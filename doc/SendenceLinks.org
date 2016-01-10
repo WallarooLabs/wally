@@ -11,7 +11,7 @@ Video
 Architecture
 https://www.youtube.com/watch?v=4n1Udu_NJXI&index=43&list=PLVjgeV_avap2arug3vIz8c6l72rvh9poV
 * FaRM: Fast Remote Memory
-Aleksandar Dragojević, Dushyanth Narayanan, Orion Hodson, and Miguel Castro
+Aleksandar Dragojević, Dushyanth Narayanan, Orion Hodson, and Miguel Castro
 2014
 Paper
 ---
@@ -305,5 +305,11 @@ Paris Carbone, Gyula Fora, Stephan Ewen, Seif Haridi, Kostas Tzoumas
 Paper
 ---
 http://arxiv.org/pdf/1506.08603.pdf
+* End-to-End Arguments in System Design
+J.H. Saltzer, D.P. Reed and D.D. Clark
+---
+Paper
+---
+http://web.mit.edu/Saltzer/www/publications/endtoend/endtoend.pdf
 
 
