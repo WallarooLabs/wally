@@ -1,3 +1,0 @@
-## Spike
-
-Destructive testing.
