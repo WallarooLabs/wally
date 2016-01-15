@@ -6,13 +6,13 @@ Destructive testing for Buffy.
 
 Each spike node can be configured to use one of the following action types. 
 
-1) duplicate
-2) drop
-3) garble
-4) delay
-5) reorder
-6) random -> for each message, selects randomly between destruction types
-7) pass
+1) duplicate  
+2) drop  
+3) garble  
+4) delay  
+5) reorder  
+6) random -> for each message, selects randomly between destruction types  
+7) pass  
 
 ## Interfacing with Buffy
 
