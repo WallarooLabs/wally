@@ -15,6 +15,7 @@ observer and verify that Buffy is operating correctly.
 
 ## Setting up with the Buffy prototype
 
+```
            +----------------------------------------------+
            |                                              |
            v               +----------------------------+ |
@@ -25,7 +26,7 @@ observer and verify that Buffy is operating correctly.
   |                |     +-+-->|Queue |-------->|Worker|+-+
   +----------------+       |   +------+         +------+|
                            +----------------------------+
-                           
+```                           
 In a simple locally running topology like the one we have above
 and assuming that Buffy's Queue is listening on port 8081 locally
 and that the worker is listening on port 8082, then you would start 
