@@ -28,23 +28,25 @@ for origin in origins:
     target = parser.get("edges", origin)
     edges.append((origin, target))
 
-# Set up nodes
 ## This won't work for non-pipeline topologies until worker.py can have multiple outputs
-for origin,target in edges:
-    action = nodes[origin]["d"]
-    o_in_ip = nodes[origin]["in_ip"]
-    o_out_ip = nodes[origin]["out_ip"]
-    subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", o_in_ip])
-    time.sleep(1)
-    subprocess.Popen(["python3.5", "../buffy/worker.py", o_in_ip, o_out_ip])
-    time.sleep(1)
-    t_in_ip = nodes[target]["in_ip"]
-    t_out_ip = nodes[target]["out_ip"]
-    subprocess.Popen(["../spike/spike", o_out_ip, t_in_ip, action, str(seed)])
-    subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", t_in_ip])
-    time.sleep(1)
-    subprocess.Popen(["python3.5", "../buffy/worker.py", t_in_ip, t_out_ip])
-    time.sleep(1)
+
+# Set up origin
+origin_node = edges[0][0]
+origin_in_ip = nodes[origin_node]["in_ip"]
+origin_out_ip = nodes[origin_node]["out_ip"]
+subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", origin_in_ip])
+subprocess.Popen(["python3.5", "../buffy/worker.py", origin_in_ip, origin_out_ip])
+
+# Set up targets
+for from,to in edges:
+    action = nodes[from]["d"]
+    from_in_ip = nodes[from]["in_ip"]
+    from_out_ip = nodes[from]["out_ip"]
+    to_in_ip = nodes[to]["in_ip"]
+    to_out_ip = nodes[to]["out_ip"]
+    subprocess.Popen(["../spike/spike", from_out_ip, to_in_ip, action, str(seed)])
+    subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", to_in_ip])
+    subprocess.Popen(["python3.5", "../buffy/worker.py", to_in_ip, to_out_ip])
 
 source_addr = nodes[edges[0][0]]["in_ip"].split(":")
 sink_addr = nodes[edges[len(edges) - 1][1]]["out_ip"].split(":")
