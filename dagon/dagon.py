@@ -108,7 +108,7 @@ for line in giles_output.readlines():
         badline_count += 1
 
 test_result = "PASSED" if badline_count == 0 else "FAILED"
-print("dagon: Test has " + test_result)
+print("\ndagon: Test has " + test_result)
 if test_result == "FAILED":
     print("dagon: Bad messages = " + str(badline_count))
 
