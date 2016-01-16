@@ -14,17 +14,25 @@ def print_buffy_node(in_ip, out_ip):
 def print_spike_node(in_ip, out_ip, action):
     print("dagon: Creating SPIKE **" + action + "** node " + in_ip + " --> " + out_ip)
 
+def print_instructions_and_exit():
+    print("USAGE: python3.5 dagon.py topology-name duration [seed]")
+    sys.exit()
 
 ## CONFIGURE
 
 # Parse command line args
-config_filename = sys.argv[1] + ".ini"
-duration = int(sys.argv[2])
-if (len(sys.argv) > 3):
-    seed = sys.argv[3]
-else:
-    seed = int(round(time.time() * 1000))
+if (sys.argv[1] == "help"):
+    print_instructions_and_exit()
 
+try:
+    config_filename = sys.argv[1] + ".ini"
+    duration = int(sys.argv[2])
+    if (len(sys.argv) > 3):
+        seed = sys.argv[3]
+    else:
+        seed = int(round(time.time() * 1000))
+except:
+    print_instructions_and_exit()
 
 # Get config info
 parser = SafeConfigParser()
