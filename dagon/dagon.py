@@ -6,19 +6,30 @@ import re
 import signal
 from configparser import SafeConfigParser
 
-PAUSE = 0.25
+PAUSE = 1
 
-parser = SafeConfigParser()
-parser.read("dagon.ini")
+def print_buffy_node(in_ip, out_ip):
+    print("dagon: Creating BUFFY node " + in_ip + " --> " + out_ip)
+
+def print_spike_node(in_ip, out_ip, action):
+    print("dagon: Creating SPIKE **" + action + "** node " + in_ip + " --> " + out_ip)
+
+
+## CONFIGURE
 
 # Parse command line args
-duration = int(sys.argv[1])
-if (len(sys.argv) > 2):
-    seed = sys.argv[2]
+config_filename = sys.argv[1] + ".ini"
+duration = int(sys.argv[2])
+if (len(sys.argv) > 3):
+    seed = sys.argv[3]
 else:
     seed = int(round(time.time() * 1000))
 
+
 # Get config info
+parser = SafeConfigParser()
+parser.read(config_filename)
+
 nodes = {}
 for section in parser.sections():
     if section == "edges": continue
@@ -33,21 +44,14 @@ for origin in origins:
     target = parser.get("edges", origin)
     edges.append((origin, target))
 
-## This won't work for non-pipeline topologies until worker.py can have multiple outputs
 
-processes = []
-devnull = open(os.devnull, "w")
-results = open("dagon.results", "w")
-results.seek(0)
-results.truncate()
+## RUN TOPOLOGY
 
-def print_buffy_node(in_ip, out_ip):
-    print("dagon: Creating buffy node " + in_ip + " --> " + out_ip)
-
-def print_spike_node(in_ip, out_ip, action):
-    print("dagon: Creating " + action + " spike node " + in_ip + " --> " + out_ip)
-
-
+processes = [] # A list of spawned subprocesses
+devnull = open(os.devnull, "w") # For suppressing stdout/stderr of subprocesses
+giles_output = open("dagon.giles", "w")
+giles_output.seek(0)
+giles_output.truncate()
 print("dagon: Creating topology...")
 
 # Set up origin
@@ -81,22 +85,25 @@ print("dagon: Source is " + source_addr[0] + ":" + source_addr[1])
 print("dagon: Sink is " + sink_addr[0] + ":" + sink_addr[1])
 
 # Set up testing framework
-print("dagon: Creating giles node writing to source and listening at sink")
-processes.append(subprocess.Popen(["../giles/giles", source_addr[0], source_addr[1], sink_addr[0], sink_addr[1]], stdout=results))
-
-
+print("dagon: Creating GILES node writing to source and listening at sink")
+processes.append(subprocess.Popen(["../giles/giles", source_addr[0], source_addr[1], sink_addr[0], sink_addr[1]], stdout=giles_output, stderr=giles_output))
 print("dagon: Test is running...")
 
+# Let test run for duration
 time.sleep(duration)
 print("dagon: Finished")
 
+# Kill subprocesses
 for process in processes:
     os.kill(process.pid, signal.SIGTERM)
 
+
+## CALCULATE TEST RESULTS
+
 badline_count = 0
-results.close()
-results = open("dagon.results", "r")
-for line in results.readlines():
+giles_output.close()
+giles_output = open("dagon.giles", "r")
+for line in giles_output.readlines():
     if re.search("bad message", line):
         badline_count += 1
 
@@ -105,6 +112,9 @@ print("dagon: Test has " + test_result)
 if test_result == "FAILED":
     print("dagon: Bad messages = " + str(badline_count))
 
-results.close()
+
+## CLEAN UP
+
+giles_output.close()
 devnull.close()
 sys.exit()
