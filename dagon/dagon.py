@@ -35,7 +35,9 @@ origin_node = edges[0][0]
 origin_in_ip = nodes[origin_node]["in_ip"]
 origin_out_ip = nodes[origin_node]["out_ip"]
 subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", origin_in_ip])
+time.sleep(1)
 subprocess.Popen(["python3.5", "../buffy/worker.py", origin_in_ip, origin_out_ip])
+time.sleep(1)
 
 # Set up targets
 for f,t in edges:
@@ -46,10 +48,14 @@ for f,t in edges:
     t_out_ip = nodes[t]["out_ip"]
     subprocess.Popen(["../spike/spike", f_out_ip, t_in_ip, action, str(seed)])
     subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", t_in_ip])
+    time.sleep(1)
     subprocess.Popen(["python3.5", "../buffy/worker.py", t_in_ip, t_out_ip])
+    time.sleep(1)
 
 source_addr = nodes[edges[0][0]]["in_ip"].split(":")
 sink_addr = nodes[edges[len(edges) - 1][1]]["out_ip"].split(":")
+print("dagon: Source is " + str(source_addr))
+print("dagon: Sink is " + str(sink_addr))
 
 # Set up testing framework
 subprocess.call(["../giles/giles", source_addr[0], source_addr[1], sink_addr[0], sink_addr[1]])
