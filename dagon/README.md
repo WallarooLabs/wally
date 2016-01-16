@@ -24,15 +24,15 @@ is the source of the topology. The target of the last edge is the sink of
 the topology. Giles outputs to the source and reads from the sink.  
 
 Edges are specified as follows:
-```node-1:node-2``` <-- creates edge from node-1 to node-2
-```node-2:node-3,node-4``` <-- creates an edge from node-2 to node-3 and an edge from node-2 to node-4
+```node-1:node-2``` <-- creates edge from node-1 to node-2  
+```node-2:node-3,node-4``` <-- creates an edge from node-2 to node-3 and an edge from node-2 to node-4  
 
 Note that multi-output nodes are not currently supported by Buffy.
 
 An individual node is configured with the following fields:
-```in_ip``` <-- input
-```out_ip``` <-- output
-```d``` <-- destructive action performed by spike node at output
+```in_ip``` <-- input  
+```out_ip``` <-- output  
+```d``` <-- destructive action performed by spike node at output  
 
 Example:
 
