@@ -46,7 +46,7 @@ actor Sender
 class EmptyNotify is UDPNotify
   let _env: Env
 
-  new create(env: Env) =>
+  new iso create(env: Env) =>
     _env = env
 
   fun ref listening(sock: UDPSocket  ref) =>
@@ -123,7 +123,7 @@ class DataGenerator is TimerNotify
   var _counter: U64
   let _sender: Sender
 
-  new create(sender: Sender) =>
+  new iso create(sender: Sender) =>
     _counter = 0
     _sender = sender
 
