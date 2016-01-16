@@ -19,6 +19,10 @@ seeds random number generators within spike.
 section types. ```[edges]``` is the section where edges are defined. Any other
 section name is interpreted as the name of a node.
 
+The order in which you specify edges matters. The origin of the first edge
+is the source of the topology. The target of the last edge is the sink of
+the topology. Giles outputs to the source and reads from the sink.  
+
 Edges are specified as follows:
 ```node-1:node-2``` <-- creates edge from node-1 to node-2
 ```node-2:node-3,node-4``` <-- creates an edge from node-2 to node-3 and an edge from node-2 to node-4
