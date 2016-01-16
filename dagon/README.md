@@ -12,3 +12,49 @@ respective folders before running dagon.
 Duration doesn't currently do anything, but it will set the duration of the run, 
 after which test results from giles will be available. The option seed parameter
 seeds random number generators within spike.
+
+## Topology Configuration
+
+```dagon.ini``` is the config file for the dagon topology. It consists of two
+section types. ```[edges]``` is the section where edges are defined. Any other
+section name is interpreted as the name of a node.
+
+Edges are specified as follows:
+```node-1:node-2``` <-- creates edge from node-1 to node-2
+```node-2:node-3,node-4``` <-- creates an edge from node-2 to node-3 and an edge from node-2 to node-4
+
+Note that multi-output nodes are not currently supported by Buffy.
+
+An individual node is configured with the following fields:
+```in_ip``` <-- input
+```out_ip``` <-- output
+```d``` <-- destructive action performed by spike node at output
+
+Example:
+
+```
+[node-1]
+in_ip = 127.0.0.1:6060
+out_ip = 127.0.0.1:6061
+d = duplicate
+
+[node-2]
+in_ip = 127.0.0.1:6062
+out_ip = 127.0.0.1:6063
+d = drop
+
+[node-3]
+in_ip = 127.0.0.1:6064
+out_ip = 127.0.0.1:6065
+d = reorder
+
+[node-4]
+in_ip = 127.0.0.1:6066
+out_ip = 127.0.0.1:6067
+d = pass
+
+[edges]
+node-1:node-2
+node-2:node-3
+node-3:node-4
+```
