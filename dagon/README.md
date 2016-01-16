@@ -10,4 +10,5 @@ respective folders before running dagon.
 ```python3.5 dagon.py duration [seed]```
 
 Duration doesn't currently do anything, but it will set the duration of the run, 
-after which test results from Giles will be available.
+after which test results from giles will be available. The option seed parameter
+seeds random number generators within spike.
