@@ -33,7 +33,6 @@ actor Sender
     _socket = UDPSocket.ip4(EmptyNotify(_env))
 
   be write(data: String) =>
-    //_env.out.print("sending")
     let put: String = "PUT:" + data
     let h: String = put.size().string(FormatHexBare)
     let l: String = h.size().string(FormatHexBare)
