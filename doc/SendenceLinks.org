@@ -312,4 +312,10 @@ Paper
 ---
 http://web.mit.edu/Saltzer/www/publications/endtoend/endtoend.pdf
 
+* Improving the packet send-time accuracy in embedded devices
+Ricky K. P. Mok, Weichao Li, and Rocky K. C. Chang
+---
+Paper
+---
+http://wan.poly.edu/pam2015/papers/115.pdf
 
