@@ -27,14 +27,14 @@ actor Main
     end
 
   fun is_valid_mode(mode: String): Bool =>
-    if ((mode == "duplicate") or
-        (mode == "drop") or
-        (mode == "garble") or
-        (mode == "delay") or
-        (mode == "reorder") or
-        (mode == "random") or
-        (mode == "pass")) then
-      true
+    match mode
+    | "duplicate"
+    | "drop"
+    | "garble"
+    | "delay"
+    | "reorder"
+    | "random"
+    | "pass" => true
     else
       false
     end
