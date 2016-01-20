@@ -4,6 +4,12 @@ Alter reality... by setting up a topology. Then test it.
 
 ## Usage
 
+You'll need to install the click package.
+
+```
+python3.5 -m pip install click
+```
+
 At the moment, you need to manually compile spike and giles in their
 respective folders before running dagon.
 
