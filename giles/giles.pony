@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "signals"
 use "time"
 
 actor Main
@@ -11,11 +12,14 @@ actor Main
       let incoming_address = env.args(3)
       let incoming_port = env.args(4)
       let store = Store(env)
-      let sender = Sender(env, outgoing_address, store)
-      UDPSocket.ip4(Receiver(env, store), incoming_address, incoming_port)
+      let socket = UDPSocket.ip4(Receiver(env, store), incoming_address, incoming_port)
+      let sender = Sender(env, socket, outgoing_address, store)
 
       let timer = Timer(DataGenerator(sender), 0, 5_000_000)
+      let timer' = timer
       timers(consume timer)
+
+      SignalHandler(TermHandler(store, sender, timers, timer') , 15)
     else
       env.out.print("wrong args")
     end
@@ -26,11 +30,11 @@ actor Sender
   let _store: Store
   let _socket: UDPSocket
 
-  new create(env: Env, to: IPAddress, store: Store) =>
+  new create(env: Env, socket: UDPSocket, to: IPAddress, store: Store) =>
     _env = env
     _to = to
     _store = store
-    _socket = UDPSocket.ip4(EmptyNotify(_env))
+    _socket = socket
 
   be write(data: String) =>
     let put: String = "PUT:" + data
@@ -42,23 +46,8 @@ actor Sender
     _socket.write(packet, _to)
     _store.sent(packet)
 
-class EmptyNotify is UDPNotify
-  let _env: Env
-
-  new iso create(env: Env) =>
-    _env = env
-
-  fun ref listening(sock: UDPSocket  ref) =>
-    try
-      (let host, let service) = sock.local_address().name()
-      _env.out.print("listening on " + host + ":" + service)
-    else
-      _env.out.print("couldn't get local address")
-    end
-
-  fun ref not_listening(sock: UDPSocket ref) =>
-    _env.out.print("couldn't listen")
-    sock.dispose()
+  be dispose() =>
+    _socket.dispose()
 
 class Receiver is UDPNotify
   let _env: Env
@@ -107,6 +96,9 @@ actor Store
       _env.out.print(msg)
     end
 
+  be dump() =>
+    _env.out.print("dump")
+
 primitive HashByteSeq
   fun hash(x: ByteSeq): U64 =>
     @hash_block[U64](x.cstring(), x.size())
@@ -132,4 +124,22 @@ class DataGenerator is TimerNotify
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     _sender.write(_next())
+    true
+
+class TermHandler is SignalNotify
+  let _store: Store
+  let _sender: Sender
+  let _timers: Timers
+  let _timer: Timer tag
+
+  new iso create(store: Store, sender: Sender, timers: Timers, timer: Timer tag) =>
+    _store = store
+    _sender = sender
+    _timers = timers
+    _timer = timer
+
+  fun ref apply(count: U32): Bool =>
+    _store.dump()
+    _sender.dispose()
+    _timers.cancel(_timer)
     true
