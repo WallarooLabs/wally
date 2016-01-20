@@ -9,7 +9,7 @@ respective folders before running dagon.
 
 Run a dagon test as follows:
 
-```python3.5 dagon.py topology-name duration [seed]```
+```python3.5 dagon.py topology-name duration [--seed seed]```
 
 ```topology-name``` corresponds to the name of the topology config file.
 For example, if your topology is called "topos", then you should name
@@ -17,7 +17,7 @@ your config file ```topos.ini```.
 
 ```duration``` sets the duration of the test.
 
-```seed``` is an optional parameter that seeds random number generators within spike.
+```--seed``` is an optional parameter that seeds random number generators within spike.
 
 ## Topology Configuration
 
