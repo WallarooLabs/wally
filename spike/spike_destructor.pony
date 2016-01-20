@@ -122,7 +122,7 @@ primitive Destructions
 
   fun garble_header(packet: Array[U8] val, sock: UDPSocket, remote_addr: IPAddress, env: Env) =>
     try
-      let spiked: Array[U8] = _spiked_header(packet)
+      let spiked: Array[U8] val = _spiked_header(packet)
       sock.write(spiked, remote_addr)
     else
       env.out.print("Couldn't garble header!")
@@ -133,7 +133,7 @@ primitive Destructions
     let payload: Array[U8] iso = recover iso BuffyProtocol.decode(consume cp) end
     recover String.append(consume payload) + "_spiked\n" end
 
-  fun _spiked_header(packet: Array[U8] val): Array[U8] ? =>
+  fun _spiked_header(packet: Array[U8] val): Array[U8] val ? =>
     let cp: Array[U8] iso = recover iso packet.clone() end
     cp(0) = cp(0) + 1
     cp
@@ -141,7 +141,7 @@ primitive Destructions
   fun delay(packet: Array[U8] val, sock: UDPSocket, remote_addr: IPAddress, env: Env, delay_in_nano: U64) =>
     let timers = Timers
 
-    let t = Timer(DelayNotify(packet, sock, remote_addr, env), delay_in_nano)
+    let t = Timer(recover DelayNotify(packet, sock, remote_addr, env) end, delay_in_nano)
     timers(consume t)
 
 class DelayNotify is TimerNotify

@@ -18,7 +18,7 @@ actor Main
       if is_valid_mode(mode) then
         let processor = Processor(mode, seed)
         let notifier = recover Notifier(env, out_ip, out_port, processor) end
-        UDPSocket.ip4(notifier, in_ip, in_port)
+        UDPSocket.ip4(consume notifier, in_ip, in_port)
       else
         env.out.print("Invalid mode. Valid options: duplicate, drop, garble, delay, reorder, random, pass")
       end
