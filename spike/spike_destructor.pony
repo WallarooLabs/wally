@@ -131,7 +131,7 @@ primitive Destructions
   fun _spiked_payload(packet: Array[U8] val): String ? =>
     let cp: Array[U8] iso = recover iso packet.clone() end
     let payload: Array[U8] iso = recover iso BuffyProtocol.decode(consume cp) end
-    recover String.append(consume payload) + "_spiked\n" end
+    recover String.append(consume payload) + "_spiked" end
 
   fun _spiked_header(packet: Array[U8] val): Array[U8] val ? =>
     let cp: Array[U8] iso = recover iso packet.clone() end
