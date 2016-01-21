@@ -1,4 +1,5 @@
 use "collections"
+use "files"
 use "net"
 use "signals"
 use "time"
@@ -75,39 +76,35 @@ class Receiver is UDPNotify
 
 actor Store
   let _env: Env
-  let _sent: HashMap[ByteSeq, ByteSeq, HashByteSeq]
-  let _received: HashMap[ByteSeq, ByteSeq, HashByteSeq]
+  let _sent: List[ByteSeq]
+  let _received: List[ByteSeq]
 
   new create(env: Env) =>
     _env = env
-    _sent = HashMap[ByteSeq, ByteSeq, HashByteSeq]
-    _received = HashMap[ByteSeq, ByteSeq, HashByteSeq]
+    _sent = List[ByteSeq](1_000_000)
+    _received = List[ByteSeq](1_000_000)
 
   be sent(msg: ByteSeq) =>
-    _sent(msg) = msg
+    _sent.push(msg)
 
   be received(msg: ByteSeq) =>
-    _received(msg) = msg
-
-    try
-      _sent(msg)
-    else
-      _env.out.print("bad message")
-      _env.out.print(msg)
-    end
+    _received.push(msg)
 
   be dump() =>
-    _env.out.print("dump")
+    try
+      let sent_handle = File(FilePath(_env.root, "sent.txt"))
+      for s in _sent.values() do
+        sent_handle.print(s)
+      end
+      sent_handle.dispose()
 
-primitive HashByteSeq
-  fun hash(x: ByteSeq): U64 =>
-    @hash_block[U64](x.cstring(), x.size())
-
-  fun eq(x: ByteSeq, y: ByteSeq): Bool =>
-    if x.size() == y.size() then
-      @memcmp[I32](x.cstring(), y.cstring(), x.size()) == 0
+      let received_handle = File(FilePath(_env.root, "received.txt"))
+      for r in _received.values() do
+        received_handle.print(r)
+      end
+      received_handle.dispose()
     else
-      false
+      _env.out.print("dump exception")
     end
 
 class DataGenerator is TimerNotify
