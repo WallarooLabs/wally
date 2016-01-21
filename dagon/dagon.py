@@ -63,7 +63,7 @@ def cli(config_file, duration, seed, infinite):
     giles_output = open("dagon.giles", "w")
     giles_output.seek(0)
     giles_output.truncate()
-    print("dagon: Creating topology...")
+    print("dagon: Creating topology with seed " + str(seed) + "...")
 
     # Set up origin
     origin_node = edges[0][0]
