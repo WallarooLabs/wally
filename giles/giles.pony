@@ -13,14 +13,14 @@ actor Main
       let incoming_address = env.args(3)
       let incoming_port = env.args(4)
       let store = Store(env)
-      let socket = UDPSocket.ip4(Receiver(env, store), incoming_address, incoming_port)
-      let sender = Sender(env, socket, outgoing_address, store)
+      let receiver = Receiver(env, store, incoming_address, incoming_port)
+      let sender = Sender(env, outgoing_address, store)
 
       let timer = Timer(DataGenerator(sender), 0, 5_000_000)
       let timer' = timer
       timers(consume timer)
 
-      SignalHandler(TermHandler(store, sender, timers, timer') , 15)
+      SignalHandler(TermHandler(store, sender, receiver, timers, timer') , 15)
     else
       env.out.print("wrong args")
     end
@@ -31,11 +31,11 @@ actor Sender
   let _store: Store
   let _socket: UDPSocket
 
-  new create(env: Env, socket: UDPSocket, to: IPAddress, store: Store) =>
+  new create(env: Env, to: IPAddress, store: Store) =>
     _env = env
-    _to = to
     _store = store
-    _socket = socket
+    _to = to
+    _socket = UDPSocket(SenderNotify)
 
   be write(data: String) =>
     let put: String = "PUT:" + data
@@ -50,7 +50,22 @@ actor Sender
   be dispose() =>
     _socket.dispose()
 
-class Receiver is UDPNotify
+class SenderNotify is UDPNotify
+  fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
+    let data': ByteSeq = consume data
+    let size = data'.size()
+    sock.write(size.string(), from)
+
+actor Receiver
+  let _socket: UDPSocket
+
+  new create(env: Env, store: Store, on_address: String, on_port: String) =>
+    _socket = UDPSocket(ReceiverNotify(env, store), on_address, on_port)
+
+  be dispose() =>
+    _socket.dispose()
+
+class ReceiverNotify is UDPNotify
   let _env: Env
   let _store: Store
 
@@ -70,8 +85,7 @@ class Receiver is UDPNotify
     _env.out.print("couldn't listen")
     sock.dispose()
 
-  fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress)
-    =>
+  fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
     _store.received(consume data)
 
 actor Store
@@ -126,17 +140,20 @@ class DataGenerator is TimerNotify
 class TermHandler is SignalNotify
   let _store: Store
   let _sender: Sender
+  let _receiver: Receiver
   let _timers: Timers
   let _timer: Timer tag
 
-  new iso create(store: Store, sender: Sender, timers: Timers, timer: Timer tag) =>
+  new iso create(store: Store, sender: Sender, receiver: Receiver, timers: Timers, timer: Timer tag) =>
     _store = store
     _sender = sender
+    _receiver = receiver
     _timers = timers
     _timer = timer
 
   fun ref apply(count: U32): Bool =>
-    _store.dump()
-    _sender.dispose()
     _timers.cancel(_timer)
+    _store.dump()
+    _receiver.dispose()
+    _sender.dispose()
     true
