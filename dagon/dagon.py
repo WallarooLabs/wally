@@ -107,22 +107,15 @@ def cli(config_file, duration, seed, infinite):
     # Kill subprocesses
     for process in processes:
         os.kill(process.pid, signal.SIGTERM)
-
+    time.sleep(5)
 
     ## CALCULATE TEST RESULTS
 
-    badline_count = 0
-    giles_output.close()
-    giles_output = open("dagon.giles", "r")
-    for line in giles_output.readlines():
-        if re.search("bad message", line):
-            badline_count += 1
+    diff_proc = subprocess.Popen(["diff", "--brief", "sent.txt", "received.txt"], stdout=subprocess.PIPE)
+    diff = diff_proc.stdout.read()
 
-    test_result = "PASSED" if badline_count == 0 else "FAILED"
+    test_result = "PASSED" if diff == "" else "FAILED"
     print("\ndagon: Test has " + test_result)
-    if test_result == "FAILED":
-        print("dagon: Bad messages = " + str(badline_count))
-
 
     ## CLEAN UP
 
