@@ -4,6 +4,10 @@ Alter reality... by setting up a topology. Then test it.
 
 ## Usage
 
+Dagon sets up and runs a topology of buffy, spike, and giles nodes
+based on an .ini file you provide. It automatically assigns ports
+and checks that your topology has a single source and a single sink.
+
 You'll need to install the click package.
 
 ```
