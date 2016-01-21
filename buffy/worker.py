@@ -53,7 +53,7 @@ def get_socket(input=True):
                                      socket.SOCK_DGRAM)
         return SOCK_OUT
 
-def udp_get(host, port):
+def udp_get(host=None, port=None):
     """Get a single message from the message queue.
     Loop forever until a message is received or an interrupt is signaled.
     """
@@ -78,7 +78,7 @@ def udp_get(host, port):
     return mq_parse.decode(output)
 
 
-def udp_put(host, port, msg):
+def udp_put(msg, host=None, port=None):
     """Put a single message into an output queue.
     """
     sock = get_socket(False)
@@ -86,40 +86,12 @@ def udp_put(host, port, msg):
                 (host, port))
 
 
-def udp_dump(host, port, msg):
+def udp_dump(msg, host=None, port=None):
     """Dump a single message into an output socket.
     """
     sock = get_socket(False)
-    sock.sendto(msg.encode(encoding='UTF-8'))
-
-
-def start(func, func_name, input_func, output_func,
-          delay=0.01, stream_out=True, file_out=False):
-
-    # Create logger
-    logger = fs.get_logger('logs/{}.{}.{}'.format(FUNC_NAME,
-                                                 '{}-{}'.format(*input_addr),
-                                                 '{}-{}'.format(*output_addr)),
-                           stream_out=True,
-                           file_out=False)
-
-
-    logger.info('Starting worker...')
-    logger.info('FUNC_NAME: %s', FUNC_NAME)
-    logger.info('input_addr: %s', input_addr)
-    logger.info('output_addr: %s', output_addr)
-
-    while True:
-        # TODO: replace with pluggable function
-        input = input_func()
-        t0 = time.time()
-        if input == '':
-            time.sleep(delay)
-            continue
-        output = func(input)
-        output_func(output)
-        dt = time.time()-t0
-        logger.info('Vertex latency: {:.09f} s'.format(dt))
+    sock.sendto(msg.encode(encoding='UTF-8'),
+                (host, port))
 
 
 @click.command()
@@ -128,7 +100,7 @@ def start(func, func_name, input_func, output_func,
 @click.option('--output-address', default='127.0.0.1:10000',
               help='Host and port pair of output address')
 @click.option('--output-type', type=click.Choice(['queue', 'socket']))
-@click.option('--console-log', is_flag=True, default=True,
+@click.option('--console-log', is_flag=True, default=False,
               help='Log output to stdout.')
 @click.option('--file-log', is_flag=True, default=False,
               help='Log output to file.')
@@ -137,7 +109,7 @@ def start(func, func_name, input_func, output_func,
 @click.option('--function', default='passthrough',
               help='The FUNC_NAME value of the function to be loaded '
               'from the functions submodule.')
-def CLI(input_address, output_address, output_type, console_log, file_log,
+def start(input_address, output_address, output_type, console_log, file_log,
         delay, function):
     # parse input and output address strings into address tuples
     input_host, input_port = [f(x) for f,x in
@@ -152,18 +124,37 @@ def CLI(input_address, output_address, output_type, console_log, file_log,
         output_func = udp_dump
 
     # Create partial functions for input and output
-    input_func = functools.partial(udp_get, input_host, input_port)
-    output_func = functools.partial(output_func, output_host, output_port)
+    input_func = functools.partial(udp_get, host=input_host, port=input_port)
+    output_func = functools.partial(output_func, host=output_host, port=output_port)
     # Import the function to be applied to data from the queue
-    func = get_function(function)
+    func, func_name = get_function(function)
+
+    # Create logger
+    logger = fs.get_logger('logs/{}.{}.{}'
+                           .format(func_name,
+                                   '{}'.format(input_address),
+                                   '{}'.format(output_address)),
+                           stream_out=console_log,
+                           file_out=file_log)
+
+
+    logger.info('Starting worker...')
+    logger.info('FUNC_NAME: %s', func_name)
+    logger.info('input_addr: %s', input_address)
+    logger.info('output_addr: %s', output_address)
 
     # Start the main loop
-    start(func=func,
-          func_name=function,
-          delay=delay,
-          stream_out=console_log,
-          file_out=file_log)
+    while True:
+        input = input_func()
+        t0 = time.time()
+        if input == '':
+            time.sleep(delay)
+            continue
+        output = func(input)
+        output_func(output)
+        dt = time.time()-t0
+        logger.info('Vertex latency: {:.09f} s'.format(dt))
 
 
 if __name__ == '__main__':
-    CLI()
+    start()
