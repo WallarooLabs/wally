@@ -153,7 +153,7 @@ class TermHandler is SignalNotify
 
   fun ref apply(count: U32): Bool =>
     _timers.cancel(_timer)
-    _store.dump()
-    _receiver.dispose()
     _sender.dispose()
+    _receiver.dispose()
+    _store.dump()
     true
