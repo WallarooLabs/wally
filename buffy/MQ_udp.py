@@ -20,9 +20,6 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
         if verb == 'PUT':
             # stamp event with current timestamp on queue insert
             QUEUE.put_nowait((time.time(), msg))
-            self.transport.sendto(
-                    mq_parse.encode('PUT {} bytes'.format(len(msg))),
-                    addr)
         elif verb == 'GET':
             try:
                 t0, msg = QUEUE.get_nowait()
