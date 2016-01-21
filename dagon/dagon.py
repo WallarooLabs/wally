@@ -9,13 +9,15 @@ from configparser import SafeConfigParser
 
 LOCAL_ADDR = "127.0.0.1"
 PAUSE = 1
-NODE_DEFAULTS = {
-    "d": "pass",
-    "p": "10"
-}
 DEVNULL = open(os.devnull, "w") # For suppressing stdout/stderr of subprocesses
 processes = [] # A list of spawned subprocesses
 
+
+def node_defaults():
+    return {
+        "d": "pass",
+        "p": "10"
+    }
 
 def remove_file(filename):
     try:
@@ -42,9 +44,10 @@ def find_unused_port():
 
 def populate_node_options(parser):
     nodes = {}
+    print(parser.sections())
     for section in parser.sections():
         if section == "edges": continue
-        nodes[section] = NODE_DEFAULTS
+        nodes[section] = node_defaults()
         options = parser.options(section)
         for option in options:
             nodes[section][option] = parser.get(section, option)
