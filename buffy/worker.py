@@ -23,7 +23,9 @@ The function file should be of the following format:
         return output
 '''
 
+import click
 import datetime
+import functools
 import logging
 import socket
 import sys
@@ -84,7 +86,14 @@ def udp_put(host, port, msg):
                 (host, port))
 
 
-def start(func, func_name, input_addr, output_addr,
+def udp_dump(host, port, msg):
+    """Dump a single message into an output socket.
+    """
+    sock = get_socket(False)
+    sock.sendto(msg.encode(encoding='UTF-8'))
+
+
+def start(func, func_name, input_func, output_func,
           delay=0.01, stream_out=True, file_out=False):
 
     # Create logger
@@ -101,42 +110,60 @@ def start(func, func_name, input_addr, output_addr,
     logger.info('output_addr: %s', output_addr)
 
     while True:
-        input = udp_get(*input_addr)
+        # TODO: replace with pluggable function
+        input = input_func()
         t0 = time.time()
         if input == '':
             time.sleep(delay)
             continue
         output = func(input)
-        udp_put(*output_addr, output)
+        output_func(output)
         dt = time.time()-t0
         logger.info('Vertex latency: {:.09f} s'.format(dt))
 
 
-def parse_cmd_args():
-    # parse command line variables
-    input_addr = (sys.argv[1].split(':')[0], int(sys.argv[1].split(':')[1]))
-    output_addr = (sys.argv[2].split(':')[0], int(sys.argv[2].split(':')[1]))
-    return input_addr, output_addr
+@click.command()
+@click.option('--input-address', default='127.0.0.1:10000',
+              help='Host and port pair of input address')
+@click.option('--output-address', default='127.0.0.1:10000',
+              help='Host and port pair of output address')
+@click.option('--output-type', type=click.Choice(['queue', 'socket']))
+@click.option('--console-log', is_flag=True, default=True,
+              help='Log output to stdout.')
+@click.option('--file-log', is_flag=True, default=False,
+              help='Log output to file.')
+@click.option('--delay', default=0.000001,
+              help='Loop delay when idling.')
+@click.option('--function', default='passthrough',
+              help='The FUNC_NAME value of the function to be loaded '
+              'from the functions submodule.')
+def CLI(input_address, output_address, output_type, console_log, file_log,
+        delay, function):
+    # parse input and output address strings into address tuples
+    input_host, input_port = [f(x) for f,x in
+                             zip((str, int), input_address.split(':'))]
+    output_host, output_port = [f(x) for f,x in
+                                zip((str, int), output_address.split(':'))]
 
 
-if __name__ == '__main__':
-    STREAM_OUT = True
-    FILE_OUT = False
-    DELAY = 0.000001
-    FUNC_NAME = 'Passthrough'
+    if output_type == 'queue':
+        output_func = udp_put
+    else:
+        output_func = udp_dump
 
+    # Create partial functions for input and output
+    input_func = functools.partial(udp_get, input_host, input_port)
+    output_func = functools.partial(output_func, output_host, output_port)
     # Import the function to be applied to data from the queue
-    func = get_function(FUNC_NAME)
-
-    # Get arguments from command line (input and output address values)
-    input_addr, output_addr = parse_cmd_args()
+    func = get_function(function)
 
     # Start the main loop
     start(func=func,
-          func_name=FUNC_NAME,
-          input_addr=input_addr,
-          output_addr=output_addr,
-          delay=DELAY,
-          stream_out=STREAM_OUT,
-          file_out=FILE_OUT)
+          func_name=function,
+          delay=delay,
+          stream_out=console_log,
+          file_out=file_log)
 
+
+if __name__ == '__main__':
+    CLI()
