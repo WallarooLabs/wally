@@ -8,14 +8,18 @@ actor Main
     var options = Options(env)
     var seed = Time.now()._2.u64()
     var destruction = "pass"
+    // Probability from 0 to 100 (corresponding to 0% to 100%)
+    var prob: U64 = 10
 
     options
+      .add("prob", "p", StringArgument)
       .add("seed", "s", StringArgument)
       .add("destruction", "d", StringArgument)
 
     try
       for option in options do
         match option
+        | ("prob", var arg: String) => prob = arg.u64()
         | ("seed", var arg: String) => seed = arg.u64()
         | ("destruction", var arg: String) =>
           if (is_valid_mode(arg)) then
@@ -41,7 +45,7 @@ actor Main
       let out_ip = out_addr(0)
       let out_port = out_addr(1)
       let mode: String val = args(3).clone()
-      let processor = Processor(mode, seed)
+      let processor = Processor(mode, seed, prob)
       let notifier = recover Notifier(env, out_ip, out_port, processor) end
       UDPSocket.ip4(consume notifier, in_ip, in_port)
     else
@@ -65,14 +69,14 @@ actor Main
 actor Processor
   let destructor: Destructor
 
-  new create(mode: String, seed: U64) =>
+  new create(mode: String, seed: U64, probability: U64) =>
     destructor = match mode
-    | "duplicate" => DuplicateDestructor(seed)
-    | "drop" => DropDestructor(seed)
-    | "garble" => GarbleDestructor(seed)
-    | "delay" => DelayDestructor(seed)
-    | "reorder" => ReorderDestructor(seed)
-    | "random" => RandomDestructor(seed)
+    | "duplicate" => DuplicateDestructor(seed, probability)
+    | "drop" => DropDestructor(seed, probability)
+    | "garble" => GarbleDestructor(seed, probability)
+    | "delay" => DelayDestructor(seed, probability)
+    | "reorder" => ReorderDestructor(seed, probability)
+    | "random" => RandomDestructor(seed, probability)
     | "pass" => PassDestructor
     else
       PassDestructor

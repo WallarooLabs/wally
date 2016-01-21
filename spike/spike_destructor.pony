@@ -53,69 +53,94 @@ class PassDestructor is Destructor
 
 class DuplicateDestructor is Destructor
   let dice: Dice
+  let prob: U64
 
-  new create(seed: U64) =>
+  new create(seed: U64, probability: U64) =>
+    prob = probability
     dice = Dice(MT(seed))
 
   fun ref spike(packet: Array[U8] val, sock: UDPSocket, remote_addr: IPAddress, env: Env) =>
-    var count = dice(1, 4)
-    while (count > 0) do
-      sock.write(packet, remote_addr)
-      count = count - 1
+    if (dice(1, 100) > prob) then
+      pass(packet, sock, remote_addr, env)
+    else
+      var count = dice(2, 4)
+      while (count > 0) do
+        sock.write(packet, remote_addr)
+        count = count - 1
+      end
     end
 
 class DropDestructor is Destructor
   let dice: Dice
+  let prob: U64
 
-  new create(seed: U64) =>
+  new create(seed: U64, probability: U64) =>
+    prob = probability
     dice = Dice(MT(seed))
 
   fun ref spike(packet: Array[U8] val, sock: UDPSocket, remote_addr: IPAddress, env: Env) =>
-    let roll = dice(1, 10)
-    if (roll > 1) then
+    if (dice(1, 100) > prob) then
       sock.write(packet, remote_addr)
     end
 
 class GarbleDestructor is Destructor
   let dice: Dice
+  let prob: U64
 
-  new create(seed: U64) =>
+  new create(seed: U64, probability: U64) =>
+    prob = probability
     dice = Dice(MT(seed))
 
   fun ref spike(packet: Array[U8] val, sock: UDPSocket, remote_addr: IPAddress, env: Env) =>
-    let roll = dice(1, 5)
-    if (roll > 1) then
-      garble_payload(packet, sock, remote_addr, env)
+    if (dice(1, 100) > prob) then
+      pass(packet, sock, remote_addr, env)
     else
-      garble_header(packet, sock, remote_addr, env)
+      let roll = dice(1, 5)
+      if (roll > 1) then
+        garble_payload(packet, sock, remote_addr, env)
+      else
+        garble_header(packet, sock, remote_addr, env)
+      end
     end
 
 class DelayDestructor is Destructor
   let dice: Dice
+  let prob: U64
 
-  new create(seed: U64) =>
+  new create(seed: U64, probability: U64) =>
+    prob = probability
     dice = Dice(MT(seed))
 
   fun ref spike(packet: Array[U8] val, sock: UDPSocket, remote_addr: IPAddress, env: Env) =>
-    let delayed_by = dice(1, 10_000) * 1_000_000
-    delay(packet, sock, remote_addr, env, delayed_by)
+    if (dice(1, 100) > prob) then
+      pass(packet, sock, remote_addr, env)
+    else
+      let delayed_by = dice(1, 10_000) * 1_000_000
+      delay(packet, sock, remote_addr, env, delayed_by)
+    end
 
 class ReorderDestructor is Destructor
   let dice: Dice
   let msg_q: Array[Array[U8] val] = Array[Array[U8] val]
+  let prob: U64
 
-  new create(seed: U64) =>
+  new create(seed: U64, probability: U64) =>
+    prob = probability
     dice = Dice(MT(seed))
 
   fun ref spike(packet: Array[U8] val, sock: UDPSocket, remote_addr: IPAddress, env: Env) =>
-    let roll = dice(1, 6).usize()
-    msg_q.push(packet)
-    if (msg_q.size() > roll) then
-      while (msg_q.size() > 0) do
-        try
-          sock.write(msg_q.pop(), remote_addr)
-        else
-          break
+    if (dice(1, 100) > prob) then
+      pass(packet, sock, remote_addr, env)
+    else
+      let roll = dice(1, 6).usize()
+      msg_q.push(packet)
+      if (msg_q.size() > roll) then
+        while (msg_q.size() > 0) do
+          try
+            sock.write(msg_q.pop(), remote_addr)
+          else
+            break
+          end
         end
       end
     end
@@ -124,23 +149,29 @@ class RandomDestructor is Destructor
   let dice: Dice
   let garbler: GarbleDestructor
   let reorderer: ReorderDestructor
+  let prob: U64
 
-  new create(seed: U64) =>
+  new create(seed: U64, probability: U64) =>
+    prob = probability
     dice = Dice(MT(seed))
-    garbler = GarbleDestructor(seed)
-    reorderer = ReorderDestructor(seed)
+    garbler = GarbleDestructor(seed, 100)
+    reorderer = ReorderDestructor(seed, 100)
 
   fun ref spike(packet: Array[U8] val, sock: UDPSocket, remote_addr: IPAddress, env: Env) =>
-    let roll = dice(1, 6)
-    match roll
-    | 1 => pass(packet, sock, remote_addr, env)
-    | 2 => duplicate(packet, sock, remote_addr, env)
-    | 3 => drop(packet, sock, remote_addr, env)
-    | 4 => garbler.spike(packet, sock, remote_addr, env)
-    | 5 =>
-      let delayed_by = dice(1, 10_000) * 1_000_000
-      delay(packet, sock, remote_addr, env, delayed_by)
-    | 6 => reorderer.spike(packet, sock, remote_addr, env)
+    if (dice(1, 100) > prob) then
+      pass(packet, sock, remote_addr, env)
+    else
+      let roll = dice(1, 6)
+      match roll
+      | 1 => pass(packet, sock, remote_addr, env)
+      | 2 => duplicate(packet, sock, remote_addr, env)
+      | 3 => drop(packet, sock, remote_addr, env)
+      | 4 => garbler.spike(packet, sock, remote_addr, env)
+      | 5 =>
+        let delayed_by = dice(1, 10_000) * 1_000_000
+        delay(packet, sock, remote_addr, env, delayed_by)
+      | 6 => reorderer.spike(packet, sock, remote_addr, env)
+      end
     end
 
 class DelayNotify is TimerNotify

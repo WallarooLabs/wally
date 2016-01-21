@@ -78,12 +78,13 @@ def cli(config_file, duration, seed, infinite):
     # Set up targets
     for f,t in edges:
         action = nodes[f]["d"]
+        probability = nodes[f]["p"]
         f_in_ip = nodes[f]["in_ip"]
         f_out_ip = nodes[f]["out_ip"]
         t_in_ip = nodes[t]["in_ip"]
         t_out_ip = nodes[t]["out_ip"]
         print_spike_node(f_out_ip, t_in_ip, action)
-        processes.append(subprocess.Popen(["../spike/spike", f_out_ip, t_in_ip, action, str(SEED)], stdout=devnull, stderr=devnull))
+        processes.append(subprocess.Popen(["../spike/spike", f_out_ip, t_in_ip, action, "--seed",  str(SEED), "--prob", probability], stdout=devnull, stderr=devnull))
         print_buffy_node(t_in_ip, t_out_ip)
         processes.append(subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", t_in_ip], stdout=devnull, stderr=devnull))
         time.sleep(PAUSE)
