@@ -30,12 +30,16 @@ intercepting packets, messing with them, and then passing them along.
 
 Command line parameters:
 
-```input_addr output_addr action_type [seed]```
+```input_addr output_addr action_type [--seed seed --prob probability]```
 
 You can start a spike node as follows:
 
-```./spike 127.0.0.1:4500 127.0.0.1:5000 garble 23423```
+```./spike 127.0.0.1:4500 127.0.0.1:5000 garble --seed 23423 --prob 20```
 
-The seed is optional. It can be provided for determinism, but keep in mind that 
+A seed can be provided for determinism, but keep in mind that 
 nothing currently accounts for parallel processing across nodes and actors, 
 so it's a pretty weak sense of "deterministic".
+
+A probability of a spike event can also be provided. This is a number from
+0 to 100 corresponding to a 0% to 100% chance that spike will act on any 
+given packet.

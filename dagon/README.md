@@ -46,6 +46,7 @@ An individual node is configured with the following fields:
 * ```in_ip```: input ip:port
 * ```out_ip```: output ip:port
 * ```d```: destructive action performed by corresponding spike node
+* ```p```: probability that the action will be taken for any given packet
 
 Example:
 
@@ -54,16 +55,19 @@ Example:
 in_ip = 127.0.0.1:6060
 out_ip = 127.0.0.1:6061
 d = duplicate
+p = 25
 
 [node-2]
 in_ip = 127.0.0.1:6062
 out_ip = 127.0.0.1:6063
 d = drop
+p = 10
 
 [node-3]
 in_ip = 127.0.0.1:6064
 out_ip = 127.0.0.1:6065
 d = reorder
+p = 25
 
 [node-4]
 in_ip = 127.0.0.1:6066

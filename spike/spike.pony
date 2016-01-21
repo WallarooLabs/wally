@@ -31,7 +31,7 @@ actor Main
         end
       end
     else
-      env.out.print("Parameters: input_address output_address destruction-mode [seed]")
+      env.out.print("Parameters: input_address output_address destruction-mode [--seed seed --prob probability]")
       return
     end
 
@@ -49,7 +49,7 @@ actor Main
       let notifier = recover Notifier(env, out_ip, out_port, processor) end
       UDPSocket.ip4(consume notifier, in_ip, in_port)
     else
-      env.out.print("Parameters: input_address output_address destruction-mode [seed]")
+      env.out.print("Parameters: input_address output_address destruction-mode [--seed seed --prob probability]")
     end
 
   fun is_valid_mode(mode: String): Bool =>
