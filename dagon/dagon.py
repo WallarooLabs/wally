@@ -13,6 +13,10 @@ CONFIG_FILENAME = ""
 DURATION = 0
 SEED = 0
 INFINITE = False
+NODE_DEFAULTS = {
+    "d": "pass",
+    "p": "10"
+}
 
 def print_buffy_node(in_ip, out_ip):
     print("dagon: Creating BUFFY node " + in_ip + " --> " + out_ip)
@@ -31,6 +35,46 @@ def find_unused_port():
     s.close()
     return LOCAL_ADDR + ":" + str(port)
 
+def populate_node_lookup(node_names):
+    lookup = {}
+    count = 0
+    for name in node_names:
+        if name == "edges": continue
+        lookup[name] = count
+        count += 1
+    return lookup
+
+def populate_reverse_lookup(node_lookup):
+    reverse_lookup = {}
+    for key,value in node_lookup.items():
+        reverse_lookup[value] = key
+    return reverse_lookup
+
+class Graph:
+    def __init__(self, node_count):
+        self.node_count = node_count
+        self.es = []
+        for i in range(node_count):
+            self.es.append([])
+
+    def add_edge(self, origin, target):
+        if target not in self.es[origin]:
+            self.es[origin].append(target)
+
+    def sinks(self):
+        sinks = []
+        for i in range(self.node_count):
+            if len(self.es[i]) == 0:
+                sinks.append(i)
+        return sinks
+
+    def sources(self):
+        converse = Graph(self.node_count)
+        for i in range(self.node_count):
+            for target in self.es[i]:
+                converse.add_edge(target, i)
+        return converse.sinks()
+
 ## CONFIGURE
 
 # Parse command line args
@@ -48,18 +92,46 @@ def cli(config_file, duration, seed):
     parser.read(CONFIG_FILENAME)
 
     nodes = {}
+    node_lookup = populate_node_lookup(parser.sections())
+    reverse_lookup = populate_reverse_lookup(node_lookup)
     for section in parser.sections():
         if section == "edges": continue
-        nodes[section] = {}
+        nodes[section] = NODE_DEFAULTS
         options = parser.options(section)
         for option in options:
             nodes[section][option] = parser.get(section, option)
 
+    graph = Graph(len(nodes))
     edges = []
     origins = parser.options("edges")
     for origin in origins:
+        if origin not in node_lookup:
+            print(origin + " must be specified as [" + origin + "] in the .ini file")
+            sys.exit()
         target = parser.get("edges", origin)
+        if target not in node_lookup:
+            print(target + " must be specified as [" + target + "] in the .ini file")
+            sys.exit()
+        graph.add_edge(node_lookup[origin], node_lookup[target])
         edges.append((origin, target))
+
+
+    sources = graph.sources()
+    if len(sources) > 1:
+        print("A topology can only have one source!")
+        sys.exit()
+    if len(sources) == 0:
+        print("A topology must have a source!")
+        sys.exit()
+    source = sources[0]
+    sinks = graph.sinks()
+    if len(sinks) > 1:
+        print("A topology can only have one sink!")
+        sys.exit()
+    if len(sinks) == 0:
+        print("A topology must have a sink!")
+        sys.exit()
+    sink = sinks[0]
 
 
     ## RUN TOPOLOGY
@@ -100,8 +172,8 @@ def cli(config_file, duration, seed):
         processes.append(subprocess.Popen(["python3.5", "../buffy/worker.py", t_in_ip, t_out_ip], stdout=devnull, stderr=devnull))
         time.sleep(PAUSE)
 
-    source_addr = nodes[edges[0][0]]["in_ip"].split(":")
-    sink_addr = nodes[edges[len(edges) - 1][1]]["out_ip"].split(":")
+    source_addr = nodes[reverse_lookup[source]]["in_ip"].split(":")
+    sink_addr = nodes[reverse_lookup[sink]]["out_ip"].split(":")
     print("dagon: Source is " + source_addr[0] + ":" + source_addr[1])
     print("dagon: Sink is " + sink_addr[0] + ":" + sink_addr[1])
 

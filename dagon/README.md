@@ -40,9 +40,9 @@ Edges are specified as follows:
 * ```node-1:node-2```: creates an edge from node-1 to node-2
 * ```node-2:node-3,node-4```: creates an edge from node-2 to node-3 and an edge from node-2 to node-4
 
-Note that multi-output nodes are not currently supported by Buffy.
+Note that multi-output nodes are not currently supported.
 
-An individual node is configured with the following fields:  
+An individual node can be configured with the following fields:  
 * ```d```: destructive action performed by corresponding spike node
 * ```p```: probability that the action will be taken for any given packet
 
@@ -62,10 +62,13 @@ d = reorder
 p = 25
 
 [node-4]
+
+[node-5]
 d = pass
 
 [edges]
 node-1:node-2
 node-2:node-3
 node-3:node-4
+node-4:node-5
 ```
