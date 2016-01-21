@@ -3,10 +3,11 @@ import sys
 import os
 import time
 import subprocess
-import re
 import signal
+import socket
 from configparser import SafeConfigParser
 
+LOCAL_ADDR = "127.0.0.1"
 PAUSE = 1
 CONFIG_FILENAME = ""
 DURATION = 0
@@ -23,6 +24,13 @@ def print_instructions_and_exit():
     print("USAGE: python3.5 dagon.py topology-name duration [seed]")
     sys.exit()
 
+def find_unused_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('localhost', 0))
+    addr, port = s.getsockname()
+    s.close()
+    return LOCAL_ADDR + ":" + str(port)
+
 ## CONFIGURE
 
 # Parse command line args
@@ -30,12 +38,10 @@ def print_instructions_and_exit():
 @click.argument("config_file")
 @click.argument("duration")
 @click.option("--seed", default=int(round(time.time() * 1000)), help="Random number seed")
-@click.option("--infinite", is_flag=True)
-def cli(config_file, duration, seed, infinite):
+def cli(config_file, duration, seed):
     CONFIG_FILENAME = config_file + ".ini"
     DURATION = int(duration)
     SEED = seed
-    INFINITE = infinite
 
     # Get config info
     parser = SafeConfigParser()
@@ -67,7 +73,9 @@ def cli(config_file, duration, seed, infinite):
 
     # Set up origin
     origin_node = edges[0][0]
+    nodes[origin_node]["in_ip"] = find_unused_port()
     origin_in_ip = nodes[origin_node]["in_ip"]
+    nodes[origin_node]["out_ip"] = find_unused_port()
     origin_out_ip = nodes[origin_node]["out_ip"]
     print_buffy_node(origin_in_ip, origin_out_ip)
     processes.append(subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", origin_in_ip], stdout=devnull, stderr=devnull))
@@ -79,9 +87,10 @@ def cli(config_file, duration, seed, infinite):
     for f,t in edges:
         action = nodes[f]["d"]
         probability = nodes[f]["p"]
-        f_in_ip = nodes[f]["in_ip"]
         f_out_ip = nodes[f]["out_ip"]
+        nodes[t]["in_ip"] = find_unused_port()
         t_in_ip = nodes[t]["in_ip"]
+        nodes[t]["out_ip"] = find_unused_port()
         t_out_ip = nodes[t]["out_ip"]
         print_spike_node(f_out_ip, t_in_ip, action)
         processes.append(subprocess.Popen(["../spike/spike", f_out_ip, t_in_ip, action, "--seed",  str(SEED), "--prob", probability], stdout=devnull, stderr=devnull))
