@@ -32,7 +32,7 @@ and assuming that Buffy's Queue is listening on port 8081 locally
 and that the worker is listening on port 8082, then you would start 
 Giles as follows:
 
-`./giles 127.0.0.1 QUEUE_INCOMING_PORT 127.0.0.1 WORKER_OUTGOING_PORT`
+`./giles 127.0.0.1:8081 127.0.0.1:8082`
 
 Once you start running Giles running, it will immediately start sending
 data on its outgoing port (to the queue's incoming port). At the moment,
