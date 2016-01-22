@@ -96,9 +96,9 @@ def udp_dump(msg, host=None, port=None):
 
 @click.command()
 @click.option('--input-address', default='127.0.0.1:10000',
-              help='Host and port pair of input address')
+              help='Host:port for input address')
 @click.option('--output-address', default='127.0.0.1:10000',
-              help='Host and port pair of output address')
+              help='Host:port for output address')
 @click.option('--output-type', type=click.Choice(['queue', 'socket']))
 @click.option('--console-log', is_flag=True, default=False,
               help='Log output to stdout.')
