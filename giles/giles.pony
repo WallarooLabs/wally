@@ -9,11 +9,14 @@ actor Main
     try
       let timers = Timers
 
-      let outgoing_address = DNS.ip4(env.args(1), env.args(2))(0)
-      let incoming_address = env.args(3)
-      let incoming_port = env.args(4)
+      let out_addr_raw = env.args(1).split(":")
+      let in_addr_raw = env.args(2).split(":")
+
+      let outgoing_address = DNS.ip4(out_addr_raw(0), out_addr_raw(1))(0)
+      let incoming_host = in_addr_raw(0)
+      let incoming_port = in_addr_raw(1)
       let store = Store(env)
-      let receiver = Receiver(env, store, incoming_address, incoming_port)
+      let receiver = Receiver(env, store, incoming_host, incoming_port)
       let sender = Sender(env, outgoing_address, store)
 
       let timer = Timer(DataGenerator(sender), 0, 5_000_000)

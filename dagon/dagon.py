@@ -32,7 +32,7 @@ def print_spike_node(in_ip, out_ip, action):
     print("dagon: Creating SPIKE **" + action + "** node " + in_ip + " --> " + out_ip)
 
 def print_instructions_and_exit():
-    print("USAGE: python3.5 dagon.py topology-name duration [seed]")
+    print("USAGE: python3.5 dagon.py topology-name duration [--seed seed]")
     sys.exit()
 
 def find_unused_port():
@@ -84,17 +84,15 @@ def start_buffy_process(in_addr, out_addr):
 
 def start_giles_process(topology):
     source_addr = topology.get_node_option(topology.source(), "in_addr")
-    sink_addr = topology.get_node_option(topology.sink(), "out_addr")
     print("dagon: Source is " + source_addr)
+    sink_addr = topology.get_node_option(topology.sink(), "out_addr")
     print("dagon: Sink is " + sink_addr)
 
-    source_ip, source_port = source_addr.split(":")
-    sink_ip, sink_port = sink_addr.split(":")
     remove_file("sent.txt")
     remove_file("received.txt")
 
     print("dagon: Creating GILES node writing to source and listening at sink")
-    giles = subprocess.Popen(["../giles/giles", source_ip, source_port, sink_ip, sink_port], stdout=DEVNULL, stderr=DEVNULL)
+    giles = subprocess.Popen(["../giles/giles", source_addr, sink_addr], stdout=DEVNULL, stderr=DEVNULL)
     processes.append(giles)
     print("-----------------------------------------------------------------------")
     print("dagon: Test is running...")
