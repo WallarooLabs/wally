@@ -75,11 +75,12 @@ def start_spike_process(f_out_ip, t_in_ip, seed, action, probability):
     print_spike_node(f_out_ip, t_in_ip, action)
     processes.append(subprocess.Popen(["../spike/spike", f_out_ip, t_in_ip, action, "--seed",  str(seed), "--prob", probability], stdout=DEVNULL, stderr=DEVNULL))
 
-def start_buffy_process(in_addr, out_addr):
+def start_buffy_process(in_addr, out_addr, is_sink):
     print_buffy_node(in_addr, out_addr)
+    output_type = "socket" if is_sink else "queue"
     processes.append(subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", in_addr], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
-    processes.append(subprocess.Popen(["python3.5", "../buffy/worker.py", in_addr, out_addr], stdout=DEVNULL, stderr=DEVNULL))
+    processes.append(subprocess.Popen(["python3.5", "../buffy/worker.py", "--input-address", in_addr, "--output-address", out_addr, "output-type", output_type, "--file-log"], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
 
 def start_giles_process(topology):
@@ -106,7 +107,12 @@ def start_nodes(topo, seed):
     for n in range(topo.size()):
         n_in_addr = topo.get_node_option(n, "in_addr")
         n_out_addr = topo.get_node_option(n, "out_addr")
-        start_buffy_process(n_in_addr, n_out_addr)
+
+        if n == topo.sink():
+            start_buffy_process(n_in_addr, n_out_addr, True)
+        else:
+            start_buffy_process(n_in_addr, n_out_addr, False)
+
         for i in topo.inputs_for(n):
             action = topo.get_node_option(i, "d")
             probability = topo.get_node_option(i, "p")

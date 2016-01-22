@@ -55,7 +55,7 @@ actor Sender
     let packet = l + h + put
 
     _socket.write(packet, _to)
-    _store.sent(packet)
+    _store.sent(data)
 
   be dispose() =>
     _socket.dispose()
