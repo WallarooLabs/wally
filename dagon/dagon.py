@@ -42,31 +42,34 @@ def find_unused_port():
     s.close()
     return LOCAL_ADDR + ":" + str(port)
 
-def populate_node_options(parser):
-    nodes = {}
-    print(parser.sections())
+def populate_node_options(parser, topology, lookup):
     for section in parser.sections():
         if section == "edges": continue
-        nodes[section] = node_defaults()
+        node_id = lookup[section]
         options = parser.options(section)
         for option in options:
-            nodes[section][option] = parser.get(section, option)
-    return nodes
+            option_val = parser.get(section, option)
+            topology.update_node(node_id, option, option_val)
 
 def populate_node_lookup(node_names):
     lookup = {}
     count = 0
     for name in node_names:
-        if name == "edges": continue
         lookup[name] = count
         count += 1
     return lookup
 
-def populate_reverse_lookup(node_lookup):
-    reverse_lookup = {}
-    for key,value in node_lookup.items():
-        reverse_lookup[value] = key
-    return reverse_lookup
+def populate_edges(parser, topology, lookup):
+    origins = parser.options("edges")
+    for origin in origins:
+        if origin not in lookup:
+            print(origin + " must be specified as [" + origin + "] in the .ini file")
+            sys.exit()
+        target = parser.get("edges", origin)
+        if target not in lookup:
+            print(target + " must be specified as [" + target + "] in the .ini file")
+            sys.exit()
+        topology.add_edge(lookup[origin], lookup[target])
 
 def start_spike_process(f_out_ip, t_in_ip, seed, action, probability):
     print_spike_node(f_out_ip, t_in_ip, action)
@@ -79,49 +82,74 @@ def start_buffy_process(in_addr, out_addr):
     processes.append(subprocess.Popen(["python3.5", "../buffy/worker.py", in_addr, out_addr], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
 
-def start_giles_process(source_addr, sink_addr):
+def start_giles_process(topology):
+    source_addr = topology.get_node_option(topology.source(), "in_addr")
+    sink_addr = topology.get_node_option(topology.sink(), "out_addr")
+    print("dagon: Source is " + source_addr)
+    print("dagon: Sink is " + sink_addr)
+
+    source_ip, source_port = source_addr.split(":")
+    sink_ip, sink_port = sink_addr.split(":")
     remove_file("sent.txt")
     remove_file("received.txt")
 
     print("dagon: Creating GILES node writing to source and listening at sink")
-    giles = subprocess.Popen(["../giles/giles", source_addr[0], source_addr[1], sink_addr[0], sink_addr[1]], stdout=DEVNULL, stderr=DEVNULL)
+    giles = subprocess.Popen(["../giles/giles", source_ip, source_port, sink_ip, sink_port], stdout=DEVNULL, stderr=DEVNULL)
     processes.append(giles)
     print("-----------------------------------------------------------------------")
     print("dagon: Test is running...")
     return giles
 
-def start_processes_for(nodes, edge_pairs, seed):
-    for f,t in edge_pairs:
-        action = nodes[f]["d"]
-        probability = nodes[f]["p"]
-        f_out_ip = nodes[f]["out_ip"]
-        nodes[t]["in_ip"] = find_unused_port()
-        t_in_ip = nodes[t]["in_ip"]
-        nodes[t]["out_ip"] = find_unused_port()
-        t_out_ip = nodes[t]["out_ip"]
+def start_nodes(topo, seed):
+    for n in range(topo.size()):
+        topo.update_node(n, "in_addr", find_unused_port())
+        topo.update_node(n, "out_addr", find_unused_port())
 
-        start_spike_process(f_out_ip, t_in_ip, seed, action, probability)
-        start_buffy_process(t_in_ip, t_out_ip)
+    for n in range(topo.size()):
+        n_in_addr = topo.get_node_option(n, "in_addr")
+        n_out_addr = topo.get_node_option(n, "out_addr")
+        start_buffy_process(n_in_addr, n_out_addr)
+        for i in topo.inputs_for(n):
+            action = topo.get_node_option(i, "d")
+            probability = topo.get_node_option(i, "p")
+            i_out_addr = topo.get_node_option(i, "out_addr")
+            start_spike_process(i_out_addr, n_in_addr, seed, action, probability)
 
 def calculate_test_results():
     diff_proc = subprocess.Popen(["diff", "--brief", "sent.txt", "received.txt"], stdout=subprocess.PIPE)
     diff = diff_proc.stdout.read()
 
-    print(diff)
     test_result = "PASSED" if diff == b'' else "FAILED"
     print("\ndagon: Test has " + test_result)
 
 
-class Graph:
+class Topology:
     def __init__(self, node_count):
-        self.node_count = node_count
-        self.es = []
-        for i in range(node_count):
-            self.es.append([])
+        self._size = node_count
+        self.out_es = []
+        self.in_es = []
+        self.nodes = []
+        for i in range(self._size):
+            self.out_es.append([])
+            self.in_es.append([])
+            self.nodes.append(node_defaults())
 
     def add_edge(self, origin, target):
-        if target not in self.es[origin]:
-            self.es[origin].append(target)
+        if target not in self.out_es[origin]:
+            self.out_es[origin].append(target)
+            self.in_es[target].append(origin)
+
+    def update_node(self, n, key, val):
+        self.nodes[n][key] = val
+
+    def get_node_option(self, n, key):
+        return self.nodes[n][key]
+
+    def outputs_for(self, n):
+        return self.out_es[n]
+
+    def inputs_for(self, n):
+        return self.in_es[n]
 
     def source(self):
         sources = self._sources()
@@ -145,17 +173,21 @@ class Graph:
 
     def _sinks(self):
         sinks = []
-        for i in range(self.node_count):
-            if len(self.es[i]) == 0:
+        for i in range(self._size):
+            if len(self.out_es[i]) == 0:
                 sinks.append(i)
         return sinks
 
     def _sources(self):
-        converse = Graph(self.node_count)
-        for i in range(self.node_count):
-            for target in self.es[i]:
-                converse.add_edge(target, i)
-        return converse._sinks()
+        sinks = []
+        for i in range(self._size):
+            if len(self.in_es[i]) == 0:
+                sinks.append(i)
+        return sinks
+
+    def size(self):
+        return self._size
+
 
 ## CONFIGURE
 
@@ -172,28 +204,13 @@ def cli(topology_name, duration, seed):
     parser = SafeConfigParser()
     parser.read(config_filename)
 
-    nodes = populate_node_options(parser)
-    node_lookup = populate_node_lookup(parser.sections())
-    reverse_lookup = populate_reverse_lookup(node_lookup)
+    # Set up topology
+    node_names = list(filter(lambda n: n != "edges", parser.sections()))
+    topology = Topology(len(node_names))
 
-    # Set up graph and edge_pairs
-    graph = Graph(len(nodes))
-    edge_pairs = []
-    origins = parser.options("edges")
-    for origin in origins:
-        if origin not in node_lookup:
-            print(origin + " must be specified as [" + origin + "] in the .ini file")
-            sys.exit()
-        target = parser.get("edges", origin)
-        if target not in node_lookup:
-            print(target + " must be specified as [" + target + "] in the .ini file")
-            sys.exit()
-        graph.add_edge(node_lookup[origin], node_lookup[target])
-        edge_pairs.append((origin, target))
-
-    source = graph.source()
-    sink = graph.sink()
-
+    node_lookup = populate_node_lookup(node_names)
+    populate_node_options(parser, topology, node_lookup)
+    populate_edges(parser, topology, node_lookup)
 
     ## RUN TOPOLOGY
 
@@ -201,24 +218,10 @@ def cli(topology_name, duration, seed):
     print("*DAGON* Creating topology '" + topology_name + "' with seed " + str(seed) + "...")
     print("-----------------------------------------------------------------------")
 
-    # Set up origin
-    origin_node = reverse_lookup[source]
-    nodes[origin_node]["in_ip"] = find_unused_port()
-    origin_in_ip = nodes[origin_node]["in_ip"]
-    nodes[origin_node]["out_ip"] = find_unused_port()
-    origin_out_ip = nodes[origin_node]["out_ip"]
+    # Start topology
+    start_nodes(topology, seed)
 
-    start_buffy_process(origin_in_ip, origin_out_ip)
-
-    # Set up rest of topology
-    start_processes_for(nodes, edge_pairs, seed)
-
-    source_addr = nodes[reverse_lookup[source]]["in_ip"].split(":")
-    sink_addr = nodes[reverse_lookup[sink]]["out_ip"].split(":")
-    print("dagon: Source is " + source_addr[0] + nodes[reverse_lookup[source]]["in_ip"])
-    print("dagon: Sink is " + nodes[reverse_lookup[sink]]["out_ip"])
-
-    giles_process = start_giles_process(source_addr, sink_addr)
+    giles_process = start_giles_process(topology)
 
     # Let test run for duration
     time.sleep(duration)
