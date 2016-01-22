@@ -84,9 +84,11 @@ def start_giles_process(source_addr, sink_addr):
     remove_file("received.txt")
 
     print("dagon: Creating GILES node writing to source and listening at sink")
-    processes.append(subprocess.Popen(["../giles/giles", source_addr[0], source_addr[1], sink_addr[0], sink_addr[1]], stdout=DEVNULL, stderr=DEVNULL))
+    giles = subprocess.Popen(["../giles/giles", source_addr[0], source_addr[1], sink_addr[0], sink_addr[1]], stdout=DEVNULL, stderr=DEVNULL)
+    processes.append(giles)
     print("-----------------------------------------------------------------------")
     print("dagon: Test is running...")
+    return giles
 
 def start_processes_for(nodes, edge_pairs, seed):
     for f,t in edge_pairs:
@@ -105,6 +107,7 @@ def calculate_test_results():
     diff_proc = subprocess.Popen(["diff", "--brief", "sent.txt", "received.txt"], stdout=subprocess.PIPE)
     diff = diff_proc.stdout.read()
 
+    print(diff)
     test_result = "PASSED" if diff == "" else "FAILED"
     print("\ndagon: Test has " + test_result)
 
@@ -215,11 +218,15 @@ def cli(topology_name, duration, seed):
     print("dagon: Source is " + source_addr[0] + nodes[reverse_lookup[source]]["in_ip"])
     print("dagon: Sink is " + nodes[reverse_lookup[sink]]["out_ip"])
 
-    start_giles_process(source_addr, sink_addr)
+    giles_process = start_giles_process(source_addr, sink_addr)
 
     # Let test run for duration
     time.sleep(duration)
     print("dagon: Finished")
+
+    # Tell giles to stop sending messages
+    os.kill(giles_process.pid, signal.SIGUSR1)
+    time.sleep(5)
 
     # Kill subprocesses
     for process in processes:

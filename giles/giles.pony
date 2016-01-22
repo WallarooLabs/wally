@@ -20,7 +20,8 @@ actor Main
       let timer' = timer
       timers(consume timer)
 
-      SignalHandler(TermHandler(store, sender, receiver, timers, timer') , 15)
+      SignalHandler(TermHandler(store, receiver) , 15)
+      SignalHandler(Usr1Handler(sender, timers, timer') , 30)
     else
       env.out.print("wrong args")
     end
@@ -36,6 +37,12 @@ actor Sender
     _store = store
     _to = to
     _socket = UDPSocket(SenderNotify)
+
+  fun foo() =>
+    None
+
+  be foofoo() =>
+    None
 
   be write(data: String) =>
     let put: String = "PUT:" + data
@@ -139,21 +146,28 @@ class DataGenerator is TimerNotify
 
 class TermHandler is SignalNotify
   let _store: Store
-  let _sender: Sender
   let _receiver: Receiver
+
+  new iso create(store: Store, receiver: Receiver) =>
+    _store = store
+    _receiver = receiver
+
+  fun ref apply(count: U32): Bool =>
+    _receiver.dispose()
+    _store.dump()
+    true
+
+class Usr1Handler is SignalNotify
+  let _sender: Sender
   let _timers: Timers
   let _timer: Timer tag
 
-  new iso create(store: Store, sender: Sender, receiver: Receiver, timers: Timers, timer: Timer tag) =>
-    _store = store
+  new iso create(sender: Sender, timers: Timers, timer: Timer tag) =>
     _sender = sender
-    _receiver = receiver
     _timers = timers
     _timer = timer
 
   fun ref apply(count: U32): Bool =>
     _timers.cancel(_timer)
     _sender.dispose()
-    _receiver.dispose()
-    _store.dump()
     true
