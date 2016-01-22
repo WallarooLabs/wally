@@ -108,7 +108,7 @@ def calculate_test_results():
     diff = diff_proc.stdout.read()
 
     print(diff)
-    test_result = "PASSED" if diff == "" else "FAILED"
+    test_result = "PASSED" if diff == b'' else "FAILED"
     print("\ndagon: Test has " + test_result)
 
 
