@@ -80,7 +80,7 @@ def start_buffy_process(in_addr, out_addr, is_sink):
     output_type = "socket" if is_sink else "queue"
     processes.append(subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", in_addr], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
-    processes.append(subprocess.Popen(["python3.5", "../buffy/worker.py", "--input-address", in_addr, "--output-address", out_addr, "output-type", output_type, "--file-log"], stdout=DEVNULL, stderr=DEVNULL))
+    processes.append(subprocess.Popen(["python3.5", "../buffy/worker.py", "--input-address", in_addr, "--output-address", out_addr, "--output-type", output_type], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
 
 def start_giles_process(topology):
