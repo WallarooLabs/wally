@@ -10,7 +10,6 @@ from configparser import SafeConfigParser
 LOCAL_ADDR = "127.0.0.1"
 PAUSE = 1
 DEVNULL = open(os.devnull, "w") # For suppressing stdout/stderr of subprocesses
-processes = [] # A list of spawned subprocesses
 
 
 def node_defaults():
@@ -73,15 +72,18 @@ def populate_edges(parser, topology, lookup):
 
 def start_spike_process(f_out_ip, t_in_ip, seed, action, probability):
     print_spike_node(f_out_ip, t_in_ip, action)
-    processes.append(subprocess.Popen(["../spike/spike", f_out_ip, t_in_ip, action, "--seed",  str(seed), "--prob", probability], stdout=DEVNULL, stderr=DEVNULL))
+    spike = subprocess.Popen(["../spike/spike", f_out_ip, t_in_ip, action, "--seed",  str(seed), "--prob", probability], stdout=DEVNULL, stderr=DEVNULL)
+    return spike
 
-def start_buffy_process(in_addr, out_addr, is_sink):
+def start_buffy_processes(in_addr, out_addr, is_sink):
+    processes = []
     print_buffy_node(in_addr, out_addr)
     output_type = "socket" if is_sink else "queue"
     processes.append(subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", in_addr], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
     processes.append(subprocess.Popen(["python3.5", "../buffy/worker.py", "--input-address", in_addr, "--output-address", out_addr, "--output-type", output_type], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
+    return processes
 
 def start_giles_process(topology):
     source_addr = topology.get_node_option(topology.source(), "in_addr")
@@ -94,12 +96,12 @@ def start_giles_process(topology):
 
     print("dagon: Creating GILES node writing to source and listening at sink")
     giles = subprocess.Popen(["../giles/giles", source_addr, sink_addr], stdout=DEVNULL, stderr=DEVNULL)
-    processes.append(giles)
     print("-----------------------------------------------------------------------")
     print("dagon: Test is running...")
     return giles
 
 def start_nodes(topo, seed):
+    processes = []
     for n in range(topo.size()):
         topo.update_node(n, "in_addr", find_unused_port())
         topo.update_node(n, "out_addr", find_unused_port())
@@ -109,15 +111,16 @@ def start_nodes(topo, seed):
         n_out_addr = topo.get_node_option(n, "out_addr")
 
         if n == topo.sink():
-            start_buffy_process(n_in_addr, n_out_addr, True)
+            processes += start_buffy_processes(n_in_addr, n_out_addr, True)
         else:
-            start_buffy_process(n_in_addr, n_out_addr, False)
+            processes += start_buffy_processes(n_in_addr, n_out_addr, False)
 
         for i in topo.inputs_for(n):
             action = topo.get_node_option(i, "d")
             probability = topo.get_node_option(i, "p")
             i_out_addr = topo.get_node_option(i, "out_addr")
-            start_spike_process(i_out_addr, n_in_addr, seed, action, probability)
+            processes.append(start_spike_process(i_out_addr, n_in_addr, seed, action, probability))
+    return processes
 
 def calculate_test_results():
     diff_proc = subprocess.Popen(["diff", "--brief", "sent.txt", "received.txt"], stdout=subprocess.PIPE)
@@ -201,6 +204,7 @@ class Topology:
 @click.argument("duration")
 @click.option("--seed", default=int(round(time.time() * 1000)), help="Random number seed")
 def cli(topology_name, duration, seed):
+    processes = [] # A list of spawned subprocesses
     config_filename = topology_name + ".ini"
     duration = int(duration)
 
@@ -223,9 +227,11 @@ def cli(topology_name, duration, seed):
     print("-----------------------------------------------------------------------")
 
     # Start topology
-    start_nodes(topology, seed)
+    topology_processes = start_nodes(topology, seed)
+    processes += topology_processes
 
     giles_process = start_giles_process(topology)
+    processes.append(giles_process)
 
     # Let test run for duration
     time.sleep(duration)
