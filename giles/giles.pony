@@ -41,12 +41,6 @@ actor Sender
     _to = to
     _socket = UDPSocket(SenderNotify)
 
-  fun foo() =>
-    None
-
-  be foofoo() =>
-    None
-
   be write(data: String) =>
     let put: String = "PUT:" + data
     let h: String = put.size().string(FormatHexBare)
