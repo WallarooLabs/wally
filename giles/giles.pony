@@ -43,8 +43,9 @@ actor Sender
 
   be write(data: String) =>
     let put: String = "PUT:" + data
-    let h: String = put.size().string(FormatHexBare)
-    let l: String = h.size().string(FormatHexBare)
+    let hexFormat = FormatSettingsInt.set_format(FormatHexBare)
+    let h: String = put.size().string(hexFormat)
+    let l: String = h.size().string(hexFormat)
 
     let packet = l + h + put
 

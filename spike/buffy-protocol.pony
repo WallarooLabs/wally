@@ -2,7 +2,8 @@ use "assert"
 
 primitive BuffyProtocol
   fun encode(msg: String): String =>
-    let hh = msg.size().string(FormatHexBare)
+    let hexFormat = FormatSettingsInt.set_format(FormatHexBare)
+    let hh = msg.size().string(hexFormat)
     let l = hh.size().string()
     l + (hh + msg)
 
