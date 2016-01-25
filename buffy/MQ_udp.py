@@ -2,12 +2,20 @@
 
 import asyncio
 import click
+import math
 import sys
 import time
 
 from functions import mq_parse
 import functions.fs as fs
+from functions import state
 
+
+
+THROUGHPUT_IN = 'throughput_in'
+THROUGHPUT_OUT = 'throughput_out'
+LATENCY_COUNT = 'latency_count'
+LATENCY_TIME = 'latency_time'
 
 class UDPMessageQueue(asyncio.DatagramProtocol):
     def connection_made(self, transport):
@@ -21,6 +29,8 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
         if verb == 'PUT':
             # stamp event with current timestamp on queue insert
             QUEUE.put_nowait((time.time(), msg))
+            # Measure throughput
+            state.add(int(time.time()), 1, THROUGHPUT_IN)
             self.transport.sendto(
                     mq_parse.encode('PUT {} bytes'.format(len(msg))),
                     addr)
@@ -32,7 +42,13 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
                 # Compute time between when event was inserted
                 # and when it was consumed by a remote client
                 dt = time.time()-t0
+                # Measure throughput
+                state.add(int(time.time()), 1, THROUGHPUT_OUT)
+                # Log latency to file
                 LOGGER.info('Edge latency: {:.09f} s'.format(dt))
+                # Add latency to histogram
+                state.add('{:.09f} s'.format(10**round(math.log(dt,10))), dt, LATENCY_TIME)
+                state.add('{:.09f} s'.format(10**round(math.log(dt,10))), 1, LATENCY_COUNT)
             except asyncio.queues.QueueEmpty:
                 self.transport.sendto(mq_parse.encode(''),
                                       addr)
@@ -92,7 +108,10 @@ def start(address, console_log, file_log):
         LOGGER.info("Shutting down")
         qsize = QUEUE.qsize()
         LOGGER.info("Queue size: {}".format(qsize))
+        LOGGER.info("Latency_count: {}".format(state.get_attribute(LATENCY_COUNT, None)))
+        LOGGER.info("Latency_time: {}".format(state.get_attribute(LATENCY_TIME, None)))
         pass
+
 
     transport.close()
     loop.close()
