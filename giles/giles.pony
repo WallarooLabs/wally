@@ -47,9 +47,12 @@ actor Sender
     let h: String = put.size().string(hexFormat)
     let l: String = h.size().string(hexFormat)
 
-    let packet = l + h + put
+    let packet = recover ref String end
+    packet.append(l)
+    packet.append(h)
+    packet.append(put)
 
-    _socket.write(packet, _to)
+    _socket.write(packet.string(), _to)
     _store.sent(data)
 
   be dispose() =>
