@@ -5,7 +5,9 @@ import time
 import subprocess
 import signal
 import socket
+import imp
 from configparser import SafeConfigParser
+
 
 LOCAL_ADDR = "127.0.0.1"
 PAUSE = 1
@@ -196,16 +198,24 @@ class Topology:
         return self._size
 
 
+def load_func(filename, funcname='func'):
+    _m = imp.load_source('_m', filename)
+    return getattr(_m, funcname)
+
 ## CONFIGURE
 
 # Parse command line args
 @click.command()
-@click.argument("topology_name")
-@click.argument("duration")
-@click.option("--seed", default=int(round(time.time() * 1000)), help="Random number seed")
-def cli(topology_name, duration, seed):
+@click.argument("topology_name")#, help="Topology name corresponding to .ini file specifying topology")
+@click.argument("duration")#, help="Duration of test run")
+@click.option("--seed", default=int(round(time.time() * 1000)))#, help="Pseudo-random number seed")
+@click.option("--function", default="passthrough")
+#               help="The FUNC_NAME value of the function to be loaded from the functions submodule.")
+def cli(topology_name, duration, seed, function):
+    success_function = load_func("./config/" + function + ".py")
+
     processes = [] # A list of spawned subprocesses
-    config_filename = topology_name + ".ini"
+    config_filename = "./config/" + topology_name + ".ini"
     duration = int(duration)
 
     # Get config info
