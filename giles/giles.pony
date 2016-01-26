@@ -42,18 +42,24 @@ actor Sender
     _socket = UDPSocket(SenderNotify)
 
   be write(data: String) =>
+    _socket.write(_build_output(data), _to)
+    _store.sent(data)
+
+  be dispose() =>
+    _socket.dispose()
+
+  fun _build_output(data: String): String =>
     let put: String = "PUT:" + data
     let hexFormat = FormatSettingsInt.set_format(FormatHexBare)
     let h: String = put.size().string(hexFormat)
     let l: String = h.size().string(hexFormat)
 
-    let packet = l + h + put
+    let packet = recover ref String end
+    packet.append(l)
+    packet.append(h)
+    packet.append(put)
 
-    _socket.write(packet, _to)
-    _store.sent(data)
-
-  be dispose() =>
-    _socket.dispose()
+    packet.string()
 
 class SenderNotify is UDPNotify
   fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
