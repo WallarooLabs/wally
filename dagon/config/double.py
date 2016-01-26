@@ -1,8 +1,8 @@
 #!/usr/bin/env python3.5
 
 """
-Passthrough
+Double
 """
 
 def func(input, output):
-    return input == output
+    return (2 * input) == output

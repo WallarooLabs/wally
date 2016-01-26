@@ -1,3 +1,4 @@
 *.giles
 received.txt
 sent.txt
+config/__pycache__/

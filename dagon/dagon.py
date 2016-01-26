@@ -87,7 +87,7 @@ def start_buffy_processes(in_addr, out_addr, is_sink):
     time.sleep(PAUSE)
     return processes
 
-def start_giles_process(topology):
+def start_giles_process(topology, test):
     source_addr = topology.get_node_option(topology.source(), "in_addr")
     print("dagon: Source is " + source_addr)
     sink_addr = topology.get_node_option(topology.sink(), "out_addr")
@@ -99,7 +99,7 @@ def start_giles_process(topology):
     print("dagon: Creating GILES node writing to source and listening at sink")
     giles = subprocess.Popen(["../giles/giles", source_addr, sink_addr], stdout=DEVNULL, stderr=DEVNULL)
     print("-----------------------------------------------------------------------")
-    print("dagon: Test is running...")
+    print("dagon: Test <<" + test + ">> is running...")
     return giles
 
 def start_nodes(topo, seed):
@@ -124,12 +124,17 @@ def start_nodes(topo, seed):
             processes.append(start_spike_process(i_out_addr, n_in_addr, seed, action, probability))
     return processes
 
-def calculate_test_results():
-    diff_proc = subprocess.Popen(["diff", "--brief", "sent.txt", "received.txt"], stdout=subprocess.PIPE)
-    diff = diff_proc.stdout.read()
+def calculate_test_results(test):
+    success_predicate = load_func("./config/" + test + ".py")
 
-    test_result = "PASSED" if diff == b'' else "FAILED"
-    print("\ndagon: Test has " + test_result)
+    with open('sent.txt') as sent, open('received.txt') as rcvd:
+        test_result = "PASSED"
+        for next_sent, next_rcvd in zip(sent, rcvd):
+            if not success_predicate(next_sent, next_rcvd):
+                test_result = "FAILED"
+                break
+        print("\ndagon: Test has " + test_result)
+
 
 
 class Topology:
@@ -206,13 +211,11 @@ def load_func(filename, funcname='func'):
 
 # Parse command line args
 @click.command()
-@click.argument("topology_name")#, help="Topology name corresponding to .ini file specifying topology")
-@click.argument("duration")#, help="Duration of test run")
-@click.option("--seed", default=int(round(time.time() * 1000)))#, help="Pseudo-random number seed")
-@click.option("--function", default="passthrough")
-#               help="The FUNC_NAME value of the function to be loaded from the functions submodule.")
-def cli(topology_name, duration, seed, function):
-    success_function = load_func("./config/" + function + ".py")
+@click.argument("topology_name")
+@click.argument("duration")
+@click.option("--seed", default=int(round(time.time() * 1000)), help="Pseudo-random number seed")
+@click.option("--test", default="identity", help="Name of condition for passing test")
+def cli(topology_name, duration, seed, test):
 
     processes = [] # A list of spawned subprocesses
     config_filename = "./config/" + topology_name + ".ini"
@@ -240,7 +243,7 @@ def cli(topology_name, duration, seed, function):
     topology_processes = start_nodes(topology, seed)
     processes += topology_processes
 
-    giles_process = start_giles_process(topology)
+    giles_process = start_giles_process(topology, test)
     processes.append(giles_process)
 
     # Let test run for duration
@@ -258,7 +261,7 @@ def cli(topology_name, duration, seed, function):
 
 
     ## CALCULATE TEST RESULTS
-    calculate_test_results()
+    calculate_test_results(test)
 
 
     ## CLEAN UP
