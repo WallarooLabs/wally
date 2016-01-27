@@ -5,4 +5,4 @@ Double
 """
 
 def func(input, output):
-    return (2 * input) == output
+    return (2 * int(input)) == int(output)

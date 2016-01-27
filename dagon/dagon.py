@@ -6,6 +6,7 @@ import subprocess
 import signal
 import socket
 import imp
+import itertools
 from configparser import SafeConfigParser
 
 
@@ -26,10 +27,10 @@ def remove_file(filename):
     except OSError:
         pass
 
-def print_buffy_node(in_ip, out_ip):
-    print("dagon: Creating BUFFY node " + in_ip + " --> " + out_ip)
+def print_buffy_node(func, in_ip, out_ip):
+    print("dagon: Creating BUFFY #" + func + "# node " + in_ip + " --> " + out_ip)
 
-def print_spike_node(in_ip, out_ip, action):
+def print_spike_node(action, in_ip, out_ip):
     print("dagon: Creating SPIKE **" + action + "** node " + in_ip + " --> " + out_ip)
 
 def print_instructions_and_exit():
@@ -73,17 +74,17 @@ def populate_edges(parser, topology, lookup):
         topology.add_edge(lookup[origin], lookup[target])
 
 def start_spike_process(f_out_ip, t_in_ip, seed, action, probability):
-    print_spike_node(f_out_ip, t_in_ip, action)
+    print_spike_node(action, f_out_ip, t_in_ip)
     spike = subprocess.Popen(["../spike/spike", f_out_ip, t_in_ip, action, "--seed",  str(seed), "--prob", probability], stdout=DEVNULL, stderr=DEVNULL)
     return spike
 
-def start_buffy_processes(in_addr, out_addr, is_sink):
+def start_buffy_processes(f, in_addr, out_addr, is_sink):
     processes = []
-    print_buffy_node(in_addr, out_addr)
+    print_buffy_node(f, in_addr, out_addr)
     output_type = "socket" if is_sink else "queue"
     processes.append(subprocess.Popen(["python3.5", "../buffy/MQ_udp.py", in_addr], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
-    processes.append(subprocess.Popen(["python3.5", "../buffy/worker.py", "--input-address", in_addr, "--output-address", out_addr, "--output-type", output_type], stdout=DEVNULL, stderr=DEVNULL))
+    processes.append(subprocess.Popen(["python3.5", "../buffy/worker.py", "--input-address", in_addr, "--output-address", out_addr, "--function", f, "--output-type", output_type], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
     return processes
 
@@ -109,13 +110,14 @@ def start_nodes(topo, seed):
         topo.update_node(n, "out_addr", find_unused_port())
 
     for n in range(topo.size()):
+        func = topo.get_node_option(n, "f")
         n_in_addr = topo.get_node_option(n, "in_addr")
         n_out_addr = topo.get_node_option(n, "out_addr")
 
         if n == topo.sink():
-            processes += start_buffy_processes(n_in_addr, n_out_addr, True)
+            processes += start_buffy_processes(func, n_in_addr, n_out_addr, True)
         else:
-            processes += start_buffy_processes(n_in_addr, n_out_addr, False)
+            processes += start_buffy_processes(func, n_in_addr, n_out_addr, False)
 
         for i in topo.inputs_for(n):
             action = topo.get_node_option(i, "d")
@@ -126,14 +128,20 @@ def start_nodes(topo, seed):
 
 def calculate_test_results(test):
     success_predicate = load_func("./config/" + test + ".py")
+    test_result = "PASSED"
+
 
     with open('sent.txt') as sent, open('received.txt') as rcvd:
-        test_result = "PASSED"
-        for next_sent, next_rcvd in zip(sent, rcvd):
-            if not success_predicate(next_sent, next_rcvd):
+        for next_sent, next_rcvd in itertools.zip_longest(sent, rcvd, fillvalue=""):
+            s = next_sent.strip("\n")
+            r = next_rcvd.strip("\n")
+            line_passes = success_predicate(s, r) if (s != "") else (r == "")
+            if not line_passes:
+                print("\nTest fails on SENT: " + s + "; RCVD: " + r)
                 test_result = "FAILED"
                 break
-        print("\ndagon: Test has " + test_result)
+
+    print("\ndagon: Test has " + test_result)
 
 
 

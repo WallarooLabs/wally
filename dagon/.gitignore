@@ -2,3 +2,4 @@
 received.txt
 sent.txt
 config/__pycache__/
+logs/
