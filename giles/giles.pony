@@ -54,12 +54,12 @@ actor Sender
     let h: String = put.size().string(hexFormat)
     let l: String = h.size().string(hexFormat)
 
-    let packet = recover ref String end
-    packet.append(l)
-    packet.append(h)
-    packet.append(put)
-
-    packet.string()
+    recover
+      String(l.size() + h.size() + put.size())
+      .append(l)
+      .append(h)
+      .append(put)
+    end
 
 class SenderNotify is UDPNotify
   fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
