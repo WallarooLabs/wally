@@ -18,7 +18,8 @@ DEVNULL = open(os.devnull, "w") # For suppressing stdout/stderr of subprocesses
 def node_defaults():
     return {
         "d": "pass",
-        "p": "10"
+        "p": "10",
+        "f": "passthrough"
     }
 
 def remove_file(filename):
