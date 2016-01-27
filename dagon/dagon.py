@@ -127,10 +127,11 @@ def start_nodes(topo, seed):
             processes.append(start_spike_process(i_out_addr, n_in_addr, seed, action, probability))
     return processes
 
-def calculate_test_results(test):
+def calculate_test_results(test, expect_mismatch):
     success_predicate = load_func("./config/" + test + ".py")
-    test_result = "PASSED"
-
+    # If we expect a mismatch, then the starting value for passes is
+    # false. On discovering a mismatch this value is toggled.
+    passes = True if not expect_mismatch else False
 
     with open('sent.txt') as sent, open('received.txt') as rcvd:
         for next_sent, next_rcvd in itertools.zip_longest(sent, rcvd, fillvalue=""):
@@ -138,11 +139,21 @@ def calculate_test_results(test):
             r = next_rcvd.strip("\n")
             line_passes = success_predicate(s, r) if (s != "") else (r == "")
             if not line_passes:
-                print("\nTest fails on SENT: " + s + "; RCVD: " + r)
-                test_result = "FAILED"
+                print("\nStopped at mismatch:")
+                print("SENT: " + s)
+                print("RCVD: " + r)
+                passes = not passes
                 break
 
-    print("\ndagon: Test has " + test_result)
+    test_result = "PASSED" if passes else "FAILED"
+    if expect_mismatch:
+        found = "at least one" if passes else "none"
+        print("\ndagon: Expected mismatch. Found " + found + ".")
+    else:
+        found = "none" if passes else "at least one"
+        print("\ndagon: Expected no mismatches. Found " + found + ".")
+
+    print("dagon: Test has " + test_result)
 
 
 
@@ -224,7 +235,8 @@ def load_func(filename, funcname='func'):
 @click.argument("duration")
 @click.option("--seed", default=int(round(time.time() * 1000)), help="Pseudo-random number seed")
 @click.option("--test", default="identity", help="Name of condition for passing test")
-def cli(topology_name, duration, seed, test):
+@click.option("--mismatch", is_flag=True, default=False, help="Signifies that we expect a mismatch.")
+def cli(topology_name, duration, seed, test, mismatch):
 
     processes = [] # A list of spawned subprocesses
     config_filename = "./config/" + topology_name + ".ini"
@@ -270,7 +282,7 @@ def cli(topology_name, duration, seed, test):
 
 
     ## CALCULATE TEST RESULTS
-    calculate_test_results(test)
+    calculate_test_results(test, mismatch)
 
 
     ## CLEAN UP
