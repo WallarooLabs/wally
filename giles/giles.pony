@@ -17,7 +17,7 @@ actor Main
       let incoming_port = in_addr_raw(1)
       let store = Store(env)
       let receiver = Receiver(env, store, incoming_host, incoming_port)
-      let sender = Sender(env, outgoing_address, store)
+      let sender = Sender(outgoing_address, store)
 
       let timer = Timer(DataGenerator(sender), 0, 5_000_000)
       let timer' = timer
@@ -31,12 +31,10 @@ actor Main
 
 actor Sender
   let _to: IPAddress
-  let _env: Env
   let _store: Store
   let _socket: UDPSocket
 
-  new create(env: Env, to: IPAddress, store: Store) =>
-    _env = env
+  new create(to: IPAddress, store: Store) =>
     _store = store
     _to = to
     _socket = UDPSocket(SenderNotify)
@@ -54,12 +52,12 @@ actor Sender
     let h: String = put.size().string(hexFormat)
     let l: String = h.size().string(hexFormat)
 
-    let packet = recover ref String end
-    packet.append(l)
-    packet.append(h)
-    packet.append(put)
-
-    packet.string()
+    recover
+      String(l.size() + h.size() + put.size())
+      .append(l)
+      .append(h)
+      .append(put)
+    end
 
 class SenderNotify is UDPNotify
   fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
