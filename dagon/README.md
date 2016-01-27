@@ -29,6 +29,11 @@ your config file ```topos.ini```.
 
 ```--seed``` is an optional parameter that seeds random number generators within spike.
 
+```--test``` is an optional parameter for specifying the test function for checking inputs
+against outputs. This function must be defined in a python source file in the ```config``` folder,
+as a function with the name and signature ```func(input, output)``` and returning a boolean.
+A function checking for identity is the default.
+
 ## Topology Configuration
 
 You configure the topology in a config file with the extension ```.ini```.
@@ -46,7 +51,8 @@ Edges are specified as follows:
 
 Note that multi-output nodes are not currently supported.
 
-An individual node can be configured with the following fields:  
+An individual node can be configured with the following fields: 
+* ```f```: function/computation performed at node
 * ```d```: destructive action performed by corresponding spike node
 * ```p```: probability that the action will be taken for any given packet
 
@@ -54,20 +60,25 @@ Example:
 
 ```
 [node-1]
+f = double
 d = duplicate
 p = 25
 
 [node-2]
+f = passthrough
 d = drop
 p = 10
 
 [node-3]
+f = passthrough
 d = reorder
 p = 25
 
 [node-4]
+f = passthrough
 
 [node-5]
+f = passthrough
 d = pass
 
 [edges]
