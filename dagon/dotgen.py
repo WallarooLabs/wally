@@ -10,6 +10,12 @@ def generate_dotfile(topology):
     file.write(prefix + '\n')
 
     # EDGES
+    source = topology.get_node_option(topology.source(), 'name')
+    sink = topology.get_node_option(topology.sink(), 'name')
+    giles_in = 'giles -> ' + source + ' [ label = "INPUT" ]'
+    file.write(giles_in + ';\n')
+    giles_out = sink + ' -> giles' + ' [ label = "OUTPUT" ]'
+    file.write(giles_out + ';\n')
     for node_id in range(topology.size()):
         origin_name = topology.get_node_option(node_id, 'name')
         spike_d = topology.get_node_option(node_id, "d")
