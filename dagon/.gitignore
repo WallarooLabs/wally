@@ -1,4 +1,8 @@
+.DS_Store
 *.giles
+*.dot
+*.png
+*.ps
 received.txt
 sent.txt
 config/__pycache__/

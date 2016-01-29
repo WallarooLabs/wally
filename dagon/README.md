@@ -25,7 +25,8 @@ Run a dagon test as follows:
 For example, if your topology is called "topos", then you should name
 your config file ```topos.ini```.
 
-```duration``` sets the duration of the test.
+```--duration``` is an optional parameter that sets the duration of the test.
+in seconds.  The default is 3.
 
 ```--seed``` is an optional parameter that seeds random number generators within spike.
 
@@ -33,6 +34,9 @@ your config file ```topos.ini```.
 against outputs. This function must be defined in a python source file in the ```config``` folder,
 as a function with the name and signature ```func(input, output)``` and returning a boolean.
 A function checking for identity is the default.
+
+```--dotgen``` is a flag that causes dagon to output a graphviz dot file of the topology.
+This flag also skips running any tests.
 
 ## Topology Configuration
 
