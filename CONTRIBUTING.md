@@ -47,3 +47,24 @@ with no logic changes or confined solely to code whose logic you touched. For
 example, changing the indentation in a file? Do not make logic changes along
 with it. Editing a line that has extra whitespace at the end? Feel free to
 remove it.
+
+## Documentation
+
+All documentation, be it textual, visual or what not, should include sources for
+that documentation so that anyone else can easily make modifications. 
+
+### Appropriate Formats
+
+* Textual
+
+We have 2 approved documentation formats. Markdown for simple documentation like
+this won't be repurposed for other mediums and org-mode format. Org-mode is used
+by more than 1 team member and makes a great end format medium. It is displayed
+with some decent formatting in GitHub and can be turned into PDF and a variety
+of other formats. Additionally, you can do basic org-mode format editing in any
+text editor although Emacs using org-mode is by far the best editor for handling
+it. 
+
+* Visual
+
+We've yet to settle on a source format for images, drawing etc.  
