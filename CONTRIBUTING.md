@@ -26,7 +26,10 @@ Pony, 4 spaces for Python.
 
 * Watch your whitespace!
 
-Use an editor plugin to remove unused trailing whitespace.
+Use an editor plugin to remove unused trailing whitespace. This includes both at
+the end of a line and at the end of a file. By the same token, remember to leave
+a single newline only line at the end of each file. It makes output files to the
+console much more pleasant.
 
 * Line Length
 
