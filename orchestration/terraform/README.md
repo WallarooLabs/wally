@@ -22,9 +22,9 @@ The cluster module depends on the `vpc` module and will fail if the `vpc` module
 
 Once the cluster has been created, you can manage it with Ansible and it's Dynamic Inventory feature (http://docs.ansible.com/ansible/intro_dynamic_inventory.html#example-aws-ec2-external-inventory-script).
 
-Installing ansible: `pip install ansible`
-Installing boto: `pip install boto`
-Setup ec2.py script: Get the linked `ec2.py` and `ec2.ini` from http://docs.ansible.com/ansible/intro_dynamic_inventory.html#example-aws-ec2-external-inventory-script and save them in the same directory. Make `ec2.py` executable.
+* Installing ansible: `pip install ansible`
+* Installing boto: `pip install boto`
+* Setup ec2.py script: Get the linked `ec2.py` and `ec2.ini` from http://docs.ansible.com/ansible/intro_dynamic_inventory.html#example-aws-ec2-external-inventory-script and save them in the same directory. Make `ec2.py` executable.
 
 Test ansible communication with the all cluster nodes:
 
