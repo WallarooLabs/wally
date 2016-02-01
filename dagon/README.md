@@ -91,3 +91,23 @@ node-2:node-3
 node-3:node-4
 node-4:node-5
 ```
+
+## Generating Image of Topology
+
+Dagon can export the topology configured in the .ini file as a graphviz .dot file.
+You can use this .dot file to generate an image of the topology.
+ 
+If you have not installed it, you will need graphviz. On OSX, run
+
+```brew install graphviz```
+
+To generate a .dot file for a topology named ```test```, run
+
+```python3.5 dagon.py test --dotgen```
+
+This will create (or overwrite) a file called ```test.dot```. Once this file
+exists, you can run
+
+```dot -Tpng test.dot -o test.png```
+
+This will output an image called test.png.
