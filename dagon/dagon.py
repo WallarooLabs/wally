@@ -1,3 +1,5 @@
+#!/usr/bin/env python3.5
+
 import click
 import sys
 import os
@@ -6,7 +8,7 @@ import subprocess
 import signal
 import socket
 import imp
-import itertools
+import giles_parser as gilesParser
 from configparser import SafeConfigParser
 
 import dotgen
@@ -30,14 +32,21 @@ def remove_file(filename):
         pass
 
 def print_buffy_node(func, in_ip, out_ip):
-    print('dagon: Creating BUFFY #' + func + '# node ' + in_ip + ' --> ' + out_ip)
+    print('dagon: Creating BUFFY #' + func + '# node ' + in_ip + ' -> ' + out_ip)
 
-def print_spike_node(action, in_ip, out_ip):
-    print('dagon: Creating SPIKE **' + action + '** node ' + in_ip + ' --> ' + out_ip)
+def print_spike_node(action, probability, in_ip, out_ip):
+    print('dagon: Creating SPIKE **' + action + ' (' + probability + '%)** node ' + in_ip + ' -> ' + out_ip)
 
 def print_instructions_and_exit():
     print('USAGE: python3.5 dagon.py topology-name duration [--seed seed]')
     sys.exit()
+
+def print_mismatch(sent, rcvd):
+    sent = '*nothing*' if sent == '' else sent
+    rcvd = '*nothing*' if rcvd == '' else rcvd
+    print('\nStopped at mismatch:')
+    print('SENT: ' + sent)
+    print('RCVD: ' + rcvd)
 
 def find_unused_port():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -77,7 +86,7 @@ def populate_edges(parser, topology, lookup):
         topology.add_edge(lookup[origin], lookup[target])
 
 def start_spike_process(f_out_ip, t_in_ip, seed, action, probability):
-    print_spike_node(action, f_out_ip, t_in_ip)
+    print_spike_node(action, probability, f_out_ip, t_in_ip)
     spike = subprocess.Popen(['../spike/spike', f_out_ip, t_in_ip, action, '--seed',  str(seed), '--prob', probability], stdout=DEVNULL, stderr=DEVNULL)
     return spike
 
@@ -117,16 +126,16 @@ def start_nodes(topo, seed):
         n_in_addr = topo.get_node_option(n, 'in_addr')
         n_out_addr = topo.get_node_option(n, 'out_addr')
 
-        if n == topo.sink():
-            processes += start_buffy_processes(func, n_in_addr, n_out_addr, True)
-        else:
-            processes += start_buffy_processes(func, n_in_addr, n_out_addr, False)
-
         for i in topo.inputs_for(n):
             action = topo.get_node_option(i, 'd')
             probability = topo.get_node_option(i, 'p')
             i_out_addr = topo.get_node_option(i, 'out_addr')
             processes.append(start_spike_process(i_out_addr, n_in_addr, seed, action, probability))
+
+        if n == topo.sink():
+            processes += start_buffy_processes(func, n_in_addr, n_out_addr, True)
+        else:
+            processes += start_buffy_processes(func, n_in_addr, n_out_addr, False)
     return processes
 
 def calculate_test_results(test, expect_mismatch):
@@ -135,17 +144,37 @@ def calculate_test_results(test, expect_mismatch):
     # false. On discovering a mismatch this value is toggled.
     passes = True if not expect_mismatch else False
 
-    with open("sent.txt") as sent, open("received.txt") as rcvd:
-        for next_sent, next_rcvd in itertools.zip_longest(sent, rcvd, fillvalue=''):
-            s = next_sent.strip('\n')
-            r = next_rcvd.strip('\n')
-            line_passes = success_predicate(s, r) if (s != '') else (r == '')
-            if not line_passes:
-                print('\nStopped at mismatch:')
-                print('SENT: ' + s)
-                print('RCVD: ' + r)
+    with open("sent.txt") as sent_file, open("received.txt") as rcvd_file:
+        sent = gilesParser.records_for(sent_file)
+        rcvd = gilesParser.records_for(rcvd_file)
+        s_len = len(sent)
+        r_len = len(rcvd)
+
+        for i in range(min(s_len, r_len)):
+            s = sent[i]['payload']
+            r = rcvd[i]['payload']
+            try:
+                line_passes = success_predicate(s, r) if (s != '') else (r == '')
+            except:
+                print("\nTest predicate error. Payload might have been garbled. Check your test function.")
                 passes = not passes
                 break
+            if not line_passes:
+                print_mismatch(s, r)
+                passes = not passes
+                break
+
+        if passes != expect_mismatch:
+            if r_len > s_len:
+                s = ''
+                r = rcvd[s_len]['payload']
+                print_mismatch(s, r)
+                passes = not passes
+            elif s_len > r_len:
+                s = sent[r_len]['payload']
+                r = ''
+                print_mismatch(s, r)
+                passes = not passes
 
     test_result = 'PASSED' if passes else 'FAILED'
     if expect_mismatch:
