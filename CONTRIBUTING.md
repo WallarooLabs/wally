@@ -51,7 +51,8 @@ remove it.
 ## Documentation
 
 All documentation, be it textual, visual or what not, should include sources for
-that documentation so that anyone else can easily make modifications. 
+that documentation so that anyone else can easily make modifications. For example,
+don't check in documentation in pdf format or as a png image.
 
 ### Appropriate Formats
 
