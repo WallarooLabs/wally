@@ -65,7 +65,7 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
 
 
 STAT_TIME_BOUNDARY = time.time()
-def process_statistics(loop, period):
+def process_statistics(call_later, period):
     global STAT_TIME_BOUNDARY
     t0 = STAT_TIME_BOUNDARY
     STAT_TIME_BOUNDARY = time.time()
@@ -79,11 +79,10 @@ def process_statistics(loop, period):
                     ('latency_count', latency_count),
                     ('throughput_in', throughput_in),
                     ('throughput_out', throughput_out))
-    loop.call_later(period, process_statistics, loop, period)
+    call_later(period, process_statistics, call_later, period)
 
 
 def emit_statistics(t0, t1, *stats):
-    print(stats)
     for name, stat in stats:
         LOGGER.info("({}, {}) {}: {}".format(t0, t1, name, stat))
 
@@ -122,9 +121,11 @@ def start(address, console_log, file_log, stats_period):
         UDPMessageQueue, local_addr=(host, port))
     transport, protocol = loop.run_until_complete(listen)
 
+    # Create the call_later partial function
+    call_later = loop.call_later
     # Start the listener event loop and run until SIGINT
     try:
-        loop.call_later(stats_period, process_statistics, loop, stats_period)
+        call_later(stats_period, process_statistics, call_later, stats_period)
         loop.run_forever()
     except KeyboardInterrupt:
         LOGGER.info("Shutting down")
