@@ -102,7 +102,27 @@ def udp_dump(msg, host=None, port=None):
                 (host, port))
 
 
-@click.command()
+def run_engine(input_func, func, output_func, delay, logger):
+    # Start the main loop
+    while True:
+        input = input_func()
+        t0 = time.time()
+        if input == '':
+            time.sleep(delay)
+            continue
+        # Measure throughput
+        state.add(int(time.time()), 1, THROUGHPUT_IN)
+        output = func(input)
+        output_func(output)
+        dt = time.time()-t0
+        # Measure throughput
+        state.add(int(time.time()), 1, THROUGHPUT_OUT)
+        # Add latency to histogram
+        state.add('{:.09f} s'.format(10**round(math.log(dt,10))), dt, LATENCY_TIME)
+        state.add('{:.09f} s'.format(10**round(math.log(dt,10))), 1, LATENCY_COUNT)
+        logger.info('Vertex latency: {:.09f} s'.format(dt))
+
+
 @click.option('--input-address', default='127.0.0.1:10000',
               help='Host:port for input address')
 @click.option('--output-address', default='127.0.0.1:10000',
@@ -152,18 +172,13 @@ def start(input_address, output_address, output_type, console_log, file_log,
     logger.info('input_addr: %s', input_address)
     logger.info('output_addr: %s', output_address)
 
-    # Start the main loop
-    while True:
-        input = input_func()
-        t0 = time.time()
-        if input == '':
-            time.sleep(delay)
-            continue
-        output = func(input)
-        output_func(output)
-        dt = time.time()-t0
-        logger.info('Vertex latency: {:.09f} s'.format(dt))
+    try:
+        run_engine(input_func, func, output_func, delay, logger)
+    except KeyboardInterrupt:
+        logger.info("Latency_count: {}".format(state.get_attribute(LATENCY_COUNT, None)))
+        logger.info("Latency_time: {}".format(state.get_attribute(LATENCY_TIME, None)))
 
 
 if __name__ == '__main__':
     start()
+
