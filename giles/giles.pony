@@ -96,7 +96,7 @@ class ReceiverNotify is UDPNotify
     sock.dispose()
 
   fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
-    let at = Time.millis()
+    let at = Time.micros()
     _store.received(consume data, at)
 
 actor Store
