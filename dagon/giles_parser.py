@@ -11,15 +11,18 @@ def payload_for(line):
 
 def fields_for(line):
     lst = fields_list_for(line)
+    if len(lst) == 0: raise Exception()
     return {
-        "timestamp": lst[0],
+        "timestamp": int(lst[0]),
         "payload": lst[1]
     }
 
 def records_for(file):
     records = []
     for line in file.readlines():
-        fields = fields_for(line)
-        if len(fields) == 0: continue
-        records.append(fields_for(line))
+        try:
+            fields = fields_for(line)
+            records.append(fields_for(line))
+        except:
+            continue
     return records

@@ -35,6 +35,8 @@ against outputs. This function must be defined in a python source file in the ``
 as a function with the name and signature ```func(input, output)``` and returning a boolean.
 A function checking for identity is the default.
 
+```--metrics``` is a flag that causes dagon to display metrics (throughput/latency)
+
 ```--dotgen``` is a flag that causes dagon to output a graphviz dot file of the topology.
 This flag also skips running any tests.
 

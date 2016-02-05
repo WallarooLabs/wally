@@ -9,6 +9,7 @@ import signal
 import socket
 import imp
 import giles_parser as gilesParser
+import metrics
 from configparser import SafeConfigParser
 
 import dotgen
@@ -138,11 +139,13 @@ def start_nodes(topo, seed):
             processes += start_buffy_processes(func, n_in_addr, n_out_addr, False)
     return processes
 
-def calculate_test_results(test, expect_mismatch):
+def calculate_test_results(test, expect_mismatch, display_metrics):
     success_predicate = load_func('./config/' + test + '.py')
     # If we expect a mismatch, then the starting value for passes is
     # false. On discovering a mismatch this value is toggled.
     passes = True if not expect_mismatch else False
+    sent = []
+    rcvd = []
 
     with open("sent.txt") as sent_file, open("received.txt") as rcvd_file:
         sent = gilesParser.records_for(sent_file)
@@ -185,8 +188,9 @@ def calculate_test_results(test, expect_mismatch):
         print('\ndagon: Expected no mismatches. Found ' + found + '.')
 
     print('dagon: Test has ' + test_result)
-
-
+    if display_metrics and passes and not expect_mismatch:
+        metrics.print_throughput(rcvd)
+        metrics.print_latency_histogram(sent, rcvd)
 
 class Topology:
     def __init__(self, name, node_count):
@@ -269,7 +273,8 @@ def load_func(filename, funcname="func"):
 @click.option('--seed', default=int(round(time.time() * 1000)), help='Pseudo-random number seed')
 @click.option('--test', default='identity', help='Name of condition for passing test')
 @click.option('--mismatch', is_flag=True, default=False, help='Signifies that we expect a mismatch.')
-def cli(topology_name, gendot, duration, seed, test, mismatch):
+@click.option('--metrics', is_flag=True, default=False, help='Print throughput and latency metrics.')
+def cli(topology_name, gendot, duration, seed, test, mismatch, metrics):
     processes = [] # A list of spawned subprocesses
     duration = int(duration)
     config_filename = './config/' + topology_name + '.ini'
@@ -318,7 +323,7 @@ def cli(topology_name, gendot, duration, seed, test, mismatch):
 
 
     ## CALCULATE TEST RESULTS
-    calculate_test_results(test, mismatch)
+    calculate_test_results(test, mismatch, metrics)
 
 
     ## CLEAN UP
