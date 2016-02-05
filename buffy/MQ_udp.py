@@ -45,7 +45,6 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
                 # Measure throughput
                 state.add(int(time.time()), 1, THROUGHPUT_OUT)
                 # Log latency to file
-                LOGGER.info('Edge latency: {:.09f} s'.format(dt))
                 # Add latency to histogram
                 state.add('{:.09f} s'.format(10**round(math.log(dt,10))),
                           dt, LATENCY_TIME)
@@ -60,7 +59,6 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
                 addr)
 
     def connection_lost(self, exc):
-        LOGGER.info('\n'.join(('connection closed?', str(exc))))
         self.transport = None
 
 

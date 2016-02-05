@@ -121,7 +121,6 @@ def run_engine(input_func, func, output_func, delay, logger):
         # Add latency to histogram
         state.add('{:.09f} s'.format(10**round(math.log(dt,10))), dt, LATENCY_TIME)
         state.add('{:.09f} s'.format(10**round(math.log(dt,10))), 1, LATENCY_COUNT)
-        logger.info('Vertex latency: {:.09f} s'.format(dt))
 
 
 STAT_TIME_BOUNDARY = time.time()
