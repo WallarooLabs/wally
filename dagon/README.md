@@ -11,7 +11,7 @@ and checks that your topology has a single source and a single sink.
 You'll need to install the click package.
 
 ```
-python3.5 -m pip install click
+python3 -m pip install click
 ```
 
 At the moment, you need to manually compile spike and giles in their
@@ -19,7 +19,7 @@ respective folders before running dagon.
 
 Run a dagon test as follows:
 
-```python3.5 dagon.py topology-name [--duration duration --seed seed --test test-function --dotgen]```
+```python3 dagon.py topology-name [--duration duration --seed seed --test test-function --dotgen]```
 
 ```topology-name``` corresponds to the name of the topology config file.
 For example, if your topology is called "topos", then you should name
@@ -103,7 +103,7 @@ If you have not installed it, you will need graphviz. On OSX, run
 
 To generate a .dot file for a topology named ```test```, run
 
-```python3.5 dagon.py test --dotgen```
+```python3 dagon.py test --dotgen```
 
 This will create (or overwrite) a file called ```test.dot```. Once this file
 exists, you can run

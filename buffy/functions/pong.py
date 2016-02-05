@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.5
+#!/usr/bin/env python3
 
 """
 Pong
@@ -13,10 +13,10 @@ class UnknownInputError(Exception):
 
 
 def func(input):
-    if input == 'ping':
-        return 'pong'
-    elif input == 'pong':
-        return 'ping'
+    if input == '14ping':
+        return '14pong'
+    elif input == '14pong':
+        return '14ping'
     else:
         raise UnknownInputError('Unknown input: {!r}'.format(input))
 
