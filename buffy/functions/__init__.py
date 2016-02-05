@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.5
+#!/usr/bin/env python3
 
 __FUNCS__ = {}
 
@@ -14,3 +14,5 @@ __FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
 from .passthrough import FUNC_NAME, func
 __FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
 
+from .double import FUNC_NAME, func
+__FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.5
+#!/usr/bin/env python3
 
 '''
 Worker takes a MQ node as input, a MQ node as output, and a filename from
@@ -11,7 +11,7 @@ It then runs in a rate-limiting loop performing the following steps in order:
 
 The function file should be of the following format:
 
-    #!/usr/bin/env python3.5
+    #!/usr/bin/env python3
 
     def func(input):
         # process data

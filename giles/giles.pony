@@ -17,7 +17,7 @@ actor Main
       let incoming_port = in_addr_raw(1)
       let store = Store(env)
       let receiver = Receiver(env, store, incoming_host, incoming_port)
-      let sender = Sender(env, outgoing_address, store)
+      let sender = Sender(outgoing_address, store)
 
       let timer = Timer(DataGenerator(sender), 0, 5_000_000)
       let timer' = timer
@@ -31,29 +31,34 @@ actor Main
 
 actor Sender
   let _to: IPAddress
-  let _env: Env
   let _store: Store
   let _socket: UDPSocket
 
-  new create(env: Env, to: IPAddress, store: Store) =>
-    _env = env
+  new create(to: IPAddress, store: Store) =>
     _store = store
     _to = to
     _socket = UDPSocket(SenderNotify)
 
   be write(data: String) =>
+    let at =  Time.micros()
+    _socket.write(_build_output(data), _to)
+    _store.sent(data, at)
+
+  be dispose() =>
+    _socket.dispose()
+
+  fun _build_output(data: String): String =>
     let put: String = "PUT:" + data
     let hexFormat = FormatSettingsInt.set_format(FormatHexBare)
     let h: String = put.size().string(hexFormat)
     let l: String = h.size().string(hexFormat)
 
-    let packet = l + h + put
-
-    _socket.write(packet, _to)
-    _store.sent(data)
-
-  be dispose() =>
-    _socket.dispose()
+    recover
+      String(l.size() + h.size() + put.size())
+      .append(l)
+      .append(h)
+      .append(put)
+    end
 
 class SenderNotify is UDPNotify
   fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
@@ -91,39 +96,51 @@ class ReceiverNotify is UDPNotify
     sock.dispose()
 
   fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
-    _store.received(consume data)
+    let at = Time.millis()
+    _store.received(consume data, at)
 
 actor Store
   let _env: Env
-  let _sent: List[ByteSeq]
-  let _received: List[ByteSeq]
+  let _sent: List[(ByteSeq, U64)]
+  let _received: List[(ByteSeq, U64)]
 
   new create(env: Env) =>
     _env = env
-    _sent = List[ByteSeq](1_000_000)
-    _received = List[ByteSeq](1_000_000)
+    _sent = List[(ByteSeq, U64)](1_000_000)
+    _received = List[(ByteSeq, U64)](1_000_000)
 
-  be sent(msg: ByteSeq) =>
-    _sent.push(msg)
+  be sent(msg: ByteSeq, at: U64) =>
+    _sent.push((msg, at))
 
-  be received(msg: ByteSeq) =>
-    _received.push(msg)
+  be received(msg: ByteSeq, at: U64) =>
+    _received.push((msg, at))
 
   be dump() =>
     try
       let sent_handle = File(FilePath(_env.root, "sent.txt"))
       for s in _sent.values() do
-        sent_handle.print(s)
+        sent_handle.print(_format_output(s))
       end
       sent_handle.dispose()
 
       let received_handle = File(FilePath(_env.root, "received.txt"))
       for r in _received.values() do
-        received_handle.print(r)
+        received_handle.print(_format_output(r))
       end
       received_handle.dispose()
     else
       _env.out.print("dump exception")
+    end
+
+  fun _format_output(tuple: (ByteSeq, U64)): String =>
+    let time: String = tuple._2.string()
+    let payload = tuple._1
+
+    recover
+      String(time.size() + ", ".size() + payload.size())
+      .append(time)
+      .append(", ")
+      .append(payload)
     end
 
 class DataGenerator is TimerNotify

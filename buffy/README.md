@@ -6,7 +6,7 @@ with which to build stream processing topologies with tunable guarantees.
 
 ## Requirements:
 
-1. Python 3.5
+1. Python 3.4 or higher
 
 
 ## Running the stream-py prototype
@@ -14,16 +14,16 @@ with which to build stream processing topologies with tunable guarantees.
 
 ### Starting a Message Queue Node
 
-    python3.5 MQ_udp.py --address=<host>:<port>>
+    python3 MQ_udp.py --address=<host>:<port>>
 
 ### Starting a Worker (pong) Node
 
-    python3.5 worker.py --input-address=<host>:port --output-address=<host>:<port> --output-type=queue --console-log --function=pong
+    python3 worker.py --input-address=<host>:port --output-address=<host>:<port> --output-type=queue --console-log --function=pong
 
 
 ### Seeding the first 'ping' message to start the game
 
-    python3.5 udp-client.py <mq_host>:<mq_port> PUT:pong
+    python3 udp-client.py <mq_host>:<mq_port> PUT:pong
 
 
 ## The Message Queue Node:
@@ -62,8 +62,8 @@ connected outputs either deterministically or with random sampling.
 In its simplest form, the game requires only one edge (a message queue) and one node (a worker).
 We can set up the graph manually by running the following commands in two separate shells:
 
-    python3.5 MQ_udp.py --address=127.0.0.1:10000 --console-log
-    python3.5 worker.py --input-address=127.0.0.1:10000 --output-address=127.0.0.1:10000 --output-type=queue --console-log --function=pong 
+    python3 MQ_udp.py --address=127.0.0.1:10000 --console-log
+    python3 worker.py --input-address=127.0.0.1:10000 --output-address=127.0.0.1:10000 --output-type=queue --console-log --function=pong 
 
 This creates a graph with one node connected to itself via one edge:
 
@@ -74,7 +74,7 @@ This creates a graph with one node connected to itself via one edge:
 We begin the game by using an external client to add either a 'ping' or a 'pong' message to the 
 message queue:
 
-    python3.5 udp-client.py 127.0.0.1:10000 PUT:ping
+    python3 udp-client.py 127.0.0.1:10000 PUT:ping
 
 Note that this will generate logs per node in the `logs` directory, and these will grow rapidly. 
 
