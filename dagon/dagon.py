@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.5
+#!/usr/bin/env python3
 
 import click
 import sys
@@ -39,7 +39,7 @@ def print_spike_node(action, probability, in_ip, out_ip):
     print('dagon: Creating SPIKE **' + action + ' (' + probability + '%)** node ' + in_ip + ' -> ' + out_ip)
 
 def print_instructions_and_exit():
-    print('USAGE: python3.5 dagon.py topology-name duration [--seed seed]')
+    print('USAGE: python3 dagon.py topology-name duration [--seed seed]')
     sys.exit()
 
 def print_mismatch(sent, rcvd):
@@ -95,9 +95,9 @@ def start_buffy_processes(f, in_addr, out_addr, is_sink):
     processes = []
     print_buffy_node(f, in_addr, out_addr)
     output_type = 'socket' if is_sink else 'queue'
-    processes.append(subprocess.Popen(['python3.5', '../buffy/MQ_udp.py', in_addr], stdout=DEVNULL, stderr=DEVNULL))
+    processes.append(subprocess.Popen(['python3', '../buffy/MQ_udp.py', in_addr], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
-    processes.append(subprocess.Popen(['python3.5', '../buffy/worker.py', '--input-address', in_addr, '--output-address', out_addr, '--function', f, '--output-type', output_type], stdout=DEVNULL, stderr=DEVNULL))
+    processes.append(subprocess.Popen(['python3', '../buffy/worker.py', '--input-address', in_addr, '--output-address', out_addr, '--function', f, '--output-type', output_type], stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
     return processes
 
