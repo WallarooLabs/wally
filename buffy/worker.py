@@ -27,6 +27,7 @@ import click
 import datetime
 import functools
 import logging
+import math
 import socket
 import sys
 import time
@@ -34,6 +35,13 @@ import time
 import functions.mq_parse as mq_parse
 import functions.fs as fs
 from functions import get_function
+from functions import state
+
+
+THROUGHPUT_IN = 'throughput_in'
+THROUGHPUT_OUT = 'throughput_out'
+LATENCY_COUNT = 'latency_count'
+LATENCY_TIME = 'latency_time'
 
 
 SOCK_IN = None
@@ -109,6 +117,7 @@ def udp_dump(msg, host=None, port=None):
 @click.option('--function', default='passthrough',
               help='The FUNC_NAME value of the function to be loaded '
               'from the functions submodule.')
+@click.command()
 def start(input_address, output_address, output_type, console_log, file_log,
         delay, function):
     # parse input and output address strings into address tuples
