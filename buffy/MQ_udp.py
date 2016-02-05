@@ -62,13 +62,6 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
         self.transport = None
 
 
-def parse_cmd_args():
-    # Get host and port from command line
-    host = sys.argv[1].split(':')[0]
-    port = int(sys.argv[1].split(':')[1])
-    return host, port
-
-
 @click.command()
 @click.option('--address', default='127.0.0.1:10000',
               help='Address to listen on')
