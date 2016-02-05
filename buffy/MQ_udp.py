@@ -47,8 +47,10 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
                 # Log latency to file
                 LOGGER.info('Edge latency: {:.09f} s'.format(dt))
                 # Add latency to histogram
-                state.add('{:.09f} s'.format(10**round(math.log(dt,10))), dt, LATENCY_TIME)
-                state.add('{:.09f} s'.format(10**round(math.log(dt,10))), 1, LATENCY_COUNT)
+                state.add('{:.09f} s'.format(10**round(math.log(dt,10))),
+                          dt, LATENCY_TIME)
+                state.add('{:.09f} s'.format(10**round(math.log(dt,10))),
+                          1, LATENCY_COUNT)
             except asyncio.queues.QueueEmpty:
                 self.transport.sendto(mq_parse.encode(''),
                                       addr)
@@ -62,6 +64,30 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
         self.transport = None
 
 
+STAT_TIME_BOUNDARY = time.time()
+def process_statistics(loop, period):
+    global STAT_TIME_BOUNDARY
+    t0 = STAT_TIME_BOUNDARY
+    STAT_TIME_BOUNDARY = time.time()
+    latency_time = state.pop(LATENCY_TIME, None)
+    latency_count = state.pop(LATENCY_COUNT, None)
+    throughput_in = state.pop(THROUGHPUT_IN, None)
+    throughput_out = state.pop(THROUGHPUT_OUT, None)
+
+    emit_statistics(t0, STAT_TIME_BOUNDARY,
+                    ('latency_time', latency_time),
+                    ('latency_count', latency_count),
+                    ('throughput_in', throughput_in),
+                    ('throughput_out', throughput_out))
+    loop.call_later(period, process_statistics, loop, period)
+
+
+def emit_statistics(t0, t1, *stats):
+    print(stats)
+    for name, stat in stats:
+        LOGGER.info("({}, {}) {}: {}".format(t0, t1, name, stat))
+
+
 @click.command()
 @click.option('--address', default='127.0.0.1:10000',
               help='Address to listen on')
@@ -69,7 +95,9 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
               help='Log output to stdout.')
 @click.option('--file-log', is_flag=True, default=False,
               help='Log output to file.')
-def start(address, console_log, file_log):
+@click.option('--stats-period', default=60,
+              help='The period over which stats are measured.')
+def start(address, console_log, file_log, stats_period):
     # Parse address string to host and port str:int pair
     host, port = [f(x) for f,x in
                   zip((str, int), address.split(':'))]
@@ -96,13 +124,16 @@ def start(address, console_log, file_log):
 
     # Start the listener event loop and run until SIGINT
     try:
+        loop.call_later(stats_period, process_statistics, loop, stats_period)
         loop.run_forever()
     except KeyboardInterrupt:
         LOGGER.info("Shutting down")
         qsize = QUEUE.qsize()
         LOGGER.info("Queue size: {}".format(qsize))
-        LOGGER.info("Latency_count: {}".format(state.get_attribute(LATENCY_COUNT, None)))
-        LOGGER.info("Latency_time: {}".format(state.get_attribute(LATENCY_TIME, None)))
+        LOGGER.info("Latency_count: {}".format(
+            state.get_attribute(LATENCY_COUNT, None)))
+        LOGGER.info("Latency_time: {}".format(
+            state.get_attribute(LATENCY_TIME, None)))
         pass
 
 
