@@ -27,13 +27,22 @@ import click
 import datetime
 import functools
 import logging
+import math
 import socket
 import sys
 import time
+from threading import Timer
 
 import functions.mq_parse as mq_parse
 import functions.fs as fs
 from functions import get_function
+from functions import state
+
+
+THROUGHPUT_IN = 'throughput_in'
+THROUGHPUT_OUT = 'throughput_out'
+LATENCY_COUNT = 'latency_count'
+LATENCY_TIME = 'latency_time'
 
 
 SOCK_IN = None
@@ -94,7 +103,53 @@ def udp_dump(msg, host=None, port=None):
                 (host, port))
 
 
-@click.command()
+def run_engine(input_func, func, output_func, delay, logger):
+    # Start the main loop
+    while True:
+        input = input_func()
+        t0 = time.time()
+        if input == '':
+            time.sleep(delay)
+            continue
+        # Measure throughput
+        state.add(int(time.time()), 1, THROUGHPUT_IN)
+        output = func(input)
+        output_func(output)
+        dt = time.time()-t0
+        # Measure throughput
+        state.add(int(time.time()), 1, THROUGHPUT_OUT)
+        # Add latency to histogram
+        state.add('{:.09f} s'.format(10**round(math.log(dt,10))), dt, LATENCY_TIME)
+        state.add('{:.09f} s'.format(10**round(math.log(dt,10))), 1, LATENCY_COUNT)
+
+
+STAT_TIME_BOUNDARY = time.time()
+def process_statistics(call_later, period):
+    global STAT_TIME_BOUNDARY
+    t0 = STAT_TIME_BOUNDARY
+    STAT_TIME_BOUNDARY = time.time()
+    latency_time = state.pop(LATENCY_TIME, None)
+    latency_count = state.pop(LATENCY_COUNT, None)
+    throughput_in = state.pop(THROUGHPUT_IN, None)
+    throughput_out = state.pop(THROUGHPUT_OUT, None)
+
+    emit_statistics(t0, STAT_TIME_BOUNDARY,
+                    ('latency_time', latency_time),
+                    ('latency_count', latency_count),
+                    ('throughput_in', throughput_in),
+                    ('throughput_out', throughput_out))
+    timer = call_later(period, process_statistics, (call_later, period))
+    timer.daemon = True
+    timer.start()
+
+
+def emit_statistics(t0, t1, *stats):
+    for name, stat in stats:
+        LOGGER.info("({}, {}) {}: {}".format(t0, t1, name, stat))
+
+
+
+
 @click.option('--input-address', default='127.0.0.1:10000',
               help='Host:port for input address')
 @click.option('--output-address', default='127.0.0.1:10000',
@@ -109,8 +164,11 @@ def udp_dump(msg, host=None, port=None):
 @click.option('--function', default='passthrough',
               help='The FUNC_NAME value of the function to be loaded '
               'from the functions submodule.')
+@click.option('--stats-period', default=60,
+              help='The period over which stats are measured.')
+@click.command()
 def start(input_address, output_address, output_type, console_log, file_log,
-        delay, function):
+        delay, function, stats_period):
     # parse input and output address strings into address tuples
     input_host, input_port = [f(x) for f,x in
                              zip((str, int), input_address.split(':'))]
@@ -129,7 +187,11 @@ def start(input_address, output_address, output_type, console_log, file_log,
     # Import the function to be applied to data from the queue
     func, func_name = get_function(function)
 
+    # Create delayed callback alias from Timer
+    call_later = Timer
+
     # Create logger
+    global LOGGER
     logger = fs.get_logger('logs/{}.{}.{}'
                            .format(func_name,
                                    '{}'.format(input_address),
@@ -142,19 +204,20 @@ def start(input_address, output_address, output_type, console_log, file_log,
     logger.info('FUNC_NAME: %s', func_name)
     logger.info('input_addr: %s', input_address)
     logger.info('output_addr: %s', output_address)
+    LOGGER = logger
 
-    # Start the main loop
-    while True:
-        input = input_func()
-        t0 = time.time()
-        if input == '':
-            time.sleep(delay)
-            continue
-        output = func(input)
-        output_func(output)
-        dt = time.time()-t0
-        logger.info('Vertex latency: {:.09f} s'.format(dt))
+    try:
+        timer = call_later(stats_period, process_statistics, (call_later,
+                           stats_period))
+        timer.daemon = True
+        timer.start()
+        run_engine(input_func, func, output_func, delay, logger)
+    except KeyboardInterrupt:
+        logger.info("Latency_count: {}".format(state.pop(LATENCY_COUNT,
+                                                         None)))
+        logger.info("Latency_time: {}".format(state.pop(LATENCY_TIME, None)))
 
 
 if __name__ == '__main__':
     start()
+

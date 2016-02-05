@@ -13,10 +13,10 @@ class UnknownInputError(Exception):
 
 
 def func(input):
-    if input == '14ping':
-        return '14pong'
-    elif input == '14pong':
-        return '14ping'
+    if input == 'ping':
+        return 'pong'
+    elif input == 'pong':
+        return 'ping'
     else:
         raise UnknownInputError('Unknown input: {!r}'.format(input))
 
