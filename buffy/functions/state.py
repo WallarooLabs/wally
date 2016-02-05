@@ -48,6 +48,7 @@ def get_attribute(name, default=_NO_DEFAULT):
         return getattr(state, name)
     except AttributeError:
         if default is not _NO_DEFAULT:
+            setattr(state, name, default)
             return default
 
 
