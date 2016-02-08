@@ -36,12 +36,19 @@ there is an error in your spec.
 
 ## Model Checking
 
-When creating a model, you will be assigning values to the variables and constants in your spec. Click to
-(TLC Model Checker->New Model) to create one.
+Click (TLC Model Checker->New Model) to create a new model. When creating a model, you will be assigning values 
+to the constants declared in your spec.  Within the model tab (with label corresponding to the name of the model),
+you can assign values to constants in the "What is the model?" section.
 
-Within the model tab (with label corresponding to the name of the model), look at the bottom left of the
-"Model Overview" tab under "What to Check". This is where you set up what you want to check when running
-the model. The first thing you should determine is whether you expect your spec to terminate. If so, deselect
-"Deadlock", since termination will be interpreted as deadlock. 
+Look at the bottom left of the "Model Overview" tab under "What to Check". This is where you set up what you want 
+to check when running the model. The first thing you should determine is whether you expect your spec to terminate. 
+If so, deselect "Deadlock", since termination will be interpreted as deadlock. 
 
+Run the model checker by clicking the green play button in the top left of the model tab. If you want more detailed
+output, click (TLC Model Checker->TLC Console) to see the console.
+
+## Notes on TLA+
+
+TLA+ is currently on version 2. However, the best source on the language, the book Specifying Systems, describes TLA+1. 
+The changes between the two versions are described here: http://research.microsoft.com/en-us/um/people/lamport/tla/tla2.html
 
