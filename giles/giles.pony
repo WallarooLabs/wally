@@ -23,8 +23,8 @@ actor Main
       let timer' = timer
       timers(consume timer)
 
-      SignalHandler(TermHandler(store, receiver) , 15)
-      SignalHandler(Usr1Handler(sender, timers, timer') , 30)
+      SignalHandler(TermHandler(store, receiver), Sig.term())
+      SignalHandler(Usr1Handler(sender, timers, timer'), Sig.usr1())
     else
       env.out.print("wrong args")
     end
