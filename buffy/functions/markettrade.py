@@ -5,7 +5,6 @@
 Based on https://docs.google.com/document/d/1qpxeWcWeUzymX6hOSWG_yuTunNd6J2UoyWLzTOQiiz4/
 
 Logic:
-# functionality
 per message:
  if message is Market/NBBO:
   # Compute: Mid = (bid+offer)/2
