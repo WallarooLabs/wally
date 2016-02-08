@@ -33,3 +33,15 @@ In order to enable PDF creation, set the PDF Viewer to /usr/texbin/pdflatex (Fil
 
 A lot of the action will be in creating and running models to see if
 there is an error in your spec.
+
+## Model Checking
+
+When creating a model, you will be assigning values to the variables and constants in your spec. Click to
+(TLC Model Checker->New Model) to create one.
+
+Within the model tab (with label corresponding to the name of the model), look at the bottom left of the
+"Model Overview" tab under "What to Check". This is where you set up what you want to check when running
+the model. The first thing you should determine is whether you expect your spec to terminate. If so, deselect
+"Deadlock", since termination will be interpreted as deadlock. 
+
+
