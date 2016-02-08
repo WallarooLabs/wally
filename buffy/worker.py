@@ -114,7 +114,8 @@ def run_engine(input_func, func, output_func, delay, logger):
         # Measure throughput
         state.add(int(time.time()), 1, THROUGHPUT_IN)
         output = func(input)
-        output_func(output)
+        if output:
+            output_func(output)
         dt = time.time()-t0
         # Measure throughput
         state.add(int(time.time()), 1, THROUGHPUT_OUT)
