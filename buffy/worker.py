@@ -24,12 +24,9 @@ The function file should be of the following format:
 '''
 
 import click
-import datetime
 import functools
-import logging
 import math
 import socket
-import sys
 import time
 from threading import Timer
 
@@ -47,6 +44,8 @@ LATENCY_TIME = 'latency_time'
 
 SOCK_IN = None
 SOCK_OUT = None
+
+
 def get_socket(input=True):
     global SOCK_IN, SOCK_OUT
     if input:
@@ -61,6 +60,7 @@ def get_socket(input=True):
             SOCK_OUT = socket.socket(socket.AF_INET,
                                      socket.SOCK_DGRAM)
         return SOCK_OUT
+
 
 def udp_get(host=None, port=None):
     """Get a single message from the message queue.
@@ -120,11 +120,15 @@ def run_engine(input_func, func, output_func, delay, logger):
         # Measure throughput
         state.add(int(time.time()), 1, THROUGHPUT_OUT)
         # Add latency to histogram
-        state.add('{:.09f} s'.format(10**round(math.log(dt,10))), dt, LATENCY_TIME)
-        state.add('{:.09f} s'.format(10**round(math.log(dt,10))), 1, LATENCY_COUNT)
+        state.add('{:.09f} s'.format(10**round(math.log(dt, 10))),
+                  dt, LATENCY_TIME)
+        state.add('{:.09f} s'.format(10**round(math.log(dt, 10))),
+                  1, LATENCY_COUNT)
 
 
 STAT_TIME_BOUNDARY = time.time()
+
+
 def process_statistics(call_later, period):
     global STAT_TIME_BOUNDARY
     t0 = STAT_TIME_BOUNDARY
@@ -149,8 +153,6 @@ def emit_statistics(t0, t1, *stats):
         LOGGER.info("({}, {}) {}: {}".format(t0, t1, name, stat))
 
 
-
-
 @click.option('--input-address', default='127.0.0.1:10000',
               help='Host:port for input address')
 @click.option('--output-address', default='127.0.0.1:10000',
@@ -169,13 +171,12 @@ def emit_statistics(t0, t1, *stats):
               help='The period over which stats are measured.')
 @click.command()
 def start(input_address, output_address, output_type, console_log, file_log,
-        delay, function, stats_period):
+          delay, function, stats_period):
     # parse input and output address strings into address tuples
-    input_host, input_port = [f(x) for f,x in
-                             zip((str, int), input_address.split(':'))]
-    output_host, output_port = [f(x) for f,x in
+    input_host, input_port = [f(x) for f, x in
+                              zip((str, int), input_address.split(':'))]
+    output_host, output_port = [f(x) for f, x in
                                 zip((str, int), output_address.split(':'))]
-
 
     if output_type == 'queue':
         output_func = udp_put
@@ -184,7 +185,8 @@ def start(input_address, output_address, output_type, console_log, file_log,
 
     # Create partial functions for input and output
     input_func = functools.partial(udp_get, host=input_host, port=input_port)
-    output_func = functools.partial(output_func, host=output_host, port=output_port)
+    output_func = functools.partial(output_func, host=output_host,
+                                    port=output_port)
     # Import the function to be applied to data from the queue
     func, func_name = get_function(function)
 
@@ -199,7 +201,6 @@ def start(input_address, output_address, output_type, console_log, file_log,
                                    '{}'.format(output_address)),
                            stream_out=console_log,
                            file_out=file_log)
-
 
     logger.info('Starting worker...')
     logger.info('FUNC_NAME: %s', func_name)
@@ -221,4 +222,3 @@ def start(input_address, output_address, output_type, console_log, file_log,
 
 if __name__ == '__main__':
     start()
-

@@ -8,6 +8,7 @@ A game of distributed Pong.
 
 FUNC_NAME = 'Pong'
 
+
 class UnknownInputError(Exception):
     pass
 
@@ -19,4 +20,3 @@ def func(input):
         return 'ping'
     else:
         raise UnknownInputError('Unknown input: {!r}'.format(input))
-

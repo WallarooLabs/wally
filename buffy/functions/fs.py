@@ -33,7 +33,8 @@ def get_file_handler(name, level):
 
 
 class UTCMicroSecondFormatter(logging.Formatter):
-    converter=datetime.datetime.utcfromtimestamp
+    converter = datetime.datetime.utcfromtimestamp
+
     def formatTime(self, record, datefmt=None):
         ct = self.converter(record.created)
         if datefmt:
@@ -50,7 +51,7 @@ def get_formatter(fmt='%(asctime)s %(message)s',
     return formatter
 
 
-def get_logger(name, level=logging.DEBUG, stream_out=False,file_out=False):
+def get_logger(name, level=logging.DEBUG, stream_out=False, file_out=False):
     # Create the logger object and set it's level
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -67,4 +68,3 @@ def get_logger(name, level=logging.DEBUG, stream_out=False,file_out=False):
         sh.setFormatter(formatter)
         logger.addHandler(sh)
     return logger
-

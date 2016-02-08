@@ -22,6 +22,8 @@ state = State()
 
 # Define accessor functionality
 _NO_DEFAULT = object()  # This allows None to be used as a valid default value
+
+
 def pop(name, default=_NO_DEFAULT):
     """Pop and return a named state object (list, counter, etc)"""
     try:
@@ -80,4 +82,3 @@ def multiply(record, value, name):
     if not hasattr(state, name):
         setattr(state, name, Counter())
     getattr(state, name)[record] *= value
-

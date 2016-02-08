@@ -11,4 +11,3 @@ FUNC_NAME = 'Passthrough'
 
 def func(input):
     return input
-

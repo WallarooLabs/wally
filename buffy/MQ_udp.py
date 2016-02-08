@@ -3,7 +3,6 @@
 import asyncio
 import click
 import math
-import sys
 import time
 
 from functions import mq_parse
@@ -11,11 +10,11 @@ import functions.fs as fs
 from functions import state
 
 
-
 THROUGHPUT_IN = 'throughput_in'
 THROUGHPUT_OUT = 'throughput_out'
 LATENCY_COUNT = 'latency_count'
 LATENCY_TIME = 'latency_time'
+
 
 class UDPMessageQueue(asyncio.DatagramProtocol):
     def connection_made(self, transport):
@@ -46,9 +45,9 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
                 state.add(int(time.time()), 1, THROUGHPUT_OUT)
                 # Log latency to file
                 # Add latency to histogram
-                state.add('{:.09f} s'.format(10**round(math.log(dt,10))),
+                state.add('{:.09f} s'.format(10**round(math.log(dt, 10))),
                           dt, LATENCY_TIME)
-                state.add('{:.09f} s'.format(10**round(math.log(dt,10))),
+                state.add('{:.09f} s'.format(10**round(math.log(dt, 10))),
                           1, LATENCY_COUNT)
             except asyncio.queues.QueueEmpty:
                 self.transport.sendto(mq_parse.encode(''),
@@ -63,6 +62,8 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
 
 
 STAT_TIME_BOUNDARY = time.time()
+
+
 def process_statistics(call_later, period):
     global STAT_TIME_BOUNDARY
     t0 = STAT_TIME_BOUNDARY
@@ -96,7 +97,7 @@ def emit_statistics(t0, t1, *stats):
               help='The period over which stats are measured.')
 def start(address, console_log, file_log, stats_period):
     # Parse address string to host and port str:int pair
-    host, port = [f(x) for f,x in
+    host, port = [f(x) for f, x in
                   zip((str, int), address.split(':'))]
 
     # Create global queue object
@@ -134,7 +135,6 @@ def start(address, console_log, file_log, stats_period):
         LOGGER.info("Latency_time: {}".format(
             state.get_attribute(LATENCY_TIME, None)))
         pass
-
 
     transport.close()
     loop.close()
