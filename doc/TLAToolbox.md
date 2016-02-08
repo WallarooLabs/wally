@@ -2,10 +2,14 @@
 
 ## Installing
 
-Install the TLA Toolbox by following the link in the "Downloading the Toolbox" section of:
+On OSX, install TLA+ Toolbox by running
+
+```brew cask install tla-plus-toolbox```.
+
+You can also follow the instructions in the "Downloading the Toolbox" section of:
 http://research.microsoft.com/en-us/um/people/lamport/tla/toolbox.html
 
-Install TLAPS, the TLA+ Proof System:
+Now install TLAPS, the TLA+ Proof System:
 http://tla.msr-inria.inria.fr/tlaps/content/Download/Binaries.html
 
 You'll need to add /usr/local/bin to your $PATH.
