@@ -59,7 +59,6 @@ class SenderNotify is UDPNotify
   fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
     let data': ByteSeq = consume data
     let size = data'.size()
-    sock.write(size.string(), from)
 
 actor Store
   let _env: Env
