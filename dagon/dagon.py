@@ -101,20 +101,27 @@ def start_buffy_processes(f, in_addr, out_addr, is_sink):
     time.sleep(PAUSE)
     return processes
 
-def start_giles_process(topology, test):
+def start_giles_sender_process(topology, test):
     source_addr = topology.get_node_option(topology.source(), 'in_addr')
     print('dagon: Source is ' + source_addr)
+
+    remove_file('sent.txt')
+
+    print('dagon: Creating GILES-SENDER node writing to source')
+    giles_sender = subprocess.Popen(['../giles/sender/sender', source_addr], stdout=DEVNULL, stderr=DEVNULL)
+    print('-----------------------------------------------------------------------')
+    print('dagon: Test <<' + test + '>> is running...')
+    return giles_sender
+
+def start_giles_receiver_process(topology):
     sink_addr = topology.get_node_option(topology.sink(), 'out_addr')
     print('dagon: Sink is ' + sink_addr)
 
-    remove_file('sent.txt')
     remove_file('received.txt')
 
-    print('dagon: Creating GILES node writing to source and listening at sink')
-    giles = subprocess.Popen(['../giles/giles', source_addr, sink_addr], stdout=DEVNULL, stderr=DEVNULL)
-    print('-----------------------------------------------------------------------')
-    print('dagon: Test <<' + test + '>> is running...')
-    return giles
+    print('dagon: Creating GILES-RECEIVER node listening at sink')
+    giles_receiver = subprocess.Popen(['../giles/receiver/receiver', sink_addr], stdout=DEVNULL, stderr=DEVNULL)
+    return giles_receiver
 
 def start_nodes(topo, seed):
     processes = []
@@ -305,16 +312,20 @@ def cli(topology_name, gendot, duration, seed, test, mismatch, metrics):
     topology_processes = start_nodes(topology, seed)
     processes += topology_processes
 
-    giles_process = start_giles_process(topology, test)
-    processes.append(giles_process)
+    giles_receiver_process = start_giles_receiver_process(topology)
+    time.sleep(1)
+    giles_sender_process = start_giles_sender_process(topology, test)
 
     # Let test run for duration
     time.sleep(duration)
     print('dagon: Finished')
 
-    # Tell giles to stop sending messages
-    os.kill(giles_process.pid, signal.SIGUSR1)
+    # Tell giles-sender to stop sending messages
+    os.kill(giles_sender_process.pid, signal.SIGTERM)
     time.sleep(5)
+
+    # Tell giles-receiver to shutdown
+    os.kill(giles_receiver_process.pid, signal.SIGTERM)
 
     # Kill subprocesses
     for process in processes:

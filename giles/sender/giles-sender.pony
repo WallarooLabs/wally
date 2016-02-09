@@ -10,21 +10,16 @@ actor Main
       let timers = Timers
 
       let out_addr_raw = env.args(1).split(":")
-      let in_addr_raw = env.args(2).split(":")
 
       let outgoing_address = DNS.ip4(out_addr_raw(0), out_addr_raw(1))(0)
-      let incoming_host = in_addr_raw(0)
-      let incoming_port = in_addr_raw(1)
       let store = Store(env)
-      let receiver = Receiver(env, store, incoming_host, incoming_port)
       let sender = Sender(outgoing_address, store)
 
       let timer = Timer(DataGenerator(sender), 0, 5_000_000)
       let timer' = timer
       timers(consume timer)
 
-      SignalHandler(TermHandler(store, receiver), Sig.term())
-      SignalHandler(Usr1Handler(sender, timers, timer'), Sig.usr1())
+      SignalHandler(TermHandler(sender, timers, timer', store), Sig.term())
     else
       env.out.print("wrong args")
     end
@@ -66,54 +61,16 @@ class SenderNotify is UDPNotify
     let size = data'.size()
     sock.write(size.string(), from)
 
-actor Receiver
-  let _socket: UDPSocket
-
-  new create(env: Env, store: Store, on_address: String, on_port: String) =>
-    _socket = UDPSocket(ReceiverNotify(env, store), on_address, on_port)
-
-  be dispose() =>
-    _socket.dispose()
-
-class ReceiverNotify is UDPNotify
-  let _env: Env
-  let _store: Store
-
-  new iso create(env: Env, store: Store) =>
-    _env = env
-    _store = store
-
-  fun ref listening(sock: UDPSocket  ref) =>
-    try
-      (let host, let service) = sock.local_address().name()
-      _env.out.print("listening on " + host + ":" + service)
-    else
-      _env.out.print("couldn't get local address")
-    end
-
-  fun ref not_listening(sock: UDPSocket ref) =>
-    _env.out.print("couldn't listen")
-    sock.dispose()
-
-  fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
-    let at = Time.micros()
-    _store.received(consume data, at)
-
 actor Store
   let _env: Env
   let _sent: List[(ByteSeq, U64)]
-  let _received: List[(ByteSeq, U64)]
 
   new create(env: Env) =>
     _env = env
     _sent = List[(ByteSeq, U64)](1_000_000)
-    _received = List[(ByteSeq, U64)](1_000_000)
 
   be sent(msg: ByteSeq, at: U64) =>
     _sent.push((msg, at))
-
-  be received(msg: ByteSeq, at: U64) =>
-    _received.push((msg, at))
 
   be dump() =>
     try
@@ -122,12 +79,6 @@ actor Store
         sent_handle.print(_format_output(s))
       end
       sent_handle.dispose()
-
-      let received_handle = File(FilePath(_env.root, "received.txt"))
-      for r in _received.values() do
-        received_handle.print(_format_output(r))
-      end
-      received_handle.dispose()
     else
       _env.out.print("dump exception")
     end
@@ -160,29 +111,19 @@ class DataGenerator is TimerNotify
     true
 
 class TermHandler is SignalNotify
-  let _store: Store
-  let _receiver: Receiver
-
-  new iso create(store: Store, receiver: Receiver) =>
-    _store = store
-    _receiver = receiver
-
-  fun ref apply(count: U32): Bool =>
-    _receiver.dispose()
-    _store.dump()
-    true
-
-class Usr1Handler is SignalNotify
   let _sender: Sender
   let _timers: Timers
   let _timer: Timer tag
+  let _store: Store
 
-  new iso create(sender: Sender, timers: Timers, timer: Timer tag) =>
+  new iso create(sender: Sender, timers: Timers, timer: Timer tag, store: Store) =>
     _sender = sender
     _timers = timers
     _timer = timer
+    _store = store
 
   fun ref apply(count: U32): Bool =>
     _timers.cancel(_timer)
     _sender.dispose()
+    _store.dump()
     true
