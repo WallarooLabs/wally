@@ -47,6 +47,15 @@ If so, deselect "Deadlock", since termination will be interpreted as deadlock.
 Run the model checker by clicking the green play button in the top left of the model tab. If you want more detailed
 output, click (TLC Model Checker->TLC Console) to see the console.
 
+## Experimenting With Expressions
+
+One way that might help you understand TLA+ better is to play around with the expression evaluator in the Model
+Checker. Your expressions will be evaluated in the context of the corresponding Specification.
+
+Open a model and click on the "Model Checking Results" tab.  Type a TLA+ expression in the Expression field
+and click the play button. TLC will evaluate the expression and print the result in the Value field.  For example, 
+the result of evaluating the expression {"a"} \cup {"b"} is {"a", "b"}.
+
 ## Notes on TLA+
 
 TLA+ is currently on version 2. However, the best source on the language, the book Specifying Systems, describes TLA+1. 
