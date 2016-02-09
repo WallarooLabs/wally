@@ -101,10 +101,7 @@ def start_buffy_processes(f, in_addr, out_addr, is_sink):
     time.sleep(PAUSE)
     return processes
 
-def start_giles_sender_process(topology, test):
-    source_addr = topology.get_node_option(topology.source(), 'in_addr')
-    print('dagon: Source is ' + source_addr)
-
+def start_giles_sender_process(source_addr, test):
     remove_file('sent.txt')
 
     print('dagon: Creating GILES-SENDER node writing to source')
@@ -113,10 +110,7 @@ def start_giles_sender_process(topology, test):
     print('dagon: Test <<' + test + '>> is running...')
     return giles_sender
 
-def start_giles_receiver_process(topology):
-    sink_addr = topology.get_node_option(topology.sink(), 'out_addr')
-    print('dagon: Sink is ' + sink_addr)
-
+def start_giles_receiver_process(sink_addr):
     remove_file('received.txt')
 
     print('dagon: Creating GILES-RECEIVER node listening at sink')
@@ -312,9 +306,14 @@ def cli(topology_name, gendot, duration, seed, test, mismatch, metrics):
     topology_processes = start_nodes(topology, seed)
     processes += topology_processes
 
-    giles_receiver_process = start_giles_receiver_process(topology)
+    source_addr = topology.get_node_option(topology.source(), 'in_addr')
+    print('dagon: Source is ' + source_addr)
+    sink_addr = topology.get_node_option(topology.sink(), 'out_addr')
+    print('dagon: Sink is ' + sink_addr)
+
+    giles_receiver_process = start_giles_receiver_process(sink_addr)
     time.sleep(1)
-    giles_sender_process = start_giles_sender_process(topology, test)
+    giles_sender_process = start_giles_sender_process(source_addr, test)
 
     # Let test run for duration
     time.sleep(duration)
