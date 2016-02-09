@@ -30,8 +30,10 @@ and assuming that Buffy's Queue is listening on port 8081 locally
 and that the worker is listening on port 8082, then you would start 
 Giles as follows:
 
-`./giles/receiver 127.0.0.1:8082`
-`./giles/sender 127.0.0.1:8081`
+```
+./giles/receiver 127.0.0.1:8082
+./giles/sender 127.0.0.1:8081
+```
 
 The receiver should be started before the sender otherwise data will be lost. By
 the same token, the sender should be shut down before the receiver to prevent
