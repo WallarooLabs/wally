@@ -190,8 +190,7 @@ def calculate_test_results(test, expect_mismatch, display_metrics):
 
     print('dagon: Test has ' + test_result)
     if display_metrics and passes and not expect_mismatch:
-        metrics.print_throughput(rcvd)
-        metrics.print_latency_histogram(sent, rcvd)
+        metrics.print_metrics(sent, rcvd)
 
 class Topology:
     def __init__(self, name, node_count):
@@ -321,7 +320,7 @@ def cli(topology_name, gendot, duration, seed, test, mismatch, metrics):
 
     # Tell giles-sender to stop sending messages
     os.kill(giles_sender_process.pid, signal.SIGTERM)
-    time.sleep(5)
+    time.sleep(10)
 
     # Tell giles-receiver to shutdown
     os.kill(giles_receiver_process.pid, signal.SIGTERM)
