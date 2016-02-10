@@ -2,3 +2,4 @@
 *.dSYM
 .cache/
 .cache/*
+.DS_Store

@@ -8,10 +8,11 @@ Dagon sets up and runs a topology of buffy, spike, and giles nodes
 based on an .ini file you provide. It automatically assigns ports
 and checks that your topology has a single source and a single sink.
 
-You'll need to install the click package.
+You'll need to install the click and numpy packages.
 
 ```
 python3 -m pip install click
+python3 -m pip install numpy
 ```
 
 At the moment, you need to manually compile spike and giles in their

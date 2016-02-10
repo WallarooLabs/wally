@@ -5,5 +5,6 @@
 *.ps
 received.txt
 sent.txt
+__pycache__/
 config/__pycache__/
 logs/
