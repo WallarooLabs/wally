@@ -1,3 +1,32 @@
+# BUILDING
+
+Buffy can currently be built for two different environments. A developer's local
+workstation or a Raspberry Pi cluster.
+
+## Prerequistes
+
+To build Buffy to run on a local development machine, you need to have a working
+version of the Sendence version of the ponyc compiler installed. (See below).
+
+To build Buffy to run on a Raspberry Pi, you need to have a working cross
+compiler installed. Currently, that means following [Markus' directions for
+creating a cross compiler](https://github.com/lispmeister/rpxp).
+
+## Buffy
+
+To facilitate builds across environments, we have a very simple python build
+script called `erbau.py`. 
+
+To build for your local machine, run:
+
+`python3 erbau/erbau.py`
+
+To build for the Raspberry Pi, run:
+
+`python3 erbau/erbau.py --arm`
+
+Which takes care of cross compilation for you.
+
 # RELEASING
  
 ## Pony Projects
