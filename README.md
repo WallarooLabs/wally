@@ -23,6 +23,9 @@ documentation.
 Check out the [build](BUILD.md) documentation for important information on how
 we stay up to date with the latest Pony compiler changes.
 
+Additional documentation, including onboarding is in the [docs](docs/)
+directory.
+ 
 ## Components
 
 * Buffy: Stream processing core
