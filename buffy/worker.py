@@ -69,6 +69,7 @@ def udp_get(host=None, port=None):
     sock = get_socket(True)
     sock.sendto(mq_parse.encode('GET'),
                 (host, port))
+    LOGGER.debug("Sent datagram to ({}, {})".format(host, port))
     # parse response length
     length_length = mq_parse.hex_to_int(sock.recv(1, socket.MSG_PEEK)
                                         .decode(encoding='UTF-8'))
@@ -82,6 +83,7 @@ def udp_get(host=None, port=None):
         if len(buf) > 0:
             total_length -= len(buf)
             buf_array.append(buf)
+    LOGGER.debug("Received datagram from ({}, {})".format(host, port))
     # join buffers in the accumulator
     output = b''.join(buf_array)
     return mq_parse.decode(output)
@@ -93,6 +95,7 @@ def udp_put(msg, host=None, port=None):
     sock = get_socket(False)
     sock.sendto(mq_parse.encode('PUT:{}'.format(msg)),
                 (host, port))
+    LOGGER.debug("Sent datagram to ({}, {})".format(host, port))
 
 
 def udp_dump(msg, host=None, port=None):
@@ -101,6 +104,7 @@ def udp_dump(msg, host=None, port=None):
     sock = get_socket(False)
     sock.sendto(msg.encode(encoding='UTF-8'),
                 (host, port))
+    LOGGER.debug("Sent datagram to ({}, {})".format(host, port))
 
 
 def run_engine(input_func, func, output_func, delay, logger):

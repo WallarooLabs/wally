@@ -22,6 +22,7 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
         self.transport = transport
 
     def datagram_received(self, data, addr):
+        LOGGER.debug("Received datagram from {}".format(addr))
         splat = mq_parse.decode(data).split(':')
         verb = splat[0]
         msg = splat[1] if len(splat) > 1 else ''
@@ -39,6 +40,7 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
                 t0, msg = QUEUE.get_nowait()
                 self.transport.sendto(mq_parse.encode(msg),
                                       addr)
+                LOGGER.debug("Sent datagram to {}".format(addr))
                 # Compute time between when event was inserted
                 # and when it was consumed by a remote client
                 dt = time.time()-t0
@@ -53,10 +55,12 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
             except asyncio.queues.QueueEmpty:
                 self.transport.sendto(mq_parse.encode(''),
                                       addr)
+                LOGGER.debug("Sent datagram to {}".format(addr))
         elif verb == 'SIZE':
             self.transport.sendto(
                 mq_parse.encode('{}'.format(QUEUE.qsize())),
                 addr)
+            LOGGER.debug("Sent datagram to {}".format(addr))
 
     def connection_lost(self, exc):
         self.transport = None
