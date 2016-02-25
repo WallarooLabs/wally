@@ -8,11 +8,10 @@ https://docs.google.com/document/d/1qpxeWcWeUzymX6hOSWG_yuTunNd6J2UoyWLzTOQiiz4/
 
 """
 
-import state
-import json
+from . import state
 
 
-FUNC_NAME = 'Markettrade'
+FUNC_NAME = 'Marketspread'
 
 
 def func(input):
