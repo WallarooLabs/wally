@@ -101,18 +101,37 @@ Popular stream processing frameworks such as Storm handle the easiest parts of
 the problem and leave the programmer holding the bag for the difficult parts.
 Getting high throughput or low latency isn’t particularly hard.
 
-However, providing “exactly once” semantics is. Within a distributed system,
-having exactly once processing is impossible.
+However, providing “exactly once” semantics is. Exactly once is a holy grail of
+sorts in stream processing. Ideally, we want each message to be delivered and
+processed once and only once. However, in the face of failures, that isn’t
+possible. Imagine Alice and Bob talking over an unreliable connection. Each
+time one of them says something, they wait for the other to respond “Ok”. This
+“Ok” acts as an acknowledgement that the message was received. If Alice sends a
+message to Bob and Bob doesn’t respond, there’s a wide variety of things that
+could have happened. Bob might not have received the message, Bob might have
+received but his acknowledgement was lost and so on and so forth. The important
+idea here is we can never be sure when we don’t get that acknowledgement whether
+Bob got the message.
 
-At least once systems, where we guarantee that a message will be delivered at
-least one time, are doable. The problem these systems leave the user with is
-that they are left holding the bag for accuracy. Programmers roll their own
-ad-hoc solutions to not overcount in at-least-once systems.
+The standard solution to this is “at least once” messaging: we keep resending
+the message until we get at least one acknowledgement. This works great for
+making sure something gets done but isn’t great for accuracy. It’s quite
+possible Bob might get a message more than once and undertake the same action
+in response more than once. If Bob is maintaining a count of some sort and the
+messages are “add 1”, “add 5”, and “subtract 2”, then with at least once
+messaging he is going to end up with an inaccurate value. To address this, we
+need to introduce idempotence. Idempotence ensures that when Alice sends the
+message “add 2” (with some way of uniquely identifying it), Bob disregards the
+message if he has already seen it. That is, we process each message only once,
+no matter how many times we receive it. Idempotence really helps with accuracy.
+However, it’s complicated and easy to get wrong.
 
-We envision a system that is built on top of idempotent data structures that
-allow for the same operation to happen more than once, (thereby ensuring message
-processing) without forcing the programmer to be a distributed systems expert.
-Idempotent processing is hard. State management is hard.
+Most current systems leave the developer holding the bag for accuracy.
+Programmers have to roll their own idempotence. We envision a system that is
+built on top of idempotent data structures that allow for the same operation to
+happen more than once (thereby ensuring message processing) without forcing the
+programmer to be a distributed systems expert. Idempotent processing is hard.
+State management is hard.
 
 == Our Solution: Buffy
 
@@ -144,10 +163,7 @@ Features::
 * Data connectors allow data to stream to external sources
 * Long lived stable and versioned API to the processing infrastructure
 * Tracing and sampling of processing
-* Able to generate synthetic streams to reproduce production failures (as an automatic consequence of any failure occurring)
-
-Goals::
-* Core capabilities aren’t tied to a 3rd party commercial products
+* Able to generate synthetic streams to reproduce production failures (as an automatic consequence of any failure occurring):
 * Have predictable and compact latency distributions
 
 ==== What do we mean by...
