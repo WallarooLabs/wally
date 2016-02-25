@@ -70,7 +70,7 @@ TAGS = {'0': ('message_id', str),
         '44': ('price', float),
         '54': ('side', int),
         '55': ('symbol', str),
-        '60': ('sent_time', str),
+        '60': ('message_time', str),
         '132': ('bid', float),
         '133': ('offer', float),}
 
