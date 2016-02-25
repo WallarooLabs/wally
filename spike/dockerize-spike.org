@@ -1,0 +1,124 @@
+* Spike Docker Container
+The following build instructions assume you are running them on
+a Raspberry Pi node with active Docker support (eg. Hypriot).
+
+We want to build a statically linked binary of =Spike= and wrap it in
+a container. We will use the [[https://github.com/lispmeister/rpi-pony][rpi-pony]] container to compile and link
+=Spike= on a RPi node then place it into a =scratch= container.
+
+[[https://help.github.com/articles/creating-an-access-token-for-command-line-use/][Create a Github token.]]
+
+Add =~/.gitconfig= a new section to your ".gitconfig" file.
+#+BEGIN_EXAMPLE
+[github]
+	user = lispmeister
+	token = <example sha token>
+#+END_EXAMPLE
+
+Copy your =.gitconfig= file to the =cl-master= node.
+#+BEGIN_SRC sh
+scp ~/.gitconfig root@cl-master:~/
+#+END_SRC
+
+Login to your =cl-master= node and fetch the rpi-pony container.
+#+BEGIN_SRC sh
+ssh root@cl-master
+docker pull lispmeister/rpi-pony
+#+END_SRC
+
+Create a project directory and fetch the =Buffy= source.
+#+BEGIN_SRC sh
+cd /home/pi
+git clone https://github.com/Sendence/Buffy.git buffy
+cd buffy/spike
+#+END_SRC
+If you are asked for a password just provide the generated token.
+
+Ponyc cannot create statically linked binaries yet. We will need to
+make a number of dynamic libraries available in the container at the
+expected place. Here's a script the copies the respective libraries
+into our project directory.
+#+BEGIN_SRC sh :tangle copy-libraries.sh :shebang "#!/bin/bash" :padline no
+cp /lib/arm-linux-gnueabihf/libpthread.so.0 .
+cp /lib/arm-linux-gnueabihf/libdl.so.2 .
+cp /lib/arm-linux-gnueabihf/libm.so.6 .
+cp /lib/arm-linux-gnueabihf/libgcc_s.so.1 .
+cp /lib/arm-linux-gnueabihf/libc.so.6 .
+cp /lib/ld-linux-armhf.so.3 .
+cp /lib/arm-linux-gnueabihf/librt.so.1 .
+#+END_SRC
+
+Run the script on your RPi build machine.
+#+BEGIN_SRC sh
+./copy-libraries.sh
+#+END_SRC
+
+We need to create a file named =Dockerfile= in the current directory
+with the following lines.
+#+BEGIN_EXAMPLE
+FROM scratch
+ADD libpthread.so.0 /lib/arm-linux-gnueabihf/libpthread.so.0
+ADD libdl.so.2 /lib/arm-linux-gnueabihf/libdl.so.2
+ADD libm.so.6 /lib/arm-linux-gnueabihf/libm.so.6
+ADD libgcc_s.so.1 /lib/arm-linux-gnueabihf/libgcc_s.so.1
+ADD libc.so.6 /lib/arm-linux-gnueabihf/libc.so.6
+ADD ld-linux-armhf.so.3 /lib/ld-linux-armhf.so.3
+ADD librt.so.1 /lib/arm-linux-gnueabihf/librt.so.1
+ADD spike /spike
+ENTRYPOINT ["/spike"]
+#+END_EXAMPLE
+
+Start a shell inside the rpi-pony container.
+#+BEGIN_SRC sh
+docker run -it --rm \
+ -v $(pwd):/data/spike \
+ -v /var/run/docker.sock:/var/run/docker.sock \
+ -v $(which docker):$(which docker) \
+ lispmeister/rpi-pony /bin/bash
+#+END_SRC
+
+Compile =Spike=.
+#+BEGIN_SRC sh
+cd /data/spike
+ponyc
+#+END_SRC
+
+Start =Spike= to see if it works.
+#+BEGIN_SRC sh
+./spike 127.0.0.1:4500 127.0.0.1:5000 garble --seed 23423 --prob 20
+#+END_SRC
+
+To build the =Spike= container we will call Docker from inside the
+=rpi-pony= container.
+#+BEGIN_SRC sh
+docker build -t lispmeister/rpi-spike /data/spike
+#+END_SRC
+
+Output should look something like this:
+#+BEGIN_EXAMPLE
+Sending build context to Docker daemon   554 kB
+Step 1 : FROM scratch
+ --->
+Step 2 : ADD spike /spike
+ ---> 830d3d7252a3
+Removing intermediate container 54b8e4432792
+Step 3 : CMD /spike
+ ---> Running in 9d1108acaa2a
+ ---> 32b19a9b1a52
+Removing intermediate container 9d1108acaa2a
+Successfully built 32b19a9b1a52
+#+END_EXAMPLE
+
+Exit the =rpi-pony= container and check if the =Spike= container is
+now available.
+#+BEGIN_SRC sh
+exit
+docker images|grep "lispmeister/rpi-spike"
+#+END_SRC
+
+Run =Spike= inside the container.
+#+BEGIN_SRC sh
+docker run -it --rm lispmeister/rpi-spike \
+"127.0.0.1:4500 127.0.0.1:5000 garble --seed 23423 --prob 20"
+#+END_SRC
+
