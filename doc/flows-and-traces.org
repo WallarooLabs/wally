@@ -130,7 +130,7 @@ express this as
 $A;\overline{B|C|E}(2,2);D$
 \end{center}
 
-Note that we could think of $A|B$ as shorthand for $\overline{A,B}(1,1)$.
+Note that we could think of $A|B$ as shorthand for $\overline{A|B}(1,1)$.
 
 Keep in mind that the binary operators described in this section can connect any
 two $Flows$, not just any two worker types. For example, consider this slightly
