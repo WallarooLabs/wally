@@ -23,10 +23,14 @@ documentation.
 Check out the [build](BUILD.md) documentation for important information on how
 we stay up to date with the latest Pony compiler changes.
 
+Additional documentation, including onboarding is in the [doc](doc/)
+directory.
+ 
 ## Components
 
 * Buffy: Stream processing core
 * Dagon: Responsible for setting up all components and running tests
+* Erbau: Short term "build tool"
 * Giles: Part of our external verification system for Buffy
 * Spike: Destructive testing. Takes a smoothly functioning Buffy and causes
 Chaos.

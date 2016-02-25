@@ -1,0 +1,68 @@
+#+LaTeX_CLASS: sendence-com-article-2
+#+SETUPFILE: ~/.emacs.dir/org-html-themes/setup/theme-readtheorg.setup
+#+STARTUP: latexpreview
+#+HTML_MATHJAX: align: left indent: 5em tagside: left font: Neo-Euler
+#+OPTIONS: tex:t 
+#+TITLE: Buffy Theory
+#+AUTHOR: Markus Fix
+#+EMAIL: markus@sendence.com
+#+DATE: 2016-02-18
+#+DESCRIPTION: Buffy Flows and Types
+#+KEYWORDS: Sendence, LBC, distributed, testing
+#+LANGUAGE: english
+#+STARTUP: overview
+#+TAGS: PROJECT(p) HOME(h) OFFICE(o) PHONE(t) ERRANDS(e)
+#+STARTUP: hidestars
+#+LaTeX_CLASS_OPTIONS: [10pt,a4paper,captions=tableheading,headsepline,footsepline]
+#+LateX_HEADER: \KOMAoptions{titlepage=true, abstract=true}
+#+LaTeX_HEADER: \subtitle{Destructively Testing Distributed Systems Ideas Using a Pony}
+#+LaTeX_HEADER: \usepackage{paralist}
+#+LaTeX_HEADER: \usepackage{amssymb}
+#+LaTeX_HEADER: \let\itemize\compactitem
+#+LaTeX_HEADER: \let\description\compactdesc
+#+LaTeX_HEADER: \let\enumerate\compactenum
+#+LaTeX_CLASS_OPTIONS: [captions=tableheading]
+#+LATEX: 
+#+LATEX: \listoffigures
+
+
+* Buffy Flow
+\begin{equation}
+
+Flow = WT | Flow; Flow | Flow \Big{|} Flow | Flow \Big{\|} Flow | \overline{Flow} | \overline{ Flow, ..., Flow} (x,y)
+
+\end{equation}
+
+** Notation
+- Worker Type
+\begin{equation}
+WT
+\end{equation}
+
+- Sequence of Flows
+\begin{equation}
+Flow;Flow
+\end{equation}
+
+- Type definition OR
+\begin{equation}
+Flow | Flow
+\end{equation}
+
+- Choice of Flows
+\begin{equation}
+Flow \Big{|} Flow
+\end{equation}
+
+- Fork of Flows
+\begin{equation}
+Flow \Big{\|} Flow
+\end{equation}
+
+- Join of Flows
+\begin{equation}
+\overline{Flow}
+\end{equation}
+
+
+
