@@ -369,9 +369,9 @@ The first property we've identified of our system is the following:
 *Trace Uniqueness*: A single trace corresponds to exactly one traversal.
 
 
-*** Building a Traversal from a Trace
+*** Deriving a Traversal from a Trace
 
-Algorithm for building a Traversal from a Trace (provided we use the alternative to
+Algorithm for deriving a Traversal from a Trace (provided we use the alternative to
 hashing outlined above):
 
 1. Build a predecessor graph with edges directed from a $(Type,Instance,LocalStamp)$ node to its predecessors. The sink of this graph is the source of the traversal. The rule against beginning a $Flow$ with a fork or inclusive choice entails that there will be only one source per traversal.
