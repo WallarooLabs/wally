@@ -166,9 +166,11 @@ def emit_statistics(t0, t1, *stats):
               'from the functions submodule.')
 @click.option('--stats-period', default=60,
               help='The period over which stats are measured.')
+@click.option('--log-level', default='info', help='Log level',
+              type=click.Choice(['debug', 'info', 'warn', 'error']))
 @click.command()
 def start(input_address, output_address, output_type, console_log, file_log,
-        delay, function, stats_period):
+        delay, function, stats_period, log_level):
     # parse input and output address strings into address tuples
     input_host, input_port = [f(x) for f,x in
                              zip((str, int), input_address.split(':'))]
@@ -197,7 +199,8 @@ def start(input_address, output_address, output_type, console_log, file_log,
                                    '{}'.format(input_address),
                                    '{}'.format(output_address)),
                            stream_out=console_log,
-                           file_out=file_log)
+                           file_out=file_log,
+                           level=log_level)
 
 
     logger.info('Starting worker...')

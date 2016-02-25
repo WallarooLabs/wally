@@ -94,7 +94,9 @@ def emit_statistics(t0, t1, *stats):
               help='Log output to file.')
 @click.option('--stats-period', default=60,
               help='The period over which stats are measured.')
-def start(address, console_log, file_log, stats_period):
+@click.option('--log-level', default='info', help='Log level',
+              type=click.Choice(['debug', 'info', 'warn', 'error']))
+def start(address, console_log, file_log, stats_period, log_level):
     # Parse address string to host and port str:int pair
     host, port = [f(x) for f,x in
                   zip((str, int), address.split(':'))]
@@ -108,7 +110,8 @@ def start(address, console_log, file_log, stats_period):
     LOGGER = fs.get_logger('logs/{}.{}'.format('MQ',
                                                '{}-{}'.format(host, port)),
                            stream_out=console_log,
-                           file_out=file_log)
+                           file_out=file_log,
+                           level=log_level)
     LOGGER.info('Starting Message Queue...')
     LOGGER.info('Address: %s', (host, port))
 

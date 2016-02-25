@@ -50,8 +50,17 @@ def get_formatter(fmt='%(asctime)s %(message)s',
     return formatter
 
 
-def get_logger(name, level=logging.DEBUG, stream_out=False,file_out=False):
+LOG_LEVELS = {'debug': logging.DEBUG,
+              'info': logging.INFO,
+              'warn': logging.WARN,
+              'error': logging.ERROR,
+              'critical': logging.CRITICAL,
+              'fatal': logging.FATAL}
+
+
+def get_logger(name, level='info', stream_out=False,file_out=False):
     # Create the logger object and set it's level
+    level = LOG_LEVELS.get(level.lower(), logging.INFO)
     logger = logging.getLogger(name)
     logger.setLevel(level)
     # Create formatter
