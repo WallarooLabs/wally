@@ -32,7 +32,7 @@ Flow ::= \  &WT \notag \\
             &| \  Flow \  ``||" \  Flow \notag \\
             &| \  \overline{Flow} \notag \\
             &| \  Flow \  ``|" \  Flow \notag \\
-            &| \  \overline{Flow \  ``," \  ... \  ``," \  Flow} \  ``(" \  x \  ``," \  y \  ``)" \notag
+            &| \  \overline{Flow \  ``|" \  ... \  ``|" \  Flow} \  ``(" \  x \  ``," \  y \  ``)" \notag
 \end{align}
 
 Let's look at each line of this type definition in turn. First, a $Flow$ can consist
@@ -110,7 +110,7 @@ along C. What we are saying here is that data must flow along at least 1 and at 
 of the choices. We would express this as:
 
 \begin{center}
-$A;\overline{B,C}(1,2);D$
+$A;\overline{B|C}(1,2);D$
 \end{center}
 
 As another example of this *inclusive choice*, consider the following graph:
@@ -127,7 +127,7 @@ Say our specification is that data must flow along exactly two of B, E, and C to
 express this as
 
 \begin{center}
-$A;\overline{B,C,E}(2,2);D$
+$A;\overline{B|C|E}(2,2);D$
 \end{center}
 
 Note that we could think of $A|B$ as shorthand for $\overline{A,B}(1,1)$.
@@ -152,6 +152,35 @@ This more complex fork and join can be represented as
 $A;\overline{B;\overline{C||D}||E;F};G$
 \end{center}
 
+This model for expressing flows cannot capture every case as it stands. Consider the following:
+
+\begin{verbatim}
+A------------>B
+  \         /
+   --->C---/
+\end{verbatim}
+
+How do you write this as a $Flow$? $A;B||C$ doesn't work because it fails to capture the join
+between A and C.
+
+We could write something like
+
+\begin{center}
+$A;\overline{A||C};B$
+\end{center}
+
+but this is misleading. Data is only processed at A once, but this
+formula seems to say that it is processed twice at A.
+
+A cleaner approach is to use a symbol that refers back to the origin, such as:
+
+\begin{center}
+$A;\overline{@||C};B$
+\end{center}
+
+Here "@" refers to A. It also implies both that processing only happens at $A$ once
+and that $A$ is joined with $C$ at $B$.
+
 Finally, a *subflow* of a $Flow$ is any component $Flow$. For example,
 
 \begin{center}
@@ -164,10 +193,22 @@ is a subflow of
 $\overline{B;\overline{C||D}||E;F}$
 \end{center}
 
-[I think this last example shows that we have some work left to do
-in deciding how we want to avoid ambiguity in our notation. We need
-to have a clean way of indicating precedence of forks, sequences, and
-choices.]
+*** ASCII Version
+
+The ASCII version of Flow Notation is the same except that it uses [] instead
+of overlines for joins. It also uses [] to demarcate groupings. For example,
+consider a more complex example from the last section:
+
+\begin{center}
+$A;\overline{B;\overline{C||D}||E;F};G$
+\end{center}
+
+The ASCII version would look like
+
+\begin{center}
+$A;[[B;[C||D]]||[E;F]];G$
+\end{center}
+
 
 *** Restrictions
 
@@ -183,47 +224,6 @@ in parallel.
 
 An exclusive choice between two worker types, on the other hand, is a valid
 starting point since only one of the options is allowed in any given traversal.
-
-
-*** Counterexample and Suggested Notational Fix
-
-This model for expressing flows cannot capture every case as it stands. Consider the following:
-
-\begin{verbatim}
-A------------>B
-  \         /
-   --->C---/
-\end{verbatim}
-
-How do you write this as a Flow? $A;B||C$ doesn't work because it fails to capture the join
-between A and C.
-
-We could write something like
-
-\begin{center}
-$A;\overline{A||C};B$
-\end{center}
-
-but this is misleading. Data is only processed at A once, but this
-formula seems to say that it is processed twice at A.
-
-One suggestion is to use subscripts to reuse steps that have already been taken:
-
-\begin{center}
-$A_1;\overline{A_1||C};B$
-\end{center}
-
-We could interpret this to mean that our flow begins at A_1, and then joins at B from A_1
-and C (where C follows from that same A_1).
-
-Another cleaner possibility is that we could use a symbol that refers back to the origin, such as:
-
-\begin{center}
-$A;\overline{@||C};B$
-\end{center}
-
-Here "@" refers to A. It also implies both that processing only happens at $A$ once
-and that $A$ is joined with $C$ at $B$.
 
 
 ** Traversals
