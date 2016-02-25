@@ -360,7 +360,7 @@ TraceReport ::= \  &UUID \notag \\
 \end{align}
 
 The trade-off is that a $TraceReport$ would require more memory, growing with
-the number of predecessors.
+the number of actual predecessors for the relevant traversal.
 
 *** Trace Uniqueness
 
