@@ -63,16 +63,22 @@ def accept_order(msg):
 
 
 SOH = '\x01'
-TAGS = {'0': ('message_id', str),
-        '1': ('client_id', str),
-        '11': ('order_id', str),
-        '38': ('order_qty', float),
-        '44': ('price', float),
-        '54': ('side', str),
-        '55': ('symbol', str),
-        '60': ('message_time', str),
-        '132': ('bid', float),
-        '133': ('offer', float),}
+# See http://www.onixs.biz/fix-dictionary/4.2/fields_by_tag.html
+# for complete tag definitions
+TAGS = {'0': ('MessageId', str),
+        '1': ('Account', str),
+        '11': ('OrderId', str),
+        '35': ('MsgType', str),
+        '37': ('OrderId', str),
+        '38': ('OrderQty', float),
+        '39': ('OrdStatus', str),
+        '44': ('Price', float),
+        '54': ('Side', str),
+        '55': ('Symbol', str),
+        '60': ('TransactTime', str),
+        '107': ('SecurityDesc', str),
+        '132': ('BidPx', float),
+        '133': ('OfferPx', float),}
 
 
 def parse_fix(input):
