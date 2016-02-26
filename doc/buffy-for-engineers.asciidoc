@@ -9,12 +9,13 @@ systems. Herein, we highlight issues that we are hoping to solve.
 
 == The Data Processing Problem
 
-The amount of data that we are producing continues to expand. People recognize
-that there could be great value in the data we accumulate. Storage has gotten
-relatively cheap compared to 20 years ago such that it’s reasonable for a
-business to retain a large amount of the data it creates. The tools used to
-process this data are still in their infancy. There are a few tools that have
-helped create an outline for how we think about data processing.
+Business today are producing more and more data. Many are accumlating more data,
+hoping to find a use for it. People recognize that there could be great value
+in the data they are accumulating. Falling storage prices now make it reasonable
+for a business to retain a large amount of the data it creates even if there is
+no immediate value. The tools used to process this data are still in their
+infancy. There are a few tools that make great exemplars of various ways
+businesses currently process data.
 
 === 3 Categories of data processing tools
 
