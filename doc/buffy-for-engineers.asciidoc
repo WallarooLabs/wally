@@ -91,6 +91,12 @@ The key point of the kappa architecture is:
  we can create a better stream processor then all our data processing can be
  stream based.
 
+The Lambda Architecture means running at least two data processing systems; at a
+cost of vastly increased operational complexity. The Kappa Architecture posits
+that rather than taking on that cost, we should look to improve the faults in
+our stream processing systems (like accuracy) that lead us to consider the
+Lambda Architecture in the first place.
+
 == Stream processing: The Hard parts
 
 What do most existing frameworks provide? What do they leave out? State
@@ -147,7 +153,7 @@ Buffy is a fast, accurate, reliable and scalable stream processing platform that
 allows the easy development and implementation of real-time applications.
 
 Buffy is Fast::
-Processing latencies are measured in milliseconds and have compact distributions.
+Processing latencies are measured in nanoseconds and have compact distributions.
 
 Buffy is Accurate::
 Exactly-once processing is guaranteed by using idempotent data structures and processing logic.
