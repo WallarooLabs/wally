@@ -66,7 +66,7 @@ SOH = '\x01'
 TAGS = {'0': ('message_id', str),
         '1': ('client_id', str),
         '11': ('order_id', str),
-        '38': ('order_qty', int),
+        '38': ('order_qty', float),
         '44': ('price', float),
         '54': ('side', int),
         '55': ('symbol', str),
@@ -89,5 +89,4 @@ def test_parse_fix():
              '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
              '10=108\x01')
     output = parse_fix(input)
-    print(output)
     assert(0)
