@@ -94,6 +94,11 @@ def test_parse_fix():
              '21=3\x0138=4000\x0140=2\x0144=252.85366153511416\x0154=1\x01'
              '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
              '10=108\x01')
-    output = parse_fix(input)
+    expected = {'Account': 'CLIENT35', 'OrderQty': 4000.0, 'Symbol': 'TSLA',
+                'Price': 252.85366153511416, 'OrderId': 's0XCIa',
+                'TransactTime': '20151204-14:30:00.000',
+                'SecurityDesc': 'Tesla Motors', 'Side': '1', 'MsgType': 'D'}
 
-    assert(0)
+    output = parse_fix(input)
+    assert(output == expected)
+
