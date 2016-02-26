@@ -146,7 +146,7 @@ Buffy is a fast, accurate, reliable and scalable stream processing platform that
 allows the easy development and implementation of real-time applications.
 
 Buffy is Fast::
-Processing latencies are measured in milliseconds and have compact distributions.
+Processing latencies are measured in nanoseconds and have compact distributions.
 
 Buffy is Accurate::
 Exactly-once processing is guaranteed by using idempotent data structures and processing logic.
