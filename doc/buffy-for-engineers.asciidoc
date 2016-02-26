@@ -241,7 +241,7 @@ tunable.
 === Buffy: the components
 
 Let’s quickly touch on each of the core components of Buffy and what we get from
-them. We will discuss each in more depth later. What’s important now it to
+them. We will discuss each in more depth later. What’s important now is to
 understand the role each plays in the larger system.
 
 Clustered solution::
