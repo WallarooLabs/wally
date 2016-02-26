@@ -102,3 +102,13 @@ def test_parse_fix():
     output = parse_fix(input)
     assert(output == expected)
 
+
+def test_func():
+    input = ('8=FIX.4.2\x019=121\x0135=D\x011=CLIENT35\x0111=s0XCIa\x01'
+             '21=3\x0138=4000\x0140=2\x0144=252.85366153511416\x0154=1\x01'
+             '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
+             '10=108\x01')
+
+   func(input)
+
+   assert(0)
