@@ -68,7 +68,7 @@ TAGS = {'0': ('message_id', str),
         '11': ('order_id', str),
         '38': ('order_qty', float),
         '44': ('price', float),
-        '54': ('side', int),
+        '54': ('side', str),
         '55': ('symbol', str),
         '60': ('message_time', str),
         '132': ('bid', float),
@@ -89,4 +89,5 @@ def test_parse_fix():
              '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
              '10=108\x01')
     output = parse_fix(input)
+
     assert(0)
