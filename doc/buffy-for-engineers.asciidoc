@@ -240,7 +240,7 @@ tunable.
 
 === Buffy: the components
 
-Let’s quickly touch on each of the core components of Buffy and we what get from
+Let’s quickly touch on each of the core components of Buffy and what we get from
 them. We will discuss each in more depth later. What’s important now it to
 understand the role each plays in the larger system.
 
