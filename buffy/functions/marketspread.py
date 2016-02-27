@@ -65,15 +65,19 @@ def accept_order(msg):
 SOH = '\x01'
 # See http://www.onixs.biz/fix-dictionary/4.2/fields_by_tag.html
 # for complete tag definitions
+MSG_TYPES = {'0': 'heartbeat',
+             'D': 'order',}
+SIDES = {'1': 'buy',
+         '2': 'sell',}
 TAGS = {'0': ('MessageId', str),
         '1': ('Account', str),
         '11': ('OrderId', str),
-        '35': ('MsgType', str),
+        '35': ('MsgType', lambda v: MSG_TYPES.get(v, None)),
         '37': ('OrderId', str),
         '38': ('OrderQty', float),
         '39': ('OrdStatus', str),
         '44': ('Price', float),
-        '54': ('Side', str),
+        '54': ('Side', lambda v: SIDES.get(v, None)),
         '55': ('Symbol', str),
         '60': ('TransactTime', str),
         '107': ('SecurityDesc', str),
@@ -97,7 +101,8 @@ def test_parse_fix():
     expected = {'Account': 'CLIENT35', 'OrderQty': 4000.0, 'Symbol': 'TSLA',
                 'Price': 252.85366153511416, 'OrderId': 's0XCIa',
                 'TransactTime': '20151204-14:30:00.000',
-                'SecurityDesc': 'Tesla Motors', 'Side': '1', 'MsgType': 'D'}
+                'SecurityDesc': 'Tesla Motors', 'Side': 'buy',
+                'MsgType': 'order'}
 
     output = parse_fix(input)
     assert(output == expected)
