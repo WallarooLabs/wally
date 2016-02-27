@@ -17,11 +17,11 @@ FUNC_NAME = 'Marketspread'
 def func(input):
     # Deserialize input
     msg = parse_fix(input)
-    if msg['type'] == 'nbbo':
-        process_order(msg)
-    elif msg['type'] == 'order':
-        process_order(msg)
-    elif msg['type'] in ('fill', 'heartbeat'):
+    if msg['MsgType'] == 'nbbo':
+        return process_order(msg)
+    elif msg['MsgType'] == 'order':
+        return process_order(msg)
+    elif msg['MsgType'] in ('fill', 'heartbeat'):
         return None
 
 
