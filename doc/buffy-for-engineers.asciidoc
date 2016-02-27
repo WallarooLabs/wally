@@ -2,20 +2,20 @@
 
 == What to expect from this document
 
-This document is an introduction to what we are doing with as part of our Buffy
+This document is an introduction to what we are doing as part of our Buffy
 project. In general, this document should be an intro level document that
 assumes experience with computers but limited experience with distributed
-systems. Herein, we highlight issues that are hoping to solve and provide
-pointers for the reader to start learning more about those topics.
+systems. Herein we highlight issues that we are hoping to solve.
 
 == The Data Processing Problem
 
-The amount of data that we are producing continues to expand. People recognize
-that there could be great value in the data we accumulate. Storage has gotten
-relatively cheap compared to 20 years ago such that it’s reasonable for a
-business to retain a large amount of the data it creates. The tools used to
-process this data are still in their infancy. There are a few tools that have
-helped create an outline for how we think about data processing.
+Businesses today are producing more and more data. Many are accumulating more data,
+hoping to find a use for it. People recognize that there could be great value
+in the data they are accumulating. Falling storage prices now make it reasonable
+for a business to retain a large amount of the data it creates even if there is
+no immediate value. The tools used to process this data are still in their
+infancy. There are a few tools that make great exemplars of various ways
+businesses currently process data.
 
 === 3 Categories of data processing tools
 
@@ -24,20 +24,20 @@ Roughly, they fall into 3 categories: batch, micro-batch, and stream processing.
 ==== Batch Processing
 
 Batch systems are best exemplified by Hadoop. At this point, if there is one
-data processing system that people are likely to have heard of, its Hadoop. The
-question  “How is X different than Hadoop?” is still so common that in the
+data processing system that people are likely to have heard of, it's Hadoop. The
+question  “How is X different from Hadoop?” is still so common that in the
 distributed systems, data processing space it is often deployed for ridiculous
-intent “How is that grilled cheese sandwich different than Hadoop?” The majority
+intent: “How is that grilled cheese sandwich different from Hadoop?” The majority
 of our existing data processing is done using batch systems of various sizes and
 flavors. What they have in common is that they take a predetermined set of data,
-that is, a batch, and operate on it for some period of time; usually measured in
-hours or days before finally returning results. They can help us learn from
+that is, a batch, and operate on it for some period of time, usually measured in
+hours or days, before finally returning results. They can help us learn from
 large amounts of data but the time to learn can be slow.
 
 ==== Micro-batch processing
 
 Micro-batch systems are best exemplified by Spark Streaming. A micro-batch
-system still operates on batches of data a time, but they are small. Perhaps
+system still operates on batches of data at a time, but they are small. Perhaps
 1,000 or 100,000 records. Our time to process is generally much lower, often
 measured in minutes rather than hours.
 
@@ -53,17 +53,17 @@ measured in milliseconds and seconds rather than hours.
 
 Stream processing has a long history but has recently popped back into the
 computing public’s general knowledge with growing interest in Apache Storm as
-well as some other projects such as Samza, S3, Amazon Lambda and commercial
+well as some other projects such as Samza, S4, Amazon Lambda and commercial
 offerings like Streambase.
 
 === Processing Architectures
 
 Nathan Marz, the original developer of Storm, wrote a book called “Big Data:
-Principles and best practices of scalable realtime data systems” that introduces
+Principles and Best Practices of Scalable Realtime Data Systems” that introduces
 what he calls “The Lambda Architecture” as a way to address our data processing
 problem. In response to the introduction of the Lambda Architecture, Jay Kreps
 introduced the idea of the Kappa Architecture. Each has a different take on how
-to integrate stream processing into an overall data handling.
+to integrate stream processing into an overall data handling system.
 
 ==== The Lambda Architecture
 
@@ -76,7 +76,7 @@ system at a time, the streaming system and the batch system. In addition, to
 this operational complexity, you also have the difficulty of stitching the
 results together. The lambda architecture can be appealing if you have an
 existing batch system as you can then work out how to integrate more up to date
-results from a streaming system that you add-on to your existing architecture.
+results from a streaming system that you add on to your existing architecture.
 
 ==== Kappa Architecture
 
@@ -91,17 +91,24 @@ The key point of the kappa architecture is:
  we can create a better stream processor then all our data processing can be
  stream based.
 
+The Lambda Architecture means running at least two data processing systems; at a
+cost of vastly increased operational complexity. The Kappa Architecture posits
+that rather than taking on that cost, we should look to improve the faults in
+our stream processing systems (like accuracy) that lead us to consider the
+Lambda Architecture in the first place.
+
 == Stream processing: The Hard parts
 
-What do most existing frameworks provide. What do they leave out. State
+What do most existing frameworks provide? What do they leave out? State
 processing is hard. Idempotent processing is hard. Roll your own is difficult
 to get right.
 
 Popular stream processing frameworks such as Storm handle the easiest parts of
 the problem and leave the programmer holding the bag for the difficult parts.
-Getting high throughput or low latency isn’t particularly hard.
+Getting high throughput or low latency isn’t particularly hard. However, providing
+“exactly once” semantics is.
 
-However, providing “exactly once” semantics is. Exactly once is a holy grail of
+Exactly once is a holy grail of
 sorts in stream processing. Ideally, we want each message to be delivered and
 processed once and only once. However, in the face of failures, that isn’t
 possible. Imagine Alice and Bob talking over an unreliable connection. Each
@@ -135,7 +142,7 @@ State management is hard.
 
 == Our Solution: Buffy
 
-The Sendence solution, our internal project is code named Buffy. It's important
+The Sendence solution, our internal project, is code named Buffy. It's important
 to understand what our goals are at a high level. This is what we are working
 towards. How we get there is less important than reaching our goals and how we
 balance between the competing interests of those goals.
@@ -146,7 +153,7 @@ Buffy is a fast, accurate, reliable and scalable stream processing platform that
 allows the easy development and implementation of real-time applications.
 
 Buffy is Fast::
-Processing latencies are measured in milliseconds and have compact distributions.
+Processing latencies are measured in nanoseconds and have compact distributions.
 
 Buffy is Accurate::
 Exactly-once processing is guaranteed by using idempotent data structures and processing logic.
@@ -173,13 +180,14 @@ High Throughput:::
 Processing rates for Buffy should be measured in the millions of messages per
 second.
 Low Latency:::
-Buffy will allow for low latency use cases. Initial targets will be processing
-100k messages/sec with 1 ms latency and upwards of 500k messages/sec with 2 ms
-latency. We want to be able to maintain our low latencies while scaling
-horizontally. This means that features such as message delivery guarantees can’t
-come with the high overheads.
+Buffy will allow for low latency use cases. We measure of latencies in
+microseconds not milliseconds. Our goal is for Buffy and its various features to
+add as little overhead as possible. By keeping our overhead low, we hope to
+enable a new generation of applications that are currently only available via
+custom development. This means that features such as message delivery guarantees
+can’t come with the high overheads.
 +
-Saying low latency is all well and good but, what
+Saying "low latency" is all well and good but, what
 is our measurement for low latency? 95p? 99p? We haven’t come up with a hard
 determination of that. However, we know that we want to have soft real time
 latency guarantees such that tail latencies are within striking range of our
@@ -187,20 +195,19 @@ targets rather than the hockey stick latencies that one sees from many
 distributed systems.
 
 Accurate::
-Exactly-once processing in a distributed system is impossible. We have two options:
-At-most-once processing and At-least-once processing.
+Exactly-once delivery in a distributed system is impossible. We have two options:
+At-most-once delivery and At-least-once delivery.
 +
-In our worst case scenario, at-most-once processing means that we might never
-process some message. At-least-once processing worst case is that we might
+In our worst case scenario, at-most-once delivery means that we might never
+process some message. At-least-once delivery worst case is that we might
 process a message more than once. Either way, this is a disaster if we want to
 be as accurate as possible. You can achieve the semantics of exactly-once
 processing in an at-least-once system by doing idempotent processing of
-messages. That is, processing a message more than once, has no more of an
+messages. That is, processing a message more than once has no more of an
 impact that processing it once.
 +
-At the core of Buffy are platform provided idempotent data structures that when
-used with the rest of Buffy allows us to provide at-least-once delivery while
-maintaining exactly-once semantics.
+Buffy provides idempotent data structures that allows us to provide
+at-least-once delivery while maintaining exactly-once semantics.
 
 Reliable::
 Guaranteed message processing + self healing.
@@ -233,8 +240,8 @@ tunable.
 
 === Buffy: the components
 
-Let’s quickly touch on each of the core components of Buffy and we what get from
-them. We will discuss each in more depth later. What’s important now it to
+Let’s quickly touch on each of the core components of Buffy and what we get from
+them. We will discuss each in more depth later. What’s important now is to
 understand the role each plays in the larger system.
 
 Clustered solution::
@@ -257,7 +264,7 @@ prevent having to fetch needed data from other nodes in the cluster.
 === Buffy: the architecture
 
 Earlier we said that the hardest part of stream processing is state management
-and idempotent processing. We further said that Buffy would solve this for
+and idempotent processing. We further said that Buffy would solve this for the
 programmer in a seamless fashion. Given that we are making this a core value
 proposition of Buffy, it makes sense to start our discussion of Buffy with how
 it addresses these issues.
@@ -291,7 +298,7 @@ Not losing our state and not double counting are the hard work of stream
 processing that Storm and frameworks of its ilk push off onto the programmer.
 
 Buffy puts our state management and idempotent processing at the core of the
-developer experience. (this is not the only way to model our data) With Buffy,
+developer experience. With Buffy,
 we start with 1 or more idempotent data structures that can store our state. In
 the simplest example, we can have a single data structure for all words. This
 data structure is a map that in turn contains keys and values. Each key is the
@@ -312,7 +319,7 @@ increments the corresponding counters. Because we are using CRDTs to represent
 our map and counters, we can safely concurrently update the messages without
 coordination. Further, our data structure is made idempotent so we can
 increment its state for the same incoming message multiple times without a
-corresponding increase in state. One example way or handling this would be to
+corresponding increase in state. One simple way of handling this would be to
 store counter state as a tuple of (source_id, increment amount). So if our
 counter is:
 
@@ -347,8 +354,6 @@ out what it means. For the time being, queryable internal data should be ignored
 as it probably won’t be the same idempotent data structures that we are using
 elsewhere.
 
-< Should have a data processing loop diagram here >
-
 == Buffy: the platform
 
 A streaming data processor itself is great but, to provide customers with a
@@ -357,18 +362,19 @@ that includes monitoring and management including a friendly UI.
 
 === Applications
 
-Multiple data flows/pipelines running on a cluster, possibly sharing steps
+Multiple data flows/pipelines running on a cluster, possibly sharing steps.
 
 === Monitoring and Management
 
-Buffy will include comprehensive monitoring and management capabilities. Both
-will span the different parts of the platform from the physical servers to the
-services that make up the platform to the applications/flows running on top of
-the platform. The purpose of the management functionality is to allow people to
-easily operate and administer the platform, it’s components, and the
-applications running on top.
+Buffy will include comprehensive monitoring and management capabilities as well
+as a level of debugability not available in the alternatives. Monitoring and
+management will span the different parts of the platform from the physical
+servers to the services that make up the platform to the applications/flows
+running on top of the platform. The purpose of the management functionality is
+to allow people to easily operate and administer the platform, its components,
+and the applications running on top.
 
-At the core of the platform’s monitoring and management is Syntelligence.
+At the core of monitoring and management is Syntelligence.
 Syntelligence is the automated self-healing capability of Buffy. It will use a
 combination of machine learning, data correlation, anomaly detection, monitoring
 data and event data in order to identify and resolve issues (service crash,
@@ -391,37 +397,14 @@ Monitoring capabilities include::
 * System event logs such as server up, service started, service shutdown etc
 * Syntelligence history & logs
 
-=== UI
+Debugging capabilities include::
 
-UI is a “dataflow UI”. Different flows (topologies) can share segments. Imagine
-a UI that allows you to see all the interconnected nodes  and map out specific
-ones as a “named” flow that you can then get latency and throughput metrics on
-(plus other UI reporting).
+* Full message tracing
+* Auditing of application state at the time decisions were made
 
-What does the highest level of UI/metrics look like? “Messages” processed?
-Latency doesn’t mean anything without a flow but you can still have throughput
-from number of messages processed.
+== Next steps
 
-Flow is a user defined series of linked idempotent processing (DAG) that has a
-single beginning point and end point that you can trace and monitor (latency etc)
-
-Open question: what does a recursive flow look like? What’s the base case?
-
-Is a flow user defined or is it user selected. All flows in the platonic sense
-already exist. We are merely selecting some that we care about.
-
-=== Machine Learning
-
-how machine learning fits in with the platform
-
-
-current systems are brittle/fragile in production and require a tremendous effort to keep running smoothly
-
-If we can build something that works reliably under pressure, at the scale we’re talking about, then that’s already a big deal
-
-programming models for existing systems don’t take idempotence into account and leave it to programmers which is a difficult and error prone exercise. accuracy and signal quality need to built into the core platform
-
-existing systems do not allow for signal quality to be measured or exposed to the business logic layer to make intelligent decisions on whether to use the data or not (critical in real-time systems)
-
-existing systems don’t provide predictable means of determining what hardware resources are required to meet a specific SLA
-
+Hopefully by now, you have a decent feel for what we are trying to accomplish
+with Buffy. We've glossed over a ton of details in this document and we've left
+a variety of ideas out. You should have enough background now to start digging
+into more detailed documents about Buffy.
