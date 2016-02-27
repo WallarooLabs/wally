@@ -42,12 +42,13 @@ def process_nbbo(msg):
 
 def process_order(msg):
     # Orders
-    if msg['type'] == 'order':
+    orders = state.get_attribute('orders', {})
+    market = state.get_attribute('market', {})
+    if msg['MsgType'] == 'order':
         # Reject order if: order already exists, the symbol has
         # stop_new_orders set to True or ???
-        if (msg['order'] in state.get_attribute('orders', {}) or
-            state.get_attribute('market',
-                                {})[msg['symbol']]['stop_new_orders']):
+        if (msg['OrderId'] in orders or not msg['Symbol'] in market or
+            market[msg['Symbol']]['stop_new_orders']):
             return reject_order(msg)
 
         # otherwise, accept the order
@@ -55,11 +56,19 @@ def process_order(msg):
 
 
 def reject_order(msg):
-    pass
+    return ("New Order: ({client}, {symbol}, {status}, {quantity}): "
+            "{status}".format(client=msg['Account'],
+                              symbol=msg['Symbol'],
+                              quantity=msg.get('OrderQty', None),
+                              status='Rejected'))
 
 
 def accept_order(msg):
-    pass
+    return ("New Order: ({client}, {symbol}, {status}, {quantity}): "
+            "{status}".format(client=msg['Account'],
+                              symbol=msg['Symbol'],
+                              quantity=msg.get('OrderQty', None),
+                              status='Accepted'))
 
 
 SOH = '\x01'
@@ -113,7 +122,6 @@ def test_func():
              '21=3\x0138=4000\x0140=2\x0144=252.85366153511416\x0154=1\x01'
              '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
              '10=108\x01')
-
-   func(input)
-
-   assert(0)
+    expected = 'New Order: (CLIENT35, TSLA, Rejected, 4000.0): Rejected'
+    output = func(input)
+    assert(output == expected)
