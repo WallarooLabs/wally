@@ -28,15 +28,15 @@ def func(input):
 
 def process_nbbo(msg):
     # Update market info in memory
-    state.get_attribute('market', {})[msg['symbol']] = {
-        'id': msg['id'],
-        'last_msg_time': msg['time'],
-        'symbol': msg['symbol'],
-        'bid': msg['bid'],
-        'offer': msg['offer'],
-        'mid': (msg['bid'] + msg['offer'])/2,
-        'stop_new_orders': ((msg['offer'] - msg['bid']) >= 0.05 and
-                            (msg['offer'] - msg['bid']) >= 0.05)}
+    state.get_attribute('market', {})[msg['Symbol']] = {
+        #'id': msg['id'],
+        'time': msg['TransactTime'],
+        'symbol': msg['Symbol'],
+        'bid': msg['BidPx'],
+        'offer': msg['OfferPx'],
+        'mid': (msg['BidPx'] + msg['OfferPx'])/2,
+        'stop_new_orders': ((msg['OfferPx'] - msg['BidPx']) >= 0.05 and
+                            (msg['OfferPx'] - msg['BidPx']) >= 0.05)}
     return None
 
 
