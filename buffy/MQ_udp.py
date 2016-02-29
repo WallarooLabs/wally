@@ -22,6 +22,7 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
         self.transport = transport
 
     def datagram_received(self, data, addr):
+        LOGGER.debug("Received datagram from {}".format(addr))
         splat = mq_parse.decode(data).split(':')
         verb = splat[0]
         msg = splat[1] if len(splat) > 1 else ''
@@ -39,6 +40,7 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
                 t0, msg = QUEUE.get_nowait()
                 self.transport.sendto(mq_parse.encode(msg),
                                       addr)
+                LOGGER.debug("Sent datagram to {}".format(addr))
                 # Compute time between when event was inserted
                 # and when it was consumed by a remote client
                 dt = time.time()-t0
@@ -53,10 +55,12 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
             except asyncio.queues.QueueEmpty:
                 self.transport.sendto(mq_parse.encode(''),
                                       addr)
+                LOGGER.debug("Sent datagram to {}".format(addr))
         elif verb == 'SIZE':
             self.transport.sendto(
                 mq_parse.encode('{}'.format(QUEUE.qsize())),
                 addr)
+            LOGGER.debug("Sent datagram to {}".format(addr))
 
     def connection_lost(self, exc):
         self.transport = None
@@ -94,7 +98,9 @@ def emit_statistics(t0, t1, *stats):
               help='Log output to file.')
 @click.option('--stats-period', default=60,
               help='The period over which stats are measured.')
-def start(address, console_log, file_log, stats_period):
+@click.option('--log-level', default='info', help='Log level',
+              type=click.Choice(['debug', 'info', 'warn', 'error']))
+def start(address, console_log, file_log, stats_period, log_level):
     # Parse address string to host and port str:int pair
     host, port = [f(x) for f,x in
                   zip((str, int), address.split(':'))]
@@ -108,7 +114,8 @@ def start(address, console_log, file_log, stats_period):
     LOGGER = fs.get_logger('logs/{}.{}'.format('MQ',
                                                '{}-{}'.format(host, port)),
                            stream_out=console_log,
-                           file_out=file_log)
+                           file_out=file_log,
+                           level=log_level)
     LOGGER.info('Starting Message Queue...')
     LOGGER.info('Address: %s', (host, port))
 
