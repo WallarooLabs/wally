@@ -179,7 +179,7 @@ $A;\overline{@||C};B$
 \end{center}
 
 Here "@" refers to A. It also implies both that processing only happens at $A$ once
-and that $A$ is joined with $C$ at $B$. See the Relay Worker section below for
+and that $A$ is joined with $C$ at $B$. See the Relay Workers section below for
 a more in-depth explanation of the semantics of "@".
 
 Finally, a *subflow* of a $Flow$ is any component $Flow$. For example,
