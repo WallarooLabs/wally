@@ -376,7 +376,8 @@ we'd have \[\binom{100}{4}\] or 3,921,225 possibilities. This indicates that
 the algorithm doesn't scale.
 
 For this reason, the new approach is to have a worker send its predecessor hashes
-as well as its own hash. The predecessor hashes can be used to uniquely
+as well as its own hash. These hashes are calculated without needing a hop count.
+The predecessor hashes can be used to uniquely
 identify predecessor $TraceReports$ within a $Trace$ without having to try
 out possibilities.
 
