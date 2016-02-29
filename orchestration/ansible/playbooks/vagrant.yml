@@ -1,0 +1,36 @@
+# Apply common configuration to all hosts
+- hosts: all
+  roles:
+  - { role: common, become: yes }
+
+# Configure and deploy leader servers.
+- hosts: buffy-leader*
+  vars_files:
+    - 'docker_creds.yml'
+  vars:
+    ethernet_interface: eth1
+    ptpd_role: master
+    ptpd_transport: multicast
+    swarm_image: swarm
+    consul_image: gliderlabs/consul
+    docker_users: vagrant
+  roles:
+  - { role: ptpd, become: yes }
+  - { role: docker, become: yes }
+
+# Configure and deploy follower servers.
+- hosts: buffy-follower*
+  vars_files:
+    - 'docker_creds.yml'
+  vars:
+    ethernet_interface: eth1
+    ptpd_role: slave
+    ptpd_transport: multicast
+    leader_ip: "{{ hostvars['buffy-leader-1']['ansible_' + ethernet_interface]['ipv4']['address'] }}"
+    swarm_image: swarm
+    consul_image: gliderlabs/consul
+    docker_users: vagrant
+  roles:
+  - { role: ptpd, become: yes }
+  - { role: docker, become: yes }
+

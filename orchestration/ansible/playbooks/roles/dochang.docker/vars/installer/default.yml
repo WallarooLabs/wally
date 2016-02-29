@@ -1,0 +1,3 @@
+---
+docker_installer: default
+docker_package: docker

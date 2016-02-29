@@ -1,0 +1,69 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.require_version ">= 1.8.1"
+
+# this Vagrantfile only works with VirtualBox so we set the default provider here
+# so we can skip the --provider virtualbox option
+ENV['VAGRANT_DEFAULT_PROVIDER'] = 'virtualbox'
+LEADER_COUNT = 1
+FOLLOWER_COUNT = 2
+START_IP = "10.0.1.200"
+leaders = {}
+followers = {}
+
+require 'ipaddr'
+
+ip_next = START_IP
+
+LEADER_COUNT.times do |i|
+  leaders[i] = i.times.inject(IPAddr.new ip_next) { |curr_ip| curr_ip.send('succ')}.to_s
+end
+
+ip_next = LEADER_COUNT.times.inject(IPAddr.new ip_next) { |curr_ip| curr_ip.send('succ')}.to_s
+
+FOLLOWER_COUNT.times do |i|
+  followers[i] = i.times.inject(IPAddr.new ip_next) { |curr_ip| curr_ip.send('succ')}.to_s
+end
+
+Vagrant.configure(2) do |config|
+
+  ip_next = START_IP
+
+  leaders.each do |i, ip|
+    node_name = "buffy-leader-#{i+1}"
+    config.vm.define node_name do |c|
+      c.vm.hostname = node_name
+      c.vm.network :private_network, ip: ip
+      c.vm.box = "ubuntu/wily64"
+      c.vm.synced_folder ".", "/vagrant"
+      c.vm.synced_folder "~/.aws/", "/home/vagrant/.aws"
+      c.vm.synced_folder "~/.aws/", "/root/.aws"
+
+      c.ssh.forward_agent = true
+      c.vm.provider "virtualbox" do |vb|
+        vb.memory = 1024
+        vb.cpus = 2
+      end
+    end
+  end
+
+  followers.each do |i, ip|
+    node_name = "buffy-follower-#{i+1}"
+    config.vm.define node_name do |c|
+      c.vm.hostname = node_name
+      c.vm.network :private_network, ip: ip
+      c.vm.box = "ubuntu/wily64"
+      c.vm.synced_folder ".", "/vagrant"
+      c.vm.synced_folder "~/.aws/", "/home/vagrant/.aws"
+      c.vm.synced_folder "~/.aws/", "/root/.aws"
+
+      c.ssh.forward_agent = true
+      c.vm.provider "virtualbox" do |vb|
+        vb.memory = 1024
+        vb.cpus = 2
+      end
+    end
+  end
+
+end

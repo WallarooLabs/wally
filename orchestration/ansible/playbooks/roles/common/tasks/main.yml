@@ -1,0 +1,30 @@
+- name: Install common packages
+  apt: name={{ item }} state=present
+  with_items:
+   - libpcap0.8
+   - python-boto
+   - python-pip
+   - python3
+   - python3-pip
+   - python3-numpy
+
+- name: Install python3 click
+  command: python3 -m pip install click
+
+- name: Get ptpd deb for armhf
+  s3: bucket=sendence-dev object=/installers/ptpd/ptpd_2.3.2-master-1_armhf.deb dest=/tmp/ptpd_2.3.2-master-1_armhf.deb mode=get
+  when: ansible_architecture == "armhf"
+
+- name: Install ptp for armhf
+  apt: deb=/tmp/ptpd_2.3.2-master-1_armhf.deb
+  when: ansible_architecture == "armhf"
+
+- name: Get ptpd deb for x86_64
+  s3: bucket=sendence-dev object=/installers/ptpd/ptpd_2.3.2-master-1_amd64.deb dest=/tmp/ptpd_2.3.2-master-1_amd64.deb mode=get
+  when: ansible_architecture == "x86_64"
+
+- name: Install ptp for x86_64
+  apt: deb=/tmp/ptpd_2.3.2-master-1_amd64.deb
+  when: ansible_architecture == "x86_64"
+
+

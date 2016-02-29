@@ -1,0 +1,9 @@
+- name: Configure ptpd file
+  template: src=ptpd.j2 dest=/etc/default/ptpd
+  tags: ptpd
+  notify: restart ptpd
+
+- name: Start the ptpd service
+  service: name=ptpd state=started enabled=yes
+  tags: ptpd
+

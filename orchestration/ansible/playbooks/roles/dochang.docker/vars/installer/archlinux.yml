@@ -1,0 +1,3 @@
+---
+docker_installer: pacman
+docker_package: docker

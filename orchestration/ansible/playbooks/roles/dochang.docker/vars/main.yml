@@ -1,0 +1,4 @@
+---
+docker_installer: default
+docker_package: docker
+docker_install_helper_script: /tmp/ansible-docker-install-helper
