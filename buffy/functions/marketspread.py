@@ -47,20 +47,26 @@ def process_order(msg):
     if msg['MsgType'] == 'order':
         # Reject order if: order already exists, the symbol has
         # stop_new_orders set to True or ???
-        if (msg['OrderId'] in orders or not msg['Symbol'] in market or
-            market[msg['Symbol']]['stop_new_orders']):
-            return reject_order(msg)
+        if msg['OrderId'] in orders:
+            return reject_order(msg, 'Order already exists')
+        elif not msg['Symbol'] in market:
+            return reject_order(msg,
+                                'Unknown symbol: {}'.format(msg['Symbol']))
+        elif market[msg['Symbol']]['stop_new_orders']:
+            return reject_order(msg,
+                                '{} - Stop New Orders'.format(msg['Symbol']))
 
         # otherwise, accept the order
         return accept_order(msg)
 
 
-def reject_order(msg):
+def reject_order(msg, reason):
     return ("New Order: ({client}, {symbol}, {status}, {quantity}): "
-            "{status}".format(client=msg['Account'],
+            "{status}: {reason}".format(client=msg['Account'],
                               symbol=msg['Symbol'],
                               quantity=msg.get('OrderQty', None),
-                              status='Rejected'))
+                              status='Rejected',
+                              reason=reason))
 
 
 def accept_order(msg):
@@ -122,6 +128,6 @@ def test_func():
              '21=3\x0138=4000\x0140=2\x0144=252.85366153511416\x0154=1\x01'
              '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
              '10=108\x01')
-    expected = 'New Order: (CLIENT35, TSLA, Rejected, 4000.0): Rejected'
+    expected = 'New Order: (CLIENT35, TSLA, Rejected, 4000.0): Rejected: Unknown symbol: TSLA'
     output = func(input)
     assert(output == expected)
