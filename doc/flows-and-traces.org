@@ -149,8 +149,10 @@ A-      ->D----->G
 This more complex fork and join can be represented as
 
 \begin{center}
-$A;\overline{B;\overline{C||D}||E;F};G$
+$A;\overline{[B;\overline{C||D}]||[E;F]};G$
 \end{center}
+
+Note the use of square brackets to group the conjuncts of the initial fork.
 
 This model for expressing flows cannot capture every case as it stands. Consider the following:
 
@@ -191,7 +193,7 @@ $E;F$
 is a subflow of
 
 \begin{center}
-$\overline{B;\overline{C||D}||E;F}$
+$\overline{[B;\overline{C||D}]||[E;F]}$
 \end{center}
 
 *** ASCII Version
@@ -201,7 +203,7 @@ of overlines for joins. It also uses [] to demarcate groupings. For example,
 consider a more complex example from the last section:
 
 \begin{center}
-$A;\overline{B;\overline{C||D}||E;F};G$
+$A;\overline{[B;\overline{C||D}]||[E;F]};G$
 \end{center}
 
 The ASCII version would look like
@@ -231,7 +233,6 @@ A--------->C
  \       /
   -->B-->
 \end{verbatim}
-
 
 can be (and must be notationwise) thought of as:
 
