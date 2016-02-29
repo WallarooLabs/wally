@@ -179,7 +179,8 @@ $A;\overline{@||C};B$
 \end{center}
 
 Here "@" refers to A. It also implies both that processing only happens at $A$ once
-and that $A$ is joined with $C$ at $B$.
+and that $A$ is joined with $C$ at $B$. See the Relay Workers section below for
+a more in-depth explanation of the semantics of "@".
 
 Finally, a *subflow* of a $Flow$ is any component $Flow$. For example,
 
@@ -209,6 +210,37 @@ The ASCII version would look like
 $A;[[B;[C||D]]||[E;F]];G$
 \end{center}
 
+*** Relay Workers
+
+"@" stands for what we can call the “Relay Worker”, which is a stateless
+passthrough worker.  Wherever X;Y shows up in a flow, you can interpolate a "@"
+without changing the spec.  So X;Y can be converted to X;@;Y or X;@;@;Y, etc.
+Furthermore, wherever "@" is preceded or followed directly by a sequence operator,
+that "@" can be removed without changing the spec.  For example, X;@;Y can be
+converted to X;Y, Z;@ can be converted to Z, and @;Z can be converted to Z.
+
+"@" cannot be added or removed from a fork or choice without changing the spec,
+however, as it denotes the implicit expansion that occurs when a worker is
+joined with one of its descendents.  So \[A;\overline{@||B};C\] is not equivalent
+to A;B;C, since the latter leaves out the join at C.
+
+To illustrate:
+
+\begin{verbatim}
+A--------->C
+ \       /
+  -->B-->
+\end{verbatim}
+
+
+can be (and must be notationwise) thought of as:
+
+\begin{verbatim}
+A--->@---->C
+ \       /
+  -->B-->
+\end{verbatim}
+
 
 *** Restrictions
 
@@ -224,6 +256,9 @@ in parallel.
 
 An exclusive choice between two worker types, on the other hand, is a valid
 starting point since only one of the options is allowed in any given traversal.
+
+Finally, a Flow cannot begin with "@", since a stateless worker cannot
+generate UUIDs.
 
 
 ** Traversals
@@ -340,13 +375,11 @@ which is 210 sets of 4 predecessors. If we had 100 possible predecessors,
 we'd have \[\binom{100}{4}\] or 3,921,225 possibilities. This indicates that
 the algorithm doesn't scale.
 
-For this reason, it might make sense to give up the hash approach. Instead
-of sending along a hash to a successor, a worker instance can send along
-a $(Type,Instance,LocalStamp)$ triple. The $LocalStamp$ is based on a logical clock
-local to the worker instance adding the stamp.
-Then, instead of using hash, hop count, and predecessor count in a $TraceReport$, we could
-send a list of $(Type,Instance,LocalStamp)$ triples that could be used to uniquely
-identify predecessor $TraceReports$.
+For this reason, the new approach is to have a worker send its predecessor hashes
+as well as its own hash. These hashes are calculated without needing a hop count.
+The predecessor hashes can be used to uniquely
+identify predecessor $TraceReports$ within a $Trace$ without having to try
+out possibilities.
 
 According to this approach, we would define a $TraceReport$ as follows:
 
@@ -356,11 +389,12 @@ TraceReport ::= \  &UUID \notag \\
                    &\times InstanceID \notag \\
                    &\times StateIndex \notag \\
                    &\times UnderivedState \notag \\
-                   &\times Predecessors \notag
+                   &\times PredecessorHashes \notag
 \end{align}
 
 The trade-off is that a $TraceReport$ would require more memory, growing with
 the number of actual predecessors for the relevant traversal.
+
 
 *** Trace Uniqueness
 
@@ -371,15 +405,13 @@ The first property we've identified of our system is the following:
 
 *** Deriving a Traversal from a Trace
 
-Algorithm for deriving a Traversal from a Trace (provided we use the alternative to
-hashing outlined above):
+Algorithm for deriving a $Traversal$ from a $Trace$ (provided we use the alternative
+to hashing outlined above):
 
-1. Build a predecessor graph with edges directed from a $(Type,Instance,LocalStamp)$ node to its predecessors. The sink of this graph is the source of the traversal. The rule against beginning a $Flow$ with a fork or inclusive choice entails that there will be only one source per traversal.
+1. Build a predecessor graph with edges directed from a node to its predecessors (uniquely identified by their trace report hashes). The sink of this graph is the source of the traversal. The rule against beginning a $Flow$ with a fork or inclusive choice entails that there will be only one source per traversal.
 2. Reverse the graph to get directed edges going in the direction of the traversal.
-3. Beginning from the source discovered in step 1, build the Traversal, using forks for multiple edges extending from one node and joins for edges joining at a node. Though the graph uses worker instances at particular logical timestamps as nodes, the resulting $Traversal$ will denote these nodes by their type only.
+3. Beginning from the source discovered in step 1, build the $Traversal$, using forks for multiple edges extending from one node and joins for edges joining at a node. Though the graph uses worker instances as nodes, the resulting $Traversal$ will denote these nodes by their type only.
 
-If we end up using hashing, we would need to use hash matching to identify predecessors
-instead of $(Type,Instance,LocalStamp)$ triples.
 
 ** Replaying
 
