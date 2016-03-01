@@ -98,7 +98,7 @@
   - Video
   - Latency
   - https://www.youtube.com/watch?v=NEG8tMn36VQ
-* "Testing Distributed Systems w/ Deterministic Simulation
+* Testing Distributed Systems w/ Deterministic Simulation
   - Wil Wilson
   - 2014
   - Video
