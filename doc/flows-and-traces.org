@@ -111,7 +111,7 @@ $A;\overline{B|C};D$
 \end{center}
 
 In this case, the overline does not technically indicate a join, but is simply used
-to make it clearer that both $B$ and $C$ lead to $D$. [Is this how we want to do it?]
+to make it clearer that both $B$ and $C$ lead to $D$.
 
 Finally, we might want to say that a flow requires something in between a fork and a choice.
 Consider the case where we want to say that data must either flow to D along B and C or along B or
@@ -190,7 +190,7 @@ A cleaner approach is to use a symbol that refers back to the origin, such as:
 $A;\overline{@||C};B$
 \end{center}
 
-Here "@" refers to A. It also implies both that processing only happens at $A$ once
+Here "@" implies both that processing only happens at $A$ once
 and that $A$ is joined with $C$ at $B$. See the Relay Workers section below for
 a more in-depth explanation of the semantics of "@".
 
@@ -234,7 +234,7 @@ converted to X;Y, Z;@ can be converted to Z, and @;Z can be converted to Z.
 "@" cannot be added or removed from a fork or choice without changing the spec,
 however, as it denotes the implicit expansion that occurs when a worker is
 joined with one of its descendents.  So \[A;\overline{@||B};C\] is not equivalent
-to A;B;C, since the latter leaves out the join at C.
+to \[A;B;C\] since the latter leaves out the join at C.
 
 To illustrate:
 
@@ -404,7 +404,7 @@ TraceReport ::= \  &UUID \notag \\
 \end{align}
 
 The trade-off is that a $TraceReport$ would require more memory, growing with
-the number of actual predecessors for the relevant traversal.
+the number of actual predecessors.
 
 
 *** Trace Uniqueness
@@ -416,8 +416,7 @@ The first property we've identified of our system is the following:
 
 *** Deriving a Traversal from a Trace
 
-Algorithm for deriving a $Traversal$ from a $Trace$ (provided we use the alternative
-to hashing outlined above):
+Algorithm for deriving a $Traversal$ from a $Trace$:
 
 1. Build a predecessor graph with edges directed from a node to its predecessors (uniquely identified by their trace report hashes). The sink of this graph is the source of the traversal. The rule against beginning a $Flow$ with a fork or inclusive choice entails that there will be only one source per traversal.
 2. Reverse the graph to get directed edges going in the direction of the traversal.
