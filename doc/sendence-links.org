@@ -297,7 +297,7 @@
   - Chandy & Lamport
   - 1985
   - Paper
-  -.
+  - .
   - http://blog.acolyer.org/2015/04/22/distributed-snapshots-determining-global-states-of-distributed-systems/
 * Lightweight Asynchronous Snapshots for Distributed Dataflows
   - Paris Carbone, Gyula Fora, Stephan Ewen, Seif Haridi, Kostas Tzoumas
