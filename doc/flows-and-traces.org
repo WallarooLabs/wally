@@ -7,7 +7,7 @@
 
 ** Workers
 
-A *topology* is a graph of workers that can process messages, maintain and update state,
+A *topology* is a directed graph of workers that can process messages, maintain and update state,
 and send the resulting messages to other workers. The following defines a worker type:
 
 \begin{align}
@@ -21,6 +21,12 @@ on the message received and the current state (technically, its alphabet is the 
 messages $Msg$). When a worker undergoes a state transition (including the
 identity transition), it sends to each of a defined subset of $WT$ a sequence of messages,
 and, if it was not the identity transition, increments its state index.
+
+It is worth mentioning that in this context, a "message" is simply data received at
+or sent by a worker. We have called this a *handoff* in other contexts to distinguish
+it from a *logical message*. A logical message is defined as data associated with a UUID
+that is processed in steps (and possibly in parallel) in a topology. In what follows,
+we reserve the term "message" for logical messages.
 
 
 ** Flows
@@ -159,6 +165,7 @@ Note the use of square brackets to group the conjuncts of the initial fork.
 
 This model for expressing flows cannot capture every case as it stands. Consider the following:
 
+\newpage
 \begin{verbatim}
 A------------>B
   \         /
