@@ -37,44 +37,43 @@ Take a look at our [TLA+ Toolbox guide](tla-toolbox.md).
 ## <a name="sendence-links-guided-tour"></a>Sendence Links Guided Tour
 
 Picking a first paper, video for this guided tour was difficult. Where to start?
-Where to start? We decided, that as we are talking about Buffy- a distributed
-stream processor that we should start with distributed systems and what that
-means.
+Where to start? We decided that as we are talking about Buffy--a distributed
+stream processor--we should start with distributed systems.
 
 For an introduction to distributed systems, we suggest you start with Alvaro
 Videla's [What we talk about when we talk about distributed systems](http://videlalvaro.github.io/2015/12/learning-about-distributed-systems.html). 
-Even if you think you are a distributed systems expert, it can't hurt to watch,
-it's a great talk.
+Even if you think you are a distributed systems expert, it can't hurt to watch.
+It's a great talk.
  
-One of the concepts you are going to hear a lot when working on Buffy is
+One of the questions you are going to hear a lot when working on Buffy is
 "how do we avoid coordination?" Coordination in any system, distributed or
 otherwise, is a massive performance killer. Peter Bailis does an excellent job
 of addressing the general topic in his talk 
 [Silence is Golden](https://www.youtube.com/watch?v=EYJnWttrC9k&index=30&list=PLVjgeV_avap2arug3vIz8c6l72rvh9poV).
 Hopefully by the time you are done watching it, you'll see how we don't always
-need to coordination we think we do in order to maintain consistency in our
+need as much coordination as we think we do in order to maintain consistency in our
 systems and will be ready to go explore ideas on the topic.
 
 Let's talk about correctness for a moment. One of the hardest things you will
 encounter when dealing with distributed systems is verifying the correctness of
 those systems. If you aren't familiar with Kyle Kingsbury's ["Jepsen"](https://aphyr.com/tags/jepsen) 
-work, we advise you to check it. Basically Kyle has done it put various
+work, we advise you to check it out. Basically what Kyle has done is put various
 distributed systems under strain and see how well their promised invariants hold
 up. Spoiler alert, most don't do particularly well. By the time you have gone
 through a few of those posts, you might have a hopeless feeling about
 correctness. So, what we do? We'll there's a nugget of hope in a talk a member
 of the FoundationDB team did at StrangeLoop a couple years back. 
 [Testing Distributed Systems w/ Deterministic Simulation](https://www.youtube.com/watch?v=4fFDFbi3toc) 
-is a great, great talk. Our key take away from it, we need to be able design a
-system where determism rules. What does that mean? Good question! It's very
-hand-wavey. Here's what we ask of you. Check out some of the Jepsen posts then
+is a great, great talk. Our key takeaway from it is we need to be able design a
+system where determinism rules. What does that mean? Good question! It's very
+hand-wavey. Here's what we ask of you: Check out some of the Jepsen posts then
 watch the deterministic simulation talk and imagine what you'd have to do when
 designing systems to be able to prove correctness and reliably and easily fix
 bugs when you encounter them. 
 
 While we are on the subject of failures, we would be remiss to not point you at
 Peter Bailis' talk [When "Worst" is Best](https://www.youtube.com/watch?v=ZGIAypUUwoQ).
-The important take away from Peter's talk? By designing for our worst failure
+The important takeaway from Peter's talk? By designing for our worst failure
 cases, we will in fact reap rewards in our best case scenarios.
 
 Buffy for Engineers brings up CRDTs. CRDTs hold out the promise of distributed,
@@ -108,7 +107,7 @@ read it:
 > them at that low level. Examples discussed in the paper include bit error
 > recovery, security using encryption, duplicate message suppression, recovery
 > from system crashes, and delivery acknowledgement. Low level mechanisms to
-> support these functions are justified only as performance enhancements
+> support these functions are justified only as performance enhancements.
 
 
 
