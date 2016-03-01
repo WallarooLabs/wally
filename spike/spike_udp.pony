@@ -41,7 +41,10 @@ class Notifier is UDPNotify
       _env.out.print(consume payload)
       _processor.spike(d, _out_sock, _out_addr, _env)
       sock.write("got it", from)
+    else
+      _env.out.print("Couldn't process message received.")
     end
+
 
   fun ref closed(sock: UDPSocket ref) =>
     _env.out.print("spike: closed")
