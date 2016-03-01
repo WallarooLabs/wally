@@ -18,7 +18,7 @@ def func(input):
     # Deserialize input
     msg = parse_fix(input)
     if msg['MsgType'] == 'nbbo':
-        return process_order(msg)
+        return process_nbbo(msg)
     elif msg['MsgType'] == 'order':
         return process_order(msg)
     elif msg['MsgType'] in ('fill', 'heartbeat'):
@@ -28,14 +28,15 @@ def func(input):
 
 def process_nbbo(msg):
     # Update market info in memory
+    mid = (msg['BidPx'] + msg['OfferPx'])/2
     state.get_attribute('market', {})[msg['Symbol']] = {
         #'id': msg['id'],
         'time': msg['TransactTime'],
         'symbol': msg['Symbol'],
         'bid': msg['BidPx'],
         'offer': msg['OfferPx'],
-        'mid': (msg['BidPx'] + msg['OfferPx'])/2,
-        'stop_new_orders': ((msg['OfferPx'] - msg['BidPx']) >= 0.05 and
+        'mid': mid,
+        'stop_new_orders': (((msg['OfferPx'] - msg['BidPx'])/mid) >= 0.05 and
                             (msg['OfferPx'] - msg['BidPx']) >= 0.05)}
     return None
 
@@ -132,22 +133,48 @@ def test_parse_fix_trade():
 
 
 def test_parse_fix_nbbo():
-    input = ('8=FIX.4.2\x019=64\x0135=S\x0155=WETF\x01'
-             '60=20151204-14:30:00.000\x01117=S\x01132=16.64\x01133=16.64'
+    state.pop('market', None)
+    state.pop('order', None)
+    input = ('8=FIX.4.2\x019=64\x0135=S\x0155=TSLA\x01'
+             '60=20151204-14:30:00.000\x01117=S\x01132=16.40\x01133=16.60'
              '\x0110=098\x01')
     expected = {'MsgType': 'nbbo', 'QuoteId': 'S', 'BodyLength': 64,
-                'BidPx': 16.64, 'OfferPx': 16.64, 'Symbol': 'WETF',
+                'BidPx': 16.40, 'OfferPx': 16.60, 'Symbol': 'TSLA',
                 'BeginString': 'FIX.4.2', 'CheckSum': '098',
                 'TransactTime': '20151204-14:30:00.000'}
     output = parse_fix(input)
     assert(output == expected)
+    output = func(input)
+    symbol = state.get_attribute('market', {}).get('TSLA')
+    assert(symbol['stop_new_orders'] is False)
+    assert(symbol['bid'] == 16.40)
+    assert(symbol['offer'] == 16.60)
+    assert(symbol['mid'] == 16.50)
 
 
 def test_func():
+    state.pop('market', None)
+    state.pop('order', None)
     input = ('8=FIX.4.2\x019=121\x0135=D\x011=CLIENT35\x0111=s0XCIa\x01'
              '21=3\x0138=4000\x0140=2\x0144=252.85366153511416\x0154=1\x01'
              '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
              '10=108\x01')
-    expected = 'New Order: (CLIENT35, TSLA, Rejected, 4000.0): Rejected: Unknown symbol: TSLA'
+    expected = ('New Order: (CLIENT35, TSLA, Rejected, 4000.0): Rejected: '
+                'Unknown symbol: TSLA')
+    output = func(input)
+    assert(output == expected)
+
+    input = ('8=FIX.4.2\x019=64\x0135=S\x0155=TSLA\x01'
+             '60=20151204-14:30:00.000\x01117=S\x01132=16.40\x01133=16.60'
+             '\x0110=098\x01')
+    func(input)
+
+    symbol = state.get_attribute('market', {}).get('TSLA')
+    assert(symbol)
+    input = ('8=FIX.4.2\x019=121\x0135=D\x011=CLIENT35\x0111=s0XCIa\x01'
+             '21=3\x0138=4000\x0140=2\x0144=252.85366153511416\x0154=1\x01'
+             '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
+             '10=108\x01')
+    expected = 'New Order: (CLIENT35, TSLA, Accepted, 4000.0): Accepted'
     output = func(input)
     assert(output == expected)
