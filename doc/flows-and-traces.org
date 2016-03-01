@@ -399,6 +399,7 @@ TraceReport ::= \  &UUID \notag \\
                    &\times InstanceID \notag \\
                    &\times StateIndex \notag \\
                    &\times UnderivedState \notag \\
+                   &\times Hash \notag \\
                    &\times PredecessorHashes \notag
 \end{align}
 
