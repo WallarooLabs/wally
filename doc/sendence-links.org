@@ -317,4 +317,10 @@
   - Paper
   - .
   - http://wan.poly.edu/pam2015/papers/115.pdf
+* When "Worst" is Best
+  - Peter Bailis
+  - 2015
+  - Video
+  - Architecture
+  - https://www.youtube.com/watch?v=ZGIAypUUwoQ
 
