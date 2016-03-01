@@ -165,7 +165,6 @@ Note the use of square brackets to group the conjuncts of the initial fork.
 
 This model for expressing flows cannot capture every case as it stands. Consider the following:
 
-\newpage
 \begin{verbatim}
 A------------>B
   \         /
