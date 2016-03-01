@@ -1,6 +1,9 @@
 #+LaTeX_CLASS: article
 #+LaTeX_HEADER: \usepackage{parskip}
 #+LaTeX_HEADER: \usepackage{amsmath}
+#+TITLE: Flows and Traces
+#+AUTHOR:
+#+DATE:
 
 ** Workers
 

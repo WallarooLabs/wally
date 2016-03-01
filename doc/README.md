@@ -3,8 +3,8 @@
 Here you'll find a variety of sources for getting started working
 on the Buffy project. 
 
-The first thing you should do is read [Buffy for Engineers](buffy-for-engineers.asciidoc)
-, to get a sense for the problems we're trying to solve and our general 
+The first thing you should do is read [Buffy for Engineers](buffy-for-engineers.asciidoc), 
+to get a sense for the problems we're trying to solve and our general 
 strategies for solving them.
 
 ## Buffy Theory
