@@ -158,10 +158,10 @@ A-      ->D----->G
 This more complex fork and join can be represented as
 
 \begin{center}
-$A;\overline{[B;\overline{C||D}]||[E;F]};G$
+$A;\overline{(B;\overline{C||D})||(E;F)};G$
 \end{center}
 
-Note the use of square brackets to group the conjuncts of the initial fork.
+Note the use of parens to group the conjuncts of the initial fork.
 
 This model for expressing flows cannot capture every case as it stands. Consider the following:
 
@@ -202,23 +202,23 @@ $E;F$
 is a subflow of
 
 \begin{center}
-$\overline{[B;\overline{C||D}]||[E;F]}$
+$\overline{(B;\overline{C||D})||(E;F)}$
 \end{center}
 
 *** ASCII Version
 
-The ASCII version of Flow Notation is the same except that it uses [] instead
-of overlines for joins. It also uses [] to demarcate groupings. For example,
-consider a more complex example from the last section:
+The ASCII version of Flow Notation is the same except that it uses <> instead
+of overlines for joins. For example, consider a more complex example from the
+last section:
 
 \begin{center}
-$A;\overline{[B;\overline{C||D}]||[E;F]};G$
+$A;\overline{(B;\overline{C||D})||(E;F)};G$
 \end{center}
 
 The ASCII version would look like
 
 \begin{center}
-$A;[[B;[C||D]]||[E;F]];G$
+$A;<(B;<C||D>)||(E;F)>;G$
 \end{center}
 
 *** Relay Workers
