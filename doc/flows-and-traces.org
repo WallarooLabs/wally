@@ -24,7 +24,7 @@ and, if it was not the identity transition, increments its state index.
 
 It is worth mentioning that in this context, a "message" is simply data received at
 or sent by a worker. We have called this a *handoff* in other contexts to distinguish
-it from a *logical message*. A logical message is defined as data associated with a UUID
+it from a logical message. A *logical message* is defined as data associated with a UUID
 that is processed in steps (and possibly in parallel) in a topology. In what follows,
 we reserve the term "message" for logical messages.
 
