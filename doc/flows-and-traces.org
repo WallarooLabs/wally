@@ -40,6 +40,7 @@ Flow ::= \  &WT \notag \\
             &| \  Flow \  ``;" \  Flow \notag \\
             &| \  Flow \  ``||" \  Flow \notag \\
             &| \  \overline{Flow} \notag \\
+            &| \  \overline{Flow}``\string^" \notag \\
             &| \  Flow \  ``|" \  Flow \notag \\
             &| \  \overline{Flow \  ``|" \  ... \  ``|" \  Flow} \  ``(" \  x \  ``," \  y \  ``)" \notag
 \end{align}
@@ -100,6 +101,20 @@ We represent the *join operation* over a fork by an overline:
 \begin{center}
 $A;\overline{B||C};D$
 \end{center}
+
+A join implies that the receiving worker blocks until it receives all the
+indicated inputs. So in the above example, $D$ waits until it receives inputs
+from both $B$ and $C$ before it processes the data. However, sometimes we might
+want $D$ to start working and sending along outputs as soon as it receives from
+$B$ or $C$. For this we have the *nonblocking join operation*, which is indicated
+by an overline followed by a carat:
+
+\begin{center}
+$A;\overline{B||C}\string^;D$
+\end{center}
+
+This indicates that $D$ should still eventually receive data from both $B$ and $C$,
+but that it doesn't need to wait for both before it starts processing.
 
 A fork indicates that data must flow along all the specified paths. However, some
 flows might also include mutually exclusive choices. This is where the *choice operator*
@@ -163,7 +178,26 @@ $A;\overline{(B;\overline{C||D})||(E;F)};G$
 
 Note the use of parens to group the conjuncts of the initial fork.
 
-This model for expressing flows cannot capture every case as it stands. Consider the following:
+In some cases we might want to indicate that data should flow back to a worker
+that has showed up earlier. For example, imagine a case where $A$ sends a question to
+$B$ and then sends a message to $C$ once it receives a reply. For example:
+
+\begin{verbatim}
+   ->B-
+  /    \
+A-<----/
+  \
+   --->C
+\end{verbatim}
+
+We can represent this by using a subscript to identify that we are reusing a
+worker in our $Flow$:
+
+\begin{center}
+$A_1;B;A_1;C$
+\end{center}
+
+Our model for expressing flows cannot capture every case as it stands. Consider the following:
 
 \begin{verbatim}
 A------------>B
