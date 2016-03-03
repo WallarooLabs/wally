@@ -2,6 +2,7 @@ version: '2'
 services:
   swarm:
     image: {{ swarm_image }}
+    restart: always
     command: join --advertise {{ my_ip }}:2375 consul://{{ my_ip }}:8500
 
   consul:
@@ -22,6 +23,7 @@ services:
 
   swarmmanage:
     image: {{ swarm_image }}
+    restart: always
     ports:
       - 2378:2375
     command: manage consul://{{ my_ip }}:8500

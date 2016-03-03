@@ -1,0 +1,64 @@
+- name: Check if hypriot cluster lab service is installed
+  stat: path=/etc/systemd/system/cluster-start.service
+  register: hcl
+
+- name: stop hypriot cluster lab service
+  service:
+    name: cluster-stop
+    state: started
+  when: hcl.stat.exists
+
+- name: Uninstall hypriot cluster lab package
+  apt: name={{ item }} state=absent purge=yes
+  with_items:
+   - hypriot-cluster-lab
+
+- name: Check if hypriot cluster lab service is installed
+  stat: path=/etc/systemd/system/cluster-start.service
+  register: hcl2
+
+- name: Manually disable hypriot cluster lab
+  file: path={{ item }} state=absent
+  with_items:
+    - /etc/systemd/system/cluster-start.service
+    - /etc/systemd/system/cluster-stop.service
+    - /usr/local/bin/cluster-start.sh
+    - /usr/local/bin/cluster-stop.sh
+    - /usr/local/bin/cluster.yml
+  when: hcl2.stat.exists
+
+- name: Install latest hypriot docker packages
+  apt: name={{ item }} state=latest
+  with_items:
+   - docker-hypriot
+   - docker-compose
+
+- name: install docker-py
+  pip:
+    name: docker-py
+    executable: pip2
+
+- name: ensure "docker" group present
+  group:
+    name: docker
+    state: present
+    system: yes
+
+- name: add users into "docker"
+  user:
+    append: yes
+    groups: docker
+    state: present
+    name: '{{ item }}'
+  with_items: '{{ docker_users or [] }}'
+
+- name: enable docker service
+  service:
+    name: docker
+    enabled: yes
+
+- name: start docker
+  service:
+    name: docker
+    state: started
+

@@ -1,0 +1,48 @@
+# install python for full ansible support
+- hosts: all
+  gather_facts: False
+  tasks:
+  - name: install python for full ansible support
+    raw: apt-get install -y python
+
+- hosts: buffy-leaders:buffy-followers
+  tasks:
+  - name: Create a group of all hosts for buffy
+    group_by: key=buffy-all
+
+# Apply common configuration to all hosts
+- hosts: buffy-all
+  roles:
+  - { role: common, become: yes }
+
+# Configure and deploy leader servers.
+- hosts: buffy-leaders
+  vars_files:
+    - 'docker_creds.yml'
+  vars:
+    ethernet_interface: eth0
+    ptpd_role: master
+    ptpd_transport: multicast
+    swarm_image: hypriot/rpi-swarm
+    consul_image: hypriot/rpi-consul
+    docker_users: root
+  roles:
+  - { role: ptpd, become: yes }
+  - { role: docker, become: yes }
+
+# Configure and deploy follower servers.
+- hosts: buffy-followers
+  vars_files:
+    - 'docker_creds.yml'
+  vars:
+    ethernet_interface: eth0
+    ptpd_role: slave
+    ptpd_transport: multicast
+    leader_ip: "{{ hostvars[groups['buffy-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
+    swarm_image: hypriot/rpi-swarm
+    consul_image: hypriot/rpi-consul
+    docker_users: root
+  roles:
+  - { role: ptpd, become: yes }
+  - { role: docker, become: yes }
+

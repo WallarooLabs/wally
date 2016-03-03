@@ -23,6 +23,11 @@ variable "aws_profile" {
   default = "default"
 }
 
+variable "aws_detailed_monitoring" {
+  description = "Whether to enable AWS detailed monitoring or not."
+  default = "false"
+}
+
 variable "project_tag" {
   description = "Value for the project tag."
   default = "buffy"

@@ -5,6 +5,7 @@
      url: https://github.com/docker/compose/releases/download/1.6.2/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}
      dest: /usr/local/bin/docker-compose
      mode: 0755
+  when: ('arm' != '{{ ansible_architecture[0:3] }}')
 
 - name: Update docker config
   replace:
@@ -18,28 +19,22 @@
 - name: restart docker
   service: name=docker state=restarted
 
-- name: login to private Docker remote registry and force reauthentification
-  docker_login:
-    registry: docker.sendence.com:5043
-    username: "{{ docker_user }}"
-    password: "{{ docker_password }}"
-    reauth: yes
-
 - name: Create consul/swarm docker-compose config
   template: src={{ 'consul_swarm_compose.yml.follower.j2' if leader_ip is defined else 'consul_swarm_compose.yml.leader.j2'  }} dest=/root/cluster.yml
-
-- name: login to private Docker remote registry and force reauthentification
-  docker_login:
-    registry: docker.sendence.com:5043
-    username: "{{ docker_user }}"
-    password: "{{ docker_password }}"
-    reauth: yes
-  become: yes
-  become_user: "{{ docker_users }}"
 
 - name: Stop/kill consul/swarm
   command: docker-compose -f /root/cluster.yml kill
 
 - name: Start consul/swarm
   command: docker-compose -f /root/cluster.yml up -d
+
+- name: login to private Docker remote registry and force reauthentification
+  docker_login:
+    registry: docker.sendence.com:5043
+    username: "{{ docker_user }}"
+    password: "{{ docker_password }}"
+    reauth: yes
+
+- name: login to private Docker remote registry for user
+  command: cp -rf /root/.docker /home/{{ docker_users }}/
 

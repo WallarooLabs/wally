@@ -1,5 +1,5 @@
 - name: Install common packages
-  apt: name={{ item }} state=present
+  apt: name={{ item }} state=latest
   with_items:
    - libpcap0.8
    - python-boto
@@ -9,22 +9,28 @@
    - python3-numpy
 
 - name: Install python3 click
-  command: python3 -m pip install click
+  pip: name=click executable=pip3
+
+- name: Check if ptpd is installed
+  stat: path=/usr/sbin/ptpd
+  register: ptpd
 
 - name: Get ptpd deb for armhf
-  s3: bucket=sendence-dev object=/installers/ptpd/ptpd_2.3.2-master-1_armhf.deb dest=/tmp/ptpd_2.3.2-master-1_armhf.deb mode=get
-  when: ansible_architecture == "armhf"
+  get_url:
+     url: https://s3.amazonaws.com/sendence-dev/installers/ptpd/ptpd_2.3.2-master-1_armhf.deb
+     dest: /tmp/ptpd_2.3.2-master-1_armhf.deb
+     mode: 0755
+  when: ('arm' == '{{ ansible_architecture[0:3] }}') and (not ptpd.stat.exists)
 
 - name: Install ptp for armhf
   apt: deb=/tmp/ptpd_2.3.2-master-1_armhf.deb
-  when: ansible_architecture == "armhf"
+  when: ('arm' == '{{ ansible_architecture[0:3] }}') and (not ptpd.stat.exists)
 
 - name: Get ptpd deb for x86_64
   s3: bucket=sendence-dev object=/installers/ptpd/ptpd_2.3.2-master-1_amd64.deb dest=/tmp/ptpd_2.3.2-master-1_amd64.deb mode=get
-  when: ansible_architecture == "x86_64"
+  when: (ansible_architecture == "x86_64") and (not ptpd.stat.exists)
 
 - name: Install ptp for x86_64
   apt: deb=/tmp/ptpd_2.3.2-master-1_amd64.deb
-  when: ansible_architecture == "x86_64"
-
+  when: (ansible_architecture == "x86_64") and (not ptpd.stat.exists)
 
