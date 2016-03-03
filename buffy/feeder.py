@@ -49,11 +49,8 @@ def feed(address, delay, path, console_log, file_log, log_level):
         s = sources[random.randint(0, len(sources)-1)]
         try:
             msg = s.readline().decode()
-            print('msg:', msg.encode())
-            print('len:', len(msg))
             worker.udp_put(msg, host, port)
         except Exception as exc:
-            raise exc
             sources.remove(s)
 
 
