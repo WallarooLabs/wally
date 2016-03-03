@@ -2,9 +2,9 @@ DOCKER_IMAGE_VERSION=$(shell git describe --tags --always)
 DOCKER_IMAGE_REPO=docker.sendence.com:5043/sendence
 
 current_dir = $(shell pwd)
-docker_image_version ?= $(DOCKER_IMAGE_VERSION) ## Docker Image Tag to use
-docker_image_repo ?= $(DOCKER_IMAGE_REPO) ## Docker Repository to use
-arch ?= native ## Architecture to build for
+docker_image_version ?= $(DOCKER_IMAGE_VERSION)## Docker Image Tag to use
+docker_image_repo ?= $(DOCKER_IMAGE_REPO)## Docker Repository to use
+arch ?= native## Architecture to build for
 
 ifdef arch
   ifeq (,$(filter $(arch),amd64 armhf native))
