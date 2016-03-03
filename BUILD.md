@@ -14,18 +14,37 @@ creating a cross compiler](https://github.com/lispmeister/rpxp).
 
 ## Buffy
 
-To facilitate builds across environments, we have a very simple python build
-script called `erbau.py`. 
+To facilitate builds across environments we are using Make.
 
 To build for your local machine, run:
 
-`python3 erbau/erbau.py`
+`make`
+
+This will use your local install of `ponyc`.
 
 To build for the Raspberry Pi, run:
 
-`python3 erbau/erbau.py --arm`
+`make arch=armhf`
 
-Which takes care of cross compilation for you.
+This will use a docker container based `ponyc` to cross compile for armhf based on
+the Sendence fork of the Pony repository.
+
+To build for x86_64 for AWS/Vagrant, run:
+
+`make arch=amd64`
+
+This will use a docker container based `ponyc` to compile for x86_64 based on
+the Sendence fork of the Pony repository.
+
+The Makefile also supports the following additional build targets:
+
+`make build-docker` - Build docker images for the desired architecture including
+the compiled binaries.
+
+`make push-docker` - Push docker images for the desired architecture to the
+repository.
+
+`make help` - Help for options and targets available.
 
 # RELEASING
  

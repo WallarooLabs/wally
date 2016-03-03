@@ -2,9 +2,9 @@ DOCKER_IMAGE_VERSION=$(shell git describe --tags --always)
 DOCKER_IMAGE_REPO=docker.sendence.com:5043/sendence
 
 current_dir = $(shell pwd)
-docker_image_version ?= $(DOCKER_IMAGE_VERSION)
-docker_image_repo ?= $(DOCKER_IMAGE_REPO)
-arch ?= native
+docker_image_version ?= $(DOCKER_IMAGE_VERSION) ## Docker Image Tag to use
+docker_image_repo ?= $(DOCKER_IMAGE_REPO) ## Docker Repository to use
+arch ?= native ## Architecture to build for
 
 ifdef arch
   ifeq (,$(filter $(arch),amd64 armhf native))
@@ -40,12 +40,12 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build:
+build: ## Build Pony based programs for Buffy
 	$(call PONYC,spike)
 	$(call PONYC,giles/receiver)
 	$(call PONYC,giles/sender)
 
-build-docker:  build
+build-docker:  build ## Build docker images for Buffy
 	docker build -t $(docker_image_repo)/spike.$(arch):$(docker_image_version) spike
 	docker build -t $(docker_image_repo)/giles-receiver.$(arch):$(docker_image_version) giles/receiver
 	docker build -t $(docker_image_repo)/giles-sender.$(arch):$(docker_image_version) giles/sender
@@ -54,7 +54,7 @@ build-docker:  build
 	docker build -t $(docker_image_repo)/dagon:$(docker_image_version) dagon
 	docker tag $(docker_image_repo)/dagon:$(docker_image_version) $(docker_image_repo)/dagon.$(arch):$(docker_image_version)
 
-push-docker: build-docker
+push-docker: build-docker ## Push docker images for Buffy to repository
 	docker push $(docker_image_repo)/spike.$(arch):$(docker_image_version)
 	docker push $(docker_image_repo)/giles-receiver.$(arch):$(docker_image_version)
 	docker push $(docker_image_repo)/giles-sender.$(arch):$(docker_image_version)
@@ -68,7 +68,7 @@ untagged := $(shell (docker images | grep "^<none>" | awk -F " " '{print $$3}'))
 dangling := $(shell docker images -f "dangling=true" -q)
 tag := $(shell docker images | grep "$(docker_image_version)" |awk -F " " '{print $$3}')
 
-clean:
+clean: ## Cleanup docker images and compiled files for Buffy
 	rm -f spike/spike spike/spike.o
 	rm -f giles/receiver/receiver giles/receiver/receiver.o
 	rm -f giles/sender/sender giles/sender/sender.o
@@ -85,4 +85,14 @@ ifneq ($(strip $(dangling)),)
 	docker rmi $(dangling)
 endif
 	@echo 'Done cleaning.'
+
+help:
+	@echo 'Usage: make [option1=value] [option2=value,...] [target]'
+	@echo ''
+	@echo 'Options:'
+	@grep -E '^[a-zA-Z_-]+ *\?=.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = "?=.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -E 'filter.*arch.*)$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = "[(),]"}; {printf "\033[36m%-30s\033[0m %s\n", "  Valid values for " $$5 ":", $$7}'
+	@echo ''
+	@echo 'Targets:'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
