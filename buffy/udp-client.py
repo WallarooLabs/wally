@@ -32,11 +32,7 @@ class EchoClientProtocol(asyncio.DatagramProtocol):
         loop.stop()
 
 
-def main():
-    host = sys.argv[1].split(':')[0]
-    port = int(sys.argv[1].split(':')[1])
-    message = ' '.join(sys.argv[2:])
-
+def send(host, port, message):
     loop = asyncio.get_event_loop()
     connect = loop.create_datagram_endpoint(
         lambda: EchoClientProtocol(message, loop),
@@ -45,6 +41,13 @@ def main():
     loop.run_forever()
     transport.close()
     loop.close()
+
+
+def main():
+    host = sys.argv[1].split(':')[0]
+    port = int(sys.argv[1].split(':')[1])
+    message = ' '.join(sys.argv[2:])
+    send(host, port, message)
 
 
 if __name__ == '__main__':
