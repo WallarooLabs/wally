@@ -6,9 +6,6 @@ import sys
 from functions.mq_parse import decode, encode
 
 
-host = sys.argv[1].split(':')[0]
-port = int(sys.argv[1].split(':')[1])
-message = ' '.join(sys.argv[2:])
 
 
 class EchoClientProtocol(asyncio.DatagramProtocol):
@@ -34,11 +31,21 @@ class EchoClientProtocol(asyncio.DatagramProtocol):
         loop = asyncio.get_event_loop()
         loop.stop()
 
-loop = asyncio.get_event_loop()
-connect = loop.create_datagram_endpoint(
-    lambda: EchoClientProtocol(message, loop),
-    remote_addr=(host, port))
-transport, protocol = loop.run_until_complete(connect)
-loop.run_forever()
-transport.close()
-loop.close()
+
+def main():
+    host = sys.argv[1].split(':')[0]
+    port = int(sys.argv[1].split(':')[1])
+    message = ' '.join(sys.argv[2:])
+
+    loop = asyncio.get_event_loop()
+    connect = loop.create_datagram_endpoint(
+        lambda: EchoClientProtocol(message, loop),
+        remote_addr=(host, port))
+    transport, protocol = loop.run_until_complete(connect)
+    loop.run_forever()
+    transport.close()
+    loop.close()
+
+
+if __name__ == '__main__':
+    main()
