@@ -50,7 +50,7 @@ def feed(address, delay, path, console_log, file_log, log_level):
         try:
             msg = s.readline().decode()
             worker.udp_put(msg, host, port)
-        except Exception as exc:
+        except:
             sources.remove(s)
 
 
