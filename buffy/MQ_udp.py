@@ -24,8 +24,7 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
         LOGGER.debug("Received datagram from {}".format(addr))
         splat = mq_parse.decode(data).split(':')
         verb = splat[0]
-        msg = splat[1] if len(splat) > 1 else ''
-
+        msg = ''.join(splat[1:]) if len(splat) > 1 else ''
         if verb == 'PUT':
             # stamp event with current timestamp on queue insert
             QUEUE.put_nowait((time.time(), msg))
