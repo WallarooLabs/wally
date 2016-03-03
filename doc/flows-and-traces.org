@@ -1,10 +1,13 @@
 #+LaTeX_CLASS: article
 #+LaTeX_HEADER: \usepackage{parskip}
 #+LaTeX_HEADER: \usepackage{amsmath}
+#+TITLE: Flows and Traces
+#+AUTHOR:
+#+DATE:
 
 ** Workers
 
-A *topology* is a graph of workers that can process messages, maintain and update state,
+A *topology* is a directed graph of workers that can process messages, maintain and update state,
 and send the resulting messages to other workers. The following defines a worker type:
 
 \begin{align}
@@ -19,6 +22,12 @@ messages $Msg$). When a worker undergoes a state transition (including the
 identity transition), it sends to each of a defined subset of $WT$ a sequence of messages,
 and, if it was not the identity transition, increments its state index.
 
+It is worth mentioning that in this context, a "message" is simply data received at
+or sent by a worker. We have called this a *handoff* in other contexts to distinguish
+it from a logical message. A *logical message* is defined as data associated with a UUID
+that is processed in steps (and possibly in parallel) in a topology. In what follows,
+we reserve the term "message" for logical messages.
+
 
 ** Flows
 
@@ -31,6 +40,7 @@ Flow ::= \  &WT \notag \\
             &| \  Flow \  ``;" \  Flow \notag \\
             &| \  Flow \  ``||" \  Flow \notag \\
             &| \  \overline{Flow} \notag \\
+            &| \  \overline{Flow}``\string^" \notag \\
             &| \  Flow \  ``|" \  Flow \notag \\
             &| \  \overline{Flow \  ``|" \  ... \  ``|" \  Flow} \  ``(" \  x \  ``," \  y \  ``)" \notag
 \end{align}
@@ -92,6 +102,20 @@ We represent the *join operation* over a fork by an overline:
 $A;\overline{B||C};D$
 \end{center}
 
+A join implies that the receiving worker blocks until it receives all the
+indicated inputs. So in the above example, $D$ waits until it receives inputs
+from both $B$ and $C$ before it processes the data. However, sometimes we might
+want $D$ to start working and sending along outputs as soon as it receives from
+$B$ or $C$. For this we have the *nonblocking join operation*, which is indicated
+by an overline followed by a carat:
+
+\begin{center}
+$A;\overline{B||C}\string^;D$
+\end{center}
+
+This indicates that $D$ should still eventually receive data from both $B$ and $C$,
+but that it doesn't need to wait for both before it starts processing.
+
 A fork indicates that data must flow along all the specified paths. However, some
 flows might also include mutually exclusive choices. This is where the *choice operator*
 ``|'' comes in. If in the preceding example data must either flow along B to D or C to D but
@@ -102,7 +126,7 @@ $A;\overline{B|C};D$
 \end{center}
 
 In this case, the overline does not technically indicate a join, but is simply used
-to make it clearer that both $B$ and $C$ lead to $D$. [Is this how we want to do it?]
+to make it clearer that both $B$ and $C$ lead to $D$.
 
 Finally, we might want to say that a flow requires something in between a fork and a choice.
 Consider the case where we want to say that data must either flow to D along B and C or along B or
@@ -149,10 +173,31 @@ A-      ->D----->G
 This more complex fork and join can be represented as
 
 \begin{center}
-$A;\overline{B;\overline{C||D}||E;F};G$
+$A;\overline{(B;\overline{C||D})||(E;F)};G$
 \end{center}
 
-This model for expressing flows cannot capture every case as it stands. Consider the following:
+Note the use of parens to group the conjuncts of the initial fork.
+
+In some cases we might want to indicate that data should flow back to a worker
+that has showed up earlier. For example, imagine a case where $A$ sends a question to
+$B$ and then sends a message to $C$ once it receives a reply. For example:
+
+\begin{verbatim}
+   ->B-
+  /    \
+A-<----/
+  \
+   --->C
+\end{verbatim}
+
+We can represent this by using a subscript to identify that we are reusing a
+worker in our $Flow$:
+
+\begin{center}
+$A_1;B;A_1;C$
+\end{center}
+
+Our model for expressing flows cannot capture every case as it stands. Consider the following:
 
 \begin{verbatim}
 A------------>B
@@ -178,7 +223,7 @@ A cleaner approach is to use a symbol that refers back to the origin, such as:
 $A;\overline{@||C};B$
 \end{center}
 
-Here "@" refers to A. It also implies both that processing only happens at $A$ once
+Here "@" implies both that processing only happens at $A$ once
 and that $A$ is joined with $C$ at $B$. See the Relay Workers section below for
 a more in-depth explanation of the semantics of "@".
 
@@ -191,23 +236,23 @@ $E;F$
 is a subflow of
 
 \begin{center}
-$\overline{B;\overline{C||D}||E;F}$
+$\overline{(B;\overline{C||D})||(E;F)}$
 \end{center}
 
 *** ASCII Version
 
-The ASCII version of Flow Notation is the same except that it uses [] instead
-of overlines for joins. It also uses [] to demarcate groupings. For example,
-consider a more complex example from the last section:
+The ASCII version of Flow Notation is the same except that it uses <> instead
+of overlines for joins. For example, consider a more complex example from the
+last section:
 
 \begin{center}
-$A;\overline{B;\overline{C||D}||E;F};G$
+$A;\overline{(B;\overline{C||D})||(E;F)};G$
 \end{center}
 
 The ASCII version would look like
 
 \begin{center}
-$A;[[B;[C||D]]||[E;F]];G$
+$A;<(B;<C||D>)||(E;F)>;G$
 \end{center}
 
 *** Relay Workers
@@ -222,7 +267,7 @@ converted to X;Y, Z;@ can be converted to Z, and @;Z can be converted to Z.
 "@" cannot be added or removed from a fork or choice without changing the spec,
 however, as it denotes the implicit expansion that occurs when a worker is
 joined with one of its descendents.  So \[A;\overline{@||B};C\] is not equivalent
-to A;B;C, since the latter leaves out the join at C.
+to \[A;B;C\] since the latter leaves out the join at C.
 
 To illustrate:
 
@@ -232,8 +277,7 @@ A--------->C
   -->B-->
 \end{verbatim}
 
-
-can be (and must be notationwise) thought of as:
+can (must notationwise) be thought of as:
 
 \begin{verbatim}
 A--->@---->C
@@ -389,11 +433,12 @@ TraceReport ::= \  &UUID \notag \\
                    &\times InstanceID \notag \\
                    &\times StateIndex \notag \\
                    &\times UnderivedState \notag \\
+                   &\times Hash \notag \\
                    &\times PredecessorHashes \notag
 \end{align}
 
 The trade-off is that a $TraceReport$ would require more memory, growing with
-the number of actual predecessors for the relevant traversal.
+the number of actual predecessors.
 
 
 *** Trace Uniqueness
@@ -405,8 +450,7 @@ The first property we've identified of our system is the following:
 
 *** Deriving a Traversal from a Trace
 
-Algorithm for deriving a $Traversal$ from a $Trace$ (provided we use the alternative
-to hashing outlined above):
+Algorithm for deriving a $Traversal$ from a $Trace$:
 
 1. Build a predecessor graph with edges directed from a node to its predecessors (uniquely identified by their trace report hashes). The sink of this graph is the source of the traversal. The rule against beginning a $Flow$ with a fork or inclusive choice entails that there will be only one source per traversal.
 2. Reverse the graph to get directed edges going in the direction of the traversal.
