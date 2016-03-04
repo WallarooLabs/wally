@@ -41,6 +41,24 @@ A function checking for identity is the default.
 ```--dotgen``` is a flag that causes dagon to output a graphviz dot file of the topology.
 This flag also skips running any tests.
 
+```--docker``` is a flag that causes dagon to use docker to run processes. It defaults to `false`.
+
+```--docker_host``` is an optional parameter that tells dagon which docker daemon to connect to. It defaults to `unix:///var/run/docker.sock`.
+
+```--docker_tag``` is an optional parameter that tells dagon which tag to use when pulling/running docker containers. It defaults to the output of `git describe --tags --always`.
+
+### Docker examples
+
+The following two examples are for running dagon using docker images that have already been built and pushed to the Sendence private repository. These have been tested/confirmed to work on both x86_64 (Vagrant/AWS) and armhf (hypriot).
+
+The following example runs dagon to start processes in docker on the local docker daemon:
+
+`./dagon.py --docker --docker_tag 0.0.3-sendence-88-g3c592b0 --test double --duration 3 dagon`
+
+The following example runs dagon to start processes in docker on a remote docker daemon (on docker swarm if running on nodes using orchestration in this repo):
+
+`./dagon.py --docker --docker_tag 0.0.3-sendence-88-g3c592b0 --docker_host <BUFFY-LEADER-IP>:2378 --test double --duration 3 dagon`
+
 ## Topology Configuration
 
 You configure the topology in a config file with the extension ```.ini```.
