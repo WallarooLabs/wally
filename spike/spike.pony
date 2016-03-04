@@ -53,10 +53,12 @@ actor Main
 
 
 actor Processor
-  let destructor: Destructor
+  let _mode: Mode
+  let _destructor: Destructor
 
   new create(mode: Mode, seed: U64, probability: U64) =>
-    destructor = match mode
+    _mode = mode
+    _destructor = match _mode
     | DuplicateMode => DuplicateDestructor(seed, probability)
     | DropMode => DropDestructor(seed, probability)
     | GarbleMode => GarbleDestructor(seed, probability)
@@ -69,4 +71,11 @@ actor Processor
     end
 
   be spike(packet: Array[U8] val, sock: UDPSocket, remote_addr: IPAddress, env: Env) =>
-    destructor.spike(packet, sock, remote_addr, env)
+    _destructor.spike(packet, sock, remote_addr, env)
+    (let host, let service) =
+      try
+        remote_addr.name()
+      else
+        ("???", "???")
+      end
+    env.out.print("spike: Sent message to " + host + ":" + service + " in " + ModeMaker.string_for(_mode))

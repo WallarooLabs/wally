@@ -31,3 +31,16 @@ primitive ModeMaker
       env.out.print("Invalid mode. Valid options: duplicate, drop, garble, delay, reorder, random, pass")
       error
     end
+
+  fun string_for(mode: Mode): String =>
+    match mode
+      | DuplicateMode => "duplicate mode"
+      | DropMode => "drop mode"
+      | GarbleMode => "garble mode"
+      | DelayMode => "delay mode"
+      | ReorderMode => "reorder mode"
+      | RandomMode => "random mode"
+      | PassMode => "pass mode"
+    else
+      "unknown mode"
+    end

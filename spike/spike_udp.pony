@@ -32,16 +32,19 @@ class Notifier is UDPNotify
     try
       let payload: Array[U8] iso = BuffyProtocol.decode(consume cp)
 
-      _env.out.print("RECEIVING")
+      _env.out.print("spike: RECEIVING")
       try
         (let host, let service) = from.name()
-        _env.out.print("from " + host + ":" + service)
+        _env.out.print("spike: from " + host + ":" + service)
       end
 
       _env.out.print(consume payload)
       _processor.spike(d, _out_sock, _out_addr, _env)
-      sock.write("got it", from)
+      sock.write("spike: got it", from)
+    else
+      _env.out.print("spike: couldn't process message received.")
     end
+
 
   fun ref closed(sock: UDPSocket ref) =>
     _env.out.print("spike: closed")

@@ -163,14 +163,25 @@ class RandomDestructor is Destructor
     else
       let roll = dice(1, 6)
       match roll
-      | 1 => pass(packet, sock, remote_addr, env)
-      | 2 => duplicate(packet, sock, remote_addr, env)
-      | 3 => drop(packet, sock, remote_addr, env)
-      | 4 => garbler.spike(packet, sock, remote_addr, env)
+      | 1 =>
+        pass(packet, sock, remote_addr, env)
+        env.out.print("spike: Random selection was to pass")
+      | 2 =>
+        duplicate(packet, sock, remote_addr, env)
+        env.out.print("spike: Random selection was to duplicate")
+      | 3 =>
+        drop(packet, sock, remote_addr, env)
+        env.out.print("spike: Random selection was to drop")
+      | 4 =>
+        garbler.spike(packet, sock, remote_addr, env)
+        env.out.print("spike: Random selection was to garble")
       | 5 =>
         let delayed_by = dice(1, 10_000) * 1_000_000
         delay(packet, sock, remote_addr, env, delayed_by)
-      | 6 => reorderer.spike(packet, sock, remote_addr, env)
+        env.out.print("spike: Random selection was to delay")
+      | 6 =>
+        reorderer.spike(packet, sock, remote_addr, env)
+        env.out.print("spike: Random selection was to reorder")
       end
     end
 
