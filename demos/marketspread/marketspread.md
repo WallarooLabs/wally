@@ -46,6 +46,7 @@ the demo data (`nbbo.msg` and `trades.msg` in this directory) and a data
 feeder.
 From the `Buffy/buffy` directory, execute the following commands in their own
 shells:
+
 1. `python3 MQ_udp.py --address 127.0.0.1:10000 --console-log`
 2. `python3 MQ_udp.py --address 127.0.0.1:10001 --console-log`
 3. `python3 worker.py --input-address 127.0.0.1:10000 --output-address 127.0.0.1:10001 --output-type queue --console-log --function marketspread`
