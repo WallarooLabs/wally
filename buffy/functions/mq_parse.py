@@ -44,7 +44,8 @@ def encode(text):
     """Encode a text message into the LHHTTT binary format."""
     msg = text.encode(encoding='UTF-8')
     msg_length_hex = int_to_hex(len(msg)).encode(encoding='UTF-8')
-    msg_length_length = int_to_hex(len(msg_length_hex)).encode(encoding='UTF-8')
+    msg_length_length = (int_to_hex(len(msg_length_hex))
+                         .encode(encoding='UTF-8'))
     if len(msg_length_length) != 1:
         raise InvalidLengthError('Message length is greater than the maximum '
                                  '1152921504606846975 bytes permitted by '
@@ -71,8 +72,8 @@ def decode(blob):
                                                          len(blob)))
 
 
-###########################################################################
-##                    Unit Tests                                         ##
+#########################################################################
+#                    Unit Tests                                         #
 def test_int_to_hex():
     assert(int_to_hex(10) == 'a')
 
@@ -85,12 +86,19 @@ def test_encode():
     # ascii input
     assert(encode('hello world') == b'1bhello world')
     # unicode input
-    assert(encode('𝐇𝐞𝐥𝐥𝐨 𝐰𝐨𝐫𝐥𝐝') == b'229\xf0\x9d\x90\x87\xf0\x9d\x90\x9e\xf0\x9d\x90\xa5\xf0\x9d\x90\xa5\xf0\x9d\x90\xa8 \xf0\x9d\x90\xb0\xf0\x9d\x90\xa8\xf0\x9d\x90\xab\xf0\x9d\x90\xa5\xf0\x9d\x90\x9d')  ## noqa
+    byte_encoded = (b'229\xf0\x9d\x90\x87\xf0\x9d\x90\x9e\xf0\x9d\x90\xa5'
+                    b'\xf0\x9d\x90\xa5\xf0\x9d\x90\xa8 \xf0\x9d\x90\xb0\xf0'
+                    b'\x9d\x90\xa8\xf0\x9d\x90\xab\xf0\x9d\x90\xa5\xf0\x9d'
+                    b'\x90\x9d')
+    assert(encode('𝐇𝐞𝐥𝐥𝐨 𝐰𝐨𝐫𝐥𝐝') == byte_encoded)
 
 
 def test_decode():
     # ascii input
     assert(decode(b'1bhello world') == 'hello world')
     # unicode input
-    assert(decode(b'229\xf0\x9d\x90\x87\xf0\x9d\x90\x9e\xf0\x9d\x90\xa5\xf0\x9d\x90\xa5\xf0\x9d\x90\xa8 \xf0\x9d\x90\xb0\xf0\x9d\x90\xa8\xf0\x9d\x90\xab\xf0\x9d\x90\xa5\xf0\x9d\x90\x9d') == '𝐇𝐞𝐥𝐥𝐨 𝐰𝐨𝐫𝐥𝐝')  ## noqa
-
+    byte_encoded = (b'229\xf0\x9d\x90\x87\xf0\x9d\x90\x9e\xf0\x9d\x90\xa5'
+                    b'\xf0\x9d\x90\xa5\xf0\x9d\x90\xa8 \xf0\x9d\x90\xb0'
+                    b'\xf0\x9d\x90\xa8\xf0\x9d\x90\xab\xf0\x9d\x90\xa5\xf0'
+                    b'\x9d\x90\x9d')
+    assert(decode(byte_encoded) == '𝐇𝐞𝐥𝐥𝐨 𝐰𝐨𝐫𝐥𝐝')

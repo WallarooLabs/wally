@@ -11,4 +11,3 @@ FUNC_NAME = 'Double'
 
 def func(input):
     return int(input) * 2
-
