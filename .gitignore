@@ -3,6 +3,8 @@
 .cache/
 .cache/*
 .DS_Store
+*.bc
+*.ll
 
 #LaTeX files
 *.lof
