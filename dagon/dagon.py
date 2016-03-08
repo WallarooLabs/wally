@@ -41,10 +41,11 @@ def print_buffy_node(func, in_ip, out_ip):
     print('dagon: Creating BUFFY #' + func + '# node ' + in_ip + ' -> ' + out_ip)
 
 def print_spike_node(action, probability, in_ip, out_ip):
-    print('dagon: Creating SPIKE **' + action + ' (' + probability + '%)** node ' + in_ip + ' -> ' + out_ip)
+    print('dagon: Creating SPIKE **' + action + ' (' + probability + '%)** node '
+        + in_ip + ' -> ' + out_ip)
 
 def print_instructions_and_exit():
-    print('USAGE: python3 dagon.py topology-name duration [--seed seed]')
+    print('USAGE: python3 dagon.py topology-name number-of-messages [--seed seed]')
     sys.exit()
 
 def print_mismatch(sent, rcvd):
@@ -105,56 +106,110 @@ def run_docker_command(args, print_stdout, print_stderr):
             print('ERROR running docker process!')
         return proc_out.decode("utf-8").rstrip('\n')
 
-def start_spike_process(f_out_ip, t_in_ip, seed, action, probability, name, docker, docker_tag, docker_host_arg):
+def start_spike_process(f_out_ip, t_in_ip, seed, action, probability, name,
+    docker, docker_tag, docker_host_arg):
+
     print_spike_node(action, probability, f_out_ip, t_in_ip)
     if docker:
-        spike = run_docker_command(['docker', docker_host_arg, 'run', '--name', name + '_spike' + DOCKER_POSTFIX, '-h', name + '_spike', '--privileged', '-d', '-e', 'affinity:container==' + name + DOCKER_POSTFIX, '-e', 'LC_ALL=C.UTF-8', '-e', 'LANG=C.UTF-8', '-v', '/bin:/bin:ro', '-v', '/lib:/lib:ro', '-v', '/lib64:/lib64:ro', '-v', '/usr:/usr:ro', '--net=' + DOCKER_NETWORK, DOCKER_REPO + 'spike.' + ARCH + ':' + docker_tag, f_out_ip, t_in_ip, action, '--seed',  str(seed), '--prob', probability], False, False)
+        spike = run_docker_command(['docker', docker_host_arg, 'run', '--name',
+            name + '_spike' + DOCKER_POSTFIX, '-h', name + '_spike',
+            '--privileged', '-d', '-e', 'affinity:container==' + name +
+            DOCKER_POSTFIX, '-e', 'LC_ALL=C.UTF-8', '-e', 'LANG=C.UTF-8', '-v',
+            '/bin:/bin:ro', '-v', '/lib:/lib:ro', '-v', '/lib64:/lib64:ro',
+            '-v', '/usr:/usr:ro', '--net=' + DOCKER_NETWORK, DOCKER_REPO +
+            'spike.' + ARCH + ':' + docker_tag, f_out_ip, t_in_ip, action,
+            '--seed',  str(seed), '--prob', probability], False, False)
     else:
-        spike = subprocess.Popen(['../spike/spike', f_out_ip, t_in_ip, action, '--seed',  str(seed), '--prob', probability], stdout=DEVNULL, stderr=DEVNULL)
+        spike = subprocess.Popen(['../spike/spike', f_out_ip, t_in_ip, action,
+            '--seed',  str(seed), '--prob', probability],
+            stdout=DEVNULL, stderr=DEVNULL)
     return spike
 
-def start_buffy_processes(f, in_addr, out_addr, is_sink, name, docker, docker_tag, docker_host_arg):
+def start_buffy_processes(f, in_addr, out_addr, is_sink, name,
+    docker, docker_tag, docker_host_arg):
+
     processes = []
     print_buffy_node(f, in_addr, out_addr)
     output_type = 'socket' if is_sink else 'queue'
     if docker:
-        buffy_mq = run_docker_command(['docker', docker_host_arg, 'run', '--privileged', '-d', '-h', name, '-e', 'LC_ALL=C.UTF-8', '-e', 'LANG=C.UTF-8', '-v', '/bin:/bin:ro', '-v', '/lib:/lib:ro', '-v', '/lib64:/lib64:ro', '-v', '/usr:/usr:ro', '--name', name + DOCKER_POSTFIX, '--net=' + DOCKER_NETWORK, DOCKER_REPO + 'buffy' + ':' + docker_tag, '/buffy/MQ_udp.py', '--address', in_addr, '--console-log'], False, False)
+        buffy_mq = run_docker_command(['docker', docker_host_arg, 'run',
+            '--privileged', '-d', '-h', name, '-e', 'LC_ALL=C.UTF-8', '-e',
+            'LANG=C.UTF-8', '-v', '/bin:/bin:ro', '-v', '/lib:/lib:ro', '-v',
+            '/lib64:/lib64:ro', '-v', '/usr:/usr:ro', '--name', name +
+            DOCKER_POSTFIX, '--net=' + DOCKER_NETWORK, DOCKER_REPO + 'buffy' +
+            ':' + docker_tag, '/buffy/MQ_udp.py', '--address', in_addr,
+            '--console-log'], False, False)
         time.sleep(PAUSE)
-        buffy_worker = run_docker_command(['docker', docker_host_arg, 'run', '--privileged', '-d', '-h', name + '_worker', '-e', 'affinity:container==' + name + DOCKER_POSTFIX, '-e', 'LC_ALL=C.UTF-8', '-e', 'LANG=C.UTF-8', '-v', '/bin:/bin:ro', '-v', '/lib:/lib:ro', '-v', '/lib64:/lib64:ro', '-v', '/usr:/usr:ro', '--name', name + '_worker' + DOCKER_POSTFIX, '--net=' + DOCKER_NETWORK, DOCKER_REPO + 'buffy' + ':' + docker_tag, '/buffy/worker.py', '--input-address', in_addr, '--output-address', out_addr, '--function', f, '--output-type', output_type, '--console-log'], False, False)
+        buffy_worker = run_docker_command(['docker', docker_host_arg, 'run',
+            '--privileged', '-d', '-h', name + '_worker', '-e',
+            'affinity:container==' + name + DOCKER_POSTFIX, '-e',
+            'LC_ALL=C.UTF-8', '-e', 'LANG=C.UTF-8', '-v', '/bin:/bin:ro', '-v',
+            '/lib:/lib:ro', '-v', '/lib64:/lib64:ro', '-v', '/usr:/usr:ro',
+            '--name', name + '_worker' + DOCKER_POSTFIX, '--net=' +
+            DOCKER_NETWORK, DOCKER_REPO + 'buffy' + ':' + docker_tag,
+            '/buffy/worker.py', '--input-address', in_addr, '--output-address',
+            out_addr, '--function', f, '--output-type', output_type,
+            '--console-log'], False, False)
         processes.append(buffy_mq)
         processes.append(buffy_worker)
     else:
-        processes.append(subprocess.Popen(['python3', '../buffy/MQ_udp.py', '--address', in_addr], stdout=DEVNULL, stderr=DEVNULL))
+        processes.append(subprocess.Popen(['python3', '../buffy/MQ_udp.py',
+            '--address', in_addr], stdout=DEVNULL, stderr=DEVNULL))
         time.sleep(PAUSE)
-        processes.append(subprocess.Popen(['python3', '../buffy/worker.py', '--input-address', in_addr, '--output-address', out_addr, '--function', f, '--output-type', output_type], stdout=DEVNULL, stderr=DEVNULL))
+        processes.append(subprocess.Popen(['python3', '../buffy/worker.py',
+            '--input-address', in_addr, '--output-address', out_addr,
+            '--function', f, '--output-type', output_type],
+            stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
     return processes
 
-def start_giles_sender_process(source_addr, test, docker, docker_tag, docker_host_arg):
+def start_giles_sender_process(source_addr, messages, test, docker,
+    docker_tag, docker_host_arg):
+
     remove_file('sent.txt')
 
     print('dagon: Creating GILES-SENDER node writing to source')
     if docker:
-        giles_sender = run_docker_command(['docker', docker_host_arg, 'run', '-u', str(os.getuid()), '--name', 'giles_sender' + DOCKER_POSTFIX, '-e', 'constraint:node==' + platform.node(), '-h', 'giles_sender', '--privileged', '-d', '-e', 'LC_ALL=C.UTF-8', '-e', 'LANG=C.UTF-8', '-v', '/bin:/bin:ro', '-v', '/lib:/lib:ro', '-v', '/lib64:/lib64:ro', '-v', '/usr:/usr:ro', '-v', os.getcwd() + ':' + os.getcwd(), '-w', os.getcwd(), '--net=' + DOCKER_NETWORK, DOCKER_REPO + 'giles-sender.' + ARCH + ':' + docker_tag, source_addr], False, False)
+        giles_sender = run_docker_command(['docker', docker_host_arg, 'run', '-u',
+            str(os.getuid()), '--name', 'giles_sender' + DOCKER_POSTFIX, '-e',
+            'constraint:node==' + platform.node(), '-h', 'giles_sender',
+            '--privileged', '-d', '-e', 'LC_ALL=C.UTF-8', '-e', 'LANG=C.UTF-8',
+            '-v', '/bin:/bin:ro', '-v', '/lib:/lib:ro', '-v', '/lib64:/lib64:ro',
+            '-v', '/usr:/usr:ro', '-v', os.getcwd() + ':' + os.getcwd(), '-w',
+            os.getcwd(), '--net=' + DOCKER_NETWORK, DOCKER_REPO + 'giles-sender.'
+            + ARCH + ':' + docker_tag, source_addr, messages], False, False)
     else:
-        giles_sender = subprocess.Popen(['../giles/sender/sender', source_addr], stdout=DEVNULL, stderr=DEVNULL)
+        giles_sender = subprocess.Popen(['../giles/sender/sender',
+            source_addr, messages], stdout=DEVNULL, stderr=DEVNULL)
     print('-----------------------------------------------------------------------')
     print('dagon: Test <<' + test + '>> is running...')
     return giles_sender
 
-def start_giles_receiver_process(sink_addr, docker, docker_tag, docker_host_arg):
+def start_giles_receiver_process(sink_addr, ttf, tsl,
+    docker, docker_tag, docker_host_arg):
+
     remove_file('received.txt')
 
     print('dagon: Creating GILES-RECEIVER node listening at sink')
     if docker:
-        giles_receiver = run_docker_command(['docker', docker_host_arg, 'run', '-u', str(os.getuid()), '--name', 'giles_receiver' + DOCKER_POSTFIX, '-e', 'constraint:node==' + platform.node(), '-h', 'giles_receiver', '--privileged', '-d', '-e', 'LC_ALL=C.UTF-8', '-e', 'LANG=C.UTF-8', '-v', '/bin:/bin:ro', '-v', '/lib:/lib:ro', '-v', '/lib64:/lib64:ro', '-v', '/usr:/usr:ro', '-v', os.getcwd() + ':' + os.getcwd(), '-w', os.getcwd(), '--net=' + DOCKER_NETWORK, DOCKER_REPO + 'giles-receiver.' + ARCH + ':' + docker_tag, sink_addr], False, False)
+        giles_receiver = run_docker_command(['docker', docker_host_arg, 'run',
+            '-u', str(os.getuid()), '--name', 'giles_receiver' + DOCKER_POSTFIX,
+            '-e', 'constraint:node==' + platform.node(), '-h', 'giles_receiver',
+            '--privileged', '-d', '-e', 'LC_ALL=C.UTF-8', '-e', 'LANG=C.UTF-8',
+            '-v', '/bin:/bin:ro', '-v', '/lib:/lib:ro', '-v', '/lib64:/lib64:ro',
+            '-v', '/usr:/usr:ro', '-v', os.getcwd() + ':' + os.getcwd(), '-w',
+            os.getcwd(), '--net=' + DOCKER_NETWORK, DOCKER_REPO +
+            'giles-receiver.' + ARCH + ':' + docker_tag,
+            sink_addr, str(ttf), str(tsl)], False, False)
     else:
-        giles_receiver = subprocess.Popen(['../giles/receiver/receiver', sink_addr], stdout=DEVNULL, stderr=DEVNULL)
+        giles_receiver = subprocess.Popen(['../giles/receiver/receiver',
+            sink_addr, str(ttf), str(tsl)], stdout=DEVNULL, stderr=DEVNULL)
     return giles_receiver
 
 def start_nodes(topo, seed, docker, docker_tag, docker_host_arg):
     if docker:
-        run_docker_command(['docker', docker_host_arg, 'network', 'create', DOCKER_NETWORK], False, False)
+        run_docker_command(['docker', docker_host_arg, 'network', 'create',
+            DOCKER_NETWORK], False, False)
 
     processes = []
     for n in range(topo.size()):
@@ -162,11 +217,15 @@ def start_nodes(topo, seed, docker, docker_tag, docker_host_arg):
         topo.update_node(n, 'out_addr', find_unused_port())
 
         if docker:
-            topo.update_node(n, 'docker_in_addr', topo.get_node_option(n, 'name') + DOCKER_POSTFIX + ':50000')
+            topo.update_node(n, 'docker_in_addr',
+                topo.get_node_option(n, 'name') + DOCKER_POSTFIX + ':50000')
             if n == topo.sink():
-                topo.update_node(n, 'docker_out_addr', 'giles_receiver' + DOCKER_POSTFIX + ':50000')
+                topo.update_node(n, 'docker_out_addr', 'giles_receiver' +
+                    DOCKER_POSTFIX + ':50000')
             else:
-                topo.update_node(n, 'docker_out_addr', topo.get_node_option(n, 'name') + '_spike' + DOCKER_POSTFIX + ':50000')
+                topo.update_node(n, 'docker_out_addr',
+                    topo.get_node_option(n, 'name') + '_spike' +
+                    DOCKER_POSTFIX + ':50000')
 
     for n in range(topo.size()):
         func = topo.get_node_option(n, 'f')
@@ -178,9 +237,13 @@ def start_nodes(topo, seed, docker, docker_tag, docker_host_arg):
             n_out_addr = topo.get_node_option(n, 'docker_out_addr')
 
         if n == topo.sink():
-            processes += start_buffy_processes(func, n_in_addr, n_out_addr, True, topo.get_node_option(n, 'name'), docker, docker_tag, docker_host_arg)
+            processes += start_buffy_processes(func, n_in_addr, n_out_addr,
+                True, topo.get_node_option(n, 'name'), docker,
+                docker_tag, docker_host_arg)
         else:
-            processes += start_buffy_processes(func, n_in_addr, n_out_addr, False, topo.get_node_option(n, 'name'), docker, docker_tag, docker_host_arg)
+            processes += start_buffy_processes(func, n_in_addr, n_out_addr,
+                False, topo.get_node_option(n, 'name'), docker,
+                docker_tag, docker_host_arg)
 
         for i in topo.inputs_for(n):
             action = topo.get_node_option(i, 'd')
@@ -190,7 +253,9 @@ def start_nodes(topo, seed, docker, docker_tag, docker_host_arg):
             if docker:
                 i_out_addr = topo.get_node_option(i, 'docker_out_addr')
 
-            processes.append(start_spike_process(i_out_addr, n_in_addr, seed, action, probability, topo.get_node_option(i, 'name'), docker, docker_tag, docker_host_arg))
+            processes.append(start_spike_process(i_out_addr, n_in_addr, seed,
+                action, probability, topo.get_node_option(i, 'name'), docker,
+                docker_tag, docker_host_arg))
 
     return processes
 
@@ -326,17 +391,33 @@ def load_func(filename, funcname="func"):
 @click.command()
 @click.argument('topology_name')
 @click.option('--gendot', is_flag=True, default=False)
-@click.option('--duration', default=3, help='Pseudo-random number seed')
-@click.option('--seed', default=int(round(time.time() * 1000)), help='Pseudo-random number seed')
-@click.option('--test', default='identity', help='Name of condition for passing test')
-@click.option('--mismatch', is_flag=True, default=False, help='Signifies that we expect a mismatch.')
-@click.option('--metrics', is_flag=True, default=False, help='Print throughput and latency metrics.')
-@click.option('--docker', is_flag=True, default=False, help='Use docker for running processes.')
-@click.option('--docker_host', default='unix:///var/run/docker.sock', help='Docker host to use.')
-@click.option('--docker_tag', default=subprocess.Popen(['git', 'describe', '--tags', '--always'], stdout=subprocess.PIPE).communicate()[0].decode("utf-8").rstrip('\n'), help='Docker version/tag to use.')
-def cli(topology_name, gendot, duration, seed, test, mismatch, metrics, docker, docker_host, docker_tag):
+@click.option('--messages', default=100,
+    help='Number of messages to send')
+@click.option('--ttf', default=60,
+    help='Seconds the receiver should wait for first message before shutting down')
+@click.option('--tsl', default=60,
+    help='Seconds since last message the receiver should wait before shutting down')
+@click.option('--seed', default=int(round(time.time() * 1000)),
+    help='Pseudo-random number seed')
+@click.option('--test', default='identity',
+    help='Name of condition for passing test')
+@click.option('--mismatch', is_flag=True, default=False,
+    help='Signifies that we expect a mismatch.')
+@click.option('--metrics', is_flag=True, default=False,
+    help='Print throughput and latency metrics.')
+@click.option('--docker', is_flag=True, default=False,
+    help='Use docker for running processes.')
+@click.option('--docker_host', default='unix:///var/run/docker.sock',
+    help='Docker host to use.')
+@click.option('--docker_tag',
+    default=subprocess.Popen(['git', 'describe', '--tags', '--always'],
+        stdout=subprocess.PIPE).communicate()[0].decode("utf-8").rstrip('\n'),
+    help='Docker version/tag to use.')
+def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
+    metrics, docker, docker_host, docker_tag):
+
     processes = [] # A list of spawned subprocesses
-    duration = int(duration)
+    messages = str(messages)
     config_filename = './config/' + topology_name + '.ini'
     docker_host_arg = '--host=' + docker_host
 
@@ -357,11 +438,16 @@ def cli(topology_name, gendot, duration, seed, test, mismatch, metrics, docker, 
         return
 
     if docker:
-        print('Using docker host: "' + docker_host + '" and docker_tag: "' + docker_tag + '". Pulling images now.')
-        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO + 'giles-receiver.' + ARCH + ':' + docker_tag], False, False)
-        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO + 'giles-sender.' + ARCH + ':' + docker_tag], False, False)
-        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO + 'spike.' + ARCH + ':' + docker_tag], False, False)
-        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO + 'buffy:' + docker_tag], False, False)
+        print('Using docker host: "' + docker_host + '" and docker_tag: "' +
+            docker_tag + '". Pulling images now.')
+        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
+            'giles-receiver.' + ARCH + ':' + docker_tag], False, False)
+        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
+            'giles-sender.' + ARCH + ':' + docker_tag], False, False)
+        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
+            'spike.' + ARCH + ':' + docker_tag], False, False)
+        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
+            'buffy:' + docker_tag], False, False)
 
     ## RUN TOPOLOGY
 
@@ -383,37 +469,45 @@ def cli(topology_name, gendot, duration, seed, test, mismatch, metrics, docker, 
         sink_addr = topology.get_node_option(topology.sink(), 'docker_out_addr')
     print('dagon: Sink is ' + sink_addr)
 
-    giles_receiver_process = start_giles_receiver_process(sink_addr, docker, docker_tag, docker_host_arg)
+    giles_receiver_process = start_giles_receiver_process(sink_addr, ttf, tsl,
+        docker, docker_tag, docker_host_arg)
     time.sleep(1)
-    giles_sender_process = start_giles_sender_process(source_addr, test, docker, docker_tag, docker_host_arg)
+    giles_sender_process = start_giles_sender_process(source_addr, messages,
+        test, docker, docker_tag, docker_host_arg)
 
-    # Let test run for duration
-    time.sleep(duration)
+    # Run until we have results
+    while (not (os.path.exists("sent.txt") and os.path.exists("received.txt"))):
+        print("dagon: running....")
+        time.sleep(5)
     print('dagon: Finished')
 
     # Tell giles-sender to stop sending messages
     if docker:
-        run_docker_command(['docker', docker_host_arg, 'stop', '--time=60', giles_sender_process], False, False)
+        run_docker_command(['docker', docker_host_arg, 'stop', '--time=60',
+            giles_sender_process], False, False)
     else:
         os.kill(giles_sender_process.pid, signal.SIGTERM)
     time.sleep(10)
 
     # Tell giles-receiver to shutdown
     if docker:
-        run_docker_command(['docker', docker_host_arg, 'stop', '--time=60', giles_receiver_process], False, False)
+        run_docker_command(['docker', docker_host_arg, 'stop', '--time=60',
+            giles_receiver_process], False, False)
     else:
         os.kill(giles_receiver_process.pid, signal.SIGTERM)
 
     # Kill subprocesses
     for process in processes:
         if docker:
-            run_docker_command(['docker', docker_host_arg, 'stop', '--time=1', process], False, False)
+            run_docker_command(['docker', docker_host_arg, 'stop', '--time=1',
+                process], False, False)
         else:
             os.kill(process.pid, signal.SIGTERM)
     time.sleep(5)
 
     if docker:
-        run_docker_command(['docker', docker_host_arg, 'network', 'rm', DOCKER_NETWORK], False, False)
+        run_docker_command(['docker', docker_host_arg, 'network', 'rm',
+            DOCKER_NETWORK], False, False)
 
     ## CALCULATE TEST RESULTS
     calculate_test_results(test, mismatch, metrics)

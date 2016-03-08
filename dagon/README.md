@@ -26,8 +26,16 @@ Run a dagon test as follows:
 For example, if your topology is called "topos", then you should name
 your config file ```topos.ini```.
 
-```--duration``` is an optional parameter that sets the duration of the test.
-in seconds.  The default is 3.
+```--messages``` is an optional parameter that sets the number of messages to
+send. The default is 100.
+
+```--ttf``` is an optional parameter that sets the how many seconds  Giles
+should wait for the first message to arrive before giving up and shutting down.
+The default is 60.
+
+```--tsl``` is an optional parameter that sets the how many seconds Giles
+should wait since the last messaged arrive before giving up and shutting down.
+The default is 60.
 
 ```--seed``` is an optional parameter that seeds random number generators within spike.
 

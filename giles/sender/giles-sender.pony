@@ -1,3 +1,4 @@
+use "bureaucracy"
 use "collections"
 use "files"
 use "net"
@@ -8,18 +9,21 @@ actor Main
   new create(env: Env) =>
     try
       let timers = Timers
+      let custodian = Custodian
 
       let out_addr_raw = env.args(1).split(":")
+      let messages_to_send = env.args(2).u64()
 
       let outgoing_address = DNS.ip4(out_addr_raw(0), out_addr_raw(1))(0)
       let store = Store(env)
       let sender = Sender(outgoing_address, store)
 
-      let timer = Timer(DataGenerator(sender), 0, 5_000_000)
+      let timer = Timer(DataGenerator(custodian, sender, messages_to_send), 0, 5_000_000)
       let timer' = timer
       timers(consume timer)
 
-      SignalHandler(TermHandler(sender, timers, timer', store), Sig.term())
+      custodian(timers)(sender)(store)
+      SignalHandler(TermHandler(custodian), Sig.term())
     else
       env.out.print("wrong args")
     end
@@ -71,7 +75,10 @@ actor Store
   be sent(msg: ByteSeq, at: U64) =>
     _sent.push((msg, at))
 
-  be dump() =>
+  be dispose() =>
+    _dump()
+
+  fun _dump() =>
     try
       let sent_handle = File(FilePath(_env.root, "sent.txt"))
       for s in _sent.values() do
@@ -96,33 +103,34 @@ actor Store
 class DataGenerator is TimerNotify
   var _counter: U64
   let _sender: Sender
+  let _custodian: Custodian
+  let _messages_to_send: U64
 
-  new iso create(sender: Sender) =>
+  new iso create(custodian: Custodian, sender: Sender, messages_to_send: U64) =>
     _counter = 0
     _sender = sender
+    _custodian = custodian
+    _messages_to_send = messages_to_send
 
   fun ref _next(): String =>
     _counter = _counter + 1
     _counter.string()
 
   fun ref apply(timer: Timer, count: U64): Bool =>
-    _sender.write(_next())
-    true
+    if _messages_to_send > _counter then
+      _sender.write(_next())
+      return true
+    else
+      _custodian.dispose()
+      return false
+    end
 
 class TermHandler is SignalNotify
-  let _sender: Sender
-  let _timers: Timers
-  let _timer: Timer tag
-  let _store: Store
+  let _custodian: Custodian
 
-  new iso create(sender: Sender, timers: Timers, timer: Timer tag, store: Store) =>
-    _sender = sender
-    _timers = timers
-    _timer = timer
-    _store = store
+  new iso create(custodian: Custodian) =>
+    _custodian = custodian
 
   fun ref apply(count: U32): Bool =>
-    _timers.cancel(_timer)
-    _sender.dispose()
-    _store.dump()
+    _custodian.dispose()
     true
