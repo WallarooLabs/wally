@@ -36,6 +36,9 @@ against outputs. This function must be defined in a python source file in the ``
 as a function with the name and signature ```func(input, output)``` and returning a boolean.
 A function checking for identity is the default.
 
+```--mismatch``` is an option parameter specifying that we expect there to be mismatched output
+as part of the results.
+
 ```--metrics``` is a flag that causes dagon to display metrics (throughput/latency)
 
 ```--dotgen``` is a flag that causes dagon to output a graphviz dot file of the topology.
@@ -46,6 +49,10 @@ This flag also skips running any tests.
 ```--docker_host``` is an optional parameter that tells dagon which docker daemon to connect to. It defaults to `unix:///var/run/docker.sock`.
 
 ```--docker_tag``` is an optional parameter that tells dagon which tag to use when pulling/running docker containers. It defaults to the output of `git describe --tags --always`.
+
+Dagon ships with a working example topology name `dagon`, to run it, you should run:
+
+`python3 dagon.py dagon`
 
 ### Docker examples
 
