@@ -1,0 +1,7 @@
+# /etc/default/ptpd
+
+# Set to "yes" to actually start ptpd automatically
+START_DAEMON=yes
+
+# Add command line options for ptpd
+PTPD_OPTS="{{ '--unicast' if ptpd_transport == "unicast" else '' }} {{ '--unicast-destinations' if ptpd_destinations is defined else '' }} {{ ptpd_destinations if ptpd_destinations is defined else '' }} --log-file /var/log/ptpd.log --statistics-file /var/log/ptpd-stats.log --{{ ptpd_role }}only --interface {{ ethernet_interface }} --ptpengine:use_libpcap=Y --ptpengine:clock_class={{ 127 if ptpd_role == "master" else 255 }} --ptpengine:panic_mode=Y --ptpengine:panic_mode_exit_threshold=100000000 --clock:max_offset_ppm=1000 --global:cpuaffinity_cpucore=0"

@@ -1,0 +1,5 @@
+---
+dependencies:
+  - { role: dochang.docker, when: ansible_architecture == "x86_64" }
+  - { role: hypriot.docker, when: "'{{ ansible_architecture[0:3] }}' == 'arm'" }
+
