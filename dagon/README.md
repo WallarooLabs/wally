@@ -41,6 +41,10 @@ A function checking for identity is the default.
 ```--dotgen``` is a flag that causes dagon to output a graphviz dot file of the topology.
 This flag also skips running any tests.
 
+Dagon ships with a working example topology name `dagon`, to run it, you should run:
+
+`python3 dagon.py dagon`
+
 ## Topology Configuration
 
 You configure the topology in a config file with the extension ```.ini```.
