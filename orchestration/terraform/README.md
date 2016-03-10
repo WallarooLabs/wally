@@ -1,4 +1,4 @@
-# Buffy Terraform Orechestration
+# Buffy Terraform Orchestration
 
 This module consists of the orchestration for Buffy using Terraform.
 So far we have only implemented AWS as a provider.
