@@ -1,0 +1,5 @@
+export default {
+   PRICE_SPREAD: "PRICE_SPREAD",
+   CLIENT_LIMIT: "CLIENT_LIMIT",
+   MARKET_DATA: "NBBO"
+}
