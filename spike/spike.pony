@@ -19,8 +19,8 @@ actor Main
     try
       for option in options do
         match option
-        | ("prob", var arg: String) => prob = arg.u64()
-        | ("seed", var arg: String) => seed = arg.u64()
+        | ("prob", let arg: String) => prob = arg.u64()
+        | ("seed", let arg: String) => seed = arg.u64()
         end
       end
     else

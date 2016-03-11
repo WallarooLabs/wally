@@ -8,11 +8,14 @@ def get_function(func_name):
 
 # Import each function manually
 # TODO: automate this part so function files are drop-in compatible
-from .pong import FUNC_NAME, func
+from .pong import FUNC_NAME, func  # noqa
 __FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
 
-from .passthrough import FUNC_NAME, func
+from .passthrough import FUNC_NAME, func  # noqa
 __FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
 
-from .double import FUNC_NAME, func
+from .double import FUNC_NAME, func  # noqa
+__FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
+
+from .marketspread import FUNC_NAME, func  # noqa
 __FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)

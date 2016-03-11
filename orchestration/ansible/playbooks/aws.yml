@@ -1,0 +1,56 @@
+# create dynamic groups
+- hosts: tag_Project_buffy:&tag_Role_follower
+  tasks:
+  - name: Create a group of all followers for buffy
+    group_by: key=buffy-followers
+
+- hosts: tag_Project_buffy:&tag_Role_leader
+  vars:
+    ethernet_interface: eth0
+  tasks:
+  - name: Create a group of all leaders for buffy
+    group_by: key=buffy-leaders
+  - name: Set IPs for ptpd unicast
+    set_fact: ptpd_destinations="{% for host in groups['buffy-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}"
+
+- hosts: buffy-leaders:buffy-followers
+  tasks:
+  - name: Create a group of all hosts for buffy
+    group_by: key=buffy-all
+
+# Apply common configuration to all hosts
+- hosts: buffy-all
+  roles:
+  - { role: common, become: yes }
+
+# Configure and deploy leader servers.
+- hosts: buffy-leaders
+  vars_files:
+    - 'docker_creds.yml'
+  vars:
+    ethernet_interface: eth0
+    ptpd_role: master
+    ptpd_transport: unicast
+    swarm_image: swarm
+    consul_image: gliderlabs/consul
+    docker_users: ubuntu
+  roles:
+  - { role: ptpd, become: yes }
+  - { role: docker, become: yes }
+
+# Configure and deploy follower servers.
+- hosts: buffy-followers
+  vars_files:
+    - 'docker_creds.yml'
+  vars:
+    ethernet_interface: eth0
+    ptpd_role: slave
+    ptpd_transport: unicast
+    leader_ip: "{{ hostvars[groups['buffy-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
+    swarm_image: swarm
+    consul_image: gliderlabs/consul
+    docker_users: ubuntu
+  roles:
+  - { role: ptpd, become: yes }
+  - { role: docker, become: yes }
+

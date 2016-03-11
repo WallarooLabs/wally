@@ -1,0 +1,3 @@
+- name: restart ptpd
+  service: name=ptpd state=restarted
+
