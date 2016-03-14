@@ -27,11 +27,19 @@
     - /usr/local/bin/cluster.yml
   when: hcl2.stat.exists
 
-- name: Install latest hypriot docker packages
-  apt: name={{ item }} state=latest
-  with_items:
-   - docker-hypriot
-   - docker-compose
+- block:
+  - name: Install latest hypriot docker packages
+    apt: name={{ item }} state=latest
+    with_items:
+     - docker-hypriot
+     - docker-compose
+  rescue:
+  - command: rm -rf /var/lib/docker/*
+  - name: Install latest hypriot docker packages
+    apt: name={{ item }} state=latest
+    with_items:
+     - docker-hypriot
+     - docker-compose
 
 - name: install docker-py
   pip:
