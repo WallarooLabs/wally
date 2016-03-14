@@ -413,8 +413,10 @@ def load_func(filename, funcname="func"):
     default=subprocess.Popen(['git', 'describe', '--tags', '--always'],
         stdout=subprocess.PIPE).communicate()[0].decode("utf-8").rstrip('\n'),
     help='Docker version/tag to use.')
+@click.option('--startup_delay', default=15,
+    help="Number of seconds to wait before starting the sender.")
 def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
-    metrics, docker, docker_host, docker_tag):
+    metrics, docker, docker_host, docker_tag, startup_delay):
 
     processes = [] # A list of spawned subprocesses
     messages = str(messages)
@@ -471,7 +473,7 @@ def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
 
     giles_receiver_process = start_giles_receiver_process(sink_addr, ttf, tsl,
         docker, docker_tag, docker_host_arg)
-    time.sleep(1)
+    time.sleep(startup_delay)
     giles_sender_process = start_giles_sender_process(source_addr, messages,
         test, docker, docker_tag, docker_host_arg)
 

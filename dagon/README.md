@@ -58,6 +58,10 @@ This flag also skips running any tests.
 
 ```--docker_tag``` is an optional parameter that tells dagon which tag to use when pulling/running docker containers. It defaults to the output of `git describe --tags --always`.
 
+```--startup_delay``` is an optional parameter that tells dagon how long to wait
+after starting up the giles receiver before starting up the sender. Defaults to
+15 seconds. Should be longer if doing a docker deploy.
+
 Dagon ships with a working example topology name `dagon`, to run it, you should run:
 
 `python3 dagon.py dagon`
