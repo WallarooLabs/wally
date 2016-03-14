@@ -31,7 +31,7 @@ send. The default is 100.
 
 ```--ttf``` is an optional parameter that sets the how many seconds  Giles
 should wait for the first message to arrive before giving up and shutting down.
-The default is 60.
+The default is 300.
 
 ```--tsl``` is an optional parameter that sets the how many seconds Giles
 should wait since the last messaged arrive before giving up and shutting down.

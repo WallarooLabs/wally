@@ -16,7 +16,7 @@ from configparser import SafeConfigParser
 import dotgen
 
 LOCAL_ADDR = '127.0.0.1'
-PAUSE = 1
+PAUSE = 60
 DEVNULL = open(os.devnull, 'w') # For suppressing stdout/stderr of subprocesses
 ARCH = 'amd64' if platform.machine() == 'x86_64' else 'armhf'
 DOCKER_REPO = 'docker.sendence.com:5043/sendence/'
@@ -393,7 +393,7 @@ def load_func(filename, funcname="func"):
 @click.option('--gendot', is_flag=True, default=False)
 @click.option('--messages', default=100,
     help='Number of messages to send')
-@click.option('--ttf', default=60,
+@click.option('--ttf', default=300,
     help='Seconds the receiver should wait for first message before shutting down')
 @click.option('--tsl', default=60,
     help='Seconds since last message the receiver should wait before shutting down')
@@ -471,7 +471,7 @@ def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
 
     giles_receiver_process = start_giles_receiver_process(sink_addr, ttf, tsl,
         docker, docker_tag, docker_host_arg)
-    time.sleep(1)
+    time.sleep(PAUSE)
     giles_sender_process = start_giles_sender_process(source_addr, messages,
         test, docker, docker_tag, docker_host_arg)
 
