@@ -4,6 +4,7 @@ import React from 'react'
 import Breadcrumbs from "../../components/Breadcrumbs";
 import MarketDataPipeline from "./pipelines/MarketDataPipeline";
 import MarketDataPipelineNode1 from "./pipelines/MarketDataPipelineNode1";
+import MarketDataPipelineNode2 from "./pipelines/MarketDataPipelineNode2";
 
 
 //            <GlobalNav />
@@ -15,6 +16,7 @@ export default class App extends React.Component {
             <div className="container">
                 <MarketDataPipeline />
                 <MarketDataPipelineNode1 />
+                <MarketDataPipelineNode2 />
             </div>
           </div>
         )

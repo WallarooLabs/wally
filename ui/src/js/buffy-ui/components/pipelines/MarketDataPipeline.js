@@ -8,7 +8,10 @@ export default class MarketDataPipeline extends React.Component {
         const pipelineKey = AppConfig.getPipelineKey("MARKET_SPREAD_CHECK", "PRICE_SPREAD");
         const pipelineName = AppConfig.getPipelineName("MARKET_SPREAD_CHECK", "PRICE_SPREAD");
         return (
-            <MetricsPanel systemKey={systemKey} pipelineKey={pipelineKey} pipelineName={pipelineName}  />
+            <div>
+                <h3>Overall (Source->Sink)</h3>
+                <MetricsPanel systemKey={systemKey} pipelineKey={pipelineKey} pipelineName={pipelineName}  />
+            </div>
         )
     }
 }

@@ -24,6 +24,15 @@ function channelHubToDispatcherWith(connector) {
 
     connector.connectTo("pipeline:market-spread-node-1")
         .dispatchOn("total-throughput:last-1-sec", Splitters.throughputs);
+
+    connector.connectTo("pipeline:market-spread-node-2")
+        .dispatchOn("latency-percentiles:last-5-mins", Splitters.latencies);
+
+    connector.connectTo("pipeline:market-spread-node-2")
+        .dispatchOn("latency-percentiles:last-5-mins", Splitters.allTimeLatencyPercentiles);
+
+    connector.connectTo("pipeline:market-spread-node-2")
+        .dispatchOn("total-throughput:last-1-sec", Splitters.throughputs);
 }
 
 function mockStreamToDispatcherWith(streamConnector) {
@@ -48,6 +57,18 @@ function mockStreamToDispatcherWith(streamConnector) {
     streamConnector.connect(new LatencyPercentilesGenerator(PipelineKeys.NODE_1))
         .withTransformer(Splitters.allTimeLatencyPercentiles)
         .onChannel("pipeline:market-spread-node-1")
+        .forMsgType("latency-percentiles:last-5-mins")
+        .start();
+
+    streamConnector.connect(new ThroughputGenerator(PipelineKeys.NODE_2))
+        .withTransformer(Splitters.throughputs)
+        .onChannel("pipeline:market-spread-node-2")
+        .forMsgType("total-throughput:last-1-sec")
+        .start();
+
+    streamConnector.connect(new LatencyPercentilesGenerator(PipelineKeys.NODE_2))
+        .withTransformer(Splitters.allTimeLatencyPercentiles)
+        .onChannel("pipeline:market-spread-node-2")
         .forMsgType("latency-percentiles:last-5-mins")
         .start();
 }

@@ -22,6 +22,12 @@ export default {
 					key: "NODE_1",
 					path: "market-data-node-1",
 					channelKey: "NODE_1"
+				},
+				NODE_2: {
+					name: "Market Data Node 2",
+					key: "NODE_2",
+					path: "market-data-node-2",
+					channelKey: "NODE_2"
 				}
 			}
 		},

@@ -9,6 +9,8 @@ export default {
                 return ActionCreators[Actions.RECEIVE_PRICE_SPREAD_LATENCY.actionType](data);
             case AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NODE_1"):
                 return ActionCreators[Actions.RECEIVE_PRICE_SPREAD_LATENCY.actionType](data);
+            case AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NODE_2"):
+                return ActionCreators[Actions.RECEIVE_PRICE_SPREAD_LATENCY.actionType](data);
         }
     },
     allTimeLatencyPercentiles: function(data) {
@@ -17,6 +19,8 @@ export default {
                 return ActionCreators[Actions.RECEIVE_PRICE_SPREAD_ALL_TIME_LATENCY_PERCENTILES.actionType](data);
             case AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NODE_1"):
                 return ActionCreators[Actions.RECEIVE_PRICE_SPREAD_ALL_TIME_LATENCY_PERCENTILES.actionType](data);
+            case AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NODE_2"):
+                return ActionCreators[Actions.RECEIVE_PRICE_SPREAD_ALL_TIME_LATENCY_PERCENTILES.actionType](data);
         }
     },
     throughputs: function(data) {
@@ -24,6 +28,8 @@ export default {
             case AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "PRICE_SPREAD"):
                 return ActionCreators[Actions.RECEIVE_PRICE_SPREAD_THROUGHPUT.actionType](data);
             case AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NODE_1"):
+                return ActionCreators[Actions.RECEIVE_PRICE_SPREAD_THROUGHPUT.actionType](data);
+            case AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NODE_2"):
                 return ActionCreators[Actions.RECEIVE_PRICE_SPREAD_THROUGHPUT.actionType](data);
         }
     }
