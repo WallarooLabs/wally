@@ -39,8 +39,9 @@ export default class LatencyPercentilesGenerator {
         })
 		let latencyPercentiles = this.latencyPercentiles;
 		return {
-			latencyPercentiles: latencyPercentiles,
-			category: pipelineKeys[1]
+            time: Date.now(),
+			"latency_percentiles": latencyPercentiles,
+			"pipeline_key": pipelineKeys[1]
 		}
 	}
 }

@@ -36,11 +36,18 @@ class BenchmarksStore extends ReduceStore {
     getPipelineThroughputs(systemKey, pipelineKey) {
         return this.getState().get(systemKey).get(pipelineKey).get("throughputs");
     }
-    filterLatencyData(state, nextLatency, pipelineKey, systemKey) {
+    filterLatencyData(state, nextLatencyPercentiles, pipelineKey, systemKey) {
         const now = Date.now();
         const systemMap = state.get(systemKey);
         const benchmarksMap = systemMap.get(pipelineKey);
         const latenciesList = benchmarksMap.get("latencies");
+        console.log(nextLatencyPercentiles);
+        const nextLatency = {
+            time: nextLatencyPercentiles.time,
+            latency: nextLatencyPercentiles.latency_percentiles["50.0"],
+            pipeline_key: nextLatencyPercentiles.pipeline_key
+        };
+        console.log(nextLatency);
         const updatedLatenciesList = latenciesList.push(fromJS(nextLatency)).sort(Comparators.propFor("time")).filter(d => {
             return now - d.get("time") < minutes(15)
         });
@@ -57,6 +64,7 @@ class BenchmarksStore extends ReduceStore {
         return state.set(systemKey, systemMap.set(pipelineKey, benchmarksMap.set("throughputs", updatedThroughputsList)));
     }
     reduce(state, action) {
+        if (!action) return state;
         let pipelineChannelKey;
         let systemKey;
         switch (action.actionType) {

@@ -1,6 +1,6 @@
 import React from "react"
 import AppConfig from "../../config/AppConfig"
-import PipelineBox from "./PipelineBox"
+import MetricsPanel from "./MetricsPanel"
 
 export default class MarketDataPipeline extends React.Component {
     render() {
@@ -8,7 +8,7 @@ export default class MarketDataPipeline extends React.Component {
         const pipelineKey = AppConfig.getPipelineKey("MARKET_SPREAD_CHECK", "PRICE_SPREAD");
         const pipelineName = AppConfig.getPipelineName("MARKET_SPREAD_CHECK", "PRICE_SPREAD");
         return (
-            <PipelineBox systemKey={systemKey} pipelineKey={pipelineKey} pipelineName={pipelineName}  />
+            <MetricsPanel systemKey={systemKey} pipelineKey={pipelineKey} pipelineName={pipelineName}  />
         )
     }
 }

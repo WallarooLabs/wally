@@ -31,7 +31,7 @@ class AllTimeLatencyPercentileStore extends ReduceStore {
 	updateAllTimeLatencyPercentiles(state, nextAllTimeLatencyPercentiles, pipelineKey, systemKey) {
 		const systemMap = state.get(systemKey);
 		return state.set(systemKey, systemMap.set(pipelineKey, 
-			fromJS(nextAllTimeLatencyPercentiles["latencyPercentiles"])));
+			fromJS(nextAllTimeLatencyPercentiles["latency_percentiles"])));
 	}
 
 	reduce(state, action) {

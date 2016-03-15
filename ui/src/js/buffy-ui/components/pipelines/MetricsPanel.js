@@ -7,7 +7,7 @@ import {minutes} from "../../../util/Duration"
 import {throughputInThousands} from "../../../util/Format"
 import MonitoringGraphsContainer from "./MonitoringGraphsContainer"
 
-export default class PipelineBox extends React.Component {
+export default class MetricsPanel extends React.Component {
     constructor(props) {
         super(props);
         const systemKey = this.props.systemKey;

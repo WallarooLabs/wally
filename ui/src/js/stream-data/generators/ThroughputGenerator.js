@@ -25,7 +25,7 @@ export default class ThroughputGenerator {
         return {
             time: time,
             throughput: throughput,
-            category: pipelineKeys[1]
+            "pipeline_key": pipelineKeys[1]
         }
     }
 }

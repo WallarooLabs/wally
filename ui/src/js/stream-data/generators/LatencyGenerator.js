@@ -25,7 +25,7 @@ export default class LatencyGenerator {
         return {
             time: time,
             latency: latency,
-            category: pipelineKeys[1]
+            "pipeline_key": pipelineKeys[1]
         }
     }
 }
