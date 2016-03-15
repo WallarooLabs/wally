@@ -4,7 +4,8 @@ import PipelineKeys from "../../buffy-ui/constants/PipelineKeys.js"
 const pipelineKeys = [PipelineKeys.CLIENT_LIMIT, PipelineKeys.PRICE_SPREAD, PipelineKeys.MARKET_DATA];
 
 export default class ThroughputGenerator {
-    constructor() {
+    constructor(pipelineKey) {
+        this.pipelineKey = pipelineKey;
         this.lastThr = Rand.rollFromZero(1000);
     }
     hasNext() {
@@ -25,7 +26,7 @@ export default class ThroughputGenerator {
         return {
             time: time,
             throughput: throughput,
-            category: pipelineKeys[1]
+            "pipeline_key": this.pipelineKey
         }
     }
 }

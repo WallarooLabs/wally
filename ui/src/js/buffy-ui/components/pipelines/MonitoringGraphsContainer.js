@@ -1,12 +1,12 @@
 import React from 'react';
 import MonitoringGraphs from "./MonitoringGraphs.js";
-import {combineStats, compilePercentiles} from "../../../components/Pipelines/calc/PipelineStatsCalc.js";
+import {combineStats, compilePercentiles} from "./calc/PipelineStatsCalc.js";
 import {Map} from "immutable";
 import {filterLast5Minutes} from "../../../util/BenchmarksHelpers";
 import {throughputInThousands, latencyInMilliseconds} from "../../../util/Format";
 import Comparators from "../../../util/Comparators";
 
-export default class Pipeline extends React.Component {
+export default class MonitoringGraphsContainer extends React.Component {
     toChartData(data, metric) {
         const chartData = data.map(d => new Map({
             x: d.get("time"),

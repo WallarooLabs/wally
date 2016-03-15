@@ -3,7 +3,6 @@ import {Col, Row, Tabs, Tab} from "react-bootstrap";
 import LineChart from "../../../components/charts/LineChart";
 import {Map, List} from "immutable";
 import Comparators from "../../../util/Comparators";
-import LatencyPercentileDataRow from "../../../components/Pipelines/Metrics/LatencyPercentileDataRow";
 import {minutes} from "../../../util/Duration";
 
 export default class HistogramContainer extends React.Component {
@@ -64,5 +63,3 @@ export default class HistogramContainer extends React.Component {
         )
     }
 }
-
-//                     <LatencyPercentileDataRow data={this.props.latencyPercData}/>
