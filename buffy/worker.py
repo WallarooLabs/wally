@@ -39,6 +39,11 @@ from functions import get_function
 from functions import state
 
 
+# Generate a unique node/vertex id
+VUID = (base64.urlsafe_b64encode(str(random.randint(100000,999999))
+        .encode()).decode())
+
+
 THROUGHPUT_IN = 'throughput_in'
 THROUGHPUT_OUT = 'throughput_out'
 LATENCY_COUNT = 'latency_count'
@@ -220,11 +225,6 @@ def start(input_address,
     else:
         output_func = udp_dump
 
-    # Generate a unique node/vertex id
-    global VUID
-    VUID = (base64.urlsafe_b64encode(str(random.randint(100000,999999))
-            .encode()).decode())
-
     # Create partial functions for input and output
     udp_input = functools.partial(udp_get, host=input_host, port=input_port)
     udp_output = functools.partial(output_func, host=output_host,
@@ -276,6 +276,7 @@ def start(input_address,
                            level=log_level)
 
     logger.info('Starting worker...')
+    logger.info('VUID: %s', VUID)
     logger.info('FUNC_NAME: %s', func_name)
     logger.info('input_addr: %s', input_address)
     logger.info('output_addr: %s', output_address)
