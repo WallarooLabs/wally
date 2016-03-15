@@ -56,7 +56,7 @@ This flag also skips running any tests.
 
 ```--docker_host``` is an optional parameter that tells dagon which docker daemon to connect to. It defaults to `unix:///var/run/docker.sock`.
 
-```--docker_tag``` is an optional parameter that tells dagon which tag to use when pulling/running docker containers. It defaults to the output of `git describe --tags --always`.
+```--docker_tag``` is an optional parameter that tells dagon which tag to use when pulling/running docker containers. It defaults to `latest`.
 
 ```--startup_delay``` is an optional parameter that tells dagon how long to wait
 after starting up the giles receiver before starting up the sender. Defaults to
