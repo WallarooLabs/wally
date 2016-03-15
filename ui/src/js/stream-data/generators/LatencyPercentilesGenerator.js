@@ -18,8 +18,9 @@ const percentiles = [
     ];
 
 export default class LatencyPercentilesGenerator {
-	constructor() {
-		let num = 350;
+	constructor(pipelineKey) {
+        this.pipelineKey = pipelineKey;
+		let num = Rand.roll(10350);
 		let latencyPercentiles = {};
         let percentile;
 		percentiles.forEach(p => {
@@ -36,11 +37,12 @@ export default class LatencyPercentilesGenerator {
         const percentiles = Object.keys(this.latencyPercentiles);
         percentiles.forEach(percentile => {
             this.latencyPercentiles[percentile] = this.latencyPercentiles[percentile] + 10;
-        })
+        });
 		let latencyPercentiles = this.latencyPercentiles;
 		return {
-			latencyPercentiles: latencyPercentiles,
-			category: pipelineKeys[1]
+            time: Date.now(),
+			"latency_percentiles": latencyPercentiles,
+			"pipeline_key": this.pipelineKey
 		}
 	}
 }

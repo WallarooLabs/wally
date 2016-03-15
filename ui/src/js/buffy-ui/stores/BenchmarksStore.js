@@ -36,11 +36,16 @@ class BenchmarksStore extends ReduceStore {
     getPipelineThroughputs(systemKey, pipelineKey) {
         return this.getState().get(systemKey).get(pipelineKey).get("throughputs");
     }
-    filterLatencyData(state, nextLatency, pipelineKey, systemKey) {
+    filterLatencyData(state, nextLatencyPercentiles, pipelineKey, systemKey) {
         const now = Date.now();
         const systemMap = state.get(systemKey);
         const benchmarksMap = systemMap.get(pipelineKey);
         const latenciesList = benchmarksMap.get("latencies");
+        const nextLatency = {
+            time: nextLatencyPercentiles.time,
+            latency: nextLatencyPercentiles.latency_percentiles["50.0"],
+            pipeline_key: nextLatencyPercentiles.pipeline_key
+        };
         const updatedLatenciesList = latenciesList.push(fromJS(nextLatency)).sort(Comparators.propFor("time")).filter(d => {
             return now - d.get("time") < minutes(15)
         });
@@ -57,58 +62,18 @@ class BenchmarksStore extends ReduceStore {
         return state.set(systemKey, systemMap.set(pipelineKey, benchmarksMap.set("throughputs", updatedThroughputsList)));
     }
     reduce(state, action) {
+        if (!action) return state;
         let pipelineChannelKey;
         let systemKey;
         switch (action.actionType) {
-            case Actions.RECEIVE_CLIENT_LIMIT_LATENCY.actionType:
-                pipelineChannelKey = AppConfig.getChannelKey("CLIENT_LIMIT_CHECK", "CLIENT_LIMIT");
-                systemKey = AppConfig.getSystemKey("CLIENT_LIMIT_CHECK");
-                return this.filterLatencyData(state, action.latency, pipelineChannelKey, systemKey);
-            case Actions.RECEIVE_CLIENT_LIMIT_THROUGHPUT.actionType:
-                pipelineChannelKey = AppConfig.getChannelKey("CLIENT_LIMIT_CHECK", "CLIENT_LIMIT");
-                systemKey = AppConfig.getSystemKey("CLIENT_LIMIT_CHECK");
-                return this.filterThroughputData(state, action.throughput, pipelineChannelKey, systemKey);
             case Actions.RECEIVE_PRICE_SPREAD_LATENCY.actionType:
-                pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "PRICE_SPREAD");
+                pipelineChannelKey = action.latency.pipeline_key;
                 systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
                 return this.filterLatencyData(state, action.latency, pipelineChannelKey, systemKey);
             case Actions.RECEIVE_PRICE_SPREAD_THROUGHPUT.actionType:
-                pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "PRICE_SPREAD");
+                pipelineChannelKey = action.throughput.pipeline_key;
                 systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
                 return this.filterThroughputData(state, action.throughput, pipelineChannelKey, systemKey);
-            case Actions.RECEIVE_MARKET_DATA_LATENCY.actionType:
-                pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NBBO");
-                systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
-                return this.filterLatencyData(state, action.latency, pipelineChannelKey, systemKey);
-            case Actions.RECEIVE_MARKET_DATA_THROUGHPUT.actionType:
-                pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NBBO");
-                systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
-                return this.filterThroughputData(state, action.throughput, pipelineChannelKey, systemKey);
-            // Actionable Pipelines
-            // case Actions.RECEIVE_CLIENT_LIMIT_ACTIONABLE_LATENCY.actionType:
-            //     pipelineChannelKey = AppConfig.getChannelKey("INTERNAL_MONITORING", "CLIENT_LIMIT_ACTIONABLE");
-            //     systemKey = AppConfig.getSystemKey("INTERNAL_MONITORING");
-            //     return this.filterLatencyData(state, action.latency, pipelineChannelKey, systemKey);
-            // case Actions.RECEIVE_CLIENT_LIMIT_ACTIONABLE_THROUGHPUT.actionType:
-            //     pipelineChannelKey = AppConfig.getChannelKey("INTERNAL_MONITORING", "CLIENT_LIMIT_ACTIONABLE");
-            //     systemKey = AppConfig.getSystemKey("INTERNAL_MONITORING");
-            //     return this.filterThroughputData(state, action.throughput, pipelineChannelKey, systemKey);
-            // case Actions.RECEIVE_PRICE_SPREAD_ACTIONABLE_LATENCY.actionType:
-            //     pipelineChannelKey = AppConfig.getChannelKey("INTERNAL_MONITORING", "PRICE_SPREAD_ACTIONABLE");
-            //     systemKey = AppConfig.getSystemKey("INTERNAL_MONITORING");
-            //     return this.filterLatencyData(state, action.latency, pipelineChannelKey, systemKey);
-            // case Actions.RECEIVE_PRICE_SPREAD_ACTIONABLE_THROUGHPUT.actionType:
-            //     pipelineChannelKey = AppConfig.getChannelKey("INTERNAL_MONITORING", "PRICE_SPREAD_ACTIONABLE");
-            //     systemKey = AppConfig.getSystemKey("INTERNAL_MONITORING");
-            //     return this.filterThroughputData(state, action.throughput, pipelineChannelKey, systemKey);
-            // case Actions.RECEIVE_MARKET_DATA_ACTIONABLE_LATENCY.actionType:
-            //     pipelineChannelKey = AppConfig.getChannelKey("INTERNAL_MONITORING", "NBBO_ACTIONABLE");
-            //     systemKey = AppConfig.getSystemKey("INTERNAL_MONITORING");
-            //     return this.filterLatencyData(state, action.latency, pipelineChannelKey, systemKey);
-            // case Actions.RECEIVE_MARKET_DATA_ACTIONABLE_THROUGHPUT.actionType:
-            //     pipelineChannelKey = AppConfig.getChannelKey("INTERNAL_MONITORING", "NBBO_ACTIONABLE");
-            //     systemKey = AppConfig.getSystemKey("INTERNAL_MONITORING");
-            //     return this.filterThroughputData(state, action.throughput, pipelineChannelKey, systemKey);
             default:
                 return state;
         }

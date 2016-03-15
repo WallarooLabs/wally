@@ -11,7 +11,6 @@ const rootRoute = {
     component: require("../components/App"),
     path: "/",
     title: "Sendence",
-    onEnter: requireAuth,
     childRoutes:[ {
         path: AppConfig.getSystemPath("MARKET_SPREAD_CHECK"),
         component: require("../components/pipelines/MarketDataPipeline"),

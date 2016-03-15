@@ -3,7 +3,6 @@ import {Col, Row, Tabs, Tab} from "react-bootstrap";
 import LineChart from "../../../components/charts/LineChart";
 import {Map, List} from "immutable";
 import Comparators from "../../../util/Comparators";
-import LatencyPercentileDataRow from "../../../components/Pipelines/Metrics/LatencyPercentileDataRow";
 import {minutes} from "../../../util/Duration";
 
 export default class HistogramContainer extends React.Component {
@@ -45,29 +44,22 @@ export default class HistogramContainer extends React.Component {
     }
     render() {
         return(
-            <Tabs>
-                <Tab eventKey={1} title="Latency">
-                    <Col lg={12}>
-                        <Col md={16}>
-                            <h5 className="text-center">Latency by Percentile Distribution: Last 5 Minutes</h5>
-                        </Col>
-                        <LineChart
-                            data={this.latenciesToLinearPercChartData(this.props.latencyPercData)}
-                            h="600"
-                            w="1000"
-                            yLeftLabel="Latency (ms)"
-                            xLogScale={false}
-                            xPowScale={true}
-                            xPowScaleExponent={4}
-                            xTicks={[0,50,75, 90, 99, 99.9]}
-                            xTickFormatter={this.percentileLinearChartXTickFormatter}
-                            />
+                <Col md={4}>
+                    <Col md={10}>
+                        <h5 className="text-center">Latency Tail: Last 5 Minutes</h5>
                     </Col>
-                    <LatencyPercentileDataRow data={this.props.latencyPercData}/>
-                </Tab>
-            </Tabs>
+                    <LineChart
+                        data={this.latenciesToLinearPercChartData(this.props.latencyPercData)}
+                        h="300"
+                        w="400"
+                        yLeftLabel="Latency (ms)"
+                        xLogScale={false}
+                        xPowScale={true}
+                        xPowScaleExponent={4}
+                        xTicks={[0,50,75, 90, 99, 99.9]}
+                        xTickFormatter={this.percentileLinearChartXTickFormatter}
+                        />
+                </Col>
         )
     }
 }
-
-// [1, 10, 100, 1000, 10000, 100000, 1000000]

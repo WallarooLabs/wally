@@ -12,41 +12,37 @@ export default class MonitoringGraphs extends React.Component {
             <div>
                 <Row>
                     <Panel>
-                        <Col md={6}>
-                            <Col md={16}>
+                        <Col md={4}>
+                            <Col md={10}>
                                 <h5 className="text-center">Last {displayInterval(this.props.chartInterval)} - Median
                                     Latency</h5>
                             </Col>
                             <LineChart
                                 data={this.props.latencyChartData}
-                                h="400"
-                                w="600"
+                                h="300"
+                                w="400"
                                 yLeftLabel="Latency (ms)"
                                 interval={this.props.chartInterval}
                                 />
                         </Col>
-                        <Col md={6}>
-                            <Col md={16}>
+                        <Col md={4}>
+                            <Col md={10}>
                                 <h5 className="text-center">Last {displayInterval(this.props.chartInterval)} -
                                     Throughput</h5>
                             </Col>
                             <LineChart
                                 data={this.props.throughputChartData}
-                                h="400"
-                                w="600"
+                                h="300"
+                                w="400"
                                 yLeftLabel="Throughput (msg/sec)"
                                 colorForLine1="red"
                                 interval={this.props.chartInterval}
                                 />
                         </Col>
-                    </Panel>
-                </Row>
-                <Row>
-                    <Panel>
                         <HistogramContainer
                             latencyPercData={this.props.latencyPercData}
                             throughputChartData={this.props.throughputChartData}
-                            />
+                        />
                     </Panel>
                 </Row>
             </div>
