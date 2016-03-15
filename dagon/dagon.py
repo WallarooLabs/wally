@@ -418,6 +418,11 @@ def load_func(filename, funcname="func"):
 def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
     metrics, docker, docker_host, docker_tag, startup_delay):
 
+    if (int(startup_delay) >= int(ttf)):
+        print("startup_delay is greater or equal to than ttf, that will" +
+        " never work out.")
+        exit(1)
+
     processes = [] # A list of spawned subprocesses
     messages = str(messages)
     config_filename = './config/' + topology_name + '.ini'
