@@ -463,6 +463,13 @@ def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
     print('-----------------------------------------------------------------------')
 
     # Start topology
+    sink_addr = topology.get_node_option(topology.sink(), 'out_addr')
+    if docker:
+        sink_addr = topology.get_node_option(topology.sink(), 'docker_out_addr')
+    print('dagon: Sink is ' + sink_addr)
+
+    giles_receiver_process = start_giles_receiver_process(sink_addr, ttf, tsl,
+        docker, docker_tag, docker_host_arg)
     topology_processes = start_nodes(topology, seed, docker, docker_tag, docker_host_arg)
     processes += topology_processes
 
@@ -471,13 +478,6 @@ def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
         source_addr = topology.get_node_option(topology.source(), 'docker_in_addr')
     print('dagon: Source is ' + source_addr)
 
-    sink_addr = topology.get_node_option(topology.sink(), 'out_addr')
-    if docker:
-        sink_addr = topology.get_node_option(topology.sink(), 'docker_out_addr')
-    print('dagon: Sink is ' + sink_addr)
-
-    giles_receiver_process = start_giles_receiver_process(sink_addr, ttf, tsl,
-        docker, docker_tag, docker_host_arg)
     time.sleep(startup_delay)
     giles_sender_process = start_giles_sender_process(source_addr, messages,
         test, docker, docker_tag, docker_host_arg)
