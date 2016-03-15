@@ -39,11 +39,7 @@ class AllTimeLatencyPercentileStore extends ReduceStore {
 		let systemKey;
 		switch (action.actionType) {
 			case Actions.RECEIVE_PRICE_SPREAD_ALL_TIME_LATENCY_PERCENTILES.actionType:
-				pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "PRICE_SPREAD");
-				systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
-				return this.updateAllTimeLatencyPercentiles(state, action.latencyPercentiles, pipelineChannelKey, systemKey);
-			case Actions.RECEIVE_MARKET_DATA_ALL_TIME_LATENCY_PERCENTILES.actionType:
-				pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NBBO");
+				pipelineChannelKey = action.latencyPercentiles.pipeline_key;
 				systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
 				return this.updateAllTimeLatencyPercentiles(state, action.latencyPercentiles, pipelineChannelKey, systemKey);
 			default:

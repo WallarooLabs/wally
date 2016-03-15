@@ -67,19 +67,11 @@ class BenchmarksStore extends ReduceStore {
         let systemKey;
         switch (action.actionType) {
             case Actions.RECEIVE_PRICE_SPREAD_LATENCY.actionType:
-                pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "PRICE_SPREAD");
+                pipelineChannelKey = action.latency.pipeline_key;
                 systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
                 return this.filterLatencyData(state, action.latency, pipelineChannelKey, systemKey);
             case Actions.RECEIVE_PRICE_SPREAD_THROUGHPUT.actionType:
-                pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "PRICE_SPREAD");
-                systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
-                return this.filterThroughputData(state, action.throughput, pipelineChannelKey, systemKey);
-            case Actions.RECEIVE_MARKET_DATA_LATENCY.actionType:
-                pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NBBO");
-                systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
-                return this.filterLatencyData(state, action.latency, pipelineChannelKey, systemKey);
-            case Actions.RECEIVE_MARKET_DATA_THROUGHPUT.actionType:
-                pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NBBO");
+                pipelineChannelKey = action.throughput.pipeline_key;
                 systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
                 return this.filterThroughputData(state, action.throughput, pipelineChannelKey, systemKey);
             default:

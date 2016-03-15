@@ -1,7 +1,6 @@
 import React from "react"
 import BenchmarksStore from "../../stores/BenchmarksStore"
 import AllTimeLatencyPercentileStore from "../../stores/AllTimeLatencyPercentileStore"
-import Pipeline from "../../../components/Pipelines/Pipeline"
 import {filterLast5Minutes} from "../../../util/BenchmarksHelpers"
 import {minutes} from "../../../util/Duration"
 import {throughputInThousands} from "../../../util/Format"

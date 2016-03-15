@@ -6,7 +6,7 @@ import {filterLast5Minutes} from "../../../util/BenchmarksHelpers";
 import {throughputInThousands, latencyInMilliseconds} from "../../../util/Format";
 import Comparators from "../../../util/Comparators";
 
-export default class Pipeline extends React.Component {
+export default class MonitoringGraphsContainer extends React.Component {
     toChartData(data, metric) {
         const chartData = data.map(d => new Map({
             x: d.get("time"),

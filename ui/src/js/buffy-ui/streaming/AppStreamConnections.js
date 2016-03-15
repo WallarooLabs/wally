@@ -1,6 +1,5 @@
 import Actions from "../actions/Actions.js";
 import ActionCreators from "../actions/ActionCreators.js";
-import LatencyGenerator from "../../stream-data/generators/LatencyGenerator.js";
 import LatencyPercentilesGenerator from "../../stream-data/generators/LatencyPercentilesGenerator.js";
 import ThroughputGenerator from "../../stream-data/generators/ThroughputGenerator.js";
 import {seconds, minutes} from "../../util/Duration.js";
