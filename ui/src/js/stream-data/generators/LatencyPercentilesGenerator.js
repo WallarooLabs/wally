@@ -18,7 +18,8 @@ const percentiles = [
     ];
 
 export default class LatencyPercentilesGenerator {
-	constructor() {
+	constructor(pipelineKey) {
+        this.pipelineKey = pipelineKey;
 		let num = 350;
 		let latencyPercentiles = {};
         let percentile;
@@ -41,7 +42,7 @@ export default class LatencyPercentilesGenerator {
 		return {
             time: Date.now(),
 			"latency_percentiles": latencyPercentiles,
-			"pipeline_key": pipelineKeys[1]
+			"pipeline_key": this.pipelineKey
 		}
 	}
 }

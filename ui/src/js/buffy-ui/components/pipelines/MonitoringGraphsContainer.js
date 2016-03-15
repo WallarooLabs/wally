@@ -1,6 +1,6 @@
 import React from 'react';
 import MonitoringGraphs from "./MonitoringGraphs.js";
-import {combineStats, compilePercentiles} from "../../../components/Pipelines/calc/PipelineStatsCalc.js";
+import {combineStats, compilePercentiles} from "./calc/PipelineStatsCalc.js";
 import {Map} from "immutable";
 import {filterLast5Minutes} from "../../../util/BenchmarksHelpers";
 import {throughputInThousands, latencyInMilliseconds} from "../../../util/Format";

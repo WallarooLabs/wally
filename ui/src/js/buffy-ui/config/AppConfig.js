@@ -16,6 +16,12 @@ export default {
 					key: "PRICE_SPREAD",
 					path: "price-spread",
 					channelKey: "PRICE_SPREAD"
+				},
+				NODE_1: {
+					name: "Market Data Node 1",
+					key: "NODE_1",
+					path: "market-data-node-1",
+					channelKey: "NODE_1"
 				}
 			}
 		},

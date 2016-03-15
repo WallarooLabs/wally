@@ -42,27 +42,10 @@ class AllTimeLatencyPercentileStore extends ReduceStore {
 				pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "PRICE_SPREAD");
 				systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
 				return this.updateAllTimeLatencyPercentiles(state, action.latencyPercentiles, pipelineChannelKey, systemKey);
-			case Actions.RECEIVE_CLIENT_LIMIT_ALL_TIME_LATENCY_PERCENTILES.actionType:
-				pipelineChannelKey = AppConfig.getChannelKey("CLIENT_LIMIT_CHECK", "CLIENT_LIMIT");
-				systemKey = AppConfig.getSystemKey("CLIENT_LIMIT_CHECK");
-				return this.updateAllTimeLatencyPercentiles(state, action.latencyPercentiles, pipelineChannelKey, systemKey);
 			case Actions.RECEIVE_MARKET_DATA_ALL_TIME_LATENCY_PERCENTILES.actionType:
 				pipelineChannelKey = AppConfig.getChannelKey("MARKET_SPREAD_CHECK", "NBBO");
 				systemKey = AppConfig.getSystemKey("MARKET_SPREAD_CHECK");
 				return this.updateAllTimeLatencyPercentiles(state, action.latencyPercentiles, pipelineChannelKey, systemKey);
-			// Actionable Pipelines
-			// case Actions.RECEIVE_PRICE_SPREAD_ACTIONABLE_ALL_TIME_LATENCY_PERCENTILES.actionType:
-			// 	pipelineChannelKey = AppConfig.getChannelKey("INTERNAL_MONITORING", "PRICE_SPREAD_ACTIONABLE");
-			// 	systemKey = AppConfig.getSystemKey("INTERNAL_MONITORING");
-			// 	return this.updateAllTimeLatencyPercentiles(state, action.latencyPercentiles, pipelineChannelKey, systemKey);
-			// case Actions.RECEIVE_CLIENT_LIMIT_ACTIONABLE_ALL_TIME_LATENCY_PERCENTILES.actionType:
-			// 	pipelineChannelKey = AppConfig.getChannelKey("INTERNAL_MONITORING", "CLIENT_LIMIT_ACTIONABLE");
-			// 	systemKey = AppConfig.getSystemKey("INTERNAL_MONITORING");
-			// 	return this.updateAllTimeLatencyPercentiles(state, action.latencyPercentiles, pipelineChannelKey, systemKey);
-			// case Actions.RECEIVE_MARKET_DATA_ACTIONABLE_ALL_TIME_LATENCY_PERCENTILES.actionType:
-			// 	pipelineChannelKey = AppConfig.getChannelKey("INTERNAL_MONITORING", "NBBO_ACTIONABLE");
-			// 	systemKey = AppConfig.getSystemKey("INTERNAL_MONITORING");
-			// 	return this.updateAllTimeLatencyPercentiles(state, action.latencyPercentiles, pipelineChannelKey, systemKey);
 			default:
 				return state;
 		}
