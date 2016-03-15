@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 
 import asyncio
+import base64
 import click
 import math
+import random
 import time
 
 from functions import mq_parse
 import functions.fs as fs
 from functions import state
+
+
+# Generate a unique node/vertex id
+VUID = (base64.urlsafe_b64encode(str(random.randint(100000,999999))
+        .encode()).decode())
 
 
 THROUGHPUT_IN = 'throughput_in'
