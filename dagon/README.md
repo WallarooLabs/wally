@@ -72,11 +72,11 @@ The following two examples are for running dagon using docker images that have a
 
 The following example runs dagon to start processes in docker on the local docker daemon:
 
-`./dagon.py --docker --docker_tag 0.0.3-sendence-88-g3c592b0 --test double --duration 3 dagon`
+`./dagon.py --docker --docker_tag 0.0.4-sendence-debug --test double dagon`
 
 The following example runs dagon to start processes in docker on a remote docker daemon (on docker swarm if running on nodes using orchestration in this repo):
 
-`./dagon.py --docker --docker_tag 0.0.3-sendence-88-g3c592b0 --docker_host <BUFFY-LEADER-IP>:2378 --test double --duration 3 dagon`
+`./dagon.py --docker --docker_tag 0.0.4-sendence-debug --docker_host <BUFFY-LEADER-IP>:2378 --test double dagon`
 
 ## Topology Configuration
 
