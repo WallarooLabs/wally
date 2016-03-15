@@ -23,10 +23,12 @@ The function file should be of the following format:
         return output
 '''
 
+import base64
 import click
 import functools
 import json
 import math
+import random
 import socket
 import time
 from threading import Timer
@@ -163,7 +165,7 @@ def emit_statistics(t0, t1, *stats):
 
 
 def serialize_statistics(args):
-    data = {'t0': args[0], 't1': args[1]}
+    data = {'t0': args[0], 't1': args[1], 'func': FUNC_NAME, 'VUID': VUID}
     for name, stat in args[2]:
         data[name] = dict(stat) if stat else None
     return json.dumps(data)
@@ -218,12 +220,19 @@ def start(input_address,
     else:
         output_func = udp_dump
 
+    # Generate a unique node/vertex id
+    global VUID
+    VUID = (base64.urlsafe_b64encode(str(random.randint(100000,999999))
+            .encode()).decode())
+
     # Create partial functions for input and output
     udp_input = functools.partial(udp_get, host=input_host, port=input_port)
     udp_output = functools.partial(output_func, host=output_host,
                                    port=output_port)
     # Import the function to be applied to data from the queue
     func, func_name = get_function(function)
+    global FUNC_NAME
+    FUNC_NAME = func_name
     # Create partial functions for metrics processing
     def stats_input():
         global STATS
