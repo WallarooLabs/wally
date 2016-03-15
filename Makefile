@@ -1,9 +1,6 @@
-DOCKER_IMAGE_VERSION=$(shell git describe --tags --always)
-DOCKER_IMAGE_REPO=docker.sendence.com:5043/sendence
-
 current_dir = $(shell pwd)
-docker_image_version ?= $(DOCKER_IMAGE_VERSION)## Docker Image Tag to use
-docker_image_repo ?= $(DOCKER_IMAGE_REPO)## Docker Repository to use
+docker_image_version ?= $(shell git describe --tags --always)## Docker Image Tag to use
+docker_image_repo ?= docker.sendence.com:5043/sendence## Docker Repository to use
 arch ?= native## Architecture to build for
 in_docker ?= false## Whether already in docker or not (used by CI)
 ponyc_tag ?= sendence-1.0.1-debug## tag for ponyc docker to use
@@ -85,10 +82,22 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: ## Build Pony based programs for Buffy
+build: build-spike build-receiver build-sender ## Build Pony based programs for Buffy
+
+build-spike: ## Build spike
 	$(call PONYC,spike)
+
+build-receiver: ## Build giles receiver
 	$(call PONYC,giles/receiver)
+
+build-sender: ## Build giles sender
 	$(call PONYC,giles/sender)
+
+test: test-buffy ## Test programs for Buffy
+
+test-buffy: ## Test buffy
+	cd buffy && python3 -m py.test functions/*
+
 
 build-docker:  build ## Build docker images for Buffy
 	docker build -t \
@@ -148,12 +157,12 @@ help:
 	@echo ''
 	@echo 'Options:'
 	@grep -E '^[a-zA-Z_-]+ *\?=.*?## .*$$' $(MAKEFILE_LIST) | awk \
-          'BEGIN {FS = "\?=.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", \
-          $$1, $$2}'
+          'BEGIN {FS = "\?="}; {printf "\033[36m%-30s\033[0m ##%s\n", $$1, $$2}' \
+          | awk 'BEGIN {FS = "## "}; {printf "%s %s \033[36m(Default: %s)\033[0m\n", $$1, $$3, $$2}'
 	@grep -E 'filter.*arch.*\)$$' $(MAKEFILE_LIST) | awk \
           'BEGIN {FS = "[(),]"}; {printf "\033[36m%-30s\033[0m %s\n", \
           "  Valid values for " $$5 ":", $$7}'
-	@grep -E 'filter.*use_docker.*\)$$' $(MAKEFILE_LIST) | awk \
+	@grep -E 'filter.*in_docker.*\)$$' $(MAKEFILE_LIST) | awk \
           'BEGIN {FS = "[(),]"}; {printf "\033[36m%-30s\033[0m %s\n", \
           "  Valid values for " $$5 ":", $$7}'
 	@echo ''
