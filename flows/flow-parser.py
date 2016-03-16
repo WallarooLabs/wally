@@ -108,6 +108,7 @@ class Flow:
     def merge_choice(self, flow):
         for fmwalk in flow._mwalks:
             self._mwalks.append(fmwalk)
+        return self
 
     def merge_fork(self, flow):
         updated_mwalks = []
@@ -118,6 +119,7 @@ class Flow:
                     mwalk_copy.append(fwalk)
                 updated_mwalks.append(mwalk_copy)
         self._mwalks = updated_mwalks
+        return self
 
     def to_lists(self):
         return self._mwalks
@@ -131,20 +133,15 @@ def to_flow(tree):
     if is_seq(root):
         left = to_flow(tree.left())
         right = to_flow(tree.right())
-        left.append(right)
-        return left
-
+        return left.append(right)
     elif is_fork(root):
         left = to_flow(tree.left())
         right = to_flow(tree.right())
-        left.merge_fork(right)
-        return left
-
+        return left.merge_fork(right)
     elif is_choice(root):
         left = to_flow(tree.left())
         right = to_flow(tree.right())
-        left.merge_choice(right)
-        return left
+        return left.merge_choice(right)
     else:
         node = Flow([[[]]])
         node.add_step(root)
