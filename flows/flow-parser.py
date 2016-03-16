@@ -143,9 +143,7 @@ def to_flow(tree):
         right = to_flow(tree.right())
         return left.merge_choice(right)
     else:
-        node = Flow([[[]]])
-        node.add_step(root)
-        return node
+        return Flow([[[root]]])
 
 def to_tla_sets(mwalks):
     sets = []
