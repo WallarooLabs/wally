@@ -6,15 +6,6 @@ class Tree:
         self._left = left
         self._right = right
 
-    def update_root(self, root):
-        self._root = root
-
-    def update_left(self, left):
-        self._left = left
-
-    def update_right(self, right):
-        self._right = right
-
     def root(self):
         return self._root
 
