@@ -150,7 +150,7 @@ def to_tla_sets(mwalks):
     for mwalk in mwalks:
         next_walks = []
         for walk in mwalk:
-            next_walks.append('<' + ', '.join(walk) + '>')
+            next_walks.append('<<' + ', '.join(walk) + '>>')
         sets.append('{' + ', '.join(next_walks) + '}')
     return '{' + ', '.join(sets) + '}'
 
