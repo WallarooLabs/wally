@@ -21,16 +21,6 @@ class Tree:
         return '[' + self._root + ', ' + str(self._left) + ', ' + str(self._right) + ']'
 
 
-operators = [';', '||', '|']
-
-def is_worker(str):
-    return str[0].isalpha()
-
-def is_op(str):
-    one = str[0]
-    two = str[0:2]
-    return one in operators or two in operators
-
 def is_seq(str):
     return str == ";"
 
