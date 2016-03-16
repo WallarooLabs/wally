@@ -98,173 +98,123 @@ def parse(str):
         raise Exception("Something went wrong! Invalid format for " + str)
 
 
-class Choices:
-    def __init__(self):
-        self._count = 0
+def new_mwalks(): return [[[]]]
 
-    def inc(self):
-        self._count = self._count + 1
-
-    def dec(self):
-        self._count = self._count - 1
-
-    def count(self):
-        return self._count
-
-class Prefix:
-    def __init__(self, mwalk, walks_to_update):
-        self._mwalk = mwalk
-        self._walks = walks_to_update
+class Flow:
+    def __init__(self, mwalks=new_mwalks()):
+        self._mwalks = mwalks
 
     def add_step(self, step):
-        for walk in self._walks:
-            walk.append(step)
+        for mwalk in self._mwalks:
+            for walk in mwalk:
+                walk.append(step)
 
-    def clone(self):
-        clone = deepcopy(self._mwalk)
-        return Prefix(clone, clone)
+    def append(self, flow):
+        updated_mwalks = []
+        for fmwalk in flow._mwalks:
+            for mwalk in self._mwalks:
+                next_mwalk = []
+                for fwalk in fmwalk:
+                    for i in range(0, len(mwalk)):
+                        walk_copy = deepcopy(mwalk[i])
+                        for fstep in fwalk:
+                            walk_copy.append(fstep)
+                        next_mwalk.append(walk_copy)
+                updated_mwalks.append(next_mwalk)
+        self._mwalks = updated_mwalks
+        return self
 
-    def clone_walks(self):
-        clones = deepcopy(self._walks)
-        # for walk in clones:
-        #     mwalk.append(walk)
-        return Prefix(self._mwalk, clones)
+    def merge_choice(self, flow):
+        for fmwalk in flow._mwalks:
+            self._mwalks.append(fmwalk)
 
-    def update_mwalk(self):
-        for i in range(0, len(self._walks)):
-            walk = self._walks[i]
-            self._mwalk.append(walk)
+    def merge_fork(self, flow):
+        updated_mwalks = []
+        for mwalk in self._mwalks:
+            for fmwalk in flow._mwalks:
+                mwalk_copy = deepcopy(mwalk)
+                for fwalk in fmwalk:
+                    mwalk_copy.append(fwalk)
+                updated_mwalks.append(mwalk_copy)
+        self._mwalks = updated_mwalks
 
-    def update(self):
-        self._mwalk = self._walks
-
-    def to_set(self):
-        return self._walks
-
-    def is_not(self, pfix):
-        return self._mwalk != pfix._mwalk
+    def to_lists(self):
+        return self._mwalks
 
     def __str__(self):
-        return "Prefix:" + str(self._mwalk)
-
-def new_prefixes():
-    mwalks = [[]]
-    return [Prefix(mwalks, mwalks)]
-
-class Prefixes:
-    def __init__(self, pfixes=new_prefixes()):
-        self._pfixes = pfixes
-
-    def pfixes(self):
-        return self._pfixes
-
-    def add_pfix(self, pfix):
-        self._pfixes.append(pfix)
-
-    def add_step(self, step):
-        for pfix in self._pfixes:
-            pfix.add_step(step)
-
-    def add_pfixes_from(self, other_pfixes):
-        for pfix in other_pfixes.pfixes():
-            self._pfixes.append(pfix)
-
-    def clone(self):
-        new_list = []
-        for pfix in self._pfixes:
-            clone = pfix.clone()
-            new_list.append(clone)
-        return Prefixes(new_list)
-
-    def clone_walks(self):
-        clones = list(map(lambda p: p.clone_walks(), self._pfixes))
-        return Prefixes(clones)
-
-    def update_mwalks(self):
-        for pfix in self._pfixes:
-            pfix.update_mwalk()
-
-    def update(self):
-        for pfix in self._pfixes:
-            pfix.update()
-
-    def to_sets(self):
-        return map(lambda p: p.to_set(), self._pfixes)
+        return "FLOW:" + str(self._mwalks)
 
 
-def to_prefixes(tree, pfixes=Prefixes(), pfixes_copy=None, choices=Choices()):
-    if not pfixes_copy:
-        pfixes_copy = pfixes
-
+def to_flow(tree):
     root = tree.root()
-
     if is_seq(root):
-        to_prefixes(tree.left(), pfixes, pfixes_copy, choices)
-        to_prefixes(tree.right(), pfixes, pfixes_copy, choices)
-        return pfixes
+        left = to_flow(tree.left())
+        right = to_flow(tree.right())
+        left.append(right)
+        return left
+
     elif is_fork(root):
-        cur_choice = choices.count()
-        backup_pfixes = pfixes_copy.clone_walks()
+        left = to_flow(tree.left())
+        right = to_flow(tree.right())
+        left.merge_fork(right)
+        return left
 
-        to_prefixes(tree.left(), pfixes, pfixes_copy, choices)
-
-        if cur_choice < choices.count():
-            for i in range(0, len(backup_pfixes.pfixes())):
-                bpfix = backup_pfixes.pfixes()[i]
-                for pfix in pfixes.pfixes():
-                    if bpfix.is_not(pfix):
-                        backup_pfixes.add_pfix(pfix)
-
-        to_prefixes(tree.right(), pfixes, backup_pfixes, choices)
-        backup_pfixes.update_mwalks()
-        # print("YO")
-        # for pfix in pfixes.pfixes():
-        #     print(pfix)
-        return pfixes
     elif is_choice(root):
-        choices.inc()
-        backup_pfixes = pfixes_copy.clone()
-        to_prefixes(tree.left(), pfixes, pfixes_copy, choices)
-        to_prefixes(tree.right(), backup_pfixes, backup_pfixes, choices)
-
-        pfixes.add_pfixes_from(backup_pfixes)
-        return pfixes
+        left = to_flow(tree.left())
+        right = to_flow(tree.right())
+        left.merge_choice(right)
+        return left
     else:
-        if root != None:
-            pfixes_copy.add_step(root)
+        node = Flow([[[]]])
+        node.add_step(root)
+        return node
 
-        return pfixes
+def to_tla_sets(mwalks):
+    sets = []
+    for mwalk in mwalks:
+        next_walks = []
+        for walk in mwalk:
+            next_walks.append('<' + ', '.join(walk) + '>')
+        sets.append('{' + ', '.join(next_walks) + '}')
+    return '{' + ', '.join(sets) + '}'
 
-def prefixify(tree):
-    pfixes = Prefixes()
-    return to_prefixes(tree, pfixes)
 
-def get_sets_for(tree):
-    prefixes = prefixify(tree)
-    print("RESULTS:")
-    for pfix in prefixes.pfixes():
-        print(pfix)
-    return prefixes.to_sets()
 
-# formula = parse("A;((B;(D|E);G)||(C;F;H))")
+def get_lists_for(tree):
+    return to_flow(tree).to_lists()
 
-# formula = parse("A;((B;(D|E);G)||(F;H))")
-# formula = parse("A;(G||(F;H))")
-# formula = parse("B;(C||D);(E|F)")
-# formula = parse("A;((B|(C|D))||((E||F);(G|H)))")
-# formula = parse("A;((C|D)||((E||F);(G|H)))")
-# formula = parse("A;(C||(E||F))")
-formula = parse("A;(C||(E|F))")
-# formula = parse("A;(E|F)")
-# formula = parse("B;(C|D);(E||F)")
-# formula = parse("B;((C|D)||(E||F))")
-# formula = parse("B;C;D")
-# formula = parse("B;C;D;E")
-# formula = parse("B;(C||D)")
+# formula = "A;((B;(D|E);G)||(C;F;H))"
+
+# formula = "A;((B;(D|E);G)||(F;H))"
+# formula = "A;(G||(F;H))"
+# formula = "B;(C||D);(E||F)"
+# formula = "A;((B|(C|D))||((E||F);(G|H)))"
+# formula = "A;((C|D)||((E||F);(G|H)))"
+# formula = "A;(C||(E||F))"
+# formula = "A;(C||(E|F))"
+# formula = "A;(E|F)"
+# formula = "B;(C|D);G;(E|F)"
+# formula = "B;(C|D);G"
+# formula = "B;(C|D);(E||F)"
+formula = "B;((C|D)||(E||F))"
+# formula = "B;C"
+# formula = "B;C;D"
+# formula = "B;C;D;E"
+# formula = "B;(C||D)"
 # print(formula)
-# print(parse("B|((C;D;F;(G||(H;I)))||E)"))
-# formula = parse("A")
+# print("B|((C;D;F;(G||(H;I)))||E)")
+# formula = "A"
 
-print(get_sets_for(formula))
+print("FLOW:")
+print(formula)
+AST = parse(formula)
+lists = get_lists_for(AST)
+print("")
+print("OUTPUT (as lists):")
+print(lists)
+print("")
+print("OUTPUT (in TLA+ notation):")
+print(to_tla_sets(lists))
+print("")
 
 
