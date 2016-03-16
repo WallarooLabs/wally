@@ -97,8 +97,6 @@ def parse(str):
     else:
         raise Exception("Something went wrong! Invalid format for " + str)
 
-def new_multiwalks():
-    return [[[]]]
 
 class Choices:
     def __init__(self):
@@ -122,89 +120,134 @@ class Prefix:
         for walk in self._walks:
             walk.append(step)
 
+    def clone(self):
+        clone = deepcopy(self._mwalk)
+        return Prefix(clone, clone)
+
     def clone_walks(self):
         clones = deepcopy(self._walks)
-        for walk in clones:
-            mwalk.append(walk)
-        return Prefix(mwalk, clones)
+        # for walk in clones:
+        #     mwalk.append(walk)
+        return Prefix(self._mwalk, clones)
+
+    def update_mwalk(self):
+        for i in range(0, len(self._walks)):
+            walk = self._walks[i]
+            self._mwalk.append(walk)
+
+    def update(self):
+        self._mwalk = self._walks
+
+    def to_set(self):
+        return self._walks
+
+    def is_not(self, pfix):
+        return self._mwalk != pfix._mwalk
+
+    def __str__(self):
+        return "Prefix:" + str(self._mwalk)
 
 def new_prefixes():
-    return []
+    mwalks = [[]]
+    return [Prefix(mwalks, mwalks)]
 
 class Prefixes:
     def __init__(self, pfixes=new_prefixes()):
         self._pfixes = pfixes
 
+    def pfixes(self):
+        return self._pfixes
+
+    def add_pfix(self, pfix):
+        self._pfixes.append(pfix)
+
+    def add_step(self, step):
+        for pfix in self._pfixes:
+            pfix.add_step(step)
+
+    def add_pfixes_from(self, other_pfixes):
+        for pfix in other_pfixes.pfixes():
+            self._pfixes.append(pfix)
+
     def clone(self):
         new_list = []
         for pfix in self._pfixes:
-            clone = pfix.clone_walks()
-            new_list.append(pfix)
+            clone = pfix.clone()
             new_list.append(clone)
         return Prefixes(new_list)
 
+    def clone_walks(self):
+        clones = list(map(lambda p: p.clone_walks(), self._pfixes))
+        return Prefixes(clones)
 
-def to_sets(tree, mwalks=new_multiwalks(), copies=False, choices=Choices(), mwalks_copy=new_multiwalks()):
+    def update_mwalks(self):
+        for pfix in self._pfixes:
+            pfix.update_mwalk()
+
+    def update(self):
+        for pfix in self._pfixes:
+            pfix.update()
+
+    def to_sets(self):
+        return map(lambda p: p.to_set(), self._pfixes)
+
+
+def to_prefixes(tree, pfixes=Prefixes(), pfixes_copy=None, choices=Choices()):
+    if not pfixes_copy:
+        pfixes_copy = pfixes
+
     root = tree.root()
+
     if is_seq(root):
-        to_sets(tree.left(), mwalks, copies, choices, mwalks_copy)
-        to_sets(tree.right(), mwalks, copies, choices, mwalks_copy)
-        return mwalks
+        to_prefixes(tree.left(), pfixes, pfixes_copy, choices)
+        to_prefixes(tree.right(), pfixes, pfixes_copy, choices)
+        return pfixes
     elif is_fork(root):
-        backup = []
-        cur_choices = choices.count()
-        # Make deep copy of current prefixes for right descent
-        # If there's already a copy, make a backup for right descent
-        if mwalks_copy == [[[]]]:
-            mwalks_copy = deepcopy(mwalks)
-        else:
-            backup = deepcopy(mwalks_copy)
+        cur_choice = choices.count()
+        backup_pfixes = pfixes_copy.clone_walks()
 
-        to_sets(tree.left(), mwalks, copies, choices, mwalks_copy)
+        to_prefixes(tree.left(), pfixes, pfixes_copy, choices)
 
-        # Copy is discharged after being mutated on left descent
-        # Restore to backup
-        if backup != []:
-            mwalks_copy = backup
+        if cur_choice < choices.count():
+            for i in range(0, len(backup_pfixes.pfixes())):
+                bpfix = backup_pfixes.pfixes()[i]
+                for pfix in pfixes.pfixes():
+                    if bpfix.is_not(pfix):
+                        backup_pfixes.add_pfix(pfix)
 
-        # If there are unhandled choices, duplicate the multiwalks
-        # an equal number of times in order to add right fork
-        # results to those multiwalks as well
-        if cur_choices < choices.count():
-            diff = choices.count() - cur_choices
-            while diff > 0:
-                new_copy = deepcopy(mwalks_copy)
-                for walk in new_copy:
-                    mwalks_copy.append(walk)
-                diff = diff - 1
-        # Add the copied walks back to mwalks so when they're
-        # updated they're also updated in mwalks
-        for i in range(0, len(mwalks_copy)):
-            for walk in mwalks_copy[i]:
-                mwalks[i].append(walk)
-        to_sets(tree.right(), mwalks, True, choices, mwalks_copy)
-        return mwalks
+        to_prefixes(tree.right(), pfixes, backup_pfixes, choices)
+        backup_pfixes.update_mwalks()
+        # print("YO")
+        # for pfix in pfixes.pfixes():
+        #     print(pfix)
+        return pfixes
     elif is_choice(root):
         choices.inc()
-        mwalks_copy = deepcopy(mwalks)
-        to_sets(tree.left(), mwalks, copies, choices, mwalks_copy)
-        to_sets(tree.right(), mwalks_copy, copies, choices, mwalks_copy)
-        for mwalk in mwalks_copy:
-            mwalks.append(mwalk)
-        return mwalks
+        backup_pfixes = pfixes_copy.clone()
+        to_prefixes(tree.left(), pfixes, pfixes_copy, choices)
+        to_prefixes(tree.right(), backup_pfixes, backup_pfixes, choices)
+
+        pfixes.add_pfixes_from(backup_pfixes)
+        return pfixes
     else:
         if root != None:
-            if not copies:
-                for mwalk in mwalks:
-                    for walk in mwalk:
-                        walk.append(root)
-            else:
-                for i in range(0, len(mwalks_copy)):
-                    for walk in mwalks_copy[i]:
-                        walk.append(root)
-        return mwalks
+            pfixes_copy.add_step(root)
+
+        return pfixes
+
+def prefixify(tree):
+    pfixes = Prefixes()
+    return to_prefixes(tree, pfixes)
+
+def get_sets_for(tree):
+    prefixes = prefixify(tree)
+    print("RESULTS:")
+    for pfix in prefixes.pfixes():
+        print(pfix)
+    return prefixes.to_sets()
 
 # formula = parse("A;((B;(D|E);G)||(C;F;H))")
+
 # formula = parse("A;((B;(D|E);G)||(F;H))")
 # formula = parse("A;(G||(F;H))")
 # formula = parse("B;(C||D);(E|F)")
@@ -214,10 +257,14 @@ def to_sets(tree, mwalks=new_multiwalks(), copies=False, choices=Choices(), mwal
 formula = parse("A;(C||(E|F))")
 # formula = parse("A;(E|F)")
 # formula = parse("B;(C|D);(E||F)")
-# formula = parse("B;C")
+# formula = parse("B;((C|D)||(E||F))")
+# formula = parse("B;C;D")
+# formula = parse("B;C;D;E")
+# formula = parse("B;(C||D)")
 # print(formula)
 # print(parse("B|((C;D;F;(G||(H;I)))||E)"))
+# formula = parse("A")
 
-print(to_sets(formula))
+print(get_sets_for(formula))
 
 
