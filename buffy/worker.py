@@ -128,7 +128,12 @@ def run_engine(choose_input, inputs, funcs, outputs, delay):
         state.add(int(time.time()), 1, THROUGHPUT_IN)
         output = funcs[input_type](input)
         if output:
-            outputs[input_type](output)
+            if isinstance(output, tuple):
+                choice, output = output
+            else:
+                choice = 0
+            (outputs[input_type][hash(choice) % len(outputs[input_type])]
+             (output))
         dt = time.time()-t0
         # Measure throughput
         state.add(int(time.time()), 1, THROUGHPUT_OUT)
@@ -179,7 +184,7 @@ def serialize_statistics(args):
 @click.option('--input-address', default='127.0.0.1:10000',
               help='Host:port for input address')
 @click.option('--output-address', default='127.0.0.1:10000',
-              help='Host:port for output address')
+              help='Host:port for output address', multiple=True)
 @click.option('--output-type', type=click.Choice(['queue', 'socket']))
 @click.option('--metrics-address', default=None,
               help='Host:port for metrics receiver. No metrics are sent out'
@@ -208,11 +213,14 @@ def start(input_address,
           function,
           stats_period,
           log_level):
-    # parse input and output address strings into address tuples
+    # parse input and output address strings into host and port params
     input_host, input_port = [f(x) for f, x in
                               zip((str, int), input_address.split(':'))]
-    output_host, output_port = [f(x) for f, x in
-                                zip((str, int), output_address.split(':'))]
+    output_hosts, output_ports = [], []
+    for addr in output_address:
+        host, port = [f(x) for f, x in zip((str, int), addr.split(':'))]
+        output_hosts.append(host)
+        output_ports.append(port)
     if metrics_address:
         metrics_host, metrics_port = [f(x) for f, x in
                                       zip((str, int),
@@ -227,8 +235,10 @@ def start(input_address,
 
     # Create partial functions for input and output
     udp_input = functools.partial(udp_get, host=input_host, port=input_port)
-    udp_output = functools.partial(output_func, host=output_host,
-                                   port=output_port)
+    udp_outputs = []
+    for host, port in zip(output_hosts, output_ports):
+        udp_outputs.append(functools.partial(output_func, host=host,
+                           port=port))
     # Import the function to be applied to data from the queue
     func, func_name = get_function(function)
     global FUNC_NAME
@@ -241,8 +251,8 @@ def start(input_address,
             STATS = None
             return data
         return None
-    stats_output = functools.partial(udp_dump, host=metrics_host,
-                                     port=metrics_port)
+    stats_outputs = [functools.partial(udp_dump, host=metrics_host,
+                                       port=metrics_port)]
 
     if metrics_address:
         def choose_input():
@@ -259,8 +269,8 @@ def start(input_address,
               'stats': stats_input}
     funcs = {'msg': func,
              'stats': serialize_statistics}
-    outputs = {'msg': udp_output,
-               'stats': stats_output}
+    outputs = {'msg': udp_outputs,
+               'stats': stats_outputs}
 
     # Create delayed callback alias from Timer
     call_later = Timer
