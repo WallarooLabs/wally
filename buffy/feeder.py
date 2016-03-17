@@ -47,13 +47,15 @@ def feed(address, delay, path, console_log, file_log, log_level):
     c = 0
     while sources:
         s = sources[c % len(sources)]
-        try:
-            msg = s.readline().decode()
-            worker.udp_put(msg, host, port)
-            c += 1
-            time.sleep(0.0001)
-        except:
+        msg = s.readline().decode()
+        if not msg:
+            logger.info('Removing file %s' % s.name)
             sources.remove(s)
+            continue
+        worker.udp_put(msg, host, port)
+        c += 1
+        time.sleep(0.0001)
+
 
 
 if __name__ == '__main__':
