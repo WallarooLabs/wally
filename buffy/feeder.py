@@ -5,7 +5,6 @@
 
 
 import click
-import random
 
 import functions.fs as fs
 import worker
@@ -44,12 +43,13 @@ def feed(address, delay, path, console_log, file_log, log_level):
     worker.LOGGER = LOGGER
 
     sources = [open(p, 'rb') for p in path]
-
+    c = 0
     while sources:
-        s = sources[random.randint(0, len(sources)-1)]
+        s = sources[c % len(sources)]
         try:
             msg = s.readline().decode()
             worker.udp_put(msg, host, port)
+            c += 1
         except:
             sources.remove(s)
 
