@@ -4,7 +4,7 @@ docker_image_repo ?= docker.sendence.com:5043/sendence## Docker Repository to us
 arch ?= native## Architecture to build for
 in_docker ?= false## Whether already in docker or not (used by CI)
 ponyc_tag ?= sendence-1.0.1-debug## tag for ponyc docker to use
-ponyc_runner ?= dipinhora/ponyc## ponyc docker image to use
+ponyc_runner ?= sendence/ponyc## ponyc docker image to use
 
 ifdef arch
   ifeq (,$(filter $(arch),amd64 armhf native))
