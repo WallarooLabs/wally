@@ -133,9 +133,9 @@ def run_engine(choose_input, inputs, funcs, outputs, delay):
         # Measure throughput
         state.add(int(time.time()), 1, THROUGHPUT_OUT)
         # Add latency to histogram
-        state.add('{:.09f} s'.format(10**round(math.log(dt, 10))),
+        state.add('{:.09f} s'.format(10**math.ceil(math.log(dt, 10))),
                   dt, LATENCY_TIME)
-        state.add('{:.09f} s'.format(10**round(math.log(dt, 10))),
+        state.add('{:.09f} s'.format(10**math.ceil(math.log(dt, 10))),
                   1, LATENCY_COUNT)
 
 

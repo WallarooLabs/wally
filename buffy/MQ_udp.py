@@ -53,9 +53,9 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
                 state.add(int(time.time()), 1, THROUGHPUT_OUT)
                 # Log latency to file
                 # Add latency to histogram
-                state.add('{:.09f} s'.format(10**round(math.log(dt, 10))),
+                state.add('{:.09f} s'.format(10**math.ceil(math.log(dt, 10))),
                           dt, LATENCY_TIME)
-                state.add('{:.09f} s'.format(10**round(math.log(dt, 10))),
+                state.add('{:.09f} s'.format(10**math.ceil(math.log(dt, 10))),
                           1, LATENCY_COUNT)
             except asyncio.queues.QueueEmpty:
                 self.transport.sendto(mq_parse.encode(''),
