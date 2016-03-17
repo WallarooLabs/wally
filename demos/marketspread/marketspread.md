@@ -56,9 +56,9 @@ shells:
 1. `python3 UDP_listener.py --address 127.0.0.1:5000`
 1. `python3 metrics_receiver.py --address 127.0.0.1:5001`
 1. `python3 metrics_receiver.py --address 127.0.0.1:5002`
-1. `python3 MQ_udp.py --address 127.0.0.1:10000 --console-log --metrics-address 127.0.0.1:5001`
-1. `python3 worker.py --input-address 127.0.0.1:10000 --output-address 127.0.0.1:5000 --output-type socket --console-log --function marketspread --metrics-address 127.0.0.1:5002`
-1. `python3 feeder.py --address 127.0.0.1:10000 --console-log --path ../demos/trades.msg --path ../demos/nbbo.msg`
+1. `python3 MQ_udp.py --address 127.0.0.1:10000 --console-log --stats-period 10 --metrics-address 127.0.0.1:5001`
+1. `python3 worker.py --input-address 127.0.0.1:10000 --output-address 127.0.0.1:5000 --output-type socket --console-log --stats-period 10 --function marketspread --metrics-address 127.0.0.1:5002`
+1. `python3 feeder.py --address 127.0.0.1:10000 --console-log --path ../demos/marketspread/trades.msg --path ../demos/marketspread/nbbo.msg`
 
 Note that we're using a separate receiver for MQ metrics and Worker metrics.
 This isn't strictly necessary, and is mostly done for convenience when reading outputs.
@@ -97,3 +97,4 @@ We can do this with the following execution (each command in its own terminal):
 1. `python3 worker.py --input-address 127.0.0.1:10000 --output-address 127.0.0.1:10001 --output-address 127.0.0.1:10002 --output-type queue --stats-period 10 --function fixrouter --metrics-address 127.0.0.1:5002 --vuid router2`
 1. `python3 worker.py --input-address 127.0.0.1:10002 --output-dress 127.0.0.1:5000 --output-type socket --stats-period 10 --function marketspread --metrics-address 127.0.0.1:5002 --vuid market1` 
 1. `python3 worker.py --input-address 127.0.0.1:10002 --output-dress 127.0.0.1:5000 --output-type socket --stats-period 10 --function marketspread --metrics-address 127.0.0.1:5002 --vuid market2` 
+1. `python3 feeder.py --address 127.0.0.1:10000 --console-log --path ../demos/marketspread/trades.msg --path ../demos/marketspread/nbbo.msg`
