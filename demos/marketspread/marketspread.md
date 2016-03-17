@@ -44,6 +44,12 @@ For each message:
 To run the demo, you need an input queue, and output queue, a worker, 
 the demo data (`nbbo.msg` and `trades.msg` in this directory) and a data
 feeder.
+This forms the following topology:
+
+    feeder -> MQ -> worker -> sink
+    MQ -> metrics_receiver
+    worker -> metrics_receiver
+
 From the `Buffy/buffy` directory, execute the following commands in their own
 shells:
 
@@ -68,8 +74,16 @@ whether an order may be accepted or rejected, and so we must ensure that
 all messages for the same symbol end up in the same worker.
 One way to do this is to add a Router between the workers and the input queue:
 
-    feeder -> MQ1 -> router -> MQ2 -> worker -> sink
-                            -> MQ3 -> worker -> sink
+    feeder -> MQ1 -> {router1, router2} -> MQ2 -> worker1 -> sink
+                                        -> MQ3 -> worker2 -> sink
+
+    MQ1 -> metrics_receiver
+    MQ2 -> metrics_receiver
+    MQ3 -> metrics_receiver
+    router1 -> metrics_receiver
+    router2 -> metrics_receiver
+    worker1 -> metrics_receiver
+    worker2 -> metrics_receiver
 
 We can do this with the following execution (each command in its own terminal):
 
