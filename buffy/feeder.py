@@ -5,6 +5,7 @@
 
 
 import click
+import time
 
 import functions.fs as fs
 import worker
@@ -50,6 +51,7 @@ def feed(address, delay, path, console_log, file_log, log_level):
             msg = s.readline().decode()
             worker.udp_put(msg, host, port)
             c += 1
+            time.sleep(0.0001)
         except:
             sources.remove(s)
 
