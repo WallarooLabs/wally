@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import click
+import json
 import math
 import random
 import time
@@ -91,14 +92,28 @@ def process_statistics(call_later, period):
     call_later(period, process_statistics, call_later, period)
 
 
+def serialize_statistics(args):
+    data = {'t0': args[0], 't1': args[1], 'func': 'Messagequeue',
+            'VUID': VUID}
+    for name, stat in args[2]:
+        data[name] = dict(stat) if stat else None
+    return json.dumps(data)
+
+
 def emit_statistics(t0, t1, *stats):
     for name, stat in stats:
         LOGGER.info("({}, {}) {}: {}".format(t0, t1, name, stat))
+    if METRICS_HOST:
+        transport.sendto(serialize_statistics((t0, t1, stats)).encode(),
+                         (METRICS_HOST, METRICS_PORT))
 
 
 @click.command()
 @click.option('--address', default='127.0.0.1:10000',
               help='Address to listen on')
+@click.option('--metrics-address', default=None,
+              help='Host:port for metrics receiver. No metrics are sent out'
+              ' if this is left blank')
 @click.option('--console-log', is_flag=True, default=False,
               help='Log output to stdout.')
 @click.option('--file-log', is_flag=True, default=False,
@@ -107,10 +122,23 @@ def emit_statistics(t0, t1, *stats):
               help='The period over which stats are measured.')
 @click.option('--log-level', default='info', help='Log level',
               type=click.Choice(['debug', 'info', 'warn', 'error']))
-def start(address, console_log, file_log, stats_period, log_level):
+def start(address,
+          metrics_address,
+          console_log,
+          file_log,
+          stats_period,
+          log_level):
     # Parse address string to host and port str:int pair
     host, port = [f(x) for f, x in
                   zip((str, int), address.split(':'))]
+    global METRICS_HOST
+    global METRICS_PORT
+    if metrics_address:
+        METRICS_HOST, METRICS_PORT = [f(x) for f, x in
+                                      zip((str, int),
+                                          metrics_address.split(':'))]
+    else:
+        METRICS_HOST, METRICS_PORT = None, None
 
     # Create global queue object
     global QUEUE
@@ -131,6 +159,7 @@ def start(address, console_log, file_log, stats_period, log_level):
     # One protocol instance will be created to serve all client requests
     listen = loop.create_datagram_endpoint(
         UDPMessageQueue, local_addr=(host, port))
+    global transport
     transport, protocol = loop.run_until_complete(listen)
 
     # Create the call_later partial function
