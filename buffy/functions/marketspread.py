@@ -71,6 +71,7 @@ def reject_order(msg, reason):
 
 
 def accept_order(msg):
+    state.get_attribute('orders', {})[msg['OrderId']] = msg
     return ("New Order: ({client}, {symbol}, {status}, {quantity}): "
             "{status}".format(client=msg['Account'],
                               symbol=msg['Symbol'],
