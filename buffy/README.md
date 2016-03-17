@@ -14,11 +14,11 @@ with which to build stream processing topologies with tunable guarantees.
 
 ### Starting a Message Queue Node
 
-    python3 MQ_udp.py --address=<host>:<port>>
+    python3 MQ_udp.py --address <host>:<port>>
 
 ### Starting a Worker (pong) Node
 
-    python3 worker.py --input-address=<host>:port --output-address=<host>:<port> --output-type=queue --console-log --function=pong
+    python3 worker.py --input-address <host>:port --output-address <host>:<port> --output-type queue --console-log --function=pong
 
 
 ### Seeding the first 'ping' message to start the game
@@ -76,5 +76,14 @@ message queue:
 
     python3 udp-client.py 127.0.0.1:10000 PUT:ping
 
-Note that this will generate logs per node in the `logs` directory, and these will grow rapidly. 
+Note that if `--file-log` is used, this will generate logs per node in the `logs` directory, and these will grow rapidly. 
 
+## Multiple Outputs (A Tree Topology)
+The workers are capable of making a choice about which output a message should be sent to.
+This requires two things:
+
+    1. That mutliple output address be provided using the `--output-address` parameter
+    2. That the function specified in `--function` return a tuple of the form `(choice, message)`. 
+
+`choice` is then used, modulo the length of the outputs list, to select an output target.
+e.g. if `func(input)` returns `(10, 'hello world')`, and we have the output list `outputs = [out1, out2, out3]`, then `out2` will be used (`10 % 3 == 1`, and `outputs[1] == out2`).
