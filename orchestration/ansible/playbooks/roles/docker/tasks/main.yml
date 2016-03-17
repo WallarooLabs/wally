@@ -13,6 +13,32 @@
     regexp: ^ExecStart.*
     replace: ExecStart=/usr/bin/docker daemon --insecure-registry docker.sendence.com:5043 --storage-driver=overlay -D -H tcp://{{ my_ip }}:2375 -H fd:// --cluster-advertise {{ my_ip }}:2375 --cluster-store consul://{{ my_ip }}:8500
 
+- name: Update docker startup dependency for network
+  replace:
+    dest: /lib/systemd/system/docker.service
+    regexp: (^After=)(network.target.*)
+    replace: \1network-online.target \2
+
+- name: Update docker startup requirement for network
+  replace:
+    dest: /lib/systemd/system/docker.service
+    regexp: (^Requires=)(docker.socket.*)
+    replace: \1network-online.target \2
+
+- name: Update docker retry on failure
+  lineinfile:
+    dest: /lib/systemd/system/docker.service
+    regexp: ^Restart=on-failure$
+    insertafter: ^ExecStart.*
+    line: Restart=on-failure
+
+- name: Update docker retry on failure sleep time
+  lineinfile:
+    dest: /lib/systemd/system/docker.service
+    regexp: ^RestartSec=5s$
+    insertafter: ^Restart=on-failu.*
+    line: RestartSec=5s
+
 - name: reload systemd
   command: systemctl daemon-reload
 

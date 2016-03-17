@@ -20,8 +20,8 @@ PAUSE = 1
 DEVNULL = open(os.devnull, 'w') # For suppressing stdout/stderr of subprocesses
 ARCH = 'amd64' if platform.machine() == 'x86_64' else 'armhf'
 DOCKER_REPO = 'docker.sendence.com:5043/sendence/'
-DOCKER_NETWORK = 'buffy-net'
 DOCKER_POSTFIX = str(int(round(time.time() * 1000)))
+DOCKER_NETWORK = 'buffy-net' + DOCKER_POSTFIX
 
 
 def node_defaults():
@@ -410,13 +410,17 @@ def load_func(filename, funcname="func"):
 @click.option('--docker_host', default='unix:///var/run/docker.sock',
     help='Docker host to use.')
 @click.option('--docker_tag',
-    default=subprocess.Popen(['git', 'describe', '--tags', '--always'],
-        stdout=subprocess.PIPE).communicate()[0].decode("utf-8").rstrip('\n'),
+    default='latest',
     help='Docker version/tag to use.')
 @click.option('--startup_delay', default=15,
     help="Number of seconds to wait before starting the sender.")
 def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
     metrics, docker, docker_host, docker_tag, startup_delay):
+
+    if (int(startup_delay) >= int(ttf)):
+        print("startup_delay is greater or equal to than ttf, that will" +
+        " never work out.")
+        exit(1)
 
     processes = [] # A list of spawned subprocesses
     messages = str(messages)

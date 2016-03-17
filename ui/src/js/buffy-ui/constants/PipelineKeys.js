@@ -1,5 +1,6 @@
 export default {
    PRICE_SPREAD: "PRICE_SPREAD",
-   CLIENT_LIMIT: "CLIENT_LIMIT",
-   MARKET_DATA: "NBBO"
+   MARKET_DATA: "NBBO",
+   NODE_1: "NODE_1",
+   NODE_2: "NODE_2"
 }

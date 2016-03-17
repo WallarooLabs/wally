@@ -1,80 +1,75 @@
 import Actions from "../actions/Actions.js";
 import ActionCreators from "../actions/ActionCreators.js";
-import LatencyGenerator from "../../stream-data/generators/LatencyGenerator.js";
-import LatencyStatsGenerator from "../../stream-data/generators/LatencyStatsGenerator.js";
 import LatencyPercentilesGenerator from "../../stream-data/generators/LatencyPercentilesGenerator.js";
 import ThroughputGenerator from "../../stream-data/generators/ThroughputGenerator.js";
-import ThroughputStatsGenerator from "../../stream-data/generators/ThroughputStatsGenerator.js";
 import {seconds, minutes} from "../../util/Duration.js";
 import Splitters from "./Splitters.js";
+import PipelineKeys from "../constants/PipelineKeys";
 
 function channelHubToDispatcherWith(connector) {
-    connector.connectTo("system")
-        .dispatchOn("msc-status", ActionCreators[Actions.RECEIVE_MSC_SYSTEM_STATUS.actionType]);
+    connector.connectTo("pipeline:market-spread-total")
+        .dispatchOn("latency-percentiles:last-5-mins", Splitters.latencies);
 
-    connector.connectTo("system")
-        .dispatchOn("clc-status", ActionCreators[Actions.RECEIVE_CLC_SYSTEM_STATUS.actionType]);
+    connector.connectTo("pipeline:market-spread-total")
+        .dispatchOn("latency-percentiles:last-5-mins", Splitters.allTimeLatencyPercentiles);
 
-    connector.connectTo("pipelines")
-        .dispatchOn("latency", Splitters.latencies);
+    connector.connectTo("pipeline:market-spread-total")
+        .dispatchOn("total-throughput:last-1-sec", Splitters.throughputs);
 
-    connector.connectTo("pipelines")
-        .dispatchOn("latency-stats", Splitters.latencyStats);
+    connector.connectTo("pipeline:market-spread-node-1")
+        .dispatchOn("latency-percentiles:last-5-mins", Splitters.latencies);
 
-    connector.connectTo("pipelines")
-        .dispatchOn("latency-stats-all-time", Splitters.allTimeLatencyStats);
+    connector.connectTo("pipeline:market-spread-node-1")
+        .dispatchOn("latency-percentiles:last-5-mins", Splitters.allTimeLatencyPercentiles);
 
-    connector.connectTo("pipelines")
-        .dispatchOn("throughput", Splitters.throughputs);
+    connector.connectTo("pipeline:market-spread-node-1")
+        .dispatchOn("total-throughput:last-1-sec", Splitters.throughputs);
 
-    connector.connectTo("pipelines")
-        .dispatchOn("throughput-stats", Splitters.throughputStats);
+    connector.connectTo("pipeline:market-spread-node-2")
+        .dispatchOn("latency-percentiles:last-5-mins", Splitters.latencies);
 
-    connector.connectTo("pipelines")
-        .dispatchOn("throughput-stats-all-time", Splitters.allTimeThroughputStats);
+    connector.connectTo("pipeline:market-spread-node-2")
+        .dispatchOn("latency-percentiles:last-5-mins", Splitters.allTimeLatencyPercentiles);
 
-    connector.connectTo("pipelines")
-        .dispatchOn("client-limit-status", ActionCreators[Actions.RECEIVE_CLIENT_LIMIT_STATUS.actionType]);
-
-    connector.connectTo("pipelines")
-        .dispatchOn("price-spread-status", ActionCreators[Actions.RECEIVE_PRICE_SPREAD_STATUS.actionType]);
-
-    connector.connectTo("pipelines")
-        .dispatchOn("market-data-status", ActionCreators[Actions.RECEIVE_MARKET_DATA_STATUS.actionType]);
-
-    connector.connectTo("rejected-orders")
-        .dispatchOn("client-order", ActionCreators[Actions.RECEIVE_CLIENT_ORDER.actionType]);
-
-    connector.connectTo("rejected-orders")
-        .dispatchOn("client-order-summaries", ActionCreators[Actions.RECEIVE_CLIENT_ORDER_SUMMARIES.actionType]);
-
-    connector.connectTo("rejected-orders")
-        .dispatchOn("gross-notional", ActionCreators[Actions.RECEIVE_GROSS_NOTIONAL.actionType]);
-
-    connector.connectTo("rejected-orders")
-        .dispatchOn("client-limit", ActionCreators[Actions.RECEIVE_CLIENT_LIMIT.actionType]);
-
-    connector.connectTo("pipelines")
-        .dispatchOn("latency-all-time", Splitters.allTimeLatencyPercentiles);
+    connector.connectTo("pipeline:market-spread-node-2")
+        .dispatchOn("total-throughput:last-1-sec", Splitters.throughputs);
 }
 
 function mockStreamToDispatcherWith(streamConnector) {
-    streamConnector.connect(new LatencyGenerator())
-        .withTransformer(Splitters.latencies)
-        .onChannel("pipelines")
-        .forMsgType("latency")
-        .start();
-
-    streamConnector.connect(new ThroughputGenerator())
+    streamConnector.connect(new ThroughputGenerator(PipelineKeys.PRICE_SPREAD))
         .withTransformer(Splitters.throughputs)
-        .onChannel("pipelines")
-        .forMsgType("throughput")
+        .onChannel("pipeline:market-spread-total")
+        .forMsgType("total-throughput:last-1-sec")
         .start();
 
-    streamConnector.connect(new LatencyPercentilesGenerator())
+    streamConnector.connect(new LatencyPercentilesGenerator(PipelineKeys.PRICE_SPREAD))
         .withTransformer(Splitters.allTimeLatencyPercentiles)
-        .onChannel("pipelines")
-        .forMsgType("latency-all-time")
+        .onChannel("pipeline:market-spread-total")
+        .forMsgType("latency-percentiles:last-5-mins")
+        .start();
+
+    streamConnector.connect(new ThroughputGenerator(PipelineKeys.NODE_1))
+        .withTransformer(Splitters.throughputs)
+        .onChannel("pipeline:market-spread-node-1")
+        .forMsgType("total-throughput:last-1-sec")
+        .start();
+
+    streamConnector.connect(new LatencyPercentilesGenerator(PipelineKeys.NODE_1))
+        .withTransformer(Splitters.allTimeLatencyPercentiles)
+        .onChannel("pipeline:market-spread-node-1")
+        .forMsgType("latency-percentiles:last-5-mins")
+        .start();
+
+    streamConnector.connect(new ThroughputGenerator(PipelineKeys.NODE_2))
+        .withTransformer(Splitters.throughputs)
+        .onChannel("pipeline:market-spread-node-2")
+        .forMsgType("total-throughput:last-1-sec")
+        .start();
+
+    streamConnector.connect(new LatencyPercentilesGenerator(PipelineKeys.NODE_2))
+        .withTransformer(Splitters.allTimeLatencyPercentiles)
+        .onChannel("pipeline:market-spread-node-2")
+        .forMsgType("latency-percentiles:last-5-mins")
         .start();
 }
 

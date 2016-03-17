@@ -1,5 +1,5 @@
 # install python for full ansible support
-- hosts: all
+- hosts: buffy-leaders:buffy-followers
   gather_facts: False
   tasks:
   - name: install python for full ansible support
@@ -7,6 +7,8 @@
 
 - hosts: buffy-leaders:buffy-followers
   tasks:
+  - name: Update pip with easy_install
+    easy_install: name=pip state=latest
   - name: Create a group of all hosts for buffy
     group_by: key=buffy-all
 
