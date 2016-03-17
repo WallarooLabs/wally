@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 
 import asyncio
-import base64
 import click
 import json
 import math
-import random
 import time
 
-from functions import mq_parse
 import functions.fs as fs
+from functions import mq_parse
 from functions import state
+from functions.vuid import get_vuid
 
 
 # Generate a unique node/vertex id
-VUID = (base64.urlsafe_b64encode(str(random.randint(100000,999999))
-        .encode()).decode())
+VUID = None
 
 
 THROUGHPUT_IN = 'throughput_in'
@@ -122,12 +120,22 @@ def emit_statistics(t0, t1, *stats):
               help='The period over which stats are measured.')
 @click.option('--log-level', default='info', help='Log level',
               type=click.Choice(['debug', 'info', 'warn', 'error']))
+@click.option('--vuid', default=None,
+              help='The VUID of the node. A VUID will be generated if none'
+              ' is provided.')
 def start(address,
           metrics_address,
           console_log,
           file_log,
           stats_period,
-          log_level):
+          log_level,
+          vuid):
+    global VUID
+    if vuid:
+        VUID = vuid
+    else:
+        VUID = get_vuid()
+
     # Parse address string to host and port str:int pair
     host, port = [f(x) for f, x in
                   zip((str, int), address.split(':'))]

@@ -23,25 +23,22 @@ The function file should be of the following format:
         return output
 '''
 
-import base64
 import click
 import functools
 import json
 import math
-import random
 import socket
 import time
 from threading import Timer
 
-import functions.mq_parse as mq_parse
 import functions.fs as fs
 from functions import get_function
+import functions.mq_parse as mq_parse
 from functions import state
+from functions.vuid import get_vuid
 
 
-# Generate a unique node/vertex id
-VUID = (base64.urlsafe_b64encode(str(random.randint(100000,999999))
-        .encode()).decode())
+VUID = None
 
 
 THROUGHPUT_IN = 'throughput_in'
@@ -202,6 +199,9 @@ def serialize_statistics(args):
               help='The period over which stats are measured.')
 @click.option('--log-level', default='info', help='Log level',
               type=click.Choice(['debug', 'info', 'warn', 'error']))
+@click.option('--vuid', default=None,
+              help='The VUID of the node. A VUID will be generated if none'
+              ' is provided.')
 @click.command()
 def start(input_address,
           output_address,
@@ -212,7 +212,14 @@ def start(input_address,
           delay,
           function,
           stats_period,
-          log_level):
+          log_level,
+          vuid):
+    global VUID
+    if vuid:
+        VUID = vuid
+    else:
+        VUID = get_vuid()
+
     # parse input and output address strings into host and port params
     input_host, input_port = [f(x) for f, x in
                               zip((str, int), input_address.split(':'))]
