@@ -13,23 +13,29 @@ import socket
 
 def parse_metrics(buf):
     data = json.loads(buf.decode())
-    if data['throughput_in']:
+    t_len = max((len(data['throughput_in'] or []),
+                 len(data['throughput_out'] or [])))
+    if t_len > 0:
+        keys, throughput_in, throughput_out = [], [] , []
+        for k in sorted(set((data['throughput_in'] or {}).keys())
+                        .union((data['throughput_out'] or {}).keys())):
+            keys.append(k)
+            throughput_in.append((data['throughput_in'] or {}).get(k, 0))
+            throughput_out.append((data['throughput_out'] or {}).get(k, 0))
+
         throughputs = "\n".join([
             "        {timestamp: <15s}{t_in: <10d}{t_out: <10d}".format(
-                timestamp=str(datetime.datetime.fromtimestamp(k).time()),
+                timestamp=str(datetime.datetime.fromtimestamp(float(k))
+                              .time()),
                 t_in=t_in,
                 t_out=t_out)
-            for k, t_in, t_out in [(float(k),
-                                   data['throughput_in'][k],
-                                   data['throughput_out'][k])
-                                   for k in sorted(data['throughput_in']
-                                                   .keys())]])
+            for k, t_in, t_out in zip(keys, throughput_in, throughput_out)])
     else:
         throughputs = ""
 
     if data['latency_time']:
         latencies = "\n".join([
-            "        {bin: <15s}{mean: <15.9f}{pct:>5.2f}  {count: <9d}{sum: <15.9f}"
+            "        {bin: <20s}{mean: <15.9f}{pct:>6.2f}  {count: <9d}{sum: <15.9f}"
                      .format(
                 bin=k,
                 mean=data['latency_time'][k]/data['latency_count'][k],
@@ -37,8 +43,17 @@ def parse_metrics(buf):
                 count=data['latency_count'][k],
                 sum=data['latency_time'][k])
             for k in sorted(data['latency_time'].keys())])
+        latencies_header = ("        {bin: <20s}{mean: <15s}{pct:^6s}  "
+                            "{count: <9s}{sum: <15s}\n").format(
+                                bin='BIN (max)',
+                                mean='MEAN',
+                                pct='PCT',
+                                count='COUNT',
+                                sum='SUM')
+
     else:
         latencies = ""
+        latencies_header = ""
 
     text = """
     Vertex: {VUID}
@@ -48,14 +63,14 @@ def parse_metrics(buf):
         TIME           IN        OUT
 {throughputs}
     Latency:
-        BIN (max)      MEAN           PCT    COUNT    SUM
-{latencies}
+{latencies_header}{latencies}
 
     """.format(VUID=data['VUID'],
                func=data['func'],
                d0=datetime.datetime.fromtimestamp(data['t0']),
                d1=datetime.datetime.fromtimestamp(data['t1']),
                throughputs=throughputs,
+               latencies_header=latencies_header,
                latencies=latencies)
 
     return text
