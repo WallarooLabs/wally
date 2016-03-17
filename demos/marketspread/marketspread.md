@@ -56,7 +56,7 @@ shells:
 1. `python3 UDP_listener.py --address 127.0.0.1:5000`
 1. `python3 metrics_receiver.py --address 127.0.0.1:5001`
 1. `python3 metrics_receiver.py --address 127.0.0.1:5002`
-1. `python3 MQ_udp.py --address 127.0.0.1:10000 --console-log --metrics-addres 127.0.0.1:5001`
+1. `python3 MQ_udp.py --address 127.0.0.1:10000 --console-log --metrics-address 127.0.0.1:5001`
 1. `python3 worker.py --input-address 127.0.0.1:10000 --output-address 127.0.0.1:5000 --output-type socket --console-log --function marketspread --metrics-address 127.0.0.1:5002`
 1. `python3 feeder.py --address 127.0.0.1:10000 --console-log --path ../demos/trades.msg --path ../demos/nbbo.msg`
 
