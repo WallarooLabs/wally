@@ -115,7 +115,8 @@ If the upstream remote isn't set, add it:
 
 ### Sendence Pony tagging strategy
 
-The Sendence Pony tagging strategy follows [semver](http://semver.org). Our Pony
+The Sendence Pony tagging strategy follows [semver](http://semver.org) (with one
+exception noted below). Our Pony
 version have no connection to official Pony versions. Semver works as follows,
 for software that has the version 1.0.2, it breaks down as follows
 
@@ -135,7 +136,7 @@ the PATCH version.
 
 All Sendence Pony tags are in the form:
 
-*MAJOR.MINOR.PATH-sendence* 
+*sendence-MAJOR.MINOR.PATH* 
 
-Do not leave off the trailing `-sendence` otherwise we will experience tag
-conflicts with the main Pony project.
+Do not leave off the leading `sendence-` otherwise we will experience tag
+conflicts with the main Pony project (here we depart from the semver guildelines).
