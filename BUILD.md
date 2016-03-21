@@ -44,7 +44,12 @@ the compiled binaries.
 `make push-docker` - Push docker images for the desired architecture to the
 repository.
 
-`make help` - Help for options and targets available.
+`make help` - Help for options and targets available (ala self-documenting 
+Makefiles from http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html).
+
+
+Also described in CI.md are details on how to use the Drone CI build process
+locally.
 
 # RELEASING
  

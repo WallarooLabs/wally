@@ -9,11 +9,11 @@ clone:
 
 build:
   main_build:
-    image: dipinhora/ponyc:sendence-1.0.1-$$PONYC_CONFIG-$$PONYC_VERSION
+    image: sendence/ponyc:sendence-1.0.1-$$PONYC_CONFIG-$$PONYC_VERSION
     commands:
       - make arch=$$PONYC_VERSION in_docker=true
   dagon_test_amd64:
-    image: dipinhora/python-runner:0.0.1
+    image: sendence/python-runner:0.0.1
     environment:
       - LC_ALL=C.UTF-8
       - LANG=C.UTF-8
@@ -24,13 +24,14 @@ build:
       matrix:
         PONYC_VERSION: amd64
   dagon_test_armhf:
-    image: dipinhora/arm-python-runner:0.0.1
+    image: sendence/arm-python-runner:0.0.1
     environment:
       - LC_ALL=C.UTF-8
       - LANG=C.UTF-8
     commands:
       - make test
-      - cd dagon && ./dagon.py --test double dagon
+      - cd dagon && chrt -f 80 ./dagon.py --test double dagon
+    privileged: true
     when:
       matrix:
         PONYC_VERSION: armhf
