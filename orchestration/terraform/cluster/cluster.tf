@@ -18,19 +18,19 @@ provider "aws" {
   profile = "${var.aws_profile}"
 }
 
-resource "aws_placement_group" "default" {
-  name = "${var.project_tag}-default"
-  strategy = "cluster"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-}
+# placement groups don't work with t2.nano which is our default instance type
+#resource "aws_placement_group" "default" {
+#  name = "${var.project_tag}-default"
+#  strategy = "cluster"
+#
+#  lifecycle {
+#    create_before_destroy = true
+#  }
+#
+#}
 
 resource "aws_autoscaling_group" "leaders" {
   vpc_zone_identifier = [ "${terraform_remote_state.vpc.output.SUBNET_ID}" ]
-  name = "leaders"
   max_size = "${var.leader_max_nodes}"
   min_size = "${var.leader_min_nodes}"
   desired_capacity = "${var.leader_default_nodes}"
@@ -42,7 +42,7 @@ resource "aws_autoscaling_group" "leaders" {
 
   tag {
     key = "Name"
-    value = "${var.project_tag}-leader"
+    value = "${var.cluster_name}:${var.project_tag}-leader"
     propagate_at_launch = true
   }
 
@@ -58,6 +58,12 @@ resource "aws_autoscaling_group" "leaders" {
     propagate_at_launch = true
   }
 
+  tag {
+    key = "ClusterName"
+    value = "${var.cluster_name}"
+    propagate_at_launch = true
+  }
+
   lifecycle {
     create_before_destroy = true
   }
@@ -66,7 +72,6 @@ resource "aws_autoscaling_group" "leaders" {
 
 resource "aws_autoscaling_group" "followers" {
   vpc_zone_identifier = [ "${terraform_remote_state.vpc.output.SUBNET_ID}" ]
-  name = "followers"
   max_size = "${var.follower_max_nodes}"
   min_size = "${var.follower_min_nodes}"
   desired_capacity = "${var.follower_default_nodes}"
@@ -78,7 +83,7 @@ resource "aws_autoscaling_group" "followers" {
 
   tag {
     key = "Name"
-    value = "${var.project_tag}-follower"
+    value = "${var.cluster_name}:${var.project_tag}-follower"
     propagate_at_launch = true
   }
 
@@ -91,6 +96,12 @@ resource "aws_autoscaling_group" "followers" {
   tag {
     key = "Role"
     value = "follower"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key = "ClusterName"
+    value = "${var.cluster_name}"
     propagate_at_launch = true
   }
 

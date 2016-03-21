@@ -1,6 +1,6 @@
-variable "aws_key_path" {
-  description = "Path to AWS key file."
-  default = "~/.ssh/ec2/us-east-1.pem"
+variable "cluster_name" {
+  description = "Cluster name for cluster to manage."
+  default = "sample"
 }
 
 variable "aws_key_name" {

@@ -1,10 +1,10 @@
 # create dynamic groups
-- hosts: tag_Project_buffy:&tag_Role_follower
+- hosts: tag_Project_buffy:&tag_Role_follower:&tag_ClusterName_{{ cluster_name }}
   tasks:
   - name: Create a group of all followers for buffy
     group_by: key=buffy-followers
 
-- hosts: tag_Project_buffy:&tag_Role_leader
+- hosts: tag_Project_buffy:&tag_Role_leader:&tag_ClusterName_{{ cluster_name }}
   vars:
     ethernet_interface: eth0
   tasks:
