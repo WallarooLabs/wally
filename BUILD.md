@@ -113,6 +113,28 @@ If the upstream remote isn't set, add it:
 - Checkout our local master branch: `git checkout master`
 - Merge upstream master with ours: `git merge upstream/master`
 
+### Installing Sendence Pony
+
+To install Sendence Pony, use make:
+
+```
+make config=release install
+```
+
+Make sure that this is the `ponyc` that will be run by default by
+checking the `ponyc` version, which ends with the first part of the
+git revision hash (in this case "8ec3e98"):
+
+```
+%  ponyc --version
+sendence-1.0.0-36-g8ec3e98
+% git rev-parse HEAD
+8ec3e98227b71f139b3818f88bccd910afd1bafd
+```
+
+If you don't see the correct version, you may need to adjust your
+path.
+
 ### Sendence Pony tagging strategy
 
 The Sendence Pony tagging strategy follows [semver](http://semver.org) (with one
