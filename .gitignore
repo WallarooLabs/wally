@@ -1,4 +1,5 @@
 .idea
+*.iml
 *.dSYM
 .cache/
 .cache/*
