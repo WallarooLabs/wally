@@ -3,7 +3,7 @@ docker_image_version ?= $(shell git describe --tags --always)## Docker Image Tag
 docker_image_repo ?= docker.sendence.com:5043/sendence## Docker Repository to use
 arch ?= native## Architecture to build for
 in_docker ?= false## Whether already in docker or not (used by CI)
-ponyc_tag ?= sendence-1.0.2-debug## tag for ponyc docker to use
+ponyc_tag ?= sendence-1.1.0-debug## tag for ponyc docker to use
 ponyc_runner ?= sendence/ponyc## ponyc docker image to use
 
 ifdef arch
