@@ -25,15 +25,20 @@ The function file should be of the following format:
 
 import click
 import functools
+import json
 import math
 import socket
 import time
 from threading import Timer
 
-import functions.mq_parse as mq_parse
 import functions.fs as fs
 from functions import get_function
+import functions.mq_parse as mq_parse
 from functions import state
+from functions.vuid import get_vuid
+
+
+VUID = None
 
 
 THROUGHPUT_IN = 'throughput_in'
@@ -107,30 +112,37 @@ def udp_dump(msg, host=None, port=None):
     LOGGER.debug("Sent datagram to ({}, {})".format(host, port))
 
 
-def run_engine(input_func, func, output_func, delay, logger):
+def run_engine(choose_input, inputs, funcs, outputs, delay):
     # Start the main loop
     while True:
-        input = input_func()
+        input_type = choose_input()
+        input = inputs[input_type]()
         t0 = time.time()
         if input == '':
             time.sleep(delay)
             continue
         # Measure throughput
         state.add(int(time.time()), 1, THROUGHPUT_IN)
-        output = func(input)
+        output = funcs[input_type](input)
         if output:
-            output_func(output)
+            if isinstance(output, tuple):
+                choice, output = output
+            else:
+                choice = 0
+            (outputs[input_type][hash(choice) % len(outputs[input_type])]
+             (output))
         dt = time.time()-t0
         # Measure throughput
         state.add(int(time.time()), 1, THROUGHPUT_OUT)
         # Add latency to histogram
-        state.add('{:.09f} s'.format(10**round(math.log(dt, 10))),
+        state.add('{:.09f} s'.format(10**math.ceil(math.log(dt, 10))),
                   dt, LATENCY_TIME)
-        state.add('{:.09f} s'.format(10**round(math.log(dt, 10))),
+        state.add('{:.09f} s'.format(10**math.ceil(math.log(dt, 10))),
                   1, LATENCY_COUNT)
 
 
 STAT_TIME_BOUNDARY = time.time()
+STATS = None
 
 
 def process_statistics(call_later, period):
@@ -155,13 +167,25 @@ def process_statistics(call_later, period):
 def emit_statistics(t0, t1, *stats):
     for name, stat in stats:
         LOGGER.info("({}, {}) {}: {}".format(t0, t1, name, stat))
+    global STATS
+    STATS = (t0, t1, stats)
+
+
+def serialize_statistics(args):
+    data = {'t0': args[0], 't1': args[1], 'func': FUNC_NAME, 'VUID': VUID}
+    for name, stat in args[2]:
+        data[name] = dict(stat) if stat else None
+    return json.dumps(data)
 
 
 @click.option('--input-address', default='127.0.0.1:10000',
               help='Host:port for input address')
 @click.option('--output-address', default='127.0.0.1:10000',
-              help='Host:port for output address')
+              help='Host:port for output address', multiple=True)
 @click.option('--output-type', type=click.Choice(['queue', 'socket']))
+@click.option('--metrics-address', default=None,
+              help='Host:port for metrics receiver. No metrics are sent out'
+              ' if this is left blank')
 @click.option('--console-log', is_flag=True, default=False,
               help='Log output to stdout.')
 @click.option('--file-log', is_flag=True, default=False,
@@ -175,14 +199,41 @@ def emit_statistics(t0, t1, *stats):
               help='The period over which stats are measured.')
 @click.option('--log-level', default='info', help='Log level',
               type=click.Choice(['debug', 'info', 'warn', 'error']))
+@click.option('--vuid', default=None,
+              help='The VUID of the node. A VUID will be generated if none'
+              ' is provided.')
 @click.command()
-def start(input_address, output_address, output_type, console_log, file_log,
-          delay, function, stats_period, log_level):
-    # parse input and output address strings into address tuples
+def start(input_address,
+          output_address,
+          output_type,
+          metrics_address,
+          console_log,
+          file_log,
+          delay,
+          function,
+          stats_period,
+          log_level,
+          vuid):
+    global VUID
+    if vuid:
+        VUID = vuid
+    else:
+        VUID = get_vuid()
+
+    # parse input and output address strings into host and port params
     input_host, input_port = [f(x) for f, x in
                               zip((str, int), input_address.split(':'))]
-    output_host, output_port = [f(x) for f, x in
-                                zip((str, int), output_address.split(':'))]
+    output_hosts, output_ports = [], []
+    for addr in output_address:
+        host, port = [f(x) for f, x in zip((str, int), addr.split(':'))]
+        output_hosts.append(host)
+        output_ports.append(port)
+    if metrics_address:
+        metrics_host, metrics_port = [f(x) for f, x in
+                                      zip((str, int),
+                                          metrics_address.split(':'))]
+    else:
+        metrics_host, metrics_port = None, None
 
     if output_type == 'queue':
         output_func = udp_put
@@ -190,11 +241,43 @@ def start(input_address, output_address, output_type, console_log, file_log,
         output_func = udp_dump
 
     # Create partial functions for input and output
-    input_func = functools.partial(udp_get, host=input_host, port=input_port)
-    output_func = functools.partial(output_func, host=output_host,
-                                    port=output_port)
+    udp_input = functools.partial(udp_get, host=input_host, port=input_port)
+    udp_outputs = []
+    for host, port in zip(output_hosts, output_ports):
+        udp_outputs.append(functools.partial(output_func, host=host,
+                           port=port))
     # Import the function to be applied to data from the queue
     func, func_name = get_function(function)
+    global FUNC_NAME
+    FUNC_NAME = func_name
+    # Create partial functions for metrics processing
+    def stats_input():
+        global STATS
+        if STATS:
+            data = STATS
+            STATS = None
+            return data
+        return None
+    stats_outputs = [functools.partial(udp_dump, host=metrics_host,
+                                       port=metrics_port)]
+
+    if metrics_address:
+        def choose_input():
+            global STATS
+            if STATS:
+                return 'stats'
+            return 'msg'
+    else:
+        def choose_input():
+            return 'msg'
+
+    # Create input, func, and output maps keyed on 'input_type'
+    inputs = {'msg': udp_input,
+              'stats': stats_input}
+    funcs = {'msg': func,
+             'stats': serialize_statistics}
+    outputs = {'msg': udp_outputs,
+               'stats': stats_outputs}
 
     # Create delayed callback alias from Timer
     call_later = Timer
@@ -210,6 +293,7 @@ def start(input_address, output_address, output_type, console_log, file_log,
                            level=log_level)
 
     logger.info('Starting worker...')
+    logger.info('VUID: %s', VUID)
     logger.info('FUNC_NAME: %s', func_name)
     logger.info('input_addr: %s', input_address)
     logger.info('output_addr: %s', output_address)
@@ -220,7 +304,7 @@ def start(input_address, output_address, output_type, console_log, file_log,
                            stats_period))
         timer.daemon = True
         timer.start()
-        run_engine(input_func, func, output_func, delay, logger)
+        run_engine(choose_input, inputs, funcs, outputs, delay)
     except KeyboardInterrupt:
         logger.info("Latency_count: {}".format(state.pop(LATENCY_COUNT,
                                                          None)))

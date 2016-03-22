@@ -19,3 +19,6 @@ __FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
 
 from .marketspread import FUNC_NAME, func  # noqa
 __FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
+
+from .fixrouter import FUNC_NAME, func  # noqa
+__FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)

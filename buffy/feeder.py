@@ -5,7 +5,7 @@
 
 
 import click
-import random
+import time
 
 import functions.fs as fs
 import worker
@@ -43,15 +43,24 @@ def feed(address, delay, path, console_log, file_log, log_level):
     LOGGER = logger
     worker.LOGGER = LOGGER
 
+    # Open the source files and get their sizes (by seeking to the end)
     sources = [open(p, 'rb') for p in path]
-
+    sources = [(s, s.seek(0,2)) for s in sources]
+    # Place the file cursors back at the beginning of the file
+    for source, _ in sources:
+        source.seek(0)
+    c = 0
     while sources:
-        s = sources[random.randint(0, len(sources)-1)]
-        try:
-            msg = s.readline().decode()
-            worker.udp_put(msg, host, port)
-        except:
-            sources.remove(s)
+        source, source_size = sources[c % len(sources)]
+        msg = source.readline().decode()
+        if not msg and source.tell() >= source_size:
+            logger.info('Removing file %s' % source.name)
+            sources.remove((source, source_size))
+            continue
+        worker.udp_put(msg, host, port)
+        c += 1
+        time.sleep(0.0001)
+
 
 
 if __name__ == '__main__':
