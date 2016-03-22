@@ -54,9 +54,9 @@ class Notifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    Server(_env)
+    ConnectNotify(_env)
 
-class Server is TCPConnectionNotify
+class ConnectNotify is TCPConnectionNotify
   let _env: Env
 
   new iso create(env: Env) =>
