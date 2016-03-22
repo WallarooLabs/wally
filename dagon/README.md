@@ -80,14 +80,21 @@ The following example runs dagon to start processes in docker on a remote docker
 
 ## Topology Configuration
 
-You configure the topology in a config file with the extension ```.ini```.
-It consists of two section types. ```[edges]```
-is the section where edges are defined. Any other section name is interpreted
-as the name of a node.
+You configure the topology in a config file with the extension
+```.ini```.  It consists of three section types. ```[test_config]```
+is where test configuration information is specfied. ```[edges]``` is
+the section where edges are defined. Any other section name is
+interpreted as the name of a node.
 
-In the ```[edges]``` section, the order in which you specify edges matters. The origin of the first edge
-is the source of the topology. The target of the last edge is the sink of
-the topology. Giles outputs to the source and reads from the sink.  
+The ```[test_config]``` section is required. The key `expected_result`
+is required, and must be either `match` if you expect the expected
+received messages to match the actual received messages, or `nomatch` if
+you do not.
+
+In the ```[edges]``` section, the order in which you specify edges
+matters. The origin of the first edge is the source of the
+topology. The target of the last edge is the sink of the
+topology. Giles outputs to the source and reads from the sink.
 
 Edges are specified as follows:  
 * ```node-1:node-2```: creates an edge from node-1 to node-2
