@@ -25,13 +25,16 @@ actor Main
       custodian(timers)(sender)(store)
       SignalHandler(TermHandler(custodian), Sig.term())
     else
-      env.out.print("wrong args")
+      env.out.print("running tests")
+      TestMain(env)
+      //env.out.print("wrong args")
     end
 
 actor Sender
   let _to: IPAddress
   let _store: Store
   let _socket: UDPSocket
+  let _encoder: Encoder = Encoder
 
   new create(to: IPAddress, store: Store) =>
     _store = store
@@ -40,13 +43,19 @@ actor Sender
 
   be write(data: String) =>
     let at =  Time.micros()
-    _socket.write(_build_output(data), _to)
+    _socket.write(_encoder(data), _to)
     _store.sent(data, at)
 
   be dispose() =>
     _socket.dispose()
 
-  fun _build_output(data: String): String =>
+class SenderNotify is UDPNotify
+  fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
+    let data': ByteSeq = consume data
+    let size = data'.size()
+
+class Encoder
+  fun apply(data: String): String =>
     let put: String = "PUT:" + data
     let hexFormat = FormatSettingsInt.set_format(FormatHexBare)
     let h: String = put.size().string(hexFormat)
@@ -58,11 +67,6 @@ actor Sender
       .append(h)
       .append(put)
     end
-
-class SenderNotify is UDPNotify
-  fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
-    let data': ByteSeq = consume data
-    let size = data'.size()
 
 actor Store
   let _env: Env
