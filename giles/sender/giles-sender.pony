@@ -71,6 +71,7 @@ class Encoder
 actor Store
   let _env: Env
   let _sent: List[(ByteSeq, U64)]
+  let _encoder: SentLogEncoder = SentLogEncoder
 
   new create(env: Env) =>
     _env = env
@@ -86,14 +87,15 @@ actor Store
     try
       let sent_handle = File(FilePath(_env.root, "sent.txt"))
       for s in _sent.values() do
-        sent_handle.print(_format_output(s))
+        sent_handle.print(_encoder(s))
       end
       sent_handle.dispose()
     else
       _env.out.print("dump exception")
     end
 
-  fun _format_output(tuple: (ByteSeq, U64)): String =>
+class SentLogEncoder
+  fun apply(tuple: (ByteSeq, U64)): String =>
     let time: String = tuple._2.string()
     let payload = tuple._1
 
