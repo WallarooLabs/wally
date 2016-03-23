@@ -57,6 +57,9 @@ class ConnectNotify is TCPConnectionNotify
     _env.out.print("dagon: connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    // Do something with data
+    // If it's a process ack:
+    //    _process_manager.ack_startup(process_name, data)
     _env.out.print("dagon: received")
 
   fun ref closed(conn: TCPConnection ref) =>
