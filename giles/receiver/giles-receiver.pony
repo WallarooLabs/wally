@@ -24,7 +24,9 @@ actor Main
       custodian(receiver)(monitor)(store)
       SignalHandler(TermHandler(custodian), Sig.term())
     else
-      env.out.print("wrong args")
+      env.out.print("running tests...")
+      TestMain(env)
+      //env.out.print("wrong args")
     end
 
 actor Receiver
@@ -106,6 +108,7 @@ class ShutdownMonitorNotifier is TimerNotify
 actor Store
   let _env: Env
   let _received: List[(ByteSeq, U64)]
+  let _encoder: ReceivedLogEncoder = ReceivedLogEncoder
 
   new create(env: Env) =>
     _env = env
@@ -121,14 +124,15 @@ actor Store
     try
       let received_handle = File(FilePath(_env.root, "received.txt"))
       for r in _received.values() do
-        received_handle.print(_format_output(r))
+        received_handle.print(_encoder(r))
       end
       received_handle.dispose()
     else
       _env.out.print("dump exception")
     end
 
-  fun _format_output(tuple: (ByteSeq, U64)): String =>
+class ReceivedLogEncoder
+  fun apply(tuple: (ByteSeq, U64)): String =>
     let time: String = tuple._2.string()
     let payload = tuple._1
 
