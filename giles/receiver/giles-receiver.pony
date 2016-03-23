@@ -18,10 +18,10 @@ actor Main
       let incoming_host = in_addr_raw(0)
       let incoming_port = in_addr_raw(1)
       let store = Store(env)
-      let free_candy = FreeCandy(custodian, time_to_first_message, time_between_messages)
-      let receiver = Receiver(env, store, free_candy, incoming_host, incoming_port)
+      let monitor = ShutdownMonitor(custodian, time_to_first_message, time_between_messages)
+      let receiver = Receiver(env, store, monitor, incoming_host, incoming_port)
 
-      custodian(receiver)(free_candy)(store)
+      custodian(receiver)(monitor)(store)
       SignalHandler(TermHandler(custodian), Sig.term())
     else
       env.out.print("wrong args")
@@ -31,9 +31,9 @@ actor Receiver
   let _socket: UDPSocket
 
   new create(env: Env, store: Store,
-    free_candy: FreeCandy,
+    monitor: ShutdownMonitor,
     on_address: String, on_port: String) =>
-    _socket = UDPSocket(ReceiverNotify(env, store, free_candy), on_address, on_port)
+    _socket = UDPSocket(ReceiverNotify(env, store, monitor), on_address, on_port)
 
   be dispose() =>
     _socket.dispose()
@@ -41,12 +41,12 @@ actor Receiver
 class ReceiverNotify is UDPNotify
   let _env: Env
   let _store: Store
-  let _free_candy: FreeCandy
+  let _monitor: ShutdownMonitor
 
-  new iso create(env: Env, store: Store, free_candy: FreeCandy) =>
+  new iso create(env: Env, store: Store, monitor: ShutdownMonitor) =>
     _env = env
     _store = store
-    _free_candy = free_candy
+    _monitor = monitor
 
   fun ref listening(sock: UDPSocket  ref) =>
     try
@@ -63,9 +63,9 @@ class ReceiverNotify is UDPNotify
   fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
     let at = Time.micros()
     _store.received(consume data, at)
-    _free_candy.received()
+    _monitor.received()
 
-actor FreeCandy
+actor ShutdownMonitor
   let _custodian: Custodian
   let _timers: Timers
   var _last_timer: Timer tag
@@ -79,7 +79,7 @@ actor FreeCandy
     Debug.out("free candy setup")
 
   be received() =>
-    Debug.out("FreeCandy message received")
+    Debug.out("ShutdownMonitor message received")
     _timers.cancel(_last_timer)
     _last_timer = _new_timer(_custodian, _timers, _time_between_messages)
 
@@ -87,12 +87,12 @@ actor FreeCandy
     _timers.dispose()
 
   fun tag _new_timer(custodian: Custodian, timers: Timers, time_to_fire: U64): Timer tag =>
-    let timer = Timer(FreeCandyNotifier(custodian), time_to_fire, 0)
+    let timer = Timer(ShutdownMonitorNotifier(custodian), time_to_fire, 0)
     let timer' = timer
     timers(consume timer)
     timer'
 
-class FreeCandyNotifier is TimerNotify
+class ShutdownMonitorNotifier is TimerNotify
   let _custodian: Custodian
 
   new iso create(custodian: Custodian) =>
