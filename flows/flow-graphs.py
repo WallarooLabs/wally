@@ -231,24 +231,16 @@ class FlowGraph:
             self._out_es[origin].remove(n)
         for i in range(n + 1, old_size):
             self._nodes[i - 1] = self._nodes[i]
-            for outs in self._out_es:
-                if outs.has_target(i):
-                    outs.remove(i)
-                    outs.add(i - 1)
-            for ins in self._in_es:
-                if i in ins:
-                    ins.remove(i)
-                    ins.append(i - 1)
+
+            for target in self._out_es[i].targets():
+                self._in_es[target].remove(i)
+                self._in_es[target].append(i - 1)
+            for origin in self._in_es[i]:
+                self._out_es[origin].remove(i)
+                self._out_es[origin].add(i - 1)
+
             self._out_es[i - 1] = self._out_es[i]
             self._in_es[i - 1] = self._in_es[i]
-            # for target in self._out_es[i].targets():
-            #     if i in self._in_es[target]:
-            #         self._in_es[target].remove(i)
-            #     self._in_es[target].append(i - 1)
-            # for origin in self._in_es[i]:
-            #     if self._out_es[origin].has_target(i):
-            #         self._out_es[origin].remove(i)
-            #     self._out_es[origin].add(i - 1)
         self._nodes.pop()
         self._out_es.pop()
         self._in_es.pop()
@@ -430,15 +422,6 @@ def flowgraph_to_set(graph):
     # Takes a FlowGraph and returns a set of graphs without choices
     frontier = collections.deque([source])
     branches = _flowgraph_to_set(graph, frontier) # A list of graphs
-
-    # Remove unreachable nodes
-    # for branch in branches:
-    #     to_remove = []
-    #     for i in range(branch.size()):
-    #         if i != source and len(branch.inputs_for(i)) == 0:
-    #             to_remove.append(i)
-    #     for node in to_remove:
-    #         branch.remove_node(node)
 
     return list(map(lambda branch: branch.to_graph_without_choices(), branches))
 
