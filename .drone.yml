@@ -9,7 +9,7 @@ clone:
 
 build:
   main_build:
-    image: sendence/ponyc:sendence-1.0.1-$$PONYC_CONFIG-$$PONYC_VERSION
+    image: sendence/ponyc:sendence-1.1.0-$$PONYC_CONFIG-$$PONYC_VERSION
     commands:
       - make arch=$$PONYC_VERSION in_docker=true
   dagon_test_amd64:
@@ -259,7 +259,7 @@ notify:
     template: >
       build `#{{ build.number }}` for {{repo.clone_url}} for commit `{{build.commit}}` 
       in branch `{{build.branch}}` by `@{{build.author}}` with a message ```{{build.message}}``` 
-      finished with a `{{ build.status }}` status.
+      finished with a `{{ build.status }}` status in {{ duration build.started_at build.finished_at }}
 
 matrix:
   PONYC_CONFIG:
