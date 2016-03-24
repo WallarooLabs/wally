@@ -1,5 +1,6 @@
 import collections
 from copy import deepcopy
+import hashlib
 
 class Choices:
     def __init__(self, choices = None):
@@ -42,37 +43,40 @@ class Choices:
 class FlowGraph:
     def __init__(self, node_count = 0):
         self._size = node_count
-        self.out_es = []
-        self.in_es = []
-        self.nodes = []
+        self._out_es = []
+        self._in_es = []
+        self._nodes = []
         for i in range(self._size):
-            self.out_es.append(Choices())
-            self.in_es.append([])
-            self.nodes.append({})
+            self._out_es.append(Choices())
+            self._in_es.append([])
+            self._nodes.append({})
 
     def __repr__(self):
         return "%s(%r)" % (self.__class__, self.__dict__)
 
     def add_node(self, node):
         idx = self._size
-        self.nodes.append(node)
-        self.out_es.append(Choices())
-        self.in_es.append([])
+        self._nodes.append(node)
+        self._out_es.append(Choices())
+        self._in_es.append([])
         self._size += 1
         return idx
 
     def update_node(self, n, key, val):
-        self.nodes[n][key] = val
+        self._nodes[n][key] = val
 
     def add_choice(self, origin, choice):
         # a "choice" is a list of targets (node indices)
-        if not self.out_es[origin].has_choice(choice):
-            self.out_es[origin].add_choice(choice)
+        if not self._out_es[origin].has_choice(choice):
+            self._out_es[origin].add_choice(choice)
             for target in choice:
-                self.in_es[target].append(origin)
+                self._in_es[target].append(origin)
+
+    def nodes(self):
+        return self._nodes
 
     def choices_for(self, n):
-        return self.out_es[n]
+        return self._out_es[n]
 
     def targets_for(self, n):
         return self.choices_for(n).targets()
@@ -81,7 +85,7 @@ class FlowGraph:
         return self.choices_for(n).size() == 1
 
     def inputs_for(self, n):
-        return self.in_es[n]
+        return self._in_es[n]
 
     def source(self):
         sources = self._sources()
@@ -103,14 +107,14 @@ class FlowGraph:
     def _sinks(self):
         sinks = []
         for i in range(self._size):
-            if self.out_es[i].size() == 0:
+            if self._out_es[i].size() == 0:
                 sinks.append(i)
         return sinks
 
     def _sources(self):
         sinks = []
         for i in range(self._size):
-            if len(self.in_es[i]) == 0:
+            if len(self._in_es[i]) == 0:
                 sinks.append(i)
         return sinks
 
@@ -120,24 +124,53 @@ class FlowGraph:
     def clone(self):
         new_graph = FlowGraph()
         for i in range(self._size):
-            node_copy = deepcopy(self.nodes[i])
+            node_copy = deepcopy(self._nodes[i])
             new_graph.add_node(node_copy)
         for j in range(self._size):
-            choices_copy = self.out_es[j].clone()
+            choices_copy = self._out_es[j].clone()
             for choice in choices_copy.choices():
                 new_graph.add_choice(j, choice)
         return new_graph
 
     def clone_choices_for(self, origin):
-        choices = self.out_es[origin].clone()
+        choices = self._out_es[origin].clone()
         clones = []
         for choice in choices.choices():
             next_graph = self.clone()
             reduced_choice = Choices()
             reduced_choice.add_choice(choice)
-            next_graph.out_es[origin] = reduced_choice
+            next_graph._out_es[origin] = reduced_choice
             clones.append(next_graph)
         return clones
+
+    def predecessors_hash_for(self, node):
+        total = 0
+        next_level = self._in_es[node]
+        seen = set(next_level)
+        while len(next_level) > 0:
+            for pred in next_level:
+                t = self._nodes[pred]["type"]
+                total += int(hashlib.sha1(t.encode()).hexdigest(), 16)
+            last_level = deepcopy(next_level)
+            next_level = []
+            for this_pred in last_level:
+                for next_pred in self._in_es[this_pred]:
+                    if next_pred not in seen:
+                        next_level.append(next_pred)
+        return total
+
+    def relabel(self, labels):
+        # Takes a list of indices representing a relabeling of vertices
+        #   The relabeling maps the list index (new label) to old label
+        # Returns a graph that is relabeled according to this mapping
+        if len(labels) != self._size: raise Exception("Wrong number of labels!")
+        g = FlowGraph()
+        for i in range(self._size):
+            g.add_node(self._nodes[labels[i]])
+        for j in range(self._size):
+            for choice in self._out_es[labels[j]].choices():
+                g.add_choice(j, choice)
+        return g
 
 
 class FlowGraphBuilder:
@@ -158,9 +191,9 @@ class FlowGraphBuilder:
     def build(self):
         return self._flow_graph
 
-# Doesn't handle cycles
 def _flowgraph_to_set(graph, frontier, seen = None):
     branches = []
+    # Seen vertices is used to handle cycles
     seen = seen if seen is not None else set([])
     while len(frontier) > 0:
         next = frontier[0]
@@ -183,12 +216,66 @@ def _flowgraph_to_set(graph, frontier, seen = None):
     else:
         return branches
 
-
 def flowgraph_to_set(graph):
-    # frontier = frontier if frontier is not None else [graph.source()]
+    # Takes a FlowGraph and returns a set of graphs without choices
     frontier = collections.deque([graph.source()])
     branches = _flowgraph_to_set(graph, frontier) # A list of graphs
     return branches
+
+def sort_duplicate_types(list, graph):
+    # Expects a list of (node_index, type_name) pairs sorted by type name
+    # Checks for duplicate type names and sorts duplicates by predecessor hashes
+    sorted_duplicates = []
+    i = 0
+    while i < len(list):
+        cur = list[i]
+        cur_type = cur[1]
+        acc = [cur]
+        for j in range(i + 1, len(list)):
+            if list[j][1] == cur_type: acc.append(list[j])
+            else: break
+        if len(acc) > 1:
+            with_hash = map(lambda pair: (pair[0], pair[1], graph.predecessors_hash_for(pair[0])), acc)
+            ordered = sorted(with_hash, key=lambda triple: triple[2])
+            for k in range(len(ordered)):
+                sorted_duplicates.append((ordered[k][0], ordered[k][1]))
+            i += len(acc)
+        else:
+            sorted_duplicates.append(cur)
+            i += 1
+    return sorted_duplicates
+
+def zip_with_index(list):
+    zipped = []
+    for i in range(len(list)):
+        zipped.append((i, list[i]))
+    return zipped
+
+def identity(x):
+    return x
+
+def sorted_indices(list, sorter=identity):
+    # Sorts a list by a sorter and returns a list of (original_index, value) pairs
+    zipped = zip_with_index(list)
+    ordered = sorted(zipped, key=lambda pair: sorter(pair[1]))
+    return map(lambda pair: (pair[0], sorter(pair[1])), ordered)
+
+def sort_graph_vertices_by_type(graph):
+    # Returns a list of indices sorted by type (ties are broken by iteratively hashing predecessor types)
+    vertices = graph.nodes()
+    indices = sorted_indices(vertices, lambda node: node["type"])
+    return list(map(lambda pair: pair[0], sort_duplicate_types(list(indices), graph)))
+
+
+## To check if a Traversal satisfies a Flow:
+#      1) Convert the Flow FlowGraph to a set of graphs without choices
+#      2) Relabel every graph in that set with the canonical labeling
+#           a) You get the relabeling by running sort_graph_vertices_by_type()
+#           b) Feed this result into graph.relabel()
+#      3) Relabel the Traversal graph with the canonical labeling
+#      4) Check if the relabeled Traversal graph is equal to any of the relabeled Flow graphs.
+
+
 
 
 ## TESTS
@@ -215,28 +302,33 @@ d = {
 
 e = {
         "id": 5,
-        "type": "e"
+        "type": "E"
 }
 
 f = {
         "id": 6,
-        "type": "f"
+        "type": "F"
 }
 
 g = {
     "id": 7,
-    "type": "g"
+    "type": "G"
 }
 
+g2 = {
+    "id": 8,
+    "type": "G"
+}
 
 bldr = FlowGraphBuilder()
-bldr.add_node(a)
+bldr.add_node(g2)
 bldr.add_node(b)
-bldr.add_node(c)
+bldr.add_node(a)
+bldr.add_node(g)
 bldr.add_node(d)
+bldr.add_node(c)
 bldr.add_node(e)
 bldr.add_node(f)
-bldr.add_node(g)
 # bldr.add_choice(a, [b, d])
 # bldr.add_choice(b, [c])
 # bldr.add_choice(b, [e])
@@ -250,15 +342,22 @@ bldr.add_choice(b, [g])
 bldr.add_choice(c, [e])
 bldr.add_choice(d, [f])
 bldr.add_choice(d, [g])
-bldr.add_choice(e, [f, c])
+bldr.add_choice(e, [f, c, g2])
 bldr.add_choice(g, [f])
+bldr.add_choice(g2, [f])
 
 graph = bldr.build()
 print("----OUTPUTS----")
-print(graph.choices_for(2))
-print(graph.size())
+# print(graph.choices_for(2))
+# print(graph.size())
 choices = graph.clone_choices_for(1)
-print(choices[0].out_es[1])
-print(len(flowgraph_to_set(graph)))
+# print(choices[0]._out_es[1])
+# print(len(flowgraph_to_set(graph)))
 # print(choices)
 # print(len(choices))
+
+initial_sort = sort_graph_vertices_by_type(graph)
+
+print(initial_sort)
+
+print(sort_graph_vertices_by_type(graph.relabel(initial_sort)))
