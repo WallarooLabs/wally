@@ -10,10 +10,10 @@ actor TestMain is TestList
 
 class iso _TestReceivedLogEncoder is UnitTest
   """
-  Verify that the giles sender log encoder is encoding individual lines as
+  Verify that the giles receiver log encoder is encoding individual lines as
   expected
   """
-  fun name(): String => "giles/sender:ReceivedLogEncoder"
+  fun name(): String => "giles/receiver:ReceivedLogEncoder"
 
   fun apply(h: TestHelper) =>
     let encoder = ReceivedLogEncoder
