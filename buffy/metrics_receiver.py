@@ -77,6 +77,13 @@ def parse_metrics(buf):
     return text
 
 
+def parse_for_dashboard(buf):
+    """Process incoming metrics data into the format expected by the
+    Monitoring Hub."""
+    data = json.loads(buf.decode())
+    # ...
+    return data
+
 def post(uri, data=None, json=None):
     response = requests.post(uri, data=data, json=json)
 
@@ -88,7 +95,8 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
     def datagram_received(self, data, addr):
         try:
             print(parse_metrics(data))
-            post(URI, None, json.loads(data.decode()))
+            if URI:
+                post(URI, None, parse_for_dashboard(data))
         except:
             print(data)
 
@@ -106,7 +114,10 @@ def listen(address, uri):
                   zip((str, int), address.split(':'))]
 
     global URI
-    URI = uri
+    if uri:
+        URI = uri
+    else:
+        URI = None
     # Create the main event loop object
     loop = asyncio.get_event_loop()
     # One protocol instance will be created to serve all client requests
