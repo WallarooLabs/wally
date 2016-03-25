@@ -59,7 +59,7 @@ def feed(address, delay, path, console_log, file_log, log_level):
             continue
         worker.udp_put(msg, host, port)
         c += 1
-        time.sleep(0.0001)
+        time.sleep(delay)
 
 
 
