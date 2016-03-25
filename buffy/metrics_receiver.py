@@ -5,10 +5,10 @@ and pretty prints them to console
 """
 
 
+import asyncio
 import click
 import datetime
 import json
-import socket
 
 
 def parse_metrics(buf):
@@ -76,29 +76,47 @@ def parse_metrics(buf):
     return text
 
 
+class UDPMessageQueue(asyncio.DatagramProtocol):
+    def connection_made(self, transport):
+        self.transport = transport
+
+    def datagram_received(self, data, addr):
+        try:
+            print(parse_metrics(data))
+        except:
+            print(data)
+
+    def connection_lost(self, exc):
+        self.transport = None
+
+
 @click.command()
 @click.option('--address', default='127.0.0.1:10000',
               help='Address to listen on')
 def listen(address):
     host, port = [f(x) for f, x in
                   zip((str, int), address.split(':'))]
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((host, port))
 
-    while True:
-        buf = sock.recv(65507)
-        if buf:
-            try:
-                print(parse_metrics(buf))
-            except:
-                print(buf)
-                raise
+    # Create the main event loop object
+    loop = asyncio.get_event_loop()
+    # One protocol instance will be created to serve all client requests
+    listen = loop.create_datagram_endpoint(
+        UDPMessageQueue, local_addr=(host, port))
+    transport, protocol = loop.run_until_complete(listen)
+
+    # Start the listener event loop and run until SIGINT
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+
+    transport.close()
+    loop.close()
 
 
 def test_parse():
     buf = b'{"t1": 1458195070.3131151, "VUID": "NTg2ODIx", "latency_time": {"0.000100000 s": 0.13107776641845703, "0.001000000 s": 0.033399105072021484}, "latency_count": {"0.000100000 s": 2449, "0.001000000 s": 227}, "throughput_out": {"1458195069": 1507, "1458195070": 1169}, "func": "Marketspread", "throughput_in": {"1458195069": 1507, "1458195070": 1169}, "t0": 1458195068.309974}'
-    print(parse_metrics(buf))
-    assert(0)
+    assert(parse_metrics(buf))
 
 
 if __name__ == '__main__':
