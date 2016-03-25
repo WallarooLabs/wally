@@ -9,6 +9,7 @@ import asyncio
 import click
 import datetime
 import json
+import requests
 
 
 def parse_metrics(buf):
@@ -76,6 +77,10 @@ def parse_metrics(buf):
     return text
 
 
+def post(uri, data=None, json=None):
+    response = requests.post(uri, data=data, json=json)
+
+
 class UDPMessageQueue(asyncio.DatagramProtocol):
     def connection_made(self, transport):
         self.transport = transport
@@ -83,6 +88,7 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
     def datagram_received(self, data, addr):
         try:
             print(parse_metrics(data))
+            post(URI, None, json.loads(data.decode()))
         except:
             print(data)
 
@@ -93,10 +99,14 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
 @click.command()
 @click.option('--address', default='127.0.0.1:10000',
               help='Address to listen on')
-def listen(address):
+@click.option('--uri', default='http://127.0.0.1:5000/',
+              help='URI for the Monitoring Hub')
+def listen(address, uri):
     host, port = [f(x) for f, x in
                   zip((str, int), address.split(':'))]
 
+    global URI
+    URI = uri
     # Create the main event loop object
     loop = asyncio.get_event_loop()
     # One protocol instance will be created to serve all client requests
