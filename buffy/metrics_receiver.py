@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-"""Metrics listens on a specified address and parses metrics messages
-and pretty prints them to console
+"""Metrics listens on a specified address and parses metrics messages,
+pretty prints them to console, and sends out a metrics data set
+to the monitoring hub
 """
 
 
