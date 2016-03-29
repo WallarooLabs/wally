@@ -33,7 +33,8 @@ TAGS = {'0': ('MessageId', str),
         '107': ('SecurityDesc', str),
         '117': ('QuoteId', str),
         '132': ('BidPx', float),
-        '133': ('OfferPx', float),}
+        '133': ('OfferPx', float),
+        '999': ('FeedEpoch', float),}
 
 
 def parse_fix(input):
@@ -48,13 +49,14 @@ def test_parse_fix_trade():
     input = ('8=FIX.4.2\x019=121\x0135=D\x011=CLIENT35\x0111=s0XCIa\x01'
              '21=3\x0138=4000\x0140=2\x0144=252.85366153511416\x0154=1\x01'
              '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
-             '10=108\x01')
+             '10=108\x01999=12345\x01')
     expected = {'Side': 'buy', 'TransactTime': '20151204-14:30:00.000',
                 'Account': 'CLIENT35', 'MsgType': 'order', 'BodyLength': 121,
                 'OrderId': 's0XCIa', 'BeginString': 'FIX.4.2',
                 'SecurityDesc': 'Tesla Motors', 'Symbol': 'TSLA',
                 'CheckSum': '108', 'OrderQty': 4000.0, 'HandlInst': '3',
-                'Price': 252.85366153511416, 'OrdType': '2'}
+                'Price': 252.85366153511416, 'OrdType': '2',
+                'FeedEpoch': 12345}
 
     output = parse_fix(input)
     assert(output == expected)
