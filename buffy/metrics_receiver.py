@@ -77,12 +77,30 @@ def parse_metrics(buf):
     return text
 
 
-def parse_for_dashboard(buf):
+def process_for_dashboard(buf):
     """Process incoming metrics data into the format expected by the
     Monitoring Hub."""
     data = json.loads(buf.decode())
-    # ...
-    return data
+    if not data['latency_count']:
+        return
+    output = {}
+    output['pipeline_key'] = data['VUID']
+    output['t1'] = data['t1']
+    output['t0'] = data['t0']
+    output['topics'] = {}
+
+    # latency bins
+    output['topics']['latency_bins'] = {float(key.split()[0]): val
+                                        for key, val in
+                                        data['latency_count'].items()}
+
+    # throughput out
+    output['topics']['throughput_out'] = {int(key.split()[0]): val
+                                          for key, val in
+                                          data['throughput_out'].items()}
+    # Post the output as an application/json content-type
+    post(uri=URI, data=None, json=output)
+
 
 def post(uri, data=None, json=None):
     response = requests.post(uri, data=data, json=json)
@@ -95,10 +113,10 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
     def datagram_received(self, data, addr):
         try:
             print(parse_metrics(data))
-            if URI:
-                post(URI, None, parse_for_dashboard(data))
+            process_for_dashboard(data)
         except:
             print(data)
+            raise
 
     def connection_lost(self, exc):
         self.transport = None
