@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
-"""UDP_listener listens on a specified address and port and emits
-whatever it receives to cosnole.
+"""sink listens on a specified address and port and emits
+whatever it receives to console.
+In addition, sink computes latencies using the value in FeedEpoch
+in the incoming json message of the format
+'{"msg": <msg>, "FeedEpoch": <epoch>}'.
 """
 
 
