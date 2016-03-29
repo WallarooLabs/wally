@@ -19,23 +19,42 @@ actor Main
       let incoming_port = in_addr_raw(1)
       let store = Store(env)
       let monitor = ShutdownMonitor(custodian, time_to_first_message, time_between_messages)
-      let receiver = Receiver(env, store, monitor, incoming_host, incoming_port)
 
-      custodian(receiver)(monitor)(store)
-      SignalHandler(TermHandler(custodian), Sig.term())
+      match ReceiverFactory(env, store, monitor, incoming_host, incoming_port)
+      | let receiver: Receiver =>
+        custodian(receiver)(monitor)(store)
+        SignalHandler(TermHandler(custodian), Sig.term())
+      | None =>
+        env.err.print("Unable to setup application. Exiting.")
+      end
     else
       env.out.print("running tests...")
       TestMain(env)
       //env.out.print("wrong args")
     end
 
-actor Receiver
-  let _socket: UDPSocket
-
-  new create(env: Env, store: Store,
+class ReceiverFactory
+  fun apply(
+    env: Env,
+    store: Store,
     monitor: ShutdownMonitor,
-    on_address: String, on_port: String) =>
-    _socket = UDPSocket(ReceiverNotify(env, store, monitor), on_address, on_port)
+    on_address: String,
+    on_port: String): (Receiver | None) =>
+
+    try
+      let auth = env.root as AmbientAuth
+      let socket = UDPSocket(auth, ReceiverNotify(env, store, monitor), on_address, on_port)
+      return Receiver(socket)
+    else
+      env.err.print("Can't open UDPSocket")
+      return None
+    end
+
+actor Receiver
+  var _socket: UDPSocket
+
+  new create(socket: UDPSocket) =>
+    _socket = socket
 
   be dispose() =>
     _socket.dispose()
@@ -122,7 +141,7 @@ actor Store
 
   fun _dump() =>
     try
-      let received_handle = File(FilePath(_env.root, "received.txt"))
+      let received_handle = File(FilePath(_env.root as AmbientAuth, "received.txt"))
       for r in _received.values() do
         received_handle.print(_encoder(r))
       end

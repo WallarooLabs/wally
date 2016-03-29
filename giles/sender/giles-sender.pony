@@ -14,20 +14,36 @@ actor Main
       let out_addr_raw = env.args(1).split(":")
       let messages_to_send = env.args(2).u64()
 
-      let outgoing_address = DNS.ip4(out_addr_raw(0), out_addr_raw(1))(0)
       let store = Store(env)
-      let sender = Sender(outgoing_address, store)
+      match SenderFactory(env, consume out_addr_raw, store)
+      | let sender: Sender =>
+        let timer = Timer(DataGenerator(custodian, sender, messages_to_send), 0, 5_000_000)
+        let timer' = timer
+        timers(consume timer)
 
-      let timer = Timer(DataGenerator(custodian, sender, messages_to_send), 0, 5_000_000)
-      let timer' = timer
-      timers(consume timer)
-
-      custodian(timers)(sender)(store)
-      SignalHandler(TermHandler(custodian), Sig.term())
+        custodian(timers)(sender)(store)
+        SignalHandler(TermHandler(custodian), Sig.term())
+      | None =>
+        env.err.print("Unable to setup application. Exiting.")
+      end
     else
       env.out.print("running tests")
       TestMain(env)
       //env.out.print("wrong args")
+    end
+
+class SenderFactory
+  fun apply(env: Env, out_addr_raw: Array[String], store: Store): (Sender | None) =>
+    try
+      let outgoing_address = DNS.ip4(
+        env.root as AmbientAuth,
+        out_addr_raw(0),
+        out_addr_raw(1))(0)
+      let socket = UDPSocket(env.root as AmbientAuth, SenderNotify)
+      return Sender(outgoing_address, store, socket)
+    else
+      env.err.print("Unable to open udp socket")
+      return None
     end
 
 actor Sender
@@ -36,10 +52,10 @@ actor Sender
   let _socket: UDPSocket
   let _encoder: Encoder = Encoder
 
-  new create(to: IPAddress, store: Store) =>
+  new create(to: IPAddress, store: Store, socket: UDPSocket) =>
     _store = store
     _to = to
-    _socket = UDPSocket(SenderNotify)
+    _socket = socket
 
   be write(data: String) =>
     let at =  Time.micros()
@@ -85,7 +101,7 @@ actor Store
 
   fun _dump() =>
     try
-      let sent_handle = File(FilePath(_env.root, "sent.txt"))
+      let sent_handle = File(FilePath(_env.root as AmbientAuth, "sent.txt"))
       for s in _sent.values() do
         sent_handle.print(_encoder(s))
       end

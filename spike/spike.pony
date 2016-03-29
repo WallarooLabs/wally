@@ -40,7 +40,7 @@ actor Main
       let mode: Mode = ModeMaker.from(args(3), env)
       let processor = Processor(mode, seed, prob)
       let notifier = recover Notifier(env, out_ip, out_port, processor) end
-      UDPSocket.ip4(consume notifier, in_ip, in_port)
+      UDPSocket.ip4(env.root as AmbientAuth, consume notifier, in_ip, in_port)
     else
       env.out.print("Parameters: input_address output_address destruction-mode [--seed seed --prob probability]")
     end
