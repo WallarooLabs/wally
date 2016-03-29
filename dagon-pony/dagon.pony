@@ -13,7 +13,7 @@ actor Main
       let sender_name: String val = args(2).clone()
       let receiver_name: String val = args(3).clone()
       let process_names: Array[String val] val = recover val [buffy_name, sender_name, receiver_name] end
-      TCPListener(recover Notifier(env, process_names) end)
+      TCPListener(env.root as AmbientAuth, recover Notifier(env, process_names) end)
     else
       env.out.print("Parameters: buffy_binary giles_sender_binary giles_receiver_binary")
     end
@@ -43,7 +43,7 @@ class Notifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    ConnectNotify(_env)
+    ConnectNotify(_env, _process_manager)
 
 class ConnectNotify is TCPConnectionNotify
   let _env: Env

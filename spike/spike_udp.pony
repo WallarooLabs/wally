@@ -8,8 +8,8 @@ class Notifier is UDPNotify
 
   new create(env: Env, out_ip: String, out_port: String, processor: Processor) ? =>
     _env = env
-    _out_addr = DNS.ip4(out_ip, out_port)(0)
-    _out_sock = UDPSocket.ip4(recover Forwarder(env) end)
+    _out_addr = DNS.ip4(env.root as AmbientAuth, out_ip, out_port)(0)
+    _out_sock = UDPSocket.ip4(env.root as AmbientAuth, recover Forwarder(env) end)
     _processor = processor
 
   fun ref listening(sock: UDPSocket ref) =>

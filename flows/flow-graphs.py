@@ -3,6 +3,21 @@ from copy import deepcopy
 import hashlib
 import flowdotgen
 
+## A FlowGraph is a graph with out edges represented by Choices objects.
+# You can convert a FlowGraph to a set of Graph objects, representing the possible traversals
+# allowed by the corresponding Flow (flowgraph_to_set()).
+
+## To check if a Traversal satisfies a Flow:
+#      1) Convert the Flow FlowGraph to a set of graphs without choices (flowgraph_to_set())
+#      2) Relabel every graph in that set with the canonical labeling
+#           a) You get the relabeling by running sort_graph_vertices_by_type()
+#           b) Feed this result into graph.relabel()
+#      3) Relabel the Traversal graph with the canonical labeling
+#           a) Again, use sort_graph_vertices_by_type() and graph.relabel()
+#      4) Check if the relabeled Traversal graph is equal to any of the relabeled Flow graphs.
+
+
+
 class Choices:
     def __init__(self, choices = None):
         self._choices = choices if choices is not None else []
@@ -164,6 +179,19 @@ class Graph:
 
     def has_choices(self):
         return False
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__): return False
+        if self._size != other._size: return False
+        for i in range(self._size):
+            if self._nodes[i]["type"] != other._nodes[i]["type"]: return False
+            if self._out_es[i] != other._out_es[i]: return False
+            if self._in_es[i] != other._in_es[i]: return False
+
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def __str__(self):
         out = "GRAPH: ["
@@ -468,16 +496,6 @@ def sort_graph_vertices_by_type(graph):
     vertices = graph.nodes()
     indices = sorted_indices(vertices, lambda node: node["type"])
     return list(map(lambda pair: pair[0], sort_duplicate_types(list(indices), graph)))
-
-
-## To check if a Traversal satisfies a Flow:
-#      1) Convert the Flow FlowGraph to a set of graphs without choices
-#      2) Relabel every graph in that set with the canonical labeling
-#           a) You get the relabeling by running sort_graph_vertices_by_type()
-#           b) Feed this result into graph.relabel()
-#      3) Relabel the Traversal graph with the canonical labeling
-#      4) Check if the relabeled Traversal graph is equal to any of the relabeled Flow graphs.
-
 
 
 
