@@ -52,7 +52,7 @@ def feed(address, delay, path, console_log, file_log, log_level):
     c = 0
     while sources:
         source, source_size = sources[c % len(sources)]
-        msg = source.readline().decode()
+        msg = source.readline().decode() + '999={}\x01'.format(time.time())
         if not msg and source.tell() >= source_size:
             logger.info('Removing file %s' % source.name)
             sources.remove((source, source_size))
