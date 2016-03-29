@@ -7,6 +7,8 @@ with which to build stream processing topologies with tunable guarantees.
 ## Requirements:
 
 1. Python 3.4 or higher
+2. click
+3. requests
 
 
 ## Running the stream-py prototype
