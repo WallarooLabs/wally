@@ -9,7 +9,7 @@ clone:
 
 build:
   main_build:
-    image: sendence/ponyc:sendence-1.1.0-$$PONYC_CONFIG-$$PONYC_VERSION
+    image: sendence/ponyc:sendence-2.0.0-$$PONYC_CONFIG-$$PONYC_VERSION
     commands:
       - make arch=$$PONYC_VERSION in_docker=true
   dagon_test_amd64:
