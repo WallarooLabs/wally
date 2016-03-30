@@ -10,7 +10,6 @@ in the incoming json message of the format
 
 import asyncio
 import click
-import datetime
 import json
 import math
 import requests
@@ -84,7 +83,7 @@ def process_msg(buf):
 
 
 def post(uri, data=None, json=None):
-    response = requests.post(uri, data=data, json=json)
+    requests.post(uri, data=data, json=json)
 
 
 class UDPMessageQueue(asyncio.DatagramProtocol):

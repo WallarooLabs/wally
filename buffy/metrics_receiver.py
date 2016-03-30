@@ -104,7 +104,7 @@ def process_for_dashboard(buf):
 
 
 def post(uri, data=None, json=None):
-    response = requests.post(uri, data=data, json=json)
+    requests.post(uri, data=data, json=json)
 
 
 class UDPMessageQueue(asyncio.DatagramProtocol):
