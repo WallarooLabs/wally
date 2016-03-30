@@ -8,6 +8,8 @@ https://docs.google.com/document/d/1qpxeWcWeUzymX6hOSWG_yuTunNd6J2UoyWLzTOQiiz4/
 
 """
 
+
+import json
 from . import state
 from .fix_parse import parse_fix
 
@@ -24,7 +26,6 @@ def func(input):
         return process_order(msg)
     elif msg['MsgType'] in ('fill', 'heartbeat'):
         return None
-
 
 
 def process_nbbo(msg):
@@ -63,21 +64,23 @@ def process_order(msg):
 
 
 def reject_order(msg, reason):
-    return ("New Order: ({client}, {symbol}, {status}, {quantity}): "
-            "{status}: {reason}".format(client=msg['Account'],
-                              symbol=msg['Symbol'],
-                              quantity=msg.get('OrderQty', None),
-                              status='Rejected',
-                              reason=reason))
+    txt = ("New Order: ({client}, {symbol}, {status}, {quantity}): "
+           "{status}: {reason}".format(client=msg['Account'],
+                                       symbol=msg['Symbol'],
+                                       quantity=msg.get('OrderQty', None),
+                                       status='Rejected',
+                                       reason=reason))
+    return json.dumps({'msg': txt, 'feed_time': msg['FeedEpoch']})
 
 
 def accept_order(msg):
     state.get_attribute('orders', {})[msg['OrderId']] = msg
-    return ("New Order: ({client}, {symbol}, {status}, {quantity}): "
-            "{status}".format(client=msg['Account'],
-                              symbol=msg['Symbol'],
-                              quantity=msg.get('OrderQty', None),
-                              status='Accepted'))
+    txt = ("New Order: ({client}, {symbol}, {status}, {quantity}): "
+           "{status}".format(client=msg['Account'],
+                             symbol=msg['Symbol'],
+                             quantity=msg.get('OrderQty', None),
+                             status='Accepted'))
+    return json.dumps({'msg': txt, 'feed_time': msg['FeedEpoch']})
 
 
 # TESTS #
