@@ -33,3 +33,22 @@ There is an ansible playbook for configuring the nodes. It can be run using the 
 
 `ansible-playbook --ask-vault-pass -i ../ansible/vagrant.py --ssh-common-args="-o StrictHostKeyChecking=no" ../ansible/playbooks/vagrant.yml`
 
+## Makefile
+
+Following our convention, there is a `Makefile` for managing the vagrant cluster.
+
+Command/options can be identified by running: `make help`
+
+The `Makefile` is just a wrapper for vagrant and ansible.
+
+### Examples
+
+The following examples are to illustrate the features available and common use cases:
+
+* Create a cluster:
+  `make build`
+* Configure (with ansible) the cluster:
+  `make configure`
+* Destroy a cluster:
+  `make destroy`
+
