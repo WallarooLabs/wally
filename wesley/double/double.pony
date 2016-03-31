@@ -61,23 +61,18 @@ class DoubleReceivedMessages is ReceivedMessages
   fun compare(that: ReceivedMessages): MatchStatus val =>
     match that
     | let that_double_received_messages: DoubleReceivedMessages =>
-      if (this._size() == that_double_received_messages._size()) and (
-        var equal = true
+      if (this._size() == that_double_received_messages._size()) then
         try
           for (i, v) in _messages.pairs() do
-            if (v != that_double_received_messages._messages(i)) and equal then
-              equal = false
+            if (v != that_double_received_messages._messages(i)) then
+              return ResultsDoNotMatch
             end
           end
         end
-      equal) then
-        ResultsMatch
-      else
-        ResultsDoNotMatch
+        return ResultsMatch
       end
-    else
-      ResultsDoNotMatch
     end
+    ResultsDoNotMatch
 
   fun ref string(): String =>
     var acc = String()
