@@ -1,12 +1,10 @@
 # Wesley
 
-Validation the results of tests run by Giles.
+Verfication of the results of tests run by Giles.
 
 "Wesley is ... an irritating foil for ... Rupert Giles."
 
-Ver 0.0.1-sendence
-
-## Validation
+## Verification
 
 Wesley does the following:
 1. applies a transforming function to the messages sent by Giles to
@@ -27,48 +25,51 @@ There are a few things that are important to note:
 
 ## The Idea
 
-Giles sends messages `S` to Buffy, which processes those messages and
-produces the received message `R`.
+Giles sends messages `Sent` to Buffy, which processes those messages and
+produces the received message `Received`.
 
 ```
-Giles =S=> Buffy =R=> Giles
+Giles =Sent=> Buffy =Received=> Giles
 
-  S: the ordered list of sent messages
-  R: the ordered list of received messages
+  Sent: the ordered list of sent messages
+  Received: the ordered list of received messages
 ```
 
-There is a function `f(x)` which transforms S into the expected
-received messages, `Re`.
+There is a function `f(x)` which transforms `Sent` into the expected
+received messages, `Expected`.
 
 ```
-Re = f(S)
+Expected = f(Sent)
 ```
 
-There is an equality function `e(x, y)` which tells us if `R` and `Re`
-are equal or not.
+There is a compare function `c(x, y)` which tells us if `Received` and `Expected`
+are match or not.
 
 ```
-e(R, Re) = equal | notEqual
+c(Received, Expected) = match | nomatch
 ```
 
 For any given test configuration there will be an expectation that the
-result of the equality function will either be equal or notEqual. This
-is specified within the test configuration. The validation function
-`v(x, y)` passes if the expectation is the same as the result of `e(R,
-Re)`, otherwise it fails.
+result of the compare function will either be `match` or
+`nomatch`. This is specified within the test configuration file. The
+verfication function `v(x, y)` passes if the match expectation is the
+same as the result of `c(Received, Expected)`, otherwise it fails.
 
 ```
-v(e(R, Re), expectation) = pass | fail
+v(c(Received, Expected), MatchExpectation) = pass | fail
 ```
 
 The test system expands to:
 
 ```
-v(e(R, f(S)), expectation)
+v(c(Received, f(Sent)), MatchExpectation)
 ```
 
-The only piece that needs to change from topology to topology is the
-function `f(x)`.
+Currently the only piece that needs to change from topology to
+topology is the function `f(x)`, but as we add more complicated
+topologies we will probably need to add a number of different
+comparison functions to choose from, or allow the test implementer to
+specify their own function.
 
 ## In Practice
 
@@ -79,16 +80,16 @@ received messages (`received.txt`) once the test finishes. After the
 test has run, Wesley takes the sent messages, applies the
 transformation function to them, and compares the expected received
 messages to the actual received messages, then compares this outcome
-with the expected outcome.
+with the expected match outcome.
 
-Each Wesley validator is a stand-alone executable. The source for the
+Each Wesley verifier is a stand-alone executable. The source for the
 program is stored under the `wesley` directory and includes only code
 that is specific to the topoloy under test (objects for reading
-messages and the transformation function `f(S) => Re`).
+messages and the transformation function `f(Sent) => Expected`).
 
-Wesley validation is run like this:
+Wesley verification is run like this:
 
-```VALIDATION-EXECUTABLE SENT-FILE RECEIVED-FILE [match|nomatch|CONFIG-INI-FILE]```
+```VERFICATION-EXECUTABLE SENT-FILE RECEIVED-FILE [match|nomatch|CONFIG-INI-FILE]```
 
 For example, this command verifies the outcome of an `identity` test
 where the expected received messages and actual received messages are
