@@ -52,14 +52,16 @@ def feed(address, delay, path, console_log, file_log, log_level):
     c = 0
     while sources:
         source, source_size = sources[c % len(sources)]
-        msg = source.readline().decode()
+        msg = source.readline().decode().strip()
+        msg = '"{}\x01999={}\x01"'.format(msg.strip('"').strip('\x01'),
+                                          time.time())
         if not msg and source.tell() >= source_size:
             logger.info('Removing file %s' % source.name)
             sources.remove((source, source_size))
             continue
         worker.udp_put(msg, host, port)
         c += 1
-        time.sleep(0.0001)
+        time.sleep(delay)
 
 
 

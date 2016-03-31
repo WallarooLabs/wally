@@ -96,4 +96,6 @@ The following examples are to illustrate the features available and common use c
 * Plan a new cluster with name `sample` with extra terraform arguments
   (`--version` in this case but could be anything):
   `make plan cluster_name=sample terraform_args="--version"`
+* Destroy a cluster with name `sample`:
+  `make destroy cluster_name=sample`
 

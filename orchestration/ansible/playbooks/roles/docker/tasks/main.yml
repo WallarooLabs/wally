@@ -51,6 +51,9 @@
 - name: Stop/kill consul/swarm
   command: docker-compose -f /root/cluster.yml kill
 
+- name: Remove consul/swarm
+  command: docker-compose -f /root/cluster.yml rm -f
+
 - name: Start consul/swarm
   command: docker-compose -f /root/cluster.yml up -d
 

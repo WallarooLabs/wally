@@ -78,7 +78,7 @@ help: ## Self-documenting help command
 	@echo ''
 	@echo 'Options:'
 	@grep -E '^[a-zA-Z_-]+ *\?=.*?## .*$$' $(MAKEFILE_LIST) | awk \
-          'BEGIN {FS = "\?="}; {printf "\033[36m%-30s\033[0m ##%s\n", $$1, $$2}' \
+          'BEGIN {FS = "?="}; {printf "\033[36m%-30s\033[0m ##%s\n", $$1, $$2}' \
           | awk 'BEGIN {FS = "## "}; {printf "%s %s \033[36m(Default: %s)\033[0m\n", $$1, $$3, $$2}'
 	@grep -E 'filter.*arch.*\)$$' $(MAKEFILE_LIST) | awk \
           'BEGIN {FS = "[(),]"}; {printf "\033[36m%-30s\033[0m %s\n", \

@@ -3,7 +3,7 @@ docker_image_version ?= $(shell git describe --tags --always)## Docker Image Tag
 docker_image_repo ?= docker.sendence.com:5043/sendence## Docker Repository to use
 arch ?= native## Architecture to build for
 in_docker ?= false## Whether already in docker or not (used by CI)
-ponyc_tag ?= sendence-1.1.0-debug## tag for ponyc docker to use
+ponyc_tag ?= sendence-2.1.0-debug## tag for ponyc docker to use
 ponyc_runner ?= sendence/ponyc## ponyc docker image to use
 
 ifdef arch
@@ -97,11 +97,21 @@ build-wesley: ## wesley
 	$(call PONYC,wesley/double)
 	$(call PONYC,wesley/identity)
 
-test: test-buffy ## Test programs for Buffy
+test: lint-test test-buffy test-giles-receiver test-giles-sender ## Test programs for Buffy
 
 test-buffy: ## Test buffy
 	cd buffy && python3 -m py.test functions/*
 
+test-giles-receiver: ## Test Giles Receiver
+	cd giles/receiver && ./receiver
+
+test-giles-sender: ## Test Giles Sender
+	cd giles/sender && ./sender
+
+lint-test: lint-test-buffy ## Run lint tests for programs for Buffy
+
+lint-test-buffy: ## Run lint test buffy
+	cd buffy && python3 -m pyflakes *.py functions/*.py
 
 build-docker:  build ## Build docker images for Buffy
 	docker build -t \

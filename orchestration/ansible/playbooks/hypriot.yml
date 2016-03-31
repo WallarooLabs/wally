@@ -5,10 +5,8 @@
   - name: install python for full ansible support
     raw: apt-get install -y python
 
-- hosts: buffy-leaders:buffy-followers
+- hosts: buffy-followers:buffy-leaders
   tasks:
-  - name: Update pip with easy_install
-    easy_install: name=pip state=latest
   - name: Create a group of all hosts for buffy
     group_by: key=buffy-all
 
@@ -16,6 +14,57 @@
 - hosts: buffy-all
   roles:
   - { role: common, become: yes }
+
+# Update pip and assign static ips
+- hosts: buffy-all
+  vars:
+    ethernet_interface: eth0
+    ip_range_start: 100
+  tasks:
+  - name: Update pip with easy_install
+    easy_install: name=pip state=latest
+  - name: set my_ip variable
+    set_fact: my_ip={{ hostvars[inventory_hostname]['ansible_' + ethernet_interface]['ipv4']['address'] }}
+  - name: set my_new_ip variable
+    set_fact: my_new_ip={{ my_ip.split('.')[0] }}.{{ my_ip.split('.')[1] }}.{{ my_ip.split('.')[2] }}.{{ ip_range_start + play_hosts.index(inventory_hostname) }}
+  - name: change /etc/network/interfaces to use static ip for interface
+    replace:
+      dest: /etc/network/interfaces
+      regexp: ^iface {{ ethernet_interface }} inet dhcp$
+      replace: iface {{ ethernet_interface }} inet static
+  - name: Add auto interface line
+    lineinfile:
+      dest: /etc/network/interfaces
+      regexp: ^auto {{ ethernet_interface }}$
+      insertbefore: ^iface {{ ethernet_interface }} inet static
+      line: auto {{ ethernet_interface }}
+  - name: Update address for interface
+    lineinfile:
+      dest: /etc/network/interfaces
+      regexp: ^address {{ my_ip.split('.')[0] }}.{{ my_ip.split('.')[1] }}.{{ my_ip.split('.')[2] }}.*$
+      insertafter: ^iface {{ ethernet_interface }} inet static
+      line: address {{ my_new_ip }}
+  - name: Update netmask for interface
+    lineinfile:
+      dest: /etc/network/interfaces
+      regexp: ^netmask {{ hostvars[inventory_hostname]['ansible_' + ethernet_interface]['ipv4']['netmask'] }}$
+      insertafter: ^address {{ hostvars[inventory_hostname]['ansible_' + ethernet_interface]['ipv4']['address'] }}
+      line: netmask {{ hostvars[inventory_hostname]['ansible_' + ethernet_interface]['ipv4']['netmask'] }}
+  - name: Update gateway for interface
+    lineinfile:
+      dest: /etc/network/interfaces
+      regexp: ^gateway {{ hostvars[inventory_hostname]['ansible_default_ipv4']['gateway'] }}$
+      insertafter: ^netmask {{ hostvars[inventory_hostname]['ansible_' + ethernet_interface]['ipv4']['netmask'] }}
+      line: gateway {{ hostvars[inventory_hostname]['ansible_default_ipv4']['gateway'] }}
+
+# restart eth0 network interface to make new network settings go into effect
+- hosts: buffy-all
+  tasks:
+  - name: restart interface to make ip change go into effect
+    shell: sleep 2 && systemctl reload networking
+    async: 30
+    poll: 5
+    ignore_errors: true
 
 # Configure and deploy leader servers.
 - hosts: buffy-leaders

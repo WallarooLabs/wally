@@ -2,8 +2,6 @@
 
 A tester, you might even say "watcher" for Buffy.
 
-Ver 0.1.1-sendence
-
 ## Relationship to Buffy
 
 Giles acts as an external tester for Buffy. It sends data into Buffy and then

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
-"""Metrics listens on a specified address and parses metrics messages
-and pretty prints them to console
+"""Metrics listens on a specified address and parses metrics messages,
+pretty prints them to console, and sends out a metrics data set
+to the monitoring hub
 """
 
 
+import asyncio
 import click
 import datetime
 import json
-import socket
+import requests
 
 
 def parse_metrics(buf):
@@ -76,29 +78,85 @@ def parse_metrics(buf):
     return text
 
 
+def process_for_dashboard(buf):
+    """Process incoming metrics data into the format expected by the
+    Monitoring Hub."""
+    data = json.loads(buf.decode())
+    if not data['latency_count']:
+        return
+    output = {}
+    output['pipeline_key'] = data['VUID']
+    output['t1'] = data['t1']
+    output['t0'] = data['t0']
+    output['topics'] = {}
+
+    # latency bins
+    output['topics']['latency_bins'] = {float(key.split()[0]): val
+                                        for key, val in
+                                        data['latency_count'].items()}
+
+    # throughput out
+    output['topics']['throughput_out'] = {int(key.split()[0]): val
+                                          for key, val in
+                                          data['throughput_out'].items()}
+    # Post the output as an application/json content-type
+    post(uri=URI, data=None, json=output)
+
+
+def post(uri, data=None, json=None):
+    requests.post(uri, data=data, json=json)
+
+
+class UDPMessageQueue(asyncio.DatagramProtocol):
+    def connection_made(self, transport):
+        self.transport = transport
+
+    def datagram_received(self, data, addr):
+        try:
+            print(parse_metrics(data))
+            process_for_dashboard(data)
+        except:
+            print(data)
+            raise
+
+    def connection_lost(self, exc):
+        self.transport = None
+
+
 @click.command()
 @click.option('--address', default='127.0.0.1:10000',
               help='Address to listen on')
-def listen(address):
+@click.option('--uri', default='http://127.0.0.1:5000/',
+              help='URI for the Monitoring Hub')
+def listen(address, uri):
     host, port = [f(x) for f, x in
                   zip((str, int), address.split(':'))]
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((host, port))
 
-    while True:
-        buf = sock.recv(65507)
-        if buf:
-            try:
-                print(parse_metrics(buf))
-            except:
-                print(buf)
-                raise
+    global URI
+    if uri:
+        URI = uri
+    else:
+        URI = None
+    # Create the main event loop object
+    loop = asyncio.get_event_loop()
+    # One protocol instance will be created to serve all client requests
+    listen = loop.create_datagram_endpoint(
+        UDPMessageQueue, local_addr=(host, port))
+    transport, protocol = loop.run_until_complete(listen)
+
+    # Start the listener event loop and run until SIGINT
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+
+    transport.close()
+    loop.close()
 
 
 def test_parse():
     buf = b'{"t1": 1458195070.3131151, "VUID": "NTg2ODIx", "latency_time": {"0.000100000 s": 0.13107776641845703, "0.001000000 s": 0.033399105072021484}, "latency_count": {"0.000100000 s": 2449, "0.001000000 s": 227}, "throughput_out": {"1458195069": 1507, "1458195070": 1169}, "func": "Marketspread", "throughput_in": {"1458195069": 1507, "1458195070": 1169}, "t0": 1458195068.309974}'
-    print(parse_metrics(buf))
-    assert(0)
+    assert(parse_metrics(buf))
 
 
 if __name__ == '__main__':

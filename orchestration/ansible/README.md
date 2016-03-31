@@ -1,6 +1,7 @@
 # Ansible for Buffy Orchestration
 
-This module consists of Ansible playbooks and roles for Buffy Orchestration for the different targets.
+This module consists of Ansible playbooks and roles for Buffy Orchestration for
+the different targets.
 
 The following are the currently supported targets:
 
@@ -10,48 +11,85 @@ The following are the currently supported targets:
 
 ## Vault
 
-The Ansible playbooks all use Ansible Vault to encrypt sensitive information. At the moment the only sensitive information we have is the login/password for the private Sendence docker repository. Because of this, all the Ansible playbook examples prompt for a password on execution. This can (and likely will) be changed so the password can be read from a file instead so as to not require user input.
+The Ansible playbooks all use Ansible Vault to encrypt sensitive information.
+At the moment the only sensitive information we have is the login/password for
+the private Sendence docker repository. Because of this, all the Ansible
+playbook examples prompt for a password on execution. This can (and likely will)
+be changed so the password can be read from a file instead so as to not require
+user input.
 
 ## Vagrant
 
-Please look at the documentation in the [Vagrant orchestration section](../vagrant/README.md) for examples on how to use Ansible to configure the vagrant nodes.
+Please look at the documentation in the 
+[Vagrant orchestration section](../vagrant/README.md) for examples on how to use
+Ansible to configure the vagrant nodes.
 
 ## AWS
 
-Please look at the documentation in the [Terraform orchestration section](../terraform/README.md) for examples on how to use Ansible to configure the AWS nodes.
+Please look at the documentation in the 
+[Terraform orchestration section](../terraform/README.md) for examples on how to
+use Ansible to configure the AWS nodes.
 
 ## Hypriot on RPi
 
 In order to configure the Hypriot nodes you need to do the following...
 
+### Starting point
+
+The ansible playbook and the instructions below assume that every node was
+flashed using the Hypriot flash utility (https://github.com/hypriot/flash) using
+the following command:
+
+```
+<PATH_TO_UTILITY>/flash --hostname <HOSTNAME> <PATH_TO_IMAGE>
+```
+
+NOTE: These instructions and the ansible playbook were tested with 
+`Version 0.7.0 Berry (beta)` of the `Hypriot Docker Image for Raspberry Pi` list
+from the Hypriot download page (http://blog.hypriot.com/downloads/).
+Theoretically other versions should also work if you're feeling adventurous.
+
 ### Hosts file
 
-Create a `hosts` file with the following format identifying all leader/follower nodes:
+Create a `hosts` file with the following format identifying all leader/follower
+nodes:
 
 ```
 [buffy-leaders]
-<LEADER_IP_HOSTNAME>
-<LEADER_IP_HOSTNAME>
+<LEADER_HOSTNAME>.local
+<LEADER_HOSTNAME>.local
 
 [buffy-followers]
-<FOLLOWER_IP_HOSTNAME>
-<FOLLOWER_IP_HOSTNAME>
+<FOLLOWER_HOSTNAME>.local
+<FOLLOWER_HOSTNAME>.local
+<FOLLOWER_HOSTNAME>.local
 
 ```
 
+NOTE: Please use the `<HOSTNAME>.local` as mentioned because the ansible
+playbook will change the ip address from being dynamically assigned to being
+statically assigned including renumbering nodes and it will only successfully be
+able to complete installing and configuring ptpd/docker/etc if the dns name is
+used.
+
 ### Copy ssh key to nodes
 
-Use the following to copy a ssh key to every node for passwordless authentication:
+Use the following to copy a ssh key to every node for passwordless
+authentication:
 
-`ssh-copy-id -i <PATH/TO/PUBLIC/KEY> root@<IP_HOSTNAME>`
+`ssh-copy-id -i <PATH/TO/PUBLIC/KEY> root@<HOSTNAME>.local`
 
 ### Test Ansible connection to nodes
 
 Test your Ansible connection to the nodes by running:
 
-`ansible all -i hosts --ssh-extra-args="-o StrictHostKeyChecking=no -i <PATH/TO/PUBLIC/KEY>" -u root -m ping`
+`ansible all -i hosts --ssh-extra-args="-o StrictHostKeyChecking=no -i <PATH/TO/PRIVATE/KEY>" -u root -m ping`
 
-If you're able to successfully connect and Python is installed already you will see:
+NOTE: `<PATH/TO/PRIVATE/KEY>` must be an absolute path or else ansible doesn't
+work properly on OSX.
+
+If you're able to successfully connect and Python is installed already you will
+see:
 
 ```
 <NODE_IP_HOSTNAME> | SUCCESS => {
@@ -60,7 +98,8 @@ If you're able to successfully connect and Python is installed already you will 
 }
 ```
 
-If you're able to successfully connect and Python is not installed already you will see:
+If you're able to successfully connect and Python is not installed already you
+will see:
 
 ```
 <NODE_IP_HOSTNAME> | FAILED! => {
@@ -73,15 +112,21 @@ If you're able to successfully connect and Python is not installed already you w
 }
 ```
 
-Both of these are good/acceptable results because they both confirm that Ansible is able to successfully use passwordless ssh to authenticate with the nodes.
+Both of these are good/acceptable results because they both confirm that Ansible
+is able to successfully use passwordless ssh to authenticate with the nodes.
 
 ### Run Ansible playbook to configure nodes
 
-Now that you're successfully able to connect to the nodes, you can run the Ansible playbook to configure them:
+Now that you're successfully able to connect to the nodes, you can run the
+Ansible playbook to configure them:
 
-`ansible-playbook --ask-vault-pass -i hosts --ssh-extra-args="-o StrictHostKeyChecking=no -i <PATH/TO/PUBLIC/KEY>" -u root playbooks/hypriot.yml`
+`ansible-playbook --ask-vault-pass -i hosts --ssh-extra-args="-o StrictHostKeyChecking=no -i <PATH/TO/PRIVATE/KEY>" -u root playbooks/hypriot.yml`
 
-Assuming no errors you'll see something like the following at the end of the output:
+NOTE: `<PATH/TO/PRIVATE/KEY>` must be an absolute path or else ansible doesn't
+work properly on OSX.
+
+Assuming no errors you'll see something like the following at the end of the
+output:
 
 ```
 PLAY RECAP *********************************************************************

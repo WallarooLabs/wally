@@ -8,6 +8,8 @@ https://docs.google.com/document/d/1qpxeWcWeUzymX6hOSWG_yuTunNd6J2UoyWLzTOQiiz4/
 
 """
 
+
+import json
 from . import state
 from .fix_parse import parse_fix
 
@@ -24,7 +26,6 @@ def func(input):
         return process_order(msg)
     elif msg['MsgType'] in ('fill', 'heartbeat'):
         return None
-
 
 
 def process_nbbo(msg):
@@ -63,21 +64,23 @@ def process_order(msg):
 
 
 def reject_order(msg, reason):
-    return ("New Order: ({client}, {symbol}, {status}, {quantity}): "
-            "{status}: {reason}".format(client=msg['Account'],
-                              symbol=msg['Symbol'],
-                              quantity=msg.get('OrderQty', None),
-                              status='Rejected',
-                              reason=reason))
+    txt = ("New Order: ({client}, {symbol}, {status}, {quantity}): "
+           "{status}: {reason}".format(client=msg['Account'],
+                                       symbol=msg['Symbol'],
+                                       quantity=msg.get('OrderQty', None),
+                                       status='Rejected',
+                                       reason=reason))
+    return json.dumps({'msg': txt, 'feed_time': msg['FeedEpoch']})
 
 
 def accept_order(msg):
     state.get_attribute('orders', {})[msg['OrderId']] = msg
-    return ("New Order: ({client}, {symbol}, {status}, {quantity}): "
-            "{status}".format(client=msg['Account'],
-                              symbol=msg['Symbol'],
-                              quantity=msg.get('OrderQty', None),
-                              status='Accepted'))
+    txt = ("New Order: ({client}, {symbol}, {status}, {quantity}): "
+           "{status}".format(client=msg['Account'],
+                             symbol=msg['Symbol'],
+                             quantity=msg.get('OrderQty', None),
+                             status='Accepted'))
+    return json.dumps({'msg': txt, 'feed_time': msg['FeedEpoch']})
 
 
 # TESTS #
@@ -107,15 +110,16 @@ def test_func():
     input = ('8=FIX.4.2\x019=121\x0135=D\x011=CLIENT35\x0111=s0XCIa\x01'
              '21=3\x0138=4000\x0140=2\x0144=252.85366153511416\x0154=1\x01'
              '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
-             '10=108\x01')
-    expected = ('New Order: (CLIENT35, TSLA, Rejected, 4000.0): Rejected: '
-                'Unknown symbol: TSLA')
+             '10=108\x01999=1234\x01')
+    expected = {'msg': ('New Order: (CLIENT35, TSLA, Rejected, 4000.0): '
+                        'Rejected: Unknown symbol: TSLA'),
+                'feed_time': 1234.0}
     output = func(input)
-    assert(output == expected)
+    assert(json.loads(output) == expected)
 
     input = ('8=FIX.4.2\x019=64\x0135=S\x0155=TSLA\x01'
              '60=20151204-14:30:00.000\x01117=S\x01132=16.40\x01133=16.60'
-             '\x0110=098\x01')
+             '\x0110=098\x01999=1234\x01')
     func(input)
 
     symbol = state.get_attribute('market', {}).get('TSLA')
@@ -123,7 +127,8 @@ def test_func():
     input = ('8=FIX.4.2\x019=121\x0135=D\x011=CLIENT35\x0111=s0XCIa\x01'
              '21=3\x0138=4000\x0140=2\x0144=252.85366153511416\x0154=1\x01'
              '55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01'
-             '10=108\x01')
-    expected = 'New Order: (CLIENT35, TSLA, Accepted, 4000.0): Accepted'
+             '10=108\x01999=1234\x01')
+    expected = {'msg': ('New Order: (CLIENT35, TSLA, Accepted, 4000.0): '
+                        'Accepted'), 'feed_time': 1234}
     output = func(input)
-    assert(output == expected)
+    assert(json.loads(output) == expected)
