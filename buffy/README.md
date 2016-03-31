@@ -89,3 +89,32 @@ This requires two things:
 
 `choice` is then used, modulo the length of the outputs list, to select an output target.
 e.g. if `func(input)` returns `(10, 'hello world')`, and we have the output list `outputs = [out1, out2, out3]`, then `out2` will be used (`10 % 3 == 1`, and `outputs[1] == out2`).
+
+## Metrics Reports
+The monitoring hub expects the following pipeline keys:
+- MARKET_SPREAD (metrics for total pipeline values)
+- NODE_1 (metrics for MQ)
+- NODE_2 (metrics for marketspread worker)
+
+It also expects to receive a message for each of these once per second.
+
+`metrics_receiver.py`, on the other hand, processes whatever it receives and sends it to the monitoring hub uri given to it in the `--uri` parameter. This means that in order for metrics to be sent to the monitoring hub once per second, they need to be emitted once per second _by the metrics collectors_, or the MQ, the worker, and the sink, in this case.
+To do this, they need to be started with the following parameters:
+
+```sh
+SINK_ADDRESS = 127.0.0.1:5000
+METRICS_ADDRESS = 127.0.0.1:5001
+MQ_ADDRESS = 127.0.0.1:10000
+STATS_PERIOD = 1
+FUNCTION = marketspread
+URI = http://127.0.0.1:5555/post
+NBBO = ../demos/marketspread/nbbo.msg
+TRADES = ../demos/marketspread/trades.msg
+DELAY = 0.001
+
+python3 metrics_receiver.py --address $METRICS_ADDRESS --uri $URI
+python3 sink.py --address $SINK_ADDRESS --metrics-address $METRICS_ADDRESS --stats-period $STATS_PERIOD --vuid MARKET_SPREAD
+python3 MQ.py --address $MQ_ADDRESS --metrics-address $METRICS_ADDRESS --stats-period $STATS_PERIOD --vuid NODE_1
+python3 worker.py --input-address $MQ_ADDRESS --output-address $SINK_ADDRESS --output-type socket --metrics-address $METRICS_ADDRESS --stats-period $STATS_PERIOD --function $FUNCTION --vuid NODE_2
+python3 feeder.py --address $MQ_ADDRESS --path $NBBO --path $TRADES --delay $DELAY
+```
