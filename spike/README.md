@@ -2,8 +2,6 @@
 
 Destructive testing for Buffy. 
 
-Ver 0.0.2-sendence
-
 ## Types of Destruction
 
 Each spike node can be configured to use one of the following action types. 
