@@ -85,6 +85,8 @@ there is an error running any commands after acquiring the lock.
 
 The following examples are to illustrate the features available and common use cases:
 
+* Detailed options/targets/help:
+  `make help`
 * Plan a new cluster with name `sample`:
   `make plan cluster_name=sample`
 * Create a new cluster with name `sample`:
@@ -98,4 +100,10 @@ The following examples are to illustrate the features available and common use c
   `make plan cluster_name=sample terraform_args="--version"`
 * Destroy a cluster with name `sample`:
   `make destroy cluster_name=sample`
+* Create a cluster using spot pricing and m3.medium instances:
+  `make apply terraform_args="-var leader_spot_price=0.02 -var follower_spot_price=0.02 -var leader_instance_type=m3.medium -var follower_instance_type=m3.medium"`
+* Create a cluster using placement group and m4.large instances:
+  `make apply use_placement_group=true terraform_args="-var leader_instance_type=m4.large -var follower_instance_type=m4.large"`
+* Create a cluster using placement group and m4.xlarge instances and spot pricing:
+  `make apply use_placement_group=true terraform_args="-var leader_spot_price=0.05 -var follower_spot_price=0.05 -var leader_instance_type=m4.large -var follower_instance_type=m4.large"`
 

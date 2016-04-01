@@ -33,6 +33,11 @@ variable "project_tag" {
   default = "buffy"
 }
 
+variable "placement_group" {
+  description = "Whther to use Placement Groups for cluster or not."
+  default = ""
+}
+
 variable "instance_ami" {
   description = "AMI for all instances."
   default = "ami-002f0f6a"
@@ -63,6 +68,11 @@ variable "leader_user_data" {
   default = "leader_user_data.sh"
 }
 
+variable "leader_spot_price" {
+  description = "Spot price to bid for the leader nodes."
+  default = ""
+}
+
 variable "follower_instance_type" {
   description = "Instance type for the follower nodes."
   default = "t2.nano"
@@ -86,5 +96,10 @@ variable "follower_default_nodes" {
 variable "follower_user_data" {
   description = "user_data file for follower nodes."
   default = "follower_user_data.sh"
+}
+
+variable "follower_spot_price" {
+  description = "Spot price to bid for the follower nodes."
+  default = ""
 }
 

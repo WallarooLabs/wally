@@ -19,15 +19,15 @@ provider "aws" {
 }
 
 # placement groups don't work with t2.nano which is our default instance type
-#resource "aws_placement_group" "default" {
-#  name = "${var.project_tag}-default"
-#  strategy = "cluster"
-#
-#  lifecycle {
-#    create_before_destroy = true
-#  }
-#
-#}
+resource "aws_placement_group" "default" {
+  name = "buffy-${var.cluster_name}"
+  strategy = "cluster"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+}
 
 resource "aws_autoscaling_group" "leaders" {
   vpc_zone_identifier = [ "${terraform_remote_state.vpc.output.SUBNET_ID}" ]
@@ -38,7 +38,9 @@ resource "aws_autoscaling_group" "leaders" {
   launch_configuration = "${aws_launch_configuration.leader_launch_config.name}"
 
 # placement groups don't work with t2.nano which is our default instance type
-#  placement_group = "${aws_placement_group.default.id}"
+  placement_group = "${var.placement_group}"
+
+  depends_on = [ "aws_placement_group.default" ]
 
   tag {
     key = "Name"
@@ -79,7 +81,9 @@ resource "aws_autoscaling_group" "followers" {
   launch_configuration = "${aws_launch_configuration.follower_launch_config.name}"
 
 # placement groups don't work with t2.nano which is our default instance type
-#  placement_group = "${aws_placement_group.default.id}"
+  placement_group = "${var.placement_group}"
+
+  depends_on = [ "aws_placement_group.default" ]
 
   tag {
     key = "Name"
@@ -116,6 +120,7 @@ resource "aws_launch_configuration" "follower_launch_config" {
   name_prefix = "follower-launch-config-"
   image_id = "${var.instance_ami}"
   instance_type = "${var.follower_instance_type}"
+  spot_price = "${var.follower_spot_price}"
   iam_instance_profile = "${var.aws_iam_role}"
   enable_monitoring = "${var.aws_detailed_monitoring}"
   key_name = "${var.aws_key_name}"
@@ -132,6 +137,7 @@ resource "aws_launch_configuration" "leader_launch_config" {
   name_prefix = "leader-launch-config-"
   image_id = "${var.instance_ami}"
   instance_type = "${var.leader_instance_type}"
+  spot_price = "${var.leader_spot_price}"
   iam_instance_profile = "${var.aws_iam_role}"
   enable_monitoring = "${var.aws_detailed_monitoring}"
   key_name = "${var.aws_key_name}"

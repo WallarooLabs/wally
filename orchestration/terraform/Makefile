@@ -2,6 +2,61 @@ current_dir = $(shell pwd)
 cluster_name ?= example## Cluster name to manage.
 cluster_pem ?= ~/.ssh/ec2/us-east-1.pem## PEM file to use for ssh keys for cluster.
 terraform_args ?= ## Terraform arguments.
+use_placement_group ?= false## Whether to use placement group or not
+
+ifdef use_placement_group
+  ifeq (,$(filter $(use_placement_group),false true))
+    $(error Unknown use_placement_group option "$(use_placement_group)")
+  endif
+endif
+
+ifeq ($(use_placement_group),true)
+  valid_instances = $(shell curl -s http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html | grep -o '<\(code\).*</\1>' | egrep -o '\w{2,3}\.\w{5,}' | grep -v amazon)
+  ifeq (,$(findstring follower_instance_type,$(terraform_args)))
+    $(error Must override follower_instance_type with terraform_args when using placement groups!)
+  else
+    follower_instance_type = $(shell echo $(terraform_args) | sed -E 's/.*follower_instance_type=([a-zA-Z0-9.]+).*/\1/')
+    ifeq (,$(findstring  $(follower_instance_type) , $(valid_instances) ))
+      $(error follower_instance_type ($(follower_instance_type)) must be one of the following! $(valid_instances))
+    endif
+  endif
+  ifeq (,$(findstring leader_instance_type,$(terraform_args)))
+    $(error Must override leader_instance_type with terraform_args when using placement groups!)
+  else
+    leader_instance_type = $(shell echo $(terraform_args) | sed -E 's/.*leader_instance_type=([a-zA-Z0-9.]+).*/\1/')
+    ifeq (,$(findstring  $(leader_instance_type) , $(valid_instances) ))
+      $(error leader_instance_type ($(leader_instance_type)) must be one of the following! $(valid_instances))
+    endif
+  endif
+  pg_arg = -var placement_group=buffy-$(cluster_name)
+endif
+
+ifneq (,$(findstring leader_spot_price,$(terraform_args)))
+  ifeq (,$(findstring leader_instance_type,$(terraform_args)))
+    $(error Must override leader_instance_type with terraform_args when using Spot Pricing!)
+  else
+    ifneq (,$(findstring leader_instance_type=t2.,$(terraform_args)))
+      $(error leader_instance_type cannot be T2.* when using Spot Pricing!)
+    endif
+    ifneq (,$(findstring leader_instance_type=hs1.,$(terraform_args)))
+      $(error leader_instance_type cannot be HS1.* when using Spot Pricing!)
+    endif
+  endif
+endif
+
+ifneq (,$(findstring follower_spot_price,$(terraform_args)))
+  ifeq (,$(findstring follower_instance_type,$(terraform_args)))
+    $(error Must override follower_instance_type with terraform_args when using Spot Pricing!)
+  else
+    ifneq (,$(findstring follower_instance_type=t2.,$(terraform_args)))
+      $(error follower_instance_type cannot be T2.* when using Spot Pricing!)
+    endif
+    ifneq (,$(findstring follower_instance_type=hs1.,$(terraform_args)))
+      $(error follower_instance_type cannot be HS1.* when using Spot Pricing!)
+    endif
+  endif
+endif
+
 
 cluster_full_pem = $(shell echo $(cluster_pem))
 
@@ -11,17 +66,17 @@ default: plan
 
 terraform-plan: # actual terraform plan command
 	@echo "\033[32m==> Running terraform plan...\033[0m"
-	cd cluster && terraform plan $(terraform_args) -var cluster_name=$(cluster_name) -var 
+	cd cluster && terraform plan $(terraform_args) -var cluster_name=$(cluster_name) $(pg_arg)
 	@echo "\033[32m==> Successfully ran terraform plan!\033[0m"
 
 terraform-apply: # actual terraform apply command
 	@echo "\033[32m==> Running terraform apply...\033[0m"
-	cd cluster && terraform apply $(terraform_args) -var cluster_name=$(cluster_name)
+	cd cluster && terraform apply $(terraform_args) -var cluster_name=$(cluster_name) $(pg_arg)
 	@echo "\033[32m==> Successfully ran terraform apply!\033[0m"
 
 terraform-destroy: # actual terraform destroy command
 	@echo "\033[32m==> Running terraform destroy...\033[0m"
-	cd cluster && terraform destroy -force $(terraform_args) -var cluster_name=$(cluster_name)
+	cd cluster && terraform destroy -force $(terraform_args) -var cluster_name=$(cluster_name) $(pg_arg)
 	@echo "\033[32m==> Successfully ran terraform destroy!\033[0m"
 
 plan: acquire-lock init-terraform terraform-plan release-lock ## Run terraform plan step
@@ -86,6 +141,12 @@ help: ## Self-documenting help command
 	@grep -E 'filter.*in_docker.*\)$$' $(MAKEFILE_LIST) | awk \
           'BEGIN {FS = "[(),]"}; {printf "\033[36m%-30s\033[0m %s\n", \
           "  Valid values for " $$5 ":", $$7}'
+	@echo ''
+	@echo 'Terraform Variables:'
+	@grep -o '"[^"]*"' $(current_dir)/cluster/variables.tf | tr '\n' ' ' | grep -o \
+          '"[^"]*" "[^"]*" "[^"]*"' | grep -v cluster_name | grep -v placement_group | awk -F\" \
+          '{printf "\033[36m%-30s\033[0m %s \033[36m(Default: %s)\033[0m\n", $$2, $$4, $$6}'
+	@echo 'Use by adding "-var <VAR1_NAME>=<VALUE1> -var <VAR2_NAME>=<VALUE2>" to terraform_args.'
 	@echo ''
 	@echo 'Targets:'
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk \
