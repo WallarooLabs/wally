@@ -3,7 +3,7 @@ resource "terraform_remote_state" "vpc" {
   backend = "s3"
   "config" {
     "bucket" = "sendence-dev"
-    "key" = "terraform-state/vpc/terraform.tfstate"
+    "key" = "terraform-state/vpc/${var.aws_region}-terraform.tfstate"
     "region" = "us-east-1"
   }
 
@@ -30,7 +30,7 @@ resource "aws_placement_group" "default" {
 }
 
 resource "aws_autoscaling_group" "leaders" {
-  vpc_zone_identifier = [ "${terraform_remote_state.vpc.output.SUBNET_ID}" ]
+  vpc_zone_identifier = [ "${coalesce(var.aws_subnet_id, terraform_remote_state.vpc.output.SUBNET_1_ID)}" ]
   max_size = "${var.leader_max_nodes}"
   min_size = "${var.leader_min_nodes}"
   desired_capacity = "${var.leader_default_nodes}"
@@ -73,7 +73,7 @@ resource "aws_autoscaling_group" "leaders" {
 }
 
 resource "aws_autoscaling_group" "followers" {
-  vpc_zone_identifier = [ "${terraform_remote_state.vpc.output.SUBNET_ID}" ]
+  vpc_zone_identifier = [ "${coalesce(var.aws_subnet_id, terraform_remote_state.vpc.output.SUBNET_1_ID)}" ]
   max_size = "${var.follower_max_nodes}"
   min_size = "${var.follower_min_nodes}"
   desired_capacity = "${var.follower_default_nodes}"
@@ -118,7 +118,7 @@ resource "aws_autoscaling_group" "followers" {
 
 resource "aws_launch_configuration" "follower_launch_config" {
   name_prefix = "follower-launch-config-"
-  image_id = "${var.instance_ami}"
+  image_id = "${lookup(var.instance_amis, var.aws_region)}"
   instance_type = "${var.follower_instance_type}"
   spot_price = "${var.follower_spot_price}"
   iam_instance_profile = "${var.aws_iam_role}"
@@ -135,7 +135,7 @@ resource "aws_launch_configuration" "follower_launch_config" {
 
 resource "aws_launch_configuration" "leader_launch_config" {
   name_prefix = "leader-launch-config-"
-  image_id = "${var.instance_ami}"
+  image_id = "${lookup(var.instance_amis, var.aws_region)}"
   instance_type = "${var.leader_instance_type}"
   spot_price = "${var.leader_spot_price}"
   iam_instance_profile = "${var.aws_iam_role}"

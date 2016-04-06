@@ -18,6 +18,11 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
+variable "aws_subnet_id" {
+  description = "AWS subnet_id to launch servers."
+  default = ""
+}
+
 variable "aws_profile" {
   description = "AWS profile to use."
   default = "default"
@@ -36,11 +41,6 @@ variable "project_tag" {
 variable "placement_group" {
   description = "Whther to use Placement Groups for cluster or not."
   default = ""
-}
-
-variable "instance_ami" {
-  description = "AMI for all instances."
-  default = "ami-002f0f6a"
 }
 
 variable "leader_instance_type" {
@@ -101,5 +101,21 @@ variable "follower_user_data" {
 variable "follower_spot_price" {
   description = "Spot price to bid for the follower nodes."
   default = ""
+}
+
+variable "instance_amis" {
+  description = "AMI for all instances."
+  default = {
+    sa-east-1 = "ami-a9e262c5"
+    us-west-1 = "ami-833c4be3"
+    us-west-2 = "ami-242fcb44"
+    us-east-1 = "ami-002f0f6a"
+    eu-west-1 = "ami-86f743f5"
+    ap-southeast-1 = "ami-8f804fec"
+    ap-southeast-2 = "ami-22715541"
+    eu-central-1 = "ami-60869f0c"
+    ap-northeast-1 = "ami-e16c558f"
+    ap-northeast-2 = "ami-232be54d"
+  }
 }
 

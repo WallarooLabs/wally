@@ -9,11 +9,11 @@ The two modules are `vpc` and `cluster`.
 
 ### VPC
 
-The VPC module handles creating the VPC along with the subnet, security group, etc.
-The state for this is stored in a shared S3 bucket.
+The VPC module handles creating the VPC along with the subnet, security group,
+etc. The state for this is stored in a shared S3 bucket.
 
-NOTE: This does *not* guarantee safety for multiple developers to work concurrently
-(see: https://www.terraform.io/docs/state/remote/).
+NOTE: This does *not* guarantee safety for multiple developers to work
+concurrently (see: https://www.terraform.io/docs/state/remote/).
 
 ### Cluster
 
@@ -21,9 +21,9 @@ The cluster module handles creating the actual cluster of nodes and the related
 AutoScalingGroups, LaunchConfigurations, etc. The state for this is store in a
 shared S3 bucket. 
 
-NOTE: This does *not* guarantee safety for multiple developers to work concurrently
-(see: https://www.terraform.io/docs/state/remote/). See section for `Makefile` for
-a safe multi-developer workflow.
+NOTE: This does *not* guarantee safety for multiple developers to work
+concurrently (see: https://www.terraform.io/docs/state/remote/). See section for
+`Makefile` for a safe multi-developer workflow.
 
 The cluster module depends on the `vpc` module and will fail if the `vpc` module
 hasn't been created yet.
@@ -83,7 +83,8 @@ there is an error running any commands after acquiring the lock.
 
 ### Examples
 
-The following examples are to illustrate the features available and common use cases:
+The following examples are to illustrate the features available and common use
+cases:
 
 * Detailed options/targets/help:
   `make help`
@@ -106,4 +107,12 @@ The following examples are to illustrate the features available and common use c
   `make apply use_placement_group=true terraform_args="-var leader_instance_type=m4.large -var follower_instance_type=m4.large"`
 * Create a cluster using placement group and m4.xlarge instances and spot pricing:
   `make apply use_placement_group=true terraform_args="-var leader_spot_price=0.05 -var follower_spot_price=0.05 -var leader_instance_type=m4.large -var follower_instance_type=m4.large"`
+* Create and configure (with ansible) a cluster with name `sample`:
+  `make cluster cluster_name=sample`
+* Create and configure (with ansible) a cluster with name `sample` in region
+  `us-east-1`:
+  `make cluster cluster_name=sample region=us-east-1`
+* Create and configure (with ansible) a cluster with name `sample` in region
+  `us-east-1` and availabiilty zone `us-east-1a`:
+  `make cluster cluster_name=sample region=us-east-1 availability_zone=us-east-1a`
 

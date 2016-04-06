@@ -31,13 +31,50 @@ resource "aws_route" "internet_access" {
 }
 
 # Create a subnet to launch our instances into
-resource "aws_subnet" "default" {
+resource "aws_subnet" "default-1" {
+  availability_zone       = "${var.aws_availability_zone_1}"
   vpc_id                  = "${aws_vpc.default.id}"
-  cidr_block              = "10.0.1.0/24"
+  cidr_block              = "10.0.0.0/19"
   map_public_ip_on_launch = true
   tags {
     Project = "${var.project_tag}"
-    Name = "${var.project_tag}-subnet"
+    Name = "${var.project_tag}-subnet-1"
+  }
+}
+
+# Create a subnet to launch our instances into
+resource "aws_subnet" "default-2" {
+  availability_zone       = "${var.aws_availability_zone_2}"
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.32.0/19"
+  map_public_ip_on_launch = true
+  tags {
+    Project = "${var.project_tag}"
+    Name = "${var.project_tag}-subnet-2"
+  }
+}
+
+# Create a subnet to launch our instances into
+resource "aws_subnet" "default-3" {
+  availability_zone       = "${var.aws_availability_zone_3}"
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.64.0/19"
+  map_public_ip_on_launch = true
+  tags {
+    Project = "${var.project_tag}"
+    Name = "${var.project_tag}-subnet-3"
+  }
+}
+
+# Create a subnet to launch our instances into
+resource "aws_subnet" "default-4" {
+  availability_zone       = "${var.aws_availability_zone_4}"
+  vpc_id                  = "${aws_vpc.default.id}"
+  cidr_block              = "10.0.96.0/19"
+  map_public_ip_on_launch = true
+  tags {
+    Project = "${var.project_tag}"
+    Name = "${var.project_tag}-subnet-4"
   }
 }
 
