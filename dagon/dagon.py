@@ -64,7 +64,7 @@ def find_unused_port():
 
 def populate_node_options(parser, topology, lookup):
     for section in parser.sections():
-        if section == 'edges': continue
+        if (section == 'edges') or (section == 'test_config'): continue
         node_id = lookup[section]
         topology.update_node(node_id, 'name', section)
         options = parser.options(section)
@@ -259,58 +259,6 @@ def start_nodes(topo, seed, docker, docker_tag, docker_host_arg):
 
     return processes
 
-def calculate_test_results(test, expect_mismatch, display_metrics):
-    success_predicate = load_func('./config/' + test + '.py')
-    # If we expect a mismatch, then the starting value for passes is
-    # false. On discovering a mismatch this value is toggled.
-    passes = True if not expect_mismatch else False
-    sent = []
-    rcvd = []
-
-    with open("sent.txt") as sent_file, open("received.txt") as rcvd_file:
-        sent = gilesParser.records_for(sent_file)
-        rcvd = gilesParser.records_for(rcvd_file)
-        s_len = len(sent)
-        r_len = len(rcvd)
-
-        for i in range(min(s_len, r_len)):
-            s = sent[i]['payload']
-            r = rcvd[i]['payload']
-            try:
-                line_passes = success_predicate(s, r) if (s != '') else (r == '')
-            except:
-                print("\nTest predicate error. Payload might have been garbled. Check your test function.")
-                passes = not passes
-                break
-            if not line_passes:
-                print_mismatch(s, r)
-                passes = not passes
-                break
-
-        if passes != expect_mismatch:
-            if r_len > s_len:
-                s = ''
-                r = rcvd[s_len]['payload']
-                print_mismatch(s, r)
-                passes = not passes
-            elif s_len > r_len:
-                s = sent[r_len]['payload']
-                r = ''
-                print_mismatch(s, r)
-                passes = not passes
-
-    test_result = 'PASSED' if passes else 'FAILED'
-    if expect_mismatch:
-        found = 'at least one' if passes else 'none'
-        print('\ndagon: Expected mismatch. Found ' + found + '.')
-    else:
-        found = 'none' if passes else 'at least one'
-        print('\ndagon: Expected no mismatches. Found ' + found + '.')
-
-    print('dagon: Test has ' + test_result)
-    if display_metrics and passes and not expect_mismatch:
-        metrics.print_metrics(sent, rcvd)
-
 class Topology:
     def __init__(self, name, node_count):
         self.name = name
@@ -432,7 +380,7 @@ def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
     parser.read(config_filename)
 
     # Set up topology
-    node_names = list(filter(lambda n: n != 'edges', parser.sections()))
+    node_names = list(filter(lambda n: (n != 'edges') and (n != 'test_config'), parser.sections()))
     topology = Topology(topology_name, len(node_names))
 
     node_lookup = populate_node_lookup(node_names)
@@ -514,10 +462,6 @@ def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
     if docker:
         run_docker_command(['docker', docker_host_arg, 'network', 'rm',
             DOCKER_NETWORK], False, False)
-
-    ## CALCULATE TEST RESULTS
-    calculate_test_results(test, mismatch, metrics)
-
 
     ## CLEAN UP
     DEVNULL.close()

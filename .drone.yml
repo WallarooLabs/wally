@@ -20,6 +20,8 @@ build:
     commands:
       - make test
       - cd dagon && ./dagon.py --test double dagon
+      - cd ..
+      -  ./wesley/double/double ./dagon/sent.txt ./dagon/received.txt ./dagon/config/dagon.ini
     when:
       matrix:
         PONYC_VERSION: amd64

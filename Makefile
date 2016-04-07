@@ -82,7 +82,7 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-spike build-receiver build-sender ## Build Pony based programs for Buffy
+build: build-spike build-receiver build-sender build-wesley ## Build Pony based programs for Buffy
 
 build-spike: ## Build spike
 	$(call PONYC,spike)
@@ -92,6 +92,10 @@ build-receiver: ## Build giles receiver
 
 build-sender: ## Build giles sender
 	$(call PONYC,giles/sender)
+
+build-wesley: ## wesley
+	$(call PONYC,wesley/double)
+	$(call PONYC,wesley/identity)
 
 test: lint-test test-buffy test-giles-receiver test-giles-sender ## Test programs for Buffy
 
@@ -148,6 +152,8 @@ clean: ## Cleanup docker images and compiled files for Buffy
 	rm -f spike/spike spike/spike.o
 	rm -f giles/receiver/receiver giles/receiver/receiver.o
 	rm -f giles/sender/sender giles/sender/sender.o
+	rm -f wesley/identity/identity wesley/identity/identity.o
+	rm -f wesley/double/double wesley/double/double.o
 ifneq ($(strip $(tag)),)
 	@echo "Removing tag $(tag) image"
 	docker rmi $(tag)
