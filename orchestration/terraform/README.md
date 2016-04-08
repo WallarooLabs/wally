@@ -88,10 +88,55 @@ or Sean or Markus.
 NOTE: The `Makefile` does *not* currently ensure that the lock is released if
 there is an error running any commands after acquiring the lock.
 
+### Automagic Cheapest Instance logic
+
+The `Makefile` uses a python script to automagically figure out the
+cheapest instance available that will meet the requirements. The way it
+works is the python script outputs a `Makefile` fragment which is then
+`eval`'d by make.
+
+This automagic cheapest instance logic can be controlled via the following
+`make` option:
+
+* `use_cheapest_instances`  Find cheapest instances to use (spot included);
+  Will automagically use placement groups if applicable (Default: true)
+
+The inputs into this script are the following `make` options:
+
+* `region` Region to launch cluster in. (Default: us-east-1)
+* `availability_zone` Availability Zone to launch cluster in. (Default: )
+* `mem_required` Minimum amount of memory in GB per instance (Default: 0.5)
+* `cpus_required` Minimum amount of CPUs per instance (Default: 0.05)
+
+The script uses the following logic to find cheapest prices:
+
+* Look up on-demand instances (current and previoud generation) for the region
+* Filter on-demand instance list based on `mem_required` and `cpus_required`
+  to identify valid instances
+* Look up current spot prices for all the valid instances. If no
+  `availability_zone` specifid, look across all availability zones. Otherwise,
+  only look in specified availability zone.
+* Look through current spot prices to determine cheapest one.
+* Look through valid instances on-demand prices to see if there's an
+  on-demend instance that is cheaper than spot pricing.
+* If the cheapest instance is allowed to be in a placement group, prepare
+  the placement group related output.
+* If the cheapest instance is an on-demand instance, output the appropriate
+  `*_instance_type` variables for terraform along with the placement group
+  output if needed.
+* If the cheapest instance is a spot instance, output the appropriate
+  `*_instance_type` and `*_spot_price` variables for terraform along with
+  the placement group output if needed. Also output the `availability_zone`
+  for the spot instance (this will be the same as what the user requested
+  or the one for the best spot pricing based on the logic described above).
+
 ### Examples
 
 The following examples are to illustrate the features available and common use
-cases:
+cases (unless `use_cheapest_instances=false` is used, it will automagically
+figure out the cheapest instance available for use based on `mem_required`
+[defaults to 0.5 GB] and `cpus_required` [defaults to 0.05 for t2.nano level
+of CPU] values):
 
 * Detailed options/targets/help:
   `make help`
@@ -108,12 +153,15 @@ cases:
   `make plan cluster_name=sample terraform_args="--version"`
 * Destroy a cluster with name `sample`:
   `make destroy cluster_name=sample`
-* Create a cluster using spot pricing and m3.medium instances:
-  `make apply terraform_args="-var leader_spot_price=0.02 -var follower_spot_price=0.02 -var leader_instance_type=m3.medium -var follower_instance_type=m3.medium"`
-* Create a cluster using placement group and m4.large instances:
-  `make apply use_placement_group=true terraform_args="-var leader_instance_type=m4.large -var follower_instance_type=m4.large"`
-* Create a cluster using placement group and m4.xlarge instances and spot pricing:
-  `make apply use_placement_group=true terraform_args="-var leader_spot_price=0.05 -var follower_spot_price=0.05 -var leader_instance_type=m4.large -var follower_instance_type=m4.large"`
+* Create a cluster using spot pricing and m3.medium instances (and not using 
+  automagic cheapest instance logic):
+  `make apply use_cheapest_instances=false terraform_args="-var leader_spot_price=0.02 -var follower_spot_price=0.02 -var leader_instance_type=m3.medium -var follower_instance_type=m3.medium"`
+* Create a cluster using placement group and m4.large instances (and not
+  using automagic cheapest instance logic):
+  `make apply use_cheapest_instances=false use_placement_group=true terraform_args="-var leader_instance_type=m4.large -var follower_instance_type=m4.large"`
+* Create a cluster using placement group and m4.xlarge instances and spot pricing
+  (and not using automagic cheapest instance logic):
+  `make apply use_cheapest_instances=false use_placement_group=true terraform_args="-var leader_spot_price=0.05 -var follower_spot_price=0.05 -var leader_instance_type=m4.large -var follower_instance_type=m4.large"`
 * Create and configure (with ansible) a cluster with name `sample`:
   `make cluster cluster_name=sample`
 * Create and configure (with ansible) a cluster with name `sample` in region
@@ -122,4 +170,7 @@ cases:
 * Create and configure (with ansible) a cluster with name `sample` in region
   `us-east-1` and availabiilty zone `us-east-1a`:
   `make cluster cluster_name=sample region=us-east-1 availability_zone=us-east-1a`
+* Create and configure (with ansible) a cluster with name `example` where
+  the instances have at least 8 cpus and 16 GB of RAM:
+  `make cluster mem_required=16 cpus_required=8`
 
