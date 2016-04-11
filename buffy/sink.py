@@ -94,7 +94,7 @@ class UDPMessageQueue(asyncio.DatagramProtocol):
         try:
             process_msg(data)
         except:
-            LOGGER.exception('Error encountered during msg processing')
+            LOGGER.exception('Error encountered when processing:\n%s', data)
 
     def connection_lost(self, exc):
         self.transport = None

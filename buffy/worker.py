@@ -30,6 +30,7 @@ import math
 import socket
 import time
 from threading import Timer
+from types import GeneratorType
 
 import functions.fs as fs
 from functions import get_function
@@ -112,6 +113,15 @@ def udp_dump(msg, host=None, port=None):
     LOGGER.debug("Sent datagram to ({}, {})".format(host, port))
 
 
+def handle_output(output, outputs, input_type):
+    if isinstance(output, tuple):
+        choice, output = output
+    else:
+        choice = 0
+    (outputs[input_type][hash(choice) % len(outputs[input_type])]
+     (output))
+
+
 def run_engine(choose_input, inputs, funcs, outputs, delay):
     # Start the main loop
     while True:
@@ -125,12 +135,11 @@ def run_engine(choose_input, inputs, funcs, outputs, delay):
         state.add(int(time.time()), 1, THROUGHPUT_IN)
         output = funcs[input_type](input)
         if output:
-            if isinstance(output, tuple):
-                choice, output = output
+            if isinstance(output, GeneratorType):
+                for msg in output:
+                    handle_output(msg, outputs, input_type)
             else:
-                choice = 0
-            (outputs[input_type][hash(choice) % len(outputs[input_type])]
-             (output))
+                handle_output(output, outputs, input_type)
         dt = time.time()-t0
         # Measure throughput
         state.add(int(time.time()), 1, THROUGHPUT_OUT)
