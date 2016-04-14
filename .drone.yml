@@ -36,9 +36,16 @@ build:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
-      - make clean-docker arch=$$PONYC_VERSION docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-      - make build-docker arch=$$PONYC_VERSION docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-      - make dagon-docker-test arch=$$PONYC_VERSION docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG docker_no_pull=true
+      - >
+        make clean-docker arch=$$PONYC_VERSION
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+      - >
+        make build-docker arch=$$PONYC_VERSION
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+      - >
+        make dagon-docker-test arch=$$PONYC_VERSION
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+        docker_no_pull=true
     privileged: true
     when:
       matrix:
@@ -64,10 +71,17 @@ build:
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/root/.docker/config.json
     commands:
-      - make push-docker arch=$$PONYC_VERSION docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG
-      - make arch=$$PONYC_VERSION docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG clean-docker
-      - make arch=$$PONYC_VERSION docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
+      - >
+        make push-docker arch=$$PONYC_VERSION
+        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG
+      - >
+        make arch=$$PONYC_VERSION
+        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG clean-docker
+      - >
+        make arch=$$PONYC_VERSION
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
     privileged: true
     when:
       event: push
@@ -78,10 +92,17 @@ build:
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/root/.docker/config.json
     commands:
-      - make push-docker arch=$$PONYC_VERSION docker_image_version=$$TAG-$$PONYC_CONFIG
-      - make arch=$$PONYC_VERSION docker_image_version=$$TAG-$$PONYC_CONFIG clean-docker
-      - make arch=$$PONYC_VERSION docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
+      - >
+        make push-docker arch=$$PONYC_VERSION
+        docker_image_version=$$TAG-$$PONYC_CONFIG
+      - >
+        make arch=$$PONYC_VERSION docker_image_version=$$TAG-$$PONYC_CONFIG
+        clean-docker
+      - >
+        make arch=$$PONYC_VERSION
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
     privileged: true
     when:
       event: tag
@@ -93,9 +114,11 @@ notify:
     channel: b-drone-ci
     username: drone-ci
     template: >
-      build `#{{ build.number }}` for {{repo.clone_url}} for commit `{{build.commit}}` 
-      in branch `{{build.branch}}` by `@{{build.author}}` with a message ```{{build.message}}``` 
-      finished with a `{{ build.status }}` status in {{ duration build.started_at build.finished_at }}
+      build `#{{ build.number }}` for {{repo.clone_url}} for commit
+      `{{build.commit}}` in branch `{{build.branch}}` by `@{{build.author}}`
+      with a message ```{{{build.message}}}``` finished with a
+      `{{ build.status }}` status in
+      {{ duration build.started_at build.finished_at }}
 
 # matrix of configurations to test
 matrix:
