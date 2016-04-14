@@ -1,258 +1,92 @@
 debug: true
 
+# only build for master and tags
 branches:
   - master
   - refs/tags/*
 
+# clone source code with tags
 clone:
   tags: true
 
+# main build steps
 build:
+  # main build of buffy
   main_build:
-    image: sendence/ponyc:sendence-2.1.0-$$PONYC_CONFIG-$$PONYC_VERSION
+    image: sendence/ponyc:sendence-2.2.0-$$PONYC_CONFIG-$$PONYC_VERSION
+    pull: true
     commands:
+      - make clean arch=$$PONYC_VERSION in_docker=true
       - make arch=$$PONYC_VERSION in_docker=true
-  dagon_test_amd64:
-    image: sendence/python-runner:0.0.1
+
+  # run tests
+  main_test:
+    image: sendence/$$PONYC_VERSION-python-runner:0.0.1
+    pull: true
     environment:
       - LC_ALL=C.UTF-8
       - LANG=C.UTF-8
     commands:
       - make test
-      - cd dagon && ./dagon.py --test double dagon
-      - cd ..
-      -  ./wesley/double/double ./dagon/sent.txt ./dagon/received.txt ./dagon/config/dagon.ini
+
+  # build docker images and test dagon (amd64)
+  build_docker_images_dagon_test_amd64:
+    image: sendence/docker-runner:0.0.1
+    pull: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - make clean-docker arch=$$PONYC_VERSION docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+      - make build-docker arch=$$PONYC_VERSION docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+      - make dagon-docker-test arch=$$PONYC_VERSION docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG docker_no_pull=true
+    privileged: true
     when:
       matrix:
         PONYC_VERSION: amd64
-  dagon_test_armhf:
-    image: sendence/arm-python-runner:0.0.1
+
+  # run dagon tests (armhf)
+  run_dagon_test_armhf:
+    image: sendence/$$PONYC_VERSION-python-runner:0.0.1
+    pull: true
     environment:
       - LC_ALL=C.UTF-8
       - LANG=C.UTF-8
     commands:
-      - make test
-      - cd dagon && chrt -f 80 ./dagon.py --test double dagon
+      - chrt -f 80 make dagon-test arch=$$PONYC_VERSION
     privileged: true
     when:
       matrix:
         PONYC_VERSION: armhf
 
-publish:
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/spike.$$PONYC_VERSION
-    insecure: true
-    file: spike/Dockerfile
-    context: spike/
-    storage_driver: overlay
-    tag:
-      - $$BRANCH-$$COMMIT-$$PONYC_CONFIG
+  # build and push final docker images on a push event
+  build_docker_images_push:
+    image: sendence/docker-runner:0.0.1
+    pull: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - make push-docker arch=$$PONYC_VERSION docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG
+      - make arch=$$PONYC_VERSION docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG clean-docker
+      - make arch=$$PONYC_VERSION docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
+    privileged: true
     when:
       event: push
 
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/giles-receiver.$$PONYC_VERSION
-    insecure: true
-    file: giles/receiver/Dockerfile
-    context: giles/receiver/
-    storage_driver: overlay
-    tag:
-      - $$BRANCH-$$COMMIT-$$PONYC_CONFIG
-    when:
-      event: push
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/giles-sender.$$PONYC_VERSION
-    insecure: true
-    file: giles/sender/Dockerfile
-    context: giles/sender/
-    storage_driver: overlay
-    tag:
-      - $$BRANCH-$$COMMIT-$$PONYC_CONFIG
-    when:
-      event: push
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/buffy.$$PONYC_VERSION
-    insecure: true
-    file: buffy/Dockerfile
-    context: buffy/
-    storage_driver: overlay
-    tag:
-      - $$BRANCH-$$COMMIT-$$PONYC_CONFIG
-    when:
-      event: push
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/buffy
-    insecure: true
-    file: buffy/Dockerfile
-    context: buffy/
-    storage_driver: overlay
-    tag:
-      - $$BRANCH-$$COMMIT-$$PONYC_CONFIG
-    when:
-      event: push
-      matrix:
-        PONYC_VERSION: amd64
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/dagon.$$PONYC_VERSION
-    insecure: true
-    file: dagon/Dockerfile
-    context: dagon/
-    storage_driver: overlay
-    tag:
-      - $$BRANCH-$$COMMIT-$$PONYC_CONFIG
-    when:
-      event: push
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/dagon
-    insecure: true
-    file: dagon/Dockerfile
-    context: dagon/
-    storage_driver: overlay
-    tag:
-      - $$BRANCH-$$COMMIT-$$PONYC_CONFIG
-    when:
-      event: push
-      matrix:
-        PONYC_VERSION: amd64
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/spike.$$PONYC_VERSION
-    insecure: true
-    file: spike/Dockerfile
-    context: spike/
-    storage_driver: overlay
-    tag:
-      - $$TAG-$$PONYC_CONFIG
+  # build and push final docker images on a tag event
+  build_docker_images_tag:
+    image: sendence/docker-runner:0.0.1
+    pull: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - make push-docker arch=$$PONYC_VERSION docker_image_version=$$TAG-$$PONYC_CONFIG
+      - make arch=$$PONYC_VERSION docker_image_version=$$TAG-$$PONYC_CONFIG clean-docker
+      - make arch=$$PONYC_VERSION docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
+    privileged: true
     when:
       event: tag
 
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/giles-receiver.$$PONYC_VERSION
-    insecure: true
-    file: giles/receiver/Dockerfile
-    context: giles/receiver/
-    storage_driver: overlay
-    tag:
-      - $$TAG-$$PONYC_CONFIG
-    when:
-      event: tag
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/giles-sender.$$PONYC_VERSION
-    insecure: true
-    file: giles/sender/Dockerfile
-    context: giles/sender/
-    storage_driver: overlay
-    tag:
-      - $$TAG-$$PONYC_CONFIG
-    when:
-      event: tag
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/buffy.$$PONYC_VERSION
-    insecure: true
-    file: buffy/Dockerfile
-    context: buffy/
-    storage_driver: overlay
-    tag:
-      - $$TAG-$$PONYC_CONFIG
-    when:
-      event: tag
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/buffy
-    insecure: true
-    file: buffy/Dockerfile
-    context: buffy/
-    storage_driver: overlay
-    tag:
-      - $$TAG-$$PONYC_CONFIG
-    when:
-      event: tag
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/dagon.$$PONYC_VERSION
-    insecure: true
-    file: dagon/Dockerfile
-    context: dagon/
-    storage_driver: overlay
-    tag:
-      - $$TAG-$$PONYC_CONFIG
-    when:
-      event: tag
-
-  docker:
-    registry: docker.sendence.com:5043
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
-    email: dipin@sendence.com
-    repo: docker.sendence.com:5043/sendence/dagon
-    insecure: true
-    file: dagon/Dockerfile
-    context: dagon/
-    storage_driver: overlay
-    tag:
-      - $$TAG-$$PONYC_CONFIG
-    when:
-      event: tag
-
+# send notifications to slack
 notify:
   slack:
     webhook_url: $$SLACK_WEBHOOK
@@ -263,6 +97,7 @@ notify:
       in branch `{{build.branch}}` by `@{{build.author}}` with a message ```{{build.message}}``` 
       finished with a `{{ build.status }}` status in {{ duration build.started_at build.finished_at }}
 
+# matrix of configurations to test
 matrix:
   PONYC_CONFIG:
     - debug

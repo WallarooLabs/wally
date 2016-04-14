@@ -22,7 +22,7 @@ ARCH = 'amd64' if platform.machine() == 'x86_64' else 'armhf'
 DOCKER_REPO = 'docker.sendence.com:5043/sendence/'
 DOCKER_POSTFIX = str(int(round(time.time() * 1000)))
 DOCKER_NETWORK = 'buffy-net' + DOCKER_POSTFIX
-
+SCRIPT_PATH = os.path.dirname(os.path.realpath(__file__))
 
 def node_defaults():
     return {
@@ -120,8 +120,8 @@ def start_spike_process(f_out_ip, t_in_ip, seed, action, probability, name,
             'spike.' + ARCH + ':' + docker_tag, f_out_ip, t_in_ip, action,
             '--seed',  str(seed), '--prob', probability], False, False)
     else:
-        spike = subprocess.Popen(['../spike/spike', f_out_ip, t_in_ip, action,
-            '--seed',  str(seed), '--prob', probability],
+        spike = subprocess.Popen([SCRIPT_PATH + '/../spike/spike', f_out_ip, 
+            t_in_ip, action, '--seed',  str(seed), '--prob', probability],
             stdout=DEVNULL, stderr=DEVNULL)
     return spike
 
@@ -153,17 +153,19 @@ def start_buffy_processes(f, in_addr, out_addr, is_sink, name,
         processes.append(buffy_mq)
         processes.append(buffy_worker)
     else:
-        processes.append(subprocess.Popen(['python3', '../buffy/MQ_udp.py',
-            '--address', in_addr], stdout=DEVNULL, stderr=DEVNULL))
+        processes.append(subprocess.Popen(['python3', SCRIPT_PATH + 
+            '/../buffy/MQ_udp.py', '--address', in_addr], stdout=DEVNULL, 
+            stderr=DEVNULL))
         time.sleep(PAUSE)
-        processes.append(subprocess.Popen(['python3', '../buffy/worker.py',
-            '--input-address', in_addr, '--output-address', out_addr,
-            '--function', f, '--output-type', output_type],
+        processes.append(subprocess.Popen(['python3', SCRIPT_PATH + 
+            '/../buffy/worker.py', '--input-address', in_addr, 
+            '--output-address', out_addr, '--function', f, '--output-type', 
+            output_type],
             stdout=DEVNULL, stderr=DEVNULL))
     time.sleep(PAUSE)
     return processes
 
-def start_giles_sender_process(source_addr, messages, test, docker,
+def start_giles_sender_process(source_addr, messages, topology_file, docker,
     docker_tag, docker_host_arg):
 
     remove_file('sent.txt')
@@ -179,10 +181,10 @@ def start_giles_sender_process(source_addr, messages, test, docker,
             os.getcwd(), '--net=' + DOCKER_NETWORK, DOCKER_REPO + 'giles-sender.'
             + ARCH + ':' + docker_tag, source_addr, messages], False, False)
     else:
-        giles_sender = subprocess.Popen(['../giles/sender/sender',
+        giles_sender = subprocess.Popen([SCRIPT_PATH + '/../giles/sender/sender',
             source_addr, messages], stdout=DEVNULL, stderr=DEVNULL)
     print('-----------------------------------------------------------------------')
-    print('dagon: Test <<' + test + '>> is running...')
+    print('dagon: Topology <<' + topology_file + '>> is running...')
     return giles_sender
 
 def start_giles_receiver_process(sink_addr, ttf, tsl,
@@ -202,8 +204,9 @@ def start_giles_receiver_process(sink_addr, ttf, tsl,
             'giles-receiver.' + ARCH + ':' + docker_tag,
             sink_addr, str(ttf), str(tsl)], False, False)
     else:
-        giles_receiver = subprocess.Popen(['../giles/receiver/receiver',
-            sink_addr, str(ttf), str(tsl)], stdout=DEVNULL, stderr=DEVNULL)
+        giles_receiver = subprocess.Popen([SCRIPT_PATH + 
+            '/../giles/receiver/receiver', sink_addr, str(ttf), str(tsl)], 
+            stdout=DEVNULL, stderr=DEVNULL)
     return giles_receiver
 
 def start_nodes(topo, seed, docker, docker_tag, docker_host_arg):
@@ -337,7 +340,7 @@ def load_func(filename, funcname="func"):
 
 # Parse command line args
 @click.command()
-@click.argument('topology_name')
+@click.argument('topology_file')
 @click.option('--gendot', is_flag=True, default=False)
 @click.option('--messages', default=100,
     help='Number of messages to send')
@@ -347,14 +350,14 @@ def load_func(filename, funcname="func"):
     help='Seconds since last message the receiver should wait before shutting down')
 @click.option('--seed', default=int(round(time.time() * 1000)),
     help='Pseudo-random number seed')
-@click.option('--test', default='identity',
-    help='Name of condition for passing test')
 @click.option('--mismatch', is_flag=True, default=False,
     help='Signifies that we expect a mismatch.')
 @click.option('--metrics', is_flag=True, default=False,
     help='Print throughput and latency metrics.')
 @click.option('--docker', is_flag=True, default=False,
     help='Use docker for running processes.')
+@click.option('--docker_pull/--no_docker_pull', default=True,
+    help='Do a docker pull to get images first.')
 @click.option('--docker_host', default='unix:///var/run/docker.sock',
     help='Docker host to use.')
 @click.option('--docker_tag',
@@ -362,8 +365,8 @@ def load_func(filename, funcname="func"):
     help='Docker version/tag to use.')
 @click.option('--startup_delay', default=15,
     help="Number of seconds to wait before starting the sender.")
-def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
-    metrics, docker, docker_host, docker_tag, startup_delay):
+def cli(topology_file, gendot, messages, ttf, tsl, seed, mismatch,
+    docker_pull, metrics, docker, docker_host, docker_tag, startup_delay):
 
     if (int(startup_delay) >= int(ttf)):
         print("startup_delay is greater or equal to than ttf, that will" +
@@ -372,7 +375,7 @@ def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
 
     processes = [] # A list of spawned subprocesses
     messages = str(messages)
-    config_filename = './config/' + topology_name + '.ini'
+    config_filename = topology_file
     docker_host_arg = '--host=' + docker_host
 
     # Get config info
@@ -381,7 +384,7 @@ def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
 
     # Set up topology
     node_names = list(filter(lambda n: (n != 'edges') and (n != 'test_config'), parser.sections()))
-    topology = Topology(topology_name, len(node_names))
+    topology = Topology(topology_file, len(node_names))
 
     node_lookup = populate_node_lookup(node_names)
     populate_node_options(parser, topology, node_lookup)
@@ -393,20 +396,23 @@ def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
 
     if docker:
         print('Using docker host: "' + docker_host + '" and docker_tag: "' +
-            docker_tag + '". Pulling images now.')
-        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
-            'giles-receiver.' + ARCH + ':' + docker_tag], False, False)
-        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
-            'giles-sender.' + ARCH + ':' + docker_tag], False, False)
-        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
-            'spike.' + ARCH + ':' + docker_tag], False, False)
-        run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
-            'buffy:' + docker_tag], False, False)
+            docker_tag + '".')
+        if docker_pull:
+            print('Pulling images now.')
+            run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
+                'giles-receiver.' + ARCH + ':' + docker_tag], False, False)
+            run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
+                'giles-sender.' + ARCH + ':' + docker_tag], False, False)
+            run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
+                'spike.' + ARCH + ':' + docker_tag], False, False)
+            run_docker_command(['docker', docker_host_arg, 'pull', DOCKER_REPO +
+                'buffy:' + docker_tag], False, False)
 
     ## RUN TOPOLOGY
 
     print('-----------------------------------------------------------------------')
-    print('*DAGON* Creating topology "' + topology_name + '" with seed ' + str(seed) + '...')
+    print('*DAGON* Creating topology "' + topology_file + '" with seed ' + 
+        str(seed) + '...')
     print('-----------------------------------------------------------------------')
 
     # Start topology
@@ -427,7 +433,7 @@ def cli(topology_name, gendot, messages, ttf, tsl, seed, test, mismatch,
         docker, docker_tag, docker_host_arg)
     time.sleep(startup_delay)
     giles_sender_process = start_giles_sender_process(source_addr, messages,
-        test, docker, docker_tag, docker_host_arg)
+        topology_file, docker, docker_tag, docker_host_arg)
 
     # Run until we have results
     while (not (os.path.exists("sent.txt") and os.path.exists("received.txt"))):
