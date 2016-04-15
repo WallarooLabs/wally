@@ -8,23 +8,51 @@ use "time"
 actor Main
   new create(env: Env) =>
     try
-      let timers = Timers
       let custodian = Custodian
 
       let out_addr_raw = env.args(1).split(":")
       let messages_to_send = env.args(2).u64()
+      let messages_file_name = try
+        env.args(3)
+      else
+        None
+      end
 
       let store = Store(env)
+      custodian(store)
       match SenderFactory(env, consume out_addr_raw, store)
       | let sender: Sender =>
-        let timer = Timer(DataGenerator(custodian, sender, messages_to_send), 0, 5_000_000)
-        let timer' = timer
-        timers(consume timer)
+        try
+          custodian(sender)
 
-        custodian(timers)(sender)(store)
+          let data_source = match messages_file_name
+          | let mfn: String =>
+            try
+              FileDataSource(custodian, sender, mfn, env, messages_to_send)
+            else
+              env.err.print("Error opening file '" + mfn + "'.")
+              error
+            end
+          else
+            IntegerDataSource(custodian, sender, messages_to_send)
+          end
+
+          let timer = Timer(consume data_source, 0, 5_000_000)
+          let timer' = timer
+          let timers = Timers
+          timers(consume timer)
+          custodian(timers)
+        else
+          env.err.print("Unable to setup data source. Exiting.")
+          env.exitcode(1)
+          custodian.dispose()
+        end
+
         SignalHandler(TermHandler(custodian), Sig.term())
       | None =>
         env.err.print("Unable to setup application. Exiting.")
+        env.exitcode(1)
+        return
       end
     else
       env.out.print("running tests")
@@ -122,7 +150,49 @@ class SentLogEncoder
       .append(payload)
     end
 
-class DataGenerator is TimerNotify
+class FileDataSource is TimerNotify
+  var _counter: U64
+  let _sender: Sender
+  let _custodian: Custodian
+  let _env: Env
+  let _messages_to_send: U64
+  let _messages_handle: File
+  let _lines: Iterator[String]
+
+  new iso create(custodian: Custodian, sender: Sender,
+    message_file_name: String, env: Env, messages_to_send: U64) ?
+  =>
+    _counter = 0
+    _sender = sender
+    _custodian = custodian
+    _messages_to_send = messages_to_send
+    _env = env
+    let path = FilePath(_env.root as AmbientAuth, message_file_name)
+    if not path.exists() then
+      error
+    end
+    _messages_handle = File(path)
+    _lines = _messages_handle.lines()
+
+  fun ref _next(): String =>
+    _counter = _counter + 1
+    try
+      return _lines.next()
+    else
+      return ""
+    end
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    if _messages_to_send > _counter then
+      _sender.write(_next())
+      return true
+    else
+      _messages_handle.dispose()
+      _custodian.dispose()
+      return false
+    end
+  
+class IntegerDataSource is TimerNotify
   var _counter: U64
   let _sender: Sender
   let _custodian: Custodian
