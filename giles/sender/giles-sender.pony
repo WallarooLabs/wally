@@ -94,7 +94,10 @@ actor Sender
     _socket.dispose()
 
 class SenderNotify is UDPNotify
-  fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
+  fun ref received(sock: UDPSocket ref,
+    data: Array[U8] iso,
+    from: IPAddress)
+  =>
     let data': ByteSeq = consume data
     let size = data'.size()
 
@@ -191,14 +194,17 @@ class FileDataSource is TimerNotify
       _custodian.dispose()
       return false
     end
-  
+
 class IntegerDataSource is TimerNotify
   var _counter: U64
   let _sender: Sender
   let _custodian: Custodian
   let _messages_to_send: U64
 
-  new iso create(custodian: Custodian, sender: Sender, messages_to_send: U64) =>
+  new iso create(custodian: Custodian,
+    sender: Sender,
+    messages_to_send: U64)
+  =>
     _counter = 0
     _sender = sender
     _custodian = custodian
