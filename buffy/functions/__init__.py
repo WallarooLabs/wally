@@ -25,3 +25,12 @@ __FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
 
 from .inputdoubler import FUNC_NAME, func  # noqa
 __FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
+
+from .basic_wordcount import FUNC_NAME, func  # noqa
+__FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
+
+from .wordcount_split import FUNC_NAME, func  # noqa
+__FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
+
+from .wordcount_count import FUNC_NAME, func  # noqa
+__FUNCS__[FUNC_NAME.lower()] = (func, FUNC_NAME)
