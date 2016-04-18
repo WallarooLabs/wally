@@ -24,3 +24,12 @@ def func(input):
     words = split_words(input)
 
     return (words_to_messages(words))
+
+# TESTS #
+def test_wordcount_split():
+    expected = ["see", "spot", "run", "run", "spot", "run"]
+    actual = func("see spot run run spot run")
+
+    for (e, (_, a)) in zip(expected, actual):
+        assert(e == a)
+    

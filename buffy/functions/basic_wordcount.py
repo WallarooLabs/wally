@@ -28,3 +28,36 @@ def func(input):
         word_counts[w] = state.get_record('words', w)
 
     return word_counts_to_messages(word_counts)
+
+# TESTS #
+def test_basic_wordcount():
+    state.state = state.State()
+    input = 'see spot run'
+    expected = ['see,1', 'spot,1', 'run,1']
+    output = [x for x in func(input)]
+    for x in expected:
+        assert(output.index(x) >= 0)
+    for x in output:
+        assert(expected.index(x) >= 0)
+
+    count = state.get_record('words', 'see')
+    assert(count == 1)
+    count = state.get_record('words', 'spot')
+    assert(count == 1)
+    count = state.get_record('words', 'run')
+    assert(count == 1)
+
+    input = 'run spot run'
+    expected = ['spot,2', 'run,3']
+    output = [x for x in func(input)]
+    for x in expected:
+        assert(output.index(x) >= 0)
+    for x in output:
+        assert(expected.index(x) >= 0)
+
+    count = state.get_record('words', 'see')
+    assert(count == 1)
+    count = state.get_record('words', 'spot')
+    assert(count == 2)
+    count = state.get_record('words', 'run')
+    assert(count == 3)
