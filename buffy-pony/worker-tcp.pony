@@ -1,17 +1,22 @@
 use "net"
-use "osc-pony"
 
 class WorkerNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
+  let _id: I32
   let _leader_host: String
   let _leader_service: String
   var _host: String = ""
   var _service: String = ""
 
-  new create(env: Env, auth: AmbientAuth, leader_host: String, leader_service: String) =>
+  new create(env: Env,
+             auth: AmbientAuth,
+             id: I32,
+             leader_host: String,
+             leader_service: String) =>
     _env = env
     _auth = auth
+    _id = id
     _leader_host = leader_host
     _leader_service = leader_service
 
@@ -19,6 +24,7 @@ class WorkerNotifier is TCPListenNotify
     try
       let env: Env = _env
       let auth: AmbientAuth = _auth
+      let id: I32 = _id
       (_host, _service) = listen.local_address().name()
       let host = _host
       let service = _service
@@ -26,11 +32,14 @@ class WorkerNotifier is TCPListenNotify
 
       let leader_host = _leader_host
       let leader_service = _leader_service
-      let notifier: TCPConnectionNotify iso = recover WorkerConnectNotify(env, leader_host, leader_service) end
-      let conn: TCPConnection = TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
+      let notifier: TCPConnectionNotify iso =
+        recover WorkerConnectNotify(env, id, leader_host, leader_service) end
+      let conn: TCPConnection =
+        TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
 
-      let message = OSCMessage("/buffy", recover [as OSCData val: OSCInt(MessageTypes.greet())] end)
-      conn.write(message.to_bytes())
+      let message = TCPMessageEncoder.greet(_id)
+      _env.out.print("My id is " + _id.string())
+      conn.write(message)
     else
       _env.out.print("buffy worker: couldn't get local address")
       listen.close()
@@ -41,29 +50,80 @@ class WorkerNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    WorkerConnectNotify(_env, _leader_host, _leader_service)
+    WorkerConnectNotify(_env, _id, _leader_host, _leader_service)
 
 class WorkerConnectNotify is TCPConnectionNotify
   let _env: Env
   let _leader_host: String
   let _leader_service: String
-  // An id of 0 means unassigned
-  var _id: I32 = 0
+  let _proxy_manager: ProxyManager
+  let _id: I32
+  var _buffer: Array[U8] = Array[U8]
+  // How many bytes are left to process for current message
+  var _left: U16 = 0
+  // For building up the two bytes of a U16 message length
+  var _len_bytes: Array[U8] = Array[U8]
 
-  new iso create(env: Env, leader_host: String, leader_service: String) =>
+  new iso create(env: Env,
+                 id: I32,
+                 leader_host: String,
+                 leader_service: String) =>
     _env = env
+    _id = id
     _leader_host = leader_host
     _leader_service = leader_service
+    _proxy_manager = ProxyManager(_env)
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("buffy worker: connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    _env.out.print("buffy worker: data received")
+
+    let d: Array[U8] ref = consume data
     try
-      let message = OSCDecoder.from_bytes(consume data) as OSCMessage val
-      match message.arguments(0)
-      | let i: OSCInt val if i.value() == MessageTypes.assign_id() =>
-        _update_id(conn, message.arguments(1))
+      while (d.size() > 0) do
+        if _left == 0 then
+          if _len_bytes.size() < 2 then
+            let next = d.shift()
+            _len_bytes.push(next)
+          else
+            // Set _left to the length of the current message in bytes
+            _left = Bytes.to_u16(_len_bytes(0), _len_bytes(1))
+            _len_bytes = Array[U8]
+          end
+        else
+          _buffer.push(d.shift())
+          _left = _left - 1
+          if _left == 0 then
+            let copy: Array[U8] iso = recover Array[U8] end
+            for byte in _buffer.values() do
+              copy.push(byte)
+            end
+            _process_data(conn, consume copy)
+            _buffer = Array[U8]
+          end
+        end
+      end
+    end
+
+  fun ref _process_data(conn: TCPConnection ref, data: Array[U8] val) =>
+    try
+      let msg: TCPMsg val = TCPMessageDecoder(data)
+      match msg
+      | let m: SpinUpMsg val =>
+        _env.out.print("SPIN UP")
+        _proxy_manager.add_proxy(m.step_id, m.computation_type_id)
+      | let m: ForwardMsg val =>
+        _env.out.print("FORWARD")
+        _proxy_manager(m.step_id, m.msg)
+      | let m: ConnectStepsMsg val =>
+        _env.out.print("CONNECT PROXIES")
+        _proxy_manager.connect_steps(m.in_step_id, m.out_step_id)
+      | let m: InitializationMsgsFinishedMsg val =>
+        _env.out.print("INITIALIZATION FINISHED")
+        let ack_msg = TCPMessageEncoder.ack_initialized()
+        conn.write(ack_msg)
       end
     else
       _env.err.print("Error decoding incoming message.")
@@ -72,19 +132,14 @@ class WorkerConnectNotify is TCPConnectionNotify
   fun ref connected(conn: TCPConnection ref) =>
     if _id != 0 then
       let id = _id
-      let message = OSCMessage("/buffy", recover [as OSCData val: OSCInt(MessageTypes.reconnect()),
-                                                                  OSCInt(id)] end)
-      conn.write(message.to_bytes())
+      let message =
+        TCPMessageEncoder.reconnect(id)
+      conn.write(message)
       _env.out.print("Re-established connection for worker " + id.string())
     end
 
-  fun ref _update_id(conn: TCPConnection ref, osc_id: OSCData val) =>
-    match osc_id
-    | let id: OSCInt val =>
-      _id = id.value()
-      _env.out.print("buffy worker: received")
-      _env.out.print("ID assigned: " + _id.string())
-    end
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    _env.out.print("buffy worker: Connection to leader failed!")
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("buffy worker: server closed")
