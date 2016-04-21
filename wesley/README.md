@@ -31,8 +31,8 @@ produces the received message `Received`.
 ```
 Giles =Sent=> Buffy =Received=> Giles
 
-  Sent: the ordered list of sent messages
-  Received: the ordered list of received messages
+  Sent: the ordered list of sent messages and their timestamps as a 'timestamp,value' string
+  Received: the ordered list of received messages and their timestamps as a 'timestamp,value' string
 ```
 
 There is a function `f(x)` which transforms `Sent` into the expected
