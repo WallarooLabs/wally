@@ -2,6 +2,7 @@ use "collections"
 
 class WordCounter
   let counts: Map[String, U64] = Map[String,U64]()
+  let _punctuation: String = """!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
 
   fun ref apply(key': String): (U64|None) =>
     """Increment the value of key by 1. Create it if necessary."""
@@ -15,11 +16,14 @@ class WordCounter
 
   fun clean(s: String): String =>
     """Strip characters based on a rule."""
-    s
+    let charset = _punctuation
+    recover val s.clone().lower().strip(charset) end
 
   fun ref update_from_string(s: String) =>
-    for word in s.split(" ").values() do
-      apply(word)
+    for line in s.split("\n").values() do
+      for word in line.split(" ").values() do
+        apply(word)
+      end
     end
  
   fun ref update_from_array(values: Array[(String, U64)]) =>
@@ -42,3 +46,5 @@ class WordCounter
       env.out.print(word + ": " + count.string())
     end
     env.out.print(counts.size().string() + " records returned.")
+
+
