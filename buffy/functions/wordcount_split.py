@@ -17,8 +17,9 @@ def words_to_messages(words):
 
 def split_words(sentence):
     # split on spaces, drop non-words
-    return [w for w in filter(lambda x: x.isalpha(),
-                              sentence.lower().split(' '))]
+    return (w for w in filter(lambda x: x != '',
+                              (p.strip(punctuation) for p in
+                               sentence.lower().split(' '))))
 
 def func(input):
     words = split_words(input)
@@ -28,8 +29,8 @@ def func(input):
 # TESTS #
 def test_wordcount_split():
     expected = ["see", "spot", "run", "run", "spot", "run"]
-    actual = func("see spot run run spot run")
+    actual = func("see spot. run run spot run")
 
     for (e, (_, a)) in zip(expected, actual):
         assert(e == a)
-    
+
