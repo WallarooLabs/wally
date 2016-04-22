@@ -17,10 +17,13 @@ def word_counts_to_messages(word_counts):
         yield "%s,%d" % (word, count)
 
 def split_words(sentence):
-    # split on spaces, drop non-words
+    # split on lines and spaces, strip punctuation, and lowercase everything
     return (w for w in filter(lambda x: x != '',
-                              (p.strip(punctuation) for p in
-                               sentence.lower().split(' '))))
+                              (p.strip(punctuation) for p
+                               in (word for fragments
+                                   in (line.split() for line
+                                       in sentence.splitlines())
+                                   for word in fragments))))
 
 def func(input):
     words = split_words(input)
