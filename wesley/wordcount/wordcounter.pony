@@ -1,8 +1,11 @@
 use "collections"
 
-class WordCounter
+class WordCounter is Equatable[WordCounter]
   let counts: Map[String, U64] = Map[String,U64]()
   let _punctuation: String = """!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+ 
+  fun eq(that: box->WordCounter): Bool =>
+    true
 
   fun ref apply(key': String): (U64|None) =>
     """Increment the value of key by 1. Create it if necessary."""
@@ -40,6 +43,7 @@ class WordCounter
     else
       None
     end
+
 
   fun print_results(env: Env) =>
     for (word, count) in counts.pairs() do
