@@ -3,9 +3,35 @@ use "collections"
 class WordCounter is Equatable[WordCounter]
   let counts: Map[String, U64] = Map[String,U64]()
   let _punctuation: String = """!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
- 
+
+  new create() =>
+    this
+
+  new create_from_map(map': Map[String, U64]) =>
+    load_from_map(map')
+
   fun eq(that: box->WordCounter): Bool =>
+    // We want to terminate early, so 
+    // 1. check size
+    if counts.size() != that.counts.size() then return false end
+    // 2. iterate through keys
+    for (key, count) in counts.pairs() do
+      try
+        if count != that.counts(key) then return false end
+      else
+        return false
+      end
+    end
+    // They match!
     true
+
+  fun ref load_from_map(map': Map[String, U64]) =>
+    for (key, count) in map'.pairs() do
+      counts.update(key, count)
+    end
+
+  fun ref clear() =>
+    counts.clear()
 
   fun ref apply(key': String): (U64|None) =>
     """Increment the value of key by 1. Create it if necessary."""
