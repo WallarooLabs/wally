@@ -65,10 +65,14 @@ class WordcountReceivedMessages is ReceivedMessages
   fun _size(): USize => 
     wc.counts.size()
 
-  fun compare(that: WordcountReceivedMessages): MatchStatus val =>
-    if wc == that.wc 
-    then ResultsMatch 
-    else ResultsDoNotMatch 
+  fun compare(that: ReceivedMessages): MatchStatus val =>
+    try
+      if wc == (that as WordcountReceivedMessages).wc 
+      then ResultsMatch 
+      else ResultsDoNotMatch 
+      end
+    else
+      ResultsDoNotMatch
     end
 
   fun ref string(): String =>
