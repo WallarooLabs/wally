@@ -18,7 +18,7 @@ def words_to_messages(words):
 def split_words(sentence):
     # split on lines and spaces, strip punctuation, and lowercase everything
     return (w for w in filter(lambda x: x != '',
-                              (p.strip(punctuation) for p
+                              (p.lower().strip(punctuation) for p
                                in (word for fragments
                                    in (line.split() for line
                                        in sentence.splitlines())
