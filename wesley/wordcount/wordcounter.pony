@@ -76,9 +76,3 @@ class WordCounter is Equatable[WordCounter]
     else
       None
     end
-  
-  fun print_results(env: Env) =>
-    for (word, count) in counts.pairs() do
-      env.out.print(word + ": " + count.string())
-    end
-    env.out.print(counts.size().string() + " records returned.")
