@@ -2,7 +2,7 @@ use "collections"
 
 class WordCounter is Equatable[WordCounter]
   let counts: Map[String, U64] = Map[String,U64]()
-  let _punctuation: String = """!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+  let _punctuation: String = """ !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
 
   new create() =>
     this
