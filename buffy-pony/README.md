@@ -13,7 +13,7 @@ To run the code, you need to kick off three processes:
 1. Leader  
 ```./buffy-pony 127.0.0.1:6000 -l -w 2 --id 1```  
 
-2. Workers
+2. Workers  
 ```./buffy-pony 127.0.0.1:6000 --id 2```  
 ```./buffy-pony 127.0.0.1:6000 --id 3```  
 
