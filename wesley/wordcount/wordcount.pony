@@ -37,7 +37,6 @@ class WordcountSentMessages is SentMessages
      for m in messages'.values() do
        wc.update_from_string(m.text)
      end
-     this
 
   fun ref string(): String =>
     var acc = String()
@@ -56,7 +55,6 @@ class WordcountReceivedMessages is ReceivedMessages
     for m in messages.values() do
       wc.update(m.word, m.count)
     end
-    this
   
   new from_wordcounter(wordcounter: WordCounter) =>
     let m = wordcounter.counts.clone()
@@ -67,9 +65,10 @@ class WordcountReceivedMessages is ReceivedMessages
 
   fun compare(that: ReceivedMessages): MatchStatus val =>
     try
-      if wc == (that as WordcountReceivedMessages).wc 
-      then ResultsMatch 
-      else ResultsDoNotMatch 
+      let that' = (that as WordcountReceivedMessages)
+      if wc == that'.wc
+        then ResultsMatch
+        else ResultsDoNotMatch
       end
     else
       ResultsDoNotMatch
@@ -110,8 +109,11 @@ class WordcountReceivedVisitor is ReceivedVisitor
 
 class WordcountResultMapper is ResultMapper
   fun f(sent_messages: SentMessages): ReceivedMessages =>
-
-    WordcountReceivedMessages.from_wordcounter(WordCounter)
+    try
+      WordcountReceivedMessages.from_wordcounter((sent_messages as WordcountSentMessages).wc)
+    else
+      WordcountReceivedMessages
+    end
 
 
 actor Main

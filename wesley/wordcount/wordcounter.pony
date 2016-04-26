@@ -17,7 +17,9 @@ class WordCounter is Equatable[WordCounter]
     // 2. iterate through keys
     for (key, count) in counts.pairs() do
       try
-        if count != that.counts(key) then return false end
+        if count != that.counts(key) 
+        then return false 
+        end
       else
         return false
       end
