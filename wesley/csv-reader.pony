@@ -1,12 +1,9 @@
-trait CSVFields
+interface CSVVisitor
+  fun ref apply(values: Array[String] ref): None ?
   fun ls(): (String|None) => "\n"
   fun ln(): USize => 0
   fun fs(): (String|None) => ","
   fun fn(): USize => 0
-
-
-interface CSVVisitor is CSVFields
-  fun ref apply(values: Array[String] ref): None ?
 
 
 class CSVReader
