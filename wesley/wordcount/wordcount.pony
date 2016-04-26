@@ -9,9 +9,11 @@ class WordcountSentMessage is SentMessage
     text = text'
 
   fun string(): String =>
-    String().append("(").append(ts.string()).append(", ").append(text).append(")").clone()
+    String().append("(").append(ts.string()).append(", ").append(text)
+            .append(")").clone()
 
-class WordcountReceivedMessage is (ReceivedMessage & Equatable[WordcountReceivedMessage])
+class WordcountReceivedMessage is (ReceivedMessage &  
+                                   Equatable[WordcountReceivedMessage])
   let ts: U64
   let word: String
   let count: U64
@@ -25,7 +27,8 @@ class WordcountReceivedMessage is (ReceivedMessage & Equatable[WordcountReceived
     (this.word == that.word) and (this.count == that.count)
 
   fun string(): String =>
-    String().append("(").append(ts.string()).append(", ").append(word).append(": ").append(count.string()).append(")").clone()
+    String().append("(").append(ts.string()).append(", ").append(word)
+            .append(": ").append(count.string()).append(")").clone()
 
 class WordcountSentMessages is SentMessages
   let wc: WordCounter = WordCounter
@@ -96,7 +99,8 @@ class WordcountSentVisitor is SentVisitor
 
 
 class WordcountReceivedVisitor is ReceivedVisitor
-  let _values: Array[WordcountReceivedMessage] ref = Array[WordcountReceivedMessage]()
+  let _values: Array[WordcountReceivedMessage] ref =
+    Array[WordcountReceivedMessage]()
 
   fun ref apply(value: Array[String] ref): None ? =>
     let timestamp = value(0).clone().strip().u64()
@@ -111,7 +115,8 @@ class WordcountReceivedVisitor is ReceivedVisitor
 class WordcountResultMapper is ResultMapper
   fun f(sent_messages: SentMessages): ReceivedMessages =>
     try
-      WordcountReceivedMessages.from_wordcounter((sent_messages as WordcountSentMessages).wc)
+      WordcountReceivedMessages.from_wordcounter((sent_messages 
+                                                  as WordcountSentMessages).wc)
     else
       WordcountReceivedMessages
     end
@@ -119,4 +124,5 @@ class WordcountResultMapper is ResultMapper
 
 actor Main
   new create(env: Env) =>
-    VerifierCLI.run(env, WordcountResultMapper, WordcountSentVisitor, WordcountReceivedVisitor)
+    VerifierCLI.run(env, WordcountResultMapper, WordcountSentVisitor, 
+                    WordcountReceivedVisitor)
