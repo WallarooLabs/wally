@@ -38,20 +38,20 @@ class WordCounter is Equatable[WordCounter]
   fun ref clear() =>
     counts.clear()
 
-  fun ref apply(key': String): (U64|None) =>
+  fun ref apply(key': String, count': U64=1): (U64|None) =>
     """Increment the value of key by 1. Create it if necessary."""
     let key = clean(key')
     if key == "" then return None end
     try
-      counts.update(key, counts(key)+1)
+      counts.update(key, counts(key)+count')
     else
-      counts.update(key, 1)
+      counts.update(key, count')
     end
 
   fun clean(s: String): String =>
     """Strip characters based on a rule."""
     let charset = _punctuation
-    recover val s.clone().lower().strip(charset) end
+    recover val s.clone().lower().lstrip(charset).rstrip(charset) end
 
   fun ref update_from_string(s: String) =>
     for line in s.split("\n").values() do
@@ -65,8 +65,10 @@ class WordCounter is Equatable[WordCounter]
       update(word, count)
     end
 
-  fun ref update(key: String, count: U64): (U64|None) =>
-    counts.update(key, count)
+  fun ref update(key': String, count': U64): (U64|None) =>
+    let key = clean(key')
+    if key == "" then return None end
+    counts.update(key, count')
 
   fun get(key: String): (U64|None) =>
     try
