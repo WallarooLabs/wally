@@ -3,18 +3,22 @@ use "osc-pony"
 primitive TCPMessageTypes
   // [0, worker_id]
   fun greet(): I32 => 0
-  // [1, reconnecting_node_id]
-  fun reconnect(): I32 => 1
-  // [2, step_id, msg_id, msg_data]
-  fun forward(): I32 => 2
-  // [3, step_id, computation_type_id]
-  fun spin_up(): I32 => 3
-  // [4, in_step_id, out_step_id]
-  fun connect_steps(): I32 => 4
-  // [5]
-  fun initialization_msgs_finished(): I32 => 5
-  // [6]
-  fun ack_initialized(): I32 => 6
+  // [1, worker_id, host, service]
+  fun greet_leader(): I32 => 1
+  // [2, reconnecting_node_id]
+  fun reconnect(): I32 => 2
+  // [3, step_id, msg_id, msg_data]
+  fun forward(): I32 => 3
+  // [4, step_id, computation_type_id]
+  fun spin_up(): I32 => 4
+  // [5, proxy_id, step_id, tcp_connection]
+  fun spin_up_proxy(): I32 => 5
+  // [6, in_step_id, out_step_id]
+  fun connect_steps(): I32 => 6
+  // [7]
+  fun initialization_msgs_finished(): I32 => 7
+  // [8]
+  fun ack_initialized(): I32 => 8
 
 primitive TCPMessageEncoder
   fun greet(node_id: I32): Array[U8] val =>
@@ -22,6 +26,16 @@ primitive TCPMessageEncoder
       recover
         [as OSCData val: OSCInt(TCPMessageTypes.greet()),
                          OSCInt(node_id)]
+      end)
+    _encode_osc(osc)
+
+  fun greet_leader(node_id: I32, host: String, service: String): Array[U8] val =>
+    let osc = OSCMessage("/buffy",
+      recover
+        [as OSCData val: OSCInt(TCPMessageTypes.greet_leader()),
+                         OSCInt(node_id),
+                         OSCString(host),
+                         OSCString(service)]
       end)
     _encode_osc(osc)
 
@@ -38,8 +52,8 @@ primitive TCPMessageEncoder
       recover
         [as OSCData val: OSCInt(TCPMessageTypes.forward()),
                          OSCInt(step_id),
-                         OSCInt(msg.id()),
-                         OSCInt(msg.data())]
+                         OSCInt(msg.id),
+                         OSCInt(msg.data)]
       end)
     _encode_osc(osc)
 
@@ -49,6 +63,20 @@ primitive TCPMessageEncoder
         [as OSCData val: OSCInt(TCPMessageTypes.spin_up()),
                          OSCInt(step_id),
                          OSCInt(computation_type_id)]
+      end)
+    _encode_osc(osc)
+
+  fun spin_up_proxy(proxy_id: I32, step_id: I32, target_node_id: I32,
+    target_host: String, target_service: String):
+    Array[U8] val =>
+    let osc = OSCMessage("/buffy",
+      recover
+        [as OSCData val: OSCInt(TCPMessageTypes.spin_up_proxy()),
+                         OSCInt(proxy_id),
+                         OSCInt(step_id),
+                         OSCInt(target_node_id),
+                         OSCString(target_host),
+                         OSCString(target_service)]
       end)
     _encode_osc(osc)
 
@@ -68,10 +96,11 @@ primitive TCPMessageEncoder
       end)
     _encode_osc(osc)
 
-  fun ack_initialized(): Array[U8] val =>
+  fun ack_initialized(worker_id: I32): Array[U8] val =>
     let osc = OSCMessage("/buffy",
       recover
-        [as OSCData val: OSCInt(TCPMessageTypes.ack_initialized())]
+        [as OSCData val: OSCInt(TCPMessageTypes.ack_initialized())
+                         OSCInt(worker_id)]
       end)
     _encode_osc(osc)
 
@@ -90,18 +119,22 @@ primitive TCPMessageDecoder
       match i.value()
       | TCPMessageTypes.greet() =>
         GreetMsg(msg)
+      | TCPMessageTypes.greet_leader() =>
+        GreetLeaderMsg(msg)
       | TCPMessageTypes.reconnect() =>
         ReconnectMsg(msg)
       | TCPMessageTypes.forward() =>
         ForwardMsg(msg)
       | TCPMessageTypes.spin_up() =>
         SpinUpMsg(msg)
+      | TCPMessageTypes.spin_up_proxy() =>
+        SpinUpProxyMsg(msg)
       | TCPMessageTypes.connect_steps() =>
         ConnectStepsMsg(msg)
       | TCPMessageTypes.initialization_msgs_finished() =>
         InitializationMsgsFinishedMsg
       | TCPMessageTypes.ack_initialized() =>
-        AckInitializedMsg
+        AckInitializedMsg(msg)
       else
         error
       end
@@ -116,7 +149,23 @@ class GreetMsg is TCPMsg
 
   new val create(msg: OSCMessage val) ? =>
     match msg.arguments(1)
-    | let i: OSCInt val => worker_id = i.value()
+    | let i: OSCInt val =>
+      worker_id = i.value()
+    else
+      error
+    end
+
+class GreetLeaderMsg is TCPMsg
+  let worker_id: I32
+  let host: String
+  let service: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match (msg.arguments(1), msg.arguments(2), msg.arguments(3))
+    | (let i: OSCInt val, let h: OSCString val, let s: OSCString val) =>
+      worker_id = i.value()
+      host = h.value()
+      service = s.value()
     else
       error
     end
@@ -157,6 +206,27 @@ class SpinUpMsg is TCPMsg
       error
     end
 
+class SpinUpProxyMsg is TCPMsg
+  let proxy_id: I32
+  let step_id: I32
+  let target_node_id: I32
+  let target_host: String
+  let target_service: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match (msg.arguments(1), msg.arguments(2), msg.arguments(3),
+      msg.arguments(4), msg.arguments(5))
+    | (let p_id: OSCInt val, let s_id: OSCInt val, let t_node_id: OSCInt val,
+      let t_host: OSCString val, let t_service: OSCString val) =>
+      proxy_id = p_id.value()
+      step_id = s_id.value()
+      target_node_id = t_node_id.value()
+      target_host = t_host.value()
+      target_service = t_service.value()
+    else
+      error
+    end
+
 class ConnectStepsMsg is TCPMsg
   let in_step_id: I32
   let out_step_id: I32
@@ -172,4 +242,13 @@ class ConnectStepsMsg is TCPMsg
 
 primitive InitializationMsgsFinishedMsg is TCPMsg
 
-primitive AckInitializedMsg is TCPMsg
+class AckInitializedMsg is TCPMsg
+  let worker_id: I32
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(1)
+    | let i: OSCInt val =>
+      worker_id = i.value()
+    else
+      error
+    end

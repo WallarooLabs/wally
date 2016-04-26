@@ -16,13 +16,13 @@ class Identity is Computation[I32, I32]
 
 class Double is Computation[I32, I32]
   fun apply(msg: Message[I32] val): Message[I32] val^ =>
-    let output = msg.data() * 2
-    Message[I32](msg.id(), output)
+    let output = msg.data * 2
+    Message[I32](msg.id, output)
 
 class Halve is Computation[I32, I32]
   fun apply(msg: Message[I32] val): Message[I32] val^ =>
-    let output = msg.data() / 2
-    Message[I32](msg.id(), output)
+    let output = msg.data / 2
+    Message[I32](msg.id, output)
 
 class Print[A: (OSCEncodable & Stringable)] is FinalComputation[A]
   let _env: Env
@@ -31,4 +31,4 @@ class Print[A: (OSCEncodable & Stringable)] is FinalComputation[A]
     _env = env
 
   fun apply(msg: Message[A] val) =>
-    _env.out.print(msg.data().string())
+    _env.out.print(msg.data.string())
