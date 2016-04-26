@@ -5,25 +5,29 @@ text into an array of Strings, which can overridden by a subclass.
 """
   fun ref apply(values: Array[String] ref): None ?
 
-  fun ls(): (String|None) => "\n"
+  fun ls(): (String|None) =>
   """
   Line separator. Use None to avoid splitting on lines.
   """
+    "\n"
 
-  fun ln(): USize => 0
+  fun ln(): USize =>
   """
   Maximum parts for the line split. (See String.split for more information.)
   """
+    0
 
-  fun fs(): (String|None) => ","
+  fun fs(): (String|None) =>
   """
   Field separator. Use None to avoid splitting on fields.
   """
+    ","
 
-  fun fn(): USize => 0
+  fun fn(): USize =>
   """
   Maximum parts for the field split. (See String.split for more information.)
   """
+    0
 
 
 
