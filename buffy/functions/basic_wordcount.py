@@ -52,7 +52,7 @@ def test_basic_wordcount():
     count = state.get_record('words', 'run')
     assert(count == 1)
 
-    input = 'run spot run'
+    input = 'run spot Run'
     expected = ['spot,2', 'run,3']
     output = [x for x in func(input)]
     for x in expected:
