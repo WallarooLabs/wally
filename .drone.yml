@@ -3,6 +3,7 @@ debug: true
 # only build for master and tags
 branches:
   - master
+  - python-buffy
   - refs/tags/*
 
 # clone source code with tags
@@ -13,7 +14,7 @@ clone:
 build:
   # main build of buffy
   main_build:
-    image: sendence/ponyc:sendence-2.2.0-$$PONYC_CONFIG-$$PONYC_VERSION
+    image: sendence/ponyc:sendence-2.3.1-$$PONYC_CONFIG-$$PONYC_VERSION
     pull: true
     commands:
       - make clean arch=$$PONYC_VERSION in_docker=true

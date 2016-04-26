@@ -39,8 +39,9 @@ endif
 ifeq ($(in_docker),true)
   ifeq ($(arch),armhf)
     define PONYC
-      cd $(current_dir)/$(1) && ponyc --triple arm-unknown-linux-gnueabihf \
-        -robj .
+      cd $(current_dir)/$(1) && stable fetch
+      cd $(current_dir)/$(1) && stable env ponyc \
+        --triple arm-unknown-linux-gnueabihf -robj .
       cd $(current_dir)/$(1) && arm-linux-gnueabihf-gcc \
         -o `basename $(current_dir)/$(1)` \
         -O3 -march=armv7-a -flto -fuse-linker-plugin \
@@ -57,22 +58,30 @@ ifeq ($(in_docker),true)
     endef
   else
     define PONYC
-      cd $(current_dir)/$(1) && ponyc .
+      cd $(current_dir)/$(1) && stable fetch
+      cd $(current_dir)/$(1) && stable env ponyc .
     endef
   endif
 else
   ifeq ($(arch),amd64)
     define PONYC
-      docker run --rm -it -v $(current_dir):$(current_dir) \
-        -w $(current_dir)/$(1) --entrypoint ponyc \
-        $(ponyc_runner):$(ponyc_tag)-$(arch) .
+      docker run --rm -it -u `id -u` -v $(current_dir):$(current_dir) \
+        -w $(current_dir)/$(1) --entrypoint stable \
+        $(ponyc_runner):$(ponyc_tag)-$(arch) fetch
+      docker run --rm -it -u `id -u` -v $(current_dir):$(current_dir) \
+        -w $(current_dir)/$(1) --entrypoint stable \
+        $(ponyc_runner):$(ponyc_tag)-$(arch) env ponyc .
     endef
   else ifeq ($(arch),armhf)
     define PONYC
       docker run --rm -it -u `id -u` -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
-        --entrypoint ponyc $(ponyc_runner):$(ponyc_tag)-$(arch) \
-        --triple arm-unknown-linux-gnueabihf -robj .
+        --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
+        fetch
+      docker run --rm -it -u `id -u` -v \
+        $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
+        --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
+        env ponyc --triple arm-unknown-linux-gnueabihf -robj .
       docker run --rm -it -u `id -u` -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
         --entrypoint arm-linux-gnueabihf-gcc \
@@ -92,7 +101,8 @@ else
     endef
   else
     define PONYC
-      cd $(current_dir)/$(1) && ponyc .
+      cd $(current_dir)/$(1) && stable fetch
+      cd $(current_dir)/$(1) && stable env ponyc .
     endef
   endif
 endif
