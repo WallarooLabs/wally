@@ -8,17 +8,15 @@ Split a sentence into words and send each word as a message
 
 import itertools
 from . import state
+from .basic_wordcount import split_words
 
 FUNC_NAME = "WordcountSplit"
+
 
 def words_to_messages(words):
     for w in words:
         yield (w, w)
 
-def split_words(sentence):
-    # split on spaces, drop non-words
-    return [w for w in filter(lambda x: x.isalpha(),
-                              sentence.lower().split(' '))]
 
 def func(input):
     words = split_words(input)
@@ -28,8 +26,8 @@ def func(input):
 # TESTS #
 def test_wordcount_split():
     expected = ["see", "spot", "run", "run", "spot", "run"]
-    actual = func("see spot run run spot run")
+    actual = func("see spot. run run spot run")
 
     for (e, (_, a)) in zip(expected, actual):
         assert(e == a)
-    
+

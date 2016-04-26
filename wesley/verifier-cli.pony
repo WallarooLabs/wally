@@ -74,6 +74,8 @@ primitive VerifierCLI
     let caps = recover val FileCaps.set(FileRead).set(FileStat) end
     with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)) as File do
       CSVReader.parse(file.read_string(file.size()), visitor)
+    else
+      error
     end
 
   fun run(env: Env, result_mapper: ResultMapper, sent_visitor: SentVisitor, received_visitor: ReceivedVisitor) =>

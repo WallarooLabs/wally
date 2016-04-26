@@ -7,6 +7,7 @@ Take in a sentence, output 1 message per word, with count
 
 """
 
+from string import punctuation
 from . import state
 
 FUNC_NAME = "BasicWordcount"
@@ -16,9 +17,13 @@ def word_counts_to_messages(word_counts):
         yield "%s,%d" % (word, count)
 
 def split_words(sentence):
-    # split on spaces, drop non-words
-    return (w for w in filter(lambda x: x.isalpha(),
-                              sentence.lower().split(' ')))
+    # split on lines and spaces, strip punctuation, and lowercase everything
+    return (w for w in filter(lambda x: x != '',
+                              (p.lower().strip(punctuation) for p
+                               in (word for fragments
+                                   in (line.split() for line
+                                       in sentence.splitlines())
+                                   for word in fragments))))
 
 def func(input):
     words = split_words(input)
@@ -32,7 +37,7 @@ def func(input):
 # TESTS #
 def test_basic_wordcount():
     state.state = state.State()
-    input = 'see spot run'
+    input = 'see spot run.'
     expected = ['see,1', 'spot,1', 'run,1']
     output = [x for x in func(input)]
     for x in expected:
@@ -47,7 +52,7 @@ def test_basic_wordcount():
     count = state.get_record('words', 'run')
     assert(count == 1)
 
-    input = 'run spot run'
+    input = 'run spot Run'
     expected = ['spot,2', 'run,3']
     output = [x for x in func(input)]
     for x in expected:
