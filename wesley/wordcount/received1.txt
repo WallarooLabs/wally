@@ -8,6 +8,7 @@
 1, vitae,3
 1, mollis,3
 1, porttitor,3
+1, ipsum,3
 1, dolor,2
 1, erat,2
 1, neque,2
@@ -22,7 +23,8 @@
 1, nulla,2
 1, enim,2
 1, dui,2
-1, ipsum,2
+1, lorem,2
+1, vel,2
 1, euismod,1
 1, adipiscing,1
 1, voluptas,1
@@ -32,7 +34,6 @@
 1, nec,1
 1, varius,1
 1, sollicitudin,1
-1, Ipsum,1
 1, vivamus,1
 1, pharetra,1
 1, pulvinar,1
@@ -47,7 +48,6 @@
 1, risus,1
 1, lobortis,1
 1, Netus,1
-1, vel,1
 1, dictum,1
 1, eleifend,1
 1, quam,1
@@ -56,7 +56,6 @@
 1, id,1
 1, pellentesque,1
 1, suspendisse,1
-1, Vel,1
 1, Nam,1
 1, Platea,1
 1, sapiente,1
@@ -68,12 +67,10 @@
 1, nonummy,1
 1, blandit,1
 1, commodo,1
-1, lorem,1
 1, Habitant,1
 1, tempus,1
 1, quisque,1
 1, fermentum,1
-1, Lorem,1
 1, sunt,1
 1, ante,1
 1, eros,1
