@@ -1,9 +1,30 @@
 interface CSVVisitor
+"""
+The CSVVisitor interface provides default methods for splitting a block of input
+text into an array of Strings, which can overridden by a subclass.
+"""
   fun ref apply(values: Array[String] ref): None ?
+
   fun ls(): (String|None) => "\n"
+  """
+  Line separator. Use None to avoid splitting on lines.
+  """
+
   fun ln(): USize => 0
+  """
+  Maximum parts for the line split. (See String.split for more information.)
+  """
+
   fun fs(): (String|None) => ","
+  """
+  Field separator. Use None to avoid splitting on fields.
+  """
+
   fun fn(): USize => 0
+  """
+  Maximum parts for the field split. (See String.split for more information.)
+  """
+
 
 
 class CSVReader
