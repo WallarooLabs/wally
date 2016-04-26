@@ -15,10 +15,7 @@ actor TopologyManager
   var _phone_home_host: String = ""
   var _phone_home_service: String = ""
 
-  new create(env: Env,
-             id: I32,
-             worker_count: USize,
-             phone_home: String) =>
+  new create(env: Env, id: I32, worker_count: USize, phone_home: String) =>
     _env = env
     _id = id
     _worker_count = worker_count
@@ -120,13 +117,8 @@ class LeaderNotifier is TCPListenNotify
   var _host: String = ""
   var _service: String = ""
 
-  new create(env: Env,
-             auth: AmbientAuth,
-             id: I32,
-             host: String,
-             service: String,
-             worker_count: USize,
-             phone_home: String) =>
+  new iso create(env: Env, auth: AmbientAuth, id: I32, host: String,
+    service: String, worker_count: USize, phone_home: String) =>
     _env = env
     _host = host
     _service = service
@@ -153,7 +145,7 @@ class LeaderConnectNotify is TCPConnectionNotify
   let _manager: TopologyManager
   var _buffer: Array[U8] = Array[U8]
   // How many bytes are left to process for current message
-  var _left: U16 = 0
+  var _left: U32 = 0
   // For building up the two bytes of a U16 message length
   var _len_bytes: Array[U8] = Array[U8]
 
@@ -169,14 +161,15 @@ class LeaderConnectNotify is TCPConnectionNotify
 
     let d: Array[U8] ref = consume data
     try
-      while (d.size() > 0) do
+      while d.size() > 0 do
         if _left == 0 then
-          if _len_bytes.size() < 2 then
+          if _len_bytes.size() < 4 then
             let next = d.shift()
             _len_bytes.push(next)
           else
             // Set _left to the length of the current message in bytes
-            _left = Bytes.to_u16(_len_bytes(0), _len_bytes(1))
+            _left = Bytes.to_u32(_len_bytes(0), _len_bytes(1), _len_bytes(2),
+              _len_bytes(3))
             _len_bytes = Array[U8]
           end
         else

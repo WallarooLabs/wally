@@ -9,11 +9,8 @@ class WorkerNotifier is TCPListenNotify
   var _host: String = ""
   var _service: String = ""
 
-  new create(env: Env,
-             auth: AmbientAuth,
-             id: I32,
-             leader_host: String,
-             leader_service: String) =>
+  new iso create(env: Env, auth: AmbientAuth, id: I32, leader_host: String,
+    leader_service: String) =>
     _env = env
     _auth = auth
     _id = id
@@ -56,23 +53,21 @@ class WorkerConnectNotify is TCPConnectionNotify
   let _env: Env
   let _leader_host: String
   let _leader_service: String
-  let _proxy_manager: ProxyManager
+  let _step_manager: StepManager
   let _id: I32
   var _buffer: Array[U8] = Array[U8]
   // How many bytes are left to process for current message
-  var _left: U16 = 0
+  var _left: U32 = 0
   // For building up the two bytes of a U16 message length
   var _len_bytes: Array[U8] = Array[U8]
 
-  new iso create(env: Env,
-                 id: I32,
-                 leader_host: String,
-                 leader_service: String) =>
+  new iso create(env: Env, id: I32, leader_host: String,
+    leader_service: String) =>
     _env = env
     _id = id
     _leader_host = leader_host
     _leader_service = leader_service
-    _proxy_manager = ProxyManager(_env)
+    _step_manager = StepManager(_env)
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("buffy worker: connection accepted")
@@ -82,14 +77,15 @@ class WorkerConnectNotify is TCPConnectionNotify
 
     let d: Array[U8] ref = consume data
     try
-      while (d.size() > 0) do
+      while d.size() > 0 do
         if _left == 0 then
-          if _len_bytes.size() < 2 then
+          if _len_bytes.size() < 4 then
             let next = d.shift()
             _len_bytes.push(next)
           else
             // Set _left to the length of the current message in bytes
-            _left = Bytes.to_u16(_len_bytes(0), _len_bytes(1))
+            _left = Bytes.to_u32(_len_bytes(0), _len_bytes(1), _len_bytes(2),
+              _len_bytes(3))
             _len_bytes = Array[U8]
           end
         else
@@ -113,13 +109,13 @@ class WorkerConnectNotify is TCPConnectionNotify
       match msg
       | let m: SpinUpMsg val =>
         _env.out.print("SPIN UP")
-        _proxy_manager.add_proxy(m.step_id, m.computation_type_id)
+        _step_manager.add_proxy(m.step_id, m.computation_type_id)
       | let m: ForwardMsg val =>
         _env.out.print("FORWARD")
-        _proxy_manager(m.step_id, m.msg)
+        _step_manager(m.step_id, m.msg)
       | let m: ConnectStepsMsg val =>
         _env.out.print("CONNECT PROXIES")
-        _proxy_manager.connect_steps(m.in_step_id, m.out_step_id)
+        _step_manager.connect_steps(m.in_step_id, m.out_step_id)
       | let m: InitializationMsgsFinishedMsg val =>
         _env.out.print("INITIALIZATION FINISHED")
         let ack_msg = TCPMessageEncoder.ack_initialized()

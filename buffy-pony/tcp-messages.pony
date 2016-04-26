@@ -78,8 +78,7 @@ primitive TCPMessageEncoder
   fun _encode_osc(msg: OSCMessage val): Array[U8] val =>
     let msg_bytes = msg.to_bytes()
     let len: U32 = msg_bytes.size().u32()
-    let arr: Array[U8] iso = recover Array[U8] end
-    arr.append(Bytes.from_u32(len))
+    let arr: Array[U8] iso = Bytes.from_u32(len, recover Array[U8] end)
     arr.append(msg_bytes)
     consume arr
 
@@ -103,10 +102,14 @@ primitive TCPMessageDecoder
         InitializationMsgsFinishedMsg
       | TCPMessageTypes.ack_initialized() =>
         AckInitializedMsg
+      else
+        error
       end
+    else
+      error
     end
 
-interface TCPMsg
+trait val TCPMsg
 
 class GreetMsg is TCPMsg
   let worker_id: I32
@@ -167,6 +170,6 @@ class ConnectStepsMsg is TCPMsg
       error
     end
 
-class val InitializationMsgsFinishedMsg is TCPMsg
+primitive InitializationMsgsFinishedMsg is TCPMsg
 
-class val AckInitializedMsg is TCPMsg
+primitive AckInitializedMsg is TCPMsg

@@ -15,18 +15,18 @@ actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
     _f = consume f
 
   be add_output(to: ComputeStep[Out] tag) =>
-    _output = consume to
+    _output = to
 
   be apply(input: Message[In] val) =>
     match _output
-    | let c: ComputeStep[Out] tag => c(_f(consume input))
+    | let c: ComputeStep[Out] tag => c(_f(input))
     end
 
 actor Sink[In: OSCEncodable val] is ComputeStep[In]
-let _f: FinalComputation[In]
+  let _f: FinalComputation[In]
 
   new create(f: FinalComputation[In] iso) =>
     _f = consume f
 
   be apply(input: Message[In] val) =>
-    _f(consume input)
+    _f(input)
