@@ -16,10 +16,13 @@ class WordCounter is Equatable[WordCounter]
     if counts.size() != that.counts.size() then return false end
     // 2. iterate through keys
     for (key, count) in counts.pairs() do
-      try
-        if count != that.counts(key) 
-        then return false 
-        end
+      match that.get(key)
+      | let count': U64 => 
+        if count == count' 
+				then continue 
+				else 
+					return false 
+				end
       else
         return false
       end
