@@ -84,6 +84,7 @@ class WordcountReceivedMessages is ReceivedMessages
 
 class WordcountSentVisitor is SentVisitor
   let _values: Array[WordcountSentMessage] ref = Array[WordcountSentMessage]()
+	fun fn(): USize => 2
 
   fun ref apply(value: Array[String] ref): None ? =>
     let timestamp = value(0).clone().strip().u64()
