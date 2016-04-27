@@ -31,7 +31,7 @@ class WorkerNotifier is TCPListenNotify
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
 
-      let message = TCPMessageEncoder.greet_leader(_id, _host, _service)
+      let message = TCPMessageEncoder.identify(_id, _host, _service)
       _env.out.print("My id is " + _id.string())
       conn.write(message)
     else
@@ -108,7 +108,7 @@ class WorkerConnectNotify is TCPConnectionNotify
     try
       let msg: TCPMsg val = TCPMessageDecoder(data)
       match msg
-      | let m: GreetMsg val =>
+      | let m: ReadyMsg val =>
         _env.out.print("GREET from " + m.worker_id.string())
         _nodes(m.worker_id) = conn
       | let m: SpinUpMsg val =>
@@ -144,7 +144,7 @@ class WorkerConnectNotify is TCPConnectionNotify
       let target_conn =
         TCPConnection(_auth, consume notifier, msg.target_host,
           msg.target_service)
-      target_conn.write(TCPMessageEncoder.greet(_id))
+      target_conn.write(TCPMessageEncoder.ready(_id))
       _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
       _nodes(msg.target_node_id) = target_conn
     end
