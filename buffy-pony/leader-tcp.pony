@@ -1,6 +1,6 @@
 use "net"
 use "collections"
-use "./encoding"
+use "./messages"
 
 actor TopologyManager
   let _env: Env

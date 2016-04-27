@@ -1,4 +1,5 @@
 use "collections"
+use "./messages"
 
 interface ComputeStep[In: OSCEncodable val]
   be apply(input: Message[In] val)
