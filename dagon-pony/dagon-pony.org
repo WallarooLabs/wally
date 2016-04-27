@@ -1,0 +1,116 @@
+#+LaTeX_CLASS: sendence-com-article-2
+#+SETUPFILE: ~/.emacs.dir/org-html-themes/setup/theme-readtheorg.setup
+#+TITLE: Dagon in Pony
+#+AUTHOR: Markus Fix
+#+EMAIL: markus@sendence.com
+#+DATE: 2015-04-26
+#+DESCRIPTION: Notes on design and implementation of Dagon in Pony
+#+KEYWORDS: Sendence, distributed, orchestration, buffy, dagon
+#+LANGUAGE: english
+#+STARTUP: overview
+#+TAGS: PROJECT(p) HOME(h) OFFICE(o) PHONE(t) ERRANDS(e)
+#+STARTUP: hidestars
+#+LaTeX_CLASS_OPTIONS: [10pt,a4paper,captions=tableheading,headsepline,footsepline]
+#+LateX_HEADER: \KOMAoptions{titlepage=true, abstract=true}
+#+LaTeX_HEADER: \subtitle{Buffy orchestration}
+#+LaTeX_HEADER: \usepackage{paralist}
+#+LaTeX_HEADER: \usepackage{amssymb}
+#+LaTeX_HEADER: \let\itemize\compactitem
+#+LaTeX_HEADER: \let\description\compactdesc
+#+LaTeX_HEADER: \let\enumerate\compactenum
+#+LaTeX_CLASS_OPTIONS: [captions=tableheading]
+#+LATEX: 
+#+LATEX: \listoffigures
+
+* Introduction
+/Dagon/ manages the lifecycle of all components of a Buffy
+topology. The components are booted using a ProcessMonitor from the
+process package. Each component is forked off as a separate Pony
+runtime process and reports back via TCP with a =ready= message to
+Dagon's control socket. We use OSC as our wire protocol for
+messages between components.
+
+* Design
+** Dagon Messages
+We define message types that will be used for communication between
+/Dagon/ and the components it manages.
+
+#+INCLUDE: "dagon-messages.pony" src pony
+
+** Boot Topology
+#+begin_src mscgen :file dagon-sequence-1.png
+msc{
+  width = 800;
+
+  D  [label = "Dagon"],
+  GR [label = "Giles Receiver"],
+  L  [label = "Leader"],
+  W1 [label = "Worker 1"],
+  W2 [label = "Worker 2"],
+  GS [label = "Giles Sender"];
+  |||;  
+  D -> D   [label = "fork Giles Receiver", textcolour = "red"];
+  D <- GR  [label = "ready"];
+  D -> D   [label = "fork Leader", textcolour = "red"];
+  D <- L   [label = "ready"];
+  D -> D   [label = "fork Worker 1", textcolour = "red"];
+  D <- W1  [label = "ready"];
+  D -> D   [label = "fork Worker 2", textcolour = "red"];
+  D <- W2  [label = "ready"];
+  D -> D   [label = "fork Giles", textcolour = "red"];
+  D <- GS  [label = "ready"];
+  |||;  
+}
+#+end_src
+
+#+ATTR_LATEX: :width 14 cm
+#+label: fig:dagaon-sequence-1
+#+caption: Dagon Sequence 1
+#+RESULTS:
+[[file:dagon-sequence-1.png]]
+ 
+** Shutdown Topology
+We expect /Giles Sender/ to complete first and send the =done= message
+to Dagon. Next /Giles Receiver/ should signal =done=. Once we have
+received the =done= message from *both* /Giles/ nodes we initiate the
+shutdown procedure by sending the =shutdown= message to the /Leader/
+to give it time for cleanup and any remaining communication with the
+/workers/. We wait for the /Leader's/ response. Once we receive the
+=done_shutdown= message from the /Leader/ we send the =shutdown=
+message to all /workers/, /Giles Sender/ and /Giles Receiver/ and wait
+for their response. Once we've received =done_shutdown= from all
+outstanding nodes we are done and exit.
+
+#+begin_src mscgen :file dagon-sequence-2.png
+msc{
+  width = 800;
+
+  D  [label = "Dagon"],
+  GR [label = "Giles Receiver"],
+  L  [label = "Leader"],
+  W1 [label = "Worker 1"],
+  W2 [label = "Worker 2"],
+  GS [label = "Giles Sender"];
+  |||;  
+  D <- GS  [label = "done"];
+  D <- GR  [label = "done"];
+  D -> L   [label = "shutdown"];
+  D <- L   [label = "done_shutdown"];
+  D -> W1  [label = "shutdown"];
+  D -> W2  [label = "shutdown"];
+  D <- W1  [label = "done_shutdown"];
+  D <- W2  [label = "done_shutdown"];
+  D -> GS  [label = "shutdown"];
+  D <- GS  [label = "done_shutdown"];  
+  D -> GR  [label = "shutdown"];
+  D <- GR  [label = "done_shutdown"];
+  |||;  
+}
+#+end_src
+
+#+ATTR_LATEX: :width 14 cm
+#+label: fig:dagaon-sequence-2
+#+caption: Dagon Sequence 2
+#+RESULTS:
+[[file:dagon-sequence-2.png]]
+
