@@ -1,4 +1,5 @@
 use "osc-pony"
+use "../"
 
 primitive _Ready                                fun apply(): String => "0"
 primitive _Identify                             fun apply(): String => "1"

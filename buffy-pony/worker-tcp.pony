@@ -1,5 +1,6 @@
 use "net"
 use "collections"
+use "./encoding"
 
 class WorkerNotifier is TCPListenNotify
   let _env: Env
