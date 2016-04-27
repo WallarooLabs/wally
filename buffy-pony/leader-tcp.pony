@@ -220,7 +220,7 @@ class LeaderConnectNotify is TCPConnectionNotify
     try
       let msg: TCPMsg val = TCPMessageDecoder(data)
       match msg
-      | let m: GreetLeaderMsg val =>
+      | let m: IdentifyMsg val =>
         _env.out.print("GREET from " + m.worker_id.string())
         _nodes(m.worker_id) = conn
         _topology_manager.assign_id(conn, m.worker_id, m.host, m.service)
