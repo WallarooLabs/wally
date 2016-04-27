@@ -1,4 +1,5 @@
 use "ponytest"
+use "./messages"
 
 actor TestMain is TestList
   new create(env: Env) => PonyTest(env, this)
