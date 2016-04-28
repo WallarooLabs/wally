@@ -13,6 +13,7 @@ primitive _SpinUpProxy                          fun apply(): String => "9"
 primitive _ConnectSteps                         fun apply(): String => "10"
 primitive _InitializationMsgsFinished           fun apply(): String => "11"
 primitive _AckInitialized                       fun apply(): String => "12"
+primitive _External                             fun apply(): String => "13"
 
 primitive TCPMessageEncoder
   fun ready(node_name: String): Array[U8] val =>
@@ -115,6 +116,8 @@ primitive TCPMessageEncoder
       end)
     _encode_osc(osc)
 
+//  fun external(data: String): Array[U8] val =>
+    
   fun _encode_osc(msg: OSCMessage val): Array[U8] val =>
     let msg_bytes = msg.to_bytes()
     let len: U32 = msg_bytes.size().u32()
