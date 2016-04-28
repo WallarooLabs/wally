@@ -22,3 +22,9 @@ primitive Bytes
     arr.push(l2)
     arr.push(l1)
     consume arr
+
+  fun length_encode(data: Array[U8] val): Array[U8] val =>
+    let len: U32 = data.size().u32()
+    let arr: Array[U8] iso = Bytes.from_u32(len, recover Array[U8] end)
+    arr.append(data)
+    consume arr

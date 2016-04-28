@@ -21,7 +21,7 @@ primitive TCPMessageEncoder
       recover
         [as OSCData val: OSCString(node_name)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun identify(node_name: String, host: String, service: String): Array[U8] val =>
     let osc = OSCMessage(_Identify(),
@@ -30,39 +30,39 @@ primitive TCPMessageEncoder
                          OSCString(host),
                          OSCString(service)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun done(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_Done(),
       recover
         [as OSCData val: OSCString(node_name)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun reconnect(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_Reconnect(),
       recover
         [as OSCData val: OSCString(node_name)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun start(): Array[U8] val =>
     let osc = OSCMessage(_Start(), recover Arguments end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun shutdown(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_Shutdown(),
       recover
         [as OSCData val: OSCString(node_name)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun done_shutdown(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_DoneShutdown(),
       recover
         [as OSCData val: OSCString(node_name)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun forward(step_id: I32, msg: Message[I32] val): Array[U8] val =>
     let osc = OSCMessage(_Forward(),
@@ -71,7 +71,7 @@ primitive TCPMessageEncoder
                          OSCInt(msg.id),
                          OSCInt(msg.data)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun spin_up(step_id: I32, computation_type_id: I32): Array[U8] val =>
     let osc = OSCMessage(_SpinUp(),
@@ -79,7 +79,7 @@ primitive TCPMessageEncoder
         [as OSCData val: OSCInt(step_id),
                          OSCInt(computation_type_id)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun spin_up_proxy(proxy_id: I32, step_id: I32, target_node_name: String,
     target_host: String, target_service: String):
@@ -92,7 +92,7 @@ primitive TCPMessageEncoder
                          OSCString(target_host),
                          OSCString(target_service)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun connect_steps(from_step_id: I32, to_step_id: I32): Array[U8] val =>
     let osc = OSCMessage(_ConnectSteps(),
@@ -100,31 +100,25 @@ primitive TCPMessageEncoder
         [as OSCData val: OSCInt(from_step_id),
                          OSCInt(to_step_id)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun initialization_msgs_finished(): Array[U8] val =>
     let osc = OSCMessage(_InitializationMsgsFinished(),
       recover
         Arguments
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
   fun ack_initialized(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_AckInitialized(),
       recover
         [as OSCData val: OSCString(node_name)]
       end)
-    _encode_osc(osc)
+    Bytes.length_encode(osc.to_bytes())
 
-//  fun external(data: String): Array[U8] val =>
+  fun external(data: String): Array[U8] val =>
+    Bytes.length_encode(data.array())
     
-  fun _encode_osc(msg: OSCMessage val): Array[U8] val =>
-    let msg_bytes = msg.to_bytes()
-    let len: U32 = msg_bytes.size().u32()
-    let arr: Array[U8] iso = Bytes.from_u32(len, recover Array[U8] end)
-    arr.append(msg_bytes)
-    consume arr
-
 primitive TCPMessageDecoder
   fun apply(data: Array[U8] val): TCPMsg val ? =>
     let msg = OSCDecoder.from_bytes(data) as OSCMessage val
@@ -158,6 +152,9 @@ primitive TCPMessageDecoder
     else
       error
     end
+
+  fun decode_external(data: Array[U8] val): TCPMsg val =>
+    ExternalMsg(data)
 
 trait val TCPMsg
 
@@ -304,3 +301,9 @@ class AckInitializedMsg is TCPMsg
     else
       error
     end
+
+class ExternalMsg is TCPMsg
+  let data: String
+
+  new val create(d: Array[U8] val) =>
+    data = String.from_array(d)
