@@ -7,4 +7,3 @@ class Message[A: OSCEncodable #send]
   new val create(msg_id: I32, msg_data: A) =>
     id = msg_id
     data = consume msg_data
-
