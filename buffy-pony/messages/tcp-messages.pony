@@ -116,7 +116,7 @@ primitive TCPMessageEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun external(data: Stringable): Array[U8] val =>
+  fun external(data: Stringable val): Array[U8] val =>
     let osc = OSCMessage(_External(),
       recover
         [as OSCData val: OSCString(data.string())]
@@ -154,7 +154,7 @@ primitive TCPMessageDecoder
     | _AckInitialized() =>
       AckInitializedMsg(msg)
     | _External() =>
-      External(msg)
+      ExternalMsg(msg)
     else
       error
     end

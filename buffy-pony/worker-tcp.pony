@@ -61,6 +61,7 @@ class WorkerConnectNotify is TCPConnectionNotify
   var _left: U32 = 0
   // For building up the two bytes of a U16 message length
   var _len_bytes: Array[U8] = Array[U8]
+  var _data_index: USize = 0
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
     leader_service: String, step_manager: StepManager) =>
@@ -79,10 +80,11 @@ class WorkerConnectNotify is TCPConnectionNotify
 
     let d: Array[U8] ref = consume data
     try
+      _data_index = 0
       while d.size() > 0 do
         if _left == 0 then
           if _len_bytes.size() < 4 then
-            let next = d.shift()
+            let next = d(_data_index = _data_index + 1)
             _len_bytes.push(next)
           else
             // Set _left to the length of the current message in bytes
@@ -91,7 +93,7 @@ class WorkerConnectNotify is TCPConnectionNotify
             _len_bytes = Array[U8]
           end
         else
-          _buffer.push(d.shift())
+          _buffer.push(d(_data_index = _data_index + 1))
           _left = _left - 1
           if _left == 0 then
             let copy: Array[U8] iso = recover Array[U8] end
