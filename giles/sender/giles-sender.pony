@@ -19,33 +19,35 @@ actor Main
     var required_args_are_present = true
     var run_tests = env.args.size() == 1
 
-    var b_arg: (Array[String] | None) = None
-    var m_arg: (USize | None) = None
-    var d_arg: (Array[String] | None) = None
-    var n_arg: (String | None) = None
-    var f_arg: (String | None) = None
+    if run_tests then
+      TestMain(env)
+    else
+      var b_arg: (Array[String] | None) = None
+      var m_arg: (USize | None) = None
+      var d_arg: (Array[String] | None) = None
+      var n_arg: (String | None) = None
+      var f_arg: (String | None) = None
 
-    try
-      var options = Options(env)
+      try
+        var options = Options(env)
 
-      options
-        .add("buffy", "b", StringArgument)
-        .add("dagon", "d", StringArgument)
-        .add("name", "n", StringArgument)
-        .add("messages", "m", I64Argument)
-        .add("file", "f", StringArgument)
+        options
+          .add("buffy", "b", StringArgument)
+          .add("dagon", "d", StringArgument)
+          .add("name", "n", StringArgument)
+          .add("messages", "m", I64Argument)
+          .add("file", "f", StringArgument)
 
-      for option in options do
-        match option
-        | ("buffy", let arg: String) => b_arg = arg.split(":")
-        | ("messages", let arg: I64) => m_arg = arg.usize()
-        | ("name", let arg: String) => n_arg = arg
-        | ("file", let arg: String) => f_arg = arg
-        | ("dagon", let arg: String) => d_arg = arg.split(":")
+        for option in options do
+          match option
+          | ("buffy", let arg: String) => b_arg = arg.split(":")
+          | ("messages", let arg: I64) => m_arg = arg.usize()
+          | ("name", let arg: String) => n_arg = arg
+          | ("file", let arg: String) => f_arg = arg
+          | ("dagon", let arg: String) => d_arg = arg.split(":")
+          end
         end
-      end
 
-      if run_tests == false then
         if b_arg is None then
           env.err.print("Must supply required '--buffy' argument")
           required_args_are_present = false
@@ -125,11 +127,8 @@ actor Main
           coordinator.sending_actor(sa)
         end
       else
-        env.out.print("Running tests...")
-        TestMain(env)
+        env.err.print("FUBAR! FUBAR!")
       end
-    else
-      env.err.print("FUBAR! FUBAR!")
     end
 
 class ToBuffyNotify is TCPConnectionNotify
