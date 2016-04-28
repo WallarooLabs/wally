@@ -5,10 +5,10 @@ use "./messages"
 actor TopologyManager
   let _env: Env
   let _step_manager: StepManager
-  let _id: I32
+  let _name: String
   let _worker_count: USize
-  let _workers: Map[I32, TCPConnection tag] = Map[I32, TCPConnection tag]
-  let _worker_addrs: Map[I32, (String, String)] = Map[I32, (String, String)]
+  let _workers: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
+  let _worker_addrs: Map[String, (String, String)] = Map[String, (String, String)]
   // Keep track of how many workers identified themselves
   var _hellos: USize = 0
   // Keep track of how many workers acknowledged they're running their
@@ -17,11 +17,11 @@ actor TopologyManager
   var _phone_home_host: String = ""
   var _phone_home_service: String = ""
 
-  new create(env: Env, id: I32, worker_count: USize, phone_home: String,
+  new create(env: Env, name: String, worker_count: USize, phone_home: String,
     step_manager: StepManager) =>
     _env = env
     _step_manager = step_manager
-    _id = id
+    _name = name
     _worker_count = worker_count
     if phone_home != "" then
       let ph_addr = phone_home.split(":")
@@ -33,19 +33,19 @@ actor TopologyManager
 
     if _worker_count == 0 then _complete_initialization() end
 
-  be assign_id(conn: TCPConnection tag, worker_id: I32,
+  be assign_name(conn: TCPConnection tag, node_name: String,
     host: String, service: String) =>
-    _workers(worker_id) = conn
-    _worker_addrs(worker_id) = (host, service)
-    _env.out.print("Identified worker " + worker_id.string())
+    _workers(node_name) = conn
+    _worker_addrs(node_name) = (host, service)
+    _env.out.print("Identified worker " + node_name)
     _hellos = _hellos + 1
     if _hellos == _worker_count then
       _env.out.print("_--- All workers accounted for! ---_")
       initialize_topology()
     end
 
-  be update_connection(conn: TCPConnection tag, worker_id: I32) =>
-    _workers(worker_id) = conn
+  be update_connection(conn: TCPConnection tag, node_name: String) =>
+    _workers(node_name) = conn
 
   be ack_initialized() =>
     _acks = _acks + 1
@@ -56,9 +56,9 @@ actor TopologyManager
   fun ref initialize_topology() =>
     try
       let keys = _workers.keys()
-      let remote_node_id1: I32 = keys.next()
-      let remote_node_id2: I32 = keys.next()
-      let node2_addr = _worker_addrs(remote_node_id2)
+      let remote_node_name1: String = keys.next()
+      let remote_node_name2: String = keys.next()
+      let node2_addr = _worker_addrs(remote_node_name2)
 
       let double_step_id: I32 = 1
       let halve_step_id: I32 = 2
@@ -70,7 +70,7 @@ actor TopologyManager
         TCPMessageEncoder.spin_up(halve_step_id, ComputationTypes.halve())
       let halve_to_print_proxy_create_msg =
         TCPMessageEncoder.spin_up_proxy(halve_to_print_proxy_id,
-          print_step_id, remote_node_id2, node2_addr._1, node2_addr._2)
+          print_step_id, remote_node_name2, node2_addr._1, node2_addr._2)
       let print_create_msg =
         TCPMessageEncoder.spin_up(print_step_id, ComputationTypes.print())
       let connect_msg =
@@ -82,14 +82,14 @@ actor TopologyManager
       _step_manager.add_step(double_step_id, ComputationTypes.double())
 
       //First worker node
-      var conn1 = _workers(remote_node_id1)
+      var conn1 = _workers(remote_node_name1)
       conn1.write(halve_create_msg)
       conn1.write(halve_to_print_proxy_create_msg)
       conn1.write(connect_msg)
       conn1.write(finished_msg)
 
       //Second worker node
-      var conn2 = _workers(remote_node_id2)
+      var conn2 = _workers(remote_node_name2)
       conn2.write(print_create_msg)
       conn2.write(finished_msg)
 
@@ -112,12 +112,13 @@ actor TopologyManager
       try
         let env = _env
         let auth = env.root as AmbientAuth
+        let name = _name
         let notifier: TCPConnectionNotify iso =
-          recover HomeConnectNotify(env) end
+          recover HomeConnectNotify(env, name) end
         let conn: TCPConnection =
           TCPConnection(auth, consume notifier, _phone_home_host, _phone_home_service)
 
-        let message = TCPMessageEncoder.ready(_id)
+        let message = TCPMessageEncoder.ready(_name)
         conn.write(message)
       else
         _env.out.print("Couldn't get ambient authority when completing "
@@ -131,61 +132,65 @@ actor TopologyManager
 class LeaderNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
+  let _name: String
   let _topology_manager: TopologyManager
   let _step_manager: StepManager
   var _host: String = ""
   var _service: String = ""
 
-  new iso create(env: Env, auth: AmbientAuth, id: I32, host: String,
+  new iso create(env: Env, auth: AmbientAuth, name: String, host: String,
     service: String, worker_count: USize, phone_home: String) =>
     _env = env
     _auth = auth
+    _name = name
     _host = host
     _service = service
     _step_manager = StepManager(env)
-    _topology_manager = TopologyManager(env, id, worker_count, phone_home,
+    _topology_manager = TopologyManager(env, name, worker_count, phone_home,
       _step_manager)
 
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
-      _env.out.print("buffy leader: listening on " + _host + ":" + _service)
+      _env.out.print(_name + ": listening on " + _host + ":" + _service)
     else
-      _env.out.print("buffy leader: couldn't get local address")
+      _env.out.print(_name + ": couldn't get local address")
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
-    _env.out.print("buffy leader: couldn't listen")
+    _env.out.print(_name + ": couldn't listen")
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    LeaderConnectNotify(_env, _auth, _topology_manager, _step_manager)
+    LeaderConnectNotify(_env, _auth, _name, _topology_manager, _step_manager)
 
 class LeaderConnectNotify is TCPConnectionNotify
   let _env: Env
   let _auth: AmbientAuth
+  let _name: String
   let _topology_manager: TopologyManager
   let _step_manager: StepManager
-  let _nodes: Map[I32, TCPConnection tag] = Map[I32, TCPConnection tag]
+  let _nodes: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
   var _buffer: Array[U8] = Array[U8]
   // How many bytes are left to process for current message
   var _left: U32 = 0
   // For building up the two bytes of a U16 message length
   var _len_bytes: Array[U8] = Array[U8]
 
-  new iso create(env: Env, auth: AmbientAuth, t_manager: TopologyManager,
+  new iso create(env: Env, auth: AmbientAuth, name: String, t_manager: TopologyManager,
     s_manager: StepManager) =>
     _env = env
     _auth = auth
+    _name = name
     _topology_manager = t_manager
     _step_manager = s_manager
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print("buffy leader: connection accepted")
+    _env.out.print(_name + ": connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    _env.out.print("buffy leader: data received")
+    _env.out.print(_name + ": data received")
 
     let d: Array[U8] ref = consume data
     try
@@ -220,15 +225,15 @@ class LeaderConnectNotify is TCPConnectionNotify
       let msg: TCPMsg val = TCPMessageDecoder(data)
       match msg
       | let m: IdentifyMsg val =>
-        _env.out.print("GREET from " + m.worker_id.string())
-        _nodes(m.worker_id) = conn
-        _topology_manager.assign_id(conn, m.worker_id, m.host, m.service)
+        _env.out.print("GREET from " + m.node_name)
+        _nodes(m.node_name) = conn
+        _topology_manager.assign_name(conn, m.node_name, m.host, m.service)
       | let m: AckInitializedMsg val =>
-        _env.out.print("ACK INITIALIZED MSG from " + m.worker_id.string())
+        _env.out.print("ACK INITIALIZED MSG from " + m.node_name)
         _topology_manager.ack_initialized()
       | let m: ReconnectMsg val =>
-        _env.out.print("RECONNECTING from " + m.node_id.string())
-        _topology_manager.update_connection(conn, m.node_id)
+        _env.out.print("RECONNECTING from " + m.node_name)
+        _topology_manager.update_connection(conn, m.node_name)
       | let m: SpinUpMsg val =>
         _env.out.print("SPIN UP STEP " + m.step_id.string())
         _step_manager.add_step(m.step_id, m.computation_type_id)
@@ -248,42 +253,38 @@ class LeaderConnectNotify is TCPConnectionNotify
     else
       _env.err.print("Error decoding incoming message.")
     end
-    _env.out.print("buffy leader: received")
+    _env.out.print(_name + ": received")
 
   fun ref _spin_up_proxy(msg: SpinUpProxyMsg val) =>
     try
-      let target_conn = _nodes(msg.target_node_id)
+      let target_conn = _nodes(msg.target_node_name)
       _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
     else
-      let env = _env
-      let auth = _auth
-      let topology_manager = _topology_manager
-      let step_manager = _step_manager
       let notifier: TCPConnectionNotify iso =
-        recover
-          LeaderConnectNotify(env, auth, topology_manager, step_manager)
-        end
+        LeaderConnectNotify(_env, _auth, _name, _topology_manager, _step_manager)
       let target_conn =
         TCPConnection(_auth, consume notifier, msg.target_host,
           msg.target_service)
       _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
-      _nodes(msg.target_node_id) = target_conn
+      _nodes(msg.target_node_name) = target_conn
     end
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print("buffy leader: server closed")
+    _env.out.print(_name + ": server closed")
 
 class HomeConnectNotify is TCPConnectionNotify
   let _env: Env
+  let _name: String
 
-  new iso create(env: Env) =>
+  new iso create(env: Env, name: String) =>
     _env = env
+    _name = name
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print("buffy leader: phone home connection accepted")
+    _env.out.print(_name + ": phone home connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    _env.out.print("buffy leader: received from phone home")
+    _env.out.print(_name + ": received from phone home")
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print("buffy leader: server closed")
+    _env.out.print(_name + ": server closed")
