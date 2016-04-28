@@ -15,24 +15,6 @@ primitive _InitializationMsgsFinished           fun apply(): String => "10"
 primitive _AckInitialized                       fun apply(): String => "11"
 
 primitive TCPMessageEncoder
-//  fun simple[O: OSCEncodable] (msg: Message[O] val): Array[U8] val =>
-//    let osc = match msg
-//    | let m: Message[I32] val =>
-//      OSCMessage("/oz", recover [as OSCData val: OSCInt(m.id),
-//                                                 OSCInt(m.data)] end)
-//    | let m: Message[F32] val =>
-//      OSCMessage("/oz", recover [as OSCData val: OSCInt(m.id),
-//                                                 OSCFloat(m.data)] end)
-//    | let m: Message[String] val =>
-//      OSCMessage("/oz", recover [as OSCData val: OSCInt(m.id),
-//                                                 OSCString(m.data)] end)
-//    end
-  fun simple(msg: Message[I32] val): Array[U8] val =>
-    let osc =
-      OSCMessage("/oz", recover [as OSCData val: OSCInt(msg.id),
-                                                 OSCInt(msg.data)] end)
-    _encode_osc(osc)
-
   fun ready(node_id: I32): Array[U8] val =>
     let osc = OSCMessage(_Ready(),
       recover
