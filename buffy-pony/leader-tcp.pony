@@ -111,10 +111,11 @@ actor TopologyManager
     if _has_phone_home() then
       try
         let env = _env
+        let auth = env.root as AmbientAuth
         let notifier: TCPConnectionNotify iso =
           recover HomeConnectNotify(env) end
         let conn: TCPConnection =
-          TCPConnection(_auth, consume notifier, _phone_home_host, _phone_home_service)
+          TCPConnection(auth, consume notifier, _phone_home_host, _phone_home_service)
 
         let message = TCPMessageEncoder.ready(_id)
         conn.write(message)
