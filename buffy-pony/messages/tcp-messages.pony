@@ -14,47 +14,47 @@ primitive _InitializationMsgsFinished           fun apply(): String => "10"
 primitive _AckInitialized                       fun apply(): String => "11"
 
 primitive TCPMessageEncoder
-  fun ready(node_id: I32): Array[U8] val =>
+  fun ready(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_Ready(),
       recover
-        [as OSCData val: OSCInt(node_id)]
+        [as OSCData val: OSCString(node_name)]
       end)
     _encode_osc(osc)
 
-  fun identify(node_id: I32, host: String, service: String): Array[U8] val =>
+  fun identify(node_name: String, host: String, service: String): Array[U8] val =>
     let osc = OSCMessage(_Identify(),
       recover
-        [as OSCData val: OSCInt(node_id),
+        [as OSCData val: OSCString(node_name),
                          OSCString(host),
                          OSCString(service)]
       end)
     _encode_osc(osc)
 
-  fun done(node_id: I32): Array[U8] val =>
+  fun done(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_Done(),
       recover
-        [as OSCData val: OSCInt(node_id)]
+        [as OSCData val: OSCString(node_name)]
       end)
     _encode_osc(osc)
 
-  fun reconnect(node_id: I32): Array[U8] val =>
+  fun reconnect(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_Reconnect(),
       recover
-        [as OSCData val: OSCInt(node_id)]
+        [as OSCData val: OSCString(node_name)]
       end)
     _encode_osc(osc)
 
-  fun shutdown(node_id: I32): Array[U8] val =>
+  fun shutdown(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_Shutdown(),
       recover
-        [as OSCData val: OSCInt(node_id)]
+        [as OSCData val: OSCString(node_name)]
       end)
     _encode_osc(osc)
 
-  fun done_shutdown(node_id: I32): Array[U8] val =>
+  fun done_shutdown(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_DoneShutdown(),
       recover
-        [as OSCData val: OSCInt(node_id)]
+        [as OSCData val: OSCString(node_name)]
       end)
     _encode_osc(osc)
 
@@ -75,14 +75,14 @@ primitive TCPMessageEncoder
       end)
     _encode_osc(osc)
 
-  fun spin_up_proxy(proxy_id: I32, step_id: I32, target_node_id: I32,
+  fun spin_up_proxy(proxy_id: I32, step_id: I32, target_node_name: String,
     target_host: String, target_service: String):
     Array[U8] val =>
     let osc = OSCMessage(_SpinUpProxy(),
       recover
         [as OSCData val: OSCInt(proxy_id),
                          OSCInt(step_id),
-                         OSCInt(target_node_id),
+                         OSCString(target_node_name),
                          OSCString(target_host),
                          OSCString(target_service)]
       end)
@@ -103,10 +103,10 @@ primitive TCPMessageEncoder
       end)
     _encode_osc(osc)
 
-  fun ack_initialized(worker_id: I32): Array[U8] val =>
+  fun ack_initialized(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_AckInitialized(),
       recover
-        [as OSCData val: OSCInt(worker_id)]
+        [as OSCData val: OSCString(node_name)]
       end)
     _encode_osc(osc)
 
@@ -146,25 +146,25 @@ primitive TCPMessageDecoder
 trait val TCPMsg
 
 class ReadyMsg is TCPMsg
-  let worker_id: I32
+  let node_name: String
 
   new val create(msg: OSCMessage val) ? =>
     match msg.arguments(0)
-    | let i: OSCInt val =>
-      worker_id = i.value()
+    | let n: OSCString val =>
+      node_name = n.value()
     else
       error
     end
 
 class IdentifyMsg is TCPMsg
-  let worker_id: I32
+  let node_name: String
   let host: String
   let service: String
 
   new val create(msg: OSCMessage val) ? =>
     match (msg.arguments(0), msg.arguments(1), msg.arguments(2))
-    | (let i: OSCInt val, let h: OSCString val, let s: OSCString val) =>
-      worker_id = i.value()
+    | (let n: OSCString val, let h: OSCString val, let s: OSCString val) =>
+      node_name = n.value()
       host = h.value()
       service = s.value()
     else
@@ -172,11 +172,11 @@ class IdentifyMsg is TCPMsg
     end
 
 class ReconnectMsg is TCPMsg
-  let node_id: I32
+  let node_name: String
 
   new val create(msg: OSCMessage val) ? =>
     match msg.arguments(0)
-    | let i: OSCInt val => node_id = i.value()
+    | let n: OSCString val => node_name = n.value()
     else
       error
     end
@@ -210,18 +210,18 @@ class SpinUpMsg is TCPMsg
 class SpinUpProxyMsg is TCPMsg
   let proxy_id: I32
   let step_id: I32
-  let target_node_id: I32
+  let target_node_name: String
   let target_host: String
   let target_service: String
 
   new val create(msg: OSCMessage val) ? =>
     match (msg.arguments(0), msg.arguments(1), msg.arguments(2),
       msg.arguments(3), msg.arguments(4))
-    | (let p_id: OSCInt val, let s_id: OSCInt val, let t_node_id: OSCInt val,
+    | (let p_id: OSCInt val, let s_id: OSCInt val, let t_node_name: OSCString val,
       let t_host: OSCString val, let t_service: OSCString val) =>
       proxy_id = p_id.value()
       step_id = s_id.value()
-      target_node_id = t_node_id.value()
+      target_node_name = t_node_name.value()
       target_host = t_host.value()
       target_service = t_service.value()
     else
@@ -244,12 +244,12 @@ class ConnectStepsMsg is TCPMsg
 primitive InitializationMsgsFinishedMsg is TCPMsg
 
 class AckInitializedMsg is TCPMsg
-  let worker_id: I32
+  let node_name: String
 
   new val create(msg: OSCMessage val) ? =>
     match msg.arguments(0)
-    | let i: OSCInt val =>
-      worker_id = i.value()
+    | let n: OSCString val =>
+      node_name = n.value()
     else
       error
     end
