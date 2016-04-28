@@ -177,6 +177,7 @@ class LeaderConnectNotify is TCPConnectionNotify
   var _left: U32 = 0
   // For building up the two bytes of a U16 message length
   var _len_bytes: Array[U8] = Array[U8]
+  var _data_index: USize = 0
 
   new iso create(env: Env, auth: AmbientAuth, name: String, t_manager: TopologyManager,
     s_manager: StepManager) =>
@@ -193,11 +194,12 @@ class LeaderConnectNotify is TCPConnectionNotify
     _env.out.print(_name + ": data received")
 
     let d: Array[U8] ref = consume data
+    _data_index = 0
     try
       while d.size() > 0 do
         if _left == 0 then
           if _len_bytes.size() < 4 then
-            let next = d.shift()
+            let next = d(_data_index = _data_index + 1)
             _len_bytes.push(next)
           else
             // Set _left to the length of the current message in bytes
@@ -206,7 +208,7 @@ class LeaderConnectNotify is TCPConnectionNotify
             _len_bytes = Array[U8]
           end
         else
-          _buffer.push(d.shift())
+          _buffer.push(d(_data_index = _data_index + 1))
           _left = _left - 1
           if _left == 0 then
             let copy: Array[U8] iso = recover Array[U8] end
