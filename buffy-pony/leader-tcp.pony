@@ -119,8 +119,8 @@ actor TopologyManager
         let conn: TCPConnection =
           TCPConnection(auth, consume notifier, ph_host, ph_service)
 
-//        let message = OSCMessage("/phone_home", recover [as OSCData val: OSCString("Buffy ready")] end)
-//        conn.write(Bytes.encode_osc(message))
+        let message = TCPMessageEncoder.ready(_id)
+        conn.write(message)
       else
         _env.out.print("Couldn't get ambient authority when completing "
           + "initialization")
