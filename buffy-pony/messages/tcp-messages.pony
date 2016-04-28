@@ -4,14 +4,15 @@ primitive _Ready                                fun apply(): String => "0"
 primitive _Identify                             fun apply(): String => "1"
 primitive _Done                                 fun apply(): String => "2"
 primitive _Reconnect                            fun apply(): String => "3"
-primitive _Shutdown                             fun apply(): String => "4"
-primitive _DoneShutdown                         fun apply(): String => "5"
-primitive _Forward                              fun apply(): String => "6"
-primitive _SpinUp                               fun apply(): String => "7"
-primitive _SpinUpProxy                          fun apply(): String => "8"
-primitive _ConnectSteps                         fun apply(): String => "9"
-primitive _InitializationMsgsFinished           fun apply(): String => "10"
-primitive _AckInitialized                       fun apply(): String => "11"
+primitive _Start                                fun apply(): String => "4"
+primitive _Shutdown                             fun apply(): String => "5"
+primitive _DoneShutdown                         fun apply(): String => "6"
+primitive _Forward                              fun apply(): String => "7"
+primitive _SpinUp                               fun apply(): String => "8"
+primitive _SpinUpProxy                          fun apply(): String => "9"
+primitive _ConnectSteps                         fun apply(): String => "10"
+primitive _InitializationMsgsFinished           fun apply(): String => "11"
+primitive _AckInitialized                       fun apply(): String => "12"
 
 primitive TCPMessageEncoder
   fun ready(node_name: String): Array[U8] val =>
@@ -42,6 +43,10 @@ primitive TCPMessageEncoder
       recover
         [as OSCData val: OSCString(node_name)]
       end)
+    _encode_osc(osc)
+
+  fun start(): Array[U8] val =>
+    let osc = OSCMessage(_Start(), recover Arguments end)
     _encode_osc(osc)
 
   fun shutdown(node_name: String): Array[U8] val =>
@@ -125,8 +130,16 @@ primitive TCPMessageDecoder
       ReadyMsg(msg)
     | _Identify() =>
       IdentifyMsg(msg)
+    | _Done() =>
+      DoneMsg(msg)
+    | _Start() =>
+      StartMsg
     | _Reconnect() =>
       ReconnectMsg(msg)
+    | _Shutdown() =>
+      ShutdownMsg(msg)
+    | _DoneShutdown() =>
+      DoneShutdownMsg(msg)
     | _Forward() =>
       ForwardMsg(msg)
     | _SpinUp() =>
@@ -171,12 +184,47 @@ class IdentifyMsg is TCPMsg
       error
     end
 
+class DoneMsg is TCPMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end
+
+primitive StartMsg is TCPMsg
+
 class ReconnectMsg is TCPMsg
   let node_name: String
 
   new val create(msg: OSCMessage val) ? =>
     match msg.arguments(0)
     | let n: OSCString val => node_name = n.value()
+    else
+      error
+    end
+
+class ShutdownMsg is TCPMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end
+
+class DoneShutdownMsg is TCPMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
     else
       error
     end
