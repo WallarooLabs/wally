@@ -117,7 +117,11 @@ primitive TCPMessageEncoder
     Bytes.length_encode(osc.to_bytes())
 
   fun external(data: Stringable): Array[U8] val =>
-    Bytes.length_encode(data.string().array())
+    let osc = OSCMessage(_External(),
+      recover
+        [as OSCData val: OSCString(data.string())]
+      end)
+    Bytes.length_encode(osc.to_bytes())
     
 primitive TCPMessageDecoder
   fun apply(data: Array[U8] val): TCPMsg val ? =>
@@ -149,12 +153,11 @@ primitive TCPMessageDecoder
       InitializationMsgsFinishedMsg
     | _AckInitialized() =>
       AckInitializedMsg(msg)
+    | _External() =>
+      External(msg)
     else
       error
     end
-
-  fun decode_external(data: Array[U8] val): TCPMsg val =>
-    ExternalMsg(data)
 
 trait val TCPMsg
 
@@ -305,5 +308,9 @@ class AckInitializedMsg is TCPMsg
 class ExternalMsg is TCPMsg
   let data: String
 
-  new val create(d: Array[U8] val) =>
-    data = String.from_array(d)
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let d: OSCString val => data = d.value()
+    else
+      error
+    end
