@@ -31,11 +31,11 @@ Dagon's control socket. We use OSC as our wire protocol for
 messages between components.
 
 * Design
-** Dagon Messages
+** Control Messages
 We define message types that will be used for communication between
 /Dagon/ and the components it manages.
 
-#+INCLUDE: "dagon-messages.pony" src pony
+#+INCLUDE: "../buffy-pony/tcp-messages.pony" src pony :lines "3-14"
 
 ** Boot Topology
 #+begin_src mscgen :file dagon-sequence-1.png
@@ -57,8 +57,9 @@ msc{
   D <- W1  [label = "ready"];
   D -> D   [label = "fork Worker 2", textcolour = "red"];
   D <- W2  [label = "ready"];
-  D -> D   [label = "fork Giles", textcolour = "red"];
+  D -> D   [label = "fork Giles Sender", textcolour = "red"];
   D <- GS  [label = "ready"];
+  D -> GS  [label = "start"];
   |||;  
 }
 #+end_src
@@ -114,3 +115,23 @@ msc{
 #+RESULTS:
 [[file:dagon-sequence-2.png]]
 
+* First Draft
+
+#+BEGIN_SRC ponylang
+actor Main
+  new create(env: Env) =>
+    var options = Options(env)
+    var args = options.remaining()
+
+    try
+      let buffy_name: String val = args(1).clone()
+      let sender_name: String val = args(2).clone()
+      let receiver_name: String val = args(3).clone()
+      let process_names: Array[String val] val = recover val [buffy_name,
+        sender_name, receiver_name] end
+      TCPListener(env.root as AmbientAuth, recover Notifier(env, process_names) end)
+    else
+      env.out.print("Parameters: buffy_binary giles_sender_binary giles_receiver_binary")
+    end
+
+#+END_SRC
