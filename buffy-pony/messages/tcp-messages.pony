@@ -116,8 +116,8 @@ primitive TCPMessageEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun external(data: String): Array[U8] val =>
-    Bytes.length_encode(data.array())
+  fun external(data: Stringable): Array[U8] val =>
+    Bytes.length_encode(data.string().array())
     
 primitive TCPMessageDecoder
   fun apply(data: Array[U8] val): TCPMsg val ? =>

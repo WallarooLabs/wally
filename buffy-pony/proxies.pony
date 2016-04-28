@@ -28,8 +28,8 @@ actor ExternalConnection is ComputeStep[I32]
 
   be apply(input: Message[I32] val) =>
     _env.out.print("External connection: sending to external system")
-//    let tcp_msg = TCPMessageEncoder.simple(input)
-//    _conn.write(tcp_msg)
+    let tcp_msg = TCPMessageEncoder.external(input.data)
+    _conn.write(tcp_msg)
 
 actor StepManager
   let _env: Env
