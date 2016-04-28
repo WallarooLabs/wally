@@ -1,7 +1,7 @@
 use "collections"
 use "debug"
 use "net"
-use "./encoding"
+use "./messages"
 
 actor Proxy is ComputeStep[I32]
   let _env: Env

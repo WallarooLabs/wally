@@ -66,6 +66,7 @@ else
   ifeq ($(arch),amd64)
     define PONYC
       docker run --rm -it -u `id -u` -v $(current_dir):$(current_dir) \
+        -v ~/.gitconfig:/.gitconfig \
         -w $(current_dir)/$(1) --entrypoint stable \
         $(ponyc_runner):$(ponyc_tag)-$(arch) fetch
       docker run --rm -it -u `id -u` -v $(current_dir):$(current_dir) \
@@ -75,6 +76,7 @@ else
   else ifeq ($(arch),armhf)
     define PONYC
       docker run --rm -it -u `id -u` -v \
+        -v ~/.gitconfig:/.gitconfig \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
         --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
         fetch
@@ -111,7 +113,7 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-spike build-receiver build-sender build-wesley ## Build Pony based programs for Buffy
+build: build-spike build-receiver build-sender build-wesley build-buffy-pony ## Build Pony based programs for Buffy
 
 build-spike: ## Build spike
 	$(call PONYC,spike)
@@ -122,11 +124,14 @@ build-receiver: ## Build giles receiver
 build-sender: ## Build giles sender
 	$(call PONYC,giles/sender)
 
+build-buffy-pony: ## Build buffy pony
+	$(call PONYC,buffy-pony)
+
 build-wesley: ## Build wesley
 	$(call PONYC,wesley/double)
 	$(call PONYC,wesley/identity)
 
-test: lint-test test-buffy test-giles-receiver test-giles-sender ## Test programs for Buffy
+test: lint-test test-buffy test-giles-receiver test-giles-sender test-buffy-pony ## Test programs for Buffy
 
 test-buffy: ## Test buffy
 	cd buffy && python3 -m py.test functions/*
@@ -136,6 +141,9 @@ test-giles-receiver: ## Test Giles Receiver
 
 test-giles-sender: ## Test Giles Sender
 	cd giles/sender && ./sender
+
+test-buffy-pony: ## Test buffy pony
+	cd buffy-pony && ./buffy-pony
 
 lint-test: lint-test-buffy ## Run lint tests for programs for Buffy
 
@@ -283,6 +291,7 @@ clean: clean-docker ## Cleanup docker images and compiled files for Buffy
 	rm -f giles/sender/sender giles/sender/sender.o
 	rm -f wesley/identity/identity wesley/identity/identity.o
 	rm -f wesley/double/double wesley/double/double.o
+	rm -f buffy-pony/buffy-pony buffy-pony/buffy-pony.o
 	rm -f sent.txt received.txt
 	rm -rf buffy/functions/__pycache__/
 	@echo 'Done cleaning.'
