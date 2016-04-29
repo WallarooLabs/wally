@@ -2,7 +2,9 @@
 
 ## Usage
 
-Buffy is currently hardcoded to run a Double/Divide app over two Buffy processes.
+Buffy must be imported as a library.
+
+When you run a client, use the following command line parameters:
 
 ```-l``` sets process as leader.  
 ```-w <count>``` tells the leader how many workers to wait for.  
@@ -11,10 +13,10 @@ Buffy is currently hardcoded to run a Double/Divide app over two Buffy processes
 To run the code, you need to kick off three processes:
 
 1. Leader  
-```./buffy-pony 127.0.0.1:6000 -l -w 2 -n LeaderNode```
+```./app-name 127.0.0.1:6000 -l -w 2 -n LeaderNode```
 
 2. Workers  
-```./buffy-pony 127.0.0.1:6000 -n Worker1```
-```./buffy-pony 127.0.0.1:6000 -n Worker2```
+```./app-name 127.0.0.1:6000 -n Worker1```
+```./app-name 127.0.0.1:6000 -n Worker2```
 
 The address passed in is the leader's address.
