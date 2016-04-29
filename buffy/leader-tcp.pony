@@ -2,6 +2,7 @@ use "net"
 use "collections"
 use "buffy/messages"
 use "sendence/bytes"
+use "sendence/tcp"
 
 actor TopologyManager
   let _env: Env
@@ -171,6 +172,7 @@ class LeaderConnectNotify is TCPConnectionNotify
   let _name: String
   let _topology_manager: TopologyManager
   let _step_manager: StepManager
+  let _framer: Framer = Framer
   let _nodes: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
   var _buffer: Array[U8] = Array[U8]
   // How many bytes are left to process for current message
@@ -191,59 +193,31 @@ class LeaderConnectNotify is TCPConnectionNotify
     _env.out.print(_name + ": connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    let d: Array[U8] ref = consume data
-    _data_index = 0
-    try
-      while d.size() > 0 do
-        if _left == 0 then
-          if _len_bytes.size() < 4 then
-            let next = d(_data_index = _data_index + 1)
-            _len_bytes.push(next)
-          else
-            // Set _left to the length of the current message in bytes
-            _left = Bytes.to_u32(_len_bytes(0), _len_bytes(1), _len_bytes(2),
-              _len_bytes(3))
-            _len_bytes = Array[U8]
-          end
+    for chunked in _framer.chunk(consume data).values() do
+      try
+        let msg = WireMsgDecoder(consume chunked)
+        match msg
+        | let m: IdentifyMsg val =>
+          _nodes(m.node_name) = conn
+          _topology_manager.assign_name(conn, m.node_name, m.host, m.service)
+        | let m: AckInitializedMsg val =>
+          _topology_manager.ack_initialized()
+        | let m: ReconnectMsg val =>
+          _topology_manager.update_connection(conn, m.node_name)
+        | let m: SpinUpMsg val =>
+          _step_manager.add_step(m.step_id, m.computation_type_id)
+        | let m: SpinUpProxyMsg val =>
+          _spin_up_proxy(m)
+        | let m: ForwardMsg val =>
+          _step_manager(m.step_id, m.msg)
+        | let m: ConnectStepsMsg val =>
+          _step_manager.connect_steps(m.in_step_id, m.out_step_id)
         else
-          _buffer.push(d(_data_index = _data_index + 1))
-          _left = _left - 1
-          if _left == 0 then
-            let copy: Array[U8] iso = recover Array[U8] end
-            for byte in _buffer.values() do
-              copy.push(byte)
-            end
-            _process_data(conn, consume copy)
-            _buffer = Array[U8]
-          end
+          _env.err.print("Error decoding incoming message.")
         end
-      end
-    end
-
-  fun ref _process_data(conn: TCPConnection ref, data: Array[U8] val) =>
-    try
-      let msg: WireMsg val = WireMsgDecoder(data)
-      match msg
-      | let m: IdentifyMsg val =>
-        _nodes(m.node_name) = conn
-        _topology_manager.assign_name(conn, m.node_name, m.host, m.service)
-      | let m: AckInitializedMsg val =>
-        _topology_manager.ack_initialized()
-      | let m: ReconnectMsg val =>
-        _topology_manager.update_connection(conn, m.node_name)
-      | let m: SpinUpMsg val =>
-        _step_manager.add_step(m.step_id, m.computation_type_id)
-      | let m: SpinUpProxyMsg val =>
-        _spin_up_proxy(m)
-      | let m: ForwardMsg val =>
-        _step_manager(m.step_id, m.msg)
-      | let m: ConnectStepsMsg val =>
-        _step_manager.connect_steps(m.in_step_id, m.out_step_id)
       else
         _env.err.print("Error decoding incoming message.")
       end
-    else
-      _env.err.print("Error decoding incoming message.")
     end
 
   fun ref _spin_up_proxy(msg: SpinUpProxyMsg val) =>
