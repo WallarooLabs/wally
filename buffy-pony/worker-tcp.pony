@@ -77,8 +77,6 @@ class WorkerConnectNotify is TCPConnectionNotify
     _env.out.print(_name + ": connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    _env.out.print(_name + ": data received")
-
     let d: Array[U8] ref = consume data
     try
       _data_index = 0
@@ -113,23 +111,16 @@ class WorkerConnectNotify is TCPConnectionNotify
       let msg: WireMsg val = WireMsgDecoder(data)
       match msg
       | let m: ReadyMsg val =>
-        _env.out.print("GREET from " + m.node_name)
         _nodes(m.node_name) = conn
       | let m: SpinUpMsg val =>
-        _env.out.print("SPIN UP " + m.step_id.string())
         _step_manager.add_step(m.step_id, m.computation_type_id)
       | let m: SpinUpProxyMsg val =>
-        _env.out.print("SPIN UP PROXY " + m.proxy_id.string())
         _spin_up_proxy(m)
       | let m: ForwardMsg val =>
-        _env.out.print("FORWARD message " + m.msg.id.string())
         _step_manager(m.step_id, m.msg)
       | let m: ConnectStepsMsg val =>
-        _env.out.print("CONNECT STEPS " + m.in_step_id.string() + " to "
-          + m.out_step_id.string())
         _step_manager.connect_steps(m.in_step_id, m.out_step_id)
       | let m: InitializationMsgsFinishedMsg val =>
-        _env.out.print("INITIALIZATION FINISHED")
         let ack_msg = WireMsgEncoder.ack_initialized(_name)
         conn.write(ack_msg)
       end

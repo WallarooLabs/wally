@@ -97,10 +97,9 @@ actor TopologyManager
       let halve_proxy_id: I32 = 5
       _step_manager.add_proxy(halve_proxy_id, halve_step_id, conn1)
       _step_manager.connect_steps(1, 5)
-      _env.out.print("Getting ready to send data messages")
 
-      for i in Range(150, 160) do
-        let next_msg = Message[I32](i.i32() - 149, i.i32())
+      for i in Range(0, 100) do
+        let next_msg = Message[I32](i.i32(), i.i32())
         _step_manager(1, next_msg)
       end
     else
@@ -192,8 +191,6 @@ class LeaderConnectNotify is TCPConnectionNotify
     _env.out.print(_name + ": connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    _env.out.print(_name + ": data received")
-
     let d: Array[U8] ref = consume data
     _data_index = 0
     try
@@ -228,27 +225,19 @@ class LeaderConnectNotify is TCPConnectionNotify
       let msg: WireMsg val = WireMsgDecoder(data)
       match msg
       | let m: IdentifyMsg val =>
-        _env.out.print("GREET from " + m.node_name)
         _nodes(m.node_name) = conn
         _topology_manager.assign_name(conn, m.node_name, m.host, m.service)
       | let m: AckInitializedMsg val =>
-        _env.out.print("ACK INITIALIZED MSG from " + m.node_name)
         _topology_manager.ack_initialized()
       | let m: ReconnectMsg val =>
-        _env.out.print("RECONNECTING from " + m.node_name)
         _topology_manager.update_connection(conn, m.node_name)
       | let m: SpinUpMsg val =>
-        _env.out.print("SPIN UP STEP " + m.step_id.string())
         _step_manager.add_step(m.step_id, m.computation_type_id)
       | let m: SpinUpProxyMsg val =>
-        _env.out.print("SPIN UP PROXY " + m.proxy_id.string())
         _spin_up_proxy(m)
       | let m: ForwardMsg val =>
-        _env.out.print("FORWARD message " + m.msg.id.string())
         _step_manager(m.step_id, m.msg)
       | let m: ConnectStepsMsg val =>
-        _env.out.print("CONNECT STEPS " + m.in_step_id.string() + " to "
-          + m.out_step_id.string())
         _step_manager.connect_steps(m.in_step_id, m.out_step_id)
       else
         _env.err.print("Error decoding incoming message.")
@@ -256,7 +245,6 @@ class LeaderConnectNotify is TCPConnectionNotify
     else
       _env.err.print("Error decoding incoming message.")
     end
-    _env.out.print(_name + ": received")
 
   fun ref _spin_up_proxy(msg: SpinUpProxyMsg val) =>
     try
