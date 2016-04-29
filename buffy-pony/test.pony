@@ -1,5 +1,6 @@
 use "ponytest"
-use "./messages"
+use "buffy/messages"
+use "sendence/bytes"
 
 actor TestMain is TestList
   new create(env: Env) => PonyTest(env, this)

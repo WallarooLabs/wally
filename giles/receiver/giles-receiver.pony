@@ -1,153 +1,282 @@
-use "bureaucracy"
+"""
+Giles receiver
+"""
 use "collections"
-use "debug"
 use "files"
 use "net"
+use "options"
 use "signals"
 use "time"
+use "buffy/messages"
+use "sendence/tcp"
+
+// needs to handle shutdown message from dagon
+// needs to handle framing for incoming messages
+// needs to handle osc decoding for incoming messges
+// tests
+// documentation
+// with dagon Finished method needs logic
 
 actor Main
   new create(env: Env) =>
+    var required_args_are_present = true
+    var run_tests = env.args.size() == 1
+
+    if run_tests then
+      TestMain(env)
+    else
+      var d_arg: (Array[String] | None) = None
+      var l_arg: (Array[String] | None) = None
+      var n_arg: (String | None) = None
+
+      try
+        var options = Options(env)
+
+        options
+          .add("dagon", "d", StringArgument)
+          .add("name", "n", StringArgument)
+          .add("listen", "l", StringArgument)
+
+        for option in options do
+          match option
+          | ("name", let arg: String) => n_arg = arg
+          | ("dagon", let arg: String) => d_arg = arg.split(":")
+          | ("listen", let arg: String) => l_arg = arg.split(":")
+          end
+        end
+
+        if l_arg is None then
+          env.err.print("Must supply required '--listen' argument")
+          required_args_are_present = false
+        else
+          if (l_arg as Array[String]).size() != 2 then
+            env.err.print(
+              "'--listen' argument should be in format: '127.0.0.1:8080")
+            required_args_are_present = false
+          end
+        end
+
+        if d_arg isnt None then
+          if (d_arg as Array[String]).size() != 2 then
+            env.err.print(
+              "'--dagon' argument should be in format: '127.0.0.1:8080")
+            required_args_are_present = false
+          end
+        end
+
+        if (d_arg isnt None) or (n_arg isnt None) then
+          if (d_arg is None) or (n_arg is None) then
+            env.err.print(
+              "'--dagon' must be used in conjunction with '--name'")
+            required_args_are_present = false
+          end
+        end
+
+        if required_args_are_present then
+          let listener_addr = l_arg as Array[String]
+
+          let store = Store(env.root as AmbientAuth)
+          let coordinator = CoordinatorFactory(env, store, n_arg, d_arg)
+
+          SignalHandler(TermHandler(coordinator), Sig.term())
+
+          let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
+          let from_buffy_listener = TCPListener(tcp_auth,
+            FromBuffyListenerNotify(coordinator, store),
+            listener_addr(0),
+            listener_addr(1))
+
+        end
+      else
+        env.err.print("FUBAR! FUBAR!")
+      end
+    end
+
+class FromBuffyListenerNotify is TCPListenNotify
+  let _coordinator: Coordinator
+  let _store: Store
+
+  new iso create(coordinator: Coordinator, store: Store) =>
+    _coordinator = coordinator
+    _store = store
+
+  fun ref not_listening(listen: TCPListener ref) =>
+    _coordinator.from_buffy_listener(listen, Failed)
+
+  fun ref listening(listen: TCPListener ref) =>
+    _coordinator.from_buffy_listener(listen, Ready)
+
+  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
+    FromBuffyNotify(_store)
+
+class FromBuffyNotify is TCPConnectionNotify
+  let _store: Store
+  let _framer: Framer = Framer
+
+  new iso create(store: Store) =>
+    _store = store
+
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    for chunked in _framer.chunk(consume data).values() do
     try
-      let custodian = Custodian
-
-      let in_addr_raw = env.args(1).split(":")
-      let time_to_first_message = env.args(2).u64() * 1_000_000_000
-      let time_between_messages = env.args(3).u64() * 1_000_000_000
-
-      let incoming_host = in_addr_raw(0)
-      let incoming_port = in_addr_raw(1)
-      let store = Store(env)
-      let monitor = ShutdownMonitor(custodian, time_to_first_message, time_between_messages)
-
-      match ReceiverFactory(env, store, monitor, incoming_host, incoming_port)
-      | let receiver: Receiver =>
-        custodian(receiver)(monitor)(store)
-        SignalHandler(TermHandler(custodian), Sig.term())
-      | None =>
-        env.err.print("Unable to setup application. Exiting.")
+      let decoded = WireMsgDecoder(consume chunked)
+      match decoded
+      | let d: ExternalMsg val =>
+        @printf[I32]("%s\n".cstring(), d.data.cstring())
+        _store.received(d.data, Time.micros())
+      else
+        @printf[I32]("UNEXPECTED DATA\n".cstring())
       end
     else
-      env.out.print("running tests...")
-      TestMain(env)
-      //env.out.print("wrong args")
+      @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
     end
+  end
 
-class ReceiverFactory
-  fun apply(
-    env: Env,
+class ToDagonNotify is TCPConnectionNotify
+  let _coordinator: WithDagonCoordinator
+
+  new iso create(coordinator: WithDagonCoordinator) =>
+    _coordinator = coordinator
+
+  fun ref connect_failed(sock: TCPConnection ref) =>
+    _coordinator.to_dagon_socket(sock, Failed)
+
+  fun ref connected(sock: TCPConnection ref) =>
+    _coordinator.to_dagon_socket(sock, Ready)
+
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    // TODO handle shutdown message here
+    None
+
+//
+// COORDINATE OUR STARTUP
+//
+
+primitive CoordinatorFactory
+  fun apply(env: Env,
     store: Store,
-    monitor: ShutdownMonitor,
-    on_address: String,
-    on_port: String): (Receiver | None) =>
+    node_id: (String | None),
+    to_dagon_addr: (Array[String] | None)): Coordinator ?
+  =>
+    if (node_id isnt None) and (to_dagon_addr isnt None) then
+      let n = node_id as String
+      let ph = to_dagon_addr as Array[String]
+      let coordinator = WithDagonCoordinator(env, store, n)
 
-    try
-      let auth = env.root as AmbientAuth
-      let socket = UDPSocket(auth, ReceiverNotify(env, store, monitor), on_address, on_port)
-      return Receiver(socket)
+      let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
+      let to_dagon_socket = TCPConnection(tcp_auth,
+        ToDagonNotify(coordinator),
+        ph(0),
+        ph(1))
+
+      coordinator
     else
-      env.err.print("Can't open UDPSocket")
-      return None
+      WithoutDagonCoordinator(env, store)
     end
 
-actor Receiver
-  var _socket: UDPSocket
+interface tag Coordinator
+  be finished()
+  be from_buffy_listener(listener: TCPListener, state: WorkerState)
 
-  new create(socket: UDPSocket) =>
-    _socket = socket
+primitive Waiting
+primitive Ready
+primitive Failed
 
-  be dispose() =>
-    _socket.dispose()
+type WorkerState is (Waiting | Ready | Failed)
 
-class ReceiverNotify is UDPNotify
+actor WithoutDagonCoordinator is Coordinator
   let _env: Env
   let _store: Store
-  let _monitor: ShutdownMonitor
+  var _from_buffy_listener: ((TCPListener | None), WorkerState) = (None, Waiting)
 
-  new iso create(env: Env, store: Store, monitor: ShutdownMonitor) =>
+  new create(env: Env, store: Store) =>
     _env = env
     _store = store
-    _monitor = monitor
 
-  fun ref listening(sock: UDPSocket  ref) =>
+  be finished() =>
     try
-      (let host, let service) = sock.local_address().name()
-      _env.out.print("listening on " + host + ":" + service)
-    else
-      _env.out.print("couldn't get local address")
+      let x = _from_buffy_listener._1 as TCPListener
+      x.dispose()
+    end
+    _store.dump()
+
+  be from_buffy_listener(listener: TCPListener, state: WorkerState) =>
+    _from_buffy_listener = (listener, state)
+    if state is Failed then
+      _env.err.print("Unable to open listener")
+      listener.dispose()
+    elseif state is Ready then
+      _env.out.print("Listening for data")
     end
 
-  fun ref not_listening(sock: UDPSocket ref) =>
-    _env.out.print("couldn't listen")
-    sock.dispose()
+actor WithDagonCoordinator is Coordinator
+  let _env: Env
+  let _store: Store
+  var _from_buffy_listener: ((TCPListener | None), WorkerState) = (None, Waiting)
+  var _to_dagon_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
+  let _node_id: String
 
-  fun ref received(sock: UDPSocket ref, data: Array[U8] iso, from: IPAddress) =>
-    let at = Time.micros()
-    _store.received(consume data, at)
-    _monitor.received()
+  new create(env: Env, store: Store, node_id: String) =>
+    _env = env
+    _store = store
+    _node_id = node_id
 
-actor ShutdownMonitor
-  let _custodian: Custodian
-  let _timers: Timers
-  var _last_timer: Timer tag
-  let _time_between_messages: U64
+  be finished() =>
+    None
 
-  new create(custodian: Custodian, time_to_first_message: U64, time_between_messages: U64) =>
-    _timers = Timers
-    _custodian = custodian
-    _time_between_messages = time_between_messages
-    _last_timer = _new_timer(custodian, _timers, time_to_first_message)
-    Debug.out("free candy setup")
+  be from_buffy_listener(listener: TCPListener, state: WorkerState) =>
+    _from_buffy_listener = (listener, state)
+    if state is Failed then
+      _env.err.print("Unable to open listener")
+      listener.dispose()
+    elseif state is Ready then
+      _env.out.print("Listening for data")
+      _alert_ready_if_ready()
+    end
 
-  be received() =>
-    Debug.out("ShutdownMonitor message received")
-    _timers.cancel(_last_timer)
-    _last_timer = _new_timer(_custodian, _timers, _time_between_messages)
+  be to_dagon_socket(sock: TCPConnection, state: WorkerState) =>
+    _to_dagon_socket = (sock, state)
+    if state is Failed then
+      _env.err.print("Unable to open dagon socket")
+      sock.dispose()
+    elseif state is Ready then
+      _alert_ready_if_ready()
+    end
 
-  be dispose() =>
-    _timers.dispose()
+  fun _alert_ready_if_ready() =>
+    if (_to_dagon_socket._2 is Ready) and
+       (_from_buffy_listener._2 is Ready)
+    then
+      try
+        let x = _to_dagon_socket._1 as TCPConnection
+        x.write(WireMsgEncoder.ready(_node_id as String))
+       end
+    end
 
-  fun tag _new_timer(custodian: Custodian, timers: Timers, time_to_fire: U64): Timer tag =>
-    let timer = Timer(ShutdownMonitorNotifier(custodian), time_to_fire, 0)
-    let timer' = timer
-    timers(consume timer)
-    timer'
-
-class ShutdownMonitorNotifier is TimerNotify
-  let _custodian: Custodian
-
-  new iso create(custodian: Custodian) =>
-    _custodian = custodian
-
-  fun ref apply(timer: Timer, count: U64): Bool =>
-    Debug.out("timer fired")
-    _custodian.dispose()
-    false
+///
+/// RECEIVED MESSAGE STORE
+///
 
 actor Store
-  let _env: Env
+  let _auth: AmbientAuth
   let _received: List[(ByteSeq, U64)]
   let _encoder: ReceivedLogEncoder = ReceivedLogEncoder
 
-  new create(env: Env) =>
-    _env = env
+  new create(auth: AmbientAuth) =>
+    _auth = auth
     _received = List[(ByteSeq, U64)](1_000_000)
 
   be received(msg: ByteSeq, at: U64) =>
     _received.push((msg, at))
 
-  be dispose() =>
-    _dump()
-
-  fun _dump() =>
+  be dump() =>
     try
-      let received_handle = File(FilePath(_env.root as AmbientAuth, "received.txt"))
+      let received_handle = File(FilePath(_auth, "received.txt"))
+      received_handle.set_length(0)
       for r in _received.values() do
         received_handle.print(_encoder(r))
       end
       received_handle.dispose()
-    else
-      _env.out.print("dump exception")
     end
 
 class ReceivedLogEncoder
@@ -162,12 +291,16 @@ class ReceivedLogEncoder
       .append(payload)
     end
 
-class TermHandler is SignalNotify
-  let _custodian: Custodian
+//
+// SHUTDOWN GRACEFULLY ON SIGTERM
+//
 
-  new iso create(custodian: Custodian) =>
-    _custodian = custodian
+class TermHandler is SignalNotify
+  let _coordinator: Coordinator
+
+  new iso create(coordinator: Coordinator) =>
+    _coordinator = coordinator
 
   fun ref apply(count: U32): Bool =>
-    _custodian.dispose()
+    _coordinator.finished()
     true

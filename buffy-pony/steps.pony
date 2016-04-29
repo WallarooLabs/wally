@@ -1,5 +1,5 @@
 use "collections"
-use "./messages"
+use "buffy/messages"
 
 interface ComputeStep[In: OSCEncodable val]
   be apply(input: Message[In] val)

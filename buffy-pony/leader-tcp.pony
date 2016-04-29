@@ -1,6 +1,7 @@
 use "net"
 use "collections"
-use "./messages"
+use "buffy/messages"
+use "sendence/bytes"
 
 actor TopologyManager
   let _env: Env

@@ -6,7 +6,7 @@ use "files"
 use "net"
 use "options"
 use "time"
-use "../../buffy-pony/messages"
+use "buffy/messages"
 
 // needs handling of "start message" to kick off run when using dagon
 // decide on done/done_shutdown usage

@@ -1,4 +1,4 @@
-use "./messages"
+use "buffy/messages"
 
 interface Computation[In: OSCEncodable, Out: OSCEncodable]
   fun ref apply(input: Message[In] val): Message[Out] val^

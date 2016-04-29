@@ -1,4 +1,5 @@
 use "osc-pony"
+use "sendence/bytes"
 
 primitive _Ready                                fun apply(): String => "/0"
 primitive _Identify                             fun apply(): String => "/1"
@@ -122,7 +123,7 @@ primitive WireMsgEncoder
         [as OSCData val: OSCString(data.string())]
       end)
     Bytes.length_encode(osc.to_bytes())
-    
+
 primitive WireMsgDecoder
   fun apply(data: Array[U8] val): WireMsg val ? =>
     let msg = OSCDecoder.from_bytes(data) as OSCMessage val
@@ -314,3 +315,4 @@ class ExternalMsg is WireMsg
     else
       error
     end
+
