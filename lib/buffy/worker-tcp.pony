@@ -15,13 +15,13 @@ class WorkerNotifier is TCPListenNotify
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
-    leader_service: String) =>
+    leader_service: String, step_builder: StepBuilder val) =>
     _env = env
     _auth = auth
     _name = name
     _leader_host = leader_host
     _leader_service = leader_service
-    _step_manager = StepManager(env)
+    _step_manager = StepManager(env, step_builder)
 
   fun ref listening(listen: TCPListener ref) =>
     try

@@ -2,8 +2,8 @@ use "net"
 use "options"
 use "collections"
 
-actor Main
-  new create(env: Env) =>
+actor Startup
+  new create(env: Env, topology: Topology val, step_builder: StepBuilder val) =>
     var is_worker = true
     var worker_count: USize = 0
     var node_name: String = "0"
@@ -38,10 +38,10 @@ actor Main
       let auth = env.root as AmbientAuth
       if is_worker then
         TCPListener(auth,
-          WorkerNotifier(env, auth, node_name, leader_host, leader_service))
+          WorkerNotifier(env, auth, node_name, leader_host, leader_service, step_builder))
       else
         let notifier = LeaderNotifier(env, auth, node_name, leader_host,
-          leader_service, worker_count, phone_home)
+          leader_service, worker_count, phone_home, topology, step_builder)
         TCPListener(auth, consume notifier, leader_host, leader_service)
       end
 

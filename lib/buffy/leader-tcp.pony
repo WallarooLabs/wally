@@ -11,6 +11,7 @@ actor TopologyManager
   let _worker_count: USize
   let _workers: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
   let _worker_addrs: Map[String, (String, String)] = Map[String, (String, String)]
+  let _topology: Topology val
   // Keep track of how many workers identified themselves
   var _hellos: USize = 0
   // Keep track of how many workers acknowledged they're running their
@@ -20,11 +21,12 @@ actor TopologyManager
   var _phone_home_service: String = ""
 
   new create(env: Env, name: String, worker_count: USize, phone_home: String,
-    step_manager: StepManager) =>
+    step_manager: StepManager, topology: Topology val) =>
     _env = env
     _step_manager = step_manager
     _name = name
     _worker_count = worker_count
+    _topology = topology
     if phone_home != "" then
       let ph_addr = phone_home.split(":")
       try
@@ -43,8 +45,11 @@ actor TopologyManager
     _hellos = _hellos + 1
     if _hellos == _worker_count then
       _env.out.print("_--- All workers accounted for! ---_")
-      initialize_topology()
+      _initialize_topology()
     end
+
+  fun ref _initialize_topology() =>
+    _topology.initialize(_workers, _worker_addrs, _step_manager)
 
   be update_connection(conn: TCPConnection tag, node_name: String) =>
     _workers(node_name) = conn
@@ -53,58 +58,6 @@ actor TopologyManager
     _acks = _acks + 1
     if _acks == _worker_count then
       _complete_initialization()
-    end
-
-  fun ref initialize_topology() =>
-    try
-      let keys = _workers.keys()
-      let remote_node_name1: String = keys.next()
-      let remote_node_name2: String = keys.next()
-      let node2_addr = _worker_addrs(remote_node_name2)
-
-      let double_step_id: I32 = 1
-      let halve_step_id: I32 = 2
-      let halve_to_print_proxy_id: I32 = 3
-      let print_step_id: I32 = 4
-
-
-      let halve_create_msg =
-        WireMsgEncoder.spin_up(halve_step_id, ComputationTypes.halve())
-      let halve_to_print_proxy_create_msg =
-        WireMsgEncoder.spin_up_proxy(halve_to_print_proxy_id,
-          print_step_id, remote_node_name2, node2_addr._1, node2_addr._2)
-      let print_create_msg =
-        WireMsgEncoder.spin_up(print_step_id, ComputationTypes.print())
-      let connect_msg =
-        WireMsgEncoder.connect_steps(halve_step_id, halve_to_print_proxy_id)
-      let finished_msg =
-        WireMsgEncoder.initialization_msgs_finished()
-
-      //Leader node (i.e. this one)
-      _step_manager.add_step(double_step_id, ComputationTypes.double())
-
-      //First worker node
-      var conn1 = _workers(remote_node_name1)
-      conn1.write(halve_create_msg)
-      conn1.write(halve_to_print_proxy_create_msg)
-      conn1.write(connect_msg)
-      conn1.write(finished_msg)
-
-      //Second worker node
-      var conn2 = _workers(remote_node_name2)
-      conn2.write(print_create_msg)
-      conn2.write(finished_msg)
-
-      let halve_proxy_id: I32 = 5
-      _step_manager.add_proxy(halve_proxy_id, halve_step_id, conn1)
-      _step_manager.connect_steps(1, 5)
-
-      for i in Range(0, 100) do
-        let next_msg = Message[I32](i.i32(), i.i32())
-        _step_manager(1, next_msg)
-      end
-    else
-      _env.out.print("Buffy Leader: Failed to initialize topology")
     end
 
   fun _complete_initialization() =>
@@ -140,15 +93,16 @@ class LeaderNotifier is TCPListenNotify
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, host: String,
-    service: String, worker_count: USize, phone_home: String) =>
+    service: String, worker_count: USize, phone_home: String,
+    topology: Topology val, step_builder: StepBuilder val) =>
     _env = env
     _auth = auth
     _name = name
     _host = host
     _service = service
-    _step_manager = StepManager(env)
+    _step_manager = StepManager(env, step_builder)
     _topology_manager = TopologyManager(env, name, worker_count, phone_home,
-      _step_manager)
+      _step_manager, topology)
 
   fun ref listening(listen: TCPListener ref) =>
     try

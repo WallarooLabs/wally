@@ -32,9 +32,11 @@ actor ExternalConnection is ComputeStep[I32]
 actor StepManager
   let _env: Env
   let _steps: Map[I32, Any tag] = Map[I32, Any tag]
+  let _step_builder: StepBuilder val
 
-  new create(env: Env) =>
+  new create(env: Env, s_builder: StepBuilder val) =>
     _env = env
+    _step_builder = s_builder
 
   be apply(step_id: I32, msg: Message[I32] val) =>
     try
@@ -49,7 +51,7 @@ actor StepManager
 
   be add_step(step_id: I32, computation_type_id: I32) =>
     try
-      _steps(step_id) = build_step(computation_type_id)
+      _steps(step_id) = _step_builder(computation_type_id)
     end
 
   be add_proxy(proxy_id: I32, step_id: I32, conn: TCPConnection tag) =>
@@ -66,16 +68,4 @@ actor StepManager
       else
         _env.out.print("StepManager: Could not connect steps")
       end
-    end
-
-  fun build_step(id: I32): Any tag ? =>
-    match id
-    | 0 => Step[I32, I32](Identity)
-    | 1 => Step[I32, I32](Double)
-    | 2 => Step[I32, I32](Halve)
-    | 3 =>
-      let env = _env
-      Sink[I32](recover Print[I32](env) end)
-    else
-      error
     end
