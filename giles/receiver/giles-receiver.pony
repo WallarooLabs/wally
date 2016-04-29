@@ -13,7 +13,6 @@ use "sendence/tcp"
 // clean up @printf's
 // tests
 // documentation
-// with dagon Finished method needs logic
 
 actor Main
   new create(env: Env) =>
