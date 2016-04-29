@@ -32,7 +32,7 @@ class WorkerNotifier is TCPListenNotify
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
 
-      let message = TCPMessageEncoder.identify(_name, _host, _service)
+      let message = TCPMsgEncoder.identify(_name, _host, _service)
       _env.out.print("My name is " + _name)
       conn.write(message)
     else
@@ -109,7 +109,7 @@ class WorkerConnectNotify is TCPConnectionNotify
 
   fun ref _process_data(conn: TCPConnection ref, data: Array[U8] val) =>
     try
-      let msg: TCPMsg val = TCPMessageDecoder(data)
+      let msg: TCPMsg val = TCPMsgDecoder(data)
       match msg
       | let m: ReadyMsg val =>
         _env.out.print("GREET from " + m.node_name)
@@ -129,7 +129,7 @@ class WorkerConnectNotify is TCPConnectionNotify
         _step_manager.connect_steps(m.in_step_id, m.out_step_id)
       | let m: InitializationMsgsFinishedMsg val =>
         _env.out.print("INITIALIZATION FINISHED")
-        let ack_msg = TCPMessageEncoder.ack_initialized(_name)
+        let ack_msg = TCPMsgEncoder.ack_initialized(_name)
         conn.write(ack_msg)
       end
     else
@@ -147,7 +147,7 @@ class WorkerConnectNotify is TCPConnectionNotify
       let target_conn =
         TCPConnection(_auth, consume notifier, msg.target_host,
           msg.target_service)
-      target_conn.write(TCPMessageEncoder.ready(_name))
+      target_conn.write(TCPMsgEncoder.ready(_name))
       _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
       _nodes(msg.target_node_name) = target_conn
     end
@@ -156,7 +156,7 @@ class WorkerConnectNotify is TCPConnectionNotify
     if _name != "0" then
       let name = _name
       let message =
-        TCPMessageEncoder.reconnect(name)
+        TCPMsgEncoder.reconnect(name)
       conn.write(message)
       _env.out.print("Re-established connection for worker " + name)
     end

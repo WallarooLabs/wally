@@ -15,7 +15,7 @@ actor Proxy is ComputeStep[I32]
 
   be apply(input: Message[I32] val) =>
     _env.out.print("Proxy: received message for forwarding")
-    let tcp_msg = TCPMessageEncoder.forward(_step_id, input)
+    let tcp_msg = TCPMsgEncoder.forward(_step_id, input)
     _conn.write(tcp_msg)
 
 actor ExternalConnection is ComputeStep[I32]
@@ -28,7 +28,7 @@ actor ExternalConnection is ComputeStep[I32]
 
   be apply(input: Message[I32] val) =>
     _env.out.print("External connection: sending to external system")
-    let tcp_msg = TCPMessageEncoder.external(input.data)
+    let tcp_msg = TCPMsgEncoder.external(input.data)
     _conn.write(tcp_msg)
 
 actor StepManager

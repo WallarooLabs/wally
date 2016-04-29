@@ -1,21 +1,21 @@
 use "osc-pony"
 
-primitive _Ready                                fun apply(): String => "0"
-primitive _Identify                             fun apply(): String => "1"
-primitive _Done                                 fun apply(): String => "2"
-primitive _Reconnect                            fun apply(): String => "3"
-primitive _Start                                fun apply(): String => "4"
-primitive _Shutdown                             fun apply(): String => "5"
-primitive _DoneShutdown                         fun apply(): String => "6"
-primitive _Forward                              fun apply(): String => "7"
-primitive _SpinUp                               fun apply(): String => "8"
-primitive _SpinUpProxy                          fun apply(): String => "9"
-primitive _ConnectSteps                         fun apply(): String => "10"
-primitive _InitializationMsgsFinished           fun apply(): String => "11"
-primitive _AckInitialized                       fun apply(): String => "12"
-primitive _External                             fun apply(): String => "13"
+primitive _Ready                                fun apply(): String => "/0"
+primitive _Identify                             fun apply(): String => "/1"
+primitive _Done                                 fun apply(): String => "/2"
+primitive _Reconnect                            fun apply(): String => "/3"
+primitive _Start                                fun apply(): String => "/4"
+primitive _Shutdown                             fun apply(): String => "/5"
+primitive _DoneShutdown                         fun apply(): String => "/6"
+primitive _Forward                              fun apply(): String => "/7"
+primitive _SpinUp                               fun apply(): String => "/8"
+primitive _SpinUpProxy                          fun apply(): String => "/9"
+primitive _ConnectSteps                         fun apply(): String => "/10"
+primitive _InitializationMsgsFinished           fun apply(): String => "/11"
+primitive _AckInitialized                       fun apply(): String => "/12"
+primitive _External                             fun apply(): String => "/13"
 
-primitive TCPMessageEncoder
+primitive TCPMsgEncoder
   fun ready(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_Ready(),
       recover
@@ -123,7 +123,7 @@ primitive TCPMessageEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
     
-primitive TCPMessageDecoder
+primitive TCPMsgDecoder
   fun apply(data: Array[U8] val): TCPMsg val ? =>
     let msg = OSCDecoder.from_bytes(data) as OSCMessage val
     match msg.address
