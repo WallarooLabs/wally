@@ -219,16 +219,10 @@ build-docker:  ## Build docker images for Buffy
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/giles-sender.$(arch):$(docker_image_version) \
           giles/sender
-#	docker $(docker_host_arg) build -t \
-#          $(docker_image_repo)/buffy:$(docker_image_version) buffy
-#	docker $(docker_host_arg) tag \
-#          $(docker_image_repo)/buffy:$(docker_image_version) \
-#          $(docker_image_repo)/buffy.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) build -t \
-          $(docker_image_repo)/dagon:$(docker_image_version) dagon
-	docker $(docker_host_arg) tag \
-          $(docker_image_repo)/dagon:$(docker_image_version) \
-          $(docker_image_repo)/dagon.$(arch):$(docker_image_version)
+          $(docker_image_repo)/buffy.$(arch):$(docker_image_version) buffy
+#	docker $(docker_host_arg) build -t \
+#          $(docker_image_repo)/dagon.$(arch):$(docker_image_version) dagon
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/wesley-double.$(arch):$(docker_image_version) \
           wesley/double
@@ -243,14 +237,10 @@ push-docker: build-docker ## Push docker images for Buffy to repository
           $(docker_image_repo)/giles-receiver.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/giles-sender.$(arch):$(docker_image_version)
-#	docker $(docker_host_arg) push \
-#          $(docker_image_repo)/buffy:$(docker_image_version)
-#	docker $(docker_host_arg) push \
-#          $(docker_image_repo)/buffy.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
-          $(docker_image_repo)/dagon:$(docker_image_version)
-	docker $(docker_host_arg) push \
-          $(docker_image_repo)/dagon.$(arch):$(docker_image_version)
+          $(docker_image_repo)/buffy.$(arch):$(docker_image_version)
+#	docker $(docker_host_arg) push \
+#          $(docker_image_repo)/dagon.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/wesley-double.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
