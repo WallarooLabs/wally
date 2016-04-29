@@ -10,9 +10,8 @@ use "time"
 use "buffy/messages"
 use "sendence/tcp"
 
+// clean up @printf's
 // needs to handle shutdown message from dagon
-// needs to handle framing for incoming messages
-// needs to handle osc decoding for incoming messges
 // tests
 // documentation
 // with dagon Finished method needs logic
