@@ -10,7 +10,6 @@ use "time"
 use "buffy/messages"
 use "sendence/tcp"
 
-// clean up @printf's
 // tests
 // documentation
 
@@ -79,7 +78,7 @@ actor Main
 
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
-            FromBuffyListenerNotify(coordinator, store),
+            FromBuffyListenerNotify(coordinator, store, env.err),
             listener_addr(0),
             listener_addr(1))
 
@@ -92,10 +91,12 @@ actor Main
 class FromBuffyListenerNotify is TCPListenNotify
   let _coordinator: Coordinator
   let _store: Store
+  let _stderr: StdStream
 
-  new iso create(coordinator: Coordinator, store: Store) =>
+  new iso create(coordinator: Coordinator, store: Store, stderr: StdStream) =>
     _coordinator = coordinator
     _store = store
+    _stderr = stderr
 
   fun ref not_listening(listen: TCPListener ref) =>
     _coordinator.from_buffy_listener(listen, Failed)
@@ -104,14 +105,16 @@ class FromBuffyListenerNotify is TCPListenNotify
     _coordinator.from_buffy_listener(listen, Ready)
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    FromBuffyNotify(_store)
+    FromBuffyNotify(_store, _stderr)
 
 class FromBuffyNotify is TCPConnectionNotify
   let _store: Store
   let _framer: Framer = Framer
+  let _stderr: StdStream
 
-  new iso create(store: Store) =>
+  new iso create(store: Store, stderr: StdStream) =>
     _store = store
+    _stderr = stderr
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
@@ -119,22 +122,23 @@ class FromBuffyNotify is TCPConnectionNotify
         let decoded = WireMsgDecoder(consume chunked)
         match decoded
         | let d: ExternalMsg val =>
-          @printf[I32]("%s\n".cstring(), d.data.cstring())
           _store.received(d.data, Time.micros())
         else
-          @printf[I32]("UNEXPECTED DATA\n".cstring())
+          _stderr.print("Unexpected data from Buffy")
         end
       else
-        @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
+        _stderr.print("Unable to decode message Buffy")
       end
     end
 
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator
   let _framer: Framer = Framer
+  let _stderr: StdStream
 
-  new iso create(coordinator: WithDagonCoordinator) =>
+  new iso create(coordinator: WithDagonCoordinator, stderr: StdStream) =>
     _coordinator = coordinator
+    _stderr = stderr
 
   fun ref connect_failed(sock: TCPConnection ref) =>
     _coordinator.to_dagon_socket(sock, Failed)
@@ -150,10 +154,10 @@ class ToDagonNotify is TCPConnectionNotify
         | let d: ShutdownMsg val =>
           _coordinator.finished()
         else
-          @printf[I32]("UNEXPECTED DATA\n".cstring())
+          _stderr.print("Unexpected data from Dagon")
         end
       else
-        @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
+        _stderr.print("Unable to decode message Dagon")
       end
     end
 
@@ -174,7 +178,7 @@ primitive CoordinatorFactory
 
       let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
       let to_dagon_socket = TCPConnection(tcp_auth,
-        ToDagonNotify(coordinator),
+        ToDagonNotify(coordinator, env.err),
         ph(0),
         ph(1))
 

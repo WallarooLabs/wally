@@ -9,7 +9,6 @@ use "time"
 use "buffy/messages"
 use "sendence/tcp"
 
-// clean up @printf's.
 // documentation
 // more tests
 
@@ -145,9 +144,11 @@ class ToBuffyNotify is TCPConnectionNotify
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator
   let _framer: Framer = Framer
+  let _stderr: StdStream
 
-  new iso create(coordinator: WithDagonCoordinator) =>
+  new iso create(coordinator: WithDagonCoordinator, stderr: StdStream) =>
     _coordinator = coordinator
+    _stderr = stderr
 
   fun ref connect_failed(sock: TCPConnection ref) =>
     _coordinator.to_dagon_socket(sock, Failed)
@@ -163,10 +164,10 @@ class ToDagonNotify is TCPConnectionNotify
         | let m: StartMsg val =>
             _coordinator.go()
         else
-          @printf[I32]("UNEXPECTED MESSAGE\n".cstring())
+          _stderr.print("Unexpected message from Dagon")
         end
       else
-        @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
+        _stderr.print("Unable to decode message from Dagon")
       end
     end
 
@@ -187,7 +188,7 @@ primitive CoordinatorFactory
 
       let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
       let to_dagon_socket = TCPConnection(tcp_auth,
-        ToDagonNotify(coordinator),
+        ToDagonNotify(coordinator, env.err),
         ph(0),
         ph(1))
 
