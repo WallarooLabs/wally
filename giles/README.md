@@ -22,11 +22,12 @@ Giles is split into two binaries: one for sending data, one for receiving data.
 |                |----+>                          -+--->|                |
 |                |    |                            |    |                |
 +----------------+    +----------------------------+    +----------------+
-```                           
+```
+
 In a simple locally running topology like the one we have above
-and assuming that Buffy's Queue is listening on port 8081 locally
-and that the worker is listening on port 8082, then you would start 
-Giles as follows:
+and assuming that our Buffy source is listening on port 8081 locally
+and that its Sink will send data to port 8082, then you would
+start Giles as follows:
 
 ```
 ./giles/receiver -b 127.0.0.1:8082
