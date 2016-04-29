@@ -1,0 +1,12 @@
+{
+  "deps": [
+    { "type": "github",
+      "repo": "aturley/osc-pony",
+      "subdir": "src/",
+      "tag": "0.0.1"
+    },
+    { "type": "local",
+      "local-path": "../../lib/"
+    }
+  ]
+}
