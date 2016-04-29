@@ -9,7 +9,6 @@ use "time"
 use "../../buffy-pony/messages"
 
 // needs handling of "start message" to kick off run when using dagon
-// needs to do proper encoding going to buffy
 // decide on done/done_shutdown usage
 // documentation
 // more tests
@@ -337,10 +336,11 @@ actor SendingActor
       end
 
     if (current_batch_size > 0) and _data_source.has_next() then
-      let d = recover Array[String](current_batch_size) end
+      let d = recover Array[ByteSeq](current_batch_size) end
       for i in Range(0, current_batch_size) do
         try
-          d.push(_data_source.next())
+          let m = TCPMessageEncoder.external(_data_source.next())
+          d.push(m)
         else
           break
         end
@@ -371,7 +371,7 @@ class Sender
     _to_buffy_socket = to_buffy_socket
     _store = store
 
-  fun send(data: Array[String] val) =>
+  fun send(data: Array[ByteSeq] val) =>
     let at =  Time.micros()
     _to_buffy_socket.writev(data)
     _store.sentv(data, at)
@@ -382,14 +382,14 @@ class Sender
 
 actor Store
   let _auth: AmbientAuth
-  let _sent: List[(String, U64)]
+  let _sent: List[(ByteSeq, U64)]
   let _encoder: SentLogEncoder = SentLogEncoder
 
   new create(auth: AmbientAuth, list_size: USize) =>
     _auth = auth
-    _sent = List[(String, U64)](list_size)
+    _sent = List[(ByteSeq, U64)](list_size)
 
-  be sentv(msgs: Array[String] val, at: U64) =>
+  be sentv(msgs: Array[ByteSeq] val, at: U64) =>
     for m in msgs.values() do
       _sent.push((m, at))
     end
