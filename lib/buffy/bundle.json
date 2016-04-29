@@ -6,7 +6,7 @@
       "tag": "0.0.1"
     },
     { "type": "local",
-      "local-path": "../lib/"
+      "local-path": "../../lib/"
     }
   ]
 }

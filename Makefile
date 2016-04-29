@@ -113,7 +113,7 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-spike build-receiver build-sender build-wesley build-buffy ## Build Pony based programs for Buffy
+build: build-spike build-receiver build-sender build-wesley build-double-divide ## Build Pony based programs for Buffy
 
 build-spike: ## Build spike
 	$(call PONYC,spike)
@@ -124,17 +124,20 @@ build-receiver: ## Build giles receiver
 build-sender: ## Build giles sender
 	$(call PONYC,giles/sender)
 
-build-buffy: ## Build buffy
-	$(call PONYC,buffy)
+build-double-divide:
+	$(call PONYC,apps/double-divide)
 
 build-wesley: ## Build wesley
 	$(call PONYC,wesley/double)
 	$(call PONYC,wesley/identity)
 
-test: test-buffy test-giles-receiver test-giles-sender ## Test programs for Buffy
+test: test-double-divide test-giles-receiver test-giles-sender ## Test programs for Buffy
 
-test-buffy: ## Test buffy
-	cd buffy && ./buffy
+test-double-divide: ## Test Double-Divide
+	cd apps/double-divide && ./double-divide
+
+test-giles-sender: ## Test Giles Sender
+	cd giles/sender && ./sender
 
 test-giles-receiver: ## Test Giles Receiver
 	cd giles/receiver && ./receiver
@@ -219,8 +222,6 @@ build-docker:  ## Build docker images for Buffy
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/giles-sender.$(arch):$(docker_image_version) \
           giles/sender
-	docker $(docker_host_arg) build -t \
-          $(docker_image_repo)/buffy.$(arch):$(docker_image_version) buffy
 #	docker $(docker_host_arg) build -t \
 #          $(docker_image_repo)/dagon.$(arch):$(docker_image_version) dagon
 	docker $(docker_host_arg) build -t \
@@ -237,8 +238,6 @@ push-docker: build-docker ## Push docker images for Buffy to repository
           $(docker_image_repo)/giles-receiver.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/giles-sender.$(arch):$(docker_image_version)
-	docker $(docker_host_arg) push \
-          $(docker_image_repo)/buffy.$(arch):$(docker_image_version)
 #	docker $(docker_host_arg) push \
 #          $(docker_image_repo)/dagon.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
@@ -273,7 +272,7 @@ clean: clean-docker ## Cleanup docker images and compiled files for Buffy
 	rm -f giles/sender/sender giles/sender/sender.o
 	rm -f wesley/identity/identity wesley/identity/identity.o
 	rm -f wesley/double/double wesley/double/double.o
-	rm -f buffy/buffy buffy/buffy.o
+	rm -f lib/buffy/buffy lib/buffy/buffy.o
 	rm -f sent.txt received.txt
 	@echo 'Done cleaning.'
 
