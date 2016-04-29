@@ -11,7 +11,6 @@ use "buffy/messages"
 use "sendence/tcp"
 
 // clean up @printf's
-// needs to handle shutdown message from dagon
 // tests
 // documentation
 // with dagon Finished method needs logic
@@ -117,22 +116,23 @@ class FromBuffyNotify is TCPConnectionNotify
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
-    try
-      let decoded = WireMsgDecoder(consume chunked)
-      match decoded
-      | let d: ExternalMsg val =>
-        @printf[I32]("%s\n".cstring(), d.data.cstring())
-        _store.received(d.data, Time.micros())
+      try
+        let decoded = WireMsgDecoder(consume chunked)
+        match decoded
+        | let d: ExternalMsg val =>
+          @printf[I32]("%s\n".cstring(), d.data.cstring())
+          _store.received(d.data, Time.micros())
+        else
+          @printf[I32]("UNEXPECTED DATA\n".cstring())
+        end
       else
-        @printf[I32]("UNEXPECTED DATA\n".cstring())
+        @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
       end
-    else
-      @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
     end
-  end
 
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator
+  let _framer: Framer = Framer
 
   new iso create(coordinator: WithDagonCoordinator) =>
     _coordinator = coordinator
@@ -144,8 +144,19 @@ class ToDagonNotify is TCPConnectionNotify
     _coordinator.to_dagon_socket(sock, Ready)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    // TODO handle shutdown message here
-    None
+    for chunked in _framer.chunk(consume data).values() do
+      try
+        let decoded = WireMsgDecoder(consume chunked)
+        match decoded
+        | let d: ShutdownMsg val =>
+          _coordinator.finished()
+        else
+          @printf[I32]("UNEXPECTED DATA\n".cstring())
+        end
+      else
+        @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
+      end
+    end
 
 //
 // COORDINATE OUR STARTUP
@@ -221,7 +232,16 @@ actor WithDagonCoordinator is Coordinator
     _node_id = node_id
 
   be finished() =>
-    None
+    try
+      let x = _from_buffy_listener._1 as TCPListener
+      x.dispose()
+    end
+    _store.dump()
+    try
+      let x = _to_dagon_socket._1 as TCPConnection
+      x.write(WireMsgEncoder.done_shutdown(_node_id))
+      x.dispose()
+    end
 
   be from_buffy_listener(listener: TCPListener, state: WorkerState) =>
     _from_buffy_listener = (listener, state)
