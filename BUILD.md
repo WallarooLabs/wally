@@ -5,8 +5,11 @@ workstation or a Raspberry Pi cluster.
 
 ## Prerequistes
 
-To build Buffy to run on a local development machine, you need to have a working
-version of the Sendence version of the ponyc compiler installed. (See below).
+To build Buffy to run on a local development machine, you need to have
+a working version of the Sendence version of the ponyc compiler
+installed. (See below). You will also need to install a working copy
+of the package manager
+[pony-stable](https://github.com/jemc/pony-stable).
 
 To build Buffy to run on a Raspberry Pi, you need to have a working cross
 compiler installed. Currently, that means following [Markus' directions for
