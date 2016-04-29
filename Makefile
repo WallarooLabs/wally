@@ -150,7 +150,7 @@ lint-test: lint-test-buffy ## Run lint tests for programs for Buffy
 lint-test-buffy: ## Run lint test buffy
 	cd buffy && python3 -m pyflakes *.py functions/*.py
 
-dagon-test: dagon-identity dagon-double ## Run dagon tests
+dagon-test: #dagon-identity dagon-double ## Run dagon tests
 
 dagon-double: ## Run double test with dagon
 	dagon/dagon.py dagon/config/double.ini
@@ -162,7 +162,7 @@ dagon-identity: ## Run identity test with dagon
 	wesley/identity/identity sent.txt received.txt \
           dagon/config/identity.ini
 
-dagon-docker-test: dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
+dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
 
 dagon-docker-double: ## Run double test with dagon
 	docker $(docker_host_arg) ps -a | \
