@@ -113,7 +113,7 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-spike build-receiver build-sender build-wesley build-buffy-pony ## Build Pony based programs for Buffy
+build: build-spike build-receiver build-sender build-wesley build-buffy ## Build Pony based programs for Buffy
 
 build-spike: ## Build spike
 	$(call PONYC,spike)
@@ -124,31 +124,23 @@ build-receiver: ## Build giles receiver
 build-sender: ## Build giles sender
 	$(call PONYC,giles/sender)
 
-build-buffy-pony: ## Build buffy pony
-	$(call PONYC,buffy-pony)
+build-buffy: ## Build buffy
+	$(call PONYC,buffy)
 
 build-wesley: ## Build wesley
 	$(call PONYC,wesley/double)
 	$(call PONYC,wesley/identity)
 
-test: lint-test test-buffy test-giles-receiver test-giles-sender test-buffy-pony ## Test programs for Buffy
+test: test-buffy test-giles-receiver test-giles-sender ## Test programs for Buffy
 
 test-buffy: ## Test buffy
-	cd buffy && python3 -m py.test functions/*
+	cd buffy && ./buffy
 
 test-giles-receiver: ## Test Giles Receiver
 	cd giles/receiver && ./receiver
 
 test-giles-sender: ## Test Giles Sender
 	cd giles/sender && ./sender
-
-test-buffy-pony: ## Test buffy pony
-	cd buffy-pony && ./buffy-pony
-
-lint-test: lint-test-buffy ## Run lint tests for programs for Buffy
-
-lint-test-buffy: ## Run lint test buffy
-	cd buffy && python3 -m pyflakes *.py functions/*.py
 
 dagon-test: #dagon-identity dagon-double ## Run dagon tests
 
@@ -227,11 +219,11 @@ build-docker:  ## Build docker images for Buffy
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/giles-sender.$(arch):$(docker_image_version) \
           giles/sender
-	docker $(docker_host_arg) build -t \
-          $(docker_image_repo)/buffy:$(docker_image_version) buffy
-	docker $(docker_host_arg) tag \
-          $(docker_image_repo)/buffy:$(docker_image_version) \
-          $(docker_image_repo)/buffy.$(arch):$(docker_image_version)
+#	docker $(docker_host_arg) build -t \
+#          $(docker_image_repo)/buffy:$(docker_image_version) buffy
+#	docker $(docker_host_arg) tag \
+#          $(docker_image_repo)/buffy:$(docker_image_version) \
+#          $(docker_image_repo)/buffy.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/dagon:$(docker_image_version) dagon
 	docker $(docker_host_arg) tag \
@@ -251,10 +243,10 @@ push-docker: build-docker ## Push docker images for Buffy to repository
           $(docker_image_repo)/giles-receiver.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/giles-sender.$(arch):$(docker_image_version)
-	docker $(docker_host_arg) push \
-          $(docker_image_repo)/buffy:$(docker_image_version)
-	docker $(docker_host_arg) push \
-          $(docker_image_repo)/buffy.$(arch):$(docker_image_version)
+#	docker $(docker_host_arg) push \
+#          $(docker_image_repo)/buffy:$(docker_image_version)
+#	docker $(docker_host_arg) push \
+#          $(docker_image_repo)/buffy.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/dagon:$(docker_image_version)
 	docker $(docker_host_arg) push \
@@ -291,9 +283,8 @@ clean: clean-docker ## Cleanup docker images and compiled files for Buffy
 	rm -f giles/sender/sender giles/sender/sender.o
 	rm -f wesley/identity/identity wesley/identity/identity.o
 	rm -f wesley/double/double wesley/double/double.o
-	rm -f buffy-pony/buffy-pony buffy-pony/buffy-pony.o
+	rm -f buffy/buffy buffy/buffy.o
 	rm -f sent.txt received.txt
-	rm -rf buffy/functions/__pycache__/
 	@echo 'Done cleaning.'
 
 help:
