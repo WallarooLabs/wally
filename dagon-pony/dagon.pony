@@ -1,70 +1,109 @@
-use "net"
-use "collections"
-use "options"
 use "assert"
-use "process"
+use "collections"
+use "files"
+use "messages"
+use "net"
+use "options"
 use "osc-pony"
+use "process"
 
-use "../buffy-pony/messages"
-
-primitive _ready
-primitive _done
-primitive _done_shutdown
+primitive _Booting
+primitive _Ready
+primitive _Done
+primitive _Shutdown
 
 type ChildState is
-  ( _booting,
-  | _ready,
-  | _done,
-  | _done_shutdown
+  ( _Booting
+  | _Ready
+  | _Done
+  | _Shutdown
   )
 
 
 actor Main
+  let _env: Env
+
+  
   new create(env: Env) =>
+    _env = env
     var options = Options(env)
     var args = options.remaining()
-  
+
+    options
+      .add("filepath", "f", StringArgument)
+      .add("name", "n", StringArgument)
+      .add("host", "h", StringArgument)
+      .add("service", "p", StringArgument)
+
+    var path: String = ""
+    var name: String = ""
+    var host: String = ""
+    var service: String = ""
+      
+    for option in options do
+      match option
+      | ("filepath", let arg: String) => path = arg
+      | ("name", let arg: String) => name = arg
+      | ("host", let arg: String) => host = arg
+      | ("service", let arg: String) => service = arg
+      end
+    end  
+
+    _env.out.print("dagon: path: " + path)
+    _env.out.print("dagon: name: " + name)
+    _env.out.print("dagon: host: " + host)
+    _env.out.print("dagon: service: " + service)
+
+    let p_mgr = ProcessManager(_env)
+
     try
-      let buffy_name: String val = args(1).clone()
-      let sender_name: String val = args(2).clone()
-      let receiver_name: String val = args(3).clone()
-      let process_names: Array[String val] val = recover val [buffy_name,
-        sender_name, receiver_name] end
-      TCPListener(env.root as AmbientAuth, recover Notifier(env, process_names) end)
+      let listener = TCPListener(env.root as AmbientAuth,
+        recover Notifier(env, p_mgr, host, service) end)
+      _boot_topology(p_mgr, path, name, host, service)
     else
-      env.out.print("Parameters: buffy_binary giles_sender_binary giles_receiver_binary")
+      _env.out.print("Failed creating tcp listener")
     end
 
-class Child
-  let _name: String
-  let _pm: ProcessMonitor
-  let _pn: ProcessClient
-  var state: ChildState
-  
-  new create(name: String, pm: ProcessMonitor, pn: ProcessClient) =>
-    _name = name
-    _pm = pm
-    _pn = pn
-    state = _booting
-
-  fun ref change_state(state': ChildState) =>
-    state = state
+  fun ref _boot_topology(p_mgr: ProcessManager, path: String, name: String,
+    host: String, service: String)
+    =>
+    """
+    Boot the topology
+    """
+    try
+      let filepath = FilePath(_env.root as AmbientAuth, path)
+      let args: Array[String] iso = recover Array[String](6) end
+      args.push("-n")
+      args.push(name)
+      args.push("-h")
+      args.push(host)
+      args.push("-p")
+      args.push(service)
+      let vars: Array[String] iso = recover Array[String](0) end
+      
+      p_mgr.boot_process(filepath, consume args, consume vars)
+    else
+      _env.out.print("dagon: Could not boot topology")
+    end
+    
 
 
 class Notifier is TCPListenNotify
   let _env: Env
-  let _process_manager: ProcessManager
-  var _host: String = "127.0.0.1"
-  var _service: String = "8080"
+  let _p_mgr: ProcessManager
+  let _host: String
+  let _service: String
 
-  new create(env: Env, process_names: Array[String val] val) =>
+  new create(env: Env, p_mgr: ProcessManager, host: String, service: String)
+    =>
     _env = env
-    _process_manager = ProcessManager(_env, process_names)
+    _p_mgr = p_mgr
+    _host = host
+    _service = service
 
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
-      _process_manager.initiate_processes(_host, _service)
       _env.out.print("dagon: listening on " + _host + ":" + _service)
     else
       _env.out.print("dagon: couldn't get local address")
@@ -76,54 +115,72 @@ class Notifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    ConnectNotify(_env, _process_manager)
+    ConnectNotify(_env, _p_mgr)
 
     
 class ConnectNotify is TCPConnectionNotify
   let _env: Env
-  let _process_manager: ProcessManager
+  let _p_mgr: ProcessManager
 
-  new iso create(env: Env, process_manager: ProcessManager) =>
+  new iso create(env: Env, p_mgr: ProcessManager) =>
     _env = env
-    _process_manager = process_manager
+    _p_mgr = p_mgr
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("dagon: connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    // Do something with data
-    // If it's a process ack:
-    //    _process_manager.ack_startup(process_name, data)
+    //    _p_mgr.ack_startup(process_name, data)
     _env.out.print("dagon: received")
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("dagon: server closed")
 
+class Child
+  let _name: String
+  let _pm: ProcessMonitor
+  var _state: ChildState
+  
+  new create(name: String, pm: ProcessMonitor) =>
+    _name = name
+    _pm = pm
+    _state = _Booting
+
+  fun ref change_state(state: ChildState) =>
+    _state = state
 
 actor ProcessManager
   let _env: Env
-  var _host: String = ""
-  var _service: String = ""
-  var children = Array[Child]
+  var children : Array[Child] = Array[Child](1)
+  var _buffy_name: String = ""
+  var _sender_name: String = ""
+  var _receiver_name: String = ""
   
-  new create(env: Env, process_names: Array[String val] val) =>
+  new create(env: Env) =>
     _env = env
+
+  be boot_process(filepath: FilePath, args: Array[String] val,
+    vars: Array[String] val)
+    =>
+    """
+    Start up processes with host and service as phone home address
+    """
+    _env.out.print("dagon: starting process " + filepath.path)
     try
-      _buffy_name = process_names(0)
-      _sender_name = process_names(1)
-      _receiver_name = process_names(2)
+      let name: String = args(0)
+      let pn: ProcessNotify iso = ProcessClient(_env)
+      let pm: ProcessMonitor = ProcessMonitor(consume pn, filepath,
+        consume args, consume vars)
+      let child = Child(name, pm)
+      children.push(child)
     else
-      _env.out.print("dagon: couldn't get process names")
+      _env.out.print("dagon: booting process failed")
     end
 
-  be initiate_processes(host: String, service: String) =>
-    _host = host
-    _service = service
-    // Start up processes with host and service as phone home address
-    _env.out.print("dagon: began process startup")
-
   be ack_startup(process_name: String) =>
-    // Do something with acks
+    """
+    Do something with acks
+    """
     _env.out.print("dagon: received ack")
 
 

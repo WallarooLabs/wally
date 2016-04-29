@@ -2,7 +2,7 @@ use "net"
 use "options"
 use "osc-pony"
 
-use "../../buffy-pony/messages"
+use "messages"
 
 
 actor Main
