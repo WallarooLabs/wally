@@ -7,8 +7,9 @@ use "net"
 use "options"
 use "time"
 use "buffy/messages"
+use "sendence/tcp"
 
-// needs handling of "start message" to kick off run when using dagon
+// clean up @printf's.
 // decide on done/done_shutdown usage
 // documentation
 // more tests
@@ -144,6 +145,7 @@ class ToBuffyNotify is TCPConnectionNotify
 
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator
+  let _framer: Framer = Framer
 
   new iso create(coordinator: WithDagonCoordinator) =>
     _coordinator = coordinator
@@ -155,8 +157,19 @@ class ToDagonNotify is TCPConnectionNotify
     _coordinator.to_dagon_socket(sock, Ready)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    // TODO handle real start message here
-    _coordinator.go()
+    for chunked in _framer.chunk(consume data).values() do
+      try
+        let decoded = WireMsgDecoder(consume chunked)
+        match decoded
+        | let m: StartMsg val =>
+            _coordinator.go()
+        else
+          @printf[I32]("UNEXPECTED MESSAGE\n".cstring())
+        end
+      else
+        @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
+      end
+    end
 
 //
 // COORDINATE OUR STARTUP
