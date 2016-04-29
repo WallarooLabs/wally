@@ -67,16 +67,16 @@ actor TopologyManager
 
 
       let halve_create_msg =
-        TCPMsgEncoder.spin_up(halve_step_id, ComputationTypes.halve())
+        WireMsgEncoder.spin_up(halve_step_id, ComputationTypes.halve())
       let halve_to_print_proxy_create_msg =
-        TCPMsgEncoder.spin_up_proxy(halve_to_print_proxy_id,
+        WireMsgEncoder.spin_up_proxy(halve_to_print_proxy_id,
           print_step_id, remote_node_name2, node2_addr._1, node2_addr._2)
       let print_create_msg =
-        TCPMsgEncoder.spin_up(print_step_id, ComputationTypes.print())
+        WireMsgEncoder.spin_up(print_step_id, ComputationTypes.print())
       let connect_msg =
-        TCPMsgEncoder.connect_steps(halve_step_id, halve_to_print_proxy_id)
+        WireMsgEncoder.connect_steps(halve_step_id, halve_to_print_proxy_id)
       let finished_msg =
-        TCPMsgEncoder.initialization_msgs_finished()
+        WireMsgEncoder.initialization_msgs_finished()
 
       //Leader node (i.e. this one)
       _step_manager.add_step(double_step_id, ComputationTypes.double())
@@ -118,7 +118,7 @@ actor TopologyManager
         let conn: TCPConnection =
           TCPConnection(auth, consume notifier, _phone_home_host, _phone_home_service)
 
-        let message = TCPMsgEncoder.ready(_name)
+        let message = WireMsgEncoder.ready(_name)
         conn.write(message)
       else
         _env.out.print("Couldn't get ambient authority when completing "
@@ -224,7 +224,7 @@ class LeaderConnectNotify is TCPConnectionNotify
 
   fun ref _process_data(conn: TCPConnection ref, data: Array[U8] val) =>
     try
-      let msg: TCPMsg val = TCPMsgDecoder(data)
+      let msg: WireMsg val = WireMsgDecoder(data)
       match msg
       | let m: IdentifyMsg val =>
         _env.out.print("GREET from " + m.node_name)

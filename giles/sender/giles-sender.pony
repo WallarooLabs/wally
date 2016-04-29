@@ -275,7 +275,7 @@ actor WithDagonCoordinator
   be finished() =>
     try
       let x = _to_dagon_socket._1 as TCPConnection
-      x.write(TCPMessageEncoder.done_shutdown(_node_id as String))
+      x.write(WireMsgEncoder.done_shutdown(_node_id as String))
       x.dispose()
     end
     try
@@ -292,7 +292,7 @@ actor WithDagonCoordinator
   fun _send_ready() =>
     try
       let x = _to_dagon_socket._1 as TCPConnection
-      x.write(TCPMessageEncoder.ready(_node_id as String))
+      x.write(WireMsgEncoder.ready(_node_id as String))
     end
 
 //
@@ -339,7 +339,7 @@ actor SendingActor
       let d = recover Array[ByteSeq](current_batch_size) end
       for i in Range(0, current_batch_size) do
         try
-          let m = TCPMessageEncoder.external(_data_source.next())
+          let m = WireMsgEncoder.external(_data_source.next())
           d.push(m)
         else
           break

@@ -15,7 +15,7 @@ primitive _InitializationMsgsFinished           fun apply(): String => "/11"
 primitive _AckInitialized                       fun apply(): String => "/12"
 primitive _External                             fun apply(): String => "/13"
 
-primitive TCPMsgEncoder
+primitive WireMsgEncoder
   fun ready(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_Ready(),
       recover
@@ -123,8 +123,8 @@ primitive TCPMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
     
-primitive TCPMsgDecoder
-  fun apply(data: Array[U8] val): TCPMsg val ? =>
+primitive WireMsgDecoder
+  fun apply(data: Array[U8] val): WireMsg val ? =>
     let msg = OSCDecoder.from_bytes(data) as OSCMessage val
     match msg.address
     | _Ready() =>
@@ -159,9 +159,9 @@ primitive TCPMsgDecoder
       error
     end
 
-trait val TCPMsg
+trait val WireMsg
 
-class ReadyMsg is TCPMsg
+class ReadyMsg is WireMsg
   let node_name: String
 
   new val create(msg: OSCMessage val) ? =>
@@ -172,7 +172,7 @@ class ReadyMsg is TCPMsg
       error
     end
 
-class IdentifyMsg is TCPMsg
+class IdentifyMsg is WireMsg
   let node_name: String
   let host: String
   let service: String
@@ -187,7 +187,7 @@ class IdentifyMsg is TCPMsg
       error
     end
 
-class DoneMsg is TCPMsg
+class DoneMsg is WireMsg
   let node_name: String
 
   new val create(msg: OSCMessage val) ? =>
@@ -198,9 +198,9 @@ class DoneMsg is TCPMsg
       error
     end
 
-primitive StartMsg is TCPMsg
+primitive StartMsg is WireMsg
 
-class ReconnectMsg is TCPMsg
+class ReconnectMsg is WireMsg
   let node_name: String
 
   new val create(msg: OSCMessage val) ? =>
@@ -210,7 +210,7 @@ class ReconnectMsg is TCPMsg
       error
     end
 
-class ShutdownMsg is TCPMsg
+class ShutdownMsg is WireMsg
   let node_name: String
 
   new val create(msg: OSCMessage val) ? =>
@@ -221,7 +221,7 @@ class ShutdownMsg is TCPMsg
       error
     end
 
-class DoneShutdownMsg is TCPMsg
+class DoneShutdownMsg is WireMsg
   let node_name: String
 
   new val create(msg: OSCMessage val) ? =>
@@ -232,7 +232,7 @@ class DoneShutdownMsg is TCPMsg
       error
     end
 
-class ForwardMsg is TCPMsg
+class ForwardMsg is WireMsg
   let step_id: I32
   let msg: Message[I32] val
 
@@ -245,7 +245,7 @@ class ForwardMsg is TCPMsg
       error
     end
 
-class SpinUpMsg is TCPMsg
+class SpinUpMsg is WireMsg
   let step_id: I32
   let computation_type_id: I32
 
@@ -258,7 +258,7 @@ class SpinUpMsg is TCPMsg
       error
     end
 
-class SpinUpProxyMsg is TCPMsg
+class SpinUpProxyMsg is WireMsg
   let proxy_id: I32
   let step_id: I32
   let target_node_name: String
@@ -279,7 +279,7 @@ class SpinUpProxyMsg is TCPMsg
       error
     end
 
-class ConnectStepsMsg is TCPMsg
+class ConnectStepsMsg is WireMsg
   let in_step_id: I32
   let out_step_id: I32
 
@@ -292,9 +292,9 @@ class ConnectStepsMsg is TCPMsg
       error
     end
 
-primitive InitializationMsgsFinishedMsg is TCPMsg
+primitive InitializationMsgsFinishedMsg is WireMsg
 
-class AckInitializedMsg is TCPMsg
+class AckInitializedMsg is WireMsg
   let node_name: String
 
   new val create(msg: OSCMessage val) ? =>
@@ -305,7 +305,7 @@ class AckInitializedMsg is TCPMsg
       error
     end
 
-class ExternalMsg is TCPMsg
+class ExternalMsg is WireMsg
   let data: String
 
   new val create(msg: OSCMessage val) ? =>
