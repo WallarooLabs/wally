@@ -10,7 +10,6 @@ use "buffy/messages"
 use "sendence/tcp"
 
 // clean up @printf's.
-// decide on done/done_shutdown usage
 // documentation
 // more tests
 
