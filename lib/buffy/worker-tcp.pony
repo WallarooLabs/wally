@@ -15,13 +15,13 @@ class WorkerNotifier is TCPListenNotify
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
-    leader_service: String, step_builder: StepBuilder val) =>
+    leader_service: String, step_manager: StepManager) =>
     _env = env
     _auth = auth
     _name = name
     _leader_host = leader_host
     _leader_service = leader_service
-    _step_manager = StepManager(env, step_builder)
+    _step_manager = step_manager
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -59,12 +59,6 @@ class WorkerConnectNotify is TCPConnectionNotify
   let _framer: Framer = Framer
   let _nodes: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
   let _name: String
-  var _buffer: Array[U8] = Array[U8]
-  // How many bytes are left to process for current message
-  var _left: U32 = 0
-  // For building up the two bytes of a U16 message length
-  var _len_bytes: Array[U8] = Array[U8]
-  var _data_index: USize = 0
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
     leader_service: String, step_manager: StepManager) =>
@@ -89,6 +83,8 @@ class WorkerConnectNotify is TCPConnectionNotify
           _step_manager.add_step(m.step_id, m.computation_type_id)
         | let m: SpinUpProxyMsg val =>
           _spin_up_proxy(m)
+        | let m: SpinUpSinkMsg val =>
+          _step_manager.add_sink(m.sink_id, m.sink_step_id, _auth)
         | let m: ForwardMsg val =>
           _step_manager(m.step_id, m.msg)
         | let m: ConnectStepsMsg val =>
@@ -119,13 +115,7 @@ class WorkerConnectNotify is TCPConnectionNotify
     end
 
   fun ref connected(conn: TCPConnection ref) =>
-    if _name != "0" then
-      let name = _name
-      let message =
-        WireMsgEncoder.reconnect(name)
-      conn.write(message)
-      _env.out.print("Re-established connection for worker " + name)
-    end
+    _env.out.print(_name + " is connected.")
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     _env.out.print(_name + ": Connection to leader failed!")

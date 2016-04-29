@@ -26,6 +26,7 @@ actor ExternalConnection is ComputeStep[I32]
     _conn = conn
 
   be apply(input: Message[I32] val) =>
+    _env.out.print(input.data.string())
     let tcp_msg = WireMsgEncoder.external(input.data)
     _conn.write(tcp_msg)
 
@@ -33,17 +34,21 @@ actor StepManager
   let _env: Env
   let _steps: Map[I32, Any tag] = Map[I32, Any tag]
   let _step_builder: StepBuilder val
+  let _sink_addrs: Map[I32, (String, String)] val
 
-  new create(env: Env, s_builder: StepBuilder val) =>
+  new create(env: Env, s_builder: StepBuilder val,
+    sink_addrs: Map[I32, (String, String)] val) =>
     _env = env
     _step_builder = s_builder
+    _sink_addrs = sink_addrs
 
   be apply(step_id: I32, msg: Message[I32] val) =>
     try
       match _steps(step_id)
       | let p: ComputeStep[I32] tag => p(msg)
       else
-        _env.out.print("StepManager: Could not forward message")
+        _env.out.print("StepManager: Could not forward message"
+        + " (it wasn't a ComputeStep")
       end
     else
       _env.out.print("StepManager: Could not forward message")
@@ -57,6 +62,16 @@ actor StepManager
   be add_proxy(proxy_id: I32, step_id: I32, conn: TCPConnection tag) =>
     let p = Proxy(_env, step_id, conn)
     _steps(proxy_id) = p
+
+  be add_sink(sink_id: I32, sink_step_id: I32, auth: AmbientAuth) =>
+    try
+      let sink_addr = _sink_addrs(sink_id)
+      let sink_host = sink_addr._1
+      let sink_service = sink_addr._2
+      let conn = TCPConnection(auth, SinkConnectNotify(_env), sink_host,
+        sink_service)
+      _steps(sink_step_id) = ExternalConnection(_env, conn)
+    end
 
   be connect_steps(in_id: I32, out_id: I32) =>
     try

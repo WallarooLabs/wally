@@ -5,7 +5,7 @@ use "buffy/messages"
 
 actor Main
   new create(env: Env) =>
-    Startup(env, T, SB)
+    Startup(env, T, SB, 1)
 
 // User computations
 primitive ComputationTypes
@@ -56,18 +56,18 @@ primitive T is Topology
 
       let double_step_id: I32 = 1
       let halve_step_id: I32 = 2
-      let halve_to_print_proxy_id: I32 = 3
-      let print_step_id: I32 = 4
+      let halve_to_sink_proxy_id: I32 = 3
+      let sink_step_id: I32 = 4
 
       let halve_create_msg =
         WireMsgEncoder.spin_up(halve_step_id, ComputationTypes.halve())
-      let halve_to_print_proxy_create_msg =
-        WireMsgEncoder.spin_up_proxy(halve_to_print_proxy_id,
-          print_step_id, remote_node_name2, node2_addr._1, node2_addr._2)
-      let print_create_msg =
-        WireMsgEncoder.spin_up(print_step_id, ComputationTypes.print())
+      let halve_to_sink_proxy_create_msg =
+        WireMsgEncoder.spin_up_proxy(halve_to_sink_proxy_id,
+          sink_step_id, remote_node_name2, node2_addr._1, node2_addr._2)
+      let sink_create_msg =
+        WireMsgEncoder.spin_up_sink(1, sink_step_id)
       let connect_msg =
-        WireMsgEncoder.connect_steps(halve_step_id, halve_to_print_proxy_id)
+        WireMsgEncoder.connect_steps(halve_step_id, halve_to_sink_proxy_id)
       let finished_msg =
         WireMsgEncoder.initialization_msgs_finished()
 
@@ -77,23 +77,18 @@ primitive T is Topology
       //First worker node
       var conn1 = workers(remote_node_name1)
       conn1.write(halve_create_msg)
-      conn1.write(halve_to_print_proxy_create_msg)
+      conn1.write(halve_to_sink_proxy_create_msg)
       conn1.write(connect_msg)
       conn1.write(finished_msg)
 
       //Second worker node
       var conn2 = workers(remote_node_name2)
-      conn2.write(print_create_msg)
+      conn2.write(sink_create_msg)
       conn2.write(finished_msg)
 
       let halve_proxy_id: I32 = 5
       step_manager.add_proxy(halve_proxy_id, halve_step_id, conn1)
       step_manager.connect_steps(1, 5)
-
-      for i in Range(0, 100) do
-        let next_msg = Message[I32](i.i32(), i.i32())
-        step_manager(1, next_msg)
-      end
     else
       @printf[String]("Buffy Leader: Failed to initialize topology".cstring())
     end

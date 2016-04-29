@@ -94,13 +94,13 @@ class LeaderNotifier is TCPListenNotify
 
   new iso create(env: Env, auth: AmbientAuth, name: String, host: String,
     service: String, worker_count: USize, phone_home: String,
-    topology: Topology val, step_builder: StepBuilder val) =>
+    topology: Topology val, step_manager: StepManager) =>
     _env = env
     _auth = auth
     _name = name
     _host = host
     _service = service
-    _step_manager = StepManager(env, step_builder)
+    _step_manager = step_manager
     _topology_manager = TopologyManager(env, name, worker_count, phone_home,
       _step_manager, topology)
 
@@ -128,12 +128,6 @@ class LeaderConnectNotify is TCPConnectionNotify
   let _step_manager: StepManager
   let _framer: Framer = Framer
   let _nodes: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
-  var _buffer: Array[U8] = Array[U8]
-  // How many bytes are left to process for current message
-  var _left: U32 = 0
-  // For building up the two bytes of a U16 message length
-  var _len_bytes: Array[U8] = Array[U8]
-  var _data_index: USize = 0
 
   new iso create(env: Env, auth: AmbientAuth, name: String, t_manager: TopologyManager,
     s_manager: StepManager) =>
@@ -162,6 +156,8 @@ class LeaderConnectNotify is TCPConnectionNotify
           _step_manager.add_step(m.step_id, m.computation_type_id)
         | let m: SpinUpProxyMsg val =>
           _spin_up_proxy(m)
+        | let m: SpinUpSinkMsg val =>
+          _step_manager.add_sink(m.sink_id, m.sink_step_id, _auth)
         | let m: ForwardMsg val =>
           _step_manager(m.step_id, m.msg)
         | let m: ConnectStepsMsg val =>

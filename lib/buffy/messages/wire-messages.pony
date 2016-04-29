@@ -11,10 +11,11 @@ primitive _DoneShutdown                         fun apply(): String => "/6"
 primitive _Forward                              fun apply(): String => "/7"
 primitive _SpinUp                               fun apply(): String => "/8"
 primitive _SpinUpProxy                          fun apply(): String => "/9"
-primitive _ConnectSteps                         fun apply(): String => "/10"
-primitive _InitializationMsgsFinished           fun apply(): String => "/11"
-primitive _AckInitialized                       fun apply(): String => "/12"
-primitive _External                             fun apply(): String => "/13"
+primitive _SpinUpSink                           fun apply(): String => "/10"
+primitive _ConnectSteps                         fun apply(): String => "/11"
+primitive _InitializationMsgsFinished           fun apply(): String => "/12"
+primitive _AckInitialized                       fun apply(): String => "/13"
+primitive _External                             fun apply(): String => "/14"
 
 primitive WireMsgEncoder
   fun ready(node_name: String): Array[U8] val =>
@@ -95,6 +96,14 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
+  fun spin_up_sink(sink_id: I32, sink_step_id: I32): Array[U8] val =>
+    let osc = OSCMessage(_SpinUpSink(),
+      recover
+        [as OSCData val: OSCInt(sink_id),
+                         OSCInt(sink_step_id)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
   fun connect_steps(from_step_id: I32, to_step_id: I32): Array[U8] val =>
     let osc = OSCMessage(_ConnectSteps(),
       recover
@@ -148,6 +157,8 @@ primitive WireMsgDecoder
       SpinUpMsg(msg)
     | _SpinUpProxy() =>
       SpinUpProxyMsg(msg)
+    | _SpinUpSink() =>
+      SpinUpSinkMsg(msg)
     | _ConnectSteps() =>
       ConnectStepsMsg(msg)
     | _InitializationMsgsFinished() =>
@@ -276,6 +287,19 @@ class SpinUpProxyMsg is WireMsg
       target_node_name = t_node_name.value()
       target_host = t_host.value()
       target_service = t_service.value()
+    else
+      error
+    end
+
+class SpinUpSinkMsg is WireMsg
+  let sink_id: I32
+  let sink_step_id: I32
+
+  new val create(msg: OSCMessage val) ? =>
+    match (msg.arguments(0), msg.arguments(1))
+    | (let s_id: OSCInt val, let s_step_id: OSCInt val) =>
+      sink_id = s_id.value()
+      sink_step_id = s_step_id.value()
     else
       error
     end
