@@ -5,7 +5,8 @@ use "buffy/messages"
 
 actor Main
   new create(env: Env) =>
-    Startup(env, T, SB, 1)
+    let topology: Topology val = Topology(recover val [1, 2] end)
+    Startup(env, topology, SB, 1)
 
 // User computations
 primitive ComputationTypes
@@ -42,57 +43,4 @@ primitive SB is StepBuilder
       Sink[I32](recover Print[I32] end)
     else
       error
-    end
-
-// Topology initialization
-primitive T is Topology
-  fun initialize(workers: Map[String, TCPConnection tag],
-    worker_addrs: Map[String, (String, String)], step_manager: StepManager) =>
-    try
-      let keys = workers.keys()
-      let remote_node_name1: String = keys.next()
-      let remote_node_name2: String = keys.next()
-      let node2_addr = worker_addrs(remote_node_name2)
-
-      // Since the source count in Startup is specified to be 1,
-      // step_id 0 refers to the step that is fed directly from
-      // that source. If the source count were 2, then step_id 1
-      // would be fed by the second source.
-      let double_step_id: I32 = 0
-      let halve_step_id: I32 = 1
-      let halve_to_sink_proxy_id: I32 = 2
-      let sink_step_id: I32 = 3
-
-      let halve_create_msg =
-        WireMsgEncoder.spin_up(halve_step_id, ComputationTypes.halve())
-      let halve_to_sink_proxy_create_msg =
-        WireMsgEncoder.spin_up_proxy(halve_to_sink_proxy_id,
-          sink_step_id, remote_node_name2, node2_addr._1, node2_addr._2)
-      let sink_create_msg =
-        WireMsgEncoder.spin_up_sink(0, sink_step_id)
-      let connect_msg =
-        WireMsgEncoder.connect_steps(halve_step_id, halve_to_sink_proxy_id)
-      let finished_msg =
-        WireMsgEncoder.initialization_msgs_finished()
-
-      //Leader node (i.e. this one)
-      step_manager.add_step(double_step_id, ComputationTypes.double())
-
-      //First worker node
-      var conn1 = workers(remote_node_name1)
-      conn1.write(halve_create_msg)
-      conn1.write(halve_to_sink_proxy_create_msg)
-      conn1.write(connect_msg)
-      conn1.write(finished_msg)
-
-      //Second worker node
-      var conn2 = workers(remote_node_name2)
-      conn2.write(sink_create_msg)
-      conn2.write(finished_msg)
-
-      let halve_proxy_id: I32 = 4
-      step_manager.add_proxy(halve_proxy_id, halve_step_id, conn1)
-      step_manager.connect_steps(0, 4)
-    else
-      @printf[String]("Buffy Leader: Failed to initialize topology".cstring())
     end

@@ -48,8 +48,72 @@ actor TopologyManager
       _initialize_topology()
     end
 
+  // Currently assigns steps in pipeline using round robin among nodes
   fun ref _initialize_topology() =>
-    _topology.initialize(_workers, _worker_addrs, _step_manager)
+    try
+      let nodes = Array[String]
+      nodes.push(_name)
+      let keys = _workers.keys()
+      for key in keys do
+        nodes.push(key)
+      end
+
+      let pipeline = _topology.pipeline
+      var step_id: USize = 0
+      var count: USize = 0
+      // Round robin node assignment
+      while count < pipeline.size() do
+        let cur_node_idx: USize = (step_id.usize() / 2) % nodes.size()
+        let cur_node = nodes((step_id / 2) % nodes.size())
+        let next_node = nodes((cur_node_idx + 1) % nodes.size())
+        let proxy_step_id = step_id + 1
+        let proxy_step_target_id = proxy_step_id + 1
+        let next_node_addr = _worker_addrs(next_node)
+        let computation_id = pipeline(count)
+        _env.out.print("Spinning up computation " + computation_id.string() + " on node " + cur_node)
+
+        if cur_node_idx == 0 then // if cur_node is the leader/source
+          let target_conn = _workers(next_node)
+          _step_manager.add_step(step_id.i32(), computation_id)
+          _step_manager.add_proxy(proxy_step_id.i32(), proxy_step_target_id.i32(),
+            target_conn)
+          _step_manager.connect_steps(step_id.i32(), proxy_step_id.i32())
+        else
+          let create_step_msg =
+            WireMsgEncoder.spin_up(step_id.i32(), computation_id)
+          let create_proxy_msg =
+            WireMsgEncoder.spin_up_proxy(proxy_step_id.i32(), proxy_step_target_id.i32(),
+              next_node, next_node_addr._1, next_node_addr._2)
+          let connect_msg =
+            WireMsgEncoder.connect_steps(step_id.i32(), proxy_step_id.i32())
+
+          let conn = _workers(cur_node)
+          conn.write(create_step_msg)
+          conn.write(create_proxy_msg)
+          conn.write(connect_msg)
+        end
+
+        count = count + 1
+        step_id = step_id + 2
+      end
+      let sink_node = nodes((step_id / 2) % nodes.size())
+      _env.out.print("Spinning up sink on node " + sink_node)
+      let create_sink_msg =
+        WireMsgEncoder.spin_up_sink(0, step_id.i32())
+      let conn = _workers(sink_node)
+      conn.write(create_sink_msg)
+
+      let finished_msg =
+        WireMsgEncoder.initialization_msgs_finished()
+      // Send finished_msg to all workers
+      for i in Range(1, nodes.size()) do
+        let node = nodes(i)
+        let next_conn = _workers(node)
+        next_conn.write(finished_msg)
+      end
+    else
+      @printf[String]("Buffy Leader: Failed to initialize topology".cstring())
+    end
 
   be update_connection(conn: TCPConnection tag, node_name: String) =>
     _workers(node_name) = conn
