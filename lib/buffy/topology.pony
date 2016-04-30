@@ -1,9 +1,13 @@
 use "collections"
 use "net"
 
-trait Topology
-  fun initialize(workers: Map[String, TCPConnection tag],
-    worker_addrs: Map[String, (String, String)], step_manager: StepManager)
+class Topology
+  // A sequence of computation type ids representing
+  // the computation pipeline
+  let pipeline: Array[I32] val
+
+  new val create(p: Array[I32] val) =>
+    pipeline = p
 
 trait StepBuilder
   fun val apply(id: I32): Any tag ?
