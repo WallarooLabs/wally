@@ -71,6 +71,8 @@ actor StepManager
       let conn = TCPConnection(auth, SinkConnectNotify(_env), sink_host,
         sink_service)
       _steps(sink_step_id) = ExternalConnection(_env, conn)
+    else
+      _env.out.print("StepManager: Could not add sink.")
     end
 
   be connect_steps(in_id: I32, out_id: I32) =>

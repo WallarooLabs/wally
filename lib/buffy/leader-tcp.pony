@@ -6,6 +6,7 @@ use "sendence/tcp"
 
 actor TopologyManager
   let _env: Env
+  let _auth: AmbientAuth
   let _step_manager: StepManager
   let _name: String
   let _worker_count: USize
@@ -17,16 +18,24 @@ actor TopologyManager
   // Keep track of how many workers acknowledged they're running their
   // part of the topology
   var _acks: USize = 0
+  let _leader_host: String
+  let _leader_service: String
   var _phone_home_host: String = ""
   var _phone_home_service: String = ""
 
-  new create(env: Env, name: String, worker_count: USize, phone_home: String,
-    step_manager: StepManager, topology: Topology val) =>
+  new create(env: Env, auth: AmbientAuth, name: String, worker_count: USize, leader_host: String,
+    leader_service: String, phone_home: String, step_manager: StepManager,
+    topology: Topology val) =>
     _env = env
+    _auth = auth
     _step_manager = step_manager
     _name = name
     _worker_count = worker_count
     _topology = topology
+    _leader_host = leader_host
+    _leader_service = leader_service
+    _worker_addrs(name) = (leader_host, leader_service)
+
     if phone_home != "" then
       let ph_addr = phone_home.split(":")
       try
@@ -63,12 +72,19 @@ actor TopologyManager
       var count: USize = 0
       // Round robin node assignment
       while count < pipeline.size() do
-        let cur_node_idx: USize = count % nodes.size()
+        let cur_node_idx = count % nodes.size()
         let cur_node = nodes(count % nodes.size())
+        let next_node_idx = (cur_node_idx + 1) % nodes.size()
         let next_node = nodes((cur_node_idx + 1) % nodes.size())
         let proxy_step_id = step_id + 1
         let proxy_step_target_id = proxy_step_id + 1
-        let next_node_addr = _worker_addrs(next_node)
+        _env.out.print(next_node)
+        let next_node_addr =
+          if next_node_idx == 0 then
+            (_leader_host, _leader_service)
+          else
+            _worker_addrs(next_node)
+          end
         let computation_id = pipeline(count)
         _env.out.print("Spinning up computation " + computation_id.string() + " on node " + cur_node)
 
@@ -96,12 +112,18 @@ actor TopologyManager
         count = count + 1
         step_id = step_id + 2
       end
-      let sink_node = nodes(count % nodes.size())
+      let sink_node_idx = count % nodes.size()
+      let sink_node = nodes(sink_node_idx)
       _env.out.print("Spinning up sink on node " + sink_node)
-      let create_sink_msg =
-        WireMsgEncoder.spin_up_sink(0, step_id.i32())
-      let conn = _workers(sink_node)
-      conn.write(create_sink_msg)
+
+      if sink_node_idx == 0 then // if cur_node is the leader
+        _step_manager.add_sink(0, step_id.i32(), _auth)
+      else
+        let create_sink_msg =
+          WireMsgEncoder.spin_up_sink(0, step_id.i32())
+        let conn = _workers(sink_node)
+        conn.write(create_sink_msg)
+      end
 
       let finished_msg =
         WireMsgEncoder.initialization_msgs_finished()
@@ -165,8 +187,8 @@ class LeaderNotifier is TCPListenNotify
     _host = host
     _service = service
     _step_manager = step_manager
-    _topology_manager = TopologyManager(env, name, worker_count, phone_home,
-      _step_manager, topology)
+    _topology_manager = TopologyManager(env, auth, name, worker_count, _host,
+      _service, phone_home, _step_manager, topology)
 
   fun ref listening(listen: TCPListener ref) =>
     try
