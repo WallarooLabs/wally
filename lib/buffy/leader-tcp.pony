@@ -162,8 +162,8 @@ class LeaderConnectNotify is TCPConnectionNotify
           _step_manager(m.step_id, m.msg)
         | let m: ConnectStepsMsg val =>
           _step_manager.connect_steps(m.in_step_id, m.out_step_id)
-        else
-          _env.err.print("Error decoding incoming message.")
+        | let m: UnknownMsg val =>
+          _env.err.print("Unknown message type.")
         end
       else
         _env.err.print("Error decoding incoming message.")

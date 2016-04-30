@@ -168,7 +168,7 @@ primitive WireMsgDecoder
     | _External() =>
       ExternalMsg(msg)
     else
-      error
+      UnknownMsg(data)
     end
 
 trait val WireMsg
@@ -340,3 +340,8 @@ class ExternalMsg is WireMsg
       error
     end
 
+class UnknownMsg is WireMsg
+  let data: Array[U8] val
+
+  new val create(d: Array[U8] val) =>
+    data = d

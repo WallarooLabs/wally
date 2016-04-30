@@ -92,6 +92,8 @@ class WorkerConnectNotify is TCPConnectionNotify
         | let m: InitializationMsgsFinishedMsg val =>
           let ack_msg = WireMsgEncoder.ack_initialized(_name)
           conn.write(ack_msg)
+        | let m: UnknownMsg val =>
+          _env.err.print("Unknown message type.")
         end
       else
         _env.err.print("Error decoding incoming message.")

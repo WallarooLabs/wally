@@ -57,6 +57,8 @@ class SourceConnectNotify is TCPConnectionNotify
         | let m: ExternalMsg val =>
           let new_msg: Message[I32] val = Message[I32](_msg_id = _msg_id + 1, m.data.i32())
           _step_manager(_source_id, new_msg)
+        | let m: UnknownMsg val =>
+          _env.err.print("Unknown message type.")
         else
           _env.err.print("Source " + _source_id.string() + ": decoded message wasn't external.")
         end
