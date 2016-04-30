@@ -63,8 +63,8 @@ actor TopologyManager
       var count: USize = 0
       // Round robin node assignment
       while count < pipeline.size() do
-        let cur_node_idx: USize = (step_id.usize() / 2) % nodes.size()
-        let cur_node = nodes((step_id / 2) % nodes.size())
+        let cur_node_idx: USize = count % nodes.size()
+        let cur_node = nodes(count % nodes.size())
         let next_node = nodes((cur_node_idx + 1) % nodes.size())
         let proxy_step_id = step_id + 1
         let proxy_step_target_id = proxy_step_id + 1
@@ -96,7 +96,7 @@ actor TopologyManager
         count = count + 1
         step_id = step_id + 2
       end
-      let sink_node = nodes((step_id / 2) % nodes.size())
+      let sink_node = nodes(count % nodes.size())
       _env.out.print("Spinning up sink on node " + sink_node)
       let create_sink_msg =
         WireMsgEncoder.spin_up_sink(0, step_id.i32())
