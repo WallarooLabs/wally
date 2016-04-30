@@ -4,15 +4,13 @@ use "collections"
 
 actor Startup
   new create(env: Env, topology: Topology val, step_builder: StepBuilder val,
-    source_count: I32) =>
+    source_count: USize) =>
     var is_worker = true
     var worker_count: USize = 0
     var node_name: String = "0"
     var phone_home: String = ""
     var options = Options(env)
     var source_addrs = Array[String]
-    var source_host = ""
-    var source_service = ""
     var sink_addrs = Array[String]
 
     options
@@ -20,6 +18,8 @@ actor Startup
       .add("worker_count", "w", I64Argument)
       .add("phone_home", "p", StringArgument)
       .add("name", "n", StringArgument)
+      // Comma-delimited source and sink addresses.
+      // e.g. --source 127.0.0.1:6000,127.0.0.1:7000
       .add("source", "source", StringArgument)
       .add("sink", "sink", StringArgument)
 
@@ -53,18 +53,7 @@ actor Startup
         let sink_service = sink_addr(1)
         env.out.print("Sink " + i.string())
         env.out.print(sink_host + ":" + sink_service)
-        sinks((i + 1).i32()) = (sink_host, sink_service)
-      end
-
-      if not is_worker then
-        try
-          let source_addr: Array[String] = source_addrs(0).split(":")
-          source_host = source_addr(0)
-          source_service = source_addr(1)
-        else
-          env.out.print("Leader needs a source specified!")
-          return
-        end
+        sinks(i.i32()) = (sink_host, sink_service)
       end
 
       let auth = env.root as AmbientAuth
@@ -73,14 +62,24 @@ actor Startup
         TCPListener(auth,
           WorkerNotifier(env, auth, node_name, leader_host, leader_service, step_manager))
       else
-        let notifier = LeaderNotifier(env, auth, node_name, leader_host,
-          leader_service, worker_count, phone_home, topology, step_manager)
-        TCPListener(auth, consume notifier, leader_host, leader_service)
-        for i in Range(1, (source_count + 1).usize()) do
+        if source_addrs.size() != source_count then
+          env.out.print("There are " + source_count.string() + " sources but "
+            + source_addrs.size().string() + " source addresses specified.")
+          return
+        end
+        // Set up source listeners
+        for i in Range(0, source_count) do
+          let source_addr: Array[String] = source_addrs(i).split(":")
+          let source_host = source_addr(0)
+          let source_service = source_addr(1)
           let source_notifier = SourceNotifier(env, auth, source_host, source_service,
             i.i32(), step_manager)
             TCPListener(auth, consume source_notifier, source_host, source_service)
         end
+        // Set up leader listener
+        let notifier = LeaderNotifier(env, auth, node_name, leader_host,
+          leader_service, worker_count, phone_home, topology, step_manager)
+        TCPListener(auth, consume notifier, leader_host, leader_service)
       end
 
       if is_worker then

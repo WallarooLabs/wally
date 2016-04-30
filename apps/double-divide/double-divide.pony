@@ -54,6 +54,10 @@ primitive T is Topology
       let remote_node_name2: String = keys.next()
       let node2_addr = worker_addrs(remote_node_name2)
 
+      // Since the source count in Startup is specified to be 1,
+      // step_id 0 refers to the step that is fed directly from
+      // that source. If the source count were 2, then step_id 1
+      // would be fed by the second source.
       let double_step_id: I32 = 0
       let halve_step_id: I32 = 1
       let halve_to_sink_proxy_id: I32 = 2
