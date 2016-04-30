@@ -54,10 +54,10 @@ primitive T is Topology
       let remote_node_name2: String = keys.next()
       let node2_addr = worker_addrs(remote_node_name2)
 
-      let double_step_id: I32 = 1
-      let halve_step_id: I32 = 2
-      let halve_to_sink_proxy_id: I32 = 3
-      let sink_step_id: I32 = 4
+      let double_step_id: I32 = 0
+      let halve_step_id: I32 = 1
+      let halve_to_sink_proxy_id: I32 = 2
+      let sink_step_id: I32 = 3
 
       let halve_create_msg =
         WireMsgEncoder.spin_up(halve_step_id, ComputationTypes.halve())
@@ -65,7 +65,7 @@ primitive T is Topology
         WireMsgEncoder.spin_up_proxy(halve_to_sink_proxy_id,
           sink_step_id, remote_node_name2, node2_addr._1, node2_addr._2)
       let sink_create_msg =
-        WireMsgEncoder.spin_up_sink(1, sink_step_id)
+        WireMsgEncoder.spin_up_sink(0, sink_step_id)
       let connect_msg =
         WireMsgEncoder.connect_steps(halve_step_id, halve_to_sink_proxy_id)
       let finished_msg =
@@ -86,9 +86,9 @@ primitive T is Topology
       conn2.write(sink_create_msg)
       conn2.write(finished_msg)
 
-      let halve_proxy_id: I32 = 5
+      let halve_proxy_id: I32 = 4
       step_manager.add_proxy(halve_proxy_id, halve_step_id, conn1)
-      step_manager.connect_steps(1, 5)
+      step_manager.connect_steps(0, 4)
     else
       @printf[String]("Buffy Leader: Failed to initialize topology".cstring())
     end
