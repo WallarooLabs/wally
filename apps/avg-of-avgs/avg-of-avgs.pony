@@ -5,7 +5,6 @@ use "buffy/messages"
 
 actor Main
   new create(env: Env) =>
-    let i: I32 = 0
     let topology: Topology val = Topology(recover val [0, 1, 2, 2] end)
     Startup(env, topology, SB, 1)
 
