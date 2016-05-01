@@ -73,9 +73,9 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
 
   be add_output(to: ComputeStep[Out] tag) =>
     _output = to
-    for i in Range(0, _partitions.size()) do
+    for key in _partitions.keys() do
       try
-        match _partitions(i.i32())
+        match _partitions(key)
         | let t: ThroughStep[In, Out] tag => t.add_output(to)
         else
           @printf[String]("Partition not a ThroughStep!".cstring())
