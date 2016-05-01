@@ -45,14 +45,6 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
     _partition_function = pf
     _step_builder = sb
 
-//    try
-//      for i in Range(0, _partition_count.usize()) do
-//        _partitions(i.i32()) = _step_builder(_computation_type)
-//      end
-//    else
-//        @printf[String]("Couldn't build partitions!".cstring())
-//    end
-
   be apply(input: Message[In] val) =>
     let partition_id = _partition_function(input.data)
     if _partitions.contains(partition_id) then
