@@ -85,18 +85,18 @@ actor TopologyManager
           else
             _worker_addrs(next_node)
           end
-        let computation_id = pipeline(count)
-        _env.out.print("Spinning up computation " + computation_id.string() + " on node " + cur_node)
+        let computation_type = pipeline(count)
+        _env.out.print("Spinning up computation " + computation_type + " on node " + cur_node)
 
         if cur_node_idx == 0 then // if cur_node is the leader/source
           let target_conn = _workers(next_node)
-          _step_manager.add_step(step_id.i32(), computation_id)
+          _step_manager.add_step(step_id.i32(), computation_type)
           _step_manager.add_proxy(proxy_step_id.i32(), proxy_step_target_id.i32(),
             target_conn)
           _step_manager.connect_steps(step_id.i32(), proxy_step_id.i32())
         else
           let create_step_msg =
-            WireMsgEncoder.spin_up(step_id.i32(), computation_id)
+            WireMsgEncoder.spin_up(step_id.i32(), computation_type)
           let create_proxy_msg =
             WireMsgEncoder.spin_up_proxy(proxy_step_id.i32(), proxy_step_target_id.i32(),
               next_node, next_node_addr._1, next_node_addr._2)
@@ -239,7 +239,7 @@ class LeaderConnectNotify is TCPConnectionNotify
         | let m: ReconnectMsg val =>
           _topology_manager.update_connection(conn, m.node_name)
         | let m: SpinUpMsg val =>
-          _step_manager.add_step(m.step_id, m.computation_type_id)
+          _step_manager.add_step(m.step_id, m.computation_type)
         | let m: SpinUpProxyMsg val =>
           _spin_up_proxy(m)
         | let m: SpinUpSinkMsg val =>

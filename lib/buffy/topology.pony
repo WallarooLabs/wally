@@ -4,10 +4,10 @@ use "net"
 class Topology
   // A sequence of computation type ids representing
   // the computation pipeline
-  let pipeline: Array[I32] val
+  let pipeline: Array[String] val
 
-  new val create(p: Array[I32] val) =>
+  new val create(p: Array[String] val) =>
     pipeline = p
 
 trait StepBuilder
-  fun val apply(id: I32): Any tag ?
+  fun val apply(computation_type: String): Any tag ?

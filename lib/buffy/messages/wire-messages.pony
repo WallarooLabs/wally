@@ -75,11 +75,11 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun spin_up(step_id: I32, computation_type_id: I32): Array[U8] val =>
+  fun spin_up(step_id: I32, computation_type: String): Array[U8] val =>
     let osc = OSCMessage(_SpinUp(),
       recover
         [as OSCData val: OSCInt(step_id),
-                         OSCInt(computation_type_id)]
+                         OSCString(computation_type)]
       end)
     Bytes.length_encode(osc.to_bytes())
 
@@ -259,13 +259,13 @@ class ForwardMsg is WireMsg
 
 class SpinUpMsg is WireMsg
   let step_id: I32
-  let computation_type_id: I32
+  let computation_type: String
 
   new val create(msg: OSCMessage val) ? =>
     match (msg.arguments(0), msg.arguments(1))
-    | (let a_id: OSCInt val, let c_id: OSCInt val) =>
+    | (let a_id: OSCInt val, let c_type: OSCString val) =>
       step_id = a_id.value()
-      computation_type_id = c_id.value()
+      computation_type = c_type.value()
     else
       error
     end

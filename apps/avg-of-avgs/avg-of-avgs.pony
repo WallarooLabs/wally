@@ -5,14 +5,21 @@ use "buffy/messages"
 
 actor Main
   new create(env: Env) =>
-    let topology: Topology val = Topology(recover val [0, 1, 2, 2] end)
+    let topology: Topology val =
+      Topology(recover val
+        ["double", "halve", "average", "average"]
+      end)
     Startup(env, topology, SB, 1)
 
-// User computations
-primitive ComputationTypes
-  fun double(): I32 => 0
-  fun halve(): I32 => 1
-  fun average(): I32 => 2
+primitive SB is StepBuilder
+  fun val apply(computation_type: String): Any tag ? =>
+    match computation_type
+    | "double" => Step[I32, I32](Double)
+    | "halve" => Step[I32, I32](Halve)
+    | "average" => Step[I32, I32](Average)
+    else
+      error
+    end
 
 class Double is Computation[I32, I32]
   fun apply(msg: Message[I32] val): Message[I32] val^ =>
@@ -39,13 +46,3 @@ class Averager
     count = count + 1
     total = total + value
     total / count
-
-primitive SB is StepBuilder
-  fun val apply(id: I32): Any tag ? =>
-    match id
-    | ComputationTypes.double() => Step[I32, I32](Double)
-    | ComputationTypes.halve() => Step[I32, I32](Halve)
-    | ComputationTypes.average() => Step[I32, I32](Average)
-    else
-      error
-    end

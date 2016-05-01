@@ -54,9 +54,9 @@ actor StepManager
       _env.out.print("StepManager: Could not forward message")
     end
 
-  be add_step(step_id: I32, computation_type_id: I32) =>
+  be add_step(step_id: I32, computation_type: String) =>
     try
-      _steps(step_id) = _step_builder(computation_type_id)
+      _steps(step_id) = _step_builder(computation_type)
     end
 
   be add_proxy(proxy_id: I32, step_id: I32, conn: TCPConnection tag) =>
