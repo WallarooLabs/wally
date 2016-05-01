@@ -48,10 +48,12 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
   be apply(input: Message[In] val) =>
     let partition_id = _partition_function(input.data)
     if _partitions.contains(partition_id) then
-      match _partitions(partition_id)
-      | let c: ComputeStep[In] tag => c(input)
-      else
-        @printf[String]("Partition not a ComputeStep!".cstring())
+      try
+        match _partitions(partition_id)
+        | let c: ComputeStep[In] tag => c(input)
+        else
+          @printf[String]("Partition not a ComputeStep!".cstring())
+        end
       end
     else
       try
