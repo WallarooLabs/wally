@@ -5,3 +5,6 @@ interface Computation[In: OSCEncodable, Out: OSCEncodable]
 
 interface FinalComputation[In: OSCEncodable]
   fun ref apply(input: Message[In] val)
+
+interface PartitionFunction[In: OSCEncodable]
+  fun apply(input: In): I32
