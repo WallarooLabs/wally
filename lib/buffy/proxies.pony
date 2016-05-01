@@ -45,7 +45,7 @@ actor StepManager
   be apply(step_id: I32, msg: Message[I32] val) =>
     try
       match _steps(step_id)
-      | let p: ComputeStep[I32] tag => p(msg)
+      | let c: ComputeStep[I32] tag => c(msg)
       else
         _env.out.print("StepManager: Could not forward message"
         + " (it wasn't a ComputeStep")
