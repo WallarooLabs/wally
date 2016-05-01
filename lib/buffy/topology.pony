@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "buffy/messages"
 
 class Topology
   // A sequence of computation type ids representing

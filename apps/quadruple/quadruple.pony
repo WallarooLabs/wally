@@ -16,7 +16,7 @@ primitive SB is StepBuilder
     match computation_type
     | "double" => Step[I32, I32](Double)
     | "double_partition" =>
-      Partition[I32, I32](4, "double", Mod4Partition, this)
+      Partition[I32, I32]("double", Mod4Partition, this)
     else
       error
     end
