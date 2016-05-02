@@ -45,8 +45,8 @@ actor MetricsCollector
       d = Bytes.from_u32(reports.size().u32(), consume d)
       for report in reports.values() do
         d = Bytes.from_u32(report.counter, consume d)
-        d = Bytes.from_u32(report.start_time.u32(), consume d)
-        d = Bytes.from_u32(report.end_time.u32(), consume d)
+        d = Bytes.from_u64(report.start_time, consume d)
+        d = Bytes.from_u64(report.end_time, consume d)
       end
     end
     _conn.write(Bytes.length_encode(consume d))
