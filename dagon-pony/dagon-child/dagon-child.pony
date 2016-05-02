@@ -93,6 +93,7 @@ actor Main
       end
     end
 
+    
 class HomeConnectNotify is TCPConnectionNotify
   let _env: Env
   let _child: Main
@@ -125,7 +126,6 @@ class HomeConnectNotify is TCPConnectionNotify
         _env.out.print("Unable to decode message from Dagon")
       end
     end
-
     
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("dagon child: server closed")

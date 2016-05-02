@@ -7,7 +7,6 @@ use "options"
 use "osc-pony"
 use "process"
 use "sendence/tcp"
-use "time" // testing only; remove once done
 
 
 primitive _Booting
@@ -25,7 +24,7 @@ type ChildState is
 
 actor Main
   let _env: Env
-
+  var _listener: (TCPListener | None) = None
   
   new create(env: Env) =>
     _env = env
@@ -57,13 +56,12 @@ actor Main
     _env.out.print("dagon: host: " + host)
     _env.out.print("dagon: service: " + service)
 
-    let p_mgr = ProcessManager(_env)
+    let p_mgr = ProcessManager(_env, this)
     let tcp_n = recover Notifier(env, p_mgr) end
     try
-      let listener = TCPListener(env.root as AmbientAuth, consume tcp_n,
+      _listener = TCPListener(env.root as AmbientAuth, consume tcp_n,
         host, service)
       _boot_topology(p_mgr, path, node_name, host, service)
-      // _shutdown_topology(p_mgr, node_name)  
     else
       _env.out.print("Failed creating tcp listener")
     end
@@ -89,12 +87,18 @@ actor Main
       _env.out.print("dagon: Could not boot topology")
     end
     
-  fun ref _shutdown_topology(p_mgr: ProcessManager, node_name: String) =>
+  be shutdown_topology() =>
     """
     Shutdown the topology
     """
-    // p_mgr.shutdown_process(node_name)
-      
+    if (_listener isnt None) then
+      try
+        let l = _listener as TCPListener
+        l.dispose()
+      else
+        _env.out.print("dagon: Could not dispose of listener")
+      end
+    end
     
 class Notifier is TCPListenNotify
   let _env: Env
@@ -156,10 +160,10 @@ class ConnectNotify is TCPConnectionNotify
       end
     end
 
-
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("dagon: server closed")
 
+    
 class Child
   let name: String
   let pm: ProcessMonitor
@@ -175,11 +179,13 @@ class Child
 
 actor ProcessManager
   let _env: Env
+  let _dagon: Main
   var roster: Map[String, Child] = Map[String, Child]
   var connections: Map[String, TCPConnection] = Map[String, TCPConnection]
   
-  new create(env: Env) =>
+  new create(env: Env, dagon: Main) =>
     _env = env
+    _dagon = dagon
 
   be boot_process(node_name: String, filepath: FilePath,
     args: Array[String] val, vars: Array[String] val)
@@ -189,7 +195,7 @@ actor ProcessManager
     """
     _env.out.print("dagon: booting process " + filepath.path)
     try
-      let pn: ProcessNotify iso = ProcessClient(_env)
+      let pn: ProcessNotify iso = ProcessClient(_env, node_name, this)
       let pm: ProcessMonitor = ProcessMonitor(consume pn, filepath,
         consume args, consume vars)
       let child = Child(node_name, pm)
@@ -238,56 +244,71 @@ actor ProcessManager
     """
     Node has shutdown. Remove it from our roster.
     """
-    _env.out.print("dagon: received done_shutdown from child")
-    _env.out.print("dagon: node_name: " + node_name)
+    _env.out.print("dagon: received done_shutdown from child: " + node_name)
     try
-      // get and close the connection
+      // get, close and remove the connection
       let c = connections(node_name)
       c.dispose()
+      connections.remove(node_name)
     else
       _env.out.print("dagon: failed to close child connection")
     end
     try
-      // remove child from roster
-      connections.remove(node_name)
+      let child = roster(node_name)
+      child.change_state(_DoneShutdown)
+    else
+      _env.out.print("dagon: failed to set child to done_shutdown")
+    end
+
+  be received_exit_code(node_name: String) =>
+    """
+    Node has exited.
+    """
+    _env.out.print("dagon: exited child: " + node_name)
+    try
+      roster.remove(node_name)
     else
       _env.out.print("dagon: failed to remove child from roster")
     end
-
-
+    if roster.size() == 0 then _dagon.shutdown_topology() end
     
 class ProcessClient is ProcessNotify
   let _env: Env
+  let _node_name: String
   var exit_code: I32 = 0
+  let _pm: ProcessManager
   
-  new iso create(env: Env) =>
+  new iso create(env: Env, node_name: String, pm: ProcessManager) =>
     _env = env
+    _node_name= node_name
+    _pm = pm
     
   fun ref stdout(data: Array[U8] iso) =>
     let out = String.from_array(consume data)
-    _env.out.print("STDOUT: " + out)
+    _env.out.print(_node_name + " STDOUT: " + out)
 
   fun ref stderr(data: Array[U8] iso) =>
     let err = String.from_array(consume data)
-    _env.out.print("STDERR: " + err)
+    _env.out.print(_node_name + " STDERR: " + err)
     
   fun ref failed(err: ProcessError) =>
     match err
-    | ExecveError   => _env.out.print("ProcessError: ExecveError")
-    | PipeError     => _env.out.print("ProcessError: PipeError")
-    | Dup2Error     => _env.out.print("ProcessError: Dup2Error")
-    | ForkError     => _env.out.print("ProcessError: ForkError")
-    | FcntlError    => _env.out.print("ProcessError: FcntlError")
-    | WaitpidError  => _env.out.print("ProcessError: WaitpidError")
-    | CloseError    => _env.out.print("ProcessError: CloseError")
-    | ReadError     => _env.out.print("ProcessError: ReadError")
-    | WriteError    => _env.out.print("ProcessError: WriteError")
-    | KillError     => _env.out.print("ProcessError: KillError")
-    | Unsupported   => _env.out.print("ProcessError: Unsupported") 
+    | ExecveError   => _env.out.print("dagon: ProcessError: ExecveError")
+    | PipeError     => _env.out.print("dagon: ProcessError: PipeError")
+    | Dup2Error     => _env.out.print("dagon: ProcessError: Dup2Error")
+    | ForkError     => _env.out.print("dagon: ProcessError: ForkError")
+    | FcntlError    => _env.out.print("dagon: ProcessError: FcntlError")
+    | WaitpidError  => _env.out.print("dagon: ProcessError: WaitpidError")
+    | CloseError    => _env.out.print("dagon: ProcessError: CloseError")
+    | ReadError     => _env.out.print("dagon: ProcessError: ReadError")
+    | WriteError    => _env.out.print("dagon: ProcessError: WriteError")
+    | KillError     => _env.out.print("dagon: ProcessError: KillError")
+    | Unsupported   => _env.out.print("dagon: ProcessError: Unsupported") 
     else
-      _env.out.print("Unknown ProcessError!")
+      _env.out.print("dagon: Unknown ProcessError!")
     end
     
   fun ref dispose(child_exit_code: I32) =>
     exit_code = consume child_exit_code
-    _env.out.print("Child exit code: " + exit_code.string())
+    _env.out.print("dagon: Child exit code: " + exit_code.string())
+    _pm.received_exit_code(_node_name)
