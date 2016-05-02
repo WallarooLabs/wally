@@ -26,52 +26,49 @@ type ChildState is
 actor Main
   let _env: Env
   var _listener: (TCPListener | None) = None
+  var _path: String = ""
+  var _host: String = ""
+  var _service: String = ""
   
   new create(env: Env) =>
     _env = env
     var options = Options(env)
     var args = options.remaining()
-
     options
       .add("filepath", "f", StringArgument)
       .add("host", "h", StringArgument)
       .add("service", "p", StringArgument)
-
-    var path: String = ""
-    var host: String = ""
-    var service: String = ""
       
     for option in options do
       match option
-      | ("filepath", let arg: String) => path = arg
-      | ("host", let arg: String) => host = arg
-      | ("service", let arg: String) => service = arg
+      | ("filepath", let arg: String) => _path = arg
+      | ("host", let arg: String) => _host = arg
+      | ("service", let arg: String) => _service = arg
       end
     end  
-
-    _env.out.print("dagon: path: " + path)
-    _env.out.print("dagon: host: " + host)
-    _env.out.print("dagon: service: " + service)
-    
+    _env.out.print("dagon: path: " + _path)
+    _env.out.print("dagon: host: " + _host)
+    _env.out.print("dagon: service: " + _service)
     let p_mgr = ProcessManager(_env, this)
     let tcp_n = recover Notifier(env, p_mgr) end
     try
       _listener = TCPListener(env.root as AmbientAuth, consume tcp_n,
-        host, service)
+        _host, _service)
     else
       _env.out.print("Failed creating tcp listener")
     end
 
+    // parse ini file and boot processes
     try
-      let ini_file = File(FilePath(_env.root as AmbientAuth, path))
+      let ini_file = File(FilePath(_env.root as AmbientAuth, _path))
       let sections = IniParse(ini_file.lines())
       for section in sections.keys() do
         _env.out.print("Section name is: " + section)
         let filepath = sections(section)("path")
-        _env.out.print("  path: " + path)
+        _env.out.print("  path: " + _path)
         let node_name = sections(section)("node_name")
         _env.out.print("  node_name: " + node_name)
-        _boot_process(p_mgr, filepath, node_name, host, service)
+        _boot_process(p_mgr, filepath, node_name, _host, _service)
       end
     end
 
@@ -79,7 +76,7 @@ actor Main
     node_name: String, host: String, service: String)
     =>
     """
-    Boot the topology
+    Boot a process
     """
     try
       let filepath = FilePath(_env.root as AmbientAuth, path)
