@@ -67,7 +67,6 @@ msc{
 #+ATTR_LATEX: :width 14 cm
 #+label: fig:dagaon-sequence-1
 #+caption: Dagon Sequence 1
-#+RESULTS:
 [[file:dagon-sequence-1.png]]
  
 ** Shutdown Topology
@@ -112,7 +111,6 @@ msc{
 #+ATTR_LATEX: :width 14 cm
 #+label: fig:dagaon-sequence-2
 #+caption: Dagon Sequence 2
-#+RESULTS:
 [[file:dagon-sequence-2.png]]
 
 * First Draft
