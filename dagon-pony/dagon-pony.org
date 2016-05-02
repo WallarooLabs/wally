@@ -35,7 +35,7 @@ messages between components.
 We define message types that will be used for communication between
 /Dagon/ and the components it manages.
 
-#+INCLUDE: "../buffy-pony/tcp-messages.pony" src pony :lines "3-14"
+#+INCLUDE: "../lib/buffy/messages/wire-messages.pony" src pony :lines "3-18"
 
 ** Boot Topology
 #+begin_src mscgen :file dagon-sequence-1.png
@@ -117,21 +117,97 @@ msc{
 
 * First Draft
 
-#+BEGIN_SRC ponylang
-actor Main
-  new create(env: Env) =>
-    var options = Options(env)
-    var args = options.remaining()
 
-    try
-      let buffy_name: String val = args(1).clone()
-      let sender_name: String val = args(2).clone()
-      let receiver_name: String val = args(3).clone()
-      let process_names: Array[String val] val = recover val [buffy_name,
-        sender_name, receiver_name] end
-      TCPListener(env.root as AmbientAuth, recover Notifier(env, process_names) end)
-    else
-      env.out.print("Parameters: buffy_binary giles_sender_binary giles_receiver_binary")
-    end
+* Notes
+** Dagon Calls
+#+BEGIN_SRC sh
+./dagon-pony -f dagon-child/dagon-child -n dagon-child -h 127.0.0.1 -p 8080
 
 #+END_SRC
+** TCPListener
+***  Listen on a specific port
+#+BEGIN_SRC ponylang
+let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
+let from_buffy_listener = TCPListener(tcp_auth,
+  FromBuffyListenerNotify(coordinator, store),
+  listener_addr(0), // ip addr
+  listener_addr(1)) // port
+#+END_SRC
+
+*** A Notifier
+#+BEGIN_SRC ponylang
+class FromBuffyListenerNotify is TCPListenNotify
+let _coordinator: Coordinator
+let _store: Store
+
+new iso create(coordinator: Coordinator, store: Store) =>
+  _coordinator = coordinator
+  _store = store
+
+fun ref not_listening(listen: TCPListener ref) =>
+  _coordinator.from_buffy_listener(listen, Failed)
+
+fun ref listening(listen: TCPListener ref) =>
+  _coordinator.from_buffy_listener(listen, Ready)
+
+fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
+  FromBuffyNotify(_store)
+#+END_SRC
+
+*** Decode Incoming Data
+#+BEGIN_SRC ponylang
+class FromBuffyNotify is TCPConnectionNotify
+  let _store: Store
+  let _framer: Framer = Framer
+
+  new iso create(store: Store) =>
+    _store = store
+
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    for chunked in _framer.chunk(consume data).values() do
+    try
+      let decoded = WireMsgDecoder(consume chunked)
+      match decoded
+      | let d: ExternalMsg val =>
+        @printf[I32]("%s\n".cstring(), d.data.cstring())
+        _store.received(d.data, Time.micros())
+      else
+        @printf[I32]("UNEXPECTED DATA\n".cstring())
+      end
+    else
+      @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
+    end
+  end
+#+END_SRC
+
+*** Actor as Child Roster
+#+BEGIN_SRC ponylang
+class MarkusListener is TCPListenNotify
+  let _all_children: AllChildrenActor
+
+  new iso create(ac: AllChildrenActor) =>
+    _all_children = ac
+
+  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
+    MyChildConnectionNotifier(_all_children)
+#+END_SRC
+
+*** Map a Connection to Child
+Once we receive the first =ready= message from a child we send an
+update to the =all_children= actor. Now we know which child is talking
+over which connection.
+#+BEGIN_SRC ponylang
+class MyChildConnectionNotifier is TCPConnectionNotify
+  let _all_children: AllChildrenActor
+
+  new iso create(ac: AllChildrenActor)
+    _all_children = ac
+
+  fun ref received(…) =>
+    // figure out who you are talking to, send _all_children message to update info about that person
+#+END_SRC
+
+*** Read Chunked Data
+#+BEGIN_SRC ponylang
+for chunked in _framer.chunk(consume data).values() do
+#+END_SRC 
