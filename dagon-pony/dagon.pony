@@ -4,6 +4,7 @@ use "files"
 use "messages"
 use "net"
 use "options"
+use "ini"
 use "osc-pony"
 use "process"
 use "sendence/tcp"
@@ -33,40 +34,48 @@ actor Main
 
     options
       .add("filepath", "f", StringArgument)
-      .add("name", "n", StringArgument)
       .add("host", "h", StringArgument)
       .add("service", "p", StringArgument)
 
     var path: String = ""
-    var node_name: String = ""
     var host: String = ""
     var service: String = ""
       
     for option in options do
       match option
       | ("filepath", let arg: String) => path = arg
-      | ("name", let arg: String) => node_name = arg
       | ("host", let arg: String) => host = arg
       | ("service", let arg: String) => service = arg
       end
     end  
 
     _env.out.print("dagon: path: " + path)
-    _env.out.print("dagon: name: " + node_name)
     _env.out.print("dagon: host: " + host)
     _env.out.print("dagon: service: " + service)
-
+    
     let p_mgr = ProcessManager(_env, this)
     let tcp_n = recover Notifier(env, p_mgr) end
     try
       _listener = TCPListener(env.root as AmbientAuth, consume tcp_n,
         host, service)
-      _boot_topology(p_mgr, path, node_name, host, service)
     else
       _env.out.print("Failed creating tcp listener")
     end
 
-  fun ref _boot_topology(p_mgr: ProcessManager, path: String,
+    try
+      let ini_file = File(FilePath(_env.root as AmbientAuth, path))
+      let sections = IniParse(ini_file.lines())
+      for section in sections.keys() do
+        _env.out.print("Section name is: " + section)
+        let filepath = sections(section)("path")
+        _env.out.print("  path: " + path)
+        let node_name = sections(section)("node_name")
+        _env.out.print("  node_name: " + node_name)
+        _boot_process(p_mgr, filepath, node_name, host, service)
+      end
+    end
+
+  fun ref _boot_process(p_mgr: ProcessManager, path: String,
     node_name: String, host: String, service: String)
     =>
     """
