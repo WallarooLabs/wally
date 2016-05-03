@@ -19,19 +19,19 @@ actor Main
     var args = options.remaining()
 
     options
-      .add("name", "n", StringArgument)
+      .add("node_name", "n", StringArgument)
       .add("phone_home_host", "h", StringArgument)
       .add("phone_home_service", "p", StringArgument)
 
     for option in options do
       match option
-      | ("name", let arg: String) => _node_name = arg
+      | ("node_name", let arg: String) => _node_name = arg
       | ("phone_home_host", let arg: String) => _phone_home_host = arg
       | ("phone_home_service", let arg: String) => _phone_home_service = arg
       end
     end
 
-    _env.out.print("dagon-child: name: " + _node_name)
+    _env.out.print("dagon-child: node_name: " + _node_name)
     _env.out.print("dagon-child: phone_home_host: " + _phone_home_host)
     _env.out.print("dagon-child: phone_home_service: " + _phone_home_service)
 

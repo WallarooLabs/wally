@@ -57,41 +57,50 @@ actor Main
     else
       _env.out.print("Failed creating tcp listener")
     end
+    _boot_topology(p_mgr)
 
-    // parse ini file and boot processes
+    
+  fun ref _boot_topology(p_mgr: ProcessManager) =>
+    """
+    Parse ini file and boot processes
+    """
+    var node_name = ""
+    var filepath: (FilePath | None) = None
+    
     try
       let ini_file = File(FilePath(_env.root as AmbientAuth, _path))
       let sections = IniParse(ini_file.lines())
       for section in sections.keys() do
         _env.out.print("Section name is: " + section)
-        let filepath = sections(section)("path")
-        _env.out.print("  path: " + _path)
-        let node_name = sections(section)("node_name")
-        _env.out.print("  node_name: " + node_name)
-        _boot_process(p_mgr, filepath, node_name, _host, _service)
+        let args: Array[String] iso = recover Array[String](6) end
+        for key in sections(section).keys() do
+          _env.out.print(key + " = " + sections(section)(key))
+          match key
+          | "path" =>
+            try
+              filepath = FilePath(_env.root as AmbientAuth, sections(section)(key))
+            else
+              _env.out.print("dagon: Could not create FilePath")
+            end
+          | "node_name" =>
+            node_name = sections(section)(key)
+            args.push("--" + key + "=" + sections(section)(key))
+          else
+            args.push("--" + key + "=" + sections(section)(key))
+          end
+        end
+        args.push("--phone_home_host=" + _host)
+        args.push("--phone_home_service=" + _service)
+        let vars: Array[String] iso = recover Array[String](0) end
+        if filepath isnt None then
+          p_mgr.boot_process(node_name, filepath as FilePath, consume args, consume vars)
+        end
       end
+    else
+      _env.out.print("dagon: Could not create FilePath for ini file")
     end
 
-  fun ref _boot_process(p_mgr: ProcessManager, path: String,
-    node_name: String, host: String, service: String)
-    =>
-    """
-    Boot a process
-    """
-    try
-      let filepath = FilePath(_env.root as AmbientAuth, path)
-      let args: Array[String] iso = recover Array[String](6) end
-      args.push("-n")
-      args.push(node_name)
-      args.push("-h")
-      args.push(host)
-      args.push("-p")
-      args.push(service)
-      let vars: Array[String] iso = recover Array[String](0) end
-      p_mgr.boot_process(node_name, filepath, consume args, consume vars)
-    else
-      _env.out.print("dagon: Could not boot topology")
-    end
+
     
   be shutdown_topology() =>
     """
