@@ -51,3 +51,13 @@ primitive Bytes
     let arr: Array[U8] iso = Bytes.from_u32(len, recover Array[U8] end)
     arr.append(data)
     consume arr
+
+  fun u16_from_idx(idx: USize, arr: Array[U8]): U16 ? =>
+    Bytes.to_u16(arr(idx), arr(idx + 1))
+
+  fun u32_from_idx(idx: USize, arr: Array[U8]): U32 ? =>
+    Bytes.to_u32(arr(idx), arr(idx + 1), arr(idx + 2), arr(idx + 3))
+
+  fun u64_from_idx(idx: USize, arr: Array[U8]): U64 ? =>
+    Bytes.to_u64(arr(idx), arr(idx + 1), arr(idx + 2), arr(idx + 3),
+      arr(idx + 4), arr(idx + 5), arr(idx + 6), arr(idx + 7))
