@@ -10,6 +10,7 @@ actor MetricsCollector
   let _env: Env
   let _node_name: String
   var _step_reports: Map[_StepId, Array[StepMetricsReport val]] = Map[_StepId, Array[StepMetricsReport val]]
+  var _step_count: USize = 0
   var _boundary_reports: Array[BoundaryMetricsReport val] = Array[BoundaryMetricsReport val]
   let _conn: TCPConnection
 
@@ -22,14 +23,17 @@ actor MetricsCollector
 	  let step_id = s_id.u32()
 	  try
 	    _step_reports(step_id).push(StepMetricsReport(start_time, end_time))
+	    _step_count = _step_count + 1
 	  else
 	    let arr = Array[StepMetricsReport val]
 	    arr.push(StepMetricsReport(start_time, end_time))
 	    _step_reports(step_id) = arr
+	    _step_count = _step_count + 1
       end
-	  if _step_reports.size() > 10 then
+	  if _step_count > 10 then
 	    _send_step_metrics_to_receiver()
 	    _step_reports = Map[_StepId, Array[StepMetricsReport val]]
+	    _step_count = 0
 	  end
 
 	be report_boundary_metrics(boundary_type: I32, msg_id: I32, timestamp: U64) =>
