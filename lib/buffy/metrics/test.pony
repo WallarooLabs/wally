@@ -38,6 +38,6 @@ class iso _TestReportsEncoder is UnitTest
     let decoded = ReportMsgDecoder(consume encoded)
 
     h.assert_eq[String](decoded.node_name, "Test")
-    h.assert_eq[U64](decoded.digests(1).reports(2).start_time, 1242596287)
+    h.assert_eq[U64](decoded.digests(0).reports(2).start_time, 1242596287)
 
     true

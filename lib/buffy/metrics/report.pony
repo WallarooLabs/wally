@@ -4,6 +4,7 @@ use "collections"
 primitive ReportsEncoder
   fun apply(name: String, reports_map: Map[_StepId, Array[StepMetricsReport val]]):
     Array[U8] iso^ =>
+    @printf[String]("Starting Encoding".cstring())
     var d: Array[U8] iso = recover Array[U8] end
     let name_bytes_length = name.array().size().u32()
     d.append(Bytes.from_u32(name_bytes_length))
@@ -24,9 +25,8 @@ primitive ReportMsgDecoder
     var name_length = Bytes.u32_from_idx(0, data)
     var data_idx: USize = 4
     let name_arr: Array[U8] iso = recover Array[U8] end
-    var i: USize = 0
-    while i < name_length.usize() do
-      name_arr.push(data(i))
+    for i in Range(0, name_length.usize()) do
+      name_arr.push(data(data_idx))
       data_idx = data_idx + 1
     end
     let name = String.from_array(consume name_arr)
@@ -37,8 +37,7 @@ primitive ReportMsgDecoder
       let digest: StepMetricsDigest iso = recover StepMetricsDigest(id) end
       let report_count = Bytes.u32_from_idx(data_idx, data)
       data_idx = data_idx + 4
-      i = 0
-      while i < report_count.usize() do
+      for i in Range(0, report_count.usize()) do
         digest.add_report(_decode_next_report(data_idx, data))
         data_idx = data_idx + 20
       end
