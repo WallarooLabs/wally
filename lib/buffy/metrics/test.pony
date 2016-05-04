@@ -9,10 +9,11 @@ actor Main is TestList
   new make() => None
 
   fun tag tests(test: PonyTest) =>
-    test(_TestReportsEncoder)
+    test(_TestNodeReportsEncoder)
+    test(_TestBoundaryReportsEncoder)
 
-class iso _TestReportsEncoder is UnitTest
-  fun name(): String => "buffy:ReportsEncoder"
+class iso _TestNodeReportsEncoder is UnitTest
+  fun name(): String => "buffy:NodeReportsEncoder"
 
   fun apply(h: TestHelper) ? =>
     let node_name = "Test"
@@ -25,7 +26,6 @@ class iso _TestReportsEncoder is UnitTest
     report_map(1).push(StepMetricsReport(103, 1298273467, 1354275829))
     report_map(1).push(StepMetricsReport(104, 1223498726, 1313488791))
 
-    let id2: I32 = 2
     report_map(2) = Array[StepMetricsReport val]
     report_map(2).push(StepMetricsReport(200, 1232143112, 1354551313))
     report_map(2).push(StepMetricsReport(201, 1232347867, 1354328748))
@@ -33,11 +33,52 @@ class iso _TestReportsEncoder is UnitTest
     report_map(2).push(StepMetricsReport(203, 1298273412, 1354275808))
     report_map(2).push(StepMetricsReport(204, 1223498723, 1313488789))
 
-    let encoded = ReportsEncoder(node_name, report_map)
+    let node_encoded = NodeMetricsEncoder(node_name, report_map)
 
-    let decoded = ReportMsgDecoder(consume encoded)
+    let node_decoded = ReportMsgDecoder(consume node_encoded)
 
-    h.assert_eq[String](decoded.node_name, "Test")
-    h.assert_eq[U64](decoded.digests(0).reports(2).start_time, 1242596287)
+    match node_decoded
+    | let n: NodeMetricsSummary val =>
+      h.assert_eq[String](n.node_name, "Test")
+      h.assert_eq[U64](n.digests(0).reports(2).start_time, 1242596287)
+    else
+      h.fail("Wrong decoded message type")
+    end
+
+    true
+
+class iso _TestBoundaryReportsEncoder is UnitTest
+  fun name(): String => "buffy:BoundaryReportsEncoder"
+
+  fun apply(h: TestHelper) ? =>
+    let boundary_node_name = "BoundaryTest"
+    let boundary_report_map = Map[_StepId, Array[BoundaryMetricsReport val]]
+
+    boundary_report_map(1) = Array[BoundaryMetricsReport val]
+    boundary_report_map(1).push(BoundaryMetricsReport(0, 9143, 91351314))
+    boundary_report_map(1).push(BoundaryMetricsReport(1, 9192, 91358734))
+    boundary_report_map(1).push(BoundaryMetricsReport(2, 9183, 91122344))
+    boundary_report_map(1).push(BoundaryMetricsReport(3, 9167, 91355829))
+    boundary_report_map(1).push(BoundaryMetricsReport(1, 9126, 91318791))
+
+    boundary_report_map(2) = Array[BoundaryMetricsReport val]
+    boundary_report_map(2).push(BoundaryMetricsReport(0, 9143, 91354551))
+    boundary_report_map(2).push(BoundaryMetricsReport(1, 9147, 91354328))
+    boundary_report_map(2).push(BoundaryMetricsReport(2, 9196, 91123612))
+    boundary_report_map(2).push(BoundaryMetricsReport(3, 9173, 91354275))
+    boundary_report_map(2).push(BoundaryMetricsReport(0, 9198, 91313488))
+
+
+    let boundary_encoded = BoundaryMetricsEncoder(boundary_node_name, boundary_report_map)
+
+    let boundary_decoded = ReportMsgDecoder(consume boundary_encoded)
+
+    match boundary_decoded
+    | let n: BoundaryMetricsSummary val =>
+      h.assert_eq[String](n.node_name, "BoundaryTest")
+      h.assert_eq[U64](n.digests(0).reports(1).timestamp, 91354328)
+    else
+      h.fail("Wrong decoded message type")
+    end
 
     true

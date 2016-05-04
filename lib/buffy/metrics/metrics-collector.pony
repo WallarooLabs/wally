@@ -12,7 +12,8 @@ actor MetricsCollector
   let _name_len_bytes: Array[U8] val
   let _source_id: U32
   let _sink_id: U32
-  var _reports: Map[_StepId, Array[StepMetricsReport val]] = Map[_StepId, Array[StepMetricsReport val]]
+  var _step_reports: Map[_StepId, Array[StepMetricsReport val]] = Map[_StepId, Array[StepMetricsReport val]]
+  var _boundary_reports: Map[_StepId, Array[BoundaryMetricsReport val]] = Map[_StepId, Array[BoundaryMetricsReport val]]
   let _conn: TCPConnection
 
 	new create(env: Env, node_name: String, source_id: I32, sink_id: I32,
@@ -29,19 +30,19 @@ actor MetricsCollector
 	  end_time: U64) =>
 	  let step_id = s_id.u32()
 	  try
-	    _reports(step_id).push(StepMetricsReport(counter, start_time,
+	    _step_reports(step_id).push(StepMetricsReport(counter, start_time,
 	      end_time))
 	  else
 	    let arr = Array[StepMetricsReport val]
 	    arr.push(StepMetricsReport(counter, start_time, end_time))
-	    _reports(step_id) = arr
+	    _step_reports(step_id) = arr
       end
-	  if _reports.size() > 10 then
+	  if _step_reports.size() > 10 then
 	    _send_to_receiver()
 	  end
 
   fun ref _send_to_receiver() =>
-    let encoded = ReportsEncoder(_node_name, _reports)
+    let encoded = NodeMetricsEncoder(_node_name, _step_reports)
     _conn.write(Bytes.length_encode(consume encoded))
 
 // double trigger: Send data either (1) at size 1MB (nominally for message on wire) or (2) on timeout // 100 milliseconds - 1 second
