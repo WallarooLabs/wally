@@ -1,7 +1,17 @@
 use "collections"
 use "buffy/messages"
+use "buffy/metrics"
+use "time"
 
-interface ComputeStep[In: OSCEncodable val]
+interface MetricsSender
+  be add_metrics_collector(mc: MetricsCollector tag) => None
+
+interface Identifiable
+  be add_id(id: I32) => None
+
+interface BasicStep is (MetricsSender & Identifiable)
+
+interface ComputeStep[In: OSCEncodable val] is BasicStep
   be apply(input: Message[In] val)
 
 interface ThroughStep[In: OSCEncodable val,
@@ -9,21 +19,44 @@ interface ThroughStep[In: OSCEncodable val,
   be add_output(to: ComputeStep[Out] tag)
 
 actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
+  var _step_id: (I32 | None) = None
   let _f: Computation[In, Out]
+  var _metrics_collector: (MetricsCollector tag | None) = None
   var _output: (ComputeStep[Out] tag | None) = None
 
   new create(f: Computation[In, Out] iso) =>
     _f = consume f
+
+  be add_id(id: I32) =>
+    _step_id = id
+
+  be add_metrics_collector(m_coll: MetricsCollector tag) =>
+    _metrics_collector = m_coll
 
   be add_output(to: ComputeStep[Out] tag) =>
     _output = to
 
   be apply(input: Message[In] val) =>
     match _output
-    | let c: ComputeStep[Out] tag => c(_f(input))
+    | let c: ComputeStep[Out] tag =>
+      let start_time = Time.millis()
+      c(_f(input))
+      let end_time = Time.millis()
+      _report_metrics(start_time, end_time)
+    end
+
+  fun _report_metrics(start_time: U64, end_time: U64) =>
+    match _metrics_collector
+    | let m: MetricsCollector tag =>
+      match _step_id
+      | let id: I32 =>
+        m.report_step_metrics(id, start_time, end_time)
+      end
     end
 
 actor Sink[In: OSCEncodable val] is ComputeStep[In]
+  var _step_id: (I32 | None) = None
+  var _metrics_collector: (MetricsCollector tag | None) = None
   let _f: FinalComputation[In]
 
   new create(f: FinalComputation[In] iso) =>
@@ -31,6 +64,13 @@ actor Sink[In: OSCEncodable val] is ComputeStep[In]
 
   be apply(input: Message[In] val) =>
     _f(input)
+
+  be add_id(id: I32) =>
+    _step_id = id
+
+  be add_metrics_collector(m_coll: MetricsCollector tag) =>
+    _metrics_collector = m_coll
+
 
 actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
   let _computation_type: String

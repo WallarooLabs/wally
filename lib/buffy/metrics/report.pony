@@ -25,7 +25,6 @@ primitive NodeMetricsEncoder
       d = Bytes.from_u32(key, consume d)
       d = Bytes.from_u32(reports.size().u32(), consume d)
       for report in reports.values() do
-        d = Bytes.from_u32(report.counter, consume d)
         d = Bytes.from_u64(report.start_time, consume d)
         d = Bytes.from_u64(report.end_time, consume d)
       end
@@ -33,21 +32,18 @@ primitive NodeMetricsEncoder
     consume d
 
 primitive BoundaryMetricsEncoder
-  fun apply(name: String, reports_map: Map[_StepId, Array[BoundaryMetricsReport val]]):
+  fun apply(name: String, reports: Array[BoundaryMetricsReport val]):
     Array[U8] iso^ =>
     var d: Array[U8] iso = recover Array[U8] end
     let name_bytes_length = name.array().size().u32()
     d.append(Bytes.from_u32(ReportTypes.boundary()))
     d.append(Bytes.from_u32(name_bytes_length))
     d.append(name)
-    for (key, reports) in reports_map.pairs() do
-      d = Bytes.from_u32(key, consume d)
-      d = Bytes.from_u32(reports.size().u32(), consume d)
-      for report in reports.values() do
-        d = Bytes.from_u32(report.boundary_type.u32(), consume d)
-        d = Bytes.from_u32(report.msg_id.u32(), consume d)
-        d = Bytes.from_u64(report.timestamp, consume d)
-      end
+    d = Bytes.from_u32(reports.size().u32(), consume d)
+    for report in reports.values() do
+      d = Bytes.from_u32(report.boundary_type.u32(), consume d)
+      d = Bytes.from_u32(report.msg_id.u32(), consume d)
+      d = Bytes.from_u64(report.timestamp, consume d)
     end
     consume d
 
@@ -77,7 +73,7 @@ primitive ReportMsgDecoder
       data_idx = data_idx + 4
       for i in Range(0, report_count.usize()) do
         digest.add_report(_decode_next_step_report(data_idx, data))
-        data_idx = data_idx + 20
+        data_idx = data_idx + 16
       end
       node_summary.add_digest(consume digest)
     end
@@ -85,13 +81,11 @@ primitive ReportMsgDecoder
 
   fun _decode_next_step_report(i: USize, arr: Array[U8]): StepMetricsReport val ? =>
     var idx = i
-    if arr.size() < (20 + idx) then error end
-    let counter = Bytes.u32_from_idx(idx, arr)
-    idx = idx + 4
+    if arr.size() < (16 + idx) then error end
     let start_time = Bytes.u64_from_idx(idx, arr)
     idx = idx + 8
     let end_time = Bytes.u64_from_idx(idx, arr)
-    StepMetricsReport(counter, start_time, end_time)
+    StepMetricsReport(start_time, end_time)
 
   fun _decode_boundary_summary(data: Array[U8]): BoundaryMetricsSummary val ? =>
     var data_idx: USize = 4
@@ -104,17 +98,11 @@ primitive ReportMsgDecoder
     end
     let name = String.from_array(consume name_arr)
     let boundary_summary: BoundaryMetricsSummary iso = recover BoundaryMetricsSummary(name) end
-    while data_idx < data.size() do
-      let id = Bytes.u32_from_idx(data_idx, data).i32()
-      data_idx = data_idx + 4
-      let digest: BoundaryMetricsDigest iso = recover BoundaryMetricsDigest(id) end
-      let report_count = Bytes.u32_from_idx(data_idx, data)
-      data_idx = data_idx + 4
-      for i in Range(0, report_count.usize()) do
-        digest.add_report(_decode_next_boundary_report(data_idx, data))
-        data_idx = data_idx + 16
-      end
-      boundary_summary.add_digest(consume digest)
+    let report_count = Bytes.u32_from_idx(data_idx, data)
+    data_idx = data_idx + 4
+    for i in Range(0, report_count.usize()) do
+      boundary_summary.add_report(_decode_next_boundary_report(data_idx, data))
+      data_idx = data_idx + 16
     end
     consume boundary_summary
 
@@ -129,12 +117,10 @@ primitive ReportMsgDecoder
     BoundaryMetricsReport(boundary_type, msg_id, timestamp)
 
 class StepMetricsReport
-  let counter: U32
   let start_time: U64
   let end_time: U64
 
-  new val create(c: U32, s_time: U64, e_time: U64) =>
-    counter = c
+  new val create(s_time: U64, e_time: U64) =>
     start_time = s_time
     end_time = e_time
 
@@ -168,22 +154,12 @@ class BoundaryMetricsReport
     msg_id = m_id
     timestamp = ts
 
-class BoundaryMetricsDigest
-  let step_id: I32
-  let reports: Array[BoundaryMetricsReport val] = Array[BoundaryMetricsReport val]
-
-  new create(id: I32) =>
-    step_id = id
-
-  fun ref add_report(r: BoundaryMetricsReport val) =>
-    reports.push(r)
-
 class BoundaryMetricsSummary
   let node_name: String
-  let digests: Array[BoundaryMetricsDigest val] = Array[BoundaryMetricsDigest val]
+  let reports: Array[BoundaryMetricsReport val] = Array[BoundaryMetricsReport val]
 
   new create(name: String) =>
     node_name = name
 
-  fun ref add_digest(r: BoundaryMetricsDigest val) =>
-    digests.push(r)
+  fun ref add_report(r: BoundaryMetricsReport val) =>
+    reports.push(r)

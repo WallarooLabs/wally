@@ -11,4 +11,4 @@ class Topology
     pipeline = p
 
 trait StepBuilder
-  fun val apply(computation_type: String): Any tag ?
+  fun val apply(computation_type: String): BasicStep tag ?

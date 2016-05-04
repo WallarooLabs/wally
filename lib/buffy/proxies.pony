@@ -2,45 +2,59 @@ use "collections"
 use "debug"
 use "net"
 use "buffy/messages"
+use "buffy/metrics"
+use "time"
 
 actor Proxy is ComputeStep[I32]
   let _env: Env
   let _step_id: I32
   let _conn: TCPConnection
+  let _metrics_collector: MetricsCollector tag
 
-  new create(env: Env, step_id: I32, conn: TCPConnection) =>
+  new create(env: Env, step_id: I32, conn: TCPConnection,
+    metrics_collector: MetricsCollector tag) =>
     _env = env
     _step_id = step_id
     _conn = conn
+    _metrics_collector = metrics_collector
 
   be apply(input: Message[I32] val) =>
     let tcp_msg = WireMsgEncoder.forward(_step_id, input)
+    _metrics_collector.report_boundary_metrics(BoundaryTypes.egress().i32(),
+      input.id, Time.millis())
     _conn.write(tcp_msg)
 
 actor ExternalConnection is ComputeStep[I32]
   let _env: Env
   let _conn: TCPConnection
+  let _metrics_collector: MetricsCollector tag
 
-  new create(env: Env, conn: TCPConnection) =>
+  new create(env: Env, conn: TCPConnection, m_coll: MetricsCollector tag) =>
     _env = env
     _conn = conn
+    _metrics_collector = m_coll
 
   be apply(input: Message[I32] val) =>
     _env.out.print(input.data.string())
     let tcp_msg = WireMsgEncoder.external(input.data)
     _conn.write(tcp_msg)
+    _metrics_collector.report_boundary_metrics(BoundaryTypes.sink().i32(),
+      input.id, Time.millis())
 
 actor StepManager
   let _env: Env
-  let _steps: Map[I32, Any tag] = Map[I32, Any tag]
+  let _metrics_collector: MetricsCollector tag
+  let _steps: Map[I32, BasicStep tag] = Map[I32, BasicStep tag]
   let _step_builder: StepBuilder val
   let _sink_addrs: Map[I32, (String, String)] val
 
   new create(env: Env, s_builder: StepBuilder val,
-    sink_addrs: Map[I32, (String, String)] val) =>
+    sink_addrs: Map[I32, (String, String)] val,
+    metrics_collector: MetricsCollector tag) =>
     _env = env
     _step_builder = s_builder
     _sink_addrs = sink_addrs
+    _metrics_collector = metrics_collector
 
   be apply(step_id: I32, msg: Message[I32] val) =>
     try
@@ -56,11 +70,14 @@ actor StepManager
 
   be add_step(step_id: I32, computation_type: String) =>
     try
-      _steps(step_id) = _step_builder(computation_type)
+      let step = _step_builder(computation_type)
+      step.add_id(step_id)
+      step.add_metrics_collector(_metrics_collector)
+      _steps(step_id) = step
     end
 
   be add_proxy(proxy_id: I32, step_id: I32, conn: TCPConnection tag) =>
-    let p = Proxy(_env, step_id, conn)
+    let p = Proxy(_env, step_id, conn, _metrics_collector)
     _steps(proxy_id) = p
 
   be add_sink(sink_id: I32, sink_step_id: I32, auth: AmbientAuth) =>
@@ -70,7 +87,7 @@ actor StepManager
       let sink_service = sink_addr._2
       let conn = TCPConnection(auth, SinkConnectNotify(_env), sink_host,
         sink_service)
-      _steps(sink_step_id) = ExternalConnection(_env, conn)
+      _steps(sink_step_id) = ExternalConnection(_env, conn, _metrics_collector)
     else
       _env.out.print("StepManager: Could not add sink.")
     end

@@ -1,8 +1,10 @@
 use "net"
 use "collections"
 use "buffy/messages"
+use "buffy/metrics"
 use "sendence/bytes"
 use "sendence/tcp"
+use "time"
 
 class WorkerNotifier is TCPListenNotify
   let _env: Env
@@ -11,17 +13,19 @@ class WorkerNotifier is TCPListenNotify
   let _leader_host: String
   let _leader_service: String
   let _step_manager: StepManager
+  let _metrics_collector: MetricsCollector
   var _host: String = ""
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
-    leader_service: String, step_manager: StepManager) =>
+    leader_service: String, step_manager: StepManager, metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
     _name = name
     _leader_host = leader_host
     _leader_service = leader_service
     _step_manager = step_manager
+    _metrics_collector = metrics_collector
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -30,7 +34,7 @@ class WorkerNotifier is TCPListenNotify
 
       let notifier: TCPConnectionNotify iso =
         WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-          _step_manager)
+          _step_manager, _metrics_collector)
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
 
@@ -48,7 +52,7 @@ class WorkerNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-      _step_manager)
+      _step_manager, _metrics_collector)
 
 class WorkerConnectNotify is TCPConnectionNotify
   let _env: Env
@@ -56,18 +60,21 @@ class WorkerConnectNotify is TCPConnectionNotify
   let _leader_host: String
   let _leader_service: String
   let _step_manager: StepManager
+  let _metrics_collector: MetricsCollector
   let _framer: Framer = Framer
   let _nodes: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
   let _name: String
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
-    leader_service: String, step_manager: StepManager) =>
+    leader_service: String, step_manager: StepManager,
+    metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
     _name = name
     _leader_host = leader_host
     _leader_service = leader_service
     _step_manager = step_manager
+    _metrics_collector = metrics_collector
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print(_name + ": connection accepted")
@@ -86,6 +93,8 @@ class WorkerConnectNotify is TCPConnectionNotify
         | let m: SpinUpSinkMsg val =>
           _step_manager.add_sink(m.sink_id, m.sink_step_id, _auth)
         | let m: ForwardMsg val =>
+          _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress().i32(),
+            m.msg.id, Time.millis())
           _step_manager(m.step_id, m.msg)
         | let m: ConnectStepsMsg val =>
           _step_manager.connect_steps(m.in_step_id, m.out_step_id)
@@ -107,7 +116,7 @@ class WorkerConnectNotify is TCPConnectionNotify
     else
       let notifier: TCPConnectionNotify iso =
         WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-          _step_manager)
+          _step_manager, _metrics_collector)
       let target_conn =
         TCPConnection(_auth, consume notifier, msg.target_host,
           msg.target_service)
