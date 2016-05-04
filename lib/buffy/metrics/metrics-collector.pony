@@ -9,40 +9,70 @@ type _StepId is U32
 actor MetricsCollector
   let _env: Env
   let _node_name: String
-  let _name_len_bytes: Array[U8] val
-  let _source_id: U32
-  let _sink_id: U32
-  var _step_reports: Map[_StepId, Array[StepMetricsReport val]] = Map[_StepId, Array[StepMetricsReport val]]
-  var _boundary_reports: Map[_StepId, Array[BoundaryMetricsReport val]] = Map[_StepId, Array[BoundaryMetricsReport val]]
-  let _conn: TCPConnection
+  var _step_reports: Map[_StepId, Array[StepMetricsReport val]] =
+  	Map[_StepId, Array[StepMetricsReport val]]
+  var _step_count: USize = 0
+  var _boundary_reports: Array[BoundaryMetricsReport val] =
+  	Array[BoundaryMetricsReport val]
+  let _conn: (TCPConnection | None)
 
-	new create(env: Env, node_name: String, source_id: I32, sink_id: I32,
-	  conn: TCPConnection) =>
+	new create(env: Env, node_name: String, conn: (TCPConnection | None) = None) =>
 	  _env = env
 	  _node_name = node_name
-	  let name_bytes_length = _node_name.array().size().u32()
-	  _name_len_bytes = Bytes.from_u32(name_bytes_length)
-	  _source_id = source_id.u32()
-	  _sink_id = sink_id.u32()
 	  _conn = conn
 
-	be report_metrics(s_id: I32, counter: U32, start_time: U64,
-	  end_time: U64) =>
+	be report_step_metrics(s_id: I32, start_time: U64, end_time: U64) =>
 	  let step_id = s_id.u32()
 	  try
-	    _step_reports(step_id).push(StepMetricsReport(counter, start_time,
-	      end_time))
+	    _step_reports(step_id).push(StepMetricsReport(start_time, end_time))
+	    _step_count = _step_count + 1
 	  else
 	    let arr = Array[StepMetricsReport val]
-	    arr.push(StepMetricsReport(counter, start_time, end_time))
+	    arr.push(StepMetricsReport(start_time, end_time))
 	    _step_reports(step_id) = arr
-      end
-	  if _step_reports.size() > 10 then
-	    _send_to_receiver()
+	    _step_count = _step_count + 1
+		end
+
+	  if _step_count > 10 then
+	  	_send_step_metrics_to_receiver()
+	  	for key in _step_reports.keys() do
+	  		_step_reports(key) = Array[StepMetricsReport val]
+			end
+	    _step_reports = Map[_StepId, Array[StepMetricsReport val]]
+	    _step_count = 0
 	  end
 
-  fun ref _send_to_receiver() =>
-    let encoded = NodeMetricsEncoder(_node_name, _step_reports)
-    _conn.write(Bytes.length_encode(consume encoded))
+	be report_boundary_metrics(boundary_type: I32, msg_id: I32, start_time: U64,
+		end_time: U64) =>
+		_boundary_reports.push(BoundaryMetricsReport(boundary_type,
+			msg_id, start_time, end_time))
 
-// double trigger: Send data either (1) at size 1MB (nominally for message on wire) or (2) on timeout // 100 milliseconds - 1 second
+	  if _boundary_reports.size() > 10 then
+	    _send_boundary_metrics_to_receiver()
+	    _boundary_reports = Array[BoundaryMetricsReport val]
+	  end
+
+  fun ref _send_step_metrics_to_receiver() =>
+  	match _conn
+  	| let c: TCPConnection =>
+			let encoded = NodeMetricsEncoder(_node_name, _step_reports)
+			c.write(Bytes.length_encode(consume encoded))
+		end
+
+  fun ref _send_boundary_metrics_to_receiver() =>
+  	match _conn
+  	| let c: TCPConnection =>
+			let encoded = BoundaryMetricsEncoder(_node_name, _boundary_reports)
+			c.write(Bytes.length_encode(consume encoded))
+		end
+
+class StepReporter
+	let _step_id: I32
+	let _metrics_collector: MetricsCollector
+
+	new val create(s_id: I32, m_coll: MetricsCollector) =>
+		_step_id = s_id
+		_metrics_collector = m_coll
+
+	fun report(start_time: U64, end_time: U64) =>
+		_metrics_collector.report_step_metrics(_step_id, start_time, end_time)

@@ -1,9 +1,12 @@
 use "collections"
 use "buffy/messages"
 use "net"
+use "buffy/metrics"
+use "time"
 
 trait BasicStep
   be apply(input: StepMessage val)
+  be add_step_reporter(sr: StepReporter val) => None
 
 trait OutputStep
   be add_output(to: BasicStep tag)
@@ -16,9 +19,13 @@ trait ThroughStep[In: OSCEncodable val,
 actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]
   var _output: (BasicStep tag | None) = None
+  var _step_reporter: (StepReporter val | None) = None
 
   new create(f: Computation[In, Out] iso) =>
     _f = consume f
+
+  be add_step_reporter(sr: StepReporter val) =>
+    _step_reporter = sr
 
   be add_output(to: BasicStep tag) =>
     _output = to
@@ -28,16 +35,26 @@ actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
     | let m: Message[In] val =>
       match _output
       | let o: BasicStep tag =>
+        let start_time = Time.millis()
         o(_f(m))
+        let end_time = Time.millis()
+        match _step_reporter
+        | let sr: StepReporter val =>
+          sr.report(start_time, end_time)
+        end
       end
     end
 
 actor Source[Out: OSCEncodable val] is ThroughStep[String, Out]
   var _input_parser: Parser[Out] val
   var _output: (BasicStep tag | None) = None
+  var _step_reporter: (StepReporter val | None) = None
 
   new create(input_parser: Parser[Out] val) =>
     _input_parser = input_parser
+
+  be add_step_reporter(sr: StepReporter val) =>
+    _step_reporter = sr
 
   be add_output(to: BasicStep tag) =>
     _output = to
@@ -46,10 +63,17 @@ actor Source[Out: OSCEncodable val] is ThroughStep[String, Out]
     match input
     | let m: Message[String] val =>
       try
-        let new_msg: Message[Out] val = Message[Out](m.id, _input_parser(m.data))
+        let new_msg: Message[Out] val =
+          Message[Out](m.id, m.source_ts, m.last_ingress_ts, _input_parser(m.data))
         match _output
         | let o: BasicStep tag =>
+          let start_time = Time.millis()
           o(new_msg)
+          let end_time = Time.millis()
+          match _step_reporter
+          | let sr: StepReporter val =>
+            sr.report(start_time, end_time)
+          end
         end
       else
         @printf[String]("Could not process incoming Message at source\n".cstring())
@@ -125,6 +149,7 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
 
 actor StateStep[In: OSCEncodable val, Out: OSCEncodable val,
   State: Any #read] is ThroughStep[In, Out]
+  var _step_reporter: (StepReporter val | None) = None
   let _state_computation: StateComputation[In, Out, State]
   var _output: (BasicStep tag | None) = None
   let _state: State
@@ -134,15 +159,25 @@ actor StateStep[In: OSCEncodable val, Out: OSCEncodable val,
     _state = state_initializer()
     _state_computation = consume state_computation
 
+  be add_step_reporter(sr: StepReporter val) =>
+    _step_reporter = sr
+
   be add_output(to: BasicStep tag) =>
     _output = to
 
   be apply(input: StepMessage val) =>
     match input
     | let i: Message[In] val =>
-      let r = _state_computation(_state, i)
+      let res = _state_computation(_state, i)
       match _output
-        | let o: BasicStep tag => o(r)
+      | let o: BasicStep tag =>
+        let start_time = Time.millis()
+        o(res)
+        let end_time = Time.millis()
+        match _step_reporter
+        | let sr: StepReporter val =>
+          sr.report(start_time, end_time)
+        end
       end
     end
 
@@ -206,5 +241,6 @@ class ExternalConnectionBuilder[In: OSCEncodable val]
   new val create(stringify: Stringify[In] val) =>
     _stringify = stringify
 
-  fun apply(conn: TCPConnection): ExternalConnection[In] =>
-    ExternalConnection[In](_stringify, conn)
+  fun apply(conn: TCPConnection, metrics_collector: MetricsCollector)
+    : ExternalConnection[In] =>
+    ExternalConnection[In](_stringify, conn, metrics_collector)

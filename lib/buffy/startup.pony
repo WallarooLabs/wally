@@ -1,6 +1,7 @@
 use "net"
 use "options"
 use "collections"
+use "buffy/metrics"
 
 actor Startup
   new create(env: Env, topology: Topology val, step_lookup: StepLookup val,
@@ -9,6 +10,7 @@ actor Startup
     var worker_count: USize = 0
     var node_name: String = "0"
     var phone_home_addr = Array[String]
+    var metrics_addr = Array[String]
     var options = Options(env)
     var leader_addr = Array[String]
     var source_addrs = Array[String]
@@ -24,6 +26,7 @@ actor Startup
       .add("leader-address", "", StringArgument)
       .add("source", "", StringArgument)
       .add("sink", "", StringArgument)
+      .add("metrics", "", StringArgument)
 
     for option in options do
       match option
@@ -34,6 +37,7 @@ actor Startup
       | ("name", let arg: String) => node_name = arg
       | ("source", let arg: String) => source_addrs.append(arg.split(","))
       | ("sink", let arg: String) => sink_addrs.append(arg.split(","))
+      | ("metrics", let arg: String) => metrics_addr = arg.split(":")
       end
     end
 
@@ -54,6 +58,21 @@ actor Startup
       let leader_host = leader_addr(0)
       let leader_service = leader_addr(1)
 
+      let metrics_collector =
+        if metrics_addr.size() > 0 then
+          let metrics_host = metrics_addr(0)
+          let metrics_service = metrics_addr(1)
+
+          let metrics_notifier: TCPConnectionNotify iso =
+            MetricsCollectorConnectNotify(env, auth)
+          let metrics_conn: TCPConnection =
+            TCPConnection(auth, consume metrics_notifier, metrics_host, metrics_service)
+
+          MetricsCollector(env, node_name, metrics_conn)
+        else
+          MetricsCollector(env, node_name)
+        end
+
       let sinks: Map[I32, (String, String)] iso =
         recover Map[I32, (String, String)] end
 
@@ -66,11 +85,12 @@ actor Startup
         sinks(i.i32()) = (sink_host, sink_service)
       end
 
-      let step_manager = StepManager(env, step_lookup, consume sinks)
+      let step_manager = StepManager(env, step_lookup, consume sinks,
+        metrics_collector)
       if is_worker then
         coordinator.add_listener(TCPListener(auth,
           WorkerNotifier(env, auth, node_name, leader_host, leader_service,
-            phone_home_conn, step_manager, coordinator)))
+            phone_home_conn, step_manager, coordinator, metrics_collector)))
       else
         if source_addrs.size() != source_count then
           env.out.print("There are " + source_count.string() + " sources but "
@@ -83,7 +103,8 @@ actor Startup
           let source_host = source_addr(0)
           let source_service = source_addr(1)
           let source_notifier: TCPListenNotify iso = SourceNotifier(env, auth,
-            source_host, source_service, i.i32(), step_manager, coordinator)
+            source_host, source_service, i.i32(), step_manager, coordinator,
+            metrics_collector)
           coordinator.add_listener(TCPListener(auth, consume source_notifier,
             source_host, source_service))
         end
@@ -96,7 +117,7 @@ actor Startup
 
         let notifier: TCPListenNotify iso = LeaderNotifier(env, auth, node_name,
           leader_host, leader_service, step_manager, coordinator,
-          topology_manager)
+          topology_manager, metrics_collector)
         coordinator.add_listener(TCPListener(auth, consume notifier, leader_host,
           leader_service))
       end

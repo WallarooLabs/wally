@@ -2,6 +2,7 @@ use "net"
 use "collections"
 use "buffy"
 use "buffy/messages"
+use "buffy/metrics"
 
 actor Main
   new create(env: Env) =>
@@ -28,18 +29,18 @@ primitive SL is StepLookup
       error
     end
 
-  fun sink(conn: TCPConnection): BasicStep tag =>
-    ExternalConnection[I32](S, conn)
+  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector): BasicStep tag =>
+    ExternalConnection[I32](S, conn, metrics_collector)
 
 class Double is Computation[I32, I32]
   fun apply(msg: Message[I32] val): Message[I32] val =>
     let output = msg.data * 2
-    Message[I32](msg.id, output)
+    Message[I32](msg.id, msg.source_ts, msg.last_ingress_ts, output)
 
 class Halve is Computation[I32, I32]
   fun apply(msg: Message[I32] val): Message[I32] val =>
     let output = msg.data / 2
-    Message[I32](msg.id, output)
+    Message[I32](msg.id, msg.source_ts, msg.last_ingress_ts, output)
 
 class P
   fun apply(s: String): I32 ? =>

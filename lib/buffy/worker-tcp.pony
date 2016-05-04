@@ -1,8 +1,10 @@
 use "net"
 use "collections"
 use "buffy/messages"
+use "buffy/metrics"
 use "sendence/bytes"
 use "sendence/tcp"
+use "time"
 
 class WorkerNotifier is TCPListenNotify
   let _env: Env
@@ -13,12 +15,14 @@ class WorkerNotifier is TCPListenNotify
   let _step_manager: StepManager
   let _coordinator: Coordinator
   let _phone_home_connection: TCPConnection
+  let _metrics_collector: MetricsCollector
   var _host: String = ""
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
     leader_service: String, phone_home_conn: TCPConnection,
-    step_manager: StepManager, coordinator: Coordinator) =>
+    step_manager: StepManager, coordinator: Coordinator,
+    metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
     _name = name
@@ -27,6 +31,7 @@ class WorkerNotifier is TCPListenNotify
     _phone_home_connection = phone_home_conn
     _step_manager = step_manager
     _coordinator = coordinator
+    _metrics_collector = metrics_collector
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -35,7 +40,7 @@ class WorkerNotifier is TCPListenNotify
 
       let notifier: TCPConnectionNotify iso =
         WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-          _step_manager, _coordinator)
+          _step_manager, _coordinator, _metrics_collector)
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
 
@@ -53,7 +58,7 @@ class WorkerNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-      _step_manager, _coordinator)
+      _step_manager, _coordinator, _metrics_collector)
 
 class WorkerConnectNotify is TCPConnectionNotify
   let _env: Env
@@ -62,12 +67,14 @@ class WorkerConnectNotify is TCPConnectionNotify
   let _leader_service: String
   let _step_manager: StepManager
   let _coordinator: Coordinator
+  let _metrics_collector: MetricsCollector
   let _framer: Framer = Framer
   let _nodes: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
   let _name: String
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
-    leader_service: String, step_manager: StepManager, coordinator: Coordinator) =>
+    leader_service: String, step_manager: StepManager, coordinator: Coordinator,
+    metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
     _name = name
@@ -75,6 +82,7 @@ class WorkerConnectNotify is TCPConnectionNotify
     _leader_service = leader_service
     _step_manager = step_manager
     _coordinator = coordinator
+    _metrics_collector = metrics_collector
 
   fun ref accepted(conn: TCPConnection ref) =>
     _coordinator.add_connection(conn)
@@ -120,7 +128,7 @@ class WorkerConnectNotify is TCPConnectionNotify
     else
       let notifier: TCPConnectionNotify iso =
         WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-          _step_manager, _coordinator)
+          _step_manager, _coordinator, _metrics_collector)
       let target_conn =
         TCPConnection(_auth, consume notifier, msg.target_host,
           msg.target_service)
