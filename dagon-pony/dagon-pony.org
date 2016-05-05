@@ -38,7 +38,11 @@ We define message types that will be used for communication between
 #+INCLUDE: "../lib/buffy/messages/wire-messages.pony" src pony :lines "3-18"
 
 ** Boot Topology
-#+begin_src mscgen :file dagon-sequence-1.png
+We start the full topology defined in the =ini= file specified by
+user. Once we've received the =ready= message from all booted nodes we
+send the =start= message to /Giles Sender/.
+
+#+begin_src mscgen :file dagon-sequence-1.png :exports code
 msc{
   width = 800;
 
@@ -59,20 +63,21 @@ msc{
   D <- W2  [label = "ready"];
   D -> D   [label = "fork Giles Sender", textcolour = "red"];
   D <- GS  [label = "ready"];
+  D -> D   [label = "are_we_ready()"];
+  |||;  
   D -> GS  [label = "start"];
   |||;  
 }
 #+end_src
 
 #+ATTR_LATEX: :width 14 cm
-#+label: fig:dagaon-sequence-1
+#+label: fig:dagon-sequence-1
 #+caption: Dagon Sequence 1
-[[file:dagon-sequence-1.png]]
+[[./dagon-sequence-1.png]]
  
 ** Shutdown Topology
 We expect /Giles Sender/ to complete first and send the =done= message
-to Dagon. Next /Giles Receiver/ should signal =done=. Once we have
-received the =done= message from *both* /Giles/ nodes we initiate the
+to Dagon. We wait for a specified period of time and then initiate the
 shutdown procedure by sending the =shutdown= message to the /Leader/
 to give it time for cleanup and any remaining communication with the
 /workers/. We wait for the /Leader's/ response. Once we receive the
@@ -81,7 +86,7 @@ message to all /workers/, /Giles Sender/ and /Giles Receiver/ and wait
 for their response. Once we've received =done_shutdown= from all
 outstanding nodes we are done and exit.
 
-#+begin_src mscgen :file dagon-sequence-2.png
+#+begin_src mscgen :file dagon-sequence-2.png :exports code
 msc{
   width = 800;
 
@@ -105,13 +110,16 @@ msc{
   D -> GR  [label = "shutdown"];
   D <- GR  [label = "done_shutdown"];
   |||;  
+  D -> D   [label = "are_we_done_yet()"];
+  D -> D   [label = "shutdown_topology()"];
+  |||;  
 }
 #+end_src
 
 #+ATTR_LATEX: :width 14 cm
-#+label: fig:dagaon-sequence-2
+#+label: fig:dagon-sequence-2
 #+caption: Dagon Sequence 2
-[[file:dagon-sequence-2.png]]
+[[./dagon-sequence-2.png]]
 
 * First Draft
 
