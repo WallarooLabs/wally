@@ -26,9 +26,9 @@ actor Main
       | ("phone_home_service", let arg: String) => service = arg
       end
     end
-    env.out.print("dagon-child: node_name: " + node_name)
-    env.out.print("dagon-child: phone_home_host: " + host)
-    env.out.print("dagon-child: phone_home_service: " + service)
+    env.out.print("    dagon-child: node_name: " + node_name)
+    env.out.print("    dagon-child: phone_home_host: " + host)
+    env.out.print("    dagon-child: phone_home_service: " + service)
     DagonChild(env, node_name, host, service)
 
     
@@ -49,7 +49,7 @@ actor DagonChild
       _conn = TCPConnection(auth, consume notifier, host, service)
       send_ready()
     else
-      _env.out.print("dagon-child: Couldn't get ambient authority")
+      _env.out.print("    dagon-child: Couldn't get ambient authority")
     end   
     
   be send_ready() =>
@@ -58,12 +58,12 @@ actor DagonChild
     """
     if (_conn isnt None) then
       try
-        _env.out.print("dagon-child: Sending ready...")
+        _env.out.print("    dagon-child: Sending ready...")
         let c = _conn as TCPConnection
         let message = WireMsgEncoder.ready(_node_name)
         c.write(message)
       else
-        _env.out.print("dagon-child: Failed sending ready")
+        _env.out.print("    dagon-child: Failed sending ready")
       end
     end
 
@@ -73,12 +73,12 @@ actor DagonChild
     """
     if (_conn isnt None) then
       try
-        _env.out.print("dagon-child: Sending done...")
+        _env.out.print("    dagon-child: Sending done...")
         let c = _conn as TCPConnection
         let message = WireMsgEncoder.done(_node_name)
         c.write(message)
       else
-        _env.out.print("dagon-child: Failed sending done")
+        _env.out.print("    dagon-child: Failed sending done")
       end
     end
     
@@ -88,17 +88,17 @@ actor DagonChild
     """
      if (_conn isnt None) then
       try
-        _env.out.print("dagon-child: Sending done_shutdown..")
+        _env.out.print("    dagon-child: Sending done_shutdown..")
         let c = _conn as TCPConnection
         let message = WireMsgEncoder.done_shutdown(_node_name)
         c.write(message)
       else
-        _env.out.print("dagon-child: Failed sending done_shutdown")
+        _env.out.print("    dagon-child: Failed sending done_shutdown")
       end
     end   
     
   be start() =>
-    _env.out.print("dagon-child: Starting...")
+    _env.out.print("    dagon-child: Starting...")
     // fake some work here
     let timers = Timers
     let timer = Timer(FakeWork(_env, _node_name, this, 10), 0, 1_000_000_000)
@@ -107,14 +107,14 @@ actor DagonChild
     
   be shutdown() =>
     if (_conn isnt None) then
-      _env.out.print("dagon-child: Shutting down " + _node_name)
+      _env.out.print("    dagon-child: Shutting down " + _node_name)
       try
         send_done_shutdown()
         let c = _conn as TCPConnection
         c.dispose()
-        _env.out.print("dagon-child: disposed of tcp connection")
+        _env.out.print("    dagon-child: disposed of tcp connection")
       else
-        _env.out.print("dagon-child: Failed closing connection")
+        _env.out.print("    dagon-child: Failed closing connection")
       end
     end
 
@@ -129,7 +129,7 @@ class HomeConnectNotify is TCPConnectionNotify
     _child = child
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print("dagon-child: Dagon connection accepted")
+    _env.out.print("    dagon-child: Dagon connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     // parse Dagon command
@@ -138,16 +138,16 @@ class HomeConnectNotify is TCPConnectionNotify
         let decoded = WireMsgDecoder(consume chunked)
         match decoded
         | let m: StartMsg val =>
-          _env.out.print("dagon-child: received start message")
+          _env.out.print("    dagon-child: received start message")
           _child.start()
         | let m: ShutdownMsg val =>
-          _env.out.print("dagon-child: received shutdown messages ")
+          _env.out.print("    dagon-child: received shutdown messages ")
          _child.shutdown()
         else
-          _env.out.print("dagon-child: Unexpected message from Dagon")
+          _env.out.print("    dagon-child: Unexpected message from Dagon")
         end
       else
-        _env.out.print("dagon-child: Unable to decode message from Dagon")
+        _env.out.print("    dagon-child: Unable to decode message from Dagon")
       end
     end
     

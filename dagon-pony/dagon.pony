@@ -13,12 +13,14 @@ use "sendence/tcp"
 
 primitive _Booting
 primitive _Ready
+primitive _Started
 primitive _Done
 primitive _DoneShutdown
 
 type ChildState is
   ( _Booting
   | _Ready
+  | _Started
   | _Done
   | _DoneShutdown
   )
@@ -29,27 +31,40 @@ actor Main
   
   new create(env: Env) =>
     _env = env
+    var timeout: I64 = 0
     var path: String = ""
     var host: String = ""
     var service: String = ""
     var options = Options(env)
     var args = options.remaining()
     options
-      .add("filepath", "f", StringArgument)
-      .add("host", "h", StringArgument)
-      .add("service", "p", StringArgument)
-    for option in options do
-      match option
-      | ("filepath", let arg: String) => path = arg
-      | ("host", let arg: String) => host = arg
-      | ("service", let arg: String) => service = arg
+    .add("timeout", "t", I64Argument)
+    .add("filepath", "f", StringArgument)
+    .add("host", "h", StringArgument)
+    .add("service", "p", StringArgument)
+    try
+      for option in options do
+        match option
+        | ("timeout", let arg: I64) =>
+          if arg < 0 then
+            _env.out.print("dagon: timeout can't be negative")
+            error
+          else
+            timeout = arg
+          end
+        | ("filepath", let arg: String) => path = arg
+        | ("host", let arg: String) => host = arg
+        | ("service", let arg: String) => service = arg
       end
-    end  
+    end
+    _env.out.print("dagon: timeout: " + timeout.string())
     _env.out.print("dagon: path: " + path)
     _env.out.print("dagon: host: " + host)
     _env.out.print("dagon: service: " + service)
-    let p_mgr = ProcessManager(_env, path, host, service)
-    
+    let p_mgr = ProcessManager(_env, timeout, path, host, service)
+  else
+    _env.out.print("dagon: error parsing commandline args")
+  end
 
     
 class Notifier is TCPListenNotify
@@ -132,14 +147,19 @@ class Child
     
 actor ProcessManager
   let _env: Env
+  let _timeout: I64
   let _path: String
   let _host: String
   let _service: String
+  var _canary_node: String = ""
   var roster: Map[String, Child] = Map[String, Child]
   var _listener: (TCPListener | None) = None
 
-  new create(env: Env, path: String, host: String, service: String) =>
+  new create(env: Env, timeout: I64, path: String,
+    host: String, service: String)
+    =>
     _env = env
+    _timeout = timeout
     _path = path
     _host = host
     _service = service
@@ -179,7 +199,8 @@ actor ProcessManager
             args.push("--" + key + "=" + sections(section)(key))
           | "canary" =>
             match sections(section)(key)
-            | "true" => is_canary = true
+            | "true" =>
+              is_canary = true
             else
               is_canary = false
             end
@@ -218,6 +239,7 @@ actor ProcessManager
     Start up processes with host and service as phone home address
     """
     _env.out.print("dagon: booting " + node_name + " is_canary: " + is_canary.string())
+    if is_canary then _canary_node = node_name end
     try
       let pn: ProcessNotify iso = ProcessClient(_env, node_name, this)
       let pm: ProcessMonitor = ProcessMonitor(consume pn, filepath,
@@ -262,42 +284,48 @@ actor ProcessManager
     else
       _env.out.print("dagon: failed to find child in roster")
     end
-    // check if we're ready
-    are_we_ready_yet()
+    // check if we're ready and start canary node
+    if _roster_is_ready() then
+      start_canary_node()
+    end
 
-  be are_we_ready_yet() =>
+  fun ref _roster_is_ready(): Bool =>
     """
-    Check if all nodes have reported in as "ready". If so send
-    a start to the canary.
+    Check if all child processes are ready
     """
-    _env.out.print("dagon: are we ready yet?")
-    var ready: Bool = true
-    var canary_node: String = ""
-    var canary_conn: (TCPConnection | None) = None
     try
       for key in roster.keys() do
         let child = roster(key)
         match child.state
-        | _Booting => ready = false
-        end
-        match child.is_canary
-        | true  =>
-          canary_node = child.name
-          canary_conn = child.conn
+        | _Booting => return false
         end
       end
     else
-      _env.out.print("dagon: can't iterate over roster")
-    end    
-    // send start to canary
+      _env.out.print("dagon: could not iterate over roster")
+    end      
+    true
+
+  be start_canary_node() =>
+    """
+    Send start to the canary node.
+    """
+    _env.out.print("dagon: starting canary node")
     try
-      if ready and (canary_conn isnt None) then
-        _env.out.print("dagon: we are ready, sending start to canary node")
-        send_start(canary_conn as TCPConnection, canary_node)
+      let child = roster(_canary_node)
+      let canary_conn: (TCPConnection | None) = child.conn
+      // send start to canary
+      try
+        if (child.state isnt _Started) and (canary_conn isnt None) then
+          send_start(canary_conn as TCPConnection, _canary_node)
+          child.state = _Started
+        end
+      else
+        _env.out.print("dagon: failed sending start to canary node")
       end
     else
-      _env.out.print("dagon: failed sending start to canary node")
+      _env.out.print("dagon: could not get canary node from roster")
     end
+
     
   be send_start(conn: TCPConnection, node_name: String) =>
     """
@@ -334,7 +362,7 @@ actor ProcessManager
     """
     _env.out.print("dagon: waiting for processing to finish")
     let timers = Timers
-    let timer = Timer(WaitForProcessing(_env, this, 10), 0, 1_000_000_000)
+    let timer = Timer(WaitForProcessing(_env, this, _timeout), 0, 1_000_000_000)
     timers(consume timer)
     
   be shutdown_topology() =>
@@ -422,16 +450,16 @@ class ProcessClient is ProcessNotify
 class WaitForProcessing is TimerNotify  
   let _env: Env
   let _p_mgr: ProcessManager
-  let _limit: U64
-  var _counter: U64
+  let _limit: I64
+  var _counter: I64
   
-  new iso create(env: Env, p_mgr: ProcessManager, limit: U64) =>
+  new iso create(env: Env, p_mgr: ProcessManager, limit: I64) =>
     _counter = 0
     _env = env
     _p_mgr = p_mgr
     _limit = limit
 
-  fun ref _next(): U64 =>
+  fun ref _next(): I64 =>
     _counter = _counter + 1
     _counter
     

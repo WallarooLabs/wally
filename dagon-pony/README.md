@@ -22,7 +22,16 @@ cd ..
 ```
 
 # Quickstart
-
+dagon-pony takes four arguments:
 ```
-./dagon-pony -f example.ini -h 127.0.0.1 -p 8080
+-t time in seconds to wait for processing to finish after Giles
+   Sender is done.
+-f configuration file path
+-h host ip address dagon should listen on
+-p port number dagon should listen on
+```
+
+Example:
+```
+./dagon-pony -t 10 -f example.ini -h 127.0.0.1 -p 8080
 ```
