@@ -3,13 +3,8 @@ use "buffy/messages"
 use "buffy/metrics"
 use "time"
 
-interface MetricsSender
-  be add_metrics_collector(mc: MetricsCollector tag) => None
-
-interface Identifiable
-  be add_id(id: I32) => None
-
-interface BasicStep is (MetricsSender & Identifiable)
+interface BasicStep
+  be add_step_reporter(sr: StepReporter val) => None
 
 interface ComputeStep[In: OSCEncodable val] is BasicStep
   be apply(input: Message[In] val)
@@ -19,19 +14,15 @@ interface ThroughStep[In: OSCEncodable val,
   be add_output(to: ComputeStep[Out] tag)
 
 actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
-  var _step_id: (I32 | None) = None
   let _f: Computation[In, Out]
-  var _metrics_collector: (MetricsCollector tag | None) = None
   var _output: (ComputeStep[Out] tag | None) = None
+  var _step_reporter: (StepReporter val | None) = None
 
   new create(f: Computation[In, Out] iso) =>
     _f = consume f
 
-  be add_id(id: I32) =>
-    _step_id = id
-
-  be add_metrics_collector(m_coll: MetricsCollector tag) =>
-    _metrics_collector = m_coll
+  be add_step_reporter(sr: StepReporter val) =>
+    _step_reporter = sr
 
   be add_output(to: ComputeStep[Out] tag) =>
     _output = to
@@ -46,12 +37,9 @@ actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
     end
 
   fun _report_metrics(start_time: U64, end_time: U64) =>
-    match _metrics_collector
-    | let m: MetricsCollector tag =>
-      match _step_id
-      | let id: I32 =>
-        m.report_step_metrics(id, start_time, end_time)
-      end
+    match _step_reporter
+    | let s: StepReporter val =>
+      s.report(start_time, end_time)
     end
 
 actor Sink[In: OSCEncodable val] is ComputeStep[In]

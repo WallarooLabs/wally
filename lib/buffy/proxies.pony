@@ -71,8 +71,7 @@ actor StepManager
   be add_step(step_id: I32, computation_type: String) =>
     try
       let step = _step_builder(computation_type)
-      step.add_id(step_id)
-      step.add_metrics_collector(_metrics_collector)
+      step.add_step_reporter(StepReporter(step_id, _metrics_collector))
       _steps(step_id) = step
     end
 

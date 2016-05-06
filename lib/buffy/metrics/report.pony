@@ -48,7 +48,8 @@ primitive BoundaryMetricsEncoder
     consume d
 
 primitive ReportMsgDecoder
-  fun apply(data: Array[U8]): ReportSummary val ? =>
+  fun apply(d: Array[U8] val): ReportSummary val ? =>
+    let data: Array[U8] ref = d.clone()
     match Bytes.u32_from_idx(0, data)
     | ReportTypes.step() => _decode_node_summary(data)
     | ReportTypes.boundary() => _decode_boundary_summary(data)
