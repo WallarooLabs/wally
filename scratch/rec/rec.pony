@@ -14,7 +14,7 @@ actor Main
       let addr: Array[String] = args(1).split(":")
       let host = addr(0)
       let service = addr(1)
-      TCPListener(auth, Notifier(env, host, service), host, service)
+      TCPListener(auth, Notifier(env), host, service)
     end
 
 class Notifier is TCPListenNotify
@@ -56,8 +56,6 @@ class ConnectNotify is TCPConnectionNotify
           _env.out.print("Node metrics message.")
         | let m: BoundaryMetricsSummary val =>
           _env.out.print("Boundary metrics message.")
-        | let n: None val =>
-          _env.out.print("None message somehow!")
         else
           _env.err.print("Message couldn't be decoded!")
         end
