@@ -24,7 +24,7 @@ primitive SB is StepBuilder
 class Double is Computation[I32, I32]
   fun apply(msg: Message[I32] val): Message[I32] val^ =>
     let output = msg.data * 2
-    Message[I32](msg.id, output)
+    Message[I32](msg.id, msg.source_ts, msg.last_ingress_ts, output)
 
 class Mod4Partition is PartitionFunction[I32]
   fun apply(input: I32): I32 =>

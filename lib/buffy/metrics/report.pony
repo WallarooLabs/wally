@@ -6,10 +6,8 @@ primitive ReportTypes
   fun boundary(): U32 => 1
 
 primitive BoundaryTypes
-  fun source(): U32 => 0
-  fun sink(): U32 => 1
-  fun ingress(): U32 => 2
-  fun egress(): U32 => 3
+  fun source_sink(): I32 => 0
+  fun ingress_egress(): I32 => 1
 
 type ReportSummary is (NodeMetricsSummary | BoundaryMetricsSummary | None)
 
@@ -43,7 +41,8 @@ primitive BoundaryMetricsEncoder
     for report in reports.values() do
       d = Bytes.from_u32(report.boundary_type.u32(), consume d)
       d = Bytes.from_u32(report.msg_id.u32(), consume d)
-      d = Bytes.from_u64(report.timestamp, consume d)
+      d = Bytes.from_u64(report.start_time, consume d)
+      d = Bytes.from_u64(report.end_time, consume d)
     end
     consume d
 
@@ -103,7 +102,7 @@ primitive ReportMsgDecoder
     data_idx = data_idx + 4
     for i in Range(0, report_count.usize()) do
       boundary_summary.add_report(_decode_next_boundary_report(data_idx, data))
-      data_idx = data_idx + 16
+      data_idx = data_idx + 24
     end
     consume boundary_summary
 
@@ -114,8 +113,11 @@ primitive ReportMsgDecoder
     idx = idx + 4
     let msg_id = Bytes.u32_from_idx(idx, arr).i32()
     idx = idx + 4
-    let timestamp = Bytes.u64_from_idx(idx, arr)
-    BoundaryMetricsReport(boundary_type, msg_id, timestamp)
+    let start_time = Bytes.u64_from_idx(idx, arr)
+    idx = idx + 8
+    let end_time = Bytes.u64_from_idx(idx, arr)
+    idx = idx + 8
+    BoundaryMetricsReport(boundary_type, msg_id, start_time, end_time)
 
 class StepMetricsReport
   let start_time: U64
@@ -148,12 +150,14 @@ class NodeMetricsSummary
 class BoundaryMetricsReport
   let boundary_type: I32
   let msg_id: I32
-  let timestamp: U64
+  let start_time: U64
+  let end_time: U64
 
-  new val create(b_type: I32, m_id: I32, ts: U64) =>
+  new val create(b_type: I32, m_id: I32, s_ts: U64, e_ts: U64) =>
     boundary_type = b_type
     msg_id = m_id
-    timestamp = ts
+    start_time = s_ts
+    end_time = e_ts
 
 class BoundaryMetricsSummary
   let node_name: String

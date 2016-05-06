@@ -62,9 +62,9 @@ class SourceConnectNotify is TCPConnectionNotify
         let msg = WireMsgDecoder(consume chunked)
         match msg
         | let m: ExternalMsg val =>
-          let new_msg: Message[I32] val = Message[I32](_msg_id = _msg_id + 1, m.data.i32())
-          _metrics_collector.report_boundary_metrics(BoundaryTypes.source().i32(),
-            new_msg.id, Time.millis())
+          let now = Time.millis()
+          let new_msg: Message[I32] val =
+            Message[I32](_msg_id = _msg_id + 1, now, now, m.data.i32())
           _step_manager(_source_id, new_msg)
         | let m: UnknownMsg val =>
           _env.err.print("Unknown message type.")

@@ -20,8 +20,8 @@ actor Proxy is ComputeStep[I32]
 
   be apply(input: Message[I32] val) =>
     let tcp_msg = WireMsgEncoder.forward(_step_id, input)
-    _metrics_collector.report_boundary_metrics(BoundaryTypes.egress().i32(),
-      input.id, Time.millis())
+    _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
+      input.id, input.last_ingress_ts, Time.millis())
     _conn.write(tcp_msg)
 
 actor ExternalConnection is ComputeStep[I32]
@@ -38,8 +38,8 @@ actor ExternalConnection is ComputeStep[I32]
     _env.out.print(input.data.string())
     let tcp_msg = WireMsgEncoder.external(input.data)
     _conn.write(tcp_msg)
-    _metrics_collector.report_boundary_metrics(BoundaryTypes.sink().i32(),
-      input.id, Time.millis())
+    _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
+      input.id, input.source_ts, Time.millis())
 
 actor StepManager
   let _env: Env

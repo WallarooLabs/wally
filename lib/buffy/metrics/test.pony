@@ -54,11 +54,11 @@ class iso _TestBoundaryReportsEncoder is UnitTest
     let boundary_node_name = "BoundaryTest"
     let boundary_reports = Array[BoundaryMetricsReport val]
 
-    boundary_reports.push(BoundaryMetricsReport(0, 9143, 91354551))
-    boundary_reports.push(BoundaryMetricsReport(1, 9147, 91354328))
-    boundary_reports.push(BoundaryMetricsReport(2, 9196, 91123612))
-    boundary_reports.push(BoundaryMetricsReport(3, 9173, 91354275))
-    boundary_reports.push(BoundaryMetricsReport(0, 9198, 91313488))
+    boundary_reports.push(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9143, 91354551, 1232143112))
+    boundary_reports.push(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9147, 91354328, 1354328748))
+    boundary_reports.push(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9196, 91123612, 1313488789))
+    boundary_reports.push(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9173, 91354275, 1313488789))
+    boundary_reports.push(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9198, 91313488, 1354275829))
 
     let boundary_encoded = BoundaryMetricsEncoder(boundary_node_name, boundary_reports)
 
@@ -67,7 +67,7 @@ class iso _TestBoundaryReportsEncoder is UnitTest
     match boundary_decoded
     | let n: BoundaryMetricsSummary val =>
       h.assert_eq[String](n.node_name, "BoundaryTest")
-      h.assert_eq[U64](n.reports(1).timestamp, 91354328)
+      h.assert_eq[U64](n.reports(1).start_time, 91354328)
     else
       h.fail("Wrong decoded message type")
     end

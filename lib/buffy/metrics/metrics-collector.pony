@@ -44,9 +44,10 @@ actor MetricsCollector
 	    _step_count = 0
 	  end
 
-	be report_boundary_metrics(boundary_type: I32, msg_id: I32, timestamp: U64) =>
+	be report_boundary_metrics(boundary_type: I32, msg_id: I32, start_time: U64,
+		end_time: U64) =>
 		_boundary_reports.push(BoundaryMetricsReport(boundary_type,
-			msg_id, timestamp))
+			msg_id, start_time, end_time))
 
 	  if _boundary_reports.size() > 10 then
 	    _send_boundary_metrics_to_receiver()

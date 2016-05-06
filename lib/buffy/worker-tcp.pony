@@ -93,8 +93,6 @@ class WorkerConnectNotify is TCPConnectionNotify
         | let m: SpinUpSinkMsg val =>
           _step_manager.add_sink(m.sink_id, m.sink_step_id, _auth)
         | let m: ForwardMsg val =>
-          _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress().i32(),
-            m.msg.id, Time.millis())
           _step_manager(m.step_id, m.msg)
         | let m: ConnectStepsMsg val =>
           _step_manager.connect_steps(m.in_step_id, m.out_step_id)
