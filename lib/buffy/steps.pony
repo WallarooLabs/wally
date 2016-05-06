@@ -84,3 +84,24 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
           @printf[String]("Couldn't find partition when trying to add output!".cstring())
       end
     end
+
+/*
+// commented out until ponylang/ponyc issue #807 is fixed
+actor State[In: OSCEncodable val, Out: OSCEncodable val, DataStructure: Any] is ThroughStep[In, Out]
+  let _f: StateComputation[In, Out, DataStructure]
+  var _output: (ComputeStep[Out] tag | None) = None
+  let _state: Map[I32, I32]
+
+  new create(state: DataStructure iso, f: StateComputation[In, Out, DataStructure] iso) =>
+    _state = consume state
+    _f = consume f
+
+  be add_output(to: ComputeStep[Out] tag) =>
+    _output = to
+
+  be apply(input: Message[In] val) =>
+    let r = _f(_state, input)
+    match _output
+      | let c: ComputeStep[Out] tag => c(r)
+    end
+*/
