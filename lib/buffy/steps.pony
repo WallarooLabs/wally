@@ -4,9 +4,11 @@ use "buffy/messages"
 interface ComputeStep[In: OSCEncodable val]
   be apply(input: Message[In] val)
 
-interface ThroughStep[In: OSCEncodable val,
-                      Out: OSCEncodable val] is ComputeStep[In]
+interface OutputStep[Out: OSCEncodable val]
   be add_output(to: ComputeStep[Out] tag)
+
+interface ThroughStep[In: OSCEncodable val,
+                      Out: OSCEncodable val] is (OutputStep[Out] & ComputeStep[In])
 
 actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]

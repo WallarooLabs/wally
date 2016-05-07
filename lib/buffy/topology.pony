@@ -12,3 +12,17 @@ class Topology
 
 trait StepBuilder
   fun val apply(computation_type: String): Any tag ?
+
+trait OutputStepBuilder[C: OSCEncodable val]
+  fun val apply(): OutputStep[C] tag ?
+
+trait ComputeStepBuilder[C: OSCEncodable val]
+  fun val apply(): ComputeStep[C] tag ?
+
+class Connector[C: OSCEncodable val]
+  let input: OutputStepBuilder[C] tag
+  let output: ComputeStepBuilder[C] tag
+
+  new create(i: OutputStepBuilder[C] val, o: ComputeStepBuilder[C]) =>
+    input = i
+    output = o
