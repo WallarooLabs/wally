@@ -199,3 +199,38 @@ to the nearest integer.
     end
 
     consume percs
+
+
+class ThroughputHistory
+"""
+A history of throughput counts per second
+"""
+  let _map: Map[U64, U64] = Map[U64, U64]()
+  var _start_time: U64 = 0
+  var _end_time: U64 = 0
+
+  fun ref apply(report: MetricsReport) => 
+    count_report(report.ended())
+
+  fun ref count_report(end_time: U64) =>
+    // Truncate milliseconds to seconds
+    let t' = end_time / 1000
+    if _start_time == 0 then _start_time = t' end
+    if t' > _end_time then _end_time = t' end
+    _map.update(t', try _map(t') + 1 else 1 end)
+
+  fun values(): Array[(U64, U64)] =>
+  """
+  The dense representation of the throughput history in the time ranges
+  counted so far
+  """
+    let arr = Array[(U64, U64)](size())
+    for ts in Range[U64](_start_time, (_end_time + 1), 1) do
+      arr.push((ts, try _map(ts) else 0 end))
+    end
+    consume arr
+
+  fun size(): USize =>
+    ((_end_time - _start_time) + 1).usize()
+
+

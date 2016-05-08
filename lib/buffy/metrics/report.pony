@@ -121,6 +121,8 @@ primitive ReportMsgDecoder
 
 interface MetricsReport
   fun dt(): U64
+  fun ended(): U64
+  fun started(): U64
 
 class StepMetricsReport is MetricsReport
   let start_time: U64
@@ -131,6 +133,8 @@ class StepMetricsReport is MetricsReport
     end_time = e_time
 
   fun dt(): U64 => end_time - start_time
+  fun started(): U64 => start_time
+  fun ended(): U64 => end_time
 
 class StepMetricsDigest
   let step_id: I32
@@ -165,6 +169,8 @@ class BoundaryMetricsReport is MetricsReport
     end_time = e_ts
 
   fun dt(): U64 => end_time - start_time
+  fun started(): U64 => start_time
+  fun ended(): U64 => end_time
 
 class BoundaryMetricsSummary
   let node_name: String
