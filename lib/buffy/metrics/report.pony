@@ -119,13 +119,18 @@ primitive ReportMsgDecoder
     idx = idx + 8
     BoundaryMetricsReport(boundary_type, msg_id, start_time, end_time)
 
-class StepMetricsReport
+interface MetricsReport
+  fun dt(): U64
+
+class StepMetricsReport is MetricsReport
   let start_time: U64
   let end_time: U64
 
   new val create(s_time: U64, e_time: U64) =>
     start_time = s_time
     end_time = e_time
+
+  fun dt(): U64 => end_time - start_time
 
 class StepMetricsDigest
   let step_id: I32
@@ -147,7 +152,7 @@ class NodeMetricsSummary
   fun ref add_digest(d: StepMetricsDigest val) =>
     digests.push(d)
 
-class BoundaryMetricsReport
+class BoundaryMetricsReport is MetricsReport
   let boundary_type: I32
   let msg_id: I32
   let start_time: U64
@@ -158,6 +163,8 @@ class BoundaryMetricsReport
     msg_id = m_id
     start_time = s_ts
     end_time = e_ts
+
+  fun dt(): U64 => end_time - start_time
 
 class BoundaryMetricsSummary
   let node_name: String

@@ -1,7 +1,6 @@
 use "collections"
 
 
-
 interface F64Selector
   fun apply(f: F64): F64
   fun bin(f: F64): F64
@@ -135,22 +134,18 @@ s(0.0001) // -> 0.001
 
 class LatencyHistogram
 """A fixed-bin histogram for aggregating individual MetricsReports
-Events are anchored to a histogram based on their start_time
-and to a bin based on their log10 value, rounded up.
+Events are anchored to a histogram based on their end_time
+and to a bin based on the log10 value of end_time-start_time, rounded up
+to the nearest integer.
 """
 
   let bin_selector: F64Selector
   let sum_bins: Map[F64, F64]
   let count_bins: Map[F64, U64]
-  var start_time: F64
-  var end_time: F64
   var total: F64 = 0
 
-  new create(bin_selector': F64Selector,
-             start_time': F64, end_time': F64) =>
+  new create(bin_selector': F64Selector) =>
     bin_selector = bin_selector'
-    start_time = start_time'
-    end_time = end_time'
     // initialize the sum and count histograms with zeros in each bin
     sum_bins = Map[F64, F64](bin_selector.size())
     count_bins = Map[F64, U64](bin_selector.size())
@@ -159,15 +154,18 @@ and to a bin based on their log10 value, rounded up.
       count_bins.update(x,0)
     end
 
-  fun ref count_report(report: StepMetricsReport) =>
+  fun ref apply(report: MetricsReport) =>
+    count_latency(report.dt())
+
+  fun ref count_latency(dt:U64) =>
     // compute dt in seconds as F64 from the millisecond U64 timestamps
-    let dt:F64 = (report.end_time - report.start_time).f64().div(1000.0)
-    if dt >= 0
+    let dt':F64 = dt.f64().div(1000.0)
+    if dt' >= 0
     then
-      let key = bin_selector(dt)
+      let key = bin_selector(dt')
       try
-        sum_bins.update(dt, sum_bins(dt)+dt)
-        count_bins.update(dt, count_bins(dt)+1)
+        sum_bins.update(key, sum_bins(key)+dt')
+        count_bins.update(key, count_bins(key)+1)
         total = total + 1
       end
     end
