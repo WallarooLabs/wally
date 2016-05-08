@@ -234,3 +234,41 @@ A history of throughput counts per second
     ((_end_time - _start_time) + 1).usize()
 
 
+type MetricsCategories is Map[String, Set[I32]]
+type MetricsTimeranges is Map[U64, Set[I32]]
+type Metrics is Map[I32, Map[U64, (LatencyHistogram, ThroughputHistory)]]
+
+interface MetricsOutputHandler
+  fun handle(payload: Array[U8])
+  fun format(cats: MetricsCategories, times: MetricsTimeranges,
+             metrics: Metrics): Array[U8]
+
+class MetricsCollection
+"""
+A hierarchical collection of LatencyHistogram's and ThroughputHistory's keyed
+on category and id
+"""
+  // Timeranges are anchored to the end of the time range
+  let _metrics: Metrics = Metrics()
+  let _timeranges: MetricsTimeranges = MetricsTimeranges()
+  let _categories: MetricsCategories = MetricsCategories()
+
+  new create() =>
+    // Initialize _Categories
+    _categories.update("source-sink", Set[I32]())
+    _categories.update("ingress-egress", Set[I32]())
+    _categories.update("step", Set[I32]())
+
+
+//  fun ref process_report(report: MetricsReport)
+//
+//  fun ref process_summary(summary: MetricsSummary)
+//
+//  fun ref process_nodesummary(summary: NodeMetricsSummary)
+//
+//  fun ref process_boundarysummary(summary: BoundaryMetricsSummary)
+//
+//  fun handle_output(cats: MetricsCategories, times: MetricsTimeranges,
+//                    metrics: Metrics,
+//                    handlers: Array[MetricsOutputHandlers])
+//
