@@ -204,12 +204,9 @@ class ThroughputHistory
 """
 A history of throughput counts per second
 """
-  let _map: Map[U64, U64] = Map[U64, U64]()
+  let _map: Map[U64, U64] = Map[U64, U64]
   var _start_time: U64 = 0
   var _end_time: U64 = 0
-
-  new create() =>
-    this
 
   fun ref apply(report: MetricsReport val) => 
     count_report(report.ended())
@@ -236,6 +233,7 @@ A history of throughput counts per second
     ((_end_time - _start_time) + 1).usize()
 
 
+type Steps is Set[I32]
 type MetricsCategories is Map[String, Set[I32]]
 type MetricsTimeranges is Map[U64, Set[I32]]
 type StepBuckets is Map[U64, (LatencyHistogram, ThroughputHistory)]
@@ -262,9 +260,9 @@ on category and id
     _period = period
     _bin_selector = bin_selector
     // Initialize _Categories
-    _categories.update("source-sink", Set[I32]())
-    _categories.update("ingress-egress", Set[I32]())
-    _categories.update("step", Set[I32]())
+    _categories.update("source-sink", Steps)
+    _categories.update("ingress-egress", Steps)
+    _categories.update("step", Steps)
 
 
 //  fun ref process_summary(summary: MetricsSummary)
@@ -281,13 +279,20 @@ on category and id
 
   fun ref process_report(step_id: I32, report: StepMetricsReport val) =>
     // Bookkeeping
-    _categories("step").set(step_id)
+    try
+      _categories("step").set(step_id)
+    else
+      _categories.update("step", Steps)
+    end
+
     let time_bucket: U64 = (report.end_time / 1000) % _period
+
     try
       _timeranges(time_bucket).set(step_id)
     else
-      _timeranges.update(time_bucket, Set[I32]())
-      _timeranges(time_bucket).set(step_id)
+      let steps' = Steps
+      steps'.set(step_id)
+      _timeranges.update(time_bucket, steps')
     end
     try
       let step_buckets:StepBuckets = _metrics(step_id)
@@ -296,20 +301,20 @@ on category and id
         lh(report)
         th(report)
       else
-        (let lh, let th) = step_buckets.insert(time_bucket, 
-                                               (LatencyHistogram(_bin_selector),
-                                                ThroughputHistory()))
+        (let lh, let th) =(LatencyHistogram(_bin_selector), recover ref
+        ThroughputHistory end)
         lh(report)
         th(report)
+        step_buckets.update(time_bucket, (lh, th))
       end
     else
-      let step_buckets = StepBuckets()
+      let step_buckets = StepBuckets
       _metrics.update(step_id, step_buckets)
-      (let lh, let th) = step_buckets.insert(time_bucket,
-                                             (LatencyHistogram(_bin_selector),
-                                              ThroughputHistory()))
+      (let lh, let th) = (LatencyHistogram(_bin_selector), recover ref
+      ThroughputHistory end)
       lh(report)
       th(report)
+      step_buckets.update(time_bucket, (lh, th))
     end
 
 
