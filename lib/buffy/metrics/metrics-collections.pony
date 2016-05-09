@@ -234,15 +234,23 @@ A history of throughput counts per second
 
 
 type Steps is Set[I32]
-type MetricsCategories is Map[String, Set[I32]]
-type MetricsTimeranges is Map[U64, Set[I32]]
+type StepTimeranges is Map[U64, Steps]
 type StepBuckets is Map[U64, (LatencyHistogram, ThroughputHistory)]
-type Metrics is Map[I32, StepBuckets]
+type StepMetrics is Map[I32, StepBuckets]
+
+type Boundaries is Set[String]
+type BoundaryTimeranges is Map[U64, Boundaries]
+type BoundaryBuckets is Map[U64, (LatencyHistogram, ThroughputHistory)]
+type BoundaryMetrics is Map[String, BoundaryBuckets]
+
+type Sinks is Set[String]
+type SinkTimeranges is Map[U64, Sinks]
+type SinkBuckets is Map[U64, (LatencyHistogram, ThroughputHistory)]
+type SinkMetrics is Map[String, SinkBuckets]
 
 interface MetricsOutputHandler
   fun handle(payload: Array[U8])
-  fun format(cats: MetricsCategories, times: MetricsTimeranges,
-             metrics: Metrics): Array[U8]
+  fun encode(): Array[U8]
 
 class MetricsCollection
 """
@@ -250,23 +258,21 @@ A hierarchical collection of LatencyHistogram's and ThroughputHistory's keyed
 on category and id
 """
   // Timeranges are anchored to the end of the time range
-  let _metrics: Metrics = Metrics()
-  let _timeranges: MetricsTimeranges = MetricsTimeranges()
-  let _categories: MetricsCategories = MetricsCategories()
+  let _stepmetrics: StepMetrics = StepMetrics
+  let _steptimeranges: StepTimeranges = StepTimeranges
+  let _boundarymetrics: BoundaryMetrics = BoundaryMetrics
+  let _boundarytimeranges: BoundaryTimeranges = BoundaryTimeranges
+  let _sinkmetrics: SinkMetrics = SinkMetrics
+  let _sinktimeranges: SinkTimeranges = SinkTimeranges
   let _period: U64
   let _bin_selector: F64Selector
 
   new create(bin_selector: F64Selector, period: U64=1) =>
     _period = period
     _bin_selector = bin_selector
-    // Initialize _Categories
-    _categories.update("source-sink", Steps)
-    _categories.update("ingress-egress", Steps)
-    _categories.update("step", Steps)
-
 
 //  fun ref process_summary(summary: MetricsSummary)
-//
+
   fun ref process_nodesummary(summary: NodeMetricsSummary) =>
     for digest in summary.digests.values() do
       process_stepmetricsdigest(digest)
@@ -278,24 +284,17 @@ on category and id
     end
 
   fun ref process_report(step_id: I32, report: StepMetricsReport val) =>
+    let time_bucket: U64 = (report.end_time / 1000) % _period
     // Bookkeeping
     try
-      _categories("step").set(step_id)
-    else
-      _categories.update("step", Steps)
-    end
-
-    let time_bucket: U64 = (report.end_time / 1000) % _period
-
-    try
-      _timeranges(time_bucket).set(step_id)
+      _steptimeranges(time_bucket).set(step_id)
     else
       let steps' = Steps
       steps'.set(step_id)
-      _timeranges.update(time_bucket, steps')
+      _steptimeranges.update(time_bucket, steps')
     end
     try
-      let step_buckets:StepBuckets = _metrics(step_id)
+      let step_buckets:StepBuckets = _stepmetrics(step_id)
       try
         (let lh, let th) = step_buckets(time_bucket)
         lh(report)
@@ -309,7 +308,7 @@ on category and id
       end
     else
       let step_buckets = StepBuckets
-      _metrics.update(step_id, step_buckets)
+      _stepmetrics.update(step_id, step_buckets)
       (let lh, let th) = (LatencyHistogram(_bin_selector),
                           recover ref ThroughputHistory end)
       lh(report)
@@ -318,9 +317,9 @@ on category and id
     end
 
 
-//
-//  fun ref process_boundarysummary(summary: BoundaryMetricsSummary)
-//
+  //fun ref process_boundarysummary(summary: BoundaryMetricsSummary) =>
+    
+
 //  fun handle_output(cats: MetricsCategories, times: MetricsTimeranges,
 //                    metrics: Metrics,
 //                    handlers: Array[MetricsOutputHandlers])
