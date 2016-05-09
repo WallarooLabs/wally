@@ -301,8 +301,8 @@ on category and id
         lh(report)
         th(report)
       else
-        (let lh, let th) =(LatencyHistogram(_bin_selector), recover ref
-        ThroughputHistory end)
+        (let lh, let th) =(LatencyHistogram(_bin_selector),
+                           recover ref ThroughputHistory end)
         lh(report)
         th(report)
         step_buckets.update(time_bucket, (lh, th))
@@ -310,8 +310,8 @@ on category and id
     else
       let step_buckets = StepBuckets
       _metrics.update(step_id, step_buckets)
-      (let lh, let th) = (LatencyHistogram(_bin_selector), recover ref
-      ThroughputHistory end)
+      (let lh, let th) = (LatencyHistogram(_bin_selector),
+                          recover ref ThroughputHistory end)
       lh(report)
       th(report)
       step_buckets.update(time_bucket, (lh, th))
