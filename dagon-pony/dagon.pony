@@ -11,32 +11,34 @@ use "process"
 use "sendence/tcp"
 
 
-primitive _Booting
-primitive _Ready
-primitive _Started
-primitive _Done
-primitive _DoneShutdown
+primitive Booting
+primitive Ready
+primitive Started
+primitive Done
+primitive DoneShutdown
 
 type ChildState is
-  ( _Booting
-  | _Ready
-  | _Started
-  | _Done
-  | _DoneShutdown
+  ( Booting
+  | Ready
+  | Started
+  | Done
+  | DoneShutdown
   )
 
 
 actor Main
-  let _env: Env
   
   new create(env: Env) =>
-    _env = env
+    """
+    Check if we have all commandline arguments. If no args where
+    given run the tests.
+    TODO: Run tests if list of args is empty.
+    """
     var timeout: I64 = 0
     var path: String = ""
     var host: String = ""
     var service: String = ""
     var options = Options(env)
-    var args = options.remaining()
     options
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
@@ -47,7 +49,7 @@ actor Main
         match option
         | ("timeout", let arg: I64) =>
           if arg < 0 then
-            _env.out.print("dagon: timeout can't be negative")
+            env.out.print("dagon: timeout can't be negative")
             error
           else
             timeout = arg
@@ -57,13 +59,13 @@ actor Main
         | ("service", let arg: String) => service = arg
       end
     end
-    _env.out.print("dagon: timeout: " + timeout.string())
-    _env.out.print("dagon: path: " + path)
-    _env.out.print("dagon: host: " + host)
-    _env.out.print("dagon: service: " + service)
-    let p_mgr = ProcessManager(_env, timeout, path, host, service)
+    env.out.print("dagon: timeout: " + timeout.string())
+    env.out.print("dagon: path: " + path)
+    env.out.print("dagon: host: " + host)
+    env.out.print("dagon: service: " + service)
+    ProcessManager(env, timeout, path, host, service)
   else
-    _env.out.print("dagon: error parsing commandline args")
+    env.out.print("dagon: error parsing commandline args")
   end
 
     
@@ -91,7 +93,7 @@ class Notifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    ConnectNotify(_env, _p_mgr) // store this with the child
+    ConnectNotify(_env, _p_mgr)
 
     
 class ConnectNotify is TCPConnectionNotify
@@ -121,10 +123,10 @@ class ConnectNotify is TCPConnectionNotify
           _env.out.print("dagon: " + m.node_name + ": _DoneShutdown")
           _p_mgr.received_done_shutdown(conn, m.node_name)
         else
-          _env.out.print("dagon: Unexpected message from Child")
+          _env.out.print("dagon: Unexpected message from child")
         end
       else
-        _env.out.print("dagon: Unable to decode message from Child")
+        _env.out.print("dagon: Unable to decode message from child")
       end
     end
 
@@ -137,7 +139,7 @@ class Child
   let is_canary: Bool
   let pm: ProcessMonitor
   var conn: (TCPConnection | None) = None
-  var state: ChildState = _Booting
+  var state: ChildState = Booting
   
   new create(name': String, is_canary': Bool, pm': ProcessMonitor) =>
     name = name'
@@ -157,7 +159,7 @@ actor ProcessManager
 
   new create(env: Env, timeout: I64, path: String,
     host: String, service: String)
-    =>
+  =>
     _env = env
     _timeout = timeout
     _path = path
@@ -165,7 +167,8 @@ actor ProcessManager
     _service = service
     let tcp_n = recover Notifier(env, this) end
     try
-      _listener = TCPListener(env.root as AmbientAuth, consume tcp_n, host, service)
+      _listener = TCPListener(env.root as AmbientAuth, consume tcp_n,
+        host, service)
     else
       _env.out.print("Failed creating tcp listener")
       return
@@ -190,7 +193,8 @@ actor ProcessManager
           match key
           | "path" =>
             try
-              filepath = FilePath(_env.root as AmbientAuth, sections(section)(key))
+              filepath = FilePath(_env.root as AmbientAuth,
+                sections(section)(key))
             else
               _env.out.print("dagon: Could not create FilePath")
             end
@@ -212,7 +216,8 @@ actor ProcessManager
         args.push("--phone_home_service=" + _service)
         let vars: Array[String] iso = recover Array[String](0) end
         if filepath isnt None then
-          boot_process(node_name, is_canary, filepath as FilePath, consume args, consume vars)
+          boot_process(node_name, is_canary, filepath as FilePath,
+            consume args, consume vars)
         end
       end
     else
@@ -234,11 +239,12 @@ actor ProcessManager
     
   be boot_process(node_name: String, is_canary: Bool, filepath: FilePath,
     args: Array[String] val, vars: Array[String] val)
-    =>
+  =>
     """
     Start up processes with host and service as phone home address
     """
-    _env.out.print("dagon: booting " + node_name + " is_canary: " + is_canary.string())
+    _env.out.print("dagon: booting " + node_name + " is_canary: " +
+      is_canary.string())
     if is_canary then _canary_node = node_name end
     try
       let pn: ProcessNotify iso = ProcessClient(_env, node_name, this)
@@ -279,7 +285,7 @@ actor ProcessManager
     try
       let child = roster(node_name)
       // update child state and connection
-      child.state = _Ready
+      child.state = Ready // remove underscore
       child.conn  = conn
     else
       _env.out.print("dagon: failed to find child in roster")
@@ -297,7 +303,7 @@ actor ProcessManager
       for key in roster.keys() do
         let child = roster(key)
         match child.state
-        | _Booting => return false
+        | Booting => return false
         end
       end
     else
@@ -315,9 +321,9 @@ actor ProcessManager
       let canary_conn: (TCPConnection | None) = child.conn
       // send start to canary
       try
-        if (child.state isnt _Started) and (canary_conn isnt None) then
+        if (child.state isnt Started) and (canary_conn isnt None) then
           send_start(canary_conn as TCPConnection, _canary_node)
-          child.state = _Started
+          child.state = Started
         end
       else
         _env.out.print("dagon: failed sending start to canary node")
@@ -325,7 +331,6 @@ actor ProcessManager
     else
       _env.out.print("dagon: could not get canary node from roster")
     end
-
     
   be send_start(conn: TCPConnection, node_name: String) =>
     """
@@ -347,7 +352,7 @@ actor ProcessManager
     _env.out.print("dagon: received done from child: " + node_name)
     try
       let child = roster(node_name)
-      child.state = _Done
+      child.state = Done
       if child.is_canary then
         _env.out.print("dagon: canary is done ---------------------")
         wait_for_processing()
@@ -371,7 +376,7 @@ actor ProcessManager
     """
     _env.out.print("dagon: shutting down topology")
     try
-      for key in roster.keys() do
+      for key in roster.keys() do // get the values and iterate over those
         let child = roster(key)
         send_shutdown(child.name)
       end
@@ -387,7 +392,7 @@ actor ProcessManager
     conn.dispose()
     try
       let child = roster(node_name)
-      child.state = _DoneShutdown
+      child.state = DoneShutdown
     else
       _env.out.print("dagon: failed to set child state to done_shutdown")
     end
@@ -402,7 +407,7 @@ actor ProcessManager
     else
       _env.out.print("dagon: failed to remove child from roster")
     end
-    if roster.size() == 0 then shutdown_listener() end
+    if roster.size() == 0 then shutdown_listener() end // this won't work for containers!
 
       
 class ProcessClient is ProcessNotify
@@ -442,8 +447,7 @@ class ProcessClient is ProcessNotify
     end
     
   fun ref dispose(child_exit_code: I32) =>
-    exit_code = consume child_exit_code
-    _env.out.print("dagon: Child exit code: " + exit_code.string())
+    _env.out.print("dagon: child exit code: " + child_exit_code.string())
     _p_mgr.received_exit_code(_node_name)
 
  

@@ -175,7 +175,7 @@ class FakeWork is TimerNotify
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     let c = _next()
-    _env.out.print(_node_name + ": " + c.string())
+    _env.out.print(_node_name + ": " + c.string() + " ...working...")
     if c > _limit then
       false
     else
