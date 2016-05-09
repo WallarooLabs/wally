@@ -327,12 +327,12 @@ on category and id
     let name = summary.node_name
     for report in summary.reports.values() do
       match report.boundary_type
-      | _egress_type => process_boundary(name, report)
+      | _egress_type => process_node(name, report)
       | _sink_type => process_sink(name, report)
       end
     end
 
-  fun ref process_boundary(name: String, report: BoundaryMetricsReport val) =>
+  fun ref process_node(name: String, report: BoundaryMetricsReport val) =>
     let time_bucket: U64 = (report.end_time / 1000) % _period
     try
       _boundarytimeranges(time_bucket).set(name)
