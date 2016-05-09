@@ -153,7 +153,7 @@ to the nearest integer.
       count_bins.update(x,0)
     end
 
-  fun ref apply(report: MetricsReport) =>
+  fun ref apply(report: MetricsReport val) =>
     count_latency(report.dt())
 
   fun ref count_latency(dt:U64) =>
@@ -211,7 +211,7 @@ A history of throughput counts per second
   new create() =>
     this
 
-  fun ref apply(report: MetricsReport) => 
+  fun ref apply(report: MetricsReport val) => 
     count_report(report.ended())
 
   fun ref count_report(end_time: U64) =>
@@ -270,16 +270,16 @@ on category and id
 //  fun ref process_summary(summary: MetricsSummary)
 //
   fun ref process_nodesummary(summary: NodeMetricsSummary) =>
-    for digest in summary.digests do
+    for digest in summary.digests.values() do
       process_stepmetricsdigest(digest)
     end
 
-  fun ref process_stepmetricsdigest(digest: StepMetricsDigest) =>
-    for report in digest.reports do
+  fun ref process_stepmetricsdigest(digest: StepMetricsDigest val) =>
+    for report in digest.reports.values() do
       process_report(digest.step_id, report)
     end
 
-  fun ref process_report(step_id: I32, report: StepMetricsReport) =>
+  fun ref process_report(step_id: I32, report: StepMetricsReport val) =>
     // Bookkeeping
     _categories("step").set(step_id)
     let time_bucket: U64 = (report.end_time / 1000) % _period
