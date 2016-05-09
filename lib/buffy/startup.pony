@@ -10,6 +10,7 @@ actor Startup
     var node_name: String = "0"
     var phone_home: String = ""
     var options = Options(env)
+    var leader_addr = Array[String]
     var source_addrs = Array[String]
     var sink_addrs = Array[String]
 
@@ -20,12 +21,14 @@ actor Startup
       .add("name", "n", StringArgument)
       // Comma-delimited source and sink addresses.
       // e.g. --source 127.0.0.1:6000,127.0.0.1:7000
-      .add("source", "source", StringArgument)
-      .add("sink", "sink", StringArgument)
+      .add("leader-address", "", StringArgument)
+      .add("source", "", StringArgument)
+      .add("sink", "", StringArgument)
 
     for option in options do
       match option
       | ("leader", None) => is_worker = false
+      | ("leader-address", let arg: String) => leader_addr = arg.split(":")
       | ("worker_count", let arg: I64) => worker_count = arg.usize()
       | ("phone_home", let arg: String) => phone_home = arg
       | ("name", let arg: String) => node_name = arg
@@ -40,7 +43,6 @@ actor Startup
       // Id must be specified and nonzero
       if node_name == "0" then error end
 
-      let leader_addr: Array[String] = args(1).split(":")
       let leader_host = leader_addr(0)
       let leader_service = leader_addr(1)
 
