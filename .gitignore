@@ -11,6 +11,9 @@
 sent.txt
 received.txt
 
+# partial compilation files
+*.o
+
 #LaTeX files
 *.lof
 *.tex
