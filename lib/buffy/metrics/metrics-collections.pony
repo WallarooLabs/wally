@@ -1,6 +1,5 @@
 use "collections"
 
-
 interface F64Selector
   fun apply(f: F64): F64
   fun bin(f: F64): F64
@@ -209,6 +208,9 @@ A history of throughput counts per second
   var _start_time: U64 = 0
   var _end_time: U64 = 0
 
+  new create() =>
+    this
+
   fun ref apply(report: MetricsReport) => 
     count_report(report.ended())
 
@@ -236,7 +238,8 @@ A history of throughput counts per second
 
 type MetricsCategories is Map[String, Set[I32]]
 type MetricsTimeranges is Map[U64, Set[I32]]
-type Metrics is Map[I32, Map[U64, (LatencyHistogram, ThroughputHistory)]]
+type StepBuckets is Map[U64, (LatencyHistogram, ThroughputHistory)]
+type Metrics is Map[I32, StepBuckets]
 
 interface MetricsOutputHandler
   fun handle(payload: Array[U8])
@@ -252,19 +255,64 @@ on category and id
   let _metrics: Metrics = Metrics()
   let _timeranges: MetricsTimeranges = MetricsTimeranges()
   let _categories: MetricsCategories = MetricsCategories()
+  let _period: U64
+  let _bin_selector: F64Selector
 
-  new create() =>
+  new create(bin_selector: F64Selector, period: U64=1) =>
+    _period = period
+    _bin_selector = bin_selector
     // Initialize _Categories
     _categories.update("source-sink", Set[I32]())
     _categories.update("ingress-egress", Set[I32]())
     _categories.update("step", Set[I32]())
 
 
-//  fun ref process_report(report: MetricsReport)
-//
 //  fun ref process_summary(summary: MetricsSummary)
 //
-//  fun ref process_nodesummary(summary: NodeMetricsSummary)
+  fun ref process_nodesummary(summary: NodeMetricsSummary) =>
+    for digest in summary.digests do
+      process_stepmetricsdigest(digest)
+    end
+
+  fun ref process_stepmetricsdigest(digest: StepMetricsDigest) =>
+    for report in digest.reports do
+      process_report(digest.step_id, report)
+    end
+
+  fun ref process_report(step_id: I32, report: StepMetricsReport) =>
+    // Bookkeeping
+    _categories("step").set(step_id)
+    let time_bucket: U64 = (report.end_time / 1000) % _period
+    try
+      _timeranges(time_bucket).set(step_id)
+    else
+      _timeranges.update(time_bucket, Set[I32]())
+      _timeranges(time_bucket).set(step_id)
+    end
+    try
+      let step_buckets:StepBuckets = _metrics(step_id)
+      try
+        (let lh, let th) = step_buckets(time_bucket)
+        lh(report)
+        th(report)
+      else
+        (let lh, let th) = step_buckets.insert(time_bucket, 
+                                               (LatencyHistogram(_bin_selector),
+                                                ThroughputHistory()))
+        lh(report)
+        th(report)
+      end
+    else
+      let step_buckets = StepBuckets()
+      _metrics.update(step_id, step_buckets)
+      (let lh, let th) = step_buckets.insert(time_bucket,
+                                             (LatencyHistogram(_bin_selector),
+                                              ThroughputHistory()))
+      lh(report)
+      th(report)
+    end
+
+
 //
 //  fun ref process_boundarysummary(summary: BoundaryMetricsSummary)
 //
