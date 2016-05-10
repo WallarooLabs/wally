@@ -257,6 +257,8 @@ actor ProcessManager
             else
               is_sender = false
             end
+          | "leader" =>
+            args.push("-l")  
           else
             args.push("--" + key + "=" + sections(section)(key))
           end

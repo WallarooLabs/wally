@@ -21,7 +21,7 @@ actor Main
     if run_tests then
       TestMain(env)
     else
-      var d_arg: (Array[String] | None) = None
+      var p_arg: (Array[String] | None) = None
       var l_arg: (Array[String] | None) = None
       var n_arg: (String | None) = None
 
@@ -29,14 +29,14 @@ actor Main
         var options = Options(env)
 
         options
-          .add("dagon", "d", StringArgument)
+          .add("phone_home", "d", StringArgument)
           .add("name", "n", StringArgument)
           .add("listen", "l", StringArgument)
 
         for option in options do
           match option
           | ("name", let arg: String) => n_arg = arg
-          | ("dagon", let arg: String) => d_arg = arg.split(":")
+          | ("phone_home", let arg: String) => p_arg = arg.split(":")
           | ("listen", let arg: String) => l_arg = arg.split(":")
           end
         end
@@ -52,16 +52,16 @@ actor Main
           end
         end
 
-        if d_arg isnt None then
-          if (d_arg as Array[String]).size() != 2 then
+        if p_arg isnt None then
+          if (p_arg as Array[String]).size() != 2 then
             env.err.print(
               "'--dagon' argument should be in format: '127.0.0.1:8080")
             required_args_are_present = false
           end
         end
 
-        if (d_arg isnt None) or (n_arg isnt None) then
-          if (d_arg is None) or (n_arg is None) then
+        if (p_arg isnt None) or (n_arg isnt None) then
+          if (p_arg is None) or (n_arg is None) then
             env.err.print(
               "'--dagon' must be used in conjunction with '--name'")
             required_args_are_present = false
@@ -72,7 +72,7 @@ actor Main
           let listener_addr = l_arg as Array[String]
 
           let store = Store(env.root as AmbientAuth)
-          let coordinator = CoordinatorFactory(env, store, n_arg, d_arg)
+          let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           SignalHandler(TermHandler(coordinator), Sig.term())
 
