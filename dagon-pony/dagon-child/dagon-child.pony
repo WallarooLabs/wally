@@ -12,24 +12,31 @@ actor Main
     var options = Options(env)
     var args = options.remaining()
     var node_name: String = ""
-    var host: String = ""
-    var service: String = ""
+    var phone_home: String = ""
+    var phone_home_host: String = ""
+    var phone_home_service: String = ""
     options
-      .add("node_name", "n", StringArgument)
-      .add("phone_home_host", "h", StringArgument)
-      .add("phone_home_service", "p", StringArgument)
+      .add("name", "n", StringArgument)
+      .add("phone_home", "h", StringArgument)
 
     for option in options do
       match option
-      | ("node_name", let arg: String) => node_name = arg
-      | ("phone_home_host", let arg: String) => host = arg
-      | ("phone_home_service", let arg: String) => service = arg
+      | ("name", let arg: String) => node_name = arg
+      | ("phone_home", let arg: String) => phone_home = arg
       end
     end
-    env.out.print("    dagon-child: node_name: " + node_name)
-    env.out.print("    dagon-child: phone_home_host: " + host)
-    env.out.print("    dagon-child: phone_home_service: " + service)
-    DagonChild(env, node_name, host, service)
+    env.out.print("    dagon-child: name: " + node_name)
+    env.out.print("    dagon-child: phone_home: " + phone_home)
+    if phone_home != "" then
+      let ph_addr = phone_home.split(":")
+      try
+        phone_home_host = ph_addr(0)
+        phone_home_service = ph_addr(1)
+      end
+    end
+    env.out.print("    dagon-child: phone_home_host: " + phone_home_host)
+    env.out.print("    dagon-child: phone_home_service: " + phone_home_service)
+    DagonChild(env, node_name, phone_home_host, phone_home_service)
 
     
 actor DagonChild
