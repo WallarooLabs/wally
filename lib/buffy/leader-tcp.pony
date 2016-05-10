@@ -20,12 +20,13 @@ actor TopologyManager
   var _acks: USize = 0
   let _leader_host: String
   let _leader_service: String
-  var _phone_home_host: String = ""
-  var _phone_home_service: String = ""
+  let _phone_home_host: String
+  let _phone_home_service: String
+  let _phone_home_connection: TCPConnection
 
   new create(env: Env, auth: AmbientAuth, name: String, worker_count: USize, leader_host: String,
-    leader_service: String, phone_home: String, step_manager: StepManager,
-    topology: Topology val) =>
+    leader_service: String, phone_home_host: String, phone_home_service: String,
+    step_manager: StepManager, topology: Topology val) =>
     _env = env
     _auth = auth
     _step_manager = step_manager
@@ -34,15 +35,17 @@ actor TopologyManager
     _topology = topology
     _leader_host = leader_host
     _leader_service = leader_service
+    _phone_home_host = phone_home_host
+    _phone_home_service = phone_home_service
     _worker_addrs(name) = (leader_host, leader_service)
 
-    if phone_home != "" then
-      let ph_addr = phone_home.split(":")
-      try
-        _phone_home_host = ph_addr(0)
-        _phone_home_service = ph_addr(1)
-      end
-    end
+    let notifier: TCPConnectionNotify iso =
+      recover HomeConnectNotify(env, name) end
+    _phone_home_connection =
+      TCPConnection(auth, consume notifier, _phone_home_host, _phone_home_service)
+
+    let message = WireMsgEncoder.ready(_name)
+    _phone_home_connection.write(message)
 
     if _worker_count == 0 then _complete_initialization() end
 
@@ -153,13 +156,9 @@ actor TopologyManager
         let env = _env
         let auth = env.root as AmbientAuth
         let name = _name
-        let notifier: TCPConnectionNotify iso =
-          recover HomeConnectNotify(env, name) end
-        let conn: TCPConnection =
-          TCPConnection(auth, consume notifier, _phone_home_host, _phone_home_service)
 
-        let message = WireMsgEncoder.ready(_name)
-        conn.write(message)
+        let message = WireMsgEncoder.topology_ready(_name)
+        _phone_home_connection.write(message)
       else
         _env.out.print("Couldn't get ambient authority when completing "
           + "initialization")
@@ -179,8 +178,8 @@ class LeaderNotifier is TCPListenNotify
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, host: String,
-    service: String, worker_count: USize, phone_home: String,
-    topology: Topology val, step_manager: StepManager) =>
+    service: String, worker_count: USize, phone_home_host: String,
+    phone_home_service: String, topology: Topology val, step_manager: StepManager) =>
     _env = env
     _auth = auth
     _name = name
@@ -188,7 +187,7 @@ class LeaderNotifier is TCPListenNotify
     _service = service
     _step_manager = step_manager
     _topology_manager = TopologyManager(env, auth, name, worker_count, _host,
-      _service, phone_home, _step_manager, topology)
+      _service, phone_home_host, phone_home_service, _step_manager, topology)
 
   fun ref listening(listen: TCPListener ref) =>
     try
