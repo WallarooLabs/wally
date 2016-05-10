@@ -2,10 +2,10 @@ use "collections"
 use "buffy/messages"
 use "net"
 
-interface BasicStep
+trait BasicStep
   be apply(input: StepMessage val)
 
-interface OutputStep
+trait OutputStep
   be add_output(to: BasicStep tag)
 
 trait ComputeStep[In: OSCEncodable] is BasicStep
