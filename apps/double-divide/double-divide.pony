@@ -12,7 +12,7 @@ actor Main
     Startup(env, topology, SB, 1)
 
 primitive SB is StepLookup
-  fun val apply(computation_type: String): Any tag ? =>
+  fun val apply(computation_type: String): BasicStep tag ? =>
     match computation_type
     | "double" => Step[I32, I32](Double)
     | "halve" => Step[I32, I32](Halve)

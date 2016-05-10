@@ -69,13 +69,13 @@ class PipelineBuilder[In: OSCEncodable val, Out: OSCEncodable val, Last: OSCEnco
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-//  fun ref and_then_partition[Next: OSCEncodable]
-//    (comp_builder: ComputationBuilder[Out, Next] val,
-//      p_fun: PartitionFunction[Out] val): PipelineBuilder[Out] =>
-//    let next_builder = PartitionBuilder[Out, Next](comp_builder, p_fun)
-//    let next_connector = ThroughConnector[In, Out, Next](_last, next_builder)
-//    _t.add_step(next_connector)
-//    PipelineBuilder[Out](_t, next_builder)
+  fun ref and_then_partition[Next: OSCEncodable](comp_type: String,
+    comp_builder: ComputationBuilder[Last, Next] val,
+    p_fun: PartitionFunction[Last] val): PipelineBuilder[In, Out, Next] =>
+    let next_builder = PartitionBuilder[Last, Next](comp_builder, p_fun)
+    let next_step = PipelineThroughStep[Last, Next](comp_type, next_builder)
+    _p.add_step(next_step)
+    PipelineBuilder[In, Out, Next](_t, _p)
 
 //  fun and_then_stateful[Out: OSCEncodable val](init_builder, state_comp_builder, id: I32 = 0): Pipeline =>
 //    this
