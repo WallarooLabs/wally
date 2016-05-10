@@ -67,7 +67,7 @@ actor TopologyManager
         nodes.push(key)
       end
 
-      let pipeline = _topology.pipeline
+      let pipeline: PipelineSteps val = _topology.pipelines(0)
       var step_id: USize = 0
       var count: USize = 0
       // Round robin node assignment
