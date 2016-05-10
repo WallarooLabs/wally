@@ -8,6 +8,7 @@ actor TopologyManager
   let _env: Env
   let _auth: AmbientAuth
   let _step_manager: StepManager
+  let _coordinator: Coordinator
   let _name: String
   let _worker_count: USize
   let _workers: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
@@ -20,29 +21,22 @@ actor TopologyManager
   var _acks: USize = 0
   let _leader_host: String
   let _leader_service: String
-  let _phone_home_host: String
-  let _phone_home_service: String
   let _phone_home_connection: TCPConnection
 
-  new create(env: Env, auth: AmbientAuth, name: String, worker_count: USize, leader_host: String,
-    leader_service: String, phone_home_host: String, phone_home_service: String,
-    step_manager: StepManager, topology: Topology val) =>
+  new create(env: Env, auth: AmbientAuth, name: String, worker_count: USize,
+    leader_host: String, leader_service: String, phone_home_conn: TCPConnection,
+    step_manager: StepManager, coordinator: Coordinator, topology: Topology val) =>
     _env = env
     _auth = auth
     _step_manager = step_manager
+    _coordinator = coordinator
     _name = name
     _worker_count = worker_count
     _topology = topology
     _leader_host = leader_host
     _leader_service = leader_service
-    _phone_home_host = phone_home_host
-    _phone_home_service = phone_home_service
+    _phone_home_connection = phone_home_conn
     _worker_addrs(name) = (leader_host, leader_service)
-
-    let notifier: TCPConnectionNotify iso =
-      recover HomeConnectNotify(env, name) end
-    _phone_home_connection =
-      TCPConnection(auth, consume notifier, _phone_home_host, _phone_home_service)
 
     let message = WireMsgEncoder.ready(_name)
     _phone_home_connection.write(message)
@@ -141,6 +135,7 @@ actor TopologyManager
     end
 
   be update_connection(conn: TCPConnection tag, node_name: String) =>
+    _coordinator.add_connection(conn)
     _workers(node_name) = conn
 
   be ack_initialized() =>
@@ -151,22 +146,24 @@ actor TopologyManager
 
   fun _complete_initialization() =>
     _env.out.print("_--- Topology successfully initialized ---_")
-    if _has_phone_home() then
-      try
-        let env = _env
-        let auth = env.root as AmbientAuth
-        let name = _name
+    try
+      let env = _env
+      let auth = env.root as AmbientAuth
+      let name = _name
 
-        let message = WireMsgEncoder.topology_ready(_name)
-        _phone_home_connection.write(message)
-      else
-        _env.out.print("Couldn't get ambient authority when completing "
-          + "initialization")
-      end
+      let message = WireMsgEncoder.topology_ready(_name)
+      _phone_home_connection.write(message)
+    else
+      _env.out.print("Couldn't get ambient authority when completing "
+        + "initialization")
     end
 
-  fun _has_phone_home(): Bool =>
-    (_phone_home_host != "") and (_phone_home_service != "")
+  be shutdown() =>
+    let message = WireMsgEncoder.shutdown(_name)
+    for (key, conn) in _workers.pairs() do
+      conn.write(message)
+    end
+    _coordinator.shutdown()
 
 class LeaderNotifier is TCPListenNotify
   let _env: Env
@@ -174,20 +171,22 @@ class LeaderNotifier is TCPListenNotify
   let _name: String
   let _topology_manager: TopologyManager
   let _step_manager: StepManager
+  let _coordinator: Coordinator
   var _host: String = ""
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, host: String,
-    service: String, worker_count: USize, phone_home_host: String,
-    phone_home_service: String, topology: Topology val, step_manager: StepManager) =>
+    service: String, worker_count: USize, phone_home_conn: TCPConnection,
+    topology: Topology val, step_manager: StepManager, coordinator: Coordinator) =>
     _env = env
     _auth = auth
     _name = name
     _host = host
     _service = service
     _step_manager = step_manager
+    _coordinator = coordinator
     _topology_manager = TopologyManager(env, auth, name, worker_count, _host,
-      _service, phone_home_host, phone_home_service, _step_manager, topology)
+      _service, phone_home_conn, _step_manager, _coordinator, topology)
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -203,7 +202,8 @@ class LeaderNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    LeaderConnectNotify(_env, _auth, _name, _topology_manager, _step_manager)
+    LeaderConnectNotify(_env, _auth, _name, _topology_manager, _step_manager,
+      _coordinator)
 
 class LeaderConnectNotify is TCPConnectionNotify
   let _env: Env
@@ -211,19 +211,21 @@ class LeaderConnectNotify is TCPConnectionNotify
   let _name: String
   let _topology_manager: TopologyManager
   let _step_manager: StepManager
+  let _coordinator: Coordinator
   let _framer: Framer = Framer
   let _nodes: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
 
   new iso create(env: Env, auth: AmbientAuth, name: String, t_manager: TopologyManager,
-    s_manager: StepManager) =>
+    s_manager: StepManager, coordinator: Coordinator) =>
     _env = env
     _auth = auth
     _name = name
     _topology_manager = t_manager
     _step_manager = s_manager
+    _coordinator = coordinator
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print(_name + ": connection accepted")
+    _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
@@ -247,6 +249,8 @@ class LeaderConnectNotify is TCPConnectionNotify
           _step_manager(m.step_id, m.msg)
         | let m: ConnectStepsMsg val =>
           _step_manager.connect_steps(m.in_step_id, m.out_step_id)
+        | let d: ShutdownMsg val =>
+          _topology_manager.shutdown()
         | let m: UnknownMsg val =>
           _env.err.print("Unknown message type.")
         end
@@ -261,7 +265,8 @@ class LeaderConnectNotify is TCPConnectionNotify
       _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
     else
       let notifier: TCPConnectionNotify iso =
-        LeaderConnectNotify(_env, _auth, _name, _topology_manager, _step_manager)
+        LeaderConnectNotify(_env, _auth, _name, _topology_manager, _step_manager,
+          _coordinator)
       let target_conn =
         TCPConnection(_auth, consume notifier, msg.target_host,
           msg.target_service)

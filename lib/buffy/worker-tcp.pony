@@ -11,22 +11,22 @@ class WorkerNotifier is TCPListenNotify
   let _leader_host: String
   let _leader_service: String
   let _step_manager: StepManager
-  let _phone_home_host: String
-  let _phone_home_service: String
+  let _coordinator: Coordinator
+  let _phone_home_connection: TCPConnection
   var _host: String = ""
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
-    leader_service: String, phone_home_host: String, phone_home_service: String,
-    step_manager: StepManager) =>
+    leader_service: String, phone_home_conn: TCPConnection,
+    step_manager: StepManager, coordinator: Coordinator) =>
     _env = env
     _auth = auth
     _name = name
     _leader_host = leader_host
     _leader_service = leader_service
-    _phone_home_host = phone_home_host
-    _phone_home_service = phone_home_service
+    _phone_home_connection = phone_home_conn
     _step_manager = step_manager
+    _coordinator = coordinator
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -35,7 +35,7 @@ class WorkerNotifier is TCPListenNotify
 
       let notifier: TCPConnectionNotify iso =
         WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-          _step_manager)
+          _step_manager, _coordinator)
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
 
@@ -53,7 +53,7 @@ class WorkerNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-      _step_manager)
+      _step_manager, _coordinator)
 
 class WorkerConnectNotify is TCPConnectionNotify
   let _env: Env
@@ -61,21 +61,23 @@ class WorkerConnectNotify is TCPConnectionNotify
   let _leader_host: String
   let _leader_service: String
   let _step_manager: StepManager
+  let _coordinator: Coordinator
   let _framer: Framer = Framer
   let _nodes: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
   let _name: String
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
-    leader_service: String, step_manager: StepManager) =>
+    leader_service: String, step_manager: StepManager, coordinator: Coordinator) =>
     _env = env
     _auth = auth
     _name = name
     _leader_host = leader_host
     _leader_service = leader_service
     _step_manager = step_manager
+    _coordinator = coordinator
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print(_name + ": connection accepted")
+    _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
@@ -97,6 +99,8 @@ class WorkerConnectNotify is TCPConnectionNotify
         | let m: InitializationMsgsFinishedMsg val =>
           let ack_msg = WireMsgEncoder.ack_initialized(_name)
           conn.write(ack_msg)
+        | let d: ShutdownMsg val =>
+          _coordinator.shutdown()
         | let m: UnknownMsg val =>
           _env.err.print("Unknown message type.")
         end
@@ -112,7 +116,7 @@ class WorkerConnectNotify is TCPConnectionNotify
     else
       let notifier: TCPConnectionNotify iso =
         WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-          _step_manager)
+          _step_manager, _coordinator)
       let target_conn =
         TCPConnection(_auth, consume notifier, msg.target_host,
           msg.target_service)
