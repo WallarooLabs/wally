@@ -163,7 +163,7 @@ actor TopologyManager
     for (key, conn) in _workers.pairs() do
       conn.write(message)
     end
-    _coordinator.shutdown()
+    _coordinator.finish_shutdown()
 
 class LeaderNotifier is TCPListenNotify
   let _env: Env
@@ -176,8 +176,8 @@ class LeaderNotifier is TCPListenNotify
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, host: String,
-    service: String, worker_count: USize, phone_home_conn: TCPConnection,
-    topology: Topology val, step_manager: StepManager, coordinator: Coordinator) =>
+    service: String, step_manager: StepManager, coordinator: Coordinator,
+    topology_manager: TopologyManager) =>
     _env = env
     _auth = auth
     _name = name
@@ -185,8 +185,7 @@ class LeaderNotifier is TCPListenNotify
     _service = service
     _step_manager = step_manager
     _coordinator = coordinator
-    _topology_manager = TopologyManager(env, auth, name, worker_count, _host,
-      _service, phone_home_conn, _step_manager, _coordinator, topology)
+    _topology_manager = topology_manager
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -280,16 +279,30 @@ class LeaderConnectNotify is TCPConnectionNotify
 class HomeConnectNotify is TCPConnectionNotify
   let _env: Env
   let _name: String
+  let _coordinator: Coordinator
+  let _framer: Framer = Framer
 
-  new iso create(env: Env, name: String) =>
+  new iso create(env: Env, name: String, coordinator: Coordinator) =>
     _env = env
     _name = name
+    _coordinator = coordinator
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print(_name + ": phone home connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    _env.out.print(_name + ": received from phone home")
-
+    for chunked in _framer.chunk(consume data).values() do
+      try
+        let msg = WireMsgDecoder(consume chunked)
+        match msg
+        | let d: ShutdownMsg val =>
+          _coordinator.shutdown()
+        | let m: UnknownMsg val =>
+          _env.err.print("Unknown message type.")
+        end
+      else
+        _env.err.print("Error decoding incoming message.")
+      end
+    end
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print(_name + ": server closed")

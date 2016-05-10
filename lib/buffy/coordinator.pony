@@ -6,11 +6,20 @@ actor Coordinator
   let _listeners: Array[TCPListener] = Array[TCPListener]
   let _connections: Array[TCPConnection] = Array[TCPConnection]
   var _phone_home_connection: (TCPConnection | None) = None
+  var _topology_manager: (TopologyManager | None) = None
 
   new create(name: String) =>
     _node_name = name
 
   be shutdown() =>
+    match _topology_manager
+    | let t: TopologyManager =>
+      t.shutdown()
+    else
+      finish_shutdown()
+    end
+
+  be finish_shutdown() =>
     for listener in _listeners.values() do
       listener.dispose()
     end
@@ -32,3 +41,6 @@ actor Coordinator
 
   be add_connection(conn: TCPConnection) =>
     _connections.push(conn)
+
+  be add_topology_manager(tm: TopologyManager) =>
+    _topology_manager = tm
