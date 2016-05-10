@@ -36,7 +36,7 @@ primitive SL is StepLookup
     ExternalConnection[I32](S, conn)
 
 class Double is Computation[I32, I32]
-  fun apply(msg: Message[I32] val): Message[I32] val^ =>
+  fun apply(msg: Message[I32] val): Message[I32] val =>
     let output = msg.data * 2
     Message[I32](msg.id, output)
 

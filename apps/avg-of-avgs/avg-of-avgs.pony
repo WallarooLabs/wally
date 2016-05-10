@@ -35,19 +35,19 @@ primitive SB is StepLookup
     ExternalConnection[I32](S, conn)
 
 class Double is Computation[I32, I32]
-  fun apply(msg: Message[I32] val): Message[I32] val^ =>
+  fun apply(msg: Message[I32] val): Message[I32] val =>
     let output = msg.data * 2
     Message[I32](msg.id, output)
 
 class Halve is Computation[I32, I32]
-  fun apply(msg: Message[I32] val): Message[I32] val^ =>
+  fun apply(msg: Message[I32] val): Message[I32] val =>
     let output = msg.data / 2
     Message[I32](msg.id, output)
 
 class Average is Computation[I32, I32]
   let state: Averager = Averager
 
-  fun ref apply(msg: Message[I32] val): Message[I32] val^ =>
+  fun ref apply(msg: Message[I32] val): Message[I32] val =>
     let output = state(msg.data)
     Message[I32](msg.id, output)
 
