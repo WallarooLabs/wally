@@ -46,7 +46,8 @@ actor Startup
       let phone_home_service = phone_home_addr(1)
 
       let phone_home_conn: TCPConnection = TCPConnection(auth,
-        HomeConnectNotify(env, node_name), phone_home_host, phone_home_service)
+        HomeConnectNotify(env, node_name, coordinator), phone_home_host,
+          phone_home_service)
 
       coordinator.add_phone_home_connection(phone_home_conn)
 
@@ -87,9 +88,15 @@ actor Startup
             source_host, source_service))
         end
         // Set up leader listener
+        let topology_manager: TopologyManager = TopologyManager(env, auth,
+          node_name, worker_count, leader_host, leader_service, phone_home_conn,
+          step_manager, coordinator, topology)
+
+        coordinator.add_topology_manager(topology_manager)
+
         let notifier: TCPListenNotify iso = LeaderNotifier(env, auth, node_name,
-          leader_host, leader_service, worker_count, phone_home_conn, topology,
-          step_manager, coordinator)
+          leader_host, leader_service, step_manager, coordinator,
+          topology_manager)
         coordinator.add_listener(TCPListener(auth, consume notifier, leader_host,
           leader_service))
       end
