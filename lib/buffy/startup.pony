@@ -40,14 +40,18 @@ actor Startup
     var args = options.remaining()
 
     try
-      // Id must be specified and nonzero
-      if node_name == "0" then error end
+      let auth = env.root as AmbientAuth
+      let coordinator: Coordinator = Coordinator(node_name)
+      let phone_home_host = phone_home_addr(0)
+      let phone_home_service = phone_home_addr(1)
+
+      let phone_home_conn: TCPConnection = TCPConnection(auth,
+        HomeConnectNotify(env, node_name), phone_home_host, phone_home_service)
+
+      coordinator.add_phone_home_connection(phone_home_conn)
 
       let leader_host = leader_addr(0)
       let leader_service = leader_addr(1)
-
-      let phone_home_host = phone_home_addr(0)
-      let phone_home_service = phone_home_addr(1)
 
       let sinks: Map[I32, (String, String)] iso =
         recover Map[I32, (String, String)] end
@@ -61,12 +65,11 @@ actor Startup
         sinks(i.i32()) = (sink_host, sink_service)
       end
 
-      let auth = env.root as AmbientAuth
       let step_manager = StepManager(env, step_lookup, consume sinks)
       if is_worker then
-        TCPListener(auth,
+        coordinator.add_listener(TCPListener(auth,
           WorkerNotifier(env, auth, node_name, leader_host, leader_service,
-            phone_home_host, phone_home_service, step_manager))
+            phone_home_conn, step_manager, coordinator)))
       else
         if source_addrs.size() != source_count then
           env.out.print("There are " + source_count.string() + " sources but "
@@ -78,15 +81,17 @@ actor Startup
           let source_addr: Array[String] = source_addrs(i).split(":")
           let source_host = source_addr(0)
           let source_service = source_addr(1)
-          let source_notifier = SourceNotifier(env, auth, source_host, source_service,
-            i.i32(), step_manager)
-            TCPListener(auth, consume source_notifier, source_host, source_service)
+          let source_notifier: TCPListenNotify iso = SourceNotifier(env, auth,
+            source_host, source_service, i.i32(), step_manager, coordinator)
+          coordinator.add_listener(TCPListener(auth, consume source_notifier,
+            source_host, source_service))
         end
         // Set up leader listener
-        let notifier = LeaderNotifier(env, auth, node_name, leader_host,
-          leader_service, worker_count, phone_home_host, phone_home_service,
-          topology, step_manager)
-        TCPListener(auth, consume notifier, leader_host, leader_service)
+        let notifier: TCPListenNotify iso = LeaderNotifier(env, auth, node_name,
+          leader_host, leader_service, worker_count, phone_home_conn, topology,
+          step_manager, coordinator)
+        coordinator.add_listener(TCPListener(auth, consume notifier, leader_host,
+          leader_service))
       end
 
       if is_worker then
@@ -102,3 +107,4 @@ actor Startup
       env.out.print("Parameters: leader_address [-l -w <worker_count>"
         + "-p <phone_home_address> --id <node_name>]")
     end
+

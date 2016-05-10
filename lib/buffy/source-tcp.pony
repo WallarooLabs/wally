@@ -11,15 +11,18 @@ class SourceNotifier is TCPListenNotify
   let _service: String
   let _source_id: I32
   let _step_manager: StepManager
+  let _coordinator: Coordinator
 
   new iso create(env: Env, auth: AmbientAuth, source_host: String,
-    source_service: String, source_id: I32, step_manager: StepManager) =>
+    source_service: String, source_id: I32, step_manager: StepManager,
+    coordinator: Coordinator) =>
     _env = env
     _auth = auth
     _host = source_host
     _service = source_service
     _source_id = source_id
     _step_manager = step_manager
+    _coordinator = coordinator
 
   fun ref listening(listen: TCPListener ref) =>
     _env.out.print("Source " + _source_id.string() + ": listening on " + _host + ":" + _service)
@@ -29,7 +32,7 @@ class SourceNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    SourceConnectNotify(_env, _auth, _source_id, _step_manager)
+    SourceConnectNotify(_env, _auth, _source_id, _step_manager, _coordinator)
 
 class SourceConnectNotify is TCPConnectionNotify
   var _msg_id: I32 = 0
@@ -38,16 +41,18 @@ class SourceConnectNotify is TCPConnectionNotify
   let _source_id: I32
   let _step_manager: StepManager
   let _framer: Framer = Framer
+  let _coordinator: Coordinator
 
   new iso create(env: Env, auth: AmbientAuth, source_id: I32,
-    step_manager: StepManager) =>
+    step_manager: StepManager, coordinator: Coordinator) =>
     _env = env
     _auth = auth
     _source_id = source_id
     _step_manager = step_manager
+    _coordinator = coordinator
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print("Source " + _source_id.string() + ": connection accepted")
+    _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
