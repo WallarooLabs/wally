@@ -9,10 +9,10 @@ actor Main
       let topology: Topology val = recover val
         Topology
           .new_pipeline[I32, I32](P, S)
-          .and_then_partition[I32]("double",
-            lambda(): Computation[I32, I32] iso^ => Double end, Mod4Partition, SL)
-          .and_then_partition[I32]("double",
-            lambda(): Computation[I32, I32] iso^ => Double end, Mod4Partition, SL)
+          .and_then_partition[I32]("double_partition",
+            lambda(): Computation[I32, I32] iso^ => Double end, Mod4Partition)
+          .and_then_partition[I32]("double_partition",
+            lambda(): Computation[I32, I32] iso^ => Double end, Mod4Partition)
           .build()
       end
       Startup(env, topology, SL, 1)
@@ -23,9 +23,11 @@ actor Main
 primitive SL is StepLookup
   fun val apply(computation_type: String): BasicStep tag ? =>
     match computation_type
+    | "source" => Source[I32](P)
     | "double" => Step[I32, I32](Double)
     | "double_partition" =>
-      Partition[I32, I32]("double", Mod4Partition, this)
+      PartitionBuilder[I32, I32](lambda(): Computation[I32, I32] iso^ => Double end,
+        Mod4Partition)()
     else
       error
     end

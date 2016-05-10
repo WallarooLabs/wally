@@ -69,13 +69,13 @@ actor Sink[In: OSCEncodable val] is ComputeStep[In]
     end
 
 actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
-  let _computation_builder: ComputationBuilder[In, Out] val
+  let _step_builder: StepBuilder[In, Out] val
   let _partition_function: PartitionFunction[In] val
-  let _partitions: Map[I32, Any tag] = Map[I32, Any tag]
+  let _partitions: Map[I32, BasicStep tag] = Map[I32, BasicStep tag]
   var _output: (BasicStep tag | None) = None
 
-  new create(c_builder: ComputationBuilder[In, Out] val, pf: PartitionFunction[In] val) =>
-    _computation_builder = c_builder
+  new create(s_builder: StepBuilder[In, Out] val, pf: PartitionFunction[In] val) =>
+    _step_builder = s_builder
     _partition_function = pf
 
   be apply(input: StepMessage val) =>
@@ -84,15 +84,13 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
       let partition_id = _partition_function(m.data)
       if _partitions.contains(partition_id) then
         try
-          match _partitions(partition_id)
-          | let c: ComputeStep[In] tag => c(m)
-          else
-            @printf[String]("Partition not a ComputeStep!\n".cstring())
-          end
+          _partitions(partition_id)(m)
+        else
+          @printf[String]("Can't forward to chosen partition!\n".cstring())
         end
       else
         try
-          _partitions(partition_id) = _computation_builder()
+          _partitions(partition_id) = _step_builder()
           match _partitions(partition_id)
           | let t: ThroughStep[In, Out] tag =>
             match _output
@@ -177,15 +175,15 @@ class StepBuilder[In: OSCEncodable val, Out: OSCEncodable val]
 
 class PartitionBuilder[In: OSCEncodable val, Out: OSCEncodable val]
   is ThroughStepBuilder[In, Out]
-  let _computation_builder: ComputationBuilder[In, Out] val
+  let _step_builder: StepBuilder[In, Out] val
   let _partition_function: PartitionFunction[In] val
 
   new val create(c: ComputationBuilder[In, Out] val, pf: PartitionFunction[In] val) =>
-    _computation_builder = c
+    _step_builder = StepBuilder[In, Out](c)
     _partition_function = pf
 
   fun apply(): ThroughStep[In, Out] tag =>
-    Partition[In, Out](_computation_builder, _partition_function)
+    Partition[In, Out](_step_builder, _partition_function)
 
 class ExternalConnectionBuilder[In: OSCEncodable val]
   let _stringify: Stringify[In] val
