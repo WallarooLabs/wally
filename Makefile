@@ -13,6 +13,17 @@ docker_no_pull ?= false## Don't pull docker images for dagon run
 docker_no_pull_arg =# Final argument string for docker no pull
 docker_host ?= unix:///var/run/docker.sock## docker host to build/run containers on
 docker_host_arg = --host=$(docker_host)# docker host argument
+dagon_docker_host ?= ## Dagon docker host arg (defaults to docker_host value)
+
+ifeq ($(dagon_docker_host),)
+  dagon_docker_host = $(docker_host)
+endif
+
+dagon_docker_host_arg = --host=$(dagon_docker_host)# dagon docker host argument
+
+ifeq ($(shell uname -s),Linux)
+  extra_xargs_arg = -r
+endif
 
 ifdef docker_no_pull
   ifeq (,$(filter $(docker_no_pull),false true))
@@ -161,8 +172,13 @@ dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests
 
 dagon-docker-double: ## Run double test with dagon
 	docker $(docker_host_arg) ps -a | \
-          grep dagon-container-$(docker_image_version) | \
-          awk '{print $$1}' | xargs -r docker $(docker_host_arg) rm
+          grep $(docker_image_version) | \
+          awk '{print $$1}' | xargs $(extra_xargs_arg) docker \
+          $(docker_host_arg) rm
+	docker $(dagon_docker_host_arg) ps -a | \
+          grep $(docker_image_version) | \
+          awk '{print $$1}' | xargs $(extra_xargs_arg) docker \
+          $(dagon_docker_host_arg) rm
 	docker $(docker_host_arg) run -i --privileged --net=host -e \
           "LC_ALL=C.UTF-8" -e "LANG=C.UTF-8"  -v /bin:/bin:ro -v /lib:/lib:ro \
           -v /lib64:/lib64:ro -v /usr:/usr:ro -v /etc:/etc:ro -v \
@@ -173,7 +189,7 @@ dagon-docker-double: ## Run double test with dagon
           dagon-container-$(docker_image_version) \
           $(docker_image_repo)/dagon:$(docker_image_version) \
           /dagon/config/double.ini --docker_tag $(docker_image_version) \
-          --docker $(docker_no_pull_arg)
+          --docker --docker_host $(dagon_docker_host) $(docker_no_pull_arg)
 	docker $(docker_host_arg) run --rm --privileged -i -v /bin:/bin:ro -v \
         /lib:/lib:ro -v /lib64:/lib64:ro  -v /usr:/usr:ro -v /etc:/etc:ro -v \
         /var/run/docker.sock:/var/run/docker.sock  -v /root:/root:ro -v \
@@ -183,13 +199,19 @@ dagon-docker-double: ## Run double test with dagon
         docker.sendence.com:5043/sendence/wesley-double.$(arch):$(docker_image_version) \
         sent.txt received.txt /dagon/config/double.ini
 	docker $(docker_host_arg) ps -a | grep \
-          dagon-container-$(docker_image_version) | awk '{print $$1}' | xargs \
-          -r docker $(docker_host_arg) rm
+          $(docker_image_version) | awk '{print $$1}' | xargs \
+          $(extra_xargs_arg) docker $(docker_host_arg) rm
+	docker $(dagon_docker_host_arg) ps -a | grep \
+          $(docker_image_version) | awk '{print $$1}' | xargs \
+          $(extra_xargs_arg) docker $(dagon_docker_host_arg) rm
 
 dagon-docker-identity: ## Run identity test with dagon
 	docker $(docker_host_arg) ps -a | grep \
-          dagon-container-$(docker_image_version) | awk '{print $$1}' | xargs \
-          -r docker $(docker_host_arg) rm
+          $(docker_image_version) | awk '{print $$1}' | xargs \
+          $(extra_xargs_arg) docker $(docker_host_arg) rm
+	docker $(dagon_docker_host_arg) ps -a | grep \
+          $(docker_image_version) | awk '{print $$1}' | xargs \
+          $(extra_xargs_arg) docker $(dagon_docker_host_arg) rm
 	docker $(docker_host_arg) run -i --privileged --net=host -e \
           "LC_ALL=C.UTF-8" -e "LANG=C.UTF-8"  -v /bin:/bin:ro -v /lib:/lib:ro \
           -v /lib64:/lib64:ro -v /usr:/usr:ro -v /etc:/etc:ro -v \
@@ -200,7 +222,7 @@ dagon-docker-identity: ## Run identity test with dagon
           dagon-container-$(docker_image_version) \
           $(docker_image_repo)/dagon:$(docker_image_version) \
           /dagon/config/identity.ini --docker_tag $(docker_image_version) \
-          --docker $(docker_no_pull_arg)
+          --docker --docker_host $(dagon_docker_host) $(docker_no_pull_arg)
 	docker $(docker_host_arg) run --rm --privileged -i -v /bin:/bin:ro -v \
         /lib:/lib:ro -v /lib64:/lib64:ro  -v /usr:/usr:ro -v /etc:/etc:ro -v \
         /var/run/docker.sock:/var/run/docker.sock  -v /root:/root:ro -v \
@@ -210,8 +232,11 @@ dagon-docker-identity: ## Run identity test with dagon
         docker.sendence.com:5043/sendence/wesley-identity.$(arch):$(docker_image_version) \
         sent.txt received.txt /dagon/config/identity.ini
 	docker $(docker_host_arg) ps -a | grep \
-          dagon-container-$(docker_image_version) | awk '{print $$1}' | xargs \
-          -r docker $(docker_host_arg) rm
+          $(docker_image_version) | awk '{print $$1}' | xargs \
+          $(extra_xargs_arg) docker $(docker_host_arg) rm
+	docker $(dagon_docker_host_arg) ps -a | grep \
+          $(docker_image_version) | awk '{print $$1}' | xargs \
+          $(extra_xargs_arg) docker $(dagon_docker_host_arg) rm
 
 build-docker:  ## Build docker images for Buffy
 	docker $(docker_host_arg) build -t \
