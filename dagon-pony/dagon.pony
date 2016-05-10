@@ -14,6 +14,7 @@ use "sendence/tcp"
 primitive Booting
 primitive Ready
 primitive Started
+primitive TopologyReady
 primitive Done
 primitive DoneShutdown
 
@@ -21,6 +22,7 @@ type ChildState is
   ( Booting
   | Ready
   | Started
+  | TopologyReady
   | Done
   | DoneShutdown
   )
@@ -124,6 +126,9 @@ class ConnectNotify is TCPConnectionNotify
         | let m: ReadyMsg val =>
           _env.out.print("dagon: " + m.node_name + ": Ready")
           _p_mgr.received_ready(conn, m.node_name)
+        | let m: TopologyReadyMsg val =>
+          _env.out.print("dagon: " + m.node_name + ": TopologyReady")
+          _p_mgr.received_topology_ready(conn, m.node_name)          
         | let m: DoneMsg val =>
           _env.out.print("dagon: " + m.node_name + ": Done")
           _p_mgr.received_done(conn, m.node_name)          
@@ -357,10 +362,11 @@ actor ProcessManager
         let message = WireMsgEncoder.shutdown(node_name)
         c.write(message)
       else
-        _env.out.print("dagon: don't have a connection to send shutdown")
+        _env.out.print("dagon: don't have a connection to send shutdown "
+          + node_name)
       end
     else
-      _env.out.print("dagon: Failed sending shutdown")
+      _env.out.print("dagon: Failed sending shutdown to " + node_name)
     end
     
   be received_ready(conn: TCPConnection, node_name: String) =>
@@ -376,30 +382,37 @@ actor ProcessManager
     else
       _env.out.print("dagon: failed to find child in roster")
     end
-    // check if we're ready and start sender node
+    // Start sender node if it's READY
     if _sender_is_ready() then
       start_sender_node()
-    elseif _roster_is_ready() then
-      boot_sender_node()
     end
 
-
-  fun ref _roster_is_ready(): Bool =>
+  be received_topology_ready(conn: TCPConnection, node_name: String) =>
     """
-    Check if all child processes are ready.
+    Leader signaled he's ready. Boot the Sender.
     """
+    _env.out.print("dagon: received topology ready from leader: " + node_name)
     try
-      for key in roster.keys() do
-        let child = roster(key)
-        match child.state
-        | Booting => return false
-        end
-      end
+      let child = roster(node_name)
+      // update child state
+      child.state = TopologyReady
     else
-      _env.out.print("dagon: could not iterate over roster")
-    end      
-    true
+      _env.out.print("dagon: failed to find leader in roster")
+    end
+    // time to boot the sender node
+    boot_sender_node()
 
+  fun ref _is_leader(node_name: String): Bool =>
+    """
+    Check if a child is the leader.
+    TODO: Find better predicate to decide if child is a leader.
+    """
+    if node_name == "leader" then
+      return true
+    else
+      return false
+    end
+    
   fun ref _sender_is_ready(): Bool =>
     """
     Check if the sender processes is ready.
@@ -452,14 +465,10 @@ actor ProcessManager
     """
     Node is done. Update it's state.
     """
-    _env.out.print("dagon: received done from child: " + node_name)
+    _env.out.print("dagon: received Done from child: " + node_name)
     try
       let child = roster(node_name)
       child.state = Done
-      if child.name == _sender_node then
-        _env.out.print("dagon: sender is done ---------------------")
-        wait_for_processing()
-      end
     else
       _env.out.print("dagon: failed to set child to done")
     end
@@ -476,10 +485,11 @@ actor ProcessManager
   be shutdown_topology() =>
     """
     Wait for n seconds then shut the topology down.
+    TODO: Get the value pairs and iterate over those.
     """
     _env.out.print("dagon: shutting down topology")
     try
-      for key in roster.keys() do // get the values and iterate over those
+      for key in roster.keys() do
         let child = roster(key)
         send_shutdown(child.name)
       end
@@ -496,21 +506,38 @@ actor ProcessManager
     try
       let child = roster(node_name)
       child.state = DoneShutdown
+      if child.name == _sender_node then
+        _env.out.print("dagon: sender reported DoneShutdown ---------------------")
+        wait_for_processing()
+      end      
     else
       _env.out.print("dagon: failed to set child state to done_shutdown")
     end
 
+  fun ref _is_done_shutdown(node_name: String): Bool =>
+    """
+    Check if the state of a node is DoneShutdown
+    """
+    try
+      let child = roster(node_name)
+      match child.state
+      | DoneShutdown => return true
+      else
+        return false
+      end
+    else
+      _env.out.print("dagon: could not get state for " + node_name)
+    end
+    false
+    
   be received_exit_code(node_name: String) =>
     """
     Node has exited.
     """
     _env.out.print("dagon: exited child: " + node_name)
-    try
-      roster.remove(node_name)
-    else
-      _env.out.print("dagon: failed to remove child from roster")
+    if _is_leader(node_name) and _is_done_shutdown(node_name) then
+      shutdown_listener()
     end
-    if roster.size() == 0 then shutdown_listener() end // this won't work for containers!
 
       
 class ProcessClient is ProcessNotify
