@@ -16,8 +16,14 @@ interface StateComputation[In: OSCEncodable,
   fun ref apply(state: State, input: Message[In] val): Message[Out] val
 
 interface ComputationBuilder[In: OSCEncodable, Out: OSCEncodable]
-  fun apply(): Computation[In, Out]
+  fun apply(): Computation[In, Out] iso^
 
 interface StateComputationBuilder[In: OSCEncodable, Out: OSCEncodable,
   State: Any]
-  fun apply(): StateComputation[In, Out, State]
+  fun apply(): StateComputation[In, Out, State] iso^
+
+interface Parser[Out: OSCEncodable]
+  fun apply(s: String): Out ?
+
+interface Stringify[In: OSCEncodable]
+  fun apply(i: In): String ?

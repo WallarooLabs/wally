@@ -11,7 +11,7 @@ actor Main
       end)
     Startup(env, topology, SB, 1)
 
-primitive SB is StepBuilder
+primitive SB is StepLookup
   fun val apply(computation_type: String): Any tag ? =>
     match computation_type
     | "double" => Step[I32, I32](Double)
