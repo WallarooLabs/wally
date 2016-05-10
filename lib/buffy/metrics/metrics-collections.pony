@@ -248,7 +248,8 @@ type SinkMetrics is Map[String, TimeBuckets]
 
 interface MetricsOutputHandler
   fun handle(payload: Array[U8])
-  fun encode(): Array[U8]
+  fun encode(sinks: SinkMetrics, boundaries: BoundaryMetrics,
+             steps: StepMetrics): Array[U8]
 
 class MetricsCollection
 """
@@ -396,7 +397,8 @@ on category and id
       time_buckets.update(time_bucket, (lh, th))
     end
 
-//  fun handle_output(cats: MetricsCategories, times: MetricsTimeranges,
-//                    metrics: Metrics,
-//                    handlers: Array[MetricsOutputHandlers])
-//
+  fun ref handle_output(handlers: Array[MetricsOutputHandler]) =>
+    for handler in handlers.values() do
+      handler.handle(handler.encode(_sinkmetrics, _boundarymetrics,
+                                    _stepmetrics))
+    end
