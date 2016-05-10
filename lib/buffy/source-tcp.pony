@@ -56,7 +56,7 @@ class SourceConnectNotify is TCPConnectionNotify
         match msg
         | let m: ExternalMsg val =>
           let new_msg: Message[String] val = Message[String](_msg_id = _msg_id + 1, m.data)
-          _step_manager[String](_source_id, new_msg)
+          _step_manager(_source_id, new_msg)
         | let m: UnknownMsg val =>
           _env.err.print("Unknown message type.")
         else

@@ -11,16 +11,21 @@ class WorkerNotifier is TCPListenNotify
   let _leader_host: String
   let _leader_service: String
   let _step_manager: StepManager
+  let _phone_home_host: String
+  let _phone_home_service: String
   var _host: String = ""
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
-    leader_service: String, step_manager: StepManager) =>
+    leader_service: String, phone_home_host: String, phone_home_service: String,
+    step_manager: StepManager) =>
     _env = env
     _auth = auth
     _name = name
     _leader_host = leader_host
     _leader_service = leader_service
+    _phone_home_host = phone_home_host
+    _phone_home_service = phone_home_service
     _step_manager = step_manager
 
   fun ref listening(listen: TCPListener ref) =>
@@ -84,13 +89,13 @@ class WorkerConnectNotify is TCPConnectionNotify
         | let m: SpinUpProxyMsg val =>
           _spin_up_proxy(m)
         | let m: SpinUpSinkMsg val =>
-          _step_manager.add_sink[I32](m.sink_id, m.sink_step_id, _auth)
+          _step_manager.add_sink(m.sink_id, m.sink_step_id, _auth)
         | let m: ForwardI32Msg val =>
-          _step_manager[I32](m.step_id, m.msg)
+          _step_manager(m.step_id, m.msg)
         | let m: ForwardF32Msg val =>
-          _step_manager[F32](m.step_id, m.msg)
+          _step_manager(m.step_id, m.msg)
         | let m: ForwardStringMsg val =>
-          _step_manager[String](m.step_id, m.msg)
+          _step_manager(m.step_id, m.msg)
         | let m: ConnectStepsMsg val =>
           _step_manager.connect_steps(m.in_step_id, m.out_step_id)
         | let m: InitializationMsgsFinishedMsg val =>

@@ -15,14 +15,14 @@ trait ThroughStep[In: OSCEncodable val,
 
 actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]
-  var _output: (ComputeStep[In] tag | None) = None
+  var _output: (ComputeStep[Out] tag | None) = None
 
   new create(f: Computation[In, Out] iso) =>
     _f = consume f
 
   be add_output(to: BasicStep tag) =>
     match to
-    | let c: ComputeStep[Out] =>
+    | let c: ComputeStep[Out] tag =>
       _output = c
     end
 
@@ -115,16 +115,19 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
     end
 
   be add_output(to: BasicStep tag) =>
-    _output = to
-    for key in _partitions.keys() do
-      try
-        match _partitions(key)
-        | let t: ThroughStep[In, Out] tag => t.add_output(to)
+    match to
+    | let o: ComputeStep[Out] tag =>
+      _output = o
+      for key in _partitions.keys() do
+        try
+          match _partitions(key)
+          | let t: ThroughStep[In, Out] tag => t.add_output(to)
+          else
+            @printf[String]("Partition not a ThroughStep!".cstring())
+          end
         else
-          @printf[String]("Partition not a ThroughStep!".cstring())
+            @printf[String]("Couldn't find partition when trying to add output!".cstring())
         end
-      else
-          @printf[String]("Couldn't find partition when trying to add output!".cstring())
       end
     end
 

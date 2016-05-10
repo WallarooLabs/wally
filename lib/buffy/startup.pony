@@ -8,7 +8,7 @@ actor Startup
     var is_worker = true
     var worker_count: USize = 0
     var node_name: String = "0"
-    var phone_home: String = ""
+    var phone_home_addr = Array[String]
     var options = Options(env)
     var leader_addr = Array[String]
     var source_addrs = Array[String]
@@ -30,7 +30,7 @@ actor Startup
       | ("leader", None) => is_worker = false
       | ("leader-address", let arg: String) => leader_addr = arg.split(":")
       | ("worker_count", let arg: I64) => worker_count = arg.usize()
-      | ("phone_home", let arg: String) => phone_home = arg
+      | ("phone_home", let arg: String) => phone_home_addr = arg.split(":")
       | ("name", let arg: String) => node_name = arg
       | ("source", let arg: String) => source_addrs.append(arg.split(","))
       | ("sink", let arg: String) => sink_addrs.append(arg.split(","))
@@ -45,6 +45,9 @@ actor Startup
 
       let leader_host = leader_addr(0)
       let leader_service = leader_addr(1)
+
+      let phone_home_host = phone_home_addr(0)
+      let phone_home_service = phone_home_addr(1)
 
       let sinks: Map[I32, (String, String)] iso =
         recover Map[I32, (String, String)] end
@@ -62,7 +65,8 @@ actor Startup
       let step_manager = StepManager(env, step_lookup, consume sinks)
       if is_worker then
         TCPListener(auth,
-          WorkerNotifier(env, auth, node_name, leader_host, leader_service, step_manager))
+          WorkerNotifier(env, auth, node_name, leader_host, leader_service,
+            phone_home_host, phone_home_service, step_manager))
       else
         if source_addrs.size() != source_count then
           env.out.print("There are " + source_count.string() + " sources but "
@@ -80,7 +84,8 @@ actor Startup
         end
         // Set up leader listener
         let notifier = LeaderNotifier(env, auth, node_name, leader_host,
-          leader_service, worker_count, phone_home, topology, step_manager)
+          leader_service, worker_count, phone_home_host, phone_home_service,
+          topology, step_manager)
         TCPListener(auth, consume notifier, leader_host, leader_service)
       end
 

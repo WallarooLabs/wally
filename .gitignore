@@ -19,3 +19,7 @@ received.txt
 *.toc
 *.log
 *.bbl
+
+#Stable files
+.deps
+.deps/*

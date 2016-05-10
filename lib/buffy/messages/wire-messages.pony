@@ -2,28 +2,35 @@ use "osc-pony"
 use "sendence/bytes"
 
 primitive _Ready                                fun apply(): String => "/0"
-primitive _Identify                             fun apply(): String => "/1"
-primitive _Done                                 fun apply(): String => "/2"
-primitive _Reconnect                            fun apply(): String => "/3"
-primitive _Start                                fun apply(): String => "/4"
-primitive _Shutdown                             fun apply(): String => "/5"
-primitive _DoneShutdown                         fun apply(): String => "/6"
-primitive _Forward                              fun apply(): String => "/7"
-primitive _SpinUp                               fun apply(): String => "/8"
-primitive _SpinUpProxy                          fun apply(): String => "/9"
-primitive _SpinUpSink                           fun apply(): String => "/10"
-primitive _ConnectSteps                         fun apply(): String => "/11"
-primitive _InitializationMsgsFinished           fun apply(): String => "/12"
-primitive _AckInitialized                       fun apply(): String => "/13"
-primitive _External                             fun apply(): String => "/14"
-primitive _ForwardI32                           fun apply(): String => "/15"
-primitive _ForwardF32                           fun apply(): String => "/16"
-primitive _ForwardString                        fun apply(): String => "/17"
-
+primitive _TopologyReady                        fun apply(): String => "/1"
+primitive _Identify                             fun apply(): String => "/2"
+primitive _Done                                 fun apply(): String => "/3"
+primitive _Reconnect                            fun apply(): String => "/4"
+primitive _Start                                fun apply(): String => "/5"
+primitive _Shutdown                             fun apply(): String => "/6"
+primitive _DoneShutdown                         fun apply(): String => "/7"
+primitive _Forward                              fun apply(): String => "/8"
+primitive _SpinUp                               fun apply(): String => "/9"
+primitive _SpinUpProxy                          fun apply(): String => "/10"
+primitive _SpinUpSink                           fun apply(): String => "/11"
+primitive _ConnectSteps                         fun apply(): String => "/12"
+primitive _InitializationMsgsFinished           fun apply(): String => "/13"
+primitive _AckInitialized                       fun apply(): String => "/14"
+primitive _External                             fun apply(): String => "/15"
+primitive _ForwardI32                           fun apply(): String => "/16"
+primitive _ForwardF32                           fun apply(): String => "/17"
+primitive _ForwardString                        fun apply(): String => "/18"
 
 primitive WireMsgEncoder
   fun ready(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_Ready(),
+      recover
+        [as OSCData val: OSCString(node_name)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
+  fun topology_ready(node_name: String): Array[U8] val =>
+    let osc = OSCMessage(_TopologyReady(),
       recover
         [as OSCData val: OSCString(node_name)]
       end)
@@ -170,6 +177,8 @@ primitive WireMsgDecoder
     match msg.address
     | _Ready() =>
       ReadyMsg(msg)
+    | _TopologyReady() =>
+      TopologyReadyMsg(msg)
     | _Identify() =>
       IdentifyMsg(msg)
     | _Done() =>
@@ -211,6 +220,17 @@ primitive WireMsgDecoder
 trait val WireMsg
 
 class ReadyMsg is WireMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end
+
+class TopologyReadyMsg is WireMsg
   let node_name: String
 
   new val create(msg: OSCMessage val) ? =>

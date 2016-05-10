@@ -105,14 +105,16 @@ class FromBuffyListenerNotify is TCPListenNotify
     _coordinator.from_buffy_listener(listen, Ready)
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    FromBuffyNotify(_store, _stderr)
+    FromBuffyNotify(_coordinator, _store, _stderr)
 
 class FromBuffyNotify is TCPConnectionNotify
+  let _coordinator: Coordinator
   let _store: Store
   let _framer: Framer = Framer
   let _stderr: StdStream
 
-  new iso create(store: Store, stderr: StdStream) =>
+  new iso create(coordinator: Coordinator, store: Store, stderr: StdStream) =>
+    _coordinator = coordinator
     _store = store
     _stderr = stderr
 
@@ -130,6 +132,10 @@ class FromBuffyNotify is TCPConnectionNotify
         _stderr.print("Unable to decode message Buffy")
       end
     end
+
+  fun ref accepted(conn: TCPConnection ref) =>
+    _coordinator.connection_added(consume conn)
+
 
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator
@@ -190,6 +196,7 @@ primitive CoordinatorFactory
 interface tag Coordinator
   be finished()
   be from_buffy_listener(listener: TCPListener, state: WorkerState)
+  be connection_added(connection: TCPConnection)
 
 primitive Waiting
 primitive Ready
@@ -201,6 +208,7 @@ actor WithoutDagonCoordinator is Coordinator
   let _env: Env
   let _store: Store
   var _from_buffy_listener: ((TCPListener | None), WorkerState) = (None, Waiting)
+  let _connections: Array[TCPConnection] = Array[TCPConnection]
 
   new create(env: Env, store: Store) =>
     _env = env
@@ -211,6 +219,7 @@ actor WithoutDagonCoordinator is Coordinator
       let x = _from_buffy_listener._1 as TCPListener
       x.dispose()
     end
+    for c in _connections.values() do c.dispose() end
     _store.dump()
 
   be from_buffy_listener(listener: TCPListener, state: WorkerState) =>
@@ -222,12 +231,16 @@ actor WithoutDagonCoordinator is Coordinator
       _env.out.print("Listening for data")
     end
 
+  be connection_added(c: TCPConnection) =>
+    _connections.push(c)
+
 actor WithDagonCoordinator is Coordinator
   let _env: Env
   let _store: Store
   var _from_buffy_listener: ((TCPListener | None), WorkerState) = (None, Waiting)
   var _to_dagon_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
   let _node_id: String
+  let _connections: Array[TCPConnection] = Array[TCPConnection]
 
   new create(env: Env, store: Store, node_id: String) =>
     _env = env
@@ -239,6 +252,7 @@ actor WithDagonCoordinator is Coordinator
       let x = _from_buffy_listener._1 as TCPListener
       x.dispose()
     end
+    for c in _connections.values() do c.dispose() end
     _store.dump()
     try
       let x = _to_dagon_socket._1 as TCPConnection
@@ -274,6 +288,9 @@ actor WithDagonCoordinator is Coordinator
         x.write(WireMsgEncoder.ready(_node_id as String))
        end
     end
+
+  be connection_added(c: TCPConnection) =>
+    _connections.push(c)
 
 ///
 /// RECEIVED MESSAGE STORE
