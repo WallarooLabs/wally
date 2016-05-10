@@ -69,6 +69,8 @@ actor StepManager
   be add_step(step_id: I32, computation_type: String) =>
     try
       _steps(step_id) = _step_lookup(computation_type)
+    else
+      _env.out.print("StepManager: Could not add step.")
     end
 
   be add_proxy(proxy_id: I32, step_id: I32, conn: TCPConnection tag) =>
@@ -82,7 +84,7 @@ actor StepManager
       let sink_service = sink_addr._2
       let conn = TCPConnection(auth, SinkConnectNotify(_env), sink_host,
         sink_service)
-//      _steps(sink_step_id) = ExternalConnection[In](_env, conn)
+      _steps(sink_step_id) = _step_lookup.sink(conn)
     else
       _env.out.print("StepManager: Could not add sink.")
     end

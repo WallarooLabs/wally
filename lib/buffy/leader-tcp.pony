@@ -75,7 +75,6 @@ actor TopologyManager
         let next_node = nodes((cur_node_idx + 1) % nodes.size())
         let proxy_step_id = step_id + 1
         let proxy_step_target_id = proxy_step_id + 1
-        _env.out.print(next_node)
         let next_node_addr =
           if next_node_idx == 0 then
             (_leader_host, _leader_service)
@@ -88,8 +87,8 @@ actor TopologyManager
         if cur_node_idx == 0 then // if cur_node is the leader/source
           let target_conn = _workers(next_node)
           _step_manager.add_step(step_id.i32(), pipeline_step.computation_type())
-//          _step_manager.add_proxy(proxy_step_id.i32(), proxy_step_target_id.i32(),
-//            target_conn)
+          _step_manager.add_proxy(proxy_step_id.i32(), proxy_step_target_id.i32(),
+            target_conn)
           _step_manager.connect_steps(step_id.i32(), proxy_step_id.i32())
         else
           let create_step_msg =

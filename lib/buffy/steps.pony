@@ -15,52 +15,44 @@ trait ThroughStep[In: OSCEncodable val,
 
 actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]
-  var _output: (ComputeStep[Out] tag | None) = None
+  var _output: (BasicStep tag | None) = None
 
   new create(f: Computation[In, Out] iso) =>
     _f = consume f
 
   be add_output(to: BasicStep tag) =>
-    match to
-    | let c: ComputeStep[Out] tag =>
-      _output = c
-    end
+    _output = to
 
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
       match _output
-      | let c: ComputeStep[In] tag => c(_f(m))
+      | let o: BasicStep tag =>
+        o(_f(m))
       end
     end
 
 actor Source[Out: OSCEncodable val] is ThroughStep[String, Out]
   var _input_parser: Parser[Out] val
-  var _output: (ComputeStep[Out] tag | None) = None
+  var _output: (BasicStep tag | None) = None
 
   new create(input_parser: Parser[Out] val) =>
     _input_parser = input_parser
 
   be add_output(to: BasicStep tag) =>
-    match to
-    | let c: ComputeStep[Out] tag =>
-      _output = c
-    else
-      @printf[String]("Could not add output".cstring())
-    end
+    _output = to
 
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[String] val =>
-      match _output
-      | let c: ComputeStep[Out] tag =>
-        try
-          let new_msg: Message[Out] val = Message[Out](m.id,
-            _input_parser(m.data))
-          c(new_msg)
+      try
+        let new_msg: Message[Out] val = Message[Out](m.id, _input_parser(m.data))
+        match _output
+        | let o: BasicStep tag =>
+          o(new_msg)
         end
       else
-        @printf[String]("Could not process incoming Message".cstring())
+        @printf[String]("Could not process incoming Message at source\n".cstring())
       end
     end
 
@@ -80,7 +72,7 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
   let _computation_builder: ComputationBuilder[In, Out] val
   let _partition_function: PartitionFunction[In] val
   let _partitions: Map[I32, Any tag] = Map[I32, Any tag]
-  var _output: (ComputeStep[Out] tag | None) = None
+  var _output: (BasicStep tag | None) = None
 
   new create(c_builder: ComputationBuilder[In, Out] val, pf: PartitionFunction[In] val) =>
     _computation_builder = c_builder
@@ -95,7 +87,7 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
           match _partitions(partition_id)
           | let c: ComputeStep[In] tag => c(m)
           else
-            @printf[String]("Partition not a ComputeStep!".cstring())
+            @printf[String]("Partition not a ComputeStep!\n".cstring())
           end
         end
       else
@@ -104,30 +96,32 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
           match _partitions(partition_id)
           | let t: ThroughStep[In, Out] tag =>
             match _output
-            | let o: ComputeStep[Out] tag => t.add_output(o)
+            | let o: BasicStep tag =>
+              t.add_output(o)
             end
             t(m)
           end
         else
-          @printf[String]("Computation type is invalid!".cstring())
+          @printf[String]("Computation type is invalid!\n".cstring())
         end
       end
     end
 
   be add_output(to: BasicStep tag) =>
-    match to
-    | let o: ComputeStep[Out] tag =>
-      _output = o
-      for key in _partitions.keys() do
-        try
-          match _partitions(key)
-          | let t: ThroughStep[In, Out] tag => t.add_output(to)
-          else
-            @printf[String]("Partition not a ThroughStep!".cstring())
+    _output = to
+    for key in _partitions.keys() do
+      try
+        match _partitions(key)
+        | let t: ThroughStep[In, Out] tag =>
+          match _output
+          | let o: BasicStep tag =>
+            t.add_output(o)
           end
         else
-            @printf[String]("Couldn't find partition when trying to add output!".cstring())
+          @printf[String]("Partition not a ThroughStep!\n".cstring())
         end
+      else
+          @printf[String]("Couldn't find partition when trying to add output!\n".cstring())
       end
     end
 

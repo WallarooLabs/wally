@@ -15,6 +15,7 @@ class Topology
 
 interface StepLookup
   fun val apply(computation_type: String): BasicStep tag ?
+  fun sink(conn: TCPConnection): BasicStep tag
 
 trait PipelineSteps
   fun sink(conn: TCPConnection): Any tag
