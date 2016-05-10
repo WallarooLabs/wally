@@ -80,9 +80,9 @@ class WorkerConnectNotify is TCPConnectionNotify
         | let m: ReadyMsg val =>
           _nodes(m.node_name) = conn
         | let m: SpinUpMsg val =>
-          _step_manager.add_step[I32](m.step_id, m.computation_type)
+          _step_manager.add_step(m.step_id, m.computation_type)
         | let m: SpinUpProxyMsg val =>
-          _spin_up_proxy[I32](m)
+          _spin_up_proxy(m)
         | let m: SpinUpSinkMsg val =>
           _step_manager.add_sink[I32](m.sink_id, m.sink_step_id, _auth)
         | let m: ForwardI32Msg val =>
@@ -104,7 +104,7 @@ class WorkerConnectNotify is TCPConnectionNotify
       end
     end
 
-  fun ref _spin_up_proxy[In: OSCEncodable val](msg: SpinUpProxyMsg val) =>
+  fun ref _spin_up_proxy(msg: SpinUpProxyMsg val) =>
     try
       let target_conn = _nodes(msg.target_node_name)
       _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
@@ -116,7 +116,7 @@ class WorkerConnectNotify is TCPConnectionNotify
         TCPConnection(_auth, consume notifier, msg.target_host,
           msg.target_service)
       target_conn.write(WireMsgEncoder.ready(_name))
-      _step_manager.add_proxy[In](msg.proxy_id, msg.step_id, target_conn)
+      _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
       _nodes(msg.target_node_name) = target_conn
     end
 

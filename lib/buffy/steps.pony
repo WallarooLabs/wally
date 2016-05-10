@@ -2,30 +2,35 @@ use "collections"
 use "buffy/messages"
 use "net"
 
-interface ComputeStep[In: OSCEncodable val]
+interface BasicStep
   be apply(input: StepMessage val)
 
-interface OutputStep[Out: OSCEncodable val]
-  be add_output(to: ComputeStep[Out] tag)
+interface OutputStep
+  be add_output(to: BasicStep tag)
 
-interface ThroughStep[In: OSCEncodable val,
-                      Out: OSCEncodable val] is (OutputStep[Out] & ComputeStep[In])
+trait ComputeStep[In: OSCEncodable] is BasicStep
+
+trait ThroughStep[In: OSCEncodable val,
+                  Out: OSCEncodable val] is (OutputStep & ComputeStep[In])
 
 actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]
-  var _output: (ComputeStep[Out] tag | None) = None
+  var _output: (ComputeStep[In] tag | None) = None
 
   new create(f: Computation[In, Out] iso) =>
     _f = consume f
 
-  be add_output(to: ComputeStep[Out] tag) =>
-    _output = to
+  be add_output(to: BasicStep tag) =>
+    match to
+    | let c: ComputeStep[Out] =>
+      _output = c
+    end
 
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
       match _output
-      | let c: ComputeStep[Out] tag => c(_f(m))
+      | let c: ComputeStep[In] tag => c(_f(m))
       end
     end
 
@@ -36,7 +41,7 @@ actor Source[Out: OSCEncodable val] is ThroughStep[String, Out]
   new create(input_parser: Parser[Out] val) =>
     _input_parser = input_parser
 
-  be add_output(to: Any tag) =>
+  be add_output(to: BasicStep tag) =>
     match to
     | let c: ComputeStep[Out] tag =>
       _output = c
@@ -109,7 +114,7 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
       end
     end
 
-  be add_output(to: ComputeStep[Out] tag) =>
+  be add_output(to: BasicStep tag) =>
     _output = to
     for key in _partitions.keys() do
       try

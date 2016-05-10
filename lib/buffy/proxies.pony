@@ -3,7 +3,7 @@ use "debug"
 use "net"
 use "buffy/messages"
 
-actor Proxy[In: OSCEncodable val] is ComputeStep[In]
+actor Proxy is BasicStep
   let _env: Env
   let _step_id: I32
   let _conn: TCPConnection
@@ -49,7 +49,7 @@ actor ExternalConnection[In: OSCEncodable val] is ComputeStep[In]
 
 actor StepManager
   let _env: Env
-  let _steps: Map[I32, Any tag] = Map[I32, Any tag]
+  let _steps: Map[I32, BasicStep tag] = Map[I32, BasicStep tag]
   let _sink_addrs: Map[I32, (String, String)] val
   let _step_lookup: StepLookup val
 
@@ -59,28 +59,23 @@ actor StepManager
     _sink_addrs = sink_addrs
     _step_lookup = step_lookup
 
-  be apply[In: OSCEncodable val](step_id: I32, msg: Message[In] val) =>
+  be apply(step_id: I32, msg: StepMessage val) =>
     try
-      match _steps(step_id)
-      | let c: ComputeStep[In] tag => c(msg)
-      else
-        _env.out.print("StepManager: Could not forward message"
-        + " (it wasn't a ComputeStep of the correct type")
-      end
+      _steps(step_id)(msg)
     else
       _env.out.print("StepManager: Could not forward message")
     end
 
-  be add_step[In: OSCEncodable val](step_id: I32, computation_type: String) =>
+  be add_step(step_id: I32, computation_type: String) =>
     try
       _steps(step_id) = _step_lookup(computation_type)
     end
 
-  be add_proxy[In: OSCEncodable val](proxy_id: I32, step_id: I32, conn: TCPConnection tag) =>
-    let p = Proxy[In](_env, step_id, conn)
+  be add_proxy(proxy_id: I32, step_id: I32, conn: TCPConnection tag) =>
+    let p = Proxy(_env, step_id, conn)
     _steps(proxy_id) = p
 
-  be add_sink[In: OSCEncodable val](sink_id: I32, sink_step_id: I32, auth: AmbientAuth) =>
+  be add_sink(sink_id: I32, sink_step_id: I32, auth: AmbientAuth) =>
     try
       let sink_addr = _sink_addrs(sink_id)
       let sink_host = sink_addr._1
@@ -96,9 +91,9 @@ actor StepManager
     try
       let input_step = _steps(in_id)
       let output_step = _steps(out_id)
-      match (input_step, output_step)
-      | (let i: ThroughStep[I32, I32] tag, let o: ComputeStep[I32] tag) =>
-        i.add_output(o)
+      match input_step
+      | let i: OutputStep tag =>
+        i.add_output(output_step)
       else
         _env.out.print("StepManager: Could not connect steps")
       end
