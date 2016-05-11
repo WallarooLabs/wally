@@ -3,7 +3,7 @@ use "options"
 use "collections"
 
 actor Startup
-  new create(env: Env, topology: Topology val, step_builder: StepBuilder val,
+  new create(env: Env, topology: Topology val, step_lookup: StepLookup val,
     source_count: USize) =>
     var is_worker = true
     var worker_count: USize = 0
@@ -66,7 +66,7 @@ actor Startup
         sinks(i.i32()) = (sink_host, sink_service)
       end
 
-      let step_manager = StepManager(env, step_builder, consume sinks)
+      let step_manager = StepManager(env, step_lookup, consume sinks)
       if is_worker then
         coordinator.add_listener(TCPListener(auth,
           WorkerNotifier(env, auth, node_name, leader_host, leader_service,

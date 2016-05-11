@@ -1,6 +1,8 @@
 type OSCEncodable is (String | I32 | F32)
 
-class Message[A: OSCEncodable #send]
+trait StepMessage
+
+class Message[A: OSCEncodable #send] is StepMessage
   let id: I32
   let data: A
 
