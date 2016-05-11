@@ -6,10 +6,7 @@ class Delay is TCPConnectionNotify
   let _letter: TCPConnectionNotify
   let _rdelayer: _ReceivedDelayer
 
-  new create(seed: U64,
-    delayer_config: DelayerConfig,
-    letter: TCPConnectionNotify iso)
-  =>
+  new create(delayer_config: DelayerConfig, letter: TCPConnectionNotify iso) =>
     _letter = consume letter
     _rdelayer = _ReceivedDelayer(delayer_config)
 
