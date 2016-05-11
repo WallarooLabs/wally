@@ -69,82 +69,90 @@ actor TopologyManager
         nodes.push(key)
       end
 
-      let pipeline: PipelineSteps val = _topology.pipelines(0)
-      var step_id: I32 = 0 // First source has step_id 0
+      var cur_source_id: I32 = 0
+      var cur_sink_id: I32 = 0
+      var step_id: I32 = cur_source_id
       var proxy_step_id: I32 = next_guid(dice)
       var proxy_step_target_id: I32 = next_guid(dice)
-      var count: USize = 0
-      // Round robin node assignment
-      while count < pipeline.size() do
-        let cur_node_idx = count % nodes.size()
-        let cur_node = nodes(count % nodes.size())
-        let next_node_idx = (cur_node_idx + 1) % nodes.size()
-        let next_node = nodes((cur_node_idx + 1) % nodes.size())
-        let next_node_addr =
-          if next_node_idx == 0 then
-            (_leader_host, _leader_service)
-          else
-            _worker_addrs(next_node)
-          end
-        let pipeline_step: PipelineStep box = pipeline(count)
-        if pipeline_step.id() != 0 then
-          try
-            step_id = repeated_steps(pipeline_step.id())
-          else
-            repeated_steps(pipeline_step.id()) = step_id
-          end
-        end
 
-        if (count + 1) < pipeline.size() then
-          let next_pipeline_id = pipeline(count + 1).id()
-          if next_pipeline_id != 0 then
-            try
-              proxy_step_target_id = repeated_steps(next_pipeline_id)
+      for pipeline in _topology.pipelines.values() do
+        var count: USize = 0
+        // Round robin node assignment
+        while count < pipeline.size() do
+          let cur_node_idx = count % nodes.size()
+          let cur_node = nodes(count % nodes.size())
+          let next_node_idx = (cur_node_idx + 1) % nodes.size()
+          let next_node = nodes((cur_node_idx + 1) % nodes.size())
+          let next_node_addr =
+            if next_node_idx == 0 then
+              (_leader_host, _leader_service)
             else
-              repeated_steps(next_pipeline_id) = proxy_step_target_id
+              _worker_addrs(next_node)
+            end
+          let pipeline_step: PipelineStep box = pipeline(count)
+          if pipeline_step.id() != 0 then
+            try
+              step_id = repeated_steps(pipeline_step.id())
+            else
+              repeated_steps(pipeline_step.id()) = step_id
             end
           end
+
+          if (count + 1) < pipeline.size() then
+            let next_pipeline_id = pipeline(count + 1).id()
+            if next_pipeline_id != 0 then
+              try
+                proxy_step_target_id = repeated_steps(next_pipeline_id)
+              else
+                repeated_steps(next_pipeline_id) = proxy_step_target_id
+              end
+            end
+          end
+
+          _env.out.print("Spinning up computation **" + pipeline_step.computation_type() + "** on node \'" + cur_node + "\'")
+
+          if cur_node_idx == 0 then // if cur_node is the leader/source
+            let target_conn = _workers(next_node)
+            _step_manager.add_step(step_id, pipeline_step.computation_type())
+            _step_manager.add_proxy(proxy_step_id, proxy_step_target_id,
+              target_conn)
+            _step_manager.connect_steps(step_id, proxy_step_id)
+          else
+            let create_step_msg =
+              WireMsgEncoder.spin_up(step_id, pipeline_step.computation_type())
+            let create_proxy_msg =
+              WireMsgEncoder.spin_up_proxy(proxy_step_id, proxy_step_target_id,
+                next_node, next_node_addr._1, next_node_addr._2)
+            let connect_msg =
+              WireMsgEncoder.connect_steps(step_id, proxy_step_id)
+
+            let conn = _workers(cur_node)
+            conn.write(create_step_msg)
+            conn.write(create_proxy_msg)
+            conn.write(connect_msg)
+          end
+
+          count = count + 1
+          step_id = proxy_step_target_id
+          proxy_step_id = next_guid(dice)
+          proxy_step_target_id = next_guid(dice)
         end
+        let sink_node_idx = count % nodes.size()
+        let sink_node = nodes(sink_node_idx)
+        _env.out.print("Spinning up sink on node " + sink_node)
 
-        _env.out.print("Spinning up computation **" + pipeline_step.computation_type() + "** on node \'" + cur_node + "\'")
-
-        if cur_node_idx == 0 then // if cur_node is the leader/source
-          let target_conn = _workers(next_node)
-          _step_manager.add_step(step_id, pipeline_step.computation_type())
-          _step_manager.add_proxy(proxy_step_id, proxy_step_target_id,
-            target_conn)
-          _step_manager.connect_steps(step_id, proxy_step_id)
+        if sink_node_idx == 0 then // if cur_node is the leader
+          _step_manager.add_sink(cur_sink_id, step_id, _auth)
         else
-          let create_step_msg =
-            WireMsgEncoder.spin_up(step_id, pipeline_step.computation_type())
-          let create_proxy_msg =
-            WireMsgEncoder.spin_up_proxy(proxy_step_id, proxy_step_target_id,
-              next_node, next_node_addr._1, next_node_addr._2)
-          let connect_msg =
-            WireMsgEncoder.connect_steps(step_id, proxy_step_id)
-
-          let conn = _workers(cur_node)
-          conn.write(create_step_msg)
-          conn.write(create_proxy_msg)
-          conn.write(connect_msg)
+          let create_sink_msg =
+            WireMsgEncoder.spin_up_sink(cur_sink_id, step_id)
+          let conn = _workers(sink_node)
+          conn.write(create_sink_msg)
         end
 
-        count = count + 1
-        step_id = proxy_step_target_id
-        proxy_step_id = next_guid(dice)
-        proxy_step_target_id = next_guid(dice)
-      end
-      let sink_node_idx = count % nodes.size()
-      let sink_node = nodes(sink_node_idx)
-      _env.out.print("Spinning up sink on node " + sink_node)
-
-      if sink_node_idx == 0 then // if cur_node is the leader
-        _step_manager.add_sink(0, step_id, _auth)
-      else
-        let create_sink_msg =
-          WireMsgEncoder.spin_up_sink(0, step_id)
-        let conn = _workers(sink_node)
-        conn.write(create_sink_msg)
+        cur_source_id = cur_source_id + 1
+        cur_sink_id = cur_sink_id + 1
+        step_id = cur_source_id
       end
 
       let finished_msg =
