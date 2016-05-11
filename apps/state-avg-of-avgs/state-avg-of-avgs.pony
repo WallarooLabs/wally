@@ -1,12 +1,3 @@
-"""
-Average of Averages app written using our "State" representation.
-Currently, until issue #807 against ponyc is fixed (couple weeks),
-we can't use the library version in steps.pony as it won't compile
-so we have to "handroll" for now. That basically means doing what
-a generic would do for us, by hand. At the end of this file, you
-will two types that accomplish that: AveragerStateComputation and
-AveragerState.
-"""
 use "collections"
 use "buffy"
 use "buffy/messages"
