@@ -44,16 +44,22 @@ class Pipeline[In: OSCEncodable val, Out: OSCEncodable val] is PipelineSteps
 
 trait PipelineStep
   fun computation_type(): String
+  fun id(): I32
 
 class PipelineThroughStep[In: OSCEncodable, Out: OSCEncodable] is PipelineStep
   let _computation_type: String
-  let step_builder: ThroughStepBuilder[In, Out] val
+  let _id: I32
+  let _step_builder: ThroughStepBuilder[In, Out] val
 
-  new create(c_type: String, s_builder: ThroughStepBuilder[In, Out] val) =>
+  new create(c_type: String, s_builder: ThroughStepBuilder[In, Out] val,
+    pipeline_id: I32 = 0) =>
     _computation_type = c_type
-    step_builder = s_builder
+    _step_builder = s_builder
+    _id = pipeline_id
 
   fun computation_type(): String => _computation_type
+
+  fun id(): I32 => _id
 
 class PipelineBuilder[In: OSCEncodable val, Out: OSCEncodable val, Last: OSCEncodable val]
   let _t: Topology
@@ -64,17 +70,19 @@ class PipelineBuilder[In: OSCEncodable val, Out: OSCEncodable val, Last: OSCEnco
     _p = p
 
   fun ref and_then[Next: OSCEncodable val](comp_type: String,
-    comp_builder: ComputationBuilder[Last, Next] val): PipelineBuilder[In, Out, Next] =>
+    comp_builder: ComputationBuilder[Last, Next] val, id: I32 = 0)
+      : PipelineBuilder[In, Out, Next] =>
     let next_builder = StepBuilder[Last, Next](comp_builder)
-    let next_step = PipelineThroughStep[Last, Next](comp_type, next_builder)
+    let next_step = PipelineThroughStep[Last, Next](comp_type, next_builder, id)
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
   fun ref and_then_partition[Next: OSCEncodable](comp_type: String,
     comp_builder: ComputationBuilder[Last, Next] val,
-    p_fun: PartitionFunction[Last] val): PipelineBuilder[In, Out, Next] =>
+    p_fun: PartitionFunction[Last] val, id: I32 = 0)
+      : PipelineBuilder[In, Out, Next] =>
     let next_builder = PartitionBuilder[Last, Next](comp_builder, p_fun)
-    let next_step = PipelineThroughStep[Last, Next](comp_type, next_builder)
+    let next_step = PipelineThroughStep[Last, Next](comp_type, next_builder, id)
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
