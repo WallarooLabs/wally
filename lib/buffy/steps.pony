@@ -123,26 +123,28 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
       end
     end
 
-/*
-// commented out until ponylang/ponyc issue #807 is fixed
-actor State[In: OSCEncodable val, Out: OSCEncodable val, DataStructure: Any] is ThroughStep[In, Out]
-  let _f: StateComputation[In, Out, DataStructure]
-  var _output: (ComputeStep[Out] tag | None) = None
-  let _state: Map[I32, I32]
+actor StateStep[In: OSCEncodable val, Out: OSCEncodable val,
+  State: Any #read] is ThroughStep[In, Out]
+  let _state_computation: StateComputation[In, Out, State]
+  var _output: (BasicStep tag | None) = None
+  let _state: State
 
-  new create(state: DataStructure iso, f: StateComputation[In, Out, DataStructure] iso) =>
-    _state = consume state
-    _f = consume f
+  new create(state_initializer: {(): State} val,
+    state_computation: StateComputation[In, Out, State] iso) =>
+    _state = state_initializer()
+    _state_computation = consume state_computation
 
-  be add_output(to: ComputeStep[Out] tag) =>
+  be add_output(to: BasicStep tag) =>
     _output = to
 
-  be apply(input: Message[In] val) =>
-    let r = _f(_state, input)
-    match _output
-      | let c: ComputeStep[Out] tag => c(r)
+  be apply(input: StepMessage val) =>
+    match input
+    | let i: Message[In] val =>
+      let r = _state_computation(_state, i)
+      match _output
+        | let o: BasicStep tag => o(r)
+      end
     end
-*/
 
 interface TagBuilder
   fun apply(): Any tag
@@ -184,6 +186,19 @@ class PartitionBuilder[In: OSCEncodable val, Out: OSCEncodable val]
 
   fun apply(): ThroughStep[In, Out] tag =>
     Partition[In, Out](_step_builder, _partition_function)
+
+class StateStepBuilder[In: OSCEncodable val, Out: OSCEncodable val, State: Any #read]
+  is ThroughStepBuilder[In, Out]
+  let _state_computation_builder: StateComputationBuilder[In, Out, State] val
+  let _state_initializer: {(): State} val
+
+  new val create(s_builder: StateComputationBuilder[In, Out, State] val,
+    s_initializer: {(): State} val) =>
+    _state_computation_builder = s_builder
+    _state_initializer = s_initializer
+
+  fun apply(): ThroughStep[In, Out] tag =>
+    StateStep[In, Out, State](_state_initializer, _state_computation_builder())
 
 class ExternalConnectionBuilder[In: OSCEncodable val]
   let _stringify: Stringify[In] val

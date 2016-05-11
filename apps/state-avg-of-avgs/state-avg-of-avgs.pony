@@ -10,26 +10,44 @@ AveragerState.
 use "collections"
 use "buffy"
 use "buffy/messages"
+use "net"
 
 actor Main
   new create(env: Env) =>
-    let topology: Topology val =
-      Topology(recover val
-        ["double", "halve", "average", "average"]
-      end)
-    Startup(env, topology, SB, 1)
+    try
+      let topology: Topology val = recover val
+        Topology
+          .new_pipeline[I32, I32](P, S)
+          .and_then[I32]("double", lambda(): Computation[I32, I32] iso^ => Double end)
+          .and_then[I32]("halve", lambda(): Computation[I32, I32] iso^ => Halve end)
+          .and_then_stateful[I32, Averager]("average",
+            lambda(): StateComputation[I32, I32, Averager] iso^ => Average end,
+            lambda(): Averager => Averager end)
+          .and_then_stateful[I32, Averager]("average",
+            lambda(): StateComputation[I32, I32, Averager] iso^ => Average end,
+            lambda(): Averager => Averager end)
+          .build()
+      end
+      Startup(env, topology, SL, 1)
+    else
+      env.out.print("Couldn't build topology")
+    end
 
-primitive SB is StepBuilder
-  fun val apply(computation_type: String): Any tag ? =>
+primitive SL is StepLookup
+  fun val apply(computation_type: String): BasicStep tag ? =>
     match computation_type
+    | "source" => Source[I32](P)
     | "double" => Step[I32, I32](Double)
     | "halve" => Step[I32, I32](Halve)
     | "average" =>
-      let s = recover Averager end
-      AveragerState[I32, I32](consume s, Average)
+      let state_initializer = lambda(): Averager => Averager end
+      StateStep[I32, I32, Averager](state_initializer, Average)
     else
       error
     end
+
+  fun sink(conn: TCPConnection): BasicStep tag =>
+    ExternalConnection[I32](S, conn)
 
 class Double is Computation[I32, I32]
   fun apply(msg: Message[I32] val): Message[I32] val^ =>
@@ -41,7 +59,7 @@ class Halve is Computation[I32, I32]
     let output = msg.data / 2
     Message[I32](msg.id, output)
 
-class Average is AveragerStateComputation[I32, I32]
+class Average is StateComputation[I32, I32, Averager]
   fun ref apply(state: Averager, msg: Message[I32] val) : Message[I32] val =>
     let output = state(msg.data)
     Message[I32](msg.id, output)
@@ -55,31 +73,10 @@ class Averager
     total = total + value
     total / count
 
-///
-///
-///
+class P
+  fun apply(s: String): I32 ? =>
+    s.i32()
 
-interface AveragerStateComputation[In: OSCEncodable,
-  Out: OSCEncodable]
-
-  fun ref apply(state: Averager, input: Message[In] val)
-    : Message[Out] val^
-
-actor AveragerState[In: OSCEncodable val,
-  Out: OSCEncodable val] is ThroughStep[In, Out]
-  let _f: AveragerStateComputation[In, Out]
-  var _output: (ComputeStep[Out] tag | None) = None
-  let _state: Averager
-
-  new create(state: Averager iso, f: AveragerStateComputation[In, Out] iso) =>
-    _state = consume state
-    _f = consume f
-
-  be add_output(to: ComputeStep[Out] tag) =>
-    _output = to
-
-  be apply(input: Message[In] val) =>
-    let r = _f(_state, input)
-    match _output
-      | let c: ComputeStep[Out] tag => c(r)
-    end
+class S
+  fun apply(input: I32): String =>
+    input.string()

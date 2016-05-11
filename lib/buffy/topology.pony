@@ -86,8 +86,15 @@ class PipelineBuilder[In: OSCEncodable val, Out: OSCEncodable val, Last: OSCEnco
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-//  fun and_then_stateful[Out: OSCEncodable val](init_builder, state_comp_builder, id: I32 = 0): Pipeline =>
-//    this
+  fun ref and_then_stateful[Next: OSCEncodable, State: Any #read](comp_type: String,
+    comp_builder: StateComputationBuilder[Last, Next, State] val,
+    state_initializer: {(): State} val, id: I32 = 0)
+      : PipelineBuilder[In, Out, Next] =>
+    let next_builder = StateStepBuilder[Last, Next, State](comp_builder,
+      state_initializer)
+    let next_step = PipelineThroughStep[Last, Next](comp_type, next_builder, id)
+    _p.add_step(next_step)
+    PipelineBuilder[In, Out, Next](_t, _p)
 
   fun ref build(): Topology ? =>
     _t.add_pipeline(_p as PipelineSteps)

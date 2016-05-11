@@ -11,7 +11,7 @@ interface PartitionFunction[In: OSCEncodable]
   fun apply(input: In): I32
 
 interface StateComputation[In: OSCEncodable,
-  Out: OSCEncodable, State: Any]
+  Out: OSCEncodable, State: Any #read]
 
   fun ref apply(state: State, input: Message[In] val): Message[Out] val
 
@@ -19,7 +19,7 @@ interface ComputationBuilder[In: OSCEncodable, Out: OSCEncodable]
   fun apply(): Computation[In, Out] iso^
 
 interface StateComputationBuilder[In: OSCEncodable, Out: OSCEncodable,
-  State: Any]
+  State: Any #read]
   fun apply(): StateComputation[In, Out, State] iso^
 
 interface Parser[Out: OSCEncodable]
