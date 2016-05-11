@@ -13,12 +13,12 @@ actor Main
           .and_then[I32]("halve", lambda(): Computation[I32, I32] iso^ => Halve end)
           .build()
       end
-      Startup(env, topology, SB, 1)
+      Startup(env, topology, SL, 1)
     else
       env.out.print("Couldn't build topology")
     end
 
-primitive SB is StepLookup
+primitive SL is StepLookup
   fun val apply(computation_type: String): BasicStep tag ? =>
     match computation_type
     | "source" => Source[I32](P)
