@@ -2,6 +2,7 @@ use "net"
 use "options"
 use "collections"
 use "buffy/metrics"
+use "spike"
 
 actor Startup
   new create(env: Env, topology: Topology val, step_lookup: StepLookup val,
@@ -44,6 +45,7 @@ actor Startup
     var args = options.remaining()
 
     try
+      let spike_config = SpikeConfig(false, false)
       let auth = env.root as AmbientAuth
       let coordinator: Coordinator = Coordinator(node_name)
       let phone_home_host = phone_home_addr(0)
@@ -90,7 +92,8 @@ actor Startup
       if is_worker then
         coordinator.add_listener(TCPListener(auth,
           WorkerNotifier(env, auth, node_name, leader_host, leader_service,
-            phone_home_conn, step_manager, coordinator, metrics_collector)))
+            phone_home_conn, step_manager, coordinator, metrics_collector,
+            spike_config)))
       else
         if source_addrs.size() != source_count then
           env.out.print("There are " + source_count.string() + " sources but "
@@ -117,7 +120,7 @@ actor Startup
 
         let notifier: TCPListenNotify iso = LeaderNotifier(env, auth, node_name,
           leader_host, leader_service, step_manager, coordinator,
-          topology_manager, metrics_collector)
+          topology_manager, metrics_collector, spike_config)
         coordinator.add_listener(TCPListener(auth, consume notifier, leader_host,
           leader_service))
       end

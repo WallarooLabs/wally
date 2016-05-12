@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "sendence/bytes"
 use "sendence/tcp"
 use "time"
+use "spike"
 
 class WorkerNotifier is TCPListenNotify
   let _env: Env
@@ -16,13 +17,14 @@ class WorkerNotifier is TCPListenNotify
   let _coordinator: Coordinator
   let _phone_home_connection: TCPConnection
   let _metrics_collector: MetricsCollector
+  let _spike_config: SpikeConfig val
   var _host: String = ""
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
     leader_service: String, phone_home_conn: TCPConnection,
     step_manager: StepManager, coordinator: Coordinator,
-    metrics_collector: MetricsCollector) =>
+    metrics_collector: MetricsCollector, spike_config: SpikeConfig val) =>
     _env = env
     _auth = auth
     _name = name
@@ -32,6 +34,7 @@ class WorkerNotifier is TCPListenNotify
     _step_manager = step_manager
     _coordinator = coordinator
     _metrics_collector = metrics_collector
+    _spike_config = spike_config
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -39,8 +42,9 @@ class WorkerNotifier is TCPListenNotify
       _env.out.print(_name + ": listening on " + _host + ":" + _service)
 
       let notifier: TCPConnectionNotify iso =
-        WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-          _step_manager, _coordinator, _metrics_collector)
+        SpikeWrapper(WorkerConnectNotify(_env, _auth, _name, _leader_host,
+          _leader_service, _step_manager, _coordinator, _metrics_collector),
+          _spike_config)
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
 
@@ -57,8 +61,9 @@ class WorkerNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    WorkerConnectNotify(_env, _auth, _name, _leader_host, _leader_service,
-      _step_manager, _coordinator, _metrics_collector)
+    SpikeWrapper(WorkerConnectNotify(_env, _auth, _name, _leader_host,
+      _leader_service, _step_manager, _coordinator, _metrics_collector),
+      _spike_config)
 
 class WorkerConnectNotify is TCPConnectionNotify
   let _env: Env

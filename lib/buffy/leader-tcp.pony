@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "sendence/bytes"
 use "sendence/tcp"
 use "time"
+use "spike"
 
 class LeaderNotifier is TCPListenNotify
   let _env: Env
@@ -14,12 +15,14 @@ class LeaderNotifier is TCPListenNotify
   let _step_manager: StepManager
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector
+  let _spike_config: SpikeConfig val
   var _host: String = ""
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, host: String,
     service: String, step_manager: StepManager, coordinator: Coordinator,
-    topology_manager: TopologyManager, metrics_collector: MetricsCollector) =>
+    topology_manager: TopologyManager, metrics_collector: MetricsCollector,
+    spike_config: SpikeConfig val) =>
     _env = env
     _auth = auth
     _name = name
@@ -29,6 +32,7 @@ class LeaderNotifier is TCPListenNotify
     _coordinator = coordinator
     _topology_manager = topology_manager
     _metrics_collector = metrics_collector
+    _spike_config = spike_config
 
   fun ref listening(listen: TCPListener ref) =>
     try
