@@ -339,7 +339,7 @@ actor SendingActor
     _timers(consume t)
 
   be send_batch() =>
-    let batch_size = USize(200)
+    let batch_size = USize(500)
 
     var current_batch_size =
       if (_messages_to_send - _messages_sent) > batch_size then
