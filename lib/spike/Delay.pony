@@ -114,12 +114,12 @@ class DelaySent is TCPConnectionNotify
   fun ref closed(conn: TCPConnection ref) =>
     _letter.closed(conn)
 
-class _ReceivedDelayer
+class _ReceivedDelayer is _Delayer
   var _delaying: Bool = false
   embed _delayed: Buffer = Buffer
   let _config: DelayerConfig
   let _dice: Dice
-  var _next_received_spike_flip: USize = 0
+  var _next_delaying_flip: USize = 0
   var expect: USize = 0
 
   new create(config: DelayerConfig) =>
@@ -163,32 +163,22 @@ class _ReceivedDelayer
 
   fun ref _start_allowing() =>
     _delaying = false
-    _next_delaying_flip = _bytes_to_allow(_config) + _delayed.size()
+    _next_delaying_flip = _bytes_to_allow(_config, _delayed, _dice)
 
   fun ref _start_delaying() =>
     _delaying = true
-    _next_delaying_flip = _bytes_to_delay(_config)
-
-  fun ref _bytes_to_allow(c: DelayerConfig): USize =>
-    let i = _next_interval(c.through_min_bytes, c.through_max_bytes)
-    i + _delayed.size()
-
-  fun ref _bytes_to_delay(c: DelayerConfig): USize =>
-    _next_interval(c.delay_min_bytes, c.delay_max_bytes)
-
-  fun ref _next_interval(min: USize, max: USize): USize =>
-    _dice(min.u64(), max.u64()).usize()
+    _next_delaying_flip = _bytes_to_delay(_config, _dice)
 
   fun ref _deliver_received(conn: TCPConnection ref,
     notifier: DelayReceived) ?
   =>
     let s = if expect == 0 then _delayed.size() else expect end
     let data' = _delayed.block(s)
-    _next_received_spike_flip = _next_received_spike_flip - s
+    _next_delaying_flip = _next_delaying_flip - s
     notifier._letter_received(conn, consume data')
 
 
-class _SentDelayer
+class _SentDelayer is _Delayer
   let _config: DelayerConfig
   let _dice: Dice
   embed _delayed: Buffer = Buffer
@@ -259,18 +249,19 @@ class _SentDelayer
 
   fun ref _start_allowing() =>
     _delaying = false
-    _next_delaying_flip = _bytes_to_allow(_config) + _delayed.size()
+    _next_delaying_flip = _bytes_to_allow(_config, _delayed, _dice)
 
   fun ref _start_delaying() =>
     _delaying = true
-    _next_delaying_flip = _bytes_to_delay(_config)
+    _next_delaying_flip = _bytes_to_delay(_config, _dice)
 
-  fun ref _bytes_to_allow(c: DelayerConfig): USize =>
-    let i = _next_interval(c.through_min_bytes, c.through_max_bytes)
-    i + _delayed.size()
+trait _Delayer
+  fun ref _bytes_to_allow(c: DelayerConfig, b: Buffer, d: Dice): USize =>
+    let i = _next_interval(c.through_min_bytes, c.through_max_bytes, d)
+    i + b.size()
 
-  fun ref _bytes_to_delay(c: DelayerConfig): USize =>
-    _next_interval(c.delay_min_bytes, c.delay_max_bytes)
+  fun ref _bytes_to_delay(c: DelayerConfig, d: Dice): USize =>
+    _next_interval(c.delay_min_bytes, c.delay_max_bytes, d)
 
-  fun ref _next_interval(min: USize, max: USize): USize =>
-    _dice(min.u64(), max.u64()).usize()
+  fun ref _next_interval(min: USize, max: USize, d: Dice): USize =>
+    d(min.u64(), max.u64()).usize()
