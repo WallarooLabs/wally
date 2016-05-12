@@ -139,6 +139,11 @@ class _ReceivedDelayer
     end
 
   fun ref _should_deliver_received(): Bool =>
+    _check_for_flip()
+
+    _delaying == false
+
+  fun ref _check_for_flip() =>
     """
     When delaying received, flip once our buffer size is greater than or
     equal to our next flip size
@@ -147,35 +152,41 @@ class _ReceivedDelayer
     below 0
     """
     if _delaying then
-      if _delayed.size() >= _next_received_spike_flip then
-        _delaying = false
-        _next_received_spike_flip =
-          _dice(_config.through_min_bytes.u64(),
-          _config.through_max_bytes.u64()).usize()
-        _next_received_spike_flip = _next_received_spike_flip + _delayed.size()
+      if _delayed.size() >= _next_delaying_flip then
+        _start_allowing()
       end
     else
-      if _next_received_spike_flip <= 0 then
-        _delaying = true
-        _next_received_spike_flip =
-          _dice(_config.delay_min_bytes.u64(),
-            _config.delay_max_bytes.u64()).usize()
+      if _next_delaying_flip <= 0 then
+        _start_delaying()
       end
     end
 
-    _delaying == false
+  fun ref _start_allowing() =>
+    _delaying = false
+    _next_delaying_flip = _bytes_to_allow(_config) + _delayed.size()
+
+  fun ref _start_delaying() =>
+    _delaying = true
+    _next_delaying_flip = _bytes_to_delay(_config)
+
+  fun ref _bytes_to_allow(c: DelayerConfig): USize =>
+    let i = _next_interval(c.through_min_bytes, c.through_max_bytes)
+    i + _delayed.size()
+
+  fun ref _bytes_to_delay(c: DelayerConfig): USize =>
+    _next_interval(c.delay_min_bytes, c.delay_max_bytes)
+
+  fun ref _next_interval(min: USize, max: USize): USize =>
+    _dice(min.u64(), max.u64()).usize()
 
   fun ref _deliver_received(conn: TCPConnection ref,
     notifier: DelayReceived) ?
   =>
-    let data' =
-      if expect == 0 then
-        _delayed.block(_delayed.size())
-      else
-        _delayed.block(expect)
-      end
-    _next_received_spike_flip = _next_received_spike_flip - expect
+    let s = if expect == 0 then _delayed.size() else expect end
+    let data' = _delayed.block(s)
+    _next_received_spike_flip = _next_received_spike_flip - s
     notifier._letter_received(conn, consume data')
+
 
 class _SentDelayer
   let _config: DelayerConfig
@@ -232,21 +243,34 @@ class _SentDelayer
     end
 
   fun ref _should_deliver_sent(): Bool =>
+    _check_for_flip()
+    _delaying == false
+
+  fun ref _check_for_flip() =>
     if _delaying then
       if _delayed.size() >= _next_delaying_flip then
-        _delaying = false
-        _next_delaying_flip = _dice(
-          _config.through_min_bytes.u64(),
-          _config.through_max_bytes.u64()).usize()
-        _next_delaying_flip = _next_delaying_flip + _delayed.size()
+        _start_allowing()
       end
     else
       if _next_delaying_flip <= 0 then
-        _delaying = true
-        _next_delaying_flip = _dice(
-          _config.delay_min_bytes.u64(),
-          _config.delay_max_bytes.u64()).usize()
+        _start_delaying()
       end
     end
 
-    _delaying == false
+  fun ref _start_allowing() =>
+    _delaying = false
+    _next_delaying_flip = _bytes_to_allow(_config) + _delayed.size()
+
+  fun ref _start_delaying() =>
+    _delaying = true
+    _next_delaying_flip = _bytes_to_delay(_config)
+
+  fun ref _bytes_to_allow(c: DelayerConfig): USize =>
+    let i = _next_interval(c.through_min_bytes, c.through_max_bytes)
+    i + _delayed.size()
+
+  fun ref _bytes_to_delay(c: DelayerConfig): USize =>
+    _next_interval(c.delay_min_bytes, c.delay_max_bytes)
+
+  fun ref _next_interval(min: USize, max: USize): USize =>
+    _dice(min.u64(), max.u64()).usize()
