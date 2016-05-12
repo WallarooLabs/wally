@@ -227,7 +227,7 @@ class _ReceivedDelayer
           _config.through_max_bytes.u64()).usize()
       end
     else
-      if _next_received_spike_flip == 0 then
+      if _next_received_spike_flip <= 0 then
         _delaying = true
         _next_received_spike_flip =
           _dice(_config.delay_min_bytes.u64(),
