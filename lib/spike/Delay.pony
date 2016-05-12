@@ -111,7 +111,7 @@ class _SentDelayer
   let _dice: Dice
   embed _delayed: Buffer = Buffer
   var _delaying: Bool = false
-  var _next_sent_spike_flip: USize = 0
+  var _next_delaying_flip: USize = 0
 
   new create(config: DelayerConfig) =>
     _config = config
@@ -131,7 +131,7 @@ class _SentDelayer
     end
 
     if _should_deliver_sent() then
-      _next_sent_spike_flip = _next_sent_spike_flip - _delayed.size()
+      _next_delaying_flip = _next_delaying_flip - _delayed.size()
       _delayed.block(_delayed.size())
     else
       ""
@@ -153,7 +153,7 @@ class _SentDelayer
     end
 
     if _should_deliver_sent() then
-      _next_sent_spike_flip = _next_sent_spike_flip - _delayed.size()
+      _next_delaying_flip = _next_delaying_flip - _delayed.size()
       let s = _delayed.block(_delayed.size())
       recover Array[Array[U8]].push(consume s) end
     else
@@ -162,9 +162,19 @@ class _SentDelayer
 
   fun ref _should_deliver_sent(): Bool =>
     if _delaying then
-      _delaying = _delayed.size() < _next_sent_spike_flip
+      if _delayed.size() >= _next_delaying_flip then
+        _delaying = false
+        _next_delaying_flip = _dice(
+          _config.through_min_bytes.u64(),
+          _config.through_max_bytes.u64()).usize()
+      end
     else
-      _delaying = _next_sent_spike_flip < 0
+      if _next_delaying_flip <= 0 then
+        _delaying = true
+        _next_delaying_flip = _dice(
+          _config.delay_min_bytes.u64(),
+          _config.delay_max_bytes.u64()).usize()
+      end
     end
 
     _delaying == false
@@ -187,11 +197,9 @@ class _ReceivedDelayer
   =>
     _delayed.append(consume data)
 
-    while _should_deliver_received() do
-      if expect <= _delayed.size() then
+    if _should_deliver_received() then
+      while (_delayed.size() > 0) and (expect <= _delayed.size()) do
         try _deliver_received(conn, notifier) end
-      else
-        break
       end
     end
 
