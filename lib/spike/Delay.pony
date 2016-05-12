@@ -14,7 +14,7 @@ class DelayerConfig
     through_min_bytes': USize = 1,
     through_max_bytes': USize = 1000,
     delay_min_bytes': USize = 1,
-    delay_max_bytes': USize = 100) ?
+    delay_max_bytes': USize = 500) ?
   =>
     if (through_min_bytes' > through_max_bytes') or
       (delay_min_bytes'> delay_max_bytes') or

@@ -48,7 +48,7 @@ actor Startup
     var args = options.remaining()
 
     try
-      let spike_config = SpikeConfig(false, false)
+      let spike_config = SpikeConfig(true, false)
       let auth = env.root as AmbientAuth
       let coordinator: Coordinator = Coordinator(node_name)
       let phone_home_host = phone_home_addr(0)
