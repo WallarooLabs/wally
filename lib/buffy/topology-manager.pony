@@ -204,17 +204,8 @@ actor TopologyManager
 
   fun _complete_initialization() =>
     _env.out.print("_--- Topology successfully initialized ---_")
-    try
-      let env = _env
-      let auth = env.root as AmbientAuth
-      let name = _name
-
-      let message = WireMsgEncoder.topology_ready(_name)
-      _phone_home_connection.write(message)
-    else
-      _env.out.print("Couldn't get ambient authority when completing "
-        + "initialization")
-    end
+    let message = WireMsgEncoder.topology_ready(_name)
+    _phone_home_connection.write(message)
 
   be shutdown() =>
     let message = WireMsgEncoder.shutdown(_name)
