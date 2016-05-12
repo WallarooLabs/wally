@@ -6,12 +6,15 @@ use "time"
 class Delay is TCPConnectionNotify
   let _letter: TCPConnectionNotify
   let _rdelayer: _ReceivedDelayer
+  let _sdelayer: _SentDelayer
 
-  new iso create(letter: TCPConnectionNotify iso,
-    delayer_config: DelayerConfig iso = DelayerConfig)
+  new create(letter: TCPConnectionNotify iso,
+    rdelayer_config: DelayerConfig iso = DelayerConfig,
+    sdelayer_config: DelayerConfig iso = DelayerConfig)
   =>
     _letter = consume letter
-    _rdelayer = _ReceivedDelayer(consume delayer_config)
+    _rdelayer = _ReceivedDelayer(consume rdelayer_config)
+    _sdelayer = _SentDelayer(consume sdelayer_config)
 
   fun ref accepted(conn: TCPConnection ref) =>
     _letter.accepted(conn)
@@ -29,10 +32,10 @@ class Delay is TCPConnectionNotify
     _letter.auth_failed(conn)
 
   fun ref sent(conn: TCPConnection ref, data: ByteSeq): ByteSeq ? =>
-    _letter.sent(conn, data)
+    _sdelayer.sent(conn, data, this)
 
   fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter ? =>
-    _letter.sentv(conn, data)
+    _sdelayer.sentv(conn, data, this)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     _rdelayer.received(conn, consume data, this)
@@ -49,16 +52,16 @@ class Delay is TCPConnectionNotify
 
 class DelayerConfig
   let seed: U64
-  let through_min_bytes: U64
-  let through_max_bytes: U64
-  let delay_min_bytes: U64
-  let delay_max_bytes: U64
+  let through_min_bytes: USize
+  let through_max_bytes: USize
+  let delay_min_bytes: USize
+  let delay_max_bytes: USize
 
   new iso create(seed': U64 = Time.millis(),
-    through_min_bytes': U64 = 1,
-    through_max_bytes': U64 = 1000,
-    delay_min_bytes': U64 = 1,
-    delay_max_bytes': U64 = 100)
+    through_min_bytes': USize = 1,
+    through_max_bytes': USize = 1000,
+    delay_min_bytes': USize = 1,
+    delay_max_bytes': USize = 100)
   =>
     seed = seed'
     through_min_bytes = through_min_bytes'
@@ -66,12 +69,75 @@ class DelayerConfig
     delay_min_bytes = delay_min_bytes'
     delay_max_bytes = delay_max_bytes'
 
+class _SentDelayer
+  let _config: DelayerConfig
+  let _dice: Dice
+  embed _delayed: Buffer = Buffer
+  var _delaying: Bool = false
+  var _next_sent_spike_flip: USize = 0
+
+  new create(config: DelayerConfig) =>
+    _config = config
+    _dice = Dice(MT(config.seed))
+
+  fun ref sent(conn: TCPConnection ref,
+    data: ByteSeq,
+    notifier: Delay)
+    : ByteSeq ?
+  =>
+    let data' = notifier.sent(conn, data)
+    match data'
+      | let d: Array[U8] val => _delayed.append(d)
+      | let d: String => _delayed.append(d.array())
+    else
+      error
+    end
+
+    if _should_deliver_sent() then
+      _next_sent_spike_flip = _next_sent_spike_flip - _delayed.size()
+      _delayed.block(_delayed.size())
+    else
+      ""
+    end
+
+  fun ref sentv(conn: TCPConnection ref,
+    data: ByteSeqIter,
+    notifier: Delay)
+    : ByteSeqIter ?
+  =>
+    let data' = notifier.sentv(conn, data)
+    for bytes in data'.values() do
+      match bytes
+        | let b: Array[U8] val => _delayed.append(b)
+        | let b: String => _delayed.append(b.array())
+      else
+        error
+      end
+    end
+
+    if _should_deliver_sent() then
+      _next_sent_spike_flip = _next_sent_spike_flip - _delayed.size()
+      let s = _delayed.block(_delayed.size())
+      recover Array[Array[U8]].push(consume s) end
+    else
+      recover Array[String] end
+    end
+
+  fun ref _should_deliver_sent(): Bool =>
+    if _delaying then
+      _delaying = _delayed.size() < _next_sent_spike_flip
+    else
+      _delaying = _next_sent_spike_flip < 0
+    end
+
+    _delaying == false
+
 class _ReceivedDelayer
   var _delaying: Bool = false
   embed _delayed: Buffer = Buffer
   let _config: DelayerConfig
   let _dice: Dice
-  var _next_received_spike_roll: U64 = 0
+  var _next_received_spike_flip: USize = 0
   var expect: USize = 0
 
   new create(config: DelayerConfig) =>
@@ -101,18 +167,18 @@ class _ReceivedDelayer
     below 0
     """
     if _delaying then
-      if _delayed.size().u64() >= _next_received_spike_roll then
+      if _delayed.size() >= _next_received_spike_flip then
         _delaying = false
-        _next_received_spike_roll =
-          _dice(_config.through_min_bytes,
-          _config.through_max_bytes)
+        _next_received_spike_flip =
+          _dice(_config.through_min_bytes.u64(),
+          _config.through_max_bytes.u64()).usize()
       end
     else
-      if _next_received_spike_roll == 0 then
+      if _next_received_spike_flip == 0 then
         _delaying = true
-        _next_received_spike_roll =
-          _dice(_config.delay_min_bytes,
-            _config.delay_max_bytes)
+        _next_received_spike_flip =
+          _dice(_config.delay_min_bytes.u64(),
+            _config.delay_max_bytes.u64()).usize()
       end
     end
 
@@ -120,5 +186,5 @@ class _ReceivedDelayer
 
   fun ref _deliver_received(conn: TCPConnection ref, notifier: Delay) ? =>
     let data' = _delayed.block(expect)
-    _next_received_spike_roll = _next_received_spike_roll - expect.u64()
+    _next_received_spike_flip = _next_received_spike_flip - expect
     notifier._letter_received(conn, consume data')
