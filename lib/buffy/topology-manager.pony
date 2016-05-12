@@ -141,16 +141,11 @@ actor TopologyManager
           _env.out.print("Spinning up computation **" + pipeline_step.computation_type() + "** on node \'" + cur_node + "\'")
 
           if cur_node_idx == 0 then // if cur_node is the leader/source
-            if cur_node_idx != next_node then
-              let target_conn = _worker_internal_conns(next_node)
-              _step_manager.add_step(step_id, pipeline_step.computation_type())
-              _step_manager.add_proxy(proxy_step_id, proxy_step_target_id,
+            let target_conn = _worker_internal_conns(next_node)
+            _step_manager.add_step(step_id, pipeline_step.computation_type())
+            _step_manager.add_proxy(proxy_step_id, proxy_step_target_id,
               target_conn)
-              _step_manager.connect_steps(step_id, proxy_step_id)
-            else
-              _step_manager.add_step(step_id, pipeline_step.computation_type())
-              _step_manager.connect_steps(step_id, proxy_step_id)
-            end
+            _step_manager.connect_steps(step_id, proxy_step_id)
           else
             let create_step_msg =
               WireMsgEncoder.spin_up(step_id, pipeline_step.computation_type())
@@ -198,7 +193,7 @@ actor TopologyManager
         next_conn.write(finished_msg)
       end
     else
-      env.err.print("Buffy Leader: Failed to initialize topology")
+      _env.err.print("Buffy Leader: Failed to initialize topology")
     end
 
   be ack_initialized() =>
