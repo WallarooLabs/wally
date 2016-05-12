@@ -92,7 +92,11 @@ class WorkerConnectNotify is TCPConnectionNotify
           _spin_up_proxy(m)
         | let m: SpinUpSinkMsg val =>
           _step_manager.add_sink(m.sink_id, m.sink_step_id, _auth)
-        | let m: ForwardMsg val =>
+        | let m: ForwardI32Msg val =>
+          _step_manager(m.step_id, m.msg)
+        | let m: ForwardF32Msg val =>
+          _step_manager(m.step_id, m.msg)
+        | let m: ForwardStringMsg val =>
           _step_manager(m.step_id, m.msg)
         | let m: ConnectStepsMsg val =>
           _step_manager.connect_steps(m.in_step_id, m.out_step_id)
