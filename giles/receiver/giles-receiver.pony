@@ -8,7 +8,7 @@ use "options"
 use "signals"
 use "time"
 use "buffy/messages"
-use "sendence/tcp"
+use "sendence/bytes"
 
 // tests
 // documentation
@@ -110,8 +110,8 @@ class FromBuffyListenerNotify is TCPListenNotify
 class FromBuffyNotify is TCPConnectionNotify
   let _coordinator: Coordinator
   let _store: Store
-  let _framer: Framer = Framer
   let _stderr: StdStream
+  var _header: Bool = true
 
   new iso create(coordinator: Coordinator, store: Store, stderr: StdStream) =>
     _coordinator = coordinator
@@ -119,9 +119,17 @@ class FromBuffyNotify is TCPConnectionNotify
     _stderr = stderr
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    for chunked in _framer.chunk(consume data).values() do
+    if _header then
       try
-        let decoded = WireMsgDecoder(consume chunked)
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        conn.expect(expect)
+        _header = false
+      else
+        _stderr.print("Blew up reading header from Buffy")
+      end
+    else
+      try
+        let decoded = WireMsgDecoder(consume data)
         match decoded
         | let d: ExternalMsg val =>
           _store.received(d.data, Time.micros())
@@ -131,16 +139,20 @@ class FromBuffyNotify is TCPConnectionNotify
       else
         _stderr.print("Unable to decode message Buffy")
       end
+
+      conn.expect(4)
+      _header = true
     end
 
   fun ref accepted(conn: TCPConnection ref) =>
+    conn.expect(4)
     _coordinator.connection_added(consume conn)
 
 
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator
-  let _framer: Framer = Framer
   let _stderr: StdStream
+  var _header: Bool = true
 
   new iso create(coordinator: WithDagonCoordinator, stderr: StdStream) =>
     _coordinator = coordinator
@@ -150,12 +162,21 @@ class ToDagonNotify is TCPConnectionNotify
     _coordinator.to_dagon_socket(sock, Failed)
 
   fun ref connected(sock: TCPConnection ref) =>
+    sock.expect(4)
     _coordinator.to_dagon_socket(sock, Ready)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    for chunked in _framer.chunk(consume data).values() do
+    if _header then
       try
-        let decoded = WireMsgDecoder(consume chunked)
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        conn.expect(expect)
+        _header = false
+      else
+        _stderr.print("Blew up reading header from Buffy")
+      end
+    else
+      try
+        let decoded = WireMsgDecoder(consume data)
         match decoded
         | let d: ShutdownMsg val =>
           _coordinator.finished()
@@ -165,6 +186,9 @@ class ToDagonNotify is TCPConnectionNotify
       else
         _stderr.print("Unable to decode message Dagon")
       end
+
+      conn.expect(4)
+      _header = true
     end
 
 //
