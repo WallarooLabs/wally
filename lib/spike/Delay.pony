@@ -82,7 +82,7 @@ class DelaySent is TCPConnectionNotify
     _letter.received(conn, consume data)
 
   fun ref expect(conn: TCPConnection ref, qty: USize): USize =>
-    qty
+    _letter.expect(conn, qty)
 
   fun ref closed(conn: TCPConnection ref) =>
     _letter.closed(conn)
