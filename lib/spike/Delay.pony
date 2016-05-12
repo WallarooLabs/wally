@@ -175,6 +175,7 @@ class _SentDelayer
         _next_delaying_flip = _dice(
           _config.through_min_bytes.u64(),
           _config.through_max_bytes.u64()).usize()
+        _next_delaying_flip = _next_delaying_flip + _delayed.size()
       end
     else
       if _next_delaying_flip <= 0 then
@@ -225,6 +226,7 @@ class _ReceivedDelayer
         _next_received_spike_flip =
           _dice(_config.through_min_bytes.u64(),
           _config.through_max_bytes.u64()).usize()
+        _next_received_spike_flip = _next_received_spike_flip + _delayed.size()
       end
     else
       if _next_received_spike_flip <= 0 then
