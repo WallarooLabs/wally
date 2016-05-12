@@ -16,7 +16,7 @@ primitive SpikeWrapper
     : TCPConnectionNotify iso^ =>
     var notify: TCPConnectionNotify iso = consume letter
     if config.delay then
-      notify = Delay(consume notify)
+      notify = DelayReceived(consume notify)
     end
     if config.drop then
       notify = DropConnection(config.seed, 25, consume notify)
