@@ -1,17 +1,17 @@
 use "collections"
 use "net"
 use "random"
+use "time"
 
 class Delay is TCPConnectionNotify
   let _letter: TCPConnectionNotify
   let _rdelayer: _ReceivedDelayer
 
-  new create(seed: U64,
-    delayer_config: DelayerConfig,
-    letter: TCPConnectionNotify iso)
+  new iso create(letter: TCPConnectionNotify iso,
+    delayer_config: DelayerConfig iso = DelayerConfig)
   =>
     _letter = consume letter
-    _rdelayer = _ReceivedDelayer(delayer_config)
+    _rdelayer = _ReceivedDelayer(consume delayer_config)
 
   fun ref accepted(conn: TCPConnection ref) =>
     _letter.accepted(conn)
@@ -54,11 +54,11 @@ class DelayerConfig
   let delay_min_bytes: U64
   let delay_max_bytes: U64
 
-  new create(seed': U64,
-    through_min_bytes': U64,
-    through_max_bytes': U64,
-    delay_min_bytes': U64,
-    delay_max_bytes': U64)
+  new iso create(seed': U64 = Time.millis(),
+    through_min_bytes': U64 = 1,
+    through_max_bytes': U64 = 1000,
+    delay_min_bytes': U64 = 1,
+    delay_max_bytes': U64 = 100)
   =>
     seed = seed'
     through_min_bytes = through_min_bytes'
@@ -71,7 +71,7 @@ class _ReceivedDelayer
   embed _delayed: Buffer = Buffer
   let _config: DelayerConfig
   let _dice: Dice
-  var _next_received_spike_flip: U64 = 0
+  var _next_received_spike_roll: U64 = 0
   var expect: USize = 0
 
   new create(config: DelayerConfig) =>
@@ -94,23 +94,23 @@ class _ReceivedDelayer
 
   fun ref _should_deliver_received(): Bool =>
     """
-    When delaying received, flip once our buffer size is greater than or
-    equal to our next flip size
+    When delaying received, roll once our buffer size is greater than or
+    equal to our next roll size
 
-    When not delaying received, flip once our next flip value drops to or
+    When not delaying received, roll once our next roll value drops to or
     below 0
     """
     if _delaying then
-      if _delayed.size().u64() >= _next_received_spike_flip then
+      if _delayed.size().u64() >= _next_received_spike_roll then
         _delaying = false
-        _next_received_spike_flip =
+        _next_received_spike_roll =
           _dice(_config.through_min_bytes,
           _config.through_max_bytes)
       end
     else
-      if _next_received_spike_flip <= 0 then
+      if _next_received_spike_roll == 0 then
         _delaying = true
-        _next_received_spike_flip =
+        _next_received_spike_roll =
           _dice(_config.delay_min_bytes,
             _config.delay_max_bytes)
       end
@@ -120,5 +120,5 @@ class _ReceivedDelayer
 
   fun ref _deliver_received(conn: TCPConnection ref, notifier: Delay) ? =>
     let data' = _delayed.block(expect)
-    _next_received_spike_flip = _next_received_spike_flip - expect.u64()
+    _next_received_spike_roll = _next_received_spike_roll - expect.u64()
     notifier._letter_received(conn, consume data')

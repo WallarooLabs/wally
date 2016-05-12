@@ -6,7 +6,7 @@ class DropConnection is TCPConnectionNotify
   let _dice: Dice
   let _prob: U64
 
-  new create(seed: U64, prob: U64, letter: TCPConnectionNotify iso) =>
+  new iso create(seed: U64, prob: U64, letter: TCPConnectionNotify iso) =>
     _dice = Dice(MT(seed))
     _prob = prob
     _letter = consume letter
