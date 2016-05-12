@@ -18,6 +18,9 @@ actor Startup
     var source_addrs = Array[String]
     var sink_addrs = Array[String]
 
+    var spike_delay = false
+    var spike_drop = false
+
     options
       .add("leader", "l", None)
       .add("worker_count", "w", I64Argument)
@@ -30,6 +33,8 @@ actor Startup
       .add("source", "", StringArgument)
       .add("sink", "", StringArgument)
       .add("metrics", "", StringArgument)
+      .add("spike-delay", "", None)
+      .add("spike-drop", "", None)
 
     for option in options do
       match option
@@ -42,13 +47,15 @@ actor Startup
       | ("source", let arg: String) => source_addrs.append(arg.split(","))
       | ("sink", let arg: String) => sink_addrs.append(arg.split(","))
       | ("metrics", let arg: String) => metrics_addr = arg.split(":")
+      | ("spike-delay", None) => spike_delay = true
+      | ("spike-drop", None) => spike_drop = true
       end
     end
 
     var args = options.remaining()
 
     try
-      let spike_config = SpikeConfig(true, false)
+      let spike_config = SpikeConfig(spike_delay, spike_drop)
       let auth = env.root as AmbientAuth
       let coordinator: Coordinator = Coordinator(node_name)
       let phone_home_host = phone_home_addr(0)
