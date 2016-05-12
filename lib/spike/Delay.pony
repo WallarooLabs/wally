@@ -3,18 +3,15 @@ use "net"
 use "random"
 use "time"
 
-class Delay is TCPConnectionNotify
+class DelayReceived is TCPConnectionNotify
   let _letter: TCPConnectionNotify
-  let _rdelayer: _ReceivedDelayer
-  let _sdelayer: _SentDelayer
+  let _delayer: _ReceivedDelayer
 
   new create(letter: TCPConnectionNotify iso,
-    rdelayer_config: DelayerConfig iso = DelayerConfig,
-    sdelayer_config: DelayerConfig iso = DelayerConfig)
+    delayer_config: DelayerConfig iso = DelayerConfig)
   =>
     _letter = consume letter
-    _rdelayer = _ReceivedDelayer(consume rdelayer_config)
-    _sdelayer = _SentDelayer(consume sdelayer_config)
+    _delayer = _ReceivedDelayer(consume delayer_config)
 
   fun ref accepted(conn: TCPConnection ref) =>
     _letter.accepted(conn)
@@ -32,16 +29,16 @@ class Delay is TCPConnectionNotify
     _letter.auth_failed(conn)
 
   fun ref sent(conn: TCPConnection ref, data: ByteSeq): ByteSeq ? =>
-    _sdelayer.sent(conn, data, this)
+    _letter.sent(conn, data)
 
   fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter ? =>
-    _sdelayer.sentv(conn, data, this)
+    _letter.sentv(conn, data)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    _rdelayer.received(conn, consume data, this)
+    _delayer.received(conn, consume data, this)
 
   fun ref expect(conn: TCPConnection ref, qty: USize): USize =>
-    _rdelayer.expect = _letter.expect(conn, qty)
+    _delayer.expect = _letter.expect(conn, qty)
     0
 
   fun ref closed(conn: TCPConnection ref) =>
@@ -49,6 +46,46 @@ class Delay is TCPConnectionNotify
 
   fun ref _letter_received(conn: TCPConnection ref, data: Array[U8] iso) =>
     _letter.received(conn, consume data)
+
+class DelaySent is TCPConnectionNotify
+  let _letter: TCPConnectionNotify
+  let _delayer: _SentDelayer
+
+  new create(letter: TCPConnectionNotify iso,
+    delayer_config: DelayerConfig iso = DelayerConfig)
+  =>
+    _letter = consume letter
+    _delayer = _SentDelayer(consume delayer_config)
+
+  fun ref accepted(conn: TCPConnection ref) =>
+    _letter.accepted(conn)
+
+  fun ref connecting(conn: TCPConnection ref, count: U32) =>
+    _letter.connecting(conn, count)
+
+  fun ref connected(conn: TCPConnection ref) =>
+    _letter.connected(conn)
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    _letter.connect_failed(conn)
+
+  fun ref auth_failed(conn: TCPConnection ref) =>
+    _letter.auth_failed(conn)
+
+  fun ref sent(conn: TCPConnection ref, data: ByteSeq): ByteSeq ? =>
+    _delayer.sent(conn, data, this)
+
+  fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter ? =>
+    _delayer.sentv(conn, data, this)
+
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    _letter.received(conn, consume data)
+
+  fun ref expect(conn: TCPConnection ref, qty: USize): USize =>
+    qty
+
+  fun ref closed(conn: TCPConnection ref) =>
+    _letter.closed(conn)
 
 class DelayerConfig
   let seed: U64
@@ -82,7 +119,7 @@ class _SentDelayer
 
   fun ref sent(conn: TCPConnection ref,
     data: ByteSeq,
-    notifier: Delay)
+    notifier: DelaySent)
     : ByteSeq ?
   =>
     let data' = notifier.sent(conn, data)
@@ -102,7 +139,7 @@ class _SentDelayer
 
   fun ref sentv(conn: TCPConnection ref,
     data: ByteSeqIter,
-    notifier: Delay)
+    notifier: DelaySent)
     : ByteSeqIter ?
   =>
     let data' = notifier.sentv(conn, data)
@@ -146,7 +183,7 @@ class _ReceivedDelayer
 
   fun ref received(conn: TCPConnection ref,
     data: Array[U8] iso,
-    notifier: Delay)
+    notifier: DelayReceived)
   =>
     _delayed.append(consume data)
 
@@ -184,7 +221,9 @@ class _ReceivedDelayer
 
     _delaying == false
 
-  fun ref _deliver_received(conn: TCPConnection ref, notifier: Delay) ? =>
+  fun ref _deliver_received(conn: TCPConnection ref,
+    notifier: DelayReceived) ?
+  =>
     let data' = _delayed.block(expect)
     _next_received_spike_flip = _next_received_spike_flip - expect
     notifier._letter_received(conn, consume data')
