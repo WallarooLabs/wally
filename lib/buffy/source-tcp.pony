@@ -1,8 +1,10 @@
 use "net"
 use "collections"
 use "buffy/messages"
+use "buffy/metrics"
 use "sendence/bytes"
 use "sendence/tcp"
+use "time"
 
 class SourceNotifier is TCPListenNotify
   let _env: Env
@@ -12,10 +14,11 @@ class SourceNotifier is TCPListenNotify
   let _source_id: I32
   let _step_manager: StepManager
   let _coordinator: Coordinator
+  let _metrics_collector: MetricsCollector
 
   new iso create(env: Env, auth: AmbientAuth, source_host: String,
     source_service: String, source_id: I32, step_manager: StepManager,
-    coordinator: Coordinator) =>
+    coordinator: Coordinator, metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
     _host = source_host
@@ -23,6 +26,7 @@ class SourceNotifier is TCPListenNotify
     _source_id = source_id
     _step_manager = step_manager
     _coordinator = coordinator
+    _metrics_collector = metrics_collector
 
   fun ref listening(listen: TCPListener ref) =>
     _env.out.print("Source " + _source_id.string() + ": listening on " + _host + ":" + _service)
@@ -32,7 +36,8 @@ class SourceNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    SourceConnectNotify(_env, _auth, _source_id, _step_manager, _coordinator)
+    SourceConnectNotify(_env, _auth, _source_id, _step_manager, _coordinator,
+      _metrics_collector)
 
 class SourceConnectNotify is TCPConnectionNotify
   var _msg_id: I32 = 0
@@ -40,16 +45,19 @@ class SourceConnectNotify is TCPConnectionNotify
   let _auth: AmbientAuth
   let _source_id: I32
   let _step_manager: StepManager
+  let _metrics_collector: MetricsCollector
   let _framer: Framer = Framer
   let _coordinator: Coordinator
 
   new iso create(env: Env, auth: AmbientAuth, source_id: I32,
-    step_manager: StepManager, coordinator: Coordinator) =>
+    step_manager: StepManager, coordinator: Coordinator,
+      metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
     _source_id = source_id
     _step_manager = step_manager
     _coordinator = coordinator
+    _metrics_collector = metrics_collector
 
   fun ref accepted(conn: TCPConnection ref) =>
     _coordinator.add_connection(conn)
@@ -60,12 +68,15 @@ class SourceConnectNotify is TCPConnectionNotify
         let msg = WireMsgDecoder(consume chunked)
         match msg
         | let m: ExternalMsg val =>
-          let new_msg: Message[String] val = Message[String](_msg_id = _msg_id + 1, m.data)
+          let now = Time.millis()
+          let new_msg: Message[String] val = Message[String](_msg_id = _msg_id + 1,
+            now, now, m.data)
           _step_manager(_source_id, new_msg)
         | let m: UnknownMsg val =>
           _env.err.print("Unknown message type.")
         else
-          _env.err.print("Source " + _source_id.string() + ": decoded message wasn't external.")
+          _env.err.print("Source " + _source_id.string()
+            + ": decoded message wasn't external.")
         end
       else
         _env.err.print("Error decoding incoming message.")

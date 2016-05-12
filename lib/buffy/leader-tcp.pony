@@ -1,8 +1,10 @@
 use "net"
 use "collections"
 use "buffy/messages"
+use "buffy/metrics"
 use "sendence/bytes"
 use "sendence/tcp"
+use "time"
 
 class LeaderNotifier is TCPListenNotify
   let _env: Env
@@ -11,12 +13,13 @@ class LeaderNotifier is TCPListenNotify
   let _topology_manager: TopologyManager
   let _step_manager: StepManager
   let _coordinator: Coordinator
+  let _metrics_collector: MetricsCollector
   var _host: String = ""
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String, host: String,
     service: String, step_manager: StepManager, coordinator: Coordinator,
-    topology_manager: TopologyManager) =>
+    topology_manager: TopologyManager, metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
     _name = name
@@ -25,6 +28,7 @@ class LeaderNotifier is TCPListenNotify
     _step_manager = step_manager
     _coordinator = coordinator
     _topology_manager = topology_manager
+    _metrics_collector = metrics_collector
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -41,7 +45,7 @@ class LeaderNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     LeaderConnectNotify(_env, _auth, _name, _topology_manager, _step_manager,
-      _coordinator)
+      _coordinator, _metrics_collector)
 
 class LeaderConnectNotify is TCPConnectionNotify
   let _env: Env
@@ -50,17 +54,20 @@ class LeaderConnectNotify is TCPConnectionNotify
   let _topology_manager: TopologyManager
   let _step_manager: StepManager
   let _coordinator: Coordinator
+  let _metrics_collector: MetricsCollector
   let _framer: Framer = Framer
   let _nodes: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
 
   new iso create(env: Env, auth: AmbientAuth, name: String, t_manager: TopologyManager,
-    s_manager: StepManager, coordinator: Coordinator) =>
+    s_manager: StepManager, coordinator: Coordinator,
+    metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
     _name = name
     _topology_manager = t_manager
     _step_manager = s_manager
     _coordinator = coordinator
+    _metrics_collector = metrics_collector
 
   fun ref accepted(conn: TCPConnection ref) =>
     _coordinator.add_connection(conn)
@@ -108,7 +115,7 @@ class LeaderConnectNotify is TCPConnectionNotify
     else
       let notifier: TCPConnectionNotify iso =
         LeaderConnectNotify(_env, _auth, _name, _topology_manager, _step_manager,
-          _coordinator)
+          _coordinator, _metrics_collector)
       let target_conn =
         TCPConnection(_auth, consume notifier, msg.target_host,
           msg.target_service)
