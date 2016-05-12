@@ -3,6 +3,33 @@ use "net"
 use "random"
 use "time"
 
+class DelayerConfig
+  let seed: U64
+  let through_min_bytes: USize
+  let through_max_bytes: USize
+  let delay_min_bytes: USize
+  let delay_max_bytes: USize
+
+  new iso create(seed': U64 = Time.millis(),
+    through_min_bytes': USize = 1,
+    through_max_bytes': USize = 1000,
+    delay_min_bytes': USize = 1,
+    delay_max_bytes': USize = 100) ?
+  =>
+    if (through_min_bytes' > through_max_bytes') or
+      (delay_min_bytes'> delay_max_bytes') or
+      (through_max_bytes' <= 0) or
+      (delay_max_bytes' <= 0)
+    then
+      error
+    end
+
+    seed = seed'
+    through_min_bytes = through_min_bytes'
+    through_max_bytes = through_max_bytes'
+    delay_min_bytes = delay_min_bytes'
+    delay_max_bytes = delay_max_bytes'
+
 class DelayReceived is TCPConnectionNotify
   let _letter: TCPConnectionNotify
   let _delayer: _ReceivedDelayer
@@ -87,32 +114,68 @@ class DelaySent is TCPConnectionNotify
   fun ref closed(conn: TCPConnection ref) =>
     _letter.closed(conn)
 
-class DelayerConfig
-  let seed: U64
-  let through_min_bytes: USize
-  let through_max_bytes: USize
-  let delay_min_bytes: USize
-  let delay_max_bytes: USize
+class _ReceivedDelayer
+  var _delaying: Bool = false
+  embed _delayed: Buffer = Buffer
+  let _config: DelayerConfig
+  let _dice: Dice
+  var _next_received_spike_flip: USize = 0
+  var expect: USize = 0
 
-  new iso create(seed': U64 = Time.millis(),
-    through_min_bytes': USize = 1,
-    through_max_bytes': USize = 1000,
-    delay_min_bytes': USize = 1,
-    delay_max_bytes': USize = 100) ?
+  new create(config: DelayerConfig) =>
+    _config = config
+    _dice = Dice(MT(config.seed))
+
+  fun ref received(conn: TCPConnection ref,
+    data: Array[U8] iso,
+    notifier: DelayReceived)
   =>
-    if (through_min_bytes' > through_max_bytes') or
-      (delay_min_bytes'> delay_max_bytes') or
-      (through_max_bytes' <= 0) or
-      (delay_max_bytes' <= 0)
-    then
-      error
+    _delayed.append(consume data)
+
+    if _should_deliver_received() then
+      while (_delayed.size() > 0) and (expect <= _delayed.size()) do
+        try _deliver_received(conn, notifier) end
+      end
     end
 
-    seed = seed'
-    through_min_bytes = through_min_bytes'
-    through_max_bytes = through_max_bytes'
-    delay_min_bytes = delay_min_bytes'
-    delay_max_bytes = delay_max_bytes'
+  fun ref _should_deliver_received(): Bool =>
+    """
+    When delaying received, flip once our buffer size is greater than or
+    equal to our next flip size
+
+    When not delaying received, flip once our next flip value drops to or
+    below 0
+    """
+    if _delaying then
+      if _delayed.size() >= _next_received_spike_flip then
+        _delaying = false
+        _next_received_spike_flip =
+          _dice(_config.through_min_bytes.u64(),
+          _config.through_max_bytes.u64()).usize()
+        _next_received_spike_flip = _next_received_spike_flip + _delayed.size()
+      end
+    else
+      if _next_received_spike_flip <= 0 then
+        _delaying = true
+        _next_received_spike_flip =
+          _dice(_config.delay_min_bytes.u64(),
+            _config.delay_max_bytes.u64()).usize()
+      end
+    end
+
+    _delaying == false
+
+  fun ref _deliver_received(conn: TCPConnection ref,
+    notifier: DelayReceived) ?
+  =>
+    let data' =
+      if expect == 0 then
+        _delayed.block(_delayed.size())
+      else
+        _delayed.block(expect)
+      end
+    _next_received_spike_flip = _next_received_spike_flip - expect
+    notifier._letter_received(conn, consume data')
 
 class _SentDelayer
   let _config: DelayerConfig
@@ -187,67 +250,3 @@ class _SentDelayer
     end
 
     _delaying == false
-
-class _ReceivedDelayer
-  var _delaying: Bool = false
-  embed _delayed: Buffer = Buffer
-  let _config: DelayerConfig
-  let _dice: Dice
-  var _next_received_spike_flip: USize = 0
-  var expect: USize = 0
-
-  new create(config: DelayerConfig) =>
-    _config = config
-    _dice = Dice(MT(config.seed))
-
-  fun ref received(conn: TCPConnection ref,
-    data: Array[U8] iso,
-    notifier: DelayReceived)
-  =>
-    _delayed.append(consume data)
-
-    if _should_deliver_received() then
-      while (_delayed.size() > 0) and (expect <= _delayed.size()) do
-        try _deliver_received(conn, notifier) end
-      end
-    end
-
-  fun ref _should_deliver_received(): Bool =>
-    """
-    When delaying received, flip once our buffer size is greater than or
-    equal to our next flip size
-
-    When not delaying received, flip once our next flip value drops to or
-    below 0
-    """
-    if _delaying then
-      if _delayed.size() >= _next_received_spike_flip then
-        _delaying = false
-        _next_received_spike_flip =
-          _dice(_config.through_min_bytes.u64(),
-          _config.through_max_bytes.u64()).usize()
-        _next_received_spike_flip = _next_received_spike_flip + _delayed.size()
-      end
-    else
-      if _next_received_spike_flip <= 0 then
-        _delaying = true
-        _next_received_spike_flip =
-          _dice(_config.delay_min_bytes.u64(),
-            _config.delay_max_bytes.u64()).usize()
-      end
-    end
-
-    _delaying == false
-
-  fun ref _deliver_received(conn: TCPConnection ref,
-    notifier: DelayReceived) ?
-  =>
-    let data' =
-      if expect == 0 then
-        _delayed.block(_delayed.size())
-      else
-        _delayed.block(expect)
-      end
-    _next_received_spike_flip = _next_received_spike_flip - expect
-    notifier._letter_received(conn, consume data')
-
