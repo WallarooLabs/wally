@@ -24,4 +24,4 @@ the leader address.
   * ```./app-name --leader-address 127.0.0.1:6000 --source 127.0.0.1:7000 --sink 127.0.0.1:8000 --metrics 127.0.0.1:9000 -p 127.0.0.1:10000 -n Worker1```
   * ```./app-name --leader-address 127.0.0.1:6000 --source 127.0.0.1:7000 --sink 127.0.0.1:8000 --metrics 127.0.0.1:9000 -p 127.0.0.1:10000 -n Worker2```
 
-The address passed in is the leader's address.
+You can also choose to enable spiking on the node with either ```--spike-delay``` or ```--spike-drop``` flags
