@@ -7,7 +7,7 @@ class DelayReceived is TCPConnectionNotify
   let _letter: TCPConnectionNotify
   let _delayer: _ReceivedDelayer
 
-  new create(letter: TCPConnectionNotify iso,
+  new iso create(letter: TCPConnectionNotify iso,
     delayer_config: DelayerConfig iso = DelayerConfig)
   =>
     _letter = consume letter
@@ -214,10 +214,10 @@ class _ReceivedDelayer
 
   fun ref _should_deliver_received(): Bool =>
     """
-    When delaying received, roll once our buffer size is greater than or
-    equal to our next roll size
+    When delaying received, flip once our buffer size is greater than or
+    equal to our next flip size
 
-    When not delaying received, roll once our next roll value drops to or
+    When not delaying received, flip once our next flip value drops to or
     below 0
     """
     if _delaying then
@@ -242,6 +242,12 @@ class _ReceivedDelayer
   fun ref _deliver_received(conn: TCPConnection ref,
     notifier: DelayReceived) ?
   =>
-    let data' = _delayed.block(expect)
+    let data' =
+      if expect == 0 then
+        _delayed.block(_delayed.size())
+      else
+        _delayed.block(expect)
+      end
     _next_received_spike_flip = _next_received_spike_flip - expect
     notifier._letter_received(conn, consume data')
+
