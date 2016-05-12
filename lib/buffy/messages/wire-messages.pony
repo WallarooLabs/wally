@@ -4,23 +4,24 @@ use "time"
 
 primitive _Ready                                fun apply(): String => "/0"
 primitive _TopologyReady                        fun apply(): String => "/1"
-primitive _Identify                             fun apply(): String => "/2"
-primitive _Done                                 fun apply(): String => "/3"
-primitive _Reconnect                            fun apply(): String => "/4"
-primitive _Start                                fun apply(): String => "/5"
-primitive _Shutdown                             fun apply(): String => "/6"
-primitive _DoneShutdown                         fun apply(): String => "/7"
-primitive _Forward                              fun apply(): String => "/8"
-primitive _SpinUp                               fun apply(): String => "/9"
-primitive _SpinUpProxy                          fun apply(): String => "/10"
-primitive _SpinUpSink                           fun apply(): String => "/11"
-primitive _ConnectSteps                         fun apply(): String => "/12"
-primitive _InitializationMsgsFinished           fun apply(): String => "/13"
-primitive _AckInitialized                       fun apply(): String => "/14"
-primitive _External                             fun apply(): String => "/15"
-primitive _ForwardI32                           fun apply(): String => "/16"
-primitive _ForwardF32                           fun apply(): String => "/17"
-primitive _ForwardString                        fun apply(): String => "/18"
+primitive _IdentifyControl                      fun apply(): String => "/2"
+primitive _IdentifyInternal                     fun apply(): String => "/3"
+primitive _Done                                 fun apply(): String => "/4"
+primitive _Reconnect                            fun apply(): String => "/5"
+primitive _Start                                fun apply(): String => "/6"
+primitive _Shutdown                             fun apply(): String => "/7"
+primitive _DoneShutdown                         fun apply(): String => "/8"
+primitive _Forward                              fun apply(): String => "/9"
+primitive _SpinUp                               fun apply(): String => "/10"
+primitive _SpinUpProxy                          fun apply(): String => "/11"
+primitive _SpinUpSink                           fun apply(): String => "/12"
+primitive _ConnectSteps                         fun apply(): String => "/13"
+primitive _InitializationMsgsFinished           fun apply(): String => "/14"
+primitive _AckInitialized                       fun apply(): String => "/15"
+primitive _External                             fun apply(): String => "/16"
+primitive _ForwardI32                           fun apply(): String => "/17"
+primitive _ForwardF32                           fun apply(): String => "/18"
+primitive _ForwardString                        fun apply(): String => "/19"
 
 primitive WireMsgEncoder
   fun ready(node_name: String): Array[U8] val =>
@@ -37,8 +38,19 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun identify(node_name: String, host: String, service: String): Array[U8] val =>
-    let osc = OSCMessage(_Identify(),
+  fun identify_control(node_name: String, host: String, service: String)
+    : Array[U8] val =>
+    let osc = OSCMessage(_IdentifyControl(),
+      recover
+        [as OSCData val: OSCString(node_name),
+                         OSCString(host),
+                         OSCString(service)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
+  fun identify_internal(node_name: String, host: String, service: String)
+    : Array[U8] val =>
+    let osc = OSCMessage(_IdentifyInternal(),
       recover
         [as OSCData val: OSCString(node_name),
                          OSCString(host),
@@ -196,8 +208,10 @@ primitive WireMsgDecoder
       ReadyMsg(msg)
     | _TopologyReady() =>
       TopologyReadyMsg(msg)
-    | _Identify() =>
-      IdentifyMsg(msg)
+    | _IdentifyControl() =>
+      IdentifyControlMsg(msg)
+    | _IdentifyInternal() =>
+      IdentifyInternalMsg(msg)
     | _Done() =>
       DoneMsg(msg)
     | _Start() =>
@@ -258,7 +272,22 @@ class TopologyReadyMsg is WireMsg
       error
     end
 
-class IdentifyMsg is WireMsg
+class IdentifyControlMsg is WireMsg
+  let node_name: String
+  let host: String
+  let service: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match (msg.arguments(0), msg.arguments(1), msg.arguments(2))
+    | (let n: OSCString val, let h: OSCString val, let s: OSCString val) =>
+      node_name = n.value()
+      host = h.value()
+      service = s.value()
+    else
+      error
+    end
+
+class IdentifyInternalMsg is WireMsg
   let node_name: String
   let host: String
   let service: String
