@@ -21,4 +21,5 @@ primitive SpikeWrapper
     if config.drop then
       notify = DropConnection(config.seed, 25, consume notify)
     end
+
     consume notify

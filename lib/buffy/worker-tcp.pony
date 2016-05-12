@@ -100,8 +100,10 @@ class WorkerConnectNotify is TCPConnectionNotify
         | let m: ReadyMsg val =>
           _nodes(m.node_name) = conn
         | let m: SpinUpMsg val =>
+          _env.err.print(_name + "is spinning up a step!")
           _step_manager.add_step(m.step_id, m.computation_type)
         | let m: SpinUpProxyMsg val =>
+          _env.err.print(_name + "is spinning up a proxy!")
           _spin_up_proxy(m)
         | let m: SpinUpSinkMsg val =>
           _step_manager.add_sink(m.sink_id, m.sink_step_id, _auth)

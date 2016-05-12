@@ -48,8 +48,8 @@ class LeaderNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    LeaderConnectNotify(_env, _auth, _name, _topology_manager, _step_manager,
-      _coordinator, _metrics_collector)
+    SpikeWrapper(LeaderConnectNotify(_env, _auth, _name, _topology_manager,
+      _step_manager, _coordinator, _metrics_collector), _spike_config)
 
 class LeaderConnectNotify is TCPConnectionNotify
   let _env: Env
