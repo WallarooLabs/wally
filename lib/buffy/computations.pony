@@ -2,10 +2,10 @@ use "buffy/messages"
 use "collections"
 
 interface Computation[In: OSCEncodable, Out: OSCEncodable]
-  fun ref apply(input: Message[In] val): Message[Out] val
+  fun ref apply(input: In): Out
 
 interface FinalComputation[In: OSCEncodable]
-  fun ref apply(input: Message[In] val)
+  fun ref apply(input: In)
 
 interface PartitionFunction[In: OSCEncodable]
   fun apply(input: In): I32
@@ -13,7 +13,7 @@ interface PartitionFunction[In: OSCEncodable]
 interface StateComputation[In: OSCEncodable,
   Out: OSCEncodable, State: Any #read]
 
-  fun ref apply(state: State, input: Message[In] val): Message[Out] val
+  fun ref apply(state: State, input: In): Out
 
 interface ComputationBuilder[In: OSCEncodable, Out: OSCEncodable]
   fun apply(): Computation[In, Out] iso^

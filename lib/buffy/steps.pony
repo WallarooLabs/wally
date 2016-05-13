@@ -36,7 +36,9 @@ actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
       match _output
       | let o: BasicStep tag =>
         let start_time = Time.millis()
-        o(_f(m))
+        let output_msg =
+          Message[Out](m.id, m.source_ts, m.last_ingress_ts, _f(m.data))
+        o(output_msg)
         let end_time = Time.millis()
         match _step_reporter
         | let sr: StepReporter val =>
@@ -63,12 +65,12 @@ actor Source[Out: OSCEncodable val] is ThroughStep[String, Out]
     match input
     | let m: Message[String] val =>
       try
-        let new_msg: Message[Out] val =
+        let start_time = Time.millis()
+        let output_msg: Message[Out] val =
           Message[Out](m.id, m.source_ts, m.last_ingress_ts, _input_parser(m.data))
         match _output
         | let o: BasicStep tag =>
-          let start_time = Time.millis()
-          o(new_msg)
+          o(output_msg)
           let end_time = Time.millis()
           match _step_reporter
           | let sr: StepReporter val =>
@@ -89,7 +91,7 @@ actor Sink[In: OSCEncodable val] is ComputeStep[In]
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
-      _f(m)
+      _f(m.data)
     end
 
 actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
@@ -167,12 +169,14 @@ actor StateStep[In: OSCEncodable val, Out: OSCEncodable val,
 
   be apply(input: StepMessage val) =>
     match input
-    | let i: Message[In] val =>
-      let res = _state_computation(_state, i)
+    | let m: Message[In] val =>
+      let res = _state_computation(_state, m.data)
       match _output
       | let o: BasicStep tag =>
         let start_time = Time.millis()
-        o(res)
+        let output_msg =
+          Message[Out](m.id, m.source_ts, m.last_ingress_ts, consume res)
+        o(output_msg)
         let end_time = Time.millis()
         match _step_reporter
         | let sr: StepReporter val =>

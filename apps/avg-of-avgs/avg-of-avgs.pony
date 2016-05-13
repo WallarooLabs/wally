@@ -36,21 +36,18 @@ primitive SL is StepLookup
     ExternalConnection[I32](S, conn, metrics_collector)
 
 class Double is Computation[I32, I32]
-  fun apply(msg: Message[I32] val): Message[I32] val =>
-    let output = msg.data * 2
-    Message[I32](msg.id, msg.source_ts, msg.last_ingress_ts, output)
+  fun apply(d: I32): I32 =>
+    d * 2
 
 class Halve is Computation[I32, I32]
-  fun apply(msg: Message[I32] val): Message[I32] val =>
-    let output = msg.data / 2
-    Message[I32](msg.id, msg.source_ts, msg.last_ingress_ts, output)
+  fun apply(d: I32): I32 =>
+    d / 2
 
 class Average is Computation[I32, I32]
   let state: Averager = Averager
 
-  fun ref apply(msg: Message[I32] val): Message[I32] val =>
-    let output = state(msg.data)
-    Message[I32](msg.id, msg.source_ts, msg.last_ingress_ts, output)
+  fun ref apply(d: I32): I32 =>
+    state(d)
 
 class Averager
   var count: I32 = 0
