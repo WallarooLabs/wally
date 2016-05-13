@@ -320,6 +320,7 @@ actor SendingActor
   let _timers: Timers
   let _sender: Sender
   let _data_source: Iterator[String] iso
+  var _finished: Bool = false
 
   new create(messages_to_send: USize,
     to_buffy_socket: TCPConnection,
@@ -339,6 +340,8 @@ actor SendingActor
     _timers(consume t)
 
   be send_batch() =>
+    if _finished then return end
+
     let batch_size = USize(500)
 
     var current_batch_size =
@@ -362,6 +365,7 @@ actor SendingActor
       _sender.send(consume d)
       _messages_sent = _messages_sent + current_batch_size
     else
+      _finished = true
       _timers.dispose()
       _coordinator.finished()
     end
