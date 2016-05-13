@@ -1,16 +1,20 @@
+use "debug"
 use "ponytest"
 use "buffy/messages"
 use "sendence/bytes"
 use "collections"
 
 actor Main is TestList
-  new create(env: Env) => PonyTest(env, this)
+  new create(env: Env) =>
+    PonyTest(env, this)
+
 
   new make() => None
 
   fun tag tests(test: PonyTest) =>
     test(_TestNodeReportsEncoder)
     test(_TestBoundaryReportsEncoder)
+    test(_TestSinkMetricsEncoder)
 
 class iso _TestNodeReportsEncoder is UnitTest
   fun name(): String => "buffy:NodeReportsEncoder"
@@ -70,6 +74,49 @@ class iso _TestBoundaryReportsEncoder is UnitTest
       h.assert_eq[U64](n.reports(1).start_time, 91354328)
     else
       h.fail("Wrong decoded message type")
+    end
+
+    true
+
+class iso _TestSinkMetricsEncoder is UnitTest
+  fun name(): String => "buffy:SinkMetricsEncoder"
+
+  fun apply(h: TestHelper)  =>
+    let sm = SinkMetrics
+    let tb = TimeBuckets
+    sm.update("sink", tb)
+    (let lh, let th) = (LatencyHistogram(Log10Selector),
+                        recover ref ThroughputHistory end)
+    tb.update(1, (lh, th))
+    lh(StepMetricsReport(0, 100))
+    lh(StepMetricsReport(50, 250))
+    let encd: Array[U8] val = SinkMetricsEncoder(sm, 1)
+    if encd.size() != 361 then h.fail("Encoded array is the wrong size") end
+    let expected: String = """[
+  {
+    "topics": {
+      "throughput_out": {
+        "0": 0
+      },
+      "latency_bins": {
+        "0.0001": 0,
+        "overflow": 0,
+        "0.1": 1,
+        "0.01": 0,
+        "1": 1,
+        "0.001": 0,
+        "1e-05": 0,
+        "1e-06": 0
+      }
+    },
+    "t1": 1,
+    "t0": 0,
+    "category": "source-sink",
+    "pipeline_key": "sink-sink"
+  }
+]"""
+    if String.from_array(encd) != expected then h.fail("Output varies from
+      expected")
     end
 
     true
