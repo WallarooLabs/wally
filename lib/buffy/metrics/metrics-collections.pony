@@ -197,9 +197,17 @@ to the nearest integer.
         percs.update(k, current_total/total)
       end
     end
-
     consume percs
 
+  fun bin_map(): Map[String, U64] =>
+    var binmap = Map[String, U64]
+    for (bin, count) in count_bins.pairs() do
+      let key:String = if bin == bin_selector.overflow() 
+                  then "overflow" 
+                  else bin.string() end
+      binmap.update(key, count)
+    end
+    consume binmap
 
 class ThroughputHistory
 """
@@ -250,7 +258,7 @@ type SinkMetrics is Map[String, TimeBuckets]
 interface MetricsOutputHandler
   fun handle(payload: Array[U8])
   fun encode(sinks: SinkMetrics, boundaries: BoundaryMetrics,
-             steps: StepMetrics): Array[U8]
+             steps: StepMetrics): Array[U8] iso^
 
 class MetricsCollection
 """
