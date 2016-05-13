@@ -1,15 +1,27 @@
 use "net"
 use "buffy/messages"
+use "spike"
 
 actor Coordinator
+  let _env: Env
+  let _auth: AmbientAuth
   let _node_name: String
+  let _leader_host: String
+  let _leader_service: String
+  let _step_manager: StepManager
   let _listeners: Array[TCPListener] = Array[TCPListener]
   let _connections: Array[TCPConnection] = Array[TCPConnection]
   var _phone_home_connection: (TCPConnection | None) = None
   var _topology_manager: (TopologyManager | None) = None
 
-  new create(name: String) =>
+  new create(name: String, env: Env, auth: AmbientAuth, leader_host: String,
+    leader_service: String, step_manager: StepManager) =>
     _node_name = name
+    _env = env
+    _auth = auth
+    _leader_host = leader_host
+    _leader_service = leader_service
+    _step_manager = step_manager
 
   be shutdown() =>
     match _topology_manager
@@ -32,6 +44,17 @@ actor Coordinator
       phc.write(WireMsgEncoder.done_shutdown(_node_name))
       phc.dispose()
     end
+
+  be identify_data_channel(host: String, service: String,
+    spike_config: SpikeConfig val) =>
+    let notifier: TCPConnectionNotify iso =
+      SpikeWrapper(IntraclusterDataConnectNotify(_env, _node_name,
+        _step_manager, this), spike_config)
+    let conn: TCPConnection =
+      TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
+
+    let message = WireMsgEncoder.identify_data(_node_name, host, service)
+    conn.write(message)
 
   be add_phone_home_connection(conn: TCPConnection) =>
     _phone_home_connection = conn

@@ -55,22 +55,24 @@ actor Startup
     var args = options.remaining()
 
     try
-      let spike_config = SpikeConfig(spike_delay, spike_drop)
-      let auth = env.root as AmbientAuth
-      let coordinator: Coordinator = Coordinator(node_name)
-      let phone_home_host = phone_home_addr(0)
-      let phone_home_service = phone_home_addr(1)
-
-      let phone_home_conn: TCPConnection = TCPConnection(auth,
-        HomeConnectNotify(env, node_name, coordinator), phone_home_host,
-          phone_home_service)
-
-      coordinator.add_phone_home_connection(phone_home_conn)
-
       let leader_control_host = leader_control_addr(0)
       let leader_control_service = leader_control_addr(1)
       let leader_data_host = leader_data_addr(0)
       let leader_data_service = leader_data_addr(1)
+      let spike_config = SpikeConfig(spike_delay, spike_drop)
+      let auth = env.root as AmbientAuth
+
+      let sinks: Map[I32, (String, String)] iso =
+        recover Map[I32, (String, String)] end
+
+      for i in Range(0, sink_addrs.size()) do
+        let sink_addr: Array[String] = sink_addrs(i).split(":")
+        let sink_host = sink_addr(0)
+        let sink_service = sink_addr(1)
+        env.out.print("Sink " + i.string())
+        env.out.print(sink_host + ":" + sink_service)
+        sinks(i.i32()) = (sink_host, sink_service)
+      end
 
       let metrics_collector =
         if metrics_addr.size() > 0 then
@@ -87,20 +89,21 @@ actor Startup
           MetricsCollector(env, node_name)
         end
 
-      let sinks: Map[I32, (String, String)] iso =
-        recover Map[I32, (String, String)] end
-
-      for i in Range(0, sink_addrs.size()) do
-        let sink_addr: Array[String] = sink_addrs(i).split(":")
-        let sink_host = sink_addr(0)
-        let sink_service = sink_addr(1)
-        env.out.print("Sink " + i.string())
-        env.out.print(sink_host + ":" + sink_service)
-        sinks(i.i32()) = (sink_host, sink_service)
-      end
-
       let step_manager = StepManager(env, step_lookup, consume sinks,
         metrics_collector)
+
+      let coordinator: Coordinator = Coordinator(node_name, env, auth,
+        leader_control_host, leader_control_service, step_manager)
+
+      let phone_home_host = phone_home_addr(0)
+      let phone_home_service = phone_home_addr(1)
+
+      let phone_home_conn: TCPConnection = TCPConnection(auth,
+        HomeConnectNotify(env, node_name, coordinator), phone_home_host,
+          phone_home_service)
+
+      coordinator.add_phone_home_connection(phone_home_conn)
+
       if is_worker then
         coordinator.add_listener(TCPListener(auth,
           WorkerControlNotifier(env, auth, node_name, leader_control_host,

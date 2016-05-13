@@ -73,14 +73,7 @@ class WorkerIntraclusterDataNotifier is TCPListenNotify
       (_host, _service) = listen.local_address().name()
       _env.out.print(_name + " data: listening on " + _host + ":" + _service)
 
-      let notifier: TCPConnectionNotify iso =
-        SpikeWrapper(IntraclusterDataConnectNotify(_env, _name,
-          _step_manager, _coordinator), _spike_config)
-      let conn: TCPConnection =
-        TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
-
-      let message = WireMsgEncoder.identify_data(_name, _host, _service)
-      conn.write(message)
+      _coordinator.identify_data_channel(_host, _service, _spike_config)
     else
       _env.out.print(_name + " data: couldn't get local address")
       listen.close()
