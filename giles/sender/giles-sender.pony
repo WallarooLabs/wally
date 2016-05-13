@@ -93,7 +93,7 @@ actor Main
           let messages_to_send = m_arg as USize
           let to_buffy_addr = b_arg as Array[String]
 
-          let store = Store(env.root as AmbientAuth, messages_to_send)
+          let store = Store(env.root as AmbientAuth)
           let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
@@ -139,6 +139,7 @@ class ToBuffyNotify is TCPConnectionNotify
     _coordinator.to_buffy_socket(sock, Failed)
 
   fun ref connected(sock: TCPConnection ref) =>
+    sock.set_nodelay(true)
     _coordinator.to_buffy_socket(sock, Ready)
 
 class ToDagonNotify is TCPConnectionNotify
@@ -235,7 +236,7 @@ actor WithoutDagonCoordinator
       let x = _to_buffy_socket._1 as TCPConnection
       x.dispose()
     end
-    _store.dump()
+    _store.dispose()
 
   fun _go_if_ready() =>
     if _to_buffy_socket._2 is Ready then
@@ -295,7 +296,7 @@ actor WithDagonCoordinator
       let x = _to_buffy_socket._1 as TCPConnection
       x.dispose()
     end
-    _store.dump()
+    _store.dispose()
 
   fun _go_if_ready() =>
     if (_to_dagon_socket._2 is Ready) and (_to_buffy_socket._2 is Ready) then
@@ -398,27 +399,29 @@ class Sender
 //
 
 actor Store
-  let _auth: AmbientAuth
-  let _sent: List[(ByteSeq, U64)]
   let _encoder: SentLogEncoder = SentLogEncoder
+  var _sent_file: (File|None)
 
-  new create(auth: AmbientAuth, list_size: USize) =>
-    _auth = auth
-    _sent = List[(ByteSeq, U64)](list_size)
-
-  be sentv(msgs: Array[ByteSeq] val, at: U64) =>
-    for m in msgs.values() do
-      _sent.push((m, at))
+  new create(auth: AmbientAuth) =>
+    _sent_file = try
+      let f = File(FilePath(auth, "sent.txt"))
+      f.set_length(0)
+      f
+    else
+      None
     end
 
-  be dump() =>
-    try
-      let sent_handle = File(FilePath(_auth, "sent.txt"))
-      sent_handle.set_length(0)
-      for s in _sent.values() do
-        sent_handle.print(_encoder(s))
+  be sentv(msgs: Array[ByteSeq] val, at: U64) =>
+    match _sent_file
+      | let file: File =>
+      for m in msgs.values() do
+        file.print(_encoder((m, at)))
       end
-      sent_handle.dispose()
+  end
+
+  be dispose() =>
+    match _sent_file
+      | let file: File => file.dispose()
     end
 
 class SentLogEncoder
