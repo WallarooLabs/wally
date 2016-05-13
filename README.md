@@ -31,5 +31,4 @@ directory.
 * Buffy: Stream processing core
 * Dagon: Responsible for setting up all components and running tests
 * Giles: Part of our external verification system for Buffy
-* Spike: Destructive testing. Takes a smoothly functioning Buffy and causes
-Chaos.
+

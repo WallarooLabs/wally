@@ -124,10 +124,7 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-spike build-receiver build-sender build-wesley build-double-divide ## Build Pony based programs for Buffy
-
-build-spike: ## Build spike
-	$(call PONYC,spike)
+build: build-receiver build-sender build-wesley build-double-divide ## Build Pony based programs for Buffy
 
 build-receiver: ## Build giles receiver
 	$(call PONYC,giles/receiver)
@@ -240,8 +237,6 @@ dagon-docker-identity: ## Run identity test with dagon
 
 build-docker:  ## Build docker images for Buffy
 	docker $(docker_host_arg) build -t \
-          $(docker_image_repo)/spike.$(arch):$(docker_image_version) spike
-	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/giles-receiver.$(arch):$(docker_image_version) \
           giles/receiver
 	docker $(docker_host_arg) build -t \
@@ -257,8 +252,6 @@ build-docker:  ## Build docker images for Buffy
           wesley/identity
 
 push-docker: build-docker ## Push docker images for Buffy to repository
-	docker $(docker_host_arg) push \
-          $(docker_image_repo)/spike.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/giles-receiver.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
@@ -292,7 +285,6 @@ ifneq ($(strip $(dangling)),)
 endif
 
 clean: clean-docker ## Cleanup docker images and compiled files for Buffy
-	rm -f spike/spike spike/spike.o
 	rm -f giles/receiver/receiver giles/receiver/receiver.o
 	rm -f giles/sender/sender giles/sender/sender.o
 	rm -f wesley/identity/identity wesley/identity/identity.o
