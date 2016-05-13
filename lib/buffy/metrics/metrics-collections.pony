@@ -9,6 +9,7 @@ interface F64Selector
   fun above(f: F64): F64
   fun size(): USize
   fun bins(): Array[F64]
+  fun overflow(): F64
 
 
 class Log10Selector is F64Selector
