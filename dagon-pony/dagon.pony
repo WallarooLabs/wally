@@ -256,10 +256,8 @@ actor ProcessManager
       let ini_file = File(FilePath(_env.root as AmbientAuth, _path))
       let sections = IniParse(ini_file.lines())
       for section in sections.keys() do
-        _env.out.print("Section name is: " + section)
         let args: Array[String] iso = recover Array[String](6) end
         for key in sections(section).keys() do
-          _env.out.print(key + " = " + sections(section)(key))
           match key
           | "path" =>
             try
@@ -285,9 +283,6 @@ actor ProcessManager
           end
         end
         args.push("--phone_home=" + _host + ":" + _service)
-        for i in Range(0, args.size()) do
-          _env.out.print("args: " + args(i))
-        end
         let vars: Array[String] iso = recover Array[String](0) end
         if filepath isnt None then
           match is_sender
@@ -569,11 +564,15 @@ class ProcessClient is ProcessNotify
     
   fun ref stdout(data: Array[U8] iso) =>
     let out = String.from_array(consume data)
-    _env.out.print("dagon: " + _node_name + " STDOUT: " + out)
+    _env.out.print("dagon: " + _node_name + " STDOUT [")
+    _env.out.print(out)
+    _env.out.print("dagon: " + _node_name + " STDOUT ]")
 
   fun ref stderr(data: Array[U8] iso) =>
     let err = String.from_array(consume data)
-    _env.out.print("dagon: " + _node_name + " STDERR: " + err)
+    _env.out.print("dagon: " + _node_name + " STDERR [")
+    _env.out.print(err)
+    _env.out.print("dagon: " + _node_name + " STDERR ]")
     
   fun ref failed(err: ProcessError) =>
     match err
