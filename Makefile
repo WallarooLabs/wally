@@ -164,7 +164,7 @@ dagon-double: ## Run double test with dagon
           dagon/config/double.ini
 
 dagon-identity: ## Run identity test with dagon
-	./dagon/dagon --timeout 5 -f ./dagon/double-divide.ini -h 127.0.0.1:8080
+	./dagon/dagon --timeout=5 -f double-divide.ini -h 127.0.0.1:8080
 	./wesley/identity/identity ./giles/sender/sent.txt ./giles/receiver/received.txt match
 	#dagon/dagon.py dagon/config/identity.ini
 	#wesley/identity/identity sent.txt received.txt \
