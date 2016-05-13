@@ -14,6 +14,7 @@ use "sendence/tcp"
 primitive Booting
 primitive Ready
 primitive Started
+primitive TopologyReady
 primitive Done
 primitive DoneShutdown
 
@@ -21,6 +22,7 @@ type ChildState is
   ( Booting
   | Ready
   | Started
+  | TopologyReady
   | Done
   | DoneShutdown
   )
@@ -36,14 +38,15 @@ actor Main
     """
     var timeout: I64 = 0
     var path: String = ""
-    var host: String = ""
+    var phone_home: String = ""
+    var phone_home_host: String = ""
+    var phone_home_service: String = ""
     var service: String = ""
     var options = Options(env)
     options
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
-    .add("host", "h", StringArgument)
-    .add("service", "p", StringArgument)
+    .add("phone_home", "h", StringArgument)
     try
       for option in options do
         match option
@@ -55,15 +58,21 @@ actor Main
             timeout = arg
           end
         | ("filepath", let arg: String) => path = arg
-        | ("host", let arg: String) => host = arg
-        | ("service", let arg: String) => service = arg
+        | ("phone_home", let arg: String) => phone_home = arg
       end
     end
     env.out.print("dagon: timeout: " + timeout.string())
     env.out.print("dagon: path: " + path)
-    env.out.print("dagon: host: " + host)
-    env.out.print("dagon: service: " + service)
-    ProcessManager(env, timeout, path, host, service)
+    if phone_home != "" then
+      let ph_addr = phone_home.split(":")
+      try
+        phone_home_host = ph_addr(0)
+        phone_home_service = ph_addr(1)
+      end
+    end
+    env.out.print("dagon: host: " + phone_home_host)
+    env.out.print("dagon: service: " + phone_home_service)
+    ProcessManager(env, timeout, path, phone_home_host, phone_home_service)
   else
     env.out.print("dagon: error parsing commandline args")
   end
@@ -83,6 +92,7 @@ class Notifier is TCPListenNotify
     try
       (host, service) = listen.local_address().name()
       _env.out.print("dagon: listening on " + host + ":" + service)
+      _p_mgr.listening()
     else
       _env.out.print("dagon: couldn't get local address")
       listen.close()
@@ -114,13 +124,16 @@ class ConnectNotify is TCPConnectionNotify
         let decoded = WireMsgDecoder(consume chunked)
         match decoded
         | let m: ReadyMsg val =>
-          _env.out.print("dagon: " + m.node_name + ": _Ready")
+          _env.out.print("dagon: " + m.node_name + ": Ready")
           _p_mgr.received_ready(conn, m.node_name)
+        | let m: TopologyReadyMsg val =>
+          _env.out.print("dagon: " + m.node_name + ": TopologyReady")
+          _p_mgr.received_topology_ready(conn, m.node_name)          
         | let m: DoneMsg val =>
-          _env.out.print("dagon: " + m.node_name + ": _Done")
+          _env.out.print("dagon: " + m.node_name + ": Done")
           _p_mgr.received_done(conn, m.node_name)          
         | let m: DoneShutdownMsg val =>
-          _env.out.print("dagon: " + m.node_name + ": _DoneShutdown")
+          _env.out.print("dagon: " + m.node_name + ": DoneShutdown")
           _p_mgr.received_done_shutdown(conn, m.node_name)
         else
           _env.out.print("dagon: Unexpected message from child")
@@ -136,15 +149,28 @@ class ConnectNotify is TCPConnectionNotify
     
 class Child
   let name: String
-  let is_canary: Bool
   let pm: ProcessMonitor
   var conn: (TCPConnection | None) = None
   var state: ChildState = Booting
   
-  new create(name': String, is_canary': Bool, pm': ProcessMonitor) =>
+  new create(name': String, pm': ProcessMonitor) =>
     name = name'
-    is_canary = is_canary'
     pm = pm'
+
+    
+class Sender
+  let node_name: String
+  let filepath: FilePath
+  let args: Array[String] val
+  let vars: Array[String] val
+  
+  new create(node_name': String, filepath': FilePath,
+    args': Array[String] val, vars': Array[String] val)
+  =>
+    node_name = node_name'
+    filepath = filepath'
+    args = args'
+    vars = vars'
 
     
 actor ProcessManager
@@ -153,10 +179,14 @@ actor ProcessManager
   let _path: String
   let _host: String
   let _service: String
-  var _canary_node: String = ""
+  var _sender_node: String = ""
+  var _sender: (Sender | None) = None
   var roster: Map[String, Child] = Map[String, Child]
   var _listener: (TCPListener | None) = None
-
+  var _listener_is_ready: Bool = false
+  let _timers: Timers = Timers
+  var _timer: (Timer tag | None) = None
+  
   new create(env: Env, timeout: I64, path: String,
     host: String, service: String)
   =>
@@ -168,28 +198,66 @@ actor ProcessManager
     let tcp_n = recover Notifier(env, this) end
     try
       _listener = TCPListener(env.root as AmbientAuth, consume tcp_n,
-        host, service)
+      host, service)
+      let timer = Timer(WaitForListener(_env, this, _timeout), 0, 1_000_000_000)
+      _timer = timer
+      _timers(consume timer)
     else
       _env.out.print("Failed creating tcp listener")
       return
     end
     boot_topology()
+    
+  be listening() =>
+    """
+    Set listener to ready.
+    """
+    _listener_is_ready = true
+    _env.out.print("dagon: listener is ready!")
 
+  be cancel_timer() =>
+    """
+    Cancel our WaitForListener timer.
+    """
+    if _timer isnt None then
+      try
+        let t = _timer as Timer tag
+        _timers.cancel(t)
+        _env.out.print("dagon: canceled listener timer")
+      else
+        _env.out.print("dagon: can't cancel listener timer")
+      end
+    else
+      _env.out.print("dagon: no listener to cancel")
+    end
+    
   be boot_topology() =>
     """
-    Parse ini file and boot processes
+    Check if listener is ready and boot if so.
     """
+    if _listener_is_ready then
+      _env.out.print("dagon: cancelling timer")
+      cancel_timer()
+      _env.out.print("dagon: listener is ready. Booting topology.")
+      parse_and_boot()
+    else
+      _env.out.print("dagon: listener is not ready.")
+    end
+    
+  be parse_and_boot() =>
+    """
+    Parse ini file and boot components
+    """
+    _env.out.print("dagon: parse_and_boot")
     var node_name: String = ""
     var filepath: (FilePath | None) = None
-    var is_canary: Bool = false
+    var is_sender: Bool = false
     try
       let ini_file = File(FilePath(_env.root as AmbientAuth, _path))
       let sections = IniParse(ini_file.lines())
       for section in sections.keys() do
-        _env.out.print("Section name is: " + section)
         let args: Array[String] iso = recover Array[String](6) end
         for key in sections(section).keys() do
-          _env.out.print(key + " = " + sections(section)(key))
           match key
           | "path" =>
             try
@@ -198,26 +266,33 @@ actor ProcessManager
             else
               _env.out.print("dagon: Could not create FilePath")
             end
-          | "node_name" =>
+          | "name" =>
             node_name = sections(section)(key)
             args.push("--" + key + "=" + sections(section)(key))
-          | "canary" =>
+          | "sender" =>
             match sections(section)(key)
             | "true" =>
-              is_canary = true
+              is_sender = true
             else
-              is_canary = false
+              is_sender = false
             end
+          | "leader" =>
+            args.push("-l")  
           else
             args.push("--" + key + "=" + sections(section)(key))
           end
         end
-        args.push("--phone_home_host=" + _host)
-        args.push("--phone_home_service=" + _service)
+        args.push("--phone_home=" + _host + ":" + _service)
         let vars: Array[String] iso = recover Array[String](0) end
         if filepath isnt None then
-          boot_process(node_name, is_canary, filepath as FilePath,
-            consume args, consume vars)
+          match is_sender
+          | false =>
+            boot_process(node_name, filepath as FilePath,
+              consume args, consume vars)
+          | true =>
+            register_sender(node_name, filepath as FilePath,
+              consume args, consume vars)
+          end
         end
       end
     else
@@ -236,29 +311,56 @@ actor ProcessManager
         _env.out.print("dagon: Could not dispose of listener")
       end
     end    
-    
-  be boot_process(node_name: String, is_canary: Bool, filepath: FilePath,
+
+  be register_sender(node_name: String, filepath: FilePath,
     args: Array[String] val, vars: Array[String] val)
   =>
     """
-    Start up processes with host and service as phone home address
+    Register the sender node. We will boot it after the rest of the topology
+    is ready.
+    TODO: Get rid of _sender_node
     """
-    _env.out.print("dagon: booting " + node_name + " is_canary: " +
-      is_canary.string())
-    if is_canary then _canary_node = node_name end
+    _env.out.print("dagon: registering sender node")
+    _sender_node = node_name // refactor this
+    // store sender info for later use
+    _sender = Sender(node_name, filepath, args, vars)
+    
+  be boot_process(node_name: String, filepath: FilePath,
+    args: Array[String] val, vars: Array[String] val)
+  =>
+    """
+    Start up processes with host and service as phone home address.
+    """
     try
       let pn: ProcessNotify iso = ProcessClient(_env, node_name, this)
       let pm: ProcessMonitor = ProcessMonitor(consume pn, filepath,
         consume args, consume vars)
-      let child = Child(node_name, is_canary, pm)
-      _env.out.print("dagon: roster.size:" + roster.size().string())
-      _env.out.print("dagon: inserting into roster: " + node_name)
+      let child = Child(node_name, pm)
+      _env.out.print("dagon: booting: " + node_name)
       roster.insert(node_name, child)
-      _env.out.print("dagon: roster.size:" + roster.size().string())
     else
       _env.out.print("dagon: booting process failed")
     end
 
+  be boot_sender_node() =>
+    """
+    Boot the Sender.
+    """
+    try
+      if _sender isnt None then
+        let sender = _sender as Sender
+        let node_name = sender.node_name
+        let filepath = sender.filepath
+        let args = sender.args
+        let vars = sender.vars
+        boot_process(node_name, filepath, args, vars)
+      else
+        _env.out.print("dagon: can't boot sender. No registered.")
+      end
+    else
+      _env.out.print("dagon: can't boot sender. No registered.")
+    end
+    
   be send_shutdown(node_name: String) =>
     """
     Shutdown a running process
@@ -271,10 +373,11 @@ actor ProcessManager
         let message = WireMsgEncoder.shutdown(node_name)
         c.write(message)
       else
-        _env.out.print("dagon: don't have a connection to send shutdown")
+        _env.out.print("dagon: don't have a connection to send shutdown "
+          + node_name)
       end
     else
-      _env.out.print("dagon: Failed sending shutdown")
+      _env.out.print("dagon: Failed sending shutdown to " + node_name)
     end
     
   be received_ready(conn: TCPConnection, node_name: String) =>
@@ -285,51 +388,75 @@ actor ProcessManager
     try
       let child = roster(node_name)
       // update child state and connection
-      child.state = Ready // remove underscore
+      child.state = Ready
       child.conn  = conn
     else
       _env.out.print("dagon: failed to find child in roster")
     end
-    // check if we're ready and start canary node
-    if _roster_is_ready() then
-      start_canary_node()
+    // Start sender node if it's READY
+    if _sender_is_ready() then
+      start_sender_node()
     end
 
-  fun ref _roster_is_ready(): Bool =>
+  be received_topology_ready(conn: TCPConnection, node_name: String) =>
     """
-    Check if all child processes are ready
+    Leader signaled he's ready. Boot the Sender.
+    """
+    _env.out.print("dagon: received topology ready from leader: " + node_name)
+    try
+      let child = roster(node_name)
+      // update child state
+      child.state = TopologyReady
+    else
+      _env.out.print("dagon: failed to find leader in roster")
+    end
+    // time to boot the sender node
+    boot_sender_node()
+
+  fun ref _is_leader(node_name: String): Bool =>
+    """
+    Check if a child is the leader.
+    TODO: Find better predicate to decide if child is a leader.
+    """
+    if node_name == "leader" then
+      return true
+    else
+      return false
+    end
+    
+  fun ref _sender_is_ready(): Bool =>
+    """
+    Check if the sender processes is ready.
     """
     try
-      for key in roster.keys() do
-        let child = roster(key)
-        match child.state
-        | Booting => return false
-        end
+      let child = roster(_sender_node)
+      match child.state
+      | Ready => return true
       end
     else
-      _env.out.print("dagon: could not iterate over roster")
+      _env.out.print("dagon: could not get sender")
     end      
-    true
+    false    
 
-  be start_canary_node() =>
+  be start_sender_node() =>
     """
-    Send start to the canary node.
+    Send start to the sender node.
     """
-    _env.out.print("dagon: starting canary node")
+    _env.out.print("dagon: starting sender node")
     try
-      let child = roster(_canary_node)
-      let canary_conn: (TCPConnection | None) = child.conn
-      // send start to canary
+      let child = roster(_sender_node)
+      let sender_conn: (TCPConnection | None) = child.conn
+      // send start to sender
       try
-        if (child.state isnt Started) and (canary_conn isnt None) then
-          send_start(canary_conn as TCPConnection, _canary_node)
+        if (child.state isnt Started) and (sender_conn isnt None) then
+          send_start(sender_conn as TCPConnection, _sender_node)
           child.state = Started
         end
       else
-        _env.out.print("dagon: failed sending start to canary node")
+        _env.out.print("dagon: failed sending start to sender node")
       end
     else
-      _env.out.print("dagon: could not get canary node from roster")
+      _env.out.print("dagon: could not get sender node from roster")
     end
     
   be send_start(conn: TCPConnection, node_name: String) =>
@@ -349,14 +476,10 @@ actor ProcessManager
     """
     Node is done. Update it's state.
     """
-    _env.out.print("dagon: received done from child: " + node_name)
+    _env.out.print("dagon: received Done from child: " + node_name)
     try
       let child = roster(node_name)
       child.state = Done
-      if child.is_canary then
-        _env.out.print("dagon: canary is done ---------------------")
-        wait_for_processing()
-      end
     else
       _env.out.print("dagon: failed to set child to done")
     end
@@ -373,10 +496,11 @@ actor ProcessManager
   be shutdown_topology() =>
     """
     Wait for n seconds then shut the topology down.
+    TODO: Get the value pairs and iterate over those.
     """
     _env.out.print("dagon: shutting down topology")
     try
-      for key in roster.keys() do // get the values and iterate over those
+      for key in roster.keys() do
         let child = roster(key)
         send_shutdown(child.name)
       end
@@ -393,21 +517,38 @@ actor ProcessManager
     try
       let child = roster(node_name)
       child.state = DoneShutdown
+      if child.name == _sender_node then
+        _env.out.print("dagon: sender reported DoneShutdown ---------------------")
+        wait_for_processing()
+      end      
     else
       _env.out.print("dagon: failed to set child state to done_shutdown")
     end
 
+  fun ref _is_done_shutdown(node_name: String): Bool =>
+    """
+    Check if the state of a node is DoneShutdown
+    """
+    try
+      let child = roster(node_name)
+      match child.state
+      | DoneShutdown => return true
+      else
+        return false
+      end
+    else
+      _env.out.print("dagon: could not get state for " + node_name)
+    end
+    false
+    
   be received_exit_code(node_name: String) =>
     """
     Node has exited.
     """
     _env.out.print("dagon: exited child: " + node_name)
-    try
-      roster.remove(node_name)
-    else
-      _env.out.print("dagon: failed to remove child from roster")
+    if _is_leader(node_name) and _is_done_shutdown(node_name) then
+      shutdown_listener()
     end
-    if roster.size() == 0 then shutdown_listener() end // this won't work for containers!
 
       
 class ProcessClient is ProcessNotify
@@ -423,11 +564,15 @@ class ProcessClient is ProcessNotify
     
   fun ref stdout(data: Array[U8] iso) =>
     let out = String.from_array(consume data)
-    _env.out.print("dagon: " + _node_name + " STDOUT: " + out)
+    _env.out.print("dagon: " + _node_name + " STDOUT [")
+    _env.out.print(out)
+    _env.out.print("dagon: " + _node_name + " STDOUT ]")
 
   fun ref stderr(data: Array[U8] iso) =>
     let err = String.from_array(consume data)
-    _env.out.print("dagon: " + _node_name + " STDERR: " + err)
+    _env.out.print("dagon: " + _node_name + " STDERR [")
+    _env.out.print(err)
+    _env.out.print("dagon: " + _node_name + " STDERR ]")
     
   fun ref failed(err: ProcessError) =>
     match err
@@ -447,7 +592,8 @@ class ProcessClient is ProcessNotify
     end
     
   fun ref dispose(child_exit_code: I32) =>
-    _env.out.print("dagon: child exit code: " + child_exit_code.string())
+    _env.out.print("dagon: " + _node_name + " exited with exit code: "
+      + child_exit_code.string())
     _p_mgr.received_exit_code(_node_name)
 
  
@@ -469,7 +615,7 @@ class WaitForProcessing is TimerNotify
     
   fun ref apply(timer: Timer, count: U64): Bool =>
     let c = _next()
-    _env.out.print("dagon: waiting for shutdown " + c.string())
+    _env.out.print("dagon: wait for processing to finish: " + c.string())
     if c > _limit then
       false
     else
@@ -478,3 +624,34 @@ class WaitForProcessing is TimerNotify
     
   fun ref cancel(timer: Timer) =>
     _p_mgr.shutdown_topology()
+
+
+class WaitForListener is TimerNotify  
+  let _env: Env
+  let _p_mgr: ProcessManager
+  let _limit: I64
+  var _counter: I64
+  
+  new iso create(env: Env, p_mgr: ProcessManager, limit: I64) =>
+    _counter = 0
+    _env = env
+    _p_mgr = p_mgr
+    _limit = limit
+
+  fun ref _next(): I64 =>
+    _counter = _counter + 1
+    _counter
+    
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    let c = _next()
+    _env.out.print("dagon: waited for listener, trying to boot: " + c.string())
+    _p_mgr.boot_topology()
+    if c > _limit then
+      _env.out.print("dagon: listener timeout reached " + c.string())
+      false // we're out of time
+    else
+      true // wait for next tick
+    end
+              
+  fun ref cancel(timer: Timer) =>
+    _env.out.print("dagon: timer got canceled")
