@@ -124,7 +124,7 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-receiver build-sender build-wesley build-double-divide ## Build Pony based programs for Buffy
+build: build-receiver build-sender build-wesley build-double-divide build-dagon ## Build Pony based programs for Buffy
 
 build-receiver: ## Build giles receiver
 	$(call PONYC,giles/receiver)
@@ -134,6 +134,9 @@ build-sender: ## Build giles sender
 
 build-double-divide:
 	$(call PONYC,apps/double-divide)
+
+build-dagon:
+	$(call PONYC,dagon)
 
 build-wesley: ## Build wesley
 	$(call PONYC,wesley/double)
@@ -161,9 +164,11 @@ dagon-double: ## Run double test with dagon
           dagon/config/double.ini
 
 dagon-identity: ## Run identity test with dagon
-	dagon/dagon.py dagon/config/identity.ini
-	wesley/identity/identity sent.txt received.txt \
-          dagon/config/identity.ini
+	./dagon/dagon --timeout 5 -f ./dagon/double-divide.ini -h 127.0.0.1:8080
+	./wesley/identity/identity ./giles/sender/sent.txt ./giles/receiver/received.txt match
+	#dagon/dagon.py dagon/config/identity.ini
+	#wesley/identity/identity sent.txt received.txt \
+  #        dagon/config/identity.ini
 
 dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
 

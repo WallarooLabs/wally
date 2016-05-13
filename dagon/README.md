@@ -28,10 +28,9 @@ dagon-pony takes four arguments:
    Sender is done.
 -f configuration file path
 -h host ip address dagon should listen on
--p port number dagon should listen on
 ```
 
 Example:
 ```
-./dagon-pony -t 10 -f example.ini -h 127.0.0.1 -p 8080
+./dagon -t 10 -f example.ini -h 127.0.0.1:8080
 ```
