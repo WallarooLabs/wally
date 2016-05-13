@@ -1,25 +1,27 @@
 use "osc-pony"
 use "sendence/bytes"
+use "time"
 
 primitive _Ready                                fun apply(): String => "/0"
 primitive _TopologyReady                        fun apply(): String => "/1"
-primitive _Identify                             fun apply(): String => "/2"
-primitive _Done                                 fun apply(): String => "/3"
-primitive _Reconnect                            fun apply(): String => "/4"
-primitive _Start                                fun apply(): String => "/5"
-primitive _Shutdown                             fun apply(): String => "/6"
-primitive _DoneShutdown                         fun apply(): String => "/7"
-primitive _Forward                              fun apply(): String => "/8"
-primitive _SpinUp                               fun apply(): String => "/9"
-primitive _SpinUpProxy                          fun apply(): String => "/10"
-primitive _SpinUpSink                           fun apply(): String => "/11"
-primitive _ConnectSteps                         fun apply(): String => "/12"
-primitive _InitializationMsgsFinished           fun apply(): String => "/13"
-primitive _AckInitialized                       fun apply(): String => "/14"
-primitive _External                             fun apply(): String => "/15"
-primitive _ForwardI32                           fun apply(): String => "/16"
-primitive _ForwardF32                           fun apply(): String => "/17"
-primitive _ForwardString                        fun apply(): String => "/18"
+primitive _IdentifyControl                      fun apply(): String => "/2"
+primitive _IdentifyInternal                     fun apply(): String => "/3"
+primitive _Done                                 fun apply(): String => "/4"
+primitive _Reconnect                            fun apply(): String => "/5"
+primitive _Start                                fun apply(): String => "/6"
+primitive _Shutdown                             fun apply(): String => "/7"
+primitive _DoneShutdown                         fun apply(): String => "/8"
+primitive _Forward                              fun apply(): String => "/9"
+primitive _SpinUp                               fun apply(): String => "/10"
+primitive _SpinUpProxy                          fun apply(): String => "/11"
+primitive _SpinUpSink                           fun apply(): String => "/12"
+primitive _ConnectSteps                         fun apply(): String => "/13"
+primitive _InitializationMsgsFinished           fun apply(): String => "/14"
+primitive _AckInitialized                       fun apply(): String => "/15"
+primitive _External                             fun apply(): String => "/16"
+primitive _ForwardI32                           fun apply(): String => "/17"
+primitive _ForwardF32                           fun apply(): String => "/18"
+primitive _ForwardString                        fun apply(): String => "/19"
 
 primitive WireMsgEncoder
   fun ready(node_name: String): Array[U8] val =>
@@ -36,8 +38,19 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun identify(node_name: String, host: String, service: String): Array[U8] val =>
-    let osc = OSCMessage(_Identify(),
+  fun identify_control(node_name: String, host: String, service: String)
+    : Array[U8] val =>
+    let osc = OSCMessage(_IdentifyControl(),
+      recover
+        [as OSCData val: OSCString(node_name),
+                         OSCString(host),
+                         OSCString(service)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
+  fun identify_internal(node_name: String, host: String, service: String)
+    : Array[U8] val =>
+    let osc = OSCMessage(_IdentifyInternal(),
       recover
         [as OSCData val: OSCString(node_name),
                          OSCString(host),
@@ -78,37 +91,53 @@ primitive WireMsgEncoder
     Bytes.length_encode(osc.to_bytes())
 
   fun forward(step_id: I32, msg: Message[I32] val): Array[U8] val =>
+    let source_ts_byte_0 = (msg.source_ts >> 32).i32()
+    let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
     let osc = OSCMessage(_Forward(),
       recover
         [as OSCData val: OSCInt(step_id),
                          OSCInt(msg.id),
+                         OSCInt(source_ts_byte_0),
+                         OSCInt(source_ts_byte_1),
                          OSCInt(msg.data)]
       end)
     Bytes.length_encode(osc.to_bytes())
 
   fun forward_i32(step_id: I32, msg: Message[I32] val): Array[U8] val =>
+    let source_ts_byte_0 = (msg.source_ts >> 32).i32()
+    let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
     let osc = OSCMessage(_ForwardI32(),
       recover
         [as OSCData val: OSCInt(step_id),
                          OSCInt(msg.id),
+                         OSCInt(source_ts_byte_0),
+                         OSCInt(source_ts_byte_1),
                          OSCInt(msg.data)]
       end)
     Bytes.length_encode(osc.to_bytes())
 
   fun forward_f32(step_id: I32, msg: Message[F32] val): Array[U8] val =>
+    let source_ts_byte_0 = (msg.source_ts >> 32).i32()
+    let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
     let osc = OSCMessage(_ForwardF32(),
       recover
         [as OSCData val: OSCInt(step_id),
                          OSCInt(msg.id),
+                         OSCInt(source_ts_byte_0),
+                         OSCInt(source_ts_byte_1),
                          OSCFloat(msg.data)]
       end)
     Bytes.length_encode(osc.to_bytes())
 
   fun forward_string(step_id: I32, msg: Message[String] val): Array[U8] val =>
+    let source_ts_byte_0 = (msg.source_ts >> 32).i32()
+    let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
     let osc = OSCMessage(_ForwardString(),
       recover
         [as OSCData val: OSCInt(step_id),
                          OSCInt(msg.id),
+                         OSCInt(source_ts_byte_0),
+                         OSCInt(source_ts_byte_1),
                          OSCString(msg.data)]
       end)
     Bytes.length_encode(osc.to_bytes())
@@ -179,8 +208,10 @@ primitive WireMsgDecoder
       ReadyMsg(msg)
     | _TopologyReady() =>
       TopologyReadyMsg(msg)
-    | _Identify() =>
-      IdentifyMsg(msg)
+    | _IdentifyControl() =>
+      IdentifyControlMsg(msg)
+    | _IdentifyInternal() =>
+      IdentifyInternalMsg(msg)
     | _Done() =>
       DoneMsg(msg)
     | _Start() =>
@@ -241,7 +272,22 @@ class TopologyReadyMsg is WireMsg
       error
     end
 
-class IdentifyMsg is WireMsg
+class IdentifyControlMsg is WireMsg
+  let node_name: String
+  let host: String
+  let service: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match (msg.arguments(0), msg.arguments(1), msg.arguments(2))
+    | (let n: OSCString val, let h: OSCString val, let s: OSCString val) =>
+      node_name = n.value()
+      host = h.value()
+      service = s.value()
+    else
+      error
+    end
+
+class IdentifyInternalMsg is WireMsg
   let node_name: String
   let host: String
   let service: String
@@ -306,10 +352,13 @@ class ForwardMsg is WireMsg
   let msg: Message[I32] val
 
   new val create(m: OSCMessage val) ? =>
-    match (m.arguments(0), m.arguments(1), m.arguments(2))
-    | (let a_id: OSCInt val, let m_id: OSCInt val, let m_data: OSCInt val) =>
+    match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
+      m.arguments(4))
+    | (let a_id: OSCInt val, let m_id: OSCInt val, let s_ts_0: OSCInt val,
+      let s_ts_1: OSCInt val, let m_data: OSCInt val) =>
       step_id = a_id.value()
-      msg = Message[I32](m_id.value(), m_data.value())
+      let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
+      msg = Message[I32](m_id.value(), source_ts, Time.millis(), m_data.value())
     else
       error
     end
@@ -319,10 +368,13 @@ class ForwardI32Msg is WireMsg
   let msg: Message[I32] val
 
   new val create(m: OSCMessage val) ? =>
-    match (m.arguments(0), m.arguments(1), m.arguments(2))
-    | (let a_id: OSCInt val, let m_id: OSCInt val, let m_data: OSCInt val) =>
+    match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
+      m.arguments(4))
+    | (let a_id: OSCInt val, let m_id: OSCInt val, let s_ts_0: OSCInt val,
+      let s_ts_1: OSCInt val, let m_data: OSCInt val) =>
       step_id = a_id.value()
-      msg = Message[I32](m_id.value(), m_data.value())
+      let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
+      msg = Message[I32](m_id.value(), source_ts, Time.millis(), m_data.value())
     else
       error
     end
@@ -332,10 +384,13 @@ class ForwardF32Msg is WireMsg
   let msg: Message[F32] val
 
   new val create(m: OSCMessage val) ? =>
-    match (m.arguments(0), m.arguments(1), m.arguments(2))
-    | (let a_id: OSCInt val, let m_id: OSCInt val, let m_data: OSCFloat val) =>
+    match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
+      m.arguments(4))
+    | (let a_id: OSCInt val, let m_id: OSCInt val, let s_ts_0: OSCInt val,
+      let s_ts_1: OSCInt val, let m_data: OSCFloat val) =>
       step_id = a_id.value()
-      msg = Message[F32](m_id.value(), m_data.value())
+      let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
+      msg = Message[F32](m_id.value(), source_ts, Time.millis(), m_data.value())
     else
       error
     end
@@ -345,10 +400,13 @@ class ForwardStringMsg is WireMsg
   let msg: Message[String] val
 
   new val create(m: OSCMessage val) ? =>
-    match (m.arguments(0), m.arguments(1), m.arguments(2))
-    | (let a_id: OSCInt val, let m_id: OSCInt val, let m_data: OSCString val) =>
+    match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
+      m.arguments(4))
+    | (let a_id: OSCInt val, let m_id: OSCInt val, let s_ts_0: OSCInt val,
+      let s_ts_1: OSCInt val, let m_data: OSCString val) =>
       step_id = a_id.value()
-      msg = Message[String](m_id.value(), m_data.value())
+      let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
+      msg = Message[String](m_id.value(), source_ts, Time.millis(), m_data.value())
     else
       error
     end

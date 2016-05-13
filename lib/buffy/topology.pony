@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "buffy/messages"
+use "buffy/metrics"
 
 class Topology
   let pipelines: Array[PipelineSteps] = Array[PipelineSteps]
@@ -15,10 +16,10 @@ class Topology
 
 interface StepLookup
   fun val apply(computation_type: String): BasicStep tag ?
-  fun sink(conn: TCPConnection): BasicStep tag
+  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector): BasicStep tag
 
 trait PipelineSteps
-  fun sink(conn: TCPConnection): Any tag
+  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector): Any tag
   fun apply(i: USize): PipelineStep box ?
   fun size(): USize
 
@@ -35,8 +36,8 @@ class Pipeline[In: OSCEncodable val, Out: OSCEncodable val] is PipelineSteps
   fun ref add_step(p: PipelineStep) =>
     _steps.push(p)
 
-  fun sink(conn: TCPConnection): Any tag =>
-    sink_builder(conn)
+  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector): Any tag =>
+    sink_builder(conn, metrics_collector)
 
   fun apply(i: USize): PipelineStep box ? => _steps(i)
 

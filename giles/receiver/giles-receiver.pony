@@ -8,7 +8,7 @@ use "options"
 use "signals"
 use "time"
 use "buffy/messages"
-use "sendence/tcp"
+use "sendence/bytes"
 
 // tests
 // documentation
@@ -72,13 +72,14 @@ actor Main
           let listener_addr = l_arg as Array[String]
 
           let store = Store(env.root as AmbientAuth)
+          let decoder = Decoder(store, env.err)
           let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           SignalHandler(TermHandler(coordinator), Sig.term())
 
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
-            FromBuffyListenerNotify(coordinator, store, env.err),
+            FromBuffyListenerNotify(coordinator, decoder, env.err),
             listener_addr(0),
             listener_addr(1))
 
@@ -90,12 +91,14 @@ actor Main
 
 class FromBuffyListenerNotify is TCPListenNotify
   let _coordinator: Coordinator
-  let _store: Store
+  let _decoder: Decoder
   let _stderr: StdStream
 
-  new iso create(coordinator: Coordinator, store: Store, stderr: StdStream) =>
+  new iso create(coordinator: Coordinator,
+    decoder: Decoder, stderr: StdStream)
+  =>
     _coordinator = coordinator
-    _store = store
+    _decoder = decoder
     _stderr = stderr
 
   fun ref not_listening(listen: TCPListener ref) =>
@@ -105,42 +108,46 @@ class FromBuffyListenerNotify is TCPListenNotify
     _coordinator.from_buffy_listener(listen, Ready)
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    FromBuffyNotify(_coordinator, _store, _stderr)
+    FromBuffyNotify(_coordinator, _decoder, _stderr)
 
 class FromBuffyNotify is TCPConnectionNotify
   let _coordinator: Coordinator
-  let _store: Store
-  let _framer: Framer = Framer
+  let _decoder: Decoder
   let _stderr: StdStream
+  var _header: Bool = true
 
-  new iso create(coordinator: Coordinator, store: Store, stderr: StdStream) =>
+  new iso create(coordinator: Coordinator,
+    decoder: Decoder, stderr: StdStream)
+  =>
     _coordinator = coordinator
-    _store = store
+    _decoder = decoder
     _stderr = stderr
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    for chunked in _framer.chunk(consume data).values() do
+    if _header then
       try
-        let decoded = WireMsgDecoder(consume chunked)
-        match decoded
-        | let d: ExternalMsg val =>
-          _store.received(d.data, Time.micros())
-        else
-          _stderr.print("Unexpected data from Buffy")
-        end
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        conn.expect(expect)
+        _header = false
       else
-        _stderr.print("Unable to decode message Buffy")
+        _stderr.print("Blew up reading header from Buffy")
       end
+    else
+      _decoder.received(consume data, Time.micros())
+
+      conn.expect(4)
+      _header = true
     end
 
   fun ref accepted(conn: TCPConnection ref) =>
+    conn.expect(4)
     _coordinator.connection_added(consume conn)
 
 
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator
-  let _framer: Framer = Framer
   let _stderr: StdStream
+  var _header: Bool = true
 
   new iso create(coordinator: WithDagonCoordinator, stderr: StdStream) =>
     _coordinator = coordinator
@@ -150,12 +157,21 @@ class ToDagonNotify is TCPConnectionNotify
     _coordinator.to_dagon_socket(sock, Failed)
 
   fun ref connected(sock: TCPConnection ref) =>
+    sock.expect(4)
     _coordinator.to_dagon_socket(sock, Ready)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    for chunked in _framer.chunk(consume data).values() do
+    if _header then
       try
-        let decoded = WireMsgDecoder(consume chunked)
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        conn.expect(expect)
+        _header = false
+      else
+        _stderr.print("Blew up reading header from Buffy")
+      end
+    else
+      try
+        let decoded = WireMsgDecoder(consume data)
         match decoded
         | let d: ShutdownMsg val =>
           _coordinator.finished()
@@ -165,6 +181,9 @@ class ToDagonNotify is TCPConnectionNotify
       else
         _stderr.print("Unable to decode message Dagon")
       end
+
+      conn.expect(4)
+      _header = true
     end
 
 //
@@ -291,6 +310,31 @@ actor WithDagonCoordinator is Coordinator
 
   be connection_added(c: TCPConnection) =>
     _connections.push(c)
+
+///
+/// RECEIVED MESSAGE DECODER
+///
+
+actor Decoder
+  let _store: Store
+  let _stderr: StdStream
+
+  new create(store: Store, stderr: StdStream) =>
+    _store = store
+    _stderr = stderr
+
+  be received(data: Array[U8] iso, at: U64) =>
+    try
+      let decoded = WireMsgDecoder(consume data)
+      match decoded
+      | let d: ExternalMsg val =>
+        _store.received(d.data, at)
+      else
+        _stderr.print("Unexpected data from Buffy")
+      end
+    else
+      _stderr.print("Unable to decode message Buffy")
+    end
 
 ///
 /// RECEIVED MESSAGE STORE
