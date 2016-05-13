@@ -92,7 +92,7 @@ class Notifier is TCPListenNotify
     try
       (host, service) = listen.local_address().name()
       _env.out.print("dagon: listening on " + host + ":" + service)
-      _p_mgr.listener_is_ready()
+      _p_mgr.listening()
     else
       _env.out.print("dagon: couldn't get local address")
       listen.close()
@@ -184,7 +184,9 @@ actor ProcessManager
   var roster: Map[String, Child] = Map[String, Child]
   var _listener: (TCPListener | None) = None
   var _listener_is_ready: Bool = false
-
+  let _timers: Timers = Timers
+  var _timer: (Timer tag | None) = None
+  
   new create(env: Env, timeout: I64, path: String,
     host: String, service: String)
   =>
@@ -196,36 +198,50 @@ actor ProcessManager
     let tcp_n = recover Notifier(env, this) end
     try
       _listener = TCPListener(env.root as AmbientAuth, consume tcp_n,
-        host, service)
+      host, service)
+      let timer = Timer(WaitForListener(_env, this, _timeout), 0, 1_000_000_000)
+      _timer = timer
+      _timers(consume timer)
     else
       _env.out.print("Failed creating tcp listener")
       return
     end
     boot_topology()
-
-  be listener_is_ready() =>
+    
+  be listening() =>
     """
     Set listener to ready.
     """
     _listener_is_ready = true
     _env.out.print("dagon: listener is ready!")
-    
-  be delay_boot() =>
+
+  be cancel_timer() =>
     """
-    Listener was not ready. Let's wait and try again to boot the topology.
+    Cancel our WaitForListener timer.
     """
-    let timers = Timers
-    let timer = Timer(WaitForListener(_env, this, _timeout), 0, 1_000_000_000)
-    timers(consume timer)
+    if _timer isnt None then
+      try
+        let t = _timer as Timer tag
+        _timers.cancel(t)
+        _env.out.print("dagon: canceled listener timer")
+      else
+        _env.out.print("dagon: can't cancel listener timer")
+      end
+    else
+      _env.out.print("dagon: no listener to cancel")
+    end
     
   be boot_topology() =>
     """
     Check if listener is ready and boot if so.
     """
     if _listener_is_ready then
+      _env.out.print("dagon: cancelling timer")
+      cancel_timer()
+      _env.out.print("dagon: listener is ready. Booting topology.")
       parse_and_boot()
     else
-      delay_boot()
+      _env.out.print("dagon: listener is not ready.")
     end
     
   be parse_and_boot() =>
@@ -629,12 +645,14 @@ class WaitForListener is TimerNotify
     
   fun ref apply(timer: Timer, count: U64): Bool =>
     let c = _next()
-    _env.out.print("dagon: wait for listener: " + c.string())
-    if c > _limit then
-      false
-    else
-      true
-    end
-    
-  fun ref cancel(timer: Timer) =>
+    _env.out.print("dagon: waited for listener, trying to boot: " + c.string())
     _p_mgr.boot_topology()
+    if c > _limit then
+      _env.out.print("dagon: listener timeout reached " + c.string())
+      false // we're out of time
+    else
+      true // wait for next tick
+    end
+              
+  fun ref cancel(timer: Timer) =>
+    _env.out.print("dagon: timer got canceled")
