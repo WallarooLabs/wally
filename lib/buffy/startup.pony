@@ -14,7 +14,7 @@ actor Startup
     var metrics_addr = Array[String]
     var options = Options(env)
     var leader_control_addr = Array[String]
-    var leader_internal_addr = Array[String]
+    var leader_data_addr = Array[String]
     var source_addrs = Array[String]
     var sink_addrs = Array[String]
 
@@ -29,7 +29,7 @@ actor Startup
       // Comma-delimited source and sink addresses.
       // e.g. --source 127.0.0.1:6000,127.0.0.1:7000
       .add("leader-control-address", "", StringArgument)
-      .add("leader-internal-address", "", StringArgument)
+      .add("leader-data-address", "", StringArgument)
       .add("source", "", StringArgument)
       .add("sink", "", StringArgument)
       .add("metrics", "", StringArgument)
@@ -40,7 +40,7 @@ actor Startup
       match option
       | ("leader", None) => is_worker = false
       | ("leader-control-address", let arg: String) => leader_control_addr = arg.split(":")
-      | ("leader-internal-address", let arg: String) => leader_internal_addr = arg.split(":")
+      | ("leader-data-address", let arg: String) => leader_data_addr = arg.split(":")
       | ("worker_count", let arg: I64) => worker_count = arg.usize()
       | ("phone_home", let arg: String) => phone_home_addr = arg.split(":")
       | ("name", let arg: String) => node_name = arg
@@ -69,8 +69,8 @@ actor Startup
 
       let leader_control_host = leader_control_addr(0)
       let leader_control_service = leader_control_addr(1)
-      let leader_internal_host = leader_internal_addr(0)
-      let leader_internal_service = leader_internal_addr(1)
+      let leader_data_host = leader_data_addr(0)
+      let leader_data_service = leader_data_addr(1)
 
       let metrics_collector =
         if metrics_addr.size() > 0 then
@@ -107,7 +107,7 @@ actor Startup
             leader_control_service, phone_home_conn, step_manager, coordinator,
             metrics_collector)))
         coordinator.add_listener(TCPListener(auth,
-          WorkerBuffyInternalNotifier(env, auth, node_name, leader_control_host,
+          WorkerIntraclusterDataNotifier(env, auth, node_name, leader_control_host,
             leader_control_service, step_manager, coordinator, spike_config)))
       else
         if source_addrs.size() != source_count then
@@ -129,7 +129,7 @@ actor Startup
         // Set up leader listener
         let topology_manager: TopologyManager = TopologyManager(env, auth,
           node_name, worker_count, leader_control_host, leader_control_service,
-          leader_internal_host, leader_internal_service, phone_home_conn,
+          leader_data_host, leader_data_service, phone_home_conn,
           step_manager, coordinator, topology)
 
         coordinator.add_topology_manager(topology_manager)
@@ -139,11 +139,11 @@ actor Startup
           coordinator, topology_manager, metrics_collector)
         coordinator.add_listener(TCPListener(auth, consume control_notifier,
           leader_control_host, leader_control_service))
-        let internal_notifier: TCPListenNotify iso =
-          LeaderBuffyInternalNotifier(env, auth, node_name, step_manager,
+        let data_notifier: TCPListenNotify iso =
+          LeaderIntraclusterDataNotifier(env, auth, node_name, step_manager,
             coordinator, spike_config)
-        coordinator.add_listener(TCPListener(auth, consume internal_notifier,
-          leader_internal_host, leader_internal_service))
+        coordinator.add_listener(TCPListener(auth, consume data_notifier,
+          leader_data_host, leader_data_service))
       end
 
       if is_worker then
@@ -151,8 +151,8 @@ actor Startup
       else
         env.out.print("**Buffy Leader " + node_name + " control: "
           + leader_control_host + ":" + leader_control_service + "**")
-        env.out.print("**Buffy Leader " + node_name + " internal: "
-          + leader_internal_host + ":" + leader_internal_service + "**")
+        env.out.print("**Buffy Leader " + node_name + " data: "
+          + leader_data_host + ":" + leader_data_service + "**")
         env.out.print("** -- Looking for " + worker_count.string()
           + " workers --**")
       end

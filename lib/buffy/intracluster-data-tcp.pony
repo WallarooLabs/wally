@@ -7,7 +7,7 @@ use "sendence/tcp"
 use "time"
 use "spike"
 
-class LeaderBuffyInternalNotifier is TCPListenNotify
+class LeaderIntraclusterDataNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
@@ -30,21 +30,21 @@ class LeaderBuffyInternalNotifier is TCPListenNotify
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
-      _env.out.print(_name + " internal: listening on " + _host + ":" + _service)
+      _env.out.print(_name + " data: listening on " + _host + ":" + _service)
     else
-      _env.out.print(_name + " internal: couldn't get local address")
+      _env.out.print(_name + " data: couldn't get local address")
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
-    _env.out.print(_name + " internal: couldn't listen")
+    _env.out.print(_name + " data: couldn't listen")
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    SpikeWrapper(BuffyInternalConnectNotify(_env, _name,
+    SpikeWrapper(IntraclusterDataConnectNotify(_env, _name,
       _step_manager, _coordinator), _spike_config)
 
-class WorkerBuffyInternalNotifier is TCPListenNotify
+class WorkerIntraclusterDataNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
@@ -71,30 +71,30 @@ class WorkerBuffyInternalNotifier is TCPListenNotify
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
-      _env.out.print(_name + " internal: listening on " + _host + ":" + _service)
+      _env.out.print(_name + " data: listening on " + _host + ":" + _service)
 
       let notifier: TCPConnectionNotify iso =
-        SpikeWrapper(BuffyInternalConnectNotify(_env, _name,
+        SpikeWrapper(IntraclusterDataConnectNotify(_env, _name,
           _step_manager, _coordinator), _spike_config)
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, _leader_host, _leader_service)
 
-      let message = WireMsgEncoder.identify_internal(_name, _host, _service)
+      let message = WireMsgEncoder.identify_data(_name, _host, _service)
       conn.write(message)
     else
-      _env.out.print(_name + " internal: couldn't get local address")
+      _env.out.print(_name + " data: couldn't get local address")
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
-    _env.out.print(_name + " internal: couldn't listen")
+    _env.out.print(_name + " data: couldn't listen")
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    SpikeWrapper(BuffyInternalConnectNotify(_env, _name,
+    SpikeWrapper(IntraclusterDataConnectNotify(_env, _name,
       _step_manager, _coordinator), _spike_config)
 
-class BuffyInternalConnectNotify is TCPConnectionNotify
+class IntraclusterDataConnectNotify is TCPConnectionNotify
   let _env: Env
   let _name: String
   let _step_manager: StepManager
@@ -123,12 +123,12 @@ class BuffyInternalConnectNotify is TCPConnectionNotify
         | let m: ForwardStringMsg val =>
           _step_manager(m.step_id, m.msg)
         | let m: UnknownMsg val =>
-          _env.err.print("Unknown internal Buffy message type.")
+          _env.err.print("Unknown data Buffy message type.")
         end
       else
-        _env.err.print("Error decoding incoming internal Buffy message.")
+        _env.err.print("Error decoding incoming data Buffy message.")
       end
     end
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print(_name + ": internal Buffy server closed")
+    _env.out.print(_name + ": data Buffy server closed")

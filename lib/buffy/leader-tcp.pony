@@ -55,7 +55,7 @@ class LeaderConnectNotify is TCPConnectionNotify
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector
   let _framer: Framer = Framer
-  let _node_internal_conns: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
+  let _node_data_conns: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
 
   new iso create(env: Env, auth: AmbientAuth, name: String, t_manager: TopologyManager,
     s_manager: StepManager, coordinator: Coordinator,
@@ -78,8 +78,8 @@ class LeaderConnectNotify is TCPConnectionNotify
         match msg
         | let m: IdentifyControlMsg val =>
           _topology_manager.assign_control_conn(conn, m.node_name, m.host, m.service)
-        | let m: IdentifyInternalMsg val =>
-          _topology_manager.assign_internal_conn(conn, m.node_name, m.host, m.service)
+        | let m: IdentifyDataMsg val =>
+          _topology_manager.assign_data_conn(conn, m.node_name, m.host, m.service)
         | let m: AckInitializedMsg val =>
           _topology_manager.ack_initialized()
         | let m: ReconnectMsg val =>
@@ -104,7 +104,7 @@ class LeaderConnectNotify is TCPConnectionNotify
 
   fun ref _spin_up_proxy(msg: SpinUpProxyMsg val) =>
     try
-      let target_conn = _node_internal_conns(msg.target_node_name)
+      let target_conn = _node_data_conns(msg.target_node_name)
       _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
     else
       let notifier: TCPConnectionNotify iso =
@@ -114,7 +114,7 @@ class LeaderConnectNotify is TCPConnectionNotify
         TCPConnection(_auth, consume notifier, msg.target_host,
           msg.target_service)
       _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
-      _node_internal_conns(msg.target_node_name) = target_conn
+      _node_data_conns(msg.target_node_name) = target_conn
     end
 
   fun ref closed(conn: TCPConnection ref) =>

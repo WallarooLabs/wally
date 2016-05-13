@@ -5,7 +5,7 @@ use "time"
 primitive _Ready                                fun apply(): String => "/0"
 primitive _TopologyReady                        fun apply(): String => "/1"
 primitive _IdentifyControl                      fun apply(): String => "/2"
-primitive _IdentifyInternal                     fun apply(): String => "/3"
+primitive _IdentifyData                         fun apply(): String => "/3"
 primitive _Done                                 fun apply(): String => "/4"
 primitive _Reconnect                            fun apply(): String => "/5"
 primitive _Start                                fun apply(): String => "/6"
@@ -48,9 +48,9 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun identify_internal(node_name: String, host: String, service: String)
+  fun identify_data(node_name: String, host: String, service: String)
     : Array[U8] val =>
-    let osc = OSCMessage(_IdentifyInternal(),
+    let osc = OSCMessage(_IdentifyData(),
       recover
         [as OSCData val: OSCString(node_name),
                          OSCString(host),
@@ -210,8 +210,8 @@ primitive WireMsgDecoder
       TopologyReadyMsg(msg)
     | _IdentifyControl() =>
       IdentifyControlMsg(msg)
-    | _IdentifyInternal() =>
-      IdentifyInternalMsg(msg)
+    | _IdentifyData() =>
+      IdentifyDataMsg(msg)
     | _Done() =>
       DoneMsg(msg)
     | _Start() =>
@@ -287,7 +287,7 @@ class IdentifyControlMsg is WireMsg
       error
     end
 
-class IdentifyInternalMsg is WireMsg
+class IdentifyDataMsg is WireMsg
   let node_name: String
   let host: String
   let service: String

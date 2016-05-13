@@ -69,7 +69,7 @@ class WorkerConnectNotify is TCPConnectionNotify
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector
   let _framer: Framer = Framer
-  let _node_internal_conns: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
+  let _node_data_conns: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
   let _name: String
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
@@ -118,7 +118,7 @@ class WorkerConnectNotify is TCPConnectionNotify
 
   fun ref _spin_up_proxy(msg: SpinUpProxyMsg val) =>
     try
-      let target_conn = _node_internal_conns(msg.target_node_name)
+      let target_conn = _node_data_conns(msg.target_node_name)
       _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
     else
       let notifier: TCPConnectionNotify iso =
@@ -129,7 +129,7 @@ class WorkerConnectNotify is TCPConnectionNotify
           msg.target_service)
       target_conn.write(WireMsgEncoder.ready(_name))
       _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
-      _node_internal_conns(msg.target_node_name) = target_conn
+      _node_data_conns(msg.target_node_name) = target_conn
     end
 
   fun ref connected(conn: TCPConnection ref) =>

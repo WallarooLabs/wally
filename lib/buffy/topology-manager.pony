@@ -11,25 +11,25 @@ actor TopologyManager
   let _name: String
   let _worker_count: USize
   let _worker_control_conns: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
-  let _worker_internal_conns: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
+  let _worker_data_conns: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
   let _node_control_addrs: Map[String, (String, String)] = Map[String, (String, String)]
-  let _node_internal_addrs: Map[String, (String, String)] = Map[String, (String, String)]
+  let _node_data_addrs: Map[String, (String, String)] = Map[String, (String, String)]
   let _topology: Topology val
   // Keep track of how many workers identified themselves
   var _control_hellos: USize = 0
-  var _internal_hellos: USize = 0
+  var _data_hellos: USize = 0
   // Keep track of how many workers acknowledged they're running their
   // part of the topology
   var _acks: USize = 0
   let _leader_control_host: String
   let _leader_control_service: String
-  let _leader_internal_host: String
-  let _leader_internal_service: String
+  let _leader_data_host: String
+  let _leader_data_service: String
   let _phone_home_connection: TCPConnection
 
   new create(env: Env, auth: AmbientAuth, name: String, worker_count: USize,
     leader_control_host: String, leader_control_service: String,
-    leader_internal_host: String, leader_internal_service: String,
+    leader_data_host: String, leader_data_service: String,
     phone_home_conn: TCPConnection, step_manager: StepManager,
     coordinator: Coordinator, topology: Topology val) =>
     _env = env
@@ -41,11 +41,11 @@ actor TopologyManager
     _topology = topology
     _leader_control_host = leader_control_host
     _leader_control_service = leader_control_service
-    _leader_internal_host = leader_internal_host
-    _leader_internal_service = leader_internal_service
+    _leader_data_host = leader_data_host
+    _leader_data_service = leader_data_service
     _phone_home_connection = phone_home_conn
     _node_control_addrs(name) = (leader_control_host, leader_control_service)
-    _node_internal_addrs(name) = (leader_internal_host, leader_internal_service)
+    _node_data_addrs(name) = (leader_data_host, leader_data_service)
 
     let message = WireMsgEncoder.ready(_name)
     _phone_home_connection.write(message)
@@ -61,22 +61,22 @@ actor TopologyManager
       _control_hellos = _control_hellos + 1
       if _control_hellos == _worker_count then
         _env.out.print("_--- All worker control channels accounted for! ---_")
-        if (_control_hellos == _worker_count) and (_internal_hellos == _worker_count) then
+        if (_control_hellos == _worker_count) and (_data_hellos == _worker_count) then
           _initialize_topology()
         end
       end
     end
 
-  be assign_internal_conn(conn: TCPConnection, node_name: String,
-    internal_host: String, internal_service: String) =>
-    _worker_internal_conns(node_name) = conn
-    _node_internal_addrs(node_name) = (internal_host, internal_service)
-    _env.out.print("Identified worker " + node_name + " internal channel")
-    if _internal_hellos < _worker_count then
-      _internal_hellos = _internal_hellos + 1
-      if _internal_hellos == _worker_count then
-        _env.out.print("_--- All worker internal channels accounted for! ---_")
-        if (_control_hellos == _worker_count) and (_internal_hellos == _worker_count) then
+  be assign_data_conn(conn: TCPConnection, node_name: String,
+    data_host: String, data_service: String) =>
+    _worker_data_conns(node_name) = conn
+    _node_data_addrs(node_name) = (data_host, data_service)
+    _env.out.print("Identified worker " + node_name + " data channel")
+    if _data_hellos < _worker_count then
+      _data_hellos = _data_hellos + 1
+      if _data_hellos == _worker_count then
+        _env.out.print("_--- All worker data channels accounted for! ---_")
+        if (_control_hellos == _worker_count) and (_data_hellos == _worker_count) then
           _initialize_topology()
         end
       end
@@ -114,9 +114,9 @@ actor TopologyManager
           let next_node = nodes((cur_node_idx + 1) % nodes.size())
           let next_node_addr =
             if next_node_idx == 0 then
-              (_leader_internal_host, _leader_internal_service)
+              (_leader_data_host, _leader_data_service)
             else
-              _node_internal_addrs(next_node)
+              _node_data_addrs(next_node)
             end
           let pipeline_step: PipelineStep box = pipeline(count)
           if pipeline_step.id() != 0 then
@@ -141,7 +141,7 @@ actor TopologyManager
           _env.out.print("Spinning up computation **" + pipeline_step.computation_type() + "** on node \'" + cur_node + "\'")
 
           if cur_node_idx == 0 then // if cur_node is the leader/source
-            let target_conn = _worker_internal_conns(next_node)
+            let target_conn = _worker_data_conns(next_node)
             _step_manager.add_step(step_id, pipeline_step.computation_type())
             _step_manager.add_proxy(proxy_step_id, proxy_step_target_id,
               target_conn)
