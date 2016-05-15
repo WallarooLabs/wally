@@ -255,11 +255,6 @@ type Sinks is Set[String]
 type SinkTimeranges is Map[U64, Sinks]
 type SinkMetrics is Map[String, TimeBuckets]
 
-interface MetricsOutputHandler
-  fun handle(payload: Array[U8])
-  fun encode(sinks: SinkMetrics, boundaries: BoundaryMetrics,
-             steps: StepMetrics): Array[U8] iso^
-
 class MetricsCollection
 """
 A hierarchical collection of LatencyHistogram's and ThroughputHistory's keyed
@@ -281,6 +276,9 @@ on category and id
   new create(bin_selector: F64Selector, period: U64=1) =>
     _period = period
     _bin_selector = bin_selector
+
+  fun ref apply(summary: (NodeMetricsSummary|BoundaryMetricsSummary)) =>
+    process_summary(summary)
 
   fun ref process_summary(summary: (NodeMetricsSummary|BoundaryMetricsSummary))
   =>
@@ -406,8 +404,7 @@ on category and id
       time_buckets.update(time_bucket, (lh, th))
     end
 
-  fun ref handle_output(handlers: Array[MetricsOutputHandler]) =>
+  fun ref handle_output(handlers: Array[MetricsCollectionOutputHandler]) =>
     for handler in handlers.values() do
-      handler.handle(handler.encode(_sinkmetrics, _boundarymetrics,
-                                    _stepmetrics))
+      handler.handle(_sinkmetrics, _boundarymetrics, _stepmetrics, _period)
     end
