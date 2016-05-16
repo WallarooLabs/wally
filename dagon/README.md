@@ -32,5 +32,5 @@ dagon-pony takes four arguments:
 
 Example:
 ```
-./dagon -t 10 -f example.ini -h 127.0.0.1:8080
+./dagon -t 10 -f double-divide.ini -h 127.0.0.1:8080
 ```
