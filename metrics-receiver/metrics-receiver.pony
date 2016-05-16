@@ -14,7 +14,7 @@ actor Main
       let addr: Array[String] = args(1).split(":")
       let host = addr(0)
       let service = addr(1)
-      TCPListener(auth, Notifier(env), host, service)
+      TCPListener(auth, Notifier(env, host, service), host, service)
     end
 
 class Notifier is TCPListenNotify
