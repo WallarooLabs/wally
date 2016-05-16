@@ -417,7 +417,7 @@ actor Store
       for m in msgs.values() do
         file.print(_encoder((m, at)))
       end
-  end
+    end
 
   be dispose() =>
     match _sent_file
