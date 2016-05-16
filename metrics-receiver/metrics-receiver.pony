@@ -17,7 +17,7 @@ actor Main
       let service = addr(1)
 
       // Monitoring Hub Address
-      let addr': Array[String] = args2.split(":")
+      let addr': Array[String] = args(2).split(":")
       let host' = addr'(0)
       let service' = addr'(1)
 
@@ -25,13 +25,14 @@ actor Main
       let name': String = args(3).clone()
 
       let output = MonitoringHubOutput(env, name', host', service')
-      let encoder = MonitoringHubEncoder
-      let handler = MetricsMonitoringHubHandler(encoder, output)
-      let handlers: Array[MetricsCollectionOutputHandler] = recover 
+      let handler = recover MetricsMonitoringHubHandler(MonitoringHubEncoder,
+      output) end
+      let handlers: Array[MetricsCollectionOutputHandler] iso^ = recover 
         Array[MetricsCollectionOutputHandler] end
-      handlers.push(handler)
+      handlers.push(consume handler)
 
-      TCPListener(auth, MetricsNotifier(env, host, service), host, service)
+      TCPListener(auth, MetricsNotifier(env, host, service, consume handlers),
+                  host, service)
     end
 
 
@@ -39,10 +40,10 @@ class MetricsNotifier is TCPListenNotify
   let _env: Env
   let _host: String
   let _service: String
-  let _handlers: Array[MetricsCollectionOutputHandler]
+  let _handlers: Array[MetricsCollectionOutputHandler] iso!
 
   new iso create(env: Env, host: String, service: String, handlers: 
-                 Array[MetricsCollectionOutputHandler]) =>
+                 Array[MetricsCollectionOutputHandler] iso^) =>
     _env = env
     _host = host
     _service = service
@@ -56,7 +57,7 @@ class MetricsNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    MetricsReceiver(_env, _handlers)
+    MetricsReceiver(_env, consume _handlers)
 
 class MetricsReceiver is TCPConnectionNotify
   let _env: Env
@@ -64,13 +65,13 @@ class MetricsReceiver is TCPConnectionNotify
   let _period: U64 = 1
   let _bin_selector: F64Selector = Log10Selector
   let _mc: MetricsCollection
-  let _handlers: Array[MetricsCollectionOutputHandler]
+  let _handlers: Array[MetricsCollectionOutputHandler] iso
 
 
-  new iso create(env: Env, handlers: Array[MetricsCollectionOutputHandler]) =>
+  new iso create(env: Env, handlers: Array[MetricsCollectionOutputHandler] iso) =>
     _env = env
     _mc = MetricsCollection(_bin_selector, _period)
-    let _handlers = handlers
+    _handlers = handlers
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("connection accepted")
