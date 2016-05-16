@@ -4,6 +4,8 @@ use "buffy"
 use "buffy/metrics"
 use "sendence/tcp"
 use "options"
+use "time"
+
 
 actor Main
   new create(env: Env) =>
@@ -24,30 +26,52 @@ actor Main
       // Application name to report to Monitoring Hub
       let name': String = args(3).clone()
 
-      let output = MonitoringHubOutput(env, name', host', service')
-      let handler = recover MetricsMonitoringHubHandler(MonitoringHubEncoder,
-      output) end
-      let handlers: Array[MetricsCollectionOutputHandler] iso^ = recover 
-        Array[MetricsCollectionOutputHandler] end
-      handlers.push(consume handler)
-
-      TCPListener(auth, MetricsNotifier(env, host, service, consume handlers),
-                  host, service)
+      let receiver = MetricsReceiver(env, auth, host, service, host',
+                                     service', name')
+      // start a timer to flush the receiver
+      let timers = Timers
+      let timer = Timer(FlushTimer(env, receiver), 0, 1_000_000_000)
+      timers(consume timer)   
     end
 
+
+actor MetricsReceiver
+  let _env: Env
+  let _handlers: Array[MetricsCollectionOutputHandler] ref =
+    Array[MetricsCollectionOutputHandler]
+
+  let _period: U64 = 1
+  let _bin_selector: F64Selector val = Log10Selector
+  let _mc: MetricsCollection tag
+
+  new create(env: Env, auth: AmbientAuth, host: String, service: String,
+             host': String, service': String, name': String) =>
+    _env = env
+
+    let output = MonitoringHubOutput(env, name', host', service')
+    let handler: MetricsMonitoringHubHandler val = 
+      MetricsMonitoringHubHandler(MonitoringHubEncoder, output)
+    _mc = MetricsCollection(_bin_selector, _period, handler)
+
+    TCPListener(auth, MetricsNotifier(env, host, service, _mc),
+                host, service)
+
+  be flush() =>
+    _env.out.print("flushed")
+    _mc.send_output()
 
 class MetricsNotifier is TCPListenNotify
   let _env: Env
   let _host: String
   let _service: String
-  let _handlers: Array[MetricsCollectionOutputHandler] iso!
+  let _mc: MetricsCollection tag
 
-  new iso create(env: Env, host: String, service: String, handlers: 
-                 Array[MetricsCollectionOutputHandler] iso^) =>
+  new iso create(env: Env, host: String, service: String,
+                 mc: MetricsCollection tag) =>
     _env = env
     _host = host
     _service = service
-    _handlers = handlers
+    _mc = mc 
 
   fun ref listening(listen: TCPListener ref) =>
     _env.out.print("listening on " + _host + ":" + _service)
@@ -57,21 +81,16 @@ class MetricsNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    MetricsReceiver(_env, consume _handlers)
+    MetricsReceiverNotify(_env, _mc)
 
-class MetricsReceiver is TCPConnectionNotify
+class MetricsReceiverNotify is TCPConnectionNotify
   let _env: Env
   let _framer: Framer = Framer
-  let _period: U64 = 1
-  let _bin_selector: F64Selector = Log10Selector
-  let _mc: MetricsCollection
-  let _handlers: Array[MetricsCollectionOutputHandler] iso
+  let _mc: MetricsCollection tag
 
-
-  new iso create(env: Env, handlers: Array[MetricsCollectionOutputHandler] iso) =>
+  new iso create(env: Env, mc: MetricsCollection tag) =>
     _env = env
-    _mc = MetricsCollection(_bin_selector, _period)
-    _handlers = handlers
+    _mc = mc
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("connection accepted")
@@ -82,9 +101,9 @@ class MetricsReceiver is TCPConnectionNotify
         let msg = ReportMsgDecoder(consume chunked)
         match msg
         | let m: NodeMetricsSummary val =>
-          _mc(m)
+          _mc.process_summary(m)
         | let m: BoundaryMetricsSummary val =>
-          _mc(m)
+          _mc.process_summary(m)
         else
           _env.err.print("Message couldn't be decoded!")
         end
@@ -92,7 +111,7 @@ class MetricsReceiver is TCPConnectionNotify
         _env.err.print("Error decoding incoming message.")
       end
     end
-
+ 
   fun ref connected(conn: TCPConnection ref) =>
     _env.out.print("connected.")
 
@@ -101,3 +120,16 @@ class MetricsReceiver is TCPConnectionNotify
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("server closed")
+
+
+class FlushTimer is TimerNotify  
+  let _env: Env
+  let _receiver: MetricsReceiver
+
+  new iso create(env: Env, receiver: MetricsReceiver) =>
+    _env = env
+    _receiver = receiver
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _receiver.flush()
+    true

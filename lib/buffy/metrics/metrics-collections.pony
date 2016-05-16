@@ -33,7 +33,7 @@ s(0.0001) // -> 0.001
     let _max: F64 = F64.max_value()
     let _size: USize
 
-  new create(min_bin': F64=0.000001, max_bin': F64=10.0) =>
+  new val create(min_bin': F64=0.000001, max_bin': F64=10.0) =>
   """
   min_bin' denotes the maximum value in the smallest bin.
   max_bin' denotes the minimum value in the Overflow bin.
@@ -139,12 +139,12 @@ and to a bin based on the log10 value of end_time-start_time, rounded up
 to the nearest integer.
 """
 
-  let bin_selector: F64Selector
+  let bin_selector: F64Selector val
   let sum_bins: Map[F64, F64]
   let count_bins: Map[F64, U64]
   var total: F64 = 0
 
-  new create(bin_selector': F64Selector) =>
+  new create(bin_selector': F64Selector val) =>
     bin_selector = bin_selector'
     // initialize the sum and count histograms with zeros in each bin
     sum_bins = Map[F64, F64](bin_selector.size())
@@ -255,38 +255,46 @@ type Sinks is Set[String]
 type SinkTimeranges is Map[U64, Sinks]
 type SinkMetrics is Map[String, TimeBuckets]
 
-class MetricsCollection
+actor MetricsCollection
 """
 A hierarchical collection of LatencyHistogram's and ThroughputHistory's keyed
 on category and id
 """
   // Timeranges are anchored to the end of the time range
-  let _stepmetrics: StepMetrics = StepMetrics
-  let _steptimeranges: StepTimeranges = StepTimeranges
-  let _boundarymetrics: BoundaryMetrics = BoundaryMetrics
-  let _boundarytimeranges: BoundaryTimeranges = BoundaryTimeranges
-  let _sinkmetrics: SinkMetrics = SinkMetrics
-  let _sinktimeranges: SinkTimeranges = SinkTimeranges
-  let _period: U64
-  let _bin_selector: F64Selector
-
+  var _stepmetrics: StepMetrics = StepMetrics
+  var _steptimeranges: StepTimeranges = StepTimeranges
+  var _boundarymetrics: BoundaryMetrics = BoundaryMetrics
+  var _boundarytimeranges: BoundaryTimeranges = BoundaryTimeranges
+  var _sinkmetrics: SinkMetrics = SinkMetrics
+  var _sinktimeranges: SinkTimeranges = SinkTimeranges
+  let _period: U64 val
+  let _bin_selector: F64Selector val
+  let _handler: MetricsCollectionOutputHandler val
   let _sink_type: I32 = BoundaryTypes.source_sink()
   let _egress_type: I32 = BoundaryTypes.ingress_egress()
 
-  new create(bin_selector: F64Selector, period: U64=1) =>
+  new create(bin_selector: F64Selector val, period: U64=1,
+             handler: MetricsCollectionOutputHandler val) =>
     _period = period
     _bin_selector = bin_selector
+    _handler = handler
 
-  fun ref apply(summary: (NodeMetricsSummary val |
-                          BoundaryMetricsSummary val)) =>
-    process_summary(summary)
+  fun ref reset_collection() =>
+    _stepmetrics = StepMetrics
+    _steptimeranges = StepTimeranges
+    _boundarymetrics = BoundaryMetrics
+    _boundarytimeranges = BoundaryTimeranges
+    _sinkmetrics = SinkMetrics
+    _sinktimeranges = SinkTimeranges
 
-  fun ref process_summary(summary: (NodeMetricsSummary val |
-                                    BoundaryMetricsSummary val))
+  be process_summary(summary: (NodeMetricsSummary val |
+                               BoundaryMetricsSummary val))
   =>
     match summary
-    | let summary':NodeMetricsSummary val => process_nodesummary(summary')
-    | let summary':BoundaryMetricsSummary val => process_boundarysummary(summary')
+    | let summary':NodeMetricsSummary val => 
+      process_nodesummary(summary')
+    | let summary':BoundaryMetricsSummary val => 
+      process_boundarysummary(summary')
     end
 
   fun ref process_nodesummary(summary: NodeMetricsSummary val) =>
@@ -406,7 +414,9 @@ on category and id
       time_buckets.update(time_bucket, (lh, th))
     end
 
-  fun ref handle_output(handlers: Array[MetricsCollectionOutputHandler]) =>
-    for handler in handlers.values() do
-      handler.handle(_sinkmetrics, _boundarymetrics, _stepmetrics, _period)
-    end
+  be send_output() =>
+    handle_output()
+
+  fun ref handle_output() =>
+    _handler.handle(_sinkmetrics, _boundarymetrics, _stepmetrics, _period)
+    reset_collection()

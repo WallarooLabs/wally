@@ -82,7 +82,13 @@ class iso _TestMonitoringHubEncoder is UnitTest
   fun name(): String => "buffy:SinkMetricsEncoder"
 
   fun apply(h: TestHelper)  =>
-    let mc = MetricsCollection(Log10Selector, 1)
+    let output = MetricsAccumulatorActor
+    let handler: MetricsCollectionOutputHandler iso =
+      recover iso MetricsStringAccumulator(MonitoringHubEncoder, output) end
+    
+    let bin_selector: F64Selector val = recover val Log10Selector end
+    let mc: MetricsCollection = MetricsCollection(bin_selector, 1,
+                                                  consume handler)
     
     let nms:NodeMetricsSummary iso = recover NodeMetricsSummary("node1") end
     let digest:StepMetricsDigest iso = recover StepMetricsDigest(999) end
@@ -98,97 +104,14 @@ class iso _TestMonitoringHubEncoder is UnitTest
     bms.add_report(BoundaryMetricsReport(1, 10000, 50, 300))
     bms.add_report(BoundaryMetricsReport(1, 10000, 100, 500))
 
+    let bms': BoundaryMetricsSummary val = consume bms
+    let nms': NodeMetricsSummary val = consume nms
     // Process summaries for step, sink, and boundary
-    mc(consume nms)
-    mc(consume bms)
-
-    // Create an array of handlers with a stdout handler
-    let handlers: Array[MetricsCollectionOutputHandler] = 
-      Array[MetricsCollectionOutputHandler]
-    let encoder = MonitoringHubEncoder
-    let handler = MetricsStringAccumulator(encoder)
-    handlers.push(handler)
+    mc.process_summary(nms')
+    mc.process_summary(bms')
 
     // Process the collection with the handlers array
-    mc.handle_output(handlers)
-    
-    // Compare output in the accumulator handler
-    let expected: Array[String] = Array[String]
-    expected.push("""[
-  {
-    "topics": {
-      "throughput_out": {
-        "0": 2
-      },
-      "latency_bins": {
-        "0.0001": 0,
-        "overflow": 0,
-        "0.1": 0,
-        "0.01": 0,
-        "1": 2,
-        "0.001": 0,
-        "1e-05": 0,
-        "1e-06": 0
-      }
-    },
-    "t1": 0,
-    "t0": -1,
-    "category": "source-sink",
-    "pipeline_key": "sink-node1"
-  }
-]""")
-  expected.push("""[
-  {
-    "topics": {
-      "throughput_out": {
-        "0": 2
-      },
-      "latency_bins": {
-        "0.0001": 0,
-        "overflow": 0,
-        "0.1": 0,
-        "0.01": 0,
-        "1": 2,
-        "0.001": 0,
-        "1e-05": 0,
-        "1e-06": 0
-      }
-    },
-    "t1": 0,
-    "t0": -1,
-    "category": "ingress-egress",
-    "pipeline_key": "boundary-node1"
-  }
-]""")
-  expected.push("""[
-  {
-    "topics": {
-      "throughput_out": {
-        "0": 2
-      },
-      "latency_bins": {
-        "0.0001": 0,
-        "overflow": 0,
-        "0.1": 1,
-        "0.01": 0,
-        "1": 1,
-        "0.001": 0,
-        "1e-05": 0,
-        "1e-06": 0
-      }
-    },
-    "t1": 0,
-    "t0": -1,
-    "category": "step",
-    "pipeline_key": "step-999"
-  }
-]""")
+    mc.send_output()
 
-    for (o, e) in Zip2[String, String](handler.output.values(),
-      expected.values()) do
-      if o != e then h.fail("Output varies from expected." + 
-        "\nExpected: \n" + e + 
-        "\nReceived: \n" + o + "\n") end
-    end
-    
     true
+

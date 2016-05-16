@@ -1,13 +1,9 @@
 use "net"
 use "sendence/bytes"
-
-primitive EventTypes
-  fun sinks(): String => "source-sink-metrics"
-  fun boundaries(): String => "ingress-egress-metrics"
-  fun steps(): String => "step-metrics"
+use "buffy/metrics"
 
 
-actor MonitoringHubOutput
+actor MonitoringHubOutput is MetricsOutputActor
   let _env: Env
   let _app_name: String
   var _conn: (TCPConnection | None) = None
@@ -60,7 +56,7 @@ actor MonitoringHubOutput
       end
     end
 
-  be send(category: String, payload: String) =>
+  be send(category: String, payload: (String val | Array[U8] val)) =>
     """
     Send a metrics messsage to Monitoring Hub
     """
@@ -71,22 +67,18 @@ actor MonitoringHubOutput
         let message: Array[U8] iso = recover Array[U8] end
         message.append("""{"event": """" + category + """", "topic": """)
         message.append(""""metrics:""" + _app_name + """", "ref": null,""")
-        message.append(""""payload" : """" + payload + """"}""")
+        match payload
+        | let payload': String val => 
+          message.append(""""payload" : """" + payload' + """"}""")
+        | let payload': Array[U8] val =>
+          message.append(""""payload" : """" + String.from_array(payload'))
+          message.append(""""}""")
+        end
         c.write(Bytes.length_encode(consume message))
       else
         _env.out.print("   metrics-receiver: Failed sending metrics")
       end
     end
-
-
-  be send_sinks(payload: String) =>
-    send(EventTypes.sinks(), payload)
-
-  be send_boundaries(payload: String) =>
-    send(EventTypes.boundaries(), payload)
-
-  be send_steps(payload: String) =>
-    send(EventTypes.steps(), payload)
 
 
 class MonitoringHubConnectNotify is TCPConnectionNotify
