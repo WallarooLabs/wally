@@ -45,6 +45,10 @@ data to `sent.txt` and `received.txt` respectively. The sender will shutdown
 when it is finished sending data. To shutdown the receiver, send a TERM signal
 to the process. 
 
+Re: logged of output to files, neither Giles process calls `flush` until exiting
+so its possible that what you see in the log is out of date as all contents
+might not have been flushed yet.
+
 Currently the Giles sender sends messages in one of two way:
 
 - With no other commandline options given, it will send string
