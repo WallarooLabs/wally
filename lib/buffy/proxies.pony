@@ -8,14 +8,16 @@ use "time"
 actor Proxy is BasicStep
   let _env: Env
   let _step_id: I32
-  let _conn: TCPConnection
+  let _target_node_name: String
+  let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector tag
 
-  new create(env: Env, step_id: I32, conn: TCPConnection,
-    metrics_collector: MetricsCollector tag) =>
+  new create(env: Env, step_id: I32, target_node_name: String,
+    coordinator: Coordinator, metrics_collector: MetricsCollector tag) =>
     _env = env
     _step_id = step_id
-    _conn = conn
+    _target_node_name = target_node_name
+    _coordinator = coordinator
     _metrics_collector = metrics_collector
 
   // input will be a Message[In] once the typearg issue is fixed
@@ -26,17 +28,17 @@ actor Proxy is BasicStep
       let tcp_msg = WireMsgEncoder.forward_i32(_step_id, m)
       _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
         m.id, m.last_ingress_ts, Time.millis())
-      _conn.write(tcp_msg)
+      _coordinator.send_data_message(_target_node_name, tcp_msg)
     | let m: Message[F32] val =>
       let tcp_msg = WireMsgEncoder.forward_f32(_step_id, m)
       _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
         m.id, m.last_ingress_ts, Time.millis())
-      _conn.write(tcp_msg)
+      _coordinator.send_data_message(_target_node_name, tcp_msg)
     | let m: Message[String] val =>
       let tcp_msg = WireMsgEncoder.forward_string(_step_id, m)
       _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
         m.id, m.last_ingress_ts, Time.millis())
-      _conn.write(tcp_msg)
+      _coordinator.send_data_message(_target_node_name, tcp_msg)
     end
 
 actor ExternalConnection[In: OSCEncodable val] is ComputeStep[In]
@@ -94,9 +96,11 @@ actor StepManager
       _env.out.print("StepManager: Could not add step.")
     end
 
-  be add_proxy(proxy_id: I32, step_id: I32, conn: TCPConnection tag) =>
-    let p = Proxy(_env, step_id, conn, _metrics_collector)
-    _steps(proxy_id) = p
+  be add_proxy(proxy_step_id: I32, target_step_id: I32,
+    target_node_name: String, coordinator: Coordinator) =>
+    let p = Proxy(_env, target_step_id, target_node_name, coordinator,
+      _metrics_collector)
+    _steps(proxy_step_id) = p
 
   be add_sink(sink_id: I32, sink_step_id: I32, auth: AmbientAuth) =>
     try
@@ -120,4 +124,6 @@ actor StepManager
       else
         _env.out.print("StepManager: Could not connect steps")
       end
+    else
+      _env.out.print("StepManager: Failed to connect steps")
     end

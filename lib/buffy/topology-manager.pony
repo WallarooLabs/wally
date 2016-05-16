@@ -6,14 +6,11 @@ use "random"
 actor TopologyManager
   let _env: Env
   let _auth: AmbientAuth
-  let _step_manager: StepManager
   let _coordinator: Coordinator
   let _name: String
   let _worker_count: USize
-  let _worker_control_conns: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
-  let _worker_data_conns: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
-  let _node_control_addrs: Map[String, (String, String)] = Map[String, (String, String)]
-  let _node_data_addrs: Map[String, (String, String)] = Map[String, (String, String)]
+  let _worker_control_addrs: Map[String, (String, String)] = Map[String, (String, String)]
+  let _worker_data_addrs: Map[String, (String, String)] = Map[String, (String, String)]
   let _topology: Topology val
   // Keep track of how many workers identified themselves
   var _control_hellos: USize = 0
@@ -25,16 +22,13 @@ actor TopologyManager
   let _leader_control_service: String
   let _leader_data_host: String
   let _leader_data_service: String
-  let _phone_home_connection: TCPConnection
 
   new create(env: Env, auth: AmbientAuth, name: String, worker_count: USize,
     leader_control_host: String, leader_control_service: String,
     leader_data_host: String, leader_data_service: String,
-    phone_home_conn: TCPConnection, step_manager: StepManager,
     coordinator: Coordinator, topology: Topology val) =>
     _env = env
     _auth = auth
-    _step_manager = step_manager
     _coordinator = coordinator
     _name = name
     _worker_count = worker_count
@@ -43,19 +37,16 @@ actor TopologyManager
     _leader_control_service = leader_control_service
     _leader_data_host = leader_data_host
     _leader_data_service = leader_data_service
-    _phone_home_connection = phone_home_conn
-    _node_control_addrs(name) = (leader_control_host, leader_control_service)
-    _node_data_addrs(name) = (leader_data_host, leader_data_service)
 
     let message = WireMsgEncoder.ready(_name)
-    _phone_home_connection.write(message)
+    _coordinator.send_phone_home_message(message)
 
     if _worker_count == 0 then _complete_initialization() end
 
   be assign_control_conn(conn: TCPConnection tag, node_name: String,
     control_host: String, control_service: String) =>
-    _worker_control_conns(node_name) = conn
-    _node_control_addrs(node_name) = (control_host, control_service)
+    _coordinator.add_control_connection(node_name, conn)
+    _worker_control_addrs(node_name) = (control_host, control_service)
     _env.out.print("Identified worker " + node_name + " control channel")
     if _control_hellos < _worker_count then
       _control_hellos = _control_hellos + 1
@@ -67,10 +58,10 @@ actor TopologyManager
       end
     end
 
-  be assign_data_conn(conn: TCPConnection, node_name: String,
-    data_host: String, data_service: String) =>
-    _worker_data_conns(node_name) = conn
-    _node_data_addrs(node_name) = (data_host, data_service)
+  be assign_data_conn(node_name: String, data_host: String,
+    data_service: String) =>
+    _coordinator.add_data_connection(node_name, data_host, data_service)
+    _worker_data_addrs(node_name) = (data_host, data_service)
     _env.out.print("Identified worker " + node_name + " data channel")
     if _data_hellos < _worker_count then
       _data_hellos = _data_hellos + 1
@@ -93,7 +84,7 @@ actor TopologyManager
     try
       let nodes = Array[String]
       nodes.push(_name)
-      let keys = _worker_control_conns.keys()
+      let keys = _worker_control_addrs.keys()
       for key in keys do
         nodes.push(key)
       end
@@ -116,7 +107,7 @@ actor TopologyManager
             if next_node_idx == 0 then
               (_leader_data_host, _leader_data_service)
             else
-              _node_data_addrs(next_node)
+              _worker_data_addrs(next_node)
             end
           let pipeline_step: PipelineStep box = pipeline(count)
           if pipeline_step.id() != 0 then
@@ -141,11 +132,10 @@ actor TopologyManager
           _env.out.print("Spinning up computation **" + pipeline_step.computation_type() + "** on node \'" + cur_node + "\'")
 
           if cur_node_idx == 0 then // if cur_node is the leader/source
-            let target_conn = _worker_data_conns(next_node)
-            _step_manager.add_step(step_id, pipeline_step.computation_type())
-            _step_manager.add_proxy(proxy_step_id, proxy_step_target_id,
-              target_conn)
-            _step_manager.connect_steps(step_id, proxy_step_id)
+            _coordinator.add_step(step_id, pipeline_step.computation_type())
+            _coordinator.add_proxy(proxy_step_id, proxy_step_target_id, next_node,
+              next_node_addr._1, next_node_addr._2)
+            _coordinator.connect_steps(step_id, proxy_step_id)
           else
             let create_step_msg =
               WireMsgEncoder.spin_up(step_id, pipeline_step.computation_type())
@@ -155,10 +145,9 @@ actor TopologyManager
             let connect_msg =
               WireMsgEncoder.connect_steps(step_id, proxy_step_id)
 
-            let conn = _worker_control_conns(cur_node)
-            conn.write(create_step_msg)
-            conn.write(create_proxy_msg)
-            conn.write(connect_msg)
+            _coordinator.send_control_message(cur_node, create_step_msg)
+            _coordinator.send_control_message(cur_node, create_proxy_msg)
+            _coordinator.send_control_message(cur_node, connect_msg)
           end
 
           count = count + 1
@@ -171,12 +160,11 @@ actor TopologyManager
         _env.out.print("Spinning up sink on node " + sink_node)
 
         if sink_node_idx == 0 then // if cur_node is the leader
-          _step_manager.add_sink(cur_sink_id, step_id, _auth)
+          _coordinator.add_sink(cur_sink_id, step_id, _auth)
         else
           let create_sink_msg =
             WireMsgEncoder.spin_up_sink(cur_sink_id, step_id)
-          let conn = _worker_control_conns(sink_node)
-          conn.write(create_sink_msg)
+            _coordinator.send_control_message(sink_node, create_sink_msg)
         end
 
         cur_source_id = cur_source_id + 1
@@ -189,8 +177,7 @@ actor TopologyManager
       // Send finished_msg to all workers
       for i in Range(1, nodes.size()) do
         let node = nodes(i)
-        let next_conn = _worker_control_conns(node)
-        next_conn.write(finished_msg)
+        _coordinator.send_control_message(node, finished_msg)
       end
     else
       _env.err.print("Buffy Leader: Failed to initialize topology")
@@ -205,11 +192,7 @@ actor TopologyManager
   fun _complete_initialization() =>
     _env.out.print("_--- Topology successfully initialized ---_")
     let message = WireMsgEncoder.topology_ready(_name)
-    _phone_home_connection.write(message)
+    _coordinator.send_phone_home_message(message)
 
   be shutdown() =>
-    let message = WireMsgEncoder.shutdown(_name)
-    for (key, conn) in _worker_control_conns.pairs() do
-      conn.write(message)
-    end
     _coordinator.finish_shutdown()

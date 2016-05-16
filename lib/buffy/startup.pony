@@ -55,6 +55,7 @@ actor Startup
     var args = options.remaining()
 
     try
+      if not is_worker then node_name = "leader" end
       let leader_control_host = leader_control_addr(0)
       let leader_control_service = leader_control_addr(1)
       let leader_data_host = leader_data_addr(0)
@@ -69,8 +70,6 @@ actor Startup
         let sink_addr: Array[String] = sink_addrs(i).split(":")
         let sink_host = sink_addr(0)
         let sink_service = sink_addr(1)
-        env.out.print("Sink " + i.string())
-        env.out.print(sink_host + ":" + sink_service)
         sinks(i.i32()) = (sink_host, sink_service)
       end
 
@@ -93,7 +92,9 @@ actor Startup
         metrics_collector)
 
       let coordinator: Coordinator = Coordinator(node_name, env, auth,
-        leader_control_host, leader_control_service, step_manager)
+        leader_control_host, leader_control_service, leader_data_host,
+        leader_data_service, step_manager, spike_config, metrics_collector,
+        is_worker)
 
       let phone_home_host = phone_home_addr(0)
       let phone_home_service = phone_home_addr(1)
@@ -107,11 +108,10 @@ actor Startup
       if is_worker then
         coordinator.add_listener(TCPListener(auth,
           WorkerControlNotifier(env, auth, node_name, leader_control_host,
-            leader_control_service, phone_home_conn, step_manager, coordinator,
-            metrics_collector)))
+            leader_control_service, coordinator, metrics_collector)))
         coordinator.add_listener(TCPListener(auth,
           WorkerIntraclusterDataNotifier(env, auth, node_name, leader_control_host,
-            leader_control_service, step_manager, coordinator, spike_config)))
+            leader_control_service, coordinator, spike_config)))
       else
         if source_addrs.size() != source_count then
           env.out.print("There are " + source_count.string() + " sources but "
@@ -132,19 +132,18 @@ actor Startup
         // Set up leader listener
         let topology_manager: TopologyManager = TopologyManager(env, auth,
           node_name, worker_count, leader_control_host, leader_control_service,
-          leader_data_host, leader_data_service, phone_home_conn,
-          step_manager, coordinator, topology)
+          leader_data_host, leader_data_service, coordinator, topology)
 
         coordinator.add_topology_manager(topology_manager)
 
         let control_notifier: TCPListenNotify iso =
-          LeaderControlNotifier(env, auth, node_name, step_manager,
-          coordinator, topology_manager, metrics_collector)
+          LeaderControlNotifier(env, auth, node_name, coordinator, topology_manager,
+          metrics_collector)
         coordinator.add_listener(TCPListener(auth, consume control_notifier,
           leader_control_host, leader_control_service))
         let data_notifier: TCPListenNotify iso =
-          LeaderIntraclusterDataNotifier(env, auth, node_name, step_manager,
-            coordinator, spike_config)
+          LeaderIntraclusterDataNotifier(env, auth, node_name, coordinator,
+          spike_config)
         coordinator.add_listener(TCPListener(auth, consume data_notifier,
           leader_data_host, leader_data_service))
       end
