@@ -1,24 +1,30 @@
+use "collections"
+use "net"
+use "buffy/messages"
+use "sendence/bytes"
+
 primitive EventTypes
   fun sinks(): String => "source-sink-metrics"
   fun boundaries(): String => "ingress-egress-metrics"
   fun steps(): String => "step-metrics"
 
 actor MonitoringHubOutput
-  let env: Env
-  let app_name: String
+  let _env: Env
+  let _app_name: String
+  let _conn: TCPConnection
 
-  new create(env': Env, app_name': String) =>
-    env = env'
-    app_name = app_name'
+  new create(env: Env, app_name: String, output: MonitoringHubActor) =>
+    _env = env
+    _app_name = app_name
 
-  fun send(category: String, payload: String) =>
-    env.out.print(consume payload)
+  be send(category: String, payload: String) =>
+    _env.out.print(consume payload)
 
   be send_sinks(payload: String) =>
-    send("sinks", payload)
+    send(EventTypes.sinks(), payload)
 
   be send_boundaries(payload: String) =>
-    send("boundaries", payload)
+    send(EventTypes.boundaries(), payload)
 
   be send_steps(payload: String) =>
-    send("steps", payload)
+    send(EventTypes.steps(), payload)

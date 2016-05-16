@@ -14,21 +14,85 @@ actor Main
       let addr: Array[String] = args(1).split(":")
       let host = addr(0)
       let service = addr(1)
-      let name: String = args(2).clone()
-      TCPListener(auth, Notifier(env, host, service, name), host, service)
+      let addr': Array[String] = args2.split(":")
+      let host' = addr'(0)
+      let service' = addr'(1)
+      let name: String = args(3).clone()
+
+      let MonHubNotifier = TCPListener(auth, MetricsNotifier(env, host,
+                                                             service, name),
+                                       host, service)
+
+      let output = MonitoringHubOutput(env, name, conn: TCPConnection)
+      let encoder = MonitoringHubEncoder
+      let handler = MetricsMonitoringHubHandler(encoder, output)
+      let handlers: Array[MetricsCollectionOutputHandler] = recover 
+        Array[MetricsCollectionOutputHandler] end
+      handlers.push(handler)
+
+      TCPListener(auth, MetricsNotifier(env, host, service), host, service)
     end
 
-class Notifier is TCPListenNotify
+class MonHubNotifier is TCPListenNotify
   let _env: Env
   let _host: String
   let _service: String
   let _name: String
+
+/*
+Connect Message:
+{"path": "/socket/tcp", "params": null}
+
+Connect Success Response:
+{"payload": {"status": "ok", "response": "connected"}}
+
+Connect Error Response:
+{"payload": {"status": "error", "response": "#{error-msg}"}}
+
+Channel Join Message:
+{"event": "phx_join", "topic": "metrics:<app-name>", "ref": null, "payload": {}}
+
+Channel Join Message Response:
+{"event": "phx_reply", "topic": "metrics:<application-name>", "ref": null, "payload": {"response": {}, "status": "ok"}}
+
+Ingress-Egress Metrics Message:
+{"event": "ingress-egress-metrics", "topic": "metrics:<app-name>", "ref": null, "payload" : "#{metrics_msg}"}
+
+Source-Sink Metrics Message:
+{"event": "source-sink-metrics", "topic": "metrics:<app-name>", "ref": null, "payload" : "#{metrics_msg}"}
+
+Step Metrics Message:
+{"event": "step-metrics", "topic": "metrics<app-name>", "ref": null, "payload" : "#{metrics_msg}"}
+
+Reply:
+{"event": "phx_reply", "topic": "metrics:<app-name>", "ref": null, "payload": {"response": {}, "status": "ok"}}
+*/
 
   new iso create(env: Env, host: String, service: String, name: String) =>
     _env = env
     _host = host
     _service = service
     _name = name
+
+  fun ref listening(listen: TCPListener ref) =>
+    _env.out.print("listening on " + _host + ":" + _service)
+
+  fun ref not_listening(listen: TCPListener ref) =>
+    _env.out.print("couldn't listen")
+    listen.close()
+
+  fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
+    MonHubReceiver(_env, _name)
+
+class MetricsNotifier is TCPListenNotify
+  let _env: Env
+  let _host: String
+  let _service: String
+
+  new iso create(env: Env, host: String, service: String, name: String) =>
+    _env = env
+    _host = host
+    _service = service
 
   fun ref listening(listen: TCPListener ref) =>
     _env.out.print("listening on " + _host + ":" + _service)
@@ -46,16 +110,13 @@ class MetricsReceiver is TCPConnectionNotify
   let _period: U64 = 1
   let _bin_selector: F64Selector = Log10Selector
   let _mc: MetricsCollection
-  let _handlers: Array[MetricsCollectionOutputHandler] = Array[MetricsCollectionOutputHandler]
+  let _handlers: Array[MetricsCollectionOutputHandler]
 
 
-  new iso create(env: Env, name: String) =>
+  new iso create(env: Env, handlers: Array[MetricsCollectionOutputHandler]) =>
     _env = env
     _mc = MetricsCollection(_bin_selector, _period)
-    let output = MonitoringHubOutput(env, name)
-    let encoder = MonitoringHubEncoder
-    let handler = MetricsMonitoringHubHandler(encoder, output)
-    _handlers.push(handler)
+    let _handlers = handlers
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("connection accepted")
@@ -76,6 +137,7 @@ class MetricsReceiver is TCPConnectionNotify
         _env.err.print("Error decoding incoming message.")
       end
     end
+
   fun ref connected(conn: TCPConnection ref) =>
     _env.out.print("connected.")
 
