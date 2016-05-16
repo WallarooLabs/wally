@@ -15,6 +15,3 @@ class MetricsStringAccumulator is MetricsCollectionOutputHandler
     output.push(String.from_array(encoder.encode_boundaries(boundaries,
       period)))
     output.push(String.from_array(encoder.encode_steps(steps, period)))
-
-//class MetricsMonitoringHubHandler is MetricsCollectionOutputHandler
-
