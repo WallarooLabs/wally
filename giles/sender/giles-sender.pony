@@ -317,9 +317,9 @@ actor SendingActor
   let _messages_to_send: USize
   var _messages_sent: USize = USize(0)
   let _to_buffy_socket: TCPConnection
+  let _store: Store
   let _coordinator: Coordinator
   let _timers: Timers
-  let _sender: Sender
   let _data_source: Iterator[String] iso
   var _finished: Bool = false
 
@@ -331,10 +331,10 @@ actor SendingActor
   =>
     _messages_to_send = messages_to_send
     _to_buffy_socket = to_buffy_socket
+    _store = store
     _coordinator = coordinator
     _data_source = consume data_source
     _timers = Timers
-    _sender = Sender(_to_buffy_socket, store)
 
   be go() =>
     let t = Timer(SendBatch(this), 0, 5_000_000)
@@ -354,16 +354,19 @@ actor SendingActor
 
     if (current_batch_size > 0) and _data_source.has_next() then
       let d = recover Array[ByteSeq](current_batch_size) end
+      let d' = recover Array[ByteSeq](current_batch_size) end
       for i in Range(0, current_batch_size) do
         try
-          let m = WireMsgEncoder.external(_data_source.next())
-          d.push(m)
+          let n = _data_source.next()
+          d'.push(n)
+          d.push(WireMsgEncoder.external(n))
         else
           break
         end
       end
 
-      _sender.send(consume d)
+      _to_buffy_socket.writev(consume d)
+      _store.sentv(consume d', Time.micros())
       _messages_sent = _messages_sent + current_batch_size
     else
       _finished = true
@@ -380,19 +383,6 @@ class SendBatch is TimerNotify
   fun ref apply(timer: Timer, count: U64): Bool =>
     _sending_actor.send_batch()
     true
-
-class Sender
-  let _to_buffy_socket: TCPConnection
-  let _store: Store
-
-  new create(to_buffy_socket: TCPConnection, store: Store) =>
-    _to_buffy_socket = to_buffy_socket
-    _store = store
-
-  fun send(data: Array[ByteSeq] val) =>
-    let at =  Time.micros()
-    _to_buffy_socket.writev(data)
-    _store.sentv(data, at)
 
 //
 // SENT MESSAGE STORE
