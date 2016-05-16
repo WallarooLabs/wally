@@ -40,10 +40,10 @@ data loss. Once you start running the sender, it will immediately start
 sending data.
 
 The Giles sender will shutdown once it has finished sending the number of
-messages requested. Upon shutdown, the sender will write out the data it sent
-to `sent.txt`. To shutdown the receiver, send a TERM signal to the process. This
-will cause it to write out its data and shutdown. Data will be written to
-`received.txt`.
+messages requested. While running the sender and receiver both log the their
+data to `sent.txt` and `received.txt` respectively. The sender will shutdown
+when it is finished sending data. To shutdown the receiver, send a TERM signal
+to the process. 
 
 Currently the Giles sender sends messages in one of two way:
 
