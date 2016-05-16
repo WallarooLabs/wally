@@ -1,7 +1,5 @@
 use "net"
-use "buffy/messages"
 use "sendence/bytes"
-
 
 primitive EventTypes
   fun sinks(): String => "source-sink-metrics"
@@ -12,7 +10,7 @@ primitive EventTypes
 actor MonitoringHubOutput
   let _env: Env
   let _app_name: String
-  let _conn: (TCPConnection | None) = None
+  var _conn: (TCPConnection | None) = None
 
   new create(env: Env, app_name: String, host: String, service: String) =>
     _env = env
@@ -28,33 +26,6 @@ actor MonitoringHubOutput
       _env.out.print("    metrics-receiver: Couldn't get ambient authority")
     end  
 
-/*
-Connect Message:
-
-Connect Success Response:
-{"payload": {"status": "ok", "response": "connected"}}
-
-Connect Error Response:
-{"payload": {"status": "error", "response": "#{error-msg}"}}
-
-Channel Join Message:
-{"event": "phx_join", "topic": "metrics:<app-name>", "ref": null, "payload": {}}
-
-Channel Join Message Response:
-{"event": "phx_reply", "topic": "metrics:<application-name>", "ref": null, "payload": {"response": {}, "status": "ok"}}
-
-Ingress-Egress Metrics Message:
-{"event": "ingress-egress-metrics", "topic": "metrics:<app-name>", "ref": null, "payload" : "#{metrics_msg}"}
-
-Source-Sink Metrics Message:
-{"event": "source-sink-metrics", "topic": "metrics:<app-name>", "ref": null, "payload" : "#{metrics_msg}"}
-
-Step Metrics Message:
-{"event": "step-metrics", "topic": "metrics<app-name>", "ref": null, "payload" : "#{metrics_msg}"}
-
-Reply:
-{"event": "phx_reply", "topic": "metrics:<app-name>", "ref": null, "payload": {"response": {}, "status": "ok"}}
-*/
   be send_connect() =>
     """
     Send a "connect" message to Monitoring Hub
@@ -65,14 +36,48 @@ Reply:
         let c = _conn as TCPConnection
         let message: Array[U8] iso = recover Array[U8] end
         message.append("""{"path": "/socket/tcp", "params": null}""")
-        c.write(Bytes.length_encode(message))
+        c.write(Bytes.length_encode(consume message))
       else
         _env.out.print("    metrics-receiver: Failed sending connect")
       end
     end
  
+  be send_join() =>
+    """
+    Send a "join" message to Monitoring Hub
+    """
+    if (_conn isnt None) then
+      try
+        _env.out.print("    metrics-receiver: Joining [" + _app_name+ "]...")
+        let c = _conn as TCPConnection
+        let message: Array[U8] iso = recover Array[U8] end
+        message.append("""{"event": "phx_join", "topic": "metrics:""")
+        message.append(_app_name)
+        message.append("""", "ref": null, "payload": {}}""")
+        c.write(Bytes.length_encode(consume message))
+      else
+        _env.out.print("    metrics-receiver: Failed sending join")
+      end
+    end
+
   be send(category: String, payload: String) =>
-    _env.out.print(consume payload)
+    """
+    Send a metrics messsage to Monitoring Hub
+    """
+    if (_conn isnt None) then
+      try
+        _env.out.print("    metrics-receiver: Sending metrics")
+        let c = _conn as TCPConnection
+        let message: Array[U8] iso = recover Array[U8] end
+        message.append("""{"event": """" + category + """", "topic": """)
+        message.append(""""metrics:""" + _app_name + """", "ref": null,""")
+        message.append(""""payload" : """" + payload + """"}""")
+        c.write(Bytes.length_encode(consume message))
+      else
+        _env.out.print("   metrics-receiver: Failed sending metrics")
+      end
+    end
+
 
   be send_sinks(payload: String) =>
     send(EventTypes.sinks(), payload)
@@ -87,34 +92,18 @@ Reply:
 class MonitoringHubConnectNotify is TCPConnectionNotify
   let _env: Env
   let _output: MonitoringHubOutput
-  let _framer: Framer = Framer
 
-  new iso create(env: Env, child: DagonChild) =>
+  new iso create(env: Env, output: MonitoringHubOutput) =>
     _env = env
-    _child = child
+    _output = output
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print("    dagon-child: Dagon connection accepted")
+    _env.out.print("    metrics-receiver: Monitoring Hub connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    // parse Dagon command
-    for chunked in _framer.chunk(consume data).values() do
-      try
-        let decoded = WireMsgDecoder(consume chunked)
-        match decoded
-        | let m: StartMsg val =>
-          _env.out.print("    dagon-child: received start message")
-          _child.start()
-        | let m: ShutdownMsg val =>
-          _env.out.print("    dagon-child: received shutdown messages ")
-         _child.shutdown()
-        else
-          _env.out.print("    dagon-child: Unexpected message from Dagon")
-        end
-      else
-        _env.out.print("    dagon-child: Unable to decode message from Dagon")
-      end
-    end
-    
+    // We don't actually have to do anything with this 
+    None 
+
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("dagon child: server closed")
+
