@@ -366,7 +366,7 @@ actor SendingActor
       end
 
       _to_buffy_socket.writev(consume d)
-      _store.sentv(consume d', Time.micros())
+      _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
       _messages_sent = _messages_sent + current_batch_size
     else
       _finished = true

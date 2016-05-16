@@ -133,7 +133,7 @@ class FromBuffyNotify is TCPConnectionNotify
         _stderr.print("Blew up reading header from Buffy")
       end
     else
-      _decoder.received(consume data, Time.micros())
+      _decoder.received(consume data, Time.wall_to_nanos(Time.now()))
 
       conn.expect(4)
       _header = true
