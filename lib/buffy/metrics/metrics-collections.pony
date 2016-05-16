@@ -277,17 +277,19 @@ on category and id
     _period = period
     _bin_selector = bin_selector
 
-  fun ref apply(summary: (NodeMetricsSummary|BoundaryMetricsSummary)) =>
+  fun ref apply(summary: (NodeMetricsSummary val |
+                          BoundaryMetricsSummary val)) =>
     process_summary(summary)
 
-  fun ref process_summary(summary: (NodeMetricsSummary|BoundaryMetricsSummary))
+  fun ref process_summary(summary: (NodeMetricsSummary val |
+                                    BoundaryMetricsSummary val))
   =>
     match summary
-    | let summary':NodeMetricsSummary => process_nodesummary(summary')
-    | let summary':BoundaryMetricsSummary => process_boundarysummary(summary')
+    | let summary':NodeMetricsSummary val => process_nodesummary(summary')
+    | let summary':BoundaryMetricsSummary val => process_boundarysummary(summary')
     end
 
-  fun ref process_nodesummary(summary: NodeMetricsSummary) =>
+  fun ref process_nodesummary(summary: NodeMetricsSummary val) =>
     for digest in summary.digests.values() do
       process_stepmetricsdigest(digest)
     end
@@ -331,7 +333,7 @@ on category and id
     end
 
 
-  fun ref process_boundarysummary(summary: BoundaryMetricsSummary) =>
+  fun ref process_boundarysummary(summary: BoundaryMetricsSummary val) =>
     let name = summary.node_name
     for report in summary.reports.values() do
       match report.boundary_type
