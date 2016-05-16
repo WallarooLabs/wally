@@ -341,25 +341,26 @@ actor Decoder
 ///
 
 actor Store
-  let _auth: AmbientAuth
-  let _received: List[(ByteSeq, U64)]
   let _encoder: ReceivedLogEncoder = ReceivedLogEncoder
+  let _received_file: (File | None)
 
   new create(auth: AmbientAuth) =>
-    _auth = auth
-    _received = List[(ByteSeq, U64)](1_000_000)
+    _received_file = try
+      let f = File(FilePath(auth, "received.txt"))
+      f.set_length(0)
+      f
+    else
+      None
+    end
 
   be received(msg: ByteSeq, at: U64) =>
-    _received.push((msg, at))
+    match _received_file
+      | let file: File => file.print(_encoder((msg, at)))
+    end
 
   be dump() =>
-    try
-      let received_handle = File(FilePath(_auth, "received.txt"))
-      received_handle.set_length(0)
-      for r in _received.values() do
-        received_handle.print(_encoder(r))
-      end
-      received_handle.dispose()
+    match _received_file
+      | let file: File => file.dispose()
     end
 
 class ReceivedLogEncoder
