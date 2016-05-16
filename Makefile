@@ -86,8 +86,8 @@ else
     endef
   else ifeq ($(arch),armhf)
     define PONYC
-      docker run --rm -it -u `id -u` -v \
-        -v ~/.gitconfig:/.gitconfig \
+      docker run --rm -it -u `id -u` \
+        -v ~/.gitconfig:/.gitconfig -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
         --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
         fetch
@@ -124,7 +124,7 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-receiver build-sender build-wesley build-double-divide build-dagon ## Build Pony based programs for Buffy
+build: build-receiver build-sender build-wesley build-double-divide build-dagon build-avg-of-avgs build-quadruple build-state-avg-of-avgs build-dagon-child ## Build Pony based programs for Buffy
 
 build-receiver: ## Build giles receiver
 	$(call PONYC,giles/receiver)
@@ -132,23 +132,41 @@ build-receiver: ## Build giles receiver
 build-sender: ## Build giles sender
 	$(call PONYC,giles/sender)
 
-build-double-divide:
+build-double-divide: ## build double/divide app
 	$(call PONYC,apps/double-divide)
 
-build-dagon:
+build-avg-of-avgs: ## build average of averages app
+	$(call PONYC,apps/avg-of-avgs)
+
+build-quadruple: ## build quadruple app
+	$(call PONYC,apps/quadruple)
+
+build-state-avg-of-avgs: ## build state average of averages app
+	$(call PONYC,apps/state-avg-of-avgs)
+
+build-dagon: ## build dagon
 	$(call PONYC,dagon)
+
+build-dagon-child: ## build dagon-child
+	$(call PONYC,dagon/dagon-child)
 
 build-wesley: ## Build wesley
 	$(call PONYC,wesley/double)
 	$(call PONYC,wesley/identity)
 
-test: test-double-divide test-giles-receiver test-giles-sender ## Test programs for Buffy
+test: test-double-divide test-avg-of-avgs test-quadruple test-state-avg-of-avgs test-giles-receiver test-giles-sender ## Test programs for Buffy
 
-test-double-divide: ## Test Double-Divide
+test-double-divide: ## Test Double-Divide app
 	cd apps/double-divide && ./double-divide
 
-test-giles-sender: ## Test Giles Sender
-	cd giles/sender && ./sender
+test-avg-of-avgs: ## Test avg-of-avgs app
+	cd apps/avg-of-avgs && ./avg-of-avgs
+
+test-quadruple: ## Test quadruple app
+	cd apps/quadruple && ./quadruple
+
+test-state-avg-of-avgs: ## Test state-avg-of-avgs app
+	cd apps/state-avg-of-avgs && ./state-avg-of-avgs
 
 test-giles-receiver: ## Test Giles Receiver
 	cd giles/receiver && ./receiver
@@ -156,7 +174,7 @@ test-giles-receiver: ## Test Giles Receiver
 test-giles-sender: ## Test Giles Sender
 	cd giles/sender && ./sender
 
-dagon-test: #dagon-identity dagon-double ## Run dagon tests
+dagon-test: dagon-identity #dagon-double ## Run dagon tests
 
 dagon-double: ## Run double test with dagon
 	dagon/dagon.py dagon/config/double.ini
@@ -166,9 +184,6 @@ dagon-double: ## Run double test with dagon
 dagon-identity: ## Run identity test with dagon
 	./dagon/dagon --timeout=5 -f apps/double-divide/double-divide.ini -h 127.0.0.1:8080
 	./wesley/identity/identity ./sent.txt ./received.txt match
-	#dagon/dagon.py dagon/config/identity.ini
-	#wesley/identity/identity sent.txt received.txt \
-  #        dagon/config/identity.ini
 
 dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
 
@@ -247,26 +262,51 @@ build-docker:  ## Build docker images for Buffy
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/giles-sender.$(arch):$(docker_image_version) \
           giles/sender
-#	docker $(docker_host_arg) build -t \
-#          $(docker_image_repo)/dagon.$(arch):$(docker_image_version) dagon
+	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/dagon.$(arch):$(docker_image_version) dagon
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/wesley-double.$(arch):$(docker_image_version) \
           wesley/double
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/wesley-identity.$(arch):$(docker_image_version) \
           wesley/identity
+	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/avg-of-avgs.$(arch):$(docker_image_version) \
+          apps/avg-of-avgs
+	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/double-divide.$(arch):$(docker_image_version) \
+          apps/double-divide
+	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/quadruple.$(arch):$(docker_image_version) \
+          apps/quadruple
+	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/state-avg-of-avgs.$(arch):$(docker_image_version) \
+          apps/state-avg-of-avgs
+	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/dagon-child.$(arch):$(docker_image_version) \
+          dagon/dagon-child
 
 push-docker: build-docker ## Push docker images for Buffy to repository
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/giles-receiver.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/giles-sender.$(arch):$(docker_image_version)
-#	docker $(docker_host_arg) push \
-#          $(docker_image_repo)/dagon.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+          $(docker_image_repo)/dagon.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/wesley-double.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/wesley-identity.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+          $(docker_image_repo)/avg-of-avgs.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+          $(docker_image_repo)/double-divide.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+          $(docker_image_repo)/quadruple.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+          $(docker_image_repo)/state-avg-of-avgs.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+          $(docker_image_repo)/dagon-child.$(arch):$(docker_image_version)
 
 exited := $(shell docker $(docker_host_arg) ps -a -q -f status=exited)
 untagged := $(shell (docker $(docker_host_arg) images | grep "^<none>" | awk \
@@ -292,10 +332,16 @@ endif
 clean: clean-docker ## Cleanup docker images and compiled files for Buffy
 	rm -f giles/receiver/receiver giles/receiver/receiver.o
 	rm -f giles/sender/sender giles/sender/sender.o
+	rm -f dagon/dagon dagon/dagon.o
 	rm -f wesley/identity/identity wesley/identity/identity.o
 	rm -f wesley/double/double wesley/double/double.o
 	rm -f lib/buffy/buffy lib/buffy/buffy.o
 	rm -f sent.txt received.txt
+	rm -f apps/avg-of-avgs/avg-of-avgs apps/avg-of-avgs/avg-of-avgs.o
+	rm -f apps/double-divide/double-divide apps/double-divide/double-divide.o
+	rm -f apps/quadruple/quadruple apps/quadruple/quadruple.o
+	rm -f apps/state-avg-of-avgs/state-avg-of-avgs apps/state-avg-of-avgs/state-avg-of-avgs.o
+	rm -f dagon/dagon-child/dagon-child dagon/dagon-child/dagon-child.o
 	@echo 'Done cleaning.'
 
 help:
