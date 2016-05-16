@@ -11,19 +11,20 @@ actor Main
     var args = options.remaining()
     try
       let auth = env.root as AmbientAuth
+      // Listening address
       let addr: Array[String] = args(1).split(":")
       let host = addr(0)
       let service = addr(1)
+
+      // Monitoring Hub Address
       let addr': Array[String] = args2.split(":")
       let host' = addr'(0)
       let service' = addr'(1)
-      let name: String = args(3).clone()
 
-      let MonHubNotifier = TCPListener(auth, MetricsNotifier(env, host,
-                                                             service, name),
-                                       host, service)
+      // Application name to report to Monitoring Hub
+      let name': String = args(3).clone()
 
-      let output = MonitoringHubOutput(env, name, conn: TCPConnection)
+      let output = MonitoringHubOutput(env, name', host', service')
       let encoder = MonitoringHubEncoder
       let handler = MetricsMonitoringHubHandler(encoder, output)
       let handlers: Array[MetricsCollectionOutputHandler] = recover 
@@ -33,66 +34,19 @@ actor Main
       TCPListener(auth, MetricsNotifier(env, host, service), host, service)
     end
 
-class MonHubNotifier is TCPListenNotify
-  let _env: Env
-  let _host: String
-  let _service: String
-  let _name: String
-
-/*
-Connect Message:
-{"path": "/socket/tcp", "params": null}
-
-Connect Success Response:
-{"payload": {"status": "ok", "response": "connected"}}
-
-Connect Error Response:
-{"payload": {"status": "error", "response": "#{error-msg}"}}
-
-Channel Join Message:
-{"event": "phx_join", "topic": "metrics:<app-name>", "ref": null, "payload": {}}
-
-Channel Join Message Response:
-{"event": "phx_reply", "topic": "metrics:<application-name>", "ref": null, "payload": {"response": {}, "status": "ok"}}
-
-Ingress-Egress Metrics Message:
-{"event": "ingress-egress-metrics", "topic": "metrics:<app-name>", "ref": null, "payload" : "#{metrics_msg}"}
-
-Source-Sink Metrics Message:
-{"event": "source-sink-metrics", "topic": "metrics:<app-name>", "ref": null, "payload" : "#{metrics_msg}"}
-
-Step Metrics Message:
-{"event": "step-metrics", "topic": "metrics<app-name>", "ref": null, "payload" : "#{metrics_msg}"}
-
-Reply:
-{"event": "phx_reply", "topic": "metrics:<app-name>", "ref": null, "payload": {"response": {}, "status": "ok"}}
-*/
-
-  new iso create(env: Env, host: String, service: String, name: String) =>
-    _env = env
-    _host = host
-    _service = service
-    _name = name
-
-  fun ref listening(listen: TCPListener ref) =>
-    _env.out.print("listening on " + _host + ":" + _service)
-
-  fun ref not_listening(listen: TCPListener ref) =>
-    _env.out.print("couldn't listen")
-    listen.close()
-
-  fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    MonHubReceiver(_env, _name)
 
 class MetricsNotifier is TCPListenNotify
   let _env: Env
   let _host: String
   let _service: String
+  let _handlers: Array[MetricsCollectionOutputHandler]
 
-  new iso create(env: Env, host: String, service: String, name: String) =>
+  new iso create(env: Env, host: String, service: String, handlers: 
+                 Array[MetricsCollectionOutputHandler]) =>
     _env = env
     _host = host
     _service = service
+    _handlers = handlers
 
   fun ref listening(listen: TCPListener ref) =>
     _env.out.print("listening on " + _host + ":" + _service)
@@ -102,7 +56,7 @@ class MetricsNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    MetricsReceiver(_env, _name)
+    MetricsReceiver(_env, _handlers)
 
 class MetricsReceiver is TCPConnectionNotify
   let _env: Env
