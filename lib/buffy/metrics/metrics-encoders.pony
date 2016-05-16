@@ -5,6 +5,10 @@ use "sendence/bytes"
 interface MetricsCollectionOutputEncoder
   fun encode(sinks: SinkMetrics, boundaries: BoundaryMetrics,
              steps: StepMetrics, period: U64): Array[U8] iso^
+  fun encode_sinks(sinks: SinkMetrics, period: U64): Array[U8] iso^
+  fun encode_boundaries(boundaries: BoundaryMetrics, period: U64): Array[U8] 
+    iso^
+  fun encode_steps(steps: StepMetrics, period: U64): Array[U8] iso^
 
 primitive MonitoringHubEncoder is MetricsCollectionOutputEncoder
   fun encode(sinks: SinkMetrics, boundaries: BoundaryMetrics,
@@ -16,6 +20,22 @@ primitive MonitoringHubEncoder is MetricsCollectionOutputEncoder
       j.data.push(_json_steps(steps, period))
       d.append(j.string())
       consume d
+
+  fun encode_sinks(sinks: SinkMetrics, period: U64): Array[U8] iso^ =>
+    let d: Array[U8] iso = recover Array[U8] end
+    d.append(_json_sinks(sinks, period).string())
+    consume d
+
+  fun encode_boundaries(boundaries: BoundaryMetrics, period: U64): Array[U8]
+    iso^ =>
+    let d: Array[U8] iso = recover Array[U8] end
+    d.append(_json_boundaries(boundaries, period).string())
+    consume d
+
+  fun encode_steps(steps: StepMetrics, period: U64): Array[U8] iso^ =>
+    let d: Array[U8] iso = recover Array[U8] end
+    d.append(_json_steps(steps, period).string())
+    consume d
 
   fun _json_sinks(metrics: SinkMetrics, period: U64): JsonArray ref^ =>
     var j: JsonArray ref^ = JsonArray

@@ -115,80 +115,80 @@ class iso _TestMonitoringHubEncoder is UnitTest
     // Compare output in the accumulator handler
     let expected: Array[String] = Array[String]
     expected.push("""[
-  [
-    {
-      "topics": {
-        "throughput_out": {
-          "0": 2
-        },
-        "latency_bins": {
-          "0.0001": 0,
-          "overflow": 0,
-          "0.1": 0,
-          "0.01": 0,
-          "1": 2,
-          "0.001": 0,
-          "1e-05": 0,
-          "1e-06": 0
-        }
+  {
+    "topics": {
+      "throughput_out": {
+        "0": 2
       },
-      "t1": 0,
-      "t0": -1,
-      "category": "source-sink",
-      "pipeline_key": "sink-node1"
-    }
-  ],
-  [
-    {
-      "topics": {
-        "throughput_out": {
-          "0": 2
-        },
-        "latency_bins": {
-          "0.0001": 0,
-          "overflow": 0,
-          "0.1": 0,
-          "0.01": 0,
-          "1": 2,
-          "0.001": 0,
-          "1e-05": 0,
-          "1e-06": 0
-        }
+      "latency_bins": {
+        "0.0001": 0,
+        "overflow": 0,
+        "0.1": 0,
+        "0.01": 0,
+        "1": 2,
+        "0.001": 0,
+        "1e-05": 0,
+        "1e-06": 0
+      }
+    },
+    "t1": 0,
+    "t0": -1,
+    "category": "source-sink",
+    "pipeline_key": "sink-node1"
+  }
+]""")
+  expected.push("""[
+  {
+    "topics": {
+      "throughput_out": {
+        "0": 2
       },
-      "t1": 0,
-      "t0": -1,
-      "category": "ingress-egress",
-      "pipeline_key": "boundary-node1"
-    }
-  ],
-  [
-    {
-      "topics": {
-        "throughput_out": {
-          "0": 2
-        },
-        "latency_bins": {
-          "0.0001": 0,
-          "overflow": 0,
-          "0.1": 1,
-          "0.01": 0,
-          "1": 1,
-          "0.001": 0,
-          "1e-05": 0,
-          "1e-06": 0
-        }
+      "latency_bins": {
+        "0.0001": 0,
+        "overflow": 0,
+        "0.1": 0,
+        "0.01": 0,
+        "1": 2,
+        "0.001": 0,
+        "1e-05": 0,
+        "1e-06": 0
+      }
+    },
+    "t1": 0,
+    "t0": -1,
+    "category": "ingress-egress",
+    "pipeline_key": "boundary-node1"
+  }
+]""")
+  expected.push("""[
+  {
+    "topics": {
+      "throughput_out": {
+        "0": 2
       },
-      "t1": 0,
-      "t0": -1,
-      "category": "step",
-      "pipeline_key": "step-999"
-    }
-  ]
+      "latency_bins": {
+        "0.0001": 0,
+        "overflow": 0,
+        "0.1": 1,
+        "0.01": 0,
+        "1": 1,
+        "0.001": 0,
+        "1e-05": 0,
+        "1e-06": 0
+      }
+    },
+    "t1": 0,
+    "t0": -1,
+    "category": "step",
+    "pipeline_key": "step-999"
+  }
 ]""")
 
     for (o, e) in Zip2[String, String](handler.output.values(),
       expected.values()) do
-      if o != e then h.fail("Output varies from expected") end
+      if o != e then h.fail("Output varies from expected." + 
+        "\nExpected: \n" + e + 
+        "\nReceived: \n" + o + "\n") end
     end
     
     true
