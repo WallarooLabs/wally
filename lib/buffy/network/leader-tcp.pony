@@ -4,6 +4,7 @@ use "buffy/messages"
 use "buffy/metrics"
 use "sendence/bytes"
 use "sendence/tcp"
+use "../topology"
 use "time"
 use "spike"
 
@@ -71,7 +72,7 @@ class LeaderConnectNotify is TCPConnectionNotify
         let msg = WireMsgDecoder(consume chunked)
         match msg
         | let m: IdentifyControlMsg val =>
-          _topology_manager.assign_control_conn(conn, m.node_name, m.host, m.service)
+          _topology_manager.assign_control_conn(m.node_name, m.host, m.service)
         | let m: IdentifyDataMsg val =>
           _topology_manager.assign_data_conn(m.node_name, m.host, m.service)
         | let m: AckInitializedMsg val =>

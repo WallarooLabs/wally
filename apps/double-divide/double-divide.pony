@@ -3,6 +3,7 @@ use "collections"
 use "buffy"
 use "buffy/messages"
 use "buffy/metrics"
+use "buffy/topology"
 
 actor Main
   new create(env: Env) =>

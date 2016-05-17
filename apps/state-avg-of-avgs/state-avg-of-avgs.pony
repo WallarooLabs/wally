@@ -2,6 +2,7 @@ use "collections"
 use "buffy"
 use "buffy/messages"
 use "buffy/metrics"
+use "buffy/topology"
 use "net"
 
 actor Main

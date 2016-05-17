@@ -90,12 +90,13 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun forward(step_id: I32, msg: Message[I32] val): Array[U8] val =>
+  fun forward(step_id: I32, node_name: String, msg: Message[I32] val): Array[U8] val =>
     let source_ts_byte_0 = (msg.source_ts >> 32).i32()
     let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
     let osc = OSCMessage(_Forward(),
       recover
         [as OSCData val: OSCInt(step_id),
+                         OSCString(node_name),
                          OSCInt(msg.id),
                          OSCInt(source_ts_byte_0),
                          OSCInt(source_ts_byte_1),
@@ -103,12 +104,13 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun forward_i32(step_id: I32, msg: Message[I32] val): Array[U8] val =>
+  fun forward_i32(step_id: I32, from_node: String, msg: Message[I32] val): Array[U8] val =>
     let source_ts_byte_0 = (msg.source_ts >> 32).i32()
     let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
     let osc = OSCMessage(_ForwardI32(),
       recover
         [as OSCData val: OSCInt(step_id),
+                         OSCString(from_node),
                          OSCInt(msg.id),
                          OSCInt(source_ts_byte_0),
                          OSCInt(source_ts_byte_1),
@@ -116,12 +118,13 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun forward_f32(step_id: I32, msg: Message[F32] val): Array[U8] val =>
+  fun forward_f32(step_id: I32, from_node: String, msg: Message[F32] val): Array[U8] val =>
     let source_ts_byte_0 = (msg.source_ts >> 32).i32()
     let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
     let osc = OSCMessage(_ForwardF32(),
       recover
         [as OSCData val: OSCInt(step_id),
+                         OSCString(from_node),
                          OSCInt(msg.id),
                          OSCInt(source_ts_byte_0),
                          OSCInt(source_ts_byte_1),
@@ -129,12 +132,13 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun forward_string(step_id: I32, msg: Message[String] val): Array[U8] val =>
+  fun forward_string(step_id: I32, from_node: String, msg: Message[String] val): Array[U8] val =>
     let source_ts_byte_0 = (msg.source_ts >> 32).i32()
     let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
     let osc = OSCMessage(_ForwardString(),
       recover
         [as OSCData val: OSCInt(step_id),
+                         OSCString(from_node),
                          OSCInt(msg.id),
                          OSCInt(source_ts_byte_0),
                          OSCInt(source_ts_byte_1),
@@ -365,14 +369,16 @@ class ForwardMsg is WireMsg
 
 class ForwardI32Msg is WireMsg
   let step_id: I32
+  let from_node_name: String
   let msg: Message[I32] val
 
   new val create(m: OSCMessage val) ? =>
     match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
-      m.arguments(4))
-    | (let a_id: OSCInt val, let m_id: OSCInt val, let s_ts_0: OSCInt val,
-      let s_ts_1: OSCInt val, let m_data: OSCInt val) =>
+      m.arguments(4), m.arguments(5))
+    | (let a_id: OSCInt val, let from_node: OSCString val, let m_id: OSCInt val,
+      let s_ts_0: OSCInt val, let s_ts_1: OSCInt val, let m_data: OSCInt val) =>
       step_id = a_id.value()
+      from_node_name = from_node.value()
       let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
       msg = Message[I32](m_id.value(), source_ts, Time.millis(), m_data.value())
     else
@@ -381,14 +387,16 @@ class ForwardI32Msg is WireMsg
 
 class ForwardF32Msg is WireMsg
   let step_id: I32
+  let from_node_name: String
   let msg: Message[F32] val
 
   new val create(m: OSCMessage val) ? =>
     match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
-      m.arguments(4))
-    | (let a_id: OSCInt val, let m_id: OSCInt val, let s_ts_0: OSCInt val,
-      let s_ts_1: OSCInt val, let m_data: OSCFloat val) =>
+      m.arguments(4), m.arguments(5))
+    | (let a_id: OSCInt val, let from_node: OSCString val, let m_id: OSCInt val,
+      let s_ts_0: OSCInt val, let s_ts_1: OSCInt val, let m_data: OSCFloat val) =>
       step_id = a_id.value()
+      from_node_name = from_node.value()
       let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
       msg = Message[F32](m_id.value(), source_ts, Time.millis(), m_data.value())
     else
@@ -397,14 +405,16 @@ class ForwardF32Msg is WireMsg
 
 class ForwardStringMsg is WireMsg
   let step_id: I32
+  let from_node_name: String
   let msg: Message[String] val
 
   new val create(m: OSCMessage val) ? =>
     match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
-      m.arguments(4))
-    | (let a_id: OSCInt val, let m_id: OSCInt val, let s_ts_0: OSCInt val,
-      let s_ts_1: OSCInt val, let m_data: OSCString val) =>
+      m.arguments(4), m.arguments(5))
+    | (let a_id: OSCInt val, let from_node: OSCString val, let m_id: OSCInt val,
+      let s_ts_0: OSCInt val, let s_ts_1: OSCInt val, let m_data: OSCString val) =>
       step_id = a_id.value()
+      from_node_name = from_node.value()
       let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
       msg = Message[String](m_id.value(), source_ts, Time.millis(), m_data.value())
     else

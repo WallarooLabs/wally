@@ -1,6 +1,7 @@
 use "net"
 use "collections"
 use "buffy/messages"
+use "../network"
 use "random"
 
 actor TopologyManager
@@ -43,9 +44,9 @@ actor TopologyManager
 
     if _worker_count == 0 then _complete_initialization() end
 
-  be assign_control_conn(conn: TCPConnection tag, node_name: String,
-    control_host: String, control_service: String) =>
-    _coordinator.add_control_connection(node_name, conn)
+  be assign_control_conn(node_name: String, control_host: String,
+    control_service: String) =>
+    _coordinator.add_control_connection(node_name, control_host, control_service)
     _worker_control_addrs(node_name) = (control_host, control_service)
     _env.out.print("Identified worker " + node_name + " control channel")
     if _control_hellos < _worker_count then

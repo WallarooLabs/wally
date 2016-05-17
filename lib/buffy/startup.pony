@@ -3,6 +3,8 @@ use "options"
 use "collections"
 use "buffy/metrics"
 use "spike"
+use "./network"
+use "./topology"
 
 actor Startup
   new create(env: Env, topology: Topology val, step_lookup: StepLookup val,
@@ -47,8 +49,12 @@ actor Startup
       | ("source", let arg: String) => source_addrs.append(arg.split(","))
       | ("sink", let arg: String) => sink_addrs.append(arg.split(","))
       | ("metrics", let arg: String) => metrics_addr = arg.split(":")
-      | ("spike-delay", None) => spike_delay = true
-      | ("spike-drop", None) => spike_drop = true
+      | ("spike-delay", None) =>
+        env.out.print("%%SPIKE-DELAY%%")
+        spike_delay = true
+      | ("spike-drop", None) =>
+        env.out.print("%%SPIKE-DROP%%")
+        spike_drop = true
       end
     end
 
@@ -88,7 +94,7 @@ actor Startup
           MetricsCollector(env, node_name)
         end
 
-      let step_manager = StepManager(env, step_lookup, consume sinks,
+      let step_manager = StepManager(env, node_name, step_lookup, consume sinks,
         metrics_collector)
 
       let coordinator: Coordinator = Coordinator(node_name, env, auth,
