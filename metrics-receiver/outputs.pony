@@ -1,6 +1,8 @@
 use "net"
 use "sendence/bytes"
 use "buffy/metrics"
+use "json"
+use "collections"
 
 
 actor MonitoringHubOutput is MetricsOutputActor
@@ -31,7 +33,10 @@ actor MonitoringHubOutput is MetricsOutputActor
         _env.out.print("    metrics-receiver: Connecting...")
         let c = _conn as TCPConnection
         let message: Array[U8] iso = recover Array[U8] end
-        message.append("""{"path": "/socket/tcp", "params": null}""")
+        let j: JsonObject = JsonObject
+        j.data.update("path", "/socket/tcp")
+        j.data.update("params", None)
+        message.append(j.string())
         c.write(Bytes.length_encode(consume message))
       else
         _env.out.print("    metrics-receiver: Failed sending connect")
@@ -47,9 +52,12 @@ actor MonitoringHubOutput is MetricsOutputActor
         _env.out.print("    metrics-receiver: Joining [" + _app_name+ "]...")
         let c = _conn as TCPConnection
         let message: Array[U8] iso = recover Array[U8] end
-        message.append("""{"event": "phx_join", "topic": "metrics:""")
-        message.append(_app_name)
-        message.append("""", "ref": null, "payload": {}}""")
+        let j: JsonObject = JsonObject
+        j.data.update("event", "phx_join")
+        j.data.update("topic", "metrics:" + _app_name)
+        j.data.update("ref", None)
+        j.data.update("payload", JsonObject)
+        message.append(j.string())
         c.write(Bytes.length_encode(consume message))
       else
         _env.out.print("    metrics-receiver: Failed sending join")
@@ -65,15 +73,22 @@ actor MonitoringHubOutput is MetricsOutputActor
         _env.out.print("    metrics-receiver: Sending metrics")
         let c = _conn as TCPConnection
         let message: Array[U8] iso = recover Array[U8] end
-        message.append("""{"event": """" + category + """", "topic": """)
-        message.append(""""metrics:""" + _app_name + """", "ref": null,""")
+        let doc: JsonDoc = JsonDoc
         match payload
-        | let payload': String val => 
-          message.append(""""payload" : """" + payload' + """"}""")
-        | let payload': Array[U8] val =>
-          message.append(""""payload" : """" + String.from_array(payload'))
-          message.append(""""}""")
+        | let p: String val =>
+          doc.parse(p)
+        | let p: Array[U8] val =>
+          doc.parse(String.from_array(p))
+        else
+          doc.parse("[]")
         end
+
+        let j: JsonObject = JsonObject
+        j.data.update("event", category)
+        j.data.update("topic", "metrics:" + _app_name)
+        j.data.update("ref", None)
+        j.data.update("payload", doc.data as JsonArray)
+        message.append(j.string())
         c.write(Bytes.length_encode(consume message))
       else
         _env.out.print("   metrics-receiver: Failed sending metrics")
