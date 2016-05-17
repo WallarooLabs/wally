@@ -3,6 +3,23 @@ use "buffy/messages"
 use "buffy/metrics"
 use "time"
 
+primitive Epoch
+  fun nanoseconds(): U64 =>
+    let wall = Time.now()
+    ((wall._1 * 1000000000) + wall._2).u64()
+
+  fun microseconds(): U64 =>
+    let wall = Time.now()
+    ((wall._1 * 1000000) + (wall._2/1000)).u64()
+
+  fun milliseconds(): U64 =>
+    let wall = Time.now()
+    ((wall._1 * 1000) + (wall._2/1000000)).u64()
+
+  fun seconds(): U64 =>
+    let wall = Time.now()
+    wall._1.u64()
+
 interface BasicStep
   be add_step_reporter(sr: StepReporter val) => None
 
@@ -30,9 +47,9 @@ actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
   be apply(input: Message[In] val) =>
     match _output
     | let c: ComputeStep[Out] tag =>
-      let start_time = Time.millis()
+      let start_time = Epoch.milliseconds()
       c(_f(input))
-      let end_time = Time.millis()
+      let end_time = Epoch.milliseconds()
       _report_metrics(start_time, end_time)
     end
 
