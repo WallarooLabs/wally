@@ -18,13 +18,13 @@ actor MetricsAccumulatorActor is (MetricsOutputActor & Retrievable)
   var data: Array[String] iso = recover iso Array[String] end
 
   be send(category: String, payload: (String val | Array[U8] val)) =>
-    match payload 
+    match payload
     | let s': String val =>
       data.push(s')
     | let s': Array[U8] val =>
       data.push(String.from_array(s'))
     end
-  
+
   be retrieve(that: Retriever tag) =>
     let data' = data = recover iso Array[String] end
     that.retrieved(consume data')
@@ -46,10 +46,9 @@ class MetricsStringAccumulator is MetricsCollectionOutputHandler
 
   fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
              steps: StepMetrics, period: U64) =>
-    output.send(MetricsCategories.sinks(), 
-                String.from_array(encoder.encode_sinks(sinks, period)))
+    output.send(MetricsCategories.sinks(),
+                encoder.encode_sinks(sinks, period))
     output.send(MetricsCategories.boundaries(),
-                String.from_array(
-                  encoder.encode_boundaries(boundaries, period)))
+                encoder.encode_boundaries(boundaries, period))
     output.send(MetricsCategories.steps(),
-                String.from_array(encoder.encode_steps(steps, period)))
+                encoder.encode_steps(steps, period))
