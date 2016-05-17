@@ -13,7 +13,7 @@ actor MonitoringHubOutput is MetricsOutputActor
   new create(env: Env, app_name: String, host: String, service: String) =>
     _env = env
     _app_name = app_name
-    
+
     try
       let auth = env.root as AmbientAuth
       let notifier: TCPConnectionNotify iso =
@@ -22,7 +22,7 @@ actor MonitoringHubOutput is MetricsOutputActor
       send_connect()
     else
       _env.out.print("    metrics-receiver: Couldn't get ambient authority")
-    end  
+    end
 
   be send_connect() =>
     """
@@ -42,7 +42,7 @@ actor MonitoringHubOutput is MetricsOutputActor
         _env.out.print("    metrics-receiver: Failed sending connect")
       end
     end
- 
+
   be send_join() =>
     """
     Send a "join" message to Monitoring Hub
@@ -78,6 +78,7 @@ actor MonitoringHubOutput is MetricsOutputActor
         | let p: String val =>
           doc.parse(p)
         | let p: Array[U8] val =>
+          _env.out.print(String.from_array(p))
           doc.parse(String.from_array(p))
         else
           doc.parse("[]")
@@ -108,8 +109,8 @@ class MonitoringHubConnectNotify is TCPConnectionNotify
     _env.out.print("    metrics-receiver: Monitoring Hub connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    // We don't actually have to do anything with this 
-    None 
+    // We don't actually have to do anything with this
+    None
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("dagon child: server closed")
