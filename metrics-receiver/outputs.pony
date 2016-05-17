@@ -64,7 +64,7 @@ actor MonitoringHubOutput is MetricsOutputActor
       end
     end
 
-  be send(category: String, payload: (String val | Array[U8] val)) =>
+  be send(category: String, payload: Array[U8] val) =>
     """
     Send a metrics messsage to Monitoring Hub
     """
@@ -74,15 +74,7 @@ actor MonitoringHubOutput is MetricsOutputActor
         let c = _conn as TCPConnection
         let message: Array[U8] iso = recover Array[U8] end
         let doc: JsonDoc = JsonDoc
-        match payload
-        | let p: String val =>
-          doc.parse(p)
-        | let p: Array[U8] val =>
-          _env.out.print(String.from_array(p))
-          doc.parse(String.from_array(p))
-        else
-          doc.parse("[]")
-        end
+        doc.parse(String.from_array(payload))
 
         let j: JsonObject = JsonObject
         j.data.update("event", category)

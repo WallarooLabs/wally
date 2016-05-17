@@ -5,14 +5,13 @@ primitive MetricsCategories
 
 
 interface MetricsOutputActor
-  be send(category: String, payload: (String val | Array[U8] val))
+  be send(category: String, payload: Array[U8] val)
 
 interface Retriever
   be retrieved(a: Array[String] iso)
 
 interface Retrievable
   be retrieve(that: Retriever tag)
-
 
 actor MetricsAccumulatorActor is (MetricsOutputActor & Retrievable)
   var data: Array[String] iso = recover iso Array[String] end
