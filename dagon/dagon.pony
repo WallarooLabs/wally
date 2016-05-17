@@ -303,6 +303,7 @@ actor ProcessManager
     """
     Shutdown the listener
     """
+    _env.out.print("dagon: shutting down listener")
     if (_listener isnt None) then
       try
         let l = _listener as TCPListener
@@ -402,17 +403,21 @@ actor ProcessManager
     """
     Leader signaled he's ready. Boot the Sender.
     """
-    _env.out.print("dagon: received topology ready from leader: " + node_name)
-    try
-      let child = roster(node_name)
-      // update child state
-      child.state = TopologyReady
+    _env.out.print("dagon: received topology ready from: " + node_name)
+    if _is_leader(node_name) then
+      try      
+        let child = roster(node_name)
+        // update child state
+        child.state = TopologyReady
+      else
+        _env.out.print("dagon: failed to find leader in roster")
+      end
+      // time to boot the sender node
+      boot_sender_node()
     else
-      _env.out.print("dagon: failed to find leader in roster")
+      _env.out.print("dagon: ignoring topology ready from worker node")
     end
-    // time to boot the sender node
-    boot_sender_node()
-
+      
   fun ref _is_leader(node_name: String): Bool =>
     """
     Check if a child is the leader.
