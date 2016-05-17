@@ -55,6 +55,7 @@ actor DagonChild
         recover HomeConnectNotify(env, this) end
       _conn = TCPConnection(auth, consume notifier, host, service)
       send_ready()
+      send_topology_ready()
     else
       _env.out.print("    dagon-child: Couldn't get ambient authority")
     end   
@@ -73,6 +74,21 @@ actor DagonChild
         _env.out.print("    dagon-child: Failed sending ready")
       end
     end
+
+  be send_topology_ready() =>
+    """
+    Send a "ready" message back to Dagon.
+    """
+    if (_conn isnt None) then
+      try
+        _env.out.print("    dagon-child: Sending topology ready...")
+        let c = _conn as TCPConnection
+        let message = WireMsgEncoder.topology_ready(_node_name)
+        c.write(message)
+      else
+        _env.out.print("    dagon-child: Failed sending topology ready")
+      end
+    end    
 
   be send_done() =>
     """
@@ -116,7 +132,6 @@ actor DagonChild
     if (_conn isnt None) then
       _env.out.print("    dagon-child: Shutting down " + _node_name)
       try
-        send_done_shutdown()
         let c = _conn as TCPConnection
         c.dispose()
         _env.out.print("    dagon-child: disposed of tcp connection")
@@ -148,7 +163,8 @@ class HomeConnectNotify is TCPConnectionNotify
           _env.out.print("    dagon-child: received start message")
           _child.start()
         | let m: ShutdownMsg val =>
-          _env.out.print("    dagon-child: received shutdown messages ")
+         _env.out.print("    dagon-child: received shutdown messages ")
+         _child.send_done_shutdown()
          _child.shutdown()
         else
           _env.out.print("    dagon-child: Unexpected message from Dagon")
@@ -159,7 +175,7 @@ class HomeConnectNotify is TCPConnectionNotify
     end
     
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print("dagon child: server closed")
+    _env.out.print("    dagon child: server closed")
 
 
 class FakeWork is TimerNotify  
@@ -191,3 +207,5 @@ class FakeWork is TimerNotify
 
   fun ref cancel(timer: Timer) =>
     _child.send_done()
+    _child.send_done_shutdown()
+    _child.shutdown()
