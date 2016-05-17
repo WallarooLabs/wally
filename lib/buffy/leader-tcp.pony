@@ -12,19 +12,17 @@ class LeaderControlNotifier is TCPListenNotify
   let _auth: AmbientAuth
   let _name: String
   let _topology_manager: TopologyManager
-  let _step_manager: StepManager
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector
   var _host: String = ""
   var _service: String = ""
 
   new iso create(env: Env, auth: AmbientAuth, name: String,
-    step_manager: StepManager, coordinator: Coordinator,
-    topology_manager: TopologyManager, metrics_collector: MetricsCollector) =>
+    coordinator: Coordinator, topology_manager: TopologyManager,
+    metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
     _name = name
-    _step_manager = step_manager
     _coordinator = coordinator
     _topology_manager = topology_manager
     _metrics_collector = metrics_collector
@@ -44,27 +42,23 @@ class LeaderControlNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     LeaderConnectNotify(_env, _auth, _name, _topology_manager,
-      _step_manager, _coordinator, _metrics_collector)
+      _coordinator, _metrics_collector)
 
 class LeaderConnectNotify is TCPConnectionNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
   let _topology_manager: TopologyManager
-  let _step_manager: StepManager
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector
   let _framer: Framer = Framer
-  let _node_data_conns: Map[String, TCPConnection tag] = Map[String, TCPConnection tag]
 
   new iso create(env: Env, auth: AmbientAuth, name: String, t_manager: TopologyManager,
-    s_manager: StepManager, coordinator: Coordinator,
-    metrics_collector: MetricsCollector) =>
+    coordinator: Coordinator, metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
     _name = name
     _topology_manager = t_manager
-    _step_manager = s_manager
     _coordinator = coordinator
     _metrics_collector = metrics_collector
 
@@ -79,19 +73,20 @@ class LeaderConnectNotify is TCPConnectionNotify
         | let m: IdentifyControlMsg val =>
           _topology_manager.assign_control_conn(conn, m.node_name, m.host, m.service)
         | let m: IdentifyDataMsg val =>
-          _topology_manager.assign_data_conn(conn, m.node_name, m.host, m.service)
+          _topology_manager.assign_data_conn(m.node_name, m.host, m.service)
         | let m: AckInitializedMsg val =>
           _topology_manager.ack_initialized()
         | let m: ReconnectMsg val =>
           _env.out.print("Received reconnect message, but doing nothing.")
         | let m: SpinUpMsg val =>
-          _step_manager.add_step(m.step_id, m.computation_type)
+          _coordinator.add_step(m.step_id, m.computation_type)
         | let m: SpinUpProxyMsg val =>
-          _spin_up_proxy(m)
+          _coordinator.add_proxy(m.proxy_id, m.step_id, m.target_node_name,
+            m.target_host, m.target_service)
         | let m: SpinUpSinkMsg val =>
-          _step_manager.add_sink(m.sink_id, m.sink_step_id, _auth)
+          _coordinator.add_sink(m.sink_id, m.sink_step_id, _auth)
         | let m: ConnectStepsMsg val =>
-          _step_manager.connect_steps(m.in_step_id, m.out_step_id)
+          _coordinator.connect_steps(m.in_step_id, m.out_step_id)
         | let d: ShutdownMsg val =>
           _topology_manager.shutdown()
         | let m: UnknownMsg val =>
@@ -100,21 +95,6 @@ class LeaderConnectNotify is TCPConnectionNotify
       else
         _env.err.print("Error decoding incoming control message.")
       end
-    end
-
-  fun ref _spin_up_proxy(msg: SpinUpProxyMsg val) =>
-    try
-      let target_conn = _node_data_conns(msg.target_node_name)
-      _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
-    else
-      let notifier: TCPConnectionNotify iso =
-        LeaderConnectNotify(_env, _auth, _name, _topology_manager, _step_manager,
-          _coordinator, _metrics_collector)
-      let target_conn =
-        TCPConnection(_auth, consume notifier, msg.target_host,
-          msg.target_service)
-      _step_manager.add_proxy(msg.proxy_id, msg.step_id, target_conn)
-      _node_data_conns(msg.target_node_name) = target_conn
     end
 
   fun ref closed(conn: TCPConnection ref) =>
