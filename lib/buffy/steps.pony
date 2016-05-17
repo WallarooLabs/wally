@@ -1,7 +1,7 @@
 use "collections"
 use "buffy/messages"
 use "buffy/metrics"
-use "time"
+use "buffy/epoch"
 
 interface BasicStep
   be add_step_reporter(sr: StepReporter val) => None
@@ -30,9 +30,9 @@ actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
   be apply(input: Message[In] val) =>
     match _output
     | let c: ComputeStep[Out] tag =>
-      let start_time = Time.millis()
+      let start_time = Epoch.milliseconds()
       c(_f(input))
-      let end_time = Time.millis()
+      let end_time = Epoch.milliseconds()
       _report_metrics(start_time, end_time)
     end
 

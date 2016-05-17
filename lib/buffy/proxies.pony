@@ -3,7 +3,7 @@ use "debug"
 use "net"
 use "buffy/messages"
 use "buffy/metrics"
-use "time"
+use "buffy/epoch"
 
 actor Proxy is ComputeStep[I32]
   let _env: Env
@@ -21,7 +21,7 @@ actor Proxy is ComputeStep[I32]
   be apply(input: Message[I32] val) =>
     let tcp_msg = WireMsgEncoder.forward(_step_id, input)
     _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
-      input.id, input.last_ingress_ts, Time.millis())
+      input.id, input.last_ingress_ts, Epoch.milliseconds())
     _conn.write(tcp_msg)
 
 actor ExternalConnection is ComputeStep[I32]
@@ -39,7 +39,7 @@ actor ExternalConnection is ComputeStep[I32]
     let tcp_msg = WireMsgEncoder.external(input.data)
     _conn.write(tcp_msg)
     _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
-      input.id, input.source_ts, Time.millis())
+      input.id, input.source_ts, Epoch.milliseconds())
 
 actor StepManager
   let _env: Env

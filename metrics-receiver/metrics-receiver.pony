@@ -57,8 +57,8 @@ actor MetricsReceiver
                 host, service)
 
   be flush() =>
-    _env.out.print("flushed")
     _mc.send_output()
+    _env.out.print("flushed")
 
 class MetricsNotifier is TCPListenNotify
   let _env: Env

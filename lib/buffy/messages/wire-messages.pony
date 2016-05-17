@@ -1,6 +1,6 @@
 use "osc-pony"
 use "sendence/bytes"
-use "time"
+use "buffy/epoch"
 
 primitive _Ready                                fun apply(): String => "/0"
 primitive _Identify                             fun apply(): String => "/1"
@@ -260,7 +260,7 @@ class ForwardMsg is WireMsg
       let s_ts_1: OSCInt val, let m_data: OSCInt val) =>
       step_id = a_id.value()
       let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
-      msg = Message[I32](m_id.value(), source_ts, Time.millis(), m_data.value())
+      msg = Message[I32](m_id.value(), source_ts, Epoch.milliseconds(), m_data.value())
     else
       error
     end
