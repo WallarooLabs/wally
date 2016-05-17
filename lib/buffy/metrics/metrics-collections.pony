@@ -222,7 +222,7 @@ A history of throughput counts per second
 
   fun ref count_report(end_time: U64) =>
     // Truncate milliseconds to seconds
-    let t' = end_time / 1000
+    let t': U64 = end_time.f64().div(1000.0).ceil().u64()
     if _start_time == 0 then _start_time = t' end
     if t' > _end_time then _end_time = t' end
     _map.update(t', try _map(t') + 1 else 1 end)
@@ -308,7 +308,7 @@ on category and id
     end
 
   fun ref process_report(step_id: I32, report: StepMetricsReport val) =>
-    let time_bucket: U64 = (report.end_time / 1000) % _period
+    let time_bucket: U64 = get_time_bucket(report.end_time)
     // Bookkeeping
     try
       _steptimeranges(time_bucket).set(step_id)
@@ -351,7 +351,7 @@ on category and id
     end
 
   fun ref process_node(name: String, report: BoundaryMetricsReport val) =>
-    let time_bucket: U64 = (report.end_time / 1000) % _period
+    let time_bucket: U64 = get_time_bucket(report.end_time)
     try
       _boundarytimeranges(time_bucket).set(name)
     else
@@ -383,7 +383,7 @@ on category and id
     end
 
   fun ref process_sink(name: String, report: BoundaryMetricsReport val) =>
-    let time_bucket: U64 = (report.end_time / 1000) % _period
+    let time_bucket: U64 = get_time_bucket(report.end_time)
     try
       _sinktimeranges(time_bucket).set(name)
     else
@@ -414,6 +414,9 @@ on category and id
       time_buckets.update(time_bucket, (lh, th))
     end
 
+  fun get_time_bucket(time: U64): U64 =>
+    (time/1000) + (_period - ((time/1000) % _period))
+ 
   be send_output() =>
     handle_output()
 

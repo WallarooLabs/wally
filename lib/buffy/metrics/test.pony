@@ -93,16 +93,16 @@ class iso _TestMonitoringHubEncoder is UnitTest
     let nms:NodeMetricsSummary iso = recover NodeMetricsSummary("node1") end
     let digest:StepMetricsDigest iso = recover StepMetricsDigest(999) end
     
-    digest.add_report(StepMetricsReport(0, 50))
-    digest.add_report(StepMetricsReport(50, 250))
+    digest.add_report(StepMetricsReport(10010, 10550))
+    digest.add_report(StepMetricsReport(10650, 12250))
     nms.add_digest(consume digest)
     
     let bms: BoundaryMetricsSummary iso = recover
       BoundaryMetricsSummary("node1") end
-    bms.add_report(BoundaryMetricsReport(0, 10000, 50, 250))
-    bms.add_report(BoundaryMetricsReport(0, 10000, 150, 600))
-    bms.add_report(BoundaryMetricsReport(1, 10000, 50, 300))
-    bms.add_report(BoundaryMetricsReport(1, 10000, 100, 500))
+    bms.add_report(BoundaryMetricsReport(0, 10000, 10050, 10250))
+    bms.add_report(BoundaryMetricsReport(0, 10001, 11150, 11600))
+    bms.add_report(BoundaryMetricsReport(1, 10002, 15050, 15300))
+    bms.add_report(BoundaryMetricsReport(1, 10003, 15400, 15500))
 
     let bms': BoundaryMetricsSummary val = consume bms
     let nms': NodeMetricsSummary val = consume nms
