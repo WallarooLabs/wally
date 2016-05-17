@@ -20,6 +20,7 @@ actor MonitoringHubOutput is MetricsOutputActor
         recover MonitoringHubConnectNotify(env, this) end
       _conn = TCPConnection(auth, consume notifier, host, service)
       send_connect()
+      send_join()
     else
       _env.out.print("    metrics-receiver: Couldn't get ambient authority")
     end
