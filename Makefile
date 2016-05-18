@@ -11,7 +11,10 @@ ponyc_tag ?= sendence-$(latest_ponyc_tag)-debug## tag for ponyc docker to use
 ponyc_runner ?= sendence/ponyc## ponyc docker image to use
 docker_no_pull ?= false## Don't pull docker images for dagon run
 docker_no_pull_arg =# Final argument string for docker no pull
-docker_host ?= unix:///var/run/docker.sock## docker host to build/run containers on
+docker_host ?= $(DOCKER_HOST)## docker host to build/run containers on
+ifeq ($(docker_host),)
+  docker_host = unix:///var/run/docker.sock
+endif
 docker_host_arg = --host=$(docker_host)# docker host argument
 dagon_docker_host ?= ## Dagon docker host arg (defaults to docker_host value)
 
@@ -349,7 +352,7 @@ help:
 	@echo ''
 	@echo 'Options:'
 	@grep -E '^[a-zA-Z_-]+ *\?=.*?## .*$$' $(MAKEFILE_LIST) | awk \
-          'BEGIN {FS = "\?="}; {printf "\033[36m%-30s\033[0m ##%s\n", $$1, \
+          'BEGIN {FS = "?="}; {printf "\033[36m%-30s\033[0m ##%s\n", $$1, \
           $$2}' | awk 'BEGIN {FS = "## "}; {printf "%s %s \033[36m(Default:\
  %s)\033[0m\n", $$1, $$3, $$2}'
 	@grep -E 'filter.*arch.*\)$$' $(MAKEFILE_LIST) | awk \
