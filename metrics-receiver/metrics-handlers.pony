@@ -5,7 +5,8 @@ class MetricsMonitoringHubHandler is MetricsCollectionOutputHandler
   let output: MetricsOutputActor tag
 
   new val create(encoder': MetricsCollectionOutputEncoder val,
-             output': MetricsOutputActor tag) =>
+    output': MetricsOutputActor tag)
+  =>
     encoder = encoder'
     output = output'
 

@@ -52,7 +52,7 @@ actor MetricsReceiver
     let handler: MetricsMonitoringHubHandler val = 
       MetricsMonitoringHubHandler(MonitoringHubEncoder, output)
     _mc = MetricsCollection(_bin_selector, _period, handler)
-
+    // TODO: save TCPListener to variable, close it when actor closes prototype
     TCPListener(auth, MetricsNotifier(env, host, service, _mc),
                 host, service)
 
@@ -85,6 +85,8 @@ class MetricsNotifier is TCPListenNotify
 
 class MetricsReceiverNotify is TCPConnectionNotify
   let _env: Env
+  // TODO: Don't use Framer. Use "expect" from
+  //       https://github.com/Sendence/buffy/blob/master/giles/receiver/giles-receiver.pony#L126
   let _framer: Framer = Framer
   let _mc: MetricsCollection tag
 

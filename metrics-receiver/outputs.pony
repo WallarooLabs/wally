@@ -8,6 +8,11 @@ use "collections"
 actor MonitoringHubOutput is MetricsOutputActor
   let _env: Env
   let _app_name: String
+  // TODO: Copy variable passing from giles-sender, create TCP Conn outside
+  //       and pass it to actor. Same thing with files, etc.
+  //       IF you fail to create the TCP stuff, can't create the acotr. Either
+  //       degrade to another type of actor, or fail the process entirely.
+  //       Without the None you don't have to do the "as" stuff
   var _conn: (TCPConnection | None) = None
 
   new create(env: Env, app_name: String, host: String, service: String) =>
@@ -17,7 +22,7 @@ actor MonitoringHubOutput is MetricsOutputActor
     try
       let auth = env.root as AmbientAuth
       let notifier: TCPConnectionNotify iso =
-        recover MonitoringHubConnectNotify(env, this) end
+        recover MonitoringHubConnectNotify(env.out, this) end
       _conn = TCPConnection(auth, consume notifier, host, service)
       send_connect()
       send_join()
@@ -91,20 +96,20 @@ actor MonitoringHubOutput is MetricsOutputActor
 
 
 class MonitoringHubConnectNotify is TCPConnectionNotify
-  let _env: Env
+  let _outstream: StdStream
   let _output: MonitoringHubOutput
 
-  new iso create(env: Env, output: MonitoringHubOutput) =>
-    _env = env
+  new iso create(outstream: StdStream, output: MonitoringHubOutput) =>
+    _outstream = outstream
     _output = output
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print("    metrics-receiver: Monitoring Hub connection accepted")
+    _outstream.print("    metrics-receiver: Monitoring Hub connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     // We don't actually have to do anything with this
     None
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print("dagon child: server closed")
+    _outstream.print("dagon child: server closed")
 
