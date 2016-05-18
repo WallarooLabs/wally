@@ -3,18 +3,21 @@ use "debug"
 use "net"
 use "buffy/messages"
 use "buffy/metrics"
+use "../network"
 use "time"
 
 actor Proxy is BasicStep
   let _env: Env
+  let _node_name: String
   let _step_id: I32
   let _target_node_name: String
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector tag
 
-  new create(env: Env, step_id: I32, target_node_name: String,
+  new create(env: Env, node_name: String, step_id: I32, target_node_name: String,
     coordinator: Coordinator, metrics_collector: MetricsCollector tag) =>
     _env = env
+    _node_name = node_name
     _step_id = step_id
     _target_node_name = target_node_name
     _coordinator = coordinator
@@ -25,57 +28,35 @@ actor Proxy is BasicStep
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[I32] val =>
-      let tcp_msg = WireMsgEncoder.forward_i32(_step_id, m)
+      let tcp_msg = WireMsgEncoder.forward_i32(_step_id, _node_name, m)
       _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
         m.id, m.last_ingress_ts, Time.millis())
       _coordinator.send_data_message(_target_node_name, tcp_msg)
     | let m: Message[F32] val =>
-      let tcp_msg = WireMsgEncoder.forward_f32(_step_id, m)
+      let tcp_msg = WireMsgEncoder.forward_f32(_step_id, _node_name, m)
       _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
         m.id, m.last_ingress_ts, Time.millis())
       _coordinator.send_data_message(_target_node_name, tcp_msg)
     | let m: Message[String] val =>
-      let tcp_msg = WireMsgEncoder.forward_string(_step_id, m)
+      let tcp_msg = WireMsgEncoder.forward_string(_step_id, _node_name, m)
       _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
         m.id, m.last_ingress_ts, Time.millis())
       _coordinator.send_data_message(_target_node_name, tcp_msg)
     end
 
-actor ExternalConnection[In: OSCEncodable val] is ComputeStep[In]
-  let _stringify: {(In): String ?} val
-  let _conn: TCPConnection
-  let _metrics_collector: MetricsCollector tag
-
-  new create(stringify: {(In): String ?} val, conn: TCPConnection,
-    m_coll: MetricsCollector tag) =>
-    _stringify = stringify
-    _conn = conn
-    _metrics_collector = m_coll
-
-  be apply(input: StepMessage val) =>
-    match input
-    | let m: Message[In] val =>
-      try
-        let str = _stringify(m.data)
-        @printf[String]((str + "\n").cstring())
-        let tcp_msg = WireMsgEncoder.external(str)
-        _conn.write(tcp_msg)
-        _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
-          m.id, m.source_ts, Time.millis())
-      end
-    end
-
 actor StepManager
   let _env: Env
+  let _node_name: String
   let _metrics_collector: MetricsCollector tag
   let _steps: Map[I32, BasicStep tag] = Map[I32, BasicStep tag]
   let _sink_addrs: Map[I32, (String, String)] val
   let _step_lookup: StepLookup val
 
-  new create(env: Env, step_lookup: StepLookup val,
+  new create(env: Env, node_name: String, step_lookup: StepLookup val,
     sink_addrs: Map[I32, (String, String)] val,
     metrics_collector: MetricsCollector tag) =>
     _env = env
+    _node_name = node_name
     _sink_addrs = sink_addrs
     _step_lookup = step_lookup
     _metrics_collector = metrics_collector
@@ -98,7 +79,7 @@ actor StepManager
 
   be add_proxy(proxy_step_id: I32, target_step_id: I32,
     target_node_name: String, coordinator: Coordinator) =>
-    let p = Proxy(_env, target_step_id, target_node_name, coordinator,
+    let p = Proxy(_env, _node_name, target_step_id, target_node_name, coordinator,
       _metrics_collector)
     _steps(proxy_step_id) = p
 

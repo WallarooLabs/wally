@@ -185,66 +185,26 @@ actor StateStep[In: OSCEncodable val, Out: OSCEncodable val,
       end
     end
 
-interface TagBuilder
-  fun apply(): Any tag
+actor ExternalConnection[In: OSCEncodable val] is ComputeStep[In]
+  let _stringify: {(In): String ?} val
+  let _conn: TCPConnection
+  let _metrics_collector: MetricsCollector tag
 
-trait OutputStepBuilder[Out: OSCEncodable val]
-
-trait ThroughStepBuilder[In: OSCEncodable val, Out: OSCEncodable val]
-  is OutputStepBuilder[Out]
-  fun apply(): ThroughStep[In, Out] tag
-
-class SourceBuilder[Out: OSCEncodable val]
-  is ThroughStepBuilder[String, Out]
-  let _parser: Parser[Out] val
-
-  new val create(p: Parser[Out] val) =>
-    _parser = p
-
-  fun apply(): ThroughStep[String, Out] tag =>
-    Source[Out](_parser)
-
-class StepBuilder[In: OSCEncodable val, Out: OSCEncodable val]
-  is ThroughStepBuilder[In, Out]
-  let _computation_builder: ComputationBuilder[In, Out] val
-
-  new val create(c: ComputationBuilder[In, Out] val) =>
-    _computation_builder = c
-
-  fun apply(): ThroughStep[In, Out] tag =>
-    Step[In, Out](_computation_builder())
-
-class PartitionBuilder[In: OSCEncodable val, Out: OSCEncodable val]
-  is ThroughStepBuilder[In, Out]
-  let _step_builder: StepBuilder[In, Out] val
-  let _partition_function: PartitionFunction[In] val
-
-  new val create(c: ComputationBuilder[In, Out] val, pf: PartitionFunction[In] val) =>
-    _step_builder = StepBuilder[In, Out](c)
-    _partition_function = pf
-
-  fun apply(): ThroughStep[In, Out] tag =>
-    Partition[In, Out](_step_builder, _partition_function)
-
-class StateStepBuilder[In: OSCEncodable val, Out: OSCEncodable val, State: Any #read]
-  is ThroughStepBuilder[In, Out]
-  let _state_computation_builder: StateComputationBuilder[In, Out, State] val
-  let _state_initializer: {(): State} val
-
-  new val create(s_builder: StateComputationBuilder[In, Out, State] val,
-    s_initializer: {(): State} val) =>
-    _state_computation_builder = s_builder
-    _state_initializer = s_initializer
-
-  fun apply(): ThroughStep[In, Out] tag =>
-    StateStep[In, Out, State](_state_initializer, _state_computation_builder())
-
-class ExternalConnectionBuilder[In: OSCEncodable val]
-  let _stringify: Stringify[In] val
-
-  new val create(stringify: Stringify[In] val) =>
+  new create(stringify: {(In): String ?} val, conn: TCPConnection,
+    m_coll: MetricsCollector tag) =>
     _stringify = stringify
+    _conn = conn
+    _metrics_collector = m_coll
 
-  fun apply(conn: TCPConnection, metrics_collector: MetricsCollector)
-    : ExternalConnection[In] =>
-    ExternalConnection[In](_stringify, conn, metrics_collector)
+  be apply(input: StepMessage val) =>
+    match input
+    | let m: Message[In] val =>
+      try
+        let str = _stringify(m.data)
+        @printf[String]((str + "\n").cstring())
+        let tcp_msg = WireMsgEncoder.external(str)
+        _conn.write(tcp_msg)
+        _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
+          m.id, m.source_ts, Time.millis())
+      end
+    end

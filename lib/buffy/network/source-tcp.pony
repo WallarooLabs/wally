@@ -4,6 +4,7 @@ use "buffy/messages"
 use "buffy/metrics"
 use "sendence/bytes"
 use "sendence/tcp"
+use "../topology"
 use "time"
 
 class SourceNotifier is TCPListenNotify

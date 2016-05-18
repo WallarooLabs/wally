@@ -1,6 +1,7 @@
 use "net"
 use "buffy/messages"
 use "buffy/metrics"
+use "../topology"
 use "spike"
 use "collections"
 
@@ -19,8 +20,10 @@ actor Coordinator
   let _connections: Array[TCPConnection] = Array[TCPConnection]
   let _control_connections: Map[String, TCPConnection tag]
     = Map[String, TCPConnection tag]
-  let _data_connections: Map[String, TCPConnection tag]
-    = Map[String, TCPConnection tag]
+  let _data_connections: Map[String, DataSender]
+    = Map[String, DataSender]
+  let _control_addrs: Map[String, (String, String)] = Map[String, (String, String)]
+  let _data_addrs: Map[String, (String, String)] = Map[String, (String, String)]
   let _spike_config: SpikeConfig val
   let _metrics_collector: MetricsCollector
   let _is_worker: Bool
@@ -43,6 +46,9 @@ actor Coordinator
     _is_worker = is_worker
 
     if _is_worker then
+      _control_addrs("leader") = (_leader_control_host, _leader_control_service)
+      _data_addrs("leader") = (_leader_data_host, _leader_data_service)
+
       let control_notifier: TCPConnectionNotify iso =
         WorkerConnectNotify(_env, _auth, _node_name, _leader_control_host,
           _leader_control_service, this, metrics_collector)
@@ -52,12 +58,12 @@ actor Coordinator
       _control_connections("leader") = control_conn
 
       let data_notifier: TCPConnectionNotify iso =
-        SpikeWrapper(IntraclusterDataConnectNotify(_env, _node_name,
-          this), _spike_config)
+        SpikeWrapper(IntraclusterDataSenderConnectNotify(_env, _node_name,
+          "leader", this), _spike_config)
       let data_conn: TCPConnection =
         TCPConnection(_auth, consume data_notifier, _leader_data_host,
           _leader_data_service)
-      _data_connections("leader") = data_conn
+      _data_connections("leader") = DataSender(data_conn)
     end
 
   be shutdown() =>
@@ -79,12 +85,12 @@ actor Coordinator
       conn.write(shutdown_msg)
       conn.dispose()
     end
-    for (key, conn) in _data_connections.pairs() do
-      conn.write(shutdown_msg)
-      conn.dispose()
+    for (k, sender) in _data_connections.pairs() do
+      sender.write(shutdown_msg)
+      sender.dispose()
     end
-    for conn in _connections.values() do
-      conn.dispose()
+    for c in _connections.values() do
+      c.dispose()
     end
 
     match _phone_home_connection
@@ -118,7 +124,7 @@ actor Coordinator
     try
       _data_connections(target_name).write(msg)
     else
-      _env.out.print("No data conn for " + target_name)
+      _env.out.print("Coordinator: no data conn for " + target_name)
     end
 
   be deliver(step_id: I32, msg: StepMessage val) =>
@@ -130,6 +136,21 @@ actor Coordinator
       phc.write(msg)
     end
 
+  be reconnect_data(target_name: String) =>
+    try
+      (let target_host: String, let target_service: String) =
+        _data_addrs(target_name)
+      let notifier: TCPConnectionNotify iso =
+        SpikeWrapper(IntraclusterDataSenderConnectNotify(_env, _node_name,
+          target_name, this), _spike_config)
+      let conn: TCPConnection =
+        TCPConnection(_auth, consume notifier, target_host,
+          target_service)
+      _data_connections(target_name) = DataSender(conn)
+    else
+      _env.err.print("Coordinator: couldn't reconnect to " + target_name)
+    end
+
   be add_step(step_id: I32, comp_type: String) =>
     _step_manager.add_step(step_id, comp_type)
 
@@ -138,12 +159,13 @@ actor Coordinator
     if _data_connections.contains(target_node_name) then
       _step_manager.add_proxy(p_step_id, p_target_id, target_node_name, this)
     else
+      _data_addrs(target_node_name) = (target_host, target_service)
       let notifier: TCPConnectionNotify iso =
-        SpikeWrapper(IntraclusterDataConnectNotify(_env, _node_name,
-          this), _spike_config)
+        SpikeWrapper(IntraclusterDataSenderConnectNotify(_env, _node_name,
+          target_node_name, this), _spike_config)
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, target_host, target_service)
-      _data_connections(target_node_name) = conn
+      _data_connections(target_node_name) = DataSender(conn)
       _step_manager.add_proxy(p_step_id, p_target_id, target_node_name, this)
     end
 
@@ -162,18 +184,27 @@ actor Coordinator
   be add_connection(conn: TCPConnection) =>
     _connections.push(conn)
 
-  be add_control_connection(target_name: String, conn: TCPConnection) =>
+  be add_control_connection(target_name: String, target_host: String,
+    target_service: String) =>
+    _control_addrs(target_name) = (target_host, target_service)
+    let notifier: TCPConnectionNotify iso =
+      WorkerConnectNotify(_env, _auth, _node_name, target_host,
+        target_service, this, _metrics_collector)
+    let conn: TCPConnection =
+      TCPConnection(_auth, consume notifier, target_host,
+        target_service)
     _control_connections(target_name) = conn
 
   be add_data_connection(target_name: String, target_host: String,
     target_service: String) =>
+    _data_addrs(target_name) = (target_host, target_service)
     let notifier: TCPConnectionNotify iso =
-      SpikeWrapper(IntraclusterDataConnectNotify(_env, _node_name,
-        this), _spike_config)
+      SpikeWrapper(IntraclusterDataSenderConnectNotify(_env, _node_name,
+        target_name, this), _spike_config)
     let conn: TCPConnection =
       TCPConnection(_auth, consume notifier, target_host,
         target_service)
-    _data_connections(target_name) = conn
+    _data_connections(target_name) = DataSender(conn)
 
   be add_topology_manager(tm: TopologyManager) =>
     _topology_manager = tm
