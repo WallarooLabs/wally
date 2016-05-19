@@ -22,6 +22,14 @@ primitive _External                             fun apply(): String => "/16"
 primitive _ForwardI32                           fun apply(): String => "/17"
 primitive _ForwardF32                           fun apply(): String => "/18"
 primitive _ForwardString                        fun apply(): String => "/19"
+primitive _AckMsgsReceived                      fun apply(): String => "/20"
+primitive _ReconnectData                        fun apply(): String => "/21"
+primitive _DataSenderReady                      fun apply(): String => "/22"
+primitive _DataReceiverReady                    fun apply(): String => "/23"
+primitive _ControlSenderReady                   fun apply(): String => "/24"
+primitive _FinishedConnections                  fun apply(): String => "/25"
+primitive _AckFinishedConnections               fun apply(): String => "/26"
+
 
 primitive WireMsgEncoder
   fun ready(node_name: String): Array[U8] val =>
@@ -155,15 +163,18 @@ primitive WireMsgEncoder
     Bytes.length_encode(osc.to_bytes())
 
   fun spin_up_proxy(proxy_id: I32, step_id: I32, target_node_name: String,
-    target_host: String, target_service: String):
+    target_control_host: String, target_control_service: String,
+    target_data_host: String, target_data_service: String):
     Array[U8] val =>
     let osc = OSCMessage(_SpinUpProxy(),
       recover
         [as OSCData val: OSCInt(proxy_id),
                          OSCInt(step_id),
                          OSCString(target_node_name),
-                         OSCString(target_host),
-                         OSCString(target_service)]
+                         OSCString(target_control_host),
+                         OSCString(target_control_service),
+                         OSCString(target_data_host),
+                         OSCString(target_data_service)]
       end)
     Bytes.length_encode(osc.to_bytes())
 
@@ -183,15 +194,65 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
-  fun initialization_msgs_finished(): Array[U8] val =>
+  fun initialization_msgs_finished(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_InitializationMsgsFinished(),
       recover
-        Arguments
+        [as OSCData val: OSCString(node_name)]
       end)
     Bytes.length_encode(osc.to_bytes())
 
   fun ack_initialized(node_name: String): Array[U8] val =>
     let osc = OSCMessage(_AckInitialized(),
+      recover
+        [as OSCData val: OSCString(node_name)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
+  fun ack_messages_received(node_name: String, msg_count: I32): Array[U8] val =>
+    let osc = OSCMessage(_AckMsgsReceived(),
+      recover
+        [as OSCData val: OSCString(node_name),
+                         OSCInt(msg_count)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
+  fun reconnect_data(node_name: String): Array[U8] val =>
+    let osc = OSCMessage(_ReconnectData(),
+      recover
+        [as OSCData val: OSCString(node_name)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
+  fun data_sender_ready(node_name: String): Array[U8] val =>
+    let osc = OSCMessage(_DataSenderReady(),
+      recover
+        [as OSCData val: OSCString(node_name)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
+  fun data_receiver_ready(node_name: String): Array[U8] val =>
+    let osc = OSCMessage(_DataReceiverReady(),
+      recover
+        [as OSCData val: OSCString(node_name)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
+  fun control_sender_ready(node_name: String): Array[U8] val =>
+    let osc = OSCMessage(_ControlSenderReady(),
+      recover
+        [as OSCData val: OSCString(node_name)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
+  fun finished_connections(node_name: String): Array[U8] val =>
+    let osc = OSCMessage(_FinishedConnections(),
+      recover
+        [as OSCData val: OSCString(node_name)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
+  fun ack_finished_connections(node_name: String): Array[U8] val =>
+    let osc = OSCMessage(_AckFinishedConnections(),
       recover
         [as OSCData val: OSCString(node_name)]
       end)
@@ -243,9 +304,23 @@ primitive WireMsgDecoder
     | _ConnectSteps() =>
       ConnectStepsMsg(msg)
     | _InitializationMsgsFinished() =>
-      InitializationMsgsFinishedMsg
+      InitializationMsgsFinishedMsg(msg)
     | _AckInitialized() =>
       AckInitializedMsg(msg)
+    | _AckMsgsReceived() =>
+      AckMsgsReceivedMsg(msg)
+    | _ReconnectData() =>
+      ReconnectDataMsg(msg)
+    | _DataSenderReady() =>
+      DataSenderReadyMsg(msg)
+    | _DataReceiverReady() =>
+      DataReceiverReadyMsg(msg)
+    | _ControlSenderReady() =>
+      ControlSenderReadyMsg(msg)
+    | _FinishedConnections() =>
+      FinishedConnectionsMsg(msg)
+    | _AckFinishedConnections() =>
+      AckFinishedConnectionsMsg(msg)
     | _External() =>
       ExternalMsg(msg)
     else
@@ -324,7 +399,8 @@ class ReconnectMsg is WireMsg
 
   new val create(msg: OSCMessage val) ? =>
     match msg.arguments(0)
-    | let n: OSCString val => node_name = n.value()
+    | let n: OSCString val =>
+      node_name = n.value()
     else
       error
     end
@@ -438,19 +514,24 @@ class SpinUpProxyMsg is WireMsg
   let proxy_id: I32
   let step_id: I32
   let target_node_name: String
-  let target_host: String
-  let target_service: String
+  let target_control_host: String
+  let target_control_service: String
+  let target_data_host: String
+  let target_data_service: String
 
   new val create(msg: OSCMessage val) ? =>
     match (msg.arguments(0), msg.arguments(1), msg.arguments(2),
-      msg.arguments(3), msg.arguments(4))
+      msg.arguments(3), msg.arguments(4), msg.arguments(5), msg.arguments(6))
     | (let p_id: OSCInt val, let s_id: OSCInt val, let t_node_name: OSCString val,
-      let t_host: OSCString val, let t_service: OSCString val) =>
+      let c_host: OSCString val, let c_service: OSCString val,
+      let d_host: OSCString val, let d_service: OSCString val) =>
       proxy_id = p_id.value()
       step_id = s_id.value()
       target_node_name = t_node_name.value()
-      target_host = t_host.value()
-      target_service = t_service.value()
+      target_control_host = c_host.value()
+      target_control_service = c_service.value()
+      target_data_host = d_host.value()
+      target_data_service = d_service.value()
     else
       error
     end
@@ -481,7 +562,16 @@ class ConnectStepsMsg is WireMsg
       error
     end
 
-primitive InitializationMsgsFinishedMsg is WireMsg
+class InitializationMsgsFinishedMsg is WireMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end
 
 class AckInitializedMsg is WireMsg
   let node_name: String
@@ -509,3 +599,82 @@ class UnknownMsg is WireMsg
 
   new val create(d: Array[U8] val) =>
     data = d
+
+class AckMsgsReceivedMsg is WireMsg
+  let node_name: String
+  let msg_count: I32
+
+  new val create(msg: OSCMessage val) ? =>
+      match (msg.arguments(0), msg.arguments(1))
+      | (let name: OSCString val, let count: OSCInt val) =>
+        node_name = name.value()
+        msg_count = count.value()
+      else
+        error
+      end
+
+class ReconnectDataMsg is WireMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end
+
+class DataSenderReadyMsg is WireMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end
+
+class DataReceiverReadyMsg is WireMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end
+
+class ControlSenderReadyMsg is WireMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end
+
+class FinishedConnectionsMsg is WireMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end
+
+class AckFinishedConnectionsMsg is WireMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end

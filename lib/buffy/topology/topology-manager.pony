@@ -16,6 +16,7 @@ actor TopologyManager
   // Keep track of how many workers identified themselves
   var _control_hellos: USize = 0
   var _data_hellos: USize = 0
+  var _connection_hellos: USize = 0
   // Keep track of how many workers acknowledged they're running their
   // part of the topology
   var _acks: USize = 0
@@ -39,38 +40,48 @@ actor TopologyManager
     _leader_data_host = leader_data_host
     _leader_data_service = leader_data_service
 
-    let message = WireMsgEncoder.ready(_name)
-    _coordinator.send_phone_home_message(message)
-
     if _worker_count == 0 then _complete_initialization() end
 
   be assign_control_conn(node_name: String, control_host: String,
     control_service: String) =>
-    _coordinator.add_control_connection(node_name, control_host, control_service)
+    _coordinator.establish_control_connection(node_name, control_host, control_service)
     _worker_control_addrs(node_name) = (control_host, control_service)
     _env.out.print("Identified worker " + node_name + " control channel")
+
+  be assign_data_conn(node_name: String, data_host: String,
+    data_service: String) =>
+    _coordinator.establish_data_connection(node_name, data_host, data_service)
+    _worker_data_addrs(node_name) = (data_host, data_service)
+    _env.out.print("Identified worker " + node_name + " data channel")
+
+  be ack_control() =>
     if _control_hellos < _worker_count then
       _control_hellos = _control_hellos + 1
       if _control_hellos == _worker_count then
         _env.out.print("_--- All worker control channels accounted for! ---_")
         if (_control_hellos == _worker_count) and (_data_hellos == _worker_count) then
-          _initialize_topology()
+          _coordinator.initialize_topology_connections()
         end
       end
     end
 
-  be assign_data_conn(node_name: String, data_host: String,
-    data_service: String) =>
-    _coordinator.add_data_connection(node_name, data_host, data_service)
-    _worker_data_addrs(node_name) = (data_host, data_service)
-    _env.out.print("Identified worker " + node_name + " data channel")
+  be ack_data() =>
     if _data_hellos < _worker_count then
       _data_hellos = _data_hellos + 1
       if _data_hellos == _worker_count then
         _env.out.print("_--- All worker data channels accounted for! ---_")
         if (_control_hellos == _worker_count) and (_data_hellos == _worker_count) then
-          _initialize_topology()
+          _coordinator.initialize_topology_connections()
         end
+      end
+    end
+
+  be ack_finished_connections() =>
+    if _connection_hellos < _worker_count then
+      _connection_hellos = _connection_hellos + 1
+      if _connection_hellos == _worker_count then
+        _env.out.print("_--- All worker interconnections complete! ---_")
+        _initialize_topology()
       end
     end
 
@@ -104,7 +115,13 @@ actor TopologyManager
           let cur_node = nodes(count % nodes.size())
           let next_node_idx = (cur_node_idx + 1) % nodes.size()
           let next_node = nodes((cur_node_idx + 1) % nodes.size())
-          let next_node_addr =
+          let next_node_control_addr =
+            if next_node_idx == 0 then
+              (_leader_control_host, _leader_control_service)
+            else
+              _worker_control_addrs(next_node)
+            end
+          let next_node_data_addr =
             if next_node_idx == 0 then
               (_leader_data_host, _leader_data_service)
             else
@@ -134,15 +151,15 @@ actor TopologyManager
 
           if cur_node_idx == 0 then // if cur_node is the leader/source
             _coordinator.add_step(step_id, pipeline_step.computation_type())
-            _coordinator.add_proxy(proxy_step_id, proxy_step_target_id, next_node,
-              next_node_addr._1, next_node_addr._2)
+            _coordinator.add_proxy(proxy_step_id, proxy_step_target_id, next_node)
             _coordinator.connect_steps(step_id, proxy_step_id)
           else
             let create_step_msg =
               WireMsgEncoder.spin_up(step_id, pipeline_step.computation_type())
             let create_proxy_msg =
               WireMsgEncoder.spin_up_proxy(proxy_step_id, proxy_step_target_id,
-                next_node, next_node_addr._1, next_node_addr._2)
+                next_node, next_node_control_addr._1, next_node_control_addr._2,
+                next_node_data_addr._1, next_node_data_addr._2)
             let connect_msg =
               WireMsgEncoder.connect_steps(step_id, proxy_step_id)
 
@@ -174,7 +191,7 @@ actor TopologyManager
       end
 
       let finished_msg =
-        WireMsgEncoder.initialization_msgs_finished()
+        WireMsgEncoder.initialization_msgs_finished(_name)
       // Send finished_msg to all workers
       for i in Range(1, nodes.size()) do
         let node = nodes(i)

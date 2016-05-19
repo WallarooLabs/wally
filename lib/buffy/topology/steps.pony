@@ -201,7 +201,7 @@ actor ExternalConnection[In: OSCEncodable val] is ComputeStep[In]
     | let m: Message[In] val =>
       try
         let str = _stringify(m.data)
-        @printf[String]((str + "\n").cstring())
+        @printf[String]((">>>>" + str + "<<<<\n").cstring())
         let tcp_msg = WireMsgEncoder.external(str)
         _conn.write(tcp_msg)
         _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),

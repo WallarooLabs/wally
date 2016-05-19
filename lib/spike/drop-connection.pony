@@ -68,7 +68,7 @@ class DropConnection is TCPConnectionNotify
     _letter.closed(conn)
 
   fun ref spike(): Bool =>
-    _dice(1, 100) > _prob
+    _dice(1, 100) < _prob
 
   fun ref drop(conn: TCPConnection ref) =>
     conn.close()
