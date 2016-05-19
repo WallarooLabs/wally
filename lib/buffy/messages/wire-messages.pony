@@ -68,14 +68,11 @@ primitive WireMsgEncoder
     Bytes.length_encode(osc.to_bytes())
 
   fun forward(step_id: I32, msg: Message[I32] val): Array[U8] val =>
-    let source_ts_byte_0 = (msg.source_ts >> 32).i32()
-    let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
     let osc = OSCMessage(_Forward(),
       recover
         [as OSCData val: OSCInt(step_id),
                          OSCInt(msg.id),
-                         OSCInt(source_ts_byte_0),
-                         OSCInt(source_ts_byte_1),
+                         OSCString(msg.source_ts.string()),
                          OSCInt(msg.data)]
       end)
     Bytes.length_encode(osc.to_bytes())
@@ -254,12 +251,12 @@ class ForwardMsg is WireMsg
   let msg: Message[I32] val
 
   new val create(m: OSCMessage val) ? =>
-    match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
-      m.arguments(4))
-    | (let a_id: OSCInt val, let m_id: OSCInt val, let s_ts_0: OSCInt val,
-      let s_ts_1: OSCInt val, let m_data: OSCInt val) =>
+    match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3))
+    | (let a_id: OSCInt val, let m_id: OSCInt val,
+       let s_ts: OSCString val,
+       let m_data: OSCInt val) =>
       step_id = a_id.value()
-      let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
+      let source_ts = s_ts.value().u64()
       msg = Message[I32](m_id.value(), source_ts, Epoch.milliseconds(), m_data.value())
     else
       error
