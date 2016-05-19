@@ -19,7 +19,7 @@ primitive SpikeWrapper
       notify = DelayReceived(consume notify)
     end
     if config.drop then
-      notify = DropConnection(config.seed, 25, consume notify)
+      notify = DropConnection(config.seed, 10, consume notify)
     end
 
     consume notify

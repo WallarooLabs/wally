@@ -77,20 +77,29 @@ class WorkerConnectNotify is TCPConnectionNotify
       try
         let msg = WireMsgDecoder(consume chunked)
         match msg
+        | let m: ReconnectMsg val =>
+          _coordinator.negotiate_reconnection(m.node_name)
+        | let m: IdentifyControlMsg val =>
+          _coordinator.establish_control_connection(m.node_name, m.host, m.service)
+        | let m: IdentifyDataMsg val =>
+          _coordinator.establish_data_connection(m.node_name, m.host, m.service)
+        | let m: InitializationMsgsFinishedMsg val =>
+          _coordinator.ack_initialization_msgs_finished(m.node_name)
+        | let m: AckMsgsReceivedMsg val =>
+          _coordinator.process_data_ack(m.node_name, m.msg_count)
+        | let m: FinishedConnectionsMsg val =>
+          _coordinator.ack_finished_connections(m.node_name)
         | let m: SpinUpMsg val =>
           _env.err.print(_name + " is spinning up a step!")
           _coordinator.add_step(m.step_id, m.computation_type)
         | let m: SpinUpProxyMsg val =>
           _env.err.print(_name + " is spinning up a proxy!")
-          _coordinator.add_proxy(m.proxy_id, m.step_id, m.target_node_name,
-            m.target_host, m.target_service)
+          _coordinator.add_proxy(m.proxy_id, m.step_id, m.target_node_name)
         | let m: SpinUpSinkMsg val =>
           _env.err.print(_name + " is spinning up a sink!")
           _coordinator.add_sink(m.sink_id, m.sink_step_id, _auth)
         | let m: ConnectStepsMsg val =>
           _coordinator.connect_steps(m.in_step_id, m.out_step_id)
-        | let m: InitializationMsgsFinishedMsg val =>
-          _coordinator.ack_initialization_finished()
         | let d: ShutdownMsg val =>
           _coordinator.shutdown()
         | let m: UnknownMsg val =>

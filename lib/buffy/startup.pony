@@ -53,8 +53,12 @@ actor Startup
         env.out.print("%%SPIKE-DELAY%%")
         spike_delay = true
       | ("spike-drop", None) =>
-        env.out.print("%%SPIKE-DROP%%")
-        spike_drop = true
+        if not is_worker then
+          env.out.print("Spike drop not currently supported on leader.")
+        else
+          env.out.print("%%SPIKE-DROP%%")
+          spike_drop = true
+        end
       end
     end
 

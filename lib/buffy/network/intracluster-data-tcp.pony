@@ -102,12 +102,12 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
         let msg = WireMsgDecoder(consume chunked)
         match msg
         | let m: ForwardI32Msg val =>
-          _coordinator.deliver(m.step_id, m.msg)
-//          _env.out.print("Received forwarded msg!")
+          _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
+          _env.out.print("Got MSG: >>>" + m.msg.data.string() + "<<<")
         | let m: ForwardF32Msg val =>
-          _coordinator.deliver(m.step_id, m.msg)
+          _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
         | let m: ForwardStringMsg val =>
-          _coordinator.deliver(m.step_id, m.msg)
+          _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
         | let m: UnknownMsg val =>
           _env.err.print("Unknown data Buffy message type.")
         end
@@ -115,6 +115,9 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
         _env.err.print("Error decoding incoming data Buffy message.")
       end
     end
+
+  fun ref closed(conn: TCPConnection ref) =>
+    _env.out.print("DataReceiverNotify: closed!")
 
 class IntraclusterDataSenderConnectNotify is TCPConnectionNotify
   let _env: Env
@@ -139,10 +142,10 @@ class IntraclusterDataSenderConnectNotify is TCPConnectionNotify
         let msg = WireMsgDecoder(consume chunked)
         match msg
         | let m: UnknownMsg val =>
-          _env.err.print("Unknown data Buffy message type.")
+          _env.err.print("Unknown data Buffy message type on data sender.")
         end
       else
-        _env.err.print("Error decoding incoming data Buffy message.")
+        _env.err.print("Error decoding incoming message on data sender.")
       end
     end
 
