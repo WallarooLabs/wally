@@ -26,6 +26,7 @@ dagon_docker_host_arg = --host=$(dagon_docker_host)# dagon docker host argument
 
 ifeq ($(shell uname -s),Linux)
   extra_xargs_arg = -r
+  docker_user_arg = -u `id -u`
 endif
 
 ifdef docker_no_pull
@@ -79,26 +80,26 @@ ifeq ($(in_docker),true)
 else
   ifeq ($(arch),amd64)
     define PONYC
-      docker run --rm -it -u `id -u` -v $(current_dir):$(current_dir) \
+      docker run --rm -it $(docker_user_arg) -v $(current_dir):$(current_dir) \
         -v ~/.gitconfig:/.gitconfig \
         -w $(current_dir)/$(1) --entrypoint stable \
         $(ponyc_runner):$(ponyc_tag)-$(arch) fetch
-      docker run --rm -it -u `id -u` -v $(current_dir):$(current_dir) \
+      docker run --rm -it $(docker_user_arg) -v $(current_dir):$(current_dir) \
         -w $(current_dir)/$(1) --entrypoint stable \
         $(ponyc_runner):$(ponyc_tag)-$(arch) env ponyc .
     endef
   else ifeq ($(arch),armhf)
     define PONYC
-      docker run --rm -it -u `id -u` \
+      docker run --rm -it $(docker_user_arg) \
         -v ~/.gitconfig:/.gitconfig -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
         --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
         fetch
-      docker run --rm -it -u `id -u` -v \
+      docker run --rm -it $(docker_user_arg) -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
         --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
         env ponyc --triple arm-unknown-linux-gnueabihf -robj .
-      docker run --rm -it -u `id -u` -v \
+      docker run --rm -it $(docker_user_arg) -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
         --entrypoint arm-linux-gnueabihf-gcc \
         $(ponyc_runner):$(ponyc_tag)-$(arch) \
