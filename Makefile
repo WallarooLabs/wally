@@ -332,7 +332,8 @@ ifneq ($(strip $(dangling)),)
 	docker $(docker_host_arg) rmi $(dangling)
 endif
 
-clean: clean-docker ## Cleanup docker images and compiled files for Buffy
+clean: clean-docker ## Cleanup docker images, deps and compiled files for Buffy
+	find . -type d -name .deps -print -exec rm -rf {} \;
 	rm -f giles/receiver/receiver giles/receiver/receiver.o
 	rm -f giles/sender/sender giles/sender/sender.o
 	rm -f dagon/dagon dagon/dagon.o
