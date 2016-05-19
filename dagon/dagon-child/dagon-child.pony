@@ -25,8 +25,8 @@ actor Main
       | ("phone_home", let arg: String) => phone_home = arg
       end
     end
-    env.out.print("    dagon-child: name: " + node_name)
-    env.out.print("    dagon-child: phone_home: " + phone_home)
+    env.out.print("\t" + node_name + ": name: " + node_name)
+    env.out.print("\t" + node_name + ": phone_home: " + phone_home)
     if phone_home != "" then
       let ph_addr = phone_home.split(":")
       try
@@ -34,30 +34,30 @@ actor Main
         phone_home_service = ph_addr(1)
       end
     end
-    env.out.print("    dagon-child: phone_home_host: " + phone_home_host)
-    env.out.print("    dagon-child: phone_home_service: " + phone_home_service)
+    env.out.print("\t" + node_name + ": phone_home_host: " + phone_home_host)
+    env.out.print("\t" + node_name + ": phone_home_service: " + phone_home_service)
     DagonChild(env, node_name, phone_home_host, phone_home_service)
 
     
 actor DagonChild
   let _env: Env
-  let _node_name: String
+  let node_name: String
   var _conn: (TCPConnection | None) = None
 
   
-  new create(env: Env, node_name: String, host: String, service:String) =>
+  new create(env: Env, node_name': String, host: String, service:String) =>
     _env = env
-    _node_name = node_name
+    node_name = node_name'
 
     try
       let auth = env.root as AmbientAuth
       let notifier: TCPConnectionNotify iso =
-        recover HomeConnectNotify(env, this) end
+        recover HomeConnectNotify(env, node_name', this) end
       _conn = TCPConnection(auth, consume notifier, host, service)
       send_ready()
       send_topology_ready()
     else
-      _env.out.print("    dagon-child: Couldn't get ambient authority")
+      _env.out.print("\t" + node_name + ": Couldn't get ambient authority")
     end   
     
   be send_ready() =>
@@ -66,12 +66,12 @@ actor DagonChild
     """
     if (_conn isnt None) then
       try
-        _env.out.print("    dagon-child: Sending ready...")
+        _env.out.print("\t" + node_name + ": Sending ready...")
         let c = _conn as TCPConnection
-        let message = WireMsgEncoder.ready(_node_name)
+        let message = WireMsgEncoder.ready(node_name)
         c.write(message)
       else
-        _env.out.print("    dagon-child: Failed sending ready")
+        _env.out.print("\t" + node_name + ": Failed sending ready")
       end
     end
 
@@ -81,12 +81,12 @@ actor DagonChild
     """
     if (_conn isnt None) then
       try
-        _env.out.print("    dagon-child: Sending topology ready...")
+        _env.out.print("\t" + node_name + ": Sending topology ready...")
         let c = _conn as TCPConnection
-        let message = WireMsgEncoder.topology_ready(_node_name)
+        let message = WireMsgEncoder.topology_ready(node_name)
         c.write(message)
       else
-        _env.out.print("    dagon-child: Failed sending topology ready")
+        _env.out.print("\t" + node_name + ": Failed sending topology ready")
       end
     end    
 
@@ -96,12 +96,12 @@ actor DagonChild
     """
     if (_conn isnt None) then
       try
-        _env.out.print("    dagon-child: Sending done...")
+        _env.out.print("\t" + node_name + ": Sending done...")
         let c = _conn as TCPConnection
-        let message = WireMsgEncoder.done(_node_name)
+        let message = WireMsgEncoder.done(node_name)
         c.write(message)
       else
-        _env.out.print("    dagon-child: Failed sending done")
+        _env.out.print("\t" + node_name + ": Failed sending done")
       end
     end
     
@@ -111,32 +111,32 @@ actor DagonChild
     """
      if (_conn isnt None) then
       try
-        _env.out.print("    dagon-child: Sending done_shutdown..")
+        _env.out.print("\t" + node_name + ": Sending done_shutdown..")
         let c = _conn as TCPConnection
-        let message = WireMsgEncoder.done_shutdown(_node_name)
+        let message = WireMsgEncoder.done_shutdown(node_name)
         c.write(message)
       else
-        _env.out.print("    dagon-child: Failed sending done_shutdown")
+        _env.out.print("\t" + node_name + ": Failed sending done_shutdown")
       end
     end   
     
   be start() =>
-    _env.out.print("    dagon-child: Starting...")
+    _env.out.print("\t" + node_name + ": Starting...")
     // fake some work here
     let timers = Timers
-    let timer = Timer(FakeWork(_env, _node_name, this, 10), 0, 1_000_000_000)
+    let timer = Timer(FakeWork(_env, node_name, this, 10), 0, 1_000_000_000)
     timers(consume timer)
 
     
   be shutdown() =>
     if (_conn isnt None) then
-      _env.out.print("    dagon-child: Shutting down " + _node_name)
+      _env.out.print("\t" + node_name + ": Shutting down " + node_name)
       try
         let c = _conn as TCPConnection
         c.dispose()
-        _env.out.print("    dagon-child: disposed of tcp connection")
+        _env.out.print("\t" + node_name + ": disposed of tcp connection")
       else
-        _env.out.print("    dagon-child: Failed closing connection")
+        _env.out.print("\t" + node_name + ": Failed closing connection")
       end
     end
 
@@ -144,14 +144,16 @@ actor DagonChild
 class HomeConnectNotify is TCPConnectionNotify
   let _env: Env
   let _child: DagonChild
+  let node_name: String
   let _framer: Framer = Framer
 
-  new iso create(env: Env, child: DagonChild) =>
+  new iso create(env: Env, node_name':String, child: DagonChild) =>
     _env = env
     _child = child
+    node_name = node_name'
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print("    dagon-child: Dagon connection accepted")
+    _env.out.print("\t" + node_name + ": Dagon accepted connection")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     // parse Dagon command
@@ -160,22 +162,22 @@ class HomeConnectNotify is TCPConnectionNotify
         let decoded = WireMsgDecoder(consume chunked)
         match decoded
         | let m: StartMsg val =>
-          _env.out.print("    dagon-child: received start message")
+          _env.out.print("\t" + node_name + ": received start message")
           _child.start()
         | let m: ShutdownMsg val =>
-         _env.out.print("    dagon-child: received shutdown messages ")
+         _env.out.print("\t" + node_name + ": received shutdown messages ")
          _child.send_done_shutdown()
          _child.shutdown()
         else
-          _env.out.print("    dagon-child: Unexpected message from Dagon")
+          _env.out.print("\t" + node_name + ": Unexpected message from Dagon")
         end
       else
-        _env.out.print("    dagon-child: Unable to decode message from Dagon")
+        _env.out.print("\t" + node_name + ": Unable to decode message from Dagon")
       end
     end
     
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print("    dagon child: server closed")
+    _env.out.print("\t" + node_name + ": server closed connection")
 
 
 class FakeWork is TimerNotify  
@@ -198,7 +200,7 @@ class FakeWork is TimerNotify
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     let c = _next()
-    _env.out.print(_node_name + ": " + c.string() + " ...working...")
+    _env.out.print("\t" + _node_name + ": " + c.string() + " ...working...")
     if c > _limit then
       false
     else
