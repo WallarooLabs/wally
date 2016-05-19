@@ -32,6 +32,9 @@ class LeaderControlNotifier is TCPListenNotify
     try
       (_host, _service) = listen.local_address().name()
       _env.out.print(_name + ": listening on " + _host + ":" + _service)
+
+      let message = WireMsgEncoder.ready(_name)
+      _coordinator.send_phone_home_message(message)
     else
       _env.out.print(_name + ": couldn't get local address")
       listen.close()
@@ -62,6 +65,7 @@ class LeaderConnectNotify is TCPConnectionNotify
     _topology_manager = t_manager
     _coordinator = coordinator
     _metrics_collector = metrics_collector
+
 
   fun ref accepted(conn: TCPConnection ref) =>
     _coordinator.add_connection(conn)

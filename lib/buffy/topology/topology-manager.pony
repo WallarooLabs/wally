@@ -40,9 +40,6 @@ actor TopologyManager
     _leader_data_host = leader_data_host
     _leader_data_service = leader_data_service
 
-    let message = WireMsgEncoder.ready(_name)
-    _coordinator.send_phone_home_message(message)
-
     if _worker_count == 0 then _complete_initialization() end
 
   be assign_control_conn(node_name: String, control_host: String,
