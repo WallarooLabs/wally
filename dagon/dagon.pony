@@ -149,16 +149,18 @@ class ConnectNotify is TCPConnectionNotify
     
 class Child
   let name: String
+  let is_canary: Bool
   let pm: ProcessMonitor
   var conn: (TCPConnection | None) = None
   var state: ChildState = Booting
   
-  new create(name': String, pm': ProcessMonitor) =>
+  new create(name': String, is_canary': Bool, pm': ProcessMonitor) =>
     name = name'
+    is_canary = is_canary'
     pm = pm'
 
     
-class Sender
+class Canary
   let node_name: String
   let filepath: FilePath
   let args: Array[String] val
@@ -179,8 +181,7 @@ actor ProcessManager
   let _path: String
   let _host: String
   let _service: String
-  var _sender_node: String = ""
-  var _sender: (Sender | None) = None
+  var _canaries: Map[String, Canary] = Map[String, Canary](2)
   var roster: Map[String, Child] = Map[String, Child]
   var _listener: (TCPListener | None) = None
   var _listener_is_ready: Bool = false
@@ -251,7 +252,7 @@ actor ProcessManager
     _env.out.print("dagon: parse_and_boot")
     var node_name: String = ""
     var filepath: (FilePath | None) = None
-    var is_sender: Bool = false
+    var is_canary: Bool = false
     try
       let ini_file = File(FilePath(_env.root as AmbientAuth, _path))
       let sections = IniParse(ini_file.lines())
@@ -272,9 +273,9 @@ actor ProcessManager
           | "sender" =>
             match sections(section)(key)
             | "true" =>
-              is_sender = true
+              is_canary = true
             else
-              is_sender = false
+              is_canary = false
             end
           | "leader" =>
             args.push("-l")  
@@ -285,12 +286,12 @@ actor ProcessManager
         args.push("--phone_home=" + _host + ":" + _service)
         let vars: Array[String] iso = recover Array[String](0) end
         if filepath isnt None then
-          match is_sender
+          match is_canary
           | false =>
-            boot_process(node_name, filepath as FilePath,
+            boot_process(node_name, is_canary, filepath as FilePath,
               consume args, consume vars)
           | true =>
-            register_sender(node_name, filepath as FilePath,
+            register_canary(node_name, filepath as FilePath,
               consume args, consume vars)
           end
         end
@@ -313,20 +314,17 @@ actor ProcessManager
       end
     end    
 
-  be register_sender(node_name: String, filepath: FilePath,
+  be register_canary(node_name: String, filepath: FilePath,
     args: Array[String] val, vars: Array[String] val)
   =>
     """
-    Register the sender node. We will boot it after the rest of the topology
+    Register a canary node. We will boot them after the rest of the topology
     is ready.
-    TODO: Get rid of _sender_node
     """
-    _env.out.print("dagon: registering sender node")
-    _sender_node = node_name // refactor this
-    // store sender info for later use
-    _sender = Sender(node_name, filepath, args, vars)
+    _env.out.print("dagon: registering canary node: " + node_name)
+    _canaries(node_name) = Canary(node_name, filepath, args, vars)
     
-  be boot_process(node_name: String, filepath: FilePath,
+  be boot_process(node_name: String, is_canary: Bool, filepath: FilePath,
     args: Array[String] val, vars: Array[String] val)
   =>
     """
@@ -336,32 +334,27 @@ actor ProcessManager
       let pn: ProcessNotify iso = ProcessClient(_env, node_name, this)
       let pm: ProcessMonitor = ProcessMonitor(consume pn, filepath,
         consume args, consume vars)
-      let child = Child(node_name, pm)
+      let child = Child(node_name, is_canary, pm)
       _env.out.print("dagon: booting: " + node_name)
       roster.insert(node_name, child)
     else
       _env.out.print("dagon: booting process failed")
     end
 
-  be boot_sender_node() =>
+  be boot_canary_nodes() =>
     """
-    Boot the Sender.
+    Boot the canary nodes.
     """
-    try
-      if _sender isnt None then
-        let sender = _sender as Sender
-        let node_name = sender.node_name
-        let filepath = sender.filepath
-        let args = sender.args
-        let vars = sender.vars
-        boot_process(node_name, filepath, args, vars)
-      else
-        _env.out.print("dagon: can't boot sender. No registered.")
-      end
-    else
-      _env.out.print("dagon: can't boot sender. No registered.")
+    _env.out.print("dagon: booting canary nodes")
+    for node in _canaries.values() do
+      let node_name = node.node_name
+      let filepath = node.filepath
+      let args = node.args
+      let vars = node.vars
+      _env.out.print("dagon: booting canary: " + node_name)
+      boot_process(node_name, true, filepath, args, vars)
     end
-    
+
   be send_shutdown(node_name: String) =>
     """
     Shutdown a running process
@@ -394,14 +387,14 @@ actor ProcessManager
     else
       _env.out.print("dagon: failed to find child in roster")
     end
-    // Start sender node if it's READY
-    if _sender_is_ready() then
-      start_sender_node()
+    // Start canary node if it's READY
+    if _canary_is_ready(node_name) then
+      start_canary_node(node_name)
     end
 
   be received_topology_ready(conn: TCPConnection, node_name: String) =>
     """
-    Leader signaled he's ready. Boot the Sender.
+    The leader signaled ready. Boot the canary nodes.
     """
     _env.out.print("dagon: received topology ready from: " + node_name)
     if _is_leader(node_name) then
@@ -412,8 +405,7 @@ actor ProcessManager
       else
         _env.out.print("dagon: failed to find leader in roster")
       end
-      // time to boot the sender node
-      boot_sender_node()
+      boot_canary_nodes()
     else
       _env.out.print("dagon: ignoring topology ready from worker node")
     end
@@ -429,39 +421,39 @@ actor ProcessManager
       return false
     end
     
-  fun ref _sender_is_ready(): Bool =>
+  fun ref _canary_is_ready(node_name: String): Bool =>
     """
-    Check if the sender processes is ready.
+    Check if a canary processes is ready.
     """
     try
-      let child = roster(_sender_node)
+      let child = roster(node_name)
       match child.state
       | Ready => return true
       end
     else
-      _env.out.print("dagon: could not get sender")
+      _env.out.print("dagon: could not get canary")
     end      
     false    
 
-  be start_sender_node() =>
+  be start_canary_node(node_name: String) =>
     """
-    Send start to the sender node.
+    Send start to a canary node.
     """
-    _env.out.print("dagon: starting sender node")
+    _env.out.print("dagon: starting canary node: " + node_name)
     try
-      let child = roster(_sender_node)
-      let sender_conn: (TCPConnection | None) = child.conn
-      // send start to sender
+      let child = roster(node_name)
+      let canary_conn: (TCPConnection | None) = child.conn
+      // send start to canary
       try
-        if (child.state isnt Started) and (sender_conn isnt None) then
-          send_start(sender_conn as TCPConnection, _sender_node)
+        if (child.state isnt Started) and (canary_conn isnt None) then
+          send_start(canary_conn as TCPConnection, node_name)
           child.state = Started
         end
       else
-        _env.out.print("dagon: failed sending start to sender node")
+        _env.out.print("dagon: failed sending start to canary node")
       end
     else
-      _env.out.print("dagon: could not get sender node from roster")
+      _env.out.print("dagon: could not get canary node from roster")
     end
     
   be send_start(conn: TCPConnection, node_name: String) =>
@@ -516,14 +508,15 @@ actor ProcessManager
   be received_done_shutdown(conn: TCPConnection, node_name: String) =>
     """
     Node has shutdown. Remove it from our roster.
+    TODO: Only enter wait_for_processing once ALL canaries reported DoneShutdown
     """
     _env.out.print("dagon: received done_shutdown from child: " + node_name)
     conn.dispose()
     try
       let child = roster(node_name)
       child.state = DoneShutdown
-      if child.name == _sender_node then
-        _env.out.print("dagon: sender reported DoneShutdown ---------------------")
+      if child.is_canary then
+        _env.out.print("dagon: canary reported DoneShutdown ---------------------")
         wait_for_processing()
       end      
     else
