@@ -160,16 +160,22 @@ class Child
     pm = pm'
 
     
-class Canary
+class Node
   let node_name: String
+  let is_canary: Bool
+  let is_leader: Bool
   let filepath: FilePath
   let args: Array[String] val
   let vars: Array[String] val
   
-  new create(node_name': String, filepath': FilePath,
-    args': Array[String] val, vars': Array[String] val)
+  new create(node_name': String,
+    is_canary': Bool, is_leader': Bool,
+    filepath': FilePath, args': Array[String] val,
+    vars': Array[String] val)
   =>
     node_name = node_name'
+    is_canary = is_canary'
+    is_leader = is_leader'
     filepath = filepath'
     args = args'
     vars = vars'
@@ -181,10 +187,13 @@ actor ProcessManager
   let _path: String
   let _host: String
   let _service: String
-  var _canaries: Map[String, Canary] = Map[String, Canary](2)
+  var _canaries: Map[String, Node val] = Map[String, Node val](2)
+  var _workers_receivers: Map[String, Node val] = Map[String, Node val](2)
+  var _leaders: Map[String, Node val] = Map[String, Node val](1)
   var roster: Map[String, Child] = Map[String, Child]
   var _listener: (TCPListener | None) = None
   var _listener_is_ready: Bool = false
+  var _finished_registration: Bool = false
   let _timers: Timers = Timers
   var _timer: (Timer tag | None) = None
   
@@ -207,6 +216,7 @@ actor ProcessManager
       _env.out.print("Failed creating tcp listener")
       return
     end
+    parse_and_register()
     boot_topology()
     
   be listening() =>
@@ -236,28 +246,35 @@ actor ProcessManager
     """
     Check if listener is ready and boot if so.
     """
-    if _listener_is_ready then
+    if _listener_is_ready and _finished_registration then
       _env.out.print("dagon: cancelling timer")
       cancel_timer()
-      _env.out.print("dagon: listener is ready. Booting topology.")
-      parse_and_boot()
+      _env.out.print("dagon: listener is ready and nodes are " +
+        "registered. Booting topology.")
+      boot_leaders()
     else
       _env.out.print("dagon: listener is not ready.")
     end
     
-  be parse_and_boot() =>
+  be parse_and_register() =>
     """
-    Parse ini file and boot components
+    Parse ini file and register components.
+    TODO: Treat sender flag and canary flag the same way.
     """
     _env.out.print("dagon: parse_and_boot")
     var node_name: String = ""
     var filepath: (FilePath | None) = None
     var is_canary: Bool = false
+    var is_leader: Bool = false
     try
       let ini_file = File(FilePath(_env.root as AmbientAuth, _path))
       let sections = IniParse(ini_file.lines())
       for section in sections.keys() do
         let args: Array[String] iso = recover Array[String](6) end
+        node_name = ""
+        filepath = None
+        is_canary = false
+        is_leader = false
         for key in sections(section).keys() do
           match key
           | "path" =>
@@ -270,14 +287,15 @@ actor ProcessManager
           | "name" =>
             node_name = sections(section)(key)
             args.push("--" + key + "=" + sections(section)(key))
-          | "sender" =>
+          | "sender" => // fixme
             match sections(section)(key)
             | "true" =>
               is_canary = true
             else
               is_canary = false
             end
-          | "leader" =>
+          | "leader" => // fixme
+            is_leader = true
             args.push("-l")  
           else
             args.push("--" + key + "=" + sections(section)(key))
@@ -286,16 +304,14 @@ actor ProcessManager
         args.push("--phone_home=" + _host + ":" + _service)
         let vars: Array[String] iso = recover Array[String](0) end
         if filepath isnt None then
-          match is_canary
-          | false =>
-            boot_process(node_name, is_canary, filepath as FilePath,
-              consume args, consume vars)
-          | true =>
-            register_canary(node_name, is_canary, filepath as FilePath,
-              consume args, consume vars)
-          end
+          register_node(node_name, is_canary, is_leader,
+            filepath as FilePath, consume args, consume vars)          
+        else
+          _env.out.print("dagon: filepath not valid for: " + node_name)
         end
       end
+      _env.out.print("dagon: finished registration of nodes")
+      _finished_registration = true
     else
       _env.out.print("dagon: Could not create FilePath for ini file")
     end
@@ -314,33 +330,76 @@ actor ProcessManager
       end
     end    
 
-  be register_canary(node_name: String, is_canary: Bool, filepath: FilePath,
-    args: Array[String] val, vars: Array[String] val)
+  be register_node(node_name: String,
+    is_canary: Bool, is_leader: Bool,
+    filepath: FilePath, args: Array[String] val,
+    vars: Array[String] val)
   =>
     """
-    Register a canary node. We will boot them after the rest of the topology
-    is ready.
+    Register a node with the appropriate map.
     """
-    _env.out.print("dagon: registering canary node: " + node_name)
-    _canaries(node_name) = Canary(node_name, filepath, args, vars)
-    
-  be boot_process(node_name: String, is_canary: Bool, filepath: FilePath,
-    args: Array[String] val, vars: Array[String] val)
-  =>
-    """
-    Start up processes with host and service as phone home address.
-    """
-    _env.out.print("dagon: booting: " + node_name)
-    let final_args = _prepend_node_name(node_name, args)
-    for arg in final_args.values() do
-      _env.out.print("dagon: " + node_name + " arg: " + arg)
+    if is_canary then
+      _env.out.print("dagon: registering canary node: " + node_name)
+      _canaries(node_name) = recover Node(node_name, is_canary, is_leader,
+        filepath, args, vars) end
+    elseif is_leader then
+      _env.out.print("dagon: registering leader node: " + node_name)
+      _leaders(node_name) = recover Node(node_name, is_canary, is_leader,
+        filepath, args, vars) end
+    else
+      _env.out.print("dagon: registering node: " + node_name)        
+      _workers_receivers(node_name) = recover Node(node_name, is_canary, is_leader,
+        filepath, args, vars) end
     end
+
+  be boot_leaders() =>
+    """
+    Boot the leader node.
+    """
+    for node in _leaders.values() do
+      boot_process(node)
+    end
+
+  be boot_workers_receivers() =>
+    """
+    Boot the leader node.
+    """
+    for node in _workers_receivers.values() do
+      boot_process(node)
+    end    
+
+  be boot_canaries() =>
+    """
+    Boot the canary nodes.
+    """
+    _env.out.print("dagon: booting canary nodes")
+    for node in _canaries.values() do
+      let node_name = node.node_name
+      let filepath = node.filepath
+      let args = node.args
+      let vars = node.vars
+      _env.out.print("dagon: booting canary: " + node_name)
+      boot_process(node)
+    end
+    
+  be boot_process(node: Node val)
+  =>
+    """
+    Boot a node as a process.
+    """
+    _env.out.print("dagon: booting: " + node.node_name)
+    let final_args = _prepend_node_name(node.node_name, node.args)
+    let final_vars = node.args
+    for arg in final_args.values() do
+      _env.out.print("dagon: " + node.node_name + " arg: " + arg)
+    end
+    
     try
-      let pn: ProcessNotify iso = ProcessClient(_env, node_name, this)
-      let pm: ProcessMonitor = ProcessMonitor(consume pn, filepath,
-        consume final_args, consume vars)
-      let child = Child(node_name, is_canary, pm)      
-      roster.insert(node_name, child)
+      let pn: ProcessNotify iso = ProcessClient(_env, node.node_name, this)
+      let pm: ProcessMonitor = ProcessMonitor(consume pn, node.filepath,
+        consume final_args, consume final_vars)
+      let child = Child(node.node_name, node.is_canary, pm)      
+      roster.insert(node.node_name, child)
     else
       _env.out.print("dagon: booting process failed")
     end
@@ -354,20 +413,6 @@ actor ProcessManager
       result.push(arg)
     end
     result
-  
-  be boot_canary_nodes() =>
-    """
-    Boot the canary nodes.
-    """
-    _env.out.print("dagon: booting canary nodes")
-    for node in _canaries.values() do
-      let node_name = node.node_name
-      let filepath = node.filepath
-      let args = node.args
-      let vars = node.vars
-      _env.out.print("dagon: booting canary: " + node_name)
-      boot_process(node_name, true, filepath, args, vars)
-    end
 
   be send_shutdown(node_name: String) =>
     """
@@ -390,7 +435,8 @@ actor ProcessManager
     
   be received_ready(conn: TCPConnection, node_name: String) =>
     """
-    Register the connection for a ready node
+    Register the connection for a ready node.
+    TODO: If we want to wait for both leaders to be Ready then fixme
     """
     _env.out.print("dagon: received ready from child: " + node_name)
     try
@@ -400,6 +446,10 @@ actor ProcessManager
       child.conn  = conn
     else
       _env.out.print("dagon: failed to find child in roster")
+    end
+    // Boot workers and receivers if leader is ready
+    if _is_leader(node_name) then // fixme
+      boot_workers_receivers() 
     end
     // Start canary node if it's READY
     if _canary_is_ready(node_name) then
@@ -419,7 +469,7 @@ actor ProcessManager
       else
         _env.out.print("dagon: failed to find leader in roster")
       end
-      boot_canary_nodes()
+      boot_canaries()
     else
       _env.out.print("dagon: ignoring topology ready from worker node")
     end
