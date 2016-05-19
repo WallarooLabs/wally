@@ -118,6 +118,8 @@ actor Coordinator
   be send_control_message(target_name: String, msg: Array[U8] val) =>
     try
       _control_connections(target_name).write(msg)
+    else
+      _env.out.print("Coordinator: control connection to " + target_name + " was not set up")
     end
 
   be send_data_message(target_name: String, msg: Array[U8] val) =>
@@ -208,3 +210,7 @@ actor Coordinator
 
   be add_topology_manager(tm: TopologyManager) =>
     _topology_manager = tm
+
+  be ack_initialization_finished() =>
+    let ack_msg = WireMsgEncoder.ack_initialized(_node_name)
+    try _control_connections("leader").write(ack_msg) end

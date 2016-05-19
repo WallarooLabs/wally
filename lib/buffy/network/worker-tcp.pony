@@ -90,8 +90,7 @@ class WorkerConnectNotify is TCPConnectionNotify
         | let m: ConnectStepsMsg val =>
           _coordinator.connect_steps(m.in_step_id, m.out_step_id)
         | let m: InitializationMsgsFinishedMsg val =>
-          let ack_msg = WireMsgEncoder.ack_initialized(_name)
-          conn.write(ack_msg)
+          _coordinator.ack_initialization_finished()
         | let d: ShutdownMsg val =>
           _coordinator.shutdown()
         | let m: UnknownMsg val =>
