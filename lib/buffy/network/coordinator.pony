@@ -227,15 +227,15 @@ actor Coordinator
       _control_connections(sender_name).write(message)
     end
 
-  be process_data_ack(target_name: String, msg_count: I32) =>
-    try _data_connection_senders(target_name).ack(msg_count.usize()) end
+  be process_data_ack(receiver_name: String, msg_count: I32) =>
+    try _data_connection_senders(receiver_name).ack(msg_count.usize()) end
 
 
   /////////////
   // RECONNECT
   /////////////
   be reconnect_data(target_name: String) =>
-//    @printf[None](("!!Reconnecting to " + target_name + "!!\n").cstring())
+    @printf[None](("!!Reconnecting to " + target_name + "!!\n").cstring())
     try
       (let target_host: String, let target_service: String) =
         _data_addrs(target_name)
@@ -245,19 +245,31 @@ actor Coordinator
         TCPConnection(_auth, consume notifier, target_host,
           target_service)
       _data_connection_senders(target_name).reconnect(conn)
-      let reconnect_message = WireMsgEncoder.reconnect(_node_name)
+      let reconnect_message = WireMsgEncoder.reconnect_data(_node_name)
       try _control_connections(target_name).write(reconnect_message) end
     else
       _env.err.print("Coordinator: couldn't reconnect to " + target_name)
     end
 
-  be negotiate_reconnection(from_name: String) =>
-//    @printf[None](("!!Acking reconnection to sender " + from_name + "!!\n").cstring())
+  be negotiate_data_reconnection(from_name: String) =>
+    @printf[None](("!!Acking reconnection to sender " + from_name + "!!\n").cstring())
     try
-      _data_connection_receivers(from_name).ack()
+      _data_connection_receivers(from_name).reconnect_ack()
     else
       _env.out.print("Can't negotiate since there's no DataReceiver!")
     end
+
+  be ack_reconnect_msg_count(sender_name: String, seen_since_last_ack: USize) =>
+    try
+      let message = WireMsgEncoder.ack_reconnect_messages_received(_node_name, seen_since_last_ack.i32())
+      _control_connections(sender_name).write(message)
+    end
+
+  be process_data_reconnect_ack(receiver_name: String, seen_since_last_ack: I32) =>
+    try
+      _data_connection_senders(receiver_name).ack_reconnect(seen_since_last_ack.usize())
+    end
+
 
 
   ////////////
