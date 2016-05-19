@@ -103,7 +103,6 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
         match msg
         | let m: ForwardI32Msg val =>
           _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
-          _env.out.print("Got MSG: >>>" + m.msg.data.string() + "<<<")
         | let m: ForwardF32Msg val =>
           _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
         | let m: ForwardStringMsg val =>
