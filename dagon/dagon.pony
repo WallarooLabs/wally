@@ -291,7 +291,7 @@ actor ProcessManager
             boot_process(node_name, is_canary, filepath as FilePath,
               consume args, consume vars)
           | true =>
-            register_canary(node_name, filepath as FilePath,
+            register_canary(node_name, is_canary, filepath as FilePath,
               consume args, consume vars)
           end
         end
@@ -314,7 +314,7 @@ actor ProcessManager
       end
     end    
 
-  be register_canary(node_name: String, filepath: FilePath,
+  be register_canary(node_name: String, is_canary: Bool, filepath: FilePath,
     args: Array[String] val, vars: Array[String] val)
   =>
     """
@@ -427,14 +427,34 @@ actor ProcessManager
     """
     try
       let child = roster(node_name)
-      match child.state
-      | Ready => return true
+      let state = child.state
+      _env.out.print("dagon: " + node_name + " state: " + _print_state(child))
+      _env.out.print("dagon: " + node_name + " iscanary: " + child.is_canary.string())
+      // _env.out.print("dagon: iscanary:" + child.is_canary.string())
+      if child.is_canary then
+        match state
+        | Ready =>  return true
+        end
       end
     else
       _env.out.print("dagon: could not get canary")
     end      
-    false    
+    false
 
+  fun ref _print_state(child: Child): String =>
+    """
+    Print the state to stdout.
+    """
+    match child.state 
+    | Booting        => return "Booting"
+    | Ready          => return "Ready"
+    | Started        => return "Started"
+    | TopologyReady  => return "TopologyReady"
+    | Done           => return "Done"
+    | DoneShutdown   => return "DoneShutdown"
+    end
+    ""
+  
   be start_canary_node(node_name: String) =>
     """
     Send start to a canary node.
