@@ -20,7 +20,6 @@ actor DataReceiver
     _coordinator.ack_msg_count(_sender_name, _seen_since_last_ack)
     _seen_since_last_ack = 0
 
-//  be reconnect_ack() =>
-//    _coordinator.ack_reconnect_msg_count(_sender_name, _seen_since_last_ack)
-//    _seen_since_last_ack = 0
-
+  be reconnect_ack() =>
+    _coordinator.ack_reconnect_msg_count(_sender_name, _seen_since_last_ack)
+    _seen_since_last_ack = 0

@@ -75,8 +75,8 @@ class LeaderConnectNotify is TCPConnectionNotify
       try
         let msg = WireMsgDecoder(consume chunked)
         match msg
-        | let m: ReconnectMsg val =>
-          _coordinator.negotiate_reconnection(m.node_name)
+        | let m: ReconnectDataMsg val =>
+          _coordinator.negotiate_data_reconnection(m.node_name)
         | let m: IdentifyControlMsg val =>
           _topology_manager.assign_control_conn(m.node_name, m.host, m.service)
         | let m: IdentifyDataMsg val =>
@@ -87,6 +87,8 @@ class LeaderConnectNotify is TCPConnectionNotify
           _topology_manager.ack_initialized()
         | let m: AckMsgsReceivedMsg val =>
           _coordinator.process_data_ack(m.node_name, m.msg_count)
+        | let m: AckReconnectMsgsReceivedMsg val =>
+          _coordinator.process_data_reconnect_ack(m.node_name, m.msg_count)
         | let m: SpinUpMsg val =>
           _coordinator.add_step(m.step_id, m.computation_type)
         | let m: SpinUpProxyMsg val =>

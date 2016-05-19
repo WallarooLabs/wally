@@ -23,6 +23,9 @@ actor DataSender
       try _held.dequeue() end
     end
 
+  be ack_reconnect(msg_count: USize) =>
+    ack(msg_count)
+
     if not _sending then
       enable_sending()
     end

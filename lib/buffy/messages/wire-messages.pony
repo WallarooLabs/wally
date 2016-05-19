@@ -29,6 +29,7 @@ primitive _DataReceiverReady                    fun apply(): String => "/23"
 primitive _ControlSenderReady                   fun apply(): String => "/24"
 primitive _FinishedConnections                  fun apply(): String => "/25"
 primitive _AckFinishedConnections               fun apply(): String => "/26"
+primitive _AckReconnectMsgsReceived             fun apply(): String => "/27"
 
 
 primitive WireMsgEncoder
@@ -258,6 +259,14 @@ primitive WireMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
+  fun ack_reconnect_messages_received(node_name: String, msg_count: I32): Array[U8] val =>
+    let osc = OSCMessage(_AckReconnectMsgsReceived(),
+      recover
+        [as OSCData val: OSCString(node_name),
+                         OSCInt(msg_count)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
   fun external(data: Stringable val): Array[U8] val =>
     let osc = OSCMessage(_External(),
       recover
@@ -309,6 +318,8 @@ primitive WireMsgDecoder
       AckInitializedMsg(msg)
     | _AckMsgsReceived() =>
       AckMsgsReceivedMsg(msg)
+    | _AckReconnectMsgsReceived() =>
+      AckReconnectMsgsReceivedMsg(msg)
     | _ReconnectData() =>
       ReconnectDataMsg(msg)
     | _DataSenderReady() =>
@@ -601,6 +612,19 @@ class UnknownMsg is WireMsg
     data = d
 
 class AckMsgsReceivedMsg is WireMsg
+  let node_name: String
+  let msg_count: I32
+
+  new val create(msg: OSCMessage val) ? =>
+      match (msg.arguments(0), msg.arguments(1))
+      | (let name: OSCString val, let count: OSCInt val) =>
+        node_name = name.value()
+        msg_count = count.value()
+      else
+        error
+      end
+
+class AckReconnectMsgsReceivedMsg is WireMsg
   let node_name: String
   let msg_count: I32
 

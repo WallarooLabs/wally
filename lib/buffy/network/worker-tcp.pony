@@ -77,8 +77,8 @@ class WorkerConnectNotify is TCPConnectionNotify
       try
         let msg = WireMsgDecoder(consume chunked)
         match msg
-        | let m: ReconnectMsg val =>
-          _coordinator.negotiate_reconnection(m.node_name)
+        | let m: ReconnectDataMsg val =>
+          _coordinator.negotiate_data_reconnection(m.node_name)
         | let m: IdentifyControlMsg val =>
           _coordinator.establish_control_connection(m.node_name, m.host, m.service)
         | let m: IdentifyDataMsg val =>
@@ -87,6 +87,8 @@ class WorkerConnectNotify is TCPConnectionNotify
           _coordinator.ack_initialization_msgs_finished(m.node_name)
         | let m: AckMsgsReceivedMsg val =>
           _coordinator.process_data_ack(m.node_name, m.msg_count)
+        | let m: AckReconnectMsgsReceivedMsg val =>
+          _coordinator.process_data_reconnect_ack(m.node_name, m.msg_count)
         | let m: FinishedConnectionsMsg val =>
           _coordinator.ack_finished_connections(m.node_name)
         | let m: SpinUpMsg val =>
