@@ -330,12 +330,15 @@ actor ProcessManager
     """
     Start up processes with host and service as phone home address.
     """
+    _env.out.print("dagon: booting: " + node_name)
+    for arg in args.values() do
+      _env.out.print("dagon: " + node_name + " arg: " + arg)
+    end
     try
       let pn: ProcessNotify iso = ProcessClient(_env, node_name, this)
       let pm: ProcessMonitor = ProcessMonitor(consume pn, filepath,
         consume args, consume vars)
-      let child = Child(node_name, is_canary, pm)
-      _env.out.print("dagon: booting: " + node_name)
+      let child = Child(node_name, is_canary, pm)      
       roster.insert(node_name, child)
     else
       _env.out.print("dagon: booting process failed")
