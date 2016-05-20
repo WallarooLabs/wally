@@ -33,7 +33,7 @@ class LeaderControlNotifier is TCPListenNotify
       (_host, _service) = listen.local_address().name()
       _env.out.print(_name + ": listening on " + _host + ":" + _service)
 
-      let message = WireMsgEncoder.ready(_name, _auth)
+      let message = ExternalMsgEncoder.ready(_name)
       _coordinator.send_phone_home_message(message)
     else
       _env.out.print(_name + ": couldn't get local address")

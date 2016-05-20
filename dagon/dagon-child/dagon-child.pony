@@ -68,7 +68,7 @@ actor DagonChild
       try
         _env.out.print("\t" + node_name + ": Sending ready...")
         let c = _conn as TCPConnection
-        let message = WireMsgEncoder.ready(node_name)
+        let message = ExternalMsgEncoder.ready(node_name)
         c.write(message)
       else
         _env.out.print("\t" + node_name + ": Failed sending ready")
@@ -83,7 +83,7 @@ actor DagonChild
       try
         _env.out.print("\t" + node_name + ": Sending topology ready...")
         let c = _conn as TCPConnection
-        let message = WireMsgEncoder.topology_ready(node_name)
+        let message = ExternalMsgEncoder.topology_ready(node_name)
         c.write(message)
       else
         _env.out.print("\t" + node_name + ": Failed sending topology ready")
@@ -98,7 +98,7 @@ actor DagonChild
       try
         _env.out.print("\t" + node_name + ": Sending done...")
         let c = _conn as TCPConnection
-        let message = WireMsgEncoder.done(node_name)
+        let message = ExternalMsgEncoder.done(node_name)
         c.write(message)
       else
         _env.out.print("\t" + node_name + ": Failed sending done")
@@ -113,7 +113,7 @@ actor DagonChild
       try
         _env.out.print("\t" + node_name + ": Sending done_shutdown..")
         let c = _conn as TCPConnection
-        let message = WireMsgEncoder.done_shutdown(node_name)
+        let message = ExternalMsgEncoder.done_shutdown(node_name)
         c.write(message)
       else
         _env.out.print("\t" + node_name + ": Failed sending done_shutdown")
@@ -159,12 +159,12 @@ class HomeConnectNotify is TCPConnectionNotify
     // parse Dagon command
     for chunked in _framer.chunk(consume data).values() do
       try
-        let decoded = WireMsgDecoder(consume chunked)
+        let decoded = ExternalMsgDecoder(consume chunked)
         match decoded
-        | let m: StartMsg val =>
+        | let m: ExternalStartMsg val =>
           _env.out.print("\t" + node_name + ": received start message")
           _child.start()
-        | let m: ShutdownMsg val =>
+        | let m: ExternalShutdownMsg val =>
          _env.out.print("\t" + node_name + ": received shutdown messages ")
          _child.send_done_shutdown()
          _child.shutdown()

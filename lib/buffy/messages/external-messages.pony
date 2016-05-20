@@ -7,7 +7,8 @@ primitive _TopologyReady                        fun apply(): String => "/3"
 primitive _Start                                fun apply(): String => "/4"
 primitive _Shutdown                             fun apply(): String => "/5"
 primitive _DoneShutdown                         fun apply(): String => "/6"
-primitive _Unknown                              fun apply(): String => "/7"
+primitive _Done                                 fun apply(): String => "/7"
+primitive _Unknown                              fun apply(): String => "/8"
 
 primitive ExternalMsgEncoder
   fun data(d: Stringable val): Array[U8] val =>
@@ -49,6 +50,13 @@ primitive ExternalMsgEncoder
       end)
     Bytes.length_encode(osc.to_bytes())
 
+  fun done(node_name: String): Array[U8] val =>
+    let osc = OSCMessage(_Done(),
+      recover
+        [as OSCData val: OSCString(node_name)]
+      end)
+    Bytes.length_encode(osc.to_bytes())
+
 primitive ExternalMsgDecoder
   fun apply(data: Array[U8] val): ExternalMsg val ? =>
     let msg = OSCDecoder.from_bytes(data) as OSCMessage val
@@ -65,6 +73,8 @@ primitive ExternalMsgDecoder
       ExternalShutdownMsg(msg)
     | _DoneShutdown() =>
       ExternalDoneShutdownMsg(msg)
+    | _Done() =>
+      ExternalDoneMsg(msg)
     else
       error
     end
@@ -104,17 +114,6 @@ class ExternalTopologyReadyMsg is ExternalMsg
       error
     end
 
-class ExternalDoneMsg is ExternalMsg
-  let node_name: String
-
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
-
 primitive ExternalStartMsg is ExternalMsg
 
 class ExternalShutdownMsg is ExternalMsg
@@ -129,6 +128,17 @@ class ExternalShutdownMsg is ExternalMsg
     end
 
 class ExternalDoneShutdownMsg is ExternalMsg
+  let node_name: String
+
+  new val create(msg: OSCMessage val) ? =>
+    match msg.arguments(0)
+    | let n: OSCString val =>
+      node_name = n.value()
+    else
+      error
+    end
+
+class ExternalDoneMsg is ExternalMsg
   let node_name: String
 
   new val create(msg: OSCMessage val) ? =>

@@ -208,10 +208,8 @@ actor TopologyManager
 
   fun _complete_initialization() =>
     _env.out.print("_--- Topology successfully initialized ---_")
-    try
-      let message = WireMsgEncoder.topology_ready(_name, _auth)
-      _coordinator.send_phone_home_message(message)
-    end
+    let message = ExternalMsgEncoder.topology_ready(_name)
+    _coordinator.send_phone_home_message(message)
 
   be shutdown() =>
     _coordinator.finish_shutdown()
