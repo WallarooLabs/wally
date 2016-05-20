@@ -160,9 +160,9 @@ class ToDagonNotify is TCPConnectionNotify
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
       try
-        let decoded = WireMsgDecoder(consume chunked)
+        let decoded = ExternalMsgDecoder(consume chunked)
         match decoded
-        | let m: StartMsg val =>
+        | let m: ExternalStartMsg val =>
             _coordinator.go()
         else
           _stderr.print("Unexpected message from Dagon")
@@ -289,7 +289,7 @@ actor WithDagonCoordinator
   be finished() =>
     try
       let x = _to_dagon_socket._1 as TCPConnection
-      x.write(WireMsgEncoder.done_shutdown(_node_id as String))
+      x.write(ExternalMsgEncoder.done_shutdown(_node_id as String))
       x.dispose()
     end
     try
@@ -306,7 +306,7 @@ actor WithDagonCoordinator
   fun _send_ready() =>
     try
       let x = _to_dagon_socket._1 as TCPConnection
-      x.write(WireMsgEncoder.ready(_node_id as String))
+      x.write(ExternalMsgEncoder.ready(_node_id as String))
     end
 
 //
@@ -359,7 +359,7 @@ actor SendingActor
         try
           let n = _data_source.next()
           d'.push(n)
-          d.push(WireMsgEncoder.external(n))
+          d.push(ExternalMsgEncoder.data(n))
         else
           break
         end

@@ -1,339 +1,109 @@
 use "osc-pony"
 use "sendence/bytes"
+use "serialise"
 use "time"
 
-primitive _Ready                                fun apply(): String => "/0"
-primitive _TopologyReady                        fun apply(): String => "/1"
-primitive _IdentifyControl                      fun apply(): String => "/2"
-primitive _IdentifyData                         fun apply(): String => "/3"
-primitive _Done                                 fun apply(): String => "/4"
-primitive _Reconnect                            fun apply(): String => "/5"
-primitive _Start                                fun apply(): String => "/6"
-primitive _Shutdown                             fun apply(): String => "/7"
-primitive _DoneShutdown                         fun apply(): String => "/8"
-primitive _Forward                              fun apply(): String => "/9"
-primitive _SpinUp                               fun apply(): String => "/10"
-primitive _SpinUpProxy                          fun apply(): String => "/11"
-primitive _SpinUpSink                           fun apply(): String => "/12"
-primitive _ConnectSteps                         fun apply(): String => "/13"
-primitive _InitializationMsgsFinished           fun apply(): String => "/14"
-primitive _AckInitialized                       fun apply(): String => "/15"
-primitive _External                             fun apply(): String => "/16"
-primitive _ForwardI32                           fun apply(): String => "/17"
-primitive _ForwardF32                           fun apply(): String => "/18"
-primitive _ForwardString                        fun apply(): String => "/19"
-primitive _AckMsgsReceived                      fun apply(): String => "/20"
-primitive _ReconnectData                        fun apply(): String => "/21"
-primitive _DataSenderReady                      fun apply(): String => "/22"
-primitive _DataReceiverReady                    fun apply(): String => "/23"
-primitive _ControlSenderReady                   fun apply(): String => "/24"
-primitive _FinishedConnections                  fun apply(): String => "/25"
-primitive _AckFinishedConnections               fun apply(): String => "/26"
-primitive _AckReconnectMsgsReceived             fun apply(): String => "/27"
-
-
 primitive WireMsgEncoder
-  fun ready(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_Ready(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun _serialise(msg: WireMsg val, auth: AmbientAuth): Array[U8] val ? =>
+    let serialised: Array[U8] val =
+      Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
+    Bytes.length_encode(serialised)
 
-  fun topology_ready(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_TopologyReady(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun ready(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(ReadyMsg(node_name), auth)
 
-  fun identify_control(node_name: String, host: String, service: String)
-    : Array[U8] val =>
-    let osc = OSCMessage(_IdentifyControl(),
-      recover
-        [as OSCData val: OSCString(node_name),
-                         OSCString(host),
-                         OSCString(service)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun topology_ready(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(TopologyReadyMsg(node_name), auth)
 
-  fun identify_data(node_name: String, host: String, service: String)
-    : Array[U8] val =>
-    let osc = OSCMessage(_IdentifyData(),
-      recover
-        [as OSCData val: OSCString(node_name),
-                         OSCString(host),
-                         OSCString(service)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun identify_control(node_name: String, host: String, service: String,
+    auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(IdentifyControlMsg(node_name, host, service), auth)
 
-  fun done(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_Done(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun identify_data(node_name: String, host: String, service: String,
+    auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(IdentifyDataMsg(node_name, host, service), auth)
 
-  fun reconnect(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_Reconnect(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun done(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(DoneMsg(node_name), auth)
 
-  fun start(): Array[U8] val =>
-    let osc = OSCMessage(_Start(), recover Arguments end)
-    Bytes.length_encode(osc.to_bytes())
+  fun reconnect(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(ReconnectMsg(node_name), auth)
 
-  fun shutdown(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_Shutdown(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun start(auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(StartMsg, auth)
 
-  fun done_shutdown(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_DoneShutdown(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun shutdown(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(ShutdownMsg(node_name), auth)
 
-  fun forward(step_id: I32, node_name: String, msg: Message[I32] val): Array[U8] val =>
-    let source_ts_byte_0 = (msg.source_ts >> 32).i32()
-    let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
-    let osc = OSCMessage(_Forward(),
-      recover
-        [as OSCData val: OSCInt(step_id),
-                         OSCString(node_name),
-                         OSCInt(msg.id),
-                         OSCInt(source_ts_byte_0),
-                         OSCInt(source_ts_byte_1),
-                         OSCInt(msg.data)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun done_shutdown(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(DoneShutdownMsg(node_name), auth)
 
-  fun forward_i32(step_id: I32, from_node: String, msg: Message[I32] val): Array[U8] val =>
-    let source_ts_byte_0 = (msg.source_ts >> 32).i32()
-    let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
-    let osc = OSCMessage(_ForwardI32(),
-      recover
-        [as OSCData val: OSCInt(step_id),
-                         OSCString(from_node),
-                         OSCInt(msg.id),
-                         OSCInt(source_ts_byte_0),
-                         OSCInt(source_ts_byte_1),
-                         OSCInt(msg.data)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun forward(step_id: U64, node_name: String, step_msg: StepMessage val,
+    auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(ForwardMsg(step_id, node_name, step_msg), auth)
 
-  fun forward_f32(step_id: I32, from_node: String, msg: Message[F32] val): Array[U8] val =>
-    let source_ts_byte_0 = (msg.source_ts >> 32).i32()
-    let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
-    let osc = OSCMessage(_ForwardF32(),
-      recover
-        [as OSCData val: OSCInt(step_id),
-                         OSCString(from_node),
-                         OSCInt(msg.id),
-                         OSCInt(source_ts_byte_0),
-                         OSCInt(source_ts_byte_1),
-                         OSCFloat(msg.data)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun spin_up(step_id: U64, computation_type: String, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(SpinUpMsg(step_id, computation_type), auth)
 
-  fun forward_string(step_id: I32, from_node: String, msg: Message[String] val): Array[U8] val =>
-    let source_ts_byte_0 = (msg.source_ts >> 32).i32()
-    let source_ts_byte_1 = (msg.source_ts and 0xFFFF_FFFF).i32()
-    let osc = OSCMessage(_ForwardString(),
-      recover
-        [as OSCData val: OSCInt(step_id),
-                         OSCString(from_node),
-                         OSCInt(msg.id),
-                         OSCInt(source_ts_byte_0),
-                         OSCInt(source_ts_byte_1),
-                         OSCString(msg.data)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun spin_up_proxy(proxy_id: U64, step_id: U64, target_node_name: String
+    , auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(SpinUpProxyMsg(proxy_id, step_id, target_node_name), auth)
 
-  fun spin_up(step_id: I32, computation_type: String): Array[U8] val =>
-    let osc = OSCMessage(_SpinUp(),
-      recover
-        [as OSCData val: OSCInt(step_id),
-                         OSCString(computation_type)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun spin_up_sink(sink_id: U64, sink_step_id: U64, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(SpinUpSinkMsg(sink_id, sink_step_id), auth)
 
-  fun spin_up_proxy(proxy_id: I32, step_id: I32, target_node_name: String,
-    target_control_host: String, target_control_service: String,
-    target_data_host: String, target_data_service: String):
-    Array[U8] val =>
-    let osc = OSCMessage(_SpinUpProxy(),
-      recover
-        [as OSCData val: OSCInt(proxy_id),
-                         OSCInt(step_id),
-                         OSCString(target_node_name),
-                         OSCString(target_control_host),
-                         OSCString(target_control_service),
-                         OSCString(target_data_host),
-                         OSCString(target_data_service)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun connect_steps(from_step_id: U64, to_step_id: U64, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(ConnectStepsMsg(from_step_id, to_step_id), auth)
 
-  fun spin_up_sink(sink_id: I32, sink_step_id: I32): Array[U8] val =>
-    let osc = OSCMessage(_SpinUpSink(),
-      recover
-        [as OSCData val: OSCInt(sink_id),
-                         OSCInt(sink_step_id)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun initialization_msgs_finished(node_name: String, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(InitializationMsgsFinishedMsg(node_name), auth)
 
-  fun connect_steps(from_step_id: I32, to_step_id: I32): Array[U8] val =>
-    let osc = OSCMessage(_ConnectSteps(),
-      recover
-        [as OSCData val: OSCInt(from_step_id),
-                         OSCInt(to_step_id)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun ack_initialized(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(AckInitializedMsg(node_name), auth)
 
-  fun initialization_msgs_finished(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_InitializationMsgsFinished(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun ack_messages_received(node_name: String, msg_count: U64,
+    auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(AckMsgsReceivedMsg(node_name, msg_count), auth)
+ 
+  fun reconnect_data(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(ReconnectDataMsg(node_name), auth)
 
-  fun ack_initialized(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_AckInitialized(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun data_sender_ready(node_name: String, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(DataSenderReadyMsg(node_name), auth)
 
-  fun ack_messages_received(node_name: String, msg_count: I32): Array[U8] val =>
-    let osc = OSCMessage(_AckMsgsReceived(),
-      recover
-        [as OSCData val: OSCString(node_name),
-                         OSCInt(msg_count)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun data_receiver_ready(node_name: String, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(DataReceiverReadyMsg(node_name), auth)
 
-  fun reconnect_data(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_ReconnectData(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun control_sender_ready(node_name: String, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(ControlSenderReadyMsg(node_name), auth)
 
-  fun data_sender_ready(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_DataSenderReady(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun finished_connections(node_name: String, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(FinishedConnectionsMsg(node_name), auth)
 
-  fun data_receiver_ready(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_DataReceiverReady(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun ack_finished_connections(node_name: String, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(AckFinishedConnectionsMsg(node_name), auth)
 
-  fun control_sender_ready(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_ControlSenderReady(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
-
-  fun finished_connections(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_FinishedConnections(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
-
-  fun ack_finished_connections(node_name: String): Array[U8] val =>
-    let osc = OSCMessage(_AckFinishedConnections(),
-      recover
-        [as OSCData val: OSCString(node_name)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
-
-  fun ack_reconnect_messages_received(node_name: String, msg_count: I32): Array[U8] val =>
-    let osc = OSCMessage(_AckReconnectMsgsReceived(),
-      recover
-        [as OSCData val: OSCString(node_name),
-                         OSCInt(msg_count)]
-      end)
-    Bytes.length_encode(osc.to_bytes())
-
-  fun external(data: Stringable val): Array[U8] val =>
-    let osc = OSCMessage(_External(),
-      recover
-        [as OSCData val: OSCString(data.string())]
-      end)
-    Bytes.length_encode(osc.to_bytes())
+  fun ack_reconnect_messages_received(node_name: String, msg_count: U64,
+    auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(AckReconnectMsgsReceivedMsg(node_name, msg_count), auth)
 
 primitive WireMsgDecoder
-  fun apply(data: Array[U8] val): WireMsg val ? =>
-    let msg = OSCDecoder.from_bytes(data) as OSCMessage val
-    match msg.address
-    | _Ready() =>
-      ReadyMsg(msg)
-    | _TopologyReady() =>
-      TopologyReadyMsg(msg)
-    | _IdentifyControl() =>
-      IdentifyControlMsg(msg)
-    | _IdentifyData() =>
-      IdentifyDataMsg(msg)
-    | _Done() =>
-      DoneMsg(msg)
-    | _Start() =>
-      StartMsg
-    | _Reconnect() =>
-      ReconnectMsg(msg)
-    | _Shutdown() =>
-      ShutdownMsg(msg)
-    | _DoneShutdown() =>
-      DoneShutdownMsg(msg)
-    | _Forward() =>
-      ForwardMsg(msg)
-    | _ForwardI32() =>
-      ForwardI32Msg(msg)
-    | _ForwardF32() =>
-      ForwardF32Msg(msg)
-    | _ForwardString() =>
-      ForwardStringMsg(msg)
-    | _SpinUp() =>
-      SpinUpMsg(msg)
-    | _SpinUpProxy() =>
-      SpinUpProxyMsg(msg)
-    | _SpinUpSink() =>
-      SpinUpSinkMsg(msg)
-    | _ConnectSteps() =>
-      ConnectStepsMsg(msg)
-    | _InitializationMsgsFinished() =>
-      InitializationMsgsFinishedMsg(msg)
-    | _AckInitialized() =>
-      AckInitializedMsg(msg)
-    | _AckMsgsReceived() =>
-      AckMsgsReceivedMsg(msg)
-    | _AckReconnectMsgsReceived() =>
-      AckReconnectMsgsReceivedMsg(msg)
-    | _ReconnectData() =>
-      ReconnectDataMsg(msg)
-    | _DataSenderReady() =>
-      DataSenderReadyMsg(msg)
-    | _DataReceiverReady() =>
-      DataReceiverReadyMsg(msg)
-    | _ControlSenderReady() =>
-      ControlSenderReadyMsg(msg)
-    | _FinishedConnections() =>
-      FinishedConnectionsMsg(msg)
-    | _AckFinishedConnections() =>
-      AckFinishedConnectionsMsg(msg)
-    | _External() =>
-      ExternalMsg(msg)
+  fun apply(data: Array[U8] val, auth: AmbientAuth): WireMsg val =>
+    try
+      match Serialised.input(InputSerialisedAuth(auth), data)(DeserialiseAuth(auth))
+      | let m: WireMsg val => m
+      else
+        UnknownMsg(data)
+      end
     else
       UnknownMsg(data)
     end
@@ -343,267 +113,116 @@ trait val WireMsg
 class ReadyMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class TopologyReadyMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class IdentifyControlMsg is WireMsg
   let node_name: String
   let host: String
   let service: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match (msg.arguments(0), msg.arguments(1), msg.arguments(2))
-    | (let n: OSCString val, let h: OSCString val, let s: OSCString val) =>
-      node_name = n.value()
-      host = h.value()
-      service = s.value()
-    else
-      error
-    end
+  new val create(name: String, h: String, s: String) =>
+    node_name = name
+    host = h
+    service = s
 
 class IdentifyDataMsg is WireMsg
   let node_name: String
   let host: String
   let service: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match (msg.arguments(0), msg.arguments(1), msg.arguments(2))
-    | (let n: OSCString val, let h: OSCString val, let s: OSCString val) =>
-      node_name = n.value()
-      host = h.value()
-      service = s.value()
-    else
-      error
-    end
-
+  new val create(name: String, h: String, s: String) =>
+    node_name = name
+    host = h
+    service = s
+    
 class DoneMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 primitive StartMsg is WireMsg
 
 class ReconnectMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class ShutdownMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class DoneShutdownMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class ForwardMsg is WireMsg
-  let step_id: I32
-  let msg: Message[I32] val
-
-  new val create(m: OSCMessage val) ? =>
-    match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
-      m.arguments(4))
-    | (let a_id: OSCInt val, let m_id: OSCInt val, let s_ts_0: OSCInt val,
-      let s_ts_1: OSCInt val, let m_data: OSCInt val) =>
-      step_id = a_id.value()
-      let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
-      msg = Message[I32](m_id.value(), source_ts, Time.millis(), m_data.value())
-    else
-      error
-    end
-
-class ForwardI32Msg is WireMsg
-  let step_id: I32
+  let step_id: U64
   let from_node_name: String
-  let msg: Message[I32] val
+  let msg: StepMessage val
 
-  new val create(m: OSCMessage val) ? =>
-    match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
-      m.arguments(4), m.arguments(5))
-    | (let a_id: OSCInt val, let from_node: OSCString val, let m_id: OSCInt val,
-      let s_ts_0: OSCInt val, let s_ts_1: OSCInt val, let m_data: OSCInt val) =>
-      step_id = a_id.value()
-      from_node_name = from_node.value()
-      let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
-      msg = Message[I32](m_id.value(), source_ts, Time.millis(), m_data.value())
-    else
-      error
-    end
-
-class ForwardF32Msg is WireMsg
-  let step_id: I32
-  let from_node_name: String
-  let msg: Message[F32] val
-
-  new val create(m: OSCMessage val) ? =>
-    match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
-      m.arguments(4), m.arguments(5))
-    | (let a_id: OSCInt val, let from_node: OSCString val, let m_id: OSCInt val,
-      let s_ts_0: OSCInt val, let s_ts_1: OSCInt val, let m_data: OSCFloat val) =>
-      step_id = a_id.value()
-      from_node_name = from_node.value()
-      let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
-      msg = Message[F32](m_id.value(), source_ts, Time.millis(), m_data.value())
-    else
-      error
-    end
-
-class ForwardStringMsg is WireMsg
-  let step_id: I32
-  let from_node_name: String
-  let msg: Message[String] val
-
-  new val create(m: OSCMessage val) ? =>
-    match (m.arguments(0), m.arguments(1), m.arguments(2), m.arguments(3),
-      m.arguments(4), m.arguments(5))
-    | (let a_id: OSCInt val, let from_node: OSCString val, let m_id: OSCInt val,
-      let s_ts_0: OSCInt val, let s_ts_1: OSCInt val, let m_data: OSCString val) =>
-      step_id = a_id.value()
-      from_node_name = from_node.value()
-      let source_ts = (s_ts_0.value().u64() << 32) + s_ts_1.value().u64()
-      msg = Message[String](m_id.value(), source_ts, Time.millis(), m_data.value())
-    else
-      error
-    end
+  new val create(s_id: U64, from: String, m: StepMessage val) =>
+    step_id = s_id
+    from_node_name = from
+    msg = m
 
 class SpinUpMsg is WireMsg
-  let step_id: I32
+  let step_id: U64
   let computation_type: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match (msg.arguments(0), msg.arguments(1))
-    | (let a_id: OSCInt val, let c_type: OSCString val) =>
-      step_id = a_id.value()
-      computation_type = c_type.value()
-    else
-      error
-    end
+  new val create(s_id: U64, c_type: String) =>
+    step_id = s_id
+    computation_type = c_type
 
 class SpinUpProxyMsg is WireMsg
-  let proxy_id: I32
-  let step_id: I32
+  let proxy_id: U64
+  let step_id: U64
   let target_node_name: String
-  let target_control_host: String
-  let target_control_service: String
-  let target_data_host: String
-  let target_data_service: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match (msg.arguments(0), msg.arguments(1), msg.arguments(2),
-      msg.arguments(3), msg.arguments(4), msg.arguments(5), msg.arguments(6))
-    | (let p_id: OSCInt val, let s_id: OSCInt val, let t_node_name: OSCString val,
-      let c_host: OSCString val, let c_service: OSCString val,
-      let d_host: OSCString val, let d_service: OSCString val) =>
-      proxy_id = p_id.value()
-      step_id = s_id.value()
-      target_node_name = t_node_name.value()
-      target_control_host = c_host.value()
-      target_control_service = c_service.value()
-      target_data_host = d_host.value()
-      target_data_service = d_service.value()
-    else
-      error
-    end
+  new val create(p_id: U64, s_id: U64, name: String) =>
+      proxy_id = p_id
+      step_id = s_id
+      target_node_name = name
 
 class SpinUpSinkMsg is WireMsg
-  let sink_id: I32
-  let sink_step_id: I32
+  let sink_id: U64
+  let sink_step_id: U64
 
-  new val create(msg: OSCMessage val) ? =>
-    match (msg.arguments(0), msg.arguments(1))
-    | (let s_id: OSCInt val, let s_step_id: OSCInt val) =>
-      sink_id = s_id.value()
-      sink_step_id = s_step_id.value()
-    else
-      error
-    end
+  new val create(s_id: U64, s_step_id: U64) =>
+      sink_id = s_id
+      sink_step_id = s_step_id
 
 class ConnectStepsMsg is WireMsg
-  let in_step_id: I32
-  let out_step_id: I32
+  let in_step_id: U64
+  let out_step_id: U64
 
-  new val create(msg: OSCMessage val) ? =>
-    match (msg.arguments(0), msg.arguments(1))
-    | (let in_a_id: OSCInt val, let out_a_id: OSCInt val) =>
-      in_step_id = in_a_id.value()
-      out_step_id = out_a_id.value()
-    else
-      error
-    end
+  new val create(i_id: U64, o_id: U64) =>
+      in_step_id = i_id
+      out_step_id = o_id
 
 class InitializationMsgsFinishedMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class AckInitializedMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
-
-class ExternalMsg is WireMsg
-  let data: String
-
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let d: OSCString val => data = d.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class UnknownMsg is WireMsg
   let data: Array[U8] val
@@ -613,92 +232,52 @@ class UnknownMsg is WireMsg
 
 class AckMsgsReceivedMsg is WireMsg
   let node_name: String
-  let msg_count: I32
+  let msg_count: U64
 
-  new val create(msg: OSCMessage val) ? =>
-      match (msg.arguments(0), msg.arguments(1))
-      | (let name: OSCString val, let count: OSCInt val) =>
-        node_name = name.value()
-        msg_count = count.value()
-      else
-        error
-      end
+  new val create(name: String, m_count: U64) =>
+      node_name = name
+      msg_count = m_count
 
 class AckReconnectMsgsReceivedMsg is WireMsg
   let node_name: String
-  let msg_count: I32
+  let msg_count: U64
 
-  new val create(msg: OSCMessage val) ? =>
-      match (msg.arguments(0), msg.arguments(1))
-      | (let name: OSCString val, let count: OSCInt val) =>
-        node_name = name.value()
-        msg_count = count.value()
-      else
-        error
-      end
+  new val create(name: String, m_count: U64) =>
+      node_name = name
+      msg_count = m_count
 
 class ReconnectDataMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class DataSenderReadyMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class DataReceiverReadyMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class ControlSenderReadyMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class FinishedConnectionsMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name
 
 class AckFinishedConnectionsMsg is WireMsg
   let node_name: String
 
-  new val create(msg: OSCMessage val) ? =>
-    match msg.arguments(0)
-    | let n: OSCString val =>
-      node_name = n.value()
-    else
-      error
-    end
+  new val create(name: String) =>
+    node_name = name

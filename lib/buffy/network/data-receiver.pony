@@ -4,7 +4,7 @@ use "collections"
 actor DataReceiver
   let _sender_name: String
   let _coordinator: Coordinator
-  var _seen_since_last_ack: USize = 0
+  var _seen_since_last_ack: U64 = 0
 
   new create(sender_name: String, coordinator: Coordinator) =>
     _sender_name = sender_name

@@ -171,9 +171,9 @@ class ToDagonNotify is TCPConnectionNotify
       end
     else
       try
-        let decoded = WireMsgDecoder(consume data)
+        let decoded = ExternalMsgDecoder(consume data)
         match decoded
-        | let d: ShutdownMsg val =>
+        | let d: ExternalShutdownMsg val =>
           _coordinator.finished()
         else
           _stderr.print("Unexpected data from Dagon")
@@ -275,7 +275,7 @@ actor WithDagonCoordinator is Coordinator
     _store.dump()
     try
       let x = _to_dagon_socket._1 as TCPConnection
-      x.write(WireMsgEncoder.done_shutdown(_node_id))
+      x.write(ExternalMsgEncoder.done_shutdown(_node_id))
       x.dispose()
     end
 
@@ -304,7 +304,7 @@ actor WithDagonCoordinator is Coordinator
     then
       try
         let x = _to_dagon_socket._1 as TCPConnection
-        x.write(WireMsgEncoder.ready(_node_id as String))
+        x.write(ExternalMsgEncoder.ready(_node_id as String))
        end
     end
 
@@ -325,9 +325,9 @@ actor Decoder
 
   be received(data: Array[U8] iso, at: U64) =>
     try
-      let decoded = WireMsgDecoder(consume data)
+      let decoded = ExternalMsgDecoder(consume data)
       match decoded
-      | let d: ExternalMsg val =>
+      | let d: ExternalDataMsg val =>
         _store.received(d.data, at)
       else
         _stderr.print("Unexpected data from Buffy")

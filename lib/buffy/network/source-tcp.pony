@@ -12,13 +12,13 @@ class SourceNotifier is TCPListenNotify
   let _auth: AmbientAuth
   let _host: String
   let _service: String
-  let _source_id: I32
+  let _source_id: U64
   let _step_manager: StepManager
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector
 
   new iso create(env: Env, auth: AmbientAuth, source_host: String,
-    source_service: String, source_id: I32, step_manager: StepManager,
+    source_service: String, source_id: U64, step_manager: StepManager,
     coordinator: Coordinator, metrics_collector: MetricsCollector) =>
     _env = env
     _auth = auth
@@ -41,16 +41,16 @@ class SourceNotifier is TCPListenNotify
       _metrics_collector)
 
 class SourceConnectNotify is TCPConnectionNotify
-  var _msg_id: I32 = 0
+  var _msg_id: U64 = 0
   let _env: Env
   let _auth: AmbientAuth
-  let _source_id: I32
+  let _source_id: U64
   let _step_manager: StepManager
   let _metrics_collector: MetricsCollector
   let _framer: Framer = Framer
   let _coordinator: Coordinator
 
-  new iso create(env: Env, auth: AmbientAuth, source_id: I32,
+  new iso create(env: Env, auth: AmbientAuth, source_id: U64,
     step_manager: StepManager, coordinator: Coordinator,
       metrics_collector: MetricsCollector) =>
     _env = env
@@ -66,14 +66,14 @@ class SourceConnectNotify is TCPConnectionNotify
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
       try
-        let msg = WireMsgDecoder(consume chunked)
+        let msg = ExternalMsgDecoder(chunked)
         match msg
-        | let m: ExternalMsg val =>
+        | let m: ExternalDataMsg val =>
           let now = Time.millis()
           let new_msg: Message[String] val = Message[String](_msg_id = _msg_id + 1,
             now, now, m.data)
           _step_manager(_source_id, new_msg)
-        | let m: UnknownMsg val =>
+        | let m: ExternalUnknownMsg val =>
           _env.err.print("Unknown message type.")
         else
           _env.err.print("Source " + _source_id.string()

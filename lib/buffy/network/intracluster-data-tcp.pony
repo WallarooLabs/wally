@@ -38,7 +38,7 @@ class LeaderIntraclusterDataNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    SpikeWrapper(IntraclusterDataReceiverConnectNotify(_env, _name,
+    SpikeWrapper(IntraclusterDataReceiverConnectNotify(_env, _auth, _name,
       _coordinator), _spike_config)
 
 class WorkerIntraclusterDataNotifier is TCPListenNotify
@@ -79,17 +79,20 @@ class WorkerIntraclusterDataNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    SpikeWrapper(IntraclusterDataReceiverConnectNotify(_env, _name,
+    SpikeWrapper(IntraclusterDataReceiverConnectNotify(_env, _auth, _name,
       _coordinator), _spike_config)
 
 class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
   let _env: Env
+  let _auth: AmbientAuth
   let _name: String
   let _framer: Framer = Framer
   let _coordinator: Coordinator
 
-  new iso create(env: Env, name: String, coordinator: Coordinator) =>
+  new iso create(env: Env, auth: AmbientAuth, name: String,
+    coordinator: Coordinator) =>
     _env = env
+    _auth = auth
     _name = name
     _coordinator = coordinator
 
@@ -98,22 +101,15 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
-      try
-        let msg = WireMsgDecoder(consume chunked)
-        match msg
-        | let m: ForwardI32Msg val =>
-          _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
-//          _env.out.print("!!MSG: <<" + m.msg.data.string() + ">>!!")
-        | let m: ForwardF32Msg val =>
-          _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
-        | let m: ForwardStringMsg val =>
-          _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
-        | let m: UnknownMsg val =>
-          _env.err.print("Unknown data Buffy message type.")
-        end
-      else
-        _env.err.print("Error decoding incoming data Buffy message.")
+      let msg = WireMsgDecoder(consume chunked, _auth)
+      match msg
+      | let m: ForwardMsg val =>
+        _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
+      | let m: UnknownMsg val =>
+        _env.err.print("Unknown data Buffy message type.")
       end
+    else
+      _env.err.print("Error decoding incoming data Buffy message.")
     end
 
   fun ref closed(conn: TCPConnection ref) =>
@@ -121,14 +117,16 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
 
 class IntraclusterDataSenderConnectNotify is TCPConnectionNotify
   let _env: Env
+  let _auth: AmbientAuth
   let _name: String
   let _target_name: String
   let _framer: Framer = Framer
   let _coordinator: Coordinator
 
-  new iso create(env: Env, name: String, target_name: String,
+  new iso create(env: Env, auth: AmbientAuth, name: String, target_name: String,
     coordinator: Coordinator) =>
     _env = env
+    _auth = auth
     _name = name
     _target_name = target_name
     _coordinator = coordinator
@@ -137,17 +135,7 @@ class IntraclusterDataSenderConnectNotify is TCPConnectionNotify
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    for chunked in _framer.chunk(consume data).values() do
-      try
-        let msg = WireMsgDecoder(consume chunked)
-        match msg
-        | let m: UnknownMsg val =>
-          _env.err.print("Unknown data Buffy message type on data sender.")
-        end
-      else
-        _env.err.print("Error decoding incoming message on data sender.")
-      end
-    end
+    _env.out.print("Data sender channel received data.")
 
   fun ref closed(conn: TCPConnection ref) =>
     _coordinator.reconnect_data(_target_name)

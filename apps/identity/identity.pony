@@ -10,10 +10,10 @@ actor Main
     try
       let topology: Topology val = recover val
         Topology
-          .new_pipeline[I32, I32](P, S)
-          .and_then[I32]("identity", lambda(): Computation[I32, I32] iso^ => Identity end)
-          .and_then[I32]("identity", lambda(): Computation[I32, I32] iso^ => Identity end)
-          .and_then[I32]("identity", lambda(): Computation[I32, I32] iso^ => Identity end)
+          .new_pipeline[U64, U64](P, S)
+          .and_then[U64]("identity", lambda(): Computation[U64, U64] iso^ => Identity end)
+          .and_then[U64]("identity", lambda(): Computation[U64, U64] iso^ => Identity end)
+          .and_then[U64]("identity", lambda(): Computation[U64, U64] iso^ => Identity end)
           .build()
       end
       Startup(env, topology, SL, 1)
@@ -24,23 +24,24 @@ actor Main
 primitive SL is StepLookup
   fun val apply(computation_type: String): BasicStep tag ? =>
     match computation_type
-    | "source" => Source[I32](P)
-    | "identity" => Step[I32, I32](Identity)
+    | "source" => Source[U64](P)
+    | "identity" => Step[U64, U64](Identity)
     else
       error
     end
 
-  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector): BasicStep tag =>
-    ExternalConnection[I32](S, conn, metrics_collector)
+  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector)
+    : BasicStep tag =>
+    ExternalConnection[U64](S, conn, metrics_collector)
 
-class Identity is Computation[I32, I32]
-  fun apply(d: I32): I32 =>
+class Identity is Computation[U64, U64]
+  fun apply(d: U64): U64 =>
     d
 
 class P
-  fun apply(s: String): I32 ? =>
-    s.i32()
+  fun apply(s: String): U64 ? =>
+    s.u64()
 
 class S
-  fun apply(input: I32): String =>
+  fun apply(input: U64): String =>
     input.string()
