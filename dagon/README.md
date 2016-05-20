@@ -2,7 +2,7 @@
 
 A topology overlord. Boots components for you.
 
-# Build
+## Build
 You will need [pony-stable](https://github.com/jemc/pony-stable)
 to build the project. Compile and install it, then run these
 commands.
@@ -21,7 +21,7 @@ stable env ponyc --debug
 cd ..
 ```
 
-# Quickstart
+## Quickstart
 dagon-pony takes four arguments:
 ```
 -t time in seconds to wait for processing to finish after Giles
