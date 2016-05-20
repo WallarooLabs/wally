@@ -1,5 +1,6 @@
 use "osc-pony"
 use "sendence/bytes"
+use "buffy/topology"
 use "serialise"
 use "time"
 
@@ -42,17 +43,18 @@ primitive WireMsgEncoder
     auth: AmbientAuth): Array[U8] val ? =>
     _serialise(ForwardMsg(step_id, node_name, step_msg), auth)
 
-  fun spin_up(step_id: U64, computation_type: String, auth: AmbientAuth)
+  fun spin_up(step_id: U64, step_builder: BasicStepBuilder val, auth: AmbientAuth)
     : Array[U8] val ? =>
-    _serialise(SpinUpMsg(step_id, computation_type), auth)
+    _serialise(SpinUpMsg(step_id, step_builder), auth)
 
   fun spin_up_proxy(proxy_id: U64, step_id: U64, target_node_name: String
     , auth: AmbientAuth): Array[U8] val ? =>
     _serialise(SpinUpProxyMsg(proxy_id, step_id, target_node_name), auth)
 
-  fun spin_up_sink(sink_id: U64, sink_step_id: U64, auth: AmbientAuth)
+  fun spin_up_sink(sink_id: U64, sink_step_id: U64, sink_builder: SinkBuilder val,
+    auth: AmbientAuth)
     : Array[U8] val ? =>
-    _serialise(SpinUpSinkMsg(sink_id, sink_step_id), auth)
+    _serialise(SpinUpSinkMsg(sink_id, sink_step_id, sink_builder), auth)
 
   fun connect_steps(from_step_id: U64, to_step_id: U64, auth: AmbientAuth)
     : Array[U8] val ? =>
@@ -180,11 +182,11 @@ class ForwardMsg is WireMsg
 
 class SpinUpMsg is WireMsg
   let step_id: U64
-  let computation_type: String
+  let step_builder: BasicStepBuilder val
 
-  new val create(s_id: U64, c_type: String) =>
+  new val create(s_id: U64, s_builder: BasicStepBuilder val) =>
     step_id = s_id
-    computation_type = c_type
+    step_builder = s_builder
 
 class SpinUpProxyMsg is WireMsg
   let proxy_id: U64
@@ -199,10 +201,12 @@ class SpinUpProxyMsg is WireMsg
 class SpinUpSinkMsg is WireMsg
   let sink_id: U64
   let sink_step_id: U64
+  let sink_builder: SinkBuilder val
 
-  new val create(s_id: U64, s_step_id: U64) =>
+  new val create(s_id: U64, s_step_id: U64, s_builder: SinkBuilder val) =>
       sink_id = s_id
       sink_step_id = s_step_id
+      sink_builder = s_builder
 
 class ConnectStepsMsg is WireMsg
   let in_step_id: U64

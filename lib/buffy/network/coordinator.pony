@@ -130,14 +130,15 @@ actor Coordinator
   be add_topology_manager(tm: TopologyManager) =>
     _topology_manager = tm
 
-  be add_step(step_id: U64, comp_type: String) =>
-    _step_manager.add_step(step_id, comp_type)
+  be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
+    _step_manager.add_step(step_id, step_builder)
 
   be add_proxy(p_step_id: U64, p_target_id: U64, target_node_name: String) =>
     _step_manager.add_proxy(p_step_id, p_target_id, target_node_name, this)
 
-  be add_sink(sink_id: U64, step_id: U64, auth: AmbientAuth) =>
-    _step_manager.add_sink(sink_id, step_id, auth)
+  be add_sink(sink_id: U64, step_id: U64, sink_builder: SinkBuilder val,
+    auth: AmbientAuth) =>
+    _step_manager.add_sink(sink_id, step_id, sink_builder, auth)
 
   be connect_steps(step_id: U64, target_id: U64) =>
     _step_manager.connect_steps(step_id, target_id)

@@ -1,8 +1,7 @@
 use "net"
 use "options"
-use "osc-pony"
 use "time"
-use "messages"
+use "buffy/messages"
 use "sendence/tcp"
 
 

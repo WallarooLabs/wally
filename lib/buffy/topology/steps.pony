@@ -13,8 +13,7 @@ trait OutputStep
 
 trait ComputeStep[In] is BasicStep
 
-trait ThroughStep[In,
-                  Out] is (OutputStep & ComputeStep[In])
+trait ThroughStep[In, Out] is (OutputStep & ComputeStep[In])
 
 actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]

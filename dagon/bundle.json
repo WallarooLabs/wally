@@ -6,10 +6,7 @@
         "tag": "0.0.2"
       },
       { "type": "local",
-        "local-path": "../lib/buffy/messages"
-      },
-      { "type": "local",
-        "local-path": "../lib/sendence"
+        "local-path": "../lib/"
       }
   ]
 }

@@ -44,16 +44,14 @@ actor StepManager
   let _metrics_collector: MetricsCollector tag
   let _steps: Map[U64, BasicStep tag] = Map[U64, BasicStep tag]
   let _sink_addrs: Map[U64, (String, String)] val
-  let _step_lookup: StepLookup val
 
   new create(env: Env, auth: AmbientAuth, node_name: String,
-    step_lookup: StepLookup val, sink_addrs: Map[U64, (String, String)] val,
+    sink_addrs: Map[U64, (String, String)] val,
     metrics_collector: MetricsCollector tag) =>
     _env = env
     _auth = auth
     _node_name = node_name
     _sink_addrs = sink_addrs
-    _step_lookup = step_lookup
     _metrics_collector = metrics_collector
 
   be apply(step_id: U64, msg: StepMessage val) =>
@@ -63,14 +61,10 @@ actor StepManager
       _env.out.print("StepManager: Could not forward message")
     end
 
-  be add_step(step_id: U64, computation_type: String) =>
-    try
-      let step = _step_lookup(computation_type)
-      step.add_step_reporter(StepReporter(step_id, _metrics_collector))
-      _steps(step_id) = step
-    else
-      _env.out.print("StepManager: Could not add step.")
-    end
+  be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
+    let step = step_builder()
+    step.add_step_reporter(StepReporter(step_id, _metrics_collector))
+    _steps(step_id) = step
 
   be add_proxy(proxy_step_id: U64, target_step_id: U64,
     target_node_name: String, coordinator: Coordinator) =>
@@ -78,14 +72,15 @@ actor StepManager
       coordinator, _metrics_collector)
     _steps(proxy_step_id) = p
 
-  be add_sink(sink_id: U64, sink_step_id: U64, auth: AmbientAuth) =>
+  be add_sink(sink_id: U64, sink_step_id: U64, sink_builder: SinkBuilder val,
+    auth: AmbientAuth) =>
     try
       let sink_addr = _sink_addrs(sink_id)
       let sink_host = sink_addr._1
       let sink_service = sink_addr._2
       let conn = TCPConnection(auth, SinkConnectNotify(_env), sink_host,
         sink_service)
-      _steps(sink_step_id) = _step_lookup.sink(conn, _metrics_collector)
+      _steps(sink_step_id) = sink_builder(conn, _metrics_collector)
     else
       _env.out.print("StepManager: Could not add sink.")
     end

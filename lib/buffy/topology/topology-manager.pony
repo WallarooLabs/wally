@@ -147,15 +147,15 @@ actor TopologyManager
             end
           end
 
-          _env.out.print("Spinning up computation **" + pipeline_step.computation_type() + "** on node \'" + cur_node + "\'")
+          _env.out.print("Spinning up computation **** on node \'" + cur_node + "\'")
 
           if cur_node_idx == 0 then // if cur_node is the leader/source
-            _coordinator.add_step(step_id, pipeline_step.computation_type())
+            _coordinator.add_step(step_id, pipeline_step.step_builder())
             _coordinator.add_proxy(proxy_step_id, proxy_step_target_id, next_node)
             _coordinator.connect_steps(step_id, proxy_step_id)
           else
             let create_step_msg =
-              WireMsgEncoder.spin_up(step_id, pipeline_step.computation_type(), _auth)
+              WireMsgEncoder.spin_up(step_id, pipeline_step.step_builder(), _auth)
             let create_proxy_msg =
               WireMsgEncoder.spin_up_proxy(proxy_step_id, proxy_step_target_id,
                 next_node, _auth)
@@ -177,10 +177,11 @@ actor TopologyManager
         _env.out.print("Spinning up sink on node " + sink_node)
 
         if sink_node_idx == 0 then // if cur_node is the leader
-          _coordinator.add_sink(cur_sink_id, step_id, _auth)
+          _coordinator.add_sink(cur_sink_id, step_id, pipeline.sink_builder(), _auth)
         else
           let create_sink_msg =
-            WireMsgEncoder.spin_up_sink(cur_sink_id, step_id, _auth)
+            WireMsgEncoder.spin_up_sink(cur_sink_id, step_id,
+              pipeline.sink_builder(), _auth)
             _coordinator.send_control_message(sink_node, create_sink_msg)
         end
 

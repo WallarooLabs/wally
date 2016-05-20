@@ -7,11 +7,17 @@ use "time"
 interface TagBuilder
   fun apply(): Any tag
 
-trait OutputStepBuilder[Out: Any val]
+trait BasicStepBuilder
+  fun apply(): BasicStep tag
+
+trait SinkBuilder
+  fun apply(conn: TCPConnection, metrics_collector: MetricsCollector): BasicStep tag
+
+trait OutputStepBuilder[Out: Any val] is BasicStepBuilder
 
 trait ThroughStepBuilder[In: Any val, Out: Any val]
   is OutputStepBuilder[Out]
-  fun apply(): ThroughStep[In, Out] tag
+//  fun apply(): ThroughStep[In, Out] tag
 
 class SourceBuilder[Out: Any val]
   is ThroughStepBuilder[String, Out]
@@ -20,7 +26,7 @@ class SourceBuilder[Out: Any val]
   new val create(p: Parser[Out] val) =>
     _parser = p
 
-  fun apply(): ThroughStep[String, Out] tag =>
+  fun apply(): BasicStep tag =>
     Source[Out](_parser)
 
 class StepBuilder[In: Any val, Out: Any val]
@@ -30,7 +36,7 @@ class StepBuilder[In: Any val, Out: Any val]
   new val create(c: ComputationBuilder[In, Out] val) =>
     _computation_builder = c
 
-  fun apply(): ThroughStep[In, Out] tag =>
+  fun apply(): BasicStep tag =>
     Step[In, Out](_computation_builder())
 
 class PartitionBuilder[In: Any val, Out: Any val]
@@ -42,7 +48,7 @@ class PartitionBuilder[In: Any val, Out: Any val]
     _step_builder = StepBuilder[In, Out](c)
     _partition_function = pf
 
-  fun apply(): ThroughStep[In, Out] tag =>
+  fun apply(): BasicStep tag =>
     Partition[In, Out](_step_builder, _partition_function)
 
 class StateStepBuilder[In: Any val, Out: Any val, State: Any #read]
@@ -55,15 +61,15 @@ class StateStepBuilder[In: Any val, Out: Any val, State: Any #read]
     _state_computation_builder = s_builder
     _state_initializer = s_initializer
 
-  fun apply(): ThroughStep[In, Out] tag =>
+  fun apply(): BasicStep tag =>
     StateStep[In, Out, State](_state_initializer, _state_computation_builder())
 
-class ExternalConnectionBuilder[In: Any val]
+class ExternalConnectionBuilder[In: Any val] is SinkBuilder
   let _stringify: Stringify[In] val
 
   new val create(stringify: Stringify[In] val) =>
     _stringify = stringify
 
   fun apply(conn: TCPConnection, metrics_collector: MetricsCollector)
-    : ExternalConnection[In] =>
+    : BasicStep tag =>
     ExternalConnection[In](_stringify, conn, metrics_collector)

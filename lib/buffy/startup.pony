@@ -7,8 +7,7 @@ use "./network"
 use "./topology"
 
 actor Startup
-  new create(env: Env, topology: Topology val, step_lookup: StepLookup val,
-    source_count: USize) =>
+  new create(env: Env, topology: Topology val, source_count: USize) =>
     var is_worker = true
     var worker_count: USize = 0
     var node_name: String = "0"
@@ -98,7 +97,7 @@ actor Startup
           MetricsCollector(env, node_name)
         end
 
-      let step_manager = StepManager(env, auth, node_name, step_lookup, consume sinks,
+      let step_manager = StepManager(env, auth, node_name, consume sinks,
         metrics_collector)
 
       let coordinator: Coordinator = Coordinator(node_name, env, auth,

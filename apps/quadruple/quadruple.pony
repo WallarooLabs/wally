@@ -11,34 +11,19 @@ actor Main
       let topology: Topology val = recover val
         Topology
           .new_pipeline[U64, U64](P, S)
-          .and_then_partition[U64]("double_partition",
+          .and_then_partition[U64](
             lambda(): Computation[U64, U64] iso^ => Double end, Mod4Partition)
-          .and_then_partition[U64]("double_partition",
+          .and_then_partition[U64](
             lambda(): Computation[U64, U64] iso^ => Double end, Mod4Partition)
           .build()
       end
-      Startup(env, topology, SL, 1)
+      Startup(env, topology, 1)
     else
       env.out.print("Couldn't build topology")
     end
 
-primitive SL is StepLookup
-  fun val apply(computation_type: String): BasicStep tag ? =>
-    match computation_type
-    | "source" => Source[U64](P)
-    | "double" => Step[U64, U64](Double)
-    | "double_partition" =>
-      PartitionBuilder[U64, U64](lambda(): Computation[U64, U64] iso^ => Double end,
-        Mod4Partition)()
-    else
-      error
-    end
-
-  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector)
-    : BasicStep tag =>
-    ExternalConnection[U64](S, conn, metrics_collector)
-
 class Double is Computation[U64, U64]
+  fun name(): String => "double"
   fun apply(d: U64): U64 =>
     d * 2
 

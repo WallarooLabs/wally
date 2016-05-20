@@ -3,6 +3,7 @@ use "collections"
 
 interface Computation[In, Out]
   fun ref apply(input: In): Out
+  fun name(): String
 
 interface FinalComputation[In]
   fun ref apply(input: In)
