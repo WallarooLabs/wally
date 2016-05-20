@@ -11,12 +11,12 @@ trait BasicStep
 trait OutputStep
   be add_output(to: BasicStep tag)
 
-trait ComputeStep[In: OSCEncodable] is BasicStep
+trait ComputeStep[In] is BasicStep
 
-trait ThroughStep[In: OSCEncodable val,
-                  Out: OSCEncodable val] is (OutputStep & ComputeStep[In])
+trait ThroughStep[In,
+                  Out] is (OutputStep & ComputeStep[In])
 
-actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
+actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]
   var _output: (BasicStep tag | None) = None
   var _step_reporter: (StepReporter val | None) = None
@@ -37,7 +37,7 @@ actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
       | let o: BasicStep tag =>
         let start_time = Time.millis()
         let output_msg =
-          Message[Out](m.id, m.source_ts, m.last_ingress_ts, _f(m.data))
+          Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), _f(m.data()))
         o(output_msg)
         let end_time = Time.millis()
         match _step_reporter
@@ -47,7 +47,7 @@ actor Step[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
       end
     end
 
-actor Source[Out: OSCEncodable val] is ThroughStep[String, Out]
+actor Source[Out: Any val] is ThroughStep[String, Out]
   var _input_parser: Parser[Out] val
   var _output: (BasicStep tag | None) = None
   var _step_reporter: (StepReporter val | None) = None
@@ -67,7 +67,7 @@ actor Source[Out: OSCEncodable val] is ThroughStep[String, Out]
       try
         let start_time = Time.millis()
         let output_msg: Message[Out] val =
-          Message[Out](m.id, m.source_ts, m.last_ingress_ts, _input_parser(m.data))
+          Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), _input_parser(m.data()))
         match _output
         | let o: BasicStep tag =>
           o(output_msg)
@@ -82,7 +82,7 @@ actor Source[Out: OSCEncodable val] is ThroughStep[String, Out]
       end
     end
 
-actor Sink[In: OSCEncodable val] is ComputeStep[In]
+actor Sink[In: Any val] is ComputeStep[In]
   let _f: FinalComputation[In]
 
   new create(f: FinalComputation[In] iso) =>
@@ -91,13 +91,13 @@ actor Sink[In: OSCEncodable val] is ComputeStep[In]
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
-      _f(m.data)
+      _f(m.data())
     end
 
-actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, Out]
+actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _step_builder: StepBuilder[In, Out] val
   let _partition_function: PartitionFunction[In] val
-  let _partitions: Map[I32, BasicStep tag] = Map[I32, BasicStep tag]
+  let _partitions: Map[U64, BasicStep tag] = Map[U64, BasicStep tag]
   var _output: (BasicStep tag | None) = None
 
   new create(s_builder: StepBuilder[In, Out] val, pf: PartitionFunction[In] val) =>
@@ -107,7 +107,7 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
-      let partition_id = _partition_function(m.data)
+      let partition_id = _partition_function(m.data())
       if _partitions.contains(partition_id) then
         try
           _partitions(partition_id)(m)
@@ -149,8 +149,8 @@ actor Partition[In: OSCEncodable val, Out: OSCEncodable val] is ThroughStep[In, 
       end
     end
 
-actor StateStep[In: OSCEncodable val, Out: OSCEncodable val,
-  State: Any #read] is ThroughStep[In, Out]
+actor StateStep[In: Any val, Out: Any val, State: Any #read]
+  is ThroughStep[In, Out]
   var _step_reporter: (StepReporter val | None) = None
   let _state_computation: StateComputation[In, Out, State]
   var _output: (BasicStep tag | None) = None
@@ -170,12 +170,12 @@ actor StateStep[In: OSCEncodable val, Out: OSCEncodable val,
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
-      let res = _state_computation(_state, m.data)
+      let res = _state_computation(_state, m.data())
       match _output
       | let o: BasicStep tag =>
         let start_time = Time.millis()
         let output_msg =
-          Message[Out](m.id, m.source_ts, m.last_ingress_ts, consume res)
+          Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), consume res)
         o(output_msg)
         let end_time = Time.millis()
         match _step_reporter
@@ -185,7 +185,7 @@ actor StateStep[In: OSCEncodable val, Out: OSCEncodable val,
       end
     end
 
-actor ExternalConnection[In: OSCEncodable val] is ComputeStep[In]
+actor ExternalConnection[In: Any val] is ComputeStep[In]
   let _stringify: {(In): String ?} val
   let _conn: TCPConnection
   let _metrics_collector: MetricsCollector tag
@@ -200,11 +200,11 @@ actor ExternalConnection[In: OSCEncodable val] is ComputeStep[In]
     match input
     | let m: Message[In] val =>
       try
-        let str = _stringify(m.data)
+        let str = _stringify(m.data())
         @printf[String]((">>>>" + str + "<<<<\n").cstring())
-        let tcp_msg = WireMsgEncoder.external(str)
+        let tcp_msg = ExternalMsgEncoder.data(str)
         _conn.write(tcp_msg)
         _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
-          m.id, m.source_ts, Time.millis())
+          m.id(), m.source_ts(), Time.millis())
       end
     end

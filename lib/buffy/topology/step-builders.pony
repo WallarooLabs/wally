@@ -7,13 +7,13 @@ use "time"
 interface TagBuilder
   fun apply(): Any tag
 
-trait OutputStepBuilder[Out: OSCEncodable val]
+trait OutputStepBuilder[Out: Any val]
 
-trait ThroughStepBuilder[In: OSCEncodable val, Out: OSCEncodable val]
+trait ThroughStepBuilder[In: Any val, Out: Any val]
   is OutputStepBuilder[Out]
   fun apply(): ThroughStep[In, Out] tag
 
-class SourceBuilder[Out: OSCEncodable val]
+class SourceBuilder[Out: Any val]
   is ThroughStepBuilder[String, Out]
   let _parser: Parser[Out] val
 
@@ -23,7 +23,7 @@ class SourceBuilder[Out: OSCEncodable val]
   fun apply(): ThroughStep[String, Out] tag =>
     Source[Out](_parser)
 
-class StepBuilder[In: OSCEncodable val, Out: OSCEncodable val]
+class StepBuilder[In: Any val, Out: Any val]
   is ThroughStepBuilder[In, Out]
   let _computation_builder: ComputationBuilder[In, Out] val
 
@@ -33,7 +33,7 @@ class StepBuilder[In: OSCEncodable val, Out: OSCEncodable val]
   fun apply(): ThroughStep[In, Out] tag =>
     Step[In, Out](_computation_builder())
 
-class PartitionBuilder[In: OSCEncodable val, Out: OSCEncodable val]
+class PartitionBuilder[In: Any val, Out: Any val]
   is ThroughStepBuilder[In, Out]
   let _step_builder: StepBuilder[In, Out] val
   let _partition_function: PartitionFunction[In] val
@@ -45,7 +45,7 @@ class PartitionBuilder[In: OSCEncodable val, Out: OSCEncodable val]
   fun apply(): ThroughStep[In, Out] tag =>
     Partition[In, Out](_step_builder, _partition_function)
 
-class StateStepBuilder[In: OSCEncodable val, Out: OSCEncodable val, State: Any #read]
+class StateStepBuilder[In: Any val, Out: Any val, State: Any #read]
   is ThroughStepBuilder[In, Out]
   let _state_computation_builder: StateComputationBuilder[In, Out, State] val
   let _state_initializer: {(): State} val
@@ -58,7 +58,7 @@ class StateStepBuilder[In: OSCEncodable val, Out: OSCEncodable val, State: Any #
   fun apply(): ThroughStep[In, Out] tag =>
     StateStep[In, Out, State](_state_initializer, _state_computation_builder())
 
-class ExternalConnectionBuilder[In: OSCEncodable val]
+class ExternalConnectionBuilder[In: Any val]
   let _stringify: Stringify[In] val
 
   new val create(stringify: Stringify[In] val) =>

@@ -8,15 +8,18 @@ use "time"
 
 actor Proxy is BasicStep
   let _env: Env
+  let _auth: AmbientAuth
   let _node_name: String
-  let _step_id: I32
+  let _step_id: U64
   let _target_node_name: String
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector tag
 
-  new create(env: Env, node_name: String, step_id: I32, target_node_name: String,
-    coordinator: Coordinator, metrics_collector: MetricsCollector tag) =>
+  new create(env: Env, auth: AmbientAuth, node_name: String, step_id: U64,
+    target_node_name: String, coordinator: Coordinator,
+    metrics_collector: MetricsCollector tag) =>
     _env = env
+    _auth = auth
     _node_name = node_name
     _step_id = step_id
     _target_node_name = target_node_name
@@ -26,49 +29,41 @@ actor Proxy is BasicStep
   // input will be a Message[In] once the typearg issue is fixed
   // ponyc #723
   be apply(input: StepMessage val) =>
-    match input
-    | let m: Message[I32] val =>
-      let tcp_msg = WireMsgEncoder.forward_i32(_step_id, _node_name, m)
-      _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
-        m.id, m.last_ingress_ts, Time.millis())
+    try
+      let tcp_msg: Array[U8] val = WireMsgEncoder.forward(_step_id, _node_name,
+        input, _auth)
       _coordinator.send_data_message(_target_node_name, tcp_msg)
-    | let m: Message[F32] val =>
-      let tcp_msg = WireMsgEncoder.forward_f32(_step_id, _node_name, m)
       _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
-        m.id, m.last_ingress_ts, Time.millis())
-      _coordinator.send_data_message(_target_node_name, tcp_msg)
-    | let m: Message[String] val =>
-      let tcp_msg = WireMsgEncoder.forward_string(_step_id, _node_name, m)
-      _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
-        m.id, m.last_ingress_ts, Time.millis())
-      _coordinator.send_data_message(_target_node_name, tcp_msg)
+        input.id(), input.last_ingress_ts(), Time.millis())
     end
 
 actor StepManager
   let _env: Env
+  let _auth: AmbientAuth
   let _node_name: String
   let _metrics_collector: MetricsCollector tag
-  let _steps: Map[I32, BasicStep tag] = Map[I32, BasicStep tag]
-  let _sink_addrs: Map[I32, (String, String)] val
+  let _steps: Map[U64, BasicStep tag] = Map[U64, BasicStep tag]
+  let _sink_addrs: Map[U64, (String, String)] val
   let _step_lookup: StepLookup val
 
-  new create(env: Env, node_name: String, step_lookup: StepLookup val,
-    sink_addrs: Map[I32, (String, String)] val,
+  new create(env: Env, auth: AmbientAuth, node_name: String,
+    step_lookup: StepLookup val, sink_addrs: Map[U64, (String, String)] val,
     metrics_collector: MetricsCollector tag) =>
     _env = env
+    _auth = auth
     _node_name = node_name
     _sink_addrs = sink_addrs
     _step_lookup = step_lookup
     _metrics_collector = metrics_collector
 
-  be apply(step_id: I32, msg: StepMessage val) =>
+  be apply(step_id: U64, msg: StepMessage val) =>
     try
       _steps(step_id)(msg)
     else
       _env.out.print("StepManager: Could not forward message")
     end
 
-  be add_step(step_id: I32, computation_type: String) =>
+  be add_step(step_id: U64, computation_type: String) =>
     try
       let step = _step_lookup(computation_type)
       step.add_step_reporter(StepReporter(step_id, _metrics_collector))
@@ -77,13 +72,13 @@ actor StepManager
       _env.out.print("StepManager: Could not add step.")
     end
 
-  be add_proxy(proxy_step_id: I32, target_step_id: I32,
+  be add_proxy(proxy_step_id: U64, target_step_id: U64,
     target_node_name: String, coordinator: Coordinator) =>
-    let p = Proxy(_env, _node_name, target_step_id, target_node_name, coordinator,
-      _metrics_collector)
+    let p = Proxy(_env, _auth, _node_name, target_step_id, target_node_name,
+      coordinator, _metrics_collector)
     _steps(proxy_step_id) = p
 
-  be add_sink(sink_id: I32, sink_step_id: I32, auth: AmbientAuth) =>
+  be add_sink(sink_id: U64, sink_step_id: U64, auth: AmbientAuth) =>
     try
       let sink_addr = _sink_addrs(sink_id)
       let sink_host = sink_addr._1
@@ -95,7 +90,7 @@ actor StepManager
       _env.out.print("StepManager: Could not add sink.")
     end
 
-  be connect_steps(in_id: I32, out_id: I32) =>
+  be connect_steps(in_id: U64, out_id: U64) =>
     try
       let input_step = _steps(in_id)
       let output_step = _steps(out_id)

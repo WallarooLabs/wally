@@ -60,7 +60,7 @@ actor Coordinator
       _control_connections("leader") = control_conn
 
       let data_notifier: TCPConnectionNotify iso =
-        SpikeWrapper(IntraclusterDataSenderConnectNotify(_env, _node_name,
+        SpikeWrapper(IntraclusterDataSenderConnectNotify(_env, _auth, _node_name,
           "leader", this), _spike_config)
       let data_conn: TCPConnection =
         TCPConnection(_auth, consume data_notifier, _leader_data_host,
@@ -74,26 +74,28 @@ actor Coordinator
   // INITIALIZE
   //////////////
   be initialize_topology_connections() =>
-    let confirm_msg = WireMsgEncoder.finished_connections(_node_name)
-    for (connector, conn) in _control_connections.pairs() do
-      for (target, addr) in _control_addrs.pairs() do
-        if connector != target then
-          let msg = WireMsgEncoder.identify_control(target, addr._1, addr._2)
-          conn.write(msg)
+    try
+      let confirm_msg = WireMsgEncoder.finished_connections(_node_name, _auth)
+      for (connector, conn) in _control_connections.pairs() do
+        for (target, addr) in _control_addrs.pairs() do
+          if connector != target then
+            let msg = WireMsgEncoder.identify_control(target, addr._1, addr._2, _auth)
+            conn.write(msg)
+          end
         end
-      end
-      for (target, addr) in _data_addrs.pairs() do
-        if connector != target then
-          let msg = WireMsgEncoder.identify_data(target, addr._1, addr._2)
-          conn.write(msg)
+        for (target, addr) in _data_addrs.pairs() do
+          if connector != target then
+            let msg = WireMsgEncoder.identify_data(target, addr._1, addr._2, _auth)
+            conn.write(msg)
+          end
         end
+        conn.write(confirm_msg)
       end
-      conn.write(confirm_msg)
     end
 
   be identify_data_channel(host: String, service: String) =>
     try
-      let message = WireMsgEncoder.identify_data(_node_name, host, service)
+      let message = WireMsgEncoder.identify_data(_node_name, host, service, _auth)
       _control_connections("leader").write(message)
     else
       _env.out.print("Coordinator: control connection to leader was not set up")
@@ -101,7 +103,7 @@ actor Coordinator
 
   be identify_control_channel(host: String, service: String) =>
     try
-      let message = WireMsgEncoder.identify_control(_node_name, host, service)
+      let message = WireMsgEncoder.identify_control(_node_name, host, service, _auth)
       _control_connections("leader").write(message)
     else
       _env.out.print("Coordinator: control connection to leader was not set up")
@@ -109,13 +111,17 @@ actor Coordinator
 
   be ack_finished_connections(target_name: String) =>
     _env.out.print("Acking connections finished!")
-    let ack_msg = WireMsgEncoder.ack_finished_connections(_node_name)
-    try _control_connections(target_name).write(ack_msg) end
+    try
+      let ack_msg = WireMsgEncoder.ack_finished_connections(_node_name, _auth)
+      _control_connections(target_name).write(ack_msg)
+    end
 
   be ack_initialization_msgs_finished(target_name: String) =>
     _env.out.print("Acking initialization messages finished!")
-    let ack_msg = WireMsgEncoder.ack_initialized(_node_name)
-    try _control_connections(target_name).write(ack_msg) end
+    try
+      let ack_msg = WireMsgEncoder.ack_initialized(_node_name, _auth)
+      _control_connections(target_name).write(ack_msg)
+    end
 
 
   ////////////
@@ -124,16 +130,16 @@ actor Coordinator
   be add_topology_manager(tm: TopologyManager) =>
     _topology_manager = tm
 
-  be add_step(step_id: I32, comp_type: String) =>
+  be add_step(step_id: U64, comp_type: String) =>
     _step_manager.add_step(step_id, comp_type)
 
-  be add_proxy(p_step_id: I32, p_target_id: I32, target_node_name: String) =>
+  be add_proxy(p_step_id: U64, p_target_id: U64, target_node_name: String) =>
     _step_manager.add_proxy(p_step_id, p_target_id, target_node_name, this)
 
-  be add_sink(sink_id: I32, step_id: I32, auth: AmbientAuth) =>
+  be add_sink(sink_id: U64, step_id: U64, auth: AmbientAuth) =>
     _step_manager.add_sink(sink_id, step_id, auth)
 
-  be connect_steps(step_id: I32, target_id: I32) =>
+  be connect_steps(step_id: U64, target_id: U64) =>
     _step_manager.connect_steps(step_id, target_id)
 
 
@@ -176,7 +182,7 @@ actor Coordinator
     target_service: String) =>
     _data_addrs(target_name) = (target_host, target_service)
     let notifier: TCPConnectionNotify iso =
-      IntraclusterDataSenderConnectNotify(_env, _node_name, target_name, this)
+      IntraclusterDataSenderConnectNotify(_env, _auth, _node_name, target_name, this)
     let conn: TCPConnection =
       TCPConnection(_auth, consume notifier, target_host,
         target_service)
@@ -208,7 +214,7 @@ actor Coordinator
       _env.out.print("Coordinator: no data conn for " + target_name)
     end
 
-  be deliver(step_id: I32, from_name: String, msg: StepMessage val) =>
+  be deliver(step_id: U64, from_name: String, msg: StepMessage val) =>
     try _data_connection_receivers(from_name).received() end
     _step_manager(step_id, msg)
 
@@ -221,14 +227,14 @@ actor Coordinator
   be enable_sending(target_name: String) =>
     try _data_connection_senders(target_name).enable_sending() end
 
-  be ack_msg_count(sender_name: String, seen_since_last_ack: USize) =>
+  be ack_msg_count(sender_name: String, seen_since_last_ack: U64) =>
     try
-      let message = WireMsgEncoder.ack_messages_received(_node_name, seen_since_last_ack.i32())
+      let message = WireMsgEncoder.ack_messages_received(_node_name, seen_since_last_ack, _auth)
       _control_connections(sender_name).write(message)
     end
 
-  be process_data_ack(receiver_name: String, msg_count: I32) =>
-    try _data_connection_senders(receiver_name).ack(msg_count.usize()) end
+  be process_data_ack(receiver_name: String, msg_count: U64) =>
+    try _data_connection_senders(receiver_name).ack(msg_count) end
 
 
   /////////////
@@ -240,12 +246,12 @@ actor Coordinator
       (let target_host: String, let target_service: String) =
         _data_addrs(target_name)
       let notifier: TCPConnectionNotify iso =
-        IntraclusterDataSenderConnectNotify(_env, _node_name, target_name, this)
+        IntraclusterDataSenderConnectNotify(_env, _auth, _node_name, target_name, this)
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, target_host,
           target_service)
       _data_connection_senders(target_name).reconnect(conn)
-      let reconnect_message = WireMsgEncoder.reconnect_data(_node_name)
+      let reconnect_message = WireMsgEncoder.reconnect_data(_node_name, _auth)
       try _control_connections(target_name).write(reconnect_message) end
     else
       _env.err.print("Coordinator: couldn't reconnect to " + target_name)
@@ -259,15 +265,16 @@ actor Coordinator
       _env.out.print("Can't negotiate since there's no DataReceiver!")
     end
 
-  be ack_reconnect_msg_count(sender_name: String, seen_since_last_ack: USize) =>
+  be ack_reconnect_msg_count(sender_name: String, seen_since_last_ack: U64) =>
     try
-      let message = WireMsgEncoder.ack_reconnect_messages_received(_node_name, seen_since_last_ack.i32())
+      let message = WireMsgEncoder.ack_reconnect_messages_received(_node_name,
+        seen_since_last_ack, _auth)
       _control_connections(sender_name).write(message)
     end
 
-  be process_data_reconnect_ack(receiver_name: String, seen_since_last_ack: I32) =>
+  be process_data_reconnect_ack(receiver_name: String, seen_since_last_ack: U64) =>
     try
-      _data_connection_senders(receiver_name).ack_reconnect(seen_since_last_ack.usize())
+      _data_connection_senders(receiver_name).ack_reconnect(seen_since_last_ack)
     end
 
 
@@ -275,16 +282,17 @@ actor Coordinator
   ////////////
   // SHUTDOWN
   ////////////
-    be shutdown() =>
-      match _topology_manager
-      | let t: TopologyManager =>
-        t.shutdown()
-      else
-        finish_shutdown()
-      end
+  be shutdown() =>
+    match _topology_manager
+    | let t: TopologyManager =>
+      t.shutdown()
+    else
+      finish_shutdown()
+    end
 
-    be finish_shutdown() =>
-      let shutdown_msg = WireMsgEncoder.shutdown(_node_name)
+  be finish_shutdown() =>
+    try
+      let shutdown_msg = WireMsgEncoder.shutdown(_node_name, _auth)
 
       for listener in _listeners.values() do
         listener.dispose()
@@ -304,6 +312,9 @@ actor Coordinator
 
       match _phone_home_connection
       | let phc: TCPConnection =>
-        phc.write(WireMsgEncoder.done_shutdown(_node_name))
+        phc.write(WireMsgEncoder.done_shutdown(_node_name, _auth))
         phc.dispose()
       end
+    else
+      _env.out.print("Coordinator: problem shutting down!")
+    end

@@ -18,12 +18,12 @@ actor DataSender
       _conn.write(msg_data)
     end
 
-  be ack(msg_count: USize) =>
-    for i in Range(0, msg_count) do
+  be ack(msg_count: U64) =>
+    for i in Range(0, msg_count.usize()) do
       try _held.dequeue() end
     end
 
-  be ack_reconnect(msg_count: USize) =>
+  be ack_reconnect(msg_count: U64) =>
     ack(msg_count)
 
     if not _sending then

@@ -33,7 +33,7 @@ class LeaderControlNotifier is TCPListenNotify
       (_host, _service) = listen.local_address().name()
       _env.out.print(_name + ": listening on " + _host + ":" + _service)
 
-      let message = WireMsgEncoder.ready(_name)
+      let message = WireMsgEncoder.ready(_name, _auth)
       _coordinator.send_phone_home_message(message)
     else
       _env.out.print(_name + ": couldn't get local address")
@@ -73,7 +73,13 @@ class LeaderConnectNotify is TCPConnectionNotify
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
       try
-        let msg = WireMsgDecoder(consume chunked)
+        let external_msg = ExternalMsgDecoder(chunked)
+        match external_msg
+        | let m: ExternalShutdownMsg val =>
+          _topology_manager.shutdown()
+        end
+      else
+        let msg = WireMsgDecoder(chunked, _auth)
         match msg
         | let m: ReconnectDataMsg val =>
           _coordinator.negotiate_data_reconnection(m.node_name)
@@ -102,9 +108,9 @@ class LeaderConnectNotify is TCPConnectionNotify
           _topology_manager.shutdown()
         | let m: UnknownMsg val =>
           _env.err.print("Unknown control message type.")
+        else
+          _env.err.print("Error decoding incoming control message.")
         end
-      else
-        _env.err.print("Error decoding incoming control message.")
       end
     end
 

@@ -75,7 +75,13 @@ class WorkerConnectNotify is TCPConnectionNotify
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
       try
-        let msg = WireMsgDecoder(consume chunked)
+        let external_msg = ExternalMsgDecoder(chunked)
+        match external_msg
+        | let m: ExternalShutdownMsg val =>
+          _coordinator.shutdown()
+        end
+      else
+        let msg = WireMsgDecoder(consume chunked, _auth)
         match msg
         | let m: ReconnectDataMsg val =>
           _coordinator.negotiate_data_reconnection(m.node_name)
@@ -106,9 +112,9 @@ class WorkerConnectNotify is TCPConnectionNotify
           _coordinator.shutdown()
         | let m: UnknownMsg val =>
           _env.err.print("Unknown message type.")
+        else
+          _env.err.print("Error decoding incoming message.")
         end
-      else
-        _env.err.print("Error decoding incoming message.")
       end
     end
 

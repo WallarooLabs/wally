@@ -85,12 +85,12 @@ actor TopologyManager
       end
     end
 
-  fun ref next_guid(dice: Dice): I32 =>
-    dice(1, I32.max_value().u64()).i32()
+  fun ref next_guid(dice: Dice): U64 =>
+    dice(1, U64.max_value().u64()).u64()
 
   // Currently assigns steps in pipeline using round robin among nodes
   fun ref _initialize_topology() =>
-    let repeated_steps = Map[I32, I32] // map from pipeline id to step id
+    let repeated_steps = Map[U64, U64] // map from pipeline id to step id
     let seed: U64 = 323437823
     let dice = Dice(MT(seed))
     try
@@ -101,11 +101,11 @@ actor TopologyManager
         nodes.push(key)
       end
 
-      var cur_source_id: I32 = 0
-      var cur_sink_id: I32 = 0
-      var step_id: I32 = cur_source_id
-      var proxy_step_id: I32 = next_guid(dice)
-      var proxy_step_target_id: I32 = next_guid(dice)
+      var cur_source_id: U64 = 0
+      var cur_sink_id: U64 = 0
+      var step_id: U64 = cur_source_id
+      var proxy_step_id: U64 = next_guid(dice)
+      var proxy_step_target_id: U64 = next_guid(dice)
 
       for pipeline in _topology.pipelines.values() do
         var count: USize = 0
@@ -155,13 +155,12 @@ actor TopologyManager
             _coordinator.connect_steps(step_id, proxy_step_id)
           else
             let create_step_msg =
-              WireMsgEncoder.spin_up(step_id, pipeline_step.computation_type())
+              WireMsgEncoder.spin_up(step_id, pipeline_step.computation_type(), _auth)
             let create_proxy_msg =
               WireMsgEncoder.spin_up_proxy(proxy_step_id, proxy_step_target_id,
-                next_node, next_node_control_addr._1, next_node_control_addr._2,
-                next_node_data_addr._1, next_node_data_addr._2)
+                next_node, _auth)
             let connect_msg =
-              WireMsgEncoder.connect_steps(step_id, proxy_step_id)
+              WireMsgEncoder.connect_steps(step_id, proxy_step_id, _auth)
 
             _coordinator.send_control_message(cur_node, create_step_msg)
             _coordinator.send_control_message(cur_node, create_proxy_msg)
@@ -181,7 +180,7 @@ actor TopologyManager
           _coordinator.add_sink(cur_sink_id, step_id, _auth)
         else
           let create_sink_msg =
-            WireMsgEncoder.spin_up_sink(cur_sink_id, step_id)
+            WireMsgEncoder.spin_up_sink(cur_sink_id, step_id, _auth)
             _coordinator.send_control_message(sink_node, create_sink_msg)
         end
 
@@ -191,7 +190,7 @@ actor TopologyManager
       end
 
       let finished_msg =
-        WireMsgEncoder.initialization_msgs_finished(_name)
+        WireMsgEncoder.initialization_msgs_finished(_name, _auth)
       // Send finished_msg to all workers
       for i in Range(1, nodes.size()) do
         let node = nodes(i)
@@ -209,8 +208,10 @@ actor TopologyManager
 
   fun _complete_initialization() =>
     _env.out.print("_--- Topology successfully initialized ---_")
-    let message = WireMsgEncoder.topology_ready(_name)
-    _coordinator.send_phone_home_message(message)
+    try
+      let message = WireMsgEncoder.topology_ready(_name, _auth)
+      _coordinator.send_phone_home_message(message)
+    end
 
   be shutdown() =>
     _coordinator.finish_shutdown()

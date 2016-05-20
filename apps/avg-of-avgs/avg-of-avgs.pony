@@ -10,11 +10,11 @@ actor Main
     try
       let topology: Topology val = recover val
         Topology
-          .new_pipeline[I32, I32](P, S)
-          .and_then[I32]("double", lambda(): Computation[I32, I32] iso^ => Double end)
-          .and_then[I32]("halve", lambda(): Computation[I32, I32] iso^ => Halve end)
-          .and_then[I32]("average", lambda(): Computation[I32, I32] iso^ => Average end)
-          .and_then[I32]("average", lambda(): Computation[I32, I32] iso^ => Average end)
+          .new_pipeline[U64, U64](P, S)
+          .and_then[U64]("double", lambda(): Computation[U64, U64] iso^ => Double end)
+          .and_then[U64]("halve", lambda(): Computation[U64, U64] iso^ => Halve end)
+          .and_then[U64]("average", lambda(): Computation[U64, U64] iso^ => Average end)
+          .and_then[U64]("average", lambda(): Computation[U64, U64] iso^ => Average end)
           .build()
       end
       Startup(env, topology, SL, 1)
@@ -25,44 +25,45 @@ actor Main
 primitive SL is StepLookup
   fun val apply(computation_type: String): BasicStep tag ? =>
     match computation_type
-    | "source" => Source[I32](P)
-    | "double" => Step[I32, I32](Double)
-    | "halve" => Step[I32, I32](Halve)
-    | "average" => Step[I32, I32](Average)
+    | "source" => Source[U64](P)
+    | "double" => Step[U64, U64](Double)
+    | "halve" => Step[U64, U64](Halve)
+    | "average" => Step[U64, U64](Average)
     else
       error
     end
 
-  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector): BasicStep tag =>
-    ExternalConnection[I32](S, conn, metrics_collector)
+  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector)
+    : BasicStep tag =>
+    ExternalConnection[U64](S, conn, metrics_collector)
 
-class Double is Computation[I32, I32]
-  fun apply(d: I32): I32 =>
+class Double is Computation[U64, U64]
+  fun apply(d: U64): U64 =>
     d * 2
 
-class Halve is Computation[I32, I32]
-  fun apply(d: I32): I32 =>
+class Halve is Computation[U64, U64]
+  fun apply(d: U64): U64 =>
     d / 2
 
-class Average is Computation[I32, I32]
+class Average is Computation[U64, U64]
   let state: Averager = Averager
 
-  fun ref apply(d: I32): I32 =>
+  fun ref apply(d: U64): U64 =>
     state(d)
 
 class Averager
-  var count: I32 = 0
-  var total: I32 = 0
+  var count: U64 = 0
+  var total: U64 = 0
 
-  fun ref apply(value: I32): I32 =>
+  fun ref apply(value: U64): U64 =>
     count = count + 1
     total = total + value
     total / count
 
 class P
-  fun apply(s: String): I32 ? =>
-    s.i32()
+  fun apply(s: String): U64 ? =>
+    s.u64()
 
 class S
-  fun apply(input: I32): String =>
+  fun apply(input: U64): String =>
     input.string()

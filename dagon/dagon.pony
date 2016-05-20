@@ -121,18 +121,18 @@ class ConnectNotify is TCPConnectionNotify
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
       try
-        let decoded = WireMsgDecoder(consume chunked)
+        let decoded = ExternalMsgDecoder(consume chunked)
         match decoded
-        | let m: ReadyMsg val =>
+        | let m: ExternalReadyMsg val =>
           _env.out.print("dagon: " + m.node_name + ": Ready")
           _p_mgr.received_ready(conn, m.node_name)
-        | let m: TopologyReadyMsg val =>
+        | let m: ExternalTopologyReadyMsg val =>
           _env.out.print("dagon: " + m.node_name + ": TopologyReady")
           _p_mgr.received_topology_ready(conn, m.node_name)          
-        | let m: DoneMsg val =>
+        | let m: ExternalDoneMsg val =>
           _env.out.print("dagon: " + m.node_name + ": Done")
           _p_mgr.received_done(conn, m.node_name)          
-        | let m: DoneShutdownMsg val =>
+        | let m: ExternalDoneShutdownMsg val =>
           _env.out.print("dagon: " + m.node_name + ": DoneShutdown")
           _p_mgr.received_done_shutdown(conn, m.node_name)
         else
@@ -423,7 +423,7 @@ actor ProcessManager
       let child = roster(node_name)
       if child.conn isnt None then
         let c = child.conn as TCPConnection
-        let message = WireMsgEncoder.shutdown(node_name)
+        let message = ExternalMsgEncoder.shutdown(node_name)
         c.write(message)
       else
         _env.out.print("dagon: don't have a connection to send shutdown "
@@ -547,7 +547,7 @@ actor ProcessManager
     _env.out.print("dagon: sending start to child: " + node_name)
     try
       let c = conn as TCPConnection
-      let message = WireMsgEncoder.start()
+      let message = ExternalMsgEncoder.start()
       c.write(message)
     else
       _env.out.print("dagon: Failed sending start")

@@ -6,8 +6,9 @@ use "buffy/metrics"
 class Topology
   let pipelines: Array[PipelineSteps] = Array[PipelineSteps]
 
-  fun ref new_pipeline[In: OSCEncodable val, Out: OSCEncodable val]
-    (parser: Parser[In] val, stringify: Stringify[Out] val): PipelineBuilder[In, Out, In] =>
+  fun ref new_pipeline[In: Any val, Out: Any val] (parser: Parser[In] val,
+    stringify: Stringify[Out] val)
+    : PipelineBuilder[In, Out, In] =>
     let pipeline = Pipeline[In, Out](parser, stringify)
     PipelineBuilder[In, Out, In](this, pipeline)
 
@@ -16,14 +17,15 @@ class Topology
 
 interface StepLookup
   fun val apply(computation_type: String): BasicStep tag ?
-  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector): BasicStep tag
+  fun sink(conn: TCPConnection, metrics_collector: MetricsCollector)
+    : BasicStep tag
 
 trait PipelineSteps
   fun sink(conn: TCPConnection, metrics_collector: MetricsCollector): Any tag
   fun apply(i: USize): PipelineStep box ?
   fun size(): USize
 
-class Pipeline[In: OSCEncodable val, Out: OSCEncodable val] is PipelineSteps
+class Pipeline[In: Any val, Out: Any val] is PipelineSteps
   let _steps: Array[PipelineStep]
   let sink_builder: ExternalConnectionBuilder[Out] val
 
@@ -45,24 +47,24 @@ class Pipeline[In: OSCEncodable val, Out: OSCEncodable val] is PipelineSteps
 
 trait PipelineStep
   fun computation_type(): String
-  fun id(): I32
+  fun id(): U64
 
-class PipelineThroughStep[In: OSCEncodable, Out: OSCEncodable] is PipelineStep
+class PipelineThroughStep[In: Any val, Out: Any val] is PipelineStep
   let _computation_type: String
-  let _id: I32
+  let _id: U64
   let _step_builder: ThroughStepBuilder[In, Out] val
 
   new create(c_type: String, s_builder: ThroughStepBuilder[In, Out] val,
-    pipeline_id: I32 = 0) =>
+    pipeline_id: U64 = 0) =>
     _computation_type = c_type
     _step_builder = s_builder
     _id = pipeline_id
 
   fun computation_type(): String => _computation_type
 
-  fun id(): I32 => _id
+  fun id(): U64 => _id
 
-class PipelineBuilder[In: OSCEncodable val, Out: OSCEncodable val, Last: OSCEncodable val]
+class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   let _t: Topology
   let _p: Pipeline[In, Out]
 
@@ -70,26 +72,26 @@ class PipelineBuilder[In: OSCEncodable val, Out: OSCEncodable val, Last: OSCEnco
     _t = t
     _p = p
 
-  fun ref and_then[Next: OSCEncodable val](comp_type: String,
-    comp_builder: ComputationBuilder[Last, Next] val, id: I32 = 0)
+  fun ref and_then[Next: Any val](comp_type: String,
+    comp_builder: ComputationBuilder[Last, Next] val, id: U64 = 0)
       : PipelineBuilder[In, Out, Next] =>
     let next_builder = StepBuilder[Last, Next](comp_builder)
     let next_step = PipelineThroughStep[Last, Next](comp_type, next_builder, id)
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-  fun ref and_then_partition[Next: OSCEncodable](comp_type: String,
+  fun ref and_then_partition[Next: Any val](comp_type: String,
     comp_builder: ComputationBuilder[Last, Next] val,
-    p_fun: PartitionFunction[Last] val, id: I32 = 0)
+    p_fun: PartitionFunction[Last] val, id: U64 = 0)
       : PipelineBuilder[In, Out, Next] =>
     let next_builder = PartitionBuilder[Last, Next](comp_builder, p_fun)
     let next_step = PipelineThroughStep[Last, Next](comp_type, next_builder, id)
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-  fun ref and_then_stateful[Next: OSCEncodable, State: Any #read](comp_type: String,
+  fun ref and_then_stateful[Next: Any val, State: Any #read](comp_type: String,
     comp_builder: StateComputationBuilder[Last, Next, State] val,
-    state_initializer: {(): State} val, id: I32 = 0)
+    state_initializer: {(): State} val, id: U64 = 0)
       : PipelineBuilder[In, Out, Next] =>
     let next_builder = StateStepBuilder[Last, Next, State](comp_builder,
       state_initializer)

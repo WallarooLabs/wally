@@ -3,8 +3,8 @@ use "net"
 use "buffy/messages"
 use "sendence/bytes"
 
-type _StepType is U32
-type _StepId is U32
+type _StepType is U64
+type _StepId is U64
 
 actor MetricsCollector
   let _env: Env
@@ -21,8 +21,7 @@ actor MetricsCollector
 	  _node_name = node_name
 	  _conn = conn
 
-	be report_step_metrics(s_id: I32, start_time: U64, end_time: U64) =>
-	  let step_id = s_id.u32()
+	be report_step_metrics(step_id: U64, start_time: U64, end_time: U64) =>
 	  try
 	    _step_reports(step_id).push(StepMetricsReport(start_time, end_time))
 	    _step_count = _step_count + 1
@@ -42,7 +41,7 @@ actor MetricsCollector
 	    _step_count = 0
 	  end
 
-	be report_boundary_metrics(boundary_type: I32, msg_id: I32, start_time: U64,
+	be report_boundary_metrics(boundary_type: U64, msg_id: U64, start_time: U64,
 		end_time: U64) =>
 		_boundary_reports.push(BoundaryMetricsReport(boundary_type,
 			msg_id, start_time, end_time))
@@ -67,10 +66,10 @@ actor MetricsCollector
 		end
 
 class StepReporter
-	let _step_id: I32
+	let _step_id: U64
 	let _metrics_collector: MetricsCollector
 
-	new val create(s_id: I32, m_coll: MetricsCollector) =>
+	new val create(s_id: U64, m_coll: MetricsCollector) =>
 		_step_id = s_id
 		_metrics_collector = m_coll
 

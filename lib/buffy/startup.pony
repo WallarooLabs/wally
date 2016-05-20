@@ -73,14 +73,14 @@ actor Startup
       let spike_config = SpikeConfig(spike_delay, spike_drop)
       let auth = env.root as AmbientAuth
 
-      let sinks: Map[I32, (String, String)] iso =
-        recover Map[I32, (String, String)] end
+      let sinks: Map[U64, (String, String)] iso =
+        recover Map[U64, (String, String)] end
 
       for i in Range(0, sink_addrs.size()) do
         let sink_addr: Array[String] = sink_addrs(i).split(":")
         let sink_host = sink_addr(0)
         let sink_service = sink_addr(1)
-        sinks(i.i32()) = (sink_host, sink_service)
+        sinks(i.u64()) = (sink_host, sink_service)
       end
 
       let metrics_collector =
@@ -98,7 +98,7 @@ actor Startup
           MetricsCollector(env, node_name)
         end
 
-      let step_manager = StepManager(env, node_name, step_lookup, consume sinks,
+      let step_manager = StepManager(env, auth, node_name, step_lookup, consume sinks,
         metrics_collector)
 
       let coordinator: Coordinator = Coordinator(node_name, env, auth,
@@ -110,7 +110,7 @@ actor Startup
       let phone_home_service = phone_home_addr(1)
 
       let phone_home_conn: TCPConnection = TCPConnection(auth,
-        HomeConnectNotify(env, node_name, coordinator), phone_home_host,
+        HomeConnectNotify(env, auth, node_name, coordinator), phone_home_host,
           phone_home_service)
 
       coordinator.add_phone_home_connection(phone_home_conn)
@@ -134,7 +134,7 @@ actor Startup
           let source_host = source_addr(0)
           let source_service = source_addr(1)
           let source_notifier: TCPListenNotify iso = SourceNotifier(env, auth,
-            source_host, source_service, i.i32(), step_manager, coordinator,
+            source_host, source_service, i.u64(), step_manager, coordinator,
             metrics_collector)
           coordinator.add_listener(TCPListener(auth, consume source_notifier,
             source_host, source_service))
