@@ -17,14 +17,22 @@ This document describes the Buffy API and how to create client apps.
   the last step and passes along the specified type `Next`. An optional `id` allows
   a step to be shared across pipelines.
 
-`and_then_partition[Next: Any val](c: ComputationBuilder[Last, Next] val, p_fun: PartitionFunction[Last] val, id: U64 = 0)`
-  specifies a step that uses the supplied partition function to create partitions.
+`and_then_map[Next: Any val](mc: MapComputationBuilder[Last, Next] val, id: U64 = 0)`
+  same as `and_then`, except for a computation that returns a Seq of values
+  to be processed separately.
 
 `and_then_stateful[Next: Any val, State: Any #read](sc: StateComputationBuilder[Last, Next, State] val, si: {(): State} val, id: U64 = 0)`
   specifies a stateful step using a StateComputation. The supplied state initializer function
   sets the initial state.
 
-`build(): Topology ?`
+`and_then_partition[Next: Any val](c: ComputationBuilder[Last, Next] val, p_fun: PartitionFunction[Last] val, id: U64 = 0)`
+  specifies a step that uses the supplied partition function to create partitions.
+
+`and_then_stateful_partition[Next: Any val, State: Any #read](sc: StateComputationBuilder[Last, Next, State] val, si: {(): State} val, pf: PartitionFunction[Last] val, id: U64 = 0)`
+  same as `and_then_partition`, except you specify a `StateComputationBuilder` and
+  state initializer to enable stateful partitions.
+
+`build(): Topology ?`  
   returns a Topology with the current in progress pipeline set.
 
 To start up a Buffy topology, use `Startup`, passing in `env`, your `Topology`, and the

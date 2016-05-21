@@ -13,11 +13,12 @@ actor Main
           .new_pipeline[String, WordCount val](P, S)
           .and_then_map[WordCount val](
             lambda(): MapComputation[String, WordCount val] iso^ => Split end)
-          .and_then_stateful[WordCount val, WordCountTotals](
+          .and_then_stateful_partition[WordCount val, WordCountTotals](
             lambda(): StateComputation[WordCount val,
                                        WordCount val,
                                        WordCountTotals] iso^ => Count end,
-            lambda(): WordCountTotals => WordCountTotals end)
+            lambda(): WordCountTotals => WordCountTotals end,
+            FirstLetterPartition)
           .build()
       end
       Startup(env, topology, 1)
@@ -58,6 +59,10 @@ class WordCountTotals
       words(value.word) = value.count
       value
     end
+
+class FirstLetterPartition is PartitionFunction[WordCount val]
+  fun apply(wc: WordCount val): U64 =>
+    try wc.word(0).hash() else 0 end
 
 class P
   fun apply(s: String): String =>

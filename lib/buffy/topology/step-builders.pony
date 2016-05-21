@@ -61,6 +61,22 @@ class PartitionBuilder[In: Any val, Out: Any val]
   fun apply(): BasicStep tag =>
     Partition[In, Out](_step_builder, _partition_function)
 
+class StatePartitionBuilder[In: Any val, Out: Any val, State: Any #read]
+  is ThroughStepBuilder[In, Out]
+  let _state_computation_builder: StateComputationBuilder[In, Out, State] val
+  let _state_initializer: {(): State} val
+  let _partition_function: PartitionFunction[In] val
+
+  new val create(scb: StateComputationBuilder[In, Out, State] val,
+    init: {(): State} val, pf: PartitionFunction[In] val) =>
+    _state_computation_builder = scb
+    _state_initializer = init
+    _partition_function = pf
+
+  fun apply(): BasicStep tag =>
+    Partition[In, Out](StateStepBuilder[In, Out, State](_state_computation_builder,
+      _state_initializer), _partition_function)
+
 class StateStepBuilder[In: Any val, Out: Any val, State: Any #read]
   is ThroughStepBuilder[In, Out]
   let _state_computation_builder: StateComputationBuilder[In, Out, State] val

@@ -127,12 +127,12 @@ actor Sink[In: Any val] is ComputeStep[In]
     end
 
 actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
-  let _step_builder: StepBuilder[In, Out] val
+  let _step_builder: BasicStepBuilder val
   let _partition_function: PartitionFunction[In] val
   let _partitions: Map[U64, BasicStep tag] = Map[U64, BasicStep tag]
   var _output: (BasicStep tag | None) = None
 
-  new create(s_builder: StepBuilder[In, Out] val, pf: PartitionFunction[In] val) =>
+  new create(s_builder: BasicStepBuilder val, pf: PartitionFunction[In] val) =>
     _step_builder = s_builder
     _partition_function = pf
 
