@@ -32,7 +32,7 @@ This document describes the Buffy API and how to create client apps.
   same as `and_then_partition`, except you specify a `StateComputationBuilder` and
   state initializer to enable stateful partitions.
 
-`build(): Topology ?`  
+`build(): Topology ?`
   returns a Topology with the current in progress pipeline set.
 
 To start up a Buffy topology, use `Startup`, passing in `env`, your `Topology`, and the
