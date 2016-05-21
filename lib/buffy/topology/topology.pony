@@ -71,6 +71,14 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
+  fun ref and_then_map[Next: Any val](
+    comp_builder: MapComputationBuilder[Last, Next] val, id: U64 = 0)
+      : PipelineBuilder[In, Out, Next] =>
+    let next_builder = MapStepBuilder[Last, Next](comp_builder)
+    let next_step = PipelineThroughStep[Last, Next](next_builder, id)
+    _p.add_step(next_step)
+    PipelineBuilder[In, Out, Next](_t, _p)
+
   fun ref and_then_partition[Next: Any val](
     comp_builder: ComputationBuilder[Last, Next] val,
     p_fun: PartitionFunction[Last] val, id: U64 = 0)

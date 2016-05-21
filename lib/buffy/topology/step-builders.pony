@@ -39,6 +39,16 @@ class StepBuilder[In: Any val, Out: Any val]
   fun apply(): BasicStep tag =>
     Step[In, Out](_computation_builder())
 
+class MapStepBuilder[In: Any val, Out: Any val]
+  is ThroughStepBuilder[In, Out]
+  let _computation_builder: MapComputationBuilder[In, Out] val
+
+  new val create(c: MapComputationBuilder[In, Out] val) =>
+    _computation_builder = c
+
+  fun apply(): BasicStep tag =>
+    MapStep[In, Out](_computation_builder())
+
 class PartitionBuilder[In: Any val, Out: Any val]
   is ThroughStepBuilder[In, Out]
   let _step_builder: StepBuilder[In, Out] val

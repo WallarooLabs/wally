@@ -46,6 +46,39 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
+actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
+  let _f: MapComputation[In, Out]
+  var _output: (BasicStep tag | None) = None
+  var _step_reporter: (StepReporter val | None) = None
+
+  new create(f: MapComputation[In, Out] iso) =>
+    _f = consume f
+
+  be add_step_reporter(sr: StepReporter val) =>
+    _step_reporter = sr
+
+  be add_output(to: BasicStep tag) =>
+    _output = to
+
+  be apply(input: StepMessage val) =>
+    match input
+    | let m: Message[In] val =>
+      match _output
+      | let o: BasicStep tag =>
+        let start_time = Time.millis()
+        for res in _f(m.data()).values() do
+          let output_msg =
+            Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), res)
+          o(output_msg)
+        end
+        let end_time = Time.millis()
+        match _step_reporter
+        | let sr: StepReporter val =>
+          sr.report(start_time, end_time)
+        end
+      end
+    end
+
 actor Source[Out: Any val] is ThroughStep[String, Out]
   var _input_parser: Parser[Out] val
   var _output: (BasicStep tag | None) = None

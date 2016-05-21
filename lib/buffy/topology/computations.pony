@@ -5,6 +5,10 @@ interface Computation[In, Out]
   fun ref apply(input: In): Out
   fun name(): String
 
+interface MapComputation[In, Out]
+  fun ref apply(input: In): Seq[Out]
+  fun name(): String
+
 interface FinalComputation[In]
   fun ref apply(input: In)
 
@@ -18,6 +22,9 @@ interface StateComputation[In,
 
 interface ComputationBuilder[In, Out]
   fun apply(): Computation[In, Out] iso^
+
+interface MapComputationBuilder[In, Out]
+  fun apply(): MapComputation[In, Out] iso^
 
 interface StateComputationBuilder[In, Out,
   State: Any #read]
