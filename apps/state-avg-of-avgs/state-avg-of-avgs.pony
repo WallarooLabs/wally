@@ -11,12 +11,12 @@ actor Main
       let topology: Topology val = recover val
         Topology
           .new_pipeline[U64, U64](P, S)
-          .and_then[U64](lambda(): Computation[U64, U64] iso^ => Double end)
-          .and_then[U64](lambda(): Computation[U64, U64] iso^ => Halve end)
-          .and_then_stateful[U64, Averager](
+          .to[U64](lambda(): Computation[U64, U64] iso^ => Double end)
+          .to[U64](lambda(): Computation[U64, U64] iso^ => Halve end)
+          .to_stateful[U64, Averager](
             lambda(): StateComputation[U64, U64, Averager] iso^ => Average end,
             lambda(): Averager => Averager end)
-          .and_then_stateful[U64, Averager](
+          .to_stateful[U64, Averager](
             lambda(): StateComputation[U64, U64, Averager] iso^ => Average end,
             lambda(): Averager => Averager end)
           .build()

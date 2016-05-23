@@ -11,9 +11,9 @@ actor Main
       let topology: Topology val = recover val
         Topology
           .new_pipeline[U64, U64](P, S)
-          .and_then_partition[U64](
+          .to_partition[U64](
             lambda(): Computation[U64, U64] iso^ => Double end, Mod4Partition)
-          .and_then_partition[U64](
+          .to_partition[U64](
             lambda(): Computation[U64, U64] iso^ => Double end, Mod4Partition)
           .build()
       end

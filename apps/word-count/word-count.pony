@@ -11,9 +11,9 @@ actor Main
       let topology: Topology val = recover val
         Topology
           .new_pipeline[String, WordCount val](P, S)
-          .and_then_map[WordCount val](
+          .to_map[WordCount val](
             lambda(): MapComputation[String, WordCount val] iso^ => Split end)
-          .and_then_stateful_partition[WordCount val, WordCountTotals](
+          .to_stateful_partition[WordCount val, WordCountTotals](
             lambda(): StateComputation[WordCount val,
                                        WordCount val,
                                        WordCountTotals] iso^ => Count end,

@@ -63,7 +63,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _t = t
     _p = p
 
-  fun ref and_then[Next: Any val](
+  fun ref to[Next: Any val](
     comp_builder: ComputationBuilder[Last, Next] val, id: U64 = 0)
       : PipelineBuilder[In, Out, Next] =>
     let next_builder = StepBuilder[Last, Next](comp_builder)
@@ -71,7 +71,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-  fun ref and_then_map[Next: Any val](
+  fun ref to_map[Next: Any val](
     comp_builder: MapComputationBuilder[Last, Next] val, id: U64 = 0)
       : PipelineBuilder[In, Out, Next] =>
     let next_builder = MapStepBuilder[Last, Next](comp_builder)
@@ -79,7 +79,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-  fun ref and_then_partition[Next: Any val](
+  fun ref to_partition[Next: Any val](
     comp_builder: ComputationBuilder[Last, Next] val,
     p_fun: PartitionFunction[Last] val, id: U64 = 0)
       : PipelineBuilder[In, Out, Next] =>
@@ -88,7 +88,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-  fun ref and_then_stateful_partition[Next: Any val, State: Any #read](
+  fun ref to_stateful_partition[Next: Any val, State: Any #read](
     comp_builder: StateComputationBuilder[Last, Next, State] val,
     state_initializer: {(): State} val,
     p_fun: PartitionFunction[Last] val, id: U64 = 0)
@@ -99,7 +99,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-  fun ref and_then_stateful[Next: Any val, State: Any #read](
+  fun ref to_stateful[Next: Any val, State: Any #read](
     comp_builder: StateComputationBuilder[Last, Next, State] val,
     state_initializer: {(): State} val, id: U64 = 0)
       : PipelineBuilder[In, Out, Next] =>

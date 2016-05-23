@@ -11,9 +11,9 @@ actor Main
       let topology: Topology val = recover val
         Topology
           .new_pipeline[U64, U64](P, S)
-          .and_then[U64](lambda(): Computation[U64, U64] iso^ => Identity end)
-          .and_then[U64](lambda(): Computation[U64, U64] iso^ => Identity end)
-          .and_then[U64](lambda(): Computation[U64, U64] iso^ => Identity end)
+          .to[U64](lambda(): Computation[U64, U64] iso^ => Identity end)
+          .to[U64](lambda(): Computation[U64, U64] iso^ => Identity end)
+          .to[U64](lambda(): Computation[U64, U64] iso^ => Identity end)
           .build()
       end
       Startup(env, topology, 1)

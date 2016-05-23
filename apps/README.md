@@ -12,24 +12,24 @@ This document describes the Buffy API and how to create client apps.
   the source step. `Out` is sent to the sink step and then stringified
   via the supplied stringifier.
 
-`and_then[Next: Any val](c: ComputationBuilder[Last, Next] val, id: U64 = 0)`
+`to[Next: Any val](c: ComputationBuilder[Last, Next] val, id: U64 = 0)`
   specifies the next computation in the chain that takes the type emitted by
   the last step and passes along the specified type `Next`. An optional `id` allows
   a step to be shared across pipelines.
 
-`and_then_map[Next: Any val](mc: MapComputationBuilder[Last, Next] val, id: U64 = 0)`
-  same as `and_then`, except for a computation that returns a Seq of values
+`to_map[Next: Any val](mc: MapComputationBuilder[Last, Next] val, id: U64 = 0)`
+  same as `to`, except for a computation that returns a Seq of values
   to be processed separately.
 
-`and_then_stateful[Next: Any val, State: Any #read](sc: StateComputationBuilder[Last, Next, State] val, si: {(): State} val, id: U64 = 0)`
+`to_stateful[Next: Any val, State: Any #read](sc: StateComputationBuilder[Last, Next, State] val, si: {(): State} val, id: U64 = 0)`
   specifies a stateful step using a StateComputation. The supplied state initializer function
   sets the initial state.
 
-`and_then_partition[Next: Any val](c: ComputationBuilder[Last, Next] val, p_fun: PartitionFunction[Last] val, id: U64 = 0)`
+`to_partition[Next: Any val](c: ComputationBuilder[Last, Next] val, p_fun: PartitionFunction[Last] val, id: U64 = 0)`
   specifies a step that uses the supplied partition function to create partitions.
 
-`and_then_stateful_partition[Next: Any val, State: Any #read](sc: StateComputationBuilder[Last, Next, State] val, si: {(): State} val, pf: PartitionFunction[Last] val, id: U64 = 0)`
-  same as `and_then_partition`, except you specify a `StateComputationBuilder` and
+`to_stateful_partition[Next: Any val, State: Any #read](sc: StateComputationBuilder[Last, Next, State] val, si: {(): State} val, pf: PartitionFunction[Last] val, id: U64 = 0)`
+  same as `to_partition`, except you specify a `StateComputationBuilder` and
   state initializer to enable stateful partitions.
 
 `build(): Topology ?`
@@ -75,8 +75,8 @@ try
   let topology: Topology val = recover val
     Topology
       .new_pipeline[U64, U64](P, S)
-      .and_then[U64](lambda(): Computation[U64, U64] iso^ => Double end)
-      .and_then[U64](lambda(): Computation[U64, U64] iso^ => Halve end)
+      .to[U64](lambda(): Computation[U64, U64] iso^ => Double end)
+      .to[U64](lambda(): Computation[U64, U64] iso^ => Halve end)
       .build()
   end
 end
@@ -93,8 +93,8 @@ class Halve is Computation[U64, U64]
 ```
 
 Here we specify two `Computation` classes. We chain a couple of calls to
-`and_then()` together to create a double-divide between the source and
-sink. `and_then()` takes a function that returns a `Computation`. Such a
+`to()` together to create a double-divide between the source and
+sink. `to()` takes a function that returns a `Computation`. Such a
 function implements the `ComputationBuilder` interface.
 
 Here's an example of setting up a partitioning step:
@@ -103,7 +103,7 @@ try
   let topology: Topology val = recover val
     Topology
       .new_pipeline[U64, U64](P, S)
-      .and_then_partition[U64](
+      .to_partition[U64](
         lambda(): Computation[U64, U64] iso^ => Double end, Mod4Partition)
       .build()
   end
@@ -128,7 +128,7 @@ try
   let topology: Topology val = recover val
     Topology
       .new_pipeline[U64, U64](P, S)
-      .and_then_stateful[U64, Averager](
+      .to_stateful[U64, Averager](
         lambda(): StateComputation[U64, U64, Averager] iso^ => Average end,
         lambda(): Averager => Averager end)
       .build()
@@ -170,10 +170,10 @@ actor Main
       let topology: Topology val = recover val
         Topology
           .new_pipeline[U64, U64](P, S)
-          .and_then[U64](lambda(): Computation[U64, U64] iso^ => Double end)
-          .and_then_partition[U64](
+          .to[U64](lambda(): Computation[U64, U64] iso^ => Double end)
+          .to_partition[U64](
             lambda(): Computation[U64, U64] iso^ => Halve end, Mod4Partition)
-          .and_then_stateful[U64, Averager](
+          .to_stateful[U64, Averager](
             lambda(): StateComputation[U64, U64, Averager] iso^ => Average end,
             lambda(): Averager => Averager end)
           .build()
