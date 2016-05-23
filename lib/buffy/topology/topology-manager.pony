@@ -147,7 +147,7 @@ actor TopologyManager
             end
           end
 
-          _env.out.print("Spinning up computation **** on node \'" + cur_node + "\'")
+          _env.out.print("Spinning up computation **** on node '" + cur_node + "'")
 
           if cur_node_idx == 0 then // if cur_node is the leader/source
             _coordinator.add_step(step_id, pipeline_step.step_builder())
