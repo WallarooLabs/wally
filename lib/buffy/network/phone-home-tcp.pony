@@ -20,6 +20,17 @@ class HomeConnectNotify is TCPConnectionNotify
     _env.out.print(_name + ": phone home connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    for chunked in _framer.chunk(consume data).values() do
+      try
+        let external_msg = ExternalMsgDecoder(chunked)
+        match external_msg
+        | let m: ExternalShutdownMsg val =>
+          _coordinator.shutdown()
+        end
+      else
+        _env.err.print("Phone home connection: error decoding phone home message")
+      end
+    end
     _env.out.print("Phone home channel: Received data")
 
   fun ref closed(conn: TCPConnection ref) =>

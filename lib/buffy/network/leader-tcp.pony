@@ -72,45 +72,37 @@ class LeaderConnectNotify is TCPConnectionNotify
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
-      try
-        let external_msg = ExternalMsgDecoder(chunked)
-        match external_msg
-        | let m: ExternalShutdownMsg val =>
-          _topology_manager.shutdown()
-        end
+      let msg = WireMsgDecoder(chunked, _auth)
+      match msg
+      | let m: ReconnectDataMsg val =>
+        _coordinator.negotiate_data_reconnection(m.node_name)
+      | let m: IdentifyControlMsg val =>
+        _topology_manager.assign_control_conn(m.node_name, m.host, m.service)
+      | let m: IdentifyDataMsg val =>
+        _topology_manager.assign_data_conn(m.node_name, m.host, m.service)
+      | let m: AckFinishedConnectionsMsg val =>
+        _topology_manager.ack_finished_connections()
+      | let m: AckInitializedMsg val =>
+        _topology_manager.ack_initialized()
+      | let m: AckMsgsReceivedMsg val =>
+        _coordinator.process_data_ack(m.node_name, m.msg_count)
+      | let m: AckReconnectMsgsReceivedMsg val =>
+        _coordinator.process_data_reconnect_ack(m.node_name, m.msg_count)
+      | let m: SpinUpMsg val =>
+        _coordinator.add_step(m.step_id, m.step_builder)
+      | let m: SpinUpProxyMsg val =>
+        _env.err.print(_name + " is spinning up a proxy!")
+        _coordinator.add_proxy(m.proxy_id, m.step_id, m.target_node_name)
+      | let m: SpinUpSinkMsg val =>
+        _coordinator.add_sink(m.sink_id, m.sink_step_id, m.sink_builder, _auth)
+      | let m: ConnectStepsMsg val =>
+        _coordinator.connect_steps(m.in_step_id, m.out_step_id)
+      | let d: ShutdownMsg val =>
+        _topology_manager.shutdown()
+      | let m: UnknownMsg val =>
+        _env.err.print("Unknown control message type.")
       else
-        let msg = WireMsgDecoder(chunked, _auth)
-        match msg
-        | let m: ReconnectDataMsg val =>
-          _coordinator.negotiate_data_reconnection(m.node_name)
-        | let m: IdentifyControlMsg val =>
-          _topology_manager.assign_control_conn(m.node_name, m.host, m.service)
-        | let m: IdentifyDataMsg val =>
-          _topology_manager.assign_data_conn(m.node_name, m.host, m.service)
-        | let m: AckFinishedConnectionsMsg val =>
-          _topology_manager.ack_finished_connections()
-        | let m: AckInitializedMsg val =>
-          _topology_manager.ack_initialized()
-        | let m: AckMsgsReceivedMsg val =>
-          _coordinator.process_data_ack(m.node_name, m.msg_count)
-        | let m: AckReconnectMsgsReceivedMsg val =>
-          _coordinator.process_data_reconnect_ack(m.node_name, m.msg_count)
-        | let m: SpinUpMsg val =>
-          _coordinator.add_step(m.step_id, m.step_builder)
-        | let m: SpinUpProxyMsg val =>
-          _env.err.print(_name + " is spinning up a proxy!")
-          _coordinator.add_proxy(m.proxy_id, m.step_id, m.target_node_name)
-        | let m: SpinUpSinkMsg val =>
-          _coordinator.add_sink(m.sink_id, m.sink_step_id, m.sink_builder, _auth)
-        | let m: ConnectStepsMsg val =>
-          _coordinator.connect_steps(m.in_step_id, m.out_step_id)
-        | let d: ShutdownMsg val =>
-          _topology_manager.shutdown()
-        | let m: UnknownMsg val =>
-          _env.err.print("Unknown control message type.")
-        else
-          _env.err.print("Error decoding incoming control message.")
-        end
+        _env.err.print("Error decoding incoming control message.")
       end
     end
 
