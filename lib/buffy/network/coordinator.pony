@@ -313,7 +313,7 @@ actor Coordinator
 
       match _phone_home_connection
       | let phc: TCPConnection =>
-        phc.write(WireMsgEncoder.done_shutdown(_node_name, _auth))
+        phc.write(ExternalMsgEncoder.done_shutdown(_node_name))
         phc.dispose()
       end
     else
