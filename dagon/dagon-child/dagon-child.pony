@@ -12,16 +12,21 @@ actor Main
     var args = options.remaining()
     var node_name: String = ""
     var phone_home: String = ""
+    var is_leader: Bool = false
     var phone_home_host: String = ""
     var phone_home_service: String = ""
     options
       .add("name", "n", StringArgument)
       .add("phone_home", "h", StringArgument)
+      .add("leader", "l", None)
 
     for option in options do
       match option
       | ("name", let arg: String) => node_name = arg
       | ("phone_home", let arg: String) => phone_home = arg
+      | ("leader", let arg: None) => is_leader = true
+      else
+        env.out.print("unknown option")
       end
     end
     env.out.print("\t" + node_name + ": name: " + node_name)

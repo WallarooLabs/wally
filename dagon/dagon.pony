@@ -35,9 +35,10 @@ actor Main
     given run the tests.
     TODO: Run tests if list of args is empty.
     """
-    var timeout: I64 = 0
-    var path: String = ""
-    var phone_home: String = ""
+    var required_args_are_present = true
+    var timeout: (I64 | None) = None
+    var path: (String | None) = None
+    var p_arg: (Array[String] | None) = None
     var phone_home_host: String = ""
     var phone_home_service: String = ""
     var service: String = ""
@@ -46,35 +47,59 @@ actor Main
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone_home", "h", StringArgument)
+    for option in options do
+      match option
+      | ("timeout", let arg: I64) => timeout = arg
+      | ("filepath", let arg: String) => path = arg
+      | ("phone_home", let arg: String) => p_arg = arg.split(":")
+      else
+        env.err.print("dagon: unknown argument")
+        env.err.print("dagon: usage: --timeout=<seconds>" +
+        " --filepath=<path> --phone_home=<host:port>")
+      end
+    end
+
     try
-      for option in options do
-        match option
-        | ("timeout", let arg: I64) =>
-          if arg < 0 then
-            env.out.print("dagon: timeout can't be negative")
-            error
-          else
-            timeout = arg
-          end
-        | ("filepath", let arg: String) => path = arg
-        | ("phone_home", let arg: String) => phone_home = arg
+      if timeout is None then
+        env.err.print("dagon: Must supply required '--timeout' argument")
+        required_args_are_present = false
+      elseif (timeout as I64) < 0 then
+        env.err.print("dagon: timeout can't be negative")
+        required_args_are_present = false
       end
-    end
-    env.out.print("dagon: timeout: " + timeout.string())
-    env.out.print("dagon: path: " + path)
-    if phone_home != "" then
-      let ph_addr = phone_home.split(":")
-      try
-        phone_home_host = ph_addr(0)
-        phone_home_service = ph_addr(1)
+    
+      if path is None then
+        env.err.print("dagon error: Must supply required '--filepath' argument")
+        required_args_are_present = false
       end
+
+      if p_arg is None then
+        env.err.print("dagon error: Must supply required '--phone_home' argument")
+        required_args_are_present = false      
+      elseif (p_arg as Array[String]).size() != 2 then
+        env.err.print(
+        "dagon error: '--dagon' argument must be in format: '127.0.0.1:8080")
+        required_args_are_present = false
+      end
+
+      if not required_args_are_present then
+        env.err.print("dagon: error parsing arguments. Bailing out!")
+        return
+      end
+
+      env.out.print("dagon: timeout: " + timeout.string())
+      env.out.print("dagon: path: " + (path as String))
+
+      phone_home_host = (p_arg as Array[String])(0)
+      phone_home_service = (p_arg as Array[String])(1)
+
+      env.out.print("dagon: host: " + phone_home_host)
+      env.out.print("dagon: service: " + phone_home_service)
+      ProcessManager(env, timeout as I64, path as String,
+        phone_home_host, phone_home_service)
+    else
+      env.err.print("dagon: error parsing arguments")
     end
-    env.out.print("dagon: host: " + phone_home_host)
-    env.out.print("dagon: service: " + phone_home_service)
-    ProcessManager(env, timeout, path, phone_home_host, phone_home_service)
-  else
-    env.out.print("dagon: error parsing commandline args")
-  end
 
     
 class Notifier is TCPListenNotify
@@ -258,9 +283,8 @@ actor ProcessManager
   be parse_and_register() =>
     """
     Parse ini file and register components.
-    TODO: Treat sender flag and canary flag the same way.
     """
-    _env.out.print("dagon: parse_and_boot")
+    _env.out.print("dagon: parse_and_register")
     var node_name: String = ""
     var filepath: (FilePath | None) = None
     var is_canary: Bool = false
@@ -269,7 +293,7 @@ actor ProcessManager
       let ini_file = File(FilePath(_env.root as AmbientAuth, _path))
       let sections = IniParse(ini_file.lines())
       for section in sections.keys() do
-        let args: Array[String] iso = recover Array[String](6) end
+        let argsbuilder: Array[String] iso = recover Array[String](6) end
         node_name = ""
         filepath = None
         is_canary = false
@@ -285,7 +309,7 @@ actor ProcessManager
             end
           | "name" =>
             node_name = sections(section)(key)
-            args.push("--" + key + "=" + sections(section)(key))
+            argsbuilder.push("--" + key + "=" + sections(section)(key))
           | "sender" => // fixme
             match sections(section)(key)
             | "true" =>
@@ -293,18 +317,30 @@ actor ProcessManager
             else
               is_canary = false
             end
-          | "leader" => // fixme
-            is_leader = true
-            args.push("-l")  
+            | "leader" => // fixme
+              match sections(section)(key)
+              | "true" =>
+                is_leader = true
+                argsbuilder.push("-l")  
+              else
+                is_leader = false
+              end
           else
-            args.push("--" + key + "=" + sections(section)(key))
+            argsbuilder.push("--" + key + "=" + sections(section)(key))
           end
         end
-        args.push("--phone_home=" + _host + ":" + _service)
+        argsbuilder.push("--phone_home=" + _host + ":" + _service)
+
+        let a: Array[String] val = consume argsbuilder
+
+        // for s in a.values() do
+        //   _env.out.print("dagon: args value: " + s)
+        // end
+        
         let vars: Array[String] iso = recover Array[String](0) end
-        if filepath isnt None then
+        if filepath isnt None then          
           register_node(node_name, is_canary, is_leader,
-            filepath as FilePath, consume args, consume vars)          
+            filepath as FilePath, a, consume vars)          
         else
           _env.out.print("dagon: filepath not valid for: " + node_name)
         end
@@ -425,7 +461,7 @@ actor ProcessManager
         let message = ExternalMsgEncoder.shutdown(node_name)
         c.write(message)
       else
-        _env.out.print("dagon: don't have a connection to send shutdown "
+        _env.out.print("dagon: don't have a connection to send shutdown to "
           + node_name)
       end
     else
