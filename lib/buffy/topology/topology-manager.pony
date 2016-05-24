@@ -40,7 +40,7 @@ actor TopologyManager
     _leader_data_host = leader_data_host
     _leader_data_service = leader_data_service
 
-    if _worker_count == 0 then _complete_initialization() end
+    if _worker_count == 0 then _initialize_topology() end
 
   be assign_control_conn(node_name: String, control_host: String,
     control_service: String) =>
@@ -88,6 +88,13 @@ actor TopologyManager
   fun ref next_guid(dice: Dice): U64 =>
     dice(1, U64.max_value().u64()).u64()
 
+  fun _check_prev(cur: String, prev: (String | None)): Bool =>
+    match prev
+    | let p: String => cur == p
+    else
+      false
+    end
+
   // Currently assigns steps in pipeline using round robin among nodes
   fun ref _initialize_topology() =>
     let repeated_steps = Map[U64, U64] // map from pipeline id to step id
@@ -104,6 +111,8 @@ actor TopologyManager
       var cur_source_id: U64 = 0
       var cur_sink_id: U64 = 0
       var step_id: U64 = cur_source_id
+      var prev_step_id: (U64 | None) = None
+      var prev_node: (String | None) = None
       var proxy_step_id: U64 = next_guid(dice)
       var proxy_step_target_id: U64 = next_guid(dice)
 
@@ -151,8 +160,14 @@ actor TopologyManager
 
           if cur_node_idx == 0 then // if cur_node is the leader/source
             _coordinator.add_step(step_id, pipeline_step.step_builder())
-            _coordinator.add_proxy(proxy_step_id, proxy_step_target_id, next_node)
-            _coordinator.connect_steps(step_id, proxy_step_id)
+            if (prev_step_id isnt None) and _check_prev(cur_node, prev_node) then
+              match prev_step_id
+              | let p_id: U64 => _coordinator.connect_steps(p_id, step_id)
+              end
+            elseif not (cur_node == next_node) then
+              _coordinator.add_proxy(proxy_step_id, proxy_step_target_id, next_node)
+              _coordinator.connect_steps(step_id, proxy_step_id)
+            end
           else
             let create_step_msg =
               WireMsgEncoder.spin_up(step_id, pipeline_step.step_builder(), _auth)
@@ -168,16 +183,24 @@ actor TopologyManager
           end
 
           count = count + 1
+          prev_step_id = step_id
+          prev_node = cur_node
           step_id = proxy_step_target_id
           proxy_step_id = next_guid(dice)
           proxy_step_target_id = next_guid(dice)
         end
+        let cur_node = nodes(count % nodes.size())
         let sink_node_idx = count % nodes.size()
         let sink_node = nodes(sink_node_idx)
         _env.out.print("Spinning up sink on node " + sink_node)
 
         if sink_node_idx == 0 then // if cur_node is the leader
           _coordinator.add_sink(cur_sink_id, step_id, pipeline.sink_builder(), _auth)
+          if _check_prev(cur_node, prev_node) then
+            match prev_step_id
+            | let p_id: U64 => _coordinator.connect_steps(p_id, step_id)
+            end
+          end
         else
           let create_sink_msg =
             WireMsgEncoder.spin_up_sink(cur_sink_id, step_id,
@@ -188,6 +211,8 @@ actor TopologyManager
         cur_source_id = cur_source_id + 1
         cur_sink_id = cur_sink_id + 1
         step_id = cur_source_id
+        prev_step_id = None
+        prev_node = None
       end
 
       let finished_msg =
