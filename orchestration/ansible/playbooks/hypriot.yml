@@ -19,7 +19,7 @@
 - hosts: buffy-all
   vars:
     ethernet_interface: eth0
-    ip_range_start: 100
+    ip_range_start: 201
   tasks:
   - name: Update pip with easy_install
     easy_install: name=pip state=latest
@@ -48,7 +48,7 @@
     lineinfile:
       dest: /etc/network/interfaces
       regexp: ^netmask {{ hostvars[inventory_hostname]['ansible_' + ethernet_interface]['ipv4']['netmask'] }}$
-      insertafter: ^address {{ hostvars[inventory_hostname]['ansible_' + ethernet_interface]['ipv4']['address'] }}
+      insertafter: ^address {{ my_new_ip }}
       line: netmask {{ hostvars[inventory_hostname]['ansible_' + ethernet_interface]['ipv4']['netmask'] }}
   - name: Update gateway for interface
     lineinfile:

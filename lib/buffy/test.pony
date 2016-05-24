@@ -1,5 +1,5 @@
 use "ponytest"
-use "buffy/messages"
+use "promises"
 use "sendence/bytes"
 
 actor TestMain is TestList

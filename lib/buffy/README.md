@@ -9,6 +9,8 @@ When you run a client, use the following command line parameters:
 ```-l``` sets process as leader.  
 ```-w <count>``` tells the leader how many workers to wait for.  
 ```-n <node_name>``` sets the name for the process in the Buffy cluster.
+```--leader-control-address <address>``` sets the address for the leader's control channel address
+```--leader-data-address <address>``` sets the address for the leader's data channel address
 ```--source <comma-delimited source_addresses>``` sets the addresses for the sink
 ```--sink <comma-delimited sink_addresses>``` sets the addresses for the sink
 ```--metrics <metrics-receiver address```
@@ -16,11 +18,11 @@ When you run a client, use the following command line parameters:
 To run the Double Divide app, you need to kick off three processes.  The first arg is
 the leader address.
 
-1. Leader  
-```./app-name 127.0.0.1:6000 --source 127.0.0.1:7000 --sink 127.0.0.1:8000 --metrics 127.0.0.1:9000 -l -w 2 -n LeaderNode```
+* Leader
+  * ```./app-name --leader-control-address 127.0.0.1:6000 --leader-data-address 127.0.0.1:6500 --source 127.0.0.1:7000 --sink 127.0.0.1:8000 --metrics 127.0.0.1:9000 -p 127.0.0.1:10000 -l -w 2 -n LeaderNode```
 
-2. Workers  
-```./app-name 127.0.0.1:6000 --source 127.0.0.1:7000 --metrics 127.0.0.1:9000 --sink 127.0.0.1:8000 -n Worker1```
-```./app-name 127.0.0.1:6000 --source 127.0.0.1:7000 --metrics 127.0.0.1:9000 --sink 127.0.0.1:8000 -n Worker2```
+* Workers  
+  * ```./app-name --leader-control-address 127.0.0.1:6000 --leader-data-address 127.0.0.1:6500 --source 127.0.0.1:7000 --sink 127.0.0.1:8000 --metrics 127.0.0.1:9000 -p 127.0.0.1:10000 -n Worker1```
+  * ```./app-name --leader-control-address 127.0.0.1:6000 --leader-data-address 127.0.0.1:6500 --source 127.0.0.1:7000 --sink 127.0.0.1:8000 --metrics 127.0.0.1:9000 -p 127.0.0.1:10000 -n Worker2```
 
-The address passed in is the leader's address.
+You can also choose to enable spiking on the node with either ```--spike-delay``` or ```--spike-drop``` flags

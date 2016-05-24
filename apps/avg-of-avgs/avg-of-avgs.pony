@@ -2,47 +2,56 @@ use "net"
 use "collections"
 use "buffy"
 use "buffy/messages"
+use "buffy/metrics"
+use "buffy/topology"
 
 actor Main
   new create(env: Env) =>
-    let topology: Topology val =
-      Topology(recover val
-        ["double", "halve", "average", "average"]
-      end)
-    Startup(env, topology, SB, 1)
-
-primitive SB is StepBuilder
-  fun val apply(computation_type: String): BasicStep tag ? =>
-    match computation_type
-    | "double" => Step[I32, I32](Double)
-    | "halve" => Step[I32, I32](Halve)
-    | "average" => Step[I32, I32](Average)
+    try
+      let topology: Topology val = recover val
+        Topology
+          .new_pipeline[U64, U64](P, S)
+          .to[U64](lambda(): Computation[U64, U64] iso^ => Double end)
+          .to[U64](lambda(): Computation[U64, U64] iso^ => Halve end)
+          .to[U64](lambda(): Computation[U64, U64] iso^ => Average end)
+          .to[U64](lambda(): Computation[U64, U64] iso^ => Average end)
+          .build()
+      end
+      Startup(env, topology, 1)
     else
-      error
+      env.out.print("Couldn't build topology")
     end
 
-class Double is Computation[I32, I32]
-  fun apply(msg: Message[I32] val): Message[I32] val^ =>
-    let output = msg.data * 2
-    Message[I32](msg.id, msg.source_ts, msg.last_ingress_ts, output)
+class Double is Computation[U64, U64]
+  fun name(): String => "double"
+  fun apply(d: U64): U64 =>
+    d * 2
 
-class Halve is Computation[I32, I32]
-  fun apply(msg: Message[I32] val): Message[I32] val^ =>
-    let output = msg.data / 2
-    Message[I32](msg.id, msg.source_ts, msg.last_ingress_ts, output)
+class Halve is Computation[U64, U64]
+  fun name(): String => "halve"
+  fun apply(d: U64): U64 =>
+    d / 2
 
-class Average is Computation[I32, I32]
+class Average is Computation[U64, U64]
   let state: Averager = Averager
 
-  fun ref apply(msg: Message[I32] val): Message[I32] val^ =>
-    let output = state(msg.data)
-    Message[I32](msg.id, msg.source_ts, msg.last_ingress_ts, output)
+  fun name(): String => "average"
+  fun ref apply(d: U64): U64 =>
+    state(d)
 
 class Averager
-  var count: I32 = 0
-  var total: I32 = 0
+  var count: U64 = 0
+  var total: U64 = 0
 
-  fun ref apply(value: I32): I32 =>
+  fun ref apply(value: U64): U64 =>
     count = count + 1
     total = total + value
     total / count
+
+class P
+  fun apply(s: String): U64 ? =>
+    s.u64()
+
+class S
+  fun apply(input: U64): String =>
+    input.string()

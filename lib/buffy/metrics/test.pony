@@ -2,12 +2,10 @@ use "ponytest"
 use "buffy/messages"
 use "sendence/bytes"
 use "collections"
-use "itertools"
 
 actor Main is TestList
   new create(env: Env) =>
     PonyTest(env, this)
-
 
   new make() => None
 
@@ -114,4 +112,3 @@ class iso _TestMonitoringHubEncoder is UnitTest
     mc.send_output()
 
     true
-

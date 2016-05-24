@@ -22,7 +22,7 @@ actor Main
     else
       var b_arg: (Array[String] | None) = None
       var m_arg: (USize | None) = None
-      var d_arg: (Array[String] | None) = None
+      var p_arg: (Array[String] | None) = None
       var n_arg: (String | None) = None
       var f_arg: (String | None) = None
 
@@ -31,7 +31,7 @@ actor Main
 
         options
           .add("buffy", "b", StringArgument)
-          .add("dagon", "d", StringArgument)
+          .add("phone_home", "p", StringArgument)
           .add("name", "n", StringArgument)
           .add("messages", "m", I64Argument)
           .add("file", "f", StringArgument)
@@ -42,7 +42,7 @@ actor Main
           | ("messages", let arg: I64) => m_arg = arg.usize()
           | ("name", let arg: String) => n_arg = arg
           | ("file", let arg: String) => f_arg = arg
-          | ("dagon", let arg: String) => d_arg = arg.split(":")
+          | ("phone_home", let arg: String) => p_arg = arg.split(":")
           end
         end
 
@@ -62,16 +62,16 @@ actor Main
           required_args_are_present = false
         end
 
-        if d_arg isnt None then
-          if (d_arg as Array[String]).size() != 2 then
+        if p_arg isnt None then
+          if (p_arg as Array[String]).size() != 2 then
             env.err.print(
               "'--dagon' argument should be in format: '127.0.0.1:8080")
             required_args_are_present = false
           end
         end
 
-        if (d_arg isnt None) or (n_arg isnt None) then
-          if (d_arg is None) or (n_arg is None) then
+        if (p_arg isnt None) or (n_arg isnt None) then
+          if (p_arg is None) or (n_arg is None) then
             env.err.print(
               "'--dagon' must be used in conjunction with '--name'")
             required_args_are_present = false
@@ -93,8 +93,8 @@ actor Main
           let messages_to_send = m_arg as USize
           let to_buffy_addr = b_arg as Array[String]
 
-          let store = Store(env.root as AmbientAuth, messages_to_send)
-          let coordinator = CoordinatorFactory(env, store, n_arg, d_arg)
+          let store = Store(env.root as AmbientAuth)
+          let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
           let to_buffy_socket = TCPConnection(tcp_auth,
@@ -139,6 +139,7 @@ class ToBuffyNotify is TCPConnectionNotify
     _coordinator.to_buffy_socket(sock, Failed)
 
   fun ref connected(sock: TCPConnection ref) =>
+    sock.set_nodelay(true)
     _coordinator.to_buffy_socket(sock, Ready)
 
 class ToDagonNotify is TCPConnectionNotify
@@ -159,9 +160,9 @@ class ToDagonNotify is TCPConnectionNotify
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     for chunked in _framer.chunk(consume data).values() do
       try
-        let decoded = WireMsgDecoder(consume chunked)
+        let decoded = ExternalMsgDecoder(consume chunked)
         match decoded
-        | let m: StartMsg val =>
+        | let m: ExternalStartMsg val =>
             _coordinator.go()
         else
           _stderr.print("Unexpected message from Dagon")
@@ -235,7 +236,7 @@ actor WithoutDagonCoordinator
       let x = _to_buffy_socket._1 as TCPConnection
       x.dispose()
     end
-    _store.dump()
+    _store.dispose()
 
   fun _go_if_ready() =>
     if _to_buffy_socket._2 is Ready then
@@ -288,14 +289,14 @@ actor WithDagonCoordinator
   be finished() =>
     try
       let x = _to_dagon_socket._1 as TCPConnection
-      x.write(WireMsgEncoder.done_shutdown(_node_id as String))
+      x.write(ExternalMsgEncoder.done_shutdown(_node_id as String))
       x.dispose()
     end
     try
       let x = _to_buffy_socket._1 as TCPConnection
       x.dispose()
     end
-    _store.dump()
+    _store.dispose()
 
   fun _go_if_ready() =>
     if (_to_dagon_socket._2 is Ready) and (_to_buffy_socket._2 is Ready) then
@@ -305,7 +306,7 @@ actor WithDagonCoordinator
   fun _send_ready() =>
     try
       let x = _to_dagon_socket._1 as TCPConnection
-      x.write(WireMsgEncoder.ready(_node_id as String))
+      x.write(ExternalMsgEncoder.ready(_node_id as String))
     end
 
 //
@@ -316,10 +317,11 @@ actor SendingActor
   let _messages_to_send: USize
   var _messages_sent: USize = USize(0)
   let _to_buffy_socket: TCPConnection
+  let _store: Store
   let _coordinator: Coordinator
   let _timers: Timers
-  let _sender: Sender
   let _data_source: Iterator[String] iso
+  var _finished: Bool = false
 
   new create(messages_to_send: USize,
     to_buffy_socket: TCPConnection,
@@ -329,17 +331,19 @@ actor SendingActor
   =>
     _messages_to_send = messages_to_send
     _to_buffy_socket = to_buffy_socket
+    _store = store
     _coordinator = coordinator
     _data_source = consume data_source
     _timers = Timers
-    _sender = Sender(_to_buffy_socket, store)
 
   be go() =>
     let t = Timer(SendBatch(this), 0, 5_000_000)
     _timers(consume t)
 
   be send_batch() =>
-    let batch_size = USize(200)
+    if _finished then return end
+
+    let batch_size = USize(500)
 
     var current_batch_size =
       if (_messages_to_send - _messages_sent) > batch_size then
@@ -350,18 +354,22 @@ actor SendingActor
 
     if (current_batch_size > 0) and _data_source.has_next() then
       let d = recover Array[ByteSeq](current_batch_size) end
+      let d' = recover Array[ByteSeq](current_batch_size) end
       for i in Range(0, current_batch_size) do
         try
-          let m = WireMsgEncoder.external(_data_source.next())
-          d.push(m)
+          let n = _data_source.next()
+          d'.push(n)
+          d.push(ExternalMsgEncoder.data(n))
         else
           break
         end
       end
 
-      _sender.send(consume d)
+      _to_buffy_socket.writev(consume d)
+      _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
       _messages_sent = _messages_sent + current_batch_size
     else
+      _finished = true
       _timers.dispose()
       _coordinator.finished()
     end
@@ -376,45 +384,34 @@ class SendBatch is TimerNotify
     _sending_actor.send_batch()
     true
 
-class Sender
-  let _to_buffy_socket: TCPConnection
-  let _store: Store
-
-  new create(to_buffy_socket: TCPConnection, store: Store) =>
-    _to_buffy_socket = to_buffy_socket
-    _store = store
-
-  fun send(data: Array[ByteSeq] val) =>
-    let at =  Time.micros()
-    _to_buffy_socket.writev(data)
-    _store.sentv(data, at)
-
 //
 // SENT MESSAGE STORE
 //
 
 actor Store
-  let _auth: AmbientAuth
-  let _sent: List[(ByteSeq, U64)]
   let _encoder: SentLogEncoder = SentLogEncoder
+  var _sent_file: (File|None)
 
-  new create(auth: AmbientAuth, list_size: USize) =>
-    _auth = auth
-    _sent = List[(ByteSeq, U64)](list_size)
-
-  be sentv(msgs: Array[ByteSeq] val, at: U64) =>
-    for m in msgs.values() do
-      _sent.push((m, at))
+  new create(auth: AmbientAuth) =>
+    _sent_file = try
+      let f = File(FilePath(auth, "sent.txt"))
+      f.set_length(0)
+      f
+    else
+      None
     end
 
-  be dump() =>
-    try
-      let sent_handle = File(FilePath(_auth, "sent.txt"))
-      sent_handle.set_length(0)
-      for s in _sent.values() do
-        sent_handle.print(_encoder(s))
+  be sentv(msgs: Array[ByteSeq] val, at: U64) =>
+    match _sent_file
+      | let file: File =>
+      for m in msgs.values() do
+        file.print(_encoder((m, at)))
       end
-      sent_handle.dispose()
+    end
+
+  be dispose() =>
+    match _sent_file
+      | let file: File => file.dispose()
     end
 
 class SentLogEncoder

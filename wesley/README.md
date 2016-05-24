@@ -73,11 +73,9 @@ specify their own function.
 
 ## In Practice
 
-Giles runs a test based on a configuration (nodes in Buffy with
-intervening Spike nodes which modify the messages passing through the
-system in some way), and records the sent messages (`sent.txt`) and
-received messages (`received.txt`) once the test finishes. After the
-test has run, Wesley takes the sent messages, applies the
+Giles runs a test based on a configuration and records the sent messages 
+(`sent.txt`) and received messages (`received.txt`) once the test finishes.
+After the test has run, Wesley takes the sent messages, applies the
 transformation function to them, and compares the expected received
 messages to the actual received messages, then compares this outcome
 with the expected match outcome.
