@@ -242,7 +242,6 @@ actor Coordinator
   // RECONNECT
   /////////////
   be reconnect_data(target_name: String) =>
-    @printf[None](("!!Reconnecting to " + target_name + "!!\n").cstring())
     try
       (let target_host: String, let target_service: String) =
         _data_addrs(target_name)
@@ -259,7 +258,6 @@ actor Coordinator
     end
 
   be negotiate_data_reconnection(from_name: String) =>
-    @printf[None](("!!Acking reconnection to sender " + from_name + "!!\n").cstring())
     try
       _data_connection_receivers(from_name).reconnect_ack()
     else
