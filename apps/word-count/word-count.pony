@@ -27,13 +27,30 @@ actor Main
     end
 
 class Split is MapComputation[String, WordCount val]
+  let punctuation: Array[String] = [",", ".", ";", ":", "\"", "'", "?", "!", "(", ")"]
+
   fun name(): String => "split"
   fun apply(d: String): Seq[WordCount val] =>
     let counts: Array[WordCount val] iso = recover Array[WordCount val] end
-    for word in d.split(" ").values() do
+    let stripped = _strip_punctuation(d)
+    for word in stripped.split(" ").values() do
       counts.push(WordCount(word.lower(), 1))
     end
     consume counts
+
+  fun _strip_punctuation(s: String): String =>
+    let clone: String iso = recover s.clone() end
+    for punc in punctuation.values() do
+      while true do
+        try
+          let idx = clone.find(punc)
+          clone.delete(idx)
+        else
+          break
+        end
+      end
+    end
+    consume clone
 
 class Count is StateComputation[WordCount val, WordCount val, WordCountTotals]
   fun name(): String => "count"
