@@ -109,9 +109,6 @@ actor TopologyManager
       end
 
       var cur_source_id: U64 = 0
-      var cur_sink_id: U64 = 0
-      let cur_sink_ids = Array[U64]
-      cur_sink_ids.push(cur_sink_id)
       var step_id: U64 = cur_source_id
       var prev_step_id: (U64 | None) = None
       var prev_node: (String | None) = None
@@ -197,7 +194,9 @@ actor TopologyManager
         _env.out.print("Spinning up sink on node " + sink_node)
 
         let sendable_sink_ids: Array[U64] iso = recover Array[U64] end
-        for id in cur_sink_ids.values() do sendable_sink_ids.push(id) end
+        for id in pipeline.sink_target_ids().values() do
+          sendable_sink_ids.push(id)
+        end
         if sink_node_idx == 0 then // if cur_node is the leader
           _coordinator.add_sink(consume sendable_sink_ids, step_id,
             pipeline.sink_builder(), _auth)
@@ -214,9 +213,6 @@ actor TopologyManager
         end
 
         cur_source_id = cur_source_id + 1
-        cur_sink_id = cur_sink_id + 1
-        cur_sink_ids.clear()
-        cur_sink_ids.push(cur_sink_id)
         step_id = cur_source_id
         prev_step_id = None
         prev_node = None

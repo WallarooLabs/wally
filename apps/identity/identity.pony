@@ -10,7 +10,7 @@ actor Main
     try
       let topology: Topology val = recover val
         Topology
-          .new_pipeline[U64, U64](P, S)
+          .new_pipeline[U64, U64](P, S, recover [0] end)
           .to[U64](lambda(): Computation[U64, U64] iso^ => Identity end)
           .to[U64](lambda(): Computation[U64, U64] iso^ => Identity end)
           .to[U64](lambda(): Computation[U64, U64] iso^ => Identity end)
