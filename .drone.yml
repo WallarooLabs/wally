@@ -120,6 +120,7 @@ notify:
       with a message ```{{{build.message}}}``` finished with a
       `{{ build.status }}` status in
       {{ duration build.started_at build.finished_at }}
+      Build logs at: https://drone.sendence.com/{{repo.full_name}}/{{ build.number }}
 
 # matrix of configurations to test
 matrix:
