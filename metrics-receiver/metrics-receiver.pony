@@ -43,6 +43,7 @@ actor MetricsReceiver
   let _period: U64 = 1
   let _bin_selector: F64Selector val = Log10Selector
   let _mc: MetricsCollection tag
+  let _listener: TCPListener
 
   new create(env: Env, auth: AmbientAuth, host: String, service: String,
              host': String, service': String, name': String) =>
@@ -52,9 +53,11 @@ actor MetricsReceiver
     let handler: MetricsMonitoringHubHandler val = 
       MetricsMonitoringHubHandler(MonitoringHubEncoder, output)
     _mc = MetricsCollection(_bin_selector, _period, handler)
-    // TODO: save TCPListener to variable, close it when actor closes prototype
-    TCPListener(auth, MetricsNotifier(env, host, service, _mc),
-                host, service)
+    _listener = TCPListener(auth, MetricsNotifier(env, host, service, _mc),
+                            host, service)
+
+  be finished() =>
+    _listener.dispose()
 
   be flush() =>
     _mc.send_output()
