@@ -243,9 +243,9 @@ A history of throughput counts per second
 
 type TimeBuckets is Map[U64, (LatencyHistogram, ThroughputHistory)]
 
-type Steps is Set[I32]
+type Steps is Set[U64]
 type StepTimeranges is Map[U64, Steps]
-type StepMetrics is Map[I32, TimeBuckets]
+type StepMetrics is Map[U64, TimeBuckets]
 
 type Boundaries is Set[String]
 type BoundaryTimeranges is Map[U64, Boundaries]
@@ -270,8 +270,8 @@ on category and id
   let _period: U64 val
   let _bin_selector: F64Selector val
   let _handler: MetricsCollectionOutputHandler val
-  let _sink_type: I32 = BoundaryTypes.source_sink()
-  let _egress_type: I32 = BoundaryTypes.ingress_egress()
+  let _sink_type: U64 = BoundaryTypes.source_sink()
+  let _egress_type: U64 = BoundaryTypes.ingress_egress()
 
   new create(bin_selector: F64Selector val, period: U64=1,
              handler: MetricsCollectionOutputHandler val) =>
@@ -307,7 +307,7 @@ on category and id
       process_report(digest.step_id, report)
     end
 
-  fun ref process_report(step_id: I32, report: StepMetricsReport val) =>
+  fun ref process_report(step_id: U64, report: StepMetricsReport val) =>
     let time_bucket: U64 = get_time_bucket(report.end_time)
     // Bookkeeping
     try
