@@ -136,9 +136,9 @@ actor Coordinator
   be add_proxy(p_step_id: U64, p_target_id: U64, target_node_name: String) =>
     _step_manager.add_proxy(p_step_id, p_target_id, target_node_name, this)
 
-  be add_sink(sink_id: U64, step_id: U64, sink_builder: SinkBuilder val,
+  be add_sink(sink_ids: Array[U64] val, step_id: U64, sink_builder: SinkBuilder val,
     auth: AmbientAuth) =>
-    _step_manager.add_sink(sink_id, step_id, sink_builder, auth)
+    _step_manager.add_sink(sink_ids, step_id, sink_builder, auth)
 
   be connect_steps(step_id: U64, target_id: U64) =>
     _step_manager.connect_steps(step_id, target_id)

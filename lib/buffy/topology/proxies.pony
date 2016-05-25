@@ -72,15 +72,19 @@ actor StepManager
       coordinator, _metrics_collector)
     _steps(proxy_step_id) = p
 
-  be add_sink(sink_id: U64, sink_step_id: U64, sink_builder: SinkBuilder val,
-    auth: AmbientAuth) =>
+  be add_sink(sink_ids: Array[U64] val, sink_step_id: U64,
+    sink_builder: SinkBuilder val, auth: AmbientAuth) =>
     try
-      let sink_addr = _sink_addrs(sink_id)
-      let sink_host = sink_addr._1
-      let sink_service = sink_addr._2
-      let conn = TCPConnection(auth, SinkConnectNotify(_env), sink_host,
-        sink_service)
-      _steps(sink_step_id) = sink_builder(conn, _metrics_collector)
+      let conns: Array[TCPConnection] iso = recover Array[TCPConnection] end
+      for sink_id in sink_ids.values() do
+        let sink_addr = _sink_addrs(sink_id)
+        let sink_host = sink_addr._1
+        let sink_service = sink_addr._2
+        let conn = TCPConnection(auth, SinkConnectNotify(_env), sink_host,
+          sink_service)
+        conns.push(conn)
+      end
+      _steps(sink_step_id) = sink_builder(consume conns, _metrics_collector)
     else
       _env.out.print("StepManager: Could not add sink.")
     end

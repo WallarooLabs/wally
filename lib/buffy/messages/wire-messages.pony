@@ -51,10 +51,10 @@ primitive WireMsgEncoder
     , auth: AmbientAuth): Array[U8] val ? =>
     _serialise(SpinUpProxyMsg(proxy_id, step_id, target_node_name), auth)
 
-  fun spin_up_sink(sink_id: U64, sink_step_id: U64, sink_builder: SinkBuilder val,
+  fun spin_up_sink(sink_ids: Array[U64] iso, sink_step_id: U64, sink_builder: SinkBuilder val,
     auth: AmbientAuth)
     : Array[U8] val ? =>
-    _serialise(SpinUpSinkMsg(sink_id, sink_step_id, sink_builder), auth)
+    _serialise(SpinUpSinkMsg(consume sink_ids, sink_step_id, sink_builder), auth)
 
   fun connect_steps(from_step_id: U64, to_step_id: U64, auth: AmbientAuth)
     : Array[U8] val ? =>
@@ -199,12 +199,12 @@ class SpinUpProxyMsg is WireMsg
       target_node_name = name
 
 class SpinUpSinkMsg is WireMsg
-  let sink_id: U64
+  let sink_ids: Array[U64] val
   let sink_step_id: U64
   let sink_builder: SinkBuilder val
 
-  new val create(s_id: U64, s_step_id: U64, s_builder: SinkBuilder val) =>
-      sink_id = s_id
+  new val create(s_ids: Array[U64] iso, s_step_id: U64, s_builder: SinkBuilder val) =>
+      sink_ids = consume s_ids
       sink_step_id = s_step_id
       sink_builder = s_builder
 
