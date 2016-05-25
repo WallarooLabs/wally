@@ -30,27 +30,27 @@ build:
     commands:
       - make test
 
-  # build docker images and test dagon (amd64)
-  build_docker_images_dagon_test_amd64:
-    image: sendence/docker-runner:0.0.1
-    pull: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    commands:
-      - >
-        make clean-docker arch=$$PONYC_VERSION
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-      - >
-        make build-docker arch=$$PONYC_VERSION
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-      - >
-        make dagon-docker-test arch=$$PONYC_VERSION
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-        docker_no_pull=true
-    privileged: true
-    when:
-      matrix:
-        PONYC_VERSION: amd64
+#  # build docker images and test dagon (amd64)
+#  build_docker_images_dagon_test_amd64:
+#    image: sendence/docker-runner:0.0.1
+#    pull: true
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#    commands:
+#      - >
+#        make clean-docker arch=$$PONYC_VERSION
+#        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+#      - >
+#        make build-docker arch=$$PONYC_VERSION
+#        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+#      - >
+#        make dagon-docker-test arch=$$PONYC_VERSION
+#        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+#        docker_no_pull=true
+#    privileged: true
+#    when:
+#      matrix:
+#        PONYC_VERSION: amd64
 
   # run dagon tests (armhf)
   run_dagon_test_armhf:
@@ -62,9 +62,9 @@ build:
     commands:
       - chrt -f 80 make dagon-test arch=$$PONYC_VERSION
     privileged: true
-    when:
-      matrix:
-        PONYC_VERSION: armhf
+#    when:
+#      matrix:
+#        PONYC_VERSION: armhf
 
   # build and push final docker images on a push event
   build_docker_images_push:
