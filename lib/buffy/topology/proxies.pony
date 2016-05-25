@@ -86,7 +86,8 @@ actor StepManager
       end
       _steps(sink_step_id) = sink_builder(consume conns, _metrics_collector)
     else
-      _env.out.print("StepManager: Could not add sink.")
+      _env.out.print("StepManager: Could not add sink. Did you supply enough"
+      + " sink addresses?")
     end
 
   be connect_steps(in_id: U64, out_id: U64) =>
