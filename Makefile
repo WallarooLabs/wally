@@ -184,7 +184,7 @@ test-giles-receiver: ## Test Giles Receiver
 test-giles-sender: ## Test Giles Sender
 	cd giles/sender && ./sender
 
-dagon-test: #dagon-identity #dagon-double ## Run dagon tests
+dagon-test: dagon-identity dagon-identity-drop #dagon-double ## Run dagon tests
 
 dagon-double: ## Run double test with dagon
 	dagon/dagon.py dagon/config/double.ini
@@ -192,11 +192,11 @@ dagon-double: ## Run double test with dagon
           dagon/config/double.ini
 
 dagon-identity: ## Run identity test with dagon
-	./dagon/dagon --timeout=5 -f apps/double-divide/double-divide.ini -h 127.0.0.1:8080
+	./dagon/dagon --ponythreads 10 --timeout=5 -f apps/double-divide/double-divide.ini -h 127.0.0.1:8080
 	./wesley/identity/identity ./sent.txt ./received.txt match
 
 dagon-identity-drop: ## Run identity test with dagon
-	./dagon/dagon --timeout=5 -f apps/double-divide/double-divide-drop.ini -h 127.0.0.1:8080
+	./dagon/dagon --ponythreads 10 --timeout=5 -f apps/double-divide/double-divide-drop.ini -h 127.0.0.1:8080
 	./wesley/identity/identity ./sent.txt ./received.txt match
 
 dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
