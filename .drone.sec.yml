@@ -1,0 +1,7 @@
+environment:
+  DOCKER_USERNAME: sendence
+  DOCKER_PASSWORD: Sendence1@
+  DOCKER_HUB_USERNAME: dipinhora
+  DOCKER_HUB_PASSWORD: openup
+  DOCKER_HUB_EMAIL: dipnhora+docker@gmail.com
+  SLACK_WEBHOOK: https://hooks.slack.com/services/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
