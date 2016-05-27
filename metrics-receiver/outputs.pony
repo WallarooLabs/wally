@@ -81,5 +81,5 @@ class MonitoringHubConnectNotify is TCPConnectionNotify
     _stdout.print("    metrics-receiver: Monitoring Hub connection accepted")
 
   fun ref closed(conn: TCPConnection ref) =>
-    _stdout.print("dagon child: server closed")
+    _stdout.print("    metrics-receiver: Monitoring Hub connection closed")
 
