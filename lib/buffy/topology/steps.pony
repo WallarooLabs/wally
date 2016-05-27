@@ -219,14 +219,17 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
 
 actor ExternalConnection[In: Any val] is ComputeStep[In]
   let _stringify: {(In): String ?} val
-  let _conn: TCPConnection
+  let _conns: Array[TCPConnection]
   let _metrics_collector: MetricsCollector tag
 
-  new create(stringify: {(In): String ?} val, conn: TCPConnection,
-    m_coll: MetricsCollector tag) =>
+  new create(stringify: {(In): String ?} val, conns: Array[TCPConnection] iso =
+    recover Array[TCPConnection] end, m_coll: MetricsCollector tag) =>
     _stringify = stringify
-    _conn = conn
+    _conns = consume conns
     _metrics_collector = m_coll
+
+  be add_conn(conn: TCPConnection) =>
+    _conns.push(conn)
 
   be apply(input: StepMessage val) =>
     match input
@@ -235,7 +238,9 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
         let str = _stringify(m.data())
         @printf[String]((">>>>" + str + "<<<<\n").cstring())
         let tcp_msg = ExternalMsgEncoder.data(str)
-        _conn.write(tcp_msg)
+        for conn in _conns.values() do
+          conn.write(tcp_msg)
+        end
         _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
           m.id(), m.source_ts(), Epoch.milliseconds())
       end

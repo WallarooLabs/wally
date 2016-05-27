@@ -9,6 +9,8 @@ arch ?= native## Architecture to build for
 in_docker ?= false## Whether already in docker or not (used by CI)
 ponyc_tag ?= sendence-$(latest_ponyc_tag)-debug## tag for ponyc docker to use
 ponyc_runner ?= sendence/ponyc## ponyc docker image to use
+debug ?= false## Use ponyc debug option (-d)
+debug_arg =# Final argument string for docker no pull
 docker_no_pull ?= false## Don't pull docker images for dagon run
 docker_no_pull_arg =# Final argument string for docker no pull
 docker_host ?= $(DOCKER_HOST)## docker host to build/run containers on
@@ -35,6 +37,10 @@ ifdef docker_no_pull
   endif
 endif
 
+ifeq ($(debug),true)
+  debug_arg=-d
+endif
+
 ifeq ($(docker_no_pull),true)
   docker_no_pull_arg=--no_docker_pull
 endif
@@ -55,7 +61,7 @@ ifeq ($(in_docker),true)
   ifeq ($(arch),armhf)
     define PONYC
       cd $(current_dir)/$(1) && stable fetch
-      cd $(current_dir)/$(1) && stable env ponyc \
+      cd $(current_dir)/$(1) && stable env ponyc $(debug_arg) \
         --triple arm-unknown-linux-gnueabihf -robj .
       cd $(current_dir)/$(1) && arm-linux-gnueabihf-gcc \
         -o `basename $(current_dir)/$(1)` \
@@ -74,7 +80,7 @@ ifeq ($(in_docker),true)
   else
     define PONYC
       cd $(current_dir)/$(1) && stable fetch
-      cd $(current_dir)/$(1) && stable env ponyc .
+      cd $(current_dir)/$(1) && stable env ponyc $(debug_arg) .
     endef
   endif
 else
@@ -86,7 +92,7 @@ else
         $(ponyc_runner):$(ponyc_tag)-$(arch) fetch
       docker run --rm -it $(docker_user_arg) -v $(current_dir):$(current_dir) \
         -w $(current_dir)/$(1) --entrypoint stable \
-        $(ponyc_runner):$(ponyc_tag)-$(arch) env ponyc .
+        $(ponyc_runner):$(ponyc_tag)-$(arch) env ponyc $(debug_arg) .
     endef
   else ifeq ($(arch),armhf)
     define PONYC
@@ -98,7 +104,7 @@ else
       docker run --rm -it $(docker_user_arg) -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
         --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
-        env ponyc --triple arm-unknown-linux-gnueabihf -robj .
+        env ponyc $(debug_arg) --triple arm-unknown-linux-gnueabihf -robj .
       docker run --rm -it $(docker_user_arg) -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
         --entrypoint arm-linux-gnueabihf-gcc \
@@ -119,7 +125,7 @@ else
   else
     define PONYC
       cd $(current_dir)/$(1) && stable fetch
-      cd $(current_dir)/$(1) && stable env ponyc .
+      cd $(current_dir)/$(1) && stable env ponyc $(debug_arg) .
     endef
   endif
 endif
@@ -178,7 +184,7 @@ test-giles-receiver: ## Test Giles Receiver
 test-giles-sender: ## Test Giles Sender
 	cd giles/sender && ./sender
 
-dagon-test: #dagon-identity #dagon-double ## Run dagon tests
+dagon-test: dagon-identity dagon-identity-drop #dagon-double ## Run dagon tests
 
 dagon-double: ## Run double test with dagon
 	dagon/dagon.py dagon/config/double.ini
@@ -186,11 +192,11 @@ dagon-double: ## Run double test with dagon
           dagon/config/double.ini
 
 dagon-identity: ## Run identity test with dagon
-	./dagon/dagon --timeout=5 -f apps/double-divide/double-divide.ini -h 127.0.0.1:8080
+	./dagon/dagon --ponythreads 10 --timeout=5 -f apps/double-divide/double-divide.ini -h 127.0.0.1:8080
 	./wesley/identity/identity ./sent.txt ./received.txt match
 
 dagon-identity-drop: ## Run identity test with dagon
-	./dagon/dagon --timeout=5 -f apps/double-divide/double-divide-drop.ini -h 127.0.0.1:8080
+	./dagon/dagon --ponythreads 10 --timeout=5 -f apps/double-divide/double-divide-drop.ini -h 127.0.0.1:8080
 	./wesley/identity/identity ./sent.txt ./received.txt match
 
 dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker

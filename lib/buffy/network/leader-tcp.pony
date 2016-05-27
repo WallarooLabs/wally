@@ -94,7 +94,7 @@ class LeaderConnectNotify is TCPConnectionNotify
         _env.err.print(_name + " is spinning up a proxy!")
         _coordinator.add_proxy(m.proxy_id, m.step_id, m.target_node_name)
       | let m: SpinUpSinkMsg val =>
-        _coordinator.add_sink(m.sink_id, m.sink_step_id, m.sink_builder, _auth)
+        _coordinator.add_sink(m.sink_ids, m.sink_step_id, m.sink_builder, _auth)
       | let m: ConnectStepsMsg val =>
         _coordinator.connect_steps(m.in_step_id, m.out_step_id)
       | let d: ShutdownMsg val =>

@@ -11,7 +11,8 @@ trait BasicStepBuilder
   fun apply(): BasicStep tag
 
 trait SinkBuilder
-  fun apply(conn: TCPConnection, metrics_collector: MetricsCollector): BasicStep tag
+  fun apply(conns: Array[TCPConnection] iso, metrics_collector: MetricsCollector)
+    : BasicStep tag
 
 trait OutputStepBuilder[Out: Any val] is BasicStepBuilder
 
@@ -96,6 +97,6 @@ class ExternalConnectionBuilder[In: Any val] is SinkBuilder
   new val create(stringify: Stringify[In] val) =>
     _stringify = stringify
 
-  fun apply(conn: TCPConnection, metrics_collector: MetricsCollector)
+  fun apply(conns: Array[TCPConnection] iso, metrics_collector: MetricsCollector)
     : BasicStep tag =>
-    ExternalConnection[In](_stringify, conn, metrics_collector)
+    ExternalConnection[In](_stringify, consume conns, metrics_collector)
