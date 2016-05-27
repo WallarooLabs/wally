@@ -10,6 +10,7 @@
 *.pyc
 sent.txt
 received.txt
+.drone.sec.yml
 
 # partial compilation files
 *.o

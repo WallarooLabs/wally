@@ -1,6 +1,8 @@
 # Buffy Apps
 
 This document describes the Buffy API and how to create client apps.
+For information on starting a Buffy app up from the command line, see
+the [Buffy library doc](../lib/buffy/README.md).
 
 ## API
 
