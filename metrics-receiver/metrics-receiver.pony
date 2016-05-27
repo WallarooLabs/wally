@@ -9,29 +9,77 @@ use "time"
 
 actor Main
   new create(env: Env) =>
-    var options = Options(env)
-    var args = options.remaining()
-    try
-      let auth = env.root as AmbientAuth
-      // Listening address
-      let addr: Array[String] = args(1).split(":")
-      let host = addr(0)
-      let service = addr(1)
+    var required_args_are_present = true
+    var run_tests = env.args.size() == 1
 
-      // Monitoring Hub Address
-      let addr': Array[String] = args(2).split(":")
-      let host' = addr'(0)
-      let service' = addr'(1)
+    if run_tests then
+      TestMain(env)
+    else
+      var listen_addr_arg: (Array[String] | None) = None
+      var monhub_addr_arg: (Array[String] | None) = None
+      var name_arg: (String | None) = None
+      var delay_arg: (U64 | None) = None
 
-      // Application name to report to Monitoring Hub
-      let name': String = args(3).clone()
+      try
+        var options = Options(env)
+        options
+          .add("listen", "l", StringArgument)
+          .add("monitor", "m", StringArgument)
+          .add("name", "n", StringArgument)
+          .add("delay", "d", F64Argument)
 
-      let receiver = MetricsReceiver(env, auth, host, service, host',
-                                     service', name')
-      // start a timer to flush the receiver
-      let timers = Timers
-      let timer = Timer(FlushTimer(env, receiver), 0, 1_000_000_000)
-      timers(consume timer)   
+        for option in options do
+          match option
+          | ("listen", let arg: String) => listen_addr_arg = arg.split(":")
+          | ("monitor", let arg: String) => monhub_addr_arg = arg.split(":")
+          | ("name", let arg: String) => name_arg = arg
+          | ("delay", let arg: F64) => delay_arg = (arg*1_000_000_000).u64()
+          end
+        end
+
+        if listen_addr_arg is None then
+          env.err.print("Must supply required '--listen' argument")
+          required_args_are_present = false
+        else
+          if (listen_addr_arg as Array[String]).size() != 2 then
+            env.err.print(
+              "'--listen' argument should be in format '127.0.0.1:9999'")
+            required_args_are_present = false
+          end
+        end
+
+        if monhub_addr_arg is None then
+          env.err.print("Must supply required --monitor' argument")
+        else
+          if (monhub_addr_arg as Array[String]).size() != 2 then
+            env.err.print(
+              "'--monitor' argument should be in format '127.0.0.1:9999'")
+            required_args_are_present = false
+          end
+        end
+
+        if name_arg is None then name_arg = "" end
+        if delay_arg is None then delay_arg = 1_000_000_000 end
+
+        if required_args_are_present then
+          let auth = env.root as AmbientAuth
+          let host = (listen_addr_arg as Array[String])(0)
+          let service = (listen_addr_arg as Array[String])(1)
+          let host' = (monhub_addr_arg as Array[String])(0)
+          let service' = (monhub_addr_arg as Array[String])(1)
+          let name' = recover val (name_arg as String).clone() end
+          let delay' = recover val (delay_arg as U64) end
+
+          let receiver = MetricsReceiver(env, auth, host, service, host',
+                                         service', name')
+          // start a timer to flush the receiver
+          let timers = Timers
+          let timer = Timer(FlushTimer(env, receiver), 0, delay')
+          timers(consume timer)
+        else
+          env.err.print("FUBAR! FUBAR!")
+        end
+      end
     end
 
 
