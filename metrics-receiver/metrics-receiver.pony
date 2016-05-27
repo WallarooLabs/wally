@@ -3,6 +3,7 @@ use "collections"
 use "buffy"
 use "buffy/metrics"
 use "sendence/tcp"
+use "sendence/bytes"
 use "options"
 use "time"
 
@@ -70,11 +71,29 @@ actor Main
           let name' = recover val (name_arg as String).clone() end
           let delay' = recover val (delay_arg as U64) end
 
-          let receiver = MetricsReceiver(env, auth, host, service, host',
-                                         service', name')
+          // Create connections and actors here
+          // MonitoringHub Output:
+          let notifier: TCPConnectionNotify iso =
+            recover MonitoringHubConnectNotify(env.out, env.err) end
+          let conn = TCPConnection(auth, consume notifier, host', service')
+          let output = MonitoringHubOutput(env.out, env.err, conn, name')
+          let handler: MetricsMonitoringHubHandler val = 
+            MetricsMonitoringHubHandler(MonitoringHubEncoder, output)
+
+          // Metrics Collection actor
+          let period: U64 = 1
+          let bin_selector: F64Selector val = Log10Selector
+          let mc = MetricsCollection(bin_selector, period, handler)
+
+          // Metrics Receiver Listener
+          let notifier' = MetricsNotifier(env.out, env.err, host, service, mc)
+          let listener = TCPListener(auth, consume notifier', host, service)
+ 
+          let receiver = MetricsReceiver(env.out, env.err, listener, mc)
+
           // start a timer to flush the receiver
           let timers = Timers
-          let timer = Timer(FlushTimer(env, receiver), 0, delay')
+          let timer = Timer(FlushTimer(receiver), 0, delay')
           timers(consume timer)
         else
           env.err.print("FUBAR! FUBAR!")
@@ -84,103 +103,115 @@ actor Main
 
 
 actor MetricsReceiver
-  let _env: Env
+  let _stderr: StdStream
+  let _stdout: StdStream
   let _handlers: Array[MetricsCollectionOutputHandler] ref =
     Array[MetricsCollectionOutputHandler]
-
-  let _period: U64 = 1
-  let _bin_selector: F64Selector val = Log10Selector
   let _mc: MetricsCollection tag
   let _listener: TCPListener
 
-  new create(env: Env, auth: AmbientAuth, host: String, service: String,
-             host': String, service': String, name': String) =>
-    _env = env
+  new create(stdout: StdStream, stderr: StdStream, listener: TCPListener,
+             mc: MetricsCollection) =>
+    _stdout = stdout
+    _stderr = stderr
+    _mc = mc
+    _listener = listener
 
-    let output = MonitoringHubOutput(env, name', host', service')
-    let handler: MetricsMonitoringHubHandler val = 
-      MetricsMonitoringHubHandler(MonitoringHubEncoder, output)
-    _mc = MetricsCollection(_bin_selector, _period, handler)
-    _listener = TCPListener(auth, MetricsNotifier(env, host, service, _mc),
-                            host, service)
 
   be finished() =>
     _listener.dispose()
 
   be flush() =>
     _mc.send_output()
-    _env.out.print("flushed")
+    _stdout.print("flushed")
+
 
 class MetricsNotifier is TCPListenNotify
-  let _env: Env
+  let _stdout: StdStream
+  let _stderr: StdStream
   let _host: String
   let _service: String
   let _mc: MetricsCollection tag
 
-  new iso create(env: Env, host: String, service: String,
-                 mc: MetricsCollection tag) =>
-    _env = env
+  new iso create(stdout: StdStream, stderr: StdStream,
+                 host: String, service: String, mc: MetricsCollection tag) =>
+    _stdout = stdout
+    _stderr = stderr
     _host = host
     _service = service
     _mc = mc 
 
   fun ref listening(listen: TCPListener ref) =>
-    _env.out.print("listening on " + _host + ":" + _service)
+    _stdout.print("listening on " + _host + ":" + _service)
 
   fun ref not_listening(listen: TCPListener ref) =>
-    _env.out.print("couldn't listen")
+    _stderr.print("couldn't listen")
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    MetricsReceiverNotify(_env, _mc)
+    MetricsReceiverNotify(_stdout, _stderr, _mc)
 
 class MetricsReceiverNotify is TCPConnectionNotify
-  let _env: Env
-  // TODO: Don't use Framer. Use "expect" from
-  //       https://github.com/Sendence/buffy/blob/master/giles/receiver/giles-receiver.pony#L126
-  let _framer: Framer = Framer
+  let _stdout: StdStream
+  let _stderr: StdStream
   let _mc: MetricsCollection tag
+  let _decoder: ReportMsgDecoder = ReportMsgDecoder
+  var _header: Bool = true
 
-  new iso create(env: Env, mc: MetricsCollection tag) =>
-    _env = env
+  new iso create(stdout: StdStream, stderr: StdStream,
+                 mc: MetricsCollection tag) =>
+    _stdout = stdout
+    _stderr = stderr
     _mc = mc
 
+
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print("connection accepted")
+    _stdout.print("connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    for chunked in _framer.chunk(consume data).values() do
+    if _header then
       try
-        let msg = ReportMsgDecoder(consume chunked)
-        match msg
-        | let m: NodeMetricsSummary val =>
-          _mc.process_summary(m)
-        | let m: BoundaryMetricsSummary val =>
-          _mc.process_summary(m)
-        else
-          _env.err.print("Message couldn't be decoded!")
-        end
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        conn.expect(expect)
+        _header = false
       else
-        _env.err.print("Error decoding incoming message.")
+        _stderr.print("Blew up reading header from Buffy")
       end
+    else
+      process_data(consume data)
+      conn.expect(4)
+      _header = true
     end
- 
+
+  fun ref process_data(data: Array[U8] iso) =>
+    try
+      let msg = _decoder(consume data)
+      match msg
+      | let m: NodeMetricsSummary val =>
+        _mc.process_summary(m)
+      | let m: BoundaryMetricsSummary val =>
+        _mc.process_summary(m)
+      else
+        _stderr.print("Message couldn't be decoded!")
+      end
+    else
+      _stderr.print("Error decoding incoming message.")
+    end
+
   fun ref connected(conn: TCPConnection ref) =>
-    _env.out.print("connected.")
+    _stdout.print("connected.")
 
   fun ref connect_failed(conn: TCPConnection ref) =>
-    _env.out.print("connection failed.")
+    _stdout.print("connection failed.")
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print("server closed")
+    _stdout.print("server closed")
 
 
 class FlushTimer is TimerNotify  
-  let _env: Env
   let _receiver: MetricsReceiver
 
-  new iso create(env: Env, receiver: MetricsReceiver) =>
-    _env = env
+  new iso create(receiver: MetricsReceiver) =>
     _receiver = receiver
 
   fun ref apply(timer: Timer, count: U64): Bool =>
