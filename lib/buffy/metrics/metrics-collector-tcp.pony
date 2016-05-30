@@ -1,3 +1,5 @@
+use "debug"
+
 use "collections"
 use "net"
 use "buffy/messages"
@@ -44,3 +46,7 @@ class MetricsCollectorConnectNotify is TCPConnectionNotify
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("Metrics Collector: server closed")
 
+  fun ref sent(conn: TCPConnection ref, data: (String val | Array[U8 val] val))
+  : (String val | Array[U8 val] val)  =>
+    Debug(data)
+    data

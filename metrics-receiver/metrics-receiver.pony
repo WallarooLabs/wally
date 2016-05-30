@@ -1,3 +1,4 @@
+use "debug"
 use "net"
 use "collections"
 use "buffy"
@@ -123,7 +124,6 @@ actor MetricsReceiver
 
   be flush() =>
     _mc.send_output()
-    _stdout.print("flushed")
 
 
 class MetricsNotifier is TCPListenNotify
@@ -169,21 +169,25 @@ class MetricsReceiverNotify is TCPConnectionNotify
     _stdout.print("connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    let d: Array[U8] val = consume data
+    Debug(d)
     if _header then
       try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let expect = Bytes.to_u32(d(0), d(1), d(2), d(3)).usize()
+        Debug("Expect: " + expect.string())
         conn.expect(expect)
         _header = false
       else
         _stderr.print("Blew up reading header from Buffy")
       end
     else
-      process_data(consume data)
+      Debug("length: " + d.size().string())
+      process_data(consume d)
       conn.expect(4)
       _header = true
     end
 
-  fun ref process_data(data: Array[U8] iso) =>
+  fun ref process_data(data: (Array[U8] val | Array[U8] iso)) =>
     try
       let msg = _decoder(consume data)
       match msg

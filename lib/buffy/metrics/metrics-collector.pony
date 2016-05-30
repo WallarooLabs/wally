@@ -32,7 +32,7 @@ actor MetricsCollector
 	    _step_count = _step_count + 1
 		end
 
-	  if _step_count > 10 then
+	  if _step_count > 1 then
 	  	_send_step_metrics_to_receiver()
 	  	for key in _step_reports.keys() do
 	  		_step_reports(key) = Array[StepMetricsReport val]
@@ -46,7 +46,7 @@ actor MetricsCollector
 		_boundary_reports.push(BoundaryMetricsReport(boundary_type,
 			msg_id, start_time, end_time))
 
-	  if _boundary_reports.size() > 10 then
+	  if _boundary_reports.size() > 1 then
 	    _send_boundary_metrics_to_receiver()
 	    _boundary_reports = Array[BoundaryMetricsReport val]
 	  end
