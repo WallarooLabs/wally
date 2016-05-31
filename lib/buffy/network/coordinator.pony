@@ -29,6 +29,9 @@ actor Coordinator
   let _spike_config: SpikeConfig val
   let _metrics_collector: MetricsCollector
   let _is_worker: Bool
+  // TODO: Remove this hack field when race condition
+  // around reconnect acking is fixed
+  var _stall: U64 = 0
 
   new create(name: String, env: Env, auth: AmbientAuth, leader_control_host: String,
     leader_control_service: String, leader_data_host: String,
@@ -252,6 +255,18 @@ actor Coordinator
           target_service)
       _data_connection_senders(target_name).reconnect(conn)
       let reconnect_message = WireMsgEncoder.reconnect_data(_node_name, _auth)
+
+      // TODO: There is a race condition around acking where messages
+      // build up on the data channel buffer on the data receiver.
+      // Before they are processed, the sender sends a reconnect on the
+      // control channel triggering
+      // a reconnect ack on the receiver before it processes those pending
+      // messages, leading to an incorrect count of how many sent messages
+      // made it through. This leads to processing duplicates.
+      for i in Range(0, 100000) do
+        _stall = _stall + i.u64()
+      end
+
       try _control_connections(target_name).write(reconnect_message) end
     else
       _env.err.print("Coordinator: couldn't reconnect to " + target_name)
