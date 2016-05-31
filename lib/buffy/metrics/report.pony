@@ -107,6 +107,9 @@ class BoundaryMetricsSummary is MetricsWireMsg
   new create(name: String) =>
     node_name = name
 
+  fun size(): USize =>
+    reports.size()
+
   fun ref add_report(r: BoundaryMetricsReport val) =>
     reports.push(r)
 
