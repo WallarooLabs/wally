@@ -102,10 +102,15 @@ class BoundaryMetricsReport is MetricsReport
 
 class BoundaryMetricsSummary is MetricsWireMsg
   let node_name: String
-  let reports: Array[BoundaryMetricsReport val] = Array[BoundaryMetricsReport val]
+  let reports: BoundaryReports = BoundaryReports
 
   new create(name: String) =>
     node_name = name
 
   fun ref add_report(r: BoundaryMetricsReport val) =>
     reports.push(r)
+
+type StepType is U64
+type StepId is U64
+type DigestMap is Map[_StepId, StepMetricsDigest]
+type BoundaryReports = Array[BoundaryMetricsReport val]
