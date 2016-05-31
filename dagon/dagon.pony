@@ -189,22 +189,38 @@ class Child
 
     
 class Node
-  let node_name: String
+  let name: String
   let is_canary: Bool
   let is_leader: Bool
-  let filepath: FilePath
+  let path: String
+  let docker_image: String
+  let docker_constraint_node: String
+  let docker_dir: String
+  let docker_tag: String
+  let docker_userid: String
   let args: Array[String] val
   let vars: Array[String] val
   
-  new create(node_name': String,
+  new create(name': String,
     is_canary': Bool, is_leader': Bool,
-    filepath': FilePath, args': Array[String] val,
+    path': String,
+    docker_image': String,
+    docker_constraint_node': String,
+    docker_dir': String,
+    docker_tag': String,
+    docker_userid': String,
+    args': Array[String] val,
     vars': Array[String] val)
   =>
-    node_name = node_name'
+    name = name'
     is_canary = is_canary'
     is_leader = is_leader'
-    filepath = filepath'
+    path = path'
+    docker_image = docker_image'
+    docker_constraint_node = docker_constraint_node'
+    docker_dir = docker_dir'
+    docker_tag = docker_tag'
+    docker_userid = docker_userid'
     args = args'
     vars = vars'
 
@@ -226,6 +242,7 @@ actor ProcessManager
   var _finished_registration: Bool = false
   let _timers: Timers = Timers
   var _timer: (Timer tag | None) = None
+  let _docker_postfix: String
   
   new create(env: Env, use_docker: Bool, timeout: I64, path: String,
     host: String, service: String)
@@ -236,6 +253,8 @@ actor ProcessManager
     _path = path
     _host = host
     _service = service
+    _docker_postfix = Time.wall_to_nanos(Time.now()).string()
+    
     let tcp_n = recover Notifier(env, this) end
     try
       _listener = TCPListener(env.root as AmbientAuth, consume tcp_n,
@@ -296,8 +315,13 @@ actor ProcessManager
     Parse ini file and register process nodes
     """
     _env.out.print("dagon: parse_and_register_processes")
-    var node_name: String = ""
-    var filepath: (FilePath | None) = None
+    var name: String = ""
+    var path: String = ""
+    var docker_image = ""
+    var docker_constraint_node = ""
+    var docker_dir = ""
+    var docker_tag = ""
+    var docker_userid = ""    
     var is_canary: Bool = false
     var is_leader: Bool = false
     try
@@ -305,21 +329,16 @@ actor ProcessManager
       let sections = IniParse(ini_file.lines())
       for section in sections.keys() do
         let argsbuilder: Array[String] iso = recover Array[String](6) end
-        node_name = ""
-        filepath = None
+        name = ""
+        path = ""
         is_canary = false
         is_leader = false
         for key in sections(section).keys() do
           match key
           | "path" =>
-            try
-              filepath = FilePath(_env.root as AmbientAuth,
-                sections(section)(key))
-            else
-              _env.out.print("dagon: Could not create FilePath")
-            end
+            path = sections(section)(key)
           | "name" =>
-            node_name = sections(section)(key)
+            name = sections(section)(key)
             argsbuilder.push("--" + key + "=" + sections(section)(key))
           | "sender" =>
             match sections(section)(key)
@@ -341,20 +360,13 @@ actor ProcessManager
           end
         end
         argsbuilder.push("--phone_home=" + _host + ":" + _service)
-
         let a: Array[String] val = consume argsbuilder
-
-        // for s in a.values() do
-        //   _env.out.print("dagon: args value: " + s)
-        // end
-        
         let vars: Array[String] iso = recover Array[String](0) end
-        if filepath isnt None then          
-          register_node(node_name, is_canary, is_leader,
-            filepath as FilePath, a, consume vars)          
-        else
-          _env.out.print("dagon: filepath not valid for: " + node_name)
-        end
+        
+        register_node(name, is_canary, is_leader, path,
+          docker_image, docker_constraint_node, docker_dir,
+          docker_tag, docker_userid,
+          a, consume vars)
       end
       _env.out.print("dagon: finished registration of nodes")
       _finished_registration = true
@@ -405,22 +417,32 @@ actor ProcessManager
     """
     _env.out.print("dagon: parse_node_section")
     let argsbuilder: Array[String] iso = recover Array[String](6) end    
-    var node_name: String = ""
-    var filepath: (FilePath | None) = None
+    var name: String = ""
+    var docker_image = ""
+    var docker_constraint_node = ""
+    var docker_dir = ""
+    var docker_tag = ""
+    var docker_userid = ""
+    var path: String = ""
     var is_canary: Bool = false
     var is_leader: Bool = false
     try
       for key in sections(section).keys() do
         match key
+        | "docker.image" =>
+          docker_image = sections(section)(key)
+        | "docker.constraint_node" =>
+          docker_constraint_node = sections(section)(key)
+        | "docker.dir" =>
+          docker_dir = sections(section)(key)
+        | "docker.tag" =>
+          docker_tag = sections(section)(key)
+        | "docker.userid" =>
+          docker_userid = sections(section)(key)
         | "path" =>
-          try
-            filepath = FilePath(_env.root as AmbientAuth,
-            sections(section)(key))
-          else
-            _env.out.print("dagon: Could not create FilePath")
-          end
+          path = sections(section)(key)
         | "name" =>
-          node_name = sections(section)(key)
+          name = sections(section)(key)
           argsbuilder.push("--" + key + "=" + sections(section)(key))
         | "sender" =>
           match sections(section)(key)
@@ -441,17 +463,18 @@ actor ProcessManager
           argsbuilder.push("--" + key + "=" + sections(section)(key))
         end
       end
-      
-      argsbuilder.push("--phone_home=" + _host + ":" + _service)
-      let a: Array[String] val = consume argsbuilder
-      let vars: Array[String] iso = recover Array[String](0) end
-
-      register_node(node_name, is_canary, is_leader, filepath as FilePath,
-          a, consume vars)          
     else
       _env.out.print("dagon: can't parse node section: " + section)
     end
+    
+    argsbuilder.push("--phone_home=" + _host + ":" + _service)
+    let a: Array[String] val = consume argsbuilder
+    let vars: Array[String] iso = recover Array[String](0) end
 
+    register_node(name, is_canary, is_leader, path,
+      docker_image, docker_constraint_node, docker_dir,
+      docker_tag, docker_userid,
+      a, consume vars)          
     
   fun ref _parse_docker_section(sections: IniMap, section: String): Map[String, String] =>
     """
@@ -481,14 +504,14 @@ actor ProcessManager
     end
     file
 
-  fun ref _filepath_from_path(auth: AmbientAuth, path: String): (FilePath | None) =>
+  fun ref _filepath_from_path(path: String): (FilePath | None) =>
     """
     Return a FilePath from a path if we have sufficient permissions to open it.
     TODO: Support restrictive permissions
     """
     var filepath: (FilePath | None) = None
     try
-      filepath = FilePath(auth, path)
+      filepath = FilePath(_env.root as AmbientAuth, path)
     else
       _env.out.print("dagon: Could not create FilePath: " + path)
     end
@@ -528,26 +551,36 @@ actor ProcessManager
       end
     end    
 
-  be register_node(node_name: String,
+  be register_node(name: String,
     is_canary: Bool, is_leader: Bool,
-    filepath: FilePath, args: Array[String] val,
+    path: String,
+    docker_image: String, docker_constraint_node: String,
+    docker_dir: String, docker_tag: String,
+    docker_userid: String,
+    args: Array[String] val,
     vars: Array[String] val)
   =>
     """
     Register a node with the appropriate map.
     """
     if is_canary then
-      _env.out.print("dagon: registering canary node: " + node_name)
-      _canaries(node_name) = recover Node(node_name, is_canary, is_leader,
-        filepath, args, vars) end
+      _env.out.print("dagon: registering canary node: " + name)
+      _canaries(name) = recover Node(name, is_canary, is_leader,
+        path, docker_image, docker_constraint_node, docker_dir,
+        docker_tag, docker_userid,
+        args, vars) end
     elseif is_leader then
-      _env.out.print("dagon: registering leader node: " + node_name)
-      _leaders(node_name) = recover Node(node_name, is_canary, is_leader,
-        filepath, args, vars) end
+      _env.out.print("dagon: registering leader node: " + name)
+      _leaders(name) = recover Node(name, is_canary, is_leader,
+        path, docker_image, docker_constraint_node, docker_dir,
+        docker_tag, docker_userid,
+        args, vars) end
     else
-      _env.out.print("dagon: registering node: " + node_name)        
-      _workers_receivers(node_name) = recover Node(node_name, is_canary, is_leader,
-        filepath, args, vars) end
+      _env.out.print("dagon: registering node: " + name)        
+      _workers_receivers(name) = recover Node(name, is_canary, is_leader,
+        path, docker_image, docker_constraint_node, docker_dir,
+        docker_tag, docker_userid,
+        args, vars) end
     end
 
   be boot_leaders() =>
@@ -555,7 +588,7 @@ actor ProcessManager
     Boot the leader node.
     """
     for node in _leaders.values() do
-      boot_process(node)
+      boot_node(node)
     end
 
   be boot_workers_receivers() =>
@@ -563,7 +596,7 @@ actor ProcessManager
     Boot the leader node.
     """
     for node in _workers_receivers.values() do
-      boot_process(node)
+      boot_node(node)
     end    
 
   be boot_canaries() =>
@@ -572,73 +605,171 @@ actor ProcessManager
     """
     _env.out.print("dagon: booting canary nodes")
     for node in _canaries.values() do
-      let node_name = node.node_name
-      let filepath = node.filepath
-      let args = node.args
-      let vars = node.vars
-      _env.out.print("dagon: booting canary: " + node_name)
+      let name = node.name
+      _env.out.print("dagon: booting canary: " + name)
+      boot_node(node)
+    end
+
+  be boot_node(node: Node val) =>
+    """
+    Boot a node as process or container.
+    """
+    if _use_docker then
+      boot_container(node)
+    else
       boot_process(node)
     end
+
+  be boot_container(node: Node val) =>
+    """
+    Boot a node as container.
+    """
+    var docker: (FilePath | None) = None
+    var docker_host: String = ""
+    var docker_network: String = ""
+    var docker_repo: String = ""
+    try
+      let docker_path = _docker_args("docker_path")
+      docker = _filepath_from_path(docker_path)
+      docker_host = _docker_args("docker_host")
+      docker_network = _docker_args("docker_network")
+      docker_repo = _docker_args("docker_repo")
+    else
+      _env.out.print("dagon: could not get docker info from map")
+    end
+
+    if docker isnt None then    
+      // try
+          // prepare the environment
+          let vars: Array[String] iso = recover Array[String](4) end
+          vars.push("DOCKER_HOST=" + docker_host)
+          vars.push("DOCKER_MACHINE_NAME=default")
+          vars.push("DOCKER_TLS_VERIFY=1")
+          vars.push("DOCKER_CERT_PATH=/Users/fix/.docker/machine/machines/default")
+          // prepare the Docker args          
+          let args: Array[String] iso = recover Array[String](6) end
+          args.push("docker")                      // first arg is always "docker"
+          args.push("run")                         // our Docker command
+          args.push("-u")                          // the userid to use
+          args.push(node.docker_userid)
+          args.push("--name")                      // the name of the app
+          args.push(node.name + _docker_postfix)   // make name unique for this run
+          args.push("-e")                          // add a constraint
+          args.push("constraint:node==" + node.docker_constraint_node)
+          args.push("-h")                          // Docker node name for /etc/hosts
+          args.push(node.name)
+          args.push("--privileged")                // give extended privileges
+          args.push("-d")                          // detach
+          args.push("-e")                          // set environment variables
+          args.push("LC_ALL=C.UTF-8")
+          args.push("-e")                          // set environment variables
+          args.push("LANG=C.UTF-8")
+          args.push("-v")                          // bind mount a volume
+          args.push("/bin:/bin:ro")
+          args.push("-v")                          // bind mount a volume
+          args.push("/lib:/lib:ro")
+          args.push("-v")                          // bind mount a volume
+          args.push("/lib64:/lib64:ro")          
+          args.push("-v")                          // bind mount a volume
+          args.push("/usr:/usr:ro")
+          args.push("-v")                          // bind mount a volume
+          args.push(node.docker_dir)
+          args.push("-w")                          // container working dir
+          args.push(node.docker_dir)
+          args.push("--net=")                      // connect to network
+          args.push(docker_network)
+          args.push(docker_repo                    // image registry and path
+            + node.docker_image
+            + node.docker_tag)
+            
+          // append node specific args
+          for value in node.args.values() do
+            args.push(value)
+          end
+
+          // dump args
+          let foo: Array[String] val = consume args
+          for value in foo.values() do
+            _env.out.print("dagon: args value: " + value)
+          end
+          
+          // finally boot the container
+          // boot_process(node.name, docker as FilePath,
+          //  consume args, consume vars)       
+           
+      // else
+      //   _env.out.print("dagon: error constructing Docker command")
+      // end
+    else
+      _env.out.print("dagon: don't have Docker info. Can't boot node.")
+    end
+
+
     
-  be boot_process(node: Node val)
-  =>
+  be boot_process(node: Node val) =>
     """
     Boot a node as a process.
     """
-    _env.out.print("dagon: booting: " + node.node_name)
-    let final_args = _prepend_node_name(node.node_name, node.args)
+    _env.out.print("dagon: booting process: " + node.name)
+    let filepath: (FilePath | None) = _filepath_from_path(node.path)
+    
+    let final_args = _prepend_name(node.name, node.args)
     let final_vars = node.args
     for arg in final_args.values() do
-      _env.out.print("dagon: " + node.node_name + " arg: " + arg)
-    end
-    
-    try
-      let pn: ProcessNotify iso = ProcessClient(_env, node.node_name, this)
-      let pm: ProcessMonitor = ProcessMonitor(consume pn, node.filepath,
-        consume final_args, consume final_vars)
-      let child = Child(node.node_name, node.is_canary, pm)      
-      roster.insert(node.node_name, child)
-    else
-      _env.out.print("dagon: booting process failed")
+      _env.out.print("dagon: " + node.name + " arg: " + arg)
     end
 
-  fun ref _prepend_node_name(node_name: String,
+    if filepath isnt None then
+      try
+        let pn: ProcessNotify iso = ProcessClient(_env, node.name, this)
+        let pm: ProcessMonitor = ProcessMonitor(consume pn, filepath as FilePath,
+          consume final_args, consume final_vars)
+        let child = Child(node.name, node.is_canary, pm)      
+        roster.insert(node.name, child)
+      else
+        _env.out.print("dagon: booting process failed")
+      end
+    else
+      _env.out.print("dagon: filepath is None: " + node.name)
+    end
+    
+  fun ref _prepend_name(name: String,
     args: Array[String] val): Array[String] val
   =>
     let result: Array[String] iso = recover Array[String](7) end
-    result.push(node_name)
+    result.push(name)
     for arg in args.values() do
       result.push(arg)
     end
     result
 
-  be send_shutdown(node_name: String) =>
+  be send_shutdown(name: String) =>
     """
     Shutdown a running process
     """
     try
-      _env.out.print("dagon: sending shutdown to " + node_name)
-      let child = roster(node_name)
+      _env.out.print("dagon: sending shutdown to " + name)
+      let child = roster(name)
       if child.conn isnt None then
         let c = child.conn as TCPConnection
-        let message = ExternalMsgEncoder.shutdown(node_name)
+        let message = ExternalMsgEncoder.shutdown(name)
         c.write(message)
       else
         _env.out.print("dagon: don't have a connection to send shutdown to "
-          + node_name)
+          + name)
       end
     else
-      _env.out.print("dagon: Failed sending shutdown to " + node_name)
+      _env.out.print("dagon: Failed sending shutdown to " + name)
     end
     
-  be received_ready(conn: TCPConnection, node_name: String) =>
+  be received_ready(conn: TCPConnection, name: String) =>
     """
     Register the connection for a ready node.
     TODO: If we want to wait for both leaders to be Ready then fixme
     """
-    _env.out.print("dagon: received ready from child: " + node_name)
+    _env.out.print("dagon: received ready from child: " + name)
     try
-      let child = roster(node_name)
+      let child = roster(name)
       // update child state and connection
       child.state = Ready
       child.conn  = conn
@@ -646,22 +777,22 @@ actor ProcessManager
       _env.out.print("dagon: failed to find child in roster")
     end
     // Boot workers and receivers if leader is ready
-    if _is_leader(node_name) then // fixme
+    if _is_leader(name) then // fixme
       boot_workers_receivers() 
     end
     // Start canary node if it's READY
-    if _canary_is_ready(node_name) then
-      start_canary_node(node_name)
+    if _canary_is_ready(name) then
+      start_canary_node(name)
     end
 
-  be received_topology_ready(conn: TCPConnection, node_name: String) =>
+  be received_topology_ready(conn: TCPConnection, name: String) =>
     """
     The leader signaled ready. Boot the canary nodes.
     """
-    _env.out.print("dagon: received topology ready from: " + node_name)
-    if _is_leader(node_name) then
+    _env.out.print("dagon: received topology ready from: " + name)
+    if _is_leader(name) then
       try      
-        let child = roster(node_name)
+        let child = roster(name)
         // update child state
         child.state = TopologyReady
       else
@@ -672,26 +803,26 @@ actor ProcessManager
       _env.out.print("dagon: ignoring topology ready from worker node")
     end
       
-  fun ref _is_leader(node_name: String): Bool =>
+  fun ref _is_leader(name: String): Bool =>
     """
     Check if a child is the leader.
     TODO: Find better predicate to decide if child is a leader.
     """
-    if node_name == "leader" then
+    if name == "leader" then
       return true
     else
       return false
     end
     
-  fun ref _canary_is_ready(node_name: String): Bool =>
+  fun ref _canary_is_ready(name: String): Bool =>
     """
     Check if a canary processes is ready.
     """
     try
-      let child = roster(node_name)
+      let child = roster(name)
       let state = child.state
-      _env.out.print("dagon: " + node_name + " state: " + _print_state(child))
-      _env.out.print("dagon: " + node_name + " iscanary: " + child.is_canary.string())
+      _env.out.print("dagon: " + name + " state: " + _print_state(child))
+      _env.out.print("dagon: " + name + " iscanary: " + child.is_canary.string())
       // _env.out.print("dagon: iscanary:" + child.is_canary.string())
       if child.is_canary then
         match state
@@ -717,18 +848,18 @@ actor ProcessManager
     end
     ""
   
-  be start_canary_node(node_name: String) =>
+  be start_canary_node(name: String) =>
     """
     Send start to a canary node.
     """
-    _env.out.print("dagon: starting canary node: " + node_name)
+    _env.out.print("dagon: starting canary node: " + name)
     try
-      let child = roster(node_name)
+      let child = roster(name)
       let canary_conn: (TCPConnection | None) = child.conn
       // send start to canary
       try
         if (child.state isnt Started) and (canary_conn isnt None) then
-          send_start(canary_conn as TCPConnection, node_name)
+          send_start(canary_conn as TCPConnection, name)
           child.state = Started
         end
       else
@@ -738,11 +869,11 @@ actor ProcessManager
       _env.out.print("dagon: could not get canary node from roster")
     end
     
-  be send_start(conn: TCPConnection, node_name: String) =>
+  be send_start(conn: TCPConnection, name: String) =>
     """
     Tell a child to start work.
     """
-    _env.out.print("dagon: sending start to child: " + node_name)
+    _env.out.print("dagon: sending start to child: " + name)
     try
       let c = conn as TCPConnection
       let message = ExternalMsgEncoder.start()
@@ -751,13 +882,13 @@ actor ProcessManager
       _env.out.print("dagon: Failed sending start")
     end
 
-  be received_done(conn: TCPConnection, node_name: String) =>
+  be received_done(conn: TCPConnection, name: String) =>
     """
     Node is done. Update it's state.
     """
-    _env.out.print("dagon: received Done from child: " + node_name)
+    _env.out.print("dagon: received Done from child: " + name)
     try
-      let child = roster(node_name)
+      let child = roster(name)
       child.state = Done
     else
       _env.out.print("dagon: failed to set child to done")
@@ -787,15 +918,15 @@ actor ProcessManager
       _env.out.print("dagon: can't iterate over roster")
     end
 
-  be received_done_shutdown(conn: TCPConnection, node_name: String) =>
+  be received_done_shutdown(conn: TCPConnection, name: String) =>
     """
     Node has shutdown. Remove it from our roster.
     TODO: Only enter wait_for_processing once ALL canaries reported DoneShutdown
     """
-    _env.out.print("dagon: received done_shutdown from child: " + node_name)
+    _env.out.print("dagon: received done_shutdown from child: " + name)
     conn.dispose()
     try
-      let child = roster(node_name)
+      let child = roster(name)
       child.state = DoneShutdown
       if child.is_canary then
         _env.out.print("dagon: canary reported DoneShutdown ---------------------")
@@ -805,54 +936,54 @@ actor ProcessManager
       _env.out.print("dagon: failed to set child state to done_shutdown")
     end
 
-  fun ref _is_done_shutdown(node_name: String): Bool =>
+  fun ref _is_done_shutdown(name: String): Bool =>
     """
     Check if the state of a node is DoneShutdown
     """
     try
-      let child = roster(node_name)
+      let child = roster(name)
       match child.state
       | DoneShutdown => return true
       else
         return false
       end
     else
-      _env.out.print("dagon: could not get state for " + node_name)
+      _env.out.print("dagon: could not get state for " + name)
     end
     false
     
-  be received_exit_code(node_name: String) =>
+  be received_exit_code(name: String) =>
     """
     Node has exited.
     """
-    _env.out.print("dagon: exited child: " + node_name)
-    if _is_leader(node_name) and _is_done_shutdown(node_name) then
+    _env.out.print("dagon: exited child: " + name)
+    if _is_leader(name) and _is_done_shutdown(name) then
       shutdown_listener()
     end
 
       
 class ProcessClient is ProcessNotify
   let _env: Env
-  let _node_name: String
+  let _name: String
   var exit_code: I32 = 0
   let _p_mgr: ProcessManager
   
-  new iso create(env: Env, node_name: String, p_mgr: ProcessManager) =>
+  new iso create(env: Env, name: String, p_mgr: ProcessManager) =>
     _env = env
-    _node_name= node_name
+    _name= name
     _p_mgr = p_mgr
     
   fun ref stdout(data: Array[U8] iso) =>
     let out = String.from_array(consume data)
-    _env.out.print("dagon: " + _node_name + " STDOUT [")
+    _env.out.print("dagon: " + _name + " STDOUT [")
     _env.out.print(out)
-    _env.out.print("dagon: " + _node_name + " STDOUT ]")
+    _env.out.print("dagon: " + _name + " STDOUT ]")
 
   fun ref stderr(data: Array[U8] iso) =>
     let err = String.from_array(consume data)
-    _env.out.print("dagon: " + _node_name + " STDERR [")
+    _env.out.print("dagon: " + _name + " STDERR [")
     _env.out.print(err)
-    _env.out.print("dagon: " + _node_name + " STDERR ]")
+    _env.out.print("dagon: " + _name + " STDERR ]")
     
   fun ref failed(err: ProcessError) =>
     match err
@@ -872,9 +1003,9 @@ class ProcessClient is ProcessNotify
     end
     
   fun ref dispose(child_exit_code: I32) =>
-    _env.out.print("dagon: " + _node_name + " exited with exit code: "
+    _env.out.print("dagon: " + _name + " exited with exit code: "
       + child_exit_code.string())
-    _p_mgr.received_exit_code(_node_name)
+    _p_mgr.received_exit_code(_name)
 
  
 class WaitForProcessing is TimerNotify  
