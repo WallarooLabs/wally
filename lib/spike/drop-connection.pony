@@ -14,23 +14,23 @@ class DropConnection is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     if spike() then
       drop(conn)
-    else
-      _letter.accepted(conn)
     end
+
+    _letter.accepted(conn)
 
   fun ref connecting(conn: TCPConnection ref, count: U32) =>
     if spike() then
       drop(conn)
-    else
-      _letter.connecting(conn, count)
     end
+
+    _letter.connecting(conn, count)
 
   fun ref connected(conn: TCPConnection ref) =>
     if spike() then
       drop(conn)
-    else
-      _letter.connected(conn)
     end
+
+    _letter.connected(conn)
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     _letter.connect_failed(conn)
