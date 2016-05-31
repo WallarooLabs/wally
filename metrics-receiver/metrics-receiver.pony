@@ -155,7 +155,7 @@ class MetricsReceiverNotify is TCPConnectionNotify
   let _stdout: StdStream
   let _stderr: StdStream
   let _mc: MetricsCollection tag
-  let _decoder: ReportMsgDecoder = ReportMsgDecoder
+  let _decoder: MetricsMsgDecoder = MetricsMsgDecoder
   var _header: Bool = true
 
   new iso create(stdout: StdStream, stderr: StdStream,
