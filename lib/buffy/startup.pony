@@ -71,6 +71,9 @@ actor Startup
       let leader_data_service = leader_data_addr(1)
       let spike_config = SpikeConfig(spike_delay, spike_drop)
       let auth = env.root as AmbientAuth
+      let stdout: StdStream = env.out
+      let stderr: StdStream = env.err
+
 
       let sinks: Map[U64, (String, String)] iso =
         recover Map[U64, (String, String)] end
@@ -88,13 +91,13 @@ actor Startup
           let metrics_service = metrics_addr(1)
 
           let metrics_notifier: TCPConnectionNotify iso =
-            MetricsCollectorConnectNotify(env, auth)
+            MetricsCollectorConnectNotify(auth, stdout, stderr)
           let metrics_conn: TCPConnection =
             TCPConnection(auth, consume metrics_notifier, metrics_host, metrics_service)
 
-          MetricsCollector(env, node_name, metrics_conn)
+          MetricsCollector(auth, node_name, metrics_conn)
         else
-          MetricsCollector(env, node_name)
+          MetricsCollector(auth, node_name)
         end
 
       let step_manager = StepManager(env, auth, node_name, consume sinks,
