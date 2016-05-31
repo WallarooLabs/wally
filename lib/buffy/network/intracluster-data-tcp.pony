@@ -3,7 +3,6 @@ use "collections"
 use "buffy/messages"
 use "buffy/metrics"
 use "sendence/bytes"
-use "sendence/tcp"
 use "time"
 use "spike"
 
@@ -86,8 +85,8 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
-  let _framer: Framer = Framer
   let _coordinator: Coordinator
+  var _header: Bool = true
 
   new iso create(env: Env, auth: AmbientAuth, name: String,
     coordinator: Coordinator) =>
@@ -97,19 +96,29 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
     _coordinator = coordinator
 
   fun ref accepted(conn: TCPConnection ref) =>
+    conn.expect(4)
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    for chunked in _framer.chunk(consume data).values() do
-      let msg = WireMsgDecoder(consume chunked, _auth)
+    if _header then
+      try
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        conn.expect(expect)
+        _header = false
+      else
+        _env.err.print("Error reading header on data channel")
+      end
+    else
+      let msg = WireMsgDecoder(consume data, _auth)
       match msg
       | let m: ForwardMsg val =>
         _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
       | let m: UnknownMsg val =>
         _env.err.print("Unknown data Buffy message type.")
       end
-    else
-      _env.err.print("Error decoding incoming data Buffy message.")
+
+      conn.expect(4)
+      _header = true
     end
 
   fun ref closed(conn: TCPConnection ref) =>
@@ -120,7 +129,6 @@ class IntraclusterDataSenderConnectNotify is TCPConnectionNotify
   let _auth: AmbientAuth
   let _name: String
   let _target_name: String
-  let _framer: Framer = Framer
   let _coordinator: Coordinator
 
   new iso create(env: Env, auth: AmbientAuth, name: String, target_name: String,

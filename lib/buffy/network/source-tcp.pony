@@ -3,7 +3,6 @@ use "collections"
 use "buffy/messages"
 use "buffy/metrics"
 use "sendence/bytes"
-use "sendence/tcp"
 use "../topology"
 use "buffy/epoch"
 
@@ -47,8 +46,8 @@ class SourceConnectNotify is TCPConnectionNotify
   let _source_id: U64
   let _step_manager: StepManager
   let _metrics_collector: MetricsCollector
-  let _framer: Framer = Framer
   let _coordinator: Coordinator
+  var _header: Bool = true
 
   new iso create(env: Env, auth: AmbientAuth, source_id: U64,
     step_manager: StepManager, coordinator: Coordinator,
@@ -61,12 +60,21 @@ class SourceConnectNotify is TCPConnectionNotify
     _metrics_collector = metrics_collector
 
   fun ref accepted(conn: TCPConnection ref) =>
+    conn.expect(4)
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    for chunked in _framer.chunk(consume data).values() do
+    if _header then
       try
-        let msg = ExternalMsgDecoder(chunked)
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        conn.expect(expect)
+        _header = false
+      else
+        _env.err.print("Error reading header from external source")
+      end
+    else
+      try
+        let msg = ExternalMsgDecoder(consume data)
         match msg
         | let m: ExternalDataMsg val =>
           let now = Epoch.milliseconds()
@@ -83,6 +91,9 @@ class SourceConnectNotify is TCPConnectionNotify
       else
         _env.err.print("Error decoding incoming message.")
       end
+
+      conn.expect(4)
+      _header = true
     end
 
   fun ref connected(conn: TCPConnection ref) =>
