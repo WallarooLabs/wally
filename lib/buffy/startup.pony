@@ -73,6 +73,7 @@ actor Startup
       let leader_control_service = leader_control_addr(1)
       let leader_data_host = leader_data_addr(0)
       let leader_data_service = leader_data_addr(1)
+      env.out.print("Using Spike seed " + spike_seed.string())
       let spike_config = SpikeConfig(spike_delay, spike_drop, spike_seed)
       let auth = env.root as AmbientAuth
 
