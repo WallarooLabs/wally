@@ -57,9 +57,11 @@ class DropConnection is TCPConnectionNotify
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     if spike() then
       drop(conn)
-    else
-      _letter.received(conn, consume data)
     end
+    // We need to always send the data we've read from the buffer along.
+    // Even when we drop the connection, we've already read that data
+    // and _letter is still expecting it.
+    _letter.received(conn, consume data)
 
   fun ref expect(conn: TCPConnection ref, qty: USize): USize =>
     _letter.expect(conn, qty)
