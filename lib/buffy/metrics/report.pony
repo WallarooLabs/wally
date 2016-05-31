@@ -12,7 +12,7 @@ primitive BoundaryTypes
 
 type ReportSummary is (NodeMetricsSummary | BoundaryMetricsSummary | None)
 
-trait val MetricsWireMsg
+trait MetricsWireMsg
 
 class UnknownMetricsMsg is MetricsWireMsg
   let data: Array[U8] val
@@ -21,18 +21,18 @@ class UnknownMetricsMsg is MetricsWireMsg
     data = d
 
 primitive MetricsMsgEncoder
-  fun _serialise(msg: MetricsWireMsg val, auth: AmbientAuth): Array[U8] val ? =>
+  fun _serialise(msg: MetricsWireMsg ref, auth: AmbientAuth): Array[U8] val ? =>
     let serialised: Array[U8] val =
       Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
     Bytes.length_encode(serialised)
 
-  fun nodemetrics(nodemetricssummary: NodeMetricsSummary, auth: AmbientAuth):
+  fun nodemetrics(summary: NodeMetricsSummary ref, auth: AmbientAuth):
   Array[U8] val ? =>
-    _serialise(consume nodemetricssummary, auth)
+    _serialise(summary, auth)
 
-  fun boundarymetrics(boundarymetricssummary: BoundaryMetricsSummary,
+  fun boundarymetrics(summary: BoundaryMetricsSummary ref,
                       auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(consume boundarymetricssummary, auth)
+    _serialise(summary, auth)
 
 primitive MetricsMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): MetricsWireMsg val =>
@@ -76,13 +76,28 @@ class StepMetricsDigest
 
 class NodeMetricsSummary is MetricsWireMsg
   let node_name: String
-  let digests: Array[StepMetricsDigest val] = Array[StepMetricsDigest val]
+  let digests: DigestMap = DigestMap
+  var _size: USize = 0
 
   new create(name: String) =>
     node_name = name
 
-  fun ref add_digest(d: StepMetricsDigest val) =>
-    digests.push(d)
+  fun size(): USize =>
+    _size
+
+  fun ref add_digest(step_id: StepId val, d: StepMetricsDigest ref) =>
+    digests.update(step_id, d)
+
+  fun ref add_report(step_id: StepId val, r: StepMetricsReport val) =>
+    try
+      digests(step_id).add_report(r)
+      _size = _size + 1
+    else
+      let dig:StepMetricsDigest ref = recover StepMetricsDigest(step_id) end
+      dig.add_report(r)
+      digests.update(step_id, dig)
+      _size = _size + 1
+    end
 
 class BoundaryMetricsReport is MetricsReport
   let boundary_type: U64
@@ -115,5 +130,5 @@ class BoundaryMetricsSummary is MetricsWireMsg
 
 type StepType is U64
 type StepId is U64
-type DigestMap is Map[_StepId, StepMetricsDigest]
-type BoundaryReports = Array[BoundaryMetricsReport val]
+type DigestMap is Map[StepId val, StepMetricsDigest ref]
+type BoundaryReports is Array[BoundaryMetricsReport val]
