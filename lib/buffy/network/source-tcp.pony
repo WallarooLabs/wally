@@ -70,7 +70,7 @@ class SourceConnectNotify is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        _env.err.print("Blew up reading header from Buffy")
+        _env.err.print("Error reading header from external source")
       end
     else
       try
