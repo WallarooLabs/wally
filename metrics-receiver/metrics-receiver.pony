@@ -166,6 +166,7 @@ class MetricsReceiverNotify is TCPConnectionNotify
 
 
   fun ref accepted(conn: TCPConnection ref) =>
+    conn.expect(4)
     _stdout.print("connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
