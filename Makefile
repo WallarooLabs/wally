@@ -184,7 +184,7 @@ test-giles-receiver: ## Test Giles Receiver
 test-giles-sender: ## Test Giles Sender
 	cd giles/sender && ./sender
 
-dagon-test: dagon-identity dagon-identity-drop #dagon-double ## Run dagon tests
+dagon-test: dagon-identity #dagon-identity-drop #dagon-double ## Run dagon tests
 
 dagon-double: ## Run double test with dagon
 	dagon/dagon.py dagon/config/double.ini
