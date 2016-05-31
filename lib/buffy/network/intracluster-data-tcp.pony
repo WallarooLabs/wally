@@ -108,8 +108,6 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
       | let m: UnknownMsg val =>
         _env.err.print("Unknown data Buffy message type.")
       end
-    else
-      _env.err.print("Error decoding incoming data Buffy message.")
     end
 
   fun ref closed(conn: TCPConnection ref) =>
