@@ -36,6 +36,7 @@ actor Main
     TODO: Run tests if list of args is empty.
     """
     var required_args_are_present = true
+    var use_docker: Bool = false    
     var timeout: (I64 | None) = None
     var path: (String | None) = None
     var p_arg: (Array[String] | None) = None
@@ -44,11 +45,13 @@ actor Main
     var service: String = ""
     var options = Options(env)
     options
+    .add("docker", "d", None)
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone_home", "h", StringArgument)
     for option in options do
       match option
+      | ("docker", None) => use_docker = true
       | ("timeout", let arg: I64) => timeout = arg
       | ("filepath", let arg: String) => path = arg
       | ("phone_home", let arg: String) => p_arg = arg.split(":")
@@ -87,6 +90,7 @@ actor Main
         return
       end
 
+      env.out.print("dagon: use docker: " + use_docker.string())
       env.out.print("dagon: timeout: " + timeout.string())
       env.out.print("dagon: path: " + (path as String))
 
@@ -95,7 +99,7 @@ actor Main
 
       env.out.print("dagon: host: " + phone_home_host)
       env.out.print("dagon: service: " + phone_home_service)
-      ProcessManager(env, timeout as I64, path as String,
+      ProcessManager(env, use_docker, timeout as I64, path as String,
         phone_home_host, phone_home_service)
     else
       env.err.print("dagon: error parsing arguments")
@@ -207,10 +211,12 @@ class Node
     
 actor ProcessManager
   let _env: Env
+  let _use_docker: Bool
   let _timeout: I64
   let _path: String
   let _host: String
   let _service: String
+  var _docker_args: Map[String, String] = Map[String, String](4)
   var _canaries: Map[String, Node val] = Map[String, Node val](2)
   var _workers_receivers: Map[String, Node val] = Map[String, Node val](2)
   var _leaders: Map[String, Node val] = Map[String, Node val](1)
@@ -221,10 +227,11 @@ actor ProcessManager
   let _timers: Timers = Timers
   var _timer: (Timer tag | None) = None
   
-  new create(env: Env, timeout: I64, path: String,
+  new create(env: Env, use_docker: Bool, timeout: I64, path: String,
     host: String, service: String)
   =>
     _env = env
+    _use_docker = use_docker
     _timeout = timeout
     _path = path
     _host = host
@@ -240,7 +247,11 @@ actor ProcessManager
       _env.out.print("Failed creating tcp listener")
       return
     end
-    parse_and_register()
+    if _use_docker then
+      parse_and_register_container_nodes()
+    else
+      parse_and_register_process_nodes()
+    end
     boot_topology()
     
   be listening() =>
@@ -280,11 +291,11 @@ actor ProcessManager
       _env.out.print("dagon: listener is not ready.")
     end
     
-  be parse_and_register() =>
+  be parse_and_register_process_nodes() =>
     """
-    Parse ini file and register components.
+    Parse ini file and register process nodes
     """
-    _env.out.print("dagon: parse_and_register")
+    _env.out.print("dagon: parse_and_register_processes")
     var node_name: String = ""
     var filepath: (FilePath | None) = None
     var is_canary: Bool = false
@@ -310,14 +321,14 @@ actor ProcessManager
           | "name" =>
             node_name = sections(section)(key)
             argsbuilder.push("--" + key + "=" + sections(section)(key))
-          | "sender" => // fixme
+          | "sender" =>
             match sections(section)(key)
             | "true" =>
               is_canary = true
             else
               is_canary = false
             end
-            | "leader" => // fixme
+            | "leader" =>
               match sections(section)(key)
               | "true" =>
                 is_leader = true
@@ -350,6 +361,158 @@ actor ProcessManager
     else
       _env.out.print("dagon: Could not create FilePath for ini file")
     end
+
+  be parse_and_register_container_nodes() =>
+    """
+    Parse ini file and register container nodes.
+    """
+    _env.out.print("dagon: parse_and_register_container_nodes")
+    var ini_file: (File | None) = None
+    try
+      ini_file = _file_from_path(_env.root as AmbientAuth, _path)
+    else
+      _env.out.print("dagon: can't read File from path: " + _path)
+    end
+
+    if ini_file isnt None then
+      let sections = _parse_config(ini_file)
+      for section in sections.keys() do
+        match section
+        | "docker" => _docker_args = _parse_docker_section(sections, section)
+        else
+          _parse_node_section(sections, section)
+        end
+      end
+    end
+    // dump docker configs
+    _dump_map(_docker_args)
+
+  fun ref _parse_config(ini_file: (File | None)): IniMap =>
+    """
+    Parse the config file.
+    """
+    var map: IniMap = IniMap()
+    try
+      map = IniParse((ini_file as File).lines())
+    else
+      _env.out.print("dagon: failed parsing ini file")
+    end
+    map
+
+  fun ref _parse_node_section(sections: IniMap, section: String) =>
+    """
+    Parse a node section and add node to appropriate map.
+    """
+    _env.out.print("dagon: parse_node_section")
+    let argsbuilder: Array[String] iso = recover Array[String](6) end    
+    var node_name: String = ""
+    var filepath: (FilePath | None) = None
+    var is_canary: Bool = false
+    var is_leader: Bool = false
+    try
+      for key in sections(section).keys() do
+        match key
+        | "path" =>
+          try
+            filepath = FilePath(_env.root as AmbientAuth,
+            sections(section)(key))
+          else
+            _env.out.print("dagon: Could not create FilePath")
+          end
+        | "name" =>
+          node_name = sections(section)(key)
+          argsbuilder.push("--" + key + "=" + sections(section)(key))
+        | "sender" =>
+          match sections(section)(key)
+            | "true" =>
+              is_canary = true
+            else
+              is_canary = false
+            end
+        | "leader" =>
+          match sections(section)(key)
+          | "true" =>
+            is_leader = true
+            argsbuilder.push("-l")  
+          else
+            is_leader = false
+          end
+        else
+          argsbuilder.push("--" + key + "=" + sections(section)(key))
+        end
+      end
+      
+      argsbuilder.push("--phone_home=" + _host + ":" + _service)
+      let a: Array[String] val = consume argsbuilder
+      let vars: Array[String] iso = recover Array[String](0) end
+
+      register_node(node_name, is_canary, is_leader, filepath as FilePath,
+          a, consume vars)          
+    else
+      _env.out.print("dagon: can't parse node section: " + section)
+    end
+
+    
+  fun ref _parse_docker_section(sections: IniMap, section: String): Map[String, String] =>
+    """
+    Parse the docker section and return args as a Map.
+    """
+    _env.out.print("dagon: parse_docker_section")
+    let args: Map[String, String] = Map[String, String]
+    try
+      for key in sections(section).keys() do
+        args(key) = sections(section)(key)
+      end
+    else
+      _env.out.print("dagon: couldn't parse args in section: " + section)
+    end
+    args
+    
+  fun ref _file_from_path(auth: AmbientAuth, path: String): (File | None) =>
+    """
+    Return a File from a path if we have sufficient permissions to open it.
+    TODO: Support restrictive permissions
+    """
+    var file: (File | None) = None
+    try
+      file = File(FilePath(auth, path))
+    else
+      _env.out.print("dagon: Could not create File: " + path)
+    end
+    file
+
+  fun ref _filepath_from_path(auth: AmbientAuth, path: String): (FilePath | None) =>
+    """
+    Return a FilePath from a path if we have sufficient permissions to open it.
+    TODO: Support restrictive permissions
+    """
+    var filepath: (FilePath | None) = None
+    try
+      filepath = FilePath(auth, path)
+    else
+      _env.out.print("dagon: Could not create FilePath: " + path)
+    end
+    filepath
+
+  fun ref _dump_map(args: Map[String, String]) =>
+    """
+    Print the args in a map.
+    """
+    try
+      for key in args.keys() do
+        _env.out.print("dagon:   key: " + key + "\t" + args(key))
+      end
+    else
+      _env.out.print("dagon: could not dump map of args")
+    end
+
+  fun ref _dump_args(args: Array[String]) =>
+    """
+    Print the args in an array.
+    """
+    for value in args.values() do
+      _env.out.print("dagon: array value: " + value)
+    end  
     
   be shutdown_listener() =>
     """
