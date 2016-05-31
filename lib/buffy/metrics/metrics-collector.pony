@@ -7,7 +7,7 @@ type _StepType is U64
 type _StepId is U64
 
 actor MetricsCollector
-  let _env: Env
+  let _auth: AmbientAuth
   let _node_name: String
   var _step_reports: Map[_StepId, Array[StepMetricsReport val]] =
   	Map[_StepId, Array[StepMetricsReport val]]
@@ -16,9 +16,9 @@ actor MetricsCollector
   	Array[BoundaryMetricsReport val]
   let _conn: (TCPConnection | None)
 
-	new create(env: Env, node_name: String, conn: (TCPConnection | None) = None) =>
-	  _env = env
-	  _node_name = node_name
+	new create(auth: AmbientAuth, node_name: String, conn: (TCPConnection | None) = None) =>
+	  _auth = auth
+    _node_name = node_name
 	  _conn = conn
 
 	be report_step_metrics(step_id: U64, start_time: U64, end_time: U64) =>
