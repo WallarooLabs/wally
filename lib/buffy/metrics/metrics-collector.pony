@@ -54,14 +54,14 @@ actor MetricsCollector
   fun ref _send_step_metrics_to_receiver() =>
   	match _conn
   	| let c: TCPConnection =>
-			let encoded = MetricsMsgEncoder.nodemetrics(_step_reports, _env.root)
+			let encoded = MetricsMsgEncoder.nodemetrics(_step_reports, _auth)
 			c.write(Bytes.length_encode(consume encoded))
 		end
 
   fun ref _send_boundary_metrics_to_receiver() =>
   	match _conn
   	| let c: TCPConnection =>
-			let encoded = MetricsMsgEncoder.boundarymetrics(_boundary_reports, _env.root)
+			let encoded = MetricsMsgEncoder.boundarymetrics(_boundary_reports, _auth)
 			c.write(Bytes.length_encode(consume encoded))
 		end
 
