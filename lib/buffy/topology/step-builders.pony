@@ -62,7 +62,7 @@ class PartitionBuilder[In: Any val, Out: Any val]
   fun apply(): BasicStep tag =>
     Partition[In, Out](_step_builder, _partition_function)
 
-class StatePartitionBuilder[In: Any val, Out: Any val, State: Any #read]
+class StatePartitionBuilder[In: Any val, Out: Any val, State: Any iso]
   is ThroughStepBuilder[In, Out]
   let _state_computation_builder: StateComputationBuilder[In, Out, State] val
   let _state_initializer: {(): State} val
@@ -78,7 +78,7 @@ class StatePartitionBuilder[In: Any val, Out: Any val, State: Any #read]
     Partition[In, Out](StateStepBuilder[In, Out, State](_state_computation_builder,
       _state_initializer), _partition_function)
 
-class StateStepBuilder[In: Any val, Out: Any val, State: Any #read]
+class StateStepBuilder[In: Any val, Out: Any val, State: Any iso]
   is ThroughStepBuilder[In, Out]
   let _state_computation_builder: StateComputationBuilder[In, Out, State] val
   let _state_initializer: {(): State} val
@@ -89,7 +89,7 @@ class StateStepBuilder[In: Any val, Out: Any val, State: Any #read]
     _state_initializer = s_initializer
 
   fun apply(): BasicStep tag =>
-    StateStep[In, Out, State](_state_initializer, _state_computation_builder())
+    StateStep[In, Out, State](_state_initializer)
 
 class ExternalConnectionBuilder[In: Any val] is SinkBuilder
   let _stringify: Stringify[In] val

@@ -54,8 +54,11 @@ class Split is MapComputation[String, WordCount val]
 
 class Count is StateComputation[WordCount val, WordCount val, WordCountTotals]
   fun name(): String => "count"
-  fun ref apply(state: WordCountTotals, d: WordCount val): WordCount val =>
-    state(d)
+  fun ref apply(state: WordCountTotals, d: WordCount val,
+    default_output_step: BasicStep tag,
+    message_wrapper: MessageWrapper[WordCount val] val) =>
+    let message = message_wrapper(state(d))
+    default_output_step(message)
 
 class WordCount
   let word: String

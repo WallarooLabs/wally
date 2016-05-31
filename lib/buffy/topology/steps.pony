@@ -181,17 +181,14 @@ actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
-actor StateStep[In: Any val, Out: Any val, State: Any #read]
+actor StateStep[In: Any val, Out: Any val, State: Any iso^]
   is ThroughStep[In, Out]
   var _step_reporter: (StepReporter val | None) = None
-  let _state_computation: StateComputation[In, Out, State]
   var _output: (BasicStep tag | None) = None
-  let _state: State
+  var _state: State
 
-  new create(state_initializer: {(): State} val,
-    state_computation: StateComputation[In, Out, State] iso) =>
+  new create(state_initializer: StateInitializer[State] val) =>
     _state = state_initializer()
-    _state_computation = consume state_computation
 
   be add_step_reporter(sr: StepReporter val) =>
     _step_reporter = sr
@@ -201,14 +198,14 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
 
   be apply(input: StepMessage val) =>
     match input
-    | let m: Message[In] val =>
-      let res = _state_computation(_state, m.data())
+    | let m: Message[StateComputation[In, Out, State] val] val =>
       match _output
       | let o: BasicStep tag =>
         let start_time = Time.millis()
-        let output_msg =
-          Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), consume res)
-        o(output_msg)
+        let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
+          m.last_ingress_ts())
+        let state_computation = m.data()
+        _state = state_computation(consume _state, o, message_wrapper)
         let end_time = Time.millis()
         match _step_reporter
         | let sr: StepReporter val =>
@@ -245,3 +242,6 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
           m.id(), m.source_ts(), Time.millis())
       end
     end
+
+interface StateInitializer[State: Any iso]
+  fun apply(): State
