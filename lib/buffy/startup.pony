@@ -95,9 +95,9 @@ actor Startup
           let metrics_conn: TCPConnection =
             TCPConnection(auth, consume metrics_notifier, metrics_host, metrics_service)
 
-          MetricsCollector(auth, node_name, metrics_conn)
+          MetricsCollector(stderr, auth, node_name, metrics_conn)
         else
-          MetricsCollector(auth, node_name)
+          MetricsCollector(stderr, auth, node_name)
         end
 
       let step_manager = StepManager(env, auth, node_name, consume sinks,
