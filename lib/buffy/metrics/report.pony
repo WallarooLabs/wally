@@ -37,9 +37,12 @@ primitive MetricsMsgEncoder
 primitive MetricsMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): MetricsWireMsg val =>
     try
-      let o = Serialised.input(InputSerialisedAuth(auth), data)(DeserialiseAuth(auth))
-      let m: MetricsWireMsg val = consume o
-      m
+      match Serialised.input(
+        InputSerialisedAuth(auth), data)(DeserialiseAuth(auth))
+      | let m: MetricsWireMsg val => m
+      else
+        UnknownMetricsMsg(data)
+      end
     else
       UnknownMetricsMsg(data)
     end
