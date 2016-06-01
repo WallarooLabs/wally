@@ -15,10 +15,10 @@ actor DataReceiver
   be received() =>
     _seen_since_last_ack = _seen_since_last_ack + 1
     if _seen_since_last_ack > 150 then
-      ack()
+      _ack()
     end
 
-  be ack() =>
+  fun ref _ack() =>
     _coordinator.ack_msg_count(_sender_name, _seen_since_last_ack)
     _seen_since_last_ack = 0
 
@@ -26,21 +26,23 @@ actor DataReceiver
     if _connected == true then
       _reconnecting = true
     else
-      connect_ack()
+      _connect_ack()
       _connected = true
       _reconnecting = false
     end
 
   be close_connection() =>
     if _reconnecting == true then
-      connect_ack()
+      _connect_ack()
       _reconnecting = false
       _connected = true
     else
       _connected = false
     end
 
-  be connect_ack() =>
+  be connect_ack() => _connect_ack()
+
+  fun ref _connect_ack() =>
     @printf[None](("Receiver: connect acking " + _seen_since_last_ack.string() + "\n").cstring())
     _coordinator.ack_connect_msg_count(_sender_name, _seen_since_last_ack)
     _seen_since_last_ack = 0

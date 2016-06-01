@@ -23,13 +23,17 @@ actor DataSender
       _conn.write(msg_data)
     end
 
-  be send_ready() =>
+  be send_ready() => _send_ready()
+
+  fun ref _send_ready() =>
     try
       let msg = WireMsgEncoder.data_sender_ready(_sender_name, _auth)
       _conn.write(msg)
     end
 
-  be ack(msg_count: U64) =>
+  be ack(msg_count: U64) => _ack(msg_count)
+
+  fun ref _ack(msg_count: U64) =>
     for i in Range(0, msg_count.usize()) do
       try
         @printf[None](("Dequeuing " + i.string() + " of " + msg_count.string() + "!!\n").cstring())
@@ -41,18 +45,18 @@ actor DataSender
 
   be ack_connect(msg_count: U64) =>
     @printf[None](("Sender: connect ack received " + msg_count.string() + "\n").cstring())
-    ack(msg_count)
+    _ack(msg_count)
 
     if not _sending then
-      enable_sending()
+      _enable_sending()
     end
 
   be reconnect(conn: TCPConnection) =>
     _conn = conn
     _sending = false
-    send_ready()
+    _send_ready()
 
-  be enable_sending() =>
+  fun ref _enable_sending() =>
     let size = _held.size()
     for idx in Range(0, size) do
       try

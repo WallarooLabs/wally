@@ -234,16 +234,13 @@ actor Coordinator
       phc.write(msg)
     end
 
-  be _send_data_sender_ready_msg(target_name: String) =>
+  fun _send_data_sender_ready_msg(target_name: String) =>
     try
       _data_connection_senders(target_name).send_ready()
     else
       _env.out.print("Coordinator: could not send data sender ready to "
          + target_name + "--no data conn available")
     end
-
-  be enable_sending(target_name: String) =>
-    try _data_connection_senders(target_name).enable_sending() end
 
   be ack_msg_count(sender_name: String, seen_since_last_ack: U64) =>
     try
@@ -267,19 +264,8 @@ actor Coordinator
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, target_host,
           target_service)
+
       _data_connection_senders(target_name).reconnect(conn)
-
-      // TODO: There is a race condition around acking where messages
-      // build up on the data channel buffer on the data receiver.
-      // Before they are processed, the sender sends a reconnect on the
-      // control channel triggering
-      // a reconnect ack on the receiver before it processes those pending
-      // messages, leading to an incorrect count of how many sent messages
-      // made it through. This leads to processing duplicates.
-//      for i in Range(0, 100000) do
-//        _stall = _stall + i.u64()
-//      end
-
 
       let reconnect_message = WireMsgEncoder.reconnect_data(_node_name, _auth)
       try _control_connections(target_name).write(reconnect_message) end
