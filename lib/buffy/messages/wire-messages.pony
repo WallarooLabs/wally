@@ -39,10 +39,6 @@ primitive WireMsgEncoder
   fun done_shutdown(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
     _serialise(DoneShutdownMsg(node_name), auth)
 
-  fun forward(step_id: U64, node_name: String, step_msg: StepMessage val,
-    auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(ForwardMsg(step_id, node_name, step_msg), auth)
-
   fun spin_up(step_id: U64, step_builder: BasicStepBuilder val, auth: AmbientAuth)
     : Array[U8] val ? =>
     _serialise(SpinUpMsg(step_id, step_builder), auth)
@@ -67,9 +63,9 @@ primitive WireMsgEncoder
   fun ack_initialized(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
     _serialise(AckInitializedMsg(node_name), auth)
 
-  fun ack_messages_received(node_name: String, msg_count: U64,
+  fun ack_message_id(node_name: String, msg_id: U64,
     auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(AckMsgsReceivedMsg(node_name, msg_count), auth)
+    _serialise(AckMsgIdMsg(node_name, msg_id), auth)
  
   fun reconnect_data(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
     _serialise(ReconnectDataMsg(node_name), auth)
@@ -94,9 +90,13 @@ primitive WireMsgEncoder
     : Array[U8] val ? =>
     _serialise(AckFinishedConnectionsMsg(node_name), auth)
 
-  fun ack_connect_messages_received(node_name: String, msg_count: U64,
+  fun ack_connect_message_id(node_name: String, msg_id: U64,
     auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(AckConnectMsgsReceivedMsg(node_name, msg_count), auth)
+    _serialise(AckConnectMsgIdMsg(node_name, msg_id), auth)
+
+  fun data_channel(id: U64, forward: Forward val, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(DataChannelMsg(id, forward), auth)
 
 primitive WireMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): WireMsg val =>
@@ -170,16 +170,6 @@ class DoneShutdownMsg is WireMsg
   new val create(name: String) =>
     node_name = name
 
-class ForwardMsg is WireMsg
-  let step_id: U64
-  let from_node_name: String
-  let msg: StepMessage val
-
-  new val create(s_id: U64, from: String, m: StepMessage val) =>
-    step_id = s_id
-    from_node_name = from
-    msg = m
-
 class SpinUpMsg is WireMsg
   let step_id: U64
   let step_builder: BasicStepBuilder val
@@ -234,21 +224,21 @@ class UnknownMsg is WireMsg
   new val create(d: Array[U8] val) =>
     data = d
 
-class AckMsgsReceivedMsg is WireMsg
+class AckMsgIdMsg is WireMsg
   let node_name: String
-  let msg_count: U64
+  let msg_id: U64
 
-  new val create(name: String, m_count: U64) =>
+  new val create(name: String, m_id: U64) =>
       node_name = name
-      msg_count = m_count
+      msg_id = m_id
 
-class AckConnectMsgsReceivedMsg is WireMsg
+class AckConnectMsgIdMsg is WireMsg
   let node_name: String
-  let msg_count: U64
+  let msg_id: U64
 
-  new val create(name: String, m_count: U64) =>
+  new val create(name: String, m_id: U64) =>
       node_name = name
-      msg_count = m_count
+      msg_id = m_id
 
 class ReconnectDataMsg is WireMsg
   let node_name: String
@@ -285,3 +275,11 @@ class AckFinishedConnectionsMsg is WireMsg
 
   new val create(name: String) =>
     node_name = name
+
+class DataChannelMsg is WireMsg
+  let id: U64
+  let forward: Forward val
+
+  new val create(i: U64, f: Forward val) =>
+    id = i
+    forward = f

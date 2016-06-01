@@ -1,10 +1,12 @@
 use "net"
 use "collections"
+use "buffy/messages"
+use "../topology"
 
 actor DataReceiver
   let _sender_name: String
   let _coordinator: Coordinator
-  var _seen_since_last_ack: U64 = 0
+  var _last_id_seen: U64 = 0
   var _connected: Bool = false
   var _reconnecting: Bool = false
 
@@ -12,15 +14,18 @@ actor DataReceiver
     _sender_name = sender_name
     _coordinator = coordinator
 
-  be received() =>
-    _seen_since_last_ack = _seen_since_last_ack + 1
-    if _seen_since_last_ack > 150 then
-      _ack()
+  be received(data_ch_id: U64, step_id: U64, msg: StepMessage val,
+    step_manager: StepManager tag) =>
+    if data_ch_id > _last_id_seen then
+      _last_id_seen = data_ch_id
+      if (_last_id_seen % 150) == 0 then
+        _ack()
+      end
+      step_manager(step_id, msg)
     end
 
   fun ref _ack() =>
-    _coordinator.ack_msg_count(_sender_name, _seen_since_last_ack)
-    _seen_since_last_ack = 0
+    _coordinator.ack_msg_id(_sender_name, _last_id_seen)
 
   be open_connection() =>
     if _connected == true then
@@ -43,6 +48,4 @@ actor DataReceiver
   be connect_ack() => _connect_ack()
 
   fun ref _connect_ack() =>
-    @printf[None](("Receiver: connect acking " + _seen_since_last_ack.string() + "\n").cstring())
-    _coordinator.ack_connect_msg_count(_sender_name, _seen_since_last_ack)
-    _seen_since_last_ack = 0
+    _coordinator.ack_connect_msg_id(_sender_name, _last_id_seen)

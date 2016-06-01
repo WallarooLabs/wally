@@ -217,16 +217,19 @@ actor Coordinator
       _env.out.print("Coordinator: no control conn to " + target_name)
     end
 
-  be send_data_message(target_name: String, msg: Array[U8] val) =>
+  be send_data_message(target_name: String, forward: Forward val) =>
     try
-      _data_connection_senders(target_name).write(msg)
+      _data_connection_senders(target_name).forward(forward)
     else
       _env.out.print("Coordinator: no data conn for " + target_name)
     end
 
-  be deliver(step_id: U64, from_name: String, msg: StepMessage val) =>
-    try _data_connection_receivers(from_name).received() end
-    _step_manager(step_id, msg)
+  be deliver(data_ch_id: U64, step_id: U64, from_name: String,
+    msg: StepMessage val) =>
+    try
+      _data_connection_receivers(from_name)
+        .received(data_ch_id, step_id, msg, _step_manager)
+    end
 
   be send_phone_home_message(msg: Array[U8] val) =>
     match _phone_home_connection
@@ -242,9 +245,9 @@ actor Coordinator
          + target_name + "--no data conn available")
     end
 
-  be ack_msg_count(sender_name: String, seen_since_last_ack: U64) =>
+  be ack_msg_id(sender_name: String, last_id: U64) =>
     try
-      let message = WireMsgEncoder.ack_messages_received(_node_name, seen_since_last_ack, _auth)
+      let message = WireMsgEncoder.ack_message_id(_node_name, last_id, _auth)
       _control_connections(sender_name).write(message)
     end
 
@@ -300,10 +303,10 @@ actor Coordinator
       _data_connection_receivers(from_name) = receiver
     end
 
-  be ack_connect_msg_count(sender_name: String, seen_since_last_ack: U64) =>
+  be ack_connect_msg_id(sender_name: String, last_id: U64) =>
     try
-      let message = WireMsgEncoder.ack_connect_messages_received(_node_name,
-        seen_since_last_ack, _auth)
+      let message = WireMsgEncoder.ack_connect_message_id(_node_name,
+        last_id, _auth)
       _control_connections(sender_name).write(message)
     end
 

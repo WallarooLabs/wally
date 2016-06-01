@@ -100,7 +100,6 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
     _auth = auth
     _name = name
     _coordinator = coordinator
-    _env.out.print(_id.string() + " started; at " + Time.micros().string())
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -119,8 +118,9 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
     else
       let msg = WireMsgDecoder(consume data, _auth)
       match msg
-      | let m: ForwardMsg val =>
-        _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
+      | let d: DataChannelMsg val =>
+        let f = d.forward
+        _coordinator.deliver(d.id, f.step_id, f.from_node_name, f.msg)
       | let m: DataSenderReadyMsg val =>
         _sender_name = m.node_name
         _coordinator.connect_receiver(m.node_name)
@@ -133,7 +133,6 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
     end
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print(_id.string() + " isclosed at " + Time.micros().string())
     _coordinator.close_receiver(_sender_name)
     _env.out.print("DataReceiverNotify: closed!")
 

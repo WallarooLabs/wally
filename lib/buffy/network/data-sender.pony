@@ -7,8 +7,9 @@ actor DataSender
   let _target_name: String
   var _conn: TCPConnection
   let _auth: AmbientAuth
-  let _held: Queue[Array[U8] val] = Queue[Array[U8] val]
+  let _held: Queue[(U64, Array[U8] val)] = Queue[(U64, Array[U8] val)]
   var _sending: Bool = true
+  var _msg_id: U64 = 1
 
   new create(sender_name: String, target_name: String, conn: TCPConnection,
     auth: AmbientAuth) =>
@@ -17,11 +18,18 @@ actor DataSender
     _conn = conn
     _auth = auth
 
-  be write(msg_data: Array[U8] val) =>
-    _held.enqueue(msg_data)
-    if _sending then
-      _conn.write(msg_data)
+  be forward(f: Forward val) =>
+    try
+      let data_msg = WireMsgEncoder.data_channel(_msg_id, f, _auth)
+      _held.enqueue((_msg_id, data_msg))
+      _msg_id = _msg_id + 1
+      if _sending then
+        _conn.write(data_msg)
+      end
     end
+
+  be write(msg: Array[U8] val) =>
+    _conn.write(msg)
 
   be send_ready() => _send_ready()
 
@@ -31,21 +39,23 @@ actor DataSender
       _conn.write(msg)
     end
 
-  be ack(msg_count: U64) => _ack(msg_count)
+  be ack(msg_id: U64) => _ack(msg_id)
 
-  fun ref _ack(msg_count: U64) =>
-    for i in Range(0, msg_count.usize()) do
+  fun ref _ack(msg_id: U64) =>
+    var i: USize = 0
+    while i < _held.size() do
       try
-        @printf[None](("Dequeuing " + i.string() + " of " + msg_count.string() + "!!\n").cstring())
-        _held.dequeue()
-      else
-        @printf[None]("Couldn't dequeue!!\n".cstring())
+        if _held.peek()._1 <= msg_id then
+          _held.dequeue()
+          i = i + 1
+        else
+          break
+        end
       end
     end
 
-  be ack_connect(msg_count: U64) =>
-    @printf[None](("Sender: connect ack received " + msg_count.string() + "\n").cstring())
-    _ack(msg_count)
+  be ack_connect(msg_id: U64) =>
+    _ack(msg_id)
 
     if not _sending then
       _enable_sending()
@@ -60,9 +70,8 @@ actor DataSender
     let size = _held.size()
     for idx in Range(0, size) do
       try
-        let next_msg = _held(idx)
+        let next_msg = _held(idx)._2
         _conn.write(next_msg)
-        @printf[None](("Resending " + idx.string() + " of " + size.string() + "!!\n").cstring())
       else
         @printf[None]("Couldn't resend!!\n".cstring())
       end
