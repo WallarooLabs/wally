@@ -3,6 +3,7 @@ use "net"
 use "collections"
 use "buffy"
 use "buffy/metrics"
+use "buffy/flusher"
 use "sendence/tcp"
 use "sendence/bytes"
 use "options"
@@ -78,7 +79,7 @@ actor Main
             recover MonitoringHubConnectNotify(env.out, env.err) end
           let conn = TCPConnection(auth, consume notifier, host', service')
           let output = MonitoringHubOutput(env.out, env.err, conn, name')
-          let handler: MetricsMonitoringHubHandler val = 
+          let handler: MetricsMonitoringHubHandler val =
             MetricsMonitoringHubHandler(MonitoringHubEncoder, output)
 
           // Metrics Collection actor
@@ -87,23 +88,21 @@ actor Main
           let mc = MetricsCollection(bin_selector, period, handler)
 
           // Metrics Receiver Listener
-          let notifier' = MetricsNotifier(env.out, env.err, host, service, mc)
+          let notifier' = MetricsNotifier(env.out, env.err, auth, host,
+                                          service, mc)
           let listener = TCPListener(auth, consume notifier', host, service)
- 
+
           let receiver = MetricsReceiver(env.out, env.err, listener, mc)
 
           // start a timer to flush the receiver
-          let timers = Timers
-          let timer = Timer(FlushTimer(receiver), 0, delay')
-          timers(consume timer)
+          Flusher(receiver, delay')
         else
           env.err.print("FUBAR! FUBAR!")
         end
       end
     end
 
-
-actor MetricsReceiver
+actor MetricsReceiver is FlushingActor
   let _stderr: StdStream
   let _stdout: StdStream
   let _handlers: Array[MetricsCollectionOutputHandler] ref =
@@ -211,14 +210,3 @@ class MetricsReceiverNotify is TCPConnectionNotify
 
   fun ref closed(conn: TCPConnection ref) =>
     _stdout.print("server closed")
-
-
-class FlushTimer is TimerNotify  
-  let _receiver: MetricsReceiver
-
-  new iso create(receiver: MetricsReceiver) =>
-    _receiver = receiver
-
-  fun ref apply(timer: Timer, count: U64): Bool =>
-    _receiver.flush()
-    true

@@ -3,8 +3,9 @@ use "net"
 use "buffy/messages"
 use "sendence/bytes"
 use "buffy/epoch"
+use "buffy/flusher"
 
-actor MetricsCollector
+actor MetricsCollector is FlushingActor
   let _stderr: StdStream
   let _auth: AmbientAuth
   let _node_name: String
@@ -27,6 +28,10 @@ actor MetricsCollector
     _max_time = max_time
     _boundary_summary = BoundaryMetricsSummary(_node_name)
     _step_summary = NodeMetricsSummary(_node_name)
+
+  be flush() =>
+    _send_steps_if_over_max()
+    _send_boundary_if_over_max()
 
 	be report_step_metrics(step_id: StepId, start_time: U64, end_time: U64) =>
     let r = StepMetricsReport(start_time, end_time)
