@@ -12,7 +12,7 @@ primitive BoundaryTypes
 
 type ReportSummary is (NodeMetricsSummary | BoundaryMetricsSummary | None)
 
-trait MetricsWireMsg
+trait val MetricsWireMsg
 
 class UnknownMetricsMsg is MetricsWireMsg
   let data: Array[U8] val
@@ -37,12 +37,9 @@ primitive MetricsMsgEncoder
 primitive MetricsMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): MetricsWireMsg val =>
     try
-      match Serialised.input(InputSerialisedAuth(auth), data)
-        (DeserialiseAuth(auth))
-      | let m: MetricsWireMsg val => m
-      else
-        UnknownMetricsMsg(data)
-      end
+      let o = Serialised.input(InputSerialisedAuth(auth), data)(DeserialiseAuth(auth))
+      let m: MetricsWireMsg val = consume o
+      m
     else
       UnknownMetricsMsg(data)
     end
