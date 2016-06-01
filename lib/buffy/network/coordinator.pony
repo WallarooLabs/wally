@@ -68,8 +68,11 @@ actor Coordinator
       let data_conn: TCPConnection =
         TCPConnection(_auth, consume data_notifier, _leader_data_host,
           _leader_data_service)
-      _data_connection_senders("leader") = DataSender("leader", data_conn)
-      _data_connection_receivers("leader") = DataReceiver("leader", this)
+      _data_connection_senders("leader") = DataSender(_node_name, "leader", data_conn, _auth)
+      if not _data_connection_receivers.contains("leader") then
+        _data_connection_receivers("leader") = DataReceiver("leader", this)
+      end
+      _send_data_sender_ready_msg("leader")
     end
 
 
@@ -190,8 +193,11 @@ actor Coordinator
     let conn: TCPConnection =
       TCPConnection(_auth, consume notifier, target_host,
         target_service)
-    _data_connection_senders(target_name) = DataSender(target_name, conn)
-    _data_connection_receivers(target_name) = DataReceiver(target_name, this)
+    _data_connection_senders(target_name) = DataSender(_node_name, target_name, conn, _auth)
+    if not _data_connection_receivers.contains(target_name) then
+      _data_connection_receivers(target_name) = DataReceiver(target_name, this)
+    end
+    _send_data_sender_ready_msg(target_name)
     _ack_data_channel()
 
   fun _ack_data_channel() =>
@@ -228,6 +234,14 @@ actor Coordinator
       phc.write(msg)
     end
 
+  be _send_data_sender_ready_msg(target_name: String) =>
+    try
+      _data_connection_senders(target_name).send_ready()
+    else
+      _env.out.print("Coordinator: could not send data sender ready to "
+         + target_name + "--no data conn available")
+    end
+
   be enable_sending(target_name: String) =>
     try _data_connection_senders(target_name).enable_sending() end
 
@@ -254,7 +268,6 @@ actor Coordinator
         TCPConnection(_auth, consume notifier, target_host,
           target_service)
       _data_connection_senders(target_name).reconnect(conn)
-      let reconnect_message = WireMsgEncoder.reconnect_data(_node_name, _auth)
 
       // TODO: There is a race condition around acking where messages
       // build up on the data channel buffer on the data receiver.
@@ -263,32 +276,54 @@ actor Coordinator
       // a reconnect ack on the receiver before it processes those pending
       // messages, leading to an incorrect count of how many sent messages
       // made it through. This leads to processing duplicates.
-      for i in Range(0, 100000) do
-        _stall = _stall + i.u64()
-      end
+//      for i in Range(0, 100000) do
+//        _stall = _stall + i.u64()
+//      end
 
+
+      let reconnect_message = WireMsgEncoder.reconnect_data(_node_name, _auth)
       try _control_connections(target_name).write(reconnect_message) end
     else
       _env.err.print("Coordinator: couldn't reconnect to " + target_name)
     end
 
-  be negotiate_data_reconnection(from_name: String) =>
+  be connect_receiver(from_name: String) =>
     try
-      _data_connection_receivers(from_name).reconnect_ack()
+      _data_connection_receivers(from_name).open_connection()
     else
-      _env.out.print("Can't negotiate since there's no DataReceiver!")
+      let receiver = DataReceiver(from_name, this)
+      receiver.open_connection()
+      _data_connection_receivers(from_name) = receiver
     end
 
-  be ack_reconnect_msg_count(sender_name: String, seen_since_last_ack: U64) =>
+  be close_receiver(from_name: String) =>
     try
-      let message = WireMsgEncoder.ack_reconnect_messages_received(_node_name,
+      _data_connection_receivers(from_name).close_connection()
+    else
+      let receiver = DataReceiver(from_name, this)
+      receiver.close_connection()
+      _data_connection_receivers(from_name) = receiver
+    end
+
+  be negotiate_data_reconnection(from_name: String) =>
+    try
+      _data_connection_receivers(from_name).connect_ack()
+    else
+      let receiver = DataReceiver(from_name, this)
+      receiver.connect_ack()
+      _data_connection_receivers(from_name) = receiver
+    end
+
+  be ack_connect_msg_count(sender_name: String, seen_since_last_ack: U64) =>
+    try
+      let message = WireMsgEncoder.ack_connect_messages_received(_node_name,
         seen_since_last_ack, _auth)
       _control_connections(sender_name).write(message)
     end
 
-  be process_data_reconnect_ack(receiver_name: String, seen_since_last_ack: U64) =>
+  be process_data_connect_ack(receiver_name: String, seen_since_last_ack: U64) =>
     try
-      _data_connection_senders(receiver_name).ack_reconnect(seen_since_last_ack)
+      _data_connection_senders(receiver_name).ack_connect(seen_since_last_ack)
     end
 
 

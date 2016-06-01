@@ -94,8 +94,8 @@ class WorkerConnectNotify is TCPConnectionNotify
         _coordinator.ack_initialization_msgs_finished(m.node_name)
       | let m: AckMsgsReceivedMsg val =>
         _coordinator.process_data_ack(m.node_name, m.msg_count)
-      | let m: AckReconnectMsgsReceivedMsg val =>
-        _coordinator.process_data_reconnect_ack(m.node_name, m.msg_count)
+      | let m: AckConnectMsgsReceivedMsg val =>
+        _coordinator.process_data_connect_ack(m.node_name, m.msg_count)
       | let m: FinishedConnectionsMsg val =>
         _coordinator.ack_finished_connections(m.node_name)
       | let m: SpinUpMsg val =>

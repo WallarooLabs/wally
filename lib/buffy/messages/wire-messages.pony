@@ -94,9 +94,9 @@ primitive WireMsgEncoder
     : Array[U8] val ? =>
     _serialise(AckFinishedConnectionsMsg(node_name), auth)
 
-  fun ack_reconnect_messages_received(node_name: String, msg_count: U64,
+  fun ack_connect_messages_received(node_name: String, msg_count: U64,
     auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(AckReconnectMsgsReceivedMsg(node_name, msg_count), auth)
+    _serialise(AckConnectMsgsReceivedMsg(node_name, msg_count), auth)
 
 primitive WireMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): WireMsg val =>
@@ -242,7 +242,7 @@ class AckMsgsReceivedMsg is WireMsg
       node_name = name
       msg_count = m_count
 
-class AckReconnectMsgsReceivedMsg is WireMsg
+class AckConnectMsgsReceivedMsg is WireMsg
   let node_name: String
   let msg_count: U64
 

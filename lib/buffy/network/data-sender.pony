@@ -3,14 +3,19 @@ use "collections"
 use "buffy/messages"
 
 actor DataSender
+  let _sender_name: String
   let _target_name: String
   var _conn: TCPConnection
+  let _auth: AmbientAuth
   let _held: Queue[Array[U8] val] = Queue[Array[U8] val]
   var _sending: Bool = true
 
-  new create(target_name: String, conn: TCPConnection) =>
+  new create(sender_name: String, target_name: String, conn: TCPConnection,
+    auth: AmbientAuth) =>
+    _sender_name = sender_name
     _target_name = target_name
     _conn = conn
+    _auth = auth
 
   be write(msg_data: Array[U8] val) =>
     _held.enqueue(msg_data)
@@ -18,12 +23,24 @@ actor DataSender
       _conn.write(msg_data)
     end
 
-  be ack(msg_count: U64) =>
-    for i in Range(0, msg_count.usize()) do
-      try _held.dequeue() end
+  be send_ready() =>
+    try
+      let msg = WireMsgEncoder.data_sender_ready(_sender_name, _auth)
+      _conn.write(msg)
     end
 
-  be ack_reconnect(msg_count: U64) =>
+  be ack(msg_count: U64) =>
+    for i in Range(0, msg_count.usize()) do
+      try
+        @printf[None](("Dequeuing " + i.string() + " of " + msg_count.string() + "!!\n").cstring())
+        _held.dequeue()
+      else
+        @printf[None]("Couldn't dequeue!!\n".cstring())
+      end
+    end
+
+  be ack_connect(msg_count: U64) =>
+    @printf[None](("Sender: connect ack received " + msg_count.string() + "\n").cstring())
     ack(msg_count)
 
     if not _sending then
@@ -33,12 +50,17 @@ actor DataSender
   be reconnect(conn: TCPConnection) =>
     _conn = conn
     _sending = false
+    send_ready()
 
   be enable_sending() =>
-    for idx in Range(0, _held.size()) do
+    let size = _held.size()
+    for idx in Range(0, size) do
       try
         let next_msg = _held(idx)
         _conn.write(next_msg)
+        @printf[None](("Resending " + idx.string() + " of " + size.string() + "!!\n").cstring())
+      else
+        @printf[None]("Couldn't resend!!\n".cstring())
       end
     end
     _sending = true
