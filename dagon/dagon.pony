@@ -398,6 +398,9 @@ actor ProcessManager
     end
     // dump docker configs
     _dump_map(_docker_args)
+    // we're done with registration
+    _env.out.print("dagon: finished registration of nodes")
+    _finished_registration = true
 
   fun ref _parse_config(ini_file: (File | None)): IniMap =>
     """
