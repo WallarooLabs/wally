@@ -651,9 +651,9 @@ actor ProcessManager
           // prepare the environment
           let vars: Array[String] iso = recover Array[String](4) end
           vars.push("DOCKER_HOST=" + docker_host)
-          vars.push("DOCKER_MACHINE_NAME=default")
-          vars.push("DOCKER_TLS_VERIFY=1")
-          vars.push("DOCKER_CERT_PATH=/Users/fix/.docker/machine/machines/default")
+          // vars.push("DOCKER_MACHINE_NAME=default")
+          // vars.push("DOCKER_TLS_VERIFY=1")
+          // vars.push("DOCKER_CERT_PATH=/Users/fix/.docker/machine/machines/default")
           // prepare the Docker args          
           let args: Array[String] iso = recover Array[String](6) end
           args.push("docker")                      // first arg is always "docker"
