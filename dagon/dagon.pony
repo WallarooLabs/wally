@@ -630,6 +630,8 @@ actor ProcessManager
     """
     Boot a node as container.
     """
+    _env.out.print("dagon: booting container: " + node.name)
+    
     var docker: (FilePath | None) = None
     var docker_host: String = ""
     var docker_network: String = ""
@@ -665,7 +667,8 @@ actor ProcessManager
           args.push("-h")                          // Docker node name for /etc/hosts
           args.push(node.name)
           args.push("--privileged")                // give extended privileges
-          args.push("-d")                          // detach
+          // args.push("-d")                          // detach
+          args.push("-i")                          // interactive
           args.push("-e")                          // set environment variables
           args.push("LC_ALL=C.UTF-8")
           args.push("-e")                          // set environment variables
@@ -682,22 +685,28 @@ actor ProcessManager
           args.push(node.docker_dir)
           args.push("-w")                          // container working dir
           args.push(node.docker_dir)
-          args.push("--net=")                      // connect to network
-          args.push(docker_network)
-          args.push(docker_repo                    // image registry and path
-            + node.docker_image
-            + node.docker_tag)
-            
+          args.push("--net=" + docker_network)     // connect to network
+
+          // args.push(docker_repo                    // image registry and path
+          //   + node.docker_image
+          //   + node.docker_tag)
+          args.push(node.docker_image + ":" + node.docker_tag)
+
+          
+          
           // append node specific args
-          for value in node.args.values() do
-            args.push(value)
-          end
+          args.push(node.path) // the command to run inside the container
+          // for value in node.args.values() do
+          //   args.push(value)
+          // end
 
           // dump args
           // let foo: Array[String] val = consume args
+          // var command: String = ""
           // for value in foo.values() do
-          //   _env.out.print("dagon: args value: " + value)
+          //   command = command + value + " "
           // end
+          // _env.out.print(command)
           
           // finally boot the container
           if docker isnt None then
