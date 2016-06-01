@@ -694,14 +694,25 @@ actor ProcessManager
           end
 
           // dump args
-          let foo: Array[String] val = consume args
-          for value in foo.values() do
-            _env.out.print("dagon: args value: " + value)
-          end
+          // let foo: Array[String] val = consume args
+          // for value in foo.values() do
+          //   _env.out.print("dagon: args value: " + value)
+          // end
           
           // finally boot the container
-          // boot_process(node.name, docker as FilePath,
-          //  consume args, consume vars)       
+          if docker isnt None then
+            try
+              let pn: ProcessNotify iso = ProcessClient(_env, node.name, this)
+              let pm: ProcessMonitor = ProcessMonitor(consume pn,
+                docker as FilePath, consume args, consume vars)
+              let child = Child(node.name, node.is_canary, pm)      
+                roster.insert(node.name, child)
+            else
+              _env.out.print("dagon: booting process failed")
+            end
+          else
+            _env.out.print("dagon: docker is None: " + node.name)
+          end
            
       // else
       //   _env.out.print("dagon: error constructing Docker command")
