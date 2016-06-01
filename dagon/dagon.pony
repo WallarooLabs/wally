@@ -588,17 +588,21 @@ actor ProcessManager
 
   be boot_leaders() =>
     """
-    Boot the leader node.
+    Boot the leader nodes
     """
+    _env.out.print("dagon: booting leaders")
     for node in _leaders.values() do
+      _env.out.print("dagon: booting leader: " + name)
       boot_node(node)
     end
 
   be boot_workers_receivers() =>
     """
-    Boot the leader node.
+    Boot the worker nodes.
     """
+    _env.out.print("dagon: booting workers")
     for node in _workers_receivers.values() do
+      _env.out.print("dagon: booting worker: " + name)
       boot_node(node)
     end    
 
