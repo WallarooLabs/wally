@@ -592,7 +592,7 @@ actor ProcessManager
     """
     _env.out.print("dagon: booting leaders")
     for node in _leaders.values() do
-      _env.out.print("dagon: booting leader: " + name)
+      _env.out.print("dagon: booting leader: " + node.name)
       boot_node(node)
     end
 
@@ -602,7 +602,7 @@ actor ProcessManager
     """
     _env.out.print("dagon: booting workers")
     for node in _workers_receivers.values() do
-      _env.out.print("dagon: booting worker: " + name)
+      _env.out.print("dagon: booting worker: " + node.name)
       boot_node(node)
     end    
 
@@ -612,8 +612,7 @@ actor ProcessManager
     """
     _env.out.print("dagon: booting canary nodes")
     for node in _canaries.values() do
-      let name = node.name
-      _env.out.print("dagon: booting canary: " + name)
+      _env.out.print("dagon: booting canary: " + node.name)
       boot_node(node)
     end
 
