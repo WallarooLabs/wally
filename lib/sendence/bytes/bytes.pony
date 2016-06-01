@@ -48,6 +48,7 @@ primitive Bytes
 
   fun length_encode(data: Array[U8] val): Array[U8] val =>
     let len: U32 = data.size().u32()
+//    @printf[None](("Length encoding message at: " + len.string() + "\n").cstring())
     let arr: Array[U8] iso = Bytes.from_u32(len, recover Array[U8] end)
     arr.append(data)
     consume arr

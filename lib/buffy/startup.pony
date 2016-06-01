@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "spike"
 use "./network"
 use "./topology"
+use "time"
 
 actor Startup
   new create(env: Env, topology: Topology val, source_count: USize) =>
@@ -21,6 +22,7 @@ actor Startup
 
     var spike_delay = false
     var spike_drop = false
+    var spike_seed: U64 = Time.millis()
 
     options
       .add("leader", "l", None)
@@ -36,6 +38,7 @@ actor Startup
       .add("metrics", "", StringArgument)
       .add("spike-delay", "", None)
       .add("spike-drop", "", None)
+      .add("spike-seed", "", I64Argument)
 
     for option in options do
       match option
@@ -58,6 +61,7 @@ actor Startup
           env.out.print("%%SPIKE-DROP%%")
           spike_drop = true
         end
+      | ("spike-seed", let arg: I64) => spike_seed = arg.u64()
       end
     end
 
@@ -69,7 +73,8 @@ actor Startup
       let leader_control_service = leader_control_addr(1)
       let leader_data_host = leader_data_addr(0)
       let leader_data_service = leader_data_addr(1)
-      let spike_config = SpikeConfig(spike_delay, spike_drop)
+      env.out.print("Using Spike seed " + spike_seed.string())
+      let spike_config = SpikeConfig(spike_delay, spike_drop, spike_seed)
       let auth = env.root as AmbientAuth
 
       let sinks: Map[U64, (String, String)] iso =

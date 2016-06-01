@@ -3,7 +3,6 @@ use "collections"
 use "buffy/messages"
 use "buffy/metrics"
 use "sendence/bytes"
-use "sendence/tcp"
 use "time"
 use "spike"
 
@@ -55,8 +54,8 @@ class WorkerConnectNotify is TCPConnectionNotify
   let _leader_service: String
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector
-  let _framer: Framer = Framer
   let _name: String
+  var _header: Bool = true
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
     leader_service: String, coordinator: Coordinator,
@@ -70,11 +69,20 @@ class WorkerConnectNotify is TCPConnectionNotify
     _metrics_collector = metrics_collector
 
   fun ref accepted(conn: TCPConnection ref) =>
+    conn.expect(4)
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    for chunked in _framer.chunk(consume data).values() do
-      let msg = WireMsgDecoder(consume chunked, _auth)
+    if _header then
+      try
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        conn.expect(expect)
+        _header = false
+      else
+        _env.err.print("Error reading header on control channel")
+      end
+    else
+      let msg = WireMsgDecoder(consume data, _auth)
       match msg
       | let m: ReconnectDataMsg val =>
         _coordinator.negotiate_data_reconnection(m.node_name)
@@ -108,6 +116,9 @@ class WorkerConnectNotify is TCPConnectionNotify
       else
         _env.err.print("Error decoding incoming message.")
       end
+
+      conn.expect(4)
+      _header = true
     end
 
   fun ref connected(conn: TCPConnection ref) =>
