@@ -10,7 +10,7 @@ class LeaderIntraclusterDataNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
-  let _spike_config: SpikeConfig val
+  var _spike_config: SpikeConfig val
   let _coordinator: Coordinator
   var _host: String = ""
   var _service: String = ""
@@ -37,6 +37,8 @@ class LeaderIntraclusterDataNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
+    _spike_config = SpikeConfig(_spike_config.delay, _spike_config.drop,
+      _spike_config.seed + 1)
     SpikeWrapper(IntraclusterDataReceiverConnectNotify(_env, _auth, _name,
       _coordinator), _spike_config)
 
@@ -44,7 +46,7 @@ class WorkerIntraclusterDataNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
-  let _spike_config: SpikeConfig val
+  var _spike_config: SpikeConfig val
   let _leader_host: String
   let _leader_service: String
   let _coordinator: Coordinator
@@ -78,6 +80,8 @@ class WorkerIntraclusterDataNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
+    _spike_config = SpikeConfig(_spike_config.delay, _spike_config.drop,
+      _spike_config.seed + 1)
     SpikeWrapper(IntraclusterDataReceiverConnectNotify(_env, _auth, _name,
       _coordinator), _spike_config)
 
@@ -116,7 +120,7 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
       let msg = WireMsgDecoder(consume data, _auth)
       match msg
       | let m: ForwardMsg val =>
-        _coordinator.deliver(m.step_id, _sender_name, m.msg)
+        _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
       | let m: DataSenderReadyMsg val =>
         _sender_name = m.node_name
         _coordinator.connect_receiver(m.node_name)
