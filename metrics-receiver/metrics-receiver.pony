@@ -126,19 +126,21 @@ actor MetricsReceiver is FlushingActor
 
 
 class MetricsNotifier is TCPListenNotify
+  let _auth: AmbientAuth
   let _stdout: StdStream
   let _stderr: StdStream
   let _host: String
   let _service: String
   let _mc: MetricsCollection tag
 
-  new iso create(stdout: StdStream, stderr: StdStream,
+  new iso create(stdout: StdStream, stderr: StdStream, auth: AmbientAuth,
                  host: String, service: String, mc: MetricsCollection tag) =>
+    _auth = auth
     _stdout = stdout
     _stderr = stderr
     _host = host
     _service = service
-    _mc = mc 
+    _mc = mc
 
   fun ref listening(listen: TCPListener ref) =>
     _stdout.print("listening on " + _host + ":" + _service)
@@ -148,17 +150,19 @@ class MetricsNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    MetricsReceiverNotify(_stdout, _stderr, _mc)
+    MetricsReceiverNotify(_stdout, _stderr, _auth, _mc)
 
 class MetricsReceiverNotify is TCPConnectionNotify
+  let _auth: AmbientAuth
   let _stdout: StdStream
   let _stderr: StdStream
   let _mc: MetricsCollection tag
   let _decoder: MetricsMsgDecoder = MetricsMsgDecoder
   var _header: Bool = true
 
-  new iso create(stdout: StdStream, stderr: StdStream,
+  new iso create(stdout: StdStream, stderr: StdStream, auth: AmbientAuth,
                  mc: MetricsCollection tag) =>
+    _auth = auth
     _stdout = stdout
     _stderr = stderr
     _mc = mc
@@ -188,8 +192,7 @@ class MetricsReceiverNotify is TCPConnectionNotify
     end
 
   fun ref process_data(data: (Array[U8] val | Array[U8] iso)) =>
-    try
-      let msg = _decoder(consume data)
+      let msg = _decoder(consume data, _auth)
       match msg
       | let m: NodeMetricsSummary val =>
         _mc.process_summary(m)
@@ -198,9 +201,6 @@ class MetricsReceiverNotify is TCPConnectionNotify
       else
         _stderr.print("Message couldn't be decoded!")
       end
-    else
-      _stderr.print("Error decoding incoming message.")
-    end
 
   fun ref connected(conn: TCPConnection ref) =>
     _stdout.print("connected.")
