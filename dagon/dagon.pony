@@ -716,9 +716,9 @@ actor ProcessManager
           
           // append node specific args
           args.push(node.path) // the command to run inside the container
-          // for value in node.args.values() do
-          //   args.push(value)
-          // end
+          for value in node.args.values() do
+            args.push(value)
+          end
 
           // dump args
           // let foo: Array[String] val = consume args
