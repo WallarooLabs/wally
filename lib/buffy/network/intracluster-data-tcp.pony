@@ -10,7 +10,7 @@ class LeaderIntraclusterDataNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
-  let _spike_config: SpikeConfig val
+  var _spike_config: SpikeConfig val
   let _coordinator: Coordinator
   var _host: String = ""
   var _service: String = ""
@@ -37,6 +37,8 @@ class LeaderIntraclusterDataNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
+    _spike_config = SpikeConfig(_spike_config.delay, _spike_config.drop,
+      _spike_config.seed + 1)
     SpikeWrapper(IntraclusterDataReceiverConnectNotify(_env, _auth, _name,
       _coordinator), _spike_config)
 
@@ -44,7 +46,7 @@ class WorkerIntraclusterDataNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
-  let _spike_config: SpikeConfig val
+  var _spike_config: SpikeConfig val
   let _leader_host: String
   let _leader_service: String
   let _coordinator: Coordinator
@@ -78,6 +80,8 @@ class WorkerIntraclusterDataNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
+    _spike_config = SpikeConfig(_spike_config.delay, _spike_config.drop,
+      _spike_config.seed + 1)
     SpikeWrapper(IntraclusterDataReceiverConnectNotify(_env, _auth, _name,
       _coordinator), _spike_config)
 
@@ -85,8 +89,10 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
+  var _sender_name: String = ""
   let _coordinator: Coordinator
   var _header: Bool = true
+  let _id: U64 = Time.millis() % 999
 
   new iso create(env: Env, auth: AmbientAuth, name: String,
     coordinator: Coordinator) =>
@@ -100,6 +106,7 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+//    _env.out.print(_id.string() + " received at " + Time.micros().string())
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
@@ -111,8 +118,12 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
     else
       let msg = WireMsgDecoder(consume data, _auth)
       match msg
-      | let m: ForwardMsg val =>
-        _coordinator.deliver(m.step_id, m.from_node_name, m.msg)
+      | let d: DataChannelMsg val =>
+        let f = d.forward
+        _coordinator.deliver(d.id, f.step_id, f.from_node_name, f.msg)
+      | let m: DataSenderReadyMsg val =>
+        _sender_name = m.node_name
+        _coordinator.connect_receiver(m.node_name)
       | let m: UnknownMsg val =>
         _env.err.print("Unknown data Buffy message type.")
       end
@@ -122,6 +133,7 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
     end
 
   fun ref closed(conn: TCPConnection ref) =>
+    _coordinator.close_receiver(_sender_name)
     _env.out.print("DataReceiverNotify: closed!")
 
 class IntraclusterDataSenderConnectNotify is TCPConnectionNotify

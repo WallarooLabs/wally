@@ -29,13 +29,10 @@ actor Proxy is BasicStep
   // input will be a Message[In] once the typearg issue is fixed
   // ponyc #723
   be apply(input: StepMessage val) =>
-    try
-      let tcp_msg: Array[U8] val = WireMsgEncoder.forward(_step_id, _node_name,
-        input, _auth)
-      _coordinator.send_data_message(_target_node_name, tcp_msg)
-      _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
-        input.id(), input.last_ingress_ts(), Time.millis())
-    end
+    let forward = Forward(_step_id, _node_name, input)
+    _coordinator.send_data_message(_target_node_name, forward)
+    _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
+      input.id(), input.last_ingress_ts(), Time.millis())
 
 actor StepManager
   let _env: Env
