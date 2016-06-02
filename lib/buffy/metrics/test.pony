@@ -4,113 +4,87 @@ use "sendence/bytes"
 use "collections"
 
 actor Main is TestList
-  let env: Env
-  new create(env': Env) =>
-    env = env'
+  new create(env: Env) =>
     PonyTest(env, this)
 
 
-  new make(env': Env) => None
-    env = env'
+  new make(env: Env) => None
 
   fun tag tests(test: PonyTest) =>
-    /*
-    test(_TestNodeReportsEncoder(env))
-    test(_TestBoundaryReportsEncoder(env))
-    */
+    test(_TestMetricsWireMsgNode)
+    test(_TestMetricsWireMsgBoundary)
     test(_TestMonitoringHubEncoder)
 
-class iso _TestNodeReportsEncoder is UnitTest
-  let _env: Env
+class iso _TestMetricsWireMsgNode is UnitTest
+  fun name(): String => "buffy:MetricsWireMsgNode"
 
-  new create(env: Env) =>
-    _env = env
+  fun apply(h: TestHelper) ? =>
+    let auth: AmbientAuth = h.env.root as AmbientAuth
+    let node_name = "NodeTest"
+    let nms = NodeMetricsSummary(node_name)
+    nms.add_report(1, StepMetricsReport(1232143143, 1354551314))
+    nms.add_report(1, StepMetricsReport(1232347892, 1354328734))
+    nms.add_report(1, StepMetricsReport(1242596283, 1123612344))
+    nms.add_report(1, StepMetricsReport(1298273467, 1354275829))
+    nms.add_report(1, StepMetricsReport(1223498726, 1313488791))
 
-  fun name(): String => "buffy:NodeReportsEncoder"
+    nms.add_report(2, StepMetricsReport(1232143112, 1354551313))
+    nms.add_report(2, StepMetricsReport(1232347867, 1354328748))
+    nms.add_report(2, StepMetricsReport(1242596287, 1123612390))
+    nms.add_report(2, StepMetricsReport(1298273412, 1354275808))
+    nms.add_report(2, StepMetricsReport(1223498723, 1313488789))
 
-  fun apply(h: TestHelper)  =>
-    try
-      let auth = _env.root as AmbientAuth
-      true
-    else
-      false
-    end
-    /*
 
-    let node_name = "Test"
-    let nodemetricssummary = NodeMetricsSummary(node_name)
-    let digest_1 = StepMetricsDigest(1)
-    digest_1.add_report(StepMetricsReport(1232143143, 1354551314))
-    digest_1.add_report(StepMetricsReport(1232347892, 1354328734))
-    digest_1.add_report(StepMetricsReport(1242596283, 1123612344))
-    digest_1.add_report(StepMetricsReport(1298273467, 1354275829))
-    digest_1.add_report(StepMetricsReport(1223498726, 1313488791))
-
-    let digest_2 = StepMetricsDigest(2)
-    digest_2.add_report(StepMetricsReport(1232143112, 1354551313))
-    digest_2.add_report(StepMetricsReport(1232347867, 1354328748))
-    digest_2.add_report(StepMetricsReport(1242596287, 1123612390))
-    digest_2.add_report(StepMetricsReport(1298273412, 1354275808))
-    digest_2.add_report(StepMetricsReport(1223498723, 1313488789))
-
-    nodemetricssummary.add_digest(digest_1)
-    nodemetricssummary.add_digest(digest_2)
-
-    let node_encoded = MetricsMsgEncoder.nodemetrics(nodemetricssummary,
-      _auth)
-
-    let node_decoded = MetricsMsgDecoder(consume node_encoded, _auth)
-
-    match node_decoded
+    let encoded = MetricsMsgEncoder.nodemetrics(nms, auth)
+    // remove the bytes length segment from the array
+    let e' = recover val encoded.slice(4) end
+    let decoded = MetricsMsgDecoder(consume e', auth)
+    match decoded
     | let n: NodeMetricsSummary val =>
-      h.assert_eq[String](n.node_name, "Test")
-      h.assert_eq[U64](n.digests(0).reports(2).start_time, 1242596287)
+      h.assert_eq[String](n.node_name, "NodeTest")
+      h.assert_eq[U64](n.digests(2).reports(2).start_time, 1242596287)
+      h.assert_eq[USize](n.size(), 10)
+      h.assert_eq[U64](n.digests(1).reports(0).dt(),(1354551314-1232143143))
     else
       h.fail("Wrong decoded message type")
     end
-
     true
-    */
 
-class iso _TestBoundaryReportsEncoder is UnitTest
-  let _env: Env
+class iso _TestMetricsWireMsgBoundary is UnitTest
+  fun name(): String => "buffy:MetricsWireMsgBoundary"
 
-  new create(env: Env) =>
-    _env = env
+  fun apply(h: TestHelper) ? =>
+    let auth: AmbientAuth = h.env.root as AmbientAuth
+    let node_name = "BoundaryTest"
+    let bms = BoundaryMetricsSummary(node_name)
 
-  fun name(): String => "buffy:BoundaryReportsEncoder"
+    bms.add_report(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9143,
+      91354551, 1232143112))
+    bms.add_report(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9147,
+      91354328, 1354328748))
+    bms.add_report(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9196,
+      91123612, 1313488789))
+    bms.add_report(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9173,
+      91354275, 1313488789))
+    bms.add_report(BoundaryMetricsReport(BoundaryTypes.ingress_egress(), 9198,
+      91313488, 1354275829))
 
-  fun apply(h: TestHelper)  =>
-    try
-      let auth = _env.root as AmbientAuth
-      true
-    else
-      false
-    end
-    /*
-    let boundary_node_name = "BoundaryTest"
-    let boundary_reports = Array[BoundaryMetricsReport val]
+    let encoded = MetricsMsgEncoder.boundarymetrics(bms, auth)
+    let e' = recover val encoded.slice(4) end
+    let decoded = MetricsMsgDecoder(consume e', auth)
 
-    boundary_reports.push(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9143, 91354551, 1232143112))
-    boundary_reports.push(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9147, 91354328, 1354328748))
-    boundary_reports.push(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9196, 91123612, 1313488789))
-    boundary_reports.push(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9173, 91354275, 1313488789))
-    boundary_reports.push(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9198, 91313488, 1354275829))
-
-    let boundary_encoded = BoundaryMetricsEncoder(boundary_node_name, boundary_reports)
-
-    let boundary_decoded = ReportMsgDecoder(consume boundary_encoded)
-
-    match boundary_decoded
+    match decoded
     | let n: BoundaryMetricsSummary val =>
       h.assert_eq[String](n.node_name, "BoundaryTest")
       h.assert_eq[U64](n.reports(1).start_time, 91354328)
+      h.assert_eq[U64](n.reports(4).boundary_type,
+        BoundaryTypes.ingress_egress())
+      h.assert_eq[U64](n.reports(4).dt(), (1354275829-91313488))
     else
       h.fail("Wrong decoded message type")
     end
 
     true
-*/
 
 class iso _TestMonitoringHubEncoder is UnitTest
   fun name(): String => "buffy:SinkMetricsEncoder"
