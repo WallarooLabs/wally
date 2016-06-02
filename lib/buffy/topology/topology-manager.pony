@@ -3,6 +3,7 @@ use "collections"
 use "buffy/messages"
 use "../network"
 use "random"
+use "time"
 
 actor TopologyManager
   let _env: Env
@@ -98,7 +99,7 @@ actor TopologyManager
   // Currently assigns steps in pipeline using round robin among nodes
   fun ref _initialize_topology() =>
     let repeated_steps = Map[U64, U64] // map from pipeline id to step id
-    let seed: U64 = 323437823
+    let seed: U64 = Time.micros()
     let dice = Dice(MT(seed))
     try
       let nodes = Array[String]

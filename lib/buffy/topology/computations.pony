@@ -15,10 +15,9 @@ interface FinalComputation[In]
 interface PartitionFunction[In]
   fun apply(input: In): U64
 
-interface StateComputation[In,
-  Out: Any val, State: Any iso]
+interface StateComputation[Out: Any val, State]
   fun apply(state: State, default_output_step: BasicStep tag,
-    message_wrapper: MessageWrapper[Out] val)
+    message_wrapper: MessageWrapper[Out] val): State
 
 interface MessageWrapper[T: Any val]
   fun apply(data: T): Message[T] val
@@ -42,12 +41,12 @@ interface ComputationBuilder[In, Out]
 interface MapComputationBuilder[In, Out]
   fun apply(): MapComputation[In, Out] iso^
 
-interface StateComputationBuilder[In, Out: Any val,
-  State: Any iso]
-  fun apply(): StateComputation[In, Out, State] iso^
+interface StateComputationBuilder[Out: Any val,
+  State]
+  fun apply(): StateComputation[Out, State] iso^
 
 interface Parser[Out]
-  fun apply(s: String): Out ?
+  fun apply(s: String): (Out | None) ?
 
 interface Stringify[In]
   fun apply(i: In): String ?

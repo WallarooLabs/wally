@@ -14,10 +14,10 @@ trait SinkBuilder
   fun apply(conns: Array[TCPConnection] iso, metrics_collector: MetricsCollector)
     : BasicStep tag
 
-trait OutputStepBuilder[Out: Any val] is BasicStepBuilder
+trait BasicOutputStepBuilder[Out: Any val] is BasicStepBuilder
 
 trait ThroughStepBuilder[In: Any val, Out: Any val]
-  is OutputStepBuilder[Out]
+  is BasicOutputStepBuilder[Out]
 //  fun apply(): ThroughStep[In, Out] tag
 
 class SourceBuilder[Out: Any val]
@@ -62,30 +62,24 @@ class PartitionBuilder[In: Any val, Out: Any val]
   fun apply(): BasicStep tag =>
     Partition[In, Out](_step_builder, _partition_function)
 
-class StatePartitionBuilder[In: Any val, Out: Any val, State: Any iso]
+class StatePartitionBuilder[In: Any val, Out: Any val, State: Any ref]
   is ThroughStepBuilder[In, Out]
-  let _state_computation_builder: StateComputationBuilder[In, Out, State] val
   let _state_initializer: {(): State} val
   let _partition_function: PartitionFunction[In] val
 
-  new val create(scb: StateComputationBuilder[In, Out, State] val,
-    init: {(): State} val, pf: PartitionFunction[In] val) =>
-    _state_computation_builder = scb
+  new val create(init: {(): State} val, pf: PartitionFunction[In] val) =>
     _state_initializer = init
     _partition_function = pf
 
   fun apply(): BasicStep tag =>
-    Partition[In, Out](StateStepBuilder[In, Out, State](_state_computation_builder,
-      _state_initializer), _partition_function)
+    Partition[In, Out](StateStepBuilder[In, Out, State](_state_initializer),
+      _partition_function)
 
-class StateStepBuilder[In: Any val, Out: Any val, State: Any iso]
+class StateStepBuilder[In: Any val, Out: Any val, State: Any ref]
   is ThroughStepBuilder[In, Out]
-  let _state_computation_builder: StateComputationBuilder[In, Out, State] val
   let _state_initializer: {(): State} val
 
-  new val create(s_builder: StateComputationBuilder[In, Out, State] val,
-    s_initializer: {(): State} val) =>
-    _state_computation_builder = s_builder
+  new val create(s_initializer: {(): State} val) =>
     _state_initializer = s_initializer
 
   fun apply(): BasicStep tag =>

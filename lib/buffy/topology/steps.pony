@@ -8,12 +8,17 @@ trait BasicStep
   be apply(input: StepMessage val)
   be add_step_reporter(sr: StepReporter val) => None
 
-trait OutputStep
+trait BasicOutputStep is BasicStep
   be add_output(to: BasicStep tag)
 
 trait ComputeStep[In] is BasicStep
 
-trait ThroughStep[In, Out] is (OutputStep & ComputeStep[In])
+trait OutputStep[Out] is BasicOutputStep
+
+trait ThroughStep[In, Out] is (ComputeStep[In] & OutputStep[Out])
+
+actor EmptyStep is BasicStep
+  be apply(input: StepMessage val) => None
 
 actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]
@@ -98,15 +103,18 @@ actor Source[Out: Any val] is ThroughStep[String, Out]
     | let m: Message[String] val =>
       try
         let start_time = Time.millis()
-        let output_msg: Message[Out] val =
-          Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), _input_parser(m.data()))
-        match _output
-        | let o: BasicStep tag =>
-          o(output_msg)
-          let end_time = Time.millis()
-          match _step_reporter
-          | let sr: StepReporter val =>
-            sr.report(start_time, end_time)
+        match _input_parser(m.data())
+        | let res: Out =>
+          let output_msg: Message[Out] val =
+            Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), res)
+          match _output
+          | let o: BasicStep tag =>
+            o(output_msg)
+            let end_time = Time.millis()
+            match _step_reporter
+            | let sr: StepReporter val =>
+              sr.report(start_time, end_time)
+            end
           end
         end
       else
@@ -181,7 +189,7 @@ actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
-actor StateStep[In: Any val, Out: Any val, State: Any iso^]
+actor StateStep[In: Any val, Out: Any val, State: Any ref]
   is ThroughStep[In, Out]
   var _step_reporter: (StepReporter val | None) = None
   var _output: (BasicStep tag | None) = None
@@ -197,15 +205,30 @@ actor StateStep[In: Any val, Out: Any val, State: Any iso^]
     _output = to
 
   be apply(input: StepMessage val) =>
+    @printf[None]("StateStep: apply called!\n".cstring())
     match input
-    | let m: Message[StateComputation[In, Out, State] val] val =>
-      match _output
-      | let o: BasicStep tag =>
+    | let m: Message[In] val => //StateComputation[Out, State] val] val =>
+      @printf[None]("StateStep: Message[In] matched!\n".cstring())
+      match m.data()
+      | let sc: StateComputation[Out, State] val =>
+        match _output
+        | let o: BasicStep tag =>
+          let start_time = Time.millis()
+          let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
+            m.last_ingress_ts())
+          _state = sc(_state, o, message_wrapper)
+          let end_time = Time.millis()
+          match _step_reporter
+          | let sr: StepReporter val =>
+            sr.report(start_time, end_time)
+          end
+        end
+      | let sc: StateComputation[None, State] val =>
+        @printf[None]("StateStep: NONE StateComputation matched!\n".cstring())
         let start_time = Time.millis()
-        let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
+        let message_wrapper = DefaultMessageWrapper[None](m.id(), m.source_ts(),
           m.last_ingress_ts())
-        let state_computation = m.data()
-        _state = state_computation(consume _state, o, message_wrapper)
+        _state = sc(_state, EmptyStep, message_wrapper)
         let end_time = Time.millis()
         match _step_reporter
         | let sr: StepReporter val =>
@@ -243,5 +266,5 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
       end
     end
 
-interface StateInitializer[State: Any iso]
+interface StateInitializer[State: Any ref]
   fun apply(): State

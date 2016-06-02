@@ -92,7 +92,7 @@ actor StepManager
       let input_step = _steps(in_id)
       let output_step = _steps(out_id)
       match input_step
-      | let i: OutputStep tag =>
+      | let i: BasicOutputStep tag =>
         i.add_output(output_step)
       else
         _env.out.print("StepManager: Could not connect steps")
