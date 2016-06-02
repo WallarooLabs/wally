@@ -633,13 +633,13 @@ actor ProcessManager
     _env.out.print("dagon: booting container: " + node.name)
     
     var docker: (FilePath | None) = None
-    var docker_host: String = ""
+    var docker_opts: String = ""
     var docker_network: String = ""
     var docker_repo: String = ""
     try
       let docker_path = _docker_args("docker_path")
       docker = _filepath_from_path(docker_path)
-      docker_host = _docker_args("docker_host")
+      docker_opts = _docker_args("docker_opts")
       docker_network = _docker_args("docker_network")
       docker_repo = _docker_args("docker_repo")
     else
@@ -650,10 +650,8 @@ actor ProcessManager
       // try
           // prepare the environment
           let vars: Array[String] iso = recover Array[String](4) end
-          vars.push("DOCKER_HOST=" + docker_host)
-          // vars.push("DOCKER_MACHINE_NAME=default")
-          // vars.push("DOCKER_TLS_VERIFY=1")
-          // vars.push("DOCKER_CERT_PATH=/Users/fix/.docker/machine/machines/default")
+          vars.push("DOCKER_OPTS=" + docker_opts)
+
           // prepare the Docker args          
           let args: Array[String] iso = recover Array[String](6) end
           args.push("docker")                      // first arg is always "docker"
