@@ -3,7 +3,6 @@ use "collections"
 use "promises"
 use "buffy/messages"
 use "sendence/bytes"
-use "debug"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -91,6 +90,7 @@ class iso _TestMonitoringHubEncoder is UnitTest
   fun name(): String => "buffy:MonitoringHubEncoder"
 
   fun apply(h: TestHelper) ? =>
+    h.long_test(1_000_000_000)
     let auth: AmbientAuth = h.env.root as AmbientAuth
 
     // Set up a NodeMetricsSummary and a BoundaryMetricsSummary
@@ -142,8 +142,7 @@ class iso _TestMonitoringHubEncoder is UnitTest
     mc.send_output(res)
 
   fun tag _fulfill(h: TestHelper, value: String): String =>
-    h.assert_eq[String]("a", "b")
-    Debug("This should fail!")
+    h.assert_eq[String]("b", "a")
     h.complete(true)
     value
 
