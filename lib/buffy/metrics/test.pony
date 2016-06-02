@@ -127,6 +127,7 @@ class iso _TestMonitoringHubEncoder is UnitTest
     let promise = Promise[String]
     promise.next[String](recover this~_fulfill(h) end)
     let output = MetricsAccumulatorActor(promise)
+    let res = ResumableTest(output)
     let handler: MetricsCollectionOutputHandler iso =
       recover iso MetricsStringAccumulator(MonitoringHubEncoder, output) end
 
@@ -138,8 +139,7 @@ class iso _TestMonitoringHubEncoder is UnitTest
     mc.process_summary(consume nms)
     mc.process_summary(consume bms)
     // Process the collection with the handlers array
-    mc.send_output()
-    output.written()
+    mc.send_output(res)
 
   fun tag _fulfill(h: TestHelper, value: String): String =>
     h.assert_eq[String]("a", "b")
@@ -149,3 +149,11 @@ class iso _TestMonitoringHubEncoder is UnitTest
 
   fun timed_out(h: TestHelper) =>
     h.complete(false)
+
+actor ResumableTest is Resumable
+  let _output: MetricsAccumulatorActor  tag
+  new create(output: MetricsAccumulatorActor tag) =>
+    _output = output
+
+  be resume() =>
+    _output.written()

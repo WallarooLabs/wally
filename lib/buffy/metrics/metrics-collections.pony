@@ -417,11 +417,15 @@ on category and id
   fun get_time_bucket(time: U64): U64 =>
     (time/1000) + (_period - ((time/1000) % _period))
 
-  be send_output() =>
-    Debug("send_output")
+  be send_output(resumable: (Resumable tag | None) = None) =>
     handle_output()
+    match resumable
+    | let r: Resumable tag => r.resume()
+    end
 
   fun ref handle_output() =>
-    Debug("handle_output")
     _handler.handle(_sinkmetrics, _boundarymetrics, _stepmetrics, _period)
     reset_collection()
+
+interface Resumable
+  be resume()
