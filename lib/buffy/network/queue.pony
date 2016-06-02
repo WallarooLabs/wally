@@ -12,6 +12,8 @@ class Queue[A]
 
   fun ref dequeue(): A ? => _data.shift()
 
+  fun peek(): this->A ? => _data(0)
+
   fun ref clear(): Array[A]^ => _data.clear()
 
   fun contains(a: A!, pred: {(box->A!, box->A!): Bool} val =
