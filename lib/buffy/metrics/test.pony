@@ -142,9 +142,9 @@ class iso _TestMonitoringHubEncoder is UnitTest
     output.written()
 
   fun tag _fulfill(h: TestHelper, value: String): String =>
-    Debug("fulfill: (" + value + ")")
-    h.assert_eq[String](value, "doesnt equal this!")
-    h.complete(false)
+    h.assert_eq[String]("a", "b")
+    Debug("This should fail!")
+    h.complete(true)
     value
 
   fun timed_out(h: TestHelper) =>

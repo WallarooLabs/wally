@@ -1,6 +1,5 @@
 use "promises"
 use "sendence/bytes"
-use "debug"
 
 primitive MetricsCategories
   fun sinks(): String => "source-sink-metrics"
@@ -15,16 +14,12 @@ actor MetricsAccumulatorActor is MetricsOutputActor
   let _promise: Promise[String]
 
   new create(promise: Promise[String]) =>
-    Debug("create")
     _promise = promise
-    _collect("hello worldsdfsdfs")
 
-  fun ref _collect(data: ByteSeq) =>
-    Debug("collect")
+  fun ref _collect(data: Array[U8 val] val) =>
     _output.append(data)
 
   be send(category: String val, payload: Array[U8 val] val) =>
-    Debug("send")
     let c = Bytes.length_encode(category.array())
     let p = Bytes.length_encode(payload)
     let a: Array[U8 val] val =
@@ -36,7 +31,6 @@ actor MetricsAccumulatorActor is MetricsOutputActor
     _collect(consume a)
 
   be written() =>
-    Debug("written")
     let s: String = _output.clone()
     _promise(s)
 

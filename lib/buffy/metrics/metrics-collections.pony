@@ -1,5 +1,4 @@
 use "collections"
-use "debug"
 
 interface F64Selector
   fun apply(f: F64): F64
