@@ -36,7 +36,8 @@ actor Main
     TODO: Run tests if list of args is empty.
     """
     var required_args_are_present = true
-    var use_docker: Bool = false    
+    var docker_host: (String | None) = None
+    var use_docker: Bool = false
     var timeout: (I64 | None) = None
     var path: (String | None) = None
     var p_arg: (Array[String] | None) = None
@@ -45,13 +46,13 @@ actor Main
     var service: String = ""
     var options = Options(env)
     options
-    .add("docker", "d", None)
+    .add("docker", "d", StringArgument)
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone_home", "h", StringArgument)
     for option in options do
       match option
-      | ("docker", None) => use_docker = true
+      | ("docker", let arg: String) => docker_host = arg
       | ("timeout", let arg: I64) => timeout = arg
       | ("filepath", let arg: String) => path = arg
       | ("phone_home", let arg: String) => p_arg = arg.split(":")
@@ -63,6 +64,13 @@ actor Main
     end
 
     try
+      if docker_host isnt None then
+        env.out.print("dagon: DOCKER_HOST: " + (docker_host as String))
+        use_docker = true
+      else
+        env.out.print("dagon: no DOCKER_HOST defined, using processes.")
+      end
+      
       if timeout is None then
         env.err.print("dagon: Must supply required '--timeout' argument")
         required_args_are_present = false
@@ -90,7 +98,6 @@ actor Main
         return
       end
 
-      env.out.print("dagon: use docker: " + use_docker.string())
       env.out.print("dagon: timeout: " + timeout.string())
       env.out.print("dagon: path: " + (path as String))
 
@@ -99,8 +106,8 @@ actor Main
 
       env.out.print("dagon: host: " + phone_home_host)
       env.out.print("dagon: service: " + phone_home_service)
-      ProcessManager(env, use_docker, timeout as I64, path as String,
-        phone_home_host, phone_home_service)
+      ProcessManager(env, use_docker, docker_host as String, timeout as I64,
+        path as String, phone_home_host, phone_home_service)
     else
       env.err.print("dagon: error parsing arguments")
     end
@@ -228,11 +235,13 @@ class Node
 actor ProcessManager
   let _env: Env
   let _use_docker: Bool
+  let _docker_host: String
   let _timeout: I64
   let _path: String
   let _host: String
   let _service: String
   var _docker_args: Map[String, String] = Map[String, String](4)
+  var _docker_vars: Map[String, String] = Map[String, String](3)
   var _canaries: Map[String, Node val] = Map[String, Node val](2)
   var _workers_receivers: Map[String, Node val] = Map[String, Node val](2)
   var _leaders: Map[String, Node val] = Map[String, Node val](1)
@@ -244,11 +253,13 @@ actor ProcessManager
   var _timer: (Timer tag | None) = None
   let _docker_postfix: String
   
-  new create(env: Env, use_docker: Bool, timeout: I64, path: String,
+  new create(env: Env, use_docker: Bool, docker_host: String,
+    timeout: I64, path: String,
     host: String, service: String)
   =>
     _env = env
     _use_docker = use_docker
+    _docker_host = docker_host
     _timeout = timeout
     _path = path
     _host = host
@@ -390,7 +401,10 @@ actor ProcessManager
       let sections = _parse_config(ini_file)
       for section in sections.keys() do
         match section
-        | "docker" => _docker_args = _parse_docker_section(sections, section)
+        | "docker-env" =>
+          _docker_vars = _parse_docker_section(sections, section)
+        | "docker" =>
+          _docker_args = _parse_docker_section(sections, section)
         else
           _parse_node_section(sections, section)
         end
@@ -479,7 +493,9 @@ actor ProcessManager
       docker_tag, docker_userid,
       a, consume vars)          
     
-  fun ref _parse_docker_section(sections: IniMap, section: String): Map[String, String] =>
+  fun ref _parse_docker_section(sections: IniMap, section: String):
+    Map[String, String]
+  =>
     """
     Parse the docker section and return args as a Map.
     """
@@ -494,7 +510,9 @@ actor ProcessManager
     end
     args
     
-  fun ref _file_from_path(auth: AmbientAuth, path: String): (File | None) =>
+  fun ref _file_from_path(auth: AmbientAuth, path: String):
+    (File | None)
+  =>
     """
     Return a File from a path if we have sufficient permissions to open it.
     TODO: Support restrictive permissions
@@ -639,7 +657,6 @@ actor ProcessManager
     try
       let docker_path = _docker_args("docker_path")
       docker = _filepath_from_path(docker_path)
-      docker_opts = _docker_args("docker_opts")
       docker_network = _docker_args("docker_network")
       docker_repo = _docker_args("docker_repo")
     else
@@ -647,10 +664,15 @@ actor ProcessManager
     end
 
     if docker isnt None then    
-      // try
           // prepare the environment
           let vars: Array[String] iso = recover Array[String](4) end
-          vars.push("DOCKER_OPTS=" + docker_opts)
+          vars.push("DOCKER_HOST=" + _docker_host)
+          // add more specific Docker env variables
+          for pair in _docker_vars.pairs() do
+            _env.out.print("dagon: adding to docker env: " +
+              pair._1 + "=" + pair._2)
+            vars.push(pair._1 + "=" + pair._2)
+          end
 
           // prepare the Docker args          
           let args: Array[String] iso = recover Array[String](6) end
