@@ -1,4 +1,5 @@
 use "collections"
+use "debug"
 
 interface F64Selector
   fun apply(f: F64): F64
@@ -53,13 +54,13 @@ s(0.0001) // -> 0.001
   """
     min_bin_ceil
 
-  fun max_bin(): F64 => 
+  fun max_bin(): F64 =>
   """
   The maximum non-overflow bin
   """
     max_bin_ceil
 
-  fun overflow(): F64 => 
+  fun overflow(): F64 =>
   """
   The ceiling value of the overflow bin
   """
@@ -86,7 +87,7 @@ s(0.0001) // -> 0.001
   The nearest integer >= log10(f)
   """
     f.log10().ceil().i32()
-  
+
   fun bin(f: F64): F64 =>
   """
   The bin to which an F64 value is associated
@@ -103,7 +104,7 @@ s(0.0001) // -> 0.001
 
   fun below(f: F64): F64 =>
   """
-  The bin below the current bin 
+  The bin below the current bin
   """
     bin(bin_floor(bin(f)))
 
@@ -203,7 +204,7 @@ to the nearest integer.
     var binmap = Map[String, U64]
     for (bin, count) in count_bins.pairs() do
       let key:String = if bin == bin_selector.overflow() 
-                  then "overflow" 
+                  then "overflow"
                   else bin.string() end
       binmap.update(key, count)
     end
@@ -217,7 +218,7 @@ A history of throughput counts per second
   var _start_time: U64 = 0
   var _end_time: U64 = 0
 
-  fun ref apply(report: MetricsReport val) => 
+  fun ref apply(report: MetricsReport val) =>
     count_report(report.ended())
 
   fun ref count_report(end_time: U64) =>
@@ -291,9 +292,9 @@ on category and id
                                BoundaryMetricsSummary val))
   =>
     match summary
-    | let summary':NodeMetricsSummary val => 
+    | let summary':NodeMetricsSummary val =>
       process_nodesummary(summary')
-    | let summary':BoundaryMetricsSummary val => 
+    | let summary':BoundaryMetricsSummary val =>
       process_boundarysummary(summary')
     end
 
@@ -416,10 +417,12 @@ on category and id
 
   fun get_time_bucket(time: U64): U64 =>
     (time/1000) + (_period - ((time/1000) % _period))
- 
+
   be send_output() =>
+    Debug("send_output")
     handle_output()
 
   fun ref handle_output() =>
+    Debug("handle_output")
     _handler.handle(_sinkmetrics, _boundarymetrics, _stepmetrics, _period)
     reset_collection()
