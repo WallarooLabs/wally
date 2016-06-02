@@ -1,38 +1,48 @@
+use "promises"
+use "sendence/bytes"
+use "debug"
+
 primitive MetricsCategories
   fun sinks(): String => "source-sink-metrics"
   fun boundaries(): String => "ingress-egress-metrics"
   fun steps(): String => "step-metrics"
 
-
 interface MetricsOutputActor
-  be send(category: String, payload: Array[U8] val)
+  be send(category: String, payload: Array[U8 val] val)
 
-interface Retriever
-  be retrieved(a: Array[String] iso)
+actor MetricsAccumulatorActor is MetricsOutputActor
+  var _output: String ref = String
+  let _promise: Promise[String]
 
-interface Retrievable
-  be retrieve(that: Retriever tag)
+  new create(promise: Promise[String]) =>
+    Debug("create")
+    _promise = promise
+    _collect("hello worldsdfsdfs")
 
-actor MetricsAccumulatorActor is (MetricsOutputActor & Retrievable)
-  var data: Array[String] iso = recover iso Array[String] end
+  fun ref _collect(data: ByteSeq) =>
+    Debug("collect")
+    _output.append(data)
 
-  be send(category: String, payload: (String val | Array[U8] val)) =>
-    match payload
-    | let s': String val =>
-      data.push(s')
-    | let s': Array[U8] val =>
-      data.push(String.from_array(s'))
-    end
+  be send(category: String val, payload: Array[U8 val] val) =>
+    Debug("send")
+    let c = Bytes.length_encode(category.array())
+    let p = Bytes.length_encode(payload)
+    let a: Array[U8 val] val =
+      recover val
+        let a: Array[U8 val] ref = recover Array[U8 val] end
+        a.append(c).append(p)
+        consume a
+      end
+    _collect(consume a)
 
-  be retrieve(that: Retriever tag) =>
-    let data' = data = recover iso Array[String] end
-    that.retrieved(consume data')
-
+  be written() =>
+    Debug("written")
+    let s: String = _output.clone()
+    _promise(s)
 
 interface MetricsCollectionOutputHandler
   fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
              steps: StepMetrics, period: U64)
-
 
 class MetricsStringAccumulator is MetricsCollectionOutputHandler
   let encoder: MetricsCollectionOutputEncoder val
