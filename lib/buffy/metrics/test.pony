@@ -1,12 +1,13 @@
 use "ponytest"
+use "collections"
+use "promises"
 use "buffy/messages"
 use "sendence/bytes"
-use "collections"
+
 
 actor Main is TestList
   new create(env: Env) =>
     PonyTest(env, this)
-
 
   new make(env: Env) => None
 
@@ -87,11 +88,37 @@ class iso _TestMetricsWireMsgBoundary is UnitTest
     true
 
 class iso _TestMonitoringHubEncoder is UnitTest
-  fun name(): String => "buffy:SinkMetricsEncoder"
+  fun name(): String => "buffy:MonitoringHubEncoder"
 
-  fun apply(h: TestHelper)  =>
-    true
-    /*
+  fun apply(h: TestHelper) ? =>
+    let auth: AmbientAuth = h.env.root as AmbientAuth
+    let node_name = "Test"
+    let nms = NodeMetricsSummary(node_name)
+    nms.add_report(1, StepMetricsReport(1232143143, 1354551314))
+    nms.add_report(1, StepMetricsReport(1232347892, 1354328734))
+    nms.add_report(1, StepMetricsReport(1242596283, 1123612344))
+    nms.add_report(1, StepMetricsReport(1298273467, 1354275829))
+    nms.add_report(1, StepMetricsReport(1223498726, 1313488791))
+
+    nms.add_report(2, StepMetricsReport(1232143112, 1354551313))
+    nms.add_report(2, StepMetricsReport(1232347867, 1354328748))
+    nms.add_report(2, StepMetricsReport(1242596287, 1123612390))
+    nms.add_report(2, StepMetricsReport(1298273412, 1354275808))
+    nms.add_report(2, StepMetricsReport(1223498723, 1313488789))
+
+    let bms = BoundaryMetricsSummary(node_name)
+
+    bms.add_report(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9143,
+      91354551, 1232143112))
+    bms.add_report(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9147,
+      91354328, 1354328748))
+    bms.add_report(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9196,
+      91123612, 1313488789))
+    bms.add_report(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9173,
+      91354275, 1313488789))
+    bms.add_report(BoundaryMetricsReport(BoundaryTypes.ingress_egress(), 9198,
+      91313488, 1354275829))
+
     let output = MetricsAccumulatorActor
     let handler: MetricsCollectionOutputHandler iso =
       recover iso MetricsStringAccumulator(MonitoringHubEncoder, output) end
@@ -100,28 +127,12 @@ class iso _TestMonitoringHubEncoder is UnitTest
     let mc: MetricsCollection = MetricsCollection(bin_selector, 1,
                                                   consume handler)
 
-    let nms:NodeMetricsSummary iso = recover NodeMetricsSummary("node1") end
-    let digest:StepMetricsDigest iso = recover StepMetricsDigest(999) end
-
-    digest.add_report(StepMetricsReport(10010, 10550))
-    digest.add_report(StepMetricsReport(10650, 12250))
-    nms.add_digest(consume digest)
-
-    let bms: BoundaryMetricsSummary iso = recover
-      BoundaryMetricsSummary("node1") end
-    bms.add_report(BoundaryMetricsReport(0, 10000, 10050, 10250))
-    bms.add_report(BoundaryMetricsReport(0, 10001, 11150, 11600))
-    bms.add_report(BoundaryMetricsReport(1, 10002, 15050, 15300))
-    bms.add_report(BoundaryMetricsReport(1, 10003, 15400, 15500))
-
-    let bms': BoundaryMetricsSummary val = consume bms
-    let nms': NodeMetricsSummary val = consume nms
-    // Process summaries for step, sink, and boundary
-    mc.process_summary(nms')
-    mc.process_summary(bms')
+/*
+    // Process summaries
+    mc.process_summary(consume nms)
+    mc.process_summary(consume bms)
 
     // Process the collection with the handlers array
     mc.send_output()
-
+*/
     true
-    */
