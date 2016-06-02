@@ -15,9 +15,12 @@ interface FinalComputation[In]
 interface PartitionFunction[In]
   fun apply(input: In): U64
 
+trait StateProcessor[State]
+  fun apply(state: State): State
+
 interface StateComputation[Out: Any val, State]
-  fun apply(state: State, default_output_step: BasicStep tag,
-    message_wrapper: MessageWrapper[Out] val): State
+  fun apply(message_wrapper: MessageWrapper[Out] val,
+    output_step: BasicStep tag): StateProcessor[State]
 
 interface MessageWrapper[T: Any val]
   fun apply(data: T): Message[T] val

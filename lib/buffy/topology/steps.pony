@@ -189,10 +189,9 @@ actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
-actor StateStep[In: Any val, Out: Any val, State: Any ref]
-  is ThroughStep[In, Out]
+actor StateStep[State: Any ref]
+  is BasicStep
   var _step_reporter: (StepReporter val | None) = None
-  var _output: (BasicStep tag | None) = None
   var _state: State
 
   new create(state_initializer: StateInitializer[State] val) =>
@@ -207,33 +206,17 @@ actor StateStep[In: Any val, Out: Any val, State: Any ref]
   be apply(input: StepMessage val) =>
     @printf[None]("StateStep: apply called!\n".cstring())
     match input
-    | let m: Message[In] val => //StateComputation[Out, State] val] val =>
-      @printf[None]("StateStep: Message[In] matched!\n".cstring())
-      match m.data()
-      | let sc: StateComputation[Out, State] val =>
-        match _output
-        | let o: BasicStep tag =>
-          let start_time = Time.millis()
-          let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
-            m.last_ingress_ts())
-          _state = sc(_state, o, message_wrapper)
-          let end_time = Time.millis()
-          match _step_reporter
-          | let sr: StepReporter val =>
-            sr.report(start_time, end_time)
-          end
-        end
-      | let sc: StateComputation[None, State] val =>
-        @printf[None]("StateStep: NONE StateComputation matched!\n".cstring())
-        let start_time = Time.millis()
-        let message_wrapper = DefaultMessageWrapper[None](m.id(), m.source_ts(),
-          m.last_ingress_ts())
-        _state = sc(_state, EmptyStep, message_wrapper)
-        let end_time = Time.millis()
-        match _step_reporter
-        | let sr: StepReporter val =>
-          sr.report(start_time, end_time)
-        end
+    | let m: Message[StateProcessor[State]] val => //StateComputation[Out, State] val] val =>
+      @printf[None]("StateStep: Message[StateProcessor[State]] matched!\n".cstring())
+      let sp: StateProcessor[State] = m.data()
+      let start_time = Time.millis()
+      let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
+        m.last_ingress_ts())
+      _state = sp(_state, message_wrapper)
+      let end_time = Time.millis()
+      match _step_reporter
+      | let sr: StepReporter val =>
+        sr.report(start_time, end_time)
       end
     end
 
