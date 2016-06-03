@@ -681,7 +681,7 @@ actor ProcessManager
           args.push("-u")                          // the userid to use
           args.push(node.docker_userid)
           args.push("--name")                      // the name of the app
-          args.push(node.name + _docker_postfix)   // make name unique for this run
+          args.push(node.name) //+ _docker_postfix)   // make name unique for this run
           args.push("-e")                          // add a constraint
           args.push("constraint:node==" + node.docker_constraint_node)
           args.push("-h")                          // Docker node name for /etc/hosts
@@ -702,15 +702,13 @@ actor ProcessManager
           args.push("-v")                          // bind mount a volume
           args.push("/usr:/usr:ro")
           args.push("-v")                          // bind mount a volume
-          args.push(node.docker_dir)
+          args.push(node.docker_dir + ":" + node.docker_dir)
           args.push("-w")                          // container working dir
           args.push(node.docker_dir)
           args.push("--net=" + docker_network)     // connect to network
 
-          // args.push(docker_repo                    // image registry and path
-          //   + node.docker_image
-          //   + node.docker_tag)
-          args.push(node.docker_image + ":" + node.docker_tag)
+          args.push(node.docker_image + ":"
+            + node.docker_tag)                     // image path
 
           
           
@@ -721,19 +719,15 @@ actor ProcessManager
           end
 
           // dump args
-          // let foo: Array[String] val = consume args
-          // var command: String = ""
-          // for value in foo.values() do
-          //   command = command + value + " "
-          // end
-          // _env.out.print(command)
+          let a: Array[String val] val = consume args
+          _dump_docker_command(a)
           
           // finally boot the container
           if docker isnt None then
             try
               let pn: ProcessNotify iso = ProcessClient(_env, node.name, this)
               let pm: ProcessMonitor = ProcessMonitor(consume pn,
-                docker as FilePath, consume args, consume vars)
+                docker as FilePath, a, consume vars)
               let child = Child(node.name, node.is_canary, pm)      
                 roster.insert(node.name, child)
             else
@@ -750,7 +744,15 @@ actor ProcessManager
       _env.out.print("dagon: don't have Docker info. Can't boot node.")
     end
 
-
+  fun ref _dump_docker_command(args: Array[String val] val) =>
+    """
+    Dump the full docker command to stdout.
+    """
+    var command: String = ""
+    for value in args.values() do
+      command = command + value + " "
+    end
+    _env.out.print("dagon: docker command\n" + command)
     
   be boot_process(node: Node val) =>
     """
