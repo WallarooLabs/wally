@@ -15,30 +15,6 @@ actor Main is TestList
     test(_TestMetricsWireMsgNode)
     test(_TestMetricsWireMsgBoundary)
     test(_TestMonitoringHubEncoder)
-    test(_Stuff)
-
-class iso _Stuff is UnitTest
-  fun name(): String => "buffy:stuff"
-  fun apply(h: TestHelper) ? =>
-    let auth: AmbientAuth = h.env.root as AmbientAuth
-    let a: Array[U8 val] val = recover [0, 0, 0, 86, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 6, 108, 101, 97, 100, 101, 114, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 1, 0, 0, 1, 85, 20, 61, 48, 145, 0, 0, 1, 85, 20, 61, 48, 145, 69,
-    203, 8, 41, 237, 197, 168, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 85, 20, 61,
-    48, 146, 0, 0, 1, 85, 20, 61, 48, 146] end
-
-    let e' = recover val a.slice(4) end
-    let decoded = MetricsMsgDecoder(consume e', auth)
-
-    match decoded
-    | let n: NodeMetricsSummary val =>
-      Debug("1")
-    | let n: BoundaryMetricsSummary val =>
-      Debug("2")
-    else
-      h.fail("Wrong decoded message type")
-    end
-    true
 
 class iso _TestMetricsWireMsgNode is UnitTest
   fun name(): String => "buffy:MetricsWireMsgNode"
@@ -46,7 +22,7 @@ class iso _TestMetricsWireMsgNode is UnitTest
   fun apply(h: TestHelper) ? =>
     let auth: AmbientAuth = h.env.root as AmbientAuth
     let node_name = "NodeTest"
-    let nms = NodeMetricsSummary(node_name)
+    let nms = recover trn NodeMetricsSummary(node_name) end
     nms.add_report(1, StepMetricsReport(1232143143, 1354551314))
     nms.add_report(1, StepMetricsReport(1232347892, 1354328734))
     nms.add_report(1, StepMetricsReport(1242596283, 1123612344))
@@ -59,8 +35,7 @@ class iso _TestMetricsWireMsgNode is UnitTest
     nms.add_report(2, StepMetricsReport(1298273412, 1354275808))
     nms.add_report(2, StepMetricsReport(1223498723, 1313488789))
 
-
-    let encoded = MetricsMsgEncoder.nodemetrics(nms, auth)
+    let encoded = MetricsMsgEncoder.nodemetrics(consume nms, auth)
     // remove the bytes length segment from the array
     let e' = recover val encoded.slice(4) end
     let decoded = MetricsMsgDecoder(consume e', auth)
@@ -81,7 +56,7 @@ class iso _TestMetricsWireMsgBoundary is UnitTest
   fun apply(h: TestHelper) ? =>
     let auth: AmbientAuth = h.env.root as AmbientAuth
     let node_name = "BoundaryTest"
-    let bms = BoundaryMetricsSummary(node_name)
+    let bms = recover trn BoundaryMetricsSummary(node_name) end
 
     bms.add_report(BoundaryMetricsReport(BoundaryTypes.source_sink(), 9143,
       91354551, 1232143112))
@@ -94,7 +69,7 @@ class iso _TestMetricsWireMsgBoundary is UnitTest
     bms.add_report(BoundaryMetricsReport(BoundaryTypes.ingress_egress(), 9198,
       91313488, 1354275829))
 
-    let encoded = MetricsMsgEncoder.boundarymetrics(bms, auth)
+    let encoded = MetricsMsgEncoder.boundarymetrics(consume bms, auth)
     let e' = recover val encoded.slice(4) end
     let decoded = MetricsMsgDecoder(consume e', auth)
 

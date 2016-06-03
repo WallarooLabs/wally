@@ -22,17 +22,17 @@ class UnknownMetricsMsg is MetricsWireMsg
     data = d
 
 primitive MetricsMsgEncoder
-  fun _serialise(msg: MetricsWireMsg ref, auth: AmbientAuth): Array[U8] val ? =>
+  fun _serialise(msg: MetricsWireMsg val, auth: AmbientAuth): Array[U8] val ? =>
     let serialised: Array[U8] val =
       Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
     Bytes.length_encode(serialised)
 
-  fun nodemetrics(summary: NodeMetricsSummary ref, auth: AmbientAuth):
+  fun nodemetrics(summary: NodeMetricsSummary val, auth: AmbientAuth):
   Array[U8] val ? =>
     Debug("nodemetrics")
     _serialise(summary, auth)
 
-  fun boundarymetrics(summary: BoundaryMetricsSummary ref,
+  fun boundarymetrics(summary: BoundaryMetricsSummary val,
                       auth: AmbientAuth): Array[U8] val ? =>
     Debug("boundarymetrics")
     _serialise(summary, auth)
@@ -79,7 +79,7 @@ class StepMetricsDigest
 
 class NodeMetricsSummary is MetricsWireMsg
   let node_name: String
-  let digests: DigestMap = DigestMap
+  let digests: DigestMap trn = recover DigestMap end
   var _size: USize = 0
 
   new create(name: String) =>
@@ -88,17 +88,14 @@ class NodeMetricsSummary is MetricsWireMsg
   fun size(): USize =>
     _size
 
-  fun ref add_digest(step_id: StepId val, d: StepMetricsDigest ref) =>
-    digests.update(step_id, d)
-
   fun ref add_report(step_id: StepId val, r: StepMetricsReport val) =>
     try
       digests(step_id).add_report(r)
       _size = _size + 1
     else
-      let dig:StepMetricsDigest ref = recover StepMetricsDigest(step_id) end
+      let dig:StepMetricsDigest trn = recover StepMetricsDigest(step_id) end
       dig.add_report(r)
-      digests.update(step_id, dig)
+      digests.update(step_id, consume dig)
       _size = _size + 1
     end
 
@@ -120,7 +117,7 @@ class BoundaryMetricsReport is MetricsReport
 
 class BoundaryMetricsSummary is MetricsWireMsg
   let node_name: String
-  let reports: BoundaryReports = BoundaryReports
+  let reports: BoundaryReports trn = recover BoundaryReports end
 
   new create(name: String) =>
     node_name = name
@@ -133,5 +130,5 @@ class BoundaryMetricsSummary is MetricsWireMsg
 
 type StepType is U64
 type StepId is U64
-type DigestMap is Map[StepId val, StepMetricsDigest ref]
+type DigestMap is Map[StepId val, StepMetricsDigest trn]
 type BoundaryReports is Array[BoundaryMetricsReport val]
