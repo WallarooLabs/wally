@@ -15,6 +15,35 @@ actor Main is TestList
     test(_TestMetricsWireMsgNode)
     test(_TestMetricsWireMsgBoundary)
     test(_TestMonitoringHubEncoder)
+    test(_DeserialiseByteArray)
+
+class iso _DeserialiseByteArray is UnitTest
+  fun name(): String => "buffy:DeserialiseByteArray"
+  fun apply(h: TestHelper) ? =>
+    let auth: AmbientAuth = h.env.root as AmbientAuth
+    let a: Array[U8 val] val = recover [
+    0, 0, 0, 191, 115, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0,
+    0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0,
+    0, 0, 0, 0, 184, 0, 0, 0, 0, 0, 0, 0, 114, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0,
+    0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 104, 0, 0, 0,
+    0, 0, 0, 0, 144, 0, 0, 0, 0, 0, 0, 0, 112, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 157, 155, 167, 23, 85, 1, 0, 0, 158,
+    155, 167, 23, 85, 1, 0, 0, 112, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 157, 155, 167, 23, 85, 1, 0, 0, 158, 155, 167, 23,
+    85, 1, 0, 0, 108, 101, 97, 100, 101, 114, 0] end
+
+    let e' = recover val a.slice(4) end
+    let decoded = MetricsMsgDecoder(consume e', auth)
+
+    match decoded
+    | let n: NodeMetricsSummary val =>
+      Debug("1")
+    | let n: BoundaryMetricsSummary val =>
+      Debug("2")
+    else
+      h.fail("Wrong decoded message type")
+    end
+    true
 
 class iso _TestMetricsWireMsgNode is UnitTest
   fun name(): String => "buffy:MetricsWireMsgNode"

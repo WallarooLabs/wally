@@ -1,7 +1,6 @@
 use "sendence/bytes"
 use "collections"
 use "serialise"
-use "debug"
 
 primitive ReportTypes
   fun step(): U64 => 0
@@ -29,12 +28,10 @@ primitive MetricsMsgEncoder
 
   fun nodemetrics(summary: NodeMetricsSummary val, auth: AmbientAuth):
   Array[U8] val ? =>
-    Debug("nodemetrics")
     _serialise(summary, auth)
 
   fun boundarymetrics(summary: BoundaryMetricsSummary val,
                       auth: AmbientAuth): Array[U8] val ? =>
-    Debug("boundarymetrics")
     _serialise(summary, auth)
 
 primitive MetricsMsgDecoder
