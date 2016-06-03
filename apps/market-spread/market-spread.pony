@@ -58,8 +58,7 @@ class UpdateData is StateComputation[None, MarketData]
     _nbbo = nbbo
 
   fun name(): String => "update market data"
-  fun apply(state: MarketData, default_output_step: BasicStep tag,
-    message_wrapper: MessageWrapper[None] val): MarketData =>
+  fun apply(state: MarketData, output: MessageTarget[None]): MarketData =>
 //    if _nbbo.symbol() == "VRTX" then
       @printf[None](("Update data at state id " + state.id().string() + "\n").cstring())
 //    end
@@ -85,15 +84,13 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
     _trade = trade
 
   fun name(): String => "check trade result"
-  fun apply(state: MarketData,
-    default_output_step: BasicStep tag,
-    message_wrapper: MessageWrapper[TradeResult val] val): MarketData =>
+  fun apply(state: MarketData, output: MessageTarget[TradeResult val]): MarketData =>
     if _trade.symbol() == "VRTX" then
       @printf[None](("Check status at state id " + state.id().string() + "\n").cstring())
     end
     let is_rejected = state.is_rejected(_trade.symbol())
     let result: TradeResult val = TradeResult(_trade.symbol(), is_rejected)
-    default_output_step(message_wrapper(result))
+    output(result)
     state
 
   fun symbol(): String => _trade.symbol()

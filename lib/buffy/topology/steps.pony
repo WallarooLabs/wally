@@ -22,7 +22,7 @@ actor EmptyStep is BasicStep
 
 actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]
-  var _output: (BasicStep tag | None) = None
+  var _output: BasicStep tag = EmptyStep
   var _step_reporter: (StepReporter val | None) = None
 
   new create(f: Computation[In, Out] iso) =>
@@ -37,23 +37,20 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
-      match _output
-      | let o: BasicStep tag =>
-        let start_time = Time.millis()
-        let output_msg =
-          Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), _f(m.data()))
-        o(output_msg)
-        let end_time = Time.millis()
-        match _step_reporter
-        | let sr: StepReporter val =>
-          sr.report(start_time, end_time)
-        end
+      let start_time = Time.millis()
+      let output_msg =
+        Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), _f(m.data()))
+      _output(output_msg)
+      let end_time = Time.millis()
+      match _step_reporter
+      | let sr: StepReporter val =>
+        sr.report(start_time, end_time)
       end
     end
 
 actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _f: MapComputation[In, Out]
-  var _output: (BasicStep tag | None) = None
+  var _output: BasicStep tag = EmptyStep
   var _step_reporter: (StepReporter val | None) = None
 
   new create(f: MapComputation[In, Out] iso) =>
@@ -68,25 +65,22 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
-      match _output
-      | let o: BasicStep tag =>
-        let start_time = Time.millis()
-        for res in _f(m.data()).values() do
-          let output_msg =
-            Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), res)
-          o(output_msg)
-        end
-        let end_time = Time.millis()
-        match _step_reporter
-        | let sr: StepReporter val =>
-          sr.report(start_time, end_time)
-        end
+      let start_time = Time.millis()
+      for res in _f(m.data()).values() do
+        let output_msg =
+          Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), res)
+        _output(output_msg)
+      end
+      let end_time = Time.millis()
+      match _step_reporter
+      | let sr: StepReporter val =>
+        sr.report(start_time, end_time)
       end
     end
 
 actor Source[Out: Any val] is ThroughStep[String, Out]
   var _input_parser: Parser[Out] val
-  var _output: (BasicStep tag | None) = None
+  var _output: BasicStep tag = EmptyStep
   var _step_reporter: (StepReporter val | None) = None
 
   new create(input_parser: Parser[Out] val) =>
@@ -107,14 +101,11 @@ actor Source[Out: Any val] is ThroughStep[String, Out]
         | let res: Out =>
           let output_msg: Message[Out] val =
             Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), res)
-          match _output
-          | let o: BasicStep tag =>
-            o(output_msg)
-            let end_time = Time.millis()
-            match _step_reporter
-            | let sr: StepReporter val =>
-              sr.report(start_time, end_time)
-            end
+          _output(output_msg)
+          let end_time = Time.millis()
+          match _step_reporter
+          | let sr: StepReporter val =>
+            sr.report(start_time, end_time)
           end
         end
       else
@@ -138,7 +129,7 @@ actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _step_builder: BasicStepBuilder val
   let _partition_function: PartitionFunction[In] val
   let _partitions: Map[U64, BasicStep tag] = Map[U64, BasicStep tag]
-  var _output: (BasicStep tag | None) = None
+  var _output: BasicStep tag = EmptyStep
 
   new create(s_builder: BasicStepBuilder val, pf: PartitionFunction[In] val) =>
     _step_builder = s_builder
@@ -159,10 +150,7 @@ actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
           _partitions(partition_id) = _step_builder()
           match _partitions(partition_id)
           | let t: ThroughStep[In, Out] tag =>
-            match _output
-            | let o: BasicStep tag =>
-              t.add_output(o)
-            end
+            t.add_output(_output)
             t(m)
           end
         else
@@ -177,10 +165,7 @@ actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
       try
         match _partitions(key)
         | let t: ThroughStep[In, Out] tag =>
-          match _output
-          | let o: BasicStep tag =>
-            t.add_output(o)
-          end
+          t.add_output(_output)
         else
           @printf[String]("Partition not a ThroughStep!\n".cstring())
         end
@@ -189,7 +174,46 @@ actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
-actor StateStep[State: Any ref]
+actor StateStep[Out: Any val, State: Any ref]
+  is BasicStep
+  let _state_computation: StateComputation[Out, State] val
+  var _step_reporter: (StepReporter val | None) = None
+  var _output: BasicStep tag = EmptyStep
+  var _shared_state: BasicStep tag = EmptyStep
+
+  new create(sc: StateComputation[Out, State] iso) =>
+    _state_computation = consume sc
+
+  be add_step_reporter(sr: StepReporter val) =>
+    _step_reporter = sr
+
+  be add_output(to: BasicStep tag) =>
+    _output = to
+
+  be add_shared_state(ss: BasicStep tag) =>
+    _shared_state = ss
+
+  be apply(input: StepMessage val) =>
+    @printf[None]("StateStep: apply called!\n".cstring())
+    match input
+    | let m: Message[Out] val =>
+      @printf[None]("StateStep: Message[StateProcessor[State]] matched!\n".cstring())
+      let start_time = Time.millis()
+      let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
+        m.last_ingress_ts())
+      let sc_wrapper = StateComputationWrapper[Out, State](_state_computation,
+        message_wrapper, _output)
+      let output_msg = Message[StateProcessor[State] val](m.id(),
+        m.source_ts(), m.last_ingress_ts(), sc_wrapper)
+      _shared_state(output_msg)
+      let end_time = Time.millis()
+      match _step_reporter
+      | let sr: StepReporter val =>
+        sr.report(start_time, end_time)
+      end
+    end
+
+actor SharedStateStep[State: Any ref]
   is BasicStep
   var _step_reporter: (StepReporter val | None) = None
   var _state: State
@@ -200,19 +224,14 @@ actor StateStep[State: Any ref]
   be add_step_reporter(sr: StepReporter val) =>
     _step_reporter = sr
 
-  be add_output(to: BasicStep tag) =>
-    _output = to
-
   be apply(input: StepMessage val) =>
-    @printf[None]("StateStep: apply called!\n".cstring())
+    @printf[None]("SharedStateStep: apply called!\n".cstring())
     match input
-    | let m: Message[StateProcessor[State]] val => //StateComputation[Out, State] val] val =>
-      @printf[None]("StateStep: Message[StateProcessor[State]] matched!\n".cstring())
-      let sp: StateProcessor[State] = m.data()
+    | let m: Message[StateProcessor[State] val] val => //StateComputation[Out, State] val] val =>
+      @printf[None]("SharedStateStep: Message[StateProcessor[State]] matched!\n".cstring())
+      let sp: StateProcessor[State] val = m.data()
       let start_time = Time.millis()
-      let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
-        m.last_ingress_ts())
-      _state = sp(_state, message_wrapper)
+      _state = sp(_state)
       let end_time = Time.millis()
       match _step_reporter
       | let sr: StepReporter val =>

@@ -64,26 +64,29 @@ class PartitionBuilder[In: Any val, Out: Any val]
 
 class StatePartitionBuilder[In: Any val, Out: Any val, State: Any ref]
   is ThroughStepBuilder[In, Out]
+  let _state_computation_builder: StateComputationBuilder[Out, State] val
   let _state_initializer: {(): State} val
   let _partition_function: PartitionFunction[In] val
 
-  new val create(init: {(): State} val, pf: PartitionFunction[In] val) =>
+  new val create(s_comp_builder: StateComputationBuilder[Out, State] val,
+    init: {(): State} val, pf: PartitionFunction[In] val) =>
+    _state_computation_builder = s_comp_builder
     _state_initializer = init
     _partition_function = pf
 
   fun apply(): BasicStep tag =>
-    Partition[In, Out](StateStepBuilder[In, Out, State](_state_initializer),
+    Partition[In, Out](StateStepBuilder[In, Out, State](_state_computation_builder),
       _partition_function)
 
 class StateStepBuilder[In: Any val, Out: Any val, State: Any ref]
   is ThroughStepBuilder[In, Out]
-  let _state_initializer: {(): State} val
+  let _state_computation_builder: StateComputationBuilder[Out, State] val
 
-  new val create(s_initializer: {(): State} val) =>
-    _state_initializer = s_initializer
+  new val create(s_comp_builder: StateComputationBuilder[Out, State] val) =>
+    _state_computation_builder = s_comp_builder
 
   fun apply(): BasicStep tag =>
-    StateStep[In, Out, State](_state_initializer)
+    StateStep[Out, State](_state_computation_builder())
 
 class ExternalConnectionBuilder[In: Any val] is SinkBuilder
   let _stringify: Stringify[In] val
