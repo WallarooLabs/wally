@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "spike"
 use "./network"
 use "./topology"
+use "buffy/flusher"
 use "time"
 
 actor Startup
@@ -14,6 +15,7 @@ actor Startup
     var node_name: String = "0"
     var phone_home_addr = Array[String]
     var metrics_addr = Array[String]
+    var metrics_delay: U64 = 1_000_000_000
     var options = Options(env)
     var leader_control_addr = Array[String]
     var leader_data_addr = Array[String]
@@ -36,6 +38,7 @@ actor Startup
       .add("source", "", StringArgument)
       .add("sink", "", StringArgument)
       .add("metrics", "", StringArgument)
+      .add("metrics-delay", "", F64Argument)
       .add("spike-delay", "", None)
       .add("spike-drop", "", None)
       .add("spike-seed", "", I64Argument)
@@ -43,14 +46,18 @@ actor Startup
     for option in options do
       match option
       | ("leader", None) => is_worker = false
-      | ("leader-control-address", let arg: String) => leader_control_addr = arg.split(":")
-      | ("leader-data-address", let arg: String) => leader_data_addr = arg.split(":")
+      | ("leader-control-address", let arg: String) =>
+        leader_control_addr = arg.split(":")
+      | ("leader-data-address", let arg: String) =>
+        leader_data_addr = arg.split(":")
       | ("worker_count", let arg: I64) => worker_count = arg.usize()
       | ("phone_home", let arg: String) => phone_home_addr = arg.split(":")
       | ("name", let arg: String) => node_name = arg
       | ("source", let arg: String) => source_addrs.append(arg.split(","))
       | ("sink", let arg: String) => sink_addrs.append(arg.split(","))
       | ("metrics", let arg: String) => metrics_addr = arg.split(":")
+      | ("metrics-delay", let arg: F64) =>
+        metrics_delay = (arg*1_000_000_000).u64()
       | ("spike-delay", None) =>
         env.out.print("%%SPIKE-DELAY%%")
         spike_delay = true
@@ -76,6 +83,9 @@ actor Startup
       env.out.print("Using Spike seed " + spike_seed.string())
       let spike_config = SpikeConfig(spike_delay, spike_drop, spike_seed)
       let auth = env.root as AmbientAuth
+      let stdout: StdStream = env.out
+      let stderr: StdStream = env.err
+
 
       let sinks: Map[U64, (String, String)] iso =
         recover Map[U64, (String, String)] end
@@ -93,14 +103,19 @@ actor Startup
           let metrics_service = metrics_addr(1)
 
           let metrics_notifier: TCPConnectionNotify iso =
-            MetricsCollectorConnectNotify(env, auth)
+            MetricsCollectorConnectNotify(auth, stdout, stderr)
           let metrics_conn: TCPConnection =
-            TCPConnection(auth, consume metrics_notifier, metrics_host, metrics_service)
+            TCPConnection(auth, consume metrics_notifier, metrics_host,
+                          metrics_service)
 
-          MetricsCollector(env, node_name, metrics_conn)
+          MetricsCollector(stderr, auth, node_name, metrics_conn)
         else
-          MetricsCollector(env, node_name)
+          MetricsCollector(stderr, auth, node_name)
         end
+
+        // start a timer to flush the receiver
+        let delay' = recover val metrics_delay end
+        Flusher(metrics_collector, delay')
 
       let step_manager = StepManager(env, auth, node_name, consume sinks,
         metrics_collector)
@@ -124,8 +139,9 @@ actor Startup
           WorkerControlNotifier(env, auth, node_name, leader_control_host,
             leader_control_service, coordinator, metrics_collector)))
         coordinator.add_listener(TCPListener(auth,
-          WorkerIntraclusterDataNotifier(env, auth, node_name, leader_control_host,
-            leader_control_service, coordinator, spike_config)))
+          WorkerIntraclusterDataNotifier(env, auth, node_name,
+            leader_control_host, leader_control_service, coordinator,
+            spike_config)))
       else
         if source_addrs.size() != source_count then
           env.out.print("There are " + source_count.string() + " sources but "
@@ -151,8 +167,8 @@ actor Startup
         coordinator.add_topology_manager(topology_manager)
 
         let control_notifier: TCPListenNotify iso =
-          LeaderControlNotifier(env, auth, node_name, coordinator, topology_manager,
-          metrics_collector)
+          LeaderControlNotifier(env, auth, node_name, coordinator,
+            topology_manager, metrics_collector)
         coordinator.add_listener(TCPListener(auth, consume control_notifier,
           leader_control_host, leader_control_service))
         let data_notifier: TCPListenNotify iso =
@@ -177,4 +193,3 @@ actor Startup
       env.out.print("Parameters: leader_address [-l -w <worker_count>"
         + "-p <phone_home_address> --id <node_name>]")
     end
-

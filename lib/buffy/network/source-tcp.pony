@@ -4,7 +4,7 @@ use "buffy/messages"
 use "buffy/metrics"
 use "sendence/bytes"
 use "../topology"
-use "time"
+use "buffy/epoch"
 
 class SourceNotifier is TCPListenNotify
   let _env: Env
@@ -77,8 +77,9 @@ class SourceConnectNotify is TCPConnectionNotify
         let msg = ExternalMsgDecoder(consume data)
         match msg
         | let m: ExternalDataMsg val =>
-          let now = Time.millis()
-          let new_msg: Message[String] val = Message[String](_msg_id = _msg_id + 1,
+          let now = Epoch.milliseconds()
+          let new_msg: Message[String] val = Message[String](
+            _msg_id = _msg_id + 1,
             now, now, m.data)
           _step_manager(_source_id, new_msg)
         | let m: ExternalUnknownMsg val =>
