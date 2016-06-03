@@ -142,12 +142,40 @@ class iso _TestMonitoringHubEncoder is UnitTest
     mc.send_output(res)
 
   fun tag _fulfill(h: TestHelper, value: String): String =>
-    h.assert_eq[String]("b", "a")
+    let arr = recover val value.array() end
+    h.assert_eq[USize](value.size(), 5375)
+    /* TODO: Parse the JSON and validate contents:
+    for chunk in LengthParser(value.array()) do
+      h.assert
+    end
+    */
     h.complete(true)
     value
 
   fun timed_out(h: TestHelper) =>
     h.complete(false)
+
+class LengthParser is Iterator[String]
+  let _data: Array[U8 val] val
+  var _idx: USize = 0
+
+  new create(data: Array[U8 val] val) =>
+    _data= data
+
+  fun ref has_next(): Bool =>
+    _idx <= _data.size()
+
+  fun ref next(): String val ? =>
+    let s = _idx = _idx + 4
+    let slc = _data.slice(s, _idx)
+    var chunk = bytes_to_usize(slc)
+    let s' = _idx = _idx + chunk
+    let slc' = _data.slice(s', _idx).clone()
+    String.create().append(slc').clone()
+
+  fun tag bytes_to_usize(a: Array[U8 val] ref): USize ? =>
+    ((a(0).u32() << 24) + (a(1).u32() << 16) + (a(2).u32() << 8) +
+    a(3).u32()).usize()
 
 actor ResumableTest is Resumable
   let _output: MetricsAccumulatorActor  tag
