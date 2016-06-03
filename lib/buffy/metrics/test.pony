@@ -3,6 +3,7 @@ use "collections"
 use "promises"
 use "buffy/messages"
 use "sendence/bytes"
+use "debug"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -14,6 +15,30 @@ actor Main is TestList
     test(_TestMetricsWireMsgNode)
     test(_TestMetricsWireMsgBoundary)
     test(_TestMonitoringHubEncoder)
+    test(_Stuff)
+
+class iso _Stuff is UnitTest
+  fun name(): String => "buffy:stuff"
+  fun apply(h: TestHelper) ? =>
+    let auth: AmbientAuth = h.env.root as AmbientAuth
+    let a: Array[U8 val] val = recover [0, 0, 0, 86, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 6, 108, 101, 97, 100, 101, 114, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 1, 0, 0, 1, 85, 20, 61, 48, 145, 0, 0, 1, 85, 20, 61, 48, 145, 69,
+    203, 8, 41, 237, 197, 168, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 85, 20, 61,
+    48, 146, 0, 0, 1, 85, 20, 61, 48, 146] end
+
+    let e' = recover val a.slice(4) end
+    let decoded = MetricsMsgDecoder(consume e', auth)
+
+    match decoded
+    | let n: NodeMetricsSummary val =>
+      Debug("1")
+    | let n: BoundaryMetricsSummary val =>
+      Debug("2")
+    else
+      h.fail("Wrong decoded message type")
+    end
+    true
 
 class iso _TestMetricsWireMsgNode is UnitTest
   fun name(): String => "buffy:MetricsWireMsgNode"
