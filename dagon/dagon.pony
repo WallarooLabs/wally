@@ -58,7 +58,7 @@ actor Main
       | ("phone_home", let arg: String) => p_arg = arg.split(":")
       else
         env.err.print("dagon: unknown argument")
-        env.err.print("dagon: usage: --timeout=<seconds>" +
+        env.err.print("dagon: usage: [--docker=<host:port>] --timeout=<seconds>" +
         " --filepath=<path> --phone_home=<host:port>")
       end
     end
@@ -69,6 +69,7 @@ actor Main
         use_docker = true
       else
         env.out.print("dagon: no DOCKER_HOST defined, using processes.")
+        docker_host = ""
       end
       
       if timeout is None then
@@ -1024,13 +1025,13 @@ class ProcessClient is ProcessNotify
   fun ref stdout(data: Array[U8] iso) =>
     let out = String.from_array(consume data)
     _env.out.print("dagon: " + _name + " STDOUT [")
-    _env.out.print(out)
+    _env.out.print("\t" + out)
     _env.out.print("dagon: " + _name + " STDOUT ]")
 
   fun ref stderr(data: Array[U8] iso) =>
     let err = String.from_array(consume data)
     _env.out.print("dagon: " + _name + " STDERR [")
-    _env.out.print(err)
+    _env.out.print("\t" + err)
     _env.out.print("dagon: " + _name + " STDERR ]")
     
   fun ref failed(err: ProcessError) =>
