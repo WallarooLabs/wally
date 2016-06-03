@@ -11,11 +11,17 @@ trait BasicStep
 trait BasicOutputStep is BasicStep
   be add_output(to: BasicStep tag)
 
+trait BasicStateStep is BasicStep
+  be add_shared_state(shared_state: BasicStep tag)
+
 trait ComputeStep[In] is BasicStep
 
 trait OutputStep[Out] is BasicOutputStep
 
 trait ThroughStep[In, Out] is (ComputeStep[In] & OutputStep[Out])
+
+trait ThroughStateStep[In: Any val, Out: Any val, State: Any #read] is (BasicStateStep &
+  ThroughStep[In, Out])
 
 actor EmptyStep is BasicStep
   be apply(input: StepMessage val) => None
@@ -174,15 +180,18 @@ actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
-actor StateStep[Out: Any val, State: Any ref]
-  is BasicStep
-  let _state_computation: StateComputation[Out, State] val
+actor StateStep[In: Any val, Payload: Any val, State: Any #read]
+  is ThroughStateStep[In, Payload, State]
   var _step_reporter: (StepReporter val | None) = None
   var _output: BasicStep tag = EmptyStep
   var _shared_state: BasicStep tag = EmptyStep
+  let _state_comp_builder: Computation[In, StateComputation[Payload, State] val]
+  let _state_id: U64
 
-  new create(sc: StateComputation[Out, State] iso) =>
-    _state_computation = consume sc
+  new create(comp_builder: ComputationBuilder[In,
+    StateComputation[Payload, State] val] val, state_id: U64) =>
+    _state_comp_builder = comp_builder()
+    _state_id = state_id
 
   be add_step_reporter(sr: StepReporter val) =>
     _step_reporter = sr
@@ -190,18 +199,19 @@ actor StateStep[Out: Any val, State: Any ref]
   be add_output(to: BasicStep tag) =>
     _output = to
 
-  be add_shared_state(ss: BasicStep tag) =>
-    _shared_state = ss
+  be add_shared_state(shared_state: BasicStep tag) =>
+    _shared_state = shared_state
 
   be apply(input: StepMessage val) =>
     @printf[None]("StateStep: apply called!\n".cstring())
     match input
-    | let m: Message[Out] val =>
-      @printf[None]("StateStep: Message[StateProcessor[State]] matched!\n".cstring())
+    | let m: Message[In] val =>
+      @printf[None]("StateStep: Message[StateComputation[Out, State]] matched!\n".cstring())
       let start_time = Time.millis()
-      let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
+      let sc: StateComputation[Payload, State] val = _state_comp_builder(m.data())
+      let message_wrapper = DefaultMessageWrapper[Payload](m.id(), m.source_ts(),
         m.last_ingress_ts())
-      let sc_wrapper = StateComputationWrapper[Out, State](_state_computation,
+      let sc_wrapper = StateComputationWrapper[Payload, State](sc,
         message_wrapper, _output)
       let output_msg = Message[StateProcessor[State] val](m.id(),
         m.source_ts(), m.last_ingress_ts(), sc_wrapper)
@@ -213,7 +223,7 @@ actor StateStep[Out: Any val, State: Any ref]
       end
     end
 
-actor SharedStateStep[State: Any ref]
+actor SharedStateStep[State: Any #read]
   is BasicStep
   var _step_reporter: (StepReporter val | None) = None
   var _state: State
@@ -227,7 +237,7 @@ actor SharedStateStep[State: Any ref]
   be apply(input: StepMessage val) =>
     @printf[None]("SharedStateStep: apply called!\n".cstring())
     match input
-    | let m: Message[StateProcessor[State] val] val => //StateComputation[Out, State] val] val =>
+    | let m: Message[StateProcessor[State] val] val =>
       @printf[None]("SharedStateStep: Message[StateProcessor[State]] matched!\n".cstring())
       let sp: StateProcessor[State] val = m.data()
       let start_time = Time.millis()
@@ -268,5 +278,5 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
       end
     end
 
-interface StateInitializer[State: Any ref]
+interface StateInitializer[State: Any #read]
   fun apply(): State

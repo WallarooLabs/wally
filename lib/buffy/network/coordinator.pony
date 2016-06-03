@@ -139,6 +139,11 @@ actor Coordinator
   be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
     _step_manager.add_step(step_id, step_builder)
 
+  be add_state_step(step_id: U64, ssb: BasicStateStepBuilder val,
+    shared_state_step_id: U64, shared_state_step_node: String) =>
+    _step_manager.add_state_step(step_id, ssb, shared_state_step_id,
+      shared_state_step_node, this)
+
   be add_proxy(p_step_id: U64, p_target_id: U64, target_node_name: String) =>
     _step_manager.add_proxy(p_step_id, p_target_id, target_node_name, this)
 

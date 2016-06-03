@@ -43,6 +43,12 @@ primitive WireMsgEncoder
     : Array[U8] val ? =>
     _serialise(SpinUpMsg(step_id, step_builder), auth)
 
+  fun spin_up_state_step(step_id: U64, step_builder: BasicStateStepBuilder val,
+    shared_state_step_id: U64, shared_state_step_node: String, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(SpinUpStateStepMsg(step_id, step_builder, shared_state_step_id,
+      shared_state_step_node), auth)
+
   fun spin_up_proxy(proxy_id: U64, step_id: U64, target_node_name: String
     , auth: AmbientAuth): Array[U8] val ? =>
     _serialise(SpinUpProxyMsg(proxy_id, step_id, target_node_name), auth)
@@ -177,6 +183,19 @@ class SpinUpMsg is WireMsg
   new val create(s_id: U64, s_builder: BasicStepBuilder val) =>
     step_id = s_id
     step_builder = s_builder
+
+class SpinUpStateStepMsg is WireMsg
+  let step_id: U64
+  let step_builder: BasicStateStepBuilder val
+  let shared_state_step_id: U64
+  let shared_state_step_node: String
+
+  new val create(s_id: U64, s_builder: BasicStateStepBuilder val,
+    sss_id: U64, sss_node: String) =>
+    step_id = s_id
+    step_builder = s_builder
+    shared_state_step_id = sss_id
+    shared_state_step_node = sss_node
 
 class SpinUpProxyMsg is WireMsg
   let proxy_id: U64

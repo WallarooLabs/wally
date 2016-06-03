@@ -15,16 +15,16 @@ interface FinalComputation[In]
 interface PartitionFunction[In]
   fun apply(input: In): U64
 
-trait StateProcessor[State]
+trait StateProcessor[State: Any #read]
   fun val apply(state: State): State
 
-interface StateComputation[Out: Any val, State]
-  fun apply(state: State, output: MessageTarget[Out]): State
+interface StateComputation[Out: Any val, State: Any #read]
+  fun apply(state: State, output: MessageTarget[Out] val): State
 
-class StateComputationWrapper[Out: Any val, State]
+class StateComputationWrapper[Out: Any val, State: Any #read]
   is StateProcessor[State]
-  let _state_computation: StateComputation[Out, State]
-  let _output: MessageTarget[Out]
+  let _state_computation: StateComputation[Out, State] val
+  let _output: MessageTarget[Out] val
 
   new val create(sc: StateComputation[Out, State] val,
     message_wrapper: MessageWrapper[Out] val,
@@ -69,7 +69,7 @@ interface MapComputationBuilder[In, Out]
   fun apply(): MapComputation[In, Out] iso^
 
 interface StateComputationBuilder[Out: Any val,
-  State]
+  State: Any #read]
   fun apply(): StateComputation[Out, State] iso^
 
 interface Parser[Out]

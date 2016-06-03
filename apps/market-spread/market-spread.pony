@@ -14,15 +14,25 @@ actor Main
       let topology: Topology val = recover val
         Topology
           .new_pipeline[FixOrderMessage val, TradeResult val](TradeParser, ResultStringify, recover [0] end)
-          .to[CheckStatus val](lambda(): Computation[FixOrderMessage val, CheckStatus val] iso^ => GenerateCheckStatus end)
-          .to_stateful_partition[TradeResult val, MarketData](
+          .to_stateful[TradeResult val, MarketData](
+            lambda(): Computation[FixOrderMessage val, CheckStatus val] iso^ => GenerateCheckStatus end,
             lambda(): MarketData => MarketData end,
-            SymbolPartition, 1)
+            1
+          )
+//          .to_stateful_partition[MarketData](
+//            lambda(): MarketData => MarketData end,
+//            SymbolPartition, 1)
           .build()
           .new_pipeline[FixNbboMessage val, None](NbboParser, NoneStringify, recover [0] end)
-          .to_stateful_partition[None, MarketData](
+//            .to_stateful[MarketData](
+//              lambda(): MarketData => MarketData end,
+//              1
+//            )
+          .to_stateful[None, MarketData](
+            lambda(): Computation[FixNbboMessage val, UpdateData val] iso^ => GenerateUpdateData end,
             lambda(): MarketData => MarketData end,
-            SymbolPartition, 1)
+            1
+          )
           .build()
       end
       Startup(env, consume topology, 2)
@@ -58,10 +68,10 @@ class UpdateData is StateComputation[None, MarketData]
     _nbbo = nbbo
 
   fun name(): String => "update market data"
-  fun apply(state: MarketData, output: MessageTarget[None]): MarketData =>
-//    if _nbbo.symbol() == "VRTX" then
+  fun apply(state: MarketData, output: MessageTarget[None] val): MarketData =>
+    if _nbbo.symbol() == "VRTX" then
       @printf[None](("Update data at state id " + state.id().string() + "\n").cstring())
-//    end
+    end
     let mid = (_nbbo.bid_px() + _nbbo.offer_px()) / 2
     if (_nbbo.offer_px() - _nbbo.bid_px()) >= 0.05 then // also (offer - bid) / mid >= 5%
       state.update(_nbbo.symbol(), true)
@@ -84,7 +94,7 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
     _trade = trade
 
   fun name(): String => "check trade result"
-  fun apply(state: MarketData, output: MessageTarget[TradeResult val]): MarketData =>
+  fun apply(state: MarketData, output: MessageTarget[TradeResult val] val): MarketData =>
     if _trade.symbol() == "VRTX" then
       @printf[None](("Check status at state id " + state.id().string() + "\n").cstring())
     end

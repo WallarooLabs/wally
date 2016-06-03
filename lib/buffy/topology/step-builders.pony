@@ -3,16 +3,21 @@ use "buffy/messages"
 use "net"
 use "buffy/metrics"
 use "time"
-
-interface TagBuilder
-  fun apply(): Any tag
+//
+//interface TagBuilder
+//  fun apply(): Any tag
 
 trait BasicStepBuilder
   fun apply(): BasicStep tag
+  fun shared_state_step_builder(): BasicStepBuilder val => EmptyStepBuilder
+
+trait BasicStateStepBuilder is BasicStepBuilder
+  fun state_id(): U64
 
 trait SinkBuilder
   fun apply(conns: Array[TCPConnection] iso, metrics_collector: MetricsCollector)
     : BasicStep tag
+  fun is_state_builder(): Bool => false
 
 trait BasicOutputStepBuilder[Out: Any val] is BasicStepBuilder
 
@@ -62,31 +67,54 @@ class PartitionBuilder[In: Any val, Out: Any val]
   fun apply(): BasicStep tag =>
     Partition[In, Out](_step_builder, _partition_function)
 
-class StatePartitionBuilder[In: Any val, Out: Any val, State: Any ref]
-  is ThroughStepBuilder[In, Out]
-  let _state_computation_builder: StateComputationBuilder[Out, State] val
-  let _state_initializer: {(): State} val
-  let _partition_function: PartitionFunction[In] val
+//class StatePartitionBuilder[Out: Any val, State: Any ref]
+//  is ThroughStepBuilder[Out, Out]
+//  let _state_initializer: {(): State} val
+//  let _partition_function: PartitionFunction[Out] val
+//
+//  new val create(init: {(): State} val, pf: PartitionFunction[Out] val) =>
+//    _state_initializer = init
+//    _partition_function = pf
+//
+//  fun apply(): BasicStep tag =>
+//    Partition[Out, Out](StateStepBuilder[Out, State],
+//      _partition_function)
 
-  new val create(s_comp_builder: StateComputationBuilder[Out, State] val,
-    init: {(): State} val, pf: PartitionFunction[In] val) =>
-    _state_computation_builder = s_comp_builder
-    _state_initializer = init
-    _partition_function = pf
+class StateStepBuilder[In: Any val, Payload: Any val, State: Any #read]
+  is (ThroughStepBuilder[In, Payload] &
+    BasicStateStepBuilder)
+  let _comp_builder: ComputationBuilder[In, StateComputation[Payload, State] val] val
+  let _shared_state_step_builder: SharedStateStepBuilder[State] val
+  let _state_id: U64
+
+  new val create(comp_builder: ComputationBuilder[In,
+    StateComputation[Payload, State] val] val,
+    state_initializer: StateInitializer[State] val, id: U64) =>
+    _comp_builder = comp_builder
+    _shared_state_step_builder =
+      SharedStateStepBuilder[State](state_initializer)
+    _state_id = id
+
+  fun apply(): BasicStateStep tag =>
+    StateStep[In, Payload, State](_comp_builder, _state_id)
+
+  fun state_id(): U64 => _state_id
+  fun shared_state_step_builder(): SharedStateStepBuilder[State] val =>
+    _shared_state_step_builder
+
+class SharedStateStepBuilder[State: Any #read]
+  is BasicStepBuilder
+  let _state_initializer: StateInitializer[State] val
+
+  new val create(state_initializer: StateInitializer[State] val) =>
+    _state_initializer = state_initializer
 
   fun apply(): BasicStep tag =>
-    Partition[In, Out](StateStepBuilder[In, Out, State](_state_computation_builder),
-      _partition_function)
+    SharedStateStep[State](_state_initializer)
 
-class StateStepBuilder[In: Any val, Out: Any val, State: Any ref]
-  is ThroughStepBuilder[In, Out]
-  let _state_computation_builder: StateComputationBuilder[Out, State] val
-
-  new val create(s_comp_builder: StateComputationBuilder[Out, State] val) =>
-    _state_computation_builder = s_comp_builder
-
-  fun apply(): BasicStep tag =>
-    StateStep[Out, State](_state_computation_builder())
+primitive EmptyStepBuilder is BasicStepBuilder
+//  new val create() => None
+  fun apply(): BasicStep tag => EmptyStep
 
 class ExternalConnectionBuilder[In: Any val] is SinkBuilder
   let _stringify: Stringify[In] val

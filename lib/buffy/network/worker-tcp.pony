@@ -101,6 +101,10 @@ class WorkerConnectNotify is TCPConnectionNotify
       | let m: SpinUpMsg val =>
         _env.err.print(_name + " is spinning up a step!")
         _coordinator.add_step(m.step_id, m.step_builder)
+      | let m: SpinUpStateStepMsg val =>
+        _env.err.print(_name + " is spinning up a state step!")
+        _coordinator.add_state_step(m.step_id, m.step_builder,
+          m.shared_state_step_id, m.shared_state_step_node)
       | let m: SpinUpProxyMsg val =>
         _env.err.print(_name + " is spinning up a proxy!")
         _coordinator.add_proxy(m.proxy_id, m.step_id, m.target_node_name)
