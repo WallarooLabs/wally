@@ -19,3 +19,13 @@ class Message[A: Any val] is StepMessage
   fun source_ts(): U64 => _source_ts
   fun last_ingress_ts(): U64 => _last_ingress_ts
   fun data(): A => _data
+
+class Forward
+  let step_id: U64
+  let from_node_name: String
+  let msg: StepMessage val
+
+  new val create(s_id: U64, from: String, m: StepMessage val) =>
+    step_id = s_id
+    from_node_name = from
+    msg = m

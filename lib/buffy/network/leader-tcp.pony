@@ -92,10 +92,10 @@ class LeaderConnectNotify is TCPConnectionNotify
         _topology_manager.ack_finished_connections()
       | let m: AckInitializedMsg val =>
         _topology_manager.ack_initialized()
-      | let m: AckMsgsReceivedMsg val =>
-        _coordinator.process_data_ack(m.node_name, m.msg_count)
-      | let m: AckReconnectMsgsReceivedMsg val =>
-        _coordinator.process_data_reconnect_ack(m.node_name, m.msg_count)
+      | let m: AckMsgIdMsg val =>
+        _coordinator.process_data_ack(m.node_name, m.msg_id)
+      | let m: AckConnectMsgIdMsg val =>
+        _coordinator.process_data_connect_ack(m.node_name, m.msg_id)
       | let m: SpinUpMsg val =>
         _coordinator.add_step(m.step_id, m.step_builder)
       | let m: SpinUpProxyMsg val =>
