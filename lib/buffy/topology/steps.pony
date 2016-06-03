@@ -180,6 +180,55 @@ actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
+//actor StatePartition[In: Any val, Out: Any val, State: Any #read] is ThroughStep[In, Out]
+//  let _state_step_builder: BasicStateStepBuilder val
+//  let _partition_function: PartitionFunction[In] val
+//  let _partitions: Map[U64, BasicStateStep tag] = Map[U64, BasicStateStep tag]
+//  var _output: BasicStep tag = EmptyStep
+//
+//  new create(s_builder: BasicStateStepBuilder val, pf: PartitionFunction[In] val) =>
+//    _state_step_builder = s_builder
+//    _partition_function = pf
+//
+//  be apply(input: StepMessage val) =>
+//    match input
+//    | let m: Message[In] val =>
+//      let partition_id = _partition_function(m.data())
+//      if _partitions.contains(partition_id) then
+//        try
+//          _partitions(partition_id)(m)
+//        else
+//          @printf[String]("Can't forward to chosen partition!\n".cstring())
+//        end
+//      else
+//        try
+//          _partitions(partition_id) = _state_step_builder(partition_id)
+//          match _partitions(partition_id)
+//          | let t: ThroughStep[In, Out] tag =>
+//            t.add_output(_output)
+//            t(m)
+//          end
+//        else
+//          @printf[String]("Computation type is invalid!\n".cstring())
+//        end
+//      end
+//    end
+//
+//  be add_output(to: BasicStep tag) =>
+//    _output = to
+//    for key in _partitions.keys() do
+//      try
+//        match _partitions(key)
+//        | let t: ThroughStep[In, Out] tag =>
+//          t.add_output(_output)
+//        else
+//          @printf[String]("Partition not a ThroughStep!\n".cstring())
+//        end
+//      else
+//          @printf[String]("Couldn't find partition when trying to add output!\n".cstring())
+//      end
+//    end
+
 actor StateStep[In: Any val, Payload: Any val, State: Any #read]
   is ThroughStateStep[In, Payload, State]
   var _step_reporter: (StepReporter val | None) = None
@@ -203,10 +252,8 @@ actor StateStep[In: Any val, Payload: Any val, State: Any #read]
     _shared_state = shared_state
 
   be apply(input: StepMessage val) =>
-    @printf[None]("StateStep: apply called!\n".cstring())
     match input
     | let m: Message[In] val =>
-      @printf[None]("StateStep: Message[StateComputation[Out, State]] matched!\n".cstring())
       let start_time = Time.millis()
       let sc: StateComputation[Payload, State] val = _state_comp_builder(m.data())
       let message_wrapper = DefaultMessageWrapper[Payload](m.id(), m.source_ts(),
@@ -235,10 +282,8 @@ actor SharedStateStep[State: Any #read]
     _step_reporter = sr
 
   be apply(input: StepMessage val) =>
-    @printf[None]("SharedStateStep: apply called!\n".cstring())
     match input
     | let m: Message[StateProcessor[State] val] val =>
-      @printf[None]("SharedStateStep: Message[StateProcessor[State]] matched!\n".cstring())
       let sp: StateProcessor[State] val = m.data()
       let start_time = Time.millis()
       _state = sp(_state)

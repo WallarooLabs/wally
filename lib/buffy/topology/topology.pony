@@ -94,16 +94,17 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let next_step = PipelineThroughStep[Last, Next](next_builder, id)
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
-//
-//  fun ref to_stateful_partition[State: Any ref](
+
+//  fun ref to_stateful_partition[Payload: Any val, State: Any ref](
+//    comp_builder: ComputationBuilder[Last, StateComputation[Payload, State] val] val,
 //    state_initializer: {(): State} val,
 //    p_fun: PartitionFunction[Last] val, id: U64 = 0)
-//      : PipelineBuilder[In, Out, Last] =>
-//    let next_builder = StatePartitionBuilder[Last, State](
-//      state_initializer, p_fun)
-//    let next_step = PipelineThroughStep[Last, Last](next_builder, id)
+//      : PipelineBuilder[In, Out, Payload] =>
+//    let next_builder = StatePartitionBuilder[Last, Payload, State](
+//      comp_builder, state_initializer, p_fun)
+//    let next_step = PipelineThroughStep[Last, Payload](next_builder, id)
 //    _p.add_step(next_step)
-//    PipelineBuilder[In, Out, Last](_t, _p)
+//    PipelineBuilder[In, Out, Payload](_t, _p)
 
   fun ref to_stateful[Payload: Any val, State: Any ref](
     comp_builder: ComputationBuilder[Last, StateComputation[Payload, State] val] val,

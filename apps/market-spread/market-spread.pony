@@ -41,15 +41,15 @@ actor Main
     end
 
 class MarketData
-  let _data: Map[String, Bool] = Map[String, Bool]
+  let _data_rejected: Map[String, Bool] = Map[String, Bool]
   let _id: U64 = Dice(MT(Time.micros()))(1, 10000)
 
   fun ref update(symbol: String, is_rej: Bool) =>
-    _data(symbol) = is_rej
+    _data_rejected(symbol) = is_rej
 
   fun is_rejected(symbol: String): Bool =>
     try
-      _data(symbol)
+      _data_rejected(symbol)
     else
       false
     end
@@ -73,7 +73,8 @@ class UpdateData is StateComputation[None, MarketData]
       @printf[None](("Update data at state id " + state.id().string() + "\n").cstring())
     end
     let mid = (_nbbo.bid_px() + _nbbo.offer_px()) / 2
-    if (_nbbo.offer_px() - _nbbo.bid_px()) >= 0.05 then // also (offer - bid) / mid >= 5%
+    if ((_nbbo.offer_px() - _nbbo.bid_px()) >= 0.05) or
+      (((_nbbo.offer_px() - _nbbo.bid_px()) / mid) >= 0.05) then
       state.update(_nbbo.symbol(), true)
     else
       state.update(_nbbo.symbol(), false)
@@ -99,6 +100,9 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
       @printf[None](("Check status at state id " + state.id().string() + "\n").cstring())
     end
     let is_rejected = state.is_rejected(_trade.symbol())
+    if is_rejected then
+      @printf[None](("REJECTED\n").cstring())
+    end
     let result: TradeResult val = TradeResult(_trade.symbol(), is_rejected)
     output(result)
     state
