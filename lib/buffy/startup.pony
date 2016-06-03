@@ -122,12 +122,12 @@ actor Startup
       if is_worker then
         coordinator.add_listener(TCPListener(auth,
           WorkerControlNotifier(env, auth, node_name, leader_control_host,
-            leader_control_service, coordinator, metrics_collector)
+            leader_control_service, coordinator, metrics_collector),
             node_name
           ))
         coordinator.add_listener(TCPListener(auth,
           WorkerIntraclusterDataNotifier(env, auth, node_name, leader_control_host,
-            leader_control_service, coordinator, spike_config)
+            leader_control_service, coordinator, spike_config),
             node_name
           ))
       else
