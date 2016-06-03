@@ -123,12 +123,12 @@ actor Startup
         coordinator.add_listener(TCPListener(auth,
           WorkerControlNotifier(env, auth, node_name, leader_control_host,
             leader_control_service, coordinator, metrics_collector),
-            node_name
+            "0.0.0.0"
           ))
         coordinator.add_listener(TCPListener(auth,
           WorkerIntraclusterDataNotifier(env, auth, node_name, leader_control_host,
             leader_control_service, coordinator, spike_config),
-            node_name
+            "0.0.0.0"
           ))
       else
         if source_addrs.size() != source_count then
