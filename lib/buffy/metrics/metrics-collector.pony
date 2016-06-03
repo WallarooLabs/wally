@@ -1,7 +1,6 @@
 use "collections"
 use "net"
 use "buffy/messages"
-use "sendence/bytes"
 use "buffy/epoch"
 use "buffy/flusher"
 
@@ -55,7 +54,7 @@ actor MetricsCollector is FlushingActor
     | let c: TCPConnection =>
       try
         let encoded = MetricsMsgEncoder.nodemetrics(summary, _auth)
-        c.write(Bytes.length_encode(consume encoded))
+        c.write(consume encoded)
       else
         _stderr.print("Failed to send NodeMetricsSummary.")
       end
@@ -84,7 +83,7 @@ actor MetricsCollector is FlushingActor
   	| let c: TCPConnection =>
       try
         let encoded = MetricsMsgEncoder.boundarymetrics(summary, _auth)
-        c.write(Bytes.length_encode(consume encoded))
+        c.write(consume encoded)
       else
         _stderr.print("Failed to send BoundaryMetricsSummary.")
       end
