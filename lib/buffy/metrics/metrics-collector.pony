@@ -29,8 +29,8 @@ actor MetricsCollector is FlushingActor
     _step_summary = recover NodeMetricsSummary(node_name) end
 
   be flush() =>
-    _send_steps_if_over_max()
-    _send_boundary_if_over_max()
+    if _step_summary.size() > 0 then _send_steps_if_over_max() end
+    if _boundary_summary.size() > 0 then _send_boundary_if_over_max() end
 
 	be report_step_metrics(step_id: StepId, start_time: U64, end_time: U64) =>
     let r = StepMetricsReport(start_time, end_time)
