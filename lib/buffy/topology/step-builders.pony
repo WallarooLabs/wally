@@ -74,13 +74,18 @@ class PartitionBuilder[In: Any val, Out: Any val]
 class SharedStatePartitionBuilder[State: Any #read]
   is BasicStepBuilder
   let _step_builder: BasicStepBuilder val
+  let _initialization_map: Map[U64, {(): State} val] val
+  let _initialize_at_start: Bool
 
-  new val create(sb: BasicStepBuilder val) =>
+  new val create(sb: BasicStepBuilder val,
+    init_map: Map[U64, {(): State} val] val, init_at_start: Bool) =>
     _step_builder = sb
+    _initialization_map = init_map
+    _initialize_at_start = init_at_start
 
   fun apply(): BasicStep tag =>
-    StatePartition[State](_step_builder)
-
+    StatePartition[State](_step_builder, _initialization_map,
+      _initialize_at_start)
 
 class StateStepBuilder[In: Any val, Out: Any val, State: Any #read]
   is (ThroughStepBuilder[In, Out] & BasicStateStepBuilder)
@@ -123,13 +128,14 @@ class StatePartitionBuilder[In: Any val, Out: Any val, State: Any #read]
   new val create(comp_builder: ComputationBuilder[In,
     StateComputation[Out, State] val] val,
     state_initializer: StateInitializer[State] val,
-    pf: PartitionFunction[In] val, s_id: U64)
+    pf: PartitionFunction[In] val, s_id: U64,
+    init_map: Map[U64, {(): State} val] val, init_at_start: Bool)
     =>
     _comp_builder = comp_builder
     _partition_function = pf
     _shared_state_step_builder =
       SharedStatePartitionBuilder[State](
-        SharedStateStepBuilder[State](state_initializer))
+        SharedStateStepBuilder[State](state_initializer), init_map, init_at_start)
     _state_id = s_id
 
   fun apply(): BasicStep tag =>
