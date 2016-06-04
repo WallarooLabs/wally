@@ -10,20 +10,30 @@ use "time"
 
 actor Main
   new create(env: Env) =>
+    let initial_market_data: Map[U64, {(): MarketData} val] iso = generate_initial_data()
+
     try
       let topology: Topology val = recover val
         Topology
           .new_pipeline[FixOrderMessage val, TradeResult val](TradeParser, ResultStringify, recover [0] end)
           .to_stateful_partition[TradeResult val, MarketData](
-            lambda(): Computation[FixOrderMessage val, CheckStatus val] iso^ => GenerateCheckStatus end,
-            lambda(): MarketData => MarketData end,
-            SymbolPartition, 1)
+            recover
+              StatePartitionConfig[FixOrderMessage val, TradeResult val, MarketData](
+                lambda(): Computation[FixOrderMessage val, CheckStatus val] iso^ => GenerateCheckStatus end,
+                lambda(): MarketData => MarketData end,
+                SymbolPartition, 1)
+              .with_initialization_map(consume initial_market_data)
+              .with_initialize_at_start()
+            end)
           .build()
           .new_pipeline[FixNbboMessage val, None](NbboParser, NoneStringify, recover [0] end)
           .to_stateful_partition[None, MarketData](
-            lambda(): Computation[FixNbboMessage val, UpdateData val] iso^ => GenerateUpdateData end,
-            lambda(): MarketData => MarketData end,
-            SymbolPartition, 1)
+            recover
+              StatePartitionConfig[FixNbboMessage val, None, MarketData](
+                lambda(): Computation[FixNbboMessage val, UpdateData val] iso^ => GenerateUpdateData end,
+                lambda(): MarketData => MarketData end,
+                SymbolPartition, 1)
+            end)
           .build()
       end
       Startup(env, consume topology, 2)
@@ -31,12 +41,20 @@ actor Main
       env.out.print("Couldn't build topology")
     end
 
+  fun generate_initial_data(): Map[U64, {(): MarketData} val] iso^ =>
+    let map = recover Map[U64, {(): MarketData} val] end
+    map("BTU".hash()) = lambda(): MarketData => MarketData.update("BTU", true) end
+    map("LNG".hash()) = lambda(): MarketData => MarketData.update("LNG", false) end
+    map("VLO".hash()) = lambda(): MarketData => MarketData.update("VLO", false) end
+    consume map
+
 class MarketData
   let _data_rejected: Map[String, Bool] = Map[String, Bool]
   let _id: U64 = Dice(MT(Time.micros()))(1, 10000)
 
-  fun ref update(symbol: String, is_rej: Bool) =>
+  fun ref update(symbol: String, is_rej: Bool): MarketData =>
     _data_rejected(symbol) = is_rej
+    this
 
   fun is_rejected(symbol: String): Bool =>
     try
@@ -67,7 +85,6 @@ class UpdateData is StateComputation[None, MarketData]
     else
       state.update(_nbbo.symbol(), false)
     end
-    state
 
 class GenerateCheckStatus is Computation[FixOrderMessage val, CheckStatus val]
   fun name(): String => "check status"

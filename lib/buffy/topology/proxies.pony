@@ -69,8 +69,9 @@ actor StepManager
     step.add_step_reporter(StepReporter(step_id, _metrics_collector))
     _steps(step_id) = step
 
-  be add_partition_step_and_ack(step_id: U64, partition_id: U64,
-    step_builder: BasicStepBuilder val, partition: PartitionAckable tag) =>
+  be add_partition_step_and_ack(step_id: U64,
+    partition_id: U64, step_builder: BasicStepBuilder val,
+    partition: PartitionAckable tag) =>
     let step = step_builder()
     match step
     | let s: StepManaged tag =>
@@ -79,6 +80,15 @@ actor StepManager
     step.add_step_reporter(StepReporter(step_id, _metrics_collector))
     _steps(step_id) = step
     partition.ack(partition_id, step_id)
+
+  be add_initial_state[State: Any #read](step_id: U64,
+    state: {(): State} val) =>
+    try
+      match _steps(step_id)
+      | let step: SharedStateStep[State] tag =>
+        step.update_state(state)
+      end
+    end
 
   be add_proxy(proxy_step_id: U64, target_step_id: U64,
     target_node_name: String, coordinator: Coordinator) =>

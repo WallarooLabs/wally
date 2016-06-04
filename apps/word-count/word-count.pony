@@ -14,10 +14,14 @@ actor Main
           .to_map[WordCount val](
             lambda(): MapComputation[String, WordCount val] iso^ => Split end)
           .to_stateful_partition[WordCount val, WordCountTotals](
-            lambda(): Computation[WordCount val, Count val] iso^
-              => GenerateCount end,
-            lambda(): WordCountTotals => WordCountTotals end,
-            FirstLetterPartition, 0)
+            recover
+              StatePartitionConfig[WordCount val, WordCount val, WordCountTotals](
+                lambda(): Computation[WordCount val, Count val] iso^
+                  => GenerateCount end,
+                lambda(): WordCountTotals => WordCountTotals end,
+                FirstLetterPartition, 0)
+            end
+            )
           .build()
       end
       Startup(env, topology, 1)

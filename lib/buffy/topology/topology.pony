@@ -105,16 +105,51 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     PipelineBuilder[In, Out, Next](_t, _p)
 
   fun ref to_stateful_partition[Next: Any val, State: Any ref](
-    comp_builder: ComputationBuilder[Last, StateComputation[Next, State] val] val,
-    state_initializer: {(): State} val,
-    p_fun: PartitionFunction[Last] val, state_id: U64, id: U64 = 0)
+    config: StatePartitionConfig[Last, Next, State] iso)
       : PipelineBuilder[In, Out, Next] =>
-    let next_builder = StatePartitionBuilder[Last, Next, State](comp_builder,
-      state_initializer, p_fun, state_id)
-    let next_step = PipelineThroughStep[Last, Next](next_builder, id)
+    let c: StatePartitionConfig[Last, Next, State] val = consume config
+    let next_builder = StatePartitionBuilder[Last, Next, State](
+      c.state_computation_builder, c.state_initializer,
+      c.partition_function, c.state_id, c.initialization_map,
+      c.initialize_at_start)
+    let next_step = PipelineThroughStep[Last, Next](next_builder, c.id)
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
   fun ref build(): Topology ? =>
     _t.add_pipeline(_p as PipelineSteps)
     _t
+
+class StatePartitionConfig[In: Any val, Out: Any val, State: Any ref]
+  let state_computation_builder:
+    ComputationBuilder[In, StateComputation[Out, State] val] val
+  let state_initializer: {(): State} val
+  let partition_function: PartitionFunction[In] val
+  let state_id: U64
+  var id: U64 = 0
+  var initialization_map: Map[U64, {(): State} val] val =
+    recover val Map[U64, {(): State} val] end
+  var initialize_at_start: Bool = false
+
+  new create(
+    c_builder: ComputationBuilder[In, StateComputation[Out, State] val] val,
+    s_initializer: {(): State} val,
+    p_fun: PartitionFunction[In] val,
+    s_id: U64) =>
+    state_computation_builder = c_builder
+    state_initializer = s_initializer
+    partition_function = p_fun
+    state_id = s_id
+
+  fun ref with_id(i: U64): StatePartitionConfig[In, Out, State]^ =>
+    id = i
+    this
+
+  fun ref with_initialization_map(im: Map[U64, {(): State} val] iso)
+    : StatePartitionConfig[In, Out, State]^ =>
+    initialization_map = consume im
+    this
+
+  fun ref with_initialize_at_start(): StatePartitionConfig[In, Out, State]^ =>
+    initialize_at_start = true
+    this

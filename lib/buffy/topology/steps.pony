@@ -213,12 +213,18 @@ actor StatePartition[State: Any #read]
   is (BasicStep & PartitionAckable & StepManaged)
   let _step_builder: BasicStepBuilder val
   let _partitions: Map[U64, U64] = Map[U64, U64]
-  let _buffers: Map[U64, Array[StepMessage val]] = Map[U64, Array[StepMessage val]]
+  let _buffers: Map[U64, Array[StepMessage val]] =
+    Map[U64, Array[StepMessage val]]
   var _step_manager: (StepManager | None) = None
   let _guid_gen: GuidGenerator = GuidGenerator
+  let _initialization_map: Map[U64, {(): State} val] val
+  let _initialize_at_start: Bool
 
-  new create(s_builder: BasicStepBuilder val) =>
+  new create(s_builder: BasicStepBuilder val, init_map: Map[U64, {(): State} val] val,
+    init_at_start: Bool) =>
     _step_builder = s_builder
+    _initialization_map = init_map
+    _initialize_at_start = init_at_start
 
   be apply(input: StepMessage val) => _apply(input)
 
@@ -243,8 +249,15 @@ actor StatePartition[State: Any #read]
               _buffers(partition_id) = [input]
             end
             let step_id = _guid_gen()
-            sm.add_partition_step_and_ack(step_id, partition_id,
-              _step_builder, this)
+            if _initialization_map.contains(partition_id) then
+              sm.add_partition_step_and_ack(step_id, partition_id,
+                _step_builder, this)
+              sm.add_initial_state[State](step_id,
+                _initialization_map(partition_id))
+            else
+              sm.add_partition_step_and_ack(step_id, partition_id,
+                _step_builder, this)
+            end
           else
             @printf[String]("Computation type is invalid!\n".cstring())
           end
@@ -266,6 +279,18 @@ actor StatePartition[State: Any #read]
 
   be add_step_manager(step_manager: StepManager) =>
     _step_manager = step_manager
+    if _initialize_at_start then
+      for (partition_id, init) in _initialization_map.pairs() do
+        if (not _partitions.contains(partition_id)) and
+          (not _buffers.contains(partition_id)) then
+          _buffers(partition_id) = Array[StepMessage val]
+          let step_id = _guid_gen()
+          step_manager.add_partition_step_and_ack(step_id, partition_id,
+            _step_builder, this)
+          step_manager.add_initial_state[State](step_id, init)
+        end
+      end
+    end
 
 actor StateStep[In: Any val, Out: Any val, State: Any #read]
   is ThroughStateStep[In, Out, State]
@@ -334,6 +359,9 @@ actor SharedStateStep[State: Any #read]
         sr.report(start_time, end_time)
       end
     end
+
+  be update_state(state: {(): State} val) =>
+    _state = state()
 
 actor ExternalConnection[In: Any val] is ComputeStep[In]
   let _stringify: {(In): String ?} val
