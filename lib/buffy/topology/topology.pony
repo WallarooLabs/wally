@@ -95,25 +95,25 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-//  fun ref to_stateful_partition[Payload: Any val, State: Any ref](
-//    comp_builder: ComputationBuilder[Last, StateComputation[Payload, State] val] val,
+//  fun ref to_stateful_partition[Out: Any val, State: Any ref](
+//    comp_builder: ComputationBuilder[Last, StateComputation[Out, State] val] val,
 //    state_initializer: {(): State} val,
 //    p_fun: PartitionFunction[Last] val, id: U64 = 0)
-//      : PipelineBuilder[In, Out, Payload] =>
-//    let next_builder = StatePartitionBuilder[Last, Payload, State](
+//      : PipelineBuilder[In, Out, Out] =>
+//    let next_builder = StatePartitionBuilder[Last, Out, State](
 //      comp_builder, state_initializer, p_fun)
-//    let next_step = PipelineThroughStep[Last, Payload](next_builder, id)
+//    let next_step = PipelineThroughStep[Last, Out](next_builder, id)
 //    _p.add_step(next_step)
-//    PipelineBuilder[In, Out, Payload](_t, _p)
+//    PipelineBuilder[In, Out, Out](_t, _p)
 
-  fun ref to_stateful[Payload: Any val, State: Any ref](
-    comp_builder: ComputationBuilder[Last, StateComputation[Payload, State] val] val,
+  fun ref to_stateful[Next: Any val, State: Any ref](
+    comp_builder: ComputationBuilder[Last, StateComputation[Next, State] val] val,
     state_initializer: {(): State} val, state_id: U64, id: U64 = 0)
-      : PipelineBuilder[In, Out, Payload] =>
-    let next_builder = StateStepBuilder[Last, Payload, State](comp_builder, state_initializer, state_id)
-    let next_step = PipelineThroughStep[Last, Payload](next_builder, id)
+      : PipelineBuilder[In, Out, Next] =>
+    let next_builder = StateStepBuilder[Last, Next, State](comp_builder, state_initializer, state_id)
+    let next_step = PipelineThroughStep[Last, Next](next_builder, id)
     _p.add_step(next_step)
-    PipelineBuilder[In, Out, Payload](_t, _p)
+    PipelineBuilder[In, Out, Next](_t, _p)
 
   fun ref build(): Topology ? =>
     _t.add_pipeline(_p as PipelineSteps)

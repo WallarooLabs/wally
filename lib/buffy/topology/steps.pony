@@ -2,6 +2,7 @@ use "collections"
 use "buffy/messages"
 use "net"
 use "buffy/metrics"
+use "sendence/guid"
 use "time"
 
 trait BasicStep
@@ -22,6 +23,12 @@ trait ThroughStep[In, Out] is (ComputeStep[In] & OutputStep[Out])
 
 trait ThroughStateStep[In: Any val, Out: Any val, State: Any #read] is (BasicStateStep &
   ThroughStep[In, Out])
+
+trait PartitionAckable
+  be ack(partition_id: U64, step_id: U64)
+
+trait StepManaged
+  be add_step_manager(step_manager: StepManager)
 
 actor EmptyStep is BasicStep
   be apply(input: StepMessage val) => None
@@ -131,54 +138,74 @@ actor Sink[In: Any val] is ComputeStep[In]
       _f(m.data())
     end
 
-actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
+actor Partition[In: Any val, Out: Any val]
+  is (ThroughStep[In, Out] & PartitionAckable & StepManaged)
   let _step_builder: BasicStepBuilder val
   let _partition_function: PartitionFunction[In] val
-  let _partitions: Map[U64, BasicStep tag] = Map[U64, BasicStep tag]
+  let _partitions: Map[U64, U64] = Map[U64, U64]
+  let _buffers: Map[U64, Array[StepMessage val]] = Map[U64, Array[StepMessage val]]
+  var _step_manager: (StepManager | None) = None
   var _output: BasicStep tag = EmptyStep
+  let _guid_gen: GuidGenerator = GuidGenerator
 
   new create(s_builder: BasicStepBuilder val, pf: PartitionFunction[In] val) =>
     _step_builder = s_builder
     _partition_function = pf
 
-  be apply(input: StepMessage val) =>
+  be apply(input: StepMessage val) => _apply(input)
+
+  fun ref _apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
-      let partition_id = _partition_function(m.data())
-      if _partitions.contains(partition_id) then
-        try
-          _partitions(partition_id)(m)
-        else
-          @printf[String]("Can't forward to chosen partition!\n".cstring())
-        end
-      else
-        try
-          _partitions(partition_id) = _step_builder()
-          match _partitions(partition_id)
-          | let t: ThroughStep[In, Out] tag =>
-            t.add_output(_output)
-            t(m)
+      match _step_manager
+      | let sm: StepManager tag =>
+        let partition_id = _partition_function(m.data())
+        if _partitions.contains(partition_id) then
+          try
+            let step_id = _partitions(partition_id)
+            sm(step_id, input)
+          else
+            @printf[String]("Can't forward to chosen partition!\n".cstring())
           end
         else
-          @printf[String]("Computation type is invalid!\n".cstring())
+          try
+            if _buffers.contains(partition_id) then
+              _buffers(partition_id).push(input)
+            else
+              _buffers(partition_id) = [input]
+            end
+            let step_id = _guid_gen()
+            sm.add_partition_step_and_ack(step_id, partition_id,
+              _step_builder, this)
+            sm.add_output_to(step_id, _output)
+          else
+            @printf[String]("Computation type is invalid!\n".cstring())
+          end
         end
       end
     end
 
+  be ack(partition_id: U64, step_id: U64) =>
+    _partitions(partition_id) = step_id
+    try
+      let buffer = _buffers(partition_id)
+      for msg in buffer.values() do
+        _apply(msg)
+      end
+      buffer.clear()
+    end
+
   be add_output(to: BasicStep tag) =>
     _output = to
-    for key in _partitions.keys() do
-      try
-        match _partitions(key)
-        | let t: ThroughStep[In, Out] tag =>
-          t.add_output(_output)
-        else
-          @printf[String]("Partition not a ThroughStep!\n".cstring())
-        end
-      else
-          @printf[String]("Couldn't find partition when trying to add output!\n".cstring())
+    for (key, step_id) in _partitions.pairs() do
+      match _step_manager
+      | let sm: StepManager tag =>
+        sm.add_output_to(step_id, _output)
       end
     end
+
+  be add_step_manager(step_manager: StepManager) =>
+    _step_manager = step_manager
 
 //actor StatePartition[In: Any val, Out: Any val, State: Any #read] is ThroughStep[In, Out]
 //  let _state_step_builder: BasicStateStepBuilder val
@@ -229,16 +256,16 @@ actor Partition[In: Any val, Out: Any val] is ThroughStep[In, Out]
 //      end
 //    end
 
-actor StateStep[In: Any val, Payload: Any val, State: Any #read]
-  is ThroughStateStep[In, Payload, State]
+actor StateStep[In: Any val, Out: Any val, State: Any #read]
+  is ThroughStateStep[In, Out, State]
   var _step_reporter: (StepReporter val | None) = None
   var _output: BasicStep tag = EmptyStep
   var _shared_state: BasicStep tag = EmptyStep
-  let _state_comp_builder: Computation[In, StateComputation[Payload, State] val]
+  let _state_comp_builder: Computation[In, StateComputation[Out, State] val]
   let _state_id: U64
 
   new create(comp_builder: ComputationBuilder[In,
-    StateComputation[Payload, State] val] val, state_id: U64) =>
+    StateComputation[Out, State] val] val, state_id: U64) =>
     _state_comp_builder = comp_builder()
     _state_id = state_id
 
@@ -255,10 +282,10 @@ actor StateStep[In: Any val, Payload: Any val, State: Any #read]
     match input
     | let m: Message[In] val =>
       let start_time = Time.millis()
-      let sc: StateComputation[Payload, State] val = _state_comp_builder(m.data())
-      let message_wrapper = DefaultMessageWrapper[Payload](m.id(), m.source_ts(),
+      let sc: StateComputation[Out, State] val = _state_comp_builder(m.data())
+      let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
         m.last_ingress_ts())
-      let sc_wrapper = StateComputationWrapper[Payload, State](sc,
+      let sc_wrapper = StateComputationWrapper[Out, State](sc,
         message_wrapper, _output)
       let output_msg = Message[StateProcessor[State] val](m.id(),
         m.source_ts(), m.last_ingress_ts(), sc_wrapper)

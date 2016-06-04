@@ -62,8 +62,23 @@ actor StepManager
 
   be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
     let step = step_builder()
+    match step
+    | let s: StepManaged tag =>
+      s.add_step_manager(this)
+    end
     step.add_step_reporter(StepReporter(step_id, _metrics_collector))
     _steps(step_id) = step
+
+  be add_partition_step_and_ack(step_id: U64, partition_id: U64,
+    step_builder: BasicStepBuilder val, partition: PartitionAckable tag) =>
+    let step = step_builder()
+    match step
+    | let s: StepManaged tag =>
+      s.add_step_manager(this)
+    end
+    step.add_step_reporter(StepReporter(step_id, _metrics_collector))
+    _steps(step_id) = step
+    partition.ack(partition_id, step_id)
 
   be add_proxy(proxy_step_id: U64, target_step_id: U64,
     target_node_name: String, coordinator: Coordinator) =>
@@ -126,4 +141,17 @@ actor StepManager
       end
     else
       _env.out.print("StepManager: Failed to connect steps")
+    end
+
+  be add_output_to(in_id: U64, output: BasicStep tag) =>
+    try
+      let input_step = _steps(in_id)
+      match input_step
+      | let i: BasicOutputStep tag =>
+        i.add_output(output)
+      else
+        _env.out.print("StepManager: Could not add output to step")
+      end
+    else
+      _env.out.print("StepManager: Failed to add output to step")
     end

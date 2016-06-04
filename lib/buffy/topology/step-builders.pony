@@ -69,7 +69,7 @@ class PartitionBuilder[In: Any val, Out: Any val]
 
 //class StatePartitionBuilder[In: Any val, Out: Any val, State: Any ref]
 //  is ThroughStepBuilder[In, Out]
-//  let _comp_builder: ComputationBuilder[In, StateComputation[Payload, State] val] val
+//  let _comp_builder: ComputationBuilder[In, StateComputation[Out, State] val] val
 //  let _state_initializer: {(): State} val
 //  let _partition_function: PartitionFunction[In] val
 //
@@ -83,15 +83,15 @@ class PartitionBuilder[In: Any val, Out: Any val]
 //      _state_initializer),
 //      _partition_function)
 
-class StateStepBuilder[In: Any val, Payload: Any val, State: Any #read]
-  is (ThroughStepBuilder[In, Payload] &
+class StateStepBuilder[In: Any val, Out: Any val, State: Any #read]
+  is (ThroughStepBuilder[In, Out] &
     BasicStateStepBuilder)
-  let _comp_builder: ComputationBuilder[In, StateComputation[Payload, State] val] val
+  let _comp_builder: ComputationBuilder[In, StateComputation[Out, State] val] val
   let _shared_state_step_builder: SharedStateStepBuilder[State] val
   let _state_id: U64
 
   new val create(comp_builder: ComputationBuilder[In,
-    StateComputation[Payload, State] val] val,
+    StateComputation[Out, State] val] val,
     state_initializer: StateInitializer[State] val, s_id: U64) =>
     _comp_builder = comp_builder
     _shared_state_step_builder =
@@ -99,7 +99,7 @@ class StateStepBuilder[In: Any val, Payload: Any val, State: Any #read]
     _state_id = s_id
 
   fun apply(): BasicStateStep tag =>
-    StateStep[In, Payload, State](_comp_builder, _state_id)
+    StateStep[In, Out, State](_comp_builder, _state_id)
 
   fun state_id(): U64 => _state_id
   fun shared_state_step_builder(): SharedStateStepBuilder[State] val =>
