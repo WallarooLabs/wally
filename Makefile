@@ -135,7 +135,7 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-receiver build-sender build-wesley build-double-divide build-dagon build-avg-of-avgs build-quadruple build-state-avg-of-avgs build-dagon-child ## Build Pony based programs for Buffy
+build: build-receiver build-sender build-wesley build-double-divide build-dagon build-avg-of-avgs build-quadruple build-market-spread build-word-count build-dagon-child ## Build Pony based programs for Buffy
 
 build-receiver: ## Build giles receiver
 	$(call PONYC,giles/receiver)
@@ -152,8 +152,11 @@ build-avg-of-avgs: ## build average of averages app
 build-quadruple: ## build quadruple app
 	$(call PONYC,apps/quadruple)
 
-build-state-avg-of-avgs: ## build state average of averages app
-	$(call PONYC,apps/state-avg-of-avgs)
+build-market-spread: ## build market spread app
+	$(call PONYC,apps/market-spread)
+
+build-word-count: ## build word count app
+	$(call PONYC,apps/word-count)
 
 build-dagon: ## build dagon
 	$(call PONYC,dagon)
@@ -165,7 +168,7 @@ build-wesley: ## Build wesley
 	$(call PONYC,wesley/double)
 	$(call PONYC,wesley/identity)
 
-test: test-double-divide test-avg-of-avgs test-quadruple test-state-avg-of-avgs test-giles-receiver test-giles-sender ## Test programs for Buffy
+test: test-double-divide test-avg-of-avgs test-quadruple test-market-spread test-word-count test-giles-receiver test-giles-sender ## Test programs for Buffy
 
 test-double-divide: ## Test Double-Divide app
 	cd apps/double-divide && ./double-divide
@@ -176,8 +179,11 @@ test-avg-of-avgs: ## Test avg-of-avgs app
 test-quadruple: ## Test quadruple app
 	cd apps/quadruple && ./quadruple
 
-test-state-avg-of-avgs: ## Test state-avg-of-avgs app
-	cd apps/state-avg-of-avgs && ./state-avg-of-avgs
+test-market-spread: ## Test market-spread app
+	cd apps/market-spread && ./market-spread
+
+test-word-count: ## Test word-count app
+	cd apps/word-count && ./word-count
 
 test-giles-receiver: ## Test Giles Receiver
 	cd giles/receiver && ./receiver

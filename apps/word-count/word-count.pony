@@ -14,11 +14,10 @@ actor Main
           .to_map[WordCount val](
             lambda(): MapComputation[String, WordCount val] iso^ => Split end)
           .to_stateful_partition[WordCount val, WordCountTotals](
-            lambda(): StateComputation[WordCount val,
-                                       WordCount val,
-                                       WordCountTotals] iso^ => Count end,
+            lambda(): Computation[WordCount val, Count val] iso^
+              => GenerateCount end,
             lambda(): WordCountTotals => WordCountTotals end,
-            FirstLetterPartition)
+            FirstLetterPartition, 0)
           .build()
       end
       Startup(env, topology, 1)
@@ -52,13 +51,21 @@ class Split is MapComputation[String, WordCount val]
     end
     consume clone
 
-class Count is StateComputation[WordCount val, WordCount val, WordCountTotals]
+class GenerateCount is Computation[WordCount val, Count val]
   fun name(): String => "count"
-  fun ref apply(state: WordCountTotals, d: WordCount val,
-    default_output_step: BasicStep tag,
-    message_wrapper: MessageWrapper[WordCount val] val) =>
-    let message = message_wrapper(state(d))
-    default_output_step(message)
+  fun apply(wc: WordCount val): Count val =>
+    Count(wc)
+
+class Count is StateComputation[WordCount val, WordCountTotals]
+  let _word_count: WordCount val
+
+  new val create(wc: WordCount val) =>
+    _word_count = wc
+
+  fun apply(state: WordCountTotals, output: MessageTarget[WordCount val] val)
+    : WordCountTotals =>
+    output(state(_word_count))
+    state
 
 class WordCount
   let word: String
