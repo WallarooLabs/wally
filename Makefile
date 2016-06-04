@@ -301,8 +301,11 @@ build-docker:  ## Build docker images for Buffy
           $(docker_image_repo)/quadruple.$(arch):$(docker_image_version) \
           apps/quadruple
 	docker $(docker_host_arg) build -t \
-          $(docker_image_repo)/state-avg-of-avgs.$(arch):$(docker_image_version) \
-          apps/state-avg-of-avgs
+          $(docker_image_repo)/market-spread.$(arch):$(docker_image_version) \
+          apps/market-spread
+	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/word-count.$(arch):$(docker_image_version) \
+          apps/word-count
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/dagon-child.$(arch):$(docker_image_version) \
           dagon/dagon-child
@@ -325,7 +328,9 @@ push-docker: build-docker ## Push docker images for Buffy to repository
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/quadruple.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
-          $(docker_image_repo)/state-avg-of-avgs.$(arch):$(docker_image_version)
+          $(docker_image_repo)/market-spread.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+          $(docker_image_repo)/word-count.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/dagon-child.$(arch):$(docker_image_version)
 
@@ -362,7 +367,8 @@ clean: clean-docker ## Cleanup docker images, deps and compiled files for Buffy
 	rm -f apps/avg-of-avgs/avg-of-avgs apps/avg-of-avgs/avg-of-avgs.o
 	rm -f apps/double-divide/double-divide apps/double-divide/double-divide.o
 	rm -f apps/quadruple/quadruple apps/quadruple/quadruple.o
-	rm -f apps/state-avg-of-avgs/state-avg-of-avgs apps/state-avg-of-avgs/state-avg-of-avgs.o
+	rm -f apps/market-spread/market-spread apps/market-spread/market-spread.o
+	rm -f apps/word-count/word-count apps/word-count/word-count.o
 	rm -f dagon/dagon-child/dagon-child dagon/dagon-child/dagon-child.o
 	@echo 'Done cleaning.'
 
