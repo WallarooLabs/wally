@@ -182,11 +182,6 @@ actor TopologyManager
               ss_addr
             end
 
-            _env.out.print("Shared state id: " + shared_state_step_addr.step_id.string())
-            _env.out.print("Shared state node: " + shared_state_step_addr.node_name.string())
-            _env.out.print("State step id: " + step_id.string())
-            _env.out.print("State step node: " + cur_node)
-
             if is_leader then
               _coordinator.add_state_step(step_id, ssb, shared_state_step_addr.step_id,
                 shared_state_step_addr.node_name)

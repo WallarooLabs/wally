@@ -17,23 +17,28 @@ interface PartitionFunction[In]
 
 trait StateProcessor[State: Any #read]
   fun val apply(state: State): State
+  fun partition_id(): U64 => 0
 
 interface StateComputation[Out: Any val, State: Any #read]
   fun apply(state: State, output: MessageTarget[Out] val): State
 
-class StateComputationWrapper[Out: Any val, State: Any #read]
+class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
   is StateProcessor[State]
   let _state_computation: StateComputation[Out, State] val
   let _output: MessageTarget[Out] val
+  let _partition_id: U64
 
   new val create(sc: StateComputation[Out, State] val,
     message_wrapper: MessageWrapper[Out] val,
-    output_step: BasicStep tag) =>
+    output_step: BasicStep tag, p_id: U64 = 0) =>
     _state_computation = sc
     _output = MessageTarget[Out](message_wrapper, output_step)
+    _partition_id = p_id
 
   fun apply(state: State): State =>
     _state_computation(state, _output)
+
+  fun partition_id(): U64 => _partition_id
 
 class MessageTarget[Out: Any val]
   let _output: BasicStep tag
@@ -68,7 +73,7 @@ interface ComputationBuilder[In, Out]
 interface MapComputationBuilder[In, Out]
   fun apply(): MapComputation[In, Out] iso^
 
-interface StateComputationBuilder[Out: Any val,
+interface StateComputationBuilder[In: Any val, Out: Any val,
   State: Any #read]
   fun apply(): StateComputation[Out, State] iso^
 
