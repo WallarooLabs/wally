@@ -34,7 +34,7 @@ class Mod4Partition is PartitionFunction[U64]
     input % 4
 
 class P
-  fun apply(s: String): U64 ? =>
+  fun apply(s: String): (U64 | None) ? =>
     s.u64()
 
 class S

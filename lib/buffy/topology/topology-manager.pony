@@ -1,8 +1,18 @@
 use "net"
 use "collections"
 use "buffy/messages"
+use "sendence/guid"
 use "../network"
 use "random"
+use "time"
+
+class SharedStateAddress
+  let node_name: String
+  let step_id: U64
+
+  new create(n: String, s: U64) =>
+    node_name = n
+    step_id = s
 
 actor TopologyManager
   let _env: Env
@@ -85,9 +95,6 @@ actor TopologyManager
       end
     end
 
-  fun ref next_guid(dice: Dice): U64 =>
-    dice(1, U64.max_value().u64()).u64()
-
   fun _check_prev(cur: String, prev: (String | None)): Bool =>
     match prev
     | let p: String => cur == p
@@ -98,8 +105,8 @@ actor TopologyManager
   // Currently assigns steps in pipeline using round robin among nodes
   fun ref _initialize_topology() =>
     let repeated_steps = Map[U64, U64] // map from pipeline id to step id
-    let seed: U64 = 323437823
-    let dice = Dice(MT(seed))
+    let shared_state_steps = Map[U64, SharedStateAddress] // map from state_id to shared_state_step_id
+    let guid_gen = GuidGenerator
     try
       let nodes = Array[String]
       nodes.push(_name)
@@ -112,8 +119,10 @@ actor TopologyManager
       var step_id: U64 = cur_source_id
       var prev_step_id: (U64 | None) = None
       var prev_node: (String | None) = None
-      var proxy_step_id: U64 = next_guid(dice)
-      var proxy_step_target_id: U64 = next_guid(dice)
+      var proxy_step_id: U64 = guid_gen()
+      var proxy_step_target_id: U64 = guid_gen()
+
+      let shared_state_manager = _topology.shared_state_manager
 
       for pipeline in _topology.pipelines.values() do
         var count: USize = 0
@@ -157,36 +166,79 @@ actor TopologyManager
 
           _env.out.print("Spinning up computation **** on node '" + cur_node + "'")
 
-          if cur_node_idx == 0 then // if cur_node is the leader/source
-            _coordinator.add_step(step_id, pipeline_step.step_builder())
-            if (prev_step_id isnt None) and _check_prev(cur_node, prev_node) then
-              match prev_step_id
-              | let p_id: U64 => _coordinator.connect_steps(p_id, step_id)
+          let is_leader = (cur_node_idx == 0)
+
+          match pipeline_step.step_builder()
+          | let ssb: BasicStateStepBuilder val =>
+            let state_id = ssb.state_id()
+            let shared_state_step_addr = try
+              shared_state_steps(state_id)
+            else
+              let ss_id = guid_gen()
+              let ss_addr = SharedStateAddress(cur_node, ss_id)
+              shared_state_steps(state_id) = ss_addr
+              _spin_up_shared_state(ssb.shared_state_step_builder(), ss_id, cur_node,
+                is_leader)
+              ss_addr
+            end
+
+            if is_leader then
+              _coordinator.add_state_step(step_id, ssb, shared_state_step_addr.step_id,
+                shared_state_step_addr.node_name)
+              if (prev_step_id isnt None) and _check_prev(cur_node, prev_node) then
+                match prev_step_id
+                | let p_id: U64 => _coordinator.connect_steps(p_id, step_id)
+                end
+              elseif not (cur_node == next_node) then
+                _coordinator.add_proxy(proxy_step_id, proxy_step_target_id, next_node)
+                _coordinator.connect_steps(step_id, proxy_step_id)
               end
-            elseif not (cur_node == next_node) then
-              _coordinator.add_proxy(proxy_step_id, proxy_step_target_id, next_node)
-              _coordinator.connect_steps(step_id, proxy_step_id)
+            else
+              let create_state_step_msg =
+                WireMsgEncoder.spin_up_state_step(step_id, ssb,
+                  shared_state_step_addr.step_id, cur_node, _auth)
+              let create_proxy_msg =
+                WireMsgEncoder.spin_up_proxy(proxy_step_id, proxy_step_target_id,
+                  next_node, _auth)
+              let connect_msg =
+                WireMsgEncoder.connect_steps(step_id, proxy_step_id, _auth)
+
+              _coordinator.send_control_message(cur_node, create_state_step_msg)
+              _coordinator.send_control_message(cur_node, create_proxy_msg)
+              _coordinator.send_control_message(cur_node, connect_msg)
             end
           else
-            let create_step_msg =
-              WireMsgEncoder.spin_up(step_id, pipeline_step.step_builder(), _auth)
-            let create_proxy_msg =
-              WireMsgEncoder.spin_up_proxy(proxy_step_id, proxy_step_target_id,
-                next_node, _auth)
-            let connect_msg =
-              WireMsgEncoder.connect_steps(step_id, proxy_step_id, _auth)
+            if is_leader then
+              _coordinator.add_step(step_id, pipeline_step.step_builder())
+              if (prev_step_id isnt None) and _check_prev(cur_node, prev_node) then
+                match prev_step_id
+                | let p_id: U64 => _coordinator.connect_steps(p_id, step_id)
+                end
+              elseif not (cur_node == next_node) then
+                _coordinator.add_proxy(proxy_step_id, proxy_step_target_id, next_node)
+                _coordinator.connect_steps(step_id, proxy_step_id)
+              end
+            else
+              let create_step_msg =
+                WireMsgEncoder.spin_up(step_id, pipeline_step.step_builder(), _auth)
+              let create_proxy_msg =
+                WireMsgEncoder.spin_up_proxy(proxy_step_id, proxy_step_target_id,
+                  next_node, _auth)
+              let connect_msg =
+                WireMsgEncoder.connect_steps(step_id, proxy_step_id, _auth)
 
-            _coordinator.send_control_message(cur_node, create_step_msg)
-            _coordinator.send_control_message(cur_node, create_proxy_msg)
-            _coordinator.send_control_message(cur_node, connect_msg)
+              _coordinator.send_control_message(cur_node, create_step_msg)
+              _coordinator.send_control_message(cur_node, create_proxy_msg)
+              _coordinator.send_control_message(cur_node, connect_msg)
+            end
           end
 
           count = count + 1
           prev_step_id = step_id
           prev_node = cur_node
           step_id = proxy_step_target_id
-          proxy_step_id = next_guid(dice)
-          proxy_step_target_id = next_guid(dice)
+          proxy_step_id = guid_gen()
+          proxy_step_target_id = guid_gen()
         end
         let cur_node = nodes(count % nodes.size())
         let sink_node_idx = count % nodes.size()
@@ -227,6 +279,18 @@ actor TopologyManager
       end
     else
       _env.err.print("Buffy Leader: Failed to initialize topology")
+    end
+
+  fun _spin_up_shared_state(shared_state_step_builder: BasicStepBuilder val,
+    shared_state_step_id: U64, cur_node: String, is_leader: Bool) =>
+    try
+      if is_leader then
+        _coordinator.add_step(shared_state_step_id, shared_state_step_builder)
+      else
+        let create_step_msg =
+          WireMsgEncoder.spin_up(shared_state_step_id, shared_state_step_builder, _auth)
+        _coordinator.send_control_message(cur_node, create_step_msg)
+      end
     end
 
   be ack_initialized() =>

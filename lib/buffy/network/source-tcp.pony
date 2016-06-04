@@ -3,8 +3,10 @@ use "collections"
 use "buffy/messages"
 use "buffy/metrics"
 use "sendence/bytes"
+use "sendence/guid"
 use "../topology"
 use "time"
+use "random"
 
 class SourceNotifier is TCPListenNotify
   let _env: Env
@@ -40,7 +42,7 @@ class SourceNotifier is TCPListenNotify
       _metrics_collector)
 
 class SourceConnectNotify is TCPConnectionNotify
-  var _msg_id: U64 = 0
+  let _guid_gen: GuidGenerator = GuidGenerator
   let _env: Env
   let _auth: AmbientAuth
   let _source_id: U64
@@ -78,8 +80,7 @@ class SourceConnectNotify is TCPConnectionNotify
         match msg
         | let m: ExternalDataMsg val =>
           let now = Time.millis()
-          let new_msg: Message[String] val = Message[String](_msg_id = _msg_id + 1,
-            now, now, m.data)
+          let new_msg: Message[String] val = Message[String](_guid_gen(), now, now, m.data)
           _step_manager(_source_id, new_msg)
         | let m: ExternalUnknownMsg val =>
           _env.err.print("Unknown message type.")

@@ -5,6 +5,7 @@ use "buffy/metrics"
 
 class Topology
   let pipelines: Array[PipelineSteps] = Array[PipelineSteps]
+  let shared_state_manager: SharedStateManager tag = SharedStateManager
 
   fun ref new_pipeline[In: Any val, Out: Any val] (parser: Parser[In] val,
     stringify: Stringify[Out] val, sink_target_ids: Array[U64] val)
@@ -94,23 +95,22 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-  fun ref to_stateful_partition[Next: Any val, State: Any #read](
-    comp_builder: StateComputationBuilder[Last, Next, State] val,
-    state_initializer: {(): State} val,
-    p_fun: PartitionFunction[Last] val, id: U64 = 0)
+  fun ref to_stateful[Next: Any val, State: Any ref](
+    comp_builder: ComputationBuilder[Last, StateComputation[Next, State] val] val,
+    state_initializer: {(): State} val, state_id: U64, id: U64 = 0)
       : PipelineBuilder[In, Out, Next] =>
-    let next_builder = StatePartitionBuilder[Last, Next, State](comp_builder,
-      state_initializer, p_fun)
+    let next_builder = StateStepBuilder[Last, Next, State](comp_builder, state_initializer, state_id)
     let next_step = PipelineThroughStep[Last, Next](next_builder, id)
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-  fun ref to_stateful[Next: Any val, State: Any #read](
-    comp_builder: StateComputationBuilder[Last, Next, State] val,
-    state_initializer: {(): State} val, id: U64 = 0)
+  fun ref to_stateful_partition[Next: Any val, State: Any ref](
+    comp_builder: ComputationBuilder[Last, StateComputation[Next, State] val] val,
+    state_initializer: {(): State} val,
+    p_fun: PartitionFunction[Last] val, state_id: U64, id: U64 = 0)
       : PipelineBuilder[In, Out, Next] =>
-    let next_builder = StateStepBuilder[Last, Next, State](comp_builder,
-      state_initializer)
+    let next_builder = StatePartitionBuilder[Last, Next, State](comp_builder,
+      state_initializer, p_fun, state_id)
     let next_step = PipelineThroughStep[Last, Next](next_builder, id)
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
