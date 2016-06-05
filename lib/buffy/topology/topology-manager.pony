@@ -122,8 +122,6 @@ actor TopologyManager
       var proxy_step_id: U64 = guid_gen()
       var proxy_step_target_id: U64 = guid_gen()
 
-      let shared_state_manager = _topology.shared_state_manager
-
       for pipeline in _topology.pipelines.values() do
         var count: USize = 0
         // Round robin node assignment

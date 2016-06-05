@@ -5,7 +5,6 @@ use "buffy/metrics"
 
 class Topology
   let pipelines: Array[PipelineSteps] = Array[PipelineSteps]
-  let shared_state_manager: SharedStateManager tag = SharedStateManager
 
   fun ref new_pipeline[In: Any val, Out: Any val] (parser: Parser[In] val,
     stringify: Stringify[Out] val, sink_target_ids: Array[U64] val)
