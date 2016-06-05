@@ -169,7 +169,6 @@ actor Startup
           + " workers --**")
       end
     else
-      TestMain(env)
       env.out.print(
         """
         PARAMETERS:
