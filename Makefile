@@ -135,7 +135,7 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-receiver build-sender build-wesley build-double-divide build-dagon build-avg-of-avgs build-quadruple build-market-spread build-word-count build-dagon-child ## Build Pony based programs for Buffy
+build: build-receiver build-sender build-wesley build-double-divide build-dagon build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count build-dagon-child ## Build Pony based programs for Buffy
 
 build-receiver: ## Build giles receiver
 	$(call PONYC,giles/receiver)
@@ -148,6 +148,9 @@ build-double-divide: ## build double/divide app
 
 build-avg-of-avgs: ## build average of averages app
 	$(call PONYC,apps/avg-of-avgs)
+
+build-state-avg-of-avgs: ## build shared state average of averages app
+	$(call PONYC,apps/state-avg-of-avgs)
 
 build-quadruple: ## build quadruple app
 	$(call PONYC,apps/quadruple)
@@ -168,13 +171,16 @@ build-wesley: ## Build wesley
 	$(call PONYC,wesley/double)
 	$(call PONYC,wesley/identity)
 
-test: test-double-divide test-avg-of-avgs test-quadruple test-market-spread test-word-count test-giles-receiver test-giles-sender ## Test programs for Buffy
+test: test-double-divide test-avg-of-avgs test-state-avg-of-avgs test-quadruple test-market-spread test-word-count test-giles-receiver test-giles-sender ## Test programs for Buffy
 
 test-double-divide: ## Test Double-Divide app
 	cd apps/double-divide && ./double-divide
 
 test-avg-of-avgs: ## Test avg-of-avgs app
 	cd apps/avg-of-avgs && ./avg-of-avgs
+
+test-state-avg-of-avgs: ## Test state-avg-of-avgs app
+	cd apps/state-avg-of-avgs && ./state-avg-of-avgs
 
 test-quadruple: ## Test quadruple app
 	cd apps/quadruple && ./quadruple
@@ -295,6 +301,9 @@ build-docker:  ## Build docker images for Buffy
           $(docker_image_repo)/avg-of-avgs.$(arch):$(docker_image_version) \
           apps/avg-of-avgs
 	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/state-avg-of-avgs.$(arch):$(docker_image_version) \
+          apps/state-avg-of-avgs
+	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/double-divide.$(arch):$(docker_image_version) \
           apps/double-divide
 	docker $(docker_host_arg) build -t \
@@ -323,6 +332,8 @@ push-docker: build-docker ## Push docker images for Buffy to repository
           $(docker_image_repo)/wesley-identity.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/avg-of-avgs.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+          $(docker_image_repo)/state-avg-of-avgs.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/double-divide.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
@@ -365,6 +376,7 @@ clean: clean-docker ## Cleanup docker images, deps and compiled files for Buffy
 	rm -f lib/buffy/buffy lib/buffy/buffy.o
 	rm -f sent.txt received.txt
 	rm -f apps/avg-of-avgs/avg-of-avgs apps/avg-of-avgs/avg-of-avgs.o
+	rm -f apps/state-avg-of-avgs/state-avg-of-avgs apps/state-avg-of-avgs/state-avg-of-avgs.o
 	rm -f apps/double-divide/double-divide apps/double-divide/double-divide.o
 	rm -f apps/quadruple/quadruple apps/quadruple/quadruple.o
 	rm -f apps/market-spread/market-spread apps/market-spread/market-spread.o
