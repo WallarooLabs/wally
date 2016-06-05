@@ -322,7 +322,7 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
     | let m: Message[In] val =>
       let start_time = Epoch.milliseconds()
       let sc: StateComputation[Out, State] val = _state_comp_builder(m.data())
-      let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
+      let message_wrapper = MessageWrapper[Out](m.id(), m.source_ts(),
         m.last_ingress_ts())
       let sc_wrapper = StateComputationWrapper[In, Out, State](sc,
         message_wrapper, _output, _partition_function(m.data()))

@@ -51,10 +51,7 @@ class MessageTarget[Out: Any val]
   fun apply(data: Out) =>
     _output(_message_wrapper(data))
 
-interface MessageWrapper[T: Any val]
-  fun apply(data: T): Message[T] val
-
-class DefaultMessageWrapper[T: Any val] is MessageWrapper[T]
+class MessageWrapper[T: Any val]
   let _id: U64
   let _source_ts: U64
   let _last_ingress_ts: U64
