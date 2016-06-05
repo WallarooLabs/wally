@@ -2,6 +2,7 @@ use "net"
 use "collections"
 use "buffy/messages"
 use "../topology"
+use "time"
 
 actor DataReceiver
   let _sender_name: String
@@ -9,20 +10,22 @@ actor DataReceiver
   var _last_id_seen: U64 = 0
   var _connected: Bool = false
   var _reconnecting: Bool = false
+  let _timers: Timers = Timers
 
   new create(sender_name: String, coordinator: Coordinator) =>
     _sender_name = sender_name
     _coordinator = coordinator
+    let t = Timer(_Ack(this), 1_000_000_000, 1_000_000_000)
+    _timers(consume t)
 
   be received(data_ch_id: U64, step_id: U64, msg: StepMessage val,
     step_manager: StepManager tag) =>
     if data_ch_id > _last_id_seen then
       _last_id_seen = data_ch_id
-      if (_last_id_seen % 150) == 0 then
-        _ack()
-      end
       step_manager(step_id, msg)
     end
+
+  be ack() => _ack()
 
   fun ref _ack() =>
     _coordinator.ack_msg_id(_sender_name, _last_id_seen)
@@ -49,3 +52,15 @@ actor DataReceiver
 
   fun ref _connect_ack() =>
     _coordinator.ack_connect_msg_id(_sender_name, _last_id_seen)
+
+  be dispose() => _timers.dispose()
+
+class _Ack is TimerNotify
+  let _receiver: DataReceiver
+
+  new iso create(receiver: DataReceiver) =>
+    _receiver = receiver
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _receiver.ack()
+    true

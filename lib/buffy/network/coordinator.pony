@@ -349,9 +349,13 @@ actor Coordinator
         sender.write(shutdown_msg)
         sender.dispose()
       end
+      for (key, receiver) in _data_connection_receivers.pairs() do
+        receiver.dispose()
+      end
       for c in _connections.values() do
         c.dispose()
       end
+
 
       match _phone_home_connection
       | let phc: TCPConnection =>
