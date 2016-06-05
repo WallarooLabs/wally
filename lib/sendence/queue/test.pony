@@ -44,4 +44,57 @@ class iso _TestQueue is UnitTest
       i = i + 1
     end
 
+
+    let q2 = Queue[USize]
+
+    for j in Range(0, 20) do
+      q2.enqueue(j)
+    end
+    h.assert_eq[USize](q2.size(), 20)
+    h.assert_eq[USize](q2.space(), 20)
+
+    for j in Range(0, 15) do
+      h.assert_eq[USize](q2.dequeue(), j)
+    end
+    h.assert_eq[USize](q2.size(), 5)
+    h.assert_eq[USize](q2.space(), 20)
+    for j in Range(20, 60) do
+      q2.enqueue(j)
+    end
+    h.assert_eq[USize](q2.size(), 45)
+    h.assert_eq[USize](q2.space(), 60)
+    for j in Range(0, 35) do
+      h.assert_eq[USize](q2.dequeue(), j + 15)
+    end
+    h.assert_eq[USize](q2.size(), 10)
+    h.assert_eq[USize](q2.space(), 60)
+    for j in Range(60, 80) do
+      q2.enqueue(j)
+    end
+    h.assert_eq[USize](q2.size(), 30)
+    h.assert_eq[USize](q2.space(), 60)
+
+    i = 0
+    for n in q2.values() do
+      h.assert_eq[USize](q2(i), i + 50)
+      i = i + 1
+    end
+
+    q2.enqueue(80)
+    h.assert_eq[USize](q2.size(), 31)
+    h.assert_eq[USize](q2.space(), 81)
+
+    i = 0
+    for n in q2.values() do
+      h.assert_eq[USize](q2(i), i + 50)
+      i = i + 1
+    end
+
+    i = 0
+    for (idx, n) in q2.pairs() do
+      h.assert_eq[USize](q2(idx), i + 50)
+      h.assert_eq[USize](q2(idx), n)
+      i = i + 1
+    end
+
     true

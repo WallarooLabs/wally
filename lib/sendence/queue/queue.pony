@@ -20,6 +20,8 @@ class Queue[A: Any #alias]
     """
     _size
 
+  fun space(): USize => _data.size()
+
   fun apply(i: USize): this->A ? =>
     """
     Get the i-th element from the front of the queue,
@@ -156,26 +158,31 @@ class QueueValues[A, B: Array[A] #read] is Iterator[B->A]
 class QueuePairs[A, B: Array[A] #read] is Iterator[(USize, B->A)]
   let _data: B
   var _front: USize
+  var _last_front: USize
   let _back: USize
   let _initial_front: USize
-  let _alloc: USize
 
   new create(data: B, front: USize, back: USize) =>
     _data = data
     _front = front
+    _last_front = _front
     _back = back
-    _initial_front = front
-    _alloc = _data.size()
+    _initial_front = _front
 
   fun has_next(): Bool =>
-    _front != _back
+    if _front >= _last_front then
+      _front != _back
+    else
+      (_back < _data.size()) and (_front != _back)
+    end
 
   fun ref next(): (USize, B->A) ? =>
+    _last_front = _front
     let relative_idx =
-      if _front > _initial_front then
+      if _front >= _initial_front then
         _front - _initial_front
       else
-        _front + (_alloc - _initial_front)
+        _front + (_data.size() - _initial_front)
       end
-    (relative_idx, _data(_front = (_front + 1) % _alloc))
+    (relative_idx, _data(_front = (_front + 1) % _data.size()))
         
