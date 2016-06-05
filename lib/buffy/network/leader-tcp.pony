@@ -4,7 +4,6 @@ use "buffy/messages"
 use "buffy/metrics"
 use "sendence/bytes"
 use "../topology"
-use "time"
 use "spike"
 
 class LeaderControlNotifier is TCPListenNotify
@@ -64,7 +63,6 @@ class LeaderConnectNotify is TCPConnectionNotify
     _topology_manager = t_manager
     _coordinator = coordinator
     _metrics_collector = metrics_collector
-
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)

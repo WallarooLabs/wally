@@ -1,5 +1,4 @@
 use "net"
-use "collections"
 use "buffy/messages"
 use "../topology"
 use "time"

@@ -110,7 +110,7 @@ actor Startup
       let phone_home_service = phone_home_addr(1)
 
       let phone_home_conn: TCPConnection = TCPConnection(auth,
-        HomeConnectNotify(env, auth, node_name, coordinator), phone_home_host,
+        HomeConnectNotify(env, node_name, coordinator), phone_home_host,
           phone_home_service)
 
       coordinator.add_phone_home_connection(phone_home_conn)
@@ -133,7 +133,7 @@ actor Startup
           let source_addr: Array[String] = source_addrs(i).split(":")
           let source_host = source_addr(0)
           let source_service = source_addr(1)
-          let source_notifier: TCPListenNotify iso = SourceNotifier(env, auth,
+          let source_notifier: TCPListenNotify iso = SourceNotifier(env,
             source_host, source_service, i.u64(), step_manager, coordinator,
             metrics_collector)
           coordinator.add_listener(TCPListener(auth, consume source_notifier,

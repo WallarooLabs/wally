@@ -29,9 +29,6 @@ actor Coordinator
   let _spike_config: SpikeConfig val
   let _metrics_collector: MetricsCollector
   let _is_worker: Bool
-  // TODO: Remove this hack field when race condition
-  // around reconnect acking is fixed
-  var _stall: U64 = 0
 
   new create(name: String, env: Env, auth: AmbientAuth, leader_control_host: String,
     leader_control_service: String, leader_data_host: String,

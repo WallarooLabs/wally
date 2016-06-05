@@ -10,7 +10,6 @@ use "random"
 
 class SourceNotifier is TCPListenNotify
   let _env: Env
-  let _auth: AmbientAuth
   let _host: String
   let _service: String
   let _source_id: U64
@@ -18,11 +17,10 @@ class SourceNotifier is TCPListenNotify
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector
 
-  new iso create(env: Env, auth: AmbientAuth, source_host: String,
+  new iso create(env: Env, source_host: String,
     source_service: String, source_id: U64, step_manager: StepManager,
     coordinator: Coordinator, metrics_collector: MetricsCollector) =>
     _env = env
-    _auth = auth
     _host = source_host
     _service = source_service
     _source_id = source_id
@@ -38,24 +36,22 @@ class SourceNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    SourceConnectNotify(_env, _auth, _source_id, _step_manager, _coordinator,
+    SourceConnectNotify(_env, _source_id, _step_manager, _coordinator,
       _metrics_collector)
 
 class SourceConnectNotify is TCPConnectionNotify
   let _guid_gen: GuidGenerator = GuidGenerator
   let _env: Env
-  let _auth: AmbientAuth
   let _source_id: U64
   let _step_manager: StepManager
   let _metrics_collector: MetricsCollector
   let _coordinator: Coordinator
   var _header: Bool = true
 
-  new iso create(env: Env, auth: AmbientAuth, source_id: U64,
+  new iso create(env: Env, source_id: U64,
     step_manager: StepManager, coordinator: Coordinator,
       metrics_collector: MetricsCollector) =>
     _env = env
-    _auth = auth
     _source_id = source_id
     _step_manager = step_manager
     _coordinator = coordinator
