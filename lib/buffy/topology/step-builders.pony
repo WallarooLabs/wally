@@ -3,9 +3,6 @@ use "buffy/messages"
 use "net"
 use "buffy/metrics"
 use "time"
-//
-//interface TagBuilder
-//  fun apply(): Any tag
 
 trait BasicStepBuilder
   fun apply(): BasicStep tag
@@ -23,7 +20,6 @@ trait BasicOutputStepBuilder[Out: Any val] is BasicStepBuilder
 
 trait ThroughStepBuilder[In: Any val, Out: Any val]
   is BasicOutputStepBuilder[Out]
-//  fun apply(): ThroughStep[In, Out] tag
 
 class SourceBuilder[Out: Any val]
   is ThroughStepBuilder[String, Out]
@@ -146,7 +142,6 @@ class StatePartitionBuilder[In: Any val, Out: Any val, State: Any #read]
     _shared_state_step_builder
 
 primitive EmptyStepBuilder is BasicStepBuilder
-//  new val create() => None
   fun apply(): BasicStep tag => EmptyStep
 
 class ExternalConnectionBuilder[In: Any val] is SinkBuilder

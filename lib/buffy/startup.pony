@@ -98,7 +98,7 @@ actor Startup
           MetricsCollector(env, node_name)
         end
 
-      let step_manager = StepManager(env, auth, node_name, consume sinks,
+      let step_manager = StepManager(env, node_name, consume sinks,
         metrics_collector)
 
       let coordinator: Coordinator = Coordinator(node_name, env, auth,

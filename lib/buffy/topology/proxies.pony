@@ -3,32 +3,25 @@ use "debug"
 use "net"
 use "buffy/messages"
 use "buffy/metrics"
-use "sendence/guid"
+use "buffy/network"
 use "sendence/epoch"
-use "../network"
 
 actor Proxy is BasicStep
-  let _env: Env
-  let _auth: AmbientAuth
   let _node_name: String
   let _step_id: U64
   let _target_node_name: String
   let _coordinator: Coordinator
   let _metrics_collector: MetricsCollector tag
 
-  new create(env: Env, auth: AmbientAuth, node_name: String, step_id: U64,
+  new create(node_name: String, step_id: U64,
     target_node_name: String, coordinator: Coordinator,
     metrics_collector: MetricsCollector tag) =>
-    _env = env
-    _auth = auth
     _node_name = node_name
     _step_id = step_id
     _target_node_name = target_node_name
     _coordinator = coordinator
     _metrics_collector = metrics_collector
 
-  // input will be a Message[In] once the typearg issue is fixed
-  // ponyc #723
   be apply(input: StepMessage val) =>
     let forward = Forward(_step_id, _node_name, input)
     _coordinator.send_data_message(_target_node_name, forward)
@@ -37,18 +30,15 @@ actor Proxy is BasicStep
 
 actor StepManager
   let _env: Env
-  let _auth: AmbientAuth
   let _node_name: String
   let _metrics_collector: MetricsCollector tag
   let _steps: Map[U64, BasicStep tag] = Map[U64, BasicStep tag]
   let _sink_addrs: Map[U64, (String, String)] val
-  let _guid_gen: GuidGenerator = GuidGenerator
 
-  new create(env: Env, auth: AmbientAuth, node_name: String,
+  new create(env: Env, node_name: String,
     sink_addrs: Map[U64, (String, String)] val,
     metrics_collector: MetricsCollector tag) =>
     _env = env
-    _auth = auth
     _node_name = node_name
     _sink_addrs = sink_addrs
     _metrics_collector = metrics_collector
@@ -92,7 +82,7 @@ actor StepManager
 
   be add_proxy(proxy_step_id: U64, target_step_id: U64,
     target_node_name: String, coordinator: Coordinator) =>
-    let p = Proxy(_env, _auth, _node_name, target_step_id, target_node_name,
+    let p = Proxy(_node_name, target_step_id, target_node_name,
       coordinator, _metrics_collector)
     _steps(proxy_step_id) = p
 
