@@ -1,8 +1,6 @@
-use "osc-pony"
 use "sendence/bytes"
 use "buffy/topology"
 use "serialise"
-use "time"
 
 primitive WireMsgEncoder
   fun _serialise(msg: WireMsg val, auth: AmbientAuth): Array[U8] val ? =>
