@@ -139,13 +139,13 @@ actor Startup
           coordinator.add_listener(TCPListener(auth, consume source_notifier,
             source_host, source_service))
         end
-        // Set up leader listener
         let topology_manager: TopologyManager = TopologyManager(env, auth,
           node_name, worker_count, leader_control_host, leader_control_service,
           leader_data_host, leader_data_service, coordinator, topology)
 
         coordinator.add_topology_manager(topology_manager)
 
+        // Set up leader listeners
         let control_notifier: TCPListenNotify iso =
           LeaderControlNotifier(env, auth, node_name, coordinator, topology_manager,
           metrics_collector)
@@ -170,7 +170,26 @@ actor Startup
       end
     else
       TestMain(env)
-      env.out.print("Parameters: leader_address [-l -w <worker_count>"
-        + "-p <phone_home_address> --id <node_name>]")
+      env.out.print(
+        """
+        PARAMETERS:
+        -----------------------------------------------------------------------------------
+        -l [Sets process as leader]
+        -w <count> [Tells the leader how many workers to wait for]
+        -n <node_name> [Sets the name for the process in the Buffy cluster]
+        -p <address> [Sets the address for phone home]
+        --leader-control-address <address> [Sets the address for the leader's control
+                                            channel address]
+        --leader-data-address <address> [Sets the address for the leader's data channel
+                                         address]
+        --source <comma-delimited source_addresses> [Sets the addresses for the sink]
+        --sink <comma-delimited sink_addresses> [Sets the addresses for the sink]
+        --metrics <metrics-receiver address> [Sets the address for the metrics receiver]
+        --spike-seed <seed> [Optionally sets seed for spike]
+        --spike-delay [Set flag for spike delay]
+        --spike-drop [Set flag for spike drop]
+        -----------------------------------------------------------------------------------
+        """
+      )
     end
 
