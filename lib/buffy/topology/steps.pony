@@ -3,7 +3,7 @@ use "buffy/messages"
 use "net"
 use "buffy/metrics"
 use "sendence/guid"
-use "time"
+use "sendence/epoch"
 
 trait BasicStep
   be apply(input: StepMessage val)
@@ -50,11 +50,11 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
-      let start_time = Time.millis()
+      let start_time = Epoch.milliseconds()
       let output_msg =
         Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), _f(m.data()))
       _output(output_msg)
-      let end_time = Time.millis()
+      let end_time = Epoch.milliseconds()
       match _step_reporter
       | let sr: StepReporter val =>
         sr.report(start_time, end_time)
@@ -78,13 +78,13 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
-      let start_time = Time.millis()
+      let start_time = Epoch.milliseconds()
       for res in _f(m.data()).values() do
         let output_msg =
           Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), res)
         _output(output_msg)
       end
-      let end_time = Time.millis()
+      let end_time = Epoch.milliseconds()
       match _step_reporter
       | let sr: StepReporter val =>
         sr.report(start_time, end_time)
@@ -109,13 +109,13 @@ actor Source[Out: Any val] is ThroughStep[String, Out]
     match input
     | let m: Message[String] val =>
       try
-        let start_time = Time.millis()
+        let start_time = Epoch.milliseconds()
         match _input_parser(m.data())
         | let res: Out =>
           let output_msg: Message[Out] val =
             Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), res)
           _output(output_msg)
-          let end_time = Time.millis()
+          let end_time = Epoch.milliseconds()
           match _step_reporter
           | let sr: StepReporter val =>
             sr.report(start_time, end_time)
@@ -320,7 +320,7 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
   be apply(input: StepMessage val) =>
     match input
     | let m: Message[In] val =>
-      let start_time = Time.millis()
+      let start_time = Epoch.milliseconds()
       let sc: StateComputation[Out, State] val = _state_comp_builder(m.data())
       let message_wrapper = DefaultMessageWrapper[Out](m.id(), m.source_ts(),
         m.last_ingress_ts())
@@ -329,7 +329,7 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
       let output_msg = Message[StateProcessor[State] val](m.id(),
         m.source_ts(), m.last_ingress_ts(), sc_wrapper)
       _shared_state(output_msg)
-      let end_time = Time.millis()
+      let end_time = Epoch.milliseconds()
       match _step_reporter
       | let sr: StepReporter val =>
         sr.report(start_time, end_time)
@@ -351,9 +351,9 @@ actor SharedStateStep[State: Any #read]
     match input
     | let m: Message[StateProcessor[State] val] val =>
       let sp: StateProcessor[State] val = m.data()
-      let start_time = Time.millis()
+      let start_time = Epoch.milliseconds()
       _state = sp(_state)
-      let end_time = Time.millis()
+      let end_time = Epoch.milliseconds()
       match _step_reporter
       | let sr: StepReporter val =>
         sr.report(start_time, end_time)
@@ -388,7 +388,7 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
           conn.write(tcp_msg)
         end
         _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
-          m.id(), m.source_ts(), Time.millis())
+          m.id(), m.source_ts(), Epoch.milliseconds())
       end
     end
 
