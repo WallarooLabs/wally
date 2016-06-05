@@ -74,7 +74,7 @@ actor DataSender
         let next_msg = _held(idx).data
         _conn.write(next_msg)
       else
-        @printf[None]("Couldn't resend!!\n".cstring())
+        @printf[I32]("Couldn't resend!!\n".cstring())
       end
     end
     _sending = true

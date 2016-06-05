@@ -122,7 +122,7 @@ actor Source[Out: Any val] is ThroughStep[String, Out]
           end
         end
       else
-        @printf[String]("Could not process incoming Message at source\n".cstring())
+        @printf[I32]("Could not process incoming Message at source\n".cstring())
       end
     end
 
@@ -165,7 +165,7 @@ actor Partition[In: Any val, Out: Any val]
             let step_id = _partitions(partition_id)
             sm(step_id, input)
           else
-            @printf[String]("Can't forward to chosen partition!\n".cstring())
+            @printf[I32]("Can't forward to chosen partition!\n".cstring())
           end
         else
           try
@@ -179,7 +179,7 @@ actor Partition[In: Any val, Out: Any val]
               _step_builder, this)
             sm.add_output_to(step_id, _output)
           else
-            @printf[String]("Computation type is invalid!\n".cstring())
+            @printf[I32]("Computation type is invalid!\n".cstring())
           end
         end
       end
@@ -194,7 +194,7 @@ actor Partition[In: Any val, Out: Any val]
       end
       buffer.clear()
     else
-      @printf[None]("Partition: buffer flush failed!\n".cstring())
+      @printf[I32]("Partition: buffer flush failed!\n".cstring())
     end
 
   be add_output(to: BasicStep tag) =>
@@ -239,7 +239,7 @@ actor StatePartition[State: Any #read]
             let step_id = _partitions(partition_id)
             sm(step_id, input)
           else
-            @printf[String]("Can't forward to chosen partition!\n".cstring())
+            @printf[I32]("Can't forward to chosen partition!\n".cstring())
           end
         else
           try
@@ -259,7 +259,7 @@ actor StatePartition[State: Any #read]
                 _step_builder, this)
             end
           else
-            @printf[String]("Computation type is invalid!\n".cstring())
+            @printf[I32]("Computation type is invalid!\n".cstring())
           end
         end
       end
@@ -274,7 +274,7 @@ actor StatePartition[State: Any #read]
       end
       buffer.clear()
     else
-      @printf[None]("Partition: buffer flush failed!\n".cstring())
+      @printf[I32]("Partition: buffer flush failed!\n".cstring())
     end
 
   be add_step_manager(step_manager: StepManager) =>
@@ -382,7 +382,7 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
     | let m: Message[In] val =>
       try
         let str = _stringify(m.data())
-        @printf[String]((">>>>" + str + "<<<<\n").cstring())
+        @printf[I32]((">>>>" + str + "<<<<\n").cstring())
         let tcp_msg = ExternalMsgEncoder.data(str)
         for conn in _conns.values() do
           conn.write(tcp_msg)

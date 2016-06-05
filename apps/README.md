@@ -118,8 +118,6 @@ class Double is Computation[U64, U64]
 
 class Mod4Partition is PartitionFunction[U64]
   fun apply(input: U64): U64 =>
-    @printf[String](("Chose partition " + (input % 4).string()
-      + " for input " + input.string() + "\n").cstring())
     input % 4
 ```
 
