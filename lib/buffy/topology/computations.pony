@@ -16,7 +16,7 @@ interface PartitionFunction[In]
   fun apply(input: In): U64
 
 trait StateProcessor[State: Any #read]
-  fun val apply(state: State): State
+  fun apply(state: State): State
   fun partition_id(): U64 => 0
 
 interface StateComputation[Out: Any val, State: Any #read]

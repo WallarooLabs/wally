@@ -8,6 +8,7 @@ use "./topology"
 use "time"
 
 actor Startup
+  // TODO: factor out source_count
   new create(env: Env, topology: Topology val, source_count: USize) =>
     var is_worker = true
     var worker_count: USize = 0

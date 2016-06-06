@@ -6,9 +6,12 @@ use "buffy/metrics"
 class Topology
   let pipelines: Array[PipelineSteps] = Array[PipelineSteps]
 
-  fun ref new_pipeline[In: Any val, Out: Any val] (parser: Parser[In] val,
-    stringify: Stringify[Out] val, sink_target_ids: Array[U64] val)
-    : PipelineBuilder[In, Out, In] =>
+  fun ref new_pipeline[In: Any val, Out: Any val] (
+    parser: Parser[In] val,
+    stringify: Stringify[Out] val,
+    sink_target_ids: Array[U64] val
+    ): PipelineBuilder[In, Out, In]
+  =>
     let pipeline = Pipeline[In, Out](parser, stringify, sink_target_ids)
     PipelineBuilder[In, Out, In](this, pipeline)
 
@@ -134,7 +137,9 @@ class StatePartitionConfig[In: Any val, Out: Any val, State: Any ref]
     c_builder: ComputationBuilder[In, StateComputation[Out, State] val] val,
     s_initializer: {(): State} val,
     p_fun: PartitionFunction[In] val,
-    s_id: U64) =>
+    s_id: U64
+    )
+  =>
     state_computation_builder = c_builder
     state_initializer = s_initializer
     partition_function = p_fun
