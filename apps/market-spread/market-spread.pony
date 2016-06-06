@@ -81,9 +81,9 @@ class UpdateData is StateComputation[None, MarketData]
     let mid = (_nbbo.bid_px() + _nbbo.offer_px()) / 2
     if ((_nbbo.offer_px() - _nbbo.bid_px()) >= 0.05) or
       (((_nbbo.offer_px() - _nbbo.bid_px()) / mid) >= 0.05) then
-      state(_nbbo.symbol()) = true
+      state.update(_nbbo.symbol(), true)
     else
-      state(_nbbo.symbol()) = false
+      state.update(_nbbo.symbol(), false)
     end
 
 class GenerateCheckStatus is Computation[FixOrderMessage val, CheckStatus val]
