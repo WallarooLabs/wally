@@ -1,3 +1,5 @@
+use "debug"
+
 use "collections"
 use "net"
 use "buffy/messages"
@@ -18,7 +20,7 @@ actor MetricsCollector is FlushingActor
 
 	new create(stderr: StdStream, auth: AmbientAuth, node_name: String,
              conn: (TCPConnection | None) = None, max_batch: USize = 10,
-             max_time: U64 = 10_000_000_000) =>
+             max_time: U64 = 5_000_000_000) =>
     _stderr = stderr
 	  _auth = auth
     _node_name = node_name
@@ -29,8 +31,8 @@ actor MetricsCollector is FlushingActor
     _step_summary = recover NodeMetricsSummary(node_name) end
 
   be flush() =>
-    if _step_summary.size() > 0 then _send_steps_if_over_max() end
-    if _boundary_summary.size() > 0 then _send_boundary_if_over_max() end
+    if _step_summary.size() > 0 then _send_steps() end
+    if _boundary_summary.size() > 0 then _send_boundary() end
 
 	be report_step_metrics(step_id: StepId, start_time: U64, end_time: U64) =>
     let r = StepMetricsReport(start_time, end_time)
@@ -44,13 +46,17 @@ actor MetricsCollector is FlushingActor
 	  if (_step_summary.size() > _max_batch) or
        ((Epoch.nanoseconds() - _node_last_sent) > _max_time)
     then
+      _send_steps()
+	  end
+
+  fun ref _send_steps() =>
       let node_name: String val = _node_name.clone()
       let summary = _step_summary =
         recover trn NodeMetricsSummary(node_name) end
       let s:NodeMetricsSummary val = consume summary
-      _send_step_metrics_to_receiver(s)
+// TODO: uncomment this when done debugging boundarymetricssummary
+//      _send_step_metrics_to_receiver(s)
       _node_last_sent = Epoch.nanoseconds()
-	  end
 
   fun ref _send_step_metrics_to_receiver(summary: NodeMetricsSummary val) =>
     match _conn
@@ -76,13 +82,16 @@ actor MetricsCollector is FlushingActor
 	  if (_boundary_summary.size() > _max_batch) or
        ((Epoch.nanoseconds() - _boundary_last_sent) > _max_time)
     then
+      _send_boundary()
+	  end
+
+  fun ref _send_boundary() =>
       let node_name: String val = _node_name.clone()
 	    let summary = _boundary_summary =
         recover trn BoundaryMetricsSummary(node_name) end
       let s: BoundaryMetricsSummary val = consume summary
 	    _send_boundary_metrics_to_receiver(s)
       _boundary_last_sent = Epoch.nanoseconds()
-	  end
 
   fun ref _send_boundary_metrics_to_receiver(
     summary: BoundaryMetricsSummary val) =>

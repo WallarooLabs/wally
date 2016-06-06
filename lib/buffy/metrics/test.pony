@@ -12,27 +12,48 @@ actor Main is TestList
   new make(env: Env) => None
 
   fun tag tests(test: PonyTest) =>
-    test(_TestMetricsWireMsgNode)
-    test(_TestMetricsWireMsgBoundary)
-    test(_TestMonitoringHubEncoder)
+//    test(_TestMetricsWireMsgNode)
+//    test(_TestMetricsWireMsgBoundary)
+//    test(_TestMonitoringHubEncoder)
     test(_DeserialiseByteArray)
 
 class iso _DeserialiseByteArray is UnitTest
   fun name(): String => "buffy:DeserialiseByteArray"
   fun apply(h: TestHelper) ? =>
     let auth: AmbientAuth = h.env.root as AmbientAuth
-    let a: Array[U8 val] val = recover [
-    0, 0, 0, 191, 115, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0,
-    0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0,
-    0, 0, 0, 0, 184, 0, 0, 0, 0, 0, 0, 0, 114, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0,
-    0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 104, 0, 0, 0,
-    0, 0, 0, 0, 144, 0, 0, 0, 0, 0, 0, 0, 112, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 157, 155, 167, 23, 85, 1, 0, 0, 158,
-    155, 167, 23, 85, 1, 0, 0, 112, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 157, 155, 167, 23, 85, 1, 0, 0, 158, 155, 167, 23,
-    85, 1, 0, 0, 108, 101, 97, 100, 101, 114, 0] end
+    let node_name = "leader"
+    let bms = recover trn BoundaryMetricsSummary(node_name) end
 
-    let e' = recover val a.slice(4) end
+    bms.add_report(BoundaryMetricsReport(1, 0, 1465237852267, 1465237852270))
+    let b' = MetricsMsgEncoder.boundarymetrics(consume bms, auth)
+
+// captured from local encoder:
+    let a': Array[U8 val] val = recover [
+0, 0, 0, 143, 129, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 136, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 126, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 107, 80, 251, 38, 85, 1, 0, 0, 110, 80, 251, 38, 85, 1, 0, 0, 108, 101, 97, 100, 101, 114, 0
+] end
+
+// captured from app before going over TCP:
+    let a: Array[U8 val] val = recover [
+0, 0, 0, 143, 115, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 0,
+0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0,
+0, 136, 0, 0, 0, 0, 0, 0, 0, 114, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+1, 0, 0, 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 112,
+0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 107, 80,
+251, 38, 85, 1, 0, 0, 110, 80, 251, 38, 85, 1, 0, 0, 108, 101, 97, 100, 101,
+114, 0
+] end
+
+// captured from bms pre tcp
+    let a'': Array[U8 val] val = recover [
+0, 0, 0, 143, 115, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 0,
+0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0,
+0, 136, 0, 0, 0, 0, 0, 0, 0, 114, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+1, 0, 0, 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 112,
+0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 85, 43, 29,
+39, 85, 1, 0, 0, 93, 43, 29, 39, 85, 1, 0, 0, 108, 101, 97, 100, 101, 114, 0]
+end
+
+    let e' = recover val a''.slice(4) end
     let decoded = MetricsMsgDecoder(consume e', auth)
 
     match decoded
