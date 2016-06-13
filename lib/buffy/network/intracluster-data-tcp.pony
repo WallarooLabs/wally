@@ -68,7 +68,7 @@ class WorkerIntraclusterDataNotifier is TCPListenNotify
       (_host, _service) = listen.local_address().name()
       _env.out.print(_name + " data: listening on " + _host + ":" + _service)
 
-      _coordinator.identify_data_channel(_host, _service)
+      _coordinator.identify_data_channel(_service)
     else
       _env.out.print(_name + " data: couldn't get local address")
       listen.close()

@@ -14,13 +14,13 @@ primitive WireMsgEncoder
   fun topology_ready(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
     _serialise(TopologyReadyMsg(node_name), auth)
 
-  fun identify_control(node_name: String, host: String, service: String,
+  fun identify_control_port(node_name: String, service: String,
     auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(IdentifyControlMsg(node_name, host, service), auth)
+    _serialise(IdentifyControlPortMsg(node_name, service), auth)
 
-  fun identify_data(node_name: String, host: String, service: String,
+  fun identify_data_port(node_name: String, service: String,
     auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(IdentifyDataMsg(node_name, host, service), auth)
+    _serialise(IdentifyDataPortMsg(node_name, service), auth)
 
   fun add_control(node_name: String, host: String, service: String,
     auth: AmbientAuth): Array[U8] val ? =>
@@ -136,24 +136,20 @@ class TopologyReadyMsg is WireMsg
   new val create(name: String) =>
     node_name = name
 
-class IdentifyControlMsg is WireMsg
+class IdentifyControlPortMsg is WireMsg
   let node_name: String
-  let host: String
   let service: String
 
-  new val create(name: String, h: String, s: String) =>
+  new val create(name: String, s: String) =>
     node_name = name
-    host = h
     service = s
 
-class IdentifyDataMsg is WireMsg
+class IdentifyDataPortMsg is WireMsg
   let node_name: String
-  let host: String
   let service: String
 
-  new val create(name: String, h: String, s: String) =>
+  new val create(name: String, s: String) =>
     node_name = name
-    host = h
     service = s
     
 class AddControlMsg is WireMsg

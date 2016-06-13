@@ -30,7 +30,7 @@ class ControlNotifier is TCPListenNotify
       (_host, _service) = listen.local_address().name()
       _env.out.print(_name + " control: listening on " + _host + ":" + _service)
       if _is_worker then
-        _coordinator.identify_control_channel(_host, _service)
+        _coordinator.identify_control_channel(_service)
       end
     else
       _env.out.print(_name + "control : couldn't get local address")
@@ -78,10 +78,18 @@ class ControlConnectNotify is TCPConnectionNotify
       match msg
       | let m: ReconnectDataMsg val =>
         _coordinator.negotiate_data_reconnection(m.node_name)
-      | let m: IdentifyControlMsg val =>
-        _coordinator.assign_topology_control_conn(m.node_name, m.host, m.service)
-      | let m: IdentifyDataMsg val =>
-        _coordinator.assign_topology_data_conn(m.node_name, m.host, m.service)
+      | let m: IdentifyControlPortMsg val =>
+        try
+          (let host, _) = conn.remote_address().name()
+          _coordinator.assign_topology_control_conn(m.node_name, host, 
+            m.service)
+        end
+      | let m: IdentifyDataPortMsg val =>
+        try
+          (let host, _) = conn.remote_address().name()
+          _coordinator.assign_topology_data_conn(m.node_name, host, 
+            m.service)
+        end
       | let m: AddControlMsg val =>
         _coordinator.establish_control_connection(m.node_name, m.host, m.service)
       | let m: AddDataMsg val =>

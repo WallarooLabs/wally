@@ -96,17 +96,19 @@ actor Coordinator
       end
     end
 
-  be identify_data_channel(host: String, service: String) =>
+  be identify_data_channel(service: String) =>
     try
-      let message = WireMsgEncoder.identify_data(_node_name, host, service, _auth)
+      let message = WireMsgEncoder.identify_data_port(_node_name, service,
+        _auth)
       _control_connections("leader").write(message)
     else
       _env.out.print("Coordinator: control connection to leader was not set up")
     end
 
-  be identify_control_channel(host: String, service: String) =>
+  be identify_control_channel(service: String) =>
     try
-      let message = WireMsgEncoder.identify_control(_node_name, host, service, _auth)
+      let message = WireMsgEncoder.identify_control_port(_node_name, service,
+        _auth)
       _control_connections("leader").write(message)
     else
       _env.out.print("Coordinator: control connection to leader was not set up")
