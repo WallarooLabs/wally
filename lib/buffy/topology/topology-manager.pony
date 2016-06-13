@@ -301,6 +301,3 @@ actor TopologyManager
     _env.out.print("_--- Topology successfully initialized ---_")
     let message = ExternalMsgEncoder.topology_ready(_name)
     _coordinator.send_phone_home_message(message)
-
-  be shutdown() =>
-    _coordinator.finish_shutdown()

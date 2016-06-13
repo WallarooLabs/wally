@@ -52,8 +52,7 @@ actor Coordinator
       _data_addrs("leader") = (_leader_data_host, _leader_data_service)
 
       let control_notifier: TCPConnectionNotify iso =
-        WorkerConnectNotify(_env, _auth, _node_name, _leader_control_host,
-          _leader_control_service, this, metrics_collector)
+        ControlConnectNotify(_env, _auth, _node_name, this, metrics_collector)
       let control_conn: TCPConnection =
         TCPConnection(_auth, consume control_notifier, _leader_control_host,
           _leader_control_service)
@@ -82,13 +81,14 @@ actor Coordinator
       for (connector, conn) in _control_connections.pairs() do
         for (target, addr) in _control_addrs.pairs() do
           if connector != target then
-            let msg = WireMsgEncoder.identify_control(target, addr._1, addr._2, _auth)
+            let msg = WireMsgEncoder.add_control(target, addr._1, addr._2,
+             _auth)
             conn.write(msg)
           end
         end
         for (target, addr) in _data_addrs.pairs() do
           if connector != target then
-            let msg = WireMsgEncoder.identify_data(target, addr._1, addr._2, _auth)
+            let msg = WireMsgEncoder.add_data(target, addr._1, addr._2, _auth)
             conn.write(msg)
           end
         end
@@ -126,6 +126,17 @@ actor Coordinator
       _control_connections(target_name).write(ack_msg)
     end
 
+  be process_finished_connections_ack() =>
+    match _topology_manager
+    | let t: TopologyManager =>
+      t.ack_finished_connections()
+    end
+      
+  be process_initialized_msg_ack() =>
+    match _topology_manager
+    | let t: TopologyManager =>
+      t.ack_initialized()
+    end
 
   ////////////
   // TOPOLOGY
@@ -163,13 +174,30 @@ actor Coordinator
 
   be add_phone_home_connection(conn: TCPConnection) =>
     _phone_home_connection = conn
+    if not _is_worker then
+      let message = ExternalMsgEncoder.ready(_node_name)
+      send_phone_home_message(message)
+    end
+
+  be assign_topology_control_conn(name: String, host: String, service: String) 
+  =>
+    match _topology_manager
+    | let t: TopologyManager =>
+      t.assign_control_conn(name, host, service)
+    end
+
+  be assign_topology_data_conn(name: String, host: String, service: String) 
+  =>
+    match _topology_manager
+    | let t: TopologyManager =>
+      t.assign_data_conn(name, host, service)
+    end
 
   be establish_control_connection(target_name: String, target_host: String,
     target_service: String) =>
     _control_addrs(target_name) = (target_host, target_service)
     let notifier: TCPConnectionNotify iso =
-      WorkerConnectNotify(_env, _auth, _node_name, target_host,
-        target_service, this, _metrics_collector)
+      ControlConnectNotify(_env, _auth, _node_name, this, _metrics_collector)
     let conn: TCPConnection =
       TCPConnection(_auth, consume notifier, target_host,
         target_service)
@@ -323,14 +351,6 @@ actor Coordinator
   // SHUTDOWN
   ////////////
   be shutdown() =>
-    match _topology_manager
-    | let t: TopologyManager =>
-      t.shutdown()
-    else
-      finish_shutdown()
-    end
-
-  be finish_shutdown() =>
     try
       let shutdown_msg = WireMsgEncoder.shutdown(_node_name, _auth)
 

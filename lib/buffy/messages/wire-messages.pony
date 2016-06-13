@@ -22,6 +22,14 @@ primitive WireMsgEncoder
     auth: AmbientAuth): Array[U8] val ? =>
     _serialise(IdentifyDataMsg(node_name, host, service), auth)
 
+  fun add_control(node_name: String, host: String, service: String,
+    auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(IdentifyControlMsg(node_name, host, service), auth)
+
+  fun add_data(node_name: String, host: String, service: String,
+    auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(IdentifyDataMsg(node_name, host, service), auth)
+
   fun done(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
     _serialise(DoneMsg(node_name), auth)
 
@@ -148,6 +156,26 @@ class IdentifyDataMsg is WireMsg
     host = h
     service = s
     
+class AddControlMsg is WireMsg
+  let node_name: String
+  let host: String
+  let service: String
+
+  new val create(name: String, h: String, s: String) =>
+    node_name = name
+    host = h
+    service = s
+
+class AddDataMsg is WireMsg
+  let node_name: String
+  let host: String
+  let service: String
+
+  new val create(name: String, h: String, s: String) =>
+    node_name = name
+    host = h
+    service = s
+
 class DoneMsg is WireMsg
   let node_name: String
 

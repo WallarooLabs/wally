@@ -118,8 +118,8 @@ actor Startup
 
       if is_worker then
         coordinator.add_listener(TCPListener(auth,
-          WorkerControlNotifier(env, auth, node_name, leader_control_host,
-            leader_control_service, coordinator, metrics_collector)))
+          ControlNotifier(env, auth, node_name, coordinator, 
+            metrics_collector)))
         coordinator.add_listener(TCPListener(auth,
           WorkerIntraclusterDataNotifier(env, auth, node_name, leader_control_host,
             leader_control_service, coordinator, spike_config)))
@@ -148,7 +148,7 @@ actor Startup
 
         // Set up leader listeners
         let control_notifier: TCPListenNotify iso =
-          LeaderControlNotifier(env, auth, node_name, coordinator, topology_manager,
+          ControlNotifier(env, auth, node_name, coordinator,
           metrics_collector)
         coordinator.add_listener(TCPListener(auth, consume control_notifier,
           leader_control_host, leader_control_service))
