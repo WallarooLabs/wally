@@ -24,11 +24,11 @@ primitive WireMsgEncoder
 
   fun add_control(node_name: String, host: String, service: String,
     auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(IdentifyControlMsg(node_name, host, service), auth)
+    _serialise(AddControlMsg(node_name, host, service), auth)
 
   fun add_data(node_name: String, host: String, service: String,
     auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(IdentifyDataMsg(node_name, host, service), auth)
+    _serialise(AddDataMsg(node_name, host, service), auth)
 
   fun done(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
     _serialise(DoneMsg(node_name), auth)
