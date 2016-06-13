@@ -20,8 +20,7 @@ actor TopologyManager
   let _coordinator: Coordinator
   let _name: String
   let _worker_count: USize
-  let _worker_control_addrs: Map[String, (String, String)] = Map[String, (String, String)]
-  let _worker_data_addrs: Map[String, (String, String)] = Map[String, (String, String)]
+  let _nodes: Array[String] = Array[String]
   let _topology: Topology val
   // Keep track of how many workers identified themselves
   var _control_hellos: USize = 0
@@ -49,19 +48,19 @@ actor TopologyManager
     _leader_control_service = leader_control_service
     _leader_data_host = leader_data_host
     _leader_data_service = leader_data_service
+    _nodes.push(name)
 
     if _worker_count == 0 then _initialize_topology() end
 
   be assign_control_conn(node_name: String, control_host: String,
     control_service: String) =>
+    _nodes.push(node_name)
     _coordinator.establish_control_connection(node_name, control_host, control_service)
-    _worker_control_addrs(node_name) = (control_host, control_service)
     _env.out.print("Identified worker " + node_name + " control channel")
 
   be assign_data_conn(node_name: String, data_host: String,
     data_service: String) =>
     _coordinator.establish_data_connection(node_name, data_host, data_service)
-    _worker_data_addrs(node_name) = (data_host, data_service)
     _env.out.print("Identified worker " + node_name + " data channel")
 
   be ack_control() =>
@@ -108,13 +107,6 @@ actor TopologyManager
     let shared_state_steps = Map[U64, SharedStateAddress] // map from state_id to shared_state_step_id
     let guid_gen = GuidGenerator
     try
-      let nodes = Array[String]
-      nodes.push(_name)
-      let keys = _worker_control_addrs.keys()
-      for key in keys do
-        nodes.push(key)
-      end
-
       var cur_source_id: U64 = 0
       var step_id: U64 = cur_source_id
       var prev_step_id: (U64 | None) = None
@@ -126,22 +118,10 @@ actor TopologyManager
         var count: USize = 0
         // Round robin node assignment
         while count < pipeline.size() do
-          let cur_node_idx = count % nodes.size()
-          let cur_node = nodes(count % nodes.size())
-          let next_node_idx = (cur_node_idx + 1) % nodes.size()
-          let next_node = nodes((cur_node_idx + 1) % nodes.size())
-          let next_node_control_addr =
-            if next_node_idx == 0 then
-              (_leader_control_host, _leader_control_service)
-            else
-              _worker_control_addrs(next_node)
-            end
-          let next_node_data_addr =
-            if next_node_idx == 0 then
-              (_leader_data_host, _leader_data_service)
-            else
-              _worker_data_addrs(next_node)
-            end
+          let cur_node_idx = count % _nodes.size()
+          let cur_node = _nodes(count % _nodes.size())
+          let next_node_idx = (cur_node_idx + 1) % _nodes.size()
+          let next_node = _nodes((cur_node_idx + 1) % _nodes.size())
           let pipeline_step: PipelineStep box = pipeline(count)
           if pipeline_step.id() != 0 then
             try
@@ -238,9 +218,9 @@ actor TopologyManager
           proxy_step_id = guid_gen()
           proxy_step_target_id = guid_gen()
         end
-        let cur_node = nodes(count % nodes.size())
-        let sink_node_idx = count % nodes.size()
-        let sink_node = nodes(sink_node_idx)
+        let cur_node = _nodes(count % _nodes.size())
+        let sink_node_idx = count % _nodes.size()
+        let sink_node = _nodes(sink_node_idx)
         _env.out.print("Spinning up sink on node " + sink_node)
 
         let sendable_sink_ids: Array[U64] iso = recover Array[U64] end
@@ -271,8 +251,8 @@ actor TopologyManager
       let finished_msg =
         WireMsgEncoder.initialization_msgs_finished(_name, _auth)
       // Send finished_msg to all workers
-      for i in Range(1, nodes.size()) do
-        let node = nodes(i)
+      for i in Range(1, _nodes.size()) do
+        let node = _nodes(i)
         _coordinator.send_control_message(node, finished_msg)
       end
     else
