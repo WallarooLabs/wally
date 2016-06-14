@@ -247,16 +247,16 @@ actor StatePartition[State: Any #read]
               _buffers(partition_id).push(input)
             else
               _buffers(partition_id) = [input]
-            end
-            let step_id = _guid_gen()
-            if _initialization_map.contains(partition_id) then
-              sm.add_partition_step_and_ack(step_id, partition_id,
-                _step_builder, this)
-              sm.add_initial_state[State](step_id,
-                _initialization_map(partition_id))
-            else
-              sm.add_partition_step_and_ack(step_id, partition_id,
-                _step_builder, this)
+              let step_id = _guid_gen()
+              if _initialization_map.contains(partition_id) then
+                sm.add_partition_step_and_ack(step_id, partition_id,
+                  _step_builder, this)
+                sm.add_initial_state[State](step_id,
+                  _initialization_map(partition_id))
+              else
+                sm.add_partition_step_and_ack(step_id, partition_id,
+                  _step_builder, this)
+              end
             end
           else
             @printf[I32]("Computation type is invalid!\n".cstring())
