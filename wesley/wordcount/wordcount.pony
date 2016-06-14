@@ -56,7 +56,7 @@ class WordcountReceivedMessages is ReceivedMessages
 
   new from(messages: Array[WordcountReceivedMessage] ref) =>
     for m in messages.values() do
-      wc.update(m.word, m.count)
+      wc(m.word) = m.count
     end
   
   new from_wordcounter(wordcounter: WordCounter) =>

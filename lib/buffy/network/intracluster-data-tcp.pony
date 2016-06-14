@@ -3,7 +3,6 @@ use "collections"
 use "buffy/messages"
 use "buffy/metrics"
 use "sendence/bytes"
-use "time"
 use "spike"
 
 class LeaderIntraclusterDataNotifier is TCPListenNotify
@@ -69,7 +68,7 @@ class WorkerIntraclusterDataNotifier is TCPListenNotify
       (_host, _service) = listen.local_address().name()
       _env.out.print(_name + " data: listening on " + _host + ":" + _service)
 
-      _coordinator.identify_data_channel(_host, _service)
+      _coordinator.identify_data_channel(_service)
     else
       _env.out.print(_name + " data: couldn't get local address")
       listen.close()
@@ -92,7 +91,6 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
   var _sender_name: String = ""
   let _coordinator: Coordinator
   var _header: Bool = true
-  let _id: U64 = Time.millis() % 999
 
   new iso create(env: Env, auth: AmbientAuth, name: String,
     coordinator: Coordinator) =>
@@ -106,7 +104,6 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-//    _env.out.print(_id.string() + " received at " + Time.micros().string())
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()

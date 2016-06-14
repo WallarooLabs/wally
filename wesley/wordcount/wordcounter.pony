@@ -32,21 +32,11 @@ class WordCounter is Equatable[WordCounter]
 
   fun ref load_from_map(map': Map[String, U64]) =>
     for (key, count) in map'.pairs() do
-      counts.update(key, count)
+      counts(key) = count
     end
 
   fun ref clear() =>
     counts.clear()
-
-  fun ref apply(key': String, count': U64=1): (U64|None) =>
-    """Increment the value of key by 1. Create it if necessary."""
-    let key = clean(key')
-    if key == "" then return None end
-    try
-      counts.update(key, counts(key)+count')
-    else
-      counts.update(key, count')
-    end
 
   fun clean(s: String): String =>
     """Strip characters based on a rule."""
@@ -56,8 +46,17 @@ class WordCounter is Equatable[WordCounter]
   fun ref update_from_string(s: String) =>
     for line in s.split("\n").values() do
       for word in line.split(" ").values() do
-        apply(word)
+        _increment_word(word)
       end
+    end
+
+  fun ref _increment_word(word': String) =>
+    let word = clean(word')
+    if word == "" then return None end
+    try
+      counts(word) = counts(word) + 1
+    else
+      counts(word) = 1
     end
  
   fun ref update_from_array(values: Array[(String, U64)]) =>
@@ -65,10 +64,10 @@ class WordCounter is Equatable[WordCounter]
       update(word, count)
     end
 
-  fun ref update(key': String, count': U64): (U64|None) =>
+  fun ref update(key': String, value: U64): (U64|None) =>
     let key = clean(key')
     if key == "" then return None end
-    counts.update(key, count')
+    counts(key) = value
 
   fun get(key: String): (U64|None) =>
     try

@@ -14,11 +14,11 @@ actor Main
           .to[U64](lambda(): Computation[U64, U64] iso^ => Double end)
           .to[U64](lambda(): Computation[U64, U64] iso^ => Halve end)
           .to_stateful[U64, Averager](
-            lambda(): StateComputation[U64, U64, Averager] iso^ => Average end,
-            lambda(): Averager => Averager end)
+            lambda(): Computation[U64, Average val] iso^ => GenerateAverage end,
+            lambda(): Averager => Averager end, 1)
           .to_stateful[U64, Averager](
-            lambda(): StateComputation[U64, U64, Averager] iso^ => Average end,
-            lambda(): Averager => Averager end)
+            lambda(): Computation[U64, Average val] iso^ => GenerateAverage end,
+            lambda(): Averager => Averager end, 2)
           .build()
       end
       Startup(env, topology, 1)
@@ -36,10 +36,22 @@ class Halve is Computation[U64, U64]
   fun apply(d: U64): U64 =>
     d / 2
 
-class Average is StateComputation[U64, U64, Averager]
+class GenerateAverage is Computation[U64, Average val]
   fun name(): String => "average"
-  fun ref apply(state: Averager, d: U64): U64 =>
-    state(d)
+  fun apply(d: U64): Average val =>
+    Average(d)
+
+class Average is StateComputation[U64, Averager]
+  let _data: U64
+
+  new val create(d: U64) =>
+    _data = d
+
+  fun name(): String => "average"
+  fun apply(state: Averager, output: MessageTarget[U64] val)
+    : Averager =>
+    output(state(_data))
+    state
 
 class Averager
   var count: U64 = 0

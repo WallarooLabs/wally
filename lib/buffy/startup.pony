@@ -8,6 +8,7 @@ use "./topology"
 use "time"
 
 actor Startup
+  // TODO: factor out source_count
   new create(env: Env, topology: Topology val, source_count: USize) =>
     var is_worker = true
     var worker_count: USize = 0
@@ -29,10 +30,10 @@ actor Startup
       .add("worker_count", "w", I64Argument)
       .add("phone_home", "p", StringArgument)
       .add("name", "n", StringArgument)
-      // Comma-delimited source and sink addresses.
-      // e.g. --source 127.0.0.1:6000,127.0.0.1:7000
       .add("leader-control-address", "", StringArgument)
       .add("leader-data-address", "", StringArgument)
+      // Comma-delimited source and sink addresses.
+      // e.g. --source 127.0.0.1:6000,127.0.0.1:7000
       .add("source", "", StringArgument)
       .add("sink", "", StringArgument)
       .add("metrics", "", StringArgument)
@@ -55,12 +56,8 @@ actor Startup
         env.out.print("%%SPIKE-DELAY%%")
         spike_delay = true
       | ("spike-drop", None) =>
-        if not is_worker then
-          env.out.print("Spike drop not currently supported on leader.")
-        else
-          env.out.print("%%SPIKE-DROP%%")
-          spike_drop = true
-        end
+        env.out.print("%%SPIKE-DROP%%")
+        spike_drop = true
       | ("spike-seed", let arg: I64) => spike_seed = arg.u64()
       end
     end
@@ -102,7 +99,7 @@ actor Startup
           MetricsCollector(env, node_name)
         end
 
-      let step_manager = StepManager(env, auth, node_name, consume sinks,
+      let step_manager = StepManager(env, node_name, consume sinks,
         metrics_collector)
 
       let coordinator: Coordinator = Coordinator(node_name, env, auth,
@@ -114,15 +111,15 @@ actor Startup
       let phone_home_service = phone_home_addr(1)
 
       let phone_home_conn: TCPConnection = TCPConnection(auth,
-        HomeConnectNotify(env, auth, node_name, coordinator), phone_home_host,
+        HomeConnectNotify(env, node_name, coordinator), phone_home_host,
           phone_home_service)
 
       coordinator.add_phone_home_connection(phone_home_conn)
 
       if is_worker then
         coordinator.add_listener(TCPListener(auth,
-          WorkerControlNotifier(env, auth, node_name, leader_control_host,
-            leader_control_service, coordinator, metrics_collector)))
+          ControlNotifier(env, auth, node_name, coordinator, 
+            metrics_collector)))
         coordinator.add_listener(TCPListener(auth,
           WorkerIntraclusterDataNotifier(env, auth, node_name, leader_control_host,
             leader_control_service, coordinator, spike_config)))
@@ -137,21 +134,21 @@ actor Startup
           let source_addr: Array[String] = source_addrs(i).split(":")
           let source_host = source_addr(0)
           let source_service = source_addr(1)
-          let source_notifier: TCPListenNotify iso = SourceNotifier(env, auth,
+          let source_notifier: TCPListenNotify iso = SourceNotifier(env,
             source_host, source_service, i.u64(), step_manager, coordinator,
             metrics_collector)
           coordinator.add_listener(TCPListener(auth, consume source_notifier,
             source_host, source_service))
         end
-        // Set up leader listener
         let topology_manager: TopologyManager = TopologyManager(env, auth,
           node_name, worker_count, leader_control_host, leader_control_service,
           leader_data_host, leader_data_service, coordinator, topology)
 
         coordinator.add_topology_manager(topology_manager)
 
+        // Set up leader listeners
         let control_notifier: TCPListenNotify iso =
-          LeaderControlNotifier(env, auth, node_name, coordinator, topology_manager,
+          ControlNotifier(env, auth, node_name, coordinator,
           metrics_collector)
         coordinator.add_listener(TCPListener(auth, consume control_notifier,
           leader_control_host, leader_control_service))
@@ -173,8 +170,26 @@ actor Startup
           + " workers --**")
       end
     else
-      TestMain(env)
-      env.out.print("Parameters: leader_address [-l -w <worker_count>"
-        + "-p <phone_home_address> --id <node_name>]")
+      env.out.print(
+        """
+        PARAMETERS:
+        -----------------------------------------------------------------------------------
+        -l [Sets process as leader]
+        -w <count> [Tells the leader how many workers to wait for]
+        -n <node_name> [Sets the name for the process in the Buffy cluster]
+        -p <address> [Sets the address for phone home]
+        --leader-control-address <address> [Sets the address for the leader's control
+                                            channel address]
+        --leader-data-address <address> [Sets the address for the leader's data channel
+                                         address]
+        --source <comma-delimited source_addresses> [Sets the addresses for the sink]
+        --sink <comma-delimited sink_addresses> [Sets the addresses for the sink]
+        --metrics <metrics-receiver address> [Sets the address for the metrics receiver]
+        --spike-seed <seed> [Optionally sets seed for spike]
+        --spike-delay [Set flag for spike delay]
+        --spike-drop [Set flag for spike drop]
+        -----------------------------------------------------------------------------------
+        """
+      )
     end
 

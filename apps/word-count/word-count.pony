@@ -14,11 +14,14 @@ actor Main
           .to_map[WordCount val](
             lambda(): MapComputation[String, WordCount val] iso^ => Split end)
           .to_stateful_partition[WordCount val, WordCountTotals](
-            lambda(): StateComputation[WordCount val,
-                                       WordCount val,
-                                       WordCountTotals] iso^ => Count end,
-            lambda(): WordCountTotals => WordCountTotals end,
-            FirstLetterPartition)
+            recover
+              StatePartitionConfig[WordCount val, WordCount val, WordCountTotals](
+                lambda(): Computation[WordCount val, Count val] iso^
+                  => GenerateCount end,
+                lambda(): WordCountTotals => WordCountTotals end,
+                FirstLetterPartition, 0)
+            end
+            )
           .build()
       end
       Startup(env, topology, 1)
@@ -27,35 +30,36 @@ actor Main
     end
 
 class Split is MapComputation[String, WordCount val]
-  let punctuation: Array[String] = [",", ".", ";", ":", "\"", "'", "?", "!", "(", ")"]
+  let punctuation: String = """!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
 
   fun name(): String => "split"
   fun apply(d: String): Seq[WordCount val] =>
     let counts: Array[WordCount val] iso = recover Array[WordCount val] end
-    let stripped = _strip_punctuation(d)
-    for word in stripped.split(" ").values() do
-      counts.push(WordCount(word.lower(), 1))
+    for word in d.split(" ").values() do
+      counts.push(WordCount(_clean(word), 1))
     end
     consume counts
 
-  fun _strip_punctuation(s: String): String =>
+  fun _clean(s: String): String =>
     let clone: String iso = recover s.clone() end
-    for punc in punctuation.values() do
-      while true do
-        try
-          let idx = clone.find(punc)
-          clone.delete(idx)
-        else
-          break
-        end
-      end
-    end
-    consume clone
+    let punc = punctuation
+    recover clone.lower().strip(punc) end
 
-class Count is StateComputation[WordCount val, WordCount val, WordCountTotals]
+class GenerateCount is Computation[WordCount val, Count val]
   fun name(): String => "count"
-  fun ref apply(state: WordCountTotals, d: WordCount val): WordCount val =>
-    state(d)
+  fun apply(wc: WordCount val): Count val =>
+    Count(wc)
+
+class Count is StateComputation[WordCount val, WordCountTotals]
+  let _word_count: WordCount val
+
+  new val create(wc: WordCount val) =>
+    _word_count = wc
+
+  fun apply(state: WordCountTotals, output: MessageTarget[WordCount val] val)
+    : WordCountTotals =>
+    output(state(_word_count))
+    state
 
 class WordCount
   let word: String
@@ -87,4 +91,4 @@ class P
 
 class S
   fun apply(input: WordCount val): String =>
-    input.word + ":" + input.count.string()
+    input.word + "," + input.count.string()

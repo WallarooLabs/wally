@@ -30,10 +30,6 @@ the [Buffy library doc](../lib/buffy/README.md).
 `to_partition[Next: Any val](c: ComputationBuilder[Last, Next] val, p_fun: PartitionFunction[Last] val, id: U64 = 0)`
   specifies a step that uses the supplied partition function to create partitions.
 
-`to_stateful_partition[Next: Any val, State: Any #read](sc: StateComputationBuilder[Last, Next, State] val, si: {(): State} val, pf: PartitionFunction[Last] val, id: U64 = 0)`
-  same as `to_partition`, except you specify a `StateComputationBuilder` and
-  state initializer to enable stateful partitions.
-
 `build(): Topology ?`
   returns a Topology with the current in progress pipeline set.
 
@@ -118,8 +114,6 @@ class Double is Computation[U64, U64]
 
 class Mod4Partition is PartitionFunction[U64]
   fun apply(input: U64): U64 =>
-    @printf[String](("Chose partition " + (input % 4).string()
-      + " for input " + input.string() + "\n").cstring())
     input % 4
 ```
 

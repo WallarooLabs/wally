@@ -8,7 +8,7 @@ use "buffy/topology"
 actor Main
   new create(env: Env) =>
     try
-      let topology: Topology val = recover val
+      let topology = recover val
         Topology
           .new_pipeline[U64, U64](P, S, recover [0] end)
           .to[U64](lambda(): Computation[U64, U64] iso^ => Double end)
@@ -30,10 +30,10 @@ class Halve is Computation[U64, U64]
   fun apply(d: U64): U64 =>
     d / 2
 
-class P
+primitive P
   fun apply(s: String): U64 ? =>
     s.u64()
 
-class S
+primitive S
   fun apply(input: U64): String =>
     input.string()

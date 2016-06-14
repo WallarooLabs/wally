@@ -29,9 +29,6 @@ actor Coordinator
   let _spike_config: SpikeConfig val
   let _metrics_collector: MetricsCollector
   let _is_worker: Bool
-  // TODO: Remove this hack field when race condition
-  // around reconnect acking is fixed
-  var _stall: U64 = 0
 
   new create(name: String, env: Env, auth: AmbientAuth, leader_control_host: String,
     leader_control_service: String, leader_data_host: String,
@@ -55,8 +52,7 @@ actor Coordinator
       _data_addrs("leader") = (_leader_data_host, _leader_data_service)
 
       let control_notifier: TCPConnectionNotify iso =
-        WorkerConnectNotify(_env, _auth, _node_name, _leader_control_host,
-          _leader_control_service, this, metrics_collector)
+        ControlConnectNotify(_env, _auth, _node_name, this, metrics_collector)
       let control_conn: TCPConnection =
         TCPConnection(_auth, consume control_notifier, _leader_control_host,
           _leader_control_service)
@@ -85,13 +81,14 @@ actor Coordinator
       for (connector, conn) in _control_connections.pairs() do
         for (target, addr) in _control_addrs.pairs() do
           if connector != target then
-            let msg = WireMsgEncoder.identify_control(target, addr._1, addr._2, _auth)
+            let msg = WireMsgEncoder.add_control(target, addr._1, addr._2,
+             _auth)
             conn.write(msg)
           end
         end
         for (target, addr) in _data_addrs.pairs() do
           if connector != target then
-            let msg = WireMsgEncoder.identify_data(target, addr._1, addr._2, _auth)
+            let msg = WireMsgEncoder.add_data(target, addr._1, addr._2, _auth)
             conn.write(msg)
           end
         end
@@ -99,17 +96,19 @@ actor Coordinator
       end
     end
 
-  be identify_data_channel(host: String, service: String) =>
+  be identify_data_channel(service: String) =>
     try
-      let message = WireMsgEncoder.identify_data(_node_name, host, service, _auth)
+      let message = WireMsgEncoder.identify_data_port(_node_name, service,
+        _auth)
       _control_connections("leader").write(message)
     else
       _env.out.print("Coordinator: control connection to leader was not set up")
     end
 
-  be identify_control_channel(host: String, service: String) =>
+  be identify_control_channel(service: String) =>
     try
-      let message = WireMsgEncoder.identify_control(_node_name, host, service, _auth)
+      let message = WireMsgEncoder.identify_control_port(_node_name, service,
+        _auth)
       _control_connections("leader").write(message)
     else
       _env.out.print("Coordinator: control connection to leader was not set up")
@@ -129,6 +128,17 @@ actor Coordinator
       _control_connections(target_name).write(ack_msg)
     end
 
+  be process_finished_connections_ack() =>
+    match _topology_manager
+    | let t: TopologyManager =>
+      t.ack_finished_connections()
+    end
+      
+  be process_initialized_msg_ack() =>
+    match _topology_manager
+    | let t: TopologyManager =>
+      t.ack_initialized()
+    end
 
   ////////////
   // TOPOLOGY
@@ -138,6 +148,11 @@ actor Coordinator
 
   be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
     _step_manager.add_step(step_id, step_builder)
+
+  be add_state_step(step_id: U64, ssb: BasicStateStepBuilder val,
+    shared_state_step_id: U64, shared_state_step_node: String) =>
+    _step_manager.add_state_step(step_id, ssb, shared_state_step_id,
+      shared_state_step_node, this)
 
   be add_proxy(p_step_id: U64, p_target_id: U64, target_node_name: String) =>
     _step_manager.add_proxy(p_step_id, p_target_id, target_node_name, this)
@@ -161,13 +176,30 @@ actor Coordinator
 
   be add_phone_home_connection(conn: TCPConnection) =>
     _phone_home_connection = conn
+    if not _is_worker then
+      let message = ExternalMsgEncoder.ready(_node_name)
+      send_phone_home_message(message)
+    end
+
+  be assign_topology_control_conn(name: String, host: String, service: String) 
+  =>
+    match _topology_manager
+    | let t: TopologyManager =>
+      t.assign_control_conn(name, host, service)
+    end
+
+  be assign_topology_data_conn(name: String, host: String, service: String) 
+  =>
+    match _topology_manager
+    | let t: TopologyManager =>
+      t.assign_data_conn(name, host, service)
+    end
 
   be establish_control_connection(target_name: String, target_host: String,
     target_service: String) =>
     _control_addrs(target_name) = (target_host, target_service)
     let notifier: TCPConnectionNotify iso =
-      WorkerConnectNotify(_env, _auth, _node_name, target_host,
-        target_service, this, _metrics_collector)
+      ControlConnectNotify(_env, _auth, _node_name, this, _metrics_collector)
     let conn: TCPConnection =
       TCPConnection(_auth, consume notifier, target_host,
         target_service)
@@ -321,14 +353,6 @@ actor Coordinator
   // SHUTDOWN
   ////////////
   be shutdown() =>
-    match _topology_manager
-    | let t: TopologyManager =>
-      t.shutdown()
-    else
-      finish_shutdown()
-    end
-
-  be finish_shutdown() =>
     try
       let shutdown_msg = WireMsgEncoder.shutdown(_node_name, _auth)
 
@@ -344,9 +368,13 @@ actor Coordinator
         sender.write(shutdown_msg)
         sender.dispose()
       end
+      for (key, receiver) in _data_connection_receivers.pairs() do
+        receiver.dispose()
+      end
       for c in _connections.values() do
         c.dispose()
       end
+
 
       match _phone_home_connection
       | let phc: TCPConnection =>
