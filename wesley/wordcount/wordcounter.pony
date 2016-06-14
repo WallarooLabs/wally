@@ -64,10 +64,10 @@ class WordCounter is Equatable[WordCounter]
       update(word, count)
     end
 
-  fun ref update(key': String, count': U64): (U64|None) =>
+  fun ref update(key': String, value: U64): (U64|None) =>
     let key = clean(key')
     if key == "" then return None end
-    counts(key) = count'
+    counts(key) = value
 
   fun get(key: String): (U64|None) =>
     try
