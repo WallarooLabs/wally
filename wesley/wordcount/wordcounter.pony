@@ -1,6 +1,7 @@
+use ".."
 use "collections"
 
-class WordCounter is Equatable[WordCounter]
+class WordCounter is CanonicalForm
   let counts: Map[String, U64] = Map[String,U64]()
   let _punctuation: String = """ !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
 
@@ -10,25 +11,23 @@ class WordCounter is Equatable[WordCounter]
   new create_from_map(map': Map[String, U64]) =>
     load_from_map(map')
 
-  fun eq(that: box->WordCounter): Bool =>
-    // We want to terminate early, so 
-    // 1. check size
-    if counts.size() != that.counts.size() then return false end
-    // 2. iterate through keys
-    for (key, count) in counts.pairs() do
-      match that.get(key)
-      | let count': U64 => 
-        if count == count' 
-				then continue 
-				else 
-					return false 
-				end
-      else
-        return false
+  fun compare(that: CanonicalForm): MatchStatus val =>
+    match that
+    | let wc: WordCounter =>
+      if counts.size() != wc.counts.size() then return ResultsDoNotMatch end
+      for (key, count) in counts.pairs() do
+        try
+          if count != wc(key) then
+  					return ResultsDoNotMatch
+  				end
+        else
+          return ResultsDoNotMatch
+        end
       end
+      ResultsMatch
+    else
+      ResultsDoNotMatch
     end
-    // They match!
-    true
 
   fun ref load_from_map(map': Map[String, U64]) =>
     for (key, count) in map'.pairs() do
@@ -52,7 +51,7 @@ class WordCounter is Equatable[WordCounter]
 
   fun ref _increment_word(word': String) =>
     let word = clean(word')
-    if word == "" then return None end
+    if word == "" then return end
     try
       counts(word) = counts(word) + 1
     else
@@ -64,17 +63,13 @@ class WordCounter is Equatable[WordCounter]
       update(word, count)
     end
 
-  fun ref update(key': String, value: U64): (U64|None) =>
+  fun ref update(key': String, value: U64) =>
     let key = clean(key')
-    if key == "" then return None end
+    if key == "" then return end
     counts(key) = value
 
-  fun get(key: String): (U64|None) =>
-    try
-      counts(key)
-    else
-      None
-    end
+  fun apply(key: String): U64 ? =>
+    counts(key)
 
   fun string(): String =>
     """Return the string representation of the map"""

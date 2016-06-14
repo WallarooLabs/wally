@@ -137,4 +137,4 @@ class TradeParser is Parser[FixOrderMessage val]
 
 class ResultStringify
   fun apply(input: TradeResult val): String =>
-    input.symbol + ":" + input.is_rejected.string()
+    input.symbol + "," + input.is_rejected.string()
