@@ -32,7 +32,7 @@ actor Startup
 
     options
       .add("leader", "l", None)
-      .add("metrics-receiver", "", None)
+      .add("metrics-receiver", "m", None)
       .add("worker_count", "w", I64Argument)
       .add("phone_home", "p", StringArgument)
       .add("name", "n", StringArgument)
@@ -200,7 +200,8 @@ actor Startup
         """
         PARAMETERS:
         -----------------------------------------------------------------------------------
-        -l [Sets process as leader]
+        -l/--leader [Sets process as leader]
+        -m/--metrics-receiver [Sets process as metrics-receiver]
         -w <count> [Tells the leader how many workers to wait for]
         -n <node_name> [Sets the name for the process in the Buffy cluster]
         -p <address> [Sets the address for phone home]

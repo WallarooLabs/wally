@@ -21,7 +21,7 @@ actor Receiver
     try
       var options = Options(env)
       options
-        .add("metrics-receiver", "", None)
+        .add("metrics-receiver", "m", None)
         .add("listen", "l", StringArgument)
         .add("monitor", "m", StringArgument)
         .add("name", "n", StringArgument)
