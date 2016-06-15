@@ -1,128 +1,85 @@
 use ".."
 
+actor Main
+  new create(env: Env) =>
+    VerifierCLI[WordcountSentMessage val, WordcountReceivedMessage val]
+      .run(env, WordcountResultMapper, WordcountSentParser, 
+        WordcountReceivedParser)
+
 class WordcountSentMessage is SentMessage
   let ts: U64
   let text: String
 
-  new create(ts': U64, text':String) =>
+  new val create(ts': U64, text':String) =>
     ts = ts'
     text = text'
 
   fun string(): String =>
-    String().append("(").append(ts.string()).append(", ").append(text)
-            .append(")").clone()
+    "(" + ts.string() + ", " + text + ")"
 
-class WordcountReceivedMessage is (ReceivedMessage &  
-                                   Equatable[WordcountReceivedMessage])
+class WordcountReceivedMessage is ReceivedMessage
   let ts: U64
   let word: String
   let count: U64
 
-  new create(ts': U64, word': String, count': U64) =>
+  new val create(ts': U64, word': String, count': U64) =>
     ts = ts'
     word = word'
     count = count'
 
-  fun eq(that: WordcountReceivedMessage box): Bool =>
-    (this.word == that.word) and (this.count == that.count)
-
   fun string(): String =>
-    String().append("(").append(ts.string()).append(", ").append(word)
-            .append(": ").append(count.string()).append(")").clone()
+    "(" + ts.string() + ", " + word + ": " + count.string() + ")"
 
-class WordcountSentMessages is SentMessages
-  let wc: WordCounter = WordCounter
-  
-  new create() =>
-    this
+class WordcountSentParser is SentParser[WordcountSentMessage val]
+  let _messages: Array[WordcountSentMessage val] = 
+    Array[WordcountSentMessage val]
 
-  new from(messages': Array[WordcountSentMessage] ref) =>
-     for m in messages'.values() do
-       wc.update_from_string(m.text)
-     end
+  fun fn(): USize => 2
 
-  fun ref string(): String =>
-    var acc = String()
-    for (word, count) in wc.counts.pairs() do
-      acc.append(", ").append(word).append(":").append(count.string())
-    end
-    acc.clone()
-
-class WordcountReceivedMessages is ReceivedMessages
-  let wc: WordCounter = WordCounter
-
-  new create() =>
-    this
-
-  new from(messages: Array[WordcountReceivedMessage] ref) =>
-    for m in messages.values() do
-      wc.update(m.word, m.count)
-    end
-  
-  new from_wordcounter(wordcounter: WordCounter) =>
-    let m = wordcounter.counts.clone()
-    wc.load_from_map(m)
-
-  fun _size(): USize => 
-    wc.counts.size()
-
-  fun compare(that: ReceivedMessages): MatchStatus val =>
-    try
-      let that' = (that as WordcountReceivedMessages)
-      if wc == that'.wc
-        then ResultsMatch
-        else ResultsDoNotMatch
-      end
-    else
-      ResultsDoNotMatch
-    end
-
-  fun ref string(): String =>
-    var acc = String()
-    for (word, count) in wc.counts.pairs() do
-      acc.append(", ").append(word).append(":").append(count.string())
-    end
-    acc.clone()
-
-
-class WordcountSentVisitor is SentVisitor
-  let _values: Array[WordcountSentMessage] ref = Array[WordcountSentMessage]()
-	fun fn(): USize => 2
-
-  fun ref apply(value: Array[String] ref): None ? =>
+  fun ref apply(value: Array[String] ref) ? =>
     let timestamp = value(0).clone().strip().u64()
-    let text = value(1).clone()
-    _values.push(WordcountSentMessage(timestamp, consume text))
+    let text = value(1)
+    _messages.push(WordcountSentMessage(timestamp, text))
 
-  fun ref build_sent_messages(): SentMessages =>
-    WordcountSentMessages.from(_values)
+  fun ref sent_messages(): Array[WordcountSentMessage val] =>
+    _messages
 
+class WordcountReceivedParser is ReceivedParser[WordcountReceivedMessage val]
+  let _messages: Array[WordcountReceivedMessage val] =
+    Array[WordcountReceivedMessage val]
 
-class WordcountReceivedVisitor is ReceivedVisitor
-  let _values: Array[WordcountReceivedMessage] ref =
-    Array[WordcountReceivedMessage]()
-
-  fun ref apply(value: Array[String] ref): None ? =>
+  fun ref apply(value: Array[String] ref) ? =>
     let timestamp = value(0).clone().strip().u64()
-    let word = value(1).clone()
+    let word = value(1)
     let count = value(2).clone().strip().u64()
-    _values.push(WordcountReceivedMessage(timestamp, consume word, count))
+    _messages.push(WordcountReceivedMessage(timestamp, consume word, count))
 
-  fun ref build_received_messages(): ReceivedMessages =>
-    WordcountReceivedMessages.from(_values)
+  fun ref received_messages(): Array[WordcountReceivedMessage val] =>
+    _messages
 
+class WordcountResultMapper is ResultMapper[WordcountSentMessage val,
+  WordcountReceivedMessage val]
 
-class WordcountResultMapper is ResultMapper
-  fun f(sent_messages: SentMessages): ReceivedMessages =>
-    try
-      WordcountReceivedMessages.from_wordcounter((sent_messages 
-                                                  as WordcountSentMessages).wc)
-    else
-      WordcountReceivedMessages
+  fun sent_transform(sent: Array[WordcountSentMessage val]): 
+    CanonicalForm =>
+    var wc = WordCounter 
+
+    for m in sent.values() do
+      wc.update_from_string(m.text)
     end
+    wc
 
+  fun received_transform(received: Array[WordcountReceivedMessage val]): 
+    CanonicalForm =>
+    var wc = WordCounter 
 
-actor Main
-  new create(env: Env) =>
-    VerifierCLI.run(env, WordcountResultMapper, WordcountSentVisitor, 
-                    WordcountReceivedVisitor)
+    for m in received.values() do
+      try 
+        if wc(m.word) < m.count then
+          wc(m.word) = m.count
+        end
+      else
+        wc(m.word) = m.count
+      end
+    end
+    wc

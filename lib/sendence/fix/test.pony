@@ -16,7 +16,7 @@ class _TestFixTradeParsing is UnitTest
     + "55=TSLA\x0160=20151204-14:30:00.000\x01107=Tesla Motors\x01"
     + "10=108\x01"
 
-  let expected: FixOrderMessage =
+  let expected: FixOrderMessage val =
     FixOrderMessage(
       Buy
       , "CLIENT35"
@@ -31,8 +31,8 @@ class _TestFixTradeParsing is UnitTest
 
   fun apply(h: TestHelper) =>
     let p = FixParser
-    match p.parse(input)
-      | let parsed: FixOrderMessage =>
+    match p(input)
+      | let parsed: FixOrderMessage val =>
         h.assert_eq[FixOrderMessage box](expected, parsed)
     else
       h.fail("Incorrect message type")
@@ -44,15 +44,15 @@ class _TestFixNbboParsing is UnitTest
     + "60=20151204-14:30:00.000\x01117=S\x01132=16.40\x01133=16.60"
     + "\x0110=098\x01"
 
-  let expected: FixNbboMessage =
+  let expected: FixNbboMessage val =
     FixNbboMessage("TSLA", "20151204-14:30:00.000", 16.40, 16.60)
 
   fun name(): String => "fix/nbbo-parsing"
 
   fun apply(h: TestHelper) =>
     let p = FixParser
-    match p.parse(input)
-      | let parsed: FixNbboMessage =>
+    match p(input)
+      | let parsed: FixNbboMessage val =>
         h.assert_eq[FixNbboMessage box](expected, parsed)
     else
       h.fail("Incorrect message type")

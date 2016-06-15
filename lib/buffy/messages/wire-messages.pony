@@ -1,8 +1,6 @@
-use "osc-pony"
 use "sendence/bytes"
 use "buffy/topology"
 use "serialise"
-use "time"
 
 primitive WireMsgEncoder
   fun _serialise(msg: WireMsg val, auth: AmbientAuth): Array[U8] val ? =>
@@ -16,13 +14,21 @@ primitive WireMsgEncoder
   fun topology_ready(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
     _serialise(TopologyReadyMsg(node_name), auth)
 
-  fun identify_control(node_name: String, host: String, service: String,
+  fun identify_control_port(node_name: String, service: String,
     auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(IdentifyControlMsg(node_name, host, service), auth)
+    _serialise(IdentifyControlPortMsg(node_name, service), auth)
 
-  fun identify_data(node_name: String, host: String, service: String,
+  fun identify_data_port(node_name: String, service: String,
     auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(IdentifyDataMsg(node_name, host, service), auth)
+    _serialise(IdentifyDataPortMsg(node_name, service), auth)
+
+  fun add_control(node_name: String, host: String, service: String,
+    auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(AddControlMsg(node_name, host, service), auth)
+
+  fun add_data(node_name: String, host: String, service: String,
+    auth: AmbientAuth): Array[U8] val ? =>
+    _serialise(AddDataMsg(node_name, host, service), auth)
 
   fun done(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
     _serialise(DoneMsg(node_name), auth)
@@ -42,6 +48,12 @@ primitive WireMsgEncoder
   fun spin_up(step_id: U64, step_builder: BasicStepBuilder val, auth: AmbientAuth)
     : Array[U8] val ? =>
     _serialise(SpinUpMsg(step_id, step_builder), auth)
+
+  fun spin_up_state_step(step_id: U64, step_builder: BasicStateStepBuilder val,
+    shared_state_step_id: U64, shared_state_step_node: String, auth: AmbientAuth)
+    : Array[U8] val ? =>
+    _serialise(SpinUpStateStepMsg(step_id, step_builder, shared_state_step_id,
+      shared_state_step_node), auth)
 
   fun spin_up_proxy(proxy_id: U64, step_id: U64, target_node_name: String
     , auth: AmbientAuth): Array[U8] val ? =>
@@ -124,26 +136,42 @@ class TopologyReadyMsg is WireMsg
   new val create(name: String) =>
     node_name = name
 
-class IdentifyControlMsg is WireMsg
+class IdentifyControlPortMsg is WireMsg
   let node_name: String
-  let host: String
   let service: String
 
-  new val create(name: String, h: String, s: String) =>
+  new val create(name: String, s: String) =>
     node_name = name
-    host = h
     service = s
 
-class IdentifyDataMsg is WireMsg
+class IdentifyDataPortMsg is WireMsg
   let node_name: String
-  let host: String
   let service: String
 
-  new val create(name: String, h: String, s: String) =>
+  new val create(name: String, s: String) =>
     node_name = name
-    host = h
     service = s
     
+class AddControlMsg is WireMsg
+  let node_name: String
+  let host: String
+  let service: String
+
+  new val create(name: String, h: String, s: String) =>
+    node_name = name
+    host = h
+    service = s
+
+class AddDataMsg is WireMsg
+  let node_name: String
+  let host: String
+  let service: String
+
+  new val create(name: String, h: String, s: String) =>
+    node_name = name
+    host = h
+    service = s
+
 class DoneMsg is WireMsg
   let node_name: String
 
@@ -177,6 +205,19 @@ class SpinUpMsg is WireMsg
   new val create(s_id: U64, s_builder: BasicStepBuilder val) =>
     step_id = s_id
     step_builder = s_builder
+
+class SpinUpStateStepMsg is WireMsg
+  let step_id: U64
+  let step_builder: BasicStateStepBuilder val
+  let shared_state_step_id: U64
+  let shared_state_step_node: String
+
+  new val create(s_id: U64, s_builder: BasicStateStepBuilder val,
+    sss_id: U64, sss_node: String) =>
+    step_id = s_id
+    step_builder = s_builder
+    shared_state_step_id = sss_id
+    shared_state_step_node = sss_node
 
 class SpinUpProxyMsg is WireMsg
   let proxy_id: U64

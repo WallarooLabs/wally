@@ -135,7 +135,7 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-receiver build-sender build-wesley build-double-divide build-dagon build-avg-of-avgs build-quadruple build-state-avg-of-avgs build-dagon-child ## Build Pony based programs for Buffy
+build: build-receiver build-sender build-wesley build-double-divide build-dagon build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count build-dagon-child ## Build Pony based programs for Buffy
 
 build-receiver: ## Build giles receiver
 	$(call PONYC,giles/receiver)
@@ -149,11 +149,17 @@ build-double-divide: ## build double/divide app
 build-avg-of-avgs: ## build average of averages app
 	$(call PONYC,apps/avg-of-avgs)
 
+build-state-avg-of-avgs: ## build shared state average of averages app
+	$(call PONYC,apps/state-avg-of-avgs)
+
 build-quadruple: ## build quadruple app
 	$(call PONYC,apps/quadruple)
 
-build-state-avg-of-avgs: ## build state average of averages app
-	$(call PONYC,apps/state-avg-of-avgs)
+build-market-spread: ## build market spread app
+	$(call PONYC,apps/market-spread)
+
+build-word-count: ## build word count app
+	$(call PONYC,apps/word-count)
 
 build-dagon: ## build dagon
 	$(call PONYC,dagon)
@@ -164,8 +170,9 @@ build-dagon-child: ## build dagon-child
 build-wesley: ## Build wesley
 	$(call PONYC,wesley/double)
 	$(call PONYC,wesley/identity)
+	$(call PONYC,wesley/wordcount)
 
-test: test-double-divide test-avg-of-avgs test-quadruple test-state-avg-of-avgs test-giles-receiver test-giles-sender ## Test programs for Buffy
+test: test-double-divide test-avg-of-avgs test-state-avg-of-avgs test-quadruple test-market-spread test-word-count test-giles-receiver test-giles-sender ## Test programs for Buffy
 
 test-double-divide: ## Test Double-Divide app
 	cd apps/double-divide && ./double-divide
@@ -173,11 +180,17 @@ test-double-divide: ## Test Double-Divide app
 test-avg-of-avgs: ## Test avg-of-avgs app
 	cd apps/avg-of-avgs && ./avg-of-avgs
 
+test-state-avg-of-avgs: ## Test state-avg-of-avgs app
+	cd apps/state-avg-of-avgs && ./state-avg-of-avgs
+
 test-quadruple: ## Test quadruple app
 	cd apps/quadruple && ./quadruple
 
-test-state-avg-of-avgs: ## Test state-avg-of-avgs app
-	cd apps/state-avg-of-avgs && ./state-avg-of-avgs
+test-market-spread: ## Test market-spread app
+	cd apps/market-spread && ./market-spread
+
+test-word-count: ## Test word-count app
+	cd apps/word-count && ./word-count
 
 test-giles-receiver: ## Test Giles Receiver
 	cd giles/receiver && ./receiver
@@ -199,6 +212,10 @@ dagon-identity: ## Run identity test with dagon
 dagon-identity-drop: ## Run identity test with dagon
 	./dagon/dagon --timeout=5 -f apps/double-divide/double-divide-drop.ini -h 127.0.0.1:8080
 	./wesley/identity/identity ./sent.txt ./received.txt match
+
+dagon-word-count: ## Run word count test with dagon
+	./dagon/dagon --timeout=5 -f apps/word-count/word-count.ini -h 127.0.0.1:8080
+	./wesley/wordcount/wordcount ./sent.txt ./received.txt match
 
 dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
 
@@ -289,14 +306,20 @@ build-docker:  ## Build docker images for Buffy
           $(docker_image_repo)/avg-of-avgs.$(arch):$(docker_image_version) \
           apps/avg-of-avgs
 	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/state-avg-of-avgs.$(arch):$(docker_image_version) \
+          apps/state-avg-of-avgs
+	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/double-divide.$(arch):$(docker_image_version) \
           apps/double-divide
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/quadruple.$(arch):$(docker_image_version) \
           apps/quadruple
 	docker $(docker_host_arg) build -t \
-          $(docker_image_repo)/state-avg-of-avgs.$(arch):$(docker_image_version) \
-          apps/state-avg-of-avgs
+          $(docker_image_repo)/market-spread.$(arch):$(docker_image_version) \
+          apps/market-spread
+	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/word-count.$(arch):$(docker_image_version) \
+          apps/word-count
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/dagon-child.$(arch):$(docker_image_version) \
           dagon/dagon-child
@@ -315,11 +338,15 @@ push-docker: build-docker ## Push docker images for Buffy to repository
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/avg-of-avgs.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
+          $(docker_image_repo)/state-avg-of-avgs.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
           $(docker_image_repo)/double-divide.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/quadruple.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
-          $(docker_image_repo)/state-avg-of-avgs.$(arch):$(docker_image_version)
+          $(docker_image_repo)/market-spread.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+          $(docker_image_repo)/word-count.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/dagon-child.$(arch):$(docker_image_version)
 
@@ -354,9 +381,11 @@ clean: clean-docker ## Cleanup docker images, deps and compiled files for Buffy
 	rm -f lib/buffy/buffy lib/buffy/buffy.o
 	rm -f sent.txt received.txt
 	rm -f apps/avg-of-avgs/avg-of-avgs apps/avg-of-avgs/avg-of-avgs.o
+	rm -f apps/state-avg-of-avgs/state-avg-of-avgs apps/state-avg-of-avgs/state-avg-of-avgs.o
 	rm -f apps/double-divide/double-divide apps/double-divide/double-divide.o
 	rm -f apps/quadruple/quadruple apps/quadruple/quadruple.o
-	rm -f apps/state-avg-of-avgs/state-avg-of-avgs apps/state-avg-of-avgs/state-avg-of-avgs.o
+	rm -f apps/market-spread/market-spread apps/market-spread/market-spread.o
+	rm -f apps/word-count/word-count apps/word-count/word-count.o
 	rm -f dagon/dagon-child/dagon-child dagon/dagon-child/dagon-child.o
 	@echo 'Done cleaning.'
 

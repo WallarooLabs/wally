@@ -4,7 +4,7 @@ use "collections"
 // test just for getting correct parsing of fix
 
 primitive  FixParser
-  fun parse(i: String): (MessageType | None) =>
+  fun apply(i: String): (FixMessage val | None) =>
     try
       let raw = _parse(i)
       if (raw("35") == "S") then
@@ -23,13 +23,13 @@ primitive  FixParser
     let split = i.split("\x01")
       split.pop()
     for part in (consume split).values() do
-      @printf[I32]("part: %s\n".cstring(), part.cstring())
+//      @printf[I32]("part: %s\n".cstring(), part.cstring())
       let tuple = part.split("=")
       out(tuple(0)) = tuple(1)
     end
     out
 
-  fun _nbbo(i: Map[String, String]): FixNbboMessage ? =>
+  fun _nbbo(i: Map[String, String]): FixNbboMessage val  ? =>
     FixNbboMessage(
       i("55")
       , i("60")
@@ -37,7 +37,7 @@ primitive  FixParser
       , i("133").f64()
       )
 
-  fun _order(i: Map[String, String]): FixOrderMessage ? =>
+  fun _order(i: Map[String, String]): FixOrderMessage val ? =>
     let side = match i("54")
       | "1" => Buy
       | "2" => Sell
@@ -55,7 +55,7 @@ primitive  FixParser
       , i("60")
       )
 
-type MessageType is (FixNbboMessage | FixOrderMessage | OtherFixMessage)
+type FixMessage is (FixNbboMessage | FixOrderMessage | OtherFixMessage)
 
 class FixNbboMessage is (Equatable[FixNbboMessage] & Stringable)
   let _symbol: String
@@ -64,18 +64,24 @@ class FixNbboMessage is (Equatable[FixNbboMessage] & Stringable)
   let _offer_px: F64
   let _mid: F64
 
-  new create(
-    symbol: String
-    , transact_time: String
-    , bid_px: F64
-    , offer_px: F64
+  new val create(
+    symbol': String
+    , transact_time': String
+    , bid_px': F64
+    , offer_px': F64
     )
   =>
-    _symbol = symbol
-    _transact_time = transact_time
-    _bid_px = bid_px
-    _offer_px = offer_px
-    _mid = (bid_px + offer_px) / 2.0
+    _symbol = symbol'
+    _transact_time = transact_time'
+    _bid_px = bid_px'
+    _offer_px = offer_px'
+    _mid = (_bid_px + _offer_px) / 2.0
+
+  fun symbol(): String => _symbol
+  fun transact_time(): String => _transact_time
+  fun bid_px(): F64 => _bid_px
+  fun offer_px(): F64 => _offer_px
+  fun mid(): F64 => _mid
 
   fun eq(o: box->FixNbboMessage): Bool =>
     (_symbol == o._symbol)
@@ -96,23 +102,31 @@ class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
   let _price: F64
   let _transact_time: String
 
-  new create(
-    side: Side
-    , account: String
-    , order_id: String
-    , symbol: String
-    , order_qty: F64
-    , price: F64
-    , transact_time: String
+  new val create(
+    side': Side
+    , account': String
+    , order_id': String
+    , symbol': String
+    , order_qty': F64
+    , price': F64
+    , transact_time': String
     )
   =>
-    _side = side
-    _account = account
-    _order_id = order_id
-    _symbol = symbol
-    _order_qty = order_qty
-    _price = price
-    _transact_time = transact_time
+    _side = side'
+    _account = account'
+    _order_id = order_id'
+    _symbol = symbol'
+    _order_qty = order_qty'
+    _price = price'
+    _transact_time = transact_time'
+
+  fun side(): Side => _side
+  fun account(): String => _account
+  fun order_id(): String => _order_id
+  fun symbol(): String => _symbol
+  fun order_qty(): F64 => _order_qty
+  fun price(): F64 => _price
+  fun transact_time(): String => _transact_time
 
   fun eq(o: box->FixOrderMessage): Bool =>
     (_side is o._side)

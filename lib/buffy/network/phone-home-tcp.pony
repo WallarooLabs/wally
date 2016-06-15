@@ -4,16 +4,14 @@ use "sendence/bytes"
 
 class HomeConnectNotify is TCPConnectionNotify
   let _env: Env
-  let _auth: AmbientAuth
   let _name: String
   let _coordinator: Coordinator
   var _header: Bool = true
   var _has_connected: Bool = false
 
-  new iso create(env: Env, auth: AmbientAuth, name: String,
+  new iso create(env: Env, name: String,
     coordinator: Coordinator) =>
     _env = env
-    _auth = auth
     _name = name
     _coordinator = coordinator
 

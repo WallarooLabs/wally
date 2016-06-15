@@ -1,3 +1,67 @@
+class Verifier[S: SentMessage val, R: ReceivedMessage val]
+  let _sent_messages: Array[S]
+  let _received_messages: Array[R]
+  let _result_mapper: ResultMapper[S, R]
+  let _expected_match_result: MatchStatus val
+  
+  new create(sent_messages: Array[S], 
+    received_messages: Array[R], 
+    result_mapper: ResultMapper[S, R], 
+    expected_match_result: MatchStatus val) 
+  =>
+    _sent_messages = sent_messages
+    _received_messages = received_messages
+    _result_mapper = result_mapper
+    _expected_match_result = expected_match_result
+
+  fun ref test(): PassFail val =>
+    let expected = _result_mapper.sent_transform(_sent_messages)
+    let actual = _result_mapper.received_transform(_received_messages)
+    let actual_match_result = expected.compare(actual)
+    if _expected_match_result is actual_match_result then
+      Pass(_expected_match_result, actual_match_result)
+    else
+      Fail(_expected_match_result, actual_match_result)
+    end
+
+interface CanonicalForm
+  fun compare(that: CanonicalForm): MatchStatus val
+
+// For when you need an ordered list of results
+class ResultsList[V: Equatable[V] #read] is CanonicalForm
+  let results: Array[V] = Array[V]
+
+  fun ref add(r: V) => results.push(r)
+
+  fun compare(that: CanonicalForm): MatchStatus val =>
+    match that
+    | let rl: ResultsList[V] =>
+      if (results.size() == rl.results.size()) then
+        try
+          for (i, v) in results.pairs() do
+            if (v != rl.results(i)) then
+              return ResultsDoNotMatch
+            end
+          end
+        end
+        return ResultsMatch
+      else
+        ResultsDoNotMatch
+      end
+    else
+      ResultsDoNotMatch
+    end
+
+trait ResultMapper[S: SentMessage val, R: ReceivedMessage val]
+  fun sent_transform(sent: Array[S]): CanonicalForm
+  fun received_transform(received: Array[R]): CanonicalForm
+
+trait SentParser[S: SentMessage val] is MessageFileParser
+  fun ref sent_messages(): Array[S]
+
+trait ReceivedParser[R: ReceivedMessage val] is MessageFileParser
+  fun ref received_messages(): Array[R]
+
 interface MatchStatus
   fun expected(): String
   fun actual(): String
@@ -29,46 +93,4 @@ class Fail is PassFail
   fun exitcode(): I32 => 1
   fun exitmessage(): String =>
     _exitmessage
-
-interface ResultMapper
-  fun f(sent_messages: SentMessages): ReceivedMessages
-
-interface Message
-  fun string(): String
-
-interface Messages
-
-interface SentMessage is Message
-interface ReceivedMessage is Message
-
-interface SentMessages is Messages
-interface ReceivedMessages is Messages
-  fun compare(that: ReceivedMessages): MatchStatus val
-
-interface SentVisitor is CSVVisitor
-  fun ref build_sent_messages(): SentMessages
-
-interface ReceivedVisitor is CSVVisitor
-  fun ref build_received_messages(): ReceivedMessages
-
-class Verifier
-  let _sent_messages: SentMessages 
-  let _received_messages: ReceivedMessages
-  let _result_mapper: ResultMapper
-  let _expected_match_result: MatchStatus val
-  
-  new create(sent_messages: SentMessages, received_messages: ReceivedMessages, result_mapper: ResultMapper, expected_match_result: MatchStatus val) =>
-    _sent_messages = sent_messages
-    _received_messages = received_messages
-    _result_mapper = result_mapper
-    _expected_match_result = expected_match_result
-
-  fun ref test(): PassFail val =>
-    let expected_messages = _result_mapper.f(_sent_messages)
-    let actual_match_result = expected_messages.compare(_received_messages)
-    if _expected_match_result is actual_match_result then
-      Pass(_expected_match_result, actual_match_result)
-    else
-      Fail(_expected_match_result, actual_match_result)
-    end
     

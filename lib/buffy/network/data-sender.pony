@@ -1,13 +1,14 @@
 use "net"
 use "collections"
 use "buffy/messages"
+use "sendence/queue"
 
 actor DataSender
   let _sender_name: String
   let _target_name: String
   var _conn: TCPConnection
   let _auth: AmbientAuth
-  let _held: Queue[(U64, Array[U8] val)] = Queue[(U64, Array[U8] val)]
+  let _held: Queue[_TCPMsg] = Queue[_TCPMsg]
   var _sending: Bool = true
   var _msg_id: U64 = 1
 
@@ -21,7 +22,7 @@ actor DataSender
   be forward(f: Forward val) =>
     try
       let data_msg = WireMsgEncoder.data_channel(_msg_id, f, _auth)
-      _held.enqueue((_msg_id, data_msg))
+      _held.enqueue(_TCPMsg(_msg_id, data_msg))
       _msg_id = _msg_id + 1
       if _sending then
         _conn.write(data_msg)
@@ -45,7 +46,7 @@ actor DataSender
     var i: USize = 0
     while i < _held.size() do
       try
-        if _held.peek()._1 <= msg_id then
+        if _held.peek().msg_id <= msg_id then
           _held.dequeue()
           i = i + 1
         else
@@ -70,13 +71,21 @@ actor DataSender
     let size = _held.size()
     for idx in Range(0, size) do
       try
-        let next_msg = _held(idx)._2
+        let next_msg = _held(idx).data
         _conn.write(next_msg)
       else
-        @printf[None]("Couldn't resend!!\n".cstring())
+        @printf[I32]("Couldn't resend!!\n".cstring())
       end
     end
     _sending = true
 
   be dispose() =>
     _conn.dispose()
+
+class _TCPMsg
+  let msg_id: U64
+  let data: Array[U8] val
+
+  new create(m_id: U64, d: Array[U8] val) =>
+    msg_id = m_id
+    data = d

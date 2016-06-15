@@ -1,8 +1,7 @@
 use "ponytest"
 use "promises"
-use "sendence/bytes"
 
-actor TestMain is TestList
+actor Main is TestList
   new create(env: Env) => PonyTest(env, this)
 
   new make() => None
