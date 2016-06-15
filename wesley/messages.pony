@@ -1,6 +1,4 @@
 interface Message
-  fun string(): String
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^
 
-trait SentMessage is Message
 
-trait ReceivedMessage is Message

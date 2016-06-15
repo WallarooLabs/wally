@@ -171,6 +171,7 @@ build-wesley: ## Build wesley
 	$(call PONYC,wesley/double)
 	$(call PONYC,wesley/identity)
 	$(call PONYC,wesley/wordcount)
+	$(call PONYC,wesley/market-spread)
 
 test: test-double-divide test-avg-of-avgs test-state-avg-of-avgs test-quadruple test-market-spread test-word-count test-giles-receiver test-giles-sender ## Test programs for Buffy
 
@@ -198,7 +199,7 @@ test-giles-receiver: ## Test Giles Receiver
 test-giles-sender: ## Test Giles Sender
 	cd giles/sender && ./sender
 
-dagon-test: dagon-identity #dagon-identity-drop #dagon-double ## Run dagon tests
+dagon-test: dagon-identity dagon-identity-drop dagon-word-count dagon-market-spread #dagon-double ## Run dagon tests
 
 dagon-double: ## Run double test with dagon
 	dagon/dagon.py dagon/config/double.ini
@@ -216,6 +217,10 @@ dagon-identity-drop: ## Run identity test with dagon
 dagon-word-count: ## Run word count test with dagon
 	./dagon/dagon --timeout=5 -f apps/word-count/word-count.ini -h 127.0.0.1:8080
 	./wesley/wordcount/wordcount ./sent.txt ./received.txt match
+
+dagon-market-spread: ## Run market spread test with dagon
+	./dagon/dagon --timeout=5 -f apps/market-spread/market-spread.ini -h 127.0.0.1:8080
+	./wesley/market-spread/market-spread ./demos/marketspread/100nbbo.msg ./sent.txt ./received.txt match
 
 dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
 
@@ -378,6 +383,8 @@ clean: clean-docker ## Cleanup docker images, deps and compiled files for Buffy
 	rm -f dagon/dagon dagon/dagon.o
 	rm -f wesley/identity/identity wesley/identity/identity.o
 	rm -f wesley/double/double wesley/double/double.o
+	rm -f wesley/wordcount/wordcount wesley/wordcount/wordcount.o
+	rm -f wesley/market-spread/market-spread wesley/market-spread/market-spread.o
 	rm -f lib/buffy/buffy lib/buffy/buffy.o
 	rm -f sent.txt received.txt
 	rm -f apps/avg-of-avgs/avg-of-avgs apps/avg-of-avgs/avg-of-avgs.o

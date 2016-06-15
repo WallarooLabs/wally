@@ -6,7 +6,7 @@ actor Main
       .run(env, IdentityResultMapper, IdentitySentParser, 
         IdentityReceivedParser)
 
-class IdentitySentMessage is SentMessage
+class IdentitySentMessage
   let ts: U64
   let v: I64
 
@@ -14,10 +14,10 @@ class IdentitySentMessage is SentMessage
     ts = ts'
     v = v'
 
-  fun string(): String =>
-    "(" + ts.string() + ", " + v.string() + ")"
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+    ("(" + ts.string() + ", " + v.string() + ")").clone()
 
-class IdentityReceivedMessage is ReceivedMessage
+class IdentityReceivedMessage
   let ts: U64
   let v: I64
 
@@ -25,8 +25,8 @@ class IdentityReceivedMessage is ReceivedMessage
     ts = ts'
     v = v'
 
-  fun string(): String =>
-    "(" + ts.string() + ", " + v.string() + ")"
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+    ("(" + ts.string() + ", " + v.string() + ")").clone()
 
 class IdentitySentParser is SentParser[IdentitySentMessage val]
   let _messages: Array[IdentitySentMessage val] = 

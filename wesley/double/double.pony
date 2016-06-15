@@ -5,7 +5,7 @@ actor Main
     VerifierCLI[DoubleSentMessage val, DoubleReceivedMessage val]
       .run(env, DoubleResultMapper, DoubleSentParser, DoubleReceivedParser)
 
-class DoubleSentMessage is SentMessage
+class DoubleSentMessage
   let ts: U64
   let v: I64
 
@@ -13,10 +13,10 @@ class DoubleSentMessage is SentMessage
     ts = ts'
     v = v'
 
-  fun string(): String =>
-    "(" + ts.string() + ", " + v.string() + ")"
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+    ("(" + ts.string() + ", " + v.string() + ")").clone()
 
-class DoubleReceivedMessage is ReceivedMessage
+class DoubleReceivedMessage
   let ts: U64
   let v: I64
 
@@ -24,8 +24,8 @@ class DoubleReceivedMessage is ReceivedMessage
     ts = ts'
     v = v'
 
-  fun string(): String =>
-    "(" + ts.string() + ", " + v.string() + ")"
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+    ("(" + ts.string() + ", " + v.string() + ")").clone()
 
 class DoubleSentParser is SentParser[DoubleSentMessage val]
   let _messages: Array[DoubleSentMessage val] = 
