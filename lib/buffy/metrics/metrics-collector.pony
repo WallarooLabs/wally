@@ -1,5 +1,3 @@
-use "debug"
-
 use "collections"
 use "net"
 use "buffy/messages"
@@ -54,8 +52,7 @@ actor MetricsCollector is FlushingActor
       let summary = _step_summary =
         recover trn NodeMetricsSummary(node_name) end
       let s:NodeMetricsSummary val = consume summary
-// TODO: uncomment this when done debugging boundarymetricssummary
-//      _send_step_metrics_to_receiver(s)
+      _send_step_metrics_to_receiver(s)
       _node_last_sent = Epoch.nanoseconds()
 
   fun ref _send_step_metrics_to_receiver(summary: NodeMetricsSummary val) =>

@@ -3,7 +3,6 @@ use "collections"
 use "promises"
 use "buffy/messages"
 use "sendence/bytes"
-use "debug"
 
 actor Main is TestList
   new create(env: Env) =>
