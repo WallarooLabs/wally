@@ -63,7 +63,7 @@ class MarketSpreadReceivedParser is
 
   fun ref apply(value: Array[String] ref) ? =>
     let timestamp = value(0).clone().strip().u64()
-    let symbol = value(1)
+    let symbol: String val = value(1).clone().strip().clone()
     let is_rejected = 
       match value(2)
       | "true" => true

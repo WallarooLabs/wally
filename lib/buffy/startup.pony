@@ -149,7 +149,7 @@ actor Startup
         // Set up leader listeners
         let control_notifier: TCPListenNotify iso =
           ControlNotifier(env, auth, node_name, coordinator,
-          metrics_collector)
+          metrics_collector, false)
         coordinator.add_listener(TCPListener(auth, consume control_notifier,
           leader_control_host, leader_control_service))
         let data_notifier: TCPListenNotify iso =
