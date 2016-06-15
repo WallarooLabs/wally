@@ -6,7 +6,7 @@ actor Main
       .run(env, WordcountResultMapper, WordcountSentParser, 
         WordcountReceivedParser)
 
-class WordcountSentMessage is SentMessage
+class WordcountSentMessage
   let ts: U64
   let text: String
 
@@ -14,10 +14,10 @@ class WordcountSentMessage is SentMessage
     ts = ts'
     text = text'
 
-  fun string(): String =>
-    "(" + ts.string() + ", " + text + ")"
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+    ("(" + ts.string() + ", " + text + ")").clone()
 
-class WordcountReceivedMessage is ReceivedMessage
+class WordcountReceivedMessage
   let ts: U64
   let word: String
   let count: U64
@@ -27,8 +27,8 @@ class WordcountReceivedMessage is ReceivedMessage
     word = word'
     count = count'
 
-  fun string(): String =>
-    "(" + ts.string() + ", " + word + ": " + count.string() + ")"
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+    ("(" + ts.string() + ", " + word + ": " + count.string() + ")").clone()
 
 class WordcountSentParser is SentParser[WordcountSentMessage val]
   let _messages: Array[WordcountSentMessage val] = 

@@ -1,9 +1,9 @@
 interface MessageFileParser
 """
-The MessageFileParser interface provides default methods for splitting a block of input
-text into an array of Strings, which can overridden by a subclass.
+The MessageFileParser interface provides default methods for splitting a block 
+of input text into an array of Strings, which can overridden by a subclass.
 """
-  fun ref apply(values: Array[String] ref): None ?
+  fun ref apply(values: Array[String] ref) ?
 
   fun ls(): (String|None) =>
   """
