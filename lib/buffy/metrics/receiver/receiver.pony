@@ -1,4 +1,3 @@
-use "debug"
 use "net"
 use "collections"
 use "buffy"
@@ -10,95 +9,91 @@ use "options"
 use "time"
 
 
-actor Main
+actor Receiver
   new create(env: Env) =>
     var required_args_are_present = true
-    var run_tests = env.args.size() == 1
 
-    if run_tests then
-      TestMain(env)
-    else
-      var listen_addr_arg: (Array[String] | None) = None
-      var monhub_addr_arg: (Array[String] | None) = None
-      var name_arg: (String | None) = None
-      var delay_arg: (U64 | None) = None
+    var listen_addr_arg: (Array[String] | None) = None
+    var monhub_addr_arg: (Array[String] | None) = None
+    var name_arg: (String | None) = None
+    var delay_arg: (U64 | None) = None
 
-      try
-        var options = Options(env)
-        options
-          .add("listen", "l", StringArgument)
-          .add("monitor", "m", StringArgument)
-          .add("name", "n", StringArgument)
-          .add("delay", "d", F64Argument)
+    try
+      var options = Options(env)
+      options
+        .add("metrics-receiver", "", None)
+        .add("listen", "l", StringArgument)
+        .add("monitor", "m", StringArgument)
+        .add("name", "n", StringArgument)
+        .add("delay", "d", F64Argument)
 
-        for option in options do
-          match option
-          | ("listen", let arg: String) => listen_addr_arg = arg.split(":")
-          | ("monitor", let arg: String) => monhub_addr_arg = arg.split(":")
-          | ("name", let arg: String) => name_arg = arg
-          | ("delay", let arg: F64) => delay_arg = (arg*1_000_000_000).u64()
-          end
+      for option in options do
+        match option
+        | ("listen", let arg: String) => listen_addr_arg = arg.split(":")
+        | ("monitor", let arg: String) => monhub_addr_arg = arg.split(":")
+        | ("name", let arg: String) => name_arg = arg
+        | ("delay", let arg: F64) => delay_arg = (arg*1_000_000_000).u64()
         end
+      end
 
-        if listen_addr_arg is None then
-          env.err.print("Must supply required '--listen' argument")
+      if listen_addr_arg is None then
+        env.err.print("Must supply required '--listen' argument")
+        required_args_are_present = false
+      else
+        if (listen_addr_arg as Array[String]).size() != 2 then
+          env.err.print(
+            "'--listen' argument should be in format '127.0.0.1:9999'")
           required_args_are_present = false
-        else
-          if (listen_addr_arg as Array[String]).size() != 2 then
-            env.err.print(
-              "'--listen' argument should be in format '127.0.0.1:9999'")
-            required_args_are_present = false
-          end
         end
+      end
 
-        if monhub_addr_arg is None then
-          env.err.print("Must supply required --monitor' argument")
-        else
-          if (monhub_addr_arg as Array[String]).size() != 2 then
-            env.err.print(
-              "'--monitor' argument should be in format '127.0.0.1:9999'")
-            required_args_are_present = false
-          end
+      if monhub_addr_arg is None then
+        env.err.print("Must supply required --monitor' argument")
+      else
+        if (monhub_addr_arg as Array[String]).size() != 2 then
+          env.err.print(
+            "'--monitor' argument should be in format '127.0.0.1:9999'")
+          required_args_are_present = false
         end
+      end
 
-        if name_arg is None then name_arg = "" end
-        if delay_arg is None then delay_arg = 1_000_000_000 end
+      if name_arg is None then name_arg = "" end
+      if delay_arg is None then delay_arg = 1_000_000_000 end
 
-        if required_args_are_present then
-          let auth = env.root as AmbientAuth
-          let host = (listen_addr_arg as Array[String])(0)
-          let service = (listen_addr_arg as Array[String])(1)
-          let host' = (monhub_addr_arg as Array[String])(0)
-          let service' = (monhub_addr_arg as Array[String])(1)
-          let name' = recover val (name_arg as String).clone() end
-          let delay' = recover val (delay_arg as U64) end
+      if required_args_are_present then
+        let auth = env.root as AmbientAuth
+        let host = (listen_addr_arg as Array[String])(0)
+        let service = (listen_addr_arg as Array[String])(1)
+        let host' = (monhub_addr_arg as Array[String])(0)
+        let service' = (monhub_addr_arg as Array[String])(1)
+        let name' = recover val (name_arg as String).clone() end
+        let delay' = recover val (delay_arg as U64) end
 
-          // Create connections and actors here
-          // MonitoringHub Output:
-          let notifier: TCPConnectionNotify iso =
-            recover MonitoringHubConnectNotify(env.out, env.err) end
-          let conn = TCPConnection(auth, consume notifier, host', service')
-          let output = MonitoringHubOutput(env.out, env.err, conn, name')
-          let handler: MetricsMonitoringHubHandler val =
-            MetricsMonitoringHubHandler(MonitoringHubEncoder, output)
+        // Create connections and actors here
+        // MonitoringHub Output:
+        let notifier: TCPConnectionNotify iso =
+          recover MonitoringHubConnectNotify(env.out, env.err) end
+        let conn = TCPConnection(auth, consume notifier, host', service')
+        let output = MonitoringHubOutput(env.out, env.err, conn, name')
+        let handler: MetricsMonitoringHubHandler val =
+          MetricsMonitoringHubHandler(MonitoringHubEncoder, output)
 
-          // Metrics Collection actor
-          let period: U64 = 1
-          let bin_selector: F64Selector val = Log10Selector
-          let mc = MetricsCollection(bin_selector, period, handler)
+        // Metrics Collection actor
+        let period: U64 = 1
+        let bin_selector: F64Selector val = Log10Selector
+        let mc = MetricsCollection(bin_selector, period, handler)
 
-          // Metrics Receiver Listener
-          let notifier' = MetricsNotifier(env.out, env.err, auth, host,
-                                          service, mc)
-          let listener = TCPListener(auth, consume notifier', host, service)
+        // Metrics Receiver Listener
+        let notifier' = MetricsNotifier(env.out, env.err, auth, host,
+                                        service, mc)
+        let listener = TCPListener(auth, consume notifier', host, service)
 
-          let receiver = MetricsReceiver(env.out, env.err, listener, mc)
+        let receiver = MetricsReceiver(env.out, env.err, listener, mc)
 
-          // start a timer to flush the receiver
-          Flusher(receiver, delay')
-        else
-          env.err.print("FUBAR! FUBAR!")
-        end
+        // start a timer to flush the receiver
+        Flusher(receiver, delay')
+      else
+        env.err.print("FUBAR! FUBAR!")
       end
     end
 
@@ -174,18 +169,15 @@ class MetricsReceiverNotify is TCPConnectionNotify
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     let d: Array[U8] val = consume data
-    Debug(d)
     if _header then
       try
         let expect = Bytes.to_u32(d(0), d(1), d(2), d(3)).usize()
-        Debug("Expect: " + expect.string())
         conn.expect(expect)
         _header = false
       else
         _stderr.print("Blew up reading header from Buffy")
       end
     else
-      Debug("length: " + d.size().string())
       process_data(consume d)
       conn.expect(4)
       _header = true

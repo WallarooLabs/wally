@@ -6,7 +6,6 @@ use "sendence/bytes"
 use "sendence/guid"
 use "sendence/epoch"
 use "../topology"
-use "sendence/epoch"
 use "random"
 
 class SourceNotifier is TCPListenNotify
