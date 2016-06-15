@@ -165,24 +165,24 @@ actor Startup
             coordinator.add_listener(TCPListener(auth, consume source_notifier,
               source_host, source_service))
           end
-          let topology_manager: TopologyManager = TopologyManager(env, auth,
-            node_name, worker_count, leader_control_host, leader_control_service,
-            leader_data_host, leader_data_service, coordinator, topology)
+        let topology_manager: TopologyManager = TopologyManager(env, auth,
+          node_name, worker_count, leader_control_host, leader_control_service,
+          leader_data_host, leader_data_service, coordinator, topology)
 
-          coordinator.add_topology_manager(topology_manager)
+        coordinator.add_topology_manager(topology_manager)
 
-          // Set up leader listeners
-          let control_notifier: TCPListenNotify iso =
-            ControlNotifier(env, auth, node_name, coordinator,
-            metrics_collector)
-          coordinator.add_listener(TCPListener(auth, consume control_notifier,
-            leader_control_host, leader_control_service))
-          let data_notifier: TCPListenNotify iso =
-            LeaderIntraclusterDataNotifier(env, auth, node_name, coordinator,
-            spike_config)
-          coordinator.add_listener(TCPListener(auth, consume data_notifier,
-            leader_data_host, leader_data_service))
-        end
+        // Set up leader listeners
+        let control_notifier: TCPListenNotify iso =
+          ControlNotifier(env, auth, node_name, coordinator,
+          metrics_collector, false)
+        coordinator.add_listener(TCPListener(auth, consume control_notifier,
+          leader_control_host, leader_control_service))
+        let data_notifier: TCPListenNotify iso =
+          LeaderIntraclusterDataNotifier(env, auth, node_name, coordinator,
+          spike_config)
+        coordinator.add_listener(TCPListener(auth, consume data_notifier,
+          leader_data_host, leader_data_service))
+      end
 
         if is_worker then
           env.out.print("**Buffy Worker " + node_name + "**")

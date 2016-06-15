@@ -128,7 +128,7 @@ actor DagonChild
     _env.out.print("\t" + node_name + ": Starting...")
     // fake some work here
     let timers = Timers
-    let timer = Timer(FakeWork(_env, node_name, this, 10), 0, 1_000_000_000)
+    let timer = Timer(FakeWork(_env, node_name, this, 10), 0, 10_000_000_000)
     timers(consume timer)
 
     

@@ -102,7 +102,7 @@ actor Coordinator
         _auth)
       _control_connections("leader").write(message)
     else
-      _env.out.print("Coordinator: control connection to leader was not set up")
+      _env.out.print("Coordinator: data connection to leader was not set up")
     end
 
   be identify_control_channel(service: String) =>

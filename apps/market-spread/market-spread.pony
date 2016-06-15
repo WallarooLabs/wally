@@ -7,30 +7,38 @@ use "sendence/fix"
 use "net"
 use "random"
 use "time"
+use "files"
 
 actor Main
   new create(env: Env) =>
-    let initial_market_data: Map[U64, {(): MarketData} val] iso = generate_initial_data()
-
     try
+      let auth = env.root as AmbientAuth
+      let initial_market_data: Map[U64, {(): MarketData} val] iso = 
+        generate_initial_data(auth)
+
       let topology = recover val
         Topology
-          .new_pipeline[FixOrderMessage val, TradeResult val](TradeParser, ResultStringify, recover [0] end)
+          .new_pipeline[FixOrderMessage val, TradeResult val](
+            TradeParser, ResultStringify, recover [0] end)
           .to_stateful_partition[TradeResult val, MarketData](
             recover
-              StatePartitionConfig[FixOrderMessage val, TradeResult val, MarketData](
-                lambda(): Computation[FixOrderMessage val, CheckStatus val] iso^ => GenerateCheckStatus end,
+              StatePartitionConfig[FixOrderMessage val, TradeResult val,
+                MarketData](
+                lambda(): Computation[FixOrderMessage val, 
+                  CheckStatus val] iso^ => GenerateCheckStatus end,
                 lambda(): MarketData => MarketData end,
                 SymbolPartition, 1)
               .with_initialization_map(consume initial_market_data)
               .with_initialize_at_start()
             end)
           .build()
-          .new_pipeline[FixNbboMessage val, None](NbboParser, NoneStringify, recover [0] end)
+          .new_pipeline[FixNbboMessage val, None](NbboParser, NoneStringify,
+            recover [0] end)
           .to_stateful_partition[None, MarketData](
             recover
               StatePartitionConfig[FixNbboMessage val, None, MarketData](
-                lambda(): Computation[FixNbboMessage val, UpdateData val] iso^ => GenerateUpdateData end,
+                lambda(): Computation[FixNbboMessage val, UpdateData val] iso^ 
+                  => GenerateUpdateData end,
                 lambda(): MarketData => MarketData end,
                 SymbolPartition, 1)
             end)
@@ -41,12 +49,47 @@ actor Main
       env.out.print("Couldn't build topology")
     end
 
-  fun generate_initial_data(): Map[U64, {(): MarketData} val] iso^ =>
+  fun generate_initial_data(auth: AmbientAuth): 
+    Map[U64, {(): MarketData} val] iso^ ? =>
     let map = recover Map[U64, {(): MarketData} val] end
-    map("BTU".hash()) = lambda(): MarketData => MarketData.update("BTU", true) end
-    map("LNG".hash()) = lambda(): MarketData => MarketData.update("LNG", false) end
-    map("VLO".hash()) = lambda(): MarketData => MarketData.update("VLO", false) end
+    let path = FilePath(auth, "./demos/marketspread/100nbbo.msg")
+    let data_source = FileDataSource(auth, path)
+    for line in consume data_source do
+      let fix_message = FixParser(line)
+      match fix_message
+      | let nbbo: FixNbboMessage val =>
+        let mid = (nbbo.bid_px() + nbbo.offer_px()) / 2
+        let is_rejected =
+          if ((nbbo.offer_px() - nbbo.bid_px()) >= 0.05) or
+            (((nbbo.offer_px() - nbbo.bid_px()) / mid) >= 0.05) then
+            true
+          else
+            false
+          end
+        let partition_id = nbbo.symbol().hash()       
+        map(partition_id) = recover 
+            lambda()(nbbo, is_rejected): MarketData => 
+              MarketData.update(nbbo.symbol(), is_rejected) end
+          end
+      end
+    end
     consume map
+
+class FileDataSource is Iterator[String]
+  let _lines: Iterator[String]
+
+  new iso create(auth: AmbientAuth, path: FilePath) =>
+    _lines = File(path).lines()
+
+  fun ref has_next(): Bool =>
+    _lines.has_next()
+
+  fun ref next(): String ? =>
+    if has_next() then
+      _lines.next()
+    else
+      error
+    end
 
 class MarketData
   let _data_rejected: Map[String, Bool] = Map[String, Bool]
@@ -98,7 +141,8 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
     _trade = trade
 
   fun name(): String => "check trade result"
-  fun apply(state: MarketData, output: MessageTarget[TradeResult val] val): MarketData =>
+  fun apply(state: MarketData, output: MessageTarget[TradeResult val] val):
+    MarketData =>
     let is_rejected = state.is_rejected(_trade.symbol())
     let result: TradeResult val = TradeResult(_trade.symbol(), is_rejected)
     output(result)
