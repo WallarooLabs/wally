@@ -382,7 +382,7 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
     | let m: Message[In] val =>
       try
         let str = _stringify(m.data())
-        @printf[I32]((">>>>" + str + "<<<<\n").cstring())
+        // @printf[I32]((">>>>" + str + "<<<<\n").cstring())
         let tcp_msg = ExternalMsgEncoder.data(str)
         for conn in _conns.values() do
           conn.write(tcp_msg)
