@@ -1,6 +1,6 @@
 interface MessageFileParser
 """
-The MessageFileparser interface provides default methods for splitting a block of input
+The MessageFileParser interface provides default methods for splitting a block of input
 text into an array of Strings, which can overridden by a subclass.
 """
   fun ref apply(values: Array[String] ref): None ?
@@ -32,7 +32,7 @@ text into an array of Strings, which can overridden by a subclass.
 class MessageFileReader
   fun ref apply(input: String, parser: MessageFileParser ref) ? =>
   """
-  The parse method separates an input String based on the methods provided in
+  The apply method separates an input String based on the methods provided in
   the parser.
   If parser.ls() returns a String, that string will be used to split the text
   into lines, with parser.ln(): USize given as a parameter to the split()
