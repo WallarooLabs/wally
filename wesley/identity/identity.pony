@@ -3,8 +3,8 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[IdentitySentMessage val, IdentityReceivedMessage val]
-      .run(env, IdentityResultMapper, IdentitySentVisitor, 
-        IdentityReceivedVisitor)
+      .run(env, IdentityResultMapper, IdentitySentParser, 
+        IdentityReceivedParser)
 
 class IdentitySentMessage is SentMessage
   let ts: U64
@@ -28,7 +28,7 @@ class IdentityReceivedMessage is ReceivedMessage
   fun string(): String =>
     "(" + ts.string() + ", " + v.string() + ")"
 
-class IdentitySentVisitor is SentVisitor[IdentitySentMessage val]
+class IdentitySentParser is SentParser[IdentitySentMessage val]
   let _messages: Array[IdentitySentMessage val] = 
     Array[IdentitySentMessage val]
 
@@ -40,7 +40,7 @@ class IdentitySentVisitor is SentVisitor[IdentitySentMessage val]
   fun ref sent_messages(): Array[IdentitySentMessage val] =>
     _messages
 
-class IdentityReceivedVisitor is ReceivedVisitor[IdentityReceivedMessage val]
+class IdentityReceivedParser is ReceivedParser[IdentityReceivedMessage val]
   let _messages: Array[IdentityReceivedMessage val] = 
     Array[IdentityReceivedMessage val]
 

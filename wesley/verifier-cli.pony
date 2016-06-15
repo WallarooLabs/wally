@@ -41,20 +41,20 @@ primitive VerifierCLI[S: SentMessage val, R: ReceivedMessage val]
       error
     end
 
-  fun _read_csv_file_with_visitor(file_name: String, visitor: CSVVisitor, 
+  fun _read_csv_file_with_parser(file_name: String, parser: MessageFileParser, 
     root: (AmbientAuth | None)): None ? =>
     let caps = recover val FileCaps.set(FileRead).set(FileStat) end
     with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)) 
       as File do
-      CSVReader.parse(file.read_string(file.size()), visitor)
+      MessageFileReader(file.read_string(file.size()), parser)
     else
       error
     end
 
   fun run(env: Env, result_mapper: ResultMapper[S, R], 
-    sent_visitor: SentVisitor[S], received_visitor: ReceivedVisitor[R]) =>
-    match verifier_from_command_line(env, result_mapper, sent_visitor, 
-      received_visitor)
+    sent_parser: SentParser[S], received_parser: ReceivedParser[R]) =>
+    match verifier_from_command_line(env, result_mapper, sent_parser, 
+      received_parser)
     | let verifier: Verifier[S, R] => verify(env, verifier)
     | let setup_error: SetupError =>
       env.exitcode(setup_error.exitcode())
@@ -62,7 +62,7 @@ primitive VerifierCLI[S: SentMessage val, R: ReceivedMessage val]
     end
 
   fun verifier_from_command_line(env: Env, result_mapper: ResultMapper[S, R], 
-    sent_visitor: SentVisitor[S], received_visitor: ReceivedVisitor[R]): 
+    sent_parser: SentParser[S], received_parser: ReceivedParser[R]): 
       (SetupError | Verifier[S, R]) =>
     (let prog: String, let sent_file: String, let received_file: String, 
       let expectation_str: String) = try
@@ -90,19 +90,19 @@ primitive VerifierCLI[S: SentMessage val, R: ReceivedMessage val]
     end
 
     try
-      _read_csv_file_with_visitor(sent_file, sent_visitor, env.root)
+      _read_csv_file_with_parser(sent_file, sent_parser, env.root)
     else
-      return SetupErrorProblemReadingCSV(sent_file)
+      return SetupErrorProblemReadingMessageFile(sent_file)
     end
 
     try
-      _read_csv_file_with_visitor(received_file, received_visitor, env.root)
+      _read_csv_file_with_parser(received_file, received_parser, env.root)
     else
-      return SetupErrorProblemReadingCSV(received_file)
+      return SetupErrorProblemReadingMessageFile(received_file)
     end
 
-    Verifier[S, R](sent_visitor.sent_messages(), 
-      received_visitor.received_messages(), result_mapper, 
+    Verifier[S, R](sent_parser.sent_messages(), 
+      received_parser.received_messages(), result_mapper, 
       expected_match_result)
 
   fun verify(env:Env, verifier: Verifier[S, R] ref): None =>
@@ -135,9 +135,9 @@ class SetupErrorCouldNotFindMatchStatusInFile
   fun exitcode(): I32 => 92
   fun message(): String => _message
 
-class SetupErrorProblemReadingCSV
+class SetupErrorProblemReadingMessageFile
   let _message: String val
   new create(file_name: String) =>
-    _message = "Error: Problem reading CSV file '".add(file_name).add("'.")
+    _message = "Error: Problem reading MessageFile file '".add(file_name).add("'.")
   fun exitcode(): I32 => 93
   fun message(): String => _message

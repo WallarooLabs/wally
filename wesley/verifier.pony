@@ -56,10 +56,10 @@ trait ResultMapper[S: SentMessage val, R: ReceivedMessage val]
   fun sent_transform(sent: Array[S]): CanonicalForm
   fun received_transform(received: Array[R]): CanonicalForm
 
-trait SentVisitor[S: SentMessage val] is CSVVisitor
+trait SentParser[S: SentMessage val] is MessageFileParser
   fun ref sent_messages(): Array[S]
 
-trait ReceivedVisitor[R: ReceivedMessage val] is CSVVisitor
+trait ReceivedParser[R: ReceivedMessage val] is MessageFileParser
   fun ref received_messages(): Array[R]
 
 interface MatchStatus

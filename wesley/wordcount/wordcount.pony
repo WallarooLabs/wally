@@ -3,8 +3,8 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[WordcountSentMessage val, WordcountReceivedMessage val]
-      .run(env, WordcountResultMapper, WordcountSentVisitor, 
-        WordcountReceivedVisitor)
+      .run(env, WordcountResultMapper, WordcountSentParser, 
+        WordcountReceivedParser)
 
 class WordcountSentMessage is SentMessage
   let ts: U64
@@ -30,7 +30,7 @@ class WordcountReceivedMessage is ReceivedMessage
   fun string(): String =>
     "(" + ts.string() + ", " + word + ": " + count.string() + ")"
 
-class WordcountSentVisitor is SentVisitor[WordcountSentMessage val]
+class WordcountSentParser is SentParser[WordcountSentMessage val]
   let _messages: Array[WordcountSentMessage val] = 
     Array[WordcountSentMessage val]
 
@@ -44,7 +44,7 @@ class WordcountSentVisitor is SentVisitor[WordcountSentMessage val]
   fun ref sent_messages(): Array[WordcountSentMessage val] =>
     _messages
 
-class WordcountReceivedVisitor is ReceivedVisitor[WordcountReceivedMessage val]
+class WordcountReceivedParser is ReceivedParser[WordcountReceivedMessage val]
   let _messages: Array[WordcountReceivedMessage val] =
     Array[WordcountReceivedMessage val]
 

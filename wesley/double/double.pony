@@ -3,7 +3,7 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[DoubleSentMessage val, DoubleReceivedMessage val]
-      .run(env, DoubleResultMapper, DoubleSentVisitor, DoubleReceivedVisitor)
+      .run(env, DoubleResultMapper, DoubleSentParser, DoubleReceivedParser)
 
 class DoubleSentMessage is SentMessage
   let ts: U64
@@ -27,7 +27,7 @@ class DoubleReceivedMessage is ReceivedMessage
   fun string(): String =>
     "(" + ts.string() + ", " + v.string() + ")"
 
-class DoubleSentVisitor is SentVisitor[DoubleSentMessage val]
+class DoubleSentParser is SentParser[DoubleSentMessage val]
   let _messages: Array[DoubleSentMessage val] = 
     Array[DoubleSentMessage val]
 
@@ -39,7 +39,7 @@ class DoubleSentVisitor is SentVisitor[DoubleSentMessage val]
   fun ref sent_messages(): Array[DoubleSentMessage val] =>
     _messages
 
-class DoubleReceivedVisitor is ReceivedVisitor[DoubleReceivedMessage val]
+class DoubleReceivedParser is ReceivedParser[DoubleReceivedMessage val]
   let _messages: Array[DoubleReceivedMessage val] = 
     Array[DoubleReceivedMessage val]
 
