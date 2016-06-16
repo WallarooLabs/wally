@@ -90,7 +90,7 @@ class NodeMetricsSummary is MetricsWireMsg
       digests(step_id).add_report(r)
       _size = _size + 1
     else
-      let dig:StepMetricsDigest trn = recover StepMetricsDigest(step_id) end
+      let dig: StepMetricsDigest trn = recover StepMetricsDigest(step_id) end
       dig.add_report(r)
       digests.update(step_id, consume dig)
       _size = _size + 1
