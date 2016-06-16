@@ -25,7 +25,7 @@ actor Proxy is BasicStep
     let forward = Forward(_step_id, _node_name, input)
     _coordinator.send_data_message(_target_node_name, forward)
     _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
-      input.id(), input.last_ingress_ts(), Epoch.milliseconds())
+      input.id(), input.last_ingress_ts(), Epoch.nanoseconds())
 
 actor StepManager
   let _env: Env
