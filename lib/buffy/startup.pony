@@ -4,12 +4,11 @@ use "./sink-node"
 
 actor Startup
   // TODO: factor out source_count
-  new create(env: Env, topology: Topology val, source_count: USize, 
-    sink_step_builders: Array[SinkNodeStepBuilder val] val = 
+  new create(env: Env, topology: Topology val, source_count: USize,
+    sink_step_builders: Array[SinkNodeStepBuilder val] val =
       recover Array[SinkNodeStepBuilder val] end) =>
     let options = Options(env)
     var is_sink = false
-    var is_metrics_receiver = false
 
     options
       .add("run-sink", "", None)
