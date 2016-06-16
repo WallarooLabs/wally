@@ -207,19 +207,19 @@ dagon-double: ## Run double test with dagon
           dagon/config/double.ini
 
 dagon-identity: ## Run identity test with dagon
-	./dagon/dagon --timeout=5 -f apps/double-divide/double-divide.ini -h 127.0.0.1:8080
+	./dagon/dagon --timeout=15 -f apps/double-divide/double-divide.ini -h 127.0.0.1:8080
 	./wesley/identity/identity ./sent.txt ./received.txt match
 
 dagon-identity-drop: ## Run identity test with dagon
-	./dagon/dagon --timeout=5 -f apps/double-divide/double-divide-drop.ini -h 127.0.0.1:8080
+	./dagon/dagon --timeout=15 -f apps/double-divide/double-divide-drop.ini -h 127.0.0.1:8080
 	./wesley/identity/identity ./sent.txt ./received.txt match
 
 dagon-word-count: ## Run word count test with dagon
-	./dagon/dagon --timeout=5 -f apps/word-count/word-count.ini -h 127.0.0.1:8080
+	./dagon/dagon --timeout=15 -f apps/word-count/word-count.ini -h 127.0.0.1:8080
 	./wesley/wordcount/wordcount ./sent.txt ./received.txt match
 
 dagon-market-spread: ## Run market spread test with dagon
-	./dagon/dagon --timeout=5 -f apps/market-spread/market-spread.ini -h 127.0.0.1:8080
+	./dagon/dagon --timeout=15 -f apps/market-spread/market-spread.ini -h 127.0.0.1:8080
 	./wesley/market-spread/market-spread ./demos/marketspread/100nbbo.msg ./sent.txt ./received.txt match
 
 dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
