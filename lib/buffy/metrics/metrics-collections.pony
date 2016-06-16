@@ -20,7 +20,7 @@ bin size, and max_bin to specify the size of the next-to-max bin size, such
 that all values < min_bin associate to min_bin, and all values > max_bin
 associate to Overflow.
 
-E.g. 
+E.g.
 ```
 let s = Log10Selector(0.001, 10.0)
 s(9) // -> 10.0
@@ -158,8 +158,8 @@ to the nearest integer.
     count_latency(report.dt())
 
   fun ref count_latency(dt:U64) =>
-    // compute dt in seconds as F64 from the millisecond U64 timestamps
-    let dt':F64 = dt.f64().div(1000.0)
+    // compute dt in seconds as F64 from the nanosecond U64 timestamps
+    let dt':F64 = dt.f64().div(1_000_000_000.0)
     if dt' >= 0
     then
       let key = bin_selector(dt')
@@ -221,8 +221,8 @@ A history of throughput counts per second
     count_report(report.ended())
 
   fun ref count_report(end_time: U64) =>
-    // Truncate milliseconds to seconds
-    let t': U64 = end_time.f64().div(1000.0).ceil().u64()
+    // Truncate nanoseconds to seconds
+    let t': U64 = end_time.f64().div(1_000_000_000.0).ceil().u64()
     if _start_time == 0 then _start_time = t' end
     if t' > _end_time then _end_time = t' end
     _map.update(t', try _map(t') + 1 else 1 end)
@@ -415,7 +415,7 @@ on category and id
     end
 
   fun get_time_bucket(time: U64): U64 =>
-    (time/1000) + (_period - ((time/1000) % _period))
+    (time/1_000_000_000) + (_period - ((time/1_000_000_000) % _period))
 
   be send_output(resumable: (Resumable tag | None) = None) =>
     handle_output()
