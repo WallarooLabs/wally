@@ -47,7 +47,7 @@ actor MonitoringHubOutput is MetricsOutputActor
     message.append(j.string())
     _conn.write(Bytes.length_encode(consume message))
 
-  be send(category: String, payload: Array[U8] val) =>
+  be apply(category: String, payload: Array[U8] val) =>
     """
     Send a metrics messsage to Monitoring Hub
     """
