@@ -8,7 +8,6 @@ use "sendence/bytes"
 use "options"
 use "time"
 
-
 actor Receiver
   new create(env: Env) =>
     var required_args_are_present = true
@@ -21,7 +20,8 @@ actor Receiver
     try
       var options = Options(env)
       options
-        .add("metrics-receiver", "m", None)
+        .add("run-sink", "", None)
+        .add("metrics-receiver", "r", None)
         .add("listen", "l", StringArgument)
         .add("monitor", "m", StringArgument)
         .add("name", "n", StringArgument)
@@ -29,6 +29,7 @@ actor Receiver
 
       for option in options do
         match option
+        | ("run-sink", None) => None
         | ("listen", let arg: String) => listen_addr_arg = arg.split(":")
         | ("monitor", let arg: String) => monhub_addr_arg = arg.split(":")
         | ("name", let arg: String) => name_arg = arg
@@ -48,7 +49,7 @@ actor Receiver
       end
 
       if monhub_addr_arg is None then
-        env.err.print("Must supply required --monitor' argument")
+        env.err.print("Must supply required '--monitor' argument")
       else
         if (monhub_addr_arg as Array[String]).size() != 2 then
           env.err.print(
@@ -93,7 +94,18 @@ actor Receiver
         // start a timer to flush the receiver
         Flusher(receiver, delay')
       else
-        env.err.print("FUBAR! FUBAR!")
+        env.out.print(
+          """
+          PARAMETERS:
+          -----------------------------------------------------------------------------------
+          --run-sink [Runs as sink node]
+          --metrics-receiver/-r [Runs as metrics-receiver node]
+          --listen [Listen address in xxx.xxx.xxx.xxx:pppp format]
+          --monitor [Monitoring Hub address in xxx.xxx.xxx.xxx:pppp format]
+          --name [Application name to report to Monitoring Hub]
+          --delay [Maximum period of time before sending data]
+          """
+        )
       end
     end
 
