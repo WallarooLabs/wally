@@ -4,6 +4,7 @@ use "buffy/messages"
 use "buffy/metrics"
 use "buffy/topology"
 use "net"
+use "buffy/sink-node"
 
 actor Main
   new create(env: Env) =>
@@ -24,7 +25,15 @@ actor Main
             )
           .build()
       end
-      Startup(env, topology, 1)
+      let sink_builders = recover Array[SinkNodeStepBuilder val] end
+      let ui_sink_builder = SinkNodeConfig[Map[String, U64]](
+        lambda(): SinkCollector[Map[String, U64]] => 
+          WordCountSinkCollector end,
+        WordCountSinkConnector,
+        WordCountSinkStringify
+      )
+      sink_builders.push(ui_sink_builder)
+      Startup(env, topology, 1, consume sink_builders)
     else
       env.out.print("Couldn't build topology")
     end
