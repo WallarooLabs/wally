@@ -9,14 +9,14 @@ class StartupSinkNode
     var addr = Array[String]
     var target_addr = Array[String]
     var step_builder_idx: I64 = 0
-    var is_metrics_receiver = false
+    var is_metrics_receiver: Bool = false
 
     options
       .add("run-sink", "", None)
       .add("addr", "a", StringArgument)
       .add("target-addr", "t", StringArgument)
       .add("step-builder", "s", I64Argument)
-      .add("metrics-receiver", "m", None)
+      .add("metrics-receiver", "r", None)
 
     for option in options do
       match option
@@ -24,7 +24,7 @@ class StartupSinkNode
       | ("addr", let arg: String) => addr = arg.split(":")
       | ("target-addr", let arg: String) => target_addr = arg.split(":")
       | ("step-builder", let arg: I64) => step_builder_idx = arg
-      | ("metrics-receiver", let arg: Bool) => is_metrics_receiver = true
+      | ("metrics-receiver", None) => is_metrics_receiver = true
       end
     end
 
@@ -56,7 +56,7 @@ class StartupSinkNode
         PARAMETERS:
         -----------------------------------------------------------------------------------
         --run-sink [Runs as sink node]
-        --metrics-receiver/-m [Runs as metrics-receiver node]
+        --metrics-receiver/-r [Runs as metrics-receiver node]
         --addr <address> [Address sink node is listening on]
         --target-addr <address> [Address sink node sends reports to]
         --step-builder <idx> [Index of sink step builder for this sink node]

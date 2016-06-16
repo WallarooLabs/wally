@@ -87,13 +87,14 @@ class StartupBuffyNode
           let metrics_service = metrics_addr(1)
 
           let metrics_notifier: TCPConnectionNotify iso =
-            MetricsCollectorConnectNotify(env, auth)
+            MetricsCollectorConnectNotify(auth, env.out, env.err)
           let metrics_conn: TCPConnection =
-            TCPConnection(auth, consume metrics_notifier, metrics_host, metrics_service)
+            TCPConnection(auth, consume metrics_notifier, metrics_host,
+              metrics_service)
 
-          MetricsCollector(env, node_name, metrics_conn)
+          MetricsCollector(env.err, auth, node_name, metrics_conn)
         else
-          MetricsCollector(env, node_name)
+          MetricsCollector(env.err, auth, node_name)
         end
 
       let step_manager = StepManager(env, node_name, consume sinks,
@@ -115,7 +116,7 @@ class StartupBuffyNode
 
       if is_worker then
         coordinator.add_listener(TCPListener(auth,
-          ControlNotifier(env, auth, node_name, coordinator, 
+          ControlNotifier(env, auth, node_name, coordinator,
             metrics_collector)))
         coordinator.add_listener(TCPListener(auth,
           WorkerIntraclusterDataNotifier(env, auth, node_name, leader_control_host,
