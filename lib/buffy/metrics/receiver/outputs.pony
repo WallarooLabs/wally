@@ -3,7 +3,7 @@ use "sendence/bytes"
 use "buffy/metrics"
 use "json"
 use "collections"
-
+use "sendence/hub"
 
 actor MonitoringHubOutput is MetricsOutputActor
   let _stdout: StdStream
@@ -27,10 +27,7 @@ actor MonitoringHubOutput is MetricsOutputActor
     """
     _stdout.print("    metrics-receiver: Connecting...")
     let message: Array[U8] iso = recover Array[U8] end
-    let j: JsonObject = JsonObject
-    j.data.update("path", "/socket/tcp")
-    j.data.update("params", None)
-    message.append(j.string())
+    message.append(HubJson.connect())
     _conn.write(Bytes.length_encode(consume message))
 
   be send_join() =>
@@ -39,12 +36,7 @@ actor MonitoringHubOutput is MetricsOutputActor
     """
     _stdout.print("    metrics-receiver: Joining [" + _app_name+ "]...")
     let message: Array[U8] iso = recover Array[U8] end
-    let j: JsonObject = JsonObject
-    j.data.update("event", "phx_join")
-    j.data.update("topic", "metrics:" + _app_name)
-    j.data.update("ref", None)
-    j.data.update("payload", JsonObject)
-    message.append(j.string())
+    message.append(HubJson.join("metrics:" + _app_name))
     _conn.write(Bytes.length_encode(consume message))
 
   be apply(category: String, payload: Array[U8] val) =>
@@ -56,13 +48,9 @@ actor MonitoringHubOutput is MetricsOutputActor
       let message: Array[U8] iso = recover Array[U8] end
       let doc: JsonDoc = JsonDoc
       doc.parse(String.from_array(payload))
-
-      let j: JsonObject = JsonObject
-      j.data.update("event", category)
-      j.data.update("topic", "metrics:" + _app_name)
-      j.data.update("ref", None)
-      j.data.update("payload", doc.data as JsonArray)
-      message.append(j.string())
+      message.append(
+        HubJson.payload(category, "metrics:" + _app_name,
+          doc.data as JsonArray))
       _conn.write(Bytes.length_encode(consume message))
     else
       _stderr.print("   metrics-receiver: Failed sending metrics")
