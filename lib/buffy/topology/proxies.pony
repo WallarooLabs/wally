@@ -1,5 +1,4 @@
 use "collections"
-use "debug"
 use "net"
 use "buffy/messages"
 use "buffy/metrics"
