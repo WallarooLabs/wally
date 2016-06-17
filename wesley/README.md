@@ -7,11 +7,13 @@ Verfication of the results of tests run by Giles.
 ## Verification
 
 Wesley does the following:
-1. applies a transforming function to the messages sent by Giles to
-   Buffy to produce expected results
-1. compares the expected results to the actual messages that Giles
-   receives from Buffy
-1. compares whether the expected results and actual results were
+1. applies a transforming function to convert the messages sent by Giles to
+   Buffy to a canonical form defined by user (after first applying the relevant
+   computations for the current test)
+2. applies a (different) transforming function to received messages to convert
+   them to canonical form.
+3. compares the two canonical form results to see if they match
+4. compares whether the expected results and actual results were
    supposed to match
 
 There are a few things that are important to note:
@@ -35,55 +37,53 @@ Giles =Sent=> Buffy =Received=> Giles
   Received: the ordered list of received messages and their timestamps as a 'timestamp,value' string
 ```
 
-There is a function `f(x)` which transforms `Sent` into the expected
-received messages, `Expected`.
+There is a function `sent_transform(x)` which transforms `Sent` into a canonical form which
+represents the underlying value/s (after the computations for the test are applied).
 
 ```
-Expected = f(Sent)
+Expected = sent_transform(`Sent`)
 ```
 
-There is a compare function `c(x, y)` which tells us if `Received` and `Expected`
-are match or not.
+There is another function `received_transform(x)` which transforms `Received` directly into canonical form.
 
 ```
-c(Received, Expected) = match | nomatch
+Actual = received_transform(`Received`)
+```
+
+There is a compare function `c(x, y)` which tells us if Expected and Actual are a match or not.
+
+```
+c(Expected, Actual) = match | nomatch
 ```
 
 For any given test configuration there will be an expectation that the
 result of the compare function will either be `match` or
 `nomatch`. This is specified within the test configuration file. The
 verfication function `v(x, y)` passes if the match expectation is the
-same as the result of `c(Received, Expected)`, otherwise it fails.
+same as the result of `c(Expected, Actual)`, otherwise it fails.
 
 ```
-v(c(Received, Expected), MatchExpectation) = pass | fail
+v(c(Expected, Actual), MatchExpectation) = pass | fail
 ```
 
 The test system expands to:
 
 ```
-v(c(Received, f(Sent)), MatchExpectation)
+v(c(sent_transform(`Sent`), received_transform(`Received`)), MatchExpectation)
 ```
-
-Currently the only piece that needs to change from topology to
-topology is the function `f(x)`, but as we add more complicated
-topologies we will probably need to add a number of different
-comparison functions to choose from, or allow the test implementer to
-specify their own function.
 
 ## In Practice
 
 Giles runs a test based on a configuration and records the sent messages 
 (`sent.txt`) and received messages (`received.txt`) once the test finishes.
 After the test has run, Wesley takes the sent messages, applies the
-transformation function to them, and compares the expected received
-messages to the actual received messages, then compares this outcome
-with the expected match outcome.
+transformation function to them, and compares the expected canonical form 
+with the result of applying the transform function to the actual received 
+messages.
 
 Each Wesley verifier is a stand-alone executable. The source for the
 program is stored under the `wesley` directory and includes only code
-that is specific to the topoloy under test (objects for reading
-messages and the transformation function `f(Sent) => Expected`).
+that is specific to the topoloy under test.
 
 Wesley verification is run like this:
 

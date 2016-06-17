@@ -271,7 +271,7 @@ actor ProcessManager
     try
       _listener = TCPListener(env.root as AmbientAuth, consume tcp_n,
       host, service)
-      let timer = Timer(WaitForListener(_env, this, _timeout), 0, 1_000_000_000)
+      let timer = Timer(WaitForListener(_env, this, _timeout), 0, 2_000_000_000)
       _timer = timer
       _timers(consume timer)
     else

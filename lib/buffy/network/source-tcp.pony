@@ -29,7 +29,8 @@ class SourceNotifier is TCPListenNotify
     _metrics_collector = metrics_collector
 
   fun ref listening(listen: TCPListener ref) =>
-    _env.out.print("Source " + _source_id.string() + ": listening on " + _host + ":" + _service)
+    _env.out.print("Source " + _source_id.string() + ": listening on "
+      + _host + ":" + _service)
 
   fun ref not_listening(listen: TCPListener ref) =>
     _env.out.print("Source " + _source_id.string() + ": couldn't listen")
@@ -75,8 +76,9 @@ class SourceConnectNotify is TCPConnectionNotify
         let msg = ExternalMsgDecoder(consume data)
         match msg
         | let m: ExternalDataMsg val =>
-          let now = Epoch.milliseconds()
-          let new_msg: Message[String] val = Message[String](_guid_gen(), now, now, m.data)
+          let now = Epoch.nanoseconds()
+          let new_msg: Message[String] val = Message[String](
+            _guid_gen(), now, now, m.data)
           _step_manager(_source_id, new_msg)
         | let m: ExternalUnknownMsg val =>
           _env.err.print("Unknown message type.")
