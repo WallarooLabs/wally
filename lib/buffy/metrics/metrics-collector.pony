@@ -17,8 +17,8 @@ actor MetricsCollector is FlushingActor
   var _boundary_last_sent: U64 = Epoch.nanoseconds()
 
 	new create(stderr: StdStream, auth: AmbientAuth, node_name: String,
-             conn: (TCPConnection | None) = None, max_batch: USize = 10,
-             max_time: U64 = 5_000_000_000) =>
+             conn: (TCPConnection | None) = None, max_batch: USize = 10000,
+             max_time: U64 = 1_000_000_000) =>
     _stderr = stderr
 	  _auth = auth
     _node_name = node_name
