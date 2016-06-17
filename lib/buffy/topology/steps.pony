@@ -385,7 +385,7 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
         // @printf[I32]((">>>>" + str + "<<<<\n").cstring())
         let tcp_msg = ExternalMsgEncoder.data(str)
         for conn in _conns.values() do
-          conn.write(tcp_msg)
+          conn.writev(tcp_msg)
         end
         _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
           m.id(), m.source_ts(), Epoch.milliseconds())

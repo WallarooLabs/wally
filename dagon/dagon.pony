@@ -459,7 +459,7 @@ actor ProcessManager
       if child.conn isnt None then
         let c = child.conn as TCPConnection
         let message = ExternalMsgEncoder.shutdown(node_name)
-        c.write(message)
+        c.writev(message)
       else
         _env.out.print("dagon: don't have a connection to send shutdown to "
           + node_name)
@@ -583,7 +583,7 @@ actor ProcessManager
     try
       let c = conn as TCPConnection
       let message = ExternalMsgEncoder.start()
-      c.write(message)
+      c.writev(message)
     else
       _env.out.print("dagon: Failed sending start")
     end

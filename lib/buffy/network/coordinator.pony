@@ -263,10 +263,10 @@ actor Coordinator
         .received(data_ch_id, step_id, msg, _step_manager)
     end
 
-  be send_phone_home_message(msg: Array[U8] val) =>
+  be send_phone_home_message(msg: Array[ByteSeq] val) =>
     match _phone_home_connection
     | let phc: TCPConnection =>
-      phc.write(msg)
+      phc.writev(msg)
     end
 
   fun _send_data_sender_ready_msg(target_name: String) =>
@@ -378,7 +378,7 @@ actor Coordinator
 
       match _phone_home_connection
       | let phc: TCPConnection =>
-        phc.write(ExternalMsgEncoder.done_shutdown(_node_name))
+        phc.writev(ExternalMsgEncoder.done_shutdown(_node_name))
         phc.dispose()
       end
     else

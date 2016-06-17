@@ -73,7 +73,7 @@ actor DagonChild
         _env.out.print("\t" + node_name + ": Sending ready...")
         let c = _conn as TCPConnection
         let message = ExternalMsgEncoder.ready(node_name)
-        c.write(message)
+        c.writev(message)
       else
         _env.out.print("\t" + node_name + ": Failed sending ready")
       end
@@ -88,7 +88,7 @@ actor DagonChild
         _env.out.print("\t" + node_name + ": Sending topology ready...")
         let c = _conn as TCPConnection
         let message = ExternalMsgEncoder.topology_ready(node_name)
-        c.write(message)
+        c.writev(message)
       else
         _env.out.print("\t" + node_name + ": Failed sending topology ready")
       end
@@ -103,7 +103,7 @@ actor DagonChild
         _env.out.print("\t" + node_name + ": Sending done...")
         let c = _conn as TCPConnection
         let message = ExternalMsgEncoder.done(node_name)
-        c.write(message)
+        c.writev(message)
       else
         _env.out.print("\t" + node_name + ": Failed sending done")
       end
@@ -118,7 +118,7 @@ actor DagonChild
         _env.out.print("\t" + node_name + ": Sending done_shutdown..")
         let c = _conn as TCPConnection
         let message = ExternalMsgEncoder.done_shutdown(node_name)
-        c.write(message)
+        c.writev(message)
       else
         _env.out.print("\t" + node_name + ": Failed sending done_shutdown")
       end
