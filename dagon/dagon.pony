@@ -1025,13 +1025,13 @@ class ProcessClient is ProcessNotify
   fun ref stdout(data: Array[U8] iso) =>
     let out = String.from_array(consume data)
     _env.out.print("dagon: " + _name + " STDOUT [")
-    _env.out.print("\t" + out)
+    _env.out.print(out)
     _env.out.print("dagon: " + _name + " STDOUT ]")
 
   fun ref stderr(data: Array[U8] iso) =>
     let err = String.from_array(consume data)
     _env.out.print("dagon: " + _name + " STDERR [")
-    _env.out.print("\t" + err)
+    _env.out.print(err)
     _env.out.print("dagon: " + _name + " STDERR ]")
     
   fun ref failed(err: ProcessError) =>

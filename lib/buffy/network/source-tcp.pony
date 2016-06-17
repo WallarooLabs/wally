@@ -62,6 +62,7 @@ class SourceConnectNotify is TCPConnectionNotify
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    _env.out.print("\t received data from source")
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
