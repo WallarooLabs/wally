@@ -6,7 +6,15 @@ class Queue[A: Any #alias]
   var _back_ptr: USize = 0
   var _size: USize = 0
 
-  new create(els: Array[A] = Array[A]) =>
+  new create(len: USize = 0) =>
+    """
+    Create a queue.
+    """
+    _data = Array[A](len)
+    _size = _data.size()
+    _back_ptr = _size
+
+  new from(els: Array[A] = Array[A], len: USize = 0) =>
     """
     Create a queue of elements from the supplied array.
     """
@@ -16,11 +24,11 @@ class Queue[A: Any #alias]
 
   fun size(): USize =>
     """
-    The number of elements in the queue.
+    The size of the queue.
     """
     _size
 
-  fun space(): USize => _data.size()
+  fun space(): USize => _data.space()
 
   fun apply(i: USize): this->A ? =>
     """
@@ -33,11 +41,11 @@ class Queue[A: Any #alias]
       error
     end
 
-  fun ref _update(i: USize, a: A): A^ ? =>
+  fun ref _update(i: USize, value: A): A^ ? =>
     """
     Change the i-th element, raising an error if the index is out of bounds.
     """
-    _data(i) = consume a
+    _data(i) = consume value
 
   fun ref enqueue(a: A) ? =>
     """
@@ -46,26 +54,26 @@ class Queue[A: Any #alias]
     wrapping elements to the end of a contiguous series.
     """
     if _size < (_data.size() / 2) then
-      if _back_ptr < _data.size() then
-        _data(_back_ptr) = consume a
-      else
-        _data(0) = consume a
-      end
+      _data(_back_ptr) = consume a
       _back_ptr = (_back_ptr + 1) % _data.size()
     else
-      let boundary = _data.size()
-      if _front_ptr > _back_ptr then
+      if space() < (_data.size() * 2) then
+        _data.reserve(space() * 2)
+      end
+      if _back_ptr == 0 then
+        _data.push(consume a)
+        if (_front_ptr == 0) and (_size == 0) then
+          _front_ptr = (_front_ptr + 1) % _data.size()
+        end
+      elseif _front_ptr > _back_ptr then
         for i in Range(0, _back_ptr) do
           _data.push(_data(i))
         end
         _data.push(consume a)
-        _back_ptr = _data.size()
-      elseif _back_ptr == _data.size() then
-        _data.push(consume a)
-        _back_ptr = _data.size()
+        _back_ptr = 0
       else
         _data(_back_ptr) = consume a
-        _back_ptr = _back_ptr + 1
+        _back_ptr = (_back_ptr + 1) % _data.size()
       end
     end
     _size = _size + 1
