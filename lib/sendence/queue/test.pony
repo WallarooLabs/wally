@@ -1,5 +1,6 @@
 use "ponytest"
 use "collections"
+use "debug"
 
 actor Main is TestList
   new create(env: Env) => PonyTest(env, this)
@@ -15,6 +16,7 @@ class iso _TestQueue is UnitTest
   fun apply(h: TestHelper) ? =>
     let q1 = Queue[U64]
     h.assert_eq[USize](q1.size(), 0)
+    h.assert_eq[USize](q1.space(), 2)
 
     q1.enqueue(0)
     h.assert_eq[U64](q1.dequeue(), 0)
@@ -46,7 +48,6 @@ class iso _TestQueue is UnitTest
       h.assert_eq[U64](q1(i), (i + 3).u64())
       i = i + 1
     end
-
 
     let q2 = Queue[USize]
 
@@ -98,6 +99,26 @@ class iso _TestQueue is UnitTest
       h.assert_eq[USize](q2(idx), i + 50)
       h.assert_eq[USize](q2(idx), n)
       i = i + 1
+    end
+
+    for j in Range(50, 70) do
+      h.assert_eq[USize](q2.dequeue(), j)
+    end
+
+    for j in Range(81, 128) do
+      q2.enqueue(j)
+    end
+
+    for j in Range(70, 110) do
+      h.assert_eq[USize](q2.dequeue(), j)
+    end
+
+    for j in Range(128, 140) do
+      q2.enqueue(j)
+    end
+
+    for j in Range(110, 130) do
+      h.assert_eq[USize](q2.dequeue(), j)
     end
 
     true
