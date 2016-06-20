@@ -66,7 +66,7 @@ class Queue[A: Any #alias]
     wrapping elements to the end of a contiguous series.
     """
     if _size < (_mod / 2) then
-      if (_data.size() == 0) then
+      if _data.size() == 0 then
         _data.push(consume a)
         _back_ptr = _data.size()
       elseif _back_ptr >= space() then
