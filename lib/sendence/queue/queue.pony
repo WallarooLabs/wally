@@ -68,7 +68,7 @@ class Queue[A: Any #alias]
     if _size < (_mod / 2) then
       if (_data.size() == 0) then
         _data.push(consume a)
-        _back_ptr = _data.size() and _mod
+        _back_ptr = _data.size()
       elseif _back_ptr >= space() then
         _back_ptr = 0
         _data(0) = consume a
@@ -84,7 +84,7 @@ class Queue[A: Any #alias]
       _data.reserve(new_space)
       _mod = new_space - 1
 
-      if _back_ptr >= _data.size() then
+      if _back_ptr == _data.size() then
         _data.push(consume a)
         _back_ptr = _data.size() 
       elseif _front_ptr > _back_ptr then
@@ -95,7 +95,7 @@ class Queue[A: Any #alias]
         _back_ptr = _data.size() 
       else
         _data(_back_ptr) = consume a
-        _back_ptr = (_back_ptr + 1) 
+        _back_ptr = _back_ptr + 1
       end
     end
     _size = _size + 1
