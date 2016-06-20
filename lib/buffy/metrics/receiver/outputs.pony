@@ -26,18 +26,14 @@ actor MonitoringHubOutput is MetricsOutputActor
     Send a "connect" message to Monitoring Hub
     """
     _stdout.print("    metrics-receiver: Connecting...")
-    let message: Array[U8] iso = recover Array[U8] end
-    message.append(HubJson.connect())
-    _conn.write(Bytes.length_encode(consume message))
+    _conn.writev(Bytes.length_encode(HubJson.connect()))
 
   be send_join() =>
     """
     Send a "join" message to Monitoring Hub
     """
     _stdout.print("    metrics-receiver: Joining [" + _app_name+ "]...")
-    let message: Array[U8] iso = recover Array[U8] end
-    message.append(HubJson.join("metrics:" + _app_name))
-    _conn.write(Bytes.length_encode(consume message))
+    _conn.writev(Bytes.length_encode(HubJson.join("metrics:" + _app_name)))
 
   be apply(category: String, payload: Array[U8] val) =>
     """
@@ -45,13 +41,11 @@ actor MonitoringHubOutput is MetricsOutputActor
     """
     try
       _stdout.print("    metrics-receiver: Sending metrics")
-      let message: Array[U8] iso = recover Array[U8] end
       let doc: JsonDoc = JsonDoc
       doc.parse(String.from_array(payload))
-      message.append(
-        HubJson.payload(category, "metrics:" + _app_name,
-          doc.data as JsonArray))
-      _conn.write(Bytes.length_encode(consume message))
+      let msg = HubJson.payload(category, "metrics:" + _app_name,
+        doc.data as JsonArray)
+      _conn.writev(Bytes.length_encode(msg))
     else
       _stderr.print("   metrics-receiver: Failed sending metrics")
     end

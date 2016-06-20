@@ -1,4 +1,13 @@
+use "net"
+
 primitive Bytes
+  fun length_encode(data: ByteSeq val): Array[ByteSeq] val =>
+    let len: U32 = data.size().u32()
+    let wb = WriteBuffer
+    wb.u32_be(len)
+    wb.write(data)
+    wb.done()
+
   fun to_u16(high: U8, low: U8): U16 =>
     (high.u16() << 8) + low.u16()
 
@@ -44,12 +53,6 @@ primitive Bytes
     arr.push(l3)
     arr.push(l2)
     arr.push(l1)
-    consume arr
-
-  fun length_encode(data: Array[U8] val): Array[U8] val =>
-    let len: U32 = data.size().u32()
-    let arr: Array[U8] iso = Bytes.from_u32(len, recover Array[U8] end)
-    arr.append(data)
     consume arr
 
   fun u16_from_idx(idx: USize, arr: Array[U8]): U16 ? =>

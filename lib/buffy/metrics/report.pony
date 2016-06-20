@@ -1,6 +1,7 @@
 use "sendence/bytes"
 use "collections"
 use "serialise"
+use "net"
 
 primitive ReportTypes
   fun step(): U64 => 0
@@ -21,18 +22,24 @@ class UnknownMetricsMsg is MetricsWireMsg
     data = d
 
 primitive MetricsMsgEncoder
-  fun _serialise(msg: MetricsWireMsg val, auth: AmbientAuth): Array[U8] val ? =>
+  fun _encode(msg: MetricsWireMsg val, auth: AmbientAuth): 
+    Array[ByteSeq] val ? 
+  =>
     let serialised: Array[U8] val =
       Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
-    Bytes.length_encode(serialised)
+    let wb = WriteBuffer
+    let size = serialised.size()
+    wb.u32_be(size.u32())
+    wb.write(serialised)
+    wb.done()
 
   fun nodemetrics(summary: NodeMetricsSummary val, auth: AmbientAuth):
-  Array[U8] val ? =>
-    _serialise(summary, auth)
+    Array[ByteSeq] val ? =>
+    _encode(summary, auth)
 
   fun boundarymetrics(summary: BoundaryMetricsSummary val,
-                      auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(summary, auth)
+                      auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(summary, auth)
 
 primitive MetricsMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): MetricsWireMsg val =>

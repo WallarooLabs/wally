@@ -60,7 +60,7 @@ actor MetricsCollector is FlushingActor
     | let c: TCPConnection =>
       try
         let encoded = MetricsMsgEncoder.nodemetrics(summary, _auth)
-        c.write(consume encoded)
+        c.writev(encoded)
       else
         _stderr.print("Failed to send NodeMetricsSummary.")
       end
@@ -96,7 +96,7 @@ actor MetricsCollector is FlushingActor
   	| let c: TCPConnection =>
       try
         let encoded = MetricsMsgEncoder.boundarymetrics(summary, _auth)
-        c.write(consume encoded)
+        c.writev(encoded)
       else
         _stderr.print("Failed to send BoundaryMetricsSummary.")
       end

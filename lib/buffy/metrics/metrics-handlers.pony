@@ -1,5 +1,6 @@
 use "promises"
 use "sendence/bytes"
+use "net"
 
 primitive MetricsCategories
   fun sinks(): String => "source-sink-metrics"
@@ -10,29 +11,20 @@ interface MetricsOutputActor
   be apply(category: String, payload: Array[U8 val] val)
 
 actor MetricsAccumulatorActor is MetricsOutputActor
-  var _output: String ref = String
-  let _promise: Promise[String]
+  let _wb: WriteBuffer = WriteBuffer
+  let _promise: Promise[Array[ByteSeq] val]
 
-  new create(promise: Promise[String]) =>
+  new create(promise: Promise[Array[ByteSeq] val]) =>
     _promise = promise
 
-  fun ref _collect(data: Array[U8 val] val) =>
-    _output.append(data)
-
   be apply(category: String val, payload: Array[U8 val] val) =>
-    let c = Bytes.length_encode(category.array())
-    let p = Bytes.length_encode(payload)
-    let a: Array[U8 val] val =
-      recover val
-        let a: Array[U8 val] ref = recover Array[U8 val] end
-        a.append(c).append(p)
-        consume a
-      end
-    _collect(consume a)
+    _wb.u32_be(category.size().u32())
+    _wb.write(category)
+    _wb.u32_be(payload.size().u32())
+    _wb.write(payload)
 
   be written() =>
-    let s: String = _output.clone()
-    _promise(s)
+    _promise(_wb.done())
 
 interface MetricsCollectionOutputHandler
   fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
