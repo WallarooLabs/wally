@@ -92,7 +92,7 @@ class Queue[A: Any #alias]
           _data.push(_data(i))
         end
         _data.push(consume a)
-        _back_ptr = _data.size() 
+        _back_ptr = _data.size() and _mod
       else
         _data(_back_ptr) = consume a
         _back_ptr = _back_ptr + 1
