@@ -14,6 +14,7 @@ actor Main is TestList
     test(_TestMetricsWireMsgNode)
     test(_TestMetricsWireMsgBoundary)
     test(_TestMonitoringHubEncoder)
+    test(_TestFixedBinSelector)
 
 
 class iso _TestMetricsWireMsgNode is UnitTest
@@ -143,7 +144,7 @@ class iso _TestMonitoringHubEncoder is UnitTest
 
   fun tag _fulfill(h: TestHelper, value: String): String =>
     let arr = recover val value.array() end
-    h.assert_eq[USize](value.size(), 5375)
+    h.assert_eq[USize](value.size(), 1506)
     /* TODO: Parse the JSON and validate contents:
     for chunk in LengthParser(value.array()) do
       h.assert
@@ -184,3 +185,18 @@ actor ResumableTest is Resumable
 
   be resume() =>
     _output.written()
+
+class iso _TestFixedBinSelector is UnitTest
+  fun name(): String => "buffy:FixedBinSelector"
+
+  fun apply(h: TestHelper) =>
+    let fbs = FixedBinSelector
+    h.assert_eq[F64](fbs.bin(5), 5)
+    h.assert_eq[F64](fbs.bin(4.95), 5)
+    h.assert_eq[F64](fbs.bin(4.99), 5)
+    h.assert_eq[F64](fbs.bin(3.95), 4)
+    h.assert_eq[F64](fbs.bin(4.0), 4)
+    h.assert_eq[F64](fbs.bin(0.149), 0.15)
+    h.assert_eq[F64](fbs.bin(0), 0.000001)
+    h.assert_eq[F64](fbs.bin(11), fbs.overflow())
+    true

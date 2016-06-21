@@ -93,7 +93,7 @@ s(0.0001) // -> 0.001
   """
     if f > max_bin_ceil
     then _max
-    else 
+    else
       let b = F64(10).powi(_log10int(f))
       if b < min_bin_ceil
       then min_bin_ceil
@@ -127,8 +127,150 @@ s(0.0001) // -> 0.001
       then max_bin_ceil
     elseif f <= min_bin_ceil
       then 0
-    else 
+    else
       F64(10).powi(_log10int((f)-1))
+    end
+
+
+class FixedBinSelector is F64Selector
+"""
+A log10 selector with increased granularity in the 0.1-10 range.
+"""
+    let min_bin_ceil: F64
+    let max_bin_ceil: F64
+    let _max: F64 = F64.max_value()
+    let _size: USize
+    let _bins: Array[F64]
+
+  new val create() =>
+  """
+  """
+  _bins = [0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15,
+    0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7,
+    0.75, 0.8, 0.85, 0.9, 0.95, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  _size = _bins.size()
+  min_bin_ceil = 0.000001
+  max_bin_ceil = 10
+
+  fun size(): USize =>
+    _size
+
+  fun min_bin(): F64 =>
+  """
+  The minimum bin
+  """
+    min_bin_ceil
+
+  fun max_bin(): F64 =>
+  """
+  The maximum non-overflow bin
+  """
+    max_bin_ceil
+
+  fun overflow(): F64 =>
+  """
+  The ceiling value of the overflow bin
+  """
+    _max
+
+  fun bins(): Array[F64] =>
+    _bins.clone()
+
+  fun apply(f: F64): F64 =>
+  """
+  bin(f)
+  """
+    bin(f)
+
+  fun _binsearch(f: F64): (USize, F64) =>
+  """
+  Binary search for the correct bin
+  """
+  var l: USize = 0
+  var r: USize = _bins.size() - 1
+  var m: USize = (l+r)/2
+  try
+    while true do
+      var v = _bins(m)
+      if (l == r) or ((r-l) == 1) then break
+      elseif v < f then
+        l = m
+        m = (l+r)/2
+      elseif v >= f then
+        r = m
+        m = (l+r)/2
+      end
+    end
+    var v = _bins(m)
+    if f > v then return (m+1, _bins(m+1))
+    else return (m, v)
+    end
+  else
+    (_size, overflow())
+  end
+
+  fun bin(f: F64): F64 =>
+  """
+  The bin to which an F64 value is associated
+  """
+    if f > max_bin_ceil
+    then _max
+    else
+      (let ind, let v) = _binsearch(f)
+      v
+    end
+
+  fun below(f: F64): F64 =>
+  """
+  The bin below the current bin
+  """
+    if f > max_bin_ceil
+    then max_bin_ceil
+    else
+      try
+        (let ind, let f') = _binsearch(f)
+        _bins(ind-1)
+      else
+        min_bin_ceil
+      end
+    end
+
+  fun above(f: F64): F64 =>
+  """
+  The bin above the current bin
+  """
+    if f > max_bin_ceil
+    then overflow()
+    else
+      try
+        (let ind, let f') = _binsearch(f)
+        _bins(ind+1)
+      else
+        max_bin_ceil
+      end
+    end
+
+  fun bin_ceil(f: F64): F64 =>
+  """
+  The upper limit value of a bin
+  """
+    bin(f)
+
+  fun bin_floor(f: F64): F64 =>
+  """
+  The lower limit value of a bin
+  """
+    if f == _max
+      then max_bin_ceil
+    elseif f <= min_bin_ceil
+      then 0
+    else
+      try
+        (let ind, let f') = _binsearch(f)
+        _bins(ind-1)
+      else
+        min_bin_ceil
+      end
     end
 
 

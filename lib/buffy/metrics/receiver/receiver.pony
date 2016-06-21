@@ -81,7 +81,7 @@ actor Receiver
 
         // Metrics Collection actor
         let period: U64 = 1
-        let bin_selector: F64Selector val = Log10Selector
+        let bin_selector: F64Selector val = FixedBinSelector
         let mc = MetricsCollection(bin_selector, period, handler)
 
         // Metrics Receiver Listener
