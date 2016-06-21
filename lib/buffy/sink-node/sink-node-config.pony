@@ -46,4 +46,4 @@ actor SinkConnection
     _conn = conn
 
   be apply(s: String) =>
-    _conn.write(Bytes.length_encode(s.array()))
+    _conn.writev(Bytes.length_encode(s))
