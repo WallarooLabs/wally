@@ -59,10 +59,20 @@ class SourceConnectNotify is TCPConnectionNotify
     _metrics_collector = metrics_collector
 
   fun ref accepted(conn: TCPConnection ref) =>
+    try
+      (let host, _) = conn.remote_address().name()
+      @printf[I32]("SourceConnectNotify.accepted() %s\n".cstring(), host.cstring())
+    end
+    
     conn.expect(4)
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    try
+      (let host, _) = conn.remote_address().name()
+      @printf[I32]("SourceConnectNotify.received() %s\n".cstring(), host.cstring())
+    end
+    
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
