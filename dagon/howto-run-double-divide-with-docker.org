@@ -1,0 +1,35 @@
+* How to test Dagon Docker
+
+** Context
+1. We are running the double-divide test
+2. We need to build all components as Linux containers
+3. We will run Dagon from the host system (OSX or Linux)
+4. We need a running docker host
+5. We need to adapt the absolute paths in the docker-example.ini
+config file
+
+** Build
+1. Checkout buffy and switch to branch "dagon-docker-reanimator"
+2. run "make arch=amd64"
+3. run "make arch=amd64 build-docker"
+4. cd dagon
+5. run "stable env ponyc --debug"
+
+** Configure
+1. create a docker network named "buffy" as a bridge network
+2. edit the docker-example.ini file and update the following
+information to match your local system (this is just temporary)
+#+BEGIN_EXAMPLE
+DOCKER_CERT_PATH
+docker.dir
+docker.userid
+docker.tag
+#+END_EXAMPLE
+
+3. start the test with the following command (run from the dagon sub
+directory):
+#+BEGIN_SRC sh
+./dagon --docker=<docker-host>:<port> -t 10 \
+ --filepath=docker-example.ini \
+ --phone_home=<dagon-host>:8080
+#+END_SRC
