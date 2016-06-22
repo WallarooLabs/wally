@@ -9,10 +9,10 @@ trait SinkNodeStepBuilder
 class SinkNodeConfig[Diff: Any #read] is SinkNodeStepBuilder
   let collector_builder: {(): SinkCollector[Diff]} val
   let connector: SinkConnector val
-  let stringify: Stringify[Diff] val
+  let stringify: ArrayStringify[Diff] val
   
   new val create(collector_builder': {(): SinkCollector[Diff]} val,
-    connector': SinkConnector val, stringify': Stringify[Diff] val) 
+    connector': SinkConnector val, stringify': ArrayStringify[Diff] val) 
   =>
     collector_builder = collector_builder'
     connector = connector'
@@ -36,6 +36,7 @@ trait SinkConnector
   fun apply(conn: TCPConnection)
 
 actor SinkConnection
+  let _wb: WriteBuffer = WriteBuffer
   var _conn: TCPConnection
 
   new create(conn: TCPConnection, sink_connector: SinkConnector val) =>
@@ -45,5 +46,16 @@ actor SinkConnection
   be update_conn(conn: TCPConnection) =>
     _conn = conn
 
-  be apply(s: String) =>
-    _conn.writev(Bytes.length_encode(s))
+  be apply(strings: (String | Array[String] val)) =>
+    match strings
+    | let s: String =>
+      _wb.u32_be(s.size().u32())
+      _wb.write(s)
+      _conn.writev(_wb.done())
+    | let arr: Array[String] val =>
+      for s in arr.values() do
+        _wb.u32_be(s.size().u32())
+        _wb.write(s)
+      end
+      _conn.writev(_wb.done())
+    end

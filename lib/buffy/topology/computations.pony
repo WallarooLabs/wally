@@ -80,5 +80,8 @@ interface Parser[Out]
 interface Stringify[In]
   fun apply(i: In): String ?
 
+interface ArrayStringify[In]
+  fun apply(i: In): (String | Array[String] val) ?
+
 class NoneStringify is Stringify[None]
   fun apply(i: None): String => ""

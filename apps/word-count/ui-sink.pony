@@ -34,7 +34,7 @@ class WordCountSinkConnector is SinkConnector
     conn.writev(Bytes.length_encode(HubJson.join("reports:word-count")))
 
 class WordCountSinkStringify
-  fun apply(diff: Map[String, U64]): String =>
+  fun apply(diff: Map[String, U64]): (String | Array[String] val) =>
     let payload = map_to_json(diff)
     HubJson.payload("word-count-msgs", "reports:word-count", payload)
 
