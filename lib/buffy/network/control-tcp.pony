@@ -82,7 +82,7 @@ class ControlConnectNotify is TCPConnectionNotify
         try
           (let host, _) = conn.remote_address().name()
 
-          @printf[I32]("ControlConnectNotify.received() %s\n".cstring(), host.cstring())
+          @printf[I32]("ControlConnectNotify.received() IdentifyControlPortMsg  %s\n".cstring(), host.cstring())
           
           _coordinator.assign_topology_control_conn(m.node_name, host, 
             m.service)
@@ -90,6 +90,9 @@ class ControlConnectNotify is TCPConnectionNotify
       | let m: IdentifyDataPortMsg val =>
         try
           (let host, _) = conn.remote_address().name()
+
+          @printf[I32]("ControlConnectNotify.received() IdentifyDataPortMsg %s\n".cstring(), host.cstring())
+          
           _coordinator.assign_topology_data_conn(m.node_name, host, 
             m.service)
         end
