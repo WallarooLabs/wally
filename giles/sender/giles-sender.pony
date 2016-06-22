@@ -322,6 +322,7 @@ actor SendingActor
   let _timers: Timers
   let _data_source: Iterator[String] iso
   var _finished: Bool = false
+  let _msg_encoder: BufferedExternalMsgEncoder = BufferedExternalMsgEncoder
 
   new create(messages_to_send: USize,
     to_buffy_socket: TCPConnection,
@@ -353,19 +354,18 @@ actor SendingActor
       end
 
     if (current_batch_size > 0) and _data_source.has_next() then
-      let d = recover Array[ByteSeq](current_batch_size) end
       let d' = recover Array[ByteSeq](current_batch_size) end
       for i in Range(0, current_batch_size) do
         try
           let n = _data_source.next()
           d'.push(n)
-          d.append(ExternalMsgEncoder.data(n))
+          _msg_encoder.add_data(n)
         else
           break
         end
       end
 
-      _to_buffy_socket.writev(consume d)
+      _to_buffy_socket.writev(_msg_encoder.done())
       _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
       _messages_sent = _messages_sent + current_batch_size
     else

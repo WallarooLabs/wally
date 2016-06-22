@@ -23,7 +23,7 @@ To run the Double Divide app, you need to kick off three processes.  The first a
 the leader address.
 
 * Leader
-  * ```./app-name --leader-control-address 127.0.0.1:6000 --leader-data-address 127.0.0.1:6500 --source 127.0.0.1:7000 --sink 127.0.0.1:8000 --metrics 127.0.0.1:9000 -p 127.0.0.1:10000 -l -w 2 -n LeaderNode```
+  * ```./app-name --leader-control-address 127.0.0.1:6000 --leader-data-address 127.0.0.1:6500 --source 127.0.0.1:7000 --sink 127.0.0.1:8000 --metrics 127.0.0.1:9000 -p 127.0.0.1:10000 -l -w 2 -n leader```
 
 * Workers  
   * ```./app-name --leader-control-address 127.0.0.1:6000 --leader-data-address 127.0.0.1:6500 --source 127.0.0.1:7000 --sink 127.0.0.1:8000 --metrics 127.0.0.1:9000 -p 127.0.0.1:10000 -n Worker1```
