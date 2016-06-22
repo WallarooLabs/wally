@@ -23,7 +23,6 @@ primitive  FixParser
     let split = i.split("\x01")
       split.pop()
     for part in (consume split).values() do
-//      @printf[I32]("part: %s\n".cstring(), part.cstring())
       let tuple = part.split("=")
       out(tuple(0)) = tuple(1)
     end
