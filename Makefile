@@ -137,7 +137,7 @@ print-%  : ; @echo $* = $($*)
 
 build-buffy-components: build-receiver build-sender build-dagon build-dagon-child build-fallor
 
-build-apps: build-wesley build-double-divide build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count ## Build Pony based programs for Buffy
+build-apps: build-wesley build-double-divide build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count build-word-length-count ## Build Pony based programs for Buffy
 
 build: build-buffy-components build-apps build-wesley
 
@@ -165,6 +165,9 @@ build-market-spread: ## build market spread app
 build-word-count: ## build word count app
 	$(call PONYC,apps/word-count)
 
+build-word-length-count: ## build word length count app
+	$(call PONYC,apps/word-length-count)
+
 build-dagon: ## build dagon
 	$(call PONYC,dagon)
 
@@ -172,6 +175,7 @@ build-dagon-child: ## build dagon-child
 	$(call PONYC,dagon/dagon-child)
 
 build-wesley: ## Build wesley
+	$(call PONYC,wesley/word-length-count-test)
 	$(call PONYC,wesley/double-test)
 	$(call PONYC,wesley/identity-test)
 	$(call PONYC,wesley/wordcount-test)
@@ -220,6 +224,9 @@ test-market-spread: ## Test market-spread app
 test-word-count: ## Test word-count app
 	cd apps/word-count && ./word-count
 
+test-word-length-count: ## Test word-length-count app
+	cd apps/word-length-count && ./word-length-count
+
 test-giles-receiver: ## Test Giles Receiver
 	cd giles/receiver && ./receiver
 
@@ -244,7 +251,7 @@ test-mh-metrics-reporter: ## Test MH Metrics Reporter
 test-mh-metrics-reporter-ui: ## Test MH Metrics Reporter UI
 	cd monitoring_hub/apps/metrics_reporter_ui && mix test
 
-dagon-test: dagon-identity dagon-word-count dagon-market-spread dagon-identity-drop #dagon-double ## Run dagon tests
+dagon-test: dagon-identity dagon-word-count dagon-market-spread dagon-identity-drop #dagon-word-length-count #dagon-double ## Run dagon tests
 
 dagon-double: ## Run double test with dagon
 	dagon/dagon.py dagon/config/double.ini
@@ -298,6 +305,10 @@ dagon-word-count-60: ## Run word count test with dagon
 dagon-market-spread: ## Run market spread test with dagon
 	./dagon/dagon --timeout=25 -f apps/market-spread/market-spread.ini -h 127.0.0.1:8080
 	./wesley/market-spread-test/market-spread-test ./demos/marketspread/100nbbo.msg ./sent.txt ./received.txt match
+
+dagon-word-length-count: ## Run word length count test with dagon
+	./dagon/dagon --timeout=15 -f apps/word-length-count/word-length-count.ini -h 127.0.0.1:8080
+	./wesley/word-length-count-test/word-length-count-test ./sent.txt ./received.txt match
 
 dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
 
@@ -493,6 +504,7 @@ clean: clean-docker ## Cleanup docker images, deps and compiled files for Buffy
 	rm -f apps/quadruple/quadruple apps/quadruple/quadruple.o
 	rm -f apps/market-spread/market-spread apps/market-spread/market-spread.o
 	rm -f apps/word-count/word-count apps/word-count/word-count.o
+	rm -f apps/word-length-count/word-length-count apps/word-length-count/word-length-count.o apps/word-length-count/*.class
 	rm -f dagon/dagon-child/dagon-child dagon/dagon-child/dagon-child.o
 	rm -rf monitoring_hub/apps/metrics_reporter_ui/rel/metrics_reporter_ui/
 	rm -rf monitoring_hub/apps/market_spread_reports_ui/rel/market_spread_reports_ui/
