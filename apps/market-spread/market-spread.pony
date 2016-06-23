@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "buffy/topology"
 use "buffy/sink-node"
 use "sendence/fix"
+use "sendence/epoch"
 use "net"
 use "random"
 use "time"
@@ -171,7 +172,7 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
         MarketDataEntry(true, 0, 0)
       end
     let result: TradeResult val = TradeResult(_trade.order_id(),
-      _trade.transact_time(), _trade.account(), _trade.symbol(), 
+      Epoch.seconds(), _trade.account(), _trade.symbol(), 
       _trade.price(), _trade.order_qty().u64(), _trade.side().string(), 
       market_data_entry.bid, market_data_entry.offer, 
       market_data_entry.is_rejected)
@@ -180,7 +181,7 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
  
 class TradeResult
   let order_id: String
-  let timestamp: String
+  let timestamp: U64
   let client_id: String
   let symbol: String
   let price: F64
@@ -191,7 +192,7 @@ class TradeResult
   let is_rejected: Bool
 
   new val create(order_id': String,
-    timestamp': String,
+    timestamp': U64,
     client_id': String,
     symbol': String,
     price': F64,
@@ -213,7 +214,7 @@ class TradeResult
     is_rejected = is_rejected'
 
   fun string(): String =>
-    symbol + "," + order_id + "," + timestamp + "," + client_id + ","
+    symbol + "," + order_id + "," + timestamp.string() + "," + client_id + ","
       + price.string() + "," + qty.string() + "," + side + "," 
       + bid.string() + "," + offer.string() + "," + is_rejected.string()
 

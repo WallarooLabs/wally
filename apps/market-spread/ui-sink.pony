@@ -42,7 +42,7 @@ class MarketSpreadSinkCollector is SinkCollector[RejectedResultStore]
       let parsed = input.split(",")
       let symbol = parsed(0)
       let order_id = parsed(1)
-      let timestamp = parsed(2)
+      let timestamp = parsed(2).u64()
       let client_id = parsed(3)
       let price = parsed(4).f64()
       let qty = parsed(5).u64()
@@ -93,7 +93,7 @@ class MarketSpreadSinkStringify
     for order in diff.rejected.values() do
       let next = recover Map[String, JsonType] end
       next("order_id") = order.order_id
-      next("timestamp") = order.timestamp
+      next("timestamp") = order.timestamp.i64()
       next("client_id") = order.client_id
       next("symbol") = order.symbol
       next("price") = order.price
