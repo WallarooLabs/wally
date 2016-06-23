@@ -8,6 +8,7 @@ use "options"
 use "time"
 use "buffy/messages"
 use "sendence/tcp"
+use "debug"
 
 // documentation
 // more tests
@@ -337,12 +338,10 @@ actor SendingActor
     _timers = Timers
 
   be go() =>
-    @printf[I32]("SendingActor.go()\n".cstring())
     let t = Timer(SendBatch(this), 0, 5_000_000)
     _timers(consume t)
 
   be send_batch() =>
-    @printf[I32]("SendingActor.send_batch()\n".cstring())
     if _finished then return end
 
     let batch_size = USize(500)
@@ -360,11 +359,10 @@ actor SendingActor
       for i in Range(0, current_batch_size) do
         try
           let n = _data_source.next()
-          @printf[I32]("Adding to batch: %s\n".cstring(), n.cstring())
           d'.push(n)
           d.push(ExternalMsgEncoder.data(n))
         else
-          @printf[I32]("SendingActor: failed reading _data_source.next()\n".cstring())
+          Debug.out("SendingActor: failed reading _data_source.next()")
           break
         end
       end

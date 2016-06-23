@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "sendence/bytes"
 use "time"
 use "spike"
+use "debug"
 
 class ControlNotifier is TCPListenNotify
   let _env: Env
@@ -82,7 +83,7 @@ class ControlConnectNotify is TCPConnectionNotify
         try
           (let host, _) = conn.remote_address().name()
 
-          @printf[I32]("ControlConnectNotify.received() IdentifyControlPortMsg  %s\n".cstring(), host.cstring())
+          Debug.out("ControlConnectNotify.received() IdentifyControlPortMsg " + host)
           
           _coordinator.assign_topology_control_conn(m.node_name, host, 
             m.service)
@@ -91,7 +92,7 @@ class ControlConnectNotify is TCPConnectionNotify
         try
           (let host, _) = conn.remote_address().name()
 
-          @printf[I32]("ControlConnectNotify.received() IdentifyDataPortMsg %s\n".cstring(), host.cstring())
+          Debug.out("ControlConnectNotify.received() IdentifyDataPortMsg " + host)
           
           _coordinator.assign_topology_data_conn(m.node_name, host, 
             m.service)
