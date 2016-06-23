@@ -83,16 +83,16 @@ actor Coordinator
           if connector != target then
             let msg = WireMsgEncoder.add_control(target, addr._1, addr._2,
              _auth)
-            conn.write(msg)
+            conn.writev(msg)
           end
         end
         for (target, addr) in _data_addrs.pairs() do
           if connector != target then
             let msg = WireMsgEncoder.add_data(target, addr._1, addr._2, _auth)
-            conn.write(msg)
+            conn.writev(msg)
           end
         end
-        conn.write(confirm_msg)
+        conn.writev(confirm_msg)
       end
     end
 
@@ -100,7 +100,7 @@ actor Coordinator
     try
       let message = WireMsgEncoder.identify_data_port(_node_name, service,
         _auth)
-      _control_connections("leader").write(message)
+      _control_connections("leader").writev(message)
     else
       _env.out.print("Coordinator: data connection to leader was not set up")
     end
@@ -109,7 +109,7 @@ actor Coordinator
     try
       let message = WireMsgEncoder.identify_control_port(_node_name, service,
         _auth)
-      _control_connections("leader").write(message)
+      _control_connections("leader").writev(message)
     else
       _env.out.print("Coordinator: control connection to leader was not set up")
     end
@@ -118,14 +118,14 @@ actor Coordinator
     _env.out.print("Acking connections finished!")
     try
       let ack_msg = WireMsgEncoder.ack_finished_connections(_node_name, _auth)
-      _control_connections(target_name).write(ack_msg)
+      _control_connections(target_name).writev(ack_msg)
     end
 
   be ack_initialization_msgs_finished(target_name: String) =>
     _env.out.print("Acking initialization messages finished!")
     try
       let ack_msg = WireMsgEncoder.ack_initialized(_node_name, _auth)
-      _control_connections(target_name).write(ack_msg)
+      _control_connections(target_name).writev(ack_msg)
     end
 
   be process_finished_connections_ack() =>
@@ -242,9 +242,9 @@ actor Coordinator
   ////////
   // SEND
   ////////
-  be send_control_message(target_name: String, msg: Array[U8] val) =>
+  be send_control_message(target_name: String, msg: Array[ByteSeq] val) =>
     try
-      _control_connections(target_name).write(msg)
+      _control_connections(target_name).writev(msg)
     else
       _env.out.print("Coordinator: no control conn to " + target_name)
     end
@@ -263,10 +263,10 @@ actor Coordinator
         .received(data_ch_id, step_id, msg, _step_manager)
     end
 
-  be send_phone_home_message(msg: Array[U8] val) =>
+  be send_phone_home_message(msg: Array[ByteSeq] val) =>
     match _phone_home_connection
     | let phc: TCPConnection =>
-      phc.write(msg)
+      phc.writev(msg)
     end
 
   fun _send_data_sender_ready_msg(target_name: String) =>
@@ -280,7 +280,7 @@ actor Coordinator
   be ack_msg_id(sender_name: String, last_id: U64) =>
     try
       let message = WireMsgEncoder.ack_message_id(_node_name, last_id, _auth)
-      _control_connections(sender_name).write(message)
+      _control_connections(sender_name).writev(message)
     end
 
   be process_data_ack(receiver_name: String, msg_count: U64) =>
@@ -303,7 +303,7 @@ actor Coordinator
       _data_connection_senders(target_name).reconnect(conn)
 
       let reconnect_message = WireMsgEncoder.reconnect_data(_node_name, _auth)
-      try _control_connections(target_name).write(reconnect_message) end
+      try _control_connections(target_name).writev(reconnect_message) end
     else
       _env.err.print("Coordinator: couldn't reconnect to " + target_name)
     end
@@ -339,7 +339,7 @@ actor Coordinator
     try
       let message = WireMsgEncoder.ack_connect_message_id(_node_name,
         last_id, _auth)
-      _control_connections(sender_name).write(message)
+      _control_connections(sender_name).writev(message)
     end
 
   be process_data_connect_ack(receiver_name: String, seen_since_last_ack: U64) =>
@@ -361,11 +361,11 @@ actor Coordinator
       end
 
       for (key, conn) in _control_connections.pairs() do
-        conn.write(shutdown_msg)
+        conn.writev(shutdown_msg)
         conn.dispose()
       end
       for (k, sender) in _data_connection_senders.pairs() do
-        sender.write(shutdown_msg)
+        sender.writev(shutdown_msg)
         sender.dispose()
       end
       for (key, receiver) in _data_connection_receivers.pairs() do
@@ -378,7 +378,7 @@ actor Coordinator
 
       match _phone_home_connection
       | let phc: TCPConnection =>
-        phc.write(ExternalMsgEncoder.done_shutdown(_node_name))
+        phc.writev(ExternalMsgEncoder.done_shutdown(_node_name))
         phc.dispose()
       end
     else

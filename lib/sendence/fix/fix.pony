@@ -23,7 +23,6 @@ primitive  FixParser
     let split = i.split("\x01")
       split.pop()
     for part in (consume split).values() do
-//      @printf[I32]("part: %s\n".cstring(), part.cstring())
       let tuple = part.split("=")
       out(tuple(0)) = tuple(1)
     end
@@ -94,7 +93,7 @@ class FixNbboMessage is (Equatable[FixNbboMessage] & Stringable)
     "FixNbboMessage".string(fmt)
 
 class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
-  let _side: Side
+  let _side: Side val
   let _account: String
   let _order_id: String
   let _symbol: String
@@ -103,7 +102,7 @@ class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
   let _transact_time: String
 
   new val create(
-    side': Side
+    side': Side val
     , account': String
     , order_id': String
     , symbol': String
@@ -120,7 +119,7 @@ class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
     _price = price'
     _transact_time = transact_time'
 
-  fun side(): Side => _side
+  fun side(): Side val => _side
   fun account(): String => _account
   fun order_id(): String => _order_id
   fun symbol(): String => _symbol
@@ -143,8 +142,11 @@ class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
 
 primitive OtherFixMessage
 
-type Side is (Buy | Sell)
+trait Side
+  fun string(): String
 
-primitive Buy
-primitive Sell
+primitive Buy is Side
+  fun string(): String => "buy"
+primitive Sell is Side
+  fun string(): String => "sell"
 

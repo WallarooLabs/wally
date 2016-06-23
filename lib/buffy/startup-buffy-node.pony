@@ -26,16 +26,16 @@ class StartupBuffyNode
 
     options
       .add("leader", "l", None)
-      .add("worker_count", "w", I64Argument)
+      .add("worker-count", "w", I64Argument)
       .add("phone_home", "p", StringArgument)
       .add("name", "n", StringArgument)
-      .add("leader-control-address", "", StringArgument)
-      .add("leader-data-address", "", StringArgument)
+      .add("leader-control-address", "c", StringArgument)
+      .add("leader-data-address", "d", StringArgument)
       // Comma-delimited source and sink addresses.
       // e.g. --source 127.0.0.1:6000,127.0.0.1:7000
-      .add("source", "", StringArgument)
-      .add("sink", "", StringArgument)
-      .add("metrics", "", StringArgument)
+      .add("source", "r", StringArgument)
+      .add("sink", "k", StringArgument)
+      .add("metrics", "m", StringArgument)
       .add("spike-delay", "", None)
       .add("spike-drop", "", None)
       .add("spike-seed", "", I64Argument)
@@ -45,7 +45,7 @@ class StartupBuffyNode
       | ("leader", None) => is_worker = false
       | ("leader-control-address", let arg: String) => leader_control_addr = arg.split(":")
       | ("leader-data-address", let arg: String) => leader_data_addr = arg.split(":")
-      | ("worker_count", let arg: I64) => worker_count = arg.usize()
+      | ("worker-count", let arg: I64) => worker_count = arg.usize()
       | ("phone_home", let arg: String) => phone_home_addr = arg.split(":")
       | ("name", let arg: String) => node_name = arg
       | ("source", let arg: String) => source_addrs.append(arg.split(","))
@@ -172,17 +172,17 @@ class StartupBuffyNode
         """
         PARAMETERS:
         -----------------------------------------------------------------------------------
-        -l [Sets process as leader]
-        -w <count> [Tells the leader how many workers to wait for]
-        -n <node_name> [Sets the name for the process in the Buffy cluster]
-        -p <address> [Sets the address for phone home]
-        --leader-control-address <address> [Sets the address for the leader's control
+        --leader/-l [Sets process as leader]
+        --worker-count/-w <count> [Tells the leader how many workers to wait for]
+        --name/-n <node_name> [Sets the name for the process in the Buffy cluster]
+        --phone_home/-p <address> [Sets the address for phone home]
+        --leader-control-address/-c <address> [Sets the address for the leader's control
                                             channel address]
-        --leader-data-address <address> [Sets the address for the leader's data channel
+        --leader-data-address/-d <address> [Sets the address for the leader's data channel
                                          address]
-        --source <comma-delimited source_addresses> [Sets the addresses for the sink]
-        --sink <comma-delimited sink_addresses> [Sets the addresses for the sink]
-        --metrics <metrics-receiver address> [Sets the address for the metrics receiver]
+        --source/-r <comma-delimited source_addresses> [Sets the addresses for the sink]
+        --sink/-k <comma-delimited sink_addresses> [Sets the addresses for the sink]
+        --metrics/-m <metrics-receiver address> [Sets the address for the metrics receiver]
         --spike-seed <seed> [Optionally sets seed for spike]
         --spike-delay [Set flag for spike delay]
         --spike-drop [Set flag for spike drop]

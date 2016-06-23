@@ -1,119 +1,125 @@
 use "sendence/bytes"
 use "buffy/topology"
 use "serialise"
+use "net"
 
 primitive WireMsgEncoder
-  fun _serialise(msg: WireMsg val, auth: AmbientAuth): Array[U8] val ? =>
+  fun _encode(msg: WireMsg val, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    let wb = WriteBuffer
     let serialised: Array[U8] val =
       Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
-    Bytes.length_encode(serialised)
+    let size = serialised.size()
+    wb.u32_be(size.u32())
+    wb.write(serialised)
+    wb.done()
 
-  fun ready(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(ReadyMsg(node_name), auth)
+  fun ready(node_name: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(ReadyMsg(node_name), auth)
 
-  fun topology_ready(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(TopologyReadyMsg(node_name), auth)
+  fun topology_ready(node_name: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(TopologyReadyMsg(node_name), auth)
 
   fun identify_control_port(node_name: String, service: String,
-    auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(IdentifyControlPortMsg(node_name, service), auth)
+    auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(IdentifyControlPortMsg(node_name, service), auth)
 
   fun identify_data_port(node_name: String, service: String,
-    auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(IdentifyDataPortMsg(node_name, service), auth)
+    auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(IdentifyDataPortMsg(node_name, service), auth)
 
   fun add_control(node_name: String, host: String, service: String,
-    auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(AddControlMsg(node_name, host, service), auth)
+    auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(AddControlMsg(node_name, host, service), auth)
 
   fun add_data(node_name: String, host: String, service: String,
-    auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(AddDataMsg(node_name, host, service), auth)
+    auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(AddDataMsg(node_name, host, service), auth)
 
-  fun done(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(DoneMsg(node_name), auth)
+  fun done(node_name: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(DoneMsg(node_name), auth)
 
-  fun reconnect(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(ReconnectMsg(node_name), auth)
+  fun reconnect(node_name: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(ReconnectMsg(node_name), auth)
 
-  fun start(auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(StartMsg, auth)
+  fun start(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(StartMsg, auth)
 
-  fun shutdown(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(ShutdownMsg(node_name), auth)
+  fun shutdown(node_name: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(ShutdownMsg(node_name), auth)
 
-  fun done_shutdown(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(DoneShutdownMsg(node_name), auth)
+  fun done_shutdown(node_name: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(DoneShutdownMsg(node_name), auth)
 
   fun spin_up(step_id: U64, step_builder: BasicStepBuilder val, auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(SpinUpMsg(step_id, step_builder), auth)
+    : Array[ByteSeq] val ? =>
+    _encode(SpinUpMsg(step_id, step_builder), auth)
 
   fun spin_up_state_step(step_id: U64, step_builder: BasicStateStepBuilder val,
     shared_state_step_id: U64, shared_state_step_node: String, auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(SpinUpStateStepMsg(step_id, step_builder, shared_state_step_id,
+    : Array[ByteSeq] val ? =>
+    _encode(SpinUpStateStepMsg(step_id, step_builder, shared_state_step_id,
       shared_state_step_node), auth)
 
   fun spin_up_proxy(proxy_id: U64, step_id: U64, target_node_name: String
-    , auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(SpinUpProxyMsg(proxy_id, step_id, target_node_name), auth)
+    , auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(SpinUpProxyMsg(proxy_id, step_id, target_node_name), auth)
 
   fun spin_up_sink(sink_ids: Array[U64] iso, sink_step_id: U64, sink_builder: SinkBuilder val,
     auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(SpinUpSinkMsg(consume sink_ids, sink_step_id, sink_builder), auth)
+    : Array[ByteSeq] val ? =>
+    _encode(SpinUpSinkMsg(consume sink_ids, sink_step_id, sink_builder), auth)
 
   fun connect_steps(from_step_id: U64, to_step_id: U64, auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(ConnectStepsMsg(from_step_id, to_step_id), auth)
+    : Array[ByteSeq] val ? =>
+    _encode(ConnectStepsMsg(from_step_id, to_step_id), auth)
 
   fun initialization_msgs_finished(node_name: String, auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(InitializationMsgsFinishedMsg(node_name), auth)
+    : Array[ByteSeq] val ? =>
+    _encode(InitializationMsgsFinishedMsg(node_name), auth)
 
-  fun ack_initialized(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(AckInitializedMsg(node_name), auth)
+  fun ack_initialized(node_name: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(AckInitializedMsg(node_name), auth)
 
   fun ack_message_id(node_name: String, msg_id: U64,
-    auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(AckMsgIdMsg(node_name, msg_id), auth)
+    auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(AckMsgIdMsg(node_name, msg_id), auth)
  
-  fun reconnect_data(node_name: String, auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(ReconnectDataMsg(node_name), auth)
+  fun reconnect_data(node_name: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(ReconnectDataMsg(node_name), auth)
 
   fun data_sender_ready(node_name: String, auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(DataSenderReadyMsg(node_name), auth)
+    : Array[ByteSeq] val ? =>
+    _encode(DataSenderReadyMsg(node_name), auth)
 
   fun data_receiver_ready(node_name: String, auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(DataReceiverReadyMsg(node_name), auth)
+    : Array[ByteSeq] val ? =>
+    _encode(DataReceiverReadyMsg(node_name), auth)
 
   fun control_sender_ready(node_name: String, auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(ControlSenderReadyMsg(node_name), auth)
+    : Array[ByteSeq] val ? =>
+    _encode(ControlSenderReadyMsg(node_name), auth)
 
   fun finished_connections(node_name: String, auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(FinishedConnectionsMsg(node_name), auth)
+    : Array[ByteSeq] val ? =>
+    _encode(FinishedConnectionsMsg(node_name), auth)
 
   fun ack_finished_connections(node_name: String, auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(AckFinishedConnectionsMsg(node_name), auth)
+    : Array[ByteSeq] val ? =>
+    _encode(AckFinishedConnectionsMsg(node_name), auth)
 
   fun ack_connect_message_id(node_name: String, msg_id: U64,
-    auth: AmbientAuth): Array[U8] val ? =>
-    _serialise(AckConnectMsgIdMsg(node_name, msg_id), auth)
+    auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(AckConnectMsgIdMsg(node_name, msg_id), auth)
 
   fun data_channel(id: U64, forward: Forward val, auth: AmbientAuth)
-    : Array[U8] val ? =>
-    _serialise(DataChannelMsg(id, forward), auth)
+    : Array[ByteSeq] val ? =>
+    _encode(DataChannelMsg(id, forward), auth)
 
 primitive WireMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): WireMsg val =>
     try
-      match Serialised.input(InputSerialisedAuth(auth), data)(DeserialiseAuth(auth))
+      match Serialised.input(InputSerialisedAuth(auth), data)(
+        DeserialiseAuth(auth))
       | let m: WireMsg val => m
       else
         UnknownMsg(data)

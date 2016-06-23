@@ -3,6 +3,7 @@ use "buffy"
 use "buffy/messages"
 use "buffy/metrics"
 use "buffy/topology"
+use "buffy/sink-node"
 use "sendence/fix"
 use "net"
 use "random"
@@ -44,7 +45,15 @@ actor Main
             end)
           .build()
       end
-      Startup(env, consume topology, 2)
+      let sink_builders = recover Array[SinkNodeStepBuilder val] end
+      let ui_sink_builder = SinkNodeConfig[RejectedResultStore](
+        lambda(): SinkCollector[RejectedResultStore] => 
+          MarketSpreadSinkCollector end,
+        MarketSpreadSinkConnector,
+        MarketSpreadSinkStringify
+      )
+      sink_builders.push(ui_sink_builder)
+      Startup(env, topology, 2, consume sink_builders)
     else
       env.out.print("Couldn't build topology")
     end
@@ -69,7 +78,8 @@ actor Main
         let partition_id = nbbo.symbol().hash()       
         map(partition_id) = recover 
             lambda()(nbbo, is_rejected): MarketData => 
-              MarketData.update(nbbo.symbol(), is_rejected) end
+              MarketData.update(nbbo.symbol(), 
+                MarketDataEntry(is_rejected, nbbo.bid_px(), nbbo.offer_px())) end
           end
       end
     end
@@ -91,22 +101,32 @@ class FileDataSource is Iterator[String]
       error
     end
 
-class MarketData
-  let _data_rejected: Map[String, Bool] = Map[String, Bool]
-  let _id: U64 = Dice(MT(Time.micros()))(1, 10000)
+class MarketDataEntry
+  let is_rejected: Bool
+  let bid: F64
+  let offer: F64
 
-  fun ref update(symbol: String, is_rej: Bool): MarketData =>
-    _data_rejected(symbol) = is_rej
+  new create(is_rej: Bool, b: F64, o: F64) =>
+    is_rejected = is_rej
+    bid = b
+    offer = o
+
+class MarketData
+  let _entries: Map[String, MarketDataEntry] = 
+    Map[String, MarketDataEntry]
+  
+  fun ref apply(symbol: String): MarketDataEntry ? => _entries(symbol) 
+
+  fun ref update(symbol: String, entry: MarketDataEntry): MarketData =>
+    _entries(symbol) = entry
     this
 
   fun is_rejected(symbol: String): Bool =>
     try
-      _data_rejected(symbol)
+      _entries(symbol).is_rejected
     else
       true
     end
-
-  fun id(): U64 => _id
 
 class GenerateUpdateData is Computation[FixNbboMessage val, UpdateData val]
   fun name(): String => "update data"
@@ -121,12 +141,13 @@ class UpdateData is StateComputation[None, MarketData]
 
   fun name(): String => "update market data"
   fun apply(state: MarketData, output: MessageTarget[None] val): MarketData =>
-    let mid = (_nbbo.bid_px() + _nbbo.offer_px()) / 2
     if ((_nbbo.offer_px() - _nbbo.bid_px()) >= 0.05) or
-      (((_nbbo.offer_px() - _nbbo.bid_px()) / mid) >= 0.05) then
-      state.update(_nbbo.symbol(), true)
+      (((_nbbo.offer_px() - _nbbo.bid_px()) / _nbbo.mid()) >= 0.05) then
+      state.update(_nbbo.symbol(), MarketDataEntry(true, _nbbo.bid_px(), 
+        _nbbo.offer_px()))
     else
-      state.update(_nbbo.symbol(), false)
+      state.update(_nbbo.symbol(), MarketDataEntry(false, _nbbo.bid_px(), 
+        _nbbo.offer_px()))
     end
 
 class GenerateCheckStatus is Computation[FixOrderMessage val, CheckStatus val]
@@ -143,18 +164,58 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
   fun name(): String => "check trade result"
   fun apply(state: MarketData, output: MessageTarget[TradeResult val] val):
     MarketData =>
-    let is_rejected = state.is_rejected(_trade.symbol())
-    let result: TradeResult val = TradeResult(_trade.symbol(), is_rejected)
+    let market_data_entry = 
+      try
+        state(_trade.symbol())
+      else
+        MarketDataEntry(true, 0, 0)
+      end
+    let result: TradeResult val = TradeResult(_trade.order_id(),
+      _trade.transact_time(), _trade.account(), _trade.symbol(), 
+      _trade.price(), _trade.order_qty().u64(), _trade.side().string(), 
+      market_data_entry.bid, market_data_entry.offer, 
+      market_data_entry.is_rejected)
     output(result)
     state
-
+ 
 class TradeResult
+  let order_id: String
+  let timestamp: String
+  let client_id: String
   let symbol: String
+  let price: F64
+  let qty: U64
+  let side: String
+  let bid: F64
+  let offer: F64
   let is_rejected: Bool
 
-  new val create(s: String, is_rej: Bool) =>
-    symbol = s
-    is_rejected = is_rej
+  new val create(order_id': String,
+    timestamp': String,
+    client_id': String,
+    symbol': String,
+    price': F64,
+    qty': U64,
+    side': String,
+    bid': F64,
+    offer': F64,
+    is_rejected': Bool) 
+  =>
+    order_id = order_id'
+    timestamp = timestamp'
+    client_id = client_id'
+    symbol = symbol'
+    price = price'
+    qty = qty'
+    side = side'
+    bid = bid'
+    offer = offer'
+    is_rejected = is_rejected'
+
+  fun string(): String =>
+    symbol + "," + order_id + "," + timestamp + "," + client_id + ","
+      + price.string() + "," + qty.string() + "," + side + "," 
+      + bid.string() + "," + offer.string() + "," + is_rejected.string()
 
 interface Symboly
   fun symbol(): String
@@ -181,4 +242,4 @@ class TradeParser is Parser[FixOrderMessage val]
 
 class ResultStringify
   fun apply(input: TradeResult val): String =>
-    input.symbol + "," + input.is_rejected.string()
+    input.string()

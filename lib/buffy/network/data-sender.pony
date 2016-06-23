@@ -25,19 +25,19 @@ actor DataSender
       _held.enqueue(_TCPMsg(_msg_id, data_msg))
       _msg_id = _msg_id + 1
       if _sending then
-        _conn.write(data_msg)
+        _conn.writev(data_msg)
       end
     end
 
-  be write(msg: Array[U8] val) =>
-    _conn.write(msg)
+  be writev(msg: Array[ByteSeq] val) =>
+    _conn.writev(msg)
 
   be send_ready() => _send_ready()
 
   fun ref _send_ready() =>
     try
       let msg = WireMsgEncoder.data_sender_ready(_sender_name, _auth)
-      _conn.write(msg)
+      _conn.writev(msg)
     end
 
   be ack(msg_id: U64) => _ack(msg_id)
@@ -72,7 +72,7 @@ actor DataSender
     for idx in Range(0, size) do
       try
         let next_msg = _held(idx).data
-        _conn.write(next_msg)
+        _conn.writev(next_msg)
       else
         @printf[I32]("Couldn't resend!!\n".cstring())
       end
@@ -84,8 +84,8 @@ actor DataSender
 
 class _TCPMsg
   let msg_id: U64
-  let data: Array[U8] val
+  let data: Array[ByteSeq] val
 
-  new create(m_id: U64, d: Array[U8] val) =>
+  new create(m_id: U64, d: Array[ByteSeq] val) =>
     msg_id = m_id
     data = d

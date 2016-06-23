@@ -28,17 +28,13 @@ class WordCountSinkConnector is SinkConnector
     _send_join(conn)
 
   fun _send_connect(conn: TCPConnection) =>
-    let message: Array[U8] iso = recover Array[U8] end
-    message.append(HubJson.connect())
-    conn.write(Bytes.length_encode(consume message))
+    conn.writev(Bytes.length_encode(HubJson.connect()))
 
   fun _send_join(conn: TCPConnection) =>
-    let message: Array[U8] iso = recover Array[U8] end
-    message.append(HubJson.join("reports:word-count"))
-    conn.write(Bytes.length_encode(consume message))
+    conn.writev(Bytes.length_encode(HubJson.join("reports:word-count")))
 
 class WordCountSinkStringify
-  fun apply(diff: Map[String, U64]): String =>
+  fun apply(diff: Map[String, U64]): (String | Array[String] val) =>
     let payload = map_to_json(diff)
     HubJson.payload("word-count-msgs", "reports:word-count", payload)
 

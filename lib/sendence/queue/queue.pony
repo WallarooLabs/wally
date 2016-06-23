@@ -1,26 +1,46 @@
 use "collections"
+use "debug"
+use "assert"
 
 class Queue[A: Any #alias]
   let _data: Array[A]
   var _front_ptr: USize = 0
   var _back_ptr: USize = 0
+  var _mod: USize = 0
   var _size: USize = 0
 
-  new create(els: Array[A] = Array[A]) =>
+  new create(len: USize = 0) =>
+    """
+    Create a queue.
+    """
+    let n = len.max(2).next_pow2()
+    _mod = n - 1
+    _data = Array[A](n)
+    _size = 0
+
+  new from(els: Array[A] = Array[A], len: USize = 0) =>
     """
     Create a queue of elements from the supplied array.
     """
+    let n = 
+      if len >= els.size() then
+        len.max(2).next_pow2()
+      else
+        els.size().max(2).next_pow2()
+      end
+    _mod = n - 1
     _data = els
+    _data.reserve(n)
     _size = _data.size()
     _back_ptr = _size
 
   fun size(): USize =>
     """
-    The number of elements in the queue.
+    The size of the queue.
     """
     _size
 
-  fun space(): USize => _data.size()
+  fun space(): USize => _mod + 1
 
   fun apply(i: USize): this->A ? =>
     """
@@ -28,16 +48,16 @@ class Queue[A: Any #alias]
     raising an error if the index is out of bounds.
     """
     if i < _size then
-      _data((i + _front_ptr) % _data.size())
+      _data((i + _front_ptr) and _mod)
     else
       error
     end
 
-  fun ref _update(i: USize, a: A): A^ ? =>
+  fun ref _update(i: USize, value: A): A^ ? =>
     """
     Change the i-th element, raising an error if the index is out of bounds.
     """
-    _data(i) = consume a
+    _data(i) = consume value
 
   fun ref enqueue(a: A) ? =>
     """
@@ -45,35 +65,48 @@ class Queue[A: Any #alias]
     if the queue size has reached the allocated size and shifting any
     wrapping elements to the end of a contiguous series.
     """
-    if _size < (_data.size() / 2) then
-      if _back_ptr < _data.size() then
-        _data(_back_ptr) = consume a
-      else
+    if _size < (_mod / 2) then
+      if _data.size() == 0 then
+        _data.push(consume a)
+        _back_ptr = _data.size()
+      elseif _back_ptr >= space() then
+        _back_ptr = 0
         _data(0) = consume a
+      elseif _back_ptr >= _data.size() then
+        _data.push(consume a)
+        _back_ptr = (_back_ptr + 1) and _mod
+      else
+        _data(_back_ptr) = consume a
+        _back_ptr = (_back_ptr + 1) and _mod
       end
-      _back_ptr = (_back_ptr + 1) % _data.size()
     else
-      let boundary = _data.size()
-      if _front_ptr > _back_ptr then
+      let new_space = space() * 2
+      _data.reserve(new_space)
+      _mod = new_space - 1
+
+      if _back_ptr == _data.size() then
+        _data.push(consume a)
+        _back_ptr = _data.size() 
+      elseif _front_ptr > _back_ptr then
         for i in Range(0, _back_ptr) do
           _data.push(_data(i))
         end
         _data.push(consume a)
-        _back_ptr = _data.size()
-      elseif _back_ptr == _data.size() then
-        _data.push(consume a)
-        _back_ptr = _data.size()
+        _back_ptr = _data.size() and _mod
       else
         _data(_back_ptr) = consume a
         _back_ptr = _back_ptr + 1
       end
     end
     _size = _size + 1
+    // Assert(_data.size() <= space(), "Data size is not <= space()")
+    // Assert(_size <= space(), "Size is not <= space()")
+    // Assert(_size <= _data.size(), "Size is not <= data size")
 
   fun ref dequeue(): A! ? =>
     if _size > 0 then
       let a = _data(_front_ptr)
-      _front_ptr = (_front_ptr + 1) % _data.size()
+      _front_ptr = (_front_ptr + 1) and _mod
       _size = _size - 1
       a
     else
