@@ -14,3 +14,6 @@ class SinkConnectNotify is TCPConnectionNotify
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("sink: server closed")
+
+  fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter =>
+    data
