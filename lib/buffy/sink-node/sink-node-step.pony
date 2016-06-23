@@ -41,5 +41,4 @@ class _SendDiff[Diff: Any #read] is TimerNotify
 
   fun ref apply(timer: Timer, count: U64): Bool =>
     _step.send_diff()
-    @printf[I32]("SENT DIFF\n".cstring())
     true 
