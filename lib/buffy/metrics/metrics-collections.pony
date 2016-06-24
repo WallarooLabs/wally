@@ -174,7 +174,7 @@ A log10 selector with increased granularity in the 0.1-10 range.
     _max
 
   fun bins(): Array[F64] =>
-    _bins.clone()
+    _bins.clone().push(_max)
 
   fun apply(f: F64): F64 =>
   """
