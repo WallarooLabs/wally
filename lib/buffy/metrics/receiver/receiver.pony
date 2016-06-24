@@ -82,8 +82,8 @@ actor Receiver
           recover MonitoringHubConnectNotify(env.out, env.err) end
         let conn = TCPConnection(auth, consume notifier, host', service')
         let output = MonitoringHubOutput(env.out, env.err, conn, name')
-        let handler: MetricsMonitoringHubHandler val =
-          MetricsMonitoringHubHandler(MonitoringHubEncoder, consume output)
+        let handler: MetricsOutputHandler val =
+          MetricsOutputHandler(MonitoringHubEncoder, consume output)
 
         // Metrics Collection actor
         let period: U64 = 1

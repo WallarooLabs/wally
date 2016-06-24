@@ -1,6 +1,6 @@
 use "buffy/metrics"
 
-class MetricsMonitoringHubHandler is MetricsCollectionOutputHandler
+class MetricsOutputHandler is MetricsCollectionOutputHandler
   let encoder: MetricsCollectionOutputEncoder val
   let output: MetricsOutputActor tag
 
