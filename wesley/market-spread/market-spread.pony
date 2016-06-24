@@ -62,9 +62,9 @@ class MarketSpreadReceivedParser is
     Array[MarketSpreadReceivedMessage val]
 
   fun ref apply(value: Array[String] ref) ? =>
-    let timestamp = value(2).clone().strip().u64()
-    let symbol: String val = value(0).clone().strip().clone()
-    let is_rejected = value(9).bool()
+    let timestamp = value(0).clone().strip().u64()
+    let symbol: String val = value(1).clone().strip().clone()
+    let is_rejected = value(10).bool()
     _messages.push(MarketSpreadReceivedMessage(timestamp, consume symbol,
       is_rejected))
 
