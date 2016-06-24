@@ -16,6 +16,8 @@ actor Receiver
     var monhub_addr_arg: (Array[String] | None) = None
     var name_arg: (String | None) = None
     var delay_arg: (U64 | None) = None
+    var report_file: (String | None) = None
+    var report_period: (U64 | None) = 300
 
     try
       var options = Options(env)
@@ -26,6 +28,8 @@ actor Receiver
         .add("monitor", "m", StringArgument)
         .add("name", "n", StringArgument)
         .add("delay", "d", F64Argument)
+        .add("report-file", "rf", StringArgument)
+        .add("report-period", "rp", I64Argument)
 
       for option in options do
         match option
@@ -34,6 +38,8 @@ actor Receiver
         | ("monitor", let arg: String) => monhub_addr_arg = arg.split(":")
         | ("name", let arg: String) => name_arg = arg
         | ("delay", let arg: F64) => delay_arg = (arg*1_000_000_000).u64()
+        | ("report-file", let arg: String) => report_file = arg
+        | ("report-period", let arg: I64) => report_period = arg.u64()
         end
       end
 
@@ -77,7 +83,7 @@ actor Receiver
         let conn = TCPConnection(auth, consume notifier, host', service')
         let output = MonitoringHubOutput(env.out, env.err, conn, name')
         let handler: MetricsMonitoringHubHandler val =
-          MetricsMonitoringHubHandler(MonitoringHubEncoder, output)
+          MetricsMonitoringHubHandler(MonitoringHubEncoder, consume output)
 
         // Metrics Collection actor
         let period: U64 = 1
@@ -104,6 +110,8 @@ actor Receiver
           --monitor [Monitoring Hub address in xxx.xxx.xxx.xxx:pppp format]
           --name [Application name to report to Monitoring Hub]
           --delay [Maximum period of time before sending data]
+          --report-file/rf [File path to write reports to]
+          --report-period/rp [Aggregation period for reports in report-file]
           """
         )
       end
