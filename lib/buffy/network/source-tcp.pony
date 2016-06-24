@@ -7,6 +7,7 @@ use "sendence/guid"
 use "sendence/epoch"
 use "../topology"
 use "random"
+use "debug"
 
 class SourceNotifier is TCPListenNotify
   let _env: Env
@@ -59,10 +60,20 @@ class SourceConnectNotify is TCPConnectionNotify
     _metrics_collector = metrics_collector
 
   fun ref accepted(conn: TCPConnection ref) =>
+    try
+      (let host, _) = conn.remote_address().name()
+      Debug.out("SourceConnectNotify.accepted() " + host)
+    end
+    
     conn.expect(4)
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+    try
+      (let host, _) = conn.remote_address().name()
+      Debug.out("SourceConnectNotify.received() " + host)
+    end
+    
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
