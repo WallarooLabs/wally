@@ -9,6 +9,7 @@ primitive MetricsCategories
 
 interface MetricsOutputActor
   be apply(category: String, payload: Array[U8 val] val)
+  be dispose()
 
 actor MetricsAccumulatorActor is MetricsOutputActor
   let _wb: WriteBuffer = WriteBuffer
@@ -26,9 +27,12 @@ actor MetricsAccumulatorActor is MetricsOutputActor
   be written() =>
     _promise(_wb.done())
 
+  be dispose() => None
+
 interface MetricsCollectionOutputHandler
   fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
              steps: StepMetrics, period: U64)
+  fun dispose(): None val => None
 
 class MetricsStringAccumulator is MetricsCollectionOutputHandler
   let encoder: MetricsCollectionOutputEncoder val

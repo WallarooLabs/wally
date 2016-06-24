@@ -421,6 +421,9 @@ on category and id
     _bin_selector = bin_selector
     _handler = handler
 
+  be dispose() =>
+    _handler.dispose()
+
   fun ref reset_collection() =>
     _stepmetrics = StepMetrics
     _steptimeranges = StepTimeranges

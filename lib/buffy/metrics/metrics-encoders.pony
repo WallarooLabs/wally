@@ -6,7 +6,7 @@ interface MetricsCollectionOutputEncoder
   fun encode(sinks: SinkMetrics, boundaries: BoundaryMetrics,
              steps: StepMetrics, period: U64): Array[U8] iso^
   fun encode_sinks(sinks: SinkMetrics, period: U64): Array[U8] iso^
-  fun encode_boundaries(boundaries: BoundaryMetrics, period: U64): Array[U8] 
+  fun encode_boundaries(boundaries: BoundaryMetrics, period: U64): Array[U8]
     iso^
   fun encode_steps(steps: StepMetrics, period: U64): Array[U8] iso^
 
@@ -54,7 +54,7 @@ primitive MonitoringHubEncoder is MetricsCollectionOutputEncoder
         let throughputs: JsonObject ref = JsonObject
         topics.data.update("latency_bins", latencies)
         topics.data.update("throughput_out", throughputs)
-        for (bin, count) in lh.bin_map().pairs() do 
+        for (bin, count) in lh.bin_map().pairs() do
           latencies.data.update(bin.string(), count.i64())
         end
         for (t', count) in th.values().values() do
@@ -83,7 +83,7 @@ primitive MonitoringHubEncoder is MetricsCollectionOutputEncoder
         let throughputs: JsonObject ref = JsonObject
         topics.data.update("latency_bins", latencies)
         topics.data.update("throughput_out", throughputs)
-        for (bin, count) in lh.bin_map().pairs() do 
+        for (bin, count) in lh.bin_map().pairs() do
           latencies.data.update(bin.string(), count.i64())
         end
         for (t', count) in th.values().values() do
@@ -112,7 +112,7 @@ primitive MonitoringHubEncoder is MetricsCollectionOutputEncoder
         let throughputs: JsonObject ref = JsonObject
         topics.data.update("latency_bins", latencies)
         topics.data.update("throughput_out", throughputs)
-        for (bin, count) in lh.bin_map().pairs() do 
+        for (bin, count) in lh.bin_map().pairs() do
           latencies.data.update(bin.string(), count.i64())
         end
         for (t', count) in th.values().values() do
