@@ -129,6 +129,8 @@ class MarketData
       true
     end
 
+  fun contains(symbol: String): Bool => _entries.contains(symbol)
+
 class GenerateUpdateData is Computation[FixNbboMessage val, UpdateData val]
   fun name(): String => "update data"
   fun apply(nbbo: FixNbboMessage val): UpdateData val =>
@@ -165,9 +167,14 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
   fun name(): String => "check trade result"
   fun apply(state: MarketData, output: MessageTarget[TradeResult val] val):
     MarketData =>
+    let symbol = _trade.symbol()
     let market_data_entry = 
-      try
-        state(_trade.symbol())
+      if state.contains(symbol) then
+        try
+          state(_trade.symbol())
+        else
+          MarketDataEntry(true, 0, 0)
+        end
       else
         MarketDataEntry(true, 0, 0)
       end
