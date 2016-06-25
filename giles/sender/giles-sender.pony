@@ -8,6 +8,7 @@ use "options"
 use "time"
 use "buffy/messages"
 use "sendence/tcp"
+use "debug"
 
 // documentation
 // more tests
@@ -114,7 +115,7 @@ actor Main
             else
               IntegerDataSource
             end
-
+            
           let sa = SendingActor(
             messages_to_send,
             to_buffy_socket,
@@ -361,6 +362,7 @@ actor SendingActor
           d'.push(n)
           _msg_encoder.add_data(n)
         else
+          Debug.out("SendingActor: failed reading _data_source.next()")
           break
         end
       end

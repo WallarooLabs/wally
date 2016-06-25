@@ -4,6 +4,7 @@ use "net"
 use "buffy/metrics"
 use "sendence/guid"
 use "sendence/epoch"
+use "debug"
 
 trait BasicStep
   be apply(input: StepMessage val)
@@ -382,7 +383,7 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
     | let m: Message[In] val =>
       try
         let str = _stringify(m.data())
-        // @printf[I32]((">>>>" + str + "<<<<\n").cstring())
+        Debug.out(">>>>" + str + "<<<<")
         let tcp_msg = ExternalMsgEncoder.data(str)
         for conn in _conns.values() do
           conn.writev(tcp_msg)
