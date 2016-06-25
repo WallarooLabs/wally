@@ -93,9 +93,11 @@ class NodeMetricsSummary is MetricsWireMsg
     _size
 
   fun ref add_report(step_id: StepId val, r: StepMetricsReport val) =>
-    try
-      digests(step_id).add_report(r)
-      _size = _size + 1
+    if digests.contains(step_id) then
+      try
+        digests(step_id).add_report(r)
+        _size = _size + 1
+      end
     else
       let dig: StepMetricsDigest trn = recover StepMetricsDigest(step_id) end
       dig.add_report(r)
