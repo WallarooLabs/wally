@@ -47,3 +47,6 @@ class MetricsCollectorConnectNotify is TCPConnectionNotify
 
   fun ref closed(conn: TCPConnection ref) =>
     _stdout.print("Metrics Collector: server closed")
+
+  fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter =>
+    data
