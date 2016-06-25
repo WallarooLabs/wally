@@ -323,7 +323,8 @@ actor SendingActor
   let _timers: Timers
   let _data_source: Iterator[String] iso
   var _finished: Bool = false
-  let _msg_encoder: BufferedExternalMsgEncoder = BufferedExternalMsgEncoder
+  let _msg_encoder: BufferedExternalMsgEncoder = 
+    BufferedExternalMsgEncoder(where chunks = 500)
 
   new create(messages_to_send: USize,
     to_buffy_socket: TCPConnection,
