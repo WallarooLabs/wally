@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+
+import json
+import click
+
+class IncongruentReportError(Exception):
+    pass
+
+
+def file_line_iter(filepath):
+    with open(filepath, 'rb') as f:
+        l = 1
+        while l:
+            l = f.readline()
+            if l and l != '\n':
+                yield l
+
+
+def load_report(line):
+    return json.loads(line.decode())
+
+
+def verify_report(report):
+    for p in report['payload']:
+        t = sum(p['topics']['throughput_out'].values())
+        l = sum(p['topics']['latency_bins'].values())
+        if t != l:
+            raise IncongruentReportError("Incongruent report found for:\n"
+                "\ttopic: {}\n"
+                "\tevent: {}:\n"
+                "\tthroughput_out: {}\n"
+                "\tlatency_bins: {}".format(report['topic'], report['event'],
+                                           t, l))
+
+@click.command()
+@click.option('--filepath', '-f', nargs=1, required=True,
+              help="Path of report file to verify")
+def verify(filepath):
+    try:
+        for line in file_line_iter(filepath):
+            r = load_report(line)
+            verify_report(r)
+        print(0)
+    except Exception as e:
+        print(e)
+
+
+if __name__ == '__main__':
+    verify()
