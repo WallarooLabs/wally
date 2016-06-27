@@ -91,9 +91,12 @@ actor MetricsFileOutput is MetricsOutputActor
     match _file
       | let file: File =>
         file.print(payload)
+        file.flush()
     end
 
   be dispose() =>
     match _file
-    | let file: File => file.dispose()
+    | let file: File =>
+      file.flush()
+      file.dispose()
     end
