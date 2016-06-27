@@ -421,6 +421,9 @@ on category and id
     _bin_selector = bin_selector
     _handler = handler
 
+  be dispose() =>
+    _handler.dispose()
+
   fun ref reset_collection() =>
     _stepmetrics = StepMetrics
     _steptimeranges = StepTimeranges
@@ -568,6 +571,9 @@ on category and id
   fun ref handle_output() =>
     _handler.handle(_sinkmetrics, _boundarymetrics, _stepmetrics, _period)
     reset_collection()
+
+  be flush() =>
+    send_output()
 
 interface Resumable
   be resume()

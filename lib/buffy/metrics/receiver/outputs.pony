@@ -1,3 +1,4 @@
+use "files"
 use "net"
 use "sendence/bytes"
 use "buffy/metrics"
@@ -10,6 +11,8 @@ actor MonitoringHubOutput is MetricsOutputActor
   let _stderr: StdStream
   let _app_name: String
   var _conn: TCPConnection
+
+  be dispose() => _conn.dispose()
 
   new create(stdout: StdStream, stderr: StdStream, conn: TCPConnection,
              app_name: String) =>
@@ -35,20 +38,12 @@ actor MonitoringHubOutput is MetricsOutputActor
     _stdout.print("    metrics-receiver: Joining [" + _app_name+ "]...")
     _conn.writev(Bytes.length_encode(HubJson.join("metrics:" + _app_name)))
 
-  be apply(category: String, payload: Array[U8] val) =>
+  be apply(payload: ByteSeq) =>
     """
     Send a metrics messsage to Monitoring Hub
     """
-    try
-      _stdout.print("    metrics-receiver: Sending metrics")
-      let doc: JsonDoc = JsonDoc
-      doc.parse(String.from_array(payload))
-      let msg = HubJson.payload(category, "metrics:" + _app_name,
-        doc.data as JsonArray)
-      _conn.writev(Bytes.length_encode(msg))
-    else
-      _stderr.print("   metrics-receiver: Failed sending metrics")
-    end
+    _stdout.print("    metrics-receiver: Sending metrics")
+    _conn.writev(Bytes.length_encode(payload))
 
 
 class MonitoringHubConnectNotify is TCPConnectionNotify
@@ -65,3 +60,43 @@ class MonitoringHubConnectNotify is TCPConnectionNotify
   fun ref closed(conn: TCPConnection ref) =>
     _stdout.print("    metrics-receiver: Monitoring Hub connection closed")
 
+actor MetricsFileOutput is MetricsOutputActor
+  let _stdout: StdStream
+  let _stderr: StdStream
+  let _auth: AmbientAuth
+  let _app_name: String
+  let _file_path: String
+  let _file: (File | None)
+
+  new create(stdout: StdStream, stderr: StdStream, auth: AmbientAuth,
+    app_name: String, file_path: String)
+  =>
+    _stdout = stdout
+    _stderr = stderr
+    _auth = auth
+    _app_name = app_name
+    _file_path = file_path
+
+    _file = try
+      let f = File(FilePath(_auth, _file_path))
+      f.set_length(0)
+      _stdout.print("Opened " + _file_path + " for writing")
+      f
+    else
+      _stderr.print("Could not create file at " + _file_path)
+      None
+    end
+
+  be apply(payload: ByteSeq) =>
+    match _file
+      | let file: File =>
+        file.print(payload)
+        file.flush()
+    end
+
+  be dispose() =>
+    match _file
+    | let file: File =>
+      file.flush()
+      file.dispose()
+    end

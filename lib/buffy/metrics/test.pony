@@ -96,6 +96,7 @@ class iso _TestMonitoringHubEncoder is UnitTest
 
     // Set up a NodeMetricsSummary and a BoundaryMetricsSummary
     let node_name = "Test"
+    let app_name = "Test App"
     let nms:NodeMetricsSummary iso = recover NodeMetricsSummary(node_name) end
     nms.add_report("1", StepMetricsReport(1000, 1999))
     nms.add_report("1", StepMetricsReport(2000, 2999))
@@ -130,7 +131,8 @@ class iso _TestMonitoringHubEncoder is UnitTest
     let output = MetricsAccumulatorActor(promise)
     let res = ResumableTest(output)
     let handler: MetricsCollectionOutputHandler iso =
-      recover iso MetricsStringAccumulator(MonitoringHubEncoder, output) end
+      recover iso MetricsStringAccumulator(MonitoringHubEncoder, output,
+        app_name) end
 
     let bin_selector: F64Selector val = recover val Log10Selector end
     let mc: MetricsCollection = MetricsCollection(bin_selector, 1,

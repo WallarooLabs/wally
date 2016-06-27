@@ -8,7 +8,13 @@ primitive MetricsCategories
   fun steps(): String => "step-metrics"
 
 interface MetricsOutputActor
-  be apply(category: String, payload: Array[U8 val] val)
+  be apply(payload: ByteSeq)
+  be dispose()
+
+interface MetricsCollectionOutputHandler
+  fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
+             steps: StepMetrics, period: U64)
+  fun dispose(): None val => None
 
 actor MetricsAccumulatorActor is MetricsOutputActor
   let _wb: WriteBuffer = WriteBuffer
@@ -17,33 +23,30 @@ actor MetricsAccumulatorActor is MetricsOutputActor
   new create(promise: Promise[Array[ByteSeq] val]) =>
     _promise = promise
 
-  be apply(category: String val, payload: Array[U8 val] val) =>
-    _wb.u32_be(category.size().u32())
-    _wb.write(category)
+  be apply(payload: ByteSeq) =>
     _wb.u32_be(payload.size().u32())
     _wb.write(payload)
 
   be written() =>
     _promise(_wb.done())
 
-interface MetricsCollectionOutputHandler
-  fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
-             steps: StepMetrics, period: U64)
+  be dispose() => None
 
 class MetricsStringAccumulator is MetricsCollectionOutputHandler
   let encoder: MetricsCollectionOutputEncoder val
   let output: MetricsOutputActor tag
+  let app_name: String
 
-  new create(encoder': MetricsCollectionOutputEncoder val,
-             output': MetricsOutputActor tag) =>
+  new iso create(encoder': MetricsCollectionOutputEncoder val,
+             output': MetricsOutputActor tag, app_name': String) =>
     encoder = encoder'
     output = output'
+    app_name = app_name'
+
+  fun dispose(): None val => None
 
   fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
              steps: StepMetrics, period: U64) =>
-    output(MetricsCategories.sinks(),
-      encoder.encode_sinks(sinks, period))
-    output(MetricsCategories.boundaries(),
-      encoder.encode_boundaries(boundaries, period))
-    output(MetricsCategories.steps(),
-      encoder.encode_steps(steps, period))
+    output(encoder.encode_sinks(sinks, period, app_name))
+    output(encoder.encode_boundaries(boundaries, period, app_name))
+    output(encoder.encode_steps(steps, period, app_name))

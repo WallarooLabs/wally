@@ -5,7 +5,7 @@ primitive HubJson
     let j: JsonObject = JsonObject
     j.data.update("path", "/socket/tcp")
     j.data.update("params", None)
-    j.string()
+    j.string(where pretty_print=false)
 
   fun join(topic: String): String =>
     let j: JsonObject = JsonObject
@@ -13,12 +13,13 @@ primitive HubJson
     j.data.update("topic", topic)
     j.data.update("ref", None)
     j.data.update("payload", JsonObject)
-    j.string()
+    j.string(where pretty_print=false)
 
-  fun payload(event: String, topic: String, payload': JsonArray): String =>
+  fun payload(event: String, topic: String, payload': JsonArray,
+    pretty_print: Bool = false): String =>
     let j: JsonObject = JsonObject
     j.data.update("event", event)
     j.data.update("topic", topic)
     j.data.update("ref", None)
     j.data.update("payload", payload')
-    j.string()
+    j.string(where pretty_print=pretty_print)

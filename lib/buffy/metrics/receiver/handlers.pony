@@ -1,26 +1,26 @@
 use "buffy/metrics"
 
-class MetricsMonitoringHubHandler is MetricsCollectionOutputHandler
+class MetricsOutputHandler is MetricsCollectionOutputHandler
   let encoder: MetricsCollectionOutputEncoder val
   let output: MetricsOutputActor tag
+  let app_name: String val
 
   new val create(encoder': MetricsCollectionOutputEncoder val,
-    output': MetricsOutputActor tag)
+    output': MetricsOutputActor tag, app_name': String val)
   =>
     encoder = encoder'
     output = output'
+    app_name = app_name'
 
   fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
              steps: StepMetrics, period: U64) =>
     if sinks.size() > 0 then
-      output(MetricsCategories.sinks(),
-        encoder.encode_sinks(sinks, period))
+      output(encoder.encode_sinks(sinks, period, app_name))
     end
     if boundaries.size() > 0 then
-      output(MetricsCategories.boundaries(),
-        encoder.encode_boundaries(boundaries, period))
+      output(encoder.encode_boundaries(boundaries, period, app_name))
     end
     if steps.size() > 0 then
-      output(MetricsCategories.steps(),
-        encoder.encode_steps(steps, period))
+      output(encoder.encode_steps(steps, period, app_name))
     end
+

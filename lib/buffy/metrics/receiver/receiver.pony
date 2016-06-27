@@ -15,7 +15,10 @@ actor Receiver
     var listen_addr_arg: (Array[String] | None) = None
     var monhub_addr_arg: (Array[String] | None) = None
     var name_arg: (String | None) = None
+    var period_arg: U64 = 1
     var delay_arg: (U64 | None) = None
+    var report_file: (String | None) = None
+    var report_period: U64 = 300
 
     try
       var options = Options(env)
@@ -25,7 +28,10 @@ actor Receiver
         .add("listen", "l", StringArgument)
         .add("monitor", "m", StringArgument)
         .add("name", "n", StringArgument)
+        .add("period", "", I64Argument)
         .add("delay", "d", F64Argument)
+        .add("report-file", "", StringArgument)
+        .add("report-period", "", I64Argument)
 
       for option in options do
         match option
@@ -33,7 +39,10 @@ actor Receiver
         | ("listen", let arg: String) => listen_addr_arg = arg.split(":")
         | ("monitor", let arg: String) => monhub_addr_arg = arg.split(":")
         | ("name", let arg: String) => name_arg = arg
+        | ("period", let arg: I64) => period_arg = arg.u64()
         | ("delay", let arg: F64) => delay_arg = (arg*1_000_000_000).u64()
+        | ("report-file", let arg: String) => report_file = arg
+        | ("report-period", let arg: I64) => report_period = arg.u64()
         end
       end
 
@@ -61,6 +70,11 @@ actor Receiver
       if name_arg is None then name_arg = "" end
       if delay_arg is None then delay_arg = 1_000_000_000 end
 
+      if ((delay_arg as U64)/1_000_000_000) < period_arg then
+        env.err.print("'--delay' must be at least as large as '--period'.")
+        required_args_are_present = false
+      end
+
       if required_args_are_present then
         let auth = env.root as AmbientAuth
         let host = (listen_addr_arg as Array[String])(0)
@@ -71,28 +85,54 @@ actor Receiver
         let delay' = recover val (delay_arg as U64) end
 
         // Create connections and actors here
+        let collections: Array[MetricsCollection tag] trn =
+          recover trn Array[MetricsCollection tag] end
+
         // MonitoringHub Output:
         let notifier: TCPConnectionNotify iso =
           recover MonitoringHubConnectNotify(env.out, env.err) end
         let conn = TCPConnection(auth, consume notifier, host', service')
         let output = MonitoringHubOutput(env.out, env.err, conn, name')
-        let handler: MetricsMonitoringHubHandler val =
-          MetricsMonitoringHubHandler(MonitoringHubEncoder, output)
+        let handler: MetricsOutputHandler val =
+          MetricsOutputHandler(MonitoringHubEncoder, consume output, name')
 
         // Metrics Collection actor
-        let period: U64 = 1
-        let bin_selector: F64Selector val = Log10Selector//FixedBinSelector
-        let mc = MetricsCollection(bin_selector, period, handler)
+        let bin_selector: F64Selector val = Log10Selector //FixedBinSelector
+        let mc = MetricsCollection(bin_selector, period_arg, handler)
+
+        // start a timer to flush the metrics-collection
+        Flusher(mc, delay')
+
+        collections.push(consume mc)
+
+        // File Output
+        match report_file
+        | let arg: String =>
+          let output' = MetricsFileOutput(env.out, env.err, auth, name',
+            arg)
+          let handler': MetricsOutputHandler val =
+            MetricsOutputHandler(MonitoringHubEncoder(false), consume output',
+              name')
+          let bin_selector': F64Selector val = FixedBinSelector
+          let mc' = MetricsCollection(bin_selector', report_period, handler')
+
+          // start a timer to flush the metrics-collection
+          Flusher(mc', report_period)
+
+          collections.push(consume mc')
+          env.out.print("Reporting to file " + arg + " every " +
+            report_period.string() + " seconds.")
+        end
 
         // Metrics Receiver Listener
+        let collections': Array[MetricsCollection tag] val =
+          consume collections
         let notifier' = MetricsNotifier(env.out, env.err, auth, host,
-                                        service, mc)
+                                        service, collections')
         let listener = TCPListener(auth, consume notifier', host, service)
 
-        let receiver = MetricsReceiver(env.out, env.err, listener, mc)
+        let receiver = MetricsReceiver(env.out, env.err, listener, collections')
 
-        // start a timer to flush the receiver
-        Flusher(receiver, delay')
       else
         env.out.print(
           """
@@ -103,7 +143,10 @@ actor Receiver
           --listen [Listen address in xxx.xxx.xxx.xxx:pppp format]
           --monitor [Monitoring Hub address in xxx.xxx.xxx.xxx:pppp format]
           --name [Application name to report to Monitoring Hub]
+          --period [Aggregation periods for reports to Monitoring Hub]
           --delay [Maximum period of time before sending data]
+          --report-file/rf [File path to write reports to]
+          --report-period/rp [Aggregation period for reports in report-file]
           """
         )
       end
@@ -114,22 +157,30 @@ actor MetricsReceiver is FlushingActor
   let _stdout: StdStream
   let _handlers: Array[MetricsCollectionOutputHandler] ref =
     Array[MetricsCollectionOutputHandler]
-  let _mc: MetricsCollection tag
+  let _collections: Array[MetricsCollection tag] val
   let _listener: TCPListener
 
   new create(stdout: StdStream, stderr: StdStream, listener: TCPListener,
-             mc: MetricsCollection) =>
+             collections: Array[MetricsCollection tag] val) =>
     _stdout = stdout
     _stderr = stderr
-    _mc = mc
+    _collections = collections
     _listener = listener
 
-
   be finished() =>
+    _flush()
     _listener.dispose()
+    for mc in _collections.values() do
+      mc.dispose()
+    end
 
   be flush() =>
-    _mc.send_output()
+    _flush()
+
+  fun _flush() =>
+    for mc in _collections.values() do
+      mc.send_output()
+    end
 
 
 class MetricsNotifier is TCPListenNotify
@@ -138,16 +189,17 @@ class MetricsNotifier is TCPListenNotify
   let _stderr: StdStream
   let _host: String
   let _service: String
-  let _mc: MetricsCollection tag
+  let _collections: Array[MetricsCollection tag] val
 
   new iso create(stdout: StdStream, stderr: StdStream, auth: AmbientAuth,
-                 host: String, service: String, mc: MetricsCollection tag) =>
+                 host: String, service: String,
+                 collections: Array[MetricsCollection tag] val) =>
     _auth = auth
     _stdout = stdout
     _stderr = stderr
     _host = host
     _service = service
-    _mc = mc
+    _collections = collections
 
   fun ref listening(listen: TCPListener ref) =>
     _stdout.print("listening on " + _host + ":" + _service)
@@ -157,22 +209,22 @@ class MetricsNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    MetricsReceiverNotify(_stdout, _stderr, _auth, _mc)
+    MetricsReceiverNotify(_stdout, _stderr, _auth, _collections)
 
 class MetricsReceiverNotify is TCPConnectionNotify
   let _auth: AmbientAuth
   let _stdout: StdStream
   let _stderr: StdStream
-  let _mc: MetricsCollection tag
   let _decoder: MetricsMsgDecoder = MetricsMsgDecoder
   var _header: Bool = true
+  let _collections: Array[MetricsCollection tag] val
 
   new iso create(stdout: StdStream, stderr: StdStream, auth: AmbientAuth,
-                 mc: MetricsCollection tag) =>
+                 collections: Array[MetricsCollection tag] val) =>
     _auth = auth
     _stdout = stdout
     _stderr = stderr
-    _mc = mc
+    _collections = collections
 
 
   fun ref accepted(conn: TCPConnection ref) =>
@@ -190,21 +242,27 @@ class MetricsReceiverNotify is TCPConnectionNotify
         _stderr.print("Blew up reading header from Buffy")
       end
     else
-      process_data(consume d)
+      handle_data(consume d)
       conn.expect(4)
       _header = true
     end
 
-  fun ref process_data(data: (Array[U8] val | Array[U8] iso)) =>
+  fun ref handle_data(data: (Array[U8] val | Array[U8] iso)) =>
       let msg = _decoder(consume data, _auth)
       match msg
       | let m: NodeMetricsSummary val =>
-        _mc.process_summary(m)
+        process_data(m)
       | let m: BoundaryMetricsSummary val =>
-        _mc.process_summary(m)
+        process_data(m)
       else
         _stderr.print("Message couldn't be decoded!")
       end
+
+  fun ref process_data(m: (NodeMetricsSummary val | BoundaryMetricsSummary val))
+  =>
+    for mc in _collections.values() do
+      mc.process_summary(m)
+    end
 
   fun ref connected(conn: TCPConnection ref) =>
     _stdout.print("connected.")
