@@ -9,33 +9,38 @@ class Topology
   fun ref new_pipeline[In: Any val, Out: Any val] (
     parser: Parser[In] val,
     stringify: Stringify[Out] val,
-    sink_target_ids: Array[U64] val
+    sink_target_ids: Array[U64] val,
+    pipeline_name: String    
     ): PipelineBuilder[In, Out, In]
   =>
-    let pipeline = Pipeline[In, Out](parser, stringify, sink_target_ids)
+    let pipeline = Pipeline[In, Out](parser, stringify, sink_target_ids, 
+      pipeline_name)
     PipelineBuilder[In, Out, In](this, pipeline)
 
   fun ref add_pipeline(p: PipelineSteps) =>
     pipelines.push(p)
 
 trait PipelineSteps
+  fun name(): String
   fun sink_builder(): SinkBuilder val
   fun sink_target_ids(): Array[U64] val
   fun apply(i: USize): PipelineStep box ?
   fun size(): USize
 
 class Pipeline[In: Any val, Out: Any val] is PipelineSteps
+  let _name: String
   let _steps: Array[PipelineStep]
   let _sink_target_ids: Array[U64] val
   let _sink_builder: SinkBuilder val
 
   new create(p: Parser[In] val, s: Stringify[Out] val,
-    s_target_ids: Array[U64] val) =>
+    s_target_ids: Array[U64] val, n: String) =>
     let source_builder = SourceBuilder[In](p)
     _steps = Array[PipelineStep]
     _sink_target_ids = s_target_ids
     _steps.push(PipelineThroughStep[String, In](source_builder))
-    _sink_builder = ExternalConnectionBuilder[Out](s)
+    _name = n
+    _sink_builder = ExternalConnectionBuilder[Out](s, _name)
 
   fun ref add_step(p: PipelineStep) =>
     _steps.push(p)
@@ -47,6 +52,8 @@ class Pipeline[In: Any val, Out: Any val] is PipelineSteps
   fun sink_target_ids(): Array[U64] val => _sink_target_ids
 
   fun size(): USize => _steps.size()
+
+  fun name(): String => _name
 
 trait PipelineStep
   fun id(): U64

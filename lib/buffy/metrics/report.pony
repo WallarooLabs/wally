@@ -111,12 +111,15 @@ class BoundaryMetricsReport is MetricsReport
   let msg_id: U64
   let start_time: U64
   let end_time: U64
+  let pipeline: String
 
-  new val create(b_type: U64, m_id: U64, s_ts: U64, e_ts: U64) =>
+  new val create(b_type: U64, m_id: U64, s_ts: U64, e_ts: U64, 
+    p: String = "") =>
     boundary_type = b_type
     msg_id = m_id
     start_time = s_ts
     end_time = e_ts
+    pipeline = p
 
   fun dt(): U64 => end_time - start_time
   fun started(): U64 => start_time

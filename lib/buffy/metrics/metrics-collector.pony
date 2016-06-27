@@ -77,9 +77,8 @@ actor MetricsCollector is FlushingActor
     end
 
 	be report_boundary_metrics(boundary_type: U64, msg_id: U64, start_time: U64,
-		end_time: U64) =>
-		_boundary_summary.add_report(BoundaryMetricsReport(boundary_type,
-			msg_id, start_time, end_time))
+    end_time: U64, pipeline_name: String = "") =>
+		_boundary_summary.add_report(BoundaryMetricsReport(boundary_type, msg_id, start_time, end_time, pipeline_name))
     _send_boundary_if_over_max()
 
   be flush_boundary_metrics() =>

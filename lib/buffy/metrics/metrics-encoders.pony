@@ -45,7 +45,7 @@ primitive MonitoringHubEncoder is MetricsCollectionOutputEncoder
       for (t_f, (lh, th)) in timebucket.pairs() do
         let j': JsonObject ref = JsonObject
         j'.data.update("category", "source-sink")
-        j'.data.update("pipeline_key", "sink-" + name)
+        j'.data.update("pipeline_key", name)
         j'.data.update("t1", t_f.i64())
         j'.data.update("t0", (t_f - period).i64())
         let topics: JsonObject ref = JsonObject

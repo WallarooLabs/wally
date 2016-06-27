@@ -368,12 +368,15 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
   let _stringify: {(In): String ?} val
   let _conns: Array[TCPConnection]
   let _metrics_collector: MetricsCollector tag
+  let _pipeline_name: String
 
   new create(stringify: {(In): String ?} val, conns: Array[TCPConnection] iso =
-    recover Array[TCPConnection] end, m_coll: MetricsCollector tag) =>
+    recover Array[TCPConnection] end, m_coll: MetricsCollector tag,
+    pipeline_name: String) =>
     _stringify = stringify
     _conns = consume conns
     _metrics_collector = m_coll
+    _pipeline_name = pipeline_name
 
   be add_conn(conn: TCPConnection) =>
     _conns.push(conn)
@@ -389,7 +392,7 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
           conn.writev(tcp_msg)
         end
         _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
-          m.id(), m.source_ts(), Epoch.nanoseconds())
+          m.id(), m.source_ts(), Epoch.nanoseconds(), _pipeline_name)
       end
     end
 

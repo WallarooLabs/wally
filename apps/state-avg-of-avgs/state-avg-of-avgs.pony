@@ -10,7 +10,8 @@ actor Main
     try
       let topology: Topology val = recover val
         Topology
-          .new_pipeline[U64, U64](P, S, recover [0] end)
+          .new_pipeline[U64, U64](P, S, recover [0] end, 
+            "State Average of Averages")
           .to[U64](lambda(): Computation[U64, U64] iso^ => Double end)
           .to[U64](lambda(): Computation[U64, U64] iso^ => Halve end)
           .to_stateful[U64, Averager](
