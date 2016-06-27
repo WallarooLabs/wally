@@ -35,7 +35,7 @@ actor Main
             end)
           .build()
           .new_pipeline[FixNbboMessage val, None](NbboParser, NoneStringify,
-            recover [0] end, "NBBO")
+            recover [1] end, "NBBO")
           .to_stateful_partition[None, MarketData](
             recover
               StatePartitionConfig[FixNbboMessage val, None, MarketData](
@@ -146,9 +146,11 @@ class UpdateData is StateComputation[None, MarketData]
   fun apply(state: MarketData, output: MessageTarget[None] val): MarketData =>
     if ((_nbbo.offer_px() - _nbbo.bid_px()) >= 0.05) or
       (((_nbbo.offer_px() - _nbbo.bid_px()) / _nbbo.mid()) >= 0.05) then
+      output(None)
       state.update(_nbbo.symbol(), MarketDataEntry(true, _nbbo.bid_px(), 
         _nbbo.offer_px()))
     else
+      output(None)
       state.update(_nbbo.symbol(), MarketDataEntry(false, _nbbo.bid_px(), 
         _nbbo.offer_px()))
     end
