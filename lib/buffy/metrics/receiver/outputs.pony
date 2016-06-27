@@ -12,7 +12,7 @@ actor MonitoringHubOutput is MetricsOutputActor
   let _app_name: String
   var _conn: TCPConnection
 
-  be dispose() => None
+  be dispose() => _conn.dispose()
 
   new create(stdout: StdStream, stderr: StdStream, conn: TCPConnection,
              app_name: String) =>
@@ -38,20 +38,12 @@ actor MonitoringHubOutput is MetricsOutputActor
     _stdout.print("    metrics-receiver: Joining [" + _app_name+ "]...")
     _conn.writev(Bytes.length_encode(HubJson.join("metrics:" + _app_name)))
 
-  be apply(category: String, payload: Array[U8] val) =>
+  be apply(payload: ByteSeq) =>
     """
     Send a metrics messsage to Monitoring Hub
     """
-    try
-      _stdout.print("    metrics-receiver: Sending metrics")
-      let doc: JsonDoc = JsonDoc
-      doc.parse(String.from_array(payload))
-      let msg = HubJson.payload(category, "metrics:" + _app_name,
-        doc.data as JsonArray)
-      _conn.writev(Bytes.length_encode(msg))
-    else
-      _stderr.print("   metrics-receiver: Failed sending metrics")
-    end
+    _stdout.print("    metrics-receiver: Sending metrics")
+    _conn.writev(Bytes.length_encode(payload))
 
 
 class MonitoringHubConnectNotify is TCPConnectionNotify
@@ -95,16 +87,10 @@ actor MetricsFileOutput is MetricsOutputActor
       None
     end
 
-  be apply(category: String, payload: Array[U8 val] val) =>
+  be apply(payload: ByteSeq) =>
     match _file
       | let file: File =>
-        try
-          let doc: JsonDoc = JsonDoc
-          doc.parse(String.from_array(payload))
-          let msg = HubJson.payload(category, "metrics:" + _app_name,
-            doc.data as JsonArray)
-          file.print(msg)
-        end
+        file.print(payload)
     end
 
   be dispose() =>
