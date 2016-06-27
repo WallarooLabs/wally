@@ -72,34 +72,37 @@ class StepMetricsReport is MetricsReport
   fun ended(): U64 => end_time
 
 class StepMetricsDigest
-  let step_id: U64
+  let step_name: String
   let reports: Array[StepMetricsReport val] = Array[StepMetricsReport val]
 
-  new create(id: U64) =>
-    step_id = id
+  new create(name: String) =>
+    step_name = name
 
   fun ref add_report(r: StepMetricsReport val) =>
     reports.push(r)
 
 class NodeMetricsSummary is MetricsWireMsg
   let node_name: String
-  let digests: DigestMap trn = recover DigestMap end
+  let digests: DigestMap trn
   var _size: USize = 0
 
-  new create(name: String) =>
+  new create(name: String, len: USize = 0) =>
     node_name = name
+    digests = recover DigestMap(len) end
 
   fun size(): USize =>
     _size
 
-  fun ref add_report(step_id: StepId val, r: StepMetricsReport val) =>
-    try
-      digests(step_id).add_report(r)
-      _size = _size + 1
+  fun ref add_report(step_name: String, r: StepMetricsReport val) =>
+    if digests.contains(step_name) then
+      try
+        digests(step_name).add_report(r)
+        _size = _size + 1
+      end
     else
-      let dig: StepMetricsDigest trn = recover StepMetricsDigest(step_id) end
+      let dig: StepMetricsDigest trn = recover StepMetricsDigest(step_name) end
       dig.add_report(r)
-      digests.update(step_id, consume dig)
+      digests.update(step_name, consume dig)
       _size = _size + 1
     end
 
@@ -108,12 +111,15 @@ class BoundaryMetricsReport is MetricsReport
   let msg_id: U64
   let start_time: U64
   let end_time: U64
+  let pipeline: String
 
-  new val create(b_type: U64, m_id: U64, s_ts: U64, e_ts: U64) =>
+  new val create(b_type: U64, m_id: U64, s_ts: U64, e_ts: U64, 
+    p: String = "") =>
     boundary_type = b_type
     msg_id = m_id
     start_time = s_ts
     end_time = e_ts
+    pipeline = p
 
   fun dt(): U64 => end_time - start_time
   fun started(): U64 => start_time
@@ -121,10 +127,11 @@ class BoundaryMetricsReport is MetricsReport
 
 class BoundaryMetricsSummary is MetricsWireMsg
   let node_name: String
-  let reports: BoundaryReports trn = recover BoundaryReports end
+  let reports: BoundaryReports trn 
 
-  new create(name: String) =>
+  new create(name: String, len: USize = 0) =>
     node_name = name
+    reports = recover BoundaryReports(len) end
 
   fun size(): USize =>
     reports.size()
@@ -134,5 +141,5 @@ class BoundaryMetricsSummary is MetricsWireMsg
 
 type StepType is U64
 type StepId is U64
-type DigestMap is Map[StepId val, StepMetricsDigest trn]
+type DigestMap is Map[String, StepMetricsDigest trn]
 type BoundaryReports is Array[BoundaryMetricsReport val]

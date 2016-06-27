@@ -21,7 +21,7 @@ actor Main
       let topology = recover val
         Topology
           .new_pipeline[FixOrderMessage val, TradeResult val](
-            TradeParser, ResultStringify, recover [0] end)
+            TradeParser, ResultStringify, recover [0] end, "Trades")
           .to_stateful_partition[TradeResult val, MarketData](
             recover
               StatePartitionConfig[FixOrderMessage val, TradeResult val,
@@ -35,7 +35,7 @@ actor Main
             end)
           .build()
           .new_pipeline[FixNbboMessage val, None](NbboParser, NoneStringify,
-            recover [0] end)
+            recover [1] end, "NBBO")
           .to_stateful_partition[None, MarketData](
             recover
               StatePartitionConfig[FixNbboMessage val, None, MarketData](
@@ -129,6 +129,8 @@ class MarketData
       true
     end
 
+  fun contains(symbol: String): Bool => _entries.contains(symbol)
+
 class GenerateUpdateData is Computation[FixNbboMessage val, UpdateData val]
   fun name(): String => "update data"
   fun apply(nbbo: FixNbboMessage val): UpdateData val =>
@@ -144,9 +146,11 @@ class UpdateData is StateComputation[None, MarketData]
   fun apply(state: MarketData, output: MessageTarget[None] val): MarketData =>
     if ((_nbbo.offer_px() - _nbbo.bid_px()) >= 0.05) or
       (((_nbbo.offer_px() - _nbbo.bid_px()) / _nbbo.mid()) >= 0.05) then
+      output(None)
       state.update(_nbbo.symbol(), MarketDataEntry(true, _nbbo.bid_px(), 
         _nbbo.offer_px()))
     else
+      output(None)
       state.update(_nbbo.symbol(), MarketDataEntry(false, _nbbo.bid_px(), 
         _nbbo.offer_px()))
     end
@@ -165,9 +169,14 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
   fun name(): String => "check trade result"
   fun apply(state: MarketData, output: MessageTarget[TradeResult val] val):
     MarketData =>
+    let symbol = _trade.symbol()
     let market_data_entry = 
-      try
-        state(_trade.symbol())
+      if state.contains(symbol) then
+        try
+          state(_trade.symbol())
+        else
+          MarketDataEntry(true, 0, 0)
+        end
       else
         MarketDataEntry(true, 0, 0)
       end

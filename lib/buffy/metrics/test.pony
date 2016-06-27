@@ -24,17 +24,17 @@ class iso _TestMetricsWireMsgNode is UnitTest
     let auth: AmbientAuth = h.env.root as AmbientAuth
     let node_name = "NodeTest"
     let nms = recover trn NodeMetricsSummary(node_name) end
-    nms.add_report(1, StepMetricsReport(1232143143, 1354551314))
-    nms.add_report(1, StepMetricsReport(1232347892, 1354328734))
-    nms.add_report(1, StepMetricsReport(1242596283, 1123612344))
-    nms.add_report(1, StepMetricsReport(1298273467, 1354275829))
-    nms.add_report(1, StepMetricsReport(1223498726, 1313488791))
+    nms.add_report("1", StepMetricsReport(1232143143, 1354551314))
+    nms.add_report("1", StepMetricsReport(1232347892, 1354328734))
+    nms.add_report("1", StepMetricsReport(1242596283, 1123612344))
+    nms.add_report("1", StepMetricsReport(1298273467, 1354275829))
+    nms.add_report("1", StepMetricsReport(1223498726, 1313488791))
 
-    nms.add_report(2, StepMetricsReport(1232143112, 1354551313))
-    nms.add_report(2, StepMetricsReport(1232347867, 1354328748))
-    nms.add_report(2, StepMetricsReport(1242596287, 1123612390))
-    nms.add_report(2, StepMetricsReport(1298273412, 1354275808))
-    nms.add_report(2, StepMetricsReport(1223498723, 1313488789))
+    nms.add_report("2", StepMetricsReport(1232143112, 1354551313))
+    nms.add_report("2", StepMetricsReport(1232347867, 1354328748))
+    nms.add_report("2", StepMetricsReport(1242596287, 1123612390))
+    nms.add_report("2", StepMetricsReport(1298273412, 1354275808))
+    nms.add_report("2", StepMetricsReport(1223498723, 1313488789))
 
     // let encoded = MetricsMsgEncoder.nodemetrics(consume nms, auth)
     // // remove the bytes length segment from the array
@@ -98,17 +98,17 @@ class iso _TestMonitoringHubEncoder is UnitTest
     let node_name = "Test"
     let app_name = "Test App"
     let nms:NodeMetricsSummary iso = recover NodeMetricsSummary(node_name) end
-    nms.add_report(1, StepMetricsReport(1000, 1999))
-    nms.add_report(1, StepMetricsReport(2000, 2999))
-    nms.add_report(1, StepMetricsReport(3000, 3999))
-    nms.add_report(1, StepMetricsReport(4000, 4999))
-    nms.add_report(1, StepMetricsReport(5000, 5999))
+    nms.add_report("1", StepMetricsReport(1000, 1999))
+    nms.add_report("1", StepMetricsReport(2000, 2999))
+    nms.add_report("1", StepMetricsReport(3000, 3999))
+    nms.add_report("1", StepMetricsReport(4000, 4999))
+    nms.add_report("1", StepMetricsReport(5000, 5999))
 
-    nms.add_report(2, StepMetricsReport(1000, 1999))
-    nms.add_report(2, StepMetricsReport(2000, 2999))
-    nms.add_report(2, StepMetricsReport(3000, 3999))
-    nms.add_report(2, StepMetricsReport(4000, 4999))
-    nms.add_report(2, StepMetricsReport(5000, 5999))
+    nms.add_report("2", StepMetricsReport(1000, 1999))
+    nms.add_report("2", StepMetricsReport(2000, 2999))
+    nms.add_report("2", StepMetricsReport(3000, 3999))
+    nms.add_report("2", StepMetricsReport(4000, 4999))
+    nms.add_report("2", StepMetricsReport(5000, 5999))
 
     let bms:BoundaryMetricsSummary iso =
       recover BoundaryMetricsSummary(node_name) end

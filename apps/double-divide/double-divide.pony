@@ -10,7 +10,7 @@ actor Main
     try
       let topology = recover val
         Topology
-          .new_pipeline[U64, U64](P, S, recover [0] end)
+          .new_pipeline[U64, U64](P, S, recover [0] end, "Double Divide")
           .to[U64](lambda(): Computation[U64, U64] iso^ => Double end)
           .to[U64](lambda(): Computation[U64, U64] iso^ => Halve end)
           .build()

@@ -42,7 +42,7 @@ Vagrant.configure(2) do |config|
 
       c.ssh.forward_agent = true
       c.vm.provider "virtualbox" do |vb|
-        vb.memory = 1024
+        vb.memory = 2048
         vb.cpus = 2
       end
     end
