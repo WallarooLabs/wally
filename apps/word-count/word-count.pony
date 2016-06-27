@@ -11,7 +11,8 @@ actor Main
     try
       let topology: Topology val = recover val
         Topology
-          .new_pipeline[String, WordCount val](P, S, recover [0] end)
+          .new_pipeline[String, WordCount val](P, S, recover [0] end, 
+            "Word Count")
           .to_map[WordCount val](
             lambda(): MapComputation[String, WordCount val] iso^ => Split end)
           .to_stateful_partition[WordCount val, WordCountTotals](
