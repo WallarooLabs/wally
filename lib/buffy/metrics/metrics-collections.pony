@@ -572,5 +572,8 @@ on category and id
     _handler.handle(_sinkmetrics, _boundarymetrics, _stepmetrics, _period)
     reset_collection()
 
+  be flush() =>
+    send_output()
+
 interface Resumable
   be resume()

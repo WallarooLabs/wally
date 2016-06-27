@@ -15,6 +15,7 @@ actor Receiver
     var listen_addr_arg: (Array[String] | None) = None
     var monhub_addr_arg: (Array[String] | None) = None
     var name_arg: (String | None) = None
+    var period_arg: U64 = 1
     var delay_arg: (U64 | None) = None
     var report_file: (String | None) = None
     var report_period: U64 = 300
@@ -27,6 +28,7 @@ actor Receiver
         .add("listen", "l", StringArgument)
         .add("monitor", "m", StringArgument)
         .add("name", "n", StringArgument)
+        .add("period", "", I64Argument)
         .add("delay", "d", F64Argument)
         .add("report-file", "", StringArgument)
         .add("report-period", "", I64Argument)
@@ -37,6 +39,7 @@ actor Receiver
         | ("listen", let arg: String) => listen_addr_arg = arg.split(":")
         | ("monitor", let arg: String) => monhub_addr_arg = arg.split(":")
         | ("name", let arg: String) => name_arg = arg
+        | ("period", let arg: I64) => period_arg = arg.u64()
         | ("delay", let arg: F64) => delay_arg = (arg*1_000_000_000).u64()
         | ("report-file", let arg: String) => report_file = arg
         | ("report-period", let arg: I64) => report_period = arg.u64()
@@ -67,6 +70,11 @@ actor Receiver
       if name_arg is None then name_arg = "" end
       if delay_arg is None then delay_arg = 1_000_000_000 end
 
+      if ((delay_arg as U64)/1_000_000_000) < period_arg then
+        env.err.print("'--delay' must be at least as large as '--period'.")
+        required_args_are_present = false
+      end
+
       if required_args_are_present then
         let auth = env.root as AmbientAuth
         let host = (listen_addr_arg as Array[String])(0)
@@ -89,9 +97,12 @@ actor Receiver
           MetricsOutputHandler(MonitoringHubEncoder, consume output, name')
 
         // Metrics Collection actor
-        let period: U64 = 1
         let bin_selector: F64Selector val = FixedBinSelector
-        let mc = MetricsCollection(bin_selector, period, handler)
+        let mc = MetricsCollection(bin_selector, period_arg, handler)
+
+        // start a timer to flush the metrics-collection
+        Flusher(mc, delay')
+
         collections.push(consume mc)
 
         // File Output
@@ -104,6 +115,10 @@ actor Receiver
               name')
           let bin_selector': F64Selector val = FixedBinSelector
           let mc' = MetricsCollection(bin_selector', report_period, handler')
+
+          // start a timer to flush the metrics-collection
+          Flusher(mc', report_period)
+
           collections.push(consume mc')
           env.out.print("Reporting to file " + arg + " every " +
             report_period.string() + " seconds.")
@@ -118,9 +133,6 @@ actor Receiver
 
         let receiver = MetricsReceiver(env.out, env.err, listener, collections')
 
-        // start a timer to flush the receiver
-        Flusher(receiver, delay')
-
       else
         env.out.print(
           """
@@ -131,6 +143,7 @@ actor Receiver
           --listen [Listen address in xxx.xxx.xxx.xxx:pppp format]
           --monitor [Monitoring Hub address in xxx.xxx.xxx.xxx:pppp format]
           --name [Application name to report to Monitoring Hub]
+          --period [Aggregation periods for reports to Monitoring Hub]
           --delay [Maximum period of time before sending data]
           --report-file/rf [File path to write reports to]
           --report-period/rp [Aggregation period for reports in report-file]
