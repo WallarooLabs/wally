@@ -55,18 +55,21 @@ actor StepManager
     | let s: StepManaged tag =>
       s.add_step_manager(this)
     end
-    step.add_step_reporter(StepReporter(step_id, _metrics_collector))
+    step.add_step_reporter(StepReporter(step_id, step_builder.name(), 
+      _metrics_collector))
     _steps(step_id) = step
 
   be add_partition_step_and_ack(step_id: U64,
-    partition_id: U64, step_builder: BasicStepBuilder val,
-    partition: PartitionAckable tag) =>
+    partition_id: U64, partition_report_id: U64, 
+    step_builder: BasicStepBuilder val, partition: PartitionAckable tag) 
+  =>
     let step = step_builder()
     match step
     | let s: StepManaged tag =>
       s.add_step_manager(this)
     end
-    step.add_step_reporter(StepReporter(step_id, _metrics_collector))
+    step.add_step_reporter(StepReporter(partition_report_id, 
+      step_builder.name(), _metrics_collector))
     _steps(step_id) = step
     partition.ack(partition_id, step_id)
 
@@ -100,7 +103,8 @@ actor StepManager
     end
 
     let step: BasicStep tag = bssb()
-    step.add_step_reporter(StepReporter(step_id, _metrics_collector))
+    step.add_step_reporter(StepReporter(step_id, bssb.name(), 
+      _metrics_collector))
     try
       let shared_state_step = _steps(shared_state_step_id)
       match step

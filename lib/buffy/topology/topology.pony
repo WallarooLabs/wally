@@ -35,7 +35,7 @@ class Pipeline[In: Any val, Out: Any val] is PipelineSteps
 
   new create(p: Parser[In] val, s: Stringify[Out] val,
     s_target_ids: Array[U64] val, n: String) =>
-    let source_builder = SourceBuilder[In](p)
+    let source_builder = SourceBuilder[In](p, n)
     _steps = Array[PipelineStep]
     _sink_target_ids = s_target_ids
     _steps.push(PipelineThroughStep[String, In](source_builder))

@@ -386,9 +386,9 @@ A history of throughput counts per second
 
 type TimeBuckets is Map[U64, (LatencyHistogram, ThroughputHistory)]
 
-type Steps is Set[U64]
+type Steps is Set[String]
 type StepTimeranges is Map[U64, Steps]
-type StepMetrics is Map[U64, TimeBuckets]
+type StepMetrics is Map[String, TimeBuckets]
 
 type Boundaries is Set[String]
 type BoundaryTimeranges is Map[U64, Boundaries]
@@ -447,21 +447,21 @@ on category and id
 
   fun ref process_stepmetricsdigest(digest: StepMetricsDigest val) =>
     for report in digest.reports.values() do
-      process_report(digest.step_id, report)
+      process_report(digest.step_name, report)
     end
 
-  fun ref process_report(step_id: U64, report: StepMetricsReport val) =>
+  fun ref process_report(step_name: String, report: StepMetricsReport val) =>
     let time_bucket: U64 = get_time_bucket(report.end_time)
     // Bookkeeping
     try
-      _steptimeranges(time_bucket).set(step_id)
+      _steptimeranges(time_bucket).set(step_name)
     else
       let steps' = Steps
-      steps'.set(step_id)
+      steps'.set(step_name)
       _steptimeranges.update(time_bucket, steps')
     end
     try
-      let time_buckets:TimeBuckets = _stepmetrics(step_id)
+      let time_buckets:TimeBuckets = _stepmetrics(step_name)
       try
         (let lh, let th) = time_buckets(time_bucket)
         lh(report)
@@ -475,7 +475,7 @@ on category and id
       end
     else
       let time_buckets = TimeBuckets
-      _stepmetrics.update(step_id, time_buckets)
+      _stepmetrics.update(step_name, time_buckets)
       (let lh, let th) = (LatencyHistogram(_bin_selector),
                           recover ref ThroughputHistory end)
       lh(report)

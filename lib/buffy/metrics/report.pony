@@ -72,11 +72,11 @@ class StepMetricsReport is MetricsReport
   fun ended(): U64 => end_time
 
 class StepMetricsDigest
-  let step_id: U64
+  let step_name: String
   let reports: Array[StepMetricsReport val] = Array[StepMetricsReport val]
 
-  new create(id: U64) =>
-    step_id = id
+  new create(name: String) =>
+    step_name = name
 
   fun ref add_report(r: StepMetricsReport val) =>
     reports.push(r)
@@ -93,16 +93,16 @@ class NodeMetricsSummary is MetricsWireMsg
   fun size(): USize =>
     _size
 
-  fun ref add_report(step_id: StepId val, r: StepMetricsReport val) =>
-    if digests.contains(step_id) then
+  fun ref add_report(step_name: String, r: StepMetricsReport val) =>
+    if digests.contains(step_name) then
       try
-        digests(step_id).add_report(r)
+        digests(step_name).add_report(r)
         _size = _size + 1
       end
     else
-      let dig: StepMetricsDigest trn = recover StepMetricsDigest(step_id) end
+      let dig: StepMetricsDigest trn = recover StepMetricsDigest(step_name) end
       dig.add_report(r)
-      digests.update(step_id, consume dig)
+      digests.update(step_name, consume dig)
       _size = _size + 1
     end
 
@@ -141,5 +141,5 @@ class BoundaryMetricsSummary is MetricsWireMsg
 
 type StepType is U64
 type StepId is U64
-type DigestMap is Map[StepId val, StepMetricsDigest trn]
+type DigestMap is Map[String, StepMetricsDigest trn]
 type BoundaryReports is Array[BoundaryMetricsReport val]

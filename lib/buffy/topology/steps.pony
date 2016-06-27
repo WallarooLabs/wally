@@ -148,6 +148,7 @@ actor Partition[In: Any val, Out: Any val]
   var _step_manager: (StepManager | None) = None
   var _output: BasicStep tag = EmptyStep
   let _guid_gen: GuidGenerator = GuidGenerator
+  let _partition_report_id: U64 = _guid_gen()
 
   new create(s_builder: BasicStepBuilder val, pf: PartitionFunction[In] val) =>
     _step_builder = s_builder
@@ -176,8 +177,8 @@ actor Partition[In: Any val, Out: Any val]
               _buffers(partition_id) = [input]
             end
             let step_id = _guid_gen()
-            sm.add_partition_step_and_ack(step_id, partition_id,
-              _step_builder, this)
+            sm.add_partition_step_and_ack(step_id, partition_id, 
+              _partition_report_id, _step_builder, this)
             sm.add_output_to(step_id, _output)
           else
             @printf[I32]("Computation type is invalid!\n".cstring())
@@ -218,6 +219,7 @@ actor StatePartition[State: Any #read]
     Map[U64, Array[StepMessage val]]
   var _step_manager: (StepManager | None) = None
   let _guid_gen: GuidGenerator = GuidGenerator
+  let _partition_report_id: U64 = _guid_gen()
   let _initialization_map: Map[U64, {(): State} val] val
   let _initialize_at_start: Bool
 
@@ -251,12 +253,12 @@ actor StatePartition[State: Any #read]
               let step_id = _guid_gen()
               if _initialization_map.contains(partition_id) then
                 sm.add_partition_step_and_ack(step_id, partition_id,
-                  _step_builder, this)
+                  _partition_report_id, _step_builder, this)
                 sm.add_initial_state[State](step_id,
                   _initialization_map(partition_id))
               else
                 sm.add_partition_step_and_ack(step_id, partition_id,
-                  _step_builder, this)
+                  _partition_report_id, _step_builder, this)
               end
             end
           else
@@ -286,8 +288,8 @@ actor StatePartition[State: Any #read]
           (not _buffers.contains(partition_id)) then
           _buffers(partition_id) = Array[StepMessage val]
           let step_id = _guid_gen()
-          step_manager.add_partition_step_and_ack(step_id, partition_id,
-            _step_builder, this)
+          step_manager.add_partition_step_and_ack(step_id, partition_id, 
+            _partition_report_id, _step_builder, this)
           step_manager.add_initial_state[State](step_id, init)
         end
       end

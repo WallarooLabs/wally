@@ -34,9 +34,10 @@ actor MetricsCollector is FlushingActor
     if _step_summary.size() > 0 then _send_steps() end
     if _boundary_summary.size() > 0 then _send_boundary() end
 
-	be report_step_metrics(step_id: StepId, start_time: U64, end_time: U64) =>
+	be report_step_metrics(step_id: StepId, step_name: String, start_time: U64,
+    end_time: U64) =>
     let r = StepMetricsReport(start_time, end_time)
-    _step_summary.add_report(consume step_id, consume r)
+    _step_summary.add_report(step_name, consume r)
     _send_steps_if_over_max()
 
   be flush_step_metrics() =>
@@ -119,11 +120,14 @@ actor MetricsCollector is FlushingActor
 
 class StepReporter
 	let _step_id: U64
+  let _step_name: String
 	let _metrics_collector: MetricsCollector
 
-	new val create(s_id: U64, m_coll: MetricsCollector) =>
+	new val create(s_id: U64, s_name: String, m_coll: MetricsCollector) =>
 		_step_id = s_id
+    _step_name = s_name
 		_metrics_collector = m_coll
 
 	fun report(start_time: U64, end_time: U64) =>
-		_metrics_collector.report_step_metrics(_step_id, start_time, end_time)
+		_metrics_collector.report_step_metrics(_step_id, _step_name, start_time,
+      end_time)
