@@ -86,7 +86,7 @@ actor Receiver
         let conn = TCPConnection(auth, consume notifier, host', service')
         let output = MonitoringHubOutput(env.out, env.err, conn, name')
         let handler: MetricsOutputHandler val =
-          MetricsOutputHandler(MonitoringHubEncoder, consume output)
+          MetricsOutputHandler(MonitoringHubEncoder, consume output, name')
 
         // Metrics Collection actor
         let period: U64 = 1
@@ -100,7 +100,8 @@ actor Receiver
           let output' = MetricsFileOutput(env.out, env.err, auth, name',
             arg)
           let handler': MetricsOutputHandler val =
-            MetricsOutputHandler(MonitoringHubEncoder(false), consume output')
+            MetricsOutputHandler(MonitoringHubEncoder(false), consume output',
+              name')
           let bin_selector': F64Selector val = FixedBinSelector
           let mc' = MetricsCollection(bin_selector', report_period, handler')
           collections.push(consume mc')
