@@ -15,6 +15,8 @@ actor MetricsCollector is FlushingActor
   let _max_time: U64
   var _node_last_sent: U64 = Epoch.nanoseconds()
   var _boundary_last_sent: U64 = Epoch.nanoseconds()
+  var _largest_boundary_summary_size: USize = 0
+  var _largest_step_summary_size: USize = 0
 
 	new create(stderr: StdStream, auth: AmbientAuth, node_name: String,
              conn: (TCPConnection | None) = None, max_batch: USize = 10000,
@@ -49,8 +51,16 @@ actor MetricsCollector is FlushingActor
 
   fun ref _send_steps() =>
       let node_name: String val = _node_name.clone()
+      var size = _step_summary.size()
+      if size > _largest_step_summary_size then 
+        _largest_step_summary_size = size
+      else
+        size = _largest_step_summary_size
+      end       
       let summary = _step_summary =
-        recover trn NodeMetricsSummary(node_name) end
+        recover 
+          trn NodeMetricsSummary(node_name, size) 
+        end
       let s:NodeMetricsSummary val = consume summary
       _send_step_metrics_to_receiver(s)
       _node_last_sent = Epoch.nanoseconds()
@@ -84,8 +94,14 @@ actor MetricsCollector is FlushingActor
 
   fun ref _send_boundary() =>
       let node_name: String val = _node_name.clone()
+      var size = _boundary_summary.size()
+      if size > _largest_boundary_summary_size then 
+        _largest_boundary_summary_size = size
+      else
+        size = _largest_boundary_summary_size
+      end
 	    let summary = _boundary_summary =
-        recover trn BoundaryMetricsSummary(node_name) end
+        recover trn BoundaryMetricsSummary(node_name, size) end
       let s: BoundaryMetricsSummary val = consume summary
 	    _send_boundary_metrics_to_receiver(s)
       _boundary_last_sent = Epoch.nanoseconds()

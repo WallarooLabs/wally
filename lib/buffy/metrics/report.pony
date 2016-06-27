@@ -83,11 +83,12 @@ class StepMetricsDigest
 
 class NodeMetricsSummary is MetricsWireMsg
   let node_name: String
-  let digests: DigestMap trn = recover DigestMap end
+  let digests: DigestMap trn
   var _size: USize = 0
 
-  new create(name: String) =>
+  new create(name: String, len: USize = 0) =>
     node_name = name
+    digests = recover DigestMap(len) end
 
   fun size(): USize =>
     _size
@@ -123,10 +124,11 @@ class BoundaryMetricsReport is MetricsReport
 
 class BoundaryMetricsSummary is MetricsWireMsg
   let node_name: String
-  let reports: BoundaryReports trn = recover BoundaryReports end
+  let reports: BoundaryReports trn 
 
-  new create(name: String) =>
+  new create(name: String, len: USize = 0) =>
     node_name = name
+    reports = recover BoundaryReports(len) end
 
   fun size(): USize =>
     reports.size()
