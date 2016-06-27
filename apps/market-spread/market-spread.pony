@@ -70,12 +70,9 @@ actor Main
       | let nbbo: FixNbboMessage val =>
         let mid = (nbbo.bid_px() + nbbo.offer_px()) / 2
         let is_rejected =
-          if ((nbbo.offer_px() - nbbo.bid_px()) >= 0.05) or
-            (((nbbo.offer_px() - nbbo.bid_px()) / mid) >= 0.05) then
-            true
-          else
-            false
-          end
+          ((nbbo.offer_px() - nbbo.bid_px()) >= 0.05) or
+            (((nbbo.offer_px() - nbbo.bid_px()) / mid) >= 0.05)
+
         let partition_id = nbbo.symbol().hash()       
         map(partition_id) = recover 
             lambda()(nbbo, is_rejected): MarketData => 
