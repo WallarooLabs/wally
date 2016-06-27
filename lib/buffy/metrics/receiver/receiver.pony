@@ -97,7 +97,7 @@ actor Receiver
           MetricsOutputHandler(MonitoringHubEncoder, consume output, name')
 
         // Metrics Collection actor
-        let bin_selector: F64Selector val = FixedBinSelector
+        let bin_selector: F64Selector val = Log10Selector //FixedBinSelector
         let mc = MetricsCollection(bin_selector, period_arg, handler)
 
         // start a timer to flush the metrics-collection
