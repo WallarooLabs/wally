@@ -135,7 +135,11 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build: build-receiver build-sender build-wesley build-double-divide build-dagon build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count build-dagon-child ## Build Pony based programs for Buffy
+build-buffy-components: build-receiver build-sender build-dagon build-dagon-child
+
+build-apps: build-wesley build-double-divide build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count ## Build Pony based programs for Buffy
+
+build: build-buffy-components build-apps
 
 build-receiver: ## Build giles receiver
 	$(call PONYC,giles/receiver)
