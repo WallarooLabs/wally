@@ -129,7 +129,7 @@ class MarketData
   fun contains(symbol: String): Bool => _entries.contains(symbol)
 
 class GenerateUpdateData is Computation[FixNbboMessage val, UpdateData val]
-  fun name(): String => "update data"
+  fun name(): String => "Update Market Data"
   fun apply(nbbo: FixNbboMessage val): UpdateData val =>
     UpdateData(nbbo)
 
@@ -139,7 +139,7 @@ class UpdateData is StateComputation[None, MarketData]
   new val create(nbbo: FixNbboMessage val) =>
     _nbbo = nbbo
 
-  fun name(): String => "update market data"
+  fun name(): String => "Update Market Data"
   fun apply(state: MarketData, output: MessageTarget[None] val): MarketData =>
     if ((_nbbo.offer_px() - _nbbo.bid_px()) >= 0.05) or
       (((_nbbo.offer_px() - _nbbo.bid_px()) / _nbbo.mid()) >= 0.05) then
@@ -153,7 +153,7 @@ class UpdateData is StateComputation[None, MarketData]
     end
 
 class GenerateCheckStatus is Computation[FixOrderMessage val, CheckStatus val]
-  fun name(): String => "check status"
+  fun name(): String => "Check Trade Status"
   fun apply(order: FixOrderMessage val): CheckStatus val =>
     CheckStatus(order)
 
@@ -163,7 +163,7 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
   new val create(trade: FixOrderMessage val) =>
     _trade = trade
 
-  fun name(): String => "check trade result"
+  fun name(): String => "Check Trade Result"
   fun apply(state: MarketData, output: MessageTarget[TradeResult val] val):
     MarketData =>
     let symbol = _trade.symbol()

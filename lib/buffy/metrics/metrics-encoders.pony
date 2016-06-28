@@ -71,7 +71,7 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
       for (t_f, (lh, th)) in timebucket.pairs() do
         let j': JsonObject ref = JsonObject
         j'.data.update("category", "ingress-egress")
-        j'.data.update("pipeline_key", "boundary-" + name)
+        j'.data.update("pipeline_key", name)
         j'.data.update("t1", t_f.i64())
         j'.data.update("t0", (t_f - period).i64())
         let topics: JsonObject ref = JsonObject
@@ -100,7 +100,7 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
       for (t_f, (lh, th)) in timebucket.pairs() do
         let j': JsonObject ref = JsonObject
         j'.data.update("category", "step")
-        j'.data.update("pipeline_key", "step-" + name)
+        j'.data.update("pipeline_key", name)
         j'.data.update("t1", t_f.i64())
         j'.data.update("t0", (t_f - period).i64())
         let topics: JsonObject ref = JsonObject
