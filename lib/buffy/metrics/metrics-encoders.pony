@@ -19,19 +19,19 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
   fun encode_sinks(sinks: SinkMetrics, period: U64, app_name: String)
     : ByteSeq
   =>
-    HubJson.payload(MetricsCategories.sinks(), "metrics: " + app_name,
+    HubJson.payload(MetricsCategories.sinks(), "metrics:" + app_name,
       _json_sinks(sinks, period), _pretty_print)
 
   fun encode_boundaries(boundaries: BoundaryMetrics, period: U64,
     app_name: String): ByteSeq
   =>
-    HubJson.payload(MetricsCategories.boundaries(), "metrics: " + app_name,
+    HubJson.payload(MetricsCategories.boundaries(), "metrics:" + app_name,
       _json_boundaries(boundaries, period), _pretty_print)
 
   fun encode_steps(steps: StepMetrics, period: U64, app_name: String)
     : ByteSeq
   =>
-    HubJson.payload(MetricsCategories.steps(), "metrics: " + app_name,
+    HubJson.payload(MetricsCategories.steps(), "metrics:" + app_name,
       _json_steps(steps, period), _pretty_print)
 
   fun _json_sinks(metrics: SinkMetrics, period: U64): JsonArray ref^ =>
