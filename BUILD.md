@@ -19,11 +19,21 @@ creating a cross compiler](https://github.com/lispmeister/rpxp).
 
 To facilitate builds across environments we are using Make.
 
-To build for your local machine, run:
+To build for your local machine (Buffy components and all apps), run:
 
 `make`
 
 This will use your local install of `ponyc`.
+
+To build Buffy components only, run   
+
+`make build-buffy-components`  
+
+To build all apps only, run  
+
+`make build-apps`  
+
+All of these must be run from the Buffy root directory.  
 
 To build for the Raspberry Pi, run:
 
