@@ -15,7 +15,7 @@ To build all Buffy components, run
 To build all apps, run  
 `make build-apps`  
 
-To build all of those at once, run
+To build all of those at once, run  
 `make`  
 
 All of these must be run from the Buffy root directory.
