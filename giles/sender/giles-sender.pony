@@ -17,6 +17,7 @@ actor Main
   new create(env: Env)=>
     var required_args_are_present = true
     var run_tests = env.args.size() == 1
+    var batch_size: USize = 500
 
     if run_tests then
       TestMain(env)
@@ -36,6 +37,7 @@ actor Main
           .add("name", "n", StringArgument)
           .add("messages", "m", I64Argument)
           .add("file", "f", StringArgument)
+          .add("batch-size", "s", I64Argument)
 
         for option in options do
           match option
@@ -44,6 +46,7 @@ actor Main
           | ("name", let arg: String) => n_arg = arg
           | ("file", let arg: String) => f_arg = arg
           | ("phone_home", let arg: String) => p_arg = arg.split(":")
+          | ("batch-size", let arg: I64) => batch_size = arg.usize()
           end
         end
 
@@ -121,7 +124,8 @@ actor Main
             to_buffy_socket,
             store,
             coordinator,
-            consume data_source)
+            consume data_source,
+            batch_size)
 
           coordinator.sending_actor(sa)
         end
@@ -323,14 +327,15 @@ actor SendingActor
   let _timers: Timers
   let _data_source: Iterator[String] iso
   var _finished: Bool = false
-  let _msg_encoder: BufferedExternalMsgEncoder = 
-    BufferedExternalMsgEncoder(where chunks = 500)
+  let _batch_size: USize
+  let _msg_encoder: BufferedExternalMsgEncoder
 
   new create(messages_to_send: USize,
     to_buffy_socket: TCPConnection,
     store: Store,
     coordinator: Coordinator,
-    data_source: Iterator[String] iso)
+    data_source: Iterator[String] iso,
+    batch_size: USize)
   =>
     _messages_to_send = messages_to_send
     _to_buffy_socket = to_buffy_socket
@@ -338,6 +343,8 @@ actor SendingActor
     _coordinator = coordinator
     _data_source = consume data_source
     _timers = Timers
+    _batch_size = batch_size
+    _msg_encoder = BufferedExternalMsgEncoder(where chunks = _batch_size)
 
   be go() =>
     let t = Timer(SendBatch(this), 0, 5_000_000)
@@ -346,11 +353,9 @@ actor SendingActor
   be send_batch() =>
     if _finished then return end
 
-    let batch_size = USize(500)
-
     var current_batch_size =
-      if (_messages_to_send - _messages_sent) > batch_size then
-        batch_size
+      if (_messages_to_send - _messages_sent) > _batch_size then
+        _batch_size
       else
         _messages_to_send - _messages_sent
       end
