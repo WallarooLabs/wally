@@ -7,6 +7,19 @@ monorepo. Why a monorepo? At the moment, we are regularly making changes cut
 across multiple sub-projects. It makes sense to keep them all together in a
 single monorepo at this time.
 
+## Building
+
+To build all Buffy components, run  
+`make build-buffy-components`  
+
+To build all apps, run  
+`make build-apps`  
+
+To build all of those at once, run
+`make`
+
+All of these must be run from the Buffy root directory.
+
 ## Naming
 
 All project names are pulled from characters from the TV show _Buffy the Vampire
