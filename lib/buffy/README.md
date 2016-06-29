@@ -5,7 +5,7 @@
 Buffy must be imported as a library.
 
 In order to allow serialization across processes, we need different Buffy-specific components  
-to be compiled as the same binary. You can therefore run a Buffy primary as one of a few different  
+to be compiled as the same binary. You can therefore run a Buffy process as one of a few different  
 components: a platform app, a sink node for forwarding results, or a metrics receiver for forwarding  
 metrics.  
 
