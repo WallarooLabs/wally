@@ -16,7 +16,7 @@ To build all apps, run
 `make build-apps`  
 
 To build all of those at once, run
-`make`
+`make`  
 
 All of these must be run from the Buffy root directory.
 
