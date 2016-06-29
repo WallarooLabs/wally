@@ -21,7 +21,7 @@ actor Main
       let topology = recover val
         Topology
           .new_pipeline[FixOrderMessage val, TradeResult val](
-            TradeParser, ResultStringify, recover [0] end, "Trades")
+            TradeParser, ResultStringify, recover [0] end, "Orders")
           .to_stateful_partition[TradeResult val, MarketData](
             recover
               StatePartitionConfig[FixOrderMessage val, TradeResult val,
@@ -153,7 +153,7 @@ class UpdateData is StateComputation[None, MarketData]
     end
 
 class GenerateCheckStatus is Computation[FixOrderMessage val, CheckStatus val]
-  fun name(): String => "Check Trade Status"
+  fun name(): String => "Check Order Status"
   fun apply(order: FixOrderMessage val): CheckStatus val =>
     CheckStatus(order)
 
@@ -163,7 +163,7 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
   new val create(trade: FixOrderMessage val) =>
     _trade = trade
 
-  fun name(): String => "Check Trade Result"
+  fun name(): String => "Check Order Result"
   fun apply(state: MarketData, output: MessageTarget[TradeResult val] val):
     MarketData =>
     let symbol = _trade.symbol()
