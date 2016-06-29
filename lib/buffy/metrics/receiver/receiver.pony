@@ -15,10 +15,10 @@ actor Receiver
     var listen_addr_arg: (Array[String] | None) = None
     var monhub_addr_arg: (Array[String] | None) = None
     var name_arg: (String | None) = None
-    var period_arg: U64 = 1
+    var period_arg: U64 = 1_000_000_000
     var delay_arg: (U64 | None) = None
     var report_file: (String | None) = None
-    var report_period: U64 = 300
+    var report_period: U64 = 300_000_000_000
 
     try
       var options = Options(env)
@@ -42,7 +42,8 @@ actor Receiver
         | ("period", let arg: I64) => period_arg = arg.u64()
         | ("delay", let arg: F64) => delay_arg = (arg*1_000_000_000).u64()
         | ("report-file", let arg: String) => report_file = arg
-        | ("report-period", let arg: I64) => report_period = arg.u64()
+        | ("report-period", let arg: I64) =>
+          report_period = (arg*1_000_000_000).u64()
         end
       end
 
