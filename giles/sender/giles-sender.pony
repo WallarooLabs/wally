@@ -18,6 +18,7 @@ actor Main
     var required_args_are_present = true
     var run_tests = env.args.size() == 1
     var batch_size: USize = 500
+    var interval: U64 = 5_000_000
 
     if run_tests then
       TestMain(env)
@@ -38,6 +39,7 @@ actor Main
           .add("messages", "m", I64Argument)
           .add("file", "f", StringArgument)
           .add("batch-size", "s", I64Argument)
+          .add("interval", "i", I64Argument)
 
         for option in options do
           match option
@@ -47,6 +49,7 @@ actor Main
           | ("file", let arg: String) => f_arg = arg
           | ("phone-home", let arg: String) => p_arg = arg.split(":")
           | ("batch-size", let arg: I64) => batch_size = arg.usize()
+          | ("interval", let arg: I64) => interval = arg.u64()
           end
         end
 
@@ -125,7 +128,8 @@ actor Main
             store,
             coordinator,
             consume data_source,
-            batch_size)
+            batch_size,
+            interval)
 
           coordinator.sending_actor(sa)
         end
@@ -328,6 +332,7 @@ actor SendingActor
   let _data_source: Iterator[String] iso
   var _finished: Bool = false
   let _batch_size: USize
+  let _interval: U64
   let _msg_encoder: BufferedExternalMsgEncoder
 
   new create(messages_to_send: USize,
@@ -335,7 +340,8 @@ actor SendingActor
     store: Store,
     coordinator: Coordinator,
     data_source: Iterator[String] iso,
-    batch_size: USize)
+    batch_size: USize,
+    interval: U64)
   =>
     _messages_to_send = messages_to_send
     _to_buffy_socket = to_buffy_socket
@@ -344,10 +350,11 @@ actor SendingActor
     _data_source = consume data_source
     _timers = Timers
     _batch_size = batch_size
+    _interval = interval
     _msg_encoder = BufferedExternalMsgEncoder(where chunks = _batch_size)
 
   be go() =>
-    let t = Timer(SendBatch(this), 0, 5_000_000)
+    let t = Timer(SendBatch(this), 0, _interval)
     _timers(consume t)
 
   be send_batch() =>
