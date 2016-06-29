@@ -4,7 +4,12 @@
 
 Buffy must be imported as a library.
 
-### Buffy Platform
+In order to allow serialization across processes, we need different Buffy-specific components  
+to be compiled as the same binary. You can therefore run a Buffy primary as one of a few different  
+components: a platform app, a sink node for forwarding results, or a metrics receiver for forwarding  
+metrics.  
+
+### Buffy Platform App
 When you run a client, use the following command line parameters:
 
 ```--leader/-l``` sets process as leader.  
@@ -45,6 +50,9 @@ For example:
 ```
 ./market-spread --run-sink -a 127.0.0.1:8000 -t 127.0.0.1:5555
 ```
+
+If the Market Spread app is writing to a sink address of 127.0.0.1:8000, then those  
+messages would be sent to this sink node.  
 
 ### Metrics Receiver
 To run as Metrics Receiver, use the following parameters:  
