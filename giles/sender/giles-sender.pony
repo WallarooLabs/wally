@@ -33,7 +33,7 @@ actor Main
 
         options
           .add("buffy", "b", StringArgument)
-          .add("phone_home", "p", StringArgument)
+          .add("phone-home", "p", StringArgument)
           .add("name", "n", StringArgument)
           .add("messages", "m", I64Argument)
           .add("file", "f", StringArgument)
@@ -45,7 +45,7 @@ actor Main
           | ("messages", let arg: I64) => m_arg = arg.usize()
           | ("name", let arg: String) => n_arg = arg
           | ("file", let arg: String) => f_arg = arg
-          | ("phone_home", let arg: String) => p_arg = arg.split(":")
+          | ("phone-home", let arg: String) => p_arg = arg.split(":")
           | ("batch-size", let arg: I64) => batch_size = arg.usize()
           end
         end

@@ -15,7 +15,7 @@ When you run a client, use the following command line parameters:
 ```--leader/-l``` sets process as leader.  
 ```--worker-count/-w <count>``` tells the leader how many workers to wait for.  
 ```--name/-n <node_name>``` sets the name for the process in the Buffy cluster.  
-```--phone_home/-p <address>``` sets the address for phone home.  
+```--phone-home/-p <address>``` sets the address for phone home.  
 ```--leader-control-address/-c <address>``` sets the address for the leader's control channel address.  
 ```--leader-data-address/-d <address>``` sets the address for the leader's data channel address.  
 ```--source/-r <comma-delimited source_addresses>``` sets the addresses for the sink.  

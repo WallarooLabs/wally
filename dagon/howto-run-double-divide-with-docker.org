@@ -51,5 +51,5 @@ Start the test with the following command (run from the dagon sub directory):
 #+BEGIN_SRC sh
 ./dagon --docker=<docker-host>:<port> -t 10 \
  --filepath=docker-example.ini \
- --phone_home=<dagon-host>:8080
+ --phone-home=<dagon-host>:8080
 #+END_SRC

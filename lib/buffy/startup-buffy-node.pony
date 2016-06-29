@@ -27,7 +27,7 @@ class StartupBuffyNode
     options
       .add("leader", "l", None)
       .add("worker-count", "w", I64Argument)
-      .add("phone_home", "p", StringArgument)
+      .add("phone-home", "p", StringArgument)
       .add("name", "n", StringArgument)
       .add("leader-control-address", "c", StringArgument)
       .add("leader-data-address", "d", StringArgument)
@@ -46,7 +46,7 @@ class StartupBuffyNode
       | ("leader-control-address", let arg: String) => leader_control_addr = arg.split(":")
       | ("leader-data-address", let arg: String) => leader_data_addr = arg.split(":")
       | ("worker-count", let arg: I64) => worker_count = arg.usize()
-      | ("phone_home", let arg: String) => phone_home_addr = arg.split(":")
+      | ("phone-home", let arg: String) => phone_home_addr = arg.split(":")
       | ("name", let arg: String) => node_name = arg
       | ("source", let arg: String) => source_addrs.append(arg.split(","))
       | ("sink", let arg: String) => sink_addrs.append(arg.split(","))
@@ -175,7 +175,7 @@ class StartupBuffyNode
         --leader/-l [Sets process as leader]
         --worker-count/-w <count> [Tells the leader how many workers to wait for]
         --name/-n <node_name> [Sets the name for the process in the Buffy cluster]
-        --phone_home/-p <address> [Sets the address for phone home]
+        --phone-home/-p <address> [Sets the address for phone home]
         --leader-control-address/-c <address> [Sets the address for the leader's control
                                             channel address]
         --leader-data-address/-d <address> [Sets the address for the leader's data channel

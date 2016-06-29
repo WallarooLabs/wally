@@ -29,14 +29,14 @@ actor Main
         var options = Options(env)
 
         options
-          .add("phone_home", "d", StringArgument)
+          .add("phone-home", "d", StringArgument)
           .add("name", "n", StringArgument)
           .add("listen", "l", StringArgument)
 
         for option in options do
           match option
           | ("name", let arg: String) => n_arg = arg
-          | ("phone_home", let arg: String) => p_arg = arg.split(":")
+          | ("phone-home", let arg: String) => p_arg = arg.split(":")
           | ("listen", let arg: String) => l_arg = arg.split(":")
           end
         end

@@ -49,17 +49,17 @@ actor Main
     .add("docker", "d", StringArgument)
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
-    .add("phone_home", "h", StringArgument)
+    .add("phone-home", "h", StringArgument)
     for option in options do
       match option
       | ("docker", let arg: String) => docker_host = arg
       | ("timeout", let arg: I64) => timeout = arg
       | ("filepath", let arg: String) => path = arg
-      | ("phone_home", let arg: String) => p_arg = arg.split(":")
+      | ("phone-home", let arg: String) => p_arg = arg.split(":")
       else
         env.err.print("dagon: unknown argument")
         env.err.print("dagon: usage: [--docker=<host:port>] --timeout=<seconds>" +
-        " --filepath=<path> --phone_home=<host:port>")
+        " --filepath=<path> --phone-home=<host:port>")
       end
     end
 
@@ -86,7 +86,7 @@ actor Main
       end
 
       if p_arg is None then
-        env.err.print("dagon error: Must supply required '--phone_home' argument")
+        env.err.print("dagon error: Must supply required '--phone-home' argument")
         required_args_are_present = false      
       elseif (p_arg as Array[String]).size() != 2 then
         env.err.print(
@@ -371,7 +371,7 @@ actor ProcessManager
             argsbuilder.push("--" + key + "=" + sections(section)(key))
           end
         end
-        argsbuilder.push("--phone_home=" + _host + ":" + _service)
+        argsbuilder.push("--phone-home=" + _host + ":" + _service)
         let a: Array[String] val = consume argsbuilder
         let vars: Array[String] iso = recover Array[String](0) end
         
@@ -485,7 +485,7 @@ actor ProcessManager
       _env.out.print("dagon: can't parse node section: " + section)
     end
     
-    argsbuilder.push("--phone_home=" + _host + ":" + _service)
+    argsbuilder.push("--phone-home=" + _host + ":" + _service)
     let a: Array[String] val = consume argsbuilder
     let vars: Array[String] iso = recover Array[String](0) end
 

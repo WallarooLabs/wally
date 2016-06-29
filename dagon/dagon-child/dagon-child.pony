@@ -17,20 +17,20 @@ actor Main
     var phone_home_service: String = ""
     options
       .add("name", "n", StringArgument)
-      .add("phone_home", "h", StringArgument)
+      .add("phone-home", "h", StringArgument)
       .add("leader", "l", None)
 
     for option in options do
       match option
       | ("name", let arg: String) => node_name = arg
-      | ("phone_home", let arg: String) => phone_home = arg
+      | ("phone-home", let arg: String) => phone_home = arg
       | ("leader", let arg: None) => is_leader = true
       else
         env.out.print("unknown option")
       end
     end
     env.out.print("\t" + node_name + ": name: " + node_name)
-    env.out.print("\t" + node_name + ": phone_home: " + phone_home)
+    env.out.print("\t" + node_name + ": phone-home: " + phone_home)
     if phone_home != "" then
       let ph_addr = phone_home.split(":")
       try
