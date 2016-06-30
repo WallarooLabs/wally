@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+
+
+import json
+import click
+from summarize import (file_line_iter,
+                       load_report,
+                       verify_report)
+
+
+@click.command()
+@click.option('--report', '-r', nargs=1, required=True,
+              help="Path of report file to verify")
+def verify(report):
+    try:
+        for line in file_line_iter(report):
+            r = load_report(line)
+            verify_report(r)
+        print("All reports appear internally congruent.")
+        exit(0)
+    except Exception as e:
+        print(e)
+        exit(1)
+
+
+if __name__ == '__main__':
+    verify()

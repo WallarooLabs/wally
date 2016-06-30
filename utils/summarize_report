@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+
+import json
+import click
+from summarize import (file_line_iter,
+                       load_report,
+                       Summarizer,
+                       FixedBins, Log10Bins,
+                       IncongruentReportError)
+
+from textwrap import indent
+
+@click.command()
+@click.option('--report', '-r', nargs=1, required=True,
+              help="Path of report file to verify")
+@click.option('--bin-type', '-b', type=click.Choice(['FixedBins', 'Log10Bins']),
+              default='Log10Bins')
+@click.option('--verify/--no-verify', ' /-V', default=True)
+def summarize(report, bin_type, verify):
+    if bin_type == 'FixedBins':
+        bins = FixedBins
+    else:
+        bins = Log10Bins
+    topics = {}
+    try:
+        for line in file_line_iter(report):
+            r = load_report(line)
+            topic = topics.setdefault(r['topic'], {})
+            for p in r['payload']:
+                s = topic.setdefault(
+                    '{}: {}'.format(p['category'], p['pipeline_key']),
+                    Summarizer(bins))
+                s.load(p['topics']['latency_bins'], p['topics']['throughput_out'])
+        if verify:
+            for topic in topics:
+                for pcat in topics[topic]:
+                    s = topics[topic][pcat]
+                    if (sum(s.counts.values()) !=
+                        sum(s.throughputs.values())):
+                        raise IncongruentReportError("Incongruent report "
+                            "summary encountered for topic: {topic}: {pcat} "
+                            "with:\nthroughputs: {throughputs}\n"
+                            "latencies: {latencies}".format(
+                                topic, pcat, s.throughputs, s.counts))
+        print("Metrics Report Summary")
+        print("======================")
+        for topic in topics:
+            print(indent("{}\n{}".format(topic, '-'*(len(topic))), ' '*2))
+            for pcat in topics[topic]:
+                print()
+                print(indent("{}".format(pcat), ' '*4))
+                print(indent("{}".format("-"*len(pcat)), ' '*4))
+                print(indent(str(topics[topic][pcat]), ' '*6))
+        exit(0)
+    except Exception as e:
+        print(e)
+        raise
+        exit(1)
+
+
+if __name__ == '__main__':
+    summarize()
