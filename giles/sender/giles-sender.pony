@@ -19,6 +19,7 @@ actor Main
     var run_tests = env.args.size() == 1
     var batch_size: USize = 500
     var interval: U64 = 5_000_000
+    var should_repeat = false
 
     if run_tests then
       TestMain(env)
@@ -40,6 +41,7 @@ actor Main
           .add("file", "f", StringArgument)
           .add("batch-size", "s", I64Argument)
           .add("interval", "i", I64Argument)
+          .add("repeat", "r", None)
 
         for option in options do
           match option
@@ -50,6 +52,7 @@ actor Main
           | ("phone-home", let arg: String) => p_arg = arg.split(":")
           | ("batch-size", let arg: I64) => batch_size = arg.usize()
           | ("interval", let arg: I64) => interval = arg.u64()
+          | ("repeat", None) => should_repeat = true
           end
         end
 
@@ -121,7 +124,7 @@ actor Main
               for str in (consume fs).values() do
                 paths.push(FilePath(env.root as AmbientAuth, str))
               end
-              MultiFileDataSource(consume paths)
+              MultiFileDataSource(consume paths, should_repeat)
             else
               IntegerDataSource
             end
@@ -483,8 +486,10 @@ class MultiFileDataSource is Iterator[String]
   let _paths: Array[FilePath val] val
   var _cur_source: (FileDataSource | None)
   var _idx: USize = 0
+  var _should_repeat: Bool
 
-  new iso create(paths: Array[FilePath val] val) =>
+  new iso create(paths: Array[FilePath val] val, should_repeat: Bool = false) 
+  =>
     _paths = paths
     _cur_source = 
       try
@@ -492,6 +497,7 @@ class MultiFileDataSource is Iterator[String]
       else
         None
       end
+    _should_repeat = should_repeat
 
   fun ref has_next(): Bool =>
     match _cur_source
@@ -504,7 +510,18 @@ class MultiFileDataSource is Iterator[String]
           _cur_source = FileDataSource(_paths(_idx))
           has_next()
         else
-          false
+          if _should_repeat then
+            _idx = 0
+            _cur_source = 
+              try
+                FileDataSource(_paths(_idx))
+              else
+                None
+              end
+            has_next()
+          else
+            false
+          end
         end
       end
     else

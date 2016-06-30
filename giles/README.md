@@ -39,6 +39,8 @@ The sender also takes the following parameters:
 Use comma-separated file paths to send multiple files in sequence.  
 ```--batch-size/-s``` specifies the number of messages sent every interval.  
 ```--interval/-i``` specifies the length of the sending interval.  
+```--repeat/-r``` tells the sender to repeat reading the file/s as long as is necessary to send
+the number of messages specified by `-m`.
 
 The receiver should be started before the sender otherwise data will be lost. By
 the same token, the sender should be shut down before the receiver to prevent
