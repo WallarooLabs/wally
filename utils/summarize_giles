@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+
+import click
+from summarize import (two_file_line_iter,
+                       parse_giles_line,
+                       Summarizer)
+
+
+@click.command()
+@click.option('--sent', '-s', nargs=1, required=True, type=str,
+              help='Path of the giles sent file')
+@click.option('--recd', '-r', nargs=1, required=True, type=str,
+              help='Path of the giles received file')
+def summarize(sent, recd):
+    """Summarize a pair of giles sent and received text logs into a source-sink
+    metrics summary."""
+    s = Summarizer()
+    for ls, lr in two_file_line_iter(sent, recd):
+        ts0, _ = parse_giles_line(ls)
+        ts1, _ = parse_giles_line(lr)
+        s.count(ts0, ts1)
+    print("Giles Report Summary")
+    print("====================")
+    print()
+    print(s)
+
+
+if __name__ == '__main__':
+    summarize()
