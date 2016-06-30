@@ -116,17 +116,12 @@ actor Main
             match f_arg
             | let mfn': String =>
               let fs: Array[String] iso = recover mfn'.split(",") end
-              if fs.size() == 1 then
-                let path = FilePath(env.root as AmbientAuth, mfn')
-                FileDataSource(path)
-              else
-                let paths: Array[FilePath] iso = 
-                  recover Array[FilePath] end
-                for str in (consume fs).values() do
-                  paths.push(FilePath(env.root as AmbientAuth, str))
-                end
-                MultiFileDataSource(consume paths)
+              let paths: Array[FilePath] iso = 
+                recover Array[FilePath] end
+              for str in (consume fs).values() do
+                paths.push(FilePath(env.root as AmbientAuth, str))
               end
+              MultiFileDataSource(consume paths)
             else
               IntegerDataSource
             end
