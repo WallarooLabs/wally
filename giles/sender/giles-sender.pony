@@ -87,11 +87,14 @@ actor Main
 
         if f_arg isnt None then
           let f = f_arg as String
+          let fs: Array[String] = recover f.split(",") end
           try
-            let path = FilePath(env.root as AmbientAuth, f)
-            if not path.exists() then
-              env.err.print("Error opening file '" + f + "'.")
-              required_args_are_present = false
+            for str in (consume fs).values() do
+              let path = FilePath(env.root as AmbientAuth, str)
+              if not path.exists() then
+                env.err.print("Error opening file '" + str + "'.")
+                required_args_are_present = false
+              end
             end
           end
         end
@@ -112,12 +115,13 @@ actor Main
           let data_source =
             match f_arg
             | let mfn': String =>
-              try
-                let path = FilePath(env.root as AmbientAuth, mfn')
-                FileDataSource(path)
-              else
-                error
+              let fs: Array[String] iso = recover mfn'.split(",") end
+              let paths: Array[FilePath] iso = 
+                recover Array[FilePath] end
+              for str in (consume fs).values() do
+                paths.push(FilePath(env.root as AmbientAuth, str))
               end
+              MultiFileDataSource(consume paths)
             else
               IntegerDataSource
             end
@@ -471,6 +475,50 @@ class FileDataSource is Iterator[String]
   fun ref next(): String ? =>
     if has_next() then
       _lines.next()
+    else
+      error
+    end
+
+class MultiFileDataSource is Iterator[String]
+  let _paths: Array[FilePath val] val
+  var _cur_source: (FileDataSource | None)
+  var _idx: USize = 0
+
+  new iso create(paths: Array[FilePath val] val) =>
+    _paths = paths
+    _cur_source = 
+      try
+        FileDataSource(_paths(_idx))
+      else
+        None
+      end
+
+  fun ref has_next(): Bool =>
+    match _cur_source
+    | let f: FileDataSource =>
+      if f.has_next() then
+        true
+      else
+        _idx = _idx + 1
+        try
+          _cur_source = FileDataSource(_paths(_idx))
+          has_next()
+        else
+          false
+        end
+      end
+    else
+      false
+    end
+
+  fun ref next(): String ? =>
+    if has_next() then
+      match _cur_source
+      | let f: FileDataSource =>
+        f.next()
+      else
+        error
+      end
     else
       error
     end
