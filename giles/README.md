@@ -34,8 +34,8 @@ start Giles as follows:
 ./giles/sender -b 127.0.0.1:8081 -m 100
 ```
 
-The sender also takes the following parameters:
-```-f``` specifies a file path to read from (the number of lines is specified by `-m`).
+The sender also takes the following parameters:  
+```--file/-f``` specifies a file path to read from (the number of lines is specified by `-m`).
 Use comma-separated file paths to send multiple files in sequence.  
 ```--batch-size/-s``` specifies the number of messages sent every interval.  
 ```--interval/-i``` specifies the length of the sending interval.  
