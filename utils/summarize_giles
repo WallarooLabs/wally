@@ -3,7 +3,8 @@
 import click
 from summarize import (two_file_line_iter,
                        parse_giles_line,
-                       Summarizer)
+                       Summarizer,
+                       FixedBins, Log10Bins)
 
 
 @click.command()
@@ -11,10 +12,16 @@ from summarize import (two_file_line_iter,
               help='Path of the giles sent file')
 @click.option('--recd', '-r', nargs=1, required=True, type=str,
               help='Path of the giles received file')
-def summarize(sent, recd):
+@click.option('--bin-type', '-b', type=click.Choice(['FixedBins', 'Log10Bins']),
+              default='Log10Bins')
+def summarize(sent, recd, bin_type):
     """Summarize a pair of giles sent and received text logs into a source-sink
     metrics summary."""
-    s = Summarizer()
+    if bin_type == 'FixedBins':
+        bins = FixedBins
+    else:
+        bins = Log10Bins
+    s = Summarizer(bins)
     for ls, lr in two_file_line_iter(sent, recd):
         ts0, _ = parse_giles_line(ls)
         ts1, _ = parse_giles_line(lr)
