@@ -19,6 +19,8 @@ actor Receiver
     var delay_arg: (U64 | None) = None
     var report_file: (String | None) = None
     var report_period: U64 = 300_000_000_000
+    var phone_home_arg: (Array[String] | None) = None
+    var phone_home_name: String = "metrics-receiver"
 
     try
       var options = Options(env)
@@ -32,6 +34,8 @@ actor Receiver
         .add("delay", "d", F64Argument)
         .add("report-file", "", StringArgument)
         .add("report-period", "", I64Argument)
+        .add("phone-home", "", StringArgument)
+        .add("phone-home-name", "", StringArgument)
 
       for option in options do
         match option
@@ -44,6 +48,8 @@ actor Receiver
         | ("report-file", let arg: String) => report_file = arg
         | ("report-period", let arg: I64) =>
           report_period = (arg*1_000_000_000).u64()
+        | ("phone-home", let arg: String) => phone_home_arg = arg.split(":")
+        | ("phone-home-name", let arg: String) => phone_home_name = arg
         end
       end
 
@@ -64,6 +70,22 @@ actor Receiver
         if (monhub_addr_arg as Array[String]).size() != 2 then
           env.err.print(
             "'--monitor' argument should be in format '127.0.0.1:9999'")
+          required_args_are_present = false
+        end
+      end
+
+      if phone_home_arg isnt None then
+        if (phone_home_arg as Array[String]).size() != 2 then
+          env.err.print(
+            "'--phone-home' argument should be in format: '127.0.0.1:8080")
+          required_args_are_present = false
+        end
+      end
+
+      if (phone_home_arg isnt None) or (phone_home_name isnt None) then
+        if (phone_home_arg is None) or (phone_home_name is None) then
+          env.err.print(
+            "'--phone-home' must be used in conjunction with '--phone-home-name'")
           required_args_are_present = false
         end
       end
@@ -148,6 +170,8 @@ actor Receiver
           --delay [Maximum period of time before sending data]
           --report-file/rf [File path to write reports to]
           --report-period/rp [Aggregation period for reports in report-file]
+          --phone-home [Address on which Dagon is listening]
+          --phone-home-name [Name to use with Dagon receiver]
           """
         )
       end
