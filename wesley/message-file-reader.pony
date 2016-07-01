@@ -45,16 +45,27 @@ class MessageFileReader
   the field separator may appear multiple times in the second field (e.g. a
   comma in a sentence).
   """
+    var cur_line_number: USize = 0
+    var cur_line: String = ""
     match parser.ls()
     | let ls: String =>  // split the input into lines
         let lines: Array[String] = input.split(ls, parser.ln())
         match parser.fs()
         | let fs: String =>  // split each line into fields
-            for l in lines.values() do
-              let values: Array[String] ref = l.split(fs, parser.fn())
-              if values.size() > 0 then
-                parser(values)
+            try
+              for l in lines.values() do
+                cur_line_number = cur_line_number + 1
+                cur_line = l
+                let values: Array[String] ref = l.split(fs, parser.fn())
+                if values.size() > 0 then
+                  parser(values)
+                end
               end
+            else
+              @printf[I32](("Failed reading on line " 
+                + cur_line_number.string() + ":\n").cstring())
+              @printf[I32]((cur_line + "\n").cstring())
+              error
             end
         else  // no field separator, return the parser over the entire line
           for l in lines.values() do

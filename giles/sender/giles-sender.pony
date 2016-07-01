@@ -19,6 +19,7 @@ actor Main
     var run_tests = env.args.size() == 1
     var batch_size: USize = 500
     var interval: U64 = 5_000_000
+    var should_repeat = false
 
     if run_tests then
       TestMain(env)
@@ -40,6 +41,7 @@ actor Main
           .add("file", "f", StringArgument)
           .add("batch-size", "s", I64Argument)
           .add("interval", "i", I64Argument)
+          .add("repeat", "r", None)
 
         for option in options do
           match option
@@ -50,6 +52,7 @@ actor Main
           | ("phone-home", let arg: String) => p_arg = arg.split(":")
           | ("batch-size", let arg: I64) => batch_size = arg.usize()
           | ("interval", let arg: I64) => interval = arg.u64()
+          | ("repeat", None) => should_repeat = true
           end
         end
 
@@ -87,11 +90,14 @@ actor Main
 
         if f_arg isnt None then
           let f = f_arg as String
+          let fs: Array[String] = recover f.split(",") end
           try
-            let path = FilePath(env.root as AmbientAuth, f)
-            if not path.exists() then
-              env.err.print("Error opening file '" + f + "'.")
-              required_args_are_present = false
+            for str in (consume fs).values() do
+              let path = FilePath(env.root as AmbientAuth, str)
+              if not path.exists() then
+                env.err.print("Error opening file '" + str + "'.")
+                required_args_are_present = false
+              end
             end
           end
         end
@@ -112,12 +118,13 @@ actor Main
           let data_source =
             match f_arg
             | let mfn': String =>
-              try
-                let path = FilePath(env.root as AmbientAuth, mfn')
-                FileDataSource(path)
-              else
-                error
+              let fs: Array[String] iso = recover mfn'.split(",") end
+              let paths: Array[FilePath] iso = 
+                recover Array[FilePath] end
+              for str in (consume fs).values() do
+                paths.push(FilePath(env.root as AmbientAuth, str))
               end
+              MultiFileDataSource(consume paths, should_repeat)
             else
               IntegerDataSource
             end
@@ -471,6 +478,64 @@ class FileDataSource is Iterator[String]
   fun ref next(): String ? =>
     if has_next() then
       _lines.next()
+    else
+      error
+    end
+
+class MultiFileDataSource is Iterator[String]
+  let _paths: Array[FilePath val] val
+  var _cur_source: (FileDataSource | None)
+  var _idx: USize = 0
+  var _should_repeat: Bool
+
+  new iso create(paths: Array[FilePath val] val, should_repeat: Bool = false) 
+  =>
+    _paths = paths
+    _cur_source = 
+      try
+        FileDataSource(_paths(_idx))
+      else
+        None
+      end
+    _should_repeat = should_repeat
+
+  fun ref has_next(): Bool =>
+    match _cur_source
+    | let f: FileDataSource =>
+      if f.has_next() then
+        true
+      else
+        _idx = _idx + 1
+        try
+          _cur_source = FileDataSource(_paths(_idx))
+          has_next()
+        else
+          if _should_repeat then
+            _idx = 0
+            _cur_source = 
+              try
+                FileDataSource(_paths(_idx))
+              else
+                None
+              end
+            has_next()
+          else
+            false
+          end
+        end
+      end
+    else
+      false
+    end
+
+  fun ref next(): String ? =>
+    if has_next() then
+      match _cur_source
+      | let f: FileDataSource =>
+        f.next()
+      else
+        error
+      end
     else
       error
     end

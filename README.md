@@ -23,6 +23,10 @@ documentation.
 Check out the [build](BUILD.md) documentation for important information on how
 we stay up to date with the latest Pony compiler changes.
 
+For information about using LLDB to debug Pony programs, please see
+the
+[Pony LLDB Cheatsheet](https://docs.google.com/a/sendence.com/document/d/11okODVmyvoa_gP_Exx46DJPbwRJX-Z7zHkA1B88MO7g/edit?usp=sharing).
+
 Additional documentation, including onboarding is in the [doc](doc/)
 directory.
  
