@@ -202,7 +202,7 @@ class Node
   let is_leader: Bool
   let path: String
   let docker_image: String
-  let docker_constraint_node: String
+  let docker_constraint: String
   let docker_dir: String
   let docker_tag: String
   let docker_userid: String
@@ -213,7 +213,7 @@ class Node
     is_canary': Bool, is_leader': Bool,
     path': String,
     docker_image': String,
-    docker_constraint_node': String,
+    docker_constraint': String,
     docker_dir': String,
     docker_tag': String,
     docker_userid': String,
@@ -225,7 +225,7 @@ class Node
     is_leader = is_leader'
     path = path'
     docker_image = docker_image'
-    docker_constraint_node = docker_constraint_node'
+    docker_constraint = docker_constraint'
     docker_dir = docker_dir'
     docker_tag = docker_tag'
     docker_userid = docker_userid'
@@ -330,7 +330,7 @@ actor ProcessManager
     var name: String = ""
     var path: String = ""
     var docker_image = ""
-    var docker_constraint_node = ""
+    var docker_constraint = ""
     var docker_dir = ""
     var docker_tag = ""
     var docker_userid = ""    
@@ -376,7 +376,7 @@ actor ProcessManager
         let vars: Array[String] iso = recover Array[String](0) end
         
         register_node(name, is_canary, is_leader, path,
-          docker_image, docker_constraint_node, docker_dir,
+          docker_image, docker_constraint, docker_dir,
           docker_tag, docker_userid,
           a, consume vars)
       end
@@ -437,7 +437,7 @@ actor ProcessManager
     let argsbuilder: Array[String] iso = recover Array[String](6) end    
     var name: String = ""
     var docker_image = ""
-    var docker_constraint_node = ""
+    var docker_constraint = ""
     var docker_dir = ""
     var docker_tag = ""
     var docker_userid = ""
@@ -449,8 +449,8 @@ actor ProcessManager
         match key
         | "docker.image" =>
           docker_image = sections(section)(key)
-        | "docker.constraint_node" =>
-          docker_constraint_node = sections(section)(key)
+        | "docker.constraint" =>
+          docker_constraint = sections(section)(key)
         | "docker.dir" =>
           docker_dir = sections(section)(key)
         | "docker.tag" =>
@@ -490,7 +490,7 @@ actor ProcessManager
     let vars: Array[String] iso = recover Array[String](0) end
 
     register_node(name, is_canary, is_leader, path,
-      docker_image, docker_constraint_node, docker_dir,
+      docker_image, docker_constraint, docker_dir,
       docker_tag, docker_userid,
       a, consume vars)          
     
@@ -576,7 +576,7 @@ actor ProcessManager
   be register_node(name: String,
     is_canary: Bool, is_leader: Bool,
     path: String,
-    docker_image: String, docker_constraint_node: String,
+    docker_image: String, docker_constraint: String,
     docker_dir: String, docker_tag: String,
     docker_userid: String,
     args: Array[String] val,
@@ -588,19 +588,19 @@ actor ProcessManager
     if is_canary then
       _env.out.print("dagon: registering canary node: " + name)
       _canaries(name) = recover Node(name, is_canary, is_leader,
-        path, docker_image, docker_constraint_node, docker_dir,
+        path, docker_image, docker_constraint, docker_dir,
         docker_tag, docker_userid,
         args, vars) end
     elseif is_leader then
       _env.out.print("dagon: registering leader node: " + name)
       _leaders(name) = recover Node(name, is_canary, is_leader,
-        path, docker_image, docker_constraint_node, docker_dir,
+        path, docker_image, docker_constraint, docker_dir,
         docker_tag, docker_userid,
         args, vars) end
     else
       _env.out.print("dagon: registering node: " + name)        
       _workers_receivers(name) = recover Node(name, is_canary, is_leader,
-        path, docker_image, docker_constraint_node, docker_dir,
+        path, docker_image, docker_constraint, docker_dir,
         docker_tag, docker_userid,
         args, vars) end
     end
@@ -683,8 +683,10 @@ actor ProcessManager
           args.push(node.docker_userid)
           args.push("--name")                      // the name of the app
           args.push(node.name) //+ _docker_postfix)   // make name unique for this run
-          args.push("-e")                          // add a constraint
-          args.push("constraint:node==" + node.docker_constraint_node)
+          if node.docker_constraint.size() > 0 then
+            args.push("-e")                          // add a constraint
+            args.push(node.docker_constraint)
+          end  
           args.push("-h")                          // Docker node name for /etc/hosts
           args.push(node.name)
           args.push("--privileged")                // give extended privileges
