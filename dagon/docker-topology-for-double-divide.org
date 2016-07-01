@@ -1223,12 +1223,12 @@ the Dagon config file on the leader.
 
 Point your =DOCKER_HOST= env variable to the AWS leader on port 2375.
 #+BEGIN_SRC sh
-export DOCKER_HOST=52.3.241.136:2375
+export DOCKER_HOST=54.173.155.42:2375
 #+END_SRC
 
 First we need to copy the configuration file to the docker host.
 #+BEGIN_SRC sh
-scp -i ~/.ssh/ec2/us-east-1.pem docker-double-divide-aws-leader.ini ubuntu@52.3.241.136:/tmp
+scp -i ~/.ssh/ec2/us-east-1.pem docker-double-divide-aws-leader.ini ubuntu@54.173.155.42:/tmp
 #+END_SRC
 
 Then we create a network. We will use the same network in our
@@ -1257,9 +1257,9 @@ docker run --rm -u 0 \
  -v /tmp:/tmp \
  -w /tmp \
  --net=buffy-leader \
- docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-555-ga154bee \
+ docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-572-g657b1b3 \
  dagon.amd64 \
- --docker=tcp://10.0.30.128:2375  -t 10 \
+ --docker=tcp://10.0.50.3:2375  -t 10 \
  --filepath=/tmp/docker-double-divide-aws-leader.ini \
  --phone-home=dagon:8080
 #+END_SRC
@@ -1277,12 +1277,12 @@ the Swarm on port 2378 and boot all components defined in the Dagon config file.
 
 Point your =DOCKER_HOST= env variable to the AWS leader on port 2375.
 #+BEGIN_SRC sh
-export DOCKER_HOST=10.0.30.128:2375
+export DOCKER_HOST=54.173.155.42:2375
 #+END_SRC
 
 First we need to copy the configuration file to the docker host.
 #+BEGIN_SRC sh
-scp -i ~/.ssh/ec2/us-east-1.pem docker-double-divide-aws-swarm.ini ubuntu@52.3.241.136:/tmp
+scp -i ~/.ssh/ec2/us-east-1.pem docker-double-divide-aws-swarm.ini ubuntu@54.173.155.42:/tmp
 #+END_SRC
 
 Then we create a network. We will use the same network in our
@@ -1309,15 +1309,15 @@ docker run --rm -u 0 \
  -v /tmp:/tmp \
  -w /tmp \
  --net=buffy-swarm \
- docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-555-ga154bee \
+ docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-572-g657b1b3 \
  dagon.amd64 \
- --docker=tcp://10.0.30.128:2378  -t 10 \
+ --docker=tcp://10.0.50.3:2378  -t 10 \
  --filepath=/tmp/docker-double-divide-aws-swarm.ini \
  --phone-home=dagon:8080
 #+END_SRC
 
-Notice that we instruct Dagon to talk to the Swarm master on port 2378
-to boot the containers into the Swarm.
+Notice that we instruct Dagon to talk to the Swarm master on it's EC2
+internal address and port 2378 to boot the containers into the Swarm.
 
 ** Check IP Tables
 Check iptables setup on the docker host (the leader).
