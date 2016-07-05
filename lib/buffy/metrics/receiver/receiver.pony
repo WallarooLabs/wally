@@ -21,6 +21,7 @@ actor Receiver
     var report_period: U64 = 300_000_000_000
     var phone_home_arg: (Array[String] | None) = None
     var phone_home_name: String = "metrics-receiver"
+    var dagonize: Bool = false
 
     try
       var options = Options(env)
@@ -79,13 +80,16 @@ actor Receiver
           env.err.print(
             "'--phone-home' argument should be in format: '127.0.0.1:8080")
           required_args_are_present = false
+        else
+          dagonize = true
         end
       end
 
       if (phone_home_arg isnt None) or (phone_home_name isnt None) then
         if (phone_home_arg is None) or (phone_home_name is None) then
           env.err.print(
-            "'--phone-home' must be used in conjunction with '--phone-home-name'")
+            "'--phone-home' must be used in conjunction with " +
+            "'--phone-home-name'")
           required_args_are_present = false
         end
       end
@@ -155,6 +159,22 @@ actor Receiver
         let listener = TCPListener(auth, consume notifier', host, service)
 
         let receiver = MetricsReceiver(env.out, env.err, listener, collections')
+
+
+        // Dagonize if necessary
+        if dagonize then
+          // TODO rewrite coordinator to work for receiver
+          // Taken from giles-receiver.pony
+          let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
+
+          SignalHandler(TermHandler(coordinator), Sig.term())
+
+          let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
+          let from_buffy_listener = TCPListener(tcp_auth,
+            FromBuffyListenerNotify(coordinator, decoder, env.err),
+            listener_addr(0),
+            listener_addr(1))
+        end
 
       else
         env.out.print(
