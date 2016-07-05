@@ -69,6 +69,10 @@ Currently the Giles sender sends messages in one of two way:
   -b 127.0.0.1:8081 -m 100 -f war-and-peace.txt` will send messages containing
   each of the first 100 lines of the file `war-and-peace.txt`.
 
+## Human Readable Receiver Outputs
+
+Use the `fallor` tool to create a human readable version of the Giles receiver output file.
+
 ## Working with Dagon
 
 If you are coordinating Giles with Dagon, then Dagon will handle passing the

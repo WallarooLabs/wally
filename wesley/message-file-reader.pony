@@ -1,10 +1,15 @@
-interface MessageFileParser
-"""
-The MessageFileParser interface provides default methods for splitting a block 
-of input text into an array of Strings, which can overridden by a subclass.
-"""
-  fun ref apply(values: Array[String] ref) ?
+use "net"
+use "sendence/messages"
 
+trait MessageFileParser
+  fun ref apply(fields: Array[String] val) ?
+
+interface TextMessageFileParser is MessageFileParser
+"""
+The TextMessageFileParser interface provides default methods for splitting a 
+block of input text into an array of Strings, which can overridden by a 
+subclass.
+"""
   fun ls(): (String|None) =>
   """
   Line separator. Use None to avoid splitting on lines.
@@ -29,8 +34,9 @@ of input text into an array of Strings, which can overridden by a subclass.
   """
     0
 
-class MessageFileReader
-  fun ref apply(input: String, parser: MessageFileParser ref) ? =>
+class TextMessageFileReader
+  fun ref apply(input: String, parser: TextMessageFileParser ref,
+    env: Env) ? =>
   """
   The apply method separates an input String based on the methods provided in
   the parser.
@@ -56,22 +62,50 @@ class MessageFileReader
               for l in lines.values() do
                 cur_line_number = cur_line_number + 1
                 cur_line = l
-                let values: Array[String] ref = l.split(fs, parser.fn())
+                let values: Array[String] val = l.split(fs, parser.fn())
                 if values.size() > 0 then
                   parser(values)
                 end
               end
             else
-              @printf[I32](("Failed reading on line " 
-                + cur_line_number.string() + ":\n").cstring())
-              @printf[I32]((cur_line + "\n").cstring())
+              env.err.print("Failed reading on line " 
+                + cur_line_number.string() + ":")
+              env.err.print(
+                "---------------------------------------------------")
+              env.err.print(cur_line)
+              env.err.print(
+                "---------------------------------------------------")
               error
             end
         else  // no field separator, return the parser over the entire line
           for l in lines.values() do
-            parser(recover ref [l] end)
+            parser(recover val [l] end)
           end
         end
     else  // No line separator, return the parser over the entire input
-      parser(recover ref [input] end)
+      parser(recover val [input] end)
+    end
+
+class ReceivedMessageFileReader
+  fun ref apply(input: Array[U8] val, parser: MessageFileParser ref,
+    env: Env) ? 
+  =>
+  """
+  """
+    let rb: ReadBuffer = ReadBuffer
+    rb.append(input)
+    var bytes_left = input.size()
+    while bytes_left > 0 do
+      // Msg size, msg size u32, and timestamp together make up next payload 
+      // size
+      let next_payload_size = rb.peek_u32_be() + 12 
+      let fields = 
+        try
+          FallorMsgDecoder.with_timestamp(rb.block(next_payload_size.usize()))
+        else
+          env.err.print("Problem decoding!")
+          error 
+        end
+      bytes_left = bytes_left - next_payload_size.usize()
+      parser(fields)
     end

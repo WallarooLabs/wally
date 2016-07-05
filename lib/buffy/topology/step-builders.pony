@@ -179,16 +179,18 @@ primitive EmptyStepBuilder is BasicStepBuilder
   fun name(): String => "Empty Step"
 
 class ExternalConnectionBuilder[In: Any val] is SinkBuilder
-  let _stringify: Stringify[In] val
+  let _array_stringify: ArrayStringify[In] val
   let _pipeline_name: String
 
-  new val create(stringify: Stringify[In] val, pipeline_name: String) =>
-    _stringify = stringify
+  new val create(array_stringify: ArrayStringify[In] val, 
+    pipeline_name: String) 
+  =>
+    _array_stringify = array_stringify
     _pipeline_name = pipeline_name
 
   fun apply(conns: Array[TCPConnection] iso, metrics_collector: MetricsCollector)
     : BasicStep tag =>
-    ExternalConnection[In](_stringify, consume conns, metrics_collector, 
+    ExternalConnection[In](_array_stringify, consume conns, metrics_collector, 
       _pipeline_name)
 
   fun name(): String => _pipeline_name + " Sink"

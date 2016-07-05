@@ -28,8 +28,8 @@ class MarketSpreadInitParser is InitializationParser[FixNbboMessage val]
 
   fun fs(): (String|None) => None
 
-  fun ref apply(value: Array[String] ref) ? =>
-    let fix_raw = value(0)
+  fun ref apply(fields: Array[String] val) ? =>
+    let fix_raw = fields(0)
     let fix_message = FixParser(fix_raw)
     match fix_message
     | let nbbo: FixNbboMessage val =>
@@ -44,8 +44,8 @@ class MarketSpreadSentParser is SentParser[FixOrderMessage val]
 
   fun fs(): (String|None) => None
 
-  fun ref apply(value: Array[String] ref) ? =>
-    let fix_raw = value(0)
+  fun ref apply(fields: Array[String] val) ? =>
+    let fix_raw = fields(0)
     let fix_message = FixParser(fix_raw)
     match fix_message
     | let trade: FixOrderMessage val =>
@@ -61,10 +61,10 @@ class MarketSpreadReceivedParser is
   let _messages: Array[MarketSpreadReceivedMessage val] =
     Array[MarketSpreadReceivedMessage val]
 
-  fun ref apply(value: Array[String] ref) ? =>
-    let timestamp = value(0).clone().strip().u64()
-    let symbol: String val = value(1).clone().strip().clone()
-    let is_rejected = value(10).bool()
+  fun ref apply(fields: Array[String] val) ? =>
+    let timestamp = fields(0).clone().strip().u64()
+    let symbol: String val = fields(1).clone().strip().clone()
+    let is_rejected = fields(10).bool()
     _messages.push(MarketSpreadReceivedMessage(timestamp, consume symbol,
       is_rejected))
 

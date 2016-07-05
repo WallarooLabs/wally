@@ -2,6 +2,7 @@ use "collections"
 use "buffy/messages"
 use "net"
 use "buffy/metrics"
+use "sendence/messages"
 use "sendence/guid"
 use "sendence/epoch"
 use "debug"
@@ -367,15 +368,15 @@ actor SharedStateStep[State: Any #read]
     _state = state()
 
 actor ExternalConnection[In: Any val] is ComputeStep[In]
-  let _stringify: {(In): String ?} val
+  let _array_stringify: ArrayStringify[In] val
   let _conns: Array[TCPConnection]
   let _metrics_collector: MetricsCollector tag
   let _pipeline_name: String
 
-  new create(stringify: {(In): String ?} val, conns: Array[TCPConnection] iso =
+  new create(array_stringify: ArrayStringify[In] val, conns: Array[TCPConnection] iso =
     recover Array[TCPConnection] end, m_coll: MetricsCollector tag,
     pipeline_name: String) =>
-    _stringify = stringify
+    _array_stringify = array_stringify
     _conns = consume conns
     _metrics_collector = m_coll
     _pipeline_name = pipeline_name
@@ -387,9 +388,16 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
     match input
     | let m: Message[In] val =>
       try
-        let str = _stringify(m.data())
-        Debug.out(">>>>" + str + "<<<<")
-        let tcp_msg = ExternalMsgEncoder.data(str)
+        let out = _array_stringify(m.data())
+        Debug.out(
+          match out
+          | let s: String =>
+            ">>>>" + s + "<<<<"
+          | let arr: Array[String] val =>
+            ">>>>" + ",".join(arr) + "<<<<"
+          end
+        )
+        let tcp_msg = FallorMsgEncoder(out)
         for conn in _conns.values() do
           conn.writev(tcp_msg)
         end

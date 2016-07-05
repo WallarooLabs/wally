@@ -97,13 +97,13 @@ trait StatefulResultMapper[S: Message val, R: Message val,
   fun sent_transform(sent: Array[S], state: State): CanonicalForm
   fun received_transform(received: Array[R]): CanonicalForm
 
-trait SentParser[S: Message val] is MessageFileParser
+trait SentParser[S: Message val] is TextMessageFileParser
   fun ref sent_messages(): Array[S]
 
 trait ReceivedParser[R: Message val] is MessageFileParser
   fun ref received_messages(): Array[R]
 
-trait InitializationParser[I: Message val] is MessageFileParser
+trait InitializationParser[I: Message val] is TextMessageFileParser
   fun ref initialization_messages(): Array[I]
 
 interface MatchStatus

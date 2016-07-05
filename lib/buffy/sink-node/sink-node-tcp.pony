@@ -1,6 +1,6 @@
 use "net"
 use "collections"
-use "buffy/messages"
+use "sendence/messages"
 use "sendence/bytes"
 use "sendence/epoch"
 use "buffy/topology"

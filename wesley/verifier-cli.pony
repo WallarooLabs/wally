@@ -64,13 +64,15 @@ primitive VerifierCLI[S: Message val, R: Message val]
     end
 
     try
-      _read_message_file_with_parser(sent_file, sent_parser, env.root)
+      _read_text_message_file_with_parser(sent_file, sent_parser, env.root,
+        env)
     else
       return SetupErrorProblemReadingMessageFile(sent_file)
     end
 
     try
-      _read_message_file_with_parser(received_file, received_parser, env.root)
+      _read_received_message_file_with_parser(received_file, received_parser, 
+        env.root, env)
     else
       return SetupErrorProblemReadingMessageFile(received_file)
     end
@@ -113,19 +115,22 @@ primitive VerifierCLI[S: Message val, R: Message val]
     end
 
     try
-      _read_message_file_with_parser(init_file, init_parser, env.root)
+      _read_text_message_file_with_parser(init_file, init_parser, env.root,
+        env)
     else
       return SetupErrorProblemReadingMessageFile(init_file)
     end
 
     try
-      _read_message_file_with_parser(sent_file, sent_parser, env.root)
+      _read_text_message_file_with_parser(sent_file, sent_parser, env.root,
+        env)
     else
       return SetupErrorProblemReadingMessageFile(sent_file)
     end
 
     try
-      _read_message_file_with_parser(received_file, received_parser, env.root)
+      _read_received_message_file_with_parser(received_file, received_parser,
+       env.root, env)
     else
       return SetupErrorProblemReadingMessageFile(received_file)
     end
@@ -183,13 +188,25 @@ primitive VerifierCLI[S: Message val, R: Message val]
       error
     end
 
-  fun _read_message_file_with_parser(file_name: String, 
-    parser: MessageFileParser, root: (AmbientAuth | None)) ? 
+  fun _read_text_message_file_with_parser(file_name: String, 
+    parser: TextMessageFileParser, root: (AmbientAuth | None),
+    env: Env) ? 
   =>
     let caps = recover val FileCaps.set(FileRead).set(FileStat) end
     with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)) 
       as File do
-      MessageFileReader(file.read_string(file.size()), parser)
+      TextMessageFileReader(file.read_string(file.size()), parser, env)
+    else
+      error
+    end
+
+  fun _read_received_message_file_with_parser(file_name: String, 
+    parser: MessageFileParser, root: (AmbientAuth | None), env: Env) ? 
+  =>
+    let caps = recover val FileCaps.set(FileRead).set(FileStat) end
+    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)) 
+      as File do
+      ReceivedMessageFileReader(file.read(file.size()), parser, env)
     else
       error
     end
