@@ -1,6 +1,7 @@
 use "net"
 use "collections"
 use "buffy/messages"
+use "sendence/messages"
 use "sendence/guid"
 use "../network"
 use "random"

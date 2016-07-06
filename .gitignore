@@ -8,6 +8,7 @@
 *.bc
 *.ll
 *.pyc
+fallor-readable.txt
 sent.txt
 received.txt
 .drone.sec.yml

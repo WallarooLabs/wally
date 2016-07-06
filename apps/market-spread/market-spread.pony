@@ -21,7 +21,7 @@ actor Main
       let topology = recover val
         Topology
           .new_pipeline[FixOrderMessage val, TradeResult val](
-            TradeParser, ResultStringify, recover [0] end, "Orders")
+            TradeParser, ResultArrayStringify, recover [0] end, "Orders")
           .to_stateful_partition[TradeResult val, MarketData](
             recover
               StatePartitionConfig[FixOrderMessage val, TradeResult val,
@@ -250,3 +250,18 @@ class TradeParser is Parser[FixOrderMessage val]
 class ResultStringify
   fun apply(input: TradeResult val): String =>
     input.string()
+
+primitive ResultArrayStringify
+  fun apply(input: TradeResult val): Array[String] val =>
+    let result: Array[String] iso = recover Array[String] end
+    result.push(input.symbol)
+    result.push(input.order_id)
+    result.push(input.timestamp.string())
+    result.push(input.client_id)
+    result.push(input.price.string())
+    result.push(input.qty.string())
+    result.push(input.side)
+    result.push(input.bid.string())
+    result.push(input.offer.string())
+    result.push(input.is_rejected.string())
+    consume result

@@ -1,5 +1,3 @@
-use "osc-pony"
-use "sendence/bytes"
 use "net"
 
 primitive _Data                                 fun apply(): U16 => 1

@@ -7,8 +7,9 @@ use "net"
 use "options"
 use "signals"
 use "time"
-use "buffy/messages"
+use "sendence/messages"
 use "sendence/bytes"
+use "debug"
 
 // tests
 // documentation
@@ -324,24 +325,13 @@ actor Decoder
     _stderr = stderr
 
   be received(data: Array[U8] iso, at: U64) =>
-    try
-      let decoded = ExternalMsgDecoder(consume data)
-      match decoded
-      | let d: ExternalDataMsg val =>
-        _store.received(d.data, at)
-      else
-        _stderr.print("Unexpected data from Buffy")
-      end
-    else
-      _stderr.print("Unable to decode message Buffy")
-    end
+    _store.received(consume data, at)
 
 ///
 /// RECEIVED MESSAGE STORE
 ///
 
 actor Store
-  let _encoder: ReceivedLogEncoder = ReceivedLogEncoder
   let _received_file: (File | None)
 
   new create(auth: AmbientAuth) =>
@@ -353,26 +343,14 @@ actor Store
       None
     end
 
-  be received(msg: ByteSeq, at: U64) =>
+  be received(msg: Array[U8] val, at: U64) =>
     match _received_file
-      | let file: File => file.print(_encoder((msg, at)))
+      | let file: File => file.writev(FallorMsgEncoder.timestamp_raw(at, msg))
     end
 
   be dump() =>
     match _received_file
       | let file: File => file.dispose()
-    end
-
-class ReceivedLogEncoder
-  fun apply(tuple: (ByteSeq, U64)): String =>
-    let time: String = tuple._2.string()
-    let payload = tuple._1
-
-    recover
-      String(time.size() + ", ".size() + payload.size())
-      .append(time)
-      .append(", ")
-      .append(payload)
     end
 
 //

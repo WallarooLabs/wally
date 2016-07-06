@@ -135,11 +135,11 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build-buffy-components: build-receiver build-sender build-dagon build-dagon-child
+build-buffy-components: build-receiver build-sender build-dagon build-dagon-child build-fallor
 
 build-apps: build-wesley build-double-divide build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count ## Build Pony based programs for Buffy
 
-build: build-buffy-components build-apps
+build: build-buffy-components build-apps build-wesley
 
 build-receiver: ## Build giles receiver
 	$(call PONYC,giles/receiver)
@@ -176,6 +176,9 @@ build-wesley: ## Build wesley
 	$(call PONYC,wesley/identity)
 	$(call PONYC,wesley/wordcount)
 	$(call PONYC,wesley/market-spread)
+
+build-fallor: ## build fallor decoder
+	$(call PONYC,fallor)
 
 test: test-double-divide test-avg-of-avgs test-state-avg-of-avgs test-quadruple test-market-spread test-word-count test-giles-receiver test-giles-sender ## Test programs for Buffy
 
