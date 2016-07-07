@@ -3,6 +3,7 @@ use "collections"
 use "buffy"
 use "buffy/metrics"
 use "buffy/flusher"
+use "buffy/sink-node"
 use "sendence/tcp"
 use "sendence/bytes"
 use "options"
@@ -30,11 +31,11 @@ actor Receiver
         .add("listen", "l", StringArgument)
         .add("monitor", "m", StringArgument)
         .add("app-name", "a", StringArgument)
-        .add("period", "", I64Argument)
+        .add("period", "e", I64Argument)
         .add("delay", "d", F64Argument)
-        .add("report-file", "", StringArgument)
+        .add("report-file", "f", StringArgument)
         .add("report-period", "", I64Argument)
-        .add("phone-home", "h", StringArgument)
+        .add("phone-home", "p", StringArgument)
         .add("name", "n", StringArgument)
 
       for option in options do
@@ -98,7 +99,7 @@ actor Receiver
         let app_name' = recover val (app_name_arg as String).clone() end
         let delay' = recover val (delay_arg as U64) end
 
-        let coordinator = ReceiverCoordinatorFactory(env, name, 
+        let coordinator = SinkNodeCoordinatorFactory(env, name, 
           phone_home_addr)
 
         // Create connections and actors here

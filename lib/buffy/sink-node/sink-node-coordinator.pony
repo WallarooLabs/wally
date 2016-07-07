@@ -1,35 +1,35 @@
 use "net"
 use "sendence/messages"
 
-primitive ReceiverCoordinatorFactory
+primitive SinkNodeCoordinatorFactory
   fun apply(env: Env,
     node_id: (String | None),
-    phone_home_addr: (Array[String] | None)): ReceiverCoordinator ?
+    phone_home_addr: (Array[String] | None)): SinkNodeCoordinator ?
   =>
     if (node_id isnt None) and (phone_home_addr isnt None) then
       let n = node_id as String
       let ph = phone_home_addr as Array[String]
-      let coordinator = WithPhoneHomeReceiverCoordinator(env, n)
+      let coordinator = WithPhoneHomeSinkNodeCoordinator(env, n)
 
       let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
       TCPConnection(
         tcp_auth,
-        ReceiverHomeConnectNotify(env, n, coordinator),
+        SinkNodeHomeConnectNotify(env, n, coordinator),
         ph(0),
         ph(1))
 
       coordinator
     else
-      WithoutPhoneHomeReceiverCoordinator(env)
+      WithoutPhoneHomeSinkNodeCoordinator(env)
     end
 
-interface tag ReceiverCoordinator
+interface tag SinkNodeCoordinator
   be shutdown()
   be buffy_ready(listener: TCPListener)
   be buffy_failed(listener: TCPListener)
   be add_connection(conn: TCPConnection)
 
-actor WithoutPhoneHomeReceiverCoordinator is ReceiverCoordinator
+actor WithoutPhoneHomeSinkNodeCoordinator is SinkNodeCoordinator
   let _env: Env
   var _buffy_listener: (TCPListener | None) = None
   let _connections: Array[TCPConnection] = Array[TCPConnection]
@@ -55,7 +55,7 @@ actor WithoutPhoneHomeReceiverCoordinator is ReceiverCoordinator
   be add_connection(conn: TCPConnection) =>
     _connections.push(conn)
 
-actor WithPhoneHomeReceiverCoordinator is ReceiverCoordinator
+actor WithPhoneHomeSinkNodeCoordinator is SinkNodeCoordinator
   let _env: Env
   var _from_buffy_listener: (TCPListener | None) = None
   var _phone_home_connection: (TCPConnection | None) = None

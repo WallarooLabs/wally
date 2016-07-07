@@ -2,15 +2,15 @@ use "net"
 use "sendence/messages"
 use "sendence/bytes"
 
-class ReceiverHomeConnectNotify is TCPConnectionNotify
+class SinkNodeHomeConnectNotify is TCPConnectionNotify
   let _env: Env
   let _name: String
-  let _coordinator: WithPhoneHomeReceiverCoordinator
+  let _coordinator: WithPhoneHomeSinkNodeCoordinator
   var _header: Bool = true
   var _has_connected: Bool = false
 
   new iso create(env: Env, name: String,
-    coordinator: WithPhoneHomeReceiverCoordinator) =>
+    coordinator: WithPhoneHomeSinkNodeCoordinator) =>
     _env = env
     _name = name
     _coordinator = coordinator

@@ -1,7 +1,8 @@
 use "net"
 use "sendence/bytes"
 use "sendence/messages"
-use "../"
+use "buffy/sink-node"
+use "buffy/metrics"
 
 class MetricsNotifier is TCPListenNotify
   let _auth: AmbientAuth
@@ -10,12 +11,12 @@ class MetricsNotifier is TCPListenNotify
   let _host: String
   let _service: String
   let _collections: Array[MetricsCollection tag] val
-  let _coordinator: ReceiverCoordinator
+  let _coordinator: SinkNodeCoordinator
 
   new iso create(stdout: StdStream, stderr: StdStream, auth: AmbientAuth,
                  host: String, service: String,
                  collections: Array[MetricsCollection tag] val,
-                 coordinator: ReceiverCoordinator) =>
+                 coordinator: SinkNodeCoordinator) =>
     _auth = auth
     _stdout = stdout
     _stderr = stderr
