@@ -56,7 +56,7 @@ actor Main
         if p_arg isnt None then
           if (p_arg as Array[String]).size() != 2 then
             env.err.print(
-              "'--dagon' argument should be in format: '127.0.0.1:8080")
+              "'--phone-home' argument should be in format: '127.0.0.1:8080")
             required_args_are_present = false
           end
         end
@@ -64,7 +64,7 @@ actor Main
         if (p_arg isnt None) or (n_arg isnt None) then
           if (p_arg is None) or (n_arg is None) then
             env.err.print(
-              "'--dagon' must be used in conjunction with '--name'")
+              "'--phone-home' must be used in conjunction with '--name'")
             required_args_are_present = false
           end
         end

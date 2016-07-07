@@ -11,21 +11,25 @@ class SinkNodeNotifier is TCPListenNotify
   let _sink_node_step: StringInStep tag
   let _host: String
   let _service: String
+  let _coordinator: SinkNodeCoordinator
 
-  new iso create(env: Env, auth: AmbientAuth, sink_node_step: StringInStep tag, 
-    host: String, service: String) =>
+  new iso create(env: Env, auth: AmbientAuth, 
+    sink_node_step: StringInStep tag, host: String, service: String,
+    coordinator: SinkNodeCoordinator) =>
     _env = env
     _auth = auth
     _sink_node_step = sink_node_step
     _host = host
     _service = service
+    _coordinator = coordinator
 
   fun ref listening(listen: TCPListener ref) =>
+    _coordinator.buffy_ready(listen)
     _env.out.print("Sink node: listening on " + _host + ":" + _service)
 
   fun ref not_listening(listen: TCPListener ref) =>
+    _coordinator.buffy_failed(listen)
     _env.out.print("Sink node: couldn't listen")
-    listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     SinkNodeConnectNotify(_env, _auth, _sink_node_step)
@@ -82,12 +86,17 @@ class SinkNodeConnectNotify is TCPConnectionNotify
 
 class SinkNodeOutConnectNotify is TCPConnectionNotify
   let _env: Env
+  let _coordinator: SinkNodeCoordinator
 
-  new iso create(env: Env) =>
+  new iso create(env: Env, coordinator: SinkNodeCoordinator) =>
     _env = env
+    _coordinator = coordinator
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("sink out: sink connection accepted")
+
+  fun ref connected(conn: TCPConnection ref) =>
+    _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     _env.out.print("sink out: received")
