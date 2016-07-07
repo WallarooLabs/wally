@@ -2,21 +2,25 @@ use "net"
 use "sendence/messages"
 use "sendence/bytes"
 
-class HomeConnectNotify is TCPConnectionNotify
+class ReceiverHomeConnectNotify is TCPConnectionNotify
   let _env: Env
   let _name: String
-  let _coordinator: Coordinator
+  let _coordinator: WithPhoneHomeReceiverCoordinator
   var _header: Bool = true
+  var _has_connected: Bool = false
 
   new iso create(env: Env, name: String,
-    coordinator: Coordinator) =>
+    coordinator: WithPhoneHomeReceiverCoordinator) =>
     _env = env
     _name = name
     _coordinator = coordinator
 
-  fun ref accepted(conn: TCPConnection ref) =>
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    _coordinator.phone_home_failed(conn)
+
+  fun ref connected(conn: TCPConnection ref) =>
     conn.expect(4)
-    _env.out.print(_name + ": phone home connection accepted")
+    _coordinator.phone_home_ready(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     if _header then

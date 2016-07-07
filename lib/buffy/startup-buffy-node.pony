@@ -14,7 +14,7 @@ class StartupBuffyNode
     var node_name: String = "0"
     var phone_home_addr = Array[String]
     var metrics_addr = Array[String]
-    var options = Options(env)
+    var options = Options(env, false)
     var leader_control_addr = Array[String]
     var leader_data_addr = Array[String]
     var source_addrs = Array[String]

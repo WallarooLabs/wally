@@ -5,7 +5,7 @@ use "buffy/metrics/receiver"
 class StartupSinkNode
 
   new create(env: Env, sink_builders: Array[SinkNodeStepBuilder val] val) =>
-    let options = Options(env)
+    let options = Options(env, false)
     var addr = Array[String]
     var target_addr = Array[String]
     var step_builder_idx: I64 = 0
