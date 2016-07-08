@@ -230,11 +230,11 @@ dagon-word-count-15: ## Run 15 minute word count test with dagon
 	./wesley/wordcount/wordcount ./sent.txt ./received.txt match
 
 dagon-word-count-30: ## Run word count test with dagon
-	./dagon/dagon --timeout=2400 -f apps/word-count/15-min-run.ini -h 127.0.0.1:8080
+	./dagon/dagon --timeout=2400 -f apps/word-count/30-min-run.ini -h 127.0.0.1:8080
 	./wesley/wordcount/wordcount ./sent.txt ./received.txt match
 
 dagon-word-count-60: ## Run word count test with dagon
-	./dagon/dagon --timeout=4800 -f apps/word-count/15-min-run.ini -h 127.0.0.1:8080
+	./dagon/dagon --timeout=4800 -f apps/word-count/60-min-run.ini -h 127.0.0.1:8080
 	./wesley/wordcount/wordcount ./sent.txt ./received.txt match	
 
 dagon-market-spread: ## Run market spread test with dagon
