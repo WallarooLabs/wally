@@ -115,22 +115,28 @@ class TradeResults is CanonicalForm
 
   fun ref update(key: String, value: Bool) => results(key) = value
 
-  fun compare(that: CanonicalForm): MatchStatus val =>
+  fun compare(that: CanonicalForm): (MatchStatus val, String) =>
     match that
     | let tr: TradeResults =>
-      if results.size() != tr.results.size() then return ResultsDoNotMatch end
+      if results.size() != tr.results.size() then 
+        return (ResultsDoNotMatch, "Trade results sizes do not match up")
+      end
       for (symbol, is_rejected) in results.pairs() do
         try
           if is_rejected != tr(symbol) then
-            return ResultsDoNotMatch
+            let msg = "Expected " + symbol + " rejection to be " 
+              + is_rejected.string() + " but it was " 
+              + (not is_rejected).string()
+            return (ResultsDoNotMatch, msg)
           end
         else
-          return ResultsDoNotMatch
+          let msg = "Couldn't find " + symbol + " in the results."
+          return (ResultsDoNotMatch, msg)
         end
       end
-      ResultsMatch
+      (ResultsMatch, "")
     else
-      ResultsDoNotMatch
+      (ResultsDoNotMatch, "")
     end
 
 class MarketData
