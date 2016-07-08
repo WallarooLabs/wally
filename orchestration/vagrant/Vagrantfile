@@ -6,9 +6,10 @@ Vagrant.require_version ">= 1.8.1"
 # this Vagrantfile only works with VirtualBox so we set the default provider here
 # so we can skip the --provider virtualbox option
 ENV['VAGRANT_DEFAULT_PROVIDER'] = 'virtualbox'
-LEADER_COUNT = 1
-FOLLOWER_COUNT = 2
+LEADER_COUNT = (ENV['NUM_LEADERS'] || 1).to_i
+FOLLOWER_COUNT = (ENV['NUM_FOLLOWERS'] || 2).to_i
 START_IP = "10.0.1.200"
+VAGRANT_BOX = "bento/ubuntu-16.04"
 leaders = {}
 followers = {}
 
@@ -35,7 +36,7 @@ Vagrant.configure(2) do |config|
     config.vm.define node_name do |c|
       c.vm.hostname = node_name
       c.vm.network :private_network, ip: ip
-      c.vm.box = "ubuntu/wily64"
+      c.vm.box = VAGRANT_BOX
       c.vm.synced_folder ".", "/vagrant"
       c.vm.synced_folder "~/.aws/", "/home/vagrant/.aws"
       c.vm.synced_folder "~/.aws/", "/root/.aws"
@@ -53,7 +54,7 @@ Vagrant.configure(2) do |config|
     config.vm.define node_name do |c|
       c.vm.hostname = node_name
       c.vm.network :private_network, ip: ip
-      c.vm.box = "ubuntu/wily64"
+      c.vm.box = VAGRANT_BOX
       c.vm.synced_folder ".", "/vagrant"
       c.vm.synced_folder "~/.aws/", "/home/vagrant/.aws"
       c.vm.synced_folder "~/.aws/", "/root/.aws"

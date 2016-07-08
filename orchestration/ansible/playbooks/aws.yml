@@ -1,3 +1,11 @@
+# install python for full ansible support
+- hosts: tag_Project_buffy:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
+  gather_facts: False
+  tasks:
+  - name: install python for full ansible support
+    raw: apt-get install -y python
+    become: yes
+
 # create dynamic groups
 - hosts: tag_Project_buffy:&tag_Role_follower:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
   tasks:
