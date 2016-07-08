@@ -1,6 +1,7 @@
 use "options"
 use "net"
 use "buffy/metrics/receiver"
+use "buffy"
 
 class StartupSinkNode
 
@@ -15,22 +16,26 @@ class StartupSinkNode
 
     options
       .add("run-sink", "", None)
-      .add("addr", "a", StringArgument)
+      .add("listen", "l", StringArgument)
       .add("target-addr", "t", StringArgument)
       .add("step-builder", "s", I64Argument)
       .add("metrics-receiver", "r", None)
       .add("name", "n", StringArgument)
       .add("phone-home", "p", StringArgument)
+      .add("help", "h", None)
 
     for option in options do
       match option
       | ("run-sink", None) => None
-      | ("addr", let arg: String) => addr = arg.split(":")
+      | ("listen", let arg: String) => addr = arg.split(":")
       | ("target-addr", let arg: String) => target_addr = arg.split(":")
       | ("step-builder", let arg: I64) => step_builder_idx = arg
       | ("metrics-receiver", None) => is_metrics_receiver = true
       | ("phone-home", let arg: String) => phone_home_addr = arg.split(":")
       | ("name", let arg: String) => name = arg
+      | ("help", None) =>
+        StartupHelp.sink_node(env)
+        return
       end
     end
 
@@ -39,7 +44,7 @@ class StartupSinkNode
         Receiver(env)
       else
         if name == "" then
-          env.err.print("You must provide a name (--name/-n)")
+          env.err.print("You must provide a name (--name/-n)\n")
           error
         end
 
@@ -65,16 +70,5 @@ class StartupSinkNode
           service, coordinator), host, service)
       end
     else
-      env.out.print(
-        """
-        PARAMETERS:
-        -----------------------------------------------------------------------------------
-        --run-sink [Runs as sink node]
-        --metrics-receiver/-r [Runs as metrics-receiver node]
-        --addr <address> [Address sink node is listening on]
-        --target-addr <address> [Address sink node sends reports to]
-        --step-builder <idx> [Index of sink step builder for this sink node]
-        --name <name> [Name of sink node]
-        """
-      )
+      StartupHelp.sink_node(env)
     end

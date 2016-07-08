@@ -39,6 +39,7 @@ class StartupBuffyNode
       .add("spike-delay", "", None)
       .add("spike-drop", "", None)
       .add("spike-seed", "", I64Argument)
+      .add("help", "h", None)
 
     for option in options do
       match option
@@ -58,6 +59,9 @@ class StartupBuffyNode
         env.out.print("%%SPIKE-DROP%%")
         spike_drop = true
       | ("spike-seed", let arg: I64) => spike_seed = arg.u64()
+      | ("help", None) => 
+        StartupHelp(env)
+        return
       end
     end
 
@@ -168,25 +172,5 @@ class StartupBuffyNode
           + " workers --**")
       end
     else
-      env.out.print(
-        """
-        PARAMETERS:
-        -----------------------------------------------------------------------------------
-        --leader/-l [Sets process as leader]
-        --worker-count/-w <count> [Tells the leader how many workers to wait for]
-        --name/-n <node_name> [Sets the name for the process in the Buffy cluster]
-        --phone-home/-p <address> [Sets the address for phone home]
-        --leader-control-address/-c <address> [Sets the address for the leader's control
-                                            channel address]
-        --leader-data-address/-d <address> [Sets the address for the leader's data channel
-                                         address]
-        --source/-r <comma-delimited source_addresses> [Sets the addresses for the sink]
-        --sink/-k <comma-delimited sink_addresses> [Sets the addresses for the sink]
-        --metrics/-m <metrics-receiver address> [Sets the address for the metrics receiver]
-        --spike-seed <seed> [Optionally sets seed for spike]
-        --spike-delay [Set flag for spike delay]
-        --spike-drop [Set flag for spike drop]
-        -----------------------------------------------------------------------------------
-        """
-      )
+      StartupHelp(env)
     end

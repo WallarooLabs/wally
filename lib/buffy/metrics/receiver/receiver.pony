@@ -37,6 +37,7 @@ actor Receiver
         .add("report-period", "", I64Argument)
         .add("phone-home", "p", StringArgument)
         .add("name", "n", StringArgument)
+        .add("help", "h", None)
 
       for option in options do
         match option
@@ -51,6 +52,9 @@ actor Receiver
           report_period = (arg*1_000_000_000).u64()
         | ("phone-home", let arg: String) => phone_home_addr = arg.split(":")
         | ("name", let arg: String) => name = arg
+        | ("help", None) =>      
+          StartupHelp.metrics_receiver(env)
+          return
         end
       end
 
@@ -150,29 +154,8 @@ actor Receiver
         let listener = TCPListener(auth, consume notifier', host, service)
 
         let receiver = MetricsReceiver(env.out, env.err, listener, collections')
-
-
-        // SignalHandler(TermHandler(coordinator), Sig.term())
-
-
       else
-        env.out.print(
-          """
-          PARAMETERS:
-          -----------------------------------------------------------------------------------
-          --run-sink [Runs as sink node]
-          --metrics-receiver/-r [Runs as metrics-receiver node]
-          --listen [Listen address in xxx.xxx.xxx.xxx:pppp format]
-          --monitor [Monitoring Hub address in xxx.xxx.xxx.xxx:pppp format]
-          --app-name [Application name to report to Monitoring Hub]
-          --period [Aggregation periods for reports to Monitoring Hub]
-          --delay [Maximum period of time before sending data]
-          --report-file/rf [File path to write reports to]
-          --report-period/rp [Aggregation period for reports in report-file]
-          --phone-home [Address on which Dagon is listening]
-          --name [Name to use with Dagon receiver]
-          """
-        )
+        StartupHelp.metrics_receiver(env)
       end
     end
 

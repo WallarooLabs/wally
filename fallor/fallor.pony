@@ -6,24 +6,31 @@ use "sendence/messages"
 actor Main
   new create(env: Env) =>
     let options = Options(env)
-    var input_file_path = ""
+    var input_file_path = "received.txt"
     var output_file_path = "fallor-readable.txt"
 
     options
       .add("input", "i", StringArgument)
       .add("output", "o", StringArgument)
+      .add("help", "h", None)
 
       for option in options do
         match option
         | ("input", let arg: String) => input_file_path = arg
         | ("output", let arg: String) => output_file_path = arg
+        | ("help", None) => 
+          env.out.print(
+            """
+            PARAMETERS:
+            -----------------------------------------------------------------------------------
+            --input/-i [Sets file to read from (default: received.txt)]
+            --output/-o [Sets file to write to (default: fallor-readable.txt)]
+            -----------------------------------------------------------------------------------
+            """
+          )
+          return
         end
       end
-
-    if input_file_path == "" then
-      env.err.print("You must provide an input file (--input/-i).\n"
-        + "An output file is optional (--output/-o).")
-    end
 
     try
       let auth = env.root as AmbientAuth
