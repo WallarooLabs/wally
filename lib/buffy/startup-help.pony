@@ -56,11 +56,11 @@ primitive StartupHelp
       To run as generic Sink Node:
       -----------------------------------------------------------------------------------
       --run-sink [Runs as sink node]
-      --addr <address> [Address sink node is listening on]
-      --target-addr <address> [Address sink node sends reports to]
+      --listen/-l <address> [Address sink node is listening on]
+      --target-addr/-t <address> [Address sink node sends reports to]
       --step-builder <idx> [Index of sink step builder for this sink node]
-      --phone-home [Address external coordinator is listening on]
-      --name <name> [Name of sink node]
+      --phone-home/-p [Address external coordinator is listening on]
+      --name/-n <name> [Name of sink node]
       -----------------------------------------------------------------------------------
       """
     )

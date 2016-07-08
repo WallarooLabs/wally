@@ -44,9 +44,15 @@ class StartupSinkNode
         Receiver(env)
       else
         if name == "" then
+          StartupHelp.sink_node(env)
           env.err.print("You must provide a name (--name/-n)\n")
-          error
+          return
         end
+
+        if sink_builders.size() == 0 then
+          env.err.print("This app is not configured to use a sink node")
+          return
+        end          
 
         let coordinator = SinkNodeCoordinatorFactory(env, name, 
           phone_home_addr)
