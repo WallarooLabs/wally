@@ -3,7 +3,7 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[IdentitySentMessage val, IdentityReceivedMessage val]
-      .run(env, IdentityResultMapper, IdentitySentParser, 
+      .run(env, "Identity", IdentityResultMapper, IdentitySentParser, 
         IdentityReceivedParser)
 
 class IdentitySentMessage

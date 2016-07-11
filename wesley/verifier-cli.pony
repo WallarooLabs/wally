@@ -6,9 +6,12 @@ primitive Usage
     .add(" SENT-FILE RECEIVED-FILE match|nomatch|TEST-INI-FILE")
 
 primitive VerifierCLI[S: Message val, R: Message val]
-  fun run(env: Env, result_mapper: ResultMapper[S, R], 
+  fun run(env: Env, test_name: String, result_mapper: ResultMapper[S, R], 
     sent_parser: SentParser[S], received_parser: ReceivedParser[R]) 
   =>
+    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
+    env.out.print(" Wesley: Starting " + test_name)
+    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
     match stateless_verifier_from_command_line(env, result_mapper, 
       sent_parser, received_parser)
     | let verifier: StatelessVerifier[S, R] => verify(env, verifier)
@@ -19,11 +22,15 @@ primitive VerifierCLI[S: Message val, R: Message val]
 
   fun run_with_initialization[I: Message val, 
     State: Any ref](env: Env, 
+    test_name: String,
     result_mapper: StatefulResultMapper[S, R, I, State], 
     initialization_parser: InitializationParser[I],
     sent_parser: SentParser[S], 
     received_parser: ReceivedParser[R]) 
   =>
+    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
+    env.out.print(" Wesley: Starting " + test_name)
+    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
     match stateful_verifier_from_command_line[I, State](env, result_mapper, 
       initialization_parser, sent_parser, received_parser)
     | let verifier: StatefulVerifier[S, R, I, State] => verify(env, verifier)

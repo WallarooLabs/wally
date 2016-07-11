@@ -3,7 +3,7 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[WordcountSentMessage val, WordcountReceivedMessage val]
-      .run(env, WordcountResultMapper, WordcountSentParser, 
+      .run(env, "Word Count", WordcountResultMapper, WordcountSentParser, 
         WordcountReceivedParser)
 
 class WordcountSentMessage

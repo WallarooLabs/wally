@@ -6,7 +6,7 @@ actor Main
   new create(env: Env) =>
     VerifierCLI[FixOrderMessage val, MarketSpreadReceivedMessage val]
       .run_with_initialization[FixNbboMessage val, MarketData](
-        env, MarketSpreadResultMapper, MarketSpreadInitParser,
+        env, "Market Spread", MarketSpreadResultMapper, MarketSpreadInitParser,
         MarketSpreadSentParser, MarketSpreadReceivedParser)
 
 class MarketSpreadReceivedMessage

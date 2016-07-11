@@ -3,7 +3,8 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[DoubleSentMessage val, DoubleReceivedMessage val]
-      .run(env, DoubleResultMapper, DoubleSentParser, DoubleReceivedParser)
+      .run(env, "Double", DoubleResultMapper, DoubleSentParser, 
+        DoubleReceivedParser)
 
 class DoubleSentMessage
   let ts: U64
