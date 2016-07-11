@@ -1,7 +1,7 @@
 primitive StartupHelp
   fun apply(env: Env) =>
-    platform(env)
     sink_node(env)
+    platform(env)
 
   fun sink_node(env: Env) =>
     _sink_node(env)
@@ -37,7 +37,7 @@ primitive StartupHelp
       -----------------------------------------------------------------------------------
       --run-sink [Runs as sink node (required for metrics-receiver)]
       --metrics-receiver/-r [Runs as metrics-receiver node]
-      --listen/-r [Listen address in xxx.xxx.xxx.xxx:pppp format]
+      --listen/-l [Listen address in xxx.xxx.xxx.xxx:pppp format]
       --monitor/-m [Monitoring Hub address in xxx.xxx.xxx.xxx:pppp format]
       --app-name/-a [Application name to report to Monitoring Hub]
       --period/-e [Aggregation periods for reports to Monitoring Hub]
