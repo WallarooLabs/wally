@@ -11,6 +11,7 @@
 fallor-readable.txt
 sent.txt
 received.txt
+metrics-report.txt
 .drone.sec.yml
 
 # partial compilation files
