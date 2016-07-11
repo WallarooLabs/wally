@@ -14,7 +14,7 @@
 
 - hosts: tag_Project_buffy:&tag_Role_leader:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
   vars:
-    ethernet_interface: ens3
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
   tasks:
   - name: Create a group of all leaders for buffy
     group_by: key=buffy-leaders
@@ -36,7 +36,7 @@
   vars_files:
     - 'docker_creds.yml'
   vars:
-    ethernet_interface: ens3
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
     ptpd_role: master
     ptpd_transport: unicast
     swarm_image: swarm
@@ -51,7 +51,7 @@
   vars_files:
     - 'docker_creds.yml'
   vars:
-    ethernet_interface: ens3
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
     ptpd_role: slave
     ptpd_transport: unicast
     leader_ip: "{{ hostvars[groups['buffy-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
