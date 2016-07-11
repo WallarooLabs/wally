@@ -225,12 +225,24 @@ dagon-word-count: ## Run word count test with dagon
 	./dagon/dagon --timeout=15 -f apps/word-count/word-count.ini -h 127.0.0.1:8080
 	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
 
+dagon-word-count-single: ## Run word count test with dagon
+	./dagon/dagon --timeout=15 -f apps/word-count/word-count-single.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+
 dagon-word-count-3: ## Run 3 minute word count test with dagon
 	./dagon/dagon --timeout=800 -f apps/word-count/3-min-run.ini -h 127.0.0.1:8080
 	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
 
+dagon-word-count-3-single: ## Run 7 minute word count test with dagon
+	./dagon/dagon --timeout=800 -f apps/word-count/3-min-run-single.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+
 dagon-word-count-7: ## Run 7 minute word count test with dagon
 	./dagon/dagon --timeout=3200 -f apps/word-count/7-min-run.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+
+dagon-word-count-7-single: ## Run 7 minute word count test with dagon
+	./dagon/dagon --timeout=3200 -f apps/word-count/7-min-run-single.ini -h 127.0.0.1:8080
 	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
 
 dagon-word-count-15: ## Run 15 minute word count test with dagon
