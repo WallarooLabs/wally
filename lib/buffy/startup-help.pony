@@ -37,15 +37,15 @@ primitive StartupHelp
       -----------------------------------------------------------------------------------
       --run-sink [Runs as sink node (required for metrics-receiver)]
       --metrics-receiver/-r [Runs as metrics-receiver node]
-      --listen [Listen address in xxx.xxx.xxx.xxx:pppp format]
-      --monitor [Monitoring Hub address in xxx.xxx.xxx.xxx:pppp format]
-      --app-name [Application name to report to Monitoring Hub]
-      --period [Aggregation periods for reports to Monitoring Hub]
-      --delay [Maximum period of time before sending data]
-      --report-file/rf [File path to write reports to]
-      --report-period/rp [Aggregation period for reports in report-file]
-      --phone-home [Address external coordinator is listening on]
-      --name [Name to use with external coordinator]
+      --listen/-r [Listen address in xxx.xxx.xxx.xxx:pppp format]
+      --monitor/-m [Monitoring Hub address in xxx.xxx.xxx.xxx:pppp format]
+      --app-name/-a [Application name to report to Monitoring Hub]
+      --period/-e [Aggregation periods for reports to Monitoring Hub]
+      --delay/-d [Maximum period of time before sending data]
+      --report-file/-f [File path to write reports to]
+      --report-period [Aggregation period for reports in report-file]
+      --phone-home/-p [Address external coordinator is listening on]
+      --name/-n [Name to use with external coordinator]
       -----------------------------------------------------------------------------------
       """
     )
