@@ -1325,3 +1325,102 @@ Check iptables setup on the docker host (the leader).
 ssh  -i ~/.ssh/ec2/us-east-1.pem ubuntu@52.87.211.240
 sudo iptables -L -n
 #+END_SRC
+* Dagon and Vagrant Cluster
+
+** Prepare Nodes
+Boot the Vagrant cluster using instructions in
+=buffy/orchestration/vagrant=.
+
+** Build and Push
+Make sure your =DOCKER_HOST= shell environment is pointing to your
+local Docker host. Build the AMD64 binaries.
+#+BEGIN_SRC sh
+DOCKER_HOST=tcp://192.168.99.100:2376 # change this as needed
+cd buffy
+make clean;make clean
+make arch=amd64 debug=true
+#+END_SRC
+
+Make sure your =DOCKER_HOST= shell environment is pointing to the
+=buffy-leader-1= host. Build containers and push them to the docker
+host.
+#+BEGIN_SRC sh
+export DOCKER_HOST=tcp://10.0.1.200:2375
+make arch=amd64 debug=true build-docker
+#+END_SRC
+
+** Update Configurations
+You'll need to update the image tag referenced in the configuration
+files.
+
+** Copy Files
+Copy the config files to the =vagrant= directory.
+#+BEGIN_SRC sh
+cd orchestration/vagrant
+cp ../../dagon/docker-double-divide-aws-*.ini ./
+#+END_SRC
+
+Login to the leader node and copy the configurations to /tmp.
+#+BEGIN_SRC sh
+vagrant ssh buffy-leader-1
+cd /tmp
+cp /vagrant/docker-double-divide-aws-*.ini ./
+#+END_SRC
+
+** Boot Dagon Container
+
+
+* Dipin's AWS Setup
+The following are the steps:
+1. create & configure cluster (with makefile)
+2. ssh into leader node
+3. git clone buffy repo
+4. build binaries using make arch=amd64
+5. build/push docker containers using make arch=amd64 push-docker
+6. copy relevant files (ini, etc) to /tmp on leader node (use latest
+   in repo with edits for image tag as necessary)
+7. exit ssh
+8. docker network create -d overlay buffy-swarm (make sure to do this
+   pointing to leader docker engine [port 2375] and NOT docker swarm
+   [port 2378])
+9. docker pull all images just pushed (dagon, giles-sender,
+   giles-receiver, etc) onto docker swarm (port 2378 on leader)
+10.
+#+BEGIN_SRC sh
+docker --host=tcp://<leader host or external ip>:2378 run -u 0 \
+ --name dagon  -h dagon  --privileged  -i  -e LC_ALL=C.UTF-8 -e LANG=C.UTF-8 \
+ -e "constraint:node==<leader internal hostname>“ -v /usr/bin:/usr/bin:ro  \
+ -v /var/run/docker.sock:/var/run/docker.sock  -v /bin:/bin:ro  \
+ -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/tmp  \
+ -w /tmp  --net=buffy-swarm  docker.sendence.com:5043/sendence/dagon.amd64:<docker tag>  
+ dagon.amd64  --docker=tcp://<leader internal ip>:2378  -t 10  \
+ --filepath=/tmp/docker-double-divide-aws-swarm.ini  --phone-home=dagon:8080
+#+END_SRC
+
+#+END_SRC
+
+Steps 2 - 7 are only there to make sure the binaries being run are AWS
+compatible. This is necessary because the ponycoptimized binaries
+created in virtualbox don't fully work on AWS and are a source of
+"fun" debugging. We will likely want to think about creating
+unoptimized/generic binaries using ponyc for general compatibility.
+
+Step 8 is important because if you create an overlay network pointing
+at docker swarm it'll look like it's what's required but it doesn't
+function the same as when it is creating pointing at docker engine.
+
+
+Step 6 is important because there are some minor tweaks to the
+constraints (got the syntax correct and had to remove the quotes) in
+the ini file for swarm to make sure it works correctly.
+
+
+Step 9 is important because docker swarm doesn't automagically pull
+images like docker engine does.
+
+
+Step 10 has some placeholders in <> that need to be replaced for dagon
+to start in the right location using the right docker swarm instance.
+
+
+
