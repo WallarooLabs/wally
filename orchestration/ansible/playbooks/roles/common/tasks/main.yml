@@ -1,6 +1,7 @@
 - name: Install common packages
-  apt: name={{ item }} state=latest
+  apt: name={{ item }} state=latest update_cache=yes
   with_items:
+   - curl
    - libpcap0.8
    - python-boto
    - python-pip
