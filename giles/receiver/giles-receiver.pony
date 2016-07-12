@@ -73,14 +73,13 @@ actor Main
           let listener_addr = l_arg as Array[String]
 
           let store = Store(env.root as AmbientAuth)
-          let decoder = Decoder(store, env.err)
           let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           SignalHandler(TermHandler(coordinator), Sig.term())
 
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
-            FromBuffyListenerNotify(coordinator, decoder, env.err),
+            FromBuffyListenerNotify(coordinator, store, env.err),
             listener_addr(0),
             listener_addr(1))
 
@@ -92,14 +91,14 @@ actor Main
 
 class FromBuffyListenerNotify is TCPListenNotify
   let _coordinator: Coordinator
-  let _decoder: Decoder
+  let _store: Store
   let _stderr: StdStream
 
   new iso create(coordinator: Coordinator,
-    decoder: Decoder, stderr: StdStream)
+    store: Store, stderr: StdStream)
   =>
     _coordinator = coordinator
-    _decoder = decoder
+    _store = store
     _stderr = stderr
 
   fun ref not_listening(listen: TCPListener ref) =>
@@ -109,24 +108,30 @@ class FromBuffyListenerNotify is TCPListenNotify
     _coordinator.from_buffy_listener(listen, Ready)
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    FromBuffyNotify(_coordinator, _decoder, _stderr)
+    FromBuffyNotify(_coordinator, _store, _stderr)
 
 class FromBuffyNotify is TCPConnectionNotify
   let _coordinator: Coordinator
-  let _decoder: Decoder
+  let _store: Store
   let _stderr: StdStream
   var _header: Bool = true
+  var _count: USize = 0
 
   new iso create(coordinator: Coordinator,
-    decoder: Decoder, stderr: StdStream)
+    store: Store, stderr: StdStream)
   =>
     _coordinator = coordinator
-    _decoder = decoder
+    _store = store
     _stderr = stderr
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     if _header then
       try
+        _count = _count + 1
+        if (_count % 100_000) == 0 then 
+          @printf[I32]("%zu received\n".cstring(), _count)
+        end
+
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
         conn.expect(expect)
         _header = false
@@ -134,7 +139,7 @@ class FromBuffyNotify is TCPConnectionNotify
         _stderr.print("Blew up reading header from Buffy")
       end
     else
-      _decoder.received(consume data, Time.wall_to_nanos(Time.now()))
+      _store.received(consume data, Time.wall_to_nanos(Time.now()))
 
       conn.expect(4)
       _header = true
@@ -313,26 +318,12 @@ actor WithDagonCoordinator is Coordinator
     _connections.push(c)
 
 ///
-/// RECEIVED MESSAGE DECODER
-///
-
-actor Decoder
-  let _store: Store
-  let _stderr: StdStream
-
-  new create(store: Store, stderr: StdStream) =>
-    _store = store
-    _stderr = stderr
-
-  be received(data: Array[U8] iso, at: U64) =>
-    _store.received(consume data, at)
-
-///
 /// RECEIVED MESSAGE STORE
 ///
 
 actor Store
   let _received_file: (File | None)
+  var _count: USize = 0
 
   new create(auth: AmbientAuth) =>
     _received_file = try
