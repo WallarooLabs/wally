@@ -2,10 +2,10 @@ use "random"
 use "time"
 
 class GuidGenerator
-  let _dice: Dice
+  let _rand: Random
 
-  new create(seed: U64 = Time.micros()) =>
-    _dice = Dice(MT(seed))
+  new create(seed: U64 = Time.nanos()) =>
+    _rand = MT(seed)
 
   fun ref apply(): U64 =>
-    _dice(1, U64.max_value().u64()).u64()
+    _rand.next()
