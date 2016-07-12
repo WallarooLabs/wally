@@ -177,6 +177,26 @@ build-wesley: ## Build wesley
 	$(call PONYC,wesley/wordcount-test)
 	$(call PONYC,wesley/market-spread-test)
 
+build-metrics-reporter-ui: ## Build Metrics Reporter UI
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix deps.clean --all
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix deps.get --only prod
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix compile
+	cd monitoring_hub/apps/metrics_reporter_ui && npm install
+	cd monitoring_hub/apps/metrics_reporter_ui && npm run build:production
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix phoenix.digest
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix release.clean
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix release
+
+build-market-spread-reports-ui: ## Build Market Spread Reports UI
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix deps.clean --all
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix deps.get --only prod
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix compile
+	cd monitoring_hub/apps/market_spread_reports_ui && npm install
+	cd monitoring_hub/apps/market_spread_reports_ui && npm run build:production
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix phoenix.digest
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix release.clean
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix release
+
 build-fallor: ## build fallor decoder
 	$(call PONYC,fallor)
 
@@ -205,6 +225,24 @@ test-giles-receiver: ## Test Giles Receiver
 
 test-giles-sender: ## Test Giles Sender
 	cd giles/sender && ./sender
+
+test-monitoring-hub: ## Test all Apps within the Monitoring Hub
+	cd monitoring_hub && mix deps.get && mix test
+
+test-monitoring-hub-utils: ## Test Monitoring Hub Utils
+	cd monitoring_hub/apps/monitoring_hub_utils && mix test
+
+test-mh-market-spread-reports: ## Test MH Market Spread Reports
+	cd monitoring_hub/apps/market_spread_reports && mix test
+
+test-mh-market-spread-reports-ui: ## Test MH Market Spread Reports UI
+	cd monitoring_hub/apps/market_spread_reports_ui && mix test
+
+test-mh-metrics-reporter: ## Test MH Metrics Reporter
+	cd monitoring_hub/apps/metrics_reporter && mix test
+
+test-mh-metrics-reporter-ui: ## Test MH Metrics Reporter UI
+	cd monitoring_hub/apps/metrics_reporter_ui && mix test
 
 dagon-test: dagon-identity dagon-word-count dagon-market-spread dagon-identity-drop #dagon-double ## Run dagon tests
 
@@ -401,6 +439,29 @@ dangling := $(shell docker $(docker_host_arg) images -f "dangling=true" -q)
 tag := $(shell docker $(docker_host_arg) images | grep \
          "$(docker_image_version)" | awk -F " " '{print $$1 ":" $$2}')
 
+build-market-spread-reports-ui-docker:
+	docker $(docker_host_arg) build -t \
+		$(docker_image_repo)/monitoring_hub/apps/market_spread_reports_ui.$(arch):$(docker_image_version) \
+		monitoring_hub/apps/market_spread_reports_ui
+
+build-metrics-reporter-ui-docker:
+	docker $(docker_host_arg) build -t \
+		$(docker_image_repo)/monitoring_hub/apps/metrics_reporter_ui.$(arch):$(docker_image_version) \
+		monitoring_hub/apps/metrics_reporter_ui
+
+push-monitoring-hub-ui-docker: build-market-spread-reports-ui-docker build-metrics-reporter-ui-docker ## Push docker images for Market Spread Reports UI to repository
+	docker $(docker_host_arg) push \
+		$(docker_image_repo)/monitoring_hub/apps/market_spread_reports_ui.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+		$(docker_image_repo)/monitoring_hub/apps/metrics_reporter_ui.$(arch):$(docker_image_version)
+exited := $(shell docker $(docker_host_arg) ps -a -q -f status=exited)
+untagged := $(shell (docker $(docker_host_arg) images | grep "^<none>" | awk \
+              -F " " '{print $$3}'))
+dangling := $(shell docker $(docker_host_arg) images -f "dangling=true" -q)
+tag := $(shell docker $(docker_host_arg) images | grep \
+         "$(docker_image_version)" | awk -F " " '{print $$1 ":" $$2}')
+
+
 clean-docker: ## cleanup docker images and containers
 ifneq ($(strip $(exited)),)
 	@echo "Cleaning exited containers: $(exited)"
@@ -433,6 +494,8 @@ clean: clean-docker ## Cleanup docker images, deps and compiled files for Buffy
 	rm -f apps/market-spread/market-spread apps/market-spread/market-spread.o
 	rm -f apps/word-count/word-count apps/word-count/word-count.o
 	rm -f dagon/dagon-child/dagon-child dagon/dagon-child/dagon-child.o
+	rm -rf monitoring_hub/apps/metrics_reporter_ui/rel/metrics_reporter_ui/
+	rm -rf monitoring_hub/apps/market_spread_reports_ui/rel/market_spread_reports_ui/
 	@echo 'Done cleaning.'
 
 help:
@@ -454,4 +517,3 @@ help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk \
           'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", \
           $$1, $$2}'
-
