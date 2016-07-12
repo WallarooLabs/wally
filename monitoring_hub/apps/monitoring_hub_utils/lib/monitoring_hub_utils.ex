@@ -1,0 +1,2 @@
+defmodule MonitoringHubUtils do
+end

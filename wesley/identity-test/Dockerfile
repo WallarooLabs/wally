@@ -1,6 +1,6 @@
 FROM scratch
 
-ADD identity /wesley/identity
+ADD identity-test /wesley/identity
 
 ENTRYPOINT ["/wesley/identity"]
 

@@ -5,6 +5,8 @@ branches:
   - master
   - python-buffy
   - refs/tags/*
+  - add-monitoring-hub
+
 
 # clone source code with tags
 clone:
@@ -95,6 +97,96 @@ build:
       - >
         make arch=$$PONYC_VERSION docker_image_version=$$TAG-$$PONYC_CONFIG
         clean-docker
+      - >
+        make arch=$$PONYC_VERSION
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
+    privileged: true
+    when:
+      event: tag
+
+  # run monitoring hub tests
+  run_monitoring_hub_test:
+    image: docker.sendence.com:5043/monitoring-hub-builder:latest
+    auth_config:
+      username: $$DOCKER_USERNAME
+      password: $$DOCKER_PASSWORD
+    pull: true
+    commands:
+      - make test-monitoring-hub
+
+  # build metrics reporter ui
+  build_metrics_reporter_ui:
+    image: docker.sendence.com:5043/monitoring-hub-builder:latest
+    auth_config:
+      username: $$DOCKER_USERNAME
+      password: $$DOCKER_PASSWORD
+    pull: true
+    commands:
+      - make build-metrics-reporter-ui
+
+  # build market spread reports ui
+  build_market_spread_reports_ui:
+    image: docker.sendence.com:5043/monitoring-hub-builder:latest
+    auth_config:
+      username: $$DOCKER_USERNAME
+      password: $$DOCKER_PASSWORD
+    pull: true
+    commands:
+      - make build-market-spread-reports-ui
+
+  # build monitoring hub ui docker images
+  build_monitoring_hub_ui_docker_images:
+    image: sendence/docker-runner:0.0.1
+    pull: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - >
+        make clean-docker arch=$$PONYC_VERSION
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+      - >
+        make build-market-spread-reports-ui-docker arch=$$PONYC_VERSION
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+      - >
+        make build-metrics-reporter-ui-docker arch=$$PONYC_VERSION
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+    privileged: true
+
+  # build and push final monitoring hub ui docker images on a push event
+  build_monitoring_hub_ui_docker_images_push:
+    image: sendence/docker-runner:0.0.1
+    pull: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/root/.docker/config.json
+    commands:
+      - >
+        make push-monitoring-hub-ui-docker arch=$$PONYC_VERSION
+        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG
+      - >
+        make arch=$$PONYC_VERSION
+        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG clean-docker
+      - >
+        make arch=$$PONYC_VERSION
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
+    privileged: true
+    when:
+      event: push
+
+  # build and push monitoring hub ui docker images on tag event
+  build_monitoring_hub_ui_docker_images_tag:
+    image: sendence/docker-runner:0.0.1
+    pull: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/root/.docker/config.json
+    commands:
+      - >
+        make push-monitoring-hub-ui-docker arch=$$PONYC_VERSION
+        docker_image_version=$$BRANCH-$$TAG-$$PONYC_CONFIG
+      - >
+        make arch=$$PONYC_VERSION
+        docker_image_version=$$BRANCH-$$TAG-$$PONYC_CONFIG clean-docker
       - >
         make arch=$$PONYC_VERSION
         docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
