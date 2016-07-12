@@ -1,0 +1,8 @@
+defmodule MonitoringHubUtilsTest do
+  use ExUnit.Case
+  doctest MonitoringHubUtils
+
+  test "the truth" do
+    assert 1 + 1 == 2
+  end
+end

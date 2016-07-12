@@ -1,0 +1,2 @@
+defmodule MonitoringHubUtils.Stores do
+end
