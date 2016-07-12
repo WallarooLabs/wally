@@ -1371,6 +1371,295 @@ cp /vagrant/docker-double-divide-aws-*.ini ./
 
 
 * Dipin's AWS Setup
+We are mostly working with spot EC2 instances. 
+
+Do not run "make destroy" after your EC2 spot instances have been
+killed by AWS. This would boot new nodes and immediately destroy
+them. Just run "make cluster" again.
+
+** Prepare environment
+On your Mac (in your virtualenv for Ansible) do the following:
+Re-create Ansible environment.
+#+BEGIN_SRC sh
+workon ansible
+pip uninstall ansible
+pip uninstall boto
+pip install -Iv ansible==2.0.0.2
+pip install -Iv boto==2.39.0
+#+END_SRC
+
+Create cluster
+#+BEGIN_SRC sh
+make cluster mem_required=16 cpus_required=8
+#+END_SRC
+
+Sample output:
+#+BEGIN_EXAMPLE
+PLAY RECAP *********************************************************************
+52.201.243.239             : ok=43   changed=23   unreachable=0    failed=0
+54.164.109.60              : ok=43   changed=23   unreachable=0    failed=0
+54.172.250.155             : ok=44   changed=23   unreachable=0    failed=0
+#+END_EXAMPLE
+
+ssh into the failed node to get the network interface name:
+#+BEGIN_SRC sh
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@54.172.250.155
+#+END_SRC
+
+List available interfaces:
+#+BEGIN_SRC sh
+ifconfig
+#+END_SRC
+
+Sample output:
+#+BEGIN_EXAMPLE
+ens3      Link encap:Ethernet  HWaddr 0a:ac:49:a4:f2:dd
+          inet addr:10.0.81.84  Bcast:10.0.95.255  Mask:255.255.224.0
+          inet6 addr: fe80::8ac:49ff:fea4:f2dd/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:9001  Metric:1
+          RX packets:3216 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:716 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:4166742 (4.1 MB)  TX bytes:85539 (85.5 KB)
+
+lo        Link encap:Local Loopback
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:164 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:164 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1
+          RX bytes:12104 (12.1 KB)  TX bytes:12104 (12.1 KB)
+#+END_EXAMPLE
+
+The interface we're interested in is the first Ethernet interface
+named =ens3=.
+
+Logout and edit the file
+=/buffy/orchestration/ansible/playbooks/aws.yml=. You need to
+substitute "ethernet_interface: eth0" with "ethernet_interface: ens3".
+
+Now configure the cluster:
+#+BEGIN_SRC sh
+make configure
+#+END_SRC
+
+Example output:
+#+BEGIN_EXAMPLE
+PLAY RECAP *********************************************************************
+52.207.224.219             : ok=43   changed=23   unreachable=0    failed=0
+54.209.210.91              : ok=44   changed=23   unreachable=0    failed=0
+54.234.124.61              : ok=43   changed=23   unreachable=0    failed=0
+
+==> Successfully ran ansible playbook for cluster 'example' in region
+'us-east-1'!
+#+END_EXAMPLE
+
+Login to leader node and check the Docker daemon is running:
+#+BEGIN_SRC sh
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@54.209.210.91
+docker ps -a
+exit
+#+END_SRC
+
+Check that Docker Swarm is up and running:
+#+BEGIN_SRC sh
+docker -H tcp://<leader ip address>:2378
+#+END_SRC
+
+** Prepare Pony
+Get the prerequisites for building Pony on the leader node.
+#+BEGIN_SRC sh
+sudo apt-get update
+sudo apt-get install -y build-essential git zlib1g-dev libncurses5-dev libssl-dev
+wget http://llvm.org/releases/3.8.0/clang+llvm-3.8.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+tar xvf clang*
+cd clang*
+sudo cp -r * /usr/local/ && cd ..
+#+END_SRC
+
+Get, build and install PCRE2.
+#+BEGIN_SRC sh
+wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2
+tar xvf pcre2-10.21.tar.bz2
+cd pcre2-10.21
+./configure --prefix=/usr
+make
+sudo make install
+#+END_SRC
+
+Build and install =ponyc=.
+#+BEGIN_SRC sh
+git clone https://github.com/ponylang/ponyc.git
+cd ponyc
+make config=release
+sudo make install
+cd ..
+#+END_SRC
+
+Build and install =stable=.
+#+BEGIN_SRC sh
+git clone https://github.com/jemc/pony-stable
+cd pony-stable
+make
+sudo make install
+#+END_SRC
+** Prepare Buffy
+Building and publishing on the EC2 leader node are only there to make
+sure the binaries being run are AWS compatible. This is necessary
+because the ponyc optimized binaries created in virtualbox don't fully
+work on AWS and are a source of "fun" debugging. We will likely want
+to think about creating unoptimized/generic binaries using ponyc for
+general compatibility.
+
+
+Copy your Github credentials and configurations to the leader node.
+#+BEGIN_SRC sh
+scp -i ~/.ssh/ec2/us-east-1.pem \
+ ~/.gitconfig \
+ ubuntu@54.172.250.155:~/
+#+END_SRC
+
+Copy the Github ssh key and config to the leader node.
+#+BEGIN_SRC sh
+scp -i ~/.ssh/ec2/us-east-1.pem \
+ ~/.ssh/github_rsa* \
+ ubuntu@54.172.250.155:~/.ssh
+scp -i ~/.ssh/ec2/us-east-1.pem \
+ ~/.ssh/config \
+ ubuntu@54.172.250.155:~/.ssh
+#+END_SRC
+
+Login to the leader node:
+#+BEGIN_SRC sh
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@54.172.250.155
+#+END_SRC
+
+Checkout the Buffy source code:
+#+BEGIN_SRC sh
+git clone git@github.com:Sendence/buffy.git
+#+END_SRC
+
+Login to the Sendence container registry.
+#+BEGIN_SRC sh
+sudo docker login docker.sendence.com:5043
+#+END_SRC
+
+
+Change into the main Buffy directory and build the binaries and
+container images:
+#+BEGIN_SRC sh
+cd buffy
+make arch=amd64 debug=true
+make arch=amd64 debug=true build-docker
+make arch=amd64 debug=true push-docker
+#+END_SRC
+
+List the container images and note down the latest tag:
+#+BEGIN_SRC sh
+docker images
+#+END_SRC
+
+Sample output:
+#+BEGIN_EXAMPLE
+REPOSITORY                                                  TAG                           IMAGE ID            CREATED             SIZE
+docker.sendence.com:5043/sendence/word-count.amd64          sendence-2.3.0-597-g37b93d1   90f56db5e45a        2 minutes ago       2.653 MB
+docker.sendence.com:5043/sendence/dagon-child.amd64         sendence-2.3.0-597-g37b93d1   d7b5b2a37747        2 minutes ago       745.8 kB
+docker.sendence.com:5043/sendence/market-spread.amd64       sendence-2.3.0-597-g37b93d1   62ca2984fc27        2 minutes ago       2.89 MB
+docker.sendence.com:5043/sendence/quadruple.amd64           sendence-2.3.0-597-g37b93d1   7fad2f085c2a        2 minutes ago       2.474 MB
+docker.sendence.com:5043/sendence/state-avg-of-avgs.amd64   sendence-2.3.0-597-g37b93d1   9f44fb95fe45        2 minutes ago       2.469 MB
+docker.sendence.com:5043/sendence/double-divide.amd64       sendence-2.3.0-597-g37b93d1   2a0ff917b9b7        2 minutes ago       2.443 MB
+docker.sendence.com:5043/sendence/avg-of-avgs.amd64         sendence-2.3.0-597-g37b93d1   7b96f514c454        2 minutes ago       2.427 MB
+docker.sendence.com:5043/sendence/dagon.amd64               sendence-2.3.0-597-g37b93d1   ebd763742bfa        2 minutes ago       1.234 MB
+docker.sendence.com:5043/sendence/wesley-identity.amd64     sendence-2.3.0-597-g37b93d1   0dffb088563c        2 minutes ago       763.8 kB
+docker.sendence.com:5043/sendence/wesley-double.amd64       sendence-2.3.0-597-g37b93d1   369259bd0598        2 minutes ago       770.8 kB
+docker.sendence.com:5043/sendence/giles-sender.amd64        sendence-2.3.0-597-g37b93d1   272f2f91ac43        2 minutes ago       1.095 MB
+docker.sendence.com:5043/sendence/giles-receiver.amd64      sendence-2.3.0-597-g37b93d1   9e5753cd5912        2 minutes ago       913.4 kB
+#+END_EXAMPLE
+
+The most recent tag is =sendence-2.3.0-597-g37b93d= in the example above.
+
+Edit file =buffy/dagon/docker-double-divide-aws-swarm.ini= file and
+update the docker.tag lines to the new tag published by the last
+build.
+
+#+BEGIN_SRC sh
+vi buffy/dagon/docker-double-divide-aws-swarm.ini
+#+END_SRC
+
+Copy the relevant configuration files to =/tmp= on the leader node:
+#+BEGIN_SRC sh
+scp -i ~/.ssh/ec2/us-east-1.pem \
+ docker-double-divide-aws-swarm.ini \
+ ubuntu@54.172.250.155:/tmp
+scp -i ~/.ssh/ec2/us-east-1.pem \
+ count-to-hundred.txt\
+ ubuntu@54.172.250.155:/tmp
+#+END_SRC
+
+Create the docker overlay network ((make sure to do this pointing to
+leader docker engine [port 2375] and NOT docker swarm [port 2378]):
+#+BEGIN_SRC sj
+docker network create -d overlay buffy-swarm
+docker network ls
+#+END_SRC
+
+Sample output:
+#+BEGIN_EXAMPLE
+NETWORK ID          NAME                DRIVER
+c33da36cbdbb        bridge              bridge
+2734ba2139e1        buffy-swarm         overlay
+58b5a4a94ed0        host                host
+a791125ab6c0        none                null
+f40bb6e7a756        root_default        bridge
+#+END_EXAMPLE
+
+Determine the IP address of the eth0/ens3 interface address for the leader.
+#+BEGIN_SRC sh
+ifconfig
+#+END_SRC
+
+
+Change the =DOCKER_HOST= variable to point to the Swarm:
+#+BEGIN_SRC sh
+export DOCKER_HOST=tcp://10.0.79.127:2378
+#+END_SRC
+
+Pull all images that you just published onto the Docker Swarm:
+#+BEGIN_SRC sh
+tbd
+#+END_SRC
+
+Start Dagon on the Swarm:
+#+BEGIN_EXAMPLE
+docker --host=tcp://<leader host or external ip>:2378 run -u 0 \
+ --name dagon  -h dagon  --privileged  -i  -e LC_ALL=C.UTF-8 -e LANG=C.UTF-8 \
+ -e "constraint:node==<leader internal hostname>" -v /usr/bin:/usr/bin:ro  \
+ -v /var/run/docker.sock:/var/run/docker.sock  -v /bin:/bin:ro  \
+ -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/tmp  \
+ -w /tmp  \
+ --net=buffy-swarm  \
+ docker.sendence.com:5043/sendence/dagon.amd64:<docker tag>  \
+ dagon.amd64  --docker=tcp://<leader internal ip>:2378  -t 10  \
+ --filepath=/tmp/docker-double-divide-aws-swarm.ini  --phone-home=dagon:8080
+#+END_EXAMPLE
+
+Using the internal IP address of our leader the command above looks
+like this:
+#+BEGIN_SRC sh
+docker --host=tcp://10.0.79.127:2378 run -u 0 \
+ --name dagon  -h dagon  --privileged  -i  -e LC_ALL=C.UTF-8 -e LANG=C.UTF-8 \
+ -e "constraint:node==ip-10-0-79-127" -v /usr/bin:/usr/bin:ro  \
+ -v /var/run/docker.sock:/var/run/docker.sock  -v /bin:/bin:ro  \
+ -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/tmp  \
+ -w /tmp  \
+ --net=buffy-swarm \
+ docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-597-g37b93d1 \
+ dagon.amd64  --docker=tcp://10.0.79.127:2378  -t 10  \
+ --filepath=/tmp/docker-double-divide-aws-swarm.ini  --phone-home=dagon:8080
+#+END_SRC
+
+** Instructions
 The following are the steps:
 1. create & configure cluster (with makefile)
 2. ssh into leader node
