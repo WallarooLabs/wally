@@ -342,10 +342,10 @@ build-docker:  ## Build docker images for Buffy
           $(docker_image_repo)/dagon.$(arch):$(docker_image_version) dagon
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/wesley-double.$(arch):$(docker_image_version) \
-          wesley/double
+          wesley/double-test
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/wesley-identity.$(arch):$(docker_image_version) \
-          wesley/identity
+          wesley/identity-test
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/avg-of-avgs.$(arch):$(docker_image_version) \
           apps/avg-of-avgs

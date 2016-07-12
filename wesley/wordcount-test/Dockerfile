@@ -1,6 +1,6 @@
 FROM scratch
 
-ADD wordcount /wesley/wordcount
+ADD wordcount-test /wesley/wordcount
 
 ENTRYPOINT ["/wesley/wordcount"]
 
