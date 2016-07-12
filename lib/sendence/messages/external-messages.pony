@@ -81,6 +81,9 @@ class BufferedExternalMsgEncoder
   fun ref add_done(node_name: String): BufferedExternalMsgEncoder =>
     _encode_and_add(_Done(), node_name)
 
+  fun ref reserve_chunks(chunks: USize = 0) =>
+    _buffer.reserve_chunks(chunks)
+
   fun ref done(): Array[ByteSeq] val =>
     _buffer.done()
 
