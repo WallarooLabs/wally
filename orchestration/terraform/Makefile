@@ -11,6 +11,9 @@ mem_required ?= 0.5## Minimum amount of memory in GB per instance (for use_cheap
 cpus_required ?= 0.05## Minimum amount of CPUs per instance (for use_cheapest_instances=true)
 no_burst ?= false## Don't use burstable instances (t1.*, t2.*) (for use_cheapest_instances=true)
 no_burst_arg :=# args for no-burst for cheapest instance script
+no_spot ?= false## Don't use spot pricing (for use_cheapest_instances=true)
+no_spot_arg :=# args for no-spot for cheapest instance script
+spot_bid_factor ?= 1.25## Percentage of maximum historical price to bid (automagically capped at instance on-demand price).
 force_instance ?= ## Force a specific instance type (for use_cheapest_instances=true)
 ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
 num_leaders ?= 1## Number of leader nodes
@@ -39,6 +42,10 @@ endef
 
 ifeq ($(no_burst),true)
   no_burst_arg := --no-burst
+endif
+
+ifeq ($(no_spot),true)
+  no_spot_arg := --no-spot
 endif
 
 ifdef use_cheapest_instances
@@ -194,13 +201,16 @@ setup_ci_arg: tmp_ci_args=$(if $(filter $(use_cheapest_instances),true),$(if \
        follower_instance_type=$(old_type) -var leader_spot_price=$(old_price) \
        -var follower_spot_price=$(old_price),$(shell\
        $(current_dir)/cheapest_instance.py --region $(region) --cpus \
-       $(cpus_required) --mem $(mem_required) $(no_burst_arg) --availability_zone \
-       "$(availability_zone)" --instance_type "$(force_instance)")))
+       $(cpus_required) --mem $(mem_required) $(no_burst_arg) \
+       --spot-bid-factor $(spot_bid_factor) --availability_zone \
+       "$(availability_zone)" $(no_spot_arg) --instance_type "$(force_instance)")))
 setup_ci_arg: # set up cheapest instances arg
 	@echo $(if $(filter $(use_cheapest_instances),true),"\033[36m==> Using \
 automagic cheapest instance logic...\033[0m",\
           "\033[36m==> Not using automagic cheapest instance logic...\033[0m")
 	$(eval $(subst #,$(newline),$(tmp_ci_args)))
+	@echo $(if $(filter $(use_cheapest_instances),true), $(if \
+          $(ci_inst_type),,$(error Error running cheapest instance script!)))
 	@echo $(if $(filter $(use_cheapest_instances),true), $(if \
         $(ci_old_values), "\033[36m==> Re-using values from existing cluster \
 to not clobber it.\033[0m",),)

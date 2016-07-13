@@ -88,13 +88,18 @@ parser.add_argument("--availability_zone"
                    , help="AWS Availability Zone to check prices for " + \
                      "(defaults to all in region).")
 parser.add_argument("--cpus", type=float, default=0.05
-                   , help="# of CPUs required in the instance.")
+                   , help="# of CPUs required in the instance. Default: 0.05")
 parser.add_argument("--mem", type=float, default=0.5
-                   , help="Amount of memory (in GB) required in the instance.")
+                   , help="Amount of memory (in GB) required in the instance. Default: 0.5")
 parser.add_argument("--no-burst", dest='burst', default=True, action="store_false" 
                    , help="Don't use burstable instances (t1.*, t2.*).")
 parser.add_argument("--instance_type"
                    , help="Specific instance type to use.")
+parser.add_argument("--no-spot", dest='spot', default=True, action="store_false" 
+                   , help="Don't use spot pricing.")
+parser.add_argument("--spot-bid-factor", type=float, default=1.25
+                   , help="Percentage of maximum historical price to bid" + \
+                    " (automagically capped at instance on-demand price). Default: 1.25")
 
 
 args = parser.parse_args()
@@ -128,7 +133,7 @@ for i in instances:
 
 if len(valid_instances) == 0:
   sys.stderr.write(
-    "No valid instances available for requested constraints.\n" )
+    "No valid instances available for requested constraints!\n" )
   sys.exit(1)
 
 
@@ -136,7 +141,7 @@ cheapest_instance = { 'Price': 9999, 'InstanceType': "INVALID"
                     , 'AvailabilityZone': "INVALID", 'Spot': "UNKNOWN"
                     , 'PlacementGroup': False, 'CurrentPrice': 9999 }
 
-if args.instance_type not in TINY_INSTS:
+if args.instance_type not in TINY_INSTS and args.spot:
   # get current spot prices
   current_spot_prices = get_spot_price_history(args.region
                 , args.availability_zone, valid_instances, 0, 0)
@@ -195,12 +200,16 @@ if cheapest_instance['Spot']:
     if float(sp['SpotPrice']) > max_price:
       max_price = float(sp['SpotPrice'])
 
-  # set bid price to be maximum price found time 1.25
-  bid_price = max_price*1.25
+  # set bid price to be maximum price found times spot-bid-factor
+  bid_price = max_price * args.spot_bid_factor
 
-  # cap bid price to on-demand price
+  # cap bid price to on-demand price on high end
   if bid_price > cheapest_instance['OnDemandPrice']:
     bid_price = cheapest_instance['OnDemandPrice']
+
+  # cap bid price to current spot price on low end
+  if bid_price < cheapest_instance['CurrentPrice']:
+    bid_price = cheapest_instance['CurrentPrice']
 
   cheapest_instance['Price'] = bid_price
 
