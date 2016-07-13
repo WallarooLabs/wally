@@ -1,5 +1,6 @@
 use "collections"
 use "buffy/messages"
+use "buffy/topology/external"
 use "net"
 use "buffy/metrics"
 use "time"
@@ -194,3 +195,21 @@ class ExternalConnectionBuilder[In: Any val] is SinkBuilder
       _pipeline_name)
 
   fun name(): String => _pipeline_name + " Sink"
+
+class ExternalProcessStepBuilder[In: Any val, Out: Any val]
+  is ThroughStepBuilder[In, Out]
+  let _config: ExternalProcessConfig val
+  let _codec: ExternalProcessCodec[In, Out] val
+  let _length_encoder: ByteLengthEncoder val
+  let _name: String val
+
+  new val create(builder: ExternalProcessBuilder[In, Out] val) =>
+    _config = builder.config()
+    _codec = builder.codec()
+    _length_encoder = builder.length_encoder()
+    _name = builder.name()
+
+  fun apply(): BasicStep tag =>
+    ExternalProcessStep[In, Out](_config, _codec, _length_encoder)
+
+  fun name(): String => _name
