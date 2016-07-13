@@ -323,4 +323,10 @@
   - Video
   - Architecture
   - https://www.youtube.com/watch?v=ZGIAypUUwoQ
+* Much Faster Networking
+  - David Riddoch
+  - 2016
+  - Video
+  - Performance, Networking
+  - https://www.infoq.com/presentations/sockets-nfv
 

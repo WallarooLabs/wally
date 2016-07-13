@@ -29,22 +29,27 @@ class WordCounter is CanonicalForm
       counts(word) = 1
     end
 
-  fun compare(that: CanonicalForm): MatchStatus val =>
+  fun compare(that: CanonicalForm): (MatchStatus val, String) =>
     match that
     | let wc: WordCounter =>
-      if counts.size() != wc.counts.size() then return ResultsDoNotMatch end
+      if counts.size() != wc.counts.size() then 
+        return (ResultsDoNotMatch, "Count map sizes do not match up.")
+      end
       for (key, count) in counts.pairs() do
         try
           if count != wc(key) then
-  					return ResultsDoNotMatch
+            let msg = "Expected " + key + " to have a count of " 
+              + count.string() + " instead of " + wc(key).string()
+  					return (ResultsDoNotMatch, msg)
   				end
         else
-          return ResultsDoNotMatch
+          let msg = "Couldn't find " + key + " in results."
+          return (ResultsDoNotMatch, msg)
         end
       end
-      ResultsMatch
+      (ResultsMatch, "")
     else
-      ResultsDoNotMatch
+      (ResultsDoNotMatch, "")
     end
 
   fun clean(s: String): String =>

@@ -8,12 +8,12 @@ class Topology
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
     parser: Parser[In] val,
-    stringify: Stringify[Out] val,
+    array_stringify: ArrayStringify[Out] val,
     sink_target_ids: Array[U64] val,
     pipeline_name: String    
     ): PipelineBuilder[In, Out, In]
   =>
-    let pipeline = Pipeline[In, Out](parser, stringify, sink_target_ids, 
+    let pipeline = Pipeline[In, Out](parser, array_stringify, sink_target_ids, 
       pipeline_name)
     PipelineBuilder[In, Out, In](this, pipeline)
 
@@ -33,14 +33,14 @@ class Pipeline[In: Any val, Out: Any val] is PipelineSteps
   let _sink_target_ids: Array[U64] val
   let _sink_builder: SinkBuilder val
 
-  new create(p: Parser[In] val, s: Stringify[Out] val,
+  new create(p: Parser[In] val, o: ArrayStringify[Out] val,
     s_target_ids: Array[U64] val, n: String) =>
     let source_builder = SourceBuilder[In](p, n)
     _steps = Array[PipelineStep]
     _sink_target_ids = s_target_ids
     _steps.push(PipelineThroughStep[String, In](source_builder))
     _name = n
-    _sink_builder = ExternalConnectionBuilder[Out](s, _name)
+    _sink_builder = ExternalConnectionBuilder[Out](o, _name)
 
   fun ref add_step(p: PipelineStep) =>
     _steps.push(p)

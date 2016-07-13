@@ -1,5 +1,6 @@
 use "net"
 use "buffy/messages"
+use "sendence/messages"
 use "buffy/metrics"
 use "../topology"
 use "spike"

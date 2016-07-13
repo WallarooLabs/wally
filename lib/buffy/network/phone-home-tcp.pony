@@ -1,5 +1,5 @@
 use "net"
-use "buffy/messages"
+use "sendence/messages"
 use "sendence/bytes"
 
 class HomeConnectNotify is TCPConnectionNotify
@@ -8,22 +8,19 @@ class HomeConnectNotify is TCPConnectionNotify
   let _coordinator: Coordinator
   var _header: Bool = true
   var _has_connected: Bool = false
-
+ 
   new iso create(env: Env, name: String,
     coordinator: Coordinator) =>
     _env = env
     _name = name
     _coordinator = coordinator
-
-  fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print(_name + ": phone home connection accepted")
-
+   
   fun ref connected(conn: TCPConnection ref) =>
     if not _has_connected then
       conn.expect(4)
       _has_connected = true
     end
-
+  
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     if _header then
       try

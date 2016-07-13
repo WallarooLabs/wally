@@ -3,7 +3,7 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[IdentitySentMessage val, IdentityReceivedMessage val]
-      .run(env, IdentityResultMapper, IdentitySentParser, 
+      .run(env, "Identity", IdentityResultMapper, IdentitySentParser, 
         IdentityReceivedParser)
 
 class IdentitySentMessage
@@ -32,9 +32,9 @@ class IdentitySentParser is SentParser[IdentitySentMessage val]
   let _messages: Array[IdentitySentMessage val] = 
     Array[IdentitySentMessage val]
 
-  fun ref apply(value: Array[String] ref): None ? =>
-    let timestamp = value(0).clone().strip().u64()
-    let i = value(1).clone().strip().i64()
+  fun ref apply(fields: Array[String] val): None ? =>
+    let timestamp = fields(0).clone().strip().u64()
+    let i = fields(1).clone().strip().i64()
     _messages.push(IdentitySentMessage(timestamp, i))
 
   fun ref sent_messages(): Array[IdentitySentMessage val] =>
@@ -44,10 +44,15 @@ class IdentityReceivedParser is ReceivedParser[IdentityReceivedMessage val]
   let _messages: Array[IdentityReceivedMessage val] = 
     Array[IdentityReceivedMessage val]
 
-  fun ref apply(value: Array[String] ref): None ? =>
-    let timestamp = value(0).clone().strip().u64()
-    let i = value(1).clone().strip().i64()
-    _messages.push(IdentityReceivedMessage(timestamp, i))
+  fun ref apply(fields: Array[String] val): None ? =>
+    try
+      let timestamp = fields(0).clone().strip().u64()
+      let i = fields(1).clone().strip().i64()
+      _messages.push(IdentityReceivedMessage(timestamp, i))
+    else
+      @printf[I32]("Parser problem!\n".cstring())
+      error
+    end
 
   fun ref received_messages(): Array[IdentityReceivedMessage val] =>
     _messages

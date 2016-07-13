@@ -11,7 +11,7 @@ actor Main
     try
       let topology: Topology val = recover val
         Topology
-          .new_pipeline[String, WordCount val](P, S, recover [0] end, 
+          .new_pipeline[String, WordCount val](P, O, recover [0] end, 
             "Word Count")
           .to_map[WordCount val](
             lambda(): MapComputation[String, WordCount val] iso^ => Split end)
@@ -102,6 +102,9 @@ class P
   fun apply(s: String): String =>
     s
 
-class S
-  fun apply(input: WordCount val): String =>
-    input.word + "," + input.count.string()
+primitive O
+  fun apply(input: WordCount val): Array[String] val =>
+    let result: Array[String] iso = recover Array[String] end
+    result.push(input.word)
+    result.push(input.count.string())
+    consume result

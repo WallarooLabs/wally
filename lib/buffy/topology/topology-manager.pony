@@ -1,6 +1,7 @@
 use "net"
 use "collections"
 use "buffy/messages"
+use "sendence/messages"
 use "sendence/guid"
 use "../network"
 use "random"
@@ -50,7 +51,7 @@ actor TopologyManager
     _leader_data_service = leader_data_service
     _nodes.push(name)
 
-    if _worker_count == 0 then _initialize_topology() end
+    if _worker_count == 0 then _initialize_topology(true) end
 
   be assign_control_conn(node_name: String, control_host: String,
     control_service: String) =>
@@ -102,7 +103,7 @@ actor TopologyManager
     end
 
   // Currently assigns steps in pipeline using round robin among nodes
-  fun ref _initialize_topology() =>
+  fun ref _initialize_topology(single_node: Bool = false) =>
     let repeated_steps = Map[U64, U64] // map from pipeline id to step id
     let shared_state_steps = Map[U64, SharedStateAddress] // map from state_id to shared_state_step_id
     let guid_gen = GuidGenerator
@@ -255,6 +256,8 @@ actor TopologyManager
         let node = _nodes(i)
         _coordinator.send_control_message(node, finished_msg)
       end
+
+      if single_node then _complete_initialization() end
     else
       _env.err.print("Buffy Leader: Failed to initialize topology")
     end

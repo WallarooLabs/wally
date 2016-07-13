@@ -23,7 +23,8 @@ When you run a client, use the following command line parameters:
 ```--metrics/-m <metrics-receiver address>``` sets the address for the metrics receiver.  
 ```--spike-seed <seed>``` optionally sets seed for spike.  
 ```--spike-delay``` set flag for spike delay.  
-```--spike-drop``` set flag for spike drop.  
+```--spike-drop``` set flag for spike drop. 
+```--help/-h``` prints parameters for all node types 
 
 To run the Double Divide app, you need to kick off three processes.  The first arg is  
 the leader address.  
@@ -41,9 +42,12 @@ You can also choose to enable spiking on the node with either ```--spike-delay``
 To run as a sink node, use the following parameters:  
 
 ```--run-sink``` runs as sink node  
-```--addr/-a <address>``` sets address sink node is listening on  
+```--listen/-l <address>``` sets address sink node is listening on  
 ```--target-addr/-t <address>``` sets address sink node sends reports to  
 ```--step-builder <idx>``` set index of sink step builder for this sink node  
+```--phone-home/-p <address>``` sets address external coordinator is listening on  
+```--name/-n <name>``` sets name of sink node  
+```--help/-h``` prints parameters for all sink node types
 
 For example:
 
@@ -59,13 +63,16 @@ To run as Metrics Receiver, use the following parameters:
 
 ```--run-sink``` runs as sink node (with -r to indicate this is a metrics receiver)  
 ```--metrics-receiver/-r``` runs as metrics-receiver node  
-```--listen [Listen address``` in xxx.xxx.xxx.xxx:pppp format  
-```--monitor``` Monitoring Hub address in xxx.xxx.xxx.xxx:pppp format  
-```--name``` Application name to report to Monitoring Hub  
-```--period``` Aggregation periods for reports to Monitoring Hub  
-```--delay``` Maximum period of time before sending data  
-```--report-file``` File path to write reports to  
+```--listen/-l``` sets listen address in xxx.xxx.xxx.xxx:pppp format  
+```--monitor/-m``` Monitoring Hub address in xxx.xxx.xxx.xxx:pppp format  
+```--app-name/-a``` Application name to report to Monitoring Hub  
+```--period/-e``` Aggregation periods for reports to Monitoring Hub  
+```--delay/-d``` Maximum period of time before sending data  
+```--report-file/-f``` File path to write reports to  
 ```--report-period``` Aggregation period for reports in report-file  
+```--phone-home/-p <address>``` sets address external coordinator is listening on  
+```--name/-n <name>``` sets name of sink node  
+```--help/-h``` prints parameters for metrics receiver
 
 For example:
 

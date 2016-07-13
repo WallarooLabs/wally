@@ -6,7 +6,7 @@ use "files"
 use "net"
 use "options"
 use "time"
-use "buffy/messages"
+use "sendence/messages"
 use "sendence/tcp"
 use "debug"
 

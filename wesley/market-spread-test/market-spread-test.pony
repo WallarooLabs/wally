@@ -6,7 +6,7 @@ actor Main
   new create(env: Env) =>
     VerifierCLI[FixOrderMessage val, MarketSpreadReceivedMessage val]
       .run_with_initialization[FixNbboMessage val, MarketData](
-        env, MarketSpreadResultMapper, MarketSpreadInitParser,
+        env, "Market Spread", MarketSpreadResultMapper, MarketSpreadInitParser,
         MarketSpreadSentParser, MarketSpreadReceivedParser)
 
 class MarketSpreadReceivedMessage
@@ -28,8 +28,8 @@ class MarketSpreadInitParser is InitializationParser[FixNbboMessage val]
 
   fun fs(): (String|None) => None
 
-  fun ref apply(value: Array[String] ref) ? =>
-    let fix_raw = value(0)
+  fun ref apply(fields: Array[String] val) ? =>
+    let fix_raw = fields(0)
     let fix_message = FixParser(fix_raw)
     match fix_message
     | let nbbo: FixNbboMessage val =>
@@ -44,8 +44,8 @@ class MarketSpreadSentParser is SentParser[FixOrderMessage val]
 
   fun fs(): (String|None) => None
 
-  fun ref apply(value: Array[String] ref) ? =>
-    let fix_raw = value(0)
+  fun ref apply(fields: Array[String] val) ? =>
+    let fix_raw = fields(0)
     let fix_message = FixParser(fix_raw)
     match fix_message
     | let trade: FixOrderMessage val =>
@@ -61,10 +61,10 @@ class MarketSpreadReceivedParser is
   let _messages: Array[MarketSpreadReceivedMessage val] =
     Array[MarketSpreadReceivedMessage val]
 
-  fun ref apply(value: Array[String] ref) ? =>
-    let timestamp = value(0).clone().strip().u64()
-    let symbol: String val = value(1).clone().strip().clone()
-    let is_rejected = value(10).bool()
+  fun ref apply(fields: Array[String] val) ? =>
+    let timestamp = fields(0).clone().strip().u64()
+    let symbol: String val = fields(1).clone().strip().clone()
+    let is_rejected = fields(10).bool()
     _messages.push(MarketSpreadReceivedMessage(timestamp, consume symbol,
       is_rejected))
 
@@ -115,22 +115,28 @@ class TradeResults is CanonicalForm
 
   fun ref update(key: String, value: Bool) => results(key) = value
 
-  fun compare(that: CanonicalForm): MatchStatus val =>
+  fun compare(that: CanonicalForm): (MatchStatus val, String) =>
     match that
     | let tr: TradeResults =>
-      if results.size() != tr.results.size() then return ResultsDoNotMatch end
+      if results.size() != tr.results.size() then 
+        return (ResultsDoNotMatch, "Trade results sizes do not match up")
+      end
       for (symbol, is_rejected) in results.pairs() do
         try
           if is_rejected != tr(symbol) then
-            return ResultsDoNotMatch
+            let msg = "Expected " + symbol + " rejection to be " 
+              + is_rejected.string() + " but it was " 
+              + (not is_rejected).string()
+            return (ResultsDoNotMatch, msg)
           end
         else
-          return ResultsDoNotMatch
+          let msg = "Couldn't find " + symbol + " in the results."
+          return (ResultsDoNotMatch, msg)
         end
       end
-      ResultsMatch
+      (ResultsMatch, "")
     else
-      ResultsDoNotMatch
+      (ResultsDoNotMatch, "")
     end
 
 class MarketData

@@ -1,5 +1,5 @@
 use "net"
-use "buffy/messages"
+use "sendence/messages"
 use "sendence/tcp"
 use "options"
 

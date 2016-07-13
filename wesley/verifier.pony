@@ -20,11 +20,11 @@ class StatelessVerifier[S: Message val, R: Message val]
   fun ref test(): PassFail val =>
     let expected = _result_mapper.sent_transform(_sent_messages)
     let actual = _result_mapper.received_transform(_received_messages)
-    let actual_match_result = expected.compare(actual)
+    (let actual_match_result, let resultmessage) = expected.compare(actual)
     if _expected_match_result is actual_match_result then
-      Pass(_expected_match_result, actual_match_result)
+      Pass(_expected_match_result, actual_match_result, resultmessage)
     else
-      Fail(_expected_match_result, actual_match_result)
+      Fail(_expected_match_result, actual_match_result, resultmessage)
     end
 
 class StatefulVerifier[S: Message val, R: Message val, 
@@ -52,39 +52,41 @@ class StatefulVerifier[S: Message val, R: Message val,
     let expected = _result_mapper.sent_transform(_sent_messages, 
       init_state)
     let actual = _result_mapper.received_transform(_received_messages)
-    let actual_match_result = expected.compare(actual)
+    (let actual_match_result, let resultmessage) = expected.compare(actual)
     if _expected_match_result is actual_match_result then
-      Pass(_expected_match_result, actual_match_result)
+      Pass(_expected_match_result, actual_match_result, resultmessage)
     else
-      Fail(_expected_match_result, actual_match_result)
+      Fail(_expected_match_result, actual_match_result, resultmessage)
     end
 
 interface CanonicalForm
-  fun compare(that: CanonicalForm): MatchStatus val
+  fun compare(that: CanonicalForm): (MatchStatus val, String)
 
 // For when you need an ordered list of results
-class ResultsList[V: Equatable[V] #read] is CanonicalForm
+class ResultsList[V: (Equatable[V] #read & Stringable)] is CanonicalForm
   let results: Array[V] = Array[V]
 
   fun ref add(r: V) => results.push(r)
 
-  fun compare(that: CanonicalForm): MatchStatus val =>
+  fun compare(that: CanonicalForm): (MatchStatus val, String) =>
     match that
     | let rl: ResultsList[V] =>
       if (results.size() == rl.results.size()) then
         try
           for (i, v) in results.pairs() do
             if (v != rl.results(i)) then
-              return ResultsDoNotMatch
+              let msg = v.string() + " expected, " + rl.results(i).string() 
+                + " received."
+              return (ResultsDoNotMatch, msg)
             end
           end
         end
-        return ResultsMatch
+        return (ResultsMatch, "")
       else
-        ResultsDoNotMatch
+        (ResultsDoNotMatch, "Result sizes do not match up.")
       end
     else
-      ResultsDoNotMatch
+      (ResultsDoNotMatch, "")
     end
 
 trait ResultMapper[S: Message val, R: Message val]
@@ -97,13 +99,13 @@ trait StatefulResultMapper[S: Message val, R: Message val,
   fun sent_transform(sent: Array[S], state: State): CanonicalForm
   fun received_transform(received: Array[R]): CanonicalForm
 
-trait SentParser[S: Message val] is MessageFileParser
+trait SentParser[S: Message val] is TextMessageFileParser
   fun ref sent_messages(): Array[S]
 
 trait ReceivedParser[R: Message val] is MessageFileParser
   fun ref received_messages(): Array[R]
 
-trait InitializationParser[I: Message val] is MessageFileParser
+trait InitializationParser[I: Message val] is TextMessageFileParser
   fun ref initialization_messages(): Array[I]
 
 interface MatchStatus
@@ -124,18 +126,20 @@ interface PassFail
 
 class Pass is PassFail
   let _exitmessage: String
-  new val create(expected: MatchStatus val, actual: MatchStatus val) =>
+  new val create(expected: MatchStatus val, actual: MatchStatus val,
+    resultmessage: String) =>
     _exitmessage = "Expected ".add(expected.expected()).add(", and ")
-      .add(actual.actual())
+      .add(actual.actual()).add("\n").add(resultmessage)
   fun exitcode(): I32 => 0
   fun exitmessage(): String =>
     _exitmessage
 
 class Fail is PassFail
   let _exitmessage: String
-  new val create(expected: MatchStatus val, actual: MatchStatus val) =>
+  new val create(expected: MatchStatus val, actual: MatchStatus val,
+    resultmessage: String) =>
     _exitmessage = "Expected ".add(expected.expected()).add(", but ")
-      .add(actual.actual())
+      .add(actual.actual()).add("\n").add(resultmessage)
   fun exitcode(): I32 => 1
   fun exitmessage(): String =>
     _exitmessage

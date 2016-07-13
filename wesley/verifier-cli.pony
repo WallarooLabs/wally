@@ -6,9 +6,12 @@ primitive Usage
     .add(" SENT-FILE RECEIVED-FILE match|nomatch|TEST-INI-FILE")
 
 primitive VerifierCLI[S: Message val, R: Message val]
-  fun run(env: Env, result_mapper: ResultMapper[S, R], 
+  fun run(env: Env, test_name: String, result_mapper: ResultMapper[S, R], 
     sent_parser: SentParser[S], received_parser: ReceivedParser[R]) 
   =>
+    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
+    env.out.print(" Wesley: Starting " + test_name)
+    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
     match stateless_verifier_from_command_line(env, result_mapper, 
       sent_parser, received_parser)
     | let verifier: StatelessVerifier[S, R] => verify(env, verifier)
@@ -19,11 +22,15 @@ primitive VerifierCLI[S: Message val, R: Message val]
 
   fun run_with_initialization[I: Message val, 
     State: Any ref](env: Env, 
+    test_name: String,
     result_mapper: StatefulResultMapper[S, R, I, State], 
     initialization_parser: InitializationParser[I],
     sent_parser: SentParser[S], 
     received_parser: ReceivedParser[R]) 
   =>
+    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
+    env.out.print(" Wesley: Starting " + test_name)
+    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
     match stateful_verifier_from_command_line[I, State](env, result_mapper, 
       initialization_parser, sent_parser, received_parser)
     | let verifier: StatefulVerifier[S, R, I, State] => verify(env, verifier)
@@ -64,13 +71,15 @@ primitive VerifierCLI[S: Message val, R: Message val]
     end
 
     try
-      _read_message_file_with_parser(sent_file, sent_parser, env.root)
+      _read_text_message_file_with_parser(sent_file, sent_parser, env.root,
+        env)
     else
       return SetupErrorProblemReadingMessageFile(sent_file)
     end
 
     try
-      _read_message_file_with_parser(received_file, received_parser, env.root)
+      _read_received_message_file_with_parser(received_file, received_parser, 
+        env.root, env)
     else
       return SetupErrorProblemReadingMessageFile(received_file)
     end
@@ -113,19 +122,22 @@ primitive VerifierCLI[S: Message val, R: Message val]
     end
 
     try
-      _read_message_file_with_parser(init_file, init_parser, env.root)
+      _read_text_message_file_with_parser(init_file, init_parser, env.root,
+        env)
     else
       return SetupErrorProblemReadingMessageFile(init_file)
     end
 
     try
-      _read_message_file_with_parser(sent_file, sent_parser, env.root)
+      _read_text_message_file_with_parser(sent_file, sent_parser, env.root,
+        env)
     else
       return SetupErrorProblemReadingMessageFile(sent_file)
     end
 
     try
-      _read_message_file_with_parser(received_file, received_parser, env.root)
+      _read_received_message_file_with_parser(received_file, received_parser,
+       env.root, env)
     else
       return SetupErrorProblemReadingMessageFile(received_file)
     end
@@ -183,13 +195,25 @@ primitive VerifierCLI[S: Message val, R: Message val]
       error
     end
 
-  fun _read_message_file_with_parser(file_name: String, 
-    parser: MessageFileParser, root: (AmbientAuth | None)) ? 
+  fun _read_text_message_file_with_parser(file_name: String, 
+    parser: TextMessageFileParser, root: (AmbientAuth | None),
+    env: Env) ? 
   =>
     let caps = recover val FileCaps.set(FileRead).set(FileStat) end
     with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)) 
       as File do
-      MessageFileReader(file.read_string(file.size()), parser)
+      TextMessageFileReader(file.read_string(file.size()), parser, env)
+    else
+      error
+    end
+
+  fun _read_received_message_file_with_parser(file_name: String, 
+    parser: MessageFileParser, root: (AmbientAuth | None), env: Env) ? 
+  =>
+    let caps = recover val FileCaps.set(FileRead).set(FileStat) end
+    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)) 
+      as File do
+      ReceivedMessageFileReader(file.read(file.size()), parser, env)
     else
       error
     end

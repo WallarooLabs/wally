@@ -135,11 +135,11 @@ default: build
 
 print-%  : ; @echo $* = $($*)
 
-build-buffy-components: build-receiver build-sender build-dagon build-dagon-child
+build-buffy-components: build-receiver build-sender build-dagon build-dagon-child build-fallor
 
 build-apps: build-wesley build-double-divide build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count ## Build Pony based programs for Buffy
 
-build: build-buffy-components build-apps
+build: build-buffy-components build-apps build-wesley
 
 build-receiver: ## Build giles receiver
 	$(call PONYC,giles/receiver)
@@ -172,10 +172,13 @@ build-dagon-child: ## build dagon-child
 	$(call PONYC,dagon/dagon-child)
 
 build-wesley: ## Build wesley
-	$(call PONYC,wesley/double)
-	$(call PONYC,wesley/identity)
-	$(call PONYC,wesley/wordcount)
-	$(call PONYC,wesley/market-spread)
+	$(call PONYC,wesley/double-test)
+	$(call PONYC,wesley/identity-test)
+	$(call PONYC,wesley/wordcount-test)
+	$(call PONYC,wesley/market-spread-test)
+
+build-fallor: ## build fallor decoder
+	$(call PONYC,fallor)
 
 test: test-double-divide test-avg-of-avgs test-state-avg-of-avgs test-quadruple test-market-spread test-word-count test-giles-receiver test-giles-sender ## Test programs for Buffy
 
@@ -207,36 +210,56 @@ dagon-test: dagon-identity dagon-word-count dagon-market-spread dagon-identity-d
 
 dagon-double: ## Run double test with dagon
 	dagon/dagon.py dagon/config/double.ini
-	wesley/double/double sent.txt received.txt \
+	wesley/double-test/double-test sent.txt received.txt \
           dagon/config/double.ini
 
 dagon-identity: ## Run identity test with dagon
 	./dagon/dagon --timeout=15 -f apps/double-divide/double-divide.ini -h 127.0.0.1:8080
-	./wesley/identity/identity ./sent.txt ./received.txt match
+	./wesley/identity-test/identity-test ./sent.txt ./received.txt match
 
 dagon-identity-drop: ## Run identity test with dagon
 	./dagon/dagon --timeout=15 -f apps/double-divide/double-divide-drop.ini -h 127.0.0.1:8080
-	./wesley/identity/identity ./sent.txt ./received.txt match
+	./wesley/identity-test/identity-test ./sent.txt ./received.txt match
 
 dagon-word-count: ## Run word count test with dagon
 	./dagon/dagon --timeout=15 -f apps/word-count/word-count.ini -h 127.0.0.1:8080
-	./wesley/wordcount/wordcount ./sent.txt ./received.txt match
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+
+dagon-word-count-single: ## Run word count test with dagon
+	./dagon/dagon --timeout=15 -f apps/word-count/word-count-single.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+
+dagon-word-count-3: ## Run 3 minute word count test with dagon
+	./dagon/dagon --timeout=800 -f apps/word-count/3-min-run.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+
+dagon-word-count-3-single: ## Run 7 minute word count test with dagon
+	./dagon/dagon --timeout=800 -f apps/word-count/3-min-run-single.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+
+dagon-word-count-7: ## Run 7 minute word count test with dagon
+	./dagon/dagon --timeout=3200 -f apps/word-count/7-min-run.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+
+dagon-word-count-7-single: ## Run 7 minute word count test with dagon
+	./dagon/dagon --timeout=3200 -f apps/word-count/7-min-run-single.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
 
 dagon-word-count-15: ## Run 15 minute word count test with dagon
-	./dagon/dagon --timeout=800 -f apps/word-count/15-min-run.ini -h 127.0.0.1:8080
-	./wesley/wordcount/wordcount ./sent.txt ./received.txt match
+	./dagon/dagon --timeout=3200 -f apps/word-count/15-min-run.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
 
 dagon-word-count-30: ## Run word count test with dagon
-	./dagon/dagon --timeout=2400 -f apps/word-count/15-min-run.ini -h 127.0.0.1:8080
-	./wesley/wordcount/wordcount ./sent.txt ./received.txt match
+	./dagon/dagon --timeout=3200 -f apps/word-count/30-min-run.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
 
 dagon-word-count-60: ## Run word count test with dagon
-	./dagon/dagon --timeout=4800 -f apps/word-count/15-min-run.ini -h 127.0.0.1:8080
-	./wesley/wordcount/wordcount ./sent.txt ./received.txt match	
+	./dagon/dagon --timeout=6400 -f apps/word-count/60-min-run.ini -h 127.0.0.1:8080
+	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match	
 
 dagon-market-spread: ## Run market spread test with dagon
 	./dagon/dagon --timeout=25 -f apps/market-spread/market-spread.ini -h 127.0.0.1:8080
-	./wesley/market-spread/market-spread ./demos/marketspread/100nbbo.msg ./sent.txt ./received.txt match
+	./wesley/market-spread-test/market-spread-test ./demos/marketspread/100nbbo.msg ./sent.txt ./received.txt match
 
 dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
 
@@ -319,10 +342,10 @@ build-docker:  ## Build docker images for Buffy
           $(docker_image_repo)/dagon.$(arch):$(docker_image_version) dagon
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/wesley-double.$(arch):$(docker_image_version) \
-          wesley/double
+          wesley/double-test
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/wesley-identity.$(arch):$(docker_image_version) \
-          wesley/identity
+          wesley/identity-test
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/avg-of-avgs.$(arch):$(docker_image_version) \
           apps/avg-of-avgs
@@ -397,10 +420,10 @@ clean: clean-docker ## Cleanup docker images, deps and compiled files for Buffy
 	rm -f giles/receiver/receiver giles/receiver/receiver.o
 	rm -f giles/sender/sender giles/sender/sender.o
 	rm -f dagon/dagon dagon/dagon.o
-	rm -f wesley/identity/identity wesley/identity/identity.o
-	rm -f wesley/double/double wesley/double/double.o
-	rm -f wesley/wordcount/wordcount wesley/wordcount/wordcount.o
-	rm -f wesley/market-spread/market-spread wesley/market-spread/market-spread.o
+	rm -f wesley/identity-test/identity-test wesley/identity-test/identity-test.o
+	rm -f wesley/double-test/double-test wesley/double-test/double-test.o
+	rm -f wesley/wordcount-test/wordcount-test wesley/wordcount-test/wordcount-test.o
+	rm -f wesley/market-spread-test/market-spread-test wesley/market-spread-test/market-spread-test.o
 	rm -f lib/buffy/buffy lib/buffy/buffy.o
 	rm -f sent.txt received.txt
 	rm -f apps/avg-of-avgs/avg-of-avgs apps/avg-of-avgs/avg-of-avgs.o

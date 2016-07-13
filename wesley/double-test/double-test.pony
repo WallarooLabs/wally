@@ -3,7 +3,8 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[DoubleSentMessage val, DoubleReceivedMessage val]
-      .run(env, DoubleResultMapper, DoubleSentParser, DoubleReceivedParser)
+      .run(env, "Double", DoubleResultMapper, DoubleSentParser, 
+        DoubleReceivedParser)
 
 class DoubleSentMessage
   let ts: U64
@@ -31,9 +32,9 @@ class DoubleSentParser is SentParser[DoubleSentMessage val]
   let _messages: Array[DoubleSentMessage val] = 
     Array[DoubleSentMessage val]
 
-  fun ref apply(value: Array[String] ref): None ? =>
-    let timestamp = value(0).clone().strip().u64()
-    let i = value(1).clone().strip().i64()
+  fun ref apply(fields: Array[String] val): None ? =>
+    let timestamp = fields(0).clone().strip().u64()
+    let i = fields(1).clone().strip().i64()
     _messages.push(DoubleSentMessage(timestamp, i))
 
   fun ref sent_messages(): Array[DoubleSentMessage val] =>
@@ -43,9 +44,9 @@ class DoubleReceivedParser is ReceivedParser[DoubleReceivedMessage val]
   let _messages: Array[DoubleReceivedMessage val] = 
     Array[DoubleReceivedMessage val]
 
-  fun ref apply(value: Array[String] ref): None ? =>
-    let timestamp = value(0).clone().strip().u64()
-    let i = value(1).clone().strip().i64()
+  fun ref apply(fields: Array[String] val): None ? =>
+    let timestamp = fields(0).clone().strip().u64()
+    let i = fields(1).clone().strip().i64()
     _messages.push(DoubleReceivedMessage(timestamp, i))
 
   fun ref received_messages(): Array[DoubleReceivedMessage val] =>

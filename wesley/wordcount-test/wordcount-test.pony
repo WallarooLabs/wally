@@ -3,7 +3,7 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[WordcountSentMessage val, WordcountReceivedMessage val]
-      .run(env, WordcountResultMapper, WordcountSentParser, 
+      .run(env, "Word Count", WordcountResultMapper, WordcountSentParser, 
         WordcountReceivedParser)
 
 class WordcountSentMessage
@@ -36,9 +36,9 @@ class WordcountSentParser is SentParser[WordcountSentMessage val]
 
   fun fn(): USize => 2
 
-  fun ref apply(value: Array[String] ref) ? =>
-    let timestamp = value(0).clone().strip().u64()
-    let text = value(1)
+  fun ref apply(fields: Array[String] val) ? =>
+    let timestamp = fields(0).clone().strip().u64()
+    let text = fields(1)
     _messages.push(WordcountSentMessage(timestamp, text))
 
   fun ref sent_messages(): Array[WordcountSentMessage val] =>
@@ -48,10 +48,10 @@ class WordcountReceivedParser is ReceivedParser[WordcountReceivedMessage val]
   let _messages: Array[WordcountReceivedMessage val] =
     Array[WordcountReceivedMessage val]
 
-  fun ref apply(value: Array[String] ref) ? =>
-    let timestamp = value(0).clone().strip().u64()
-    let word = value(1)
-    let count = value(2).clone().strip().u64()
+  fun ref apply(fields: Array[String] val) ? =>
+    let timestamp = fields(0).clone().strip().u64()
+    let word = fields(1)
+    let count = fields(2).clone().strip().u64()
     _messages.push(WordcountReceivedMessage(timestamp, consume word, count))
 
   fun ref received_messages(): Array[WordcountReceivedMessage val] =>

@@ -1,6 +1,6 @@
 FROM scratch
 
-ADD double /wesley/double
+ADD double-test /wesley/double
 
 ENTRYPOINT ["/wesley/double"]
 
