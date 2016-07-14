@@ -260,6 +260,11 @@ acquire-lock: ## Acquire lock in order to safely run terraform commands on share
           terraform_locking --item-name terraform_lock --attributes \
           Name=lock,Value=`id -u -n`-`hostname`,Replace=true \
           --expected Name=lock,Value=free
+       # next command is for when a previous make target failed without releasing a lock
+       aws sdb put-attributes --region us-east-1 --domain-name \
+          terraform_locking --item-name terraform_lock --attributes \
+          Name=lock,Value=`id -u -n`-`hostname`,Replace=true \
+          --expected Name=lock,Value=`id -u -n`-`hostname`
 	@echo "\033[36m==> Lock successfully acquired!\033[0m"
 
 init-vpc-terraform: ## Initialize/reset local terraform state based on what is in S3 for vpc
