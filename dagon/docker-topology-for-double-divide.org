@@ -1504,6 +1504,7 @@ cd pony-stable
 make
 sudo make install
 #+END_SRC
+
 ** Prepare Buffy
 Building and publishing on the EC2 leader node are only there to make
 sure the binaries being run are AWS compatible. This is necessary
@@ -1562,22 +1563,22 @@ docker images
 
 Sample output:
 #+BEGIN_EXAMPLE
-REPOSITORY                                                  TAG                           IMAGE ID            CREATED             SIZE
-docker.sendence.com:5043/sendence/word-count.amd64          sendence-2.3.0-597-g37b93d1   90f56db5e45a        2 minutes ago       2.653 MB
-docker.sendence.com:5043/sendence/dagon-child.amd64         sendence-2.3.0-597-g37b93d1   d7b5b2a37747        2 minutes ago       745.8 kB
-docker.sendence.com:5043/sendence/market-spread.amd64       sendence-2.3.0-597-g37b93d1   62ca2984fc27        2 minutes ago       2.89 MB
-docker.sendence.com:5043/sendence/quadruple.amd64           sendence-2.3.0-597-g37b93d1   7fad2f085c2a        2 minutes ago       2.474 MB
-docker.sendence.com:5043/sendence/state-avg-of-avgs.amd64   sendence-2.3.0-597-g37b93d1   9f44fb95fe45        2 minutes ago       2.469 MB
-docker.sendence.com:5043/sendence/double-divide.amd64       sendence-2.3.0-597-g37b93d1   2a0ff917b9b7        2 minutes ago       2.443 MB
-docker.sendence.com:5043/sendence/avg-of-avgs.amd64         sendence-2.3.0-597-g37b93d1   7b96f514c454        2 minutes ago       2.427 MB
-docker.sendence.com:5043/sendence/dagon.amd64               sendence-2.3.0-597-g37b93d1   ebd763742bfa        2 minutes ago       1.234 MB
-docker.sendence.com:5043/sendence/wesley-identity.amd64     sendence-2.3.0-597-g37b93d1   0dffb088563c        2 minutes ago       763.8 kB
-docker.sendence.com:5043/sendence/wesley-double.amd64       sendence-2.3.0-597-g37b93d1   369259bd0598        2 minutes ago       770.8 kB
-docker.sendence.com:5043/sendence/giles-sender.amd64        sendence-2.3.0-597-g37b93d1   272f2f91ac43        2 minutes ago       1.095 MB
-docker.sendence.com:5043/sendence/giles-receiver.amd64      sendence-2.3.0-597-g37b93d1   9e5753cd5912        2 minutes ago       913.4 kB
+REPOSITORY                                                  TAG                           IMAGE ID            CREATED              SIZE
+docker.sendence.com:5043/sendence/word-count.amd64          sendence-2.3.0-580-g5733702   351ae0c586c4        About a minute ago   2.59 MB
+docker.sendence.com:5043/sendence/dagon-child.amd64         sendence-2.3.0-580-g5733702   c4832918d81c        About a minute ago   746 kB
+docker.sendence.com:5043/sendence/double-divide.amd64       sendence-2.3.0-580-g5733702   141c77cc0e88        About a minute ago   2.313 MB
+docker.sendence.com:5043/sendence/quadruple.amd64           sendence-2.3.0-580-g5733702   6017bc5804ee        About a minute ago   2.402 MB
+docker.sendence.com:5043/sendence/market-spread.amd64       sendence-2.3.0-580-g5733702   93915c141be9        About a minute ago   2.804 MB
+docker.sendence.com:5043/sendence/avg-of-avgs.amd64         sendence-2.3.0-580-g5733702   872f875be656        About a minute ago   2.342 MB
+docker.sendence.com:5043/sendence/wesley-double.amd64       sendence-2.3.0-580-g5733702   f2e695fdca82        About a minute ago   697.9 kB
+docker.sendence.com:5043/sendence/state-avg-of-avgs.amd64   sendence-2.3.0-580-g5733702   8a973cba02ce        About a minute ago   2.376 MB
+docker.sendence.com:5043/sendence/wesley-identity.amd64     sendence-2.3.0-580-g5733702   ceccf7bc4629        About a minute ago   690.7 kB
+docker.sendence.com:5043/sendence/dagon.amd64               sendence-2.3.0-580-g5733702   496cc1f01563        About a minute ago   1.245 MB
+docker.sendence.com:5043/sendence/giles-receiver.amd64      sendence-2.3.0-580-g5733702   9c2c744ba15a        About a minute ago   1.025 MB
+docker.sendence.com:5043/sendence/giles-sender.amd64        sendence-2.3.0-580-g5733702   fd8276321b8f        About a minute ago   1.104 MB
 #+END_EXAMPLE
 
-The most recent tag is =sendence-2.3.0-597-g37b93d= in the example above.
+The most recent tag is =sendence-2.3.0-580-g5733702= in the example above.
 
 Edit file =buffy/dagon/docker-double-divide-aws-swarm.ini= file and
 update the docker.tag lines to the new tag published by the last
@@ -1627,7 +1628,7 @@ export DOCKER_HOST=tcp://10.0.79.127:2378
 
 Pull all images that you just published onto the Docker Swarm:
 #+BEGIN_SRC sh
-tbd
+docker pull docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-580-g5733702
 #+END_SRC
 
 Start Dagon on the Swarm:
@@ -1654,12 +1655,12 @@ docker --host=tcp://10.0.79.127:2378 run -u 0 \
  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/tmp  \
  -w /tmp  \
  --net=buffy-swarm \
- docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-597-g37b93d1 \
+ docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-580-g5733702 \
  dagon.amd64  --docker=tcp://10.0.79.127:2378  -t 10  \
  --filepath=/tmp/docker-double-divide-aws-swarm.ini  --phone-home=dagon:8080
 #+END_SRC
 
-** Instructions
+** Dipin's Instructions
 The following are the steps:
 1. create & configure cluster (with makefile)
 2. ssh into leader node
@@ -1711,5 +1712,116 @@ images like docker engine does.
 Step 10 has some placeholders in <> that need to be replaced for dagon
 to start in the right location using the right docker swarm instance.
 
+* Demo Quickstart
+** Cluster Boot
+Checkout the Buffy repository. If your AWS configurtion is up to date
+you can then just run the following commands.
+#+BEGIN_SRC sh
+cd buffy/orchestration/terraform
+make cluster mem_required=16 cpus_required=8 no_spot=true
+#+END_SRC
+
+Result:
+#+BEGIN_SRC sh
+PLAY RECAP *********************************************************************
+52.87.154.214              : ok=43   changed=23   unreachable=0    failed=0
+54.175.144.43              : ok=43   changed=23   unreachable=0    failed=0
+54.87.214.83               : ok=44   changed=23   unreachable=0    failed=0
+#+END_SRC
+
+Login to the leader node:
+#+BEGIN_SRC sh
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@54.87.214.83 
+#+END_SRC
+
+Create the Docker network:
+#+BEGIN_SRC sh
 
 
+#+END_SRC
+
+Get the internal IP address for the leader node:
+#+BEGIN_SRC sh
+ifconfig |grep -A 2 ens3
+#+END_SRC
+
+Result:
+#+BEGIN_EXAMPLE
+ens3      Link encap:Ethernet  HWaddr 06:7b:31:68:92:5b
+          inet addr:10.0.12.200  Bcast:10.0.31.255  Mask:255.255.224.0
+          inet6 addr: fe80::47b:31ff:fe68:925b/64 Scope:Link
+#+END_EXAMPLE
+
+Create the docker overlay network ((make sure to do this pointing to
+leader docker engine [port 2375] and NOT docker swarm [port 2378]):
+#+BEGIN_SRC sj
+docker network create -d overlay buffy-swarm
+docker network ls
+#+END_SRC
+
+Change the =DOCKER_HOST= variable to point to the Swarm:
+#+BEGIN_SRC sh
+export DOCKER_HOST=tcp://10.0.12.200:2378
+#+END_SRC
+
+Pull all images that you just published onto the Docker Swarm:
+#+BEGIN_SRC sh
+docker pull docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/word-count.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/dagon-child.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/double-divide.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/quadruple.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/market-spread.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/avg-of-avgs.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/wesley-double.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/state-avg-of-avgs.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/wesley-identity.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/giles-receiver.amd64:sendence-2.3.0-580-g5733702
+docker pull docker.sendence.com:5043/sendence/giles-sender.amd64:sendence-2.3.0-580-g5733702
+#+END_SRC
+
+** Copy configurations
+On your MacBook again upload the configuration the =/tmp= directory of
+the leader node:
+#+BEGIN_SRC sh
+cd buffy/dagon
+scp -i ~/.ssh/ec2/us-east-1.pem \
+ docker-double-divide-aws-swarm.ini \
+ ubuntu@54.87.214.83:/tmp
+scp -i ~/.ssh/ec2/us-east-1.pem \
+ count-to-hundred.txt\
+ ubuntu@54.87.214.83:/tmp
+#+END_SRC
+
+** Swarm Dagon Boot
+Boot Dagon on the Swarm. Make sure you use the internal VPC IP address
+of the leader node in the =--host= sections and the internal name in
+the =constraint= section of the command. You don't want to rely on
+name resolving when you boot a container image on one of the worker
+nodes.
+#+BEGIN_SRC sh
+docker --host=tcp://10.0.12.200:2378 run -u 0 \
+ --name dagon  -h dagon  --privileged  -i  -e LC_ALL=C.UTF-8 -e LANG=C.UTF-8 \
+ -e "constraint:node==ip-10-0-12-200" -v /usr/bin:/usr/bin:ro  \
+ -v /var/run/docker.sock:/var/run/docker.sock  -v /bin:/bin:ro  \
+ -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/tmp  \
+ -w /tmp  \
+ --net=buffy-swarm \
+ docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-580-g5733702 \
+ dagon.amd64  --docker=tcp://10.0.12.200:2378  -t 10  \
+ --filepath=/tmp/docker-double-divide-aws-swarm.ini  --phone-home=dagon:8080
+#+END_SRC
+
+** Leader Dagon Boot
+#+BEGIN_SRC sh
+docker --host=tcp://10.0.12.200:2375 run -u 0 \
+ --name dagon  -h dagon  --privileged  -i  -e LC_ALL=C.UTF-8 -e LANG=C.UTF-8 \
+ -e "constraint:node==ip-10-0-12-200" -v /usr/bin:/usr/bin:ro  \
+ -v /var/run/docker.sock:/var/run/docker.sock  -v /bin:/bin:ro  \
+ -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/tmp  \
+ -w /tmp  \
+ --net=buffy-swarm \
+ docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-580-g5733702 \
+ dagon.amd64  --docker=tcp://10.0.12.200:2375  -t 10  \
+ --filepath=/tmp/docker-double-divide-aws-swarm.ini  --phone-home=dagon:8080
+#+END_SRC
