@@ -13,7 +13,7 @@ no_burst ?= false## Don't use burstable instances (t1.*, t2.*) (for use_cheapest
 no_burst_arg :=# args for no-burst for cheapest instance script
 no_spot ?= false## Don't use spot pricing (for use_cheapest_instances=true)
 no_spot_arg :=# args for no-spot for cheapest instance script
-spot_bid_factor ?= 1.25## Percentage of maximum historical price to bid (automagically capped at instance on-demand price).
+spot_bid_factor ?= 1.25## Percentage of maximum historical price to bid (automagically capped at instance on-demand price) (for use_cheapest_instances=true)
 force_instance ?= ## Force a specific instance type (for use_cheapest_instances=true)
 ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
 num_leaders ?= 1## Number of leader nodes
@@ -260,7 +260,8 @@ acquire-lock: ## Acquire lock in order to safely run terraform commands on share
           terraform_locking --item-name terraform_lock --attributes \
           Name=lock,Value=`id -u -n`-`hostname`,Replace=true \
           --expected Name=lock,Value=free
-	aws sdb put-attributes --region us-east-1 --domain-name \
+       # next command is for when a previous make target failed without releasing a lock
+       aws sdb put-attributes --region us-east-1 --domain-name \
           terraform_locking --item-name terraform_lock --attributes \
           Name=lock,Value=`id -u -n`-`hostname`,Replace=true \
           --expected Name=lock,Value=`id -u -n`-`hostname`
@@ -307,6 +308,13 @@ release-lock: ## Release lock after safely running terraform commands on shared 
           terraform_locking --item-name terraform_lock --attributes \
           Name=lock,Value=free,Replace=true \
           --expected Name=lock,Value=`id -u -n`-`hostname`
+	@echo "\033[36m==> Lock successfully released!\033[0m"
+
+force-release-lock: ## Force release lock (NOTE: ONLY USE IN EMERGENCY ELSE IT COULD CORRUPT TERRAFORM CACHE!!!!)
+	@echo "\033[36m==> Forcing release of lock...\033[0m"
+	aws sdb put-attributes --region us-east-1 --domain-name \
+          terraform_locking --item-name terraform_lock --attributes \
+          Name=lock,Value=free,Replace=true
 	@echo "\033[36m==> Lock successfully released!\033[0m"
 
 help: ## Self-documenting help command
