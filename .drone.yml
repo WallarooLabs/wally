@@ -16,7 +16,7 @@ clone:
 build:
   # main build of buffy
   main_build:
-    image: sendence/ponyc:sendence-4.4.2-$$PONYC_CONFIG-$$PONYC_VERSION
+    image: sendence/ponyc:sendence-5.0.1-$$PONYC_CONFIG-$$PONYC_VERSION
     pull: true
     commands:
       - make clean arch=$$PONYC_VERSION in_docker=true
@@ -24,7 +24,7 @@ build:
 
   # run tests
   main_test:
-    image: sendence/$$PONYC_VERSION-python-runner:0.0.1
+    image: sendence/$$PONYC_VERSION-python-runner:0.0.2
     pull: true
     environment:
       - LC_ALL=C.UTF-8
@@ -34,7 +34,7 @@ build:
 
   # run dagon tests
   run_dagon_test:
-    image: sendence/$$PONYC_VERSION-python-runner:0.0.1
+    image: sendence/$$PONYC_VERSION-python-runner:0.0.2
     pull: true
     environment:
       - LC_ALL=C.UTF-8
@@ -45,7 +45,7 @@ build:
 
   # build docker images and test dagon
   build_docker_images_dagon_test:
-    image: sendence/docker-runner:0.0.1
+    image: sendence/docker-runner:0.0.2
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -64,7 +64,7 @@ build:
 
   # build and push final docker images on a push event
   build_docker_images_push:
-    image: sendence/docker-runner:0.0.1
+    image: sendence/docker-runner:0.0.2
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -85,7 +85,7 @@ build:
 
   # build and push final docker images on a tag event
   build_docker_images_tag:
-    image: sendence/docker-runner:0.0.1
+    image: sendence/docker-runner:0.0.2
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -136,7 +136,7 @@ build:
 
   # build monitoring hub ui docker images
   build_monitoring_hub_ui_docker_images:
-    image: sendence/docker-runner:0.0.1
+    image: sendence/docker-runner:0.0.2
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -154,7 +154,7 @@ build:
 
   # build and push final monitoring hub ui docker images on a push event
   build_monitoring_hub_ui_docker_images_push:
-    image: sendence/docker-runner:0.0.1
+    image: sendence/docker-runner:0.0.2
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -175,7 +175,7 @@ build:
 
   # build and push monitoring hub ui docker images on tag event
   build_monitoring_hub_ui_docker_images_tag:
-    image: sendence/docker-runner:0.0.1
+    image: sendence/docker-runner:0.0.2
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

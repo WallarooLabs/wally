@@ -1,7 +1,7 @@
 current_dir = $(shell pwd)
 latest_ponyc_tag = $(shell curl -s \
   https://hub.docker.com/r/sendence/ponyc/tags/ | grep -o \
-  'sendence-[0-9.-]*-release-' | sed 's/sendence-\([0-9.-]*\)-release-/\1/' \
+  'sendence-[0-9.-]*-' | sed 's/sendence-\([0-9.-]*\)-/\1/' \
   | sort -un | tail -n 1)# latest ponyc tag
 docker_image_version ?= $(shell git describe --tags --always)## Docker Image Tag to use
 docker_image_repo ?= docker.sendence.com:5043/sendence## Docker Repository to use
@@ -75,6 +75,7 @@ ifeq ($(in_docker),true)
         -L"/build/arm/ponyc/packages" \
         -Wl,--start-group \
         -l"rt" \
+        -l"pcre2-8" \
         -Wl,--end-group  \
         -lponyrt -lpthread -ldl -lm
     endef
@@ -90,26 +91,26 @@ else
       docker run --rm -it $(docker_user_arg) -v $(current_dir):$(current_dir) \
         -v ~/.gitconfig:/.gitconfig \
         -w $(current_dir)/$(1) --entrypoint stable \
-        $(ponyc_runner):$(ponyc_tag)-$(arch) fetch
+        $(ponyc_runner):$(ponyc_tag) fetch
       docker run --rm -it $(docker_user_arg) -v $(current_dir):$(current_dir) \
         -w $(current_dir)/$(1) --entrypoint stable \
-        $(ponyc_runner):$(ponyc_tag)-$(arch) env ponyc $(debug_arg) .
+        $(ponyc_runner):$(ponyc_tag) env ponyc $(debug_arg) .
     endef
   else ifeq ($(arch),armhf)
     define PONYC
       docker run --rm -it $(docker_user_arg) \
         -v ~/.gitconfig:/.gitconfig -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
-        --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
+        --entrypoint stable $(ponyc_runner):$(ponyc_tag) \
         fetch
       docker run --rm -it $(docker_user_arg) -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
-        --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
+        --entrypoint stable $(ponyc_runner):$(ponyc_tag) \
         env ponyc $(debug_arg) --triple arm-unknown-linux-gnueabihf -robj .
       docker run --rm -it $(docker_user_arg) -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
         --entrypoint arm-linux-gnueabihf-gcc \
-        $(ponyc_runner):$(ponyc_tag)-$(arch) \
+        $(ponyc_runner):$(ponyc_tag) \
         -o `basename $(current_dir)/$(1)` \
         -O3 -march=armv7-a -flto -fuse-linker-plugin \
         -fuse-ld=gold \
@@ -120,6 +121,7 @@ else
         -L"/build/arm/ponyc/packages" \
         -Wl,--start-group \
         -l"rt" \
+        -l"pcre2-8" \
         -Wl,--end-group  \
         -lponyrt -lpthread -ldl -lm
     endef
