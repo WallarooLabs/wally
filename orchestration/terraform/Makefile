@@ -13,7 +13,7 @@ no_burst ?= false## Don't use burstable instances (t1.*, t2.*) (for use_cheapest
 no_burst_arg :=# args for no-burst for cheapest instance script
 no_spot ?= false## Don't use spot pricing (for use_cheapest_instances=true)
 no_spot_arg :=# args for no-spot for cheapest instance script
-spot_bid_factor ?= 1.25## Percentage of maximum historical price to bid (automagically capped at instance on-demand price).
+spot_bid_factor ?= 1.25## Percentage of maximum historical price to bid (automagically capped at instance on-demand price) (for use_cheapest_instances=true)
 force_instance ?= ## Force a specific instance type (for use_cheapest_instances=true)
 ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
 num_leaders ?= 1## Number of leader nodes
