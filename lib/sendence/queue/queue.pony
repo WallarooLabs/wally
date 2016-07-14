@@ -126,6 +126,8 @@ class Queue[A: Any #alias]
     The queue is returned to allow call chaining.
     """
     _size = 0
+    _front_ptr = 0
+    _back_ptr = 0
     this
 
   fun contains(a: A!, pred: {(box->A!, box->A!): Bool} val =
