@@ -89,7 +89,7 @@ class WordCountTotals
   let words: Map[String, U64] = Map[String, U64]
 
   fun ref apply(value: WordCount val): WordCount val =>
-    words.modify(value.word, value.count, 
+    words.upsert(value.word, value.count, 
       lambda(x1: U64, x2: U64): U64 => x1 + x2 end)
     try
       WordCount(value.word, words(value.word))
