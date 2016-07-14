@@ -11,7 +11,7 @@
   - name: Create a group of all leaders for buffy
     group_by: key=buffy-leaders
   - name: Set IPs for ptpd unicast
-    set_fact: ptpd_destinations="{% if 'buffy-followers' in group_names %}{% for host in groups['buffy-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}{% else %}127.0.0.1{% endif %}"
+    set_fact: ptpd_destinations="{% if groups['buffy-followers'] is defined %}{% for host in groups['buffy-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}{% else %}127.0.0.1{% endif %}"
 
 - hosts: buffy-leaders:buffy-followers
   tasks:
