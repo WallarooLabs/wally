@@ -88,7 +88,13 @@ actor Main
 
         end
       else
-        env.err.print("FUBAR! FUBAR!")
+        env.err.print(
+          """
+          --phone-home/-p <address> [Sets the address for phone home]
+          --name/-n <name> [Name of giles-receiver node]
+          --listen/-l <address> [Address giles-receiver node is listening on]
+          --expect/-e <number> [Number of messages to process before terminating]
+          """)
       end
     end
 
