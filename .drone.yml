@@ -24,23 +24,21 @@ build:
 
   # run tests
   main_test:
-    image: sendence/$$PONYC_VERSION-python-runner:0.0.3
+    image: sendence/$$PONYC_VERSION-python-runner:0.0.4
     pull: true
     environment:
       - LC_ALL=C.UTF-8
       - LANG=C.UTF-8
-      - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
     commands:
       - make test
 
   # run dagon tests
   run_dagon_test:
-    image: sendence/$$PONYC_VERSION-python-runner:0.0.3
+    image: sendence/$$PONYC_VERSION-python-runner:0.0.4
     pull: true
     environment:
       - LC_ALL=C.UTF-8
       - LANG=C.UTF-8
-      - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
     commands:
       - chrt -f 80 make dagon-test arch=$$PONYC_VERSION
     privileged: true
