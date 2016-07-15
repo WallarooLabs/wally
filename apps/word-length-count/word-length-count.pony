@@ -5,18 +5,19 @@ use "buffy/topology"
 use "buffy/topology/external"
 
 actor Main
+  """
+  Instructions for running:
+  1. Update config: ./apps/word-length-count/word-length-count-java.ini 
+    to match your environment
+  2. Build pony: make build-buffy-components && make build-word-length-count && make build-wesley 
+  3. Build java: cd ./external-lang-api/java/ && mvn clean install && cd - & cd ./apps/word-length-count/ && mvn clean package && cd -
+  4. Run: make dagon-word-length-count
+  """
   new create(env: Env) =>
-    // TODO: how are buffy topologies built? are they built on every single
-    // node even if some of the steps will only be in some of the nodes?
-    // what happens when the external process is only on some of the nodes?
-    // atm, all nodes need to be identical
     try
-      // TODO: current buffy (buffy, not giles/dagon) does not support 
-      // configuration of its steps via config files or some other form, 
-      // so doing it this way, not sure whether this is a good idea
-      let jvmConfig = JVMConfigBuilder.from_ini(env, 
+      let jvmConfig = JVMConfigBuilder.uberjar_from_ini(env, 
         "./apps/word-length-count/word-length-count-java.ini"
-        ).asExternalProcessConfig()
+        )
       let topology = recover val
         Topology
           .new_pipeline[String, String](P, S, recover [0] end, "word-length-count")

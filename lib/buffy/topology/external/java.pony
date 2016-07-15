@@ -18,68 +18,88 @@ class JavaLengthEncoder is ByteLengthEncoder
   fun msg_size(header: Array[U8] val): USize val ? =>
     ReadBuffer.create().append(header).i32_be().usize()
 
-class JVMConfigBuilder
-  """
-  Currently supports use of a single java main class as an external process,
-  along with all its dependencies provided via a specifiable classpath. 
+primitive JVMConfigBuilder
+  fun class_from_ini(env: Env,
+    ini_file: String): ExternalProcessConfig val ? =>
+    """
+    Reads the following fields from an INI under [java] section:
+      - java_home (required)
+      - main_class (required)
+      - class_path (required) that has main_class in it
+      - java_opts (optional)
+    """
+    let file = File(FilePath(env.root as AmbientAuth, ini_file))
+    let sections = IniParse(file.lines())
 
-  TODO: Should also support jar files, including uberjars w/ their own 
-  manifests so the main class need not be specified.
-  """
+    let java_home: String = sections("java")("java_home")
+    let main_class: String = sections("java")("main_class")
+    let classpath: String = sections("java")("class_path")
+    let java_opts: (String | None) = 
+      try sections("java")("java_opts") else None end
 
-  let _env: Env
-  let _main_class: String
-  let _classpath: String
-  let _java_home: String
-  let _java_opts: String
+    ExternalProcessConfig(
+      _java_process_path(env, java_home), 
+      _java_process_args(where 
+        main_class = main_class, 
+        java_opts = java_opts), 
+      _environment_variables(java_home, classpath))
 
-  new val create(env: Env,
-                 main_class: String val, 
-                 classpath: String val,
-                 java_home: String val, 
-                 java_opts: String val) =>
-    _env = env
-    _main_class = main_class
-    _classpath = classpath
-    _java_home = java_home
-    _java_opts = java_opts
+  fun uberjar_from_ini(env: Env,
+    ini_file: String): ExternalProcessConfig val ? =>
+    """
+    Reads the following fields from an INI under [java] section:
+      - java_home (required)
+      - uber_jar (required) for all inclusive jar with manifest w/ main class
+      - class_path (optional) for additional library
+      - java_opts (optional)
+    """
+    let file = File(FilePath(env.root as AmbientAuth, ini_file))
+    let sections = IniParse(file.lines())
 
-  new val from_ini(env: Env,
-                   ini_file': String) ? =>
-    _env = env
+    let java_home: String = sections("java")("java_home")
+    let uber_jar: (String | None) = sections("java")("uber_jar")
+    let classpath: (String | None) = 
+      try sections("java")("class_path") else None end
+    let java_opts: (String | None) = 
+      try sections("java")("java_opts") else None end
 
-    let ini_file = File(FilePath(env.root as AmbientAuth, ini_file'))
-    let sections = IniParse(ini_file.lines())
+    ExternalProcessConfig(
+      _java_process_path(env, java_home), 
+      _java_process_args(where 
+        uber_jar = uber_jar, 
+        java_opts = java_opts), 
+      _environment_variables(java_home, classpath))
 
-    _main_class = sections("java")("main_class")
-    _classpath = sections("java")("class_path")
-    _java_home = sections("java")("java_home")
-    _java_opts = sections("java")("java_opts")
 
-    env.out.print("Using: ")
-    env.out.print(" java_home: " + _java_home)
-    env.out.print(" class_path: " + _classpath)
-    env.out.print(" main_class: " + _main_class)
-    env.out.print(" java_opts: " + _java_opts)
+  fun _java_process_path(env: Env, java_home: String): FilePath ? =>
+    FilePath(env.root as AmbientAuth, java_home + "/bin/java")
 
-  fun asExternalProcessConfig(): ExternalProcessConfig val ? =>
-    ExternalProcessConfig(_java_process_path(), 
-      _java_process_args(), 
-      _environment_variables())
-
-  fun _java_process_path(): FilePath ? =>
-    FilePath(_env.root as AmbientAuth, _java_home + "/bin/java")
-
-  fun _java_process_args(): Array[String] val =>
-    let args: Array[String] iso = recover Array[String](3) end
+  fun _java_process_args(main_class: (String | None) = None, 
+                         java_opts: (String | None) = None,
+                         uber_jar: (String | None) = None): 
+  Array[String] val =>
+    let args: Array[String] iso = recover Array[String]() end
     args.push("java")
-    args.push(_java_opts)
-    args.push(_main_class)
+    match java_opts
+    | let value: String => args.push(value)
+    end
+    match main_class
+    | let value: String => args.push(value)
+    end
+    match uber_jar
+    | let value: String => 
+      args.push("-jar")
+      args.push(value)
+    end
     consume args
 
-  fun _environment_variables(): Array[String] val => 
-    let vars: Array[String] iso = recover Array[String](3) end
-    vars.push("JAVA_HOME=" + _java_home)
-    vars.push("PATH=" + _java_home + "/bin")
-    vars.push("CLASSPATH=" + _classpath)
+  fun _environment_variables(java_home: String, 
+                             classpath: (String | None)): Array[String] val => 
+    let vars: Array[String] iso = recover Array[String]() end
+    vars.push("JAVA_HOME=" + java_home)
+    vars.push("PATH=" + java_home + "/bin")
+    match classpath
+    | let value: String => 
+      vars.push("CLASSPATH=" + value)
+    end
     consume vars
