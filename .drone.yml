@@ -29,6 +29,7 @@ build:
     environment:
       - LC_ALL=C.UTF-8
       - LANG=C.UTF-8
+      - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
     commands:
       - make test
 
@@ -39,6 +40,7 @@ build:
     environment:
       - LC_ALL=C.UTF-8
       - LANG=C.UTF-8
+      - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
     commands:
       - chrt -f 80 make dagon-test arch=$$PONYC_VERSION
     privileged: true
