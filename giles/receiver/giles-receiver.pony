@@ -25,6 +25,7 @@ actor Main
       var p_arg: (Array[String] | None) = None
       var l_arg: (Array[String] | None) = None
       var n_arg: (String | None) = None
+      var e_arg: (USize | None) = None
 
       try
         var options = Options(env)
@@ -33,12 +34,14 @@ actor Main
           .add("phone-home", "d", StringArgument)
           .add("name", "n", StringArgument)
           .add("listen", "l", StringArgument)
+          .add("expect", "e", I64Argument)
 
         for option in options do
           match option
           | ("name", let arg: String) => n_arg = arg
           | ("phone-home", let arg: String) => p_arg = arg.split(":")
           | ("listen", let arg: String) => l_arg = arg.split(":")
+          | ("expect", let arg: I64) => e_arg = arg.usize()
           end
         end
 
@@ -79,7 +82,7 @@ actor Main
 
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
-            FromBuffyListenerNotify(coordinator, store, env.err),
+            FromBuffyListenerNotify(coordinator, store, env.err, e_arg),
             listener_addr(0),
             listener_addr(1))
 
@@ -93,13 +96,15 @@ class FromBuffyListenerNotify is TCPListenNotify
   let _coordinator: Coordinator
   let _store: Store
   let _stderr: StdStream
+  let _expected: (USize | None)
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream)
+    store: Store, stderr: StdStream, expected: (USize | None) = None)
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
+    _expected = expected
 
   fun ref not_listening(listen: TCPListener ref) =>
     _coordinator.from_buffy_listener(listen, Failed)
@@ -108,7 +113,7 @@ class FromBuffyListenerNotify is TCPListenNotify
     _coordinator.from_buffy_listener(listen, Ready)
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    FromBuffyNotify(_coordinator, _store, _stderr)
+    FromBuffyNotify(_coordinator, _store, _stderr, _expected)
 
 class FromBuffyNotify is TCPConnectionNotify
   let _coordinator: Coordinator
@@ -116,20 +121,32 @@ class FromBuffyNotify is TCPConnectionNotify
   let _stderr: StdStream
   var _header: Bool = true
   var _count: USize = 0
+  var _remaining: USize = 0
+  var _expect_termination: Bool = false
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream)
+    store: Store, stderr: StdStream, expected: (USize | None) = None)
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
+    try
+      if (expected as USize) > 0
+      then
+        _remaining = expected as USize
+        _expect_termination = true
+      end
+    end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     if _header then
       try
         _count = _count + 1
-        if (_count % 100_000) == 0 then 
+        if (_count % 100_000) == 0 then
           @printf[I32]("%zu received\n".cstring(), _count)
+        end
+        if _expect_termination
+          then _remaining = _remaining - 1
         end
 
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
@@ -140,9 +157,15 @@ class FromBuffyNotify is TCPConnectionNotify
       end
     else
       _store.received(consume data, Time.wall_to_nanos(Time.now()))
-
-      conn.expect(4)
-      _header = true
+      if _expect_termination and (_remaining <= 0)
+       then
+        _stderr.print(_count.string() + " expected messages received. " +
+          "Terminating...")
+        _coordinator.finished()
+      else
+        conn.expect(4)
+        _header = true
+      end
     end
 
   fun ref accepted(conn: TCPConnection ref) =>
