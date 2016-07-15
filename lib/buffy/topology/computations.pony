@@ -1,4 +1,5 @@
 use "buffy/messages"
+use "buffy/topology/external"
 use "collections"
 
 interface Computation[In, Out]
@@ -73,6 +74,12 @@ interface MapComputationBuilder[In, Out]
 interface StateComputationBuilder[In: Any val, Out: Any val,
   State: Any #read]
   fun apply(): StateComputation[Out, State] iso^
+
+trait ExternalProcessBuilder[In: Any val, Out: Any val]
+  fun config(): ExternalProcessConfig val
+  fun codec(): ExternalProcessCodec[In, Out] val
+  fun length_encoder(): ByteLengthEncoder val
+  fun name(): String val
 
 interface Parser[Out]
   fun apply(s: String): (Out | None) ?

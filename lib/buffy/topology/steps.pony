@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "sendence/messages"
 use "sendence/guid"
 use "sendence/epoch"
+use "sendence/queue"
 use "debug"
 
 trait BasicStep
@@ -125,6 +126,27 @@ actor Source[Out: Any val] is ThroughStep[String, Out]
         end
       else
         @printf[I32]("Could not process incoming Message at source\n".cstring())
+      end
+    end
+
+actor PassThrough is BasicOutputStep
+  var _output: (BasicStep tag | None) = None
+  let _initial_queue: Queue[StepMessage val] = Queue[StepMessage val]
+
+  be add_output(to: BasicStep tag) =>
+    _output = to
+    for idx in Range(0, _initial_queue.size()) do
+      try to(_initial_queue.dequeue()) end
+    end
+
+  be apply(input: StepMessage val) =>
+    match _output
+    | let s: BasicStep tag => s(input)
+    else
+      try 
+        _initial_queue.enqueue(input) 
+      else
+        @printf[I32]("Could not enqueue input at passthrough!\n".cstring())
       end
     end
 

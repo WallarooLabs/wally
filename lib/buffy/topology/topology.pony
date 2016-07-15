@@ -125,6 +125,14 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
+  fun ref to_external[Next: Any val](
+    ext_builder: ExternalProcessBuilder[Last, Next] val, id: U64 = 0)
+      : PipelineBuilder[In, Out, Next] =>
+    let next_builder = ExternalProcessStepBuilder[Last, Next](ext_builder)
+    let next_step = PipelineThroughStep[Last, Next](next_builder, id)
+    _p.add_step(next_step)
+    PipelineBuilder[In, Out, Next](_t, _p)
+
   fun ref build(): Topology ? =>
     _t.add_pipeline(_p as PipelineSteps)
     _t

@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "buffy/topology"
 use "net"
 use "buffy/sink-node"
+use "regex"
 
 actor Main
   new create(env: Env) =>
@@ -40,23 +41,25 @@ actor Main
     end
 
 class Split is MapComputation[String, WordCount val]
-  let punctuation: String = """!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
-
   fun name(): String => "split"
   fun apply(d: String): Seq[WordCount val] =>
     let counts: Array[WordCount val] iso = recover Array[WordCount val] end
-    for word in d.split(" ").values() do
-      let next = _clean(word)
+    let updated_d = try
+      let r = Regex("[\\W_]+")
+      r.replace(d, " " where global = true)
+    else
+      d
+    end
+    for word in updated_d.split(" ").values() do
+      let next = _lower(word)
       if next.size() > 0 then
         counts.push(WordCount(next, 1))
       end
     end
     consume counts
 
-  fun _clean(s: String): String =>
-    let clone: String iso = recover s.clone() end
-    let punc = punctuation
-    recover clone.lower().strip(punc) end
+  fun _lower(s: String): String =>
+    recover s.lower() end
 
 class GenerateCount is Computation[WordCount val, Count val]
   fun name(): String => "count"
@@ -86,7 +89,7 @@ class WordCountTotals
   let words: Map[String, U64] = Map[String, U64]
 
   fun ref apply(value: WordCount val): WordCount val =>
-    words.modify(value.word, value.count, 
+    words.upsert(value.word, value.count, 
       lambda(x1: U64, x2: U64): U64 => x1 + x2 end)
     try
       WordCount(value.word, words(value.word))

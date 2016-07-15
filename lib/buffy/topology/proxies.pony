@@ -49,6 +49,14 @@ actor StepManager
       _env.out.print("StepManager: Could not forward message")
     end
 
+  be passthrough_to_step(step_id: U64, passthrough: BasicOutputStep tag) =>
+    try
+      let step = _steps(step_id)    
+      passthrough.add_output(step)
+    else
+      _env.err.print("StepManager: Error setting up passthrough.")
+    end
+
   be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
     let step = step_builder()
     match step

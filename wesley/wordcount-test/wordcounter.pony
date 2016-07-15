@@ -1,5 +1,6 @@
 use ".."
 use "collections"
+use "regex"
 
 class WordCounter is CanonicalForm
   let counts: Map[String, U64] = Map[String,U64]()
@@ -15,13 +16,19 @@ class WordCounter is CanonicalForm
 
   fun ref update_from_string(s: String) =>
     for line in s.split("\n").values() do
-      for word in line.split(" ").values() do
+      let updated_line = try
+        let r = Regex("[\\W_]+")
+        r.replace(line, " " where global = true)
+      else
+        line
+      end
+      for word in updated_line.split(" ").values() do
         _increment_word(word)
       end
     end
 
   fun ref _increment_word(word': String) =>
-    let word = clean(word')
+    let word = lower(word')
     if word == "" then return end
     try
       counts(word) = counts(word) + 1
@@ -56,6 +63,9 @@ class WordCounter is CanonicalForm
     """Strip characters based on a rule."""
     let charset = _punctuation
     recover val s.clone().lower().lstrip(charset).rstrip(charset) end
+
+  fun lower(s: String): String =>
+    recover s.lower() end
 
   fun string(): String =>
     """Return the string representation of the map"""

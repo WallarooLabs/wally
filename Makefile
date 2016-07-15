@@ -1,7 +1,7 @@
 current_dir = $(shell pwd)
 latest_ponyc_tag = $(shell curl -s \
   https://hub.docker.com/r/sendence/ponyc/tags/ | grep -o \
-  'sendence-[0-9.-]*-release-' | sed 's/sendence-\([0-9.-]*\)-release-/\1/' \
+  'sendence-[0-9.-]*-' | sed 's/sendence-\([0-9.-]*\)-/\1/' \
   | sort -un | tail -n 1)# latest ponyc tag
 docker_image_version ?= $(shell git describe --tags --always)## Docker Image Tag to use
 docker_image_repo ?= docker.sendence.com:5043/sendence## Docker Repository to use
@@ -75,6 +75,7 @@ ifeq ($(in_docker),true)
         -L"/build/arm/ponyc/packages" \
         -Wl,--start-group \
         -l"rt" \
+        -l"pcre2-8" \
         -Wl,--end-group  \
         -lponyrt -lpthread -ldl -lm
     endef
@@ -90,26 +91,26 @@ else
       docker run --rm -it $(docker_user_arg) -v $(current_dir):$(current_dir) \
         -v ~/.gitconfig:/.gitconfig \
         -w $(current_dir)/$(1) --entrypoint stable \
-        $(ponyc_runner):$(ponyc_tag)-$(arch) fetch
+        $(ponyc_runner):$(ponyc_tag) fetch
       docker run --rm -it $(docker_user_arg) -v $(current_dir):$(current_dir) \
         -w $(current_dir)/$(1) --entrypoint stable \
-        $(ponyc_runner):$(ponyc_tag)-$(arch) env ponyc $(debug_arg) .
+        $(ponyc_runner):$(ponyc_tag) env ponyc $(debug_arg) .
     endef
   else ifeq ($(arch),armhf)
     define PONYC
       docker run --rm -it $(docker_user_arg) \
         -v ~/.gitconfig:/.gitconfig -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
-        --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
+        --entrypoint stable $(ponyc_runner):$(ponyc_tag) \
         fetch
       docker run --rm -it $(docker_user_arg) -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
-        --entrypoint stable $(ponyc_runner):$(ponyc_tag)-$(arch) \
+        --entrypoint stable $(ponyc_runner):$(ponyc_tag) \
         env ponyc $(debug_arg) --triple arm-unknown-linux-gnueabihf -robj .
       docker run --rm -it $(docker_user_arg) -v \
         $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
         --entrypoint arm-linux-gnueabihf-gcc \
-        $(ponyc_runner):$(ponyc_tag)-$(arch) \
+        $(ponyc_runner):$(ponyc_tag) \
         -o `basename $(current_dir)/$(1)` \
         -O3 -march=armv7-a -flto -fuse-linker-plugin \
         -fuse-ld=gold \
@@ -120,6 +121,7 @@ else
         -L"/build/arm/ponyc/packages" \
         -Wl,--start-group \
         -l"rt" \
+        -l"pcre2-8" \
         -Wl,--end-group  \
         -lponyrt -lpthread -ldl -lm
     endef
@@ -137,7 +139,7 @@ print-%  : ; @echo $* = $($*)
 
 build-buffy-components: build-receiver build-sender build-dagon build-dagon-child build-fallor
 
-build-apps: build-wesley build-double-divide build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count ## Build Pony based programs for Buffy
+build-apps: build-wesley build-double-divide build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count build-word-length-count ## Build Pony based programs for Buffy
 
 build: build-buffy-components build-apps build-wesley
 
@@ -165,6 +167,9 @@ build-market-spread: ## build market spread app
 build-word-count: ## build word count app
 	$(call PONYC,apps/word-count)
 
+build-word-length-count: ## build word length count app
+	$(call PONYC,apps/word-length-count)
+
 build-dagon: ## build dagon
 	$(call PONYC,dagon)
 
@@ -172,10 +177,31 @@ build-dagon-child: ## build dagon-child
 	$(call PONYC,dagon/dagon-child)
 
 build-wesley: ## Build wesley
+	$(call PONYC,wesley/word-length-count-test)
 	$(call PONYC,wesley/double-test)
 	$(call PONYC,wesley/identity-test)
 	$(call PONYC,wesley/wordcount-test)
 	$(call PONYC,wesley/market-spread-test)
+
+build-metrics-reporter-ui: ## Build Metrics Reporter UI
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix deps.clean --all
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix deps.get --only prod
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix compile
+	cd monitoring_hub/apps/metrics_reporter_ui && npm install
+	cd monitoring_hub/apps/metrics_reporter_ui && npm run build:production
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix phoenix.digest
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix release.clean
+	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix release
+
+build-market-spread-reports-ui: ## Build Market Spread Reports UI
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix deps.clean --all
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix deps.get --only prod
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix compile
+	cd monitoring_hub/apps/market_spread_reports_ui && npm install
+	cd monitoring_hub/apps/market_spread_reports_ui && npm run build:production
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix phoenix.digest
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix release.clean
+	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix release
 
 build-fallor: ## build fallor decoder
 	$(call PONYC,fallor)
@@ -200,13 +226,34 @@ test-market-spread: ## Test market-spread app
 test-word-count: ## Test word-count app
 	cd apps/word-count && ./word-count
 
+test-word-length-count: ## Test word-length-count app
+	cd apps/word-length-count && ./word-length-count
+
 test-giles-receiver: ## Test Giles Receiver
 	cd giles/receiver && ./receiver
 
 test-giles-sender: ## Test Giles Sender
 	cd giles/sender && ./sender
 
-dagon-test: dagon-identity dagon-word-count dagon-market-spread dagon-identity-drop #dagon-double ## Run dagon tests
+test-monitoring-hub: ## Test all Apps within the Monitoring Hub
+	cd monitoring_hub && mix deps.get && mix test
+
+test-monitoring-hub-utils: ## Test Monitoring Hub Utils
+	cd monitoring_hub/apps/monitoring_hub_utils && mix test
+
+test-mh-market-spread-reports: ## Test MH Market Spread Reports
+	cd monitoring_hub/apps/market_spread_reports && mix test
+
+test-mh-market-spread-reports-ui: ## Test MH Market Spread Reports UI
+	cd monitoring_hub/apps/market_spread_reports_ui && mix test
+
+test-mh-metrics-reporter: ## Test MH Metrics Reporter
+	cd monitoring_hub/apps/metrics_reporter && mix test
+
+test-mh-metrics-reporter-ui: ## Test MH Metrics Reporter UI
+	cd monitoring_hub/apps/metrics_reporter_ui && mix test
+
+dagon-test: dagon-identity dagon-word-count dagon-market-spread dagon-identity-drop #dagon-word-length-count #dagon-double ## Run dagon tests
 
 dagon-double: ## Run double test with dagon
 	dagon/dagon.py dagon/config/double.ini
@@ -242,7 +289,7 @@ dagon-word-count-7: ## Run 7 minute word count test with dagon
 	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
 
 dagon-word-count-7-single: ## Run 7 minute word count test with dagon
-	./dagon/dagon --timeout=3200 -f apps/word-count/7-min-run-single.ini -h 127.0.0.1:8080
+	./dagon/dagon --timeout=30 -f apps/word-count/7-min-run-single.ini -h 127.0.0.1:8080
 	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
 
 dagon-word-count-15: ## Run 15 minute word count test with dagon
@@ -260,6 +307,10 @@ dagon-word-count-60: ## Run word count test with dagon
 dagon-market-spread: ## Run market spread test with dagon
 	./dagon/dagon --timeout=25 -f apps/market-spread/market-spread.ini -h 127.0.0.1:8080
 	./wesley/market-spread-test/market-spread-test ./demos/marketspread/100nbbo.msg ./sent.txt ./received.txt match
+
+dagon-word-length-count: ## Run word length count test with dagon
+	./dagon/dagon --timeout=15 -f apps/word-length-count/word-length-count.ini -h 127.0.0.1:8080
+	./wesley/word-length-count-test/word-length-count-test ./sent.txt ./received.txt match
 
 dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
 
@@ -401,6 +452,29 @@ dangling := $(shell docker $(docker_host_arg) images -f "dangling=true" -q)
 tag := $(shell docker $(docker_host_arg) images | grep \
          "$(docker_image_version)" | awk -F " " '{print $$1 ":" $$2}')
 
+build-market-spread-reports-ui-docker:
+	docker $(docker_host_arg) build -t \
+		$(docker_image_repo)/monitoring_hub/apps/market_spread_reports_ui.$(arch):$(docker_image_version) \
+		monitoring_hub/apps/market_spread_reports_ui
+
+build-metrics-reporter-ui-docker:
+	docker $(docker_host_arg) build -t \
+		$(docker_image_repo)/monitoring_hub/apps/metrics_reporter_ui.$(arch):$(docker_image_version) \
+		monitoring_hub/apps/metrics_reporter_ui
+
+push-monitoring-hub-ui-docker: build-market-spread-reports-ui-docker build-metrics-reporter-ui-docker ## Push docker images for Market Spread Reports UI to repository
+	docker $(docker_host_arg) push \
+		$(docker_image_repo)/monitoring_hub/apps/market_spread_reports_ui.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+		$(docker_image_repo)/monitoring_hub/apps/metrics_reporter_ui.$(arch):$(docker_image_version)
+exited := $(shell docker $(docker_host_arg) ps -a -q -f status=exited)
+untagged := $(shell (docker $(docker_host_arg) images | grep "^<none>" | awk \
+              -F " " '{print $$3}'))
+dangling := $(shell docker $(docker_host_arg) images -f "dangling=true" -q)
+tag := $(shell docker $(docker_host_arg) images | grep \
+         "$(docker_image_version)" | awk -F " " '{print $$1 ":" $$2}')
+
+
 clean-docker: ## cleanup docker images and containers
 ifneq ($(strip $(exited)),)
 	@echo "Cleaning exited containers: $(exited)"
@@ -432,7 +506,10 @@ clean: clean-docker ## Cleanup docker images, deps and compiled files for Buffy
 	rm -f apps/quadruple/quadruple apps/quadruple/quadruple.o
 	rm -f apps/market-spread/market-spread apps/market-spread/market-spread.o
 	rm -f apps/word-count/word-count apps/word-count/word-count.o
+	rm -f apps/word-length-count/word-length-count apps/word-length-count/word-length-count.o apps/word-length-count/*.class
 	rm -f dagon/dagon-child/dagon-child dagon/dagon-child/dagon-child.o
+	rm -rf monitoring_hub/apps/metrics_reporter_ui/rel/metrics_reporter_ui/
+	rm -rf monitoring_hub/apps/market_spread_reports_ui/rel/market_spread_reports_ui/
 	@echo 'Done cleaning.'
 
 help:
@@ -454,4 +531,3 @@ help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk \
           'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", \
           $$1, $$2}'
-

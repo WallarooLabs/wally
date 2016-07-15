@@ -50,6 +50,8 @@ class SourceConnectNotify is TCPConnectionNotify
   let _metrics_collector: MetricsCollector
   let _coordinator: Coordinator
   var _header: Bool = true
+  var _source_initialized: Bool = false
+  var _source_step: BasicOutputStep tag = PassThrough
 
   new iso create(env: Env, source_id: U64,
     step_manager: StepManager, coordinator: Coordinator,
@@ -91,7 +93,14 @@ class SourceConnectNotify is TCPConnectionNotify
           let now = Epoch.nanoseconds()
           let new_msg: Message[String] val = Message[String](
             _guid_gen(), now, now, m.data)
-          _step_manager(_source_id, new_msg)
+          if _source_initialized then
+            _source_step(new_msg)
+          else
+            _step_manager.passthrough_to_step(_source_id, 
+              _source_step)
+            _source_step(new_msg)
+            _source_initialized = true
+          end
         else
           _env.err.print("Source " + _source_id.string()
             + ": decoded message wasn't external.")
