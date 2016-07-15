@@ -37,6 +37,7 @@ actor Main
     """
     var required_args_are_present = true
     var docker_host: (String | None) = None
+    var docker_tag: (String | None) = None
     var use_docker: Bool = false
     var timeout: (I64 | None) = None
     var path: (String | None) = None
@@ -47,19 +48,24 @@ actor Main
     var options = Options(env)
     options
     .add("docker", "d", StringArgument)
+    .add("tag", "T", StringArgument)
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
     for option in options do
       match option
       | ("docker", let arg: String) => docker_host = arg
+      | ("tag", let arg: String) => docker_tag = arg
       | ("timeout", let arg: I64) => timeout = arg
       | ("filepath", let arg: String) => path = arg
       | ("phone-home", let arg: String) => p_arg = arg.split(":")
       else
         env.err.print("dagon: unknown argument")
-        env.err.print("dagon: usage: [--docker=<host:port>] --timeout=<seconds>" +
-        " --filepath=<path> --phone-home=<host:port>")
+        env.err.print("dagon: usage: [--docker=<host:port>" +
+        " --tag=<tag>]" +
+        " --timeout=<seconds>" +
+        " --filepath=<path>" +
+        " --phone-home=<host:port>")
       end
     end
 
@@ -70,6 +76,16 @@ actor Main
       else
         env.out.print("dagon: no DOCKER_HOST defined, using processes.")
         docker_host = ""
+      end
+
+      if docker_tag isnt None then
+        env.out.print("dagon: docker_tag: " + (docker_tag as String))
+      else
+        docker_tag = ""
+        if use_docker then
+          env.err.print("dagon: Must supply required '--tag' argument")
+          required_args_are_present = false
+        end
       end
       
       if timeout is None then
@@ -107,8 +123,9 @@ actor Main
 
       env.out.print("dagon: host: " + phone_home_host)
       env.out.print("dagon: service: " + phone_home_service)
-      ProcessManager(env, use_docker, docker_host as String, timeout as I64,
-        path as String, phone_home_host, phone_home_service)
+      ProcessManager(env, use_docker, docker_host as String,
+        docker_tag as String, timeout as I64, path as String,
+        phone_home_host, phone_home_service)
     else
       env.err.print("dagon: error parsing arguments")
     end
@@ -237,6 +254,7 @@ actor ProcessManager
   let _env: Env
   let _use_docker: Bool
   let _docker_host: String
+  let _docker_tag: String
   let _timeout: I64
   let _path: String
   let _host: String
@@ -255,12 +273,14 @@ actor ProcessManager
   let _docker_postfix: String
   
   new create(env: Env, use_docker: Bool, docker_host: String,
+    docker_tag: String,
     timeout: I64, path: String,
     host: String, service: String)
   =>
     _env = env
     _use_docker = use_docker
     _docker_host = docker_host
+    _docker_tag = docker_tag
     _timeout = timeout
     _path = path
     _host = host
@@ -431,7 +451,9 @@ actor ProcessManager
 
   fun ref _parse_node_section(sections: IniMap, section: String) =>
     """
-    Parse a node section and add node to appropriate map.
+    Parse a node section and add node to appropriate map. Use the
+    docker_tag set on the commandline as the default tag that can
+    be overridden in the configuration file.
     """
     _env.out.print("dagon: parse_node_section")
     let argsbuilder: Array[String] iso = recover Array[String](6) end    
@@ -446,6 +468,7 @@ actor ProcessManager
     var is_leader: Bool = false
     try
       for key in sections(section).keys() do
+        docker_tag = _docker_tag // set default tag
         match key
         | "docker.image" =>
           docker_image = sections(section)(key)
