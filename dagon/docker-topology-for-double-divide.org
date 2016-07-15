@@ -1825,3 +1825,63 @@ docker --host=tcp://10.0.12.200:2375 run -u 0 \
  dagon.amd64  --docker=tcp://10.0.12.200:2375  -t 10  \
  --filepath=/tmp/docker-double-divide-aws-swarm.ini  --phone-home=dagon:8080
 #+END_SRC
+
+* Dagon Docker with Docker VirtualBox
+For ease of testing you can run Dagon inside a container using the
+default VirtualBox VM that comes with the default Docker install.
+
+** Build
+#+BEGIN_SRC sh
+cd buffy
+make arch=amd64
+make arch=amd64 build-docker
+#+END_SRC
+
+** Prepare
+#+BEGIN_SRC sh
+docker images
+#+END_SRC
+Note down the tag of your most recent build. In our case that's
+=sendence-2.3.0-644-g18cccc6=.
+
+Get the address of your local Docker host.
+#+BEGIN_SRC sh
+docker-machine ls
+#+END_SRC
+
+Result:
+#+BEGIN_EXAMPLE
+NAME      ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER    ERRORS
+default   *        virtualbox   Running   tcp://192.168.99.100:2376           v1.11.2
+#+END_EXAMPLE
+
+Create the docker network.
+#+BEGIN_SRC sh
+docker network create buffy
+#+END_SRC
+
+** Run
+We are running all containers on our local Docker host VM. In this
+case we don't have to copy the configuration file. We can just mount
+the local directory and read the file from there. We will also mount
+the local directory that contains the pem file to enable TLS
+encryption for our connnection to the Docker host.
+#+BEGIN_SRC sh
+docker --host=tcp://192.168.99.100:2376 run -u 0 \
+ --name dagon  -h dagon \
+ --privileged  -i \
+ -e LC_ALL=C.UTF-8 -e LANG=C.UTF-8 \
+ -e "constraint:node==default" -v /usr/bin:/usr/bin:ro \
+ -v /var/run/docker.sock:/var/run/docker.sock  -v /bin:/bin:ro \
+ -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro \
+ -v /Users/fix/projects/Sendence/Buffy/dagon:/tmp \
+ -v /Users/fix/.docker/machine/machines/default/:/certs \
+ -w /tmp \
+ --net=buffy \
+ docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-644-g18cccc6 \
+ dagon.amd64  --docker=tcp://192.168.99.100:2376 \
+ --tag=sendence-2.3.0-644-g18cccc6 \
+ -t 10 \
+ --filepath=/tmp/docker-double-divide.ini \
+ --phone-home=dagon:8080
+#+END_SRC
