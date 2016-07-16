@@ -2,7 +2,7 @@
 
 - name: Install docker compose
   get_url: 
-     url: https://github.com/docker/compose/releases/download/1.6.2/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}
+     url: https://github.com/docker/compose/releases/download/1.7.1/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}
      dest: /usr/local/bin/docker-compose
      mode: 0755
   when: ('arm' != '{{ ansible_architecture[0:3] }}')

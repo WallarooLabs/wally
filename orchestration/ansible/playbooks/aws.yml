@@ -1,3 +1,11 @@
+# install python for full ansible support
+- hosts: tag_Project_buffy:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
+  gather_facts: False
+  tasks:
+  - name: install python for full ansible support
+    raw: apt-get install -y python
+    become: yes
+
 # create dynamic groups
 - hosts: tag_Project_buffy:&tag_Role_follower:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
   tasks:
@@ -6,12 +14,12 @@
 
 - hosts: tag_Project_buffy:&tag_Role_leader:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
   vars:
-    ethernet_interface: eth0
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
   tasks:
   - name: Create a group of all leaders for buffy
     group_by: key=buffy-leaders
   - name: Set IPs for ptpd unicast
-    set_fact: ptpd_destinations="{% for host in groups['buffy-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}"
+    set_fact: ptpd_destinations="{% if groups['buffy-followers'] is defined %}{% for host in groups['buffy-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}{% else %}127.0.0.1{% endif %}"
 
 - hosts: buffy-leaders:buffy-followers
   tasks:
@@ -28,7 +36,7 @@
   vars_files:
     - 'docker_creds.yml'
   vars:
-    ethernet_interface: eth0
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
     ptpd_role: master
     ptpd_transport: unicast
     swarm_image: swarm
@@ -43,7 +51,7 @@
   vars_files:
     - 'docker_creds.yml'
   vars:
-    ethernet_interface: eth0
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
     ptpd_role: slave
     ptpd_transport: unicast
     leader_ip: "{{ hostvars[groups['buffy-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"

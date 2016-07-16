@@ -1,19 +1,35 @@
 ansible_vault_password ?= ~/.ansible_vault_pass.txt## Ansible Vault password file
+ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
+num_leaders ?= 1## Number of leader nodes
+num_followers ?= 2## Number of follower nodes
+
+# set arguments for # of nodes
+num_leaders_arg := NUM_LEADERS=$(num_leaders)
+num_followers_arg := NUM_FOLLOWERS=$(num_followers)
+
+# set arguments for ansible parallelism
+ifeq ($(ansible_parallelism),default)
+  ansible_parallelism_arg := 
+else
+  ansible_parallelism_arg := --forks=$(ansible_parallelism)
+endif
 
 .PHONY: build configure
 
 default: build
 
-build: ## Run vagrant up step
-	vagrant up
+cluster: build configure ## Creates a cluster and configures it with Ansible
 
-destroy: ## Run vagrant destroy step
-	vagrant destroy -f
+build: ## Run vagrant up step to create a cluster
+	$(num_leaders_arg) $(num_followers_arg) vagrant up
+
+destroy: ## Run vagrant destroy step to destroy a cluster
+	$(num_leaders_arg) $(num_followers_arg) vagrant destroy -f
 
 configure: ## Configure nodes using ansible
 	@echo "\033[32m==> Running ansible playbook...\033[0m"
-	ansible-playbook --vault-password-file $(ansible_vault_password)\
-          -i ../ansible/vagrant.py \
+	$(num_leaders_arg) $(num_followers_arg) ansible-playbook --vault-password-file $(ansible_vault_password)\
+          $(ansible_parallelism_arg) -i ../ansible/vagrant.py \
           --ssh-common-args="-o StrictHostKeyChecking=no" \
           --extra-vars "cluster_name=$(cluster_name)" \
           ../ansible/playbooks/vagrant.yml
