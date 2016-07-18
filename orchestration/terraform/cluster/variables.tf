@@ -106,16 +106,16 @@ variable "follower_spot_price" {
 variable "instance_amis" {
   description = "AMI for all instances."
   default = {
-    sa-east-1 = "ami-a9e262c5"
-    us-west-1 = "ami-833c4be3"
-    us-west-2 = "ami-242fcb44"
-    us-east-1 = "ami-002f0f6a"
-    eu-west-1 = "ami-86f743f5"
-    ap-southeast-1 = "ami-8f804fec"
-    ap-southeast-2 = "ami-22715541"
-    eu-central-1 = "ami-60869f0c"
-    ap-northeast-1 = "ami-e16c558f"
-    ap-northeast-2 = "ami-232be54d"
+    sa-east-1 = "ami-78a93c14"
+    us-west-1 = "ami-b20542d2"
+    us-west-2 = "ami-b9ff39d9"
+    us-east-1 = "ami-ddf13fb0"
+    eu-west-1 = "ami-a4d44ed7"
+    ap-southeast-1 = "ami-fc37e59f"
+    ap-southeast-2 = "ami-a387afc0"
+    eu-central-1 = "ami-26e70c49"
+    ap-northeast-1 = "ami-b7d829d6"
+    ap-south-1 = "ami-7e94fe11"
   }
 }
 

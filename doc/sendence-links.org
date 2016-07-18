@@ -329,4 +329,9 @@
   - Video
   - Performance, Networking
   - https://www.infoq.com/presentations/sockets-nfv
-
+* How NOT to Measure Latency
+  - Gil Tene
+  - 2016
+  - Video
+  - Performance, Metrics
+  - https://www.infoq.com/presentations/latency-response-time

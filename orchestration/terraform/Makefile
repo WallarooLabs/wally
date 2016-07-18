@@ -7,14 +7,46 @@ terraform_args ?= ## Terraform arguments.
 use_placement_group ?= false## Whether to use placement group or not
 ansible_vault_password ?= ~/.ansible_vault_pass.txt## Ansible Vault password file
 use_cheapest_instances ?= true## Find cheapest instances to use (spot included); Will automagically use placement groups if applicable
-mem_required ?= 0.5## Minimum amount of memory in GB per instance
-cpus_required ?= 0.05## Minimum amount of CPUs per instance
+mem_required ?= 0.5## Minimum amount of memory in GB per instance (for use_cheapest_instances=true)
+cpus_required ?= 0.05## Minimum amount of CPUs per instance (for use_cheapest_instances=true)
+no_burst ?= false## Don't use burstable instances (t1.*, t2.*) (for use_cheapest_instances=true)
+no_burst_arg :=# args for no-burst for cheapest instance script
+no_spot ?= false## Don't use spot pricing (for use_cheapest_instances=true)
+no_spot_arg :=# args for no-spot for cheapest instance script
+spot_bid_factor ?= 1.25## Percentage of maximum historical price to bid (automagically capped at instance on-demand price) (for use_cheapest_instances=true)
+force_instance ?= ## Force a specific instance type (for use_cheapest_instances=true)
+ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
+num_leaders ?= 1## Number of leader nodes
+num_followers ?= 2## Number of follower nodes
+
+# set arguments for # of nodes
+num_leaders_arg := -var leader_default_nodes=$(num_leaders) -var \
+                   leader_max_nodes=$(num_leaders) -var \
+                   leader_min_nodes=$(num_leaders)
+num_followers_arg := -var follower_default_nodes=$(num_followers) -var \
+                   follower_max_nodes=$(num_followers) -var \
+                   follower_min_nodes=$(num_followers)
+
+# set arguments for ansible parallelism
+ifeq ($(ansible_parallelism),default)
+  ansible_parallelism_arg :=
+else
+  ansible_parallelism_arg := --forks=$(ansible_parallelism)
+endif
 
 # Do not change or remove. Used as part of the cheapest_instance logic
 define newline
 
 
 endef
+
+ifeq ($(no_burst),true)
+  no_burst_arg := --no-burst
+endif
+
+ifeq ($(no_spot),true)
+  no_spot_arg := --no-spot
+endif
 
 ifdef use_cheapest_instances
   ifeq (,$(filter $(use_cheapest_instances),false true))
@@ -99,7 +131,8 @@ terraform-plan: # actual terraform plan command
  in region '$(region)'...\033[0m"
 	cd cluster && terraform plan -var aws_key_name=$(region) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
-          aws_region=$(region) $(pg_arg) $(az_arg) $(ci_args)
+          aws_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
+          $(num_leaders_arg) $(num_followers_arg)
 	@echo "\033[36m==> Successfully ran terraform plan for cluster \
 '$(cluster_name)' in region '$(region)'!\033[0m"
 
@@ -108,7 +141,8 @@ terraform-apply: # actual terraform apply command
 '$(cluster_name)' in region '$(region)'...\033[0m"
 	cd cluster && terraform apply -var aws_key_name=$(region) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
-          aws_region=$(region) $(pg_arg) $(az_arg) $(ci_args)
+          aws_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
+          $(num_leaders_arg) $(num_followers_arg)
 	@echo "\033[36m==> Successfully ran terraform apply for cluster \
 '$(cluster_name)' in region '$(region)'!\033[0m"
 
@@ -135,7 +169,7 @@ configure: ## Configure nodes using ansible
           password file ($(ansible_vault_password)) is missing!))
 	@echo "\033[36m==> Running ansible playbook for cluster \
 '$(cluster_name)' in region '$(region)'...\033[0m"
-	ansible-playbook --vault-password-file $(ansible_vault_password) -i\
+	ansible-playbook $(ansible_parallelism_arg) --vault-password-file $(ansible_vault_password) -i\
           ../ansible/ec2.py --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
           aws_region=$(region)" -u ubuntu ../ansible/playbooks/aws.yml
@@ -167,13 +201,16 @@ setup_ci_arg: tmp_ci_args=$(if $(filter $(use_cheapest_instances),true),$(if \
        follower_instance_type=$(old_type) -var leader_spot_price=$(old_price) \
        -var follower_spot_price=$(old_price),$(shell\
        $(current_dir)/cheapest_instance.py --region $(region) --cpus \
-       $(cpus_required) --mem $(mem_required) --availability_zone \
-       "$(availability_zone)" )))
+       $(cpus_required) --mem $(mem_required) $(no_burst_arg) \
+       --spot-bid-factor $(spot_bid_factor) --availability_zone \
+       "$(availability_zone)" $(no_spot_arg) --instance_type "$(force_instance)")))
 setup_ci_arg: # set up cheapest instances arg
 	@echo $(if $(filter $(use_cheapest_instances),true),"\033[36m==> Using \
 automagic cheapest instance logic...\033[0m",\
           "\033[36m==> Not using automagic cheapest instance logic...\033[0m")
 	$(eval $(subst #,$(newline),$(tmp_ci_args)))
+	@echo $(if $(filter $(use_cheapest_instances),true), $(if \
+          $(ci_inst_type),,$(error Error running cheapest instance script!)))
 	@echo $(if $(filter $(use_cheapest_instances),true), $(if \
         $(ci_old_values), "\033[36m==> Re-using values from existing cluster \
 to not clobber it.\033[0m",),)
@@ -223,7 +260,8 @@ acquire-lock: ## Acquire lock in order to safely run terraform commands on share
           terraform_locking --item-name terraform_lock --attributes \
           Name=lock,Value=`id -u -n`-`hostname`,Replace=true \
           --expected Name=lock,Value=free
-	aws sdb put-attributes --region us-east-1 --domain-name \
+       # next command is for when a previous make target failed without releasing a lock
+       aws sdb put-attributes --region us-east-1 --domain-name \
           terraform_locking --item-name terraform_lock --attributes \
           Name=lock,Value=`id -u -n`-`hostname`,Replace=true \
           --expected Name=lock,Value=`id -u -n`-`hostname`
@@ -270,6 +308,13 @@ release-lock: ## Release lock after safely running terraform commands on shared 
           terraform_locking --item-name terraform_lock --attributes \
           Name=lock,Value=free,Replace=true \
           --expected Name=lock,Value=`id -u -n`-`hostname`
+	@echo "\033[36m==> Lock successfully released!\033[0m"
+
+force-release-lock: ## Force release lock (NOTE: ONLY USE IN EMERGENCY ELSE IT COULD CORRUPT TERRAFORM CACHE!!!!)
+	@echo "\033[36m==> Forcing release of lock...\033[0m"
+	aws sdb put-attributes --region us-east-1 --domain-name \
+          terraform_locking --item-name terraform_lock --attributes \
+          Name=lock,Value=free,Replace=true
 	@echo "\033[36m==> Lock successfully released!\033[0m"
 
 help: ## Self-documenting help command

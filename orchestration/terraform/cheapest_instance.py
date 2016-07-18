@@ -30,7 +30,7 @@ def get_instances_for_region(url, region):
   return json.loads(proc_out)
 
 # get an array of instances for a region
-def get_instances(region):
+def get_instances(region, burst):
   ci = get_instances_for_region(CURRENT_GEN_URL, args.region)
   pi = get_instances_for_region(PREVIOUS_GEN_URL, args.region)
   if ci is None:
@@ -40,6 +40,10 @@ def get_instances(region):
   for i in insts:
     if i['size'] in TINY_INSTS:
       i['vCPU'] = TINY_INSTS[i['size']]
+      if burst == True:
+        i['vCPU'] = TINY_INSTS[i['size']]
+      else:
+        i['vCPU'] = -1
   return insts
 
 # get spot price history for a region/AZ/instances and time range
@@ -84,9 +88,19 @@ parser.add_argument("--availability_zone"
                    , help="AWS Availability Zone to check prices for " + \
                      "(defaults to all in region).")
 parser.add_argument("--cpus", type=float, default=0.05
-                   , help="# of CPUs required in the instance.")
+                   , help="# of CPUs required in the instance. Default: 0.05")
 parser.add_argument("--mem", type=float, default=0.5
-                   , help="Amount of memory (in GB) required in the instance.")
+                   , help="Amount of memory (in GB) required in the instance. Default: 0.5")
+parser.add_argument("--no-burst", dest='burst', default=True, action="store_false" 
+                   , help="Don't use burstable instances (t1.*, t2.*).")
+parser.add_argument("--instance_type"
+                   , help="Specific instance type to use.")
+parser.add_argument("--no-spot", dest='spot', default=True, action="store_false" 
+                   , help="Don't use spot pricing.")
+parser.add_argument("--spot-bid-factor", type=float, default=1.25
+                   , help="Percentage of maximum historical price to bid" + \
+                    " (automagically capped at instance on-demand price). Default: 1.25")
+
 
 args = parser.parse_args()
 
@@ -104,7 +118,7 @@ if args.availability_zone:
 
 
 # get all instances for region
-instances = get_instances(args.region)
+instances = get_instances(args.region, args.burst)
 
 valid_instances = []
 
@@ -112,25 +126,34 @@ valid_instances = []
 for i in instances:
   if float(i['vCPU']) >= args.cpus and float(i['memoryGiB']) >= args.mem \
   and i['size'] not in PV_INSTS:
-    valid_instances.append(i['size'])
+    if not args.instance_type:
+      valid_instances.append(i['size'])
+    elif i['size'] == args.instance_type:
+      valid_instances.append(i['size'])
+
+if len(valid_instances) == 0:
+  sys.stderr.write(
+    "No valid instances available for requested constraints!\n" )
+  sys.exit(1)
 
 
 cheapest_instance = { 'Price': 9999, 'InstanceType': "INVALID"
                     , 'AvailabilityZone': "INVALID", 'Spot': "UNKNOWN"
                     , 'PlacementGroup': False, 'CurrentPrice': 9999 }
 
-# get current spot prices
-current_spot_prices = get_spot_price_history(args.region
+if args.instance_type not in TINY_INSTS and args.spot:
+  # get current spot prices
+  current_spot_prices = get_spot_price_history(args.region
                 , args.availability_zone, valid_instances, 0, 0)
 
-# find cheapest spot price based valid instance
-for sp in current_spot_prices:
-  if float(sp['SpotPrice']) < cheapest_instance['Price']:
-    cheapest_instance['Price'] = float(sp['SpotPrice'])
-    cheapest_instance['CurrentPrice'] = float(sp['SpotPrice'])
-    cheapest_instance['InstanceType'] = sp['InstanceType']
-    cheapest_instance['AvailabilityZone'] = sp['AvailabilityZone']
-    cheapest_instance['Spot'] = True
+  # find cheapest spot price based valid instance
+  for sp in current_spot_prices:
+    if float(sp['SpotPrice']) < cheapest_instance['Price']:
+      cheapest_instance['Price'] = float(sp['SpotPrice'])
+      cheapest_instance['CurrentPrice'] = float(sp['SpotPrice'])
+      cheapest_instance['InstanceType'] = sp['InstanceType']
+      cheapest_instance['AvailabilityZone'] = sp['AvailabilityZone']
+      cheapest_instance['Spot'] = True
 
 # see if a cheaper regular on-demand instance suffices
 for i in instances:
@@ -177,12 +200,16 @@ if cheapest_instance['Spot']:
     if float(sp['SpotPrice']) > max_price:
       max_price = float(sp['SpotPrice'])
 
-  # set bid price to be maximum price found time 1.25
-  bid_price = max_price*1.25
+  # set bid price to be maximum price found times spot-bid-factor
+  bid_price = max_price * args.spot_bid_factor
 
-  # cap bid price to on-demand price
+  # cap bid price to on-demand price on high end
   if bid_price > cheapest_instance['OnDemandPrice']:
     bid_price = cheapest_instance['OnDemandPrice']
+
+  # cap bid price to current spot price on low end
+  if bid_price < cheapest_instance['CurrentPrice']:
+    bid_price = cheapest_instance['CurrentPrice']
 
   cheapest_instance['Price'] = bid_price
 

@@ -18,7 +18,7 @@
 # Update pip and assign static ips
 - hosts: buffy-all
   vars:
-    ethernet_interface: eth0
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
     ip_range_start: 201
   tasks:
   - name: Update pip with easy_install
@@ -57,7 +57,7 @@
       insertafter: ^netmask {{ hostvars[inventory_hostname]['ansible_' + ethernet_interface]['ipv4']['netmask'] }}
       line: gateway {{ hostvars[inventory_hostname]['ansible_default_ipv4']['gateway'] }}
 
-# restart eth0 network interface to make new network settings go into effect
+# restart default network interface to make new network settings go into effect
 - hosts: buffy-all
   tasks:
   - name: restart interface to make ip change go into effect
@@ -71,7 +71,7 @@
   vars_files:
     - 'docker_creds.yml'
   vars:
-    ethernet_interface: eth0
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
     ptpd_role: master
     ptpd_transport: multicast
     swarm_image: hypriot/rpi-swarm
@@ -87,7 +87,7 @@
   vars_files:
     - 'docker_creds.yml'
   vars:
-    ethernet_interface: eth0
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
     ptpd_role: slave
     ptpd_transport: multicast
     leader_ip: "{{ hostvars[groups['buffy-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
