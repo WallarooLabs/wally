@@ -12,14 +12,14 @@ Metrics Receiver:
 apps/double-divide/double-divide --run-sink -r -l 127.0.0.1:9000 -m 127.0.0.1:5001 -e 1 -a double-divide --ponythreads 1
 ```
 
-Buffy:
-```
-apps/double-divide/double-divide -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000 -k 127.0.0.1:8000 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 3
-```
-
 Giles receiver:
 ```
 giles/receiver/receiver -l 127.0.0.1:8000 --ponythreads 1
+```
+
+Buffy:
+```
+apps/double-divide/double-divide -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000 -k 127.0.0.1:8000 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 3
 ```
 
 Giles sender:
