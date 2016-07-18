@@ -1,4 +1,5 @@
 receiver
 receiver.o
 received.txt
+readable.txt
 .deps

@@ -9,9 +9,10 @@ def file_line_iter(fp):
     with open(fp, 'rb') as f:
         l = 1
         while l:
-            l = f.readline().decode().strip()
-            if l:
-                yield l
+            l = f.readline()
+            ll = l.decode().strip()
+            if ll:
+                yield ll
 
 
 def two_file_line_iter(fp1, fp2):
