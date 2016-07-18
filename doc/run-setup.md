@@ -19,7 +19,7 @@ apps/double-divide/double-divide -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 
 
 Giles receiver:
 ```
-giles/sender/receiver -l 127.0.0.1:8000 --ponythreads 1
+giles/receiver/receiver -l 127.0.0.1:8000 --ponythreads 1
 ```
 
 Giles sender:
