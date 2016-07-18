@@ -119,7 +119,7 @@ actor Main
             match f_arg
             | let mfn': String =>
               let fs: Array[String] iso = recover mfn'.split(",") end
-              let paths: Array[FilePath] iso = 
+              let paths: Array[FilePath] iso =
                 recover Array[FilePath] end
               for str in (consume fs).values() do
                 paths.push(FilePath(env.root as AmbientAuth, str))
@@ -128,7 +128,7 @@ actor Main
             else
               IntegerDataSource
             end
-            
+
           let sa = SendingActor(
             messages_to_send,
             to_buffy_socket,
@@ -155,7 +155,6 @@ class ToBuffyNotify is TCPConnectionNotify
     _coordinator.to_buffy_socket(sock, Failed)
 
   fun ref connected(sock: TCPConnection ref) =>
-    sock.set_nodelay(true)
     _coordinator.to_buffy_socket(sock, Ready)
 
 class ToDagonNotify is TCPConnectionNotify
@@ -488,10 +487,10 @@ class MultiFileDataSource is Iterator[String]
   var _idx: USize = 0
   var _should_repeat: Bool
 
-  new iso create(paths: Array[FilePath val] val, should_repeat: Bool = false) 
+  new iso create(paths: Array[FilePath val] val, should_repeat: Bool = false)
   =>
     _paths = paths
-    _cur_source = 
+    _cur_source =
       try
         FileDataSource(_paths(_idx))
       else
@@ -512,7 +511,7 @@ class MultiFileDataSource is Iterator[String]
         else
           if _should_repeat then
             _idx = 0
-            _cur_source = 
+            _cur_source =
               try
                 FileDataSource(_paths(_idx))
               else
