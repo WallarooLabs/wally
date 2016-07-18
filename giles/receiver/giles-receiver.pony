@@ -42,6 +42,9 @@ actor Main
           | ("phone-home", let arg: String) => p_arg = arg.split(":")
           | ("listen", let arg: String) => l_arg = arg.split(":")
           | ("expect", let arg: I64) => e_arg = arg.usize()
+          | let err: ParseError =>
+            err.report(env.err)
+            required_args_are_present = false
           end
         end
 
@@ -68,6 +71,17 @@ actor Main
           if (p_arg is None) or (n_arg is None) then
             env.err.print(
               "'--phone-home' must be used in conjunction with '--name'")
+            required_args_are_present = false
+          end
+        end
+
+        if (e_arg isnt None) then
+          try
+            let e' = (e_arg as USize)
+            if e' < 1 then error end
+          else
+            env.err.print(
+              "'--expect' must be an integer greater than 0")
             required_args_are_present = false
           end
         end
