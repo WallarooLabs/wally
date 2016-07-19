@@ -38,7 +38,7 @@ class DropConnection is TCPConnectionNotify
   fun ref auth_failed(conn: TCPConnection ref) =>
     _letter.auth_failed(conn)
 
-  fun ref sent(conn: TCPConnection ref, data: ByteSeq): ByteSeq ? =>
+  fun ref sent(conn: TCPConnection ref, data: ByteSeq): ByteSeq =>
     if spike() then
       drop(conn)
       ""
@@ -46,7 +46,7 @@ class DropConnection is TCPConnectionNotify
       _letter.sent(conn, data)
     end
 
-  fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter ? =>
+  fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter =>
     if spike() then
       drop(conn)
       recover Array[String] end

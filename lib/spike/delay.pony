@@ -55,10 +55,10 @@ class DelayReceived is TCPConnectionNotify
   fun ref auth_failed(conn: TCPConnection ref) =>
     _letter.auth_failed(conn)
 
-  fun ref sent(conn: TCPConnection ref, data: ByteSeq): ByteSeq ? =>
+  fun ref sent(conn: TCPConnection ref, data: ByteSeq): ByteSeq =>
     _letter.sent(conn, data)
 
-  fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter ? =>
+  fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter =>
     _letter.sentv(conn, data)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
@@ -99,11 +99,19 @@ class DelaySent is TCPConnectionNotify
   fun ref auth_failed(conn: TCPConnection ref) =>
     _letter.auth_failed(conn)
 
-  fun ref sent(conn: TCPConnection ref, data: ByteSeq): ByteSeq ? =>
-    _delayer.sent(conn, data, this)
+  fun ref sent(conn: TCPConnection ref, data: ByteSeq): ByteSeq =>
+    try
+      _delayer.sent(conn, data, this)
+    else
+      ""
+    end
 
-  fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter ? =>
-    _delayer.sentv(conn, data, this)
+  fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter =>
+    try
+      _delayer.sentv(conn, data, this)
+    else
+      recover Array[String] end
+    end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     _letter.received(conn, consume data)
