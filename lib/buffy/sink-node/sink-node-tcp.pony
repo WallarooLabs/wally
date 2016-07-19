@@ -60,9 +60,6 @@ class SinkNodeConnectNotify is TCPConnectionNotify
     else
       try
         let decoded: Array[String] val = FallorMsgDecoder(consume data)
-        for d in decoded.values() do
-          _env.out.print(d)
-        end
         _sink_node_step(decoded)
       else
         _env.err.print("sink node: Unable to decode message")
