@@ -134,9 +134,10 @@ actor Main
 
       env.out.print("dagon: host: " + phone_home_host)
       env.out.print("dagon: service: " + phone_home_service)
+
       ProcessManager(env, use_docker, docker_host as String,
         docker_tag as String, timeout as I64, path as String,
-        phone_home_host, phone_home_service)
+        phone_home_host, phone_home_service, expect)
     else
       env.err.print("dagon: error parsing arguments")
     end
@@ -280,9 +281,11 @@ actor ProcessManager
   var _listener_is_ready: Bool = false
   var _finished_registration: Bool = false
   let _timers: Timers = Timers
-  var _timer: (Timer tag | None) = None
+  var _listener_timer: (Timer tag | None) = None
+  var _processing_timer: (Timer tag | None) = None
   let _docker_postfix: String
-  let _giles_receiver_expect: Bool
+  let _expect: Bool
+  var _expecting: String = ""
 
   new create(env: Env, use_docker: Bool, docker_host: String,
     docker_tag: String,
@@ -299,14 +302,14 @@ actor ProcessManager
     _host = host
     _service = service
     _docker_postfix = Time.wall_to_nanos(Time.now()).string()
-    _giles_receiver_expect = expect
+    _expect = expect
 
     let tcp_n = recover Notifier(env, this) end
     try
       _listener = TCPListener(env.root as AmbientAuth, consume tcp_n,
       host, service)
       let timer = Timer(WaitForListener(_env, this, _timeout), 0, 2_000_000_000)
-      _timer = timer
+      _listener_timer = timer
       _timers(consume timer)
     else
       _env.out.print("Failed creating tcp listener")
@@ -330,9 +333,9 @@ actor ProcessManager
     """
     Cancel our WaitForListener timer.
     """
-    if _timer isnt None then
+    if _listener_timer isnt None then
       try
-        let t = _timer as Timer tag
+        let t = _listener_timer as Timer tag
         _timers.cancel(t)
         _env.out.print("dagon: canceled listener timer")
       else
@@ -341,6 +344,22 @@ actor ProcessManager
     else
       _env.out.print("dagon: no listener to cancel")
     end
+
+  be cancel_timeout_timer() =>
+  """
+  Cancel the WaitForProcessingTimer.
+  """
+  if _processing_timer isnt None then
+    try
+      let t = _processing_timer as Timer tag
+      _timers.cancel(t)
+      _env.out.print("dagon: canceled processing timer")
+    else
+      _env.out.print("dagon: can't cancel processing timer")
+    end
+  else
+    _env.out.print("dagon: no processer to cancel")
+  end
 
   be boot_topology() =>
     """
@@ -370,6 +389,8 @@ actor ProcessManager
     var docker_userid = ""
     var is_canary: Bool = false
     var is_leader: Bool = false
+    var is_expect: Bool = false
+
     try
       let ini_file = File(FilePath(_env.root as AmbientAuth, _path))
       let sections = IniParse(ini_file.lines())
@@ -379,6 +400,8 @@ actor ProcessManager
         path = ""
         is_canary = false
         is_leader = false
+        is_expect = false
+
         for key in sections(section).keys() do
           match key
           | "path" =>
@@ -393,14 +416,17 @@ actor ProcessManager
             else
               is_canary = false
             end
-            | "leader" =>
-              match sections(section)(key)
-              | "true" =>
-                is_leader = true
-                argsbuilder.push("-l")
-              else
-                is_leader = false
-              end
+          | "leader" =>
+            match sections(section)(key)
+            | "true" =>
+              is_leader = true
+              argsbuilder.push("-l")
+            else
+              is_leader = false
+            end
+          | "expect" =>
+            is_expect = true
+            argsbuilder.push("--" + key + "=" + sections(section)(key))
           else
             argsbuilder.push("--" + key + "=" + sections(section)(key))
           end
@@ -408,6 +434,7 @@ actor ProcessManager
         argsbuilder.push("--phone-home=" + _host + ":" + _service)
         let a: Array[String] val = consume argsbuilder
         let vars: Array[String] iso = recover Array[String](0) end
+        if is_expect then _expecting = name.clone() end
 
         register_node(name, is_canary, is_leader, path,
           docker_image, docker_constraint, docker_dir,
@@ -989,6 +1016,7 @@ actor ProcessManager
     _env.out.print("dagon: waiting for processing to finish")
     let timers = Timers
     let timer = Timer(WaitForProcessing(_env, this, _timeout), 0, 1_000_000_000)
+    _processing_timer = timer
     timers(consume timer)
 
   be shutdown_topology() =>
@@ -1047,7 +1075,11 @@ actor ProcessManager
     _env.out.print("dagon: exited child: " + name)
     if _is_leader(name) and _is_done_shutdown(name) then
       shutdown_listener()
+    elseif _expecting == name then
+      _env.out.print("Expected termination occured for: " + name)
+      cancel_timeout_timer()
     end
+
 
 
 class ProcessClient is ProcessNotify
