@@ -37,19 +37,18 @@ class RejectedResultStore
 class MarketSpreadSinkCollector is SinkCollector[RejectedResultStore]
   let _diff: RejectedResultStore = RejectedResultStore
 
-  fun ref apply(input: String) =>
+  fun ref apply(input: Array[String] val) =>
     try
-      let parsed = input.split(",")
-      let symbol = parsed(0)
-      let order_id = parsed(1)
-      let timestamp = parsed(2).u64()
-      let client_id = parsed(3)
-      let price = parsed(4).f64()
-      let qty = parsed(5).u64()
-      let side = parsed(6)
-      let bid = parsed(7).f64()
-      let offer = parsed(8).f64()
-      let is_rejected = parsed(9).bool()
+      let symbol = input(0)
+      let order_id = input(1)
+      let timestamp = input(2).u64()
+      let client_id = input(3)
+      let price = input(4).f64()
+      let qty = input(5).u64()
+      let side = input(6)
+      let bid = input(7).f64()
+      let offer = input(8).f64()
+      let is_rejected = input(9).bool()
       let trade_result = TradeResult(order_id, timestamp, client_id, symbol,
         price, qty, side, bid, offer, is_rejected)
       _diff.add_result(trade_result)

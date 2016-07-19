@@ -24,7 +24,7 @@ class SinkNodeConfig[Diff: Any #read] is SinkNodeStepBuilder
     SinkNodeStep[Diff](collector_builder, stringify, sink_connection)
 
 trait SinkCollector[Diff: Any #read]
-  fun ref apply(input: String)
+  fun ref apply(input: Array[String] val)
 
   fun has_diff(): Bool
 
