@@ -425,8 +425,10 @@ actor ProcessManager
               is_leader = false
             end
           | "expect" =>
-            is_expect = true
-            argsbuilder.push("--" + key + "=" + sections(section)(key))
+            if _expect then
+              is_expect = true
+              argsbuilder.push("--" + key + "=" + sections(section)(key))
+            end
           else
             argsbuilder.push("--" + key + "=" + sections(section)(key))
           end
