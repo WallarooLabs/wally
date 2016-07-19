@@ -339,7 +339,8 @@ actor SendingActor
   var _finished: Bool = false
   let _batch_size: USize
   let _interval: U64
-  let _msg_encoder: BufferedExternalMsgEncoder
+  let _wb: WriteBuffer
+  // let _msg_encoder: BufferedExternalMsgEncoder
 
   new create(messages_to_send: USize,
     to_buffy_socket: TCPConnection,
@@ -357,7 +358,9 @@ actor SendingActor
     _timers = Timers
     _batch_size = batch_size
     _interval = interval
-    _msg_encoder = BufferedExternalMsgEncoder(where chunks = _batch_size)
+    _wb = WriteBuffer
+    _wb.reserve_chunks(_batch_size)
+    // _msg_encoder = BufferedExternalMsgEncoder(where chunks = _batch_size)
 
   be go() =>
     let t = Timer(SendBatch(this), 0, _interval)
@@ -379,7 +382,8 @@ actor SendingActor
         try
           let n = _data_source.next()
           d'.push(n)
-          _msg_encoder.add_data(n)
+          _wb.u32_be(n.size().u32())
+          _wb.write(n)
         else
           ifdef debug then
             Debug.out("SendingActor: failed reading _data_source.next()")
@@ -388,7 +392,7 @@ actor SendingActor
         end
       end
 
-      _to_buffy_socket.writev(_msg_encoder.done())
+      _to_buffy_socket.writev(_wb.done())
       _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
       _messages_sent = _messages_sent + current_batch_size
     else
