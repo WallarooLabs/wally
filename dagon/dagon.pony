@@ -1014,10 +1014,9 @@ actor ProcessManager
     Start the time to wait for processing.
     """
     _env.out.print("dagon: waiting for processing to finish")
-    let timers = Timers
     let timer = Timer(WaitForProcessing(_env, this, _timeout), 0, 1_000_000_000)
     _processing_timer = timer
-    timers(consume timer)
+    _timers(consume timer)
 
   be shutdown_topology() =>
     """
