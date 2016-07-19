@@ -48,8 +48,6 @@ actor Main
     var service: String = ""
     var options = Options(env)
 
-    let truthy: Array[String] = ["yes", "true", "on", "1"]
-
     options
     .add("docker", "d", StringArgument)
     .add("tag", "T", StringArgument)
