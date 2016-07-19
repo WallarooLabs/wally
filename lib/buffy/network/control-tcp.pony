@@ -17,7 +17,7 @@ class ControlNotifier is TCPListenNotify
   var _service: String = ""
   let _is_worker: Bool
 
-  new iso create(env: Env, auth: AmbientAuth, name: String, 
+  new iso create(env: Env, auth: AmbientAuth, name: String,
     coordinator: Coordinator, metrics_collector: MetricsCollector, is_worker: Bool = true) =>
     _env = env
     _auth = auth
@@ -83,18 +83,22 @@ class ControlConnectNotify is TCPConnectionNotify
         try
           (let host, _) = conn.remote_address().name()
 
-          Debug.out("ControlConnectNotify.received() IdentifyControlPortMsg " + host)
-          
-          _coordinator.assign_topology_control_conn(m.node_name, host, 
+          ifdef debug then
+            Debug.out("ControlConnectNotify.received() IdentifyControlPortMsg " + host)
+          end
+
+          _coordinator.assign_topology_control_conn(m.node_name, host,
             m.service)
         end
       | let m: IdentifyDataPortMsg val =>
         try
           (let host, _) = conn.remote_address().name()
 
-          Debug.out("ControlConnectNotify.received() IdentifyDataPortMsg " + host)
-          
-          _coordinator.assign_topology_data_conn(m.node_name, host, 
+          ifdef debug then
+            Debug.out("ControlConnectNotify.received() IdentifyDataPortMsg " + host)
+          end
+
+          _coordinator.assign_topology_data_conn(m.node_name, host,
             m.service)
         end
       | let m: AddControlMsg val =>

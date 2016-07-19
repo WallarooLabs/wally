@@ -23,10 +23,17 @@ def summarize_file(file_path):
               help='Path of the giles received file in readable format')
 @click.option('--count-lines', '-c', is_flag=True,
               help="Fail if line counts don't match")
-def run_length(sent, recd, count_lines):
+@click.option('--expect-lines', '-e', type=int, default=0,
+              help="Specify number of lines to expect from received file")
+def run_length(sent, recd, count_lines, expect_lines):
     """Read a giles sent.txt and received.txt to produce a total run-length"""
     sent_min, sent_max, sent_lines = summarize_file(sent)
     recd_min, recd_max, recd_lines = summarize_file(recd)
+    if expect_lines > 0:
+        if recd_lines != expect_lines:
+            print("Received file line count doesn't match expected value. "
+                  "Expected %d but got %d" % (expect_lines, recd_lines))
+            exit(1)
     if count_lines:
         if sent_lines != recd_lines:
             print("Line counts don't match. %d sent vs. %d "

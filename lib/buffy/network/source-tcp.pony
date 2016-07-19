@@ -63,20 +63,24 @@ class SourceConnectNotify is TCPConnectionNotify
     _metrics_collector = metrics_collector
 
   fun ref accepted(conn: TCPConnection ref) =>
-    try
-      (let host, _) = conn.remote_address().name()
-      Debug.out("SourceConnectNotify.accepted() " + host)
+    ifdef debug then
+      try
+        (let host, _) = conn.remote_address().name()
+        Debug.out("SourceConnectNotify.accepted() " + host)
+      end
     end
-    
+
     conn.expect(4)
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    try
-      (let host, _) = conn.remote_address().name()
-      Debug.out("SourceConnectNotify.received() " + host)
+    ifdef debug then
+      try
+        (let host, _) = conn.remote_address().name()
+        Debug.out("SourceConnectNotify.received() " + host)
+      end
     end
-    
+
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
@@ -86,28 +90,16 @@ class SourceConnectNotify is TCPConnectionNotify
         _env.err.print("Error reading header from external source")
       end
     else
-      try
-        let msg = ExternalMsgDecoder(consume data)
-        match msg
-        | let m: ExternalDataMsg val =>
-          let now = Epoch.nanoseconds()
-          let new_msg: Message[String] val = Message[String](
-            _guid_gen(), now, now, m.data)
-          if _source_initialized then
-            _source_step(new_msg)
-          else
-            _step_manager.passthrough_to_step(_source_id, 
-              _source_step)
-            _source_step(new_msg)
-            _source_initialized = true
-          end
-        else
-          _env.err.print("Source " + _source_id.string()
-            + ": decoded message wasn't external.")
-        end
+      let now = Epoch.nanoseconds()
+      let new_msg: Message[String] val = Message[String](
+        _guid_gen(), now, now, String.from_array(consume data))
+      if _source_initialized then
+        _source_step(new_msg)
       else
-        _env.err.print("Source " + _source_id.string() + ": Error decoding " 
-          + "incoming message.")
+        _step_manager.passthrough_to_step(_source_id, 
+          _source_step)
+        _source_step(new_msg)
+        _source_initialized = true
       end
 
       conn.expect(4)

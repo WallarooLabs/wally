@@ -9,14 +9,14 @@ primitive Bytes
     wb.done()
 
   fun to_u16(high: U8, low: U8): U16 =>
-    (high.u16() << 8) + low.u16()
+    (high.u16() << 8) or low.u16()
 
   fun to_u32(a: U8, b: U8, c: U8, d: U8): U32 =>
-    (a.u32() << 24) + (b.u32() << 16) + (c.u32() << 8) + d.u32()
+    (a.u32() << 24) or (b.u32() << 16) or (c.u32() << 8) or d.u32()
 
   fun to_u64(a: U8, b: U8, c: U8, d: U8, e: U8, f: U8, g: U8, h: U8): U64 =>
-    (a.u64() << 56) + (b.u64() << 48) + (c.u64() << 40) + (d.u64() << 32)
-    + (e.u64() << 24) + (f.u64() << 16) + (g.u64() << 8) + h.u64()
+    (a.u64() << 56) or (b.u64() << 48) or (c.u64() << 40) or (d.u64() << 32)
+    or (e.u64() << 24) or (f.u64() << 16) or (g.u64() << 8) or h.u64()
 
   fun from_u16(u16: U16, arr: Array[U8] iso = recover Array[U8] end): Array[U8] iso^ =>
     let l1: U8 = (u16 and 0xFF).u8()

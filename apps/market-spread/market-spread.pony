@@ -21,7 +21,7 @@ actor Main
       let topology = recover val
         Topology
           .new_pipeline[FixOrderMessage val, TradeResult val](
-            TradeParser, ResultArrayStringify, recover [0] end, "Orders")
+            TradeParser, ResultArrayStringify, recover [0, 1] end, "Orders")
           .to_stateful_partition[TradeResult val, MarketData](
             recover
               StatePartitionConfig[FixOrderMessage val, TradeResult val,
@@ -35,7 +35,7 @@ actor Main
             end)
           .build()
           .new_pipeline[FixNbboMessage val, None](NbboParser, NoneStringify,
-            recover [1] end, "NBBO")
+            recover [2] end, "NBBO")
           .to_stateful_partition[None, MarketData](
             recover
               StatePartitionConfig[FixNbboMessage val, None, MarketData](

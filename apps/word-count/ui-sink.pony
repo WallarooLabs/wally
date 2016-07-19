@@ -8,11 +8,10 @@ use "collections"
 class WordCountSinkCollector is SinkCollector[Map[String, U64]]
   let _diff: Map[String, U64] = Map[String, U64]
 
-  fun ref apply(input: String) =>
+  fun ref apply(input: Array[String] val) =>
     try
-      let parsed = input.split(",")
-      let word = parsed(0)
-      let count = parsed(1).u64()
+      let word = input(0)
+      let count = input(1).u64()
       _diff(word) = count
     end
 

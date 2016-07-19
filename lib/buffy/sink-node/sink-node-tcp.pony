@@ -59,13 +59,8 @@ class SinkNodeConnectNotify is TCPConnectionNotify
       end
     else
       try
-        let decoded = ExternalMsgDecoder(consume data)
-        match decoded
-        | let d: ExternalDataMsg val =>
-          _sink_node_step(d.data)
-        else
-          _env.err.print("sink node: Unexpected data")
-        end
+        let decoded: Array[String] val = FallorMsgDecoder(consume data)
+        _sink_node_step(decoded)
       else
         _env.err.print("sink node: Unable to decode message")
       end

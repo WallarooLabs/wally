@@ -143,8 +143,8 @@ actor PassThrough is BasicOutputStep
     match _output
     | let s: BasicStep tag => s(input)
     else
-      try 
-        _initial_queue.enqueue(input) 
+      try
+        _initial_queue.enqueue(input)
       else
         @printf[I32]("Could not enqueue input at passthrough!\n".cstring())
       end
@@ -200,7 +200,7 @@ actor Partition[In: Any val, Out: Any val]
               _buffers(partition_id) = [input]
             end
             let step_id = _guid_gen()
-            sm.add_partition_step_and_ack(step_id, partition_id, 
+            sm.add_partition_step_and_ack(step_id, partition_id,
               _partition_report_id, _step_builder, this)
             sm.add_output_to(step_id, _output)
           else
@@ -311,7 +311,7 @@ actor StatePartition[State: Any #read]
           (not _buffers.contains(partition_id)) then
           _buffers(partition_id) = Array[StepMessage val]
           let step_id = _guid_gen()
-          step_manager.add_partition_step_and_ack(step_id, partition_id, 
+          step_manager.add_partition_step_and_ack(step_id, partition_id,
             _partition_report_id, _step_builder, this)
           step_manager.add_initial_state[State](step_id, init)
         end
@@ -411,14 +411,16 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
     | let m: Message[In] val =>
       try
         let out = _array_stringify(m.data())
-        Debug.out(
-          match out
-          | let s: String =>
-            ">>>>" + s + "<<<<"
-          | let arr: Array[String] val =>
-            ">>>>" + ",".join(arr) + "<<<<"
-          end
-        )
+        ifdef debug then
+          Debug.out(
+            match out
+            | let s: String =>
+              ">>>>" + s + "<<<<"
+            | let arr: Array[String] val =>
+              ">>>>" + ",".join(arr) + "<<<<"
+            end
+          )
+        end
         let tcp_msg = FallorMsgEncoder(out)
         for conn in _conns.values() do
           conn.writev(tcp_msg)

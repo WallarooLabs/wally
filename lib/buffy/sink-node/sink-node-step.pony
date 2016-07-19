@@ -3,7 +3,7 @@ use "buffy/messages"
 use "time"
 
 trait StringInStep
-  be apply(input: String)
+  be apply(input: Array[String] val)
 
 actor SinkNodeStep[Diff: Any #read] 
   is StringInStep
@@ -21,7 +21,7 @@ actor SinkNodeStep[Diff: Any #read]
     let t = Timer(_SendDiff[Diff](this), 1_000_000_000, 1_000_000_000)
     _timers(consume t)
 
-  be apply(input: String) =>
+  be apply(input: Array[String] val) =>
     _collector(input)
 
   be send_diff() =>
