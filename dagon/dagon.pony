@@ -126,6 +126,7 @@ actor Main
       end
 
       env.out.print("dagon: timeout: " + timeout.string())
+      env.out.print("dagon: expect: " + expect.string())
       env.out.print("dagon: path: " + (path as String))
 
       phone_home_host = (p_arg as Array[String])(0)
@@ -281,11 +282,13 @@ actor ProcessManager
   let _timers: Timers = Timers
   var _timer: (Timer tag | None) = None
   let _docker_postfix: String
+  let _giles_receiver_expect: Bool
 
   new create(env: Env, use_docker: Bool, docker_host: String,
     docker_tag: String,
     timeout: I64, path: String,
-    host: String, service: String)
+    host: String, service: String,
+    expect: Bool)
   =>
     _env = env
     _use_docker = use_docker
@@ -296,6 +299,7 @@ actor ProcessManager
     _host = host
     _service = service
     _docker_postfix = Time.wall_to_nanos(Time.now()).string()
+    _giles_receiver_expect = expect
 
     let tcp_n = recover Notifier(env, this) end
     try
