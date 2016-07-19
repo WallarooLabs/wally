@@ -117,7 +117,8 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
       match msg
       | let d: DataChannelMsg val =>
         let f = d.forward
-        _coordinator.deliver(d.id, f.step_id, f.from_node_name, f.msg)
+        _coordinator.deliver(d.id, f.step_id, f.from_node_name, f.msg_id,
+          f.source_ts, f.ingress_ts, f.data)
       | let m: DataSenderReadyMsg val =>
         _sender_name = m.node_name
         _coordinator.connect_receiver(m.node_name)

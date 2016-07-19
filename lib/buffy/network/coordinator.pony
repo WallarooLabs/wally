@@ -258,10 +258,11 @@ actor Coordinator
     end
 
   be deliver(data_ch_id: U64, step_id: U64, from_name: String,
-    msg: StepMessage val) =>
+    msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
     try
       _data_connection_receivers(from_name)
-        .received(data_ch_id, step_id, msg, _step_manager)
+        .received(data_ch_id, step_id, msg_id, source_ts, ingress_ts,
+          msg_data, _step_manager)
     end
 
   be send_phone_home_message(msg: Array[ByteSeq] val) =>

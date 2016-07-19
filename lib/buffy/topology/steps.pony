@@ -9,7 +9,7 @@ use "sendence/queue"
 use "debug"
 
 trait BasicStep
-  be apply(input: StepMessage val)
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val)
   be add_step_reporter(sr: StepReporter val) => None
 
 trait BasicOutputStep is BasicStep
@@ -34,7 +34,8 @@ trait StepManaged
   be add_step_manager(step_manager: StepManager)
 
 actor EmptyStep is BasicStep
-  be apply(input: StepMessage val) => None
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) => 
+    None
 
 actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]
@@ -50,13 +51,11 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be add_output(to: BasicStep tag) =>
     _output = to
 
-  be apply(input: StepMessage val) =>
-    match input
-    | let m: Message[In] val =>
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
+    match msg_data
+    | let input: In =>
       let start_time = Epoch.nanoseconds()
-      let output_msg =
-        Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), _f(m.data()))
-      _output(output_msg)
+      _output(msg_id, source_ts, ingress_ts, _f(input))
       let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: StepReporter val =>
@@ -78,14 +77,12 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be add_output(to: BasicStep tag) =>
     _output = to
 
-  be apply(input: StepMessage val) =>
-    match input
-    | let m: Message[In] val =>
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
+    match msg_data
+    | let input: In =>
       let start_time = Epoch.nanoseconds()
-      for res in _f(m.data()).values() do
-        let output_msg =
-          Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), res)
-        _output(output_msg)
+      for res in _f(input).values() do
+        _output(msg_id, source_ts, ingress_ts, res)
       end
       let end_time = Epoch.nanoseconds()
       match _step_reporter
@@ -108,16 +105,14 @@ actor Source[Out: Any val] is ThroughStep[String, Out]
   be add_output(to: BasicStep tag) =>
     _output = to
 
-  be apply(input: StepMessage val) =>
-    match input
-    | let m: Message[String] val =>
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
+    match msg_data
+    | let input: String =>
       try
         let start_time = Epoch.nanoseconds()
-        match _input_parser(m.data())
+        match _input_parser(input)
         | let res: Out =>
-          let output_msg: Message[Out] val =
-            Message[Out](m.id(), m.source_ts(), m.last_ingress_ts(), res)
-          _output(output_msg)
+          _output(msg_id, source_ts, ingress_ts, res)
           let end_time = Epoch.nanoseconds()
           match _step_reporter
           | let sr: StepReporter val =>
@@ -131,23 +126,21 @@ actor Source[Out: Any val] is ThroughStep[String, Out]
 
 actor PassThrough is BasicOutputStep
   var _output: (BasicStep tag | None) = None
-  let _initial_queue: Queue[StepMessage val] = Queue[StepMessage val]
+  let _initial_queue: Array[(U64, U64, U64, Any val)] = 
+    Array[(U64, U64, U64, Any val)]
 
   be add_output(to: BasicStep tag) =>
     _output = to
-    for idx in Range(0, _initial_queue.size()) do
-      try to(_initial_queue.dequeue()) end
+    for msg in _initial_queue.values() do
+      to(msg._1, msg._2, msg._3, msg._4)
     end
+    _initial_queue.clear()
 
-  be apply(input: StepMessage val) =>
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
     match _output
-    | let s: BasicStep tag => s(input)
+    | let s: BasicStep tag => s(msg_id, source_ts, ingress_ts, msg_data)
     else
-      try
-        _initial_queue.enqueue(input)
-      else
-        @printf[I32]("Could not enqueue input at passthrough!\n".cstring())
-      end
+      _initial_queue.push((msg_id, source_ts, ingress_ts, msg_data))
     end
 
 actor Sink[In: Any val] is ComputeStep[In]
@@ -156,10 +149,10 @@ actor Sink[In: Any val] is ComputeStep[In]
   new create(f: FinalComputation[In] iso) =>
     _f = consume f
 
-  be apply(input: StepMessage val) =>
-    match input
-    | let m: Message[In] val =>
-      _f(m.data())
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
+    match msg_data
+    | let input: In =>
+      _f(input)
     end
 
 actor Partition[In: Any val, Out: Any val]
@@ -167,7 +160,8 @@ actor Partition[In: Any val, Out: Any val]
   let _step_builder: BasicStepBuilder val
   let _partition_function: PartitionFunction[In] val
   let _partitions: Map[U64, U64] = Map[U64, U64]
-  let _buffers: Map[U64, Array[StepMessage val]] = Map[U64, Array[StepMessage val]]
+  let _buffers: Map[U64, Array[(U64, U64, U64, In)]] = 
+    Map[U64, Array[(U64, U64, U64, In)]]
   var _step_manager: (StepManager | None) = None
   var _output: BasicStep tag = EmptyStep
   let _guid_gen: GuidGenerator = GuidGenerator
@@ -177,27 +171,29 @@ actor Partition[In: Any val, Out: Any val]
     _step_builder = s_builder
     _partition_function = pf
 
-  be apply(input: StepMessage val) => _apply(input)
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) => 
+    _apply(msg_id, source_ts, ingress_ts, msg_data)
 
-  fun ref _apply(input: StepMessage val) =>
-    match input
-    | let m: Message[In] val =>
+  fun ref _apply(msg_id: U64, source_ts: U64, ingress_ts: U64, 
+    msg_data: Any val) =>
+    match msg_data
+    | let input: In =>
       match _step_manager
       | let sm: StepManager tag =>
-        let partition_id = _partition_function(m.data())
+        let partition_id = _partition_function(input)
         if _partitions.contains(partition_id) then
           try
             let step_id = _partitions(partition_id)
-            sm(step_id, input)
+            sm(step_id, msg_id, source_ts, ingress_ts, input)
           else
             @printf[I32]("Can't forward to chosen partition!\n".cstring())
           end
         else
           try
             if _buffers.contains(partition_id) then
-              _buffers(partition_id).push(input)
+              _buffers(partition_id).push((msg_id, source_ts, ingress_ts, input))
             else
-              _buffers(partition_id) = [input]
+              _buffers(partition_id) = [(msg_id, source_ts, ingress_ts, input)]
             end
             let step_id = _guid_gen()
             sm.add_partition_step_and_ack(step_id, partition_id,
@@ -214,8 +210,8 @@ actor Partition[In: Any val, Out: Any val]
     _partitions(partition_id) = step_id
     try
       let buffer = _buffers(partition_id)
-      for msg in buffer.values() do
-        _apply(msg)
+      for (id, source_ts, ingress_ts, data) in buffer.values() do
+        _apply(id, source_ts, ingress_ts, data)
       end
       buffer.clear()
     else
@@ -238,8 +234,8 @@ actor StatePartition[State: Any #read]
   is (BasicStep & PartitionAckable & StepManaged)
   let _step_builder: BasicStepBuilder val
   let _partitions: Map[U64, U64] = Map[U64, U64]
-  let _buffers: Map[U64, Array[StepMessage val]] =
-    Map[U64, Array[StepMessage val]]
+  let _buffers: Map[U64, Array[(U64, U64, U64, StateProcessor[State] val)]] = 
+    Map[U64, Array[(U64, U64, U64, StateProcessor[State] val)]]
   var _step_manager: (StepManager | None) = None
   let _guid_gen: GuidGenerator = GuidGenerator
   let _partition_report_id: U64 = _guid_gen()
@@ -252,27 +248,29 @@ actor StatePartition[State: Any #read]
     _initialization_map = init_map
     _initialize_at_start = init_at_start
 
-  be apply(input: StepMessage val) => _apply(input)
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) => 
+    _apply(msg_id, source_ts, ingress_ts, msg_data)
 
-  fun ref _apply(input: StepMessage val) =>
-    match input
-    | let m: Message[StateProcessor[State] val] val =>
+  fun ref _apply(msg_id: U64, source_ts: U64, ingress_ts: U64, 
+    msg_data: Any val) =>
+    match msg_data
+    | let sp: StateProcessor[State] val =>
       match _step_manager
       | let sm: StepManager tag =>
-        let partition_id = m.data().partition_id()
+        let partition_id = sp.partition_id()
         if _partitions.contains(partition_id) then
           try
             let step_id = _partitions(partition_id)
-            sm(step_id, input)
+            sm(step_id, msg_id, source_ts, ingress_ts, sp)
           else
             @printf[I32]("Can't forward to chosen partition!\n".cstring())
           end
         else
           try
             if _buffers.contains(partition_id) then
-              _buffers(partition_id).push(input)
+              _buffers(partition_id).push((msg_id, source_ts, ingress_ts, sp))
             else
-              _buffers(partition_id) = [input]
+              _buffers(partition_id) = [(msg_id, source_ts, ingress_ts, sp)]
               let step_id = _guid_gen()
               if _initialization_map.contains(partition_id) then
                 sm.add_partition_step_and_ack(step_id, partition_id,
@@ -295,8 +293,8 @@ actor StatePartition[State: Any #read]
     _partitions(partition_id) = step_id
     try
       let buffer = _buffers(partition_id)
-      for msg in buffer.values() do
-        _apply(msg)
+      for (id, source_ts, ingress_ts, data) in buffer.values() do
+        _apply(id, source_ts, ingress_ts, data)
       end
       buffer.clear()
     else
@@ -309,7 +307,8 @@ actor StatePartition[State: Any #read]
       for (partition_id, init) in _initialization_map.pairs() do
         if (not _partitions.contains(partition_id)) and
           (not _buffers.contains(partition_id)) then
-          _buffers(partition_id) = Array[StepMessage val]
+          _buffers(partition_id) = Array[(U64, U64, U64, 
+            StateProcessor[State] val)]
           let step_id = _guid_gen()
           step_manager.add_partition_step_and_ack(step_id, partition_id,
             _partition_report_id, _step_builder, this)
@@ -343,18 +342,14 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
   be add_shared_state(shared_state: BasicStep tag) =>
     _shared_state = shared_state
 
-  be apply(input: StepMessage val) =>
-    match input
-    | let m: Message[In] val =>
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
+    match msg_data
+    | let input: In =>
       let start_time = Epoch.nanoseconds()
-      let sc: StateComputation[Out, State] val = _state_comp_builder(m.data())
-      let message_wrapper = MessageWrapper[Out](m.id(), m.source_ts(),
-        m.last_ingress_ts())
+      let sc: StateComputation[Out, State] val = _state_comp_builder(input)
       let sc_wrapper = StateComputationWrapper[In, Out, State](sc,
-        message_wrapper, _output, _partition_function(m.data()))
-      let output_msg = Message[StateProcessor[State] val](m.id(),
-        m.source_ts(), m.last_ingress_ts(), sc_wrapper)
-      _shared_state(output_msg)
+        _output, _partition_function(input))
+      _shared_state(msg_id, source_ts, ingress_ts, sc_wrapper)
       let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: StepReporter val =>
@@ -373,12 +368,11 @@ actor SharedStateStep[State: Any #read]
   be add_step_reporter(sr: StepReporter val) =>
     _step_reporter = sr
 
-  be apply(input: StepMessage val) =>
-    match input
-    | let m: Message[StateProcessor[State] val] val =>
-      let sp: StateProcessor[State] val = m.data()
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
+    match msg_data
+    | let sp: StateProcessor[State] val =>
       let start_time = Epoch.nanoseconds()
-      _state = sp(_state)
+      _state = sp(msg_id, source_ts, ingress_ts, _state)
       let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: StepReporter val =>
@@ -406,11 +400,11 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
   be add_conn(conn: TCPConnection) =>
     _conns.push(conn)
 
-  be apply(input: StepMessage val) =>
-    match input
-    | let m: Message[In] val =>
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
+    match msg_data
+    | let input: In =>
       try
-        let out = _array_stringify(m.data())
+        let out = _array_stringify(input)
         ifdef debug then
           Debug.out(
             match out
@@ -427,10 +421,9 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
         end
         let now = Epoch.nanoseconds()
         _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
-          m.id(), m.source_ts(), now, _pipeline_name)
+          msg_id, source_ts, now, _pipeline_name)
         _metrics_collector.report_boundary_metrics(
-          BoundaryTypes.ingress_egress(), m.id(), m.last_ingress_ts(),
-          now)
+          BoundaryTypes.ingress_egress(), msg_id, ingress_ts, now)
       end
     end
 
