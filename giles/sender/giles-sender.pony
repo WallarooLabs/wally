@@ -381,7 +381,9 @@ actor SendingActor
           d'.push(n)
           _msg_encoder.add_data(n)
         else
-          Debug.out("SendingActor: failed reading _data_source.next()")
+          ifdef debug then
+            Debug.out("SendingActor: failed reading _data_source.next()")
+          end
           break
         end
       end
