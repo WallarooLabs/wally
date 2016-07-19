@@ -54,7 +54,7 @@ actor Main
     .add("docker", "d", StringArgument)
     .add("tag", "T", StringArgument)
     .add("timeout", "t", I64Argument)
-    .add("expect", "e", StringArgument)
+    .add("expect", "e", None)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
     try
@@ -63,8 +63,7 @@ actor Main
         | ("docker", let arg: String) => docker_host = arg
         | ("tag", let arg: String) => docker_tag = arg
         | ("timeout", let arg: I64) => timeout = arg
-        | ("expect", let arg: String) => if arg.clone().lower().strip() == "true"
-          then expect = true end
+        | ("expect", _) => expect = true
         | ("filepath", let arg: String) => path = arg
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
         | let err: ParseError =>
@@ -74,10 +73,11 @@ actor Main
       end
     else
       env.err.print("""dagon: usage: [--docker=<host:port>
---tag=<tag>]
---timeout=<seconds>
---filepath=<path>
---phone-home=<host:port>""")
+--tag/-T <tag>]
+--timeout/-t <seconds>
+--expect/-e
+--filepath/-f <path>
+--phone-home/-h <host:port>""")
       return
     end
 
@@ -142,11 +142,11 @@ actor Main
       env.err.print("dagon: error parsing arguments")
     end
 
-    
+
 class Notifier is TCPListenNotify
   let _env: Env
   let _p_mgr: ProcessManager
-  
+
   new create(env: Env, p_mgr: ProcessManager) =>
     _env = env
     _p_mgr = p_mgr
