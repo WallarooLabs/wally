@@ -28,7 +28,7 @@ type ChildState is
 
 
 actor Main
-  
+
   new create(env: Env) =>
     """
     Check if we have all commandline arguments. If no args where
@@ -40,33 +40,45 @@ actor Main
     var docker_tag: (String | None) = None
     var use_docker: Bool = false
     var timeout: (I64 | None) = None
+    var expect: Bool = false
     var path: (String | None) = None
     var p_arg: (Array[String] | None) = None
     var phone_home_host: String = ""
     var phone_home_service: String = ""
     var service: String = ""
     var options = Options(env)
+
+    let truthy: Array[String] = ["yes", "true", "on", "1"]
+
     options
     .add("docker", "d", StringArgument)
     .add("tag", "T", StringArgument)
     .add("timeout", "t", I64Argument)
+    .add("expect", "e", StringArgument)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
-    for option in options do
-      match option
-      | ("docker", let arg: String) => docker_host = arg
-      | ("tag", let arg: String) => docker_tag = arg
-      | ("timeout", let arg: I64) => timeout = arg
-      | ("filepath", let arg: String) => path = arg
-      | ("phone-home", let arg: String) => p_arg = arg.split(":")
-      else
-        env.err.print("dagon: unknown argument")
-        env.err.print("dagon: usage: [--docker=<host:port>" +
-        " --tag=<tag>]" +
-        " --timeout=<seconds>" +
-        " --filepath=<path>" +
-        " --phone-home=<host:port>")
+    try
+      for option in options do
+        match option
+        | ("docker", let arg: String) => docker_host = arg
+        | ("tag", let arg: String) => docker_tag = arg
+        | ("timeout", let arg: I64) => timeout = arg
+        | ("expect", let arg: String) => if arg.clone().lower().strip() == "true"
+          then expect = true end
+        | ("filepath", let arg: String) => path = arg
+        | ("phone-home", let arg: String) => p_arg = arg.split(":")
+        | let err: ParseError =>
+          err.report(env.err)
+          error
+        end
       end
+    else
+      env.err.print("""dagon: usage: [--docker=<host:port>
+--tag=<tag>]
+--timeout=<seconds>
+--filepath=<path>
+--phone-home=<host:port>""")
+      return
     end
 
     try
@@ -87,7 +99,7 @@ actor Main
           required_args_are_present = false
         end
       end
-      
+
       if timeout is None then
         env.err.print("dagon: Must supply required '--timeout' argument")
         required_args_are_present = false
@@ -95,7 +107,7 @@ actor Main
         env.err.print("dagon: timeout can't be negative")
         required_args_are_present = false
       end
-    
+
       if path is None then
         env.err.print("dagon error: Must supply required '--filepath' argument")
         required_args_are_present = false
@@ -103,7 +115,7 @@ actor Main
 
       if p_arg is None then
         env.err.print("dagon error: Must supply required '--phone-home' argument")
-        required_args_are_present = false      
+        required_args_are_present = false
       elseif (p_arg as Array[String]).size() != 2 then
         env.err.print(
         "dagon error: '--dagon' argument must be in format: '127.0.0.1:8080")
