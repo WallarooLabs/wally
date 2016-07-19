@@ -7,12 +7,16 @@ Reads a giles sent.txt and received.txt (in readable format) to produce a total 
 ```
 Usage: run_length [OPTIONS]
 
+  Read a giles sent.txt and received.txt to produce a total run-length
+
 Options:
-  -s, --sent TEXT    Path of the giles sent file  [required]
-  -r, --recd TEXT    Path of the giles received file in readable format
-                     [required]
-  -c, --count-lines  Fail if line counts don't match
-  --help             Show this message and exit.
+  -s, --sent TEXT             Path of the giles sent file  [required]
+  -r, --recd TEXT             Path of the giles received file in readable
+                              format  [required]
+  -c, --count-lines           Fail if line counts don't match
+  -e, --expect-lines INTEGER  Specify number of lines to expect from received
+                              file
+  --help                      Show this message and exit.
 ```
 
 
