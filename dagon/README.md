@@ -25,7 +25,7 @@ cd ..
 dagon-pony takes four arguments:
 ```
 -t time in seconds to wait for processing to finish after Giles
-   Sender is done.
+   Sender is done
 -f configuration file path
 -h host ip address dagon should listen on
 ```
