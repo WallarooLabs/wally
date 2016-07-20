@@ -157,7 +157,7 @@ class FromBuffyNotify is TCPConnectionNotify
       end
     end
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
       try
         _count = _count + 1
@@ -186,6 +186,7 @@ class FromBuffyNotify is TCPConnectionNotify
         _header = true
       end
     end
+    true
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)

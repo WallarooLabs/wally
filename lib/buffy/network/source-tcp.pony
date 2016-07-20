@@ -52,6 +52,7 @@ class SourceConnectNotify is TCPConnectionNotify
   var _header: Bool = true
   var _source_initialized: Bool = false
   var _source_step: BasicOutputStep tag = PassThrough
+  var _msg_count: USize = 0
 
   new iso create(env: Env, source_id: U64,
     step_manager: StepManager, coordinator: Coordinator,
@@ -73,7 +74,7 @@ class SourceConnectNotify is TCPConnectionNotify
     conn.expect(4)
     _coordinator.add_connection(conn)
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     ifdef debug then
       try
         (let host, _) = conn.remote_address().name()
@@ -101,7 +102,13 @@ class SourceConnectNotify is TCPConnectionNotify
 
       conn.expect(4)
       _header = true
+      _msg_count = _msg_count + 1
+      if _msg_count >= 5 then
+        _msg_count = 0
+        return false
+      end
     end
+    true
 
   fun ref connected(conn: TCPConnection ref) =>
     _env.out.print("Source " + _source_id.string() + ": connected.")

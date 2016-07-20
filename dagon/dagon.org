@@ -169,21 +169,22 @@ class FromBuffyNotify is TCPConnectionNotify
   new iso create(store: Store) =>
     _store = store
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     for chunked in _framer.chunk(consume data).values() do
-    try
-      let decoded = WireMsgDecoder(consume chunked)
-      match decoded
-      | let d: ExternalMsg val =>
-        @printf[I32]("%s\n".cstring(), d.data.cstring())
-        _store.received(d.data, Time.micros())
+      try
+        let decoded = WireMsgDecoder(consume chunked)
+        match decoded
+        | let d: ExternalMsg val =>
+          @printf[I32]("%s\n".cstring(), d.data.cstring())
+          _store.received(d.data, Time.micros())
+        else
+          @printf[I32]("UNEXPECTED DATA\n".cstring())
+        end
       else
-        @printf[I32]("UNEXPECTED DATA\n".cstring())
+        @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
       end
-    else
-      @printf[I32]("UNABLE TO DECODE MESSAGE\n".cstring())
     end
-  end
+    true
 #+END_SRC
 
 *** Actor as Child Roster

@@ -36,8 +36,9 @@ class MetricsCollectorConnectNotify is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     _stdout.print("Metrics Collector: connection accepted")
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
 		_stdout.print("Metrics Collector:  received data.")
+    true
 
   fun ref connected(conn: TCPConnection ref) =>
     _stdout.print("Metrics Collector: connected.")

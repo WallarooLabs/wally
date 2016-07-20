@@ -178,7 +178,7 @@ class ConnectNotify is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("dagon: connection accepted")
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     for chunked in _framer.chunk(consume data).values() do
       try
         let decoded = ExternalMsgDecoder(consume chunked)
@@ -202,6 +202,7 @@ class ConnectNotify is TCPConnectionNotify
         _env.out.print("dagon: Unable to decode message from child")
       end
     end
+    true
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("dagon: server closed")
