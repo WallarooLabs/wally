@@ -26,15 +26,11 @@ dagon-pony takes four arguments:
 ```
 -t time in seconds to wait for processing to finish after Giles
    Sender is done
--e giles-receiver will terminate early if it receives all of the messages
-   it is expecting.
-   If no 'expect' is specified for giles-receiver in the ini section,
-   Dagon behaves as if it wasn't invoked with '-e'
 -f configuration file path
 -h host ip address dagon should listen on
 ```
 
 Example:
 ```
-./dagon -t 10 -e -f double-divide.ini -h 127.0.0.1:8080
+./dagon -t 10 -f double-divide.ini -h 127.0.0.1:8080
 ```
