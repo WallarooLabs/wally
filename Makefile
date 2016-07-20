@@ -1,49 +1,40 @@
-current_dir = $(shell pwd)
-latest_ponyc_tag = $(shell curl -s \
+current_dir := $(shell pwd)
+latest_ponyc_tag := $(shell curl -s \
   https://hub.docker.com/r/sendence/ponyc/tags/ | grep -o \
   'sendence-[0-9.-]*-' | sed 's/sendence-\([0-9.-]*\)-/\1/' \
   | sort -un | tail -n 1)# latest ponyc tag
 docker_image_version ?= $(shell git describe --tags --always)## Docker Image Tag to use
-docker_image_repo ?= docker.sendence.com:5043/sendence## Docker Repository to use
+docker_image_repo_host ?= docker.sendence.com:5043## Docker Repository to use
+docker_image_repo ?= $(docker_image_repo_host)/sendence## Docker Repository to use
 arch ?= native## Architecture to build for
 in_docker ?= false## Whether already in docker or not (used by CI)
 ponyc_tag ?= sendence-$(latest_ponyc_tag)-debug## tag for ponyc docker to use
 ponyc_runner ?= sendence/ponyc## ponyc docker image to use
 debug ?= false## Use ponyc debug option (-d)
-debug_arg =# Final argument string for docker no pull
-docker_no_pull ?= false## Don't pull docker images for dagon run
-docker_no_pull_arg =# Final argument string for docker no pull
+debug_arg :=# Final argument string for docker no pull
 docker_host ?= $(DOCKER_HOST)## docker host to build/run containers on
 ifeq ($(docker_host),)
-  docker_host = unix:///var/run/docker.sock
+  docker_host := unix:///var/run/docker.sock
 endif
-docker_host_arg = --host=$(docker_host)# docker host argument
+docker_host_arg := --host=$(docker_host)# docker host argument
 dagon_docker_host ?= ## Dagon docker host arg (defaults to docker_host value)
+monhub_builder ?= monitoring-hub-builder
+monhub_builder_tag ?= latest
 
 ifeq ($(dagon_docker_host),)
-  dagon_docker_host = $(docker_host)
+  dagon_docker_host := $(docker_host)
 endif
 
-dagon_docker_host_arg = --host=$(dagon_docker_host)# dagon docker host argument
+dagon_docker_host_arg := --host=$(dagon_docker_host)# dagon docker host argument
 
 ifeq ($(shell uname -s),Linux)
-  extra_xargs_arg = -r
-  docker_user_arg = -u `id -u`
-  extra_awk_arg = \\
-endif
-
-ifdef docker_no_pull
-  ifeq (,$(filter $(docker_no_pull),false true))
-    $(error Unknown docker_no_pull option "$(docker_no_pull)")
-  endif
+  extra_xargs_arg := -r
+  docker_user_arg := -u `id -u`
+  extra_awk_arg := \\
 endif
 
 ifeq ($(debug),true)
-  debug_arg=-d
-endif
-
-ifeq ($(docker_no_pull),true)
-  docker_no_pull_arg=--no_docker_pull
+  debug_arg := -d
 endif
 
 ifdef arch
@@ -58,84 +49,68 @@ ifdef in_docker
   endif
 endif
 
-ifeq ($(in_docker),true)
-  ifeq ($(arch),armhf)
-    define PONYC
-      cd $(current_dir)/$(1) && stable fetch
-      cd $(current_dir)/$(1) && stable env ponyc $(debug_arg) \
-        --triple arm-unknown-linux-gnueabihf -robj .
-      cd $(current_dir)/$(1) && arm-linux-gnueabihf-gcc \
-        -o `basename $(current_dir)/$(1)` \
-        -O3 -march=armv7-a -flto -fuse-linker-plugin \
-        -fuse-ld=gold \
-        `basename $(current_dir)/$(1)`.o \
-        -L"/usr/local/lib" \
-        -L"/build/arm/ponyc/build/debug/" \
-        -L"/build/arm/ponyc/build/release/" \
-        -L"/build/arm/ponyc/packages" \
-        -Wl,--start-group \
-        -l"rt" \
-        -l"pcre2-8" \
-        -Wl,--end-group  \
-        -lponyrt -lpthread -ldl -lm
-    endef
-  else
-    define PONYC
-      cd $(current_dir)/$(1) && stable fetch
-      cd $(current_dir)/$(1) && stable env ponyc $(debug_arg) .
-    endef
-  endif
-else
-  ifeq ($(arch),amd64)
-    define PONYC
-      docker run --rm -it $(docker_user_arg) -v $(current_dir):$(current_dir) \
-        -v ~/.gitconfig:/.gitconfig \
-        -w $(current_dir)/$(1) --entrypoint stable \
-        $(ponyc_runner):$(ponyc_tag) fetch
-      docker run --rm -it $(docker_user_arg) -v $(current_dir):$(current_dir) \
-        -w $(current_dir)/$(1) --entrypoint stable \
-        $(ponyc_runner):$(ponyc_tag) env ponyc $(debug_arg) .
-    endef
-  else ifeq ($(arch),armhf)
-    define PONYC
-      docker run --rm -it $(docker_user_arg) \
-        -v ~/.gitconfig:/.gitconfig -v \
-        $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
-        --entrypoint stable $(ponyc_runner):$(ponyc_tag) \
-        fetch
-      docker run --rm -it $(docker_user_arg) -v \
-        $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
-        --entrypoint stable $(ponyc_runner):$(ponyc_tag) \
-        env ponyc $(debug_arg) --triple arm-unknown-linux-gnueabihf -robj .
-      docker run --rm -it $(docker_user_arg) -v \
-        $(current_dir):$(current_dir) -w $(current_dir)/$(1) \
-        --entrypoint arm-linux-gnueabihf-gcc \
-        $(ponyc_runner):$(ponyc_tag) \
-        -o `basename $(current_dir)/$(1)` \
-        -O3 -march=armv7-a -flto -fuse-linker-plugin \
-        -fuse-ld=gold \
-        `basename $(current_dir)/$(1)`.o \
-        -L"/usr/local/lib" \
-        -L"/build/arm/ponyc/build/debug/" \
-        -L"/build/arm/ponyc/build/release/" \
-        -L"/build/arm/ponyc/packages" \
-        -Wl,--start-group \
-        -l"rt" \
-        -l"pcre2-8" \
-        -Wl,--end-group  \
-        -lponyrt -lpthread -ldl -lm
-    endef
-  else
-    define PONYC
-      cd $(current_dir)/$(1) && stable fetch
-      cd $(current_dir)/$(1) && stable env ponyc $(debug_arg) .
-    endef
-  endif
+ifeq ($(arch),armhf)
+  ponyc_arch_args := --triple arm-unknown-linux-gnueabihf --cpu=armv7-a
 endif
+
+ifneq ($(arch),native)
+  quote = '
+  ponyc_docker_args = docker run --rm -it $(docker_user_arg) -v \
+        $(current_dir):$(current_dir) \
+        -v $(HOME)/.gitconfig:/.gitconfig \
+        -v $(HOME)/.gitconfig:/root/.gitconfig \
+        -w $(current_dir)/$(1) --entrypoint bash \
+        $(ponyc_runner):$(ponyc_tag) -c $(quote)
+
+  monhub_docker_args = docker run --rm -it -v \
+        $(current_dir):$(current_dir) \
+        -v $(HOME)/.gitconfig:/.gitconfig \
+        -v $(HOME)/.gitconfig:/root/.gitconfig \
+        -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
+        -v $(HOME)/.git-credential-cache:/.git-credential-cache \
+        -w $(current_dir)/$(1) --entrypoint bash \
+        $(docker_image_repo_host)/$(monhub_builder):$(monhub_builder_tag) -c $(quote)
+endif
+
+
+define PONYC
+  cd $(current_dir)/$(1) && $(ponyc_docker_args) stable fetch \
+    $(if $(filter $(ponyc_docker_args),docker),$(quote))
+  cd $(current_dir)/$(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
+    $(debug_arg) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
+endef
+
+define MONHUBC
+  cd $(current_dir)/$(1) && $(monhub_docker_args) MIX_ENV=prod mix deps.clean --all \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  cd $(current_dir)/$(1) && $(monhub_docker_args) MIX_ENV=prod mix deps.get --only prod \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  cd $(current_dir)/$(1) && $(monhub_docker_args) MIX_ENV=prod mix compile \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  cd $(current_dir)/$(1) && $(monhub_docker_args) npm install \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  cd $(current_dir)/$(1) && $(monhub_docker_args) npm run build:production \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  cd $(current_dir)/$(1) && $(monhub_docker_args) MIX_ENV=prod mix phoenix.digest \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  cd $(current_dir)/$(1) && $(monhub_docker_args) MIX_ENV=prod mix release.clean \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  cd $(current_dir)/$(1) && $(monhub_docker_args) MIX_ENV=prod mix release \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+endef
+
 
 default: build
 
 print-%  : ; @echo $* = $($*)
+
+docker-arch-check:
+	$(if $(filter $(arch),native),$(error Arch cannot be 'native' \
+          for docker build!),)
+
+monhub-arch-check:
+	$(if $(filter $(arch),armhf),$(error Arch cannot be 'armhf' \
+          for building of monitoring hub!),)
 
 build-buffy-components: build-receiver build-sender build-dagon build-dagon-child build-fallor
 
@@ -183,25 +158,11 @@ build-wesley: ## Build wesley
 	$(call PONYC,wesley/wordcount-test)
 	$(call PONYC,wesley/market-spread-test)
 
-build-metrics-reporter-ui: ## Build Metrics Reporter UI
-	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix deps.clean --all
-	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix deps.get --only prod
-	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix compile
-	cd monitoring_hub/apps/metrics_reporter_ui && npm install
-	cd monitoring_hub/apps/metrics_reporter_ui && npm run build:production
-	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix phoenix.digest
-	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix release.clean
-	cd monitoring_hub/apps/metrics_reporter_ui && MIX_ENV=prod mix release
+build-metrics-reporter-ui: monhub-arch-check## Build Metrics Reporter UI
+	$(call MONHUBC,monitoring_hub/apps/metrics_reporter_ui)
 
-build-market-spread-reports-ui: ## Build Market Spread Reports UI
-	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix deps.clean --all
-	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix deps.get --only prod
-	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix compile
-	cd monitoring_hub/apps/market_spread_reports_ui && npm install
-	cd monitoring_hub/apps/market_spread_reports_ui && npm run build:production
-	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix phoenix.digest
-	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix release.clean
-	cd monitoring_hub/apps/market_spread_reports_ui && MIX_ENV=prod mix release
+build-market-spread-reports-ui: monhub-arch-check## Build Market Spread Reports UI
+	$(call MONHUBC,monitoring_hub/apps/market_spread_reports_ui)
 
 build-fallor: ## build fallor decoder
 	$(call PONYC,fallor)
@@ -312,77 +273,7 @@ dagon-word-length-count: ## Run word length count test with dagon
 	./dagon/dagon --timeout=15 -f apps/word-length-count/word-length-count.ini -h 127.0.0.1:8080
 	./wesley/word-length-count-test/word-length-count-test ./sent.txt ./received.txt match
 
-dagon-docker-test: #dagon-docker-identity dagon-docker-double ## Run dagon tests using docker
-
-dagon-docker-double: ## Run double test with dagon
-	docker $(docker_host_arg) ps -a | \
-          grep $(docker_image_version) | \
-          awk '{print $$1}' | xargs $(extra_xargs_arg) docker \
-          $(docker_host_arg) rm
-	docker $(dagon_docker_host_arg) ps -a | \
-          grep $(docker_image_version) | \
-          awk '{print $$1}' | xargs $(extra_xargs_arg) docker \
-          $(dagon_docker_host_arg) rm
-	docker $(docker_host_arg) run -i --privileged --net=host -e \
-          "LC_ALL=C.UTF-8" -e "LANG=C.UTF-8"  -v /bin:/bin:ro -v /lib:/lib:ro \
-          -v /lib64:/lib64:ro -v /usr:/usr:ro -v /etc:/etc:ro -v \
-          /var/run/docker.sock:/var/run/docker.sock  -v /root:/root:ro -v \
-          /dagon/config -v \
-          /tmp/dagon-$(docker_image_version):/tmp/dagon-$(docker_image_version)\
-          -w /tmp/dagon-$(docker_image_version) --name \
-          dagon-container-$(docker_image_version) \
-          $(docker_image_repo)/dagon:$(docker_image_version) \
-          /dagon/config/double.ini --docker_tag $(docker_image_version) \
-          --docker --docker_host $(dagon_docker_host) $(docker_no_pull_arg)
-	docker $(docker_host_arg) run --rm --privileged -i -v /bin:/bin:ro -v \
-        /lib:/lib:ro -v /lib64:/lib64:ro  -v /usr:/usr:ro -v /etc:/etc:ro -v \
-        /var/run/docker.sock:/var/run/docker.sock  -v /root:/root:ro -v \
-        /tmp/dagon-$(docker_image_version):/tmp/dagon-$(docker_image_version) \
-        -w /tmp/dagon-$(docker_image_version) \
-        --volumes-from dagon-container-$(docker_image_version) \
-        docker.sendence.com:5043/sendence/wesley-double.$(arch):$(docker_image_version) \
-        sent.txt received.txt /dagon/config/double.ini
-	docker $(docker_host_arg) ps -a | grep \
-          $(docker_image_version) | awk '{print $$1}' | xargs \
-          $(extra_xargs_arg) docker $(docker_host_arg) rm
-	docker $(dagon_docker_host_arg) ps -a | grep \
-          $(docker_image_version) | awk '{print $$1}' | xargs \
-          $(extra_xargs_arg) docker $(dagon_docker_host_arg) rm
-
-dagon-docker-identity: ## Run identity test with dagon
-	docker $(docker_host_arg) ps -a | grep \
-          $(docker_image_version) | awk '{print $$1}' | xargs \
-          $(extra_xargs_arg) docker $(docker_host_arg) rm
-	docker $(dagon_docker_host_arg) ps -a | grep \
-          $(docker_image_version) | awk '{print $$1}' | xargs \
-          $(extra_xargs_arg) docker $(dagon_docker_host_arg) rm
-	docker $(docker_host_arg) run -i --privileged --net=host -e \
-          "LC_ALL=C.UTF-8" -e "LANG=C.UTF-8"  -v /bin:/bin:ro -v /lib:/lib:ro \
-          -v /lib64:/lib64:ro -v /usr:/usr:ro -v /etc:/etc:ro -v \
-          /var/run/docker.sock:/var/run/docker.sock  -v /root:/root:ro -v \
-          /dagon/config -v \
-          /tmp/dagon-$(docker_image_version):/tmp/dagon-$(docker_image_version)\
-          -w /tmp/dagon-$(docker_image_version) --name \
-          dagon-container-$(docker_image_version) \
-          $(docker_image_repo)/dagon:$(docker_image_version) \
-          /dagon/config/identity.ini --docker_tag $(docker_image_version) \
-          --docker --docker_host $(dagon_docker_host) $(docker_no_pull_arg)
-	docker $(docker_host_arg) run --rm --privileged -i -v /bin:/bin:ro -v \
-        /lib:/lib:ro -v /lib64:/lib64:ro  -v /usr:/usr:ro -v /etc:/etc:ro -v \
-        /var/run/docker.sock:/var/run/docker.sock  -v /root:/root:ro -v \
-        /tmp/dagon-$(docker_image_version):/tmp/dagon-$(docker_image_version) \
-        -w /tmp/dagon-$(docker_image_version) \
-        --volumes-from dagon-container-$(docker_image_version) \
-        docker.sendence.com:5043/sendence/wesley-identity.$(arch):$(docker_image_version) \
-        sent.txt received.txt /dagon/config/identity.ini
-	docker $(docker_host_arg) ps -a | grep \
-          $(docker_image_version) | awk '{print $$1}' | xargs \
-          $(extra_xargs_arg) docker $(docker_host_arg) rm
-	docker $(dagon_docker_host_arg) ps -a | grep \
-          $(docker_image_version) | awk '{print $$1}' | xargs \
-          $(extra_xargs_arg) docker $(dagon_docker_host_arg) rm
-
-build-docker:  ## Build docker images for Buffy
+build-docker: docker-arch-check ## Build docker images for Buffy
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/giles-receiver.$(arch):$(docker_image_version) \
           giles/receiver
@@ -445,13 +336,6 @@ push-docker: build-docker ## Push docker images for Buffy to repository
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/dagon-child.$(arch):$(docker_image_version)
 
-exited := $(shell docker $(docker_host_arg) ps -a -q -f status=exited)
-untagged := $(shell (docker $(docker_host_arg) images | grep "^<none>" | awk \
-              -F " " '{print $$3}'))
-dangling := $(shell docker $(docker_host_arg) images -f "dangling=true" -q)
-tag := $(shell docker $(docker_host_arg) images | grep \
-         "$(docker_image_version)" | awk -F " " '{print $$1 ":" $$2}')
-
 build-market-spread-reports-ui-docker:
 	docker $(docker_host_arg) build -t \
 		$(docker_image_repo)/monitoring_hub/apps/market_spread_reports_ui.$(arch):$(docker_image_version) \
@@ -467,13 +351,13 @@ push-monitoring-hub-ui-docker: build-market-spread-reports-ui-docker build-metri
 		$(docker_image_repo)/monitoring_hub/apps/market_spread_reports_ui.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
 		$(docker_image_repo)/monitoring_hub/apps/metrics_reporter_ui.$(arch):$(docker_image_version)
+
 exited := $(shell docker $(docker_host_arg) ps -a -q -f status=exited)
 untagged := $(shell (docker $(docker_host_arg) images | grep "^<none>" | awk \
               -F " " '{print $$3}'))
 dangling := $(shell docker $(docker_host_arg) images -f "dangling=true" -q)
 tag := $(shell docker $(docker_host_arg) images | grep \
          "$(docker_image_version)" | awk -F " " '{print $$1 ":" $$2}')
-
 
 clean-docker: ## cleanup docker images and containers
 ifneq ($(strip $(exited)),)
