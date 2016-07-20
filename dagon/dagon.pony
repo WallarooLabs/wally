@@ -40,7 +40,6 @@ actor Main
     var docker_tag: (String | None) = None
     var use_docker: Bool = false
     var timeout: (I64 | None) = None
-    var expect: Bool = false
     var path: (String | None) = None
     var p_arg: (Array[String] | None) = None
     var phone_home_host: String = ""
@@ -52,7 +51,6 @@ actor Main
     .add("docker", "d", StringArgument)
     .add("tag", "T", StringArgument)
     .add("timeout", "t", I64Argument)
-    .add("expect", "e", None)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
     try
@@ -61,7 +59,6 @@ actor Main
         | ("docker", let arg: String) => docker_host = arg
         | ("tag", let arg: String) => docker_tag = arg
         | ("timeout", let arg: I64) => timeout = arg
-        | ("expect", _) => expect = true
         | ("filepath", let arg: String) => path = arg
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
         | let err: ParseError =>
@@ -73,7 +70,6 @@ actor Main
       env.err.print("""dagon: usage: [--docker=<host:port>
 --tag/-T <tag>]
 --timeout/-t <seconds>
---expect/-e
 --filepath/-f <path>
 --phone-home/-h <host:port>""")
       return
@@ -126,7 +122,6 @@ actor Main
       end
 
       env.out.print("dagon: timeout: " + timeout.string())
-      env.out.print("dagon: expect: " + expect.string())
       env.out.print("dagon: path: " + (path as String))
 
       phone_home_host = (p_arg as Array[String])(0)
@@ -137,7 +132,7 @@ actor Main
 
       ProcessManager(env, use_docker, docker_host as String,
         docker_tag as String, timeout as I64, path as String,
-        phone_home_host, phone_home_service, expect)
+        phone_home_host, phone_home_service)
     else
       env.err.print("dagon: error parsing arguments")
     end
@@ -284,14 +279,12 @@ actor ProcessManager
   var _listener_timer: (Timer tag | None) = None
   var _processing_timer: (Timer tag | None) = None
   let _docker_postfix: String
-  let _expect: Bool
-  var _expecting: String = ""
+  var _expect: Bool = false
 
   new create(env: Env, use_docker: Bool, docker_host: String,
     docker_tag: String,
     timeout: I64, path: String,
-    host: String, service: String,
-    expect: Bool)
+    host: String, service: String)
   =>
     _env = env
     _use_docker = use_docker
@@ -302,7 +295,6 @@ actor ProcessManager
     _host = host
     _service = service
     _docker_postfix = Time.wall_to_nanos(Time.now()).string()
-    _expect = expect
 
     let tcp_n = recover Notifier(env, this) end
     try
