@@ -358,7 +358,7 @@ actor ProcessManager
       _env.out.print("dagon: can't cancel processing timer")
     end
   else
-    _env.out.print("dagon: no processer to cancel")
+    _env.out.print("dagon: no processing timer to cancel")
   end
 
   be boot_topology() =>
