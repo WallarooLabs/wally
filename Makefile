@@ -214,12 +214,9 @@ test-mh-metrics-reporter: ## Test MH Metrics Reporter
 test-mh-metrics-reporter-ui: ## Test MH Metrics Reporter UI
 	cd monitoring_hub/apps/metrics_reporter_ui && mix test
 
-dagon-test: dagon-identity dagon-word-count dagon-market-spread dagon-identity-drop #dagon-word-length-count #dagon-double ## Run dagon tests
+dagon-test: dagon-identity dagon-word-count dagon-market-spread #dagon-word-length-count ## Run dagon tests
 
-dagon-double: ## Run double test with dagon
-	dagon/dagon.py dagon/config/double.ini
-	wesley/double-test/double-test sent.txt received.txt \
-          dagon/config/double.ini
+dagon-spike-test: dagon-identity-drop ## Run dagon spike tests
 
 dagon-identity: ## Run identity test with dagon
 	./dagon/dagon --timeout=15 -f apps/double-divide/double-divide.ini -h 127.0.0.1:8080

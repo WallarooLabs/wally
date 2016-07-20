@@ -210,6 +210,17 @@ build:
       matrix:
         PONYC_VERSION: amd64
 
+  # run dagon spike tests
+  run_dagon_spike_test:
+    image: sendence/$$PONYC_VERSION-python-runner:0.0.4
+    pull: true
+    environment:
+      - LC_ALL=C.UTF-8
+      - LANG=C.UTF-8
+    commands:
+      - chrt -f 80 make dagon-spike-test arch=$$PONYC_VERSION
+    privileged: true
+
 # send notifications to slack
 notify:
   slack:
