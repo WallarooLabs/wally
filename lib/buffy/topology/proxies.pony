@@ -21,11 +21,12 @@ actor Proxy is BasicStep
     _coordinator = coordinator
     _metrics_collector = metrics_collector
 
-  be apply(input: StepMessage val) =>
-    let forward = Forward(_step_id, _node_name, input)
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
+    let forward = Forward(_step_id, _node_name, msg_id, source_ts, 
+      ingress_ts, msg_data)
     _coordinator.send_data_message(_target_node_name, forward)
     _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
-      input.id(), input.last_ingress_ts(), Epoch.nanoseconds())
+      msg_id, ingress_ts, Epoch.nanoseconds())
 
 actor StepManager
   let _env: Env
@@ -42,9 +43,11 @@ actor StepManager
     _sink_addrs = sink_addrs
     _metrics_collector = metrics_collector
 
-  be apply(step_id: U64, msg: StepMessage val) =>
+  be apply(step_id: U64, msg_id: U64, source_ts: U64, ingress_ts: U64, 
+    msg_data: Any val) 
+  =>
     try
-      _steps(step_id)(msg)
+      _steps(step_id)(msg_id, source_ts, ingress_ts, msg_data)
     else
       _env.out.print("StepManager: Could not forward message")
     end

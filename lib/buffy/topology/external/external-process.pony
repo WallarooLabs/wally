@@ -86,17 +86,18 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be add_output(to: BasicStep tag) =>
     _output = to
 
-  be apply(input: StepMessage val) =>
+  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
     _restart_process_if_necessary()
-    _execute_with_process(lambda(p: ProcessMonitor)(input, codec=_codec, length_encoder=_length_encoder) =>
-      match input
-      | let m: Message[In] val =>
+    _execute_with_process(lambda(p: ProcessMonitor)(msg_id, source_ts,
+      ingress_ts, msg_data, codec=_codec, length_encoder=_length_encoder) =>
+      match msg_data
+      | let d: In =>
         let start_time = Epoch.milliseconds()
-        let ext_msg = ExternalMessage[In](m.id(), m.source_ts(), 
-          m.last_ingress_ts(), start_time, m.data())
+        let ext_msg = ExternalMessage[In](msg_id, source_ts, 
+          ingress_ts, start_time, d)
         try
-          let msg_data = codec.encode(ext_msg)
-          let length_encoded_msg = length_encoder(msg_data)
+          let encoded_msg_data = codec.encode(ext_msg)
+          let length_encoded_msg = length_encoder(encoded_msg_data)
           p.writev(length_encoded_msg)
         end
       end
@@ -132,8 +133,8 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be _message_completed(msg_undecoded: Array[U8] val) =>
     try  
       let ext_msg: ExternalMessage[Out] val = _codec.decode(msg_undecoded)
-      let msg = Message[Out](ext_msg.id(), ext_msg.source_ts(), ext_msg.last_ingress_ts(), ext_msg.data())
-      _output(msg)
+      _output(ext_msg.id(), ext_msg.source_ts(), ext_msg.last_ingress_ts(), 
+        ext_msg.data())
       match _step_reporter
       | let sr: StepReporter val => 
         let end_time: U64 = Epoch.milliseconds()
