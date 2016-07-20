@@ -359,7 +359,6 @@ actor SendingActor
     _batch_size = batch_size
     _interval = interval
     _wb = WriteBuffer
-    _wb.reserve_chunks(_batch_size)
     // _msg_encoder = BufferedExternalMsgEncoder(where chunks = _batch_size)
 
   be go() =>
@@ -377,6 +376,8 @@ actor SendingActor
       end
 
     if (current_batch_size > 0) and _data_source.has_next() then
+      _wb.reserve_chunks(current_batch_size)
+
       let d' = recover Array[ByteSeq](current_batch_size) end
       for i in Range(0, current_batch_size) do
         try
