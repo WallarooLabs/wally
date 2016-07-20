@@ -17,53 +17,46 @@ interface PartitionFunction[In]
   fun apply(input: In): U64
 
 trait StateProcessor[State: Any #read]
-  fun apply(state: State): State
+  fun apply(msg_id: U64, source_ts: U64, ingress_ts: U64, state: State): State
   fun partition_id(): U64 => 0
 
 interface StateComputation[Out: Any val, State: Any #read]
-  fun apply(state: State, output: MessageTarget[Out] val): State
+  fun apply(state: State, output: MessageTarget val): State
 
 class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
   is StateProcessor[State]
   let _state_computation: StateComputation[Out, State] val
-  let _output: MessageTarget[Out] val
+  let _output: BasicStep tag
   let _partition_id: U64
 
   new val create(sc: StateComputation[Out, State] val,
-    message_wrapper: MessageWrapper[Out] val,
     output_step: BasicStep tag, p_id: U64 = 0) =>
     _state_computation = sc
-    _output = MessageTarget[Out](message_wrapper, output_step)
+    _output = output_step
     _partition_id = p_id
 
-  fun apply(state: State): State =>
-    _state_computation(state, _output)
+  fun apply(msg_id: U64, source_ts: U64, ingress_ts: U64, state: State): State 
+  =>
+    let target = MessageTarget(_output, msg_id, source_ts, ingress_ts)
+    _state_computation(state, target)
 
   fun partition_id(): U64 => _partition_id
 
-class MessageTarget[Out: Any val]
+class MessageTarget
   let _output: BasicStep tag
-  let _message_wrapper: MessageWrapper[Out] val
-
-  new val create(mw: MessageWrapper[Out] val, o: BasicStep tag) =>
-    _output = o
-    _message_wrapper = mw
-
-  fun apply(data: Out) =>
-    _output(_message_wrapper(data))
-
-class MessageWrapper[T: Any val]
   let _id: U64
   let _source_ts: U64
-  let _last_ingress_ts: U64
+  let _ingress_ts: U64
 
-  new val create(id: U64, source_ts: U64, last_ingress_ts: U64) =>
-    _id = id
+  new val create(o: BasicStep tag, msg_id: U64, source_ts: U64, 
+    ingress_ts: U64) =>
+    _output = o
+    _id = msg_id
     _source_ts = source_ts
-    _last_ingress_ts = last_ingress_ts
+    _ingress_ts = ingress_ts
 
-  fun apply(data: T): Message[T] val =>
-    Message[T](_id, _source_ts, _last_ingress_ts, data)
+  fun apply(data: Any val) =>
+    _output(_id, _source_ts, _ingress_ts, data)
 
 interface ComputationBuilder[In, Out]
   fun apply(): Computation[In, Out] iso^

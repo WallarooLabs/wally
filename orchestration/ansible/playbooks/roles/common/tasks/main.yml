@@ -35,3 +35,35 @@
   apt: deb=/tmp/ptpd_2.3.2-master-1_amd64.deb
   when: (ansible_architecture == "x86_64") and (not ptpd.stat.exists)
 
+- name: List ponyc custom C libs from S3
+  s3:
+    mode=list
+    bucket=sendence-dev
+    prefix=ponyc_external_dependencies/
+  register: s3_bucket_items
+
+- name: Filter list of ponyc custom C libs (amd64)
+  set_fact:
+    custom_libs: "{{ s3_bucket_items.s3_keys | select('search', '/amd64') | list }}"
+  when: (ansible_architecture == "x86_64")
+
+- name: Filter list of ponyc custom C libs (armhf)
+  set_fact:
+    custom_libs: "{{ s3_bucket_items.s3_keys | select('search', '/armhf') | list }}"
+  when: ('arm' == '{{ ansible_architecture[0:3] }}')
+
+- name: download ponyc custom C libs from S3
+  s3:
+    mode=get
+    bucket=sendence-dev
+    object={{ item }}
+    dest=/tmp/{{ item | basename }}
+  with_items: custom_libs
+
+- name: unarchive ponyc custom C libs
+  unarchive:
+    src=/tmp/{{ item | basename }}
+    dest=/usr/
+    copy=no
+  with_items: custom_libs
+

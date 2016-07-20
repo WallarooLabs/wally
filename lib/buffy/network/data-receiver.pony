@@ -17,11 +17,11 @@ actor DataReceiver
     let t = Timer(_Ack(this), 1_000_000_000, 1_000_000_000)
     _timers(consume t)
 
-  be received(data_ch_id: U64, step_id: U64, msg: StepMessage val,
-    step_manager: StepManager tag) =>
+  be received(data_ch_id: U64, step_id: U64, msg_id: U64, source_ts: U64, 
+    ingress_ts: U64, msg_data: Any val, step_manager: StepManager tag) =>
     if data_ch_id > _last_id_seen then
       _last_id_seen = data_ch_id
-      step_manager(step_id, msg)
+      step_manager(step_id, msg_id, source_ts, ingress_ts, msg_data)
     end
 
   be ack() => _ack()

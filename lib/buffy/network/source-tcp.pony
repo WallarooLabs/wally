@@ -90,17 +90,14 @@ class SourceConnectNotify is TCPConnectionNotify
         _env.err.print("Error reading header from external source")
       end
     else
-      let now = Epoch.nanoseconds()
-      let new_msg: Message[String] val = Message[String](
-        _guid_gen(), now, now, String.from_array(consume data))
-      if _source_initialized then
-        _source_step(new_msg)
-      else
+      if not _source_initialized then
         _step_manager.passthrough_to_step(_source_id, 
           _source_step)
-        _source_step(new_msg)
         _source_initialized = true
       end
+
+      let now = Epoch.nanoseconds()
+      _source_step(_guid_gen(), now, now, String.from_array(consume data))
 
       conn.expect(4)
       _header = true

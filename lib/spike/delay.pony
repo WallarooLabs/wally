@@ -273,3 +273,4 @@ trait _Delayer
 
   fun ref _next_interval(min: USize, max: USize, d: Dice): USize =>
     d(min.u64(), max.u64()).usize()
+    

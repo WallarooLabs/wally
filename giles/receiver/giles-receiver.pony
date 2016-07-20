@@ -151,8 +151,7 @@ class FromBuffyNotify is TCPConnectionNotify
     _store = store
     _stderr = stderr
     try
-      if (expected as USize) > 0
-      then
+      if (expected as USize) > 0 then
         _remaining = expected as USize
         _expect_termination = true
       end
@@ -165,11 +164,12 @@ class FromBuffyNotify is TCPConnectionNotify
         if (_count % 100_000) == 0 then
           @printf[I32]("%zu received\n".cstring(), _count)
         end
-        if _expect_termination
-          then _remaining = _remaining - 1
+        if _expect_termination then
+          _remaining = _remaining - 1
         end
 
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+
         conn.expect(expect)
         _header = false
       else
@@ -177,8 +177,7 @@ class FromBuffyNotify is TCPConnectionNotify
       end
     else
       _store.received(consume data, Time.wall_to_nanos(Time.now()))
-      if _expect_termination and (_remaining <= 0)
-       then
+      if _expect_termination and (_remaining <= 0) then
         _stderr.print(_count.string() + " expected messages received. " +
           "Terminating...")
         _coordinator.finished()
