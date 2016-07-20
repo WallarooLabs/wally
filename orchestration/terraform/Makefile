@@ -6,15 +6,15 @@ cluster_pem ?= ~/.ssh/ec2/$(region).pem## PEM file to use for ssh keys for clust
 terraform_args ?= ## Terraform arguments.
 use_placement_group ?= false## Whether to use placement group or not
 ansible_vault_password ?= ~/.ansible_vault_pass.txt## Ansible Vault password file
-use_cheapest_instances ?= true## Find cheapest instances to use (spot included); Will automagically use placement groups if applicable
-mem_required ?= 0.5## Minimum amount of memory in GB per instance (for use_cheapest_instances=true)
-cpus_required ?= 0.05## Minimum amount of CPUs per instance (for use_cheapest_instances=true)
-no_burst ?= false## Don't use burstable instances (t1.*, t2.*) (for use_cheapest_instances=true)
-no_burst_arg :=# args for no-burst for cheapest instance script
-no_spot ?= false## Don't use spot pricing (for use_cheapest_instances=true)
-no_spot_arg :=# args for no-spot for cheapest instance script
-spot_bid_factor ?= 1.25## Percentage of maximum historical price to bid (automagically capped at instance on-demand price) (for use_cheapest_instances=true)
-force_instance ?= ## Force a specific instance type (for use_cheapest_instances=true)
+use_automagic_instances ?= true## Find appropriate instances to use (spot included); Will automagically use placement groups if applicable
+mem_required ?= 0.5## Minimum amount of memory in GB per instance (for use_automagic_instances=true)
+cpus_required ?= 0.05## Minimum amount of CPUs per instance (for use_automagic_instances=true)
+no_burst ?= false## Don't use burstable instances (t1.*, t2.*) (for use_automagic_instances=true)
+no_burst_arg :=# args for no-burst for automagic instance script
+no_spot ?= false## Don't use spot pricing (for use_automagic_instances=true)
+no_spot_arg :=# args for no-spot for automagic instance script
+spot_bid_factor ?= 1.25## Percentage of maximum historical price to bid (automagically capped at instance on-demand price) (for use_automagic_instances=true)
+force_instance ?= ## Force a specific instance type (for use_automagic_instances=true)
 ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
 num_leaders ?= 1## Number of leader nodes
 num_followers ?= 2## Number of follower nodes
@@ -34,7 +34,7 @@ else
   ansible_parallelism_arg := --forks=$(ansible_parallelism)
 endif
 
-# Do not change or remove. Used as part of the cheapest_instance logic
+# Do not change or remove. Used as part of the automagic_instance logic
 define newline
 
 
@@ -48,9 +48,9 @@ ifeq ($(no_spot),true)
   no_spot_arg := --no-spot
 endif
 
-ifdef use_cheapest_instances
-  ifeq (,$(filter $(use_cheapest_instances),false true))
-    $(error Unknown use_cheapest_instances option "$(use_cheapest_instances). \
+ifdef use_automagic_instances
+  ifeq (,$(filter $(use_automagic_instances),false true))
+    $(error Unknown use_automagic_instances option "$(use_automagic_instances). \
       Valid options are 'true' and 'false'")
   endif
 endif
@@ -194,40 +194,40 @@ setup_ci_arg: old_pg=$(shell egrep 'placement_group.:' \
                 | sed -e 's/.*: "\(.*\)",/\1/')
 setup_ci_arg: old_pg_args=$(if $(old_pg),ci_pg=is using placement groups\
        #pg_arg=-var placement_group=$(old_pg),ci_pg=is not using placement groups)
-setup_ci_arg: tmp_ci_args=$(if $(filter $(use_cheapest_instances),true),$(if \
+setup_ci_arg: tmp_ci_args=$(if $(filter $(use_automagic_instances),true),$(if \
        $(old_type),ci_old_values=true#ci_inst_type=$(old_type)#$(old_pg_args)\
        #ci_inst_price=$(old_price)#ci_az=$(old_az)#availability_zone=$(old_az)\
        #ci_current_price=???#ci_args=-var leader_instance_type=$(old_type) -var \
        follower_instance_type=$(old_type) -var leader_spot_price=$(old_price) \
        -var follower_spot_price=$(old_price),$(shell\
-       $(current_dir)/cheapest_instance.py --region $(region) --cpus \
+       $(current_dir)/automagic_instance.py --region $(region) --cpus \
        $(cpus_required) --mem $(mem_required) $(no_burst_arg) \
        --spot-bid-factor $(spot_bid_factor) --availability_zone \
        "$(availability_zone)" $(no_spot_arg) --instance_type "$(force_instance)")))
-setup_ci_arg: # set up cheapest instances arg
-	@echo $(if $(filter $(use_cheapest_instances),true),"\033[36m==> Using \
-automagic cheapest instance logic...\033[0m",\
-          "\033[36m==> Not using automagic cheapest instance logic...\033[0m")
+setup_ci_arg: # set up automagic instances arg
+	@echo $(if $(filter $(use_automagic_instances),true),"\033[36m==> Using \
+automagic instance logic...\033[0m",\
+          "\033[36m==> Not using automagic instance logic...\033[0m")
 	$(eval $(subst #,$(newline),$(tmp_ci_args)))
-	@echo $(if $(filter $(use_cheapest_instances),true), $(if \
-          $(ci_inst_type),,$(error Error running cheapest instance script!)))
-	@echo $(if $(filter $(use_cheapest_instances),true), $(if \
+	@echo $(if $(filter $(use_automagic_instances),true), $(if \
+          $(ci_inst_type),,$(error Error running automagic instance script!)))
+	@echo $(if $(filter $(use_automagic_instances),true), $(if \
         $(ci_old_values), "\033[36m==> Re-using values from existing cluster \
 to not clobber it.\033[0m",),)
-	@echo $(if $(filter $(use_cheapest_instances),true),"\033[36m==> \
-Automagic cheapest instance logic determined instance_type='$(ci_inst_type)' \
+	@echo $(if $(filter $(use_automagic_instances),true),"\033[36m==> \
+Automagic instance logic determined instance_type='$(ci_inst_type)' \
 current_price='$(ci_current_price)' bid_price='$(ci_inst_price)' and \
 availability_zone='$(ci_az)' and $(ci_pg).\033[0m",)
 
-post_message: # end of work output regarding automagic cheapest instance logic
-	@echo $(if $(filter $(use_cheapest_instances),true),"\033[36m==> Used \
-automagic cheapest instance logic...\033[0m",\
-          "\033[36m==> Didn't use automagic cheapest instance logic...\033[0m")
-	@echo $(if $(filter $(use_cheapest_instances),true), $(if \
+post_message: # end of work output regarding automagic instance logic
+	@echo $(if $(filter $(use_automagic_instances),true),"\033[36m==> Used \
+automagic instance logic...\033[0m",\
+          "\033[36m==> Didn't use automagic instance logic...\033[0m")
+	@echo $(if $(filter $(use_automagic_instances),true), $(if \
         $(ci_old_values), "\033[36m==> Re-used values from existing cluster \
 to not clobber it.\033[0m",),)
-	@echo $(if $(filter $(use_cheapest_instances),true),"\033[36m==> \
-Automagic cheapest instance logic determined instance_type='$(ci_inst_type)' \
+	@echo $(if $(filter $(use_automagic_instances),true),"\033[36m==> \
+Automagic instance logic determined instance_type='$(ci_inst_type)' \
 current_price='$(ci_current_price)' bid_price='$(ci_inst_price)' and \
 availability_zone='$(ci_az)' and $(ci_pg).\033[0m",)
 
