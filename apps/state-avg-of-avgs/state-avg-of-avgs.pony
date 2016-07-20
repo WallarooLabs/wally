@@ -49,7 +49,7 @@ class Average is StateComputation[U64, Averager]
     _data = d
 
   fun name(): String => "average"
-  fun apply(state: Averager, output: MessageTarget[U64] val)
+  fun apply(state: Averager, output: MessageTarget val)
     : Averager =>
     output(state(_data))
     state
