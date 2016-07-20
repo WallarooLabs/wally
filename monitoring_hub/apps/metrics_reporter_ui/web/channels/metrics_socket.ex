@@ -11,7 +11,8 @@ defmodule MetricsReporterUI.MetricsSocket do
 
   transport :websocket, Phoenix.Transports.WebSocket
   transport :longpoll, Phoenix.Transports.LongPoll
-  transport :tcp, PhoenixTCP.Transports.TCP
+  transport :tcp, PhoenixTCP.Transports.TCP,
+    timeout: :infinity
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After
