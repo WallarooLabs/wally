@@ -1,3 +1,24 @@
+- name: Add sendence group
+  group: name=sendence state=present gid=1111
+
+- name: Add sendence user
+  user:
+    name: sendence
+    uid: 1111
+    group: sendence
+    shell: /bin/bash
+
+- name: Copy ssh keys for sendence user
+  command: creates=/home/sendence/.ssh cp -rf /home/{{ ansible_user_id }}/.ssh /home/sendence/
+  when: (ansible_architecture == "x86_64")
+
+- name: Copy ssh keys for sendence user
+  command: creates=/home/sendence/.ssh cp -rf /root/.ssh /home/sendence/
+  when: ('arm' == '{{ ansible_architecture[0:3] }}')
+
+- name: Change ownership ssh keys for sendence user
+  file: path=/home/sendence/.ssh owner=sendence group=sendence recurse=yes state=directory
+
 - name: Install common packages
   apt: name={{ item }} state=latest update_cache=yes
   with_items:

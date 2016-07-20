@@ -1,4 +1,4 @@
-current_dir = $(shell pwd)
+current_dir := $(shell pwd)
 cluster_name ?= example## Cluster name to manage.
 region ?= us-east-1## Region to launch cluster in.
 availability_zone ?= ## Availability Zone to launch cluster in.
@@ -63,14 +63,14 @@ ifdef use_placement_group
 endif
 
 ifeq ($(use_placement_group),true)
-  valid_instances = $(shell curl -s \
+  valid_instances := $(shell curl -s \
     http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-groups.html \
     | grep -o '<\(code\).*</\1>' | egrep -o '\w{2,3}\.\w{5,}' | grep -v amazon)
   ifeq (,$(findstring -var follower_instance_type=,$(terraform_args)))
     $(error Must override follower_instance_type with terraform_args when using\
       placement groups!)
   else
-    follower_instance_type = $(shell echo $(terraform_args) | sed -E \
+    follower_instance_type := $(shell echo $(terraform_args) | sed -E \
       's/.*-var follower_instance_type=([a-zA-Z0-9.-]+).*/\1/')
     ifeq (,$(findstring  $(follower_instance_type) , $(valid_instances) ))
       $(error follower_instance_type ($(follower_instance_type)) must be one of\
@@ -81,14 +81,14 @@ ifeq ($(use_placement_group),true)
     $(error Must override leader_instance_type with terraform_args when using \
       placement groups!)
   else
-    leader_instance_type = $(shell echo $(terraform_args) | sed -E \
+    leader_instance_type := $(shell echo $(terraform_args) | sed -E \
       's/.*-var leader_instance_type=([a-zA-Z0-9.-]+).*/\1/')
     ifeq (,$(findstring  $(leader_instance_type) , $(valid_instances) ))
       $(error leader_instance_type ($(leader_instance_type)) must be one of the\
         following! $(valid_instances))
     endif
   endif
-  pg_arg = -var placement_group=buffy-$(cluster_name)
+  pg_arg := -var placement_group=buffy-$(cluster_name)
 endif
 
 ifneq (,$(findstring -var leader_spot_price=,$(terraform_args)))
@@ -119,7 +119,7 @@ ifneq (,$(findstring -var follower_spot_price=,$(terraform_args)))
   endif
 endif
 
-cluster_full_pem = $(shell echo $(cluster_pem))
+cluster_full_pem := $(shell echo $(cluster_pem))
 
 .PHONY: all get-lock init-vpc-terraform init-terrform plan apply terraform-plan\
         terraform-apply cluster setup_az_arg setup_ci_arg post_message
