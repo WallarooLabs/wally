@@ -417,10 +417,8 @@ actor ProcessManager
               is_leader = false
             end
           | "expect" =>
-            if _expect then
               is_expect = true
               argsbuilder.push("--" + key + "=" + sections(section)(key))
-            end
           else
             argsbuilder.push("--" + key + "=" + sections(section)(key))
           end
@@ -428,7 +426,9 @@ actor ProcessManager
         argsbuilder.push("--phone-home=" + _host + ":" + _service)
         let a: Array[String] val = consume argsbuilder
         let vars: Array[String] iso = recover Array[String](0) end
-        if is_expect then _expecting = name.clone() end
+        if is_expect and (name == "giles-receiver") then
+          _expect = true
+        end
 
         register_node(name, is_canary, is_leader, path,
           docker_image, docker_constraint, docker_dir,
@@ -1068,8 +1068,8 @@ actor ProcessManager
     _env.out.print("dagon: exited child: " + name)
     if _is_leader(name) and _is_done_shutdown(name) then
       shutdown_listener()
-    elseif _expecting == name then
-      _env.out.print("Expected termination occured for: " + name)
+    elseif (name == "giles-receiver") and _expect then
+      _env.out.print("Expected termination occured for: giles-receiver")
       cancel_timeout_timer()
     end
 
