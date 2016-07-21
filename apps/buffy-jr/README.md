@@ -1,5 +1,9 @@
 Be sure to listen on 9000 to simulate metrics receiver.
 
+Running binaries:
+ use Giles receiver, nc -l 127.0.01 9000, and Giles sender batch size 550
+ send in 1,000,000 messages
+
 Binaries:
 1 – four pass pass array
 2 – creates string and  convert string to array
