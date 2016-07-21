@@ -58,36 +58,7 @@ class IncomingNotify is TCPConnectionNotify
   new iso create(fp: FirstPass) =>
     _fp = fp
 
-/*
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    try
-      (let host, _) = conn.remote_address().name()
-    end
-
-    if _header then
-      try
-        _count = _count + 1
-        if (_count % 100_000) == 0 then
-          @printf[I32]("%zu received\n".cstring(), _count)
-        end
-
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
-        conn.expect(expect)
-        _header = false
-      end
-    else
-      _fp.take(consume data)
-
-      conn.expect(4)
-      _header = true
-    end
-    */
-
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    //try
-    //   (let host, _) = conn.remote_address().name()
-    //end
-
     if _header then
       try
         _count = _count + 1
