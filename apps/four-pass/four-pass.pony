@@ -7,6 +7,8 @@ actor Main
   new create(env: Env) =>
     var i_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
+    var expected: USize = 1_000_000
+    var continuous: Bool = false
 
     try
       var options = Options(env)
@@ -14,16 +16,21 @@ actor Main
       options
         .add("in", "i", StringArgument)
         .add("out", "o", StringArgument)
+        .add("expected", "e", I64Argument)
+        .add("continuous", "c", None)
 
       for option in options do
         match option
         | ("in", let arg: String) => i_arg = arg.split(":")
         | ("out", let arg: String) => o_arg = arg.split(":")
+        | ("expected", let arg: I64) => expected = arg.usize()
+        | ("continuous", let arg: None) => continuous = true
         end
       end
 
       let in_addr = i_arg as Array[String]
       let out_addr = o_arg as Array[String]
+      let metrics = Metrics
 
       let connect_auth = TCPConnectAuth(env.root as AmbientAuth)
       let out_socket = TCPConnection(connect_auth,
@@ -31,52 +38,65 @@ actor Main
             out_addr(0),
             out_addr(1))
 
-      let last_pass = LastPass(out_socket)
-      let first_pass = FirstPass(last_pass)
+      let last_pass = LastPass(out_socket, metrics, expected)
+      let first_pass = FirstPass(last_pass, metrics)
 
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       let listener = TCPListener(listen_auth,
-            ListenerNotify(first_pass),
+            ListenerNotify(first_pass, metrics, expected),
             in_addr(0),
             in_addr(1))
+
+      @printf[I32]("Expecting %zu messages\n".cstring(), expected)
     end
 
 class ListenerNotify is TCPListenNotify
   let _fp: FirstPass
+  let _metrics: Metrics
+  let _expected: USize
 
-  new iso create(fp: FirstPass) =>
+  new iso create(fp: FirstPass, metrics: Metrics, expected: USize) =>
     _fp = fp
+    _metrics = metrics
+    _expected = expected
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    IncomingNotify(_fp)
+    IncomingNotify(_fp, _metrics, _expected)
 
 class IncomingNotify is TCPConnectionNotify
   let _fp: FirstPass
+  let _metrics: Metrics
+  let _expected: USize
   var _header: Bool = true
   var _count: USize = 0
 
-  new iso create(fp: FirstPass) =>
+  new iso create(fp: FirstPass, metrics: Metrics, expected: USize) =>
     _fp = fp
+    _metrics = metrics
+    _expected = expected
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
     if _header then
       try
         _count = _count + 1
-        if (_count % 100_000) == 0 then
+        if ((_count % 100_000) == 0) and (_count <= _expected) then
           @printf[I32]("%zu received\n".cstring(), _count)
         end
 
         if _count == 1 then
-          @printf[None]("Start: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
+          _metrics.set_start(Time.wall_to_nanos(Time.now()))
+          // @printf[I32]("Start: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
         end
-
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
         conn.expect(expect)
         _header = false
       end
     else
-      _fp.take(1, 1, 1, consume data)
+      if _count <= _expected then
+        _fp.take(1, 1, 1, consume data)
+      end
+
       conn.expect(4)
       _header = true
     end
@@ -94,20 +114,26 @@ class OutNotify is TCPConnectionNotify
 
 actor FirstPass
   let _last: LastPass
+  let _metrics: Metrics
 
-  new create(last: LastPass) =>
+  new create(last: LastPass, metrics: Metrics) =>
     _last = last
+    _metrics = metrics
 
   be take(a: U64, b: U64, c: U64, data: Array[U8] val) =>
     _last.take(a, b, c, data)
 
 actor LastPass
   var _count: USize = 0
+  let _expected: USize
   let _sender: TCPConnection
+  let _metrics: Metrics
   let _buffer: WriteBuffer = WriteBuffer
 
-  new create(sender: TCPConnection) =>
+  new create(sender: TCPConnection, metrics: Metrics, expected: USize) =>
     _sender = sender
+    _expected = expected
+    _metrics = metrics
 
   be take(a: U64, b: U64, c: U64, data: Array[U8] val) =>
     _count = _count + 1
@@ -115,8 +141,9 @@ actor LastPass
       @printf[I32]("%zu sent\n".cstring(), _count)
     end
 
-    if _count == 1000000 then
-      @printf[None]("End: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
+    if _count == _expected then
+      _metrics.set_end(Time.wall_to_nanos(Time.now()), _expected)
+      // @printf[None]("End: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
     end
 
     _buffer.reserve_chunks(100)
@@ -128,6 +155,24 @@ actor LastPass
     _buffer.u32_be(s.size().u32())
     _buffer.write(s)
     _sender.writev(_buffer.done())
+
+actor Metrics
+  var start_t: U64 = 0
+  var end_t: U64 = 0
+
+  be set_start(s: U64) => 
+    start_t = s
+    @printf[I32]("Start: %zu\n".cstring(), start_t)
+
+  be set_end(e: U64, expected: USize) => 
+    end_t = e
+    let overall = (end_t - start_t).f64() / 1_000_000_000
+    let throughput = ((expected.f64() / overall) / 1_000).usize()
+    @printf[I32]("End: %zu\n".cstring(), end_t)
+    @printf[I32]("Overall: %f\n".cstring(), overall) 
+    @printf[I32]("Throughput: %zuk\n".cstring(), throughput) 
+    start_t = 0
+    end_t = 0
 
 primitive Bytes
   fun length_encode(data: ByteSeq val): Array[ByteSeq] val =>
