@@ -52,9 +52,9 @@ actor Main
       // These are the "Steps".
       let last_pass = LastPass(out_socket, metrics, expected, metrics_collector)
       // let fifth_pass = FirstPass(last_pass, metrics, metrics_collector)
-      // let fourth_pass = FirstPass(last_pass, metrics, metrics_collector)
-      // let third_pass = FirstPass(fourth_pass, metrics, metrics_collector)
-      let second_pass = FirstPass(last_pass, metrics, metrics_collector)
+      let fourth_pass = FirstPass(last_pass, metrics, metrics_collector)
+      let third_pass = FirstPass(fourth_pass, metrics, metrics_collector)
+      let second_pass = FirstPass(third_pass, metrics, metrics_collector)
       let first_pass = FirstPass(second_pass, metrics, metrics_collector)
 
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)

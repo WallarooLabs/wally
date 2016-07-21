@@ -16,7 +16,8 @@ Binaries:
 14 – pass along result of computation without collecting (5 steps)
 15 – same with three steps
 16 – same but with collecting
-17 – pass value times two at each step
+17 – pass value times two at each step (3 steps)
+18 - same but with 5 steps
 
 My initial results:
 1 – 130k
@@ -35,3 +36,4 @@ My initial results:
 15 – 105k
 16 – 105k
 17 – 97k
+18 - 47k
