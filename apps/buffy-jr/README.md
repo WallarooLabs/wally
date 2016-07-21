@@ -1,6 +1,7 @@
 Be sure to listen on 9000 to simulate metrics receiver.
 
 Running binaries:
+ './buffy-jr -i 127.0.0.1:7000 -o 127.0.0.1:8000 --ponythreads 3'
  use Giles receiver, nc -l 127.0.01 9000, and Giles sender batch size 550
  send in 1,000,000 messages
 
