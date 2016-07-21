@@ -1,9 +1,6 @@
+use "collections"
 use "net"
 use "options"
-use "collections"
-//use "buffy/messages"
-use "sendence/messages"
-use "sendence/epoch"
 use "time"
 
 actor Main
@@ -98,9 +95,9 @@ class IncomingNotify is TCPConnectionNotify
           @printf[I32]("%zu received\n".cstring(), _count)
         end
 
-    if _count == 1 then
-      @printf[None]("Start: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
-    end
+        if _count == 1 then
+          @printf[None]("Start: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
+        end
 
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
@@ -108,31 +105,7 @@ class IncomingNotify is TCPConnectionNotify
         _header = false
       end
     else
-
-/*
-      try
-        let msg = ExternalMsgDecoder(consume data)
-        match msg
-        | let m: ExternalDataMsg val =>
-          //let now = Epoch.nanoseconds()
-          let now: U64 = 1
-          //let now = Time.wall_to_nanos(Time.now())
-          _fp.take(m, now)
-
-          //_fp.take3(_count.string(), now)
-        else
-          @printf[None]("no match\n".cstring())
-        end
-      end
-*/
-      //let m = ExternalDataMsg(String.from_array(consume data, 2))
-      //_fp.take(m, 1)
-      //_fp.take2(consume data, 1)
-      //_fp.take3(String.from_array(consume data), 1)
-      let new_msg: Message[Array[U8] val] val = Message[Array[U8] val](
-            1, 1, 1, consume data)
-      _fp.take4(new_msg)
-      //_fp.take5(1, 1, 1, consume data)
+      _fp.take(1, 1, 1, consume data)
       conn.expect(4)
       _header = true
     end
@@ -154,22 +127,8 @@ actor FirstPass
   new create(last: LastPass) =>
     _last = last
 
-  be take(data: ExternalDataMsg val, s: U64) =>
-    _last.take(data)
-
-  be take2(data: Array[U8] val, s: U64) =>
-    _last.take2(data)
-
-  be take3(data: String val, s: U64) =>
-    _last.take3(data)
-
-  be take4(data: Message[Array[U8] val] val) =>
-   // let message = Message[Array[U8] val](
-    //        data.id(), data.source_ts(), data.last_ingress_ts(), data.data())
-    _last.take4(data)
-
-  be take5(a: U64, b: U64, c: U64, data: Array[U8] val) =>
-    _last.take5(a,b,c,data)
+  be take(a: U64, b: U64, c: U64, data: Array[U8] val) =>
+    _last.take(a, b, c, data)
 
 actor LastPass
   var _count: USize = 0
@@ -179,97 +138,7 @@ actor LastPass
   new create(sender: TCPConnection) =>
     _sender = sender
 
-  be take(data: ExternalDataMsg val) =>
-    _count = _count + 1
-    if (_count % 100_000) == 0 then
-      @printf[I32]("%zu sent\n".cstring(), _count)
-    end
-
-    if _count == 1000000 then
-      @printf[None]("End: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
-    end
-
-      _buffer.reserve_chunks(100)
-    //let msg = Message[String](U64(1), U64(1), U64(1), data.data)
-
-    let s: String val = data.data
-    //let s: String val = _count.string()
-
-    _buffer.u32_be((s.size() + 8).u32())
-    //Message size field
-    _buffer.u32_be((s.size() + 4).u32())
-    _buffer.u32_be(s.size().u32())
-    _buffer.write(s)
-    _sender.writev(_buffer.done())
-
-    //_sender.writev(FallorMsgEncoder(data.data, _buffer))
-    //_sender.writev(FallorMsgEncoder(_count.string(), _buffer))
-    //_sender.writev(FallorMsgEncoder(_count.string()))
-
-    //_sender.write("hello")
-
-  be take2(data: Array[U8] val) =>
-    _count = _count + 1
-    if (_count % 100_000) == 0 then
-      @printf[I32]("%zu sent\n".cstring(), _count)
-    end
-
-    if _count == 1000000 then
-      @printf[None]("End: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
-    end
-
-    _buffer.reserve_chunks(100)
-
-    //let s: String val = _count.string()
-    let s = data
-    _buffer.u32_be((s.size() + 8).u32())
-    //Message size field
-    _buffer.u32_be((s.size() + 4).u32())
-    _buffer.u32_be(s.size().u32())
-    _buffer.write(s)
-    _sender.writev(_buffer.done())
-
-  be take3(data: String val) =>
-    _count = _count + 1
-    if (_count % 100_000) == 0 then
-      @printf[I32]("%zu sent\n".cstring(), _count)
-    end
-
-    if _count == 1000000 then
-      @printf[None]("End: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
-    end
-
-    _buffer.reserve_chunks(100)
-
-    let s = data
-    _buffer.u32_be((s.size() + 8).u32())
-    //Message size field
-    _buffer.u32_be((s.size() + 4).u32())
-    _buffer.u32_be(s.size().u32())
-    _buffer.write(s)
-    _sender.writev(_buffer.done())
-
-  be take4(data: Message[Array[U8] val] val) =>
-    _count = _count + 1
-    if (_count % 100_000) == 0 then
-      @printf[I32]("%zu sent\n".cstring(), _count)
-    end
-
-    if _count == 1000000 then
-      @printf[None]("End: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
-    end
-
-    _buffer.reserve_chunks(100)
-
-    let s = data.data()
-    _buffer.u32_be((s.size()).u32())
-    //Message size field
-    _buffer.u32_be((s.size() + 4).u32())
-    _buffer.u32_be(s.size().u32())
-    _buffer.write(s)
-    _sender.writev(_buffer.done())
-
-  be take5(a: U64, b: U64, c: U64, data: Array[U8] val) =>
+  be take(a: U64, b: U64, c: U64, data: Array[U8] val) =>
     _count = _count + 1
     if (_count % 100_000) == 0 then
       @printf[I32]("%zu sent\n".cstring(), _count)
@@ -353,20 +222,3 @@ primitive Bytes
   fun u64_from_idx(idx: USize, arr: Array[U8]): U64 ? =>
     Bytes.to_u64(arr(idx), arr(idx + 1), arr(idx + 2), arr(idx + 3),
       arr(idx + 4), arr(idx + 5), arr(idx + 6), arr(idx + 7))
-
-class Message[A: Any val]
-  let _id: U64
-  let _source_ts: U64
-  let _last_ingress_ts: U64
-  let _data: A
-
-  new val create(msg_id: U64, s_ts: U64, i_ts: U64, msg_data: A) =>
-    _id = msg_id
-    _source_ts = s_ts
-    _last_ingress_ts = i_ts
-    _data = consume msg_data
-
-  fun id(): U64 => _id
-  fun source_ts(): U64 => _source_ts
-  fun last_ingress_ts(): U64 => _last_ingress_ts
-  fun data(): A => _data
