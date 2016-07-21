@@ -8,7 +8,6 @@ actor Main
     var i_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
     var expected: USize = 1_000_000
-    var continuous: Bool = false
 
     try
       var options = Options(env)
@@ -17,14 +16,12 @@ actor Main
         .add("in", "i", StringArgument)
         .add("out", "o", StringArgument)
         .add("expected", "e", I64Argument)
-        .add("continuous", "c", None)
 
       for option in options do
         match option
         | ("in", let arg: String) => i_arg = arg.split(":")
         | ("out", let arg: String) => o_arg = arg.split(":")
         | ("expected", let arg: I64) => expected = arg.usize()
-        | ("continuous", let arg: None) => continuous = true
         end
       end
 
@@ -95,6 +92,8 @@ class IncomingNotify is TCPConnectionNotify
     else
       if _count <= _expected then
         _fp.take(1, 1, 1, consume data)
+      else
+        _count = 0
       end
 
       conn.expect(4)
@@ -144,6 +143,7 @@ actor LastPass
     if _count == _expected then
       _metrics.set_end(Time.wall_to_nanos(Time.now()), _expected)
       // @printf[None]("End: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
+      _count = 0
     end
 
     _buffer.reserve_chunks(100)
@@ -158,10 +158,15 @@ actor LastPass
 
 actor Metrics
   var start_t: U64 = 0
+  var next_start_t: U64 = 0
   var end_t: U64 = 0
 
   be set_start(s: U64) => 
-    start_t = s
+    if start_t != 0 then
+      next_start_t = s
+    else
+      start_t = s
+    end
     @printf[I32]("Start: %zu\n".cstring(), start_t)
 
   be set_end(e: U64, expected: USize) => 
@@ -171,7 +176,8 @@ actor Metrics
     @printf[I32]("End: %zu\n".cstring(), end_t)
     @printf[I32]("Overall: %f\n".cstring(), overall) 
     @printf[I32]("Throughput: %zuk\n".cstring(), throughput) 
-    start_t = 0
+    start_t = next_start_t
+    next_start_t = 0
     end_t = 0
 
 primitive Bytes
