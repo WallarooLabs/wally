@@ -50,7 +50,8 @@ class BufferedExternalMsgEncoder
   let _buffer: WriteBuffer
 
   new create(wb: WriteBuffer = WriteBuffer, chunks: USize = 0) =>
-    _buffer = wb.reserve_chunks(chunks)
+    _buffer = wb
+    _buffer.reserve_chunks(chunks)
 
   fun ref _encode_and_add(id: U16, s: String): BufferedExternalMsgEncoder =>
     let s_array = s.array()
