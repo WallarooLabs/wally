@@ -87,6 +87,8 @@ class IncomingNotify is TCPConnectionNotify
   var _count: USize = 0
   let _guid_gen: GuidGenerator = GuidGenerator
 
+  var _msg_count: USize = 0
+
   new iso create(fp: Pass tag, metrics: Metrics, expected: USize) =>
     _fp = fp
     _metrics = metrics
@@ -101,7 +103,7 @@ class IncomingNotify is TCPConnectionNotify
         end
 
         if _count == 1 then
-          _metrics.set_start(Time.wall_to_nanos(Time.now()))
+          _metrics.set_start(Time.nanos())
         end
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
@@ -110,7 +112,7 @@ class IncomingNotify is TCPConnectionNotify
       end
     else
       if _count <= _expected then
-        let now = Epoch.nanoseconds()
+        let now = Time.cycles()//Epoch.nanoseconds()
 
         try
           _fp.take[U64](_guid_gen(), now, now, String.from_array(consume data).u64())
@@ -123,6 +125,11 @@ class IncomingNotify is TCPConnectionNotify
 
       conn.expect(4)
       _header = true
+
+      _msg_count = _msg_count + 1
+      if _msg_count >= 100 then
+        return false
+      end
     end
     true
 
@@ -159,11 +166,11 @@ actor FirstPass is Pass
       _latest = _latest + (u * _latest)
 
       // JOHN- TRY WITH THESE 4 METRICS LINES OFF
-      let start_t = Time.cycles()
-      let end_t = Time.cycles()
-      _metrics.report(a, start_t, end_t)
-      //  collecting is a source for a slowdown
-      _collector.report_step_metrics(b, "what", start_t, end_t)
+      // let start_t = Time.cycles()
+      // let end_t = Time.cycles()
+      // _metrics.report(a, start_t, end_t)
+      // //  collecting is a source for a slowdown
+      // _collector.report_step_metrics(b, "what", start_t, end_t)
 
       match _next
       | let n: FirstPass tag =>
@@ -196,17 +203,17 @@ actor LastPass is Pass
     match data
     | let u: U64 =>
       _count = _count + 1
-      let start_t = Epoch.nanoseconds()
-      let end_t = Epoch.nanoseconds()
-      _metrics.report(_count.u64(), start_t, end_t)
-      // collecting is a source for a slowdown
-      _collector.report_boundary_metrics(b, c, start_t, end_t)
+      // let start_t = Time.cycles()//Epoch.nanoseconds()
+      // let end_t = Time.cycles()//Epoch.nanoseconds()
+      // _metrics.report(_count.u64(), start_t, end_t)
+      // // collecting is a source for a slowdown
+      // _collector.report_boundary_metrics(b, c, start_t, end_t)
       if (_count % 100_000) == 0 then
         @printf[I32]("%zu sent\n".cstring(), _count)
       end
 
       if _count == _expected then
-        _metrics.set_end(Time.wall_to_nanos(Time.now()), _expected)
+        _metrics.set_end(Time.nanos(), _expected)
         _count = 0
       end
 
