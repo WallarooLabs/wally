@@ -2,6 +2,9 @@ use "collections"
 use "net"
 use "options"
 use "time"
+use "sendence/guid"
+use "sendence/epoch"
+use "buffy/metrics"
 
 actor Main
   new create(env: Env) =>
@@ -35,8 +38,24 @@ actor Main
             out_addr(0),
             out_addr(1))
 
-      let last_pass = LastPass(out_socket, metrics, expected)
-      let first_pass = FirstPass(last_pass, metrics)
+      let auth = env.root as AmbientAuth
+      let metrics_host = "127.0.0.1"//metrics_addr(0)
+      let metrics_service = "9000"//metrics_addr(1)
+      let metrics_notifier: TCPConnectionNotify iso =
+        MetricsCollectorConnectNotify(auth, env.out, env.err)
+      let metrics_conn: TCPConnection =
+        TCPConnection(auth, consume metrics_notifier, metrics_host,
+          metrics_service)
+      let metrics_collector = 
+          MetricsCollector(env.err, auth, "me", metrics_conn)
+
+      // These are the "Steps".
+      let last_pass = LastPass(out_socket, metrics, expected, metrics_collector)
+      // let fifth_pass = FirstPass(last_pass, metrics, metrics_collector)
+      let fourth_pass = FirstPass(last_pass, metrics, metrics_collector)
+      let third_pass = FirstPass(fourth_pass, metrics, metrics_collector)
+      let second_pass = FirstPass(third_pass, metrics, metrics_collector)
+      let first_pass = FirstPass(second_pass, metrics, metrics_collector)
 
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       let listener = TCPListener(listen_auth,
@@ -48,11 +67,11 @@ actor Main
     end
 
 class ListenerNotify is TCPListenNotify
-  let _fp: FirstPass
+  let _fp: Pass tag
   let _metrics: Metrics
   let _expected: USize
 
-  new iso create(fp: FirstPass, metrics: Metrics, expected: USize) =>
+  new iso create(fp: Pass tag, metrics: Metrics, expected: USize) =>
     _fp = fp
     _metrics = metrics
     _expected = expected
@@ -61,13 +80,14 @@ class ListenerNotify is TCPListenNotify
     IncomingNotify(_fp, _metrics, _expected)
 
 class IncomingNotify is TCPConnectionNotify
-  let _fp: FirstPass
+  let _fp: Pass tag
   let _metrics: Metrics
   let _expected: USize
   var _header: Bool = true
   var _count: USize = 0
+  let _guid_gen: GuidGenerator = GuidGenerator
 
-  new iso create(fp: FirstPass, metrics: Metrics, expected: USize) =>
+  new iso create(fp: Pass tag, metrics: Metrics, expected: USize) =>
     _fp = fp
     _metrics = metrics
     _expected = expected
@@ -82,7 +102,6 @@ class IncomingNotify is TCPConnectionNotify
 
         if _count == 1 then
           _metrics.set_start(Time.wall_to_nanos(Time.now()))
-          // @printf[I32]("Start: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
         end
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
@@ -91,7 +110,15 @@ class IncomingNotify is TCPConnectionNotify
       end
     else
       if _count <= _expected then
-        _fp.take(1, 1, 1, consume data)
+        let now = Epoch.nanoseconds()
+
+        // _fp.take(1, 1, 1, consume data)
+        // _fp.take(1, 1, 1, String.from_array(consume data))
+        try
+          _fp.take(_guid_gen(), now, now, String.from_array(consume data).u64())
+        else
+          @printf[I32]("Error parsing data\n".cstring())
+        end
       else
         _count = 0
       end
@@ -111,55 +138,99 @@ class OutNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     @printf[None]("outgoing connected\n".cstring())
 
-actor FirstPass
-  let _last: LastPass
+trait Pass
+  be take(a: U64, b: U64, c: U64, data: Any val)
+
+actor FirstPass is Pass
+  let _next: Pass tag
   let _metrics: Metrics
+  // For the old computation:
+  // var _latest: U64 = 1
+  let _collector: MetricsCollector tag
 
-  new create(last: LastPass, metrics: Metrics) =>
-    _last = last
+  new create(next: Pass tag, metrics: Metrics, 
+    collector: MetricsCollector tag) =>
+    _next = next
     _metrics = metrics
+    _collector = collector
 
-  be take(a: U64, b: U64, c: U64, data: Array[U8] val) =>
-    _last.take(a, b, c, data)
+  be take(a: U64, b: U64, c: U64, data: Any val) =>
+    match data
+    | let u: U64 =>
+      // try
+      // _latest = _latest + (u * _latest)
+      // else
+        // @printf[I32]("Error parsing data\n".cstring())
+      // end
+      let start_t = Epoch.nanoseconds()
+      let end_t = Epoch.nanoseconds()
+      _metrics.report(a, start_t, end_t)
+      //  collecting is a source for a slowdown
+      _collector.report_step_metrics(b, "what", start_t, end_t)
+      match _next
+      | let n: FirstPass tag =>
+        // This u * 2 seems to be a source of a significant slowdown
+        n.take(a, b, c, u * 2)//_latest)
+      | let n: LastPass tag =>
+        // This u * 2 seems to be a source of a significant slowdown
+        n.take(a, b, c, u * 2)//_latest)
+      end
+    else
+      @printf[I32]("Error matching data\n".cstring())
+    end
 
-actor LastPass
+actor LastPass is Pass
   var _count: USize = 0
   let _expected: USize
   let _sender: TCPConnection
   let _metrics: Metrics
   let _buffer: WriteBuffer = WriteBuffer
+  let _collector: MetricsCollector tag
 
-  new create(sender: TCPConnection, metrics: Metrics, expected: USize) =>
+  new create(sender: TCPConnection, metrics: Metrics, expected: USize, 
+    collector: MetricsCollector tag) =>
     _sender = sender
     _expected = expected
     _metrics = metrics
+    _collector = collector
 
-  be take(a: U64, b: U64, c: U64, data: Array[U8] val) =>
-    _count = _count + 1
-    if (_count % 100_000) == 0 then
-      @printf[I32]("%zu sent\n".cstring(), _count)
+  be take(a: U64, b: U64, c: U64, data: Any val) =>
+    match data
+    | let u: U64 =>
+      _count = _count + 1
+      let start_t = Epoch.nanoseconds()
+      let end_t = Epoch.nanoseconds()
+      _metrics.report(_count.u64(), start_t, end_t)
+      // collecting is a source for a slowdown
+      _collector.report_boundary_metrics(b, c, start_t, end_t)
+      if (_count % 100_000) == 0 then
+        @printf[I32]("%zu sent\n".cstring(), _count)
+      end
+
+      if _count == _expected then
+        _metrics.set_end(Time.wall_to_nanos(Time.now()), _expected)
+        _count = 0
+      end
+
+      _buffer.reserve_chunks(100)
+
+    
+      let s = u.string()
+      _buffer.u32_be((s.size() + 8).u32())
+      //Message size field
+      _buffer.u32_be((s.size() + 4).u32())
+      _buffer.u32_be(s.size().u32())
+      _buffer.write(consume s)
+      _sender.writev(_buffer.done())
+    else
+      @printf[I32]("Error matching data\n".cstring())
     end
-
-    if _count == _expected then
-      _metrics.set_end(Time.wall_to_nanos(Time.now()), _expected)
-      // @printf[None]("End: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
-      _count = 0
-    end
-
-    _buffer.reserve_chunks(100)
-
-    let s = data
-    _buffer.u32_be((s.size() + 8).u32())
-    //Message size field
-    _buffer.u32_be((s.size() + 4).u32())
-    _buffer.u32_be(s.size().u32())
-    _buffer.write(s)
-    _sender.writev(_buffer.done())
 
 actor Metrics
   var start_t: U64 = 0
   var next_start_t: U64 = 0
   var end_t: U64 = 0
+  var last_report: U64 = 0
 
   be set_start(s: U64) => 
     if start_t != 0 then
@@ -179,6 +250,8 @@ actor Metrics
     start_t = next_start_t
     next_start_t = 0
     end_t = 0
+
+  be report(r: U64, s: U64, e: U64) => last_report = (r + s + e) + last_report
 
 primitive Bytes
   fun length_encode(data: ByteSeq val): Array[ByteSeq] val =>
