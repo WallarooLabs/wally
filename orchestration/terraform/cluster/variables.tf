@@ -50,7 +50,7 @@ variable "leader_instance_type" {
 
 variable "leader_max_nodes" {
   description = "Maximum number of leader nodes."
-  default = "1"
+  default = "100"
 }
 
 variable "leader_min_nodes" {
@@ -80,7 +80,7 @@ variable "follower_instance_type" {
 
 variable "follower_max_nodes" {
   description = "Maximum number of follower nodes."
-  default = "9"
+  default = "100"
 }
 
 variable "follower_min_nodes" {
