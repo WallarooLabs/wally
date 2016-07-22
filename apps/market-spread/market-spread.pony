@@ -140,7 +140,7 @@ class UpdateData is StateComputation[None, MarketData]
     _nbbo = nbbo
 
   fun name(): String => "Update Market Data"
-  fun apply(state: MarketData, output: MessageTarget val): MarketData =>
+  fun apply(state: MarketData, output: MessageTarget[None] val): MarketData =>
     if ((_nbbo.offer_px() - _nbbo.bid_px()) >= 0.05) or
       (((_nbbo.offer_px() - _nbbo.bid_px()) / _nbbo.mid()) >= 0.05) then
       output(None)
@@ -164,7 +164,7 @@ class CheckStatus is StateComputation[TradeResult val, MarketData]
     _trade = trade
 
   fun name(): String => "Check Order Result"
-  fun apply(state: MarketData, output: MessageTarget val):
+  fun apply(state: MarketData, output: MessageTarget[TradeResult val] val):
     MarketData =>
     let symbol = _trade.symbol()
     let market_data_entry = 

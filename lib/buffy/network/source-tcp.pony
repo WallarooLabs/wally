@@ -92,13 +92,14 @@ class SourceConnectNotify is TCPConnectionNotify
       end
     else
       if not _source_initialized then
-        _step_manager.passthrough_to_step(_source_id, 
+        _step_manager.passthrough_to_step[String](_source_id, 
           _source_step)
         _source_initialized = true
       end
 
       let now = Epoch.nanoseconds()
-      _source_step(_guid_gen(), now, now, String.from_array(consume data))
+      _source_step.send[String](_guid_gen(), now, now,
+        String.from_array(consume data))
 
       conn.expect(4)
       _header = true
