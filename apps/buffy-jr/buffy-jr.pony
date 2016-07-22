@@ -92,7 +92,7 @@ class IncomingNotify is TCPConnectionNotify
     _metrics = metrics
     _expected = expected
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
       try
         _count = _count + 1
@@ -124,6 +124,7 @@ class IncomingNotify is TCPConnectionNotify
       conn.expect(4)
       _header = true
     end
+    true
 
   fun ref accepted(conn: TCPConnection ref) =>
     @printf[None]("accepted\n".cstring())
