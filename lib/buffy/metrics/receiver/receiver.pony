@@ -52,7 +52,7 @@ actor Receiver
           report_period = (arg*1_000_000_000).u64()
         | ("phone-home", let arg: String) => phone_home_addr = arg.split(":")
         | ("name", let arg: String) => name = arg
-        | ("help", None) =>      
+        | ("help", None) =>
           StartupHelp.metrics_receiver(env)
           return
         end

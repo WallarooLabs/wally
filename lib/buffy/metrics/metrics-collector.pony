@@ -53,14 +53,14 @@ actor MetricsCollector is FlushingActor
   fun ref _send_steps() =>
       let node_name: String val = _node_name.clone()
       var size = _step_summary.size()
-      if size > _largest_step_summary_size then 
+      if size > _largest_step_summary_size then
         _largest_step_summary_size = size
       else
         size = _largest_step_summary_size
-      end       
+      end
       let summary = _step_summary =
-        recover 
-          trn NodeMetricsSummary(node_name, size) 
+        recover
+          trn NodeMetricsSummary(node_name, size)
         end
       let s:NodeMetricsSummary val = consume summary
       _send_step_metrics_to_receiver(s)
@@ -95,7 +95,7 @@ actor MetricsCollector is FlushingActor
   fun ref _send_boundary() =>
       let node_name: String val = _node_name.clone()
       var size = _boundary_summary.size()
-      if size > _largest_boundary_summary_size then 
+      if size > _largest_boundary_summary_size then
         _largest_boundary_summary_size = size
       else
         size = _largest_boundary_summary_size
