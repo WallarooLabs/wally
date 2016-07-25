@@ -65,7 +65,7 @@ class ControlConnectNotify is TCPConnectionNotify
     conn.expect(4)
     _coordinator.add_connection(conn)
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
@@ -143,6 +143,7 @@ class ControlConnectNotify is TCPConnectionNotify
       conn.expect(4)
       _header = true
     end
+    true
 
   fun ref connected(conn: TCPConnection ref) =>
     _env.out.print(_name + " is connected.")

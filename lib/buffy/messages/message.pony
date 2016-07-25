@@ -20,24 +20,6 @@ class Message[A: Any val] is StepMessage
   fun last_ingress_ts(): U64 => _last_ingress_ts
   fun data(): A => _data
 
-class Forward
-  let step_id: U64
-  let from_node_name: String
-  let msg_id: U64
-  let source_ts: U64
-  let ingress_ts: U64
-  let data: Any val
-
-  new val create(s_id: U64, from: String, m_id: U64, s_ts: U64, 
-    i_ts: U64, m_data: Any val) 
-  =>
-    step_id = s_id
-    from_node_name = from
-    msg_id = m_id
-    source_ts = s_ts
-    ingress_ts = i_ts
-    data = m_data
-
 class ExternalMessage[A: Any val] is StepMessage
   let _id: U64
   let _source_ts: U64

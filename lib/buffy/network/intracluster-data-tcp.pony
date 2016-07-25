@@ -91,6 +91,7 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
   var _sender_name: String = ""
   let _coordinator: Coordinator
   var _header: Bool = true
+  var _msg_count: U64 = 0
 
   new iso create(env: Env, auth: AmbientAuth, name: String,
     coordinator: Coordinator) =>
@@ -103,7 +104,7 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
     conn.expect(4)
     _coordinator.add_connection(conn)
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
@@ -116,9 +117,7 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
       let msg = WireMsgDecoder(consume data, _auth)
       match msg
       | let d: DataChannelMsg val =>
-        let f = d.forward
-        _coordinator.deliver(d.id, f.step_id, f.from_node_name, f.msg_id,
-          f.source_ts, f.ingress_ts, f.data)
+        _coordinator.deliver(d)
       | let m: DataSenderReadyMsg val =>
         _sender_name = m.node_name
         _coordinator.connect_receiver(m.node_name)
@@ -128,7 +127,13 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
 
       conn.expect(4)
       _header = true
+      _msg_count = _msg_count + 1
+      if _msg_count >= 5 then
+        _msg_count = 0
+        return false
+      end
     end
+    true
 
   fun ref closed(conn: TCPConnection ref) =>
     _coordinator.close_receiver(_sender_name)
@@ -141,8 +146,9 @@ class IntraclusterDataSenderConnectNotify is TCPConnectionNotify
   let _target_name: String
   let _coordinator: Coordinator
 
-  new iso create(env: Env, auth: AmbientAuth, name: String, target_name: String,
-    coordinator: Coordinator) =>
+  new iso create(env: Env, auth: AmbientAuth, name: String, 
+    target_name: String, coordinator: Coordinator)
+  =>
     _env = env
     _auth = auth
     _name = name
@@ -152,8 +158,9 @@ class IntraclusterDataSenderConnectNotify is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     _coordinator.add_connection(conn)
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     _env.out.print("Data sender channel received data.")
+    true
 
   fun ref closed(conn: TCPConnection ref) =>
     _coordinator.reconnect_data(_target_name)

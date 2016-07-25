@@ -159,7 +159,7 @@ class HomeConnectNotify is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("\t" + node_name + ": Dagon accepted connection")
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     // parse Dagon command
     for chunked in _framer.chunk(consume data).values() do
       try
@@ -179,6 +179,7 @@ class HomeConnectNotify is TCPConnectionNotify
         _env.out.print("\t" + node_name + ": Unable to decode message from Dagon")
       end
     end
+    true
     
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("\t" + node_name + ": server closed connection")

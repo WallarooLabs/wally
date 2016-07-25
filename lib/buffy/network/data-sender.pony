@@ -19,9 +19,11 @@ actor DataSender
     _conn = conn
     _auth = auth
 
-  be forward(f: Forward val) =>
+  be forward[D: Any val](step_id: U64, from_node_name: String, msg_id: U64, 
+    source_ts: U64, ingress_ts: U64, msg_data: D) =>
     try
-      let data_msg = WireMsgEncoder.data_channel(_msg_id, f, _auth)
+      let data_msg = WireMsgEncoder.data_channel[D](_msg_id, step_id, 
+        from_node_name, msg_id, source_ts, ingress_ts, msg_data, _auth)
       _held.enqueue(_TCPMsg(_msg_id, data_msg))
       _msg_id = _msg_id + 1
       if _sending then

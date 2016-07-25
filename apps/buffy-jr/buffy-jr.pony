@@ -46,7 +46,7 @@ actor Main
       let metrics_conn: TCPConnection =
         TCPConnection(auth, consume metrics_notifier, metrics_host,
           metrics_service)
-      let metrics_collector = 
+      let metrics_collector =
           MetricsCollector(env.err, auth, "me", metrics_conn)
 
       // These are the "Steps".
@@ -87,12 +87,14 @@ class IncomingNotify is TCPConnectionNotify
   var _count: USize = 0
   let _guid_gen: GuidGenerator = GuidGenerator
 
+  var _msg_count: USize = 0
+
   new iso create(fp: Pass tag, metrics: Metrics, expected: USize) =>
     _fp = fp
     _metrics = metrics
     _expected = expected
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
       try
         _count = _count + 1
@@ -101,7 +103,7 @@ class IncomingNotify is TCPConnectionNotify
         end
 
         if _count == 1 then
-          _metrics.set_start(Time.wall_to_nanos(Time.now()))
+          _metrics.set_start(Time.nanos())
         end
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
@@ -110,12 +112,10 @@ class IncomingNotify is TCPConnectionNotify
       end
     else
       if _count <= _expected then
-        let now = Epoch.nanoseconds()
+        let now = Time.cycles()//Epoch.nanoseconds()
 
-        // _fp.take(1, 1, 1, consume data)
-        // _fp.take(1, 1, 1, String.from_array(consume data))
         try
-          _fp.take(_guid_gen(), now, now, String.from_array(consume data).u64())
+          _fp.take[U64](_guid_gen(), now, now, String.from_array(consume data).u64())
         else
           @printf[I32]("Error parsing data\n".cstring())
         end
@@ -125,7 +125,13 @@ class IncomingNotify is TCPConnectionNotify
 
       conn.expect(4)
       _header = true
+
+      _msg_count = _msg_count + 1
+      if _msg_count >= 100 then
+        return false
+      end
     end
+    true
 
   fun ref accepted(conn: TCPConnection ref) =>
     @printf[None]("accepted\n".cstring())
@@ -139,45 +145,44 @@ class OutNotify is TCPConnectionNotify
     @printf[None]("outgoing connected\n".cstring())
 
 trait Pass
-  be take(a: U64, b: U64, c: U64, data: Any val)
+  be take[A: Any val](a: U64, b: U64, c: U64, data: A)
 
 actor FirstPass is Pass
   let _next: Pass tag
   let _metrics: Metrics
   // For the old computation:
-  // var _latest: U64 = 1
+  var _latest: U64 = 1
   let _collector: MetricsCollector tag
 
-  new create(next: Pass tag, metrics: Metrics, 
+  new create(next: Pass tag, metrics: Metrics,
     collector: MetricsCollector tag) =>
     _next = next
     _metrics = metrics
     _collector = collector
 
-  be take(a: U64, b: U64, c: U64, data: Any val) =>
+  be take[A: Any val](a: U64, b: U64, c: U64, data: A) =>
     match data
     | let u: U64 =>
-      // try
-      // _latest = _latest + (u * _latest)
-      // else
-        // @printf[I32]("Error parsing data\n".cstring())
-      // end
-      let start_t = Epoch.nanoseconds()
-      let end_t = Epoch.nanoseconds()
-      _metrics.report(a, start_t, end_t)
-      //  collecting is a source for a slowdown
-      _collector.report_step_metrics(b, "what", start_t, end_t)
+      _latest = _latest + (u * _latest)
+
+      // JOHN- TRY WITH THESE 4 METRICS LINES OFF
+      // let start_t = Time.cycles()
+      // let end_t = Time.cycles()
+      // _metrics.report(a, start_t, end_t)
+      // //  collecting is a source for a slowdown
+      // _collector.report_step_metrics(b, "what", start_t, end_t)
+
       match _next
       | let n: FirstPass tag =>
-        // This u * 2 seems to be a source of a significant slowdown
-        n.take(a, b, c, u * 2)//_latest)
+        n.take[U64](a, b, c, u)
       | let n: LastPass tag =>
-        // This u * 2 seems to be a source of a significant slowdown
-        n.take(a, b, c, u * 2)//_latest)
+        n.take[U64](a, b, c, u)
       end
     else
       @printf[I32]("Error matching data\n".cstring())
     end
+
+
 
 actor LastPass is Pass
   var _count: USize = 0
@@ -187,34 +192,34 @@ actor LastPass is Pass
   let _buffer: WriteBuffer = WriteBuffer
   let _collector: MetricsCollector tag
 
-  new create(sender: TCPConnection, metrics: Metrics, expected: USize, 
+  new create(sender: TCPConnection, metrics: Metrics, expected: USize,
     collector: MetricsCollector tag) =>
     _sender = sender
     _expected = expected
     _metrics = metrics
     _collector = collector
 
-  be take(a: U64, b: U64, c: U64, data: Any val) =>
+  be take[A: Any val](a: U64, b: U64, c: U64, data: A) =>
     match data
     | let u: U64 =>
       _count = _count + 1
-      let start_t = Epoch.nanoseconds()
-      let end_t = Epoch.nanoseconds()
-      _metrics.report(_count.u64(), start_t, end_t)
-      // collecting is a source for a slowdown
-      _collector.report_boundary_metrics(b, c, start_t, end_t)
+      // let start_t = Time.cycles()//Epoch.nanoseconds()
+      // let end_t = Time.cycles()//Epoch.nanoseconds()
+      // _metrics.report(_count.u64(), start_t, end_t)
+      // // collecting is a source for a slowdown
+      // _collector.report_boundary_metrics(b, c, start_t, end_t)
       if (_count % 100_000) == 0 then
         @printf[I32]("%zu sent\n".cstring(), _count)
       end
 
       if _count == _expected then
-        _metrics.set_end(Time.wall_to_nanos(Time.now()), _expected)
+        _metrics.set_end(Time.nanos(), _expected)
         _count = 0
       end
 
       _buffer.reserve_chunks(100)
 
-    
+
       let s = u.string()
       _buffer.u32_be((s.size() + 8).u32())
       //Message size field
@@ -232,7 +237,7 @@ actor Metrics
   var end_t: U64 = 0
   var last_report: U64 = 0
 
-  be set_start(s: U64) => 
+  be set_start(s: U64) =>
     if start_t != 0 then
       next_start_t = s
     else
@@ -240,13 +245,13 @@ actor Metrics
     end
     @printf[I32]("Start: %zu\n".cstring(), start_t)
 
-  be set_end(e: U64, expected: USize) => 
+  be set_end(e: U64, expected: USize) =>
     end_t = e
     let overall = (end_t - start_t).f64() / 1_000_000_000
     let throughput = ((expected.f64() / overall) / 1_000).usize()
     @printf[I32]("End: %zu\n".cstring(), end_t)
-    @printf[I32]("Overall: %f\n".cstring(), overall) 
-    @printf[I32]("Throughput: %zuk\n".cstring(), throughput) 
+    @printf[I32]("Overall: %f\n".cstring(), overall)
+    @printf[I32]("Throughput: %zuk\n".cstring(), throughput)
     start_t = next_start_t
     next_start_t = 0
     end_t = 0

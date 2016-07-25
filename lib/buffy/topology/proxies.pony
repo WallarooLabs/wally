@@ -21,10 +21,9 @@ actor Proxy is BasicStep
     _coordinator = coordinator
     _metrics_collector = metrics_collector
 
-  be apply(msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
-    let forward = Forward(_step_id, _node_name, msg_id, source_ts, 
-      ingress_ts, msg_data)
-    _coordinator.send_data_message(_target_node_name, forward)
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+    msg_data: D) =>
+    _coordinator.send_data_message[D](_target_node_name, _step_id, _node_name, msg_id, source_ts, ingress_ts, msg_data)
     _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
       msg_id, ingress_ts, Epoch.nanoseconds())
 
@@ -43,19 +42,23 @@ actor StepManager
     _sink_addrs = sink_addrs
     _metrics_collector = metrics_collector
 
-  be apply(step_id: U64, msg_id: U64, source_ts: U64, ingress_ts: U64, 
-    msg_data: Any val) 
+  be send[D: Any val](step_id: U64, msg_id: U64, source_ts: U64, 
+    ingress_ts: U64, msg_data: D) 
   =>
     try
-      _steps(step_id)(msg_id, source_ts, ingress_ts, msg_data)
+      _steps(step_id).send[D](msg_id, source_ts, ingress_ts, msg_data)
     else
       _env.out.print("StepManager: Could not forward message")
     end
 
-  be passthrough_to_step(step_id: U64, passthrough: BasicOutputStep tag) =>
+  be passthrough_to_step[D: Any val](step_id: U64, 
+    passthrough: BasicOutputStep tag) =>
     try
-      let step = _steps(step_id)    
-      passthrough.add_output(step)
+      let step = _steps(step_id) 
+      match passthrough
+      | let p: PassThrough tag =>   
+        p.add_output_and_send[D](step)
+      end
     else
       _env.err.print("StepManager: Error setting up passthrough.")
     end

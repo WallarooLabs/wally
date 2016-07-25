@@ -43,6 +43,7 @@ class MetricsReceiverNotify is TCPConnectionNotify
   let _decoder: MetricsMsgDecoder = MetricsMsgDecoder
   var _header: Bool = true
   let _collections: Array[MetricsCollection tag] val
+  var _msg_count: USize = 0
 
   new iso create(stdout: StdStream, stderr: StdStream, auth: AmbientAuth,
                  collections: Array[MetricsCollection tag] val) =>
@@ -55,7 +56,7 @@ class MetricsReceiverNotify is TCPConnectionNotify
     conn.expect(4)
     _stdout.print("connection accepted")
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     let d: Array[U8] val = consume data
     if _header then
       try
@@ -69,7 +70,13 @@ class MetricsReceiverNotify is TCPConnectionNotify
       handle_data(consume d)
       conn.expect(4)
       _header = true
+      _msg_count = _msg_count + 1
+      if _msg_count >= 5 then
+        _msg_count = 0
+        return false
+      end
     end
+    true
 
   fun ref handle_data(data: (Array[U8] val | Array[U8] iso)) =>
       let msg = _decoder(consume data, _auth)

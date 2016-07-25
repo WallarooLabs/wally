@@ -1,4 +1,5 @@
 use "sendence/bytes"
+use "buffy/network"
 use "buffy/topology"
 use "serialise"
 use "net"
@@ -111,9 +112,13 @@ primitive WireMsgEncoder
     auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(AckConnectMsgIdMsg(node_name, msg_id), auth)
 
-  fun data_channel(id: U64, forward: Forward val, auth: AmbientAuth)
-    : Array[ByteSeq] val ? =>
-    _encode(DataChannelMsg(id, forward), auth)
+  fun data_channel[D: Any val](data_ch_id: U64, step_id: U64, 
+    from_node_name: String, msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D, auth: AmbientAuth)
+    : Array[ByteSeq] val ? 
+  =>
+    _encode(ForwardMsg[D](data_ch_id, step_id, from_node_name, msg_id, 
+      source_ts, ingress_ts, msg_data), auth)
 
 primitive WireMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): WireMsg val =>
@@ -323,10 +328,32 @@ class AckFinishedConnectionsMsg is WireMsg
   new val create(name: String) =>
     node_name = name
 
-class DataChannelMsg is WireMsg
-  let id: U64
-  let forward: Forward val
+trait DataChannelMsg is WireMsg
+  fun data_channel_id(): U64
+  fun from_name(): String
+  fun deliver(data_receiver: DataReceiver, step_manager: StepManager tag)  
 
-  new val create(i: U64, f: Forward val) =>
-    id = i
-    forward = f
+class ForwardMsg[D: Any val] is DataChannelMsg
+  let _data_ch_id: U64
+  let _step_id: U64
+  let _from_node_name: String
+  let _msg_id: U64
+  let _source_ts: U64
+  let _ingress_ts: U64
+  let _data: D
+
+  new val create(data_ch_id: U64, s_id: U64, from: String, m_id: U64, 
+    s_ts: U64, i_ts: U64, m_data: D) =>
+    _data_ch_id = data_ch_id
+    _step_id = s_id
+    _from_node_name = from
+    _msg_id = m_id
+    _source_ts = s_ts
+    _ingress_ts = i_ts
+    _data = m_data
+
+  fun data_channel_id(): U64 => _data_ch_id
+  fun from_name(): String => _from_node_name
+  fun deliver(data_receiver: DataReceiver, step_manager: StepManager tag) =>
+    data_receiver.received[D](_data_ch_id, _step_id, _msg_id, _source_ts, 
+      _ingress_ts, _data, step_manager)

@@ -47,7 +47,7 @@ class ConnectNotify is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("connection accepted")
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     for chunked in _framer.chunk(consume data).values() do
       try
         let msg = ReportMsgDecoder(consume chunked)
@@ -63,6 +63,8 @@ class ConnectNotify is TCPConnectionNotify
         _env.err.print("Error decoding incoming message.")
       end
     end
+    true
+    
   fun ref connected(conn: TCPConnection ref) =>
     _env.out.print("connected.")
 

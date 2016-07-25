@@ -172,7 +172,7 @@ class ToDagonNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     _coordinator.to_dagon_socket(sock, Ready)
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     for chunked in _framer.chunk(consume data).values() do
       try
         let decoded = ExternalMsgDecoder(consume chunked)
@@ -186,6 +186,7 @@ class ToDagonNotify is TCPConnectionNotify
         _stderr.print("Unable to decode message from Dagon")
       end
     end
+    true
 
 //
 // COORDINATE OUR STARTUP

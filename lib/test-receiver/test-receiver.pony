@@ -46,7 +46,7 @@ class ConnectNotify is TCPConnectionNotify
   new iso create(env: Env) =>
     _env = env
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     for chunked in _framer.chunk(consume data).values() do
       try
         let decoded = ExternalMsgDecoder(chunked)
@@ -60,6 +60,7 @@ class ConnectNotify is TCPConnectionNotify
         _env.err.print("Error decoding message")
       end
     end
+    true
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("Server closed")

@@ -39,6 +39,7 @@ class SinkNodeConnectNotify is TCPConnectionNotify
   let _auth: AmbientAuth
   let _sink_node_step: StringInStep tag
   var _header: Bool = true
+  var _msg_count: USize = 0
 
   new iso create(env: Env, auth: AmbientAuth, sink_node_step: StringInStep tag) =>
     _env = env
@@ -48,7 +49,7 @@ class SinkNodeConnectNotify is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
@@ -67,7 +68,13 @@ class SinkNodeConnectNotify is TCPConnectionNotify
 
       conn.expect(4)
       _header = true
+      _msg_count = _msg_count + 1
+      if _msg_count >= 5 then
+        _msg_count = 0
+        return false
+      end
     end
+    true
 
   fun ref connected(conn: TCPConnection ref) =>
     _env.out.print("Sink node: connected.")
@@ -93,8 +100,9 @@ class SinkNodeOutConnectNotify is TCPConnectionNotify
   fun ref connected(conn: TCPConnection ref) =>
     _coordinator.add_connection(conn)
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     _env.out.print("sink out: received")
+    true
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("sink out: server closed")

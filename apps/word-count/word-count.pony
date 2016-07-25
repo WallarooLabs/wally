@@ -72,7 +72,7 @@ class Count is StateComputation[WordCount val, WordCountTotals]
   new val create(wc: WordCount val) =>
     _word_count = wc
 
-  fun apply(state: WordCountTotals, output: MessageTarget val)
+  fun apply(state: WordCountTotals, output: MessageTarget[WordCount val] val)
     : WordCountTotals =>
     output(state(_word_count))
     state
