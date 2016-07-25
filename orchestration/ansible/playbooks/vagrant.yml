@@ -34,6 +34,7 @@
     swarm_image: swarm
     consul_image: gliderlabs/consul
     docker_users: [ vagrant, sendence ]
+    userland_proxy: true
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
@@ -50,6 +51,7 @@
     swarm_image: swarm
     consul_image: gliderlabs/consul
     docker_users: [ vagrant, sendence ]
+    userland_proxy: true
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
