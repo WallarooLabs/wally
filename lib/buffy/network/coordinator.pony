@@ -250,19 +250,21 @@ actor Coordinator
       _env.out.print("Coordinator: no control conn to " + target_name)
     end
 
-  be send_data_message(target_name: String, forward: Forward val) =>
+  be send_data_message[D: Any val](target_name: String, step_id: U64, 
+    from_node_name: String, msg_id: U64, source_ts: U64, ingress_ts: U64, 
+    msg_data: D) 
+  =>
     try
-      _data_connection_senders(target_name).forward(forward)
+      _data_connection_senders(target_name).forward[D](step_id, from_node_name,
+        msg_id, source_ts, ingress_ts, msg_data)
     else
       _env.out.print("Coordinator: no data conn for " + target_name)
     end
 
-  be deliver(data_ch_id: U64, step_id: U64, from_name: String,
-    msg_id: U64, source_ts: U64, ingress_ts: U64, msg_data: Any val) =>
+  be deliver(data_ch_msg: DataChannelMsg val) =>
     try
-      _data_connection_receivers(from_name)
-        .received(data_ch_id, step_id, msg_id, source_ts, ingress_ts,
-          msg_data, _step_manager)
+      let receiver = _data_connection_receivers(data_ch_msg.from_name())
+      data_ch_msg.deliver(receiver, _step_manager)
     end
 
   be send_phone_home_message(msg: Array[ByteSeq] val) =>

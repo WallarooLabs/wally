@@ -21,7 +21,7 @@ trait StateProcessor[State: Any #read]
   fun partition_id(): U64 => 0
 
 interface StateComputation[Out: Any val, State: Any #read]
-  fun apply(state: State, output: MessageTarget val): State
+  fun apply(state: State, output: MessageTarget[Out] val): State
 
 class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
   is StateProcessor[State]
@@ -37,12 +37,12 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
 
   fun apply(msg_id: U64, source_ts: U64, ingress_ts: U64, state: State): State 
   =>
-    let target = MessageTarget(_output, msg_id, source_ts, ingress_ts)
+    let target = MessageTarget[Out](_output, msg_id, source_ts, ingress_ts)
     _state_computation(state, target)
 
   fun partition_id(): U64 => _partition_id
 
-class MessageTarget
+class MessageTarget[Out: Any val]
   let _output: BasicStep tag
   let _id: U64
   let _source_ts: U64
@@ -56,7 +56,10 @@ class MessageTarget
     _ingress_ts = ingress_ts
 
   fun apply(data: Any val) =>
-    _output(_id, _source_ts, _ingress_ts, data)
+    match data
+    | let o: Out =>
+      _output.send[Out](_id, _source_ts, _ingress_ts, o)
+    end
 
 interface ComputationBuilder[In, Out]
   fun apply(): Computation[In, Out] iso^
