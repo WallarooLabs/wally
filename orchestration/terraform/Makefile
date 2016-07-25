@@ -1,5 +1,5 @@
 current_dir := $(shell pwd)
-cluster_name ?= example## Cluster name to manage.
+cluster_name ?= ## Cluster name to manage.
 region ?= us-east-1## Region to launch cluster in.
 availability_zone ?= ## Availability Zone to launch cluster in.
 cluster_pem ?= ~/.ssh/ec2/$(region).pem## PEM file to use for ssh keys for cluster.
@@ -194,11 +194,11 @@ sleep60: # sleep 60 seconds
 	@sleep 60
 
 cluster: in_cluster=true
-cluster: apply sleep60 configure ## Creates a cluster and configures it with Ansible
+cluster: check-cluster-name apply sleep60 configure ## Creates a cluster and configures it with Ansible
 
-destroy: acquire-cluster-lock init-terraform setup_ci_arg setup_az_arg terraform-destroy release-cluster-lock ## Run terraform destroy step
+destroy: check-cluster-name acquire-cluster-lock init-terraform setup_ci_arg setup_az_arg terraform-destroy release-cluster-lock ## Run terraform destroy step
 
-configure: ## Configure nodes using ansible
+configure: check-cluster-name ## Configure nodes using ansible
 	$(if $(wildcard $(ansible_vault_password)),,$(error Ansible Vault \
           password file ($(ansible_vault_password)) is missing!))
 	@echo "\033[36m==> Running ansible playbook for cluster \
@@ -210,9 +210,9 @@ configure: ## Configure nodes using ansible
 	@echo "\033[36m==> Successfully ran ansible playbook for cluster \
 '$(cluster_name)' in region '$(region)'!\033[0m"
 
-plan: acquire-vpc-lock create-vpc release-vpc-lock acquire-cluster-lock init-terraform setup_ci_arg setup_az_arg terraform-plan post_message release-cluster-lock ## Run terraform plan step
+plan: check-cluster-name acquire-vpc-lock create-vpc release-vpc-lock acquire-cluster-lock init-terraform setup_ci_arg setup_az_arg terraform-plan post_message release-cluster-lock ## Run terraform plan step
 
-apply: acquire-vpc-lock create-vpc release-vpc-lock acquire-cluster-lock init-terraform setup_ci_arg setup_az_arg terraform-apply post_message release-cluster-lock ## Run terraform apply step (set use_automagic_instances=false to be able to change more than # instances)
+apply: check-cluster-name acquire-vpc-lock create-vpc release-vpc-lock acquire-cluster-lock init-terraform setup_ci_arg setup_az_arg terraform-apply post_message release-cluster-lock ## Run terraform apply step (set use_automagic_instances=false to be able to change more than # instances)
 
 setup_ci_arg: exists=$(shell egrep 'resources' \
                 ./cluster/.terraform/terraform.tfstate | sort -u | sed \
@@ -282,7 +282,7 @@ Automagic instance logic determined instance_type='$(ci_inst_type)' \
 current_price='$(ci_current_price)' bid_price='$(ci_inst_price)' and \
 availability_zone='$(ci_az)' and $(ci_pg).\033[0m",)
 
-create-vpc: init-vpc-terraform # confirm VPC is created
+create-vpc: check-cluster-name init-vpc-terraform # confirm VPC is created
 	@echo "\033[36m==> Confirming VPC is created in region \
 '$(region)'...\033[0m"
 	cd vpc && terraform apply $(terraform_args) -var aws_region=$(region) \
@@ -296,14 +296,14 @@ create-vpc: init-vpc-terraform # confirm VPC is created
 	@echo "\033[36m==> Successfully confirmed VPC is created in region \
 '$(region)'!\033[0m"
 
-destroy-vpc: init-vpc-terraform # destroy VPC in region
+destroy-vpc: check-cluster-name init-vpc-terraform # destroy VPC in region
 	@echo "\033[36m==> Destroying VPC in region '$(region)'...\033[0m"
 	cd vpc && terraform destroy -force $(terraform_args) -var \
           aws_region=$(region)
 	@echo "\033[36m==> Successfully confirmed VPC is created in region \
 '$(region)'!\033[0m"
 
-acquire-cluster-lock: ## Acquire cluster lock in order to safely run terraform commands on shared remote state in S3
+acquire-cluster-lock: check-cluster-name ## Acquire cluster lock in order to safely run terraform commands on shared remote state in S3
 	@echo "\033[36m==> Acquiring cluster lock...\033[0m"
 	aws configure set preview.sdb true
 	aws sdb create-domain --region us-east-1 --domain-name terraform_locking
@@ -324,7 +324,7 @@ acquire-cluster-lock: ## Acquire cluster lock in order to safely run terraform c
           --expected Name=$(cluster_name)-lock,Value=`id -u -n`-`hostname`
 	@echo "\033[36m==> Cluster lock successfully acquired!\033[0m"
 
-acquire-vpc-lock: ## Acquire vpc lock in order to safely run terraform commands on shared remote state in S3
+acquire-vpc-lock: check-cluster-name ## Acquire vpc lock in order to safely run terraform commands on shared remote state in S3
 	@echo "\033[36m==> Acquiring vpc lock...\033[0m"
 	aws configure set preview.sdb true
 	aws sdb create-domain --region us-east-1 --domain-name terraform_locking
@@ -345,7 +345,10 @@ acquire-vpc-lock: ## Acquire vpc lock in order to safely run terraform commands 
           --expected Name=vpc-lock,Value=`id -u -n`-`hostname`
 	@echo "\033[36m==> VPC lock successfully acquired!\033[0m"
 
-init-vpc-terraform: ## Initialize/reset local terraform state based on what is in S3 for vpc
+check-cluster-name: # check for valid cluster name
+	$(if $(cluster_name),,$(error 'cluster_name' cannot be empty!))
+
+init-vpc-terraform: check-cluster-name ## Initialize/reset local terraform state based on what is in S3 for vpc
 	@echo "\033[36m==> Initializing terraform state for VPC in region \
 '$(region)' with remote S3 config...\033[0m"
 	cd vpc && rm -f .terraform/terraform.tfstate
@@ -380,7 +383,7 @@ init-terraform: ## Initialize/reset local terraform state based on what is in S3
 	@echo "\033[36m==> Terraform state successfully initialized for cluster\
  '$(cluster_name)' in region '$(region)'!\033[0m"
 
-release-cluster-lock: ## Release cluster lock after safely running terraform commands on shared remote state in S3
+release-cluster-lock: check-cluster-name ## Release cluster lock after safely running terraform commands on shared remote state in S3
 	@echo "\033[36m==> Releasing cluster lock...\033[0m"
 	aws sdb put-attributes --region us-east-1 --domain-name \
           terraform_locking --item-name $(region)_lock --attributes \
@@ -388,14 +391,14 @@ release-cluster-lock: ## Release cluster lock after safely running terraform com
           --expected Name=$(cluster_name)-lock,Value=`id -u -n`-`hostname`
 	@echo "\033[36m==> Cluster lock successfully released!\033[0m"
 
-force-release-cluster-lock: ## Force release cluster lock (NOTE: ONLY USE IN EMERGENCY ELSE IT COULD CORRUPT TERRAFORM CACHE!!!!)
+force-release-cluster-lock: check-cluster-name ## Force release cluster lock (NOTE: ONLY USE IN EMERGENCY ELSE IT COULD CORRUPT TERRAFORM CACHE!!!!)
 	@echo "\033[36m==> Forcing release of cluster lock...\033[0m"
 	aws sdb put-attributes --region us-east-1 --domain-name \
           terraform_locking --item-name $(region)_lock --attributes \
           Name=$(cluster_name)-lock,Value=free,Replace=true
 	@echo "\033[36m==> Cluster lock successfully released!\033[0m"
 
-release-vpc-lock: ## Release vpc lock after safely running terraform commands on shared remote state in S3
+release-vpc-lock: check-cluster-name ## Release vpc lock after safely running terraform commands on shared remote state in S3
 	@echo "\033[36m==> Releasing vpc lock...\033[0m"
 	aws sdb put-attributes --region us-east-1 --domain-name \
           terraform_locking --item-name $(region)_lock --attributes \
@@ -403,7 +406,7 @@ release-vpc-lock: ## Release vpc lock after safely running terraform commands on
           --expected Name=vpc-lock,Value=`id -u -n`-`hostname`
 	@echo "\033[36m==> VPC lock successfully released!\033[0m"
 
-force-release-vpc-lock: ## Force release vpc lock (NOTE: ONLY USE IN EMERGENCY ELSE IT COULD CORRUPT TERRAFORM CACHE!!!!)
+force-release-vpc-lock: check-cluster-name ## Force release vpc lock (NOTE: ONLY USE IN EMERGENCY ELSE IT COULD CORRUPT TERRAFORM CACHE!!!!)
 	@echo "\033[36m==> Forcing release of vpc lock...\033[0m"
 	aws sdb put-attributes --region us-east-1 --domain-name \
           terraform_locking --item-name $(region)_lock --attributes \
