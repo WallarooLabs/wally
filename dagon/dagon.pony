@@ -72,6 +72,7 @@ actor Main
     var phone_home_service: String = ""
     var service: String = ""
     var options = Options(env)
+    var delay_senders = false
 
     options
     .add("docker", "d", StringArgument)
@@ -79,6 +80,7 @@ actor Main
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
+    .add("delay-senders", "ds", None)
     try
       for option in options do
         match option
@@ -87,6 +89,7 @@ actor Main
         | ("timeout", let arg: I64) => timeout = arg
         | ("filepath", let arg: String) => path = arg
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
+        | ("delay-senders", None) => delay_senders = true
         | let err: ParseError =>
           err.report(env.err)
           error
@@ -156,7 +159,7 @@ actor Main
       env.out.print("dagon: host: " + phone_home_host)
       env.out.print("dagon: service: " + phone_home_service)
 
-      ProcessManager(env, use_docker, docker_host as String,
+      ProcessManager(env, delay_senders, use_docker, docker_host as String,
         docker_tag as String, timeout as I64, path as String,
         phone_home_host, phone_home_service)
     else
@@ -312,12 +315,13 @@ actor ProcessManager
   var _delay_senders: Bool = false
   var state: DagonState = Initialized
 
-  new create(env: Env, use_docker: Bool, docker_host: String,
+  new create(env: Env, delay_senders: Bool, use_docker: Bool, docker_host: String,
     docker_tag: String,
     timeout: I64, path: String,
     host: String, service: String)
   =>
     _env = env
+    _delay_senders = delay_senders
     _use_docker = use_docker
     _docker_host = docker_host
     _docker_tag = docker_tag
@@ -1106,6 +1110,7 @@ actor ProcessManager
 
   be received_start_senders(conn: TCPConnection) =>
     transition_to(StartSenders)
+    send_senders_started(conn)
 
   be transition_to(state': DagonState, node_name: String = "") =>
     var old_state: DagonState
@@ -1200,6 +1205,7 @@ actor ProcessManager
     | TopologyReady => return "TopologyReady"
     | AwaitingSendersReady => return "AwaitingSendersReady"
     | AwaitingSendersStart => return "AwaitingSendersStart"
+    | StartSenders => return "StartSenders"
     | SendersReady => return "SendersReady"
     | SendersStarted => return "SendersStarted"
     | SendersDone => return "SendersDone"
@@ -1209,6 +1215,15 @@ actor ProcessManager
     else
       return "Unknown state"
     end
+
+  be send_senders_started(conn: TCPConnection) =>
+    """
+    Tell notifier that senders have been started.
+    """
+    _env.out.print("dagon: sending 'SendersStarted' to notifier")
+    let message = ExternalMsgEncoder.senders_started()
+    conn.writev(message)
+
 
 class ProcessClient is ProcessNotify
   let _env: Env
