@@ -296,8 +296,8 @@ to the nearest integer.
       count_bins.update(x,0)
     end
 
-  fun ref apply(report: MetricsReport val) =>
-    count_latency(report.dt())
+  fun ref apply(dt: U64) =>
+    count_latency(dt)
 
   fun ref count_latency(dt:U64) =>
     // compute dt in seconds as F64 from the nanosecond U64 timestamps
@@ -359,8 +359,8 @@ A history of throughput counts per second
   var _start_time: U64 = 0
   var _end_time: U64 = 0
 
-  fun ref apply(report: MetricsReport val) =>
-    count_report(report.ended())
+  fun ref apply(end_time: U64) =>
+    count_report(end_time)
 
   fun ref count_report(end_time: U64) =>
     // Truncate nanoseconds to seconds
@@ -412,8 +412,6 @@ on category and id
   let _period: U64 val
   let _bin_selector: F64Selector val
   let _handler: MetricsCollectionOutputHandler val
-  let _sink_type: U64 = BoundaryTypes.source_sink()
-  let _egress_type: U64 = BoundaryTypes.ingress_egress()
 
   new create(bin_selector: F64Selector val, period: U64=1,
              handler: MetricsCollectionOutputHandler val) =>
@@ -432,11 +430,12 @@ on category and id
     _sinkmetrics = SinkMetrics
     _sinktimeranges = SinkTimeranges
 
-  be process_report(step_name: String, report: StepMetricsReport val) =>
-    _process_report(step_name, report)
+  be process_step(step_name: String, start_time: U64, end_time: U64) =>
+    _process_step(step_name, start_time, end_time)
 
-  fun ref _process_report(step_name: String, report: StepMetricsReport val) =>
-    let time_bucket: U64 = get_time_bucket(report.end_time)
+  fun ref _process_step(step_name: String, start_time: U64, end_time: U64) =>
+    let time_bucket: U64 = get_time_bucket(end_time)
+    let dt: U64 = end_time - start_time
     // Bookkeeping
     try
       _steptimeranges(time_bucket).set(step_name)
@@ -449,13 +448,13 @@ on category and id
       let time_buckets:TimeBuckets = _stepmetrics(step_name)
       try
         (let lh, let th) = time_buckets(time_bucket)
-        lh(report)
-        th(report)
+        lh(dt)
+        th(dt)
       else
         (let lh, let th) =(LatencyHistogram(_bin_selector),
                            recover ref ThroughputHistory end)
-        lh(report)
-        th(report)
+        lh(dt)
+        th(dt)
         time_buckets.update(time_bucket, (lh, th))
       end
     else
@@ -463,16 +462,17 @@ on category and id
       _stepmetrics.update(step_name, time_buckets)
       (let lh, let th) = (LatencyHistogram(_bin_selector),
                           recover ref ThroughputHistory end)
-      lh(report)
-      th(report)
+      lh(dt)
+      th(dt)
       time_buckets.update(time_bucket, (lh, th))
     end
 
-  be process_boundary(name: String, report: BoundaryMetricsReport val) =>
-    _process_boundary(name, report)
+  be process_boundary(name: String, start_time: U64, end_time: U64) =>
+    _process_boundary(name, start_time, end_time)
 
-  fun ref _process_boundary(name: String, report: BoundaryMetricsReport val) =>
-    let time_bucket: U64 = get_time_bucket(report.end_time)
+  fun ref _process_boundary(name: String, start_time: U64, end_time: U64) =>
+    let time_bucket: U64 = get_time_bucket(end_time)
+    let dt: U64 = end_time - start_time
     try
       _boundarytimeranges(time_bucket).set(name)
     else
@@ -484,13 +484,13 @@ on category and id
       let time_buckets: TimeBuckets = _boundarymetrics(name)
       try
         (let lh, let th) = time_buckets(time_bucket)
-        lh(report)
-        th(report)
+        lh(dt)
+        th(dt)
       else
         (let lh, let th) = (LatencyHistogram(_bin_selector),
                             recover ref ThroughputHistory end)
-        lh(report)
-        th(report)
+        lh(dt)
+        th(dt)
         time_buckets.update(time_bucket, (lh, th))
       end
     else
@@ -498,16 +498,17 @@ on category and id
       _boundarymetrics.update(name, time_buckets)
       (let lh, let th) = (LatencyHistogram(_bin_selector),
                           recover ref ThroughputHistory end)
-      lh(report)
-      th(report)
+      lh(dt)
+      th(dt)
       time_buckets.update(time_bucket, (lh, th))
     end
 
-  be process_sink(name: String, report: BoundaryMetricsReport val) =>
-    _process_sink(name, report)
+  be process_sink(name: String, start_time: U64, end_time: U64) =>
+    _process_sink(name, start_time, end_time)
 
-  fun ref _process_sink(name: String, report: BoundaryMetricsReport val) =>
-    let time_bucket: U64 = get_time_bucket(report.end_time)
+  fun ref _process_sink(name: String, start_time: U64, end_time: U64) =>
+    let time_bucket: U64 = get_time_bucket(end_time)
+    let dt: U64 = end_time - start_time
     try
       _sinktimeranges(time_bucket).set(name)
     else
@@ -519,13 +520,13 @@ on category and id
       let time_buckets: TimeBuckets = _sinkmetrics(name)
       try
         (let lh, let th) = time_buckets(time_bucket)
-        lh(report)
-        th(report)
+        lh(dt)
+        th(dt)
       else
         (let lh, let th) = (LatencyHistogram(_bin_selector),
                             recover ref ThroughputHistory end)
-        lh(report)
-        th(report)
+        lh(dt)
+        th(dt)
         time_buckets.update(time_bucket, (lh, th))
       end
     else
@@ -533,8 +534,8 @@ on category and id
       _sinkmetrics.update(name, time_buckets)
       (let lh, let th) = (LatencyHistogram(_bin_selector),
                           recover ref ThroughputHistory end)
-      lh(report)
-      th(report)
+      lh(dt)
+      th(dt)
       time_buckets.update(time_bucket, (lh, th))
     end
 

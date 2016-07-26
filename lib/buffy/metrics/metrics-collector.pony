@@ -3,7 +3,6 @@ use "net"
 use "buffy/messages"
 use "buffy/epoch"
 use "buffy/flusher"
-use "buffy/metrics/receiver"
 
 actor MetricsCollector is FlushingActor
   let _stdout: StdStream
@@ -86,20 +85,16 @@ actor MetricsCollector is FlushingActor
 	be report_step_metrics(step_id: StepId, step_name: String, start_time: U64,
     end_time: U64) =>
     for mc in _collections.values() do
-      mc.process_report(step_name, StepMetricsReport(start_time, end_time))
+      mc.process_report(step_name, tart_time, end_time)
     end
 
 	be report_boundary_metrics(boundary_type: U64, msg_id: U64, start_time: U64,
     end_time: U64, pipeline_name: String = "") =>
     for mc in _collections.values() do
       if boundary_type == 0 then
-        mc.process_sink(pipeline_name,
-          BoundaryMetricsReport(boundary_type, msg_id, start_time, end_time,
-            pipeline_name))
+        mc.process_sink(pipeline_name, start_time, end_time)
       elseif boundary_type == 1 then
-        mc.process_boundary(pipeline_name,
-          BoundaryMetricsReport(boundary_type, msg_id, start_time, end_time,
-            pipeline_name))
+        mc.process_boundary(pipeline_name, start_time, end_time)
       end
     end
 
