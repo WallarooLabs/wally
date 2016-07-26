@@ -5,7 +5,6 @@ primitive StartupHelp
 
   fun sink_node(env: Env) =>
     _sink_node(env)
-    metrics_receiver(env)
 
   fun platform(env: Env) =>
     env.out.print(
