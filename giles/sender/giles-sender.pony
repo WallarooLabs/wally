@@ -383,9 +383,11 @@ actor SendingActor
       for i in Range(0, current_batch_size) do
         try
           let n = _data_source.next()
-          d'.push(n)
-          _wb.u32_be(n.size().u32())
-          _wb.write(n)
+          if n.size() > 0 then
+            d'.push(n)
+            _wb.u32_be(n.size().u32())
+            _wb.write(n)
+          end
         else
           ifdef debug then
             Debug.out("SendingActor: failed reading _data_source.next()")
