@@ -3,120 +3,106 @@ use "net"
 use "buffy/messages"
 use "buffy/epoch"
 use "buffy/flusher"
+use "buffy/metrics/receiver"
 
 actor MetricsCollector is FlushingActor
+  let _stdout: StdStream
   let _stderr: StdStream
   let _auth: AmbientAuth
   let _node_name: String
-  var _step_summary: NodeMetricsSummary trn
-  var _boundary_summary: BoundaryMetricsSummary trn
-  let _conn: (TCPConnection | None)
-  let _max_batch: USize
-  let _max_time: U64
-  var _node_last_sent: U64 = Epoch.nanoseconds()
-  var _boundary_last_sent: U64 = Epoch.nanoseconds()
-  var _largest_boundary_summary_size: USize = 0
-  var _largest_step_summary_size: USize = 0
+  let _collections: Array[MetricsCollection tag] ref = recover
+    Array[MetricsCollection tag] end
 
-	new create(stderr: StdStream, auth: AmbientAuth, node_name: String,
-             conn: (TCPConnection | None) = None, max_batch: USize = 10000,
-             max_time: U64 = 1_000_000_000) =>
+  be finished() =>
+    _flush()
+
+  be flush() => _flush()
+
+  fun _flush() =>
+    for mc in _collections.values() do
+      mc.send_output()
+    end
+
+  new create(stdout: StdStream,
+             stderr: StdStream,
+             auth: AmbientAuth,
+             node_name: String,
+             // MetricsCollection arguments:
+             app_name: String,
+             metrics_host: (String | None) = None,
+             metrics_service: (String | None) = None,
+             report_file: (String | None) = None,
+             max_time: U64 = 1_000_000_000,
+             period: U64 = 1_000_000_000,
+             delay: U64 = 1_000_000_000,
+             report_period: U64 = 300_000_000_000)
+  =>
+    _stdout = stdout
     _stderr = stderr
 	  _auth = auth
     _node_name = node_name
-	  _conn = conn
-    _max_batch = max_batch
-    _max_time = max_time
-    _boundary_summary = recover BoundaryMetricsSummary(node_name) end
-    _step_summary = recover NodeMetricsSummary(node_name) end
 
-  be flush() =>
-    if _step_summary.size() > 0 then _send_steps() end
-    if _boundary_summary.size() > 0 then _send_boundary() end
+    // Create connections and actors here
+
+    // MonitoringHub Output:
+    match (metrics_host, metrics_service)
+    | (let host: String, let service: String) =>
+      let notifier: TCPConnectionNotify iso =
+        recover MonitoringHubConnectNotify(stdout, stderr) end
+      let conn' = TCPConnection(auth, consume notifier, host, service)
+      let output = MonitoringHubOutput(stdout, stderr, conn', app_name)
+      let handler: MetricsOutputHandler val =
+        MetricsOutputHandler(MonitoringHubEncoder, consume output, app_name)
+
+      // Metrics Collection actor
+      let bin_selector: F64Selector val = Log10Selector //FixedBinSelector
+      let mc = MetricsCollection(bin_selector, period, handler)
+
+      // start a timer to flush the metrics-collection
+      Flusher(mc, delay)
+
+      _collections.push(consume mc)
+    end
+
+    // File Output
+    match report_file
+    | let arg: String =>
+      let output' = MetricsFileOutput(stdout, stderr, auth, app_name,
+        arg)
+      let handler': MetricsOutputHandler val =
+        MetricsOutputHandler(MonitoringHubEncoder(false), consume output',
+          app_name)
+      let bin_selector': F64Selector val = FixedBinSelector
+      let mc' = MetricsCollection(bin_selector', report_period, handler')
+
+      // start a timer to flush the metrics-collection
+      Flusher(mc', report_period)
+
+      _collections.push(consume mc')
+      stdout.print("Reporting to file " + arg + " every " +
+        report_period.string() + " seconds.")
+    end
 
 	be report_step_metrics(step_id: StepId, step_name: String, start_time: U64,
     end_time: U64) =>
-    let r = StepMetricsReport(start_time, end_time)
-    _step_summary.add_report(step_name, consume r)
-    _send_steps_if_over_max()
-
-  be flush_step_metrics() =>
-    _send_steps_if_over_max()
-
-  fun ref _send_steps_if_over_max() =>
-	  if (_step_summary.size() > _max_batch) or
-       ((Epoch.nanoseconds() - _node_last_sent) > _max_time)
-    then
-      _send_steps()
-	  end
-
-  fun ref _send_steps() =>
-      let node_name: String val = _node_name.clone()
-      var size = _step_summary.size()
-      if size > _largest_step_summary_size then
-        _largest_step_summary_size = size
-      else
-        size = _largest_step_summary_size
-      end
-      let summary = _step_summary =
-        recover
-          trn NodeMetricsSummary(node_name, size)
-        end
-      let s:NodeMetricsSummary val = consume summary
-      _send_step_metrics_to_receiver(s)
-      _node_last_sent = Epoch.nanoseconds()
-
-  fun ref _send_step_metrics_to_receiver(summary: NodeMetricsSummary val) =>
-    match _conn
-    | let c: TCPConnection =>
-      try
-        let encoded = MetricsMsgEncoder.nodemetrics(summary, _auth)
-        c.writev(encoded)
-      else
-        _stderr.print("Failed to send NodeMetricsSummary.")
-      end
+    for mc in _collections.values() do
+      mc.process_report(step_name, StepMetricsReport(start_time, end_time))
     end
 
 	be report_boundary_metrics(boundary_type: U64, msg_id: U64, start_time: U64,
     end_time: U64, pipeline_name: String = "") =>
-		_boundary_summary.add_report(BoundaryMetricsReport(boundary_type, msg_id, start_time, end_time, pipeline_name))
-    _send_boundary_if_over_max()
-
-  be flush_boundary_metrics() =>
-    _send_boundary_if_over_max()
-
-  fun ref _send_boundary_if_over_max() =>
-	  if (_boundary_summary.size() > _max_batch) or
-       ((Epoch.nanoseconds() - _boundary_last_sent) > _max_time)
-    then
-      _send_boundary()
-	  end
-
-  fun ref _send_boundary() =>
-      let node_name: String val = _node_name.clone()
-      var size = _boundary_summary.size()
-      if size > _largest_boundary_summary_size then
-        _largest_boundary_summary_size = size
-      else
-        size = _largest_boundary_summary_size
+    for mc in _collections.values() do
+      if boundary_type == 0 then
+        mc.process_sink(pipeline_name,
+          BoundaryMetricsReport(boundary_type, msg_id, start_time, end_time,
+            pipeline_name))
+      elseif boundary_type == 1 then
+        mc.process_boundary(pipeline_name,
+          BoundaryMetricsReport(boundary_type, msg_id, start_time, end_time,
+            pipeline_name))
       end
-	    let summary = _boundary_summary =
-        recover trn BoundaryMetricsSummary(node_name, size) end
-      let s: BoundaryMetricsSummary val = consume summary
-	    _send_boundary_metrics_to_receiver(s)
-      _boundary_last_sent = Epoch.nanoseconds()
+    end
 
-  fun ref _send_boundary_metrics_to_receiver(
-    summary: BoundaryMetricsSummary val) =>
-  	match _conn
-  	| let c: TCPConnection =>
-      try
-        let encoded = MetricsMsgEncoder.boundarymetrics(summary, _auth)
-        c.writev(encoded)
-      else
-        _stderr.print("Failed to send BoundaryMetricsSummary.")
-      end
-		end
 
 class StepReporter
 	let _step_id: U64

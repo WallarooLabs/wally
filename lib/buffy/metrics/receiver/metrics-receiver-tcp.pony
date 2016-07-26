@@ -44,6 +44,8 @@ class MetricsReceiverNotify is TCPConnectionNotify
   var _header: Bool = true
   let _collections: Array[MetricsCollection tag] val
   var _msg_count: USize = 0
+  let _sink_type: U64 = BoundaryTypes.source_sink()
+  let _egress_type: U64 = BoundaryTypes.ingress_egress()
 
   new iso create(stdout: StdStream, stderr: StdStream, auth: AmbientAuth,
                  collections: Array[MetricsCollection tag] val) =>
@@ -91,8 +93,30 @@ class MetricsReceiverNotify is TCPConnectionNotify
 
   fun ref process_data(m: (NodeMetricsSummary val | BoundaryMetricsSummary val))
   =>
-    for mc in _collections.values() do
-      mc.process_summary(m)
+    match m
+    | let m': NodeMetricsSummary val =>
+      for digest in m'.digests.values() do
+        let name = digest.step_name
+        for report in digest.reports.values() do
+          for mc in _collections.values() do
+            mc.process_report(name, report)
+          end
+        end
+      end
+    | let m': BoundaryMetricsSummary val =>
+      let name = m'.node_name
+      for report in m'.reports.values() do
+        match report.boundary_type
+        | _egress_type =>
+          for mc in _collections.values() do
+            mc.process_boundary(name, report)
+          end
+        | _sink_type =>
+          for mc in _collections.values() do
+            mc.process_sink(name, report)
+          end
+        end
+      end
     end
 
   fun ref connected(conn: TCPConnection ref) =>

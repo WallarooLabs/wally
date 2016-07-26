@@ -432,27 +432,10 @@ on category and id
     _sinkmetrics = SinkMetrics
     _sinktimeranges = SinkTimeranges
 
-  be process_summary(summary: (NodeMetricsSummary val |
-                               BoundaryMetricsSummary val))
-  =>
-    match summary
-    | let summary':NodeMetricsSummary val =>
-      process_nodesummary(summary')
-    | let summary':BoundaryMetricsSummary val =>
-      process_boundarysummary(summary')
-    end
+  be process_report(step_name: String, report: StepMetricsReport val) =>
+    _process_report(step_name, report)
 
-  fun ref process_nodesummary(summary: NodeMetricsSummary val) =>
-    for digest in summary.digests.values() do
-      process_stepmetricsdigest(digest)
-    end
-
-  fun ref process_stepmetricsdigest(digest: StepMetricsDigest val) =>
-    for report in digest.reports.values() do
-      process_report(digest.step_name, report)
-    end
-
-  fun ref process_report(step_name: String, report: StepMetricsReport val) =>
+  fun ref _process_report(step_name: String, report: StepMetricsReport val) =>
     let time_bucket: U64 = get_time_bucket(report.end_time)
     // Bookkeeping
     try
@@ -485,17 +468,10 @@ on category and id
       time_buckets.update(time_bucket, (lh, th))
     end
 
+  be process_boundary(name: String, report: BoundaryMetricsReport val) =>
+    _process_boundary(name, report)
 
-  fun ref process_boundarysummary(summary: BoundaryMetricsSummary val) =>
-    let name = summary.node_name
-    for report in summary.reports.values() do
-      match report.boundary_type
-      | _egress_type => process_node(name, report)
-      | _sink_type => process_sink(report.pipeline, report)
-      end
-    end
-
-  fun ref process_node(name: String, report: BoundaryMetricsReport val) =>
+  fun ref _process_boundary(name: String, report: BoundaryMetricsReport val) =>
     let time_bucket: U64 = get_time_bucket(report.end_time)
     try
       _boundarytimeranges(time_bucket).set(name)
@@ -527,7 +503,10 @@ on category and id
       time_buckets.update(time_bucket, (lh, th))
     end
 
-  fun ref process_sink(name: String, report: BoundaryMetricsReport val) =>
+  be process_sink(name: String, report: BoundaryMetricsReport val) =>
+    _process_sink(name, report)
+
+  fun ref _process_sink(name: String, report: BoundaryMetricsReport val) =>
     let time_bucket: U64 = get_time_bucket(report.end_time)
     try
       _sinktimeranges(time_bucket).set(name)
