@@ -31,9 +31,7 @@ actor MetricsCollector is FlushingActor
              metrics_host: (String | None) = None,
              metrics_service: (String | None) = None,
              report_file: (String | None) = None,
-             max_time: U64 = 1_000_000_000,
              period: U64 = 1_000_000_000,
-             delay: U64 = 1_000_000_000,
              report_period: U64 = 300_000_000_000)
   =>
     _stdout = stdout
@@ -58,7 +56,7 @@ actor MetricsCollector is FlushingActor
       let mc = MetricsCollection(bin_selector, period, handler)
 
       // start a timer to flush the metrics-collection
-      Flusher(mc, delay)
+      Flusher(mc, period)
 
       _collections.push(consume mc)
     end

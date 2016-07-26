@@ -14,7 +14,9 @@ class StartupBuffyNode
     var node_name: String = "0"
     var phone_home_addr = Array[String]
     var metrics_addr = Array[String]
+    var metrics_period: U64 = 1_000_000_000
     var metrics_file: (String | None) = None
+    var metrics_file_period: U64 = 300_000_000_000
     var options = Options(env, false)
     var leader_control_addr = Array[String]
     var leader_data_addr = Array[String]
@@ -37,7 +39,9 @@ class StartupBuffyNode
       .add("source", "r", StringArgument)
       .add("sink", "k", StringArgument)
       .add("metrics", "m", StringArgument)
+      .add("metrics-period", "", I64Argument)
       .add("metrics-file", "", StringArgument)
+      .add("metrics-file-period", "", I64Argument)
       .add("spike-delay", "", None)
       .add("spike-drop", "", None)
       .add("spike-seed", "", I64Argument)
@@ -55,7 +59,11 @@ class StartupBuffyNode
       | ("source", let arg: String) => source_addrs.append(arg.split(","))
       | ("sink", let arg: String) => sink_addrs.append(arg.split(","))
       | ("metrics", let arg: String) => metrics_addr = arg.split(":")
+      | ("metrics-period", let arg: I64) =>
+        metrics_period = arg.u64()*1_000_000_000
       | ("metrics-file", let arg: String) => metrics_file = arg
+      | ("metrics-file-period", let arg: I64) =>
+        metrics_file_period = arg.u64()*1_000_000_000
       | ("spike-delay", None) =>
         env.out.print("%%SPIKE-DELAY%%")
         spike_delay = true
@@ -100,7 +108,8 @@ class StartupBuffyNode
       let metrics_collector = MetricsCollector(env.out, env.err, auth
         where node_name=node_name, app_name=app_name,
         metrics_host=metrics_host, metrics_service=metrics_service,
-        report_file=metrics_file)
+        report_file=metrics_file, period=metrics_period,
+        report_period=metrics_file_period)
 
       let step_manager = StepManager(env, node_name, consume sinks,
         metrics_collector)
