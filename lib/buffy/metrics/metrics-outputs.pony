@@ -1,7 +1,6 @@
 use "files"
 use "net"
 use "sendence/bytes"
-use "buffy/metrics"
 use "json"
 use "collections"
 use "sendence/hub"
