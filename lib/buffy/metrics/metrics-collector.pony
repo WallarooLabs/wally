@@ -85,7 +85,7 @@ actor MetricsCollector is FlushingActor
 	be report_step_metrics(step_id: StepId, step_name: String, start_time: U64,
     end_time: U64) =>
     for mc in _collections.values() do
-      mc.process_report(step_name, tart_time, end_time)
+      mc.process_step(step_name, start_time, end_time)
     end
 
 	be report_boundary_metrics(boundary_type: U64, msg_id: U64, start_time: U64,
