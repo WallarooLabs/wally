@@ -65,8 +65,14 @@ actor MetricsCollector is FlushingActor
       Flusher(mc', report_period)
 
       _collections.push(consume mc')
-      stdout.print("Reporting to file " + arg + " every " +
-        report_period.string() + " seconds.")
+      stdout.print(recover val
+        let out': String ref = String(100)
+        out'.append("reporting to file ")
+        out'.append(arg)
+        out'.append(" every ")
+        out'.append((report_period/1_000_000_000).string())
+        out'.append(" seconds.")
+        consume out' end)
     end
 
   be finished() =>
