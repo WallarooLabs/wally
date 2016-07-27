@@ -12,27 +12,16 @@ actor MetricsCollector is FlushingActor
   let _collections: Array[MetricsCollection tag] ref = recover
     Array[MetricsCollection tag] end
 
-  be finished() =>
-    _flush()
-
-  be flush() => _flush()
-
-  fun _flush() =>
-    for mc in _collections.values() do
-      mc.send_output()
-    end
-
   new create(stdout: StdStream,
-             stderr: StdStream,
-             auth: AmbientAuth,
-             node_name: String,
-             // MetricsCollection arguments:
-             app_name: String,
-             metrics_host: (String | None) = None,
-             metrics_service: (String | None) = None,
-             report_file: (String | None) = None,
-             period: U64 = 1_000_000_000,
-             report_period: U64 = 300_000_000_000)
+    stderr: StdStream,
+    auth: AmbientAuth,
+    node_name: String,
+    app_name: String,
+    metrics_host: (String | None) = None,
+    metrics_service: (String | None) = None,
+    report_file: (String | None) = None,
+    period: U64 = 1_000_000_000,
+    report_period: U64 = 300_000_000_000)
   =>
     _stdout = stdout
     _stderr = stderr
@@ -78,6 +67,16 @@ actor MetricsCollector is FlushingActor
       _collections.push(consume mc')
       stdout.print("Reporting to file " + arg + " every " +
         report_period.string() + " seconds.")
+    end
+
+  be finished() =>
+    _flush()
+
+  be flush() => _flush()
+
+  fun _flush() =>
+    for mc in _collections.values() do
+      mc.send_output()
     end
 
 	be report_step_metrics(step_id: StepId, step_name: String, start_time: U64,

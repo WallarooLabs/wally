@@ -13,7 +13,7 @@ interface MetricsOutputActor
 
 interface MetricsCollectionOutputHandler
   fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
-             steps: StepMetrics, period: U64)
+    steps: StepMetrics, period: U64)
   fun dispose(): None val => None
 
 actor MetricsAccumulatorActor is MetricsOutputActor
@@ -40,7 +40,8 @@ class MetricsStringAccumulator is MetricsCollectionOutputHandler
   let app_name: String
 
   new iso create(encoder': MetricsCollectionOutputEncoder val,
-             output': MetricsOutputActor tag, app_name': String) =>
+    output': MetricsOutputActor tag, app_name': String)
+  =>
     encoder = encoder'
     output = output'
     app_name = app_name'
@@ -48,7 +49,8 @@ class MetricsStringAccumulator is MetricsCollectionOutputHandler
   fun dispose(): None val => None
 
   fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
-             steps: StepMetrics, period: U64) =>
+    steps: StepMetrics, period: U64)
+  =>
     output(encoder.encode_sinks(sinks, period, app_name))
     output(encoder.encode_boundaries(boundaries, period, app_name))
     output(encoder.encode_steps(steps, period, app_name))
@@ -66,7 +68,8 @@ class MetricsOutputHandler is MetricsCollectionOutputHandler
     app_name = app_name'
 
   fun handle(sinks: SinkMetrics, boundaries: BoundaryMetrics,
-             steps: StepMetrics, period: U64) =>
+    steps: StepMetrics, period: U64)
+  =>
     if sinks.size() > 0 then
       output(encoder.encode_sinks(sinks, period, app_name))
     end
