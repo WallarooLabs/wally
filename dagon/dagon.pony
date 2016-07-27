@@ -1114,35 +1114,39 @@ actor ProcessManager
 
   be transition_to(state': DagonState, node_name: String = "") =>
     var old_state: DagonState
-    if (state is Initialized) and (state' is Booting) then
+    match (state, state')
+    | (Initialized, Booting) =>
       old_state = state = state'
       boot_topology()
-    elseif (state is Booting) and (state' is TopologyReady) then
+    | (Booting, TopologyReady) =>
       old_state = state = state'
       boot_canaries()
-    elseif (state is TopologyReady) and (state' is AwaitingSendersReady) then
+    | (TopologyReady, AwaitingSendersReady) =>
       old_state = state = state'
       verify_senders_ready()
-    elseif (state is AwaitingSendersReady) and (state' is SendersReady) then
+    | (AwaitingSendersReady, SendersReady) =>
       old_state = state = state'
       if not _delay_senders then start_canary_nodes() end
-    elseif (state is SendersReady) and (state' is StartSenders) then
+    | (SendersReady, StartSenders) =>
       old_state = state = state'
       start_canary_nodes()
-    elseif ( (state is StartSenders) or (state is SendersReady) ) 
-      and (state' is SendersStarted) then
+    | (StartSenders, SendersStarted) =>
       old_state = state = state'
-    elseif (state is SendersStarted) and (state' is SendersDone) then
+    | (SendersReady, SendersStarted) =>
       old_state = state = state'
-    elseif ((state is SendersStarted) or (state is SendersDone)) 
-    and (state' is SendersDoneShutdown) then
+    | (SendersStarted, SendersDone) =>
+      old_state = state = state'
+    | (SendersStarted, SendersDoneShutdown) =>
       old_state = state = state'
       wait_for_processing()
-    elseif (state is SendersDoneShutdown) and (state' is TopologyDoneShutdown) then
+    | (SendersDone, SendersDoneShutdown) =>
       old_state = state = state'
-    elseif state' is TopologyDoneShutdown then
+      wait_for_processing()
+    | (SendersDoneShutdown, TopologyDoneShutdown) =>
       old_state = state = state'
       shutdown_topology()
+    | (_, TopologyDoneShutdown) =>
+      old_state = state = state'
     else
       _env.err.print("Unable to transition from state: " + _print_state(state) + " to: " + _print_state(state'))
       return
