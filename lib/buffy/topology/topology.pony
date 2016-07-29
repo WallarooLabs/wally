@@ -2,6 +2,7 @@ use "collections"
 use "net"
 use "buffy/messages"
 use "buffy/metrics"
+use "buffy/network"
 
 class Topology
   let pipelines: Array[PipelineSteps] = Array[PipelineSteps]
@@ -22,6 +23,9 @@ class Topology
 
 trait PipelineSteps
   fun name(): String
+  fun initialize_source(source_id: U64, host: String, service: String, 
+    env: Env, auth: AmbientAuth, coordinator: Coordinator, 
+    output: BasicStep tag, local_step_builder: (LocalStepBuilder val | None))
   fun sink_builder(): SinkBuilder val
   fun sink_target_ids(): Array[U64] val
   fun apply(i: USize): PipelineStep box ?
@@ -29,16 +33,16 @@ trait PipelineSteps
 
 class Pipeline[In: Any val, Out: Any val] is PipelineSteps
   let _name: String
+  let _parser: Parser[In] val
   let _steps: Array[PipelineStep]
   let _sink_target_ids: Array[U64] val
   let _sink_builder: SinkBuilder val
 
   new create(p: Parser[In] val, o: ArrayStringify[Out] val,
     s_target_ids: Array[U64] val, n: String) =>
-    let source_builder = SourceBuilder[In](p, n)
+    _parser = p
     _steps = Array[PipelineStep]
     _sink_target_ids = s_target_ids
-    _steps.push(PipelineThroughStep[String, In](source_builder))
     _name = n
     _sink_builder = ExternalConnectionBuilder[Out](o, _name)
 
@@ -46,6 +50,22 @@ class Pipeline[In: Any val, Out: Any val] is PipelineSteps
     _steps.push(p)
 
   fun apply(i: USize): PipelineStep box ? => _steps(i)
+
+  fun initialize_source(source_id: U64, host: String, service: String, 
+    env: Env, auth: AmbientAuth, coordinator: Coordinator, 
+    output: BasicStep tag, local_step_builder: (LocalStepBuilder val | None))
+  =>
+    let source_notifier: TCPListenNotify iso = 
+      match local_step_builder
+      | let l: LocalStepBuilder val =>
+        SourceNotifier[In](
+          env, host, service, source_id, coordinator, _parser, output, l)
+      else
+        SourceNotifier[In](
+          env, host, service, source_id, coordinator, _parser, output)
+      end
+    coordinator.add_listener(TCPListener(auth, consume source_notifier,
+      host, service))
 
   fun sink_builder(): SinkBuilder val => _sink_builder
 
@@ -58,6 +78,7 @@ class Pipeline[In: Any val, Out: Any val] is PipelineSteps
 trait PipelineStep
   fun id(): U64
   fun step_builder(): BasicStepBuilder val
+  fun name(): String => step_builder().name()
 
 class PipelineThroughStep[In: Any val, Out: Any val] is PipelineStep
   let _id: U64
@@ -78,6 +99,11 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   new create(t: Topology, p: Pipeline[In, Out]) =>
     _t = t
     _p = p
+
+  fun ref coalesce[CIn: Any val, COut: Any val](id: U64 = 0): 
+    CoalesceBuilder[CIn, COut, In, Out, Last] 
+  =>
+    CoalesceBuilder[CIn, COut, In, Out, Last](_t, _p where id = id)
 
   fun ref to[Next: Any val](
     comp_builder: ComputationBuilder[Last, Next] val, id: U64 = 0)
@@ -105,25 +131,25 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     PipelineBuilder[In, Out, Next](_t, _p)
 
   fun ref to_stateful[Next: Any val, State: Any ref](
-    comp_builder: ComputationBuilder[Last, StateComputation[Next, State] val] val,
+    state_comp: StateComputation[Last, Next, State] val,
     state_initializer: {(): State} val, state_id: U64, id: U64 = 0)
       : PipelineBuilder[In, Out, Next] =>
-    let next_builder = StateStepBuilder[Last, Next, State](comp_builder, state_initializer, state_id)
+    let next_builder = StateStepBuilder[Last, Next, State](state_comp, state_initializer, state_id)
     let next_step = PipelineThroughStep[Last, Next](next_builder, id)
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-  fun ref to_stateful_partition[Next: Any val, State: Any ref](
-    config: StatePartitionConfig[Last, Next, State] iso)
-      : PipelineBuilder[In, Out, Next] =>
-    let c: StatePartitionConfig[Last, Next, State] val = consume config
-    let next_builder = StatePartitionBuilder[Last, Next, State](
-      c.state_computation_builder, c.state_initializer,
-      c.partition_function, c.state_id, c.initialization_map,
-      c.initialize_at_start)
-    let next_step = PipelineThroughStep[Last, Next](next_builder, c.id)
-    _p.add_step(next_step)
-    PipelineBuilder[In, Out, Next](_t, _p)
+  // fun ref to_stateful_partition[Next: Any val, State: Any ref](
+  //   config: StatePartitionConfig[Last, Next, State] iso)
+  //     : PipelineBuilder[In, Out, Next] =>
+  //   let c: StatePartitionConfig[Last, Next, State] val = consume config
+  //   let next_builder = StatePartitionBuilder[Last, Next, State](
+  //     c.state_computation, c.state_initializer,
+  //     c.partition_function, c.state_id, c.initialization_map,
+  //     c.initialize_at_start)
+  //   let next_step = PipelineThroughStep[Last, Next](next_builder, c.id)
+  //   _p.add_step(next_step)
+  //   PipelineBuilder[In, Out, Next](_t, _p)
 
   fun ref to_external[Next: Any val](
     ext_builder: ExternalProcessBuilder[Last, Next] val, id: U64 = 0)
@@ -137,38 +163,74 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _t.add_pipeline(_p as PipelineSteps)
     _t
 
-class StatePartitionConfig[In: Any val, Out: Any val, State: Any ref]
-  let state_computation_builder:
-    ComputationBuilder[In, StateComputation[Out, State] val] val
-  let state_initializer: {(): State} val
-  let partition_function: PartitionFunction[In] val
-  let state_id: U64
-  var id: U64 = 0
-  var initialization_map: Map[U64, {(): State} val] val =
-    recover val Map[U64, {(): State} val] end
-  var initialize_at_start: Bool = false
+class CoalesceBuilder[CIn: Any val, COut: Any val, PIn: Any val, 
+  POut: Any val, Last: Any val] 
+  let _t: Topology
+  let _p: Pipeline[PIn, POut]
+  let _builders: Array[BasicOutputComputationStepBuilder val]
+  let _id: U64
 
-  new create(
-    c_builder: ComputationBuilder[In, StateComputation[Out, State] val] val,
-    s_initializer: {(): State} val,
-    p_fun: PartitionFunction[In] val,
-    s_id: U64
-    )
+  new create(t: Topology, p: Pipeline[PIn, POut],
+    builders: Array[BasicOutputComputationStepBuilder val] = 
+    Array[BasicOutputComputationStepBuilder val], id: U64) 
   =>
-    state_computation_builder = c_builder
-    state_initializer = s_initializer
-    partition_function = p_fun
-    state_id = s_id
+    _t = t
+    _p = p
+    _builders = builders
+    _id = id
 
-  fun ref with_id(i: U64): StatePartitionConfig[In, Out, State]^ =>
-    id = i
-    this
+  fun ref to[Next: Any val](
+    comp_builder: ComputationBuilder[Last, Next] val, id: U64 = 0)
+    : CoalesceBuilder[CIn, COut, PIn, POut, Next] 
+  =>
+    _builders.push(
+      TypedBasicOutputComputationStepBuilder[Last, Next](comp_builder)
+    )
+    CoalesceBuilder[CIn, COut, PIn, POut, Next](_t, _p, _builders, _id)    
 
-  fun ref with_initialization_map(im: Map[U64, {(): State} val] iso)
-    : StatePartitionConfig[In, Out, State]^ =>
-    initialization_map = consume im
-    this
+  fun ref close(): PipelineBuilder[PIn, POut, COut] =>
+    let builders: Array[BasicOutputComputationStepBuilder val] iso = 
+      recover Array[BasicOutputComputationStepBuilder val] end
+    for b in _builders.values() do
+      builders.push(b)
+    end
+    let coalesce_step_builder: CoalesceStepBuilder[CIn, COut] val =
+      CoalesceStepBuilder[CIn, COut](consume builders)
+    let next_step = PipelineThroughStep[CIn, COut](coalesce_step_builder, _id)
+    _p.add_step(next_step)
+    PipelineBuilder[PIn, POut, COut](_t, _p)
 
-  fun ref with_initialize_at_start(): StatePartitionConfig[In, Out, State]^ =>
-    initialize_at_start = true
-    this
+// class StatePartitionConfig[In: Any val, Out: Any val, State: Any ref]
+//   let state_computation: StateComputation[In, Out, State] val
+//   let state_initializer: {(): State} val
+//   let partition_function: PartitionFunction[In] val
+//   let state_id: U64
+//   var id: U64 = 0
+//   var initialization_map: Map[U64, {(): State} val] val =
+//     recover val Map[U64, {(): State} val] end
+//   var initialize_at_start: Bool = false
+
+//   new create(
+//     s_comp: StateComputation[In, Out, State] val,
+//     s_initializer: {(): State} val,
+//     p_fun: PartitionFunction[In] val,
+//     s_id: U64
+//     )
+//   =>
+//     state_computation = s_comp
+//     state_initializer = s_initializer
+//     partition_function = p_fun
+//     state_id = s_id
+
+//   fun ref with_id(i: U64): StatePartitionConfig[In, Out, State]^ =>
+//     id = i
+//     this
+
+//   fun ref with_initialization_map(im: Map[U64, {(): State} val] iso)
+//     : StatePartitionConfig[In, Out, State]^ =>
+//     initialization_map = consume im
+//     this
+
+//   fun ref with_initialize_at_start(): StatePartitionConfig[In, Out, State]^ =>
+//     initialize_at_start = true
+//     this

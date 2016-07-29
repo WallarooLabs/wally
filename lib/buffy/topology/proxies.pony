@@ -24,14 +24,16 @@ actor Proxy is BasicStep
   be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
     msg_data: D) =>
     _coordinator.send_data_message[D](_target_node_name, _step_id, _node_name, msg_id, source_ts, ingress_ts, msg_data)
-    _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
-      msg_id, ingress_ts, Epoch.nanoseconds())
+    // _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
+    //   msg_id, ingress_ts, Epoch.nanoseconds())
 
 actor StepManager
   let _env: Env
   let _node_name: String
   let _metrics_collector: MetricsCollector tag
   let _steps: Map[U64, BasicStep tag] = Map[U64, BasicStep tag]
+  let _shared_state_steps: Map[U64, BasicSharedStateStep tag] 
+    = Map[U64, BasicSharedStateStep tag]
   let _sink_addrs: Map[U64, (String, String)] val
 
   new create(env: Env, node_name: String,
@@ -42,6 +44,8 @@ actor StepManager
     _sink_addrs = sink_addrs
     _metrics_collector = metrics_collector
 
+  fun lookup(i: U64): BasicStep tag ? => _steps(i) 
+
   be send[D: Any val](step_id: U64, msg_id: U64, source_ts: U64, 
     ingress_ts: U64, msg_data: D) 
   =>
@@ -50,6 +54,22 @@ actor StepManager
     else
       _env.out.print("StepManager: Could not forward message")
     end
+
+  be initialize_source(source_id: U64, pipeline: PipelineSteps val, 
+    target_id: U64, host: String, service: String,
+    local_step_builder: (LocalStepBuilder val | None),
+    coordinator: Coordinator tag) =>
+    try
+      let target_step = _steps(target_id)
+      let auth = _env.root as AmbientAuth
+      pipeline.initialize_source(source_id, host, service, 
+        _env, auth, coordinator, target_step, local_step_builder) 
+    else
+      _env.err.print("StepManager: Could not initialize source")
+    end
+
+
+    None
 
   be passthrough_to_step[D: Any val](step_id: U64, 
     passthrough: BasicOutputStep tag) =>
@@ -73,6 +93,11 @@ actor StepManager
       _metrics_collector))
     _steps(step_id) = step
 
+  be add_shared_state_step(step_id: U64, 
+    step_builder: BasicSharedStateStepBuilder val) =>
+    let step = step_builder()
+    _shared_state_steps(step_id) = step
+
   be add_partition_step_and_ack(step_id: U64,
     partition_id: U64, partition_report_id: U64, 
     step_builder: BasicStepBuilder val, partition: PartitionAckable tag) 
@@ -90,7 +115,7 @@ actor StepManager
   be add_initial_state[State: Any #read](step_id: U64,
     state: {(): State} val) =>
     try
-      match _steps(step_id)
+      match _shared_state_steps(step_id)
       | let step: SharedStateStep[State] tag =>
         step.update_state(state)
       end
@@ -102,16 +127,18 @@ actor StepManager
       coordinator, _metrics_collector)
     _steps(proxy_step_id) = p
 
-  be connect_to_state(state_step_id: U64, state_step: BasicStateStep tag) =>
+  be connect_to_state(shared_state_step_id: U64, 
+    state_step: BasicStateStep tag) =>
     try
-      let shared_state_step = _steps(state_step_id)
+      let shared_state_step = _shared_state_steps(shared_state_step_id)
       state_step.add_shared_state(shared_state_step)
     end
 
   be add_state_step(step_id: U64, bssb: BasicStateStepBuilder val,
     shared_state_step_id: U64, shared_state_step_node: String,
-    coordinator: Coordinator) =>
-    if not _steps.contains(shared_state_step_id) then
+    coordinator: Coordinator)
+  =>
+    if not _shared_state_steps.contains(shared_state_step_id) then
       add_proxy(shared_state_step_id, shared_state_step_id,
         shared_state_step_node, coordinator)
     end
@@ -120,7 +147,7 @@ actor StepManager
     step.add_step_reporter(StepReporter(step_id, bssb.name(), 
       _metrics_collector))
     try
-      let shared_state_step = _steps(shared_state_step_id)
+      let shared_state_step = _shared_state_steps(shared_state_step_id)
       match step
       | let s: BasicStateStep tag =>
         s.add_shared_state(shared_state_step)
@@ -140,7 +167,8 @@ actor StepManager
           sink_service)
         conns.push(conn)
       end
-      _steps(sink_step_id) = sink_builder(consume conns, _metrics_collector)
+      let sink = sink_builder(consume conns, _metrics_collector)
+      _steps(sink_step_id) = sink
     else
       _env.out.print("StepManager: Could not add sink. Did you supply enough"
       + " sink addresses?")

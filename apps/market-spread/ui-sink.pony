@@ -17,9 +17,9 @@ class RejectedResultStore
   let client_order_counts: Map[String, ClientSummary] = 
     Map[String, ClientSummary]
   let client_orders_updated: Set[String] = Set[String]
-  let rejected: Array[TradeResult val] = Array[TradeResult val]
+  let rejected: Array[OrderResult val] = Array[OrderResult val]
 
-  fun ref add_result(tr: TradeResult val) =>
+  fun ref add_result(tr: OrderResult val) =>
     client_orders_updated.set(tr.client_id) 
     let summary = 
       try client_order_counts(tr.client_id) else ClientSummary end
@@ -49,7 +49,7 @@ class MarketSpreadSinkCollector is SinkCollector[RejectedResultStore]
       let bid = input(7).f64()
       let offer = input(8).f64()
       let is_rejected = input(9).bool()
-      let trade_result = TradeResult(order_id, timestamp, client_id, symbol,
+      let trade_result = OrderResult(order_id, timestamp, client_id, symbol,
         price, qty, side, bid, offer, is_rejected)
       _diff.add_result(trade_result)
     end

@@ -1,7 +1,6 @@
 use "net"
 use "collections"
 use "buffy/messages"
-use "buffy/metrics"
 use "sendence/messages"
 use "sendence/bytes"
 use "sendence/guid"
@@ -10,25 +9,29 @@ use "../topology"
 use "random"
 use "debug"
 
-class SourceNotifier is TCPListenNotify
+class SourceNotifier[In: Any val] is TCPListenNotify
   let _env: Env
   let _host: String
   let _service: String
   let _source_id: U64
-  let _step_manager: StepManager
   let _coordinator: Coordinator
-  let _metrics_collector: MetricsCollector
+  let _parser: Parser[In] val
+  let _local_step_builder: LocalStepBuilder val
+  let _output: BasicStep tag
 
   new iso create(env: Env, source_host: String,
-    source_service: String, source_id: U64, step_manager: StepManager,
-    coordinator: Coordinator, metrics_collector: MetricsCollector) =>
+    source_service: String, source_id: U64, 
+    coordinator: Coordinator, parser: Parser[In] val, output: BasicStep tag,
+    local_step_builder: LocalStepBuilder val = PassThroughStepBuilder[In, In])
+  =>
     _env = env
     _host = source_host
     _service = source_service
     _source_id = source_id
-    _step_manager = step_manager
     _coordinator = coordinator
-    _metrics_collector = metrics_collector
+    _parser = parser
+    _local_step_builder = local_step_builder
+    _output = output
 
   fun ref listening(listen: TCPListener ref) =>
     _env.out.print("Source " + _source_id.string() + ": listening on "
@@ -39,29 +42,29 @@ class SourceNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    SourceConnectNotify(_env, _source_id, _step_manager, _coordinator,
-      _metrics_collector)
+    SourceConnectNotify[In](_env, _source_id, _coordinator,
+      _parser, _output, _local_step_builder)
 
-class SourceConnectNotify is TCPConnectionNotify
+class SourceConnectNotify[In: Any val] is TCPConnectionNotify
   let _guid_gen: GuidGenerator = GuidGenerator
   let _env: Env
   let _source_id: U64
-  let _step_manager: StepManager
-  let _metrics_collector: MetricsCollector
   let _coordinator: Coordinator
+  let _parser: Parser[In] val
+  let _local_step: BasicOutputLocalStep
   var _header: Bool = true
-  var _source_initialized: Bool = false
-  var _source_step: BasicOutputStep tag = PassThrough
   var _msg_count: USize = 0
 
-  new iso create(env: Env, source_id: U64,
-    step_manager: StepManager, coordinator: Coordinator,
-      metrics_collector: MetricsCollector) =>
+  new iso create(env: Env, source_id: U64, coordinator: Coordinator,
+    parser: Parser[In] val, output: BasicStep tag,
+    local_step_builder: LocalStepBuilder val) 
+  =>
     _env = env
     _source_id = source_id
-    _step_manager = step_manager
     _coordinator = coordinator
-    _metrics_collector = metrics_collector
+    _parser = parser
+    _local_step = local_step_builder.local()
+    _local_step.add_output(output)
 
   fun ref accepted(conn: TCPConnection ref) =>
     ifdef debug then
@@ -75,13 +78,6 @@ class SourceConnectNotify is TCPConnectionNotify
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
-    ifdef debug then
-      try
-        (let host, _) = conn.remote_address().name()
-        Debug.out("SourceConnectNotify.received() " + host)
-      end
-    end
-
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
@@ -91,15 +87,19 @@ class SourceConnectNotify is TCPConnectionNotify
         _env.err.print("Error reading header from external source")
       end
     else
-      if not _source_initialized then
-        _step_manager.passthrough_to_step[String](_source_id, 
-          _source_step)
-        _source_initialized = true
-      end
 
       let now = Epoch.nanoseconds()
-      _source_step.send[String](_guid_gen(), now, now,
-        String.from_array(consume data))
+      let input_raw = String.from_array(consume data)
+      try
+        match _parser(input_raw)
+        | let input: In =>
+          _local_step.send[In](_guid_gen(), now, now, input)
+        else
+          _env.out.print("Error parsing input at source")
+        end
+      else
+        _env.out.print("Error parsing input at source")
+      end
 
       conn.expect(4)
       _header = true

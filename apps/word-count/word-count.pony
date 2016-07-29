@@ -15,15 +15,19 @@ actor Main
             "Word Count")
           .to_map[WordCount val](
             lambda(): MapComputation[String, WordCount val] iso^ => Split end)
-          .to_stateful_partition[WordCount val, WordCountTotals](
-            recover
-              StatePartitionConfig[WordCount val, WordCount val, WordCountTotals](
-                lambda(): Computation[WordCount val, Count val] iso^
-                  => GenerateCount end,
-                lambda(): WordCountTotals => WordCountTotals end,
-                FirstLetterPartition, 0)
-            end
-            )
+          .to_stateful[WordCount val, WordCountTotals](
+            Count,
+            lambda(): WordCountTotals => WordCountTotals end,
+            0)
+          // .to_stateful_partition[WordCount val, WordCountTotals](
+          //   recover
+          //     StatePartitionConfig[WordCount val, WordCount val, WordCountTotals](
+          //       lambda(): Computation[WordCount val, Count val] iso^
+          //         => GenerateCount end,
+          //       lambda(): WordCountTotals => WordCountTotals end,
+          //       FirstLetterPartition, 0)
+          //   end
+          //   )
           .build()
       end
       let sink_builders = recover Array[SinkNodeStepBuilder val] end
@@ -56,20 +60,12 @@ class Split is MapComputation[String, WordCount val]
   fun _lower(s: String): String =>
     recover s.lower() end
 
-class GenerateCount is Computation[WordCount val, Count val]
-  fun name(): String => "count"
-  fun apply(wc: WordCount val): Count val =>
-    Count(wc)
-
-class Count is StateComputation[WordCount val, WordCountTotals]
-  let _word_count: WordCount val
-
-  new val create(wc: WordCount val) =>
-    _word_count = wc
-
-  fun apply(state: WordCountTotals, output: MessageTarget[WordCount val] val)
-    : WordCountTotals =>
-    output(state(_word_count))
+primitive Count is StateComputation[WordCount val, WordCount val, WordCountTotals]
+  fun name(): String => "Count"
+  fun apply(wc: WordCount val, state: WordCountTotals, 
+    output: MessageTarget[WordCount val] val): WordCountTotals 
+  =>
+    output(state(wc))
     state
 
 class WordCount
