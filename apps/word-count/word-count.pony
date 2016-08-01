@@ -5,7 +5,6 @@ use "buffy/metrics"
 use "buffy/topology"
 use "net"
 use "buffy/sink-node"
-use "regex"
 
 actor Main
   new create(env: Env) =>
@@ -41,16 +40,12 @@ actor Main
     end
 
 class Split is MapComputation[String, WordCount val]
+  let non_word_chars: String = """!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~ """
+
   fun name(): String => "split"
   fun apply(d: String): Seq[WordCount val] =>
     let counts: Array[WordCount val] iso = recover Array[WordCount val] end
-    let updated_d = try
-      let r = Regex("[\\W_]+")
-      r.replace(d, " " where global = true)
-    else
-      d
-    end
-    for word in updated_d.split(" ").values() do
+    for word in d.split(non_word_chars).values() do
       let next = _lower(word)
       if next.size() > 0 then
         counts.push(WordCount(next, 1))
