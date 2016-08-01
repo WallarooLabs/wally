@@ -29,6 +29,17 @@
    - python3
    - python3-pip
    - python3-numpy
+   - less
+   - dnsutils
+   - net-tools
+   - vim
+   - wget
+   - jq
+   - sysstat
+   - htop
+   - numactl
+   - cpuset
+
 
 - name: Install python3 click
   pip: name=click executable=pip3
