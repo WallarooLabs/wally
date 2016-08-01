@@ -157,7 +157,7 @@ We will copy this file to your test box later in this guide.
 * Prepare Test Node
 Checkout the buffy repository locally (on your dev box).
 #+BEGIN_SRC sh
-git co https://github.com/Sendence/buffy.git
+git clone https://github.com/Sendence/buffy.git
 #+END_SRC
 
 Boot and provision a single c4.4xlarge EC2 node using spot pricing.
