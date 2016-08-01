@@ -11,8 +11,25 @@ actor Main is TestList
   new make(env: Env) => None
 
   fun tag tests(test: PonyTest) =>
+    test(_TestThroughputHistory)
     test(_TestMonitoringHubEncoder)
     test(_TestFixedBinSelector)
+
+class iso _TestThroughputHistory is UnitTest
+  fun name(): String => "buffy:ThroughputHistory"
+
+  fun apply(h: TestHelper) =>
+    let th = recover ref ThroughputHistory end
+    let base: U64 = 1469658500_000000001
+    let incr: U64 = 100_000_000
+    let ceil: U64 = base + 10_000_000_000
+    for v in Range[U64](base, ceil, incr) do
+      th(v)
+    end
+    for (t, c) in th.values() do
+      h.assert_eq[U64](c, 10)
+    end
+    true
 
 class iso _TestMonitoringHubEncoder is UnitTest
   fun name(): String => "buffy:MonitoringHubEncoder"

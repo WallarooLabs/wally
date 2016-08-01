@@ -356,32 +356,31 @@ class ThroughputHistory
 A history of throughput counts per second
 """
   let _map: Map[U64, U64] = Map[U64, U64]
-  var _start_time: U64 = 0
-  var _end_time: U64 = 0
+  var _max_time: U64 = U64.min_value()
+  var _min_time: U64 = U64.max_value()
 
   fun ref apply(end_time: U64) =>
-    count_report(end_time)
-
-  fun ref count_report(end_time: U64) =>
-    // Truncate nanoseconds to seconds
-    let t': U64 = end_time.f64().div(1_000_000_000.0).ceil().u64()
-    if _start_time == 0 then _start_time = t' end
-    if t' > _end_time then _end_time = t' end
+    // Round end_time down to nearest second
+    let t': U64 = (end_time/1_000_000_000) + (if (end_time % 1_000_000_000) == 0
+      then 0 else 1 end)
     _map.update(t', try _map(t') + 1 else 1 end)
+    _max_time = _max_time.max(t')
+    _min_time = _min_time.min(t')
 
-  fun values(): Array[(U64, U64)] =>
+  fun values(): ArrayValues[(U64, U64), Array[(U64, U64)]]^  =>
   """
   The dense representation of the throughput history in the time ranges
   counted so far
   """
-    let arr = Array[(U64, U64)](size())
-    for ts in Range[U64](_start_time, (_end_time + 1), 1) do
+    let s = size()
+    let arr = Array[(U64, U64)](s)
+    for ts in Range[U64](_min_time, (_max_time + 1), 1) do
       arr.push((ts, try _map(ts) else 0 end))
     end
-    consume arr
+    ArrayValues[(U64, U64), Array[(U64, U64)]](arr)
 
   fun size(): USize =>
-    ((_end_time - _start_time) + 1).usize()
+    ((_max_time - _min_time) + 1).usize()
 
 type TimeBuckets is Map[U64, (LatencyHistogram, ThroughputHistory)]
 
@@ -413,7 +412,7 @@ on category and id
   let _bin_selector: F64Selector val
   let _handler: MetricsCollectionOutputHandler val
 
-  new create(bin_selector: F64Selector val, period: U64=1,
+  new create(bin_selector: F64Selector val, period: U64=1_000_000_000,
              handler: MetricsCollectionOutputHandler val) =>
     _period = period
     _bin_selector = bin_selector
@@ -540,7 +539,8 @@ on category and id
     end
 
   fun get_time_bucket(time: U64): U64 =>
-    (time/1_000_000_000) + (_period - ((time/1_000_000_000) % _period))
+  """Use nanoseconds for the timebucket"""
+    time + (_period - (time % _period))
 
   be send_output(resumable: (Resumable tag | None) = None) =>
     handle_output()

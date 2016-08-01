@@ -43,8 +43,8 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
         let j': JsonObject ref = JsonObject
         j'.data.update("category", "source-sink")
         j'.data.update("pipeline_key", name)
-        j'.data.update("t1", t_f.i64())
-        j'.data.update("t0", (t_f - period).i64())
+        j'.data.update("t1", (t_f/1_000_000_000).i64())
+        j'.data.update("t0", ((t_f - period)/1_000_000_000).i64())
         let topics: JsonObject ref = JsonObject
         j'.data.update("topics", topics)
         let latencies: JsonObject ref = JsonObject
@@ -54,7 +54,7 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
         for (bin, count) in lh.bin_map().pairs() do
           latencies.data.update(bin.string(), count.i64())
         end
-        for (t', count) in th.values().values() do
+        for (t', count) in th.values() do
           throughputs.data.update(t'.string(), count.i64())
         end
         j.data.push(j')
@@ -72,8 +72,8 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
         let j': JsonObject ref = JsonObject
         j'.data.update("category", "ingress-egress")
         j'.data.update("pipeline_key", name)
-        j'.data.update("t1", t_f.i64())
-        j'.data.update("t0", (t_f - period).i64())
+        j'.data.update("t1", (t_f/1_000_000_000).i64())
+        j'.data.update("t0", ((t_f - period)/1_000_000_000).i64())
         let topics: JsonObject ref = JsonObject
         j'.data.update("topics", topics)
         let latencies: JsonObject ref = JsonObject
@@ -83,7 +83,7 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
         for (bin, count) in lh.bin_map().pairs() do
           latencies.data.update(bin.string(), count.i64())
         end
-        for (t', count) in th.values().values() do
+        for (t', count) in th.values() do
           throughputs.data.update(t'.string(), count.i64())
         end
         j.data.push(j')
@@ -101,8 +101,8 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
         let j': JsonObject ref = JsonObject
         j'.data.update("category", "step")
         j'.data.update("pipeline_key", name)
-        j'.data.update("t1", t_f.i64())
-        j'.data.update("t0", (t_f - period).i64())
+        j'.data.update("t1", (t_f/1_000_000_000).i64())
+        j'.data.update("t0", ((t_f - period)/1_000_000_000).i64())
         let topics: JsonObject ref = JsonObject
         j'.data.update("topics", topics)
         let latencies: JsonObject ref = JsonObject
@@ -112,7 +112,7 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
         for (bin, count) in lh.bin_map().pairs() do
           latencies.data.update(bin.string(), count.i64())
         end
-        for (t', count) in th.values().values() do
+        for (t', count) in th.values() do
           throughputs.data.update(t'.string(), count.i64())
         end
         j.data.push(j')
