@@ -28,6 +28,7 @@ dagon-pony takes four arguments:
    Sender is done
 -f configuration file path
 -h host ip address dagon should listen on
+-ds delays the start of Giles Senders
 ```
 
 Example:

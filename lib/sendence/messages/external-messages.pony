@@ -8,6 +8,8 @@ primitive _Shutdown                             fun apply(): U16 => 5
 primitive _DoneShutdown                         fun apply(): U16 => 6
 primitive _Done                                 fun apply(): U16 => 7
 primitive _Unknown                              fun apply(): U16 => 8
+primitive _StartGilesSenders                    fun apply(): U16 => 9
+primitive _GilesSendersStarted                  fun apply(): U16 => 10
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: WriteBuffer): Array[ByteSeq] val =>
@@ -45,7 +47,15 @@ primitive ExternalMsgEncoder
   fun done(node_name: String, wb: WriteBuffer = WriteBuffer): 
     Array[ByteSeq] val =>
     _encode(_Done(), node_name, wb)
-    
+
+  fun start_giles_senders(wb: WriteBuffer = WriteBuffer):
+    Array[ByteSeq] val =>
+      _encode(_StartGilesSenders(), "", wb)
+
+  fun senders_started(wb: WriteBuffer = WriteBuffer): 
+    Array[ByteSeq] val =>
+    _encode(_GilesSendersStarted(), "", wb)
+
 class BufferedExternalMsgEncoder
   let _buffer: WriteBuffer
 
@@ -105,6 +115,10 @@ primitive ExternalMsgDecoder
       ExternalDoneShutdownMsg(s)
     | (_Done(), let s: String) =>
       ExternalDoneMsg(s)
+    | (_StartGilesSenders(), let s: String) =>
+      ExternalStartGilesSendersMsg
+    | (_GilesSendersStarted(), let s: String) =>
+      ExternalGilesSendersStartedMsg
     else
       error
     end
@@ -156,3 +170,6 @@ class ExternalDoneMsg is ExternalMsg
 
   new val create(n: String) =>
     node_name = n
+
+primitive ExternalStartGilesSendersMsg is ExternalMsg
+primitive ExternalGilesSendersStartedMsg is ExternalMsg

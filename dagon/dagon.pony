@@ -16,6 +16,32 @@ primitive Started
 primitive TopologyReady
 primitive Done
 primitive DoneShutdown
+primitive StartSenders
+primitive SendersReady
+primitive SendersStarted
+primitive SendersDone
+primitive SendersDoneShutdown
+primitive AwaitingSendersReady
+primitive AwaitingSendersStart
+primitive AwaitingSendersDoneShutdown
+primitive TopologyDoneShutdown
+primitive Initialized
+
+type DagonState is
+  ( Initialized
+  | Booting
+  | TopologyReady
+  | AwaitingSendersReady
+  | AwaitingSendersStart
+  | AwaitingSendersDoneShutdown
+  | StartSenders
+  | SendersReady
+  | SendersStarted
+  | SendersDone
+  | SendersDoneShutdown
+  | TopologyDoneShutdown
+  | Done
+  )
 
 type ChildState is
   ( Booting
@@ -46,6 +72,7 @@ actor Main
     var phone_home_service: String = ""
     var service: String = ""
     var options = Options(env)
+    var delay_senders = false
 
     options
     .add("docker", "d", StringArgument)
@@ -53,6 +80,7 @@ actor Main
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
+    .add("delay-senders", "ds", None)
     try
       for option in options do
         match option
@@ -61,6 +89,7 @@ actor Main
         | ("timeout", let arg: I64) => timeout = arg
         | ("filepath", let arg: String) => path = arg
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
+        | ("delay-senders", None) => delay_senders = true
         | let err: ParseError =>
           err.report(env.err)
           error
@@ -130,7 +159,7 @@ actor Main
       env.out.print("dagon: host: " + phone_home_host)
       env.out.print("dagon: service: " + phone_home_service)
 
-      ProcessManager(env, use_docker, docker_host as String,
+      ProcessManager(env, delay_senders, use_docker, docker_host as String,
         docker_tag as String, timeout as I64, path as String,
         phone_home_host, phone_home_service)
     else
@@ -195,6 +224,8 @@ class ConnectNotify is TCPConnectionNotify
         | let m: ExternalDoneShutdownMsg val =>
           _env.out.print("dagon: " + m.node_name + ": DoneShutdown")
           _p_mgr.received_done_shutdown(conn, m.node_name)
+        | let m: ExternalStartGilesSendersMsg val =>
+          _p_mgr.received_start_senders(conn)
         else
           _env.out.print("dagon: Unexpected message from child")
         end
@@ -281,13 +312,16 @@ actor ProcessManager
   var _processing_timer: (Timer tag | None) = None
   let _docker_postfix: String
   var _expect: Bool = false
+  var _delay_senders: Bool = false
+  var state: DagonState = Initialized
 
-  new create(env: Env, use_docker: Bool, docker_host: String,
+  new create(env: Env, delay_senders: Bool, use_docker: Bool, docker_host: String,
     docker_tag: String,
     timeout: I64, path: String,
     host: String, service: String)
   =>
     _env = env
+    _delay_senders = delay_senders
     _use_docker = use_docker
     _docker_host = docker_host
     _docker_tag = docker_tag
@@ -313,7 +347,7 @@ actor ProcessManager
     else
       parse_and_register_process_nodes()
     end
-    boot_topology()
+    transition_to(Booting)
 
   be listening() =>
     """
@@ -693,6 +727,7 @@ actor ProcessManager
       _env.out.print("dagon: booting canary: " + node.name)
       boot_node(node)
     end
+    transition_to(AwaitingSendersReady)
 
   be boot_node(node: Node val) =>
     """
@@ -890,10 +925,8 @@ actor ProcessManager
     if _is_leader(name) then // fixme
       boot_workers_receivers()
     end
-    // Start canary node if it's READY
-    if _canary_is_ready(name) then
-      start_canary_node(name)
-    end
+    // Verify canary nodes are ready
+    verify_senders_ready()
 
   be received_topology_ready(conn: TCPConnection, name: String) =>
     """
@@ -908,7 +941,7 @@ actor ProcessManager
       else
         _env.out.print("dagon: failed to find leader in roster")
       end
-      boot_canaries()
+      transition_to(TopologyReady)
     else
       _env.out.print("dagon: ignoring topology ready from worker node")
     end
@@ -930,12 +963,12 @@ actor ProcessManager
     """
     try
       let child = roster(name)
-      let state = child.state
-      _env.out.print("dagon: " + name + " state: " + _print_state(child))
+      let child_state = child.state
+      _env.out.print("dagon: " + name + " state: " + _print_child_state(child))
       _env.out.print("dagon: " + name + " iscanary: " + child.is_canary.string())
       // _env.out.print("dagon: iscanary:" + child.is_canary.string())
       if child.is_canary then
-        match state
+        match child_state
         | Ready =>  return true
         end
       end
@@ -944,7 +977,7 @@ actor ProcessManager
     end
     false
 
-  fun ref _print_state(child: Child): String =>
+  fun ref _print_child_state(child: Child): String =>
     """
     Print the state to stdout.
     """
@@ -1003,6 +1036,7 @@ actor ProcessManager
     else
       _env.out.print("dagon: failed to set child to done")
     end
+    verify_senders_done()
 
   be wait_for_processing() =>
     """
@@ -1022,8 +1056,9 @@ actor ProcessManager
     try
       for key in roster.keys() do
         let child = roster(key)
-        send_shutdown(child.name)
+        if child.state isnt DoneShutdown then send_shutdown(child.name) end
       end
+      transition_to(TopologyDoneShutdown)
     else
       _env.out.print("dagon: can't iterate over roster")
     end
@@ -1031,7 +1066,6 @@ actor ProcessManager
   be received_done_shutdown(conn: TCPConnection, name: String) =>
     """
     Node has shutdown. Remove it from our roster.
-    TODO: Only enter wait_for_processing once ALL canaries reported DoneShutdown
     """
     _env.out.print("dagon: received done_shutdown from child: " + name)
     conn.dispose()
@@ -1040,11 +1074,11 @@ actor ProcessManager
       child.state = DoneShutdown
       if child.is_canary then
         _env.out.print("dagon: canary reported DoneShutdown ---------------------")
-        wait_for_processing()
       end
     else
       _env.out.print("dagon: failed to set child state to done_shutdown")
     end
+    verify_senders_shutdown()
 
   fun ref _is_done_shutdown(name: String): Bool =>
     """
@@ -1074,6 +1108,125 @@ actor ProcessManager
       cancel_timeout_timer()
     end
 
+  be received_start_senders(conn: TCPConnection) =>
+    transition_to(StartSenders)
+    send_senders_started(conn)
+
+  be transition_to(state': DagonState, node_name: String = "") =>
+    var old_state: DagonState
+    match (state, state')
+    | (Initialized, Booting) =>
+      old_state = state = state'
+      boot_topology()
+    | (Booting, TopologyReady) =>
+      old_state = state = state'
+      boot_canaries()
+    | (TopologyReady, AwaitingSendersReady) =>
+      old_state = state = state'
+      verify_senders_ready()
+    | (AwaitingSendersReady, SendersReady) =>
+      old_state = state = state'
+      if not _delay_senders then start_canary_nodes() end
+    | (SendersReady, StartSenders) =>
+      old_state = state = state'
+      start_canary_nodes()
+    | (StartSenders, SendersStarted) =>
+      old_state = state = state'
+    | (SendersReady, SendersStarted) =>
+      old_state = state = state'
+    | (SendersStarted, SendersDone) =>
+      old_state = state = state'
+    | (SendersStarted, SendersDoneShutdown) =>
+      old_state = state = state'
+      wait_for_processing()
+    | (SendersDone, SendersDoneShutdown) =>
+      old_state = state = state'
+      wait_for_processing()
+    | (SendersDoneShutdown, TopologyDoneShutdown) =>
+      old_state = state = state'
+      shutdown_topology()
+    | (_, TopologyDoneShutdown) =>
+      old_state = state = state'
+    else
+      _env.err.print("Unable to transition from state: " + _print_state(state) + " to: " + _print_state(state'))
+      return
+    end
+    _print_transition(old_state, state)
+
+  be start_canary_nodes() =>
+    for node in _canaries.values() do
+      start_canary_node(node.name)
+      transition_to(SendersStarted)
+    end
+
+  be verify_senders_ready() =>
+    if state is AwaitingSendersReady then
+      for node in _canaries.values() do
+        try
+          let sender = roster(node.name)
+          if sender.state isnt Ready then return end
+        else
+          return
+        end
+      end
+      transition_to(SendersReady)
+    end
+
+  be verify_senders_done() =>
+    if state is SendersStarted then
+      for node in _canaries.values() do
+        try
+          let sender = roster(node.name)
+          if sender.state isnt Done then break end
+        end
+        transition_to(SendersDone)
+      end
+    end
+
+  be verify_senders_shutdown() =>
+    if state is SendersStarted then
+      for node in _canaries.values() do
+        try
+          let sender = roster(node.name)
+          if sender.state isnt DoneShutdown then return end
+        else
+          return
+        end
+      end
+      transition_to(SendersDoneShutdown)
+    end
+
+  fun ref _print_transition(old_state: DagonState, state': DagonState) =>
+    _env.out.print("dagon: transitioned from: " + _print_state(old_state) + " to: " + _print_state(state'))
+
+  fun ref _print_state(state': DagonState): String =>  
+    """
+    Print the state to stdout.
+    """
+    match state'
+    | Initialized => return "Initialized"
+    | Booting     => return "Booting"
+    | TopologyReady => return "TopologyReady"
+    | AwaitingSendersReady => return "AwaitingSendersReady"
+    | AwaitingSendersStart => return "AwaitingSendersStart"
+    | StartSenders => return "StartSenders"
+    | SendersReady => return "SendersReady"
+    | SendersStarted => return "SendersStarted"
+    | SendersDone => return "SendersDone"
+    | SendersDoneShutdown => return "SendersDoneShutdown"
+    | TopologyDoneShutdown => return "TopologyDoneShutdown"
+    | Done => return "Done"
+    else
+      return "Unknown state"
+    end
+
+  be send_senders_started(conn: TCPConnection) =>
+    """
+    Tell notifier that senders have been started.
+    """
+    _env.out.print("dagon: sending 'SendersStarted' to notifier")
+    let message = ExternalMsgEncoder.senders_started()
+    conn.writev(message)
 
 
 class ProcessClient is ProcessNotify
