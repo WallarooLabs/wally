@@ -1,10 +1,9 @@
 use ".."
 use "collections"
-use "regex"
 
 class WordCounter is CanonicalForm
   let counts: Map[String, U64] = Map[String,U64]()
-  let _punctuation: String = """ !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+  let _punctuation: String = """ !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~ """
 
   fun apply(key: String): U64 ? =>
     counts(key)
@@ -16,13 +15,7 @@ class WordCounter is CanonicalForm
 
   fun ref update_from_string(s: String) =>
     for line in s.split("\n").values() do
-      let updated_line = try
-        let r = Regex("[\\W_]+")
-        r.replace(line, " " where global = true)
-      else
-        line
-      end
-      for word in updated_line.split(" ").values() do
+      for word in line.split(_punctuation).values() do
         _increment_word(word)
       end
     end
