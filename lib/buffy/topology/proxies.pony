@@ -63,11 +63,15 @@ actor StepManager
       _env.err.print("StepManager: Error setting up passthrough.")
     end
 
-  be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
+  be add_step(step_id: U64, step_builder: BasicStepBuilder val, coordinator: Coordinator) =>
     let step = step_builder()
     match step
     | let s: StepManaged tag =>
       s.add_step_manager(this)
+    end
+    match step
+    | let s: DisposableStep tag =>
+      coordinator.add_disposable_step(s)
     end
     step.add_step_reporter(StepReporter(step_id, step_builder.name(), 
       _metrics_collector))

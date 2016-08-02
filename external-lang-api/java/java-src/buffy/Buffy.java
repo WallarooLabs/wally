@@ -78,7 +78,6 @@ public final class Buffy<In, Out> {
     private byte[] process(byte[] msgAsBytes) {
         try {
         	ExternalMessage<In> msg = codec.decode(msgAsBytes, this);
-            log("Received: " + msg.toString());
             Out result = computation.execute(msg.data, this);
             ExternalMessage<Out> resultMsg = msg.withResult(result); 
             return codec.encode(resultMsg, this);
