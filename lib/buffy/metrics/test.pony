@@ -13,7 +13,6 @@ actor Main is TestList
   fun tag tests(test: PonyTest) =>
     test(_TestThroughputHistory)
     test(_TestMonitoringHubEncoder)
-    test(_TestFixedBinSelector)
 
 class iso _TestThroughputHistory is UnitTest
   fun name(): String => "buffy:ThroughputHistory"
@@ -49,9 +48,7 @@ class iso _TestMonitoringHubEncoder is UnitTest
       recover iso MetricsStringAccumulator(MonitoringHubEncoder, output,
         app_name) end
 
-    let bin_selector: F64Selector val = recover val Log10Selector end
-    let mc: MetricsCollection = MetricsCollection(bin_selector, 1,
-                                                  consume handler)
+    let mc: MetricsCollection = MetricsCollection(1, consume handler)
 
     mc.process_step("1", 1000, 1999)
     mc.process_step("1", 2000, 2999)
@@ -121,19 +118,3 @@ actor ResumableTest is Resumable
 
   be resume() =>
     _output.written()
-
-
-class iso _TestFixedBinSelector is UnitTest
-  fun name(): String => "buffy:FixedBinSelector"
-
-  fun apply(h: TestHelper) =>
-    let fbs = FixedBinSelector
-    h.assert_eq[F64](fbs.bin(5), 5)
-    h.assert_eq[F64](fbs.bin(4.95), 5)
-    h.assert_eq[F64](fbs.bin(4.99), 5)
-    h.assert_eq[F64](fbs.bin(3.95), 4)
-    h.assert_eq[F64](fbs.bin(4.0), 4)
-    h.assert_eq[F64](fbs.bin(0.149), 0.15)
-    h.assert_eq[F64](fbs.bin(0), 0.000001)
-    h.assert_eq[F64](fbs.bin(11), fbs.overflow())
-    true

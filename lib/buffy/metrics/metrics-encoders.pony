@@ -51,7 +51,7 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
         let throughputs: JsonObject ref = JsonObject
         topics.data.update("latency_bins", latencies)
         topics.data.update("throughput_out", throughputs)
-        for (bin, count) in lh.bin_map().pairs() do
+        for (bin, count) in lh.pairs() do
           latencies.data.update(bin.string(), count.i64())
         end
         for (t', count) in th.values() do
@@ -80,7 +80,7 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
         let throughputs: JsonObject ref = JsonObject
         topics.data.update("latency_bins", latencies)
         topics.data.update("throughput_out", throughputs)
-        for (bin, count) in lh.bin_map().pairs() do
+        for (bin, count) in lh.pairs() do
           latencies.data.update(bin.string(), count.i64())
         end
         for (t', count) in th.values() do
@@ -109,7 +109,7 @@ class MonitoringHubEncoder is MetricsCollectionOutputEncoder
         let throughputs: JsonObject ref = JsonObject
         topics.data.update("latency_bins", latencies)
         topics.data.update("throughput_out", throughputs)
-        for (bin, count) in lh.bin_map().pairs() do
+        for (bin, count) in lh.pairs() do
           latencies.data.update(bin.string(), count.i64())
         end
         for (t', count) in th.values() do

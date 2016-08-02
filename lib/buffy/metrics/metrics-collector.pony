@@ -41,8 +41,7 @@ actor MetricsCollector is FlushingActor
         MetricsOutputHandler(MonitoringHubEncoder, consume output, app_name)
 
       // Metrics Collection actor
-      let bin_selector: F64Selector val = Log10Selector //FixedBinSelector
-      let mc = MetricsCollection(bin_selector, period, handler)
+      let mc = MetricsCollection(period, handler)
 
       // start a timer to flush the metrics-collection
       Flusher(mc, period)
@@ -58,8 +57,7 @@ actor MetricsCollector is FlushingActor
       let handler': MetricsOutputHandler val =
         MetricsOutputHandler(MonitoringHubEncoder(false), consume output',
           app_name)
-      let bin_selector': F64Selector val = FixedBinSelector
-      let mc' = MetricsCollection(bin_selector', report_period, handler')
+      let mc' = MetricsCollection(report_period, handler')
 
       // start a timer to flush the metrics-collection
       Flusher(mc', report_period)
