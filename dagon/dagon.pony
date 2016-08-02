@@ -263,29 +263,35 @@ class Node
   let docker_tag: String
   let docker_userid: String
   let args: Array[String] val
+  let wrapper_path: String
+  let wrapper_args: Array[String] val
   let vars: Array[String] val
 
   new create(name': String,
     is_canary': Bool, is_leader': Bool,
     path': String,
+    wrapper_path': String,
     docker_image': String,
     docker_constraint': String,
     docker_dir': String,
     docker_tag': String,
     docker_userid': String,
     args': Array[String] val,
+    wrapper_args': Array[String] val,
     vars': Array[String] val)
   =>
     name = name'
     is_canary = is_canary'
     is_leader = is_leader'
     path = path'
+    wrapper_path = wrapper_path'
     docker_image = docker_image'
     docker_constraint = docker_constraint'
     docker_dir = docker_dir'
     docker_tag = docker_tag'
     docker_userid = docker_userid'
     args = args'
+    wrapper_args = wrapper_args'
     vars = vars'
 
 
@@ -409,6 +415,7 @@ actor ProcessManager
     _env.out.print("dagon: parse_and_register_processes")
     var name: String = ""
     var path: String = ""
+    var wrapper_path: String = ""
     var docker_image = ""
     var docker_constraint = ""
     var docker_dir = ""
@@ -423,8 +430,10 @@ actor ProcessManager
       let sections = IniParse(ini_file.lines())
       for section in sections.keys() do
         let argsbuilder: Array[String] iso = recover Array[String](6) end
+        let wrapper_args: Array[String] iso = recover Array[String](4) end
         name = ""
         path = ""
+        wrapper_path = ""
         is_canary = false
         is_leader = false
         is_expect = false
@@ -452,8 +461,18 @@ actor ProcessManager
               is_leader = false
             end
           | "expect" =>
-              is_expect = true
-              argsbuilder.push("--" + key + "=" + sections(section)(key))
+            is_expect = true
+            argsbuilder.push("--" + key + "=" + sections(section)(key))
+          | "wrapper_path" =>
+            wrapper_path = sections(section)(key)
+          | "wrapper_args_1" =>
+            wrapper_args.push(sections(section)(key))
+          | "wrapper_args_2" =>
+            wrapper_args.push(sections(section)(key))
+          | "extra_args_3" =>
+            wrapper_args.push(sections(section)(key))
+          | "wrapper_args_4" =>
+            wrapper_args.push(sections(section)(key))
           else
             argsbuilder.push("--" + key + "=" + sections(section)(key))
           end
@@ -465,10 +484,10 @@ actor ProcessManager
           _expect = true
         end
 
-        register_node(name, is_canary, is_leader, path,
+        register_node(name, is_canary, is_leader, path, wrapper_path,
           docker_image, docker_constraint, docker_dir,
           docker_tag, docker_userid,
-          a, consume vars)
+          a, consume wrapper_args, consume vars)
       end
       _env.out.print("dagon: finished registration of nodes")
       _finished_registration = true
@@ -527,6 +546,7 @@ actor ProcessManager
     """
     _env.out.print("dagon: parse_node_section")
     let argsbuilder: Array[String] iso = recover Array[String](6) end
+    let wrapper_args: Array[String] iso = recover Array[String](4) end
     var name: String = ""
     var docker_image = ""
     var docker_constraint = ""
@@ -534,8 +554,10 @@ actor ProcessManager
     var docker_tag = ""
     var docker_userid = ""
     var path: String = ""
+    var wrapper_path: String = ""
     var is_canary: Bool = false
     var is_leader: Bool = false
+    var is_expect: Bool = false
     try
       for key in sections(section).keys() do
         docker_tag = _docker_tag // set default tag
@@ -570,6 +592,19 @@ actor ProcessManager
           else
             is_leader = false
           end
+        | "expect" =>
+          is_expect = true
+          argsbuilder.push("--" + key + "=" + sections(section)(key))
+        | "wrapper_path" =>
+          wrapper_path = sections(section)(key)          
+        | "wrapper_args_1" =>
+          wrapper_args.push(sections(section)(key))
+        | "wrapper_args_2" =>
+          wrapper_args.push(sections(section)(key))
+        | "wrapper_args_3" =>
+          wrapper_args.push(sections(section)(key))
+        | "wrapper_args_4" =>
+          wrapper_args.push(sections(section)(key))
         else
           argsbuilder.push("--" + key + "=" + sections(section)(key))
         end
@@ -582,10 +617,10 @@ actor ProcessManager
     let a: Array[String] val = consume argsbuilder
     let vars: Array[String] iso = recover Array[String](0) end
 
-    register_node(name, is_canary, is_leader, path,
+    register_node(name, is_canary, is_leader, path, wrapper_path,
       docker_image, docker_constraint, docker_dir,
       docker_tag, docker_userid,
-      a, consume vars)
+      a, consume wrapper_args, consume vars)
 
   fun ref _parse_docker_section(sections: IniMap, section: String):
     Map[String, String]
@@ -668,11 +703,12 @@ actor ProcessManager
 
   be register_node(name: String,
     is_canary: Bool, is_leader: Bool,
-    path: String,
+    path: String, wrapper_path: String,
     docker_image: String, docker_constraint: String,
     docker_dir: String, docker_tag: String,
     docker_userid: String,
     args: Array[String] val,
+    wrapper_args: Array[String] val,
     vars: Array[String] val)
   =>
     """
@@ -681,21 +717,21 @@ actor ProcessManager
     if is_canary then
       _env.out.print("dagon: registering canary node: " + name)
       _canaries(name) = recover Node(name, is_canary, is_leader,
-        path, docker_image, docker_constraint, docker_dir,
+        path, wrapper_path, docker_image, docker_constraint, docker_dir,
         docker_tag, docker_userid,
-        args, vars) end
+        args, wrapper_args, vars) end
     elseif is_leader then
       _env.out.print("dagon: registering leader node: " + name)
       _leaders(name) = recover Node(name, is_canary, is_leader,
-        path, docker_image, docker_constraint, docker_dir,
+        path, wrapper_path, docker_image, docker_constraint, docker_dir,
         docker_tag, docker_userid,
-        args, vars) end
+        args, wrapper_args, vars) end
     else
       _env.out.print("dagon: registering node: " + name)
       _workers_receivers(name) = recover Node(name, is_canary, is_leader,
-        path, docker_image, docker_constraint, docker_dir,
+        path, wrapper_path, docker_image, docker_constraint, docker_dir,
         docker_tag, docker_userid,
-        args, vars) end
+        args, wrapper_args, vars) end
     end
 
   be boot_leaders() =>
@@ -814,7 +850,10 @@ actor ProcessManager
           for value in node.args.values() do
             args.push(value)
           end
-
+          // append wrapper_args
+          for value in node.wrapper_args.values() do
+            args.push(value)
+          end          
           // dump args
           let a: Array[String val] val = consume args
           _dump_docker_command(a)
@@ -856,13 +895,22 @@ actor ProcessManager
     Boot a node as a process.
     """
     _env.out.print("dagon: booting process: " + node.name)
-    let filepath: (FilePath | None) = _filepath_from_path(node.path)
-
-    let final_args = _prepend_name(node.name, node.args)
-    let final_vars = node.args
-    for arg in final_args.values() do
-      _env.out.print("dagon: " + node.name + " arg: " + arg)
+    var filepath: (FilePath | None) = None
+    var final_args: Array[String] val = recover Array[String](0) end
+    if node.wrapper_path.size() > 0 then // wrap if path is set
+      filepath = _filepath_from_path(node.wrapper_path)
+      final_args = _prepend_name(node.name, _prepend_wrapper(
+        node.path, node.wrapper_args, node.args))
+    else // normal, unwrapped execution
+      filepath = _filepath_from_path(node.path)
+      final_args = _prepend_name(node.name, node.args)
     end
+    let final_vars = node.vars
+    _env.out.print("dagon: " + node.name + " command: ")
+    for arg in final_args.values() do
+      _env.out.write(arg + " ")
+    end
+    _env.out.write("\n")
 
     if filepath isnt None then
       try
@@ -888,6 +936,19 @@ actor ProcessManager
     end
     result
 
+  fun ref _prepend_wrapper(path: String, wrapper_args: Array[String] val,
+    args: Array[String] val): Array[String] val
+  =>
+    let result: Array[String] iso = recover Array[String](11) end
+    for arg in wrapper_args.values() do // wrapper parameters
+      result.push(arg)
+    end
+    result.push(path) // add path to the binary we are wrapping
+    for arg in args.values() do // add parameters for our binary
+      result.push(arg)
+    end
+    result    
+    
   be send_shutdown(name: String) =>
     """
     Shutdown a running process
