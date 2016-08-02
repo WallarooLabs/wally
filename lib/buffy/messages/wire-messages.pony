@@ -10,8 +10,10 @@ primitive WireMsgEncoder
     let serialised: Array[U8] val =
       Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
     let size = serialised.size()
-    wb.u32_be(size.u32())
-    wb.write(serialised)
+    if size > 0 then
+      wb.u32_be(size.u32())
+      wb.write(serialised)
+    end
     wb.done()
 
   fun ready(node_name: String, auth: AmbientAuth): Array[ByteSeq] val ? =>

@@ -49,13 +49,19 @@ actor SinkConnection
   be apply(strings: (String | Array[String] val)) =>
     match strings
     | let s: String =>
-      _wb.u32_be(s.size().u32())
-      _wb.write(s)
+      let size = s.size()
+      if size > 0 then
+        _wb.u32_be(size.u32())
+        _wb.write(s)
+      end
       _conn.writev(_wb.done())
     | let arr: Array[String] val =>
       for s in arr.values() do
-        _wb.u32_be(s.size().u32())
-        _wb.write(s)
+        let size = s.size()
+        if size > 0 then
+          _wb.u32_be(size.u32())
+          _wb.write(s)
+        end
       end
       _conn.writev(_wb.done())
     end
