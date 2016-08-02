@@ -843,17 +843,25 @@ actor ProcessManager
           args.push(node.docker_image + ":"
             + node.docker_tag)                     // image path
 
-
-
-          // append node specific args
-          args.push(node.path) // the command to run inside the container
-          for value in node.args.values() do
-            args.push(value)
+          if node.wrapper_path.size() > 0 then // we are wrapping the executable
+            args.push(node.wrapper_path)
+            // append wrapper_args
+            for value in node.wrapper_args.values() do
+              args.push(value)
+            end          
+            // append node specific args
+            args.push(node.path) // the command to run inside the container
+            for value in node.args.values() do
+              args.push(value)
+            end
+          else // we are executing directly
+            // append node specific args
+            args.push(node.path) // the command to run inside the container
+            for value in node.args.values() do
+              args.push(value)
+            end
           end
-          // append wrapper_args
-          for value in node.wrapper_args.values() do
-            args.push(value)
-          end          
+
           // dump args
           let a: Array[String val] val = consume args
           _dump_docker_command(a)
