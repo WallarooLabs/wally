@@ -80,7 +80,7 @@ actor Main
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
-    .add("delay-senders", "ds", None)
+    .add("delay-senders", "D", None)
     try
       for option in options do
         match option
@@ -100,7 +100,8 @@ actor Main
 --tag/-T <tag>]
 --timeout/-t <seconds>
 --filepath/-f <path>
---phone-home/-h <host:port>""")
+--phone-home/-h <host:port>
+--delay-senders/-D""")
       return
     end
 
@@ -1156,8 +1157,8 @@ actor ProcessManager
   be start_canary_nodes() =>
     for node in _canaries.values() do
       start_canary_node(node.name)
-      transition_to(SendersStarted)
     end
+    transition_to(SendersStarted)
 
   be verify_senders_ready() =>
     if state is AwaitingSendersReady then
