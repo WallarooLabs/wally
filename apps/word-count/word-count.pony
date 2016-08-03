@@ -5,7 +5,6 @@ use "buffy/metrics"
 use "buffy/topology"
 use "net"
 use "buffy/sink-node"
-use "regex"
 
 actor Main
   new create(env: Env) =>
@@ -16,15 +15,19 @@ actor Main
             "Word Count")
           .to_map[WordCount val](
             lambda(): MapComputation[String, WordCount val] iso^ => Split end)
-          .to_stateful_partition[WordCount val, WordCountTotals](
-            recover
-              StatePartitionConfig[WordCount val, WordCount val, WordCountTotals](
-                lambda(): Computation[WordCount val, Count val] iso^
-                  => GenerateCount end,
-                lambda(): WordCountTotals => WordCountTotals end,
-                FirstLetterPartition, 0)
-            end
-            )
+          .to_stateful[WordCount val, WordCountTotals](
+            Count,
+            lambda(): WordCountTotals => WordCountTotals end,
+            0)
+          // .to_stateful_partition[WordCount val, WordCountTotals](
+          //   recover
+          //     StatePartitionConfig[WordCount val, WordCount val, WordCountTotals](
+          //       lambda(): Computation[WordCount val, Count val] iso^
+          //         => GenerateCount end,
+          //       lambda(): WordCountTotals => WordCountTotals end,
+          //       FirstLetterPartition, 0)
+          //   end
+          //   )
           .build()
       end
       let sink_builders = recover Array[SinkNodeStepBuilder val] end
@@ -41,16 +44,12 @@ actor Main
     end
 
 class Split is MapComputation[String, WordCount val]
+  let non_word_chars: String = """!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~ """
+
   fun name(): String => "split"
   fun apply(d: String): Seq[WordCount val] =>
     let counts: Array[WordCount val] iso = recover Array[WordCount val] end
-    let updated_d = try
-      let r = Regex("[\\W_]+")
-      r.replace(d, " " where global = true)
-    else
-      d
-    end
-    for word in updated_d.split(" ").values() do
+    for word in d.split(non_word_chars).values() do
       let next = _lower(word)
       if next.size() > 0 then
         counts.push(WordCount(next, 1))
@@ -61,20 +60,12 @@ class Split is MapComputation[String, WordCount val]
   fun _lower(s: String): String =>
     recover s.lower() end
 
-class GenerateCount is Computation[WordCount val, Count val]
-  fun name(): String => "count"
-  fun apply(wc: WordCount val): Count val =>
-    Count(wc)
-
-class Count is StateComputation[WordCount val, WordCountTotals]
-  let _word_count: WordCount val
-
-  new val create(wc: WordCount val) =>
-    _word_count = wc
-
-  fun apply(state: WordCountTotals, output: MessageTarget[WordCount val] val)
-    : WordCountTotals =>
-    output(state(_word_count))
+primitive Count is StateComputation[WordCount val, WordCount val, WordCountTotals]
+  fun name(): String => "Count"
+  fun apply(wc: WordCount val, state: WordCountTotals, 
+    output: MessageTarget[WordCount val] val): WordCountTotals 
+  =>
+    output(state(wc))
     state
 
 class WordCount

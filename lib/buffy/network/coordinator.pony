@@ -147,6 +147,12 @@ actor Coordinator
   be add_topology_manager(tm: TopologyManager) =>
     _topology_manager = tm
 
+  be initialize_source(source_id: U64, pipeline: PipelineSteps val, 
+    target_id: U64, host: String, service: String, 
+    local_step_builder: (LocalStepBuilder val | None)) =>
+    _step_manager.initialize_source(source_id, pipeline, 
+      target_id, host, service, local_step_builder, this)
+
   be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
     _step_manager.add_step(step_id, step_builder)
 
@@ -154,6 +160,10 @@ actor Coordinator
     shared_state_step_id: U64, shared_state_step_node: String) =>
     _step_manager.add_state_step(step_id, ssb, shared_state_step_id,
       shared_state_step_node, this)
+
+  be add_shared_state_step(step_id: U64, 
+    step_builder: BasicSharedStateStepBuilder val) =>
+    _step_manager.add_shared_state_step(step_id, step_builder)
 
   be add_proxy(p_step_id: U64, p_target_id: U64, target_node_name: String) =>
     _step_manager.add_proxy(p_step_id, p_target_id, target_node_name, this)

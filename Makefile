@@ -112,7 +112,7 @@ monhub-arch-check:
 	$(if $(filter $(arch),armhf),$(error Arch cannot be 'armhf' \
           for building of monitoring hub!),)
 
-build-buffy-components: build-receiver build-sender build-dagon build-dagon-child build-fallor
+build-buffy-components: build-receiver build-sender build-dagon build-dagon-child build-dagon-notifier build-fallor
 
 build-apps: build-wesley build-double-divide build-avg-of-avgs build-state-avg-of-avgs build-quadruple build-market-spread build-word-count build-word-length-count ## Build Pony based programs for Buffy
 
@@ -150,6 +150,9 @@ build-dagon: ## build dagon
 
 build-dagon-child: ## build dagon-child
 	$(call PONYC,dagon/dagon-child)
+
+build-dagon-notifier: ## build dagon-notifier
+	$(call PONYC,dagon/dagon-notifier)
 
 build-wesley: ## Build wesley
 	$(call PONYC,wesley/word-length-count-test)
@@ -306,6 +309,9 @@ build-docker: docker-arch-check ## Build docker images for Buffy
 	docker $(docker_host_arg) build -t \
           $(docker_image_repo)/dagon-child.$(arch):$(docker_image_version) \
           dagon/dagon-child
+	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/dagon-notifier.$(arch):$(docker_image_version) \
+          dagon/dagon-notifier
 
 push-docker: build-docker ## Push docker images for Buffy to repository
 	docker $(docker_host_arg) push \
@@ -332,6 +338,8 @@ push-docker: build-docker ## Push docker images for Buffy to repository
           $(docker_image_repo)/word-count.$(arch):$(docker_image_version)
 	docker $(docker_host_arg) push \
           $(docker_image_repo)/dagon-child.$(arch):$(docker_image_version)
+	docker $(docker_host_arg) push \
+    	  $(docker_image_repo)/dagon-notifier.$(arch):$(docker_image_version)
 
 build-market-spread-reports-ui-docker:
 	docker $(docker_host_arg) build -t \
@@ -389,6 +397,7 @@ clean: clean-docker ## Cleanup docker images, deps and compiled files for Buffy
 	rm -f apps/word-count/word-count apps/word-count/word-count.o
 	rm -f apps/word-length-count/word-length-count apps/word-length-count/word-length-count.o apps/word-length-count/*.class
 	rm -f dagon/dagon-child/dagon-child dagon/dagon-child/dagon-child.o
+	rm -f dagon/dagon-notifier/dagon-notifier dagon/dagon-notifier/dagon-notifier.o
 	rm -rf monitoring_hub/apps/metrics_reporter_ui/rel/metrics_reporter_ui/
 	rm -rf monitoring_hub/apps/market_spread_reports_ui/rel/market_spread_reports_ui/
 	@echo 'Done cleaning.'

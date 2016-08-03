@@ -18,6 +18,8 @@ actor Main
   new create(env: Env) =>
     var required_args_are_present = true
     var run_tests = env.args.size() == 1
+    var use_metrics = false
+    var no_write = false
 
     if run_tests then
       TestMain(env)
@@ -35,6 +37,8 @@ actor Main
           .add("name", "n", StringArgument)
           .add("listen", "l", StringArgument)
           .add("expect", "e", I64Argument)
+          .add("metrics", "m", None)
+          .add("no-write", "w", None)
 
         for option in options do
           match option
@@ -42,6 +46,8 @@ actor Main
           | ("phone-home", let arg: String) => p_arg = arg.split(":")
           | ("listen", let arg: String) => l_arg = arg.split(":")
           | ("expect", let arg: I64) => e_arg = arg.usize()
+          | ("metrics", None) => use_metrics = true
+          | ("no-write", None) => no_write = true
           | let err: ParseError =>
             err.report(env.err)
             required_args_are_present = false
@@ -93,10 +99,12 @@ actor Main
           let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           SignalHandler(TermHandler(coordinator), Sig.term())
+          SignalHandler(TermHandler(coordinator), Sig.int())
 
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
-            FromBuffyListenerNotify(coordinator, store, env.err, e_arg),
+            FromBuffyListenerNotify(coordinator, store, env.err, e_arg, 
+              use_metrics, no_write),
             listener_addr(0),
             listener_addr(1))
 
@@ -108,6 +116,7 @@ actor Main
           --name/-n <name> [Name of giles-receiver node]
           --listen/-l <address> [Address giles-receiver node is listening on]
           --expect/-e <number> [Number of messages to process before terminating]
+          --metrics/-m [Add metrics reporting]
           """)
       end
     end
@@ -117,14 +126,19 @@ class FromBuffyListenerNotify is TCPListenNotify
   let _store: Store
   let _stderr: StdStream
   let _expected: (USize | None)
+  let _use_metrics: Bool
+  let _no_write: Bool
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream, expected: (USize | None) = None)
+    store: Store, stderr: StdStream, expected: (USize | None) = None,
+    use_metrics: Bool, no_write: Bool)
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
     _expected = expected
+    _use_metrics = use_metrics
+    _no_write = no_write
 
   fun ref not_listening(listen: TCPListener ref) =>
     _coordinator.from_buffy_listener(listen, Failed)
@@ -133,7 +147,8 @@ class FromBuffyListenerNotify is TCPListenNotify
     _coordinator.from_buffy_listener(listen, Ready)
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    FromBuffyNotify(_coordinator, _store, _stderr, _expected)
+    FromBuffyNotify(_coordinator, _store, _stderr, _expected, _use_metrics,
+      _no_write)
 
 class FromBuffyNotify is TCPConnectionNotify
   let _coordinator: Coordinator
@@ -142,17 +157,27 @@ class FromBuffyNotify is TCPConnectionNotify
   var _header: Bool = true
   var _count: USize = 0
   var _remaining: USize = 0
+  var _expected: USize = 0
   var _expect_termination: Bool = false
+  let _metrics: Metrics tag = Metrics
+  let _use_metrics: Bool 
+  let _no_write: Bool 
+  var _closed: Bool = false
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream, expected: (USize | None) = None)
+    store: Store, stderr: StdStream, 
+    expected: (USize | None),
+    use_metrics: Bool, no_write: Bool)
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
+    _use_metrics = use_metrics
+    _no_write = no_write
     try
       if (expected as USize) > 0 then
-        _remaining = expected as USize
+        _expected = expected as USize
+        _remaining = _expected
         _expect_termination = true
       end
     end
@@ -161,6 +186,9 @@ class FromBuffyNotify is TCPConnectionNotify
     if _header then
       try
         _count = _count + 1
+        if (_count == 1) and _use_metrics then
+          _metrics.set_start(Time.nanos())
+        end
         if (_count % 100_000) == 0 then
           @printf[I32]("%zu received\n".cstring(), _count)
         end
@@ -176,11 +204,19 @@ class FromBuffyNotify is TCPConnectionNotify
         _stderr.print("Blew up reading header from Buffy")
       end
     else
-      _store.received(consume data, Time.wall_to_nanos(Time.now()))
+      if not _no_write then
+        _store.received(consume data, Time.wall_to_nanos(Time.now()))
+      end
       if _expect_termination and (_remaining <= 0) then
-        _stderr.print(_count.string() + " expected messages received. " +
-          "Terminating...")
-        _coordinator.finished()
+        if not _closed then
+          _stderr.print(_count.string() + " expected messages received. " +
+            "Terminating...")
+          if _use_metrics then
+            _metrics.set_end(Time.nanos(), _expected)
+          end
+          _coordinator.finished()
+        end
+        _closed = true
       else
         conn.expect(4)
         _header = true
@@ -370,13 +406,14 @@ actor Store
   var _count: USize = 0
 
   new create(auth: AmbientAuth) =>
-    _received_file = try
-      let f = File(FilePath(auth, "received.txt"))
-      f.set_length(0)
-      f
-    else
-      None
-    end
+    _received_file = 
+      try
+        let f = File(FilePath(auth, "received.txt"))
+        f.set_length(0)
+        f
+      else
+        None
+      end
 
   be received(msg: Array[U8] val, at: U64) =>
     match _received_file
@@ -401,3 +438,28 @@ class TermHandler is SignalNotify
   fun ref apply(count: U32): Bool =>
     _coordinator.finished()
     true
+
+actor Metrics
+  var start_t: U64 = 0
+  var next_start_t: U64 = 0
+  var end_t: U64 = 0
+
+  be set_start(s: U64) =>
+    if start_t != 0 then
+      next_start_t = s
+    else
+      start_t = s
+    end
+    @printf[I32]("Metrics Start: %zu\n".cstring(), start_t)
+
+  be set_end(e: U64, expected: USize) =>
+    end_t = e
+    let overall = (end_t - start_t).f64() / 1_000_000_000
+    let throughput = ((expected.f64() / overall) / 1_000).usize()
+    @printf[I32]("Metrics End: %zu\n".cstring(), end_t)
+    @printf[I32]("Overall Time: %fs\n".cstring(), overall)
+    @printf[I32]("Messages: %zu\n".cstring(), expected)
+    @printf[I32]("Throughput: %zuk\n".cstring(), throughput)
+    start_t = next_start_t
+    next_start_t = 0
+    end_t = 0

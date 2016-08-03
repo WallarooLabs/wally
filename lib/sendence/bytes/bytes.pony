@@ -4,8 +4,10 @@ primitive Bytes
   fun length_encode(data: ByteSeq val): Array[ByteSeq] val =>
     let len: U32 = data.size().u32()
     let wb = WriteBuffer
-    wb.u32_be(len)
-    wb.write(data)
+    if len > 0 then
+      wb.u32_be(len)
+      wb.write(data)
+    end
     wb.done()
 
   fun to_u16(high: U8, low: U8): U16 =>

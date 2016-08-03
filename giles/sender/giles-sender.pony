@@ -383,9 +383,12 @@ actor SendingActor
       for i in Range(0, current_batch_size) do
         try
           let n = _data_source.next()
-          d'.push(n)
-          _wb.u32_be(n.size().u32())
-          _wb.write(n)
+          if n.size() > 0 then
+            d'.push(n)
+            _wb.u32_be(n.size().u32())
+            _wb.write(n)
+            _messages_sent = _messages_sent + 1
+          end
         else
           ifdef debug then
             Debug.out("SendingActor: failed reading _data_source.next()")
@@ -396,7 +399,6 @@ actor SendingActor
 
       _to_buffy_socket.writev(_wb.done())
       _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
-      _messages_sent = _messages_sent + current_batch_size
     else
       _finished = true
       _timers.dispose()

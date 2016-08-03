@@ -9,7 +9,7 @@ use "sendence/queue"
 use "debug"
 
 trait BasicStep
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D)
   be add_step_reporter(sr: StepReporter val) => None
 
@@ -17,13 +17,31 @@ trait BasicOutputStep is BasicStep
   be add_output(to: BasicStep tag)
 
 trait BasicStateStep is BasicStep
-  be add_shared_state(shared_state: BasicStep tag)
+  be add_shared_state(shared_state: BasicSharedStateStep tag)
+
+trait BasicLocalStep
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D)
+  fun ref add_step_reporter(sr: StepReporter val) => None
+
+trait BasicOutputLocalStep is BasicLocalStep
+  fun ref add_output(to: BasicStep tag)
+
+trait BasicStateLocalStep is BasicLocalStep
+  fun ref add_shared_state(shared_state: BasicStep tag)
 
 trait ComputeStep[In] is BasicStep
 
 trait OutputStep[Out] is BasicOutputStep
 
 trait ThroughStep[In, Out] is (ComputeStep[In] & OutputStep[Out])
+
+trait ComputeLocalStep[In] is BasicLocalStep
+
+trait OutputLocalStep[Out] is BasicOutputLocalStep
+
+trait ThroughLocalStep[In, Out] is 
+  (ComputeLocalStep[In] & OutputLocalStep[Out])
 
 trait ThroughStateStep[In: Any val, Out: Any val, State: Any #read] is (BasicStateStep &
   ThroughStep[In, Out])
@@ -34,10 +52,137 @@ trait PartitionAckable
 trait StepManaged
   be add_step_manager(step_manager: StepManager)
 
+trait BasicSharedStateStep
+  be send[D: Any val, State: Any #read](msg_id: U64, source_ts: U64, 
+    ingress_ts: U64, msg_data: D, sp: StateProcessor[State] val)
+
 actor EmptyStep is BasicStep
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
+    None
+
+actor EmptySharedStateStep is BasicSharedStateStep
+  be send[D: Any val, State: Any #read](msg_id: U64, source_ts: U64, 
+    ingress_ts: U64, msg_data: D, sp: StateProcessor[State] val) => None
+
+class EmptyLocalStep is BasicOutputLocalStep
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) => None
+  fun ref add_output(to: BasicStep tag) => None
+
+trait BasicComputationStep
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+    msg_data: D)
+
+trait BasicOutputComputationStep is BasicComputationStep
+  fun ref add_output(to: BasicComputationStep)
+
+class EmptyComputationStep is BasicComputationStep
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
     msg_data: D) => 
     None
+  fun ref add_output(to: BasicComputationStep) => None
+
+class ComputationStep[In: Any val, Out: Any val] is BasicOutputComputationStep
+  var _output: BasicComputationStep = EmptyComputationStep
+  let _f: Computation[In, Out]
+
+  new create(f: Computation[In, Out]) =>
+    _f = f
+
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+    msg_data: D) => 
+    match msg_data
+    | let input: In =>
+      _output.send[Out](msg_id, source_ts, ingress_ts, _f(input))
+    end
+
+  fun ref add_output(to: BasicComputationStep) =>
+    _output = to
+
+class ComputationForwardStep[In: Any val] is BasicComputationStep
+  var _output: BasicStep tag = EmptyStep
+
+  new create(output: BasicStep tag) =>
+    _output = output
+
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+    msg_data: D) => 
+    match msg_data
+    | let input: In =>
+      _output.send[In](msg_id, source_ts, ingress_ts, input)
+    end
+
+class ComputationSteps[In: Any val, Out: Any val] is BasicComputationStep
+  let _first_step: BasicOutputComputationStep
+  let _last_step: BasicOutputComputationStep
+
+  new create(f: BasicOutputComputationStep, l: BasicOutputComputationStep) => 
+    _first_step = f
+    _last_step = l
+
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+    msg_data: D) 
+  =>
+    match msg_data
+    | let input: In =>
+      _first_step.send[In](msg_id, source_ts, ingress_ts, input)
+    end    
+
+  fun ref add_output(to: BasicStep tag) =>
+    _last_step.add_output(ComputationForwardStep[Out](to))
+
+actor CoalesceStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
+  let _f: ComputationSteps[In, Out]
+  var _step_reporter: (StepReporter val | None) = None
+
+  new create(f: ComputationStepsBuilder[In, Out] iso) =>
+    _f = (consume f)()
+
+  be add_step_reporter(sr: StepReporter val) =>
+    _step_reporter = sr
+
+  be add_output(to: BasicStep tag) =>
+    _f.add_output(to)
+
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
+    match msg_data
+    | let input: In =>
+      let start_time = Epoch.nanoseconds()
+      _f.send[In](msg_id, source_ts, ingress_ts, input)
+      let end_time = Epoch.nanoseconds()
+      // match _step_reporter
+      // | let sr: StepReporter val =>
+      //   sr.report(start_time, end_time)
+      // end
+    end
+
+class CoalesceLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
+  let _f: ComputationSteps[In, Out]
+  var _step_reporter: (StepReporter val | None) = None
+
+  new create(f: ComputationStepsBuilder[In, Out] iso) =>
+    _f = (consume f)()
+
+  fun ref add_step_reporter(sr: StepReporter val) =>
+    _step_reporter = sr
+
+  fun ref add_output(to: BasicStep tag) =>
+    _f.add_output(to)
+
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
+    match msg_data
+    | let input: In =>
+      let start_time = Epoch.nanoseconds()
+      _f.send[In](msg_id, source_ts, ingress_ts, input)
+      let end_time = Epoch.nanoseconds()
+      // match _step_reporter
+      // | let sr: StepReporter val =>
+      //   sr.report(start_time, end_time)
+      // end
+    end
 
 actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]
@@ -53,17 +198,44 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be add_output(to: BasicStep tag) =>
     _output = to
 
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
-    msg_data: D) =>   
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
     match msg_data
     | let input: In =>
       let start_time = Epoch.nanoseconds()
       _output.send[Out](msg_id, source_ts, ingress_ts, _f(input))
       let end_time = Epoch.nanoseconds()
-      match _step_reporter
-      | let sr: StepReporter val =>
-        sr.report(start_time, end_time)
-      end
+      // match _step_reporter
+      // | let sr: StepReporter val =>
+      //   sr.report(start_time, end_time)
+      // end
+    end
+
+class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
+  let _f: Computation[In, Out]
+  var _output: BasicStep tag = EmptyStep
+  var _step_reporter: (StepReporter val | None) = None
+
+  new create(f: Computation[In, Out] iso) =>
+    _f = consume f
+
+  fun ref add_step_reporter(sr: StepReporter val) =>
+    _step_reporter = sr
+
+  fun ref add_output(to: BasicStep tag) =>
+    _output = to
+
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
+    match msg_data
+    | let input: In =>
+      let start_time = Epoch.nanoseconds()
+      _output.send[Out](msg_id, source_ts, ingress_ts, _f(input))
+      let end_time = Epoch.nanoseconds()
+      // match _step_reporter
+      // | let sr: StepReporter val =>
+      //   sr.report(start_time, end_time)
+      // end
     end
 
 actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
@@ -80,7 +252,7 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be add_output(to: BasicStep tag) =>
     _output = to
 
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D) =>
     match msg_data
     | let input: In =>
@@ -89,10 +261,39 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
         _output.send[Out](msg_id, source_ts, ingress_ts, res)
       end
       let end_time = Epoch.nanoseconds()
-      match _step_reporter
-      | let sr: StepReporter val =>
-        sr.report(start_time, end_time)
+      // match _step_reporter
+      // | let sr: StepReporter val =>
+      //   sr.report(start_time, end_time)
+      // end
+    end
+
+class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
+  let _f: MapComputation[In, Out]
+  var _output: BasicStep tag = EmptyStep
+  var _step_reporter: (StepReporter val | None) = None
+
+  new create(f: MapComputation[In, Out] iso) =>
+    _f = consume f
+
+  fun ref add_step_reporter(sr: StepReporter val) =>
+    _step_reporter = sr
+
+  fun ref add_output(to: BasicStep tag) =>
+    _output = to
+
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
+    match msg_data
+    | let input: In =>
+      let start_time = Epoch.nanoseconds()
+      for res in _f(input).values() do
+        _output.send[Out](msg_id, source_ts, ingress_ts, res)
       end
+      let end_time = Epoch.nanoseconds()
+      // match _step_reporter
+      // | let sr: StepReporter val =>
+      //   sr.report(start_time, end_time)
+      // end
     end
 
 actor Source[Out: Any val] is ThroughStep[String, Out]
@@ -109,7 +310,7 @@ actor Source[Out: Any val] is ThroughStep[String, Out]
   be add_output(to: BasicStep tag) =>
     _output = to
 
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D) =>
     match msg_data
     | let input: String =>
@@ -131,7 +332,7 @@ actor Source[Out: Any val] is ThroughStep[String, Out]
 
 actor PassThrough is BasicOutputStep
   var _output: (BasicStep tag | None) = None
-  let _initial_queue: Array[(U64, U64, U64, Any val)] = 
+  let _initial_queue: Array[(U64, U64, U64, Any val)] =
     Array[(U64, U64, U64, Any val)]
 
   be add_output(to: BasicStep tag) => _output = to
@@ -143,12 +344,39 @@ actor PassThrough is BasicOutputStep
       | let data: D =>
         to.send[D](msg._1, msg._2, msg._3, data)
       else
-        @printf[I32]("Queued passthrough message of unknown type\n".cstring())        
+        @printf[I32]("Queued passthrough message of unknown type\n".cstring())
       end
     end
     _initial_queue.clear()
 
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
+    match _output
+    | let s: BasicStep tag => s.send[D](msg_id, source_ts, ingress_ts, msg_data)
+    else
+      _initial_queue.push((msg_id, source_ts, ingress_ts, msg_data))
+    end
+
+class PassThroughLocalStep is BasicOutputLocalStep
+  var _output: (BasicStep tag | None) = None
+  let _initial_queue: Array[(U64, U64, U64, Any val)] =
+    Array[(U64, U64, U64, Any val)]
+
+  fun ref add_output(to: BasicStep tag) => _output = to
+
+  fun ref add_output_and_send[D: Any val](to: BasicStep tag) =>
+    _output = to
+    for msg in _initial_queue.values() do
+      match msg._4
+      | let data: D =>
+        to.send[D](msg._1, msg._2, msg._3, data)
+      else
+        @printf[I32]("Queued passthrough message of unknown type\n".cstring())
+      end
+    end
+    _initial_queue.clear()
+
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D) =>
     match _output
     | let s: BasicStep tag => s.send[D](msg_id, source_ts, ingress_ts, msg_data)
@@ -162,7 +390,7 @@ actor Sink[In: Any val] is ComputeStep[In]
   new create(f: FinalComputation[In] iso) =>
     _f = consume f
 
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D) =>
     match msg_data
     | let input: In =>
@@ -174,7 +402,7 @@ actor Partition[In: Any val, Out: Any val]
   let _step_builder: BasicStepBuilder val
   let _partition_function: PartitionFunction[In] val
   let _partitions: Map[U64, U64] = Map[U64, U64]
-  let _buffers: Map[U64, Array[(U64, U64, U64, In)]] = 
+  let _buffers: Map[U64, Array[(U64, U64, U64, In)]] =
     Map[U64, Array[(U64, U64, U64, In)]]
   var _step_manager: (StepManager | None) = None
   var _output: BasicStep tag = EmptyStep
@@ -185,11 +413,11 @@ actor Partition[In: Any val, Out: Any val]
     _step_builder = s_builder
     _partition_function = pf
 
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D) =>
     _send[D](msg_id, source_ts, ingress_ts, msg_data)
 
-  fun ref _send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  fun ref _send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D) =>
     match msg_data
     | let input: In =>
@@ -245,142 +473,144 @@ actor Partition[In: Any val, Out: Any val]
   be add_step_manager(step_manager: StepManager) =>
     _step_manager = step_manager
 
-actor StatePartition[State: Any #read]
-  is (BasicStep & PartitionAckable & StepManaged)
-  let _step_builder: BasicStepBuilder val
-  let _partitions: Map[U64, U64] = Map[U64, U64]
-  let _buffers: Map[U64, Array[(U64, U64, U64, StateProcessor[State] val)]] = 
-    Map[U64, Array[(U64, U64, U64, StateProcessor[State] val)]]
-  var _step_manager: (StepManager | None) = None
-  let _guid_gen: GuidGenerator = GuidGenerator
-  let _partition_report_id: U64 = _guid_gen()
-  let _initialization_map: Map[U64, {(): State} val] val
-  let _initialize_at_start: Bool
+// actor StatePartition[State: Any #read]
+//   is (BasicStep & PartitionAckable & StepManaged)
+//   let _step_builder: BasicStepBuilder val
+//   let _partitions: Map[U64, U64] = Map[U64, U64]
+//   let _buffers: Map[U64, Array[(U64, U64, U64, StateProcessor[State] val)]] =
+//     Map[U64, Array[(U64, U64, U64, StateProcessor[State] val)]]
+//   var _step_manager: (StepManager | None) = None
+//   let _guid_gen: GuidGenerator = GuidGenerator
+//   let _partition_report_id: U64 = _guid_gen()
+//   let _initialization_map: Map[U64, {(): State} val] val
+//   let _initialize_at_start: Bool
 
-  new create(s_builder: BasicStepBuilder val, init_map: Map[U64, {(): State} val] val,
-    init_at_start: Bool) =>
-    _step_builder = s_builder
-    _initialization_map = init_map
-    _initialize_at_start = init_at_start
+//   new create(s_builder: BasicStepBuilder val, init_map: Map[U64, {(): State} val] val,
+//     init_at_start: Bool) =>
+//     _step_builder = s_builder
+//     _initialization_map = init_map
+//     _initialize_at_start = init_at_start
 
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
-    msg_data: D) =>
-    _send[D](msg_id, source_ts, ingress_ts, msg_data)
+//   be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+//     msg_data: D) =>
+//     _send[D](msg_id, source_ts, ingress_ts, msg_data)
 
-  fun ref _send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
-    msg_data: D) =>
-    match msg_data
-    | let sp: StateProcessor[State] val =>
-      match _step_manager
-      | let sm: StepManager tag =>
-        let partition_id = sp.partition_id()
-        if _partitions.contains(partition_id) then
-          try
-            let step_id = _partitions(partition_id)
-            sm.send[StateProcessor[State] val](step_id, msg_id, source_ts,
-              ingress_ts, sp)
-          else
-            @printf[I32]("Can't forward to chosen partition!\n".cstring())
-          end
-        else
-          try
-            if _buffers.contains(partition_id) then
-              _buffers(partition_id).push((msg_id, source_ts, ingress_ts, sp))
-            else
-              _buffers(partition_id) = [(msg_id, source_ts, ingress_ts, sp)]
-              let step_id = _guid_gen()
-              if _initialization_map.contains(partition_id) then
-                sm.add_partition_step_and_ack(step_id, partition_id,
-                  _partition_report_id, _step_builder, this)
-                sm.add_initial_state[State](step_id,
-                  _initialization_map(partition_id))
-              else
-                sm.add_partition_step_and_ack(step_id, partition_id,
-                  _partition_report_id, _step_builder, this)
-              end
-            end
-          else
-            @printf[I32]("Computation type is invalid!\n".cstring())
-          end
-        end
-      end
-    end
+//   fun ref _send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+//     msg_data: D) =>
+//     match msg_data
+//     | let sp: StateProcessor[State] val =>
+//       match _step_manager
+//       | let sm: StepManager tag =>
+//         let partition_id = sp.partition_id()
+//         if _partitions.contains(partition_id) then
+//           try
+//             let step_id = _partitions(partition_id)
+//             sm.send[StateProcessor[State] val](step_id, msg_id, source_ts,
+//               ingress_ts, sp)
+//           else
+//             @printf[I32]("Can't forward to chosen partition!\n".cstring())
+//           end
+//         else
+//           try
+//             if _buffers.contains(partition_id) then
+//               _buffers(partition_id).push((msg_id, source_ts, ingress_ts, sp))
+//             else
+//               _buffers(partition_id) = [(msg_id, source_ts, ingress_ts, sp)]
+//               let step_id = _guid_gen()
+//               if _initialization_map.contains(partition_id) then
+//                 sm.add_partition_step_and_ack(step_id, partition_id,
+//                   _partition_report_id, _step_builder, this)
+//                 sm.add_initial_state[State](step_id,
+//                   _initialization_map(partition_id))
+//               else
+//                 sm.add_partition_step_and_ack(step_id, partition_id,
+//                   _partition_report_id, _step_builder, this)
+//               end
+//             end
+//           else
+//             @printf[I32]("Computation type is invalid!\n".cstring())
+//           end
+//         end
+//       end
+//     end
 
-  be ack(partition_id: U64, step_id: U64) =>
-    _partitions(partition_id) = step_id
-    try
-      let buffer = _buffers(partition_id)
-      for (id, source_ts, ingress_ts, data) in buffer.values() do
-        match data
-        | let sp: StateProcessor[State] val =>
-          _send[StateProcessor[State] val](id, source_ts, ingress_ts, sp)
-        end
-      end
-      buffer.clear()
-    else
-      @printf[I32]("Partition: buffer flush failed!\n".cstring())
-    end
+//   be ack(partition_id: U64, step_id: U64) =>
+//     _partitions(partition_id) = step_id
+//     try
+//       let buffer = _buffers(partition_id)
+//       for (id, source_ts, ingress_ts, data) in buffer.values() do
+//         match data
+//         | let sp: StateProcessor[State] val =>
+//           _send[StateProcessor[State] val](id, source_ts, ingress_ts, sp)
+//         end
+//       end
+//       buffer.clear()
+//     else
+//       @printf[I32]("Partition: buffer flush failed!\n".cstring())
+//     end
 
-  be add_step_manager(step_manager: StepManager) =>
-    _step_manager = step_manager
-    if _initialize_at_start then
-      for (partition_id, init) in _initialization_map.pairs() do
-        if (not _partitions.contains(partition_id)) and
-          (not _buffers.contains(partition_id)) then
-          _buffers(partition_id) = Array[(U64, U64, U64, 
-            StateProcessor[State] val)]
-          let step_id = _guid_gen()
-          step_manager.add_partition_step_and_ack(step_id, partition_id,
-            _partition_report_id, _step_builder, this)
-          step_manager.add_initial_state[State](step_id, init)
-        end
-      end
-    end
+//   be add_step_manager(step_manager: StepManager) =>
+//     _step_manager = step_manager
+//     if _initialize_at_start then
+//       for (partition_id, init) in _initialization_map.pairs() do
+//         if (not _partitions.contains(partition_id)) and
+//           (not _buffers.contains(partition_id)) then
+//           _buffers(partition_id) = Array[(U64, U64, U64,
+//             StateProcessor[State] val)]
+//           let step_id = _guid_gen()
+//           step_manager.add_partition_step_and_ack(step_id, partition_id,
+//             _partition_report_id, _step_builder, this)
+//           step_manager.add_initial_state[State](step_id, init)
+//         end
+//       end
+//     end
 
 actor StateStep[In: Any val, Out: Any val, State: Any #read]
   is ThroughStateStep[In, Out, State]
   var _step_reporter: (StepReporter val | None) = None
   var _output: BasicStep tag = EmptyStep
-  var _shared_state: BasicStep tag = EmptyStep
-  let _state_comp_builder: Computation[In, StateComputation[Out, State] val]
+  var _shared_state: BasicSharedStateStep tag 
+    = EmptySharedStateStep
+  let _state_comp: StateComputation[In, Out, State] val
+  var _state_comp_wrapper: StateComputationWrapper[In, Out, State] val
   let _state_id: U64
   let _partition_function: PartitionFunction[In] val
 
-  new create(comp_builder: ComputationBuilder[In,
-    StateComputation[Out, State] val] val, state_id: U64,
+  new create(s_comp: StateComputation[In, Out, State] val, state_id: U64,
     pf: PartitionFunction[In] val = lambda(i: In): U64 => 0 end) =>
-    _state_comp_builder = comp_builder()
+    _state_comp = s_comp
     _state_id = state_id
     _partition_function = pf
+    _state_comp_wrapper = StateComputationWrapper[In, Out, State](_state_comp,
+      EmptyStep, _partition_function)
 
   be add_step_reporter(sr: StepReporter val) =>
     _step_reporter = sr
 
   be add_output(to: BasicStep tag) =>
     _output = to
+    _state_comp_wrapper = StateComputationWrapper[In, Out, State](_state_comp,
+      _output, _partition_function)
 
-  be add_shared_state(shared_state: BasicStep tag) =>
+  be add_shared_state(shared_state: BasicSharedStateStep tag) =>
     _shared_state = shared_state
 
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D) =>
     match msg_data
     | let input: In =>
       let start_time = Epoch.nanoseconds()
-      let sc: StateComputation[Out, State] val = _state_comp_builder(input)
-      let sc_wrapper = StateComputationWrapper[In, Out, State](sc,
-        _output, _partition_function(input))
-      _shared_state.send[StateProcessor[State] val](msg_id, source_ts,
-        ingress_ts, sc_wrapper)
+      _shared_state.send[In, State](msg_id, source_ts,
+        ingress_ts, input, _state_comp_wrapper)
       let end_time = Epoch.nanoseconds()
-      match _step_reporter
-      | let sr: StepReporter val =>
-        sr.report(start_time, end_time)
-      end
+      // match _step_reporter
+      // | let sr: StepReporter val =>
+      //   sr.report(start_time, end_time)
+      // end
     end
 
 actor SharedStateStep[State: Any #read]
-  is BasicStep
+  is BasicSharedStateStep
   var _step_reporter: (StepReporter val | None) = None
   var _state: State
 
@@ -390,17 +620,18 @@ actor SharedStateStep[State: Any #read]
   be add_step_reporter(sr: StepReporter val) =>
     _step_reporter = sr
 
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
-    msg_data: D) =>
-    match msg_data
-    | let sp: StateProcessor[State] val =>
+  be send[D: Any val, S: Any #read](msg_id: U64, source_ts: U64, 
+    ingress_ts: U64, msg_data: D, sp: StateProcessor[S] val) 
+  =>
+    match sp
+    | let s_processor: StateProcessor[State] val =>
       let start_time = Epoch.nanoseconds()
-      _state = sp(msg_id, source_ts, ingress_ts, _state)
+      _state = s_processor(msg_id, source_ts, ingress_ts, msg_data, _state)
       let end_time = Epoch.nanoseconds()
-      match _step_reporter
-      | let sr: StepReporter val =>
-        sr.report(start_time, end_time)
-      end
+      // match _step_reporter
+      // | let sr: StepReporter val =>
+      //   sr.report(start_time, end_time)
+      // end
     end
 
   be update_state(state: {(): State} val) =>
@@ -411,6 +642,7 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
   let _conns: Array[TCPConnection]
   let _metrics_collector: MetricsCollector tag
   let _pipeline_name: String
+  embed _write_buffer: WriteBuffer = WriteBuffer
 
   new create(array_stringify: ArrayStringify[In] val, conns: Array[TCPConnection] iso =
     recover Array[TCPConnection] end, m_coll: MetricsCollector tag,
@@ -423,7 +655,7 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
   be add_conn(conn: TCPConnection) =>
     _conns.push(conn)
 
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D) =>
     match msg_data
     | let input: In =>
@@ -439,15 +671,15 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
             end
           )
         end
-        let tcp_msg = FallorMsgEncoder(out)
+        let tcp_msg = FallorMsgEncoder(out, _write_buffer)
         for conn in _conns.values() do
           conn.writev(tcp_msg)
         end
         let now = Epoch.nanoseconds()
-        _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
-          msg_id, source_ts, now, _pipeline_name)
-        _metrics_collector.report_boundary_metrics(
-          BoundaryTypes.ingress_egress(), msg_id, ingress_ts, now)
+        // _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
+        //   msg_id, source_ts, now, _pipeline_name)
+        // _metrics_collector.report_boundary_metrics(
+        //   BoundaryTypes.ingress_egress(), msg_id, ingress_ts, now)
       end
     end
 

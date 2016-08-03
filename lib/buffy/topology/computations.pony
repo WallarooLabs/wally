@@ -17,30 +17,46 @@ interface PartitionFunction[In]
   fun apply(input: In): U64
 
 trait StateProcessor[State: Any #read]
-  fun apply(msg_id: U64, source_ts: U64, ingress_ts: U64, state: State): State
-  fun partition_id(): U64 => 0
+  fun apply(msg_id: U64, source_ts: U64, ingress_ts: U64, input: Any val,
+    state: State): State
+  fun partition_id(a: Any val): U64 => 0
 
-interface StateComputation[Out: Any val, State: Any #read]
-  fun apply(state: State, output: MessageTarget[Out] val): State
+interface StateComputation[In: Any val, Out: Any val, State: Any #read]
+  fun apply(input: In, state: State, output: MessageTarget[Out] val)
+    : State
+  fun name(): String
 
 class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
   is StateProcessor[State]
-  let _state_computation: StateComputation[Out, State] val
+  let _state_computation: StateComputation[In, Out, State] val
   let _output: BasicStep tag
-  let _partition_id: U64
+  let _partition_function: PartitionFunction[In] val
 
-  new val create(sc: StateComputation[Out, State] val,
-    output_step: BasicStep tag, p_id: U64 = 0) =>
+  new val create(sc: StateComputation[In, Out, State] val,
+    output_step: BasicStep tag, 
+    p_f: PartitionFunction[In] val = lambda(a: Any val): U64 => 0 end) 
+  =>
     _state_computation = sc
     _output = output_step
-    _partition_id = p_id
+    _partition_function = p_f
 
-  fun apply(msg_id: U64, source_ts: U64, ingress_ts: U64, state: State): State 
+  fun apply(msg_id: U64, source_ts: U64, ingress_ts: U64, input: Any val, 
+    state: State): State 
   =>
-    let target = MessageTarget[Out](_output, msg_id, source_ts, ingress_ts)
-    _state_computation(state, target)
+    match input
+    | let i: In =>
+      let target = MessageTarget[Out](_output, msg_id, source_ts, ingress_ts)
+      _state_computation(i, state, target)
+    else
+      state
+    end
 
-  fun partition_id(): U64 => _partition_id
+  fun partition_id(input: Any val): U64 => 
+    match input
+    | let i: In => _partition_function(i)
+    else
+      0
+    end
 
 class MessageTarget[Out: Any val]
   let _output: BasicStep tag
@@ -69,7 +85,7 @@ interface MapComputationBuilder[In, Out]
 
 interface StateComputationBuilder[In: Any val, Out: Any val,
   State: Any #read]
-  fun apply(): StateComputation[Out, State] iso^
+  fun apply(): StateComputation[In, Out, State] iso^
 
 trait ExternalProcessBuilder[In: Any val, Out: Any val]
   fun config(): ExternalProcessConfig val
@@ -79,6 +95,9 @@ trait ExternalProcessBuilder[In: Any val, Out: Any val]
 
 interface Parser[Out]
   fun apply(s: String): (Out | None) ?
+
+primitive IdentityParser is Parser[String]
+  fun apply(s: String): String => s
 
 interface Stringify[In]
   fun apply(i: In): String ?

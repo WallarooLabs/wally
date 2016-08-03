@@ -24,8 +24,10 @@ actor MetricsAccumulatorActor is MetricsOutputActor
     _promise = promise
 
   be apply(payload: ByteSeq) =>
-    _wb.u32_be(payload.size().u32())
-    _wb.write(payload)
+    if payload.size() > 0 then
+      _wb.u32_be(payload.size().u32())
+      _wb.write(payload)
+    end
 
   be written() =>
     _promise(_wb.done())
