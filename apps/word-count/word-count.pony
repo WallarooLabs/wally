@@ -13,12 +13,14 @@ actor Main
         Topology
           .new_pipeline[String, WordCount val](P, O, recover [0] end, 
             "Word Count")
-          .to_map[WordCount val](
-            lambda(): MapComputation[String, WordCount val] iso^ => Split end)
-          .to_stateful[WordCount val, WordCountTotals](
-            Count,
-            lambda(): WordCountTotals => WordCountTotals end,
-            0)
+          .coalesce[WordCount val]()
+            .to_map[WordCount val](
+              lambda(): MapComputation[String, WordCount val] iso^ => Split end)
+            .to_stateful[WordCount val, WordCountTotals](
+              Count,
+              lambda(): WordCountTotals => WordCountTotals end,
+              1)
+          .close()
           // .to_stateful_partition[WordCount val, WordCountTotals](
           //   recover
           //     StatePartitionConfig[WordCount val, WordCount val, WordCountTotals](
@@ -61,7 +63,7 @@ class Split is MapComputation[String, WordCount val]
     recover s.lower() end
 
 primitive Count is StateComputation[WordCount val, WordCount val, WordCountTotals]
-  fun name(): String => "Count"
+  fun name(): String => "count"
   fun apply(wc: WordCount val, state: WordCountTotals, 
     output: MessageTarget[WordCount val] val): WordCountTotals 
   =>
@@ -80,9 +82,9 @@ class WordCountTotals
   let words: Map[String, U64] = Map[String, U64]
 
   fun ref apply(value: WordCount val): WordCount val =>
-    words.upsert(value.word, value.count, 
-      lambda(x1: U64, x2: U64): U64 => x1 + x2 end)
     try
+      words.upsert(value.word, value.count, 
+        lambda(x1: U64, x2: U64): U64 => x1 + x2 end)
       WordCount(value.word, words(value.word))
     else
       value

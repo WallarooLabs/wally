@@ -18,10 +18,12 @@ class SourceNotifier[In: Any val] is TCPListenNotify
   let _parser: Parser[In] val
   let _local_step_builder: LocalStepBuilder val
   let _output: BasicStep tag
+  let _shared_state_step: (BasicSharedStateStep tag | None)
 
   new iso create(env: Env, source_host: String,
     source_service: String, source_id: U64, 
     coordinator: Coordinator, parser: Parser[In] val, output: BasicStep tag,
+    shared_state_step: (BasicSharedStateStep tag | None) = None,
     local_step_builder: LocalStepBuilder val = PassThroughStepBuilder[In, In])
   =>
     _env = env
@@ -30,6 +32,7 @@ class SourceNotifier[In: Any val] is TCPListenNotify
     _source_id = source_id
     _coordinator = coordinator
     _parser = parser
+    _shared_state_step = shared_state_step
     _local_step_builder = local_step_builder
     _output = output
 
@@ -43,7 +46,7 @@ class SourceNotifier[In: Any val] is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     SourceConnectNotify[In](_env, _source_id, _coordinator,
-      _parser, _output, _local_step_builder)
+      _parser, _output, _shared_state_step, _local_step_builder)
 
 class SourceConnectNotify[In: Any val] is TCPConnectionNotify
   let _guid_gen: GuidGenerator = GuidGenerator
@@ -57,6 +60,7 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
 
   new iso create(env: Env, source_id: U64, coordinator: Coordinator,
     parser: Parser[In] val, output: BasicStep tag,
+    shared_state_step: (BasicSharedStateStep tag | None),
     local_step_builder: LocalStepBuilder val) 
   =>
     _env = env
@@ -65,6 +69,13 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
     _parser = parser
     _local_step = local_step_builder.local()
     _local_step.add_output(output)
+    match _local_step
+    | let state_step: BasicStateLocalStep =>
+      match shared_state_step
+      | let ss: BasicSharedStateStep tag =>
+        state_step.add_shared_state(ss)
+      end
+    end
 
   fun ref accepted(conn: TCPConnection ref) =>
     ifdef debug then
