@@ -95,7 +95,7 @@ actor Main
         if required_args_are_present then
           let listener_addr = l_arg as Array[String]
 
-          let store = Store(env.root as AmbientAuth, no_write)
+          let store = Store(env.root as AmbientAuth)
           let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           SignalHandler(TermHandler(coordinator), Sig.term())
@@ -104,7 +104,7 @@ actor Main
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
             FromBuffyListenerNotify(coordinator, store, env.err, e_arg, 
-              use_metrics),
+              use_metrics, no_write),
             listener_addr(0),
             listener_addr(1))
 
@@ -127,16 +127,18 @@ class FromBuffyListenerNotify is TCPListenNotify
   let _stderr: StdStream
   let _expected: (USize | None)
   let _use_metrics: Bool
+  let _no_write: Bool
 
   new iso create(coordinator: Coordinator,
     store: Store, stderr: StdStream, expected: (USize | None) = None,
-    use_metrics: Bool = false)
+    use_metrics: Bool, no_write: Bool)
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
     _expected = expected
     _use_metrics = use_metrics
+    _no_write = no_write
 
   fun ref not_listening(listen: TCPListener ref) =>
     _coordinator.from_buffy_listener(listen, Failed)
@@ -145,7 +147,8 @@ class FromBuffyListenerNotify is TCPListenNotify
     _coordinator.from_buffy_listener(listen, Ready)
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    FromBuffyNotify(_coordinator, _store, _stderr, _expected, _use_metrics)
+    FromBuffyNotify(_coordinator, _store, _stderr, _expected, _use_metrics,
+      _no_write)
 
 class FromBuffyNotify is TCPConnectionNotify
   let _coordinator: Coordinator
@@ -158,17 +161,19 @@ class FromBuffyNotify is TCPConnectionNotify
   var _expect_termination: Bool = false
   let _metrics: Metrics tag = Metrics
   let _use_metrics: Bool 
+  let _no_write: Bool 
   var _closed: Bool = false
 
   new iso create(coordinator: Coordinator,
     store: Store, stderr: StdStream, 
-    expected: (USize | None) = None,
-    use_metrics: Bool = false)
+    expected: (USize | None),
+    use_metrics: Bool, no_write: Bool)
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
     _use_metrics = use_metrics
+    _no_write = no_write
     try
       if (expected as USize) > 0 then
         _expected = expected as USize
@@ -199,7 +204,9 @@ class FromBuffyNotify is TCPConnectionNotify
         _stderr.print("Blew up reading header from Buffy")
       end
     else
-      _store.received(consume data, Time.wall_to_nanos(Time.now()))
+      if not _no_write then
+        _store.received(consume data, Time.wall_to_nanos(Time.now()))
+      end
       if _expect_termination and (_remaining <= 0) then
         if not _closed then
           _stderr.print(_count.string() + " expected messages received. " +
@@ -398,23 +405,14 @@ actor Store
   let _received_file: (File | None)
   var _count: USize = 0
 
-  new create(auth: AmbientAuth, no_write: Bool = false) =>
+  new create(auth: AmbientAuth) =>
     _received_file = 
-      if no_write then
-        try
-          let f = File(FilePath(auth, "received.txt"))
-          f.set_length(0)
-          f.dispose()
-        end
-        None
+      try
+        let f = File(FilePath(auth, "received.txt"))
+        f.set_length(0)
+        f
       else
-        try
-          let f = File(FilePath(auth, "received.txt"))
-          f.set_length(0)
-          f
-        else
-          None
-        end
+        None
       end
 
   be received(msg: Array[U8] val, at: U64) =>
