@@ -205,10 +205,10 @@ class WordCountTotals
 
   fun ref apply(word: String, count: U64): WordCount val =>
     try
-     words.upsert(word, count,
+     let new_count = words.upsert(word, count,
       lambda(x1: U64, x2: U64): U64 => x1 + x2 end)
 
-      WordCount(word, words(word))
+      WordCount(word, new_count)
     else
       WordCount(word, count)
     end
