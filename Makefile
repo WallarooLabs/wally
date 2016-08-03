@@ -50,7 +50,8 @@ ifdef in_docker
 endif
 
 ifeq ($(arch),armhf)
-  ponyc_arch_args := --triple arm-unknown-linux-gnueabihf --cpu=armv7-a
+  ponyc_arch_args := --triple arm-unknown-linux-gnueabihf --link-arch armv7-a \
+                       --linker arm-linux-gnueabihf-gcc
 endif
 
 ifneq ($(arch),native)
