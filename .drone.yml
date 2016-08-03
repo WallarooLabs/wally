@@ -1,11 +1,11 @@
 debug: true
 
-# only build for master and tags
-branches:
-  - master
-  - python-buffy
-  - refs/tags/*
-  - add-monitoring-hub
+## only build for master and tags
+#branches:
+#  - master
+#  - python-buffy
+#  - refs/tags/*
+#  - add-monitoring-hub
 
 
 # clone source code with tags
