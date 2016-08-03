@@ -120,6 +120,9 @@ class ControlConnectNotify is TCPConnectionNotify
       | let m: SpinUpMsg val =>
         _env.err.print(_name + " is spinning up a step!")
         _coordinator.add_step(m.step_id, m.step_builder)
+      | let m: SpinUpSharedStateMsg val =>
+        _env.err.print(_name + " is spinning up a shared state step!")
+        _coordinator.add_shared_state_step(m.step_id, m.step_builder)
       | let m: SpinUpStateStepMsg val =>
         _env.err.print(_name + " is spinning up a state step!")
         _coordinator.add_state_step(m.step_id, m.step_builder,

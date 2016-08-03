@@ -19,6 +19,7 @@ actor Main
     var required_args_are_present = true
     var run_tests = env.args.size() == 1
     var use_metrics = false
+    var no_write = false
 
     if run_tests then
       TestMain(env)
@@ -37,6 +38,7 @@ actor Main
           .add("listen", "l", StringArgument)
           .add("expect", "e", I64Argument)
           .add("metrics", "m", None)
+          .add("no-write", "w", None)
 
         for option in options do
           match option
@@ -45,6 +47,7 @@ actor Main
           | ("listen", let arg: String) => l_arg = arg.split(":")
           | ("expect", let arg: I64) => e_arg = arg.usize()
           | ("metrics", None) => use_metrics = true
+          | ("no-write", None) => no_write = true
           | let err: ParseError =>
             err.report(env.err)
             required_args_are_present = false
@@ -92,7 +95,7 @@ actor Main
         if required_args_are_present then
           let listener_addr = l_arg as Array[String]
 
-          let store = Store(env.root as AmbientAuth)
+          let store = Store(env.root as AmbientAuth, no_write)
           let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           SignalHandler(TermHandler(coordinator), Sig.term())
@@ -154,6 +157,7 @@ class FromBuffyNotify is TCPConnectionNotify
   var _expect_termination: Bool = false
   let _metrics: Metrics tag = Metrics
   let _use_metrics: Bool 
+  var _closed: Bool = false
 
   new iso create(coordinator: Coordinator,
     store: Store, stderr: StdStream, 
@@ -196,12 +200,15 @@ class FromBuffyNotify is TCPConnectionNotify
     else
       _store.received(consume data, Time.wall_to_nanos(Time.now()))
       if _expect_termination and (_remaining <= 0) then
-        if _use_metrics then
-          _metrics.set_end(Time.nanos(), _expected)
+        if not _closed then
+          _stderr.print(_count.string() + " expected messages received. " +
+            "Terminating...")
+          if _use_metrics then
+            _metrics.set_end(Time.nanos(), _expected)
+          end
+          _coordinator.finished()
         end
-        _stderr.print(_count.string() + " expected messages received. " +
-          "Terminating...")
-        _coordinator.finished()
+        _closed = true
       else
         conn.expect(4)
         _header = true
@@ -390,14 +397,24 @@ actor Store
   let _received_file: (File | None)
   var _count: USize = 0
 
-  new create(auth: AmbientAuth) =>
-    _received_file = try
-      let f = File(FilePath(auth, "received.txt"))
-      f.set_length(0)
-      f
-    else
-      None
-    end
+  new create(auth: AmbientAuth, no_write: Bool = false) =>
+    _received_file = 
+      if no_write then
+        try
+          let f = File(FilePath(auth, "received.txt"))
+          f.set_length(0)
+          f.dispose()
+        end
+        None
+      else
+        try
+          let f = File(FilePath(auth, "received.txt"))
+          f.set_length(0)
+          f
+        else
+          None
+        end
+      end
 
   be received(msg: Array[U8] val, at: U64) =>
     match _received_file
