@@ -57,6 +57,12 @@ primitive WireMsgEncoder
     : Array[ByteSeq] val ? =>
     _encode(SpinUpMsg(step_id, step_builder), auth)
 
+  fun spin_up_shared_state(step_id: U64, 
+    step_builder: BasicSharedStateStepBuilder val, auth: AmbientAuth)
+    : Array[ByteSeq] val ? 
+  =>
+    _encode(SpinUpSharedStateMsg(step_id, step_builder), auth)
+
   fun spin_up_state_step(step_id: U64, step_builder: BasicStateStepBuilder val,
     shared_state_step_id: U64, shared_state_step_node: String, auth: AmbientAuth)
     : Array[ByteSeq] val ? =>
@@ -216,6 +222,14 @@ class SpinUpMsg is WireMsg
   let step_builder: BasicStepBuilder val
 
   new val create(s_id: U64, s_builder: BasicStepBuilder val) =>
+    step_id = s_id
+    step_builder = s_builder
+
+class SpinUpSharedStateMsg is WireMsg
+  let step_id: U64
+  let step_builder: BasicSharedStateStepBuilder val
+
+  new val create(s_id: U64, s_builder: BasicSharedStateStepBuilder val) =>
     step_id = s_id
     step_builder = s_builder
 

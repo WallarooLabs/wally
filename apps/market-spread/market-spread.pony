@@ -15,35 +15,26 @@ actor Main
   new create(env: Env) =>
     try
       let auth = env.root as AmbientAuth
-      let initial_market_data: Map[U64, {(): MarketData} val] iso = 
-        generate_initial_data(auth)
+      let initial_market_data = generate_initial_data(auth)
 
       let topology = recover val
         Topology
-          .new_pipeline[FixOrderMessage val, TradeResult val](
+          .new_pipeline[FixOrderMessage val, OrderResult val](
             TradeParser, ResultArrayStringify, recover [0, 1] end, "Orders")
-          .to_stateful_partition[TradeResult val, MarketData](
-            recover
-              StatePartitionConfig[FixOrderMessage val, TradeResult val,
-                MarketData](
-                lambda(): Computation[FixOrderMessage val, 
-                  CheckStatus val] iso^ => GenerateCheckStatus end,
-                lambda(): MarketData => MarketData end,
-                SymbolPartition, 1)
-              .with_initialization_map(consume initial_market_data)
-              .with_initialize_at_start()
-            end)
+          .to_stateful[OrderResult val, MarketData](
+            CheckStatus,
+            recover 
+              lambda()(initial_market_data): MarketData => 
+                MarketData.from(initial_market_data) end
+            end,
+            1)
           .build()
           .new_pipeline[FixNbboMessage val, None](NbboParser, NoneStringify,
             recover [2] end, "NBBO")
-          .to_stateful_partition[None, MarketData](
-            recover
-              StatePartitionConfig[FixNbboMessage val, None, MarketData](
-                lambda(): Computation[FixNbboMessage val, UpdateData val] iso^ 
-                  => GenerateUpdateData end,
-                lambda(): MarketData => MarketData end,
-                SymbolPartition, 1)
-            end)
+          .to_stateful[None, MarketData](
+            UpdateData,
+            lambda(): MarketData => MarketData end,
+            1)
           .build()
       end
       let sink_builders = recover Array[SinkNodeStepBuilder val] end
@@ -60,8 +51,9 @@ actor Main
     end
 
   fun generate_initial_data(auth: AmbientAuth): 
-    Map[U64, {(): MarketData} val] iso^ ? =>
-    let map = recover Map[U64, {(): MarketData} val] end
+    Map[String, MarketDataEntry val] val ? =>
+    let map: Map[String, MarketDataEntry val] iso = 
+      recover Map[String, MarketDataEntry val] end
     let path = FilePath(auth, "./demos/marketspread/100nbbo.msg")
     let data_source = FileDataSource(auth, path)
     for line in consume data_source do
@@ -74,11 +66,8 @@ actor Main
             (((nbbo.offer_px() - nbbo.bid_px()) / mid) >= 0.05)
 
         let partition_id = nbbo.symbol().hash()       
-        map(partition_id) = recover 
-            lambda()(nbbo, is_rejected): MarketData => 
-              MarketData.update(nbbo.symbol(), 
-                MarketDataEntry(is_rejected, nbbo.bid_px(), nbbo.offer_px())) end
-          end
+        map(nbbo.symbol()) =  
+          MarketDataEntry(is_rejected, nbbo.bid_px(), nbbo.offer_px())
       end
     end
     consume map
@@ -104,18 +93,25 @@ class MarketDataEntry
   let bid: F64
   let offer: F64
 
-  new create(is_rej: Bool, b: F64, o: F64) =>
+  new val create(is_rej: Bool, b: F64, o: F64) =>
     is_rejected = is_rej
     bid = b
     offer = o
 
 class MarketData
-  let _entries: Map[String, MarketDataEntry] = 
-    Map[String, MarketDataEntry]
+  let _entries: Map[String, MarketDataEntry val] = 
+    Map[String, MarketDataEntry val]
   
-  fun ref apply(symbol: String): MarketDataEntry ? => _entries(symbol) 
+  new create() => None
 
-  fun ref update(symbol: String, entry: MarketDataEntry): MarketData =>
+  new from(md: Map[String, MarketDataEntry val] val) =>
+    for (key, value) in md.pairs() do
+      _entries(key) = value
+    end
+
+  fun ref apply(symbol: String): MarketDataEntry val ? => _entries(symbol) 
+
+  fun ref update(symbol: String, entry: MarketDataEntry val): MarketData =>
     _entries(symbol) = entry
     this
 
@@ -128,64 +124,47 @@ class MarketData
 
   fun contains(symbol: String): Bool => _entries.contains(symbol)
 
-class GenerateUpdateData is Computation[FixNbboMessage val, UpdateData val]
+class UpdateData is StateComputation[FixNbboMessage val, None, MarketData]
   fun name(): String => "Update Market Data"
-  fun apply(nbbo: FixNbboMessage val): UpdateData val =>
-    UpdateData(nbbo)
-
-class UpdateData is StateComputation[None, MarketData]
-  let _nbbo: FixNbboMessage val
-
-  new val create(nbbo: FixNbboMessage val) =>
-    _nbbo = nbbo
-
-  fun name(): String => "Update Market Data"
-  fun apply(state: MarketData, output: MessageTarget[None] val): MarketData =>
-    if ((_nbbo.offer_px() - _nbbo.bid_px()) >= 0.05) or
-      (((_nbbo.offer_px() - _nbbo.bid_px()) / _nbbo.mid()) >= 0.05) then
+  fun apply(nbbo: FixNbboMessage val, state: MarketData, 
+    output: MessageTarget[None] val): MarketData =>
+    if ((nbbo.offer_px() - nbbo.bid_px()) >= 0.05) or
+      (((nbbo.offer_px() - nbbo.bid_px()) / nbbo.mid()) >= 0.05) then
       output(None)
-      state.update(_nbbo.symbol(), MarketDataEntry(true, _nbbo.bid_px(), 
-        _nbbo.offer_px()))
+      state.update(nbbo.symbol(), MarketDataEntry(true, nbbo.bid_px(), 
+        nbbo.offer_px()))
     else
       output(None)
-      state.update(_nbbo.symbol(), MarketDataEntry(false, _nbbo.bid_px(), 
-        _nbbo.offer_px()))
+      state.update(nbbo.symbol(), MarketDataEntry(false, nbbo.bid_px(), 
+        nbbo.offer_px()))
     end
 
-class GenerateCheckStatus is Computation[FixOrderMessage val, CheckStatus val]
-  fun name(): String => "Check Order Status"
-  fun apply(order: FixOrderMessage val): CheckStatus val =>
-    CheckStatus(order)
-
-class CheckStatus is StateComputation[TradeResult val, MarketData]
-  let _trade: FixOrderMessage val
-
-  new val create(trade: FixOrderMessage val) =>
-    _trade = trade
-
+class CheckStatus is StateComputation[FixOrderMessage val, OrderResult val, 
+  MarketData]
   fun name(): String => "Check Order Result"
-  fun apply(state: MarketData, output: MessageTarget[TradeResult val] val):
+  fun apply(order: FixOrderMessage val, state: MarketData, 
+    output: MessageTarget[OrderResult val] val):
     MarketData =>
-    let symbol = _trade.symbol()
+    let symbol = order.symbol()
     let market_data_entry = 
       if state.contains(symbol) then
         try
-          state(_trade.symbol())
+          state(order.symbol())
         else
           MarketDataEntry(true, 0, 0)
         end
       else
         MarketDataEntry(true, 0, 0)
       end
-    let result: TradeResult val = TradeResult(_trade.order_id(),
-      Epoch.seconds(), _trade.account(), _trade.symbol(), 
-      _trade.price(), _trade.order_qty().u64(), _trade.side().string(), 
+    let result: OrderResult val = OrderResult(order.order_id(),
+      Epoch.seconds(), order.account(), order.symbol(), 
+      order.price(), order.order_qty().u64(), order.side().string(), 
       market_data_entry.bid, market_data_entry.offer, 
       market_data_entry.is_rejected)
     output(result)
     state
  
-class TradeResult
+class OrderResult
   let order_id: String
   let timestamp: U64
   let client_id: String
@@ -248,11 +227,11 @@ class TradeParser is Parser[FixOrderMessage val]
     end
 
 class ResultStringify
-  fun apply(input: TradeResult val): String =>
+  fun apply(input: OrderResult val): String =>
     input.string()
 
 primitive ResultArrayStringify
-  fun apply(input: TradeResult val): Array[String] val =>
+  fun apply(input: OrderResult val): Array[String] val =>
     let result: Array[String] iso = recover Array[String] end
     result.push(input.symbol)
     result.push(input.order_id)

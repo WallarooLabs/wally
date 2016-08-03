@@ -20,7 +20,7 @@ class StartupBuffyNode
     var options = Options(env, false)
     var leader_control_addr = Array[String]
     var leader_data_addr = Array[String]
-    var source_addrs = Array[String]
+    var source_addrs: Array[String] iso = recover Array[String] end
     var sink_addrs = Array[String]
     var app_name: String = ""
     var spike_delay = false
@@ -142,19 +142,20 @@ class StartupBuffyNode
           return
         end
         // Set up source listeners
-        for i in Range(0, source_count) do
-          let source_addr: Array[String] = source_addrs(i).split(":")
-          let source_host = source_addr(0)
-          let source_service = source_addr(1)
-          let source_notifier: TCPListenNotify iso = SourceNotifier(env,
-            source_host, source_service, i.u64(), step_manager, coordinator,
-            metrics_collector)
-          coordinator.add_listener(TCPListener(auth, consume source_notifier,
-            source_host, source_service))
-        end
+        // for i in Range(0, source_count) do
+        //   let source_addr: Array[String] = source_addrs(i).split(":")
+        //   let source_host = source_addr(0)
+        //   let source_service = source_addr(1)
+        //   let source_notifier: TCPListenNotify iso = SourceNotifier[String](
+        //     env, source_host, source_service, i.u64(), 
+        //     coordinator, IdentityParser, EmptyStep)
+        //   coordinator.add_listener(TCPListener(auth, consume source_notifier,
+        //     source_host, source_service))
+        // end
         let topology_manager: TopologyManager = TopologyManager(env, auth,
           node_name, worker_count, leader_control_host, leader_control_service,
-          leader_data_host, leader_data_service, coordinator, topology)
+          leader_data_host, leader_data_service, coordinator, topology,
+          consume source_addrs)
 
         coordinator.add_topology_manager(topology_manager)
 
