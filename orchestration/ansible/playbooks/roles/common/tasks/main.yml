@@ -1,3 +1,7 @@
+- name: Get groups for ssh user
+  command: groups {{ ansible_ssh_user }}
+  register: my_groups
+
 - name: Add sendence group
   group: name=sendence state=present gid=1111
 
@@ -7,6 +11,7 @@
     uid: 1111
     group: sendence
     shell: /bin/bash
+    groups: "{{ my_groups.stdout.split(':')[1] | replace(' ', ',') }}"
 
 - name: Copy ssh keys for sendence user
   command: creates=/home/sendence/.ssh cp -rf /home/{{ ansible_user_id }}/.ssh /home/sendence/
@@ -98,4 +103,12 @@
     dest=/usr/
     copy=no
   with_items: custom_libs
+
+- name: apply kernel tweaks
+  script: kerneltweaks.sh > /kerneltweaks.out
+  when: ('vagrant' != '{{ ansible_ssh_user }}')
+
+- name: create cpu shield
+  script: create_cpu_shield.sh {{ num_system_cpus }} > /create_cpu_shield.out
+  when: ('vagrant' != '{{ ansible_ssh_user }}' and {{ num_system_cpus is defined }})
 

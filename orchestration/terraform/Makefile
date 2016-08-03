@@ -18,6 +18,14 @@ force_instance ?= ## Force a specific instance type (for use_automagic_instances
 ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
 num_leaders ?= ## Number of leader nodes (1 by default)
 num_followers ?= ## Number of follower nodes (2 by default)
+ansible_num_system_cpus ?= ## Number of cpus to dedicate for system processes (the rest are isolated for user processes)
+
+# set arguments for ansible num_system_cpus variable
+ifeq ($(ansible_num_system_cpus),)
+  ansible_num_sys_cpus_arg :=
+else
+  ansible_num_sys_cpus_arg := num_system_cpus=$(ansible_num_system_cpus)
+endif
 
 # set arguments for ansible parallelism
 ifeq ($(ansible_parallelism),default)
@@ -206,7 +214,8 @@ configure: check-cluster-name ## Configure nodes using ansible
 	ansible-playbook $(ansible_parallelism_arg) --vault-password-file $(ansible_vault_password) -i\
           ../ansible/ec2.py --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
-          aws_region=$(region)" -u ubuntu ../ansible/playbooks/aws.yml
+          aws_region=$(region) $(ansible_num_sys_cpus_arg)" -u ubuntu \
+          ../ansible/playbooks/aws.yml
 	@echo "\033[36m==> Successfully ran ansible playbook for cluster \
 '$(cluster_name)' in region '$(region)'!\033[0m"
 

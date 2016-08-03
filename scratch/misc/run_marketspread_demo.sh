@@ -1,4 +1,7 @@
-#!/bin/bash -evx
+#!/bin/bash -e
+
+echo -e "\033[0;31m"WARNING! This is a hacky script and not guaranteed to work. It is run with set -e and will exit on the first error encountered.'\033[0m'
+
 
 if [ $# -ne 2 ]; then
   echo "Must supply two arguments:"

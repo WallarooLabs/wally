@@ -55,7 +55,7 @@ variable "leader_max_nodes" {
 
 variable "leader_min_nodes" {
   description = "Minimum number of leader nodes."
-  default = "1"
+  default = "0"
 }
 
 variable "leader_default_nodes" {
@@ -85,7 +85,7 @@ variable "follower_max_nodes" {
 
 variable "follower_min_nodes" {
   description = "Minimum number of follower nodes."
-  default = "1"
+  default = "0"
 }
 
 variable "follower_default_nodes" {
