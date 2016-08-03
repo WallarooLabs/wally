@@ -45,7 +45,7 @@ endif
 
 ifdef in_docker
   ifeq (,$(filter $(in_docker),false true))
-    $(error Unknown in_docker option "$(use_docker)")
+    $(error Unknown in_docker option "$(in_docker)")
   endif
 endif
 
@@ -55,15 +55,16 @@ ifeq ($(arch),armhf)
 endif
 
 ifneq ($(arch),native)
-  quote = '
-  ponyc_docker_args = docker run --rm -it $(docker_user_arg) -v \
+  ifneq ($(in_docker),true)
+    quote = '
+    ponyc_docker_args = docker run --rm -it $(docker_user_arg) -v \
         $(current_dir):$(current_dir) \
         -v $(HOME)/.gitconfig:/.gitconfig \
         -v $(HOME)/.gitconfig:/root/.gitconfig \
         -w $(current_dir)/$(1) --entrypoint bash \
         $(ponyc_runner):$(ponyc_tag) -c $(quote)
 
-  monhub_docker_args = docker run --rm -it -v \
+    monhub_docker_args = docker run --rm -it -v \
         $(current_dir):$(current_dir) \
         -v $(HOME)/.gitconfig:/.gitconfig \
         -v $(HOME)/.gitconfig:/root/.gitconfig \
@@ -71,6 +72,7 @@ ifneq ($(arch),native)
         -v $(HOME)/.git-credential-cache:/.git-credential-cache \
         -w $(current_dir)/$(1) --entrypoint bash \
         $(docker_image_repo_host)/$(monhub_builder):$(monhub_builder_tag) -c $(quote)
+  endif
 endif
 
 
