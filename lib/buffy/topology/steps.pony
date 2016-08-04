@@ -41,7 +41,8 @@ trait BasicSharedStateStep
 actor EmptyStep is BasicStep
   be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D) =>
-    None
+    @printf[I32]("EmptyStep: A step has not been configured properly\n"
+      .cstring())
 
 actor EmptySharedStateStep is BasicSharedStateStep
   be send[D: Any val, State: Any #read](msg_id: U64, source_ts: U64, 
@@ -107,7 +108,10 @@ class ComputationStep[In: Any val, Out: Any val] is BasicOutputComputationStep
     msg_data: D) => 
     match msg_data
     | let input: In =>
-      _output.send[Out](msg_id, source_ts, ingress_ts, _f(input))
+      match _f(input)
+      | let o: Out =>
+        _output.send[Out](msg_id, source_ts, ingress_ts, o)
+      end
     end
 
   fun ref add_local_output(to: BasicComputationStep) =>
@@ -255,7 +259,10 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
     match msg_data
     | let input: In =>
       let start_time = Epoch.nanoseconds()
-      _output.send[Out](msg_id, source_ts, ingress_ts, _f(input))
+      match _f(input)
+      | let o: Out =>
+        _output.send[Out](msg_id, source_ts, ingress_ts, o)
+      end
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
       // | let sr: StepReporter val =>
@@ -282,7 +289,10 @@ class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
     match msg_data
     | let input: In =>
       let start_time = Epoch.nanoseconds()
-      _output.send[Out](msg_id, source_ts, ingress_ts, _f(input))
+      match _f(input)
+      | let o: Out =>
+        _output.send[Out](msg_id, source_ts, ingress_ts, o)
+      end
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
       // | let sr: StepReporter val =>
@@ -346,67 +356,6 @@ class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
       // | let sr: StepReporter val =>
       //   sr.report(start_time, end_time)
       // end
-    end
-
-actor Source[Out: Any val] is ThroughStep[String, Out]
-  var _input_parser: Parser[Out] val
-  var _output: BasicStep tag = EmptyStep
-  var _step_reporter: (StepReporter val | None) = None
-
-  new create(input_parser: Parser[Out] val) =>
-    _input_parser = input_parser
-
-  be add_step_reporter(sr: StepReporter val) =>
-    _step_reporter = sr
-
-  be add_output(to: BasicStep tag) =>
-    _output = to
-
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
-    msg_data: D) =>
-    match msg_data
-    | let input: String =>
-      try
-        let start_time = Epoch.nanoseconds()
-        match _input_parser(input)
-        | let res: Out =>
-          _output.send[Out](msg_id, source_ts, ingress_ts, res)
-          let end_time = Epoch.nanoseconds()
-          match _step_reporter
-          | let sr: StepReporter val =>
-            sr.report(start_time, end_time)
-          end
-        end
-      else
-        @printf[I32]("Could not process incoming Message at source\n".cstring())
-      end
-    end
-
-actor PassThrough is BasicOutputStep
-  var _output: (BasicStep tag | None) = None
-  let _initial_queue: Array[(U64, U64, U64, Any val)] =
-    Array[(U64, U64, U64, Any val)]
-
-  be add_output(to: BasicStep tag) => _output = to
-
-  be add_output_and_send[D: Any val](to: BasicStep tag) =>
-    _output = to
-    for msg in _initial_queue.values() do
-      match msg._4
-      | let data: D =>
-        to.send[D](msg._1, msg._2, msg._3, data)
-      else
-        @printf[I32]("Queued passthrough message of unknown type\n".cstring())
-      end
-    end
-    _initial_queue.clear()
-
-  be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
-    msg_data: D) =>
-    match _output
-    | let s: BasicStep tag => s.send[D](msg_id, source_ts, ingress_ts, msg_data)
-    else
-      _initial_queue.push((msg_id, source_ts, ingress_ts, msg_data))
     end
 
 class PassThroughLocalStep is BasicOutputLocalStep

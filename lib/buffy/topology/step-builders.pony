@@ -219,20 +219,6 @@ class CoalesceStepBuilder[In: Any val, Out: Any val]
 //   fun name(): String => _name
 //   fun state_id(): U64 => _state_id
 
-class SourceBuilder[Out: Any val]
-  is ThroughStepBuilder[String, Out]
-  let _parser: Parser[Out] val
-  let _pipeline_name: String
-
-  new val create(p: Parser[Out] val, pipeline_name: String) =>
-    _parser = p
-    _pipeline_name = pipeline_name
-
-  fun apply(): BasicStep tag =>
-    Source[Out](_parser)
-
-  fun name(): String => _pipeline_name + " Source"
-
 class StepBuilder[In: Any val, Out: Any val]
   is (ThroughStepBuilder[In, Out] & LocalStepBuilder)
   let _computation_builder: ComputationBuilder[In, Out] val
@@ -267,10 +253,8 @@ class MapStepBuilder[In: Any val, Out: Any val]
 
   fun name(): String => _name
 
-class PassThroughStepBuilder[In: Any val, Out: Any val]
-  is (ThroughStepBuilder[In, Out] & LocalStepBuilder)
-  fun apply(): BasicStep tag =>
-    PassThrough
+class PassThroughStepBuilder[In: Any val, Out: Any val] is LocalStepBuilder
+  fun apply(): BasicStep tag => EmptyStep
 
   fun local(): BasicOutputLocalStep =>
     PassThroughLocalStep
