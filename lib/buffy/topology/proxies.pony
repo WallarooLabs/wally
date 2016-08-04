@@ -61,15 +61,22 @@ actor StepManager
     coordinator: Coordinator tag) =>
     try
       let target_step = _steps(target_id)
+      let shared_state = 
+        try
+          let l = local_step_builder as LocalStepBuilder val
+          let state_id = l.state_id() as U64
+          let ss = _shared_state_steps(state_id)
+          ss
+        else
+          None 
+        end
       let auth = _env.root as AmbientAuth
       pipeline.initialize_source(source_id, host, service, 
-        _env, auth, coordinator, target_step, local_step_builder) 
+        _env, auth, coordinator, target_step, local_step_builder,
+        shared_state) 
     else
       _env.err.print("StepManager: Could not initialize source")
     end
-
-
-    None
 
   be passthrough_to_step[D: Any val](step_id: U64, 
     passthrough: BasicOutputStep tag) =>
@@ -95,8 +102,10 @@ actor StepManager
 
   be add_shared_state_step(step_id: U64, 
     step_builder: BasicSharedStateStepBuilder val) =>
-    let step = step_builder()
-    _shared_state_steps(step_id) = step
+    if not _shared_state_steps.contains(step_id) then
+      let step = step_builder()
+      _shared_state_steps(step_id) = step
+    end
 
   be add_partition_step_and_ack(step_id: U64,
     partition_id: U64, partition_report_id: U64, 
