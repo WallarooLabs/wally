@@ -62,7 +62,7 @@ trait ByteLengthEncoder
     Given a header, determine the size of the message to follow in bytes
     """  
 
-actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
+actor ExternalProcessStep[In: Any val, Out: Any val] is (ThroughStep[In, Out] & DisposableStep)
   let _config: ExternalProcessConfig val
   let _codec: ExternalProcessCodec[In, Out] val
   let _length_encoder: ByteLengthEncoder val
@@ -105,12 +105,7 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
     end,
     "External process not running. Not sent")
 
-  // TODO: our steps do not have init/shutdown hooks so write external
-  // processes are not notified of termination but they find out by way of 
-  // accident when stdin is closed and they notify us with false exit errors
-  // because of this. instead we should have a hook within buffy to have each
-  // steps terminate() be called before the topology is shutdown.
-  be terminate() =>
+  be dispose() =>
     _execute_with_process(lambda(p: ProcessMonitor)(codec=_codec, length_encoder=_length_encoder) =>
       let poison_pill = codec.shutdown_signal()
       let encoded_pill = length_encoder(poison_pill)

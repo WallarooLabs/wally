@@ -22,7 +22,6 @@ class wordlength {
         public ExternalMessage<String> decode(byte[] msgAsBytes, Buffy buffy) {
             String msgAsString = new String(msgAsBytes);
             try {
-                buffy.log("Decoding: " + msgAsString);
                 String[] msgParts = msgAsString.split(SEPARATOR);
                 return new ExternalMessage<String>(msgParts[0],
                     msgParts[1],
@@ -45,8 +44,7 @@ class wordlength {
         }
 
         public boolean isShutdownSignal(byte[] signal, Buffy buffy) {
-            //TODO: shutdown signals not working on pony-buffy side yet
-            return false;
+            return signal != null && new String(signal).equals("POISON");
         }
     }  
 }

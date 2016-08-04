@@ -25,6 +25,9 @@ trait OutputStep[Out] is BasicOutputStep
 
 trait ThroughStep[In, Out] is (ComputeStep[In] & OutputStep[Out])
 
+trait DisposableStep
+  be dispose()
+
 trait ThroughStateStep[In: Any val, Out: Any val, State: Any #read] is (BasicStateStep &
   ThroughStep[In, Out])
 

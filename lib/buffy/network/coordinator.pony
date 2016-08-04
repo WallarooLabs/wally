@@ -27,6 +27,7 @@ actor Coordinator
     = Map[String, DataReceiver]
   let _control_addrs: Map[String, (String, String)] = Map[String, (String, String)]
   let _data_addrs: Map[String, (String, String)] = Map[String, (String, String)]
+  let _disposable_steps: Array[DisposableStep tag] = Array[DisposableStep tag]
   let _spike_config: SpikeConfig val
   let _metrics_collector: MetricsCollector
   let _is_worker: Bool
@@ -154,7 +155,7 @@ actor Coordinator
       target_id, host, service, local_step_builder, this)
 
   be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
-    _step_manager.add_step(step_id, step_builder)
+    _step_manager.add_step(step_id, step_builder, this)
 
   be add_state_step(step_id: U64, ssb: BasicStateStepBuilder val,
     shared_state_step_id: U64, shared_state_step_node: String) =>
@@ -366,9 +367,16 @@ actor Coordinator
   ////////////
   // SHUTDOWN
   ////////////
+  be add_disposable_step(step: DisposableStep tag) =>
+    _disposable_steps.push(step)
+
   be shutdown() =>
     try
       let shutdown_msg = WireMsgEncoder.shutdown(_node_name, _auth)
+
+      for step in _disposable_steps.values() do
+        step.dispose()
+      end
 
       for listener in _listeners.values() do
         listener.dispose()

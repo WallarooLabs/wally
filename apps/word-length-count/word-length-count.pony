@@ -9,7 +9,7 @@ actor Main
   Instructions for running:
   1. Update config: ./apps/word-length-count/word-length-count-java.ini 
     to match your environment
-  2. Build pony: make build-buffy-components && make build-word-length-count && make build-wesley 
+  2. Build pony: rm -rf apps/word-length-count/word-length-count && make build-buffy-components && make build-word-length-count && make build-wesley 
   3. Build java: cd ./external-lang-api/java/ && mvn clean install && cd - & cd ./apps/word-length-count/ && mvn clean package && cd -
   4. Run: make dagon-word-length-count
   """
