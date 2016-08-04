@@ -78,18 +78,6 @@ actor StepManager
       _env.err.print("StepManager: Could not initialize source")
     end
 
-  be passthrough_to_step[D: Any val](step_id: U64, 
-    passthrough: BasicOutputStep tag) =>
-    try
-      let step = _steps(step_id) 
-      match passthrough
-      | let p: PassThrough tag =>   
-        p.add_output_and_send[D](step)
-      end
-    else
-      _env.err.print("StepManager: Error setting up passthrough.")
-    end
-
   be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
     let step = step_builder()
     match step
