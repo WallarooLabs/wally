@@ -465,16 +465,12 @@ actor ProcessManager
             argsbuilder.push("--" + key + "=" + sections(section)(key))
           | "wrapper_path" =>
             wrapper_path = sections(section)(key)
-          | "wrapper_args_1" =>
-            wrapper_args.push(sections(section)(key))
-          | "wrapper_args_2" =>
-            wrapper_args.push(sections(section)(key))
-          | "extra_args_3" =>
-            wrapper_args.push(sections(section)(key))
-          | "wrapper_args_4" =>
-            wrapper_args.push(sections(section)(key))
           else
-            argsbuilder.push("--" + key + "=" + sections(section)(key))
+           if key.at("wrapper_args") then
+             wrapper_args.push(sections(section)(key))
+           else
+             argsbuilder.push("--" + key + "=" + sections(section)(key))
+           end
           end
         end
         argsbuilder.push("--phone-home=" + _host + ":" + _service)
