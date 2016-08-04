@@ -25,7 +25,9 @@ trait PipelineSteps
   fun name(): String
   fun initialize_source(source_id: U64, host: String, service: String, 
     env: Env, auth: AmbientAuth, coordinator: Coordinator, 
-    output: BasicStep tag, local_step_builder: (LocalStepBuilder val | None))
+    output: BasicStep tag, 
+    local_step_builder: (LocalStepBuilder val | None),
+    shared_state_step: (BasicSharedStateStep tag | None) = None)  
   fun sink_builder(): SinkBuilder val
   fun sink_target_ids(): Array[U64] val
   fun apply(i: USize): PipelineStep box ?
@@ -53,16 +55,20 @@ class Pipeline[In: Any val, Out: Any val] is PipelineSteps
 
   fun initialize_source(source_id: U64, host: String, service: String, 
     env: Env, auth: AmbientAuth, coordinator: Coordinator, 
-    output: BasicStep tag, local_step_builder: (LocalStepBuilder val | None))
+    output: BasicStep tag, 
+    local_step_builder: (LocalStepBuilder val | None),
+    shared_state_step: (BasicSharedStateStep tag | None))
   =>
     let source_notifier: TCPListenNotify iso = 
       match local_step_builder
       | let l: LocalStepBuilder val =>
         SourceNotifier[In](
-          env, host, service, source_id, coordinator, _parser, output, l)
+          env, host, service, source_id, coordinator, _parser, output, 
+          shared_state_step, l)
       else
         SourceNotifier[In](
-          env, host, service, source_id, coordinator, _parser, output)
+          env, host, service, source_id, coordinator, _parser, output,
+          shared_state_step)
       end
     coordinator.add_listener(TCPListener(auth, consume source_notifier,
       host, service))
@@ -100,10 +106,10 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _t = t
     _p = p
 
-  fun ref coalesce[CIn: Any val, COut: Any val](id: U64 = 0): 
-    CoalesceBuilder[CIn, COut, In, Out, Last] 
+  fun ref coalesce[COut: Any val](id: U64 = 0): 
+    CoalesceBuilder[Last, COut, In, Out, Last] 
   =>
-    CoalesceBuilder[CIn, COut, In, Out, Last](_t, _p where id = id)
+    CoalesceBuilder[Last, COut, In, Out, Last](_t, _p where id = id)
 
   fun ref to[Next: Any val](
     comp_builder: ComputationBuilder[Last, Next] val, id: U64 = 0)
@@ -184,9 +190,26 @@ class CoalesceBuilder[CIn: Any val, COut: Any val, PIn: Any val,
     : CoalesceBuilder[CIn, COut, PIn, POut, Next] 
   =>
     _builders.push(
-      TypedBasicOutputComputationStepBuilder[Last, Next](comp_builder)
+      ComputationStepBuilder[Last, Next](comp_builder)
     )
     CoalesceBuilder[CIn, COut, PIn, POut, Next](_t, _p, _builders, _id)    
+
+  fun ref to_map[Next: Any val](
+    comp_builder: MapComputationBuilder[Last, Next] val, id: U64 = 0)
+    : CoalesceBuilder[CIn, COut, PIn, POut, Next] 
+  =>
+    _builders.push(
+      MapComputationStepBuilder[Last, Next](comp_builder)
+    )
+    CoalesceBuilder[CIn, COut, PIn, POut, Next](_t, _p, _builders, _id)    
+
+  fun ref to_stateful[Next: Any val, State: Any ref](
+    state_comp: StateComputation[Last, Next, State] val,
+    state_initializer: {(): State} val, state_id: U64, id: U64 = 0)
+      : CoalesceStateBuilder[CIn, COut, PIn, POut, Last, Next, State] =>
+    CoalesceStateBuilder[CIn, COut, PIn, POut, Last, Next, State](
+      _t, _p, state_comp, state_initializer, state_id, _builders, id
+    )
 
   fun ref close(): PipelineBuilder[PIn, POut, COut] =>
     let builders: Array[BasicOutputComputationStepBuilder val] iso = 
@@ -196,6 +219,46 @@ class CoalesceBuilder[CIn: Any val, COut: Any val, PIn: Any val,
     end
     let coalesce_step_builder: CoalesceStepBuilder[CIn, COut] val =
       CoalesceStepBuilder[CIn, COut](consume builders)
+    let next_step = PipelineThroughStep[CIn, COut](coalesce_step_builder, _id)
+    _p.add_step(next_step)
+    PipelineBuilder[PIn, POut, COut](_t, _p)
+
+class CoalesceStateBuilder[CIn: Any val, COut: Any val, PIn: Any val, 
+  POut: Any val, Last: Any val, Next: Any val, State: Any #read] 
+  let _t: Topology
+  let _p: Pipeline[PIn, POut]
+  let _builders: Array[BasicOutputComputationStepBuilder val]
+  let _id: U64
+  let _state_id: U64
+  let _shared_state_step_builder: SharedStateStepBuilder[State] val
+
+  new create(t: Topology, p: Pipeline[PIn, POut],
+    s_comp: StateComputation[Last, Next, State] val,
+    state_initializer: {(): State} val,
+    state_id: U64,
+    builders: Array[BasicOutputComputationStepBuilder val], id: U64) 
+  =>
+    _t = t
+    _p = p
+    _builders = builders
+    _id = id
+    _state_id = state_id
+    _builders.push(
+      StateLocalStepBuilder[Last, Next, State](s_comp, state_initializer,
+        state_id)
+    )
+    _shared_state_step_builder = 
+      SharedStateStepBuilder[State](state_initializer)
+
+  fun ref close(): PipelineBuilder[PIn, POut, COut] =>
+    let builders: Array[BasicOutputComputationStepBuilder val] iso = 
+      recover Array[BasicOutputComputationStepBuilder val] end
+    for b in _builders.values() do
+      builders.push(b)
+    end
+    let coalesce_step_builder: CoalesceStepBuilder[CIn, COut] val =
+      CoalesceStepBuilder[CIn, COut](consume builders, _state_id, 
+        _shared_state_step_builder)
     let next_step = PipelineThroughStep[CIn, COut](coalesce_step_builder, _id)
     _p.add_step(next_step)
     PipelineBuilder[PIn, POut, COut](_t, _p)
