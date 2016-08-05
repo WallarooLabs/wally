@@ -6,7 +6,9 @@ set -euox pipefail
 echo tsc > /sys/devices/system/clocksource/clocksource0/current_clocksource # change clocksource
 echo never > /sys/kernel/mm/transparent_hugepage/enabled # disable transparent hugepages
 echo 1000000000 > /proc/sys/vm/nr_overcommit_hugepages # enable hugepages
+sysctl -w vm.min_free_kbytes=8000000   # keep memory in reserve for when processes request it
 sysctl -w vm.swappiness=0                       # change swappiness
+sysctl -w vm.zone_reclaim_mode=0                       # disable zone reclaim on numa nodes
 sysctl -w kernel.sched_migration_cost_ns=5000000
 sysctl -w kernel.sched_autogroup_enabled=0
 sysctl -w kernel.sched_latency_ns=36000000

@@ -274,7 +274,8 @@ setup_ci_arg: tmp_ci_args=$(if $(filter $(use_automagic_instances),true),$(if \
        "$(availability_zone)" $(no_spot_arg) --instance_type "$(force_instance)")))
 setup_ci_arg: # set up automagic instances arg
 	@echo $(if $(filter $(exists),{), $(if \
-          $(in_cluster),$(error Can't create an existing cluster! Use apply instead.)))
+          $(in_cluster),$(error Can't create an existing cluster! Use apply \
+          instead to modify it.)))
 	@echo $(if $(filter $(use_automagic_instances),true),"\033[36m==> Using \
 automagic instance logic...\033[0m",\
           "\033[36m==> Not using automagic instance logic...\033[0m")
