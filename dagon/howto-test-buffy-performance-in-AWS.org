@@ -515,6 +515,59 @@ processes running on these cores any longer.
 This is exactly what we want because pony will take care of
 managing/spreading it’s own threads.
 
+** Running Double-Divide with Tuning Enabled
+Giles receiver:
+#+BEGIN_SRC sh
+sudo cset proc -s user -e numactl -- -C 2-5 chrt -f 80 \
+ giles/receiver/receiver -l 127.0.0.1:8000 --ponythreads 1 \
+ -e 1000000 -m -w
+#+END_SRC
+
+Buffy:
+#+BEGIN_SRC sh
+sudo cset proc -s user -e numactl -- -C 6-12 chrt -f 80 \
+ apps/double-divide/double-divide -l -w 0 -c 127.0.0.1:6000 \
+ -d 127.0.0.1:6001 -r 127.0.0.1:7000 -k 127.0.0.1:8000 \
+ -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 3
+#+END_SRC
+
+Giles sender:
+#+BEGIN_SRC sh
+sudo cset proc -s user -e numactl -- -C 13-15 chrt -f 80 \
+ giles/sender/sender -b 127.0.0.1:7000 -m 1000000 \
+ --ponythreads 1 -s 500
+#+END_SRC
+
+** Running Market-Spread with Tuning Enabled
+Giles receiver:
+#+BEGIN_SRC sh
+sudo cset proc -s user -e numactl -- -C 2-4 chrt -f 80 \
+ giles/receiver/receiver -l 127.0.0.1:8000 --ponythreads 1 \
+ -e 1000000 -m -w
+#+END_SRC
+
+Buffy:
+#+BEGIN_SRC sh
+sudo cset proc -s user -e numactl -- -C 5-11 chrt -f 80 \
+ apps/market-spread/market-spread -l -w 0 -c 127.0.0.1:6000 \
+ -d 127.0.0.1:6001 -r 127.0.0.1:7000,127.0.0.1:7001 \
+ -k 127.0.0.1:8000,127.0.0.1:8001,127.0.0.1:8002 -n leader \
+ -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 3
+#+END_SRC
+
+Giles sender:
+#+BEGIN_SRC sh
+sudo cset proc -s user -e numactl -- -C 12-13 chrt -f 80 \
+ giles/sender/sender -b 127.0.0.1:7000 -m 1000000 \
+ -f ./demos/marketspread/trades.msg -r \
+ --ponythreads 1 -s 500
+
+sudo cset proc -s user -e numactl -- -C 14-15 chrt -f 80 \
+ giles/sender/sender -b 127.0.0.1:7001 -m 1000000 \
+ -f ./demos/marketspread/nbbo.msg -r \
+ --ponythreads 1 -s 500
+#+END_SRC
+
 
 
 ** Documentation Links
