@@ -1241,19 +1241,19 @@ class ProcessClient is ProcessNotify
     _name= name
     _p_mgr = p_mgr
 
-  fun ref stdout(data: Array[U8] iso) =>
+  fun ref stdout(process: ProcessMonitor ref, data: Array[U8] iso) =>
     let out = String.from_array(consume data)
     _env.out.print("dagon: " + _name + " STDOUT [")
     _env.out.print(out)
     _env.out.print("dagon: " + _name + " STDOUT ]")
 
-  fun ref stderr(data: Array[U8] iso) =>
+  fun ref stderr(process: ProcessMonitor ref, data: Array[U8] iso) =>
     let err = String.from_array(consume data)
     _env.out.print("dagon: " + _name + " STDERR [")
     _env.out.print(err)
     _env.out.print("dagon: " + _name + " STDERR ]")
 
-  fun ref failed(err: ProcessError) =>
+  fun ref failed(process: ProcessMonitor ref, err: ProcessError) =>
     match err
     | ExecveError   => _env.out.print("dagon: ProcessError: ExecveError")
     | PipeError     => _env.out.print("dagon: ProcessError: PipeError")
@@ -1270,7 +1270,7 @@ class ProcessClient is ProcessNotify
       _env.out.print("dagon: Unknown ProcessError!")
     end
 
-  fun ref dispose(child_exit_code: I32) =>
+  fun ref dispose(process: ProcessMonitor ref, child_exit_code: I32) =>
     _env.out.print("dagon: " + _name + " exited with exit code: "
       + child_exit_code.string())
     _p_mgr.received_exit_code(_name)
