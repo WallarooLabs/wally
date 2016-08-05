@@ -3,7 +3,7 @@ use "buffy/topology/external"
 use "collections"
 
 interface Computation[In, Out]
-  fun ref apply(input: In): Out
+  fun ref apply(input: In): (Out | None)
   fun name(): String
 
 interface MapComputation[In, Out]

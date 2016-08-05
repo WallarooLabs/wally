@@ -192,7 +192,7 @@ class ExternalProcessNotifier[In: Any val, Out: Any val] is ProcessNotify
     _step = step
     _length_encoder = length_encoder
 
-  fun ref stdout(data: Array[U8] iso) =>
+  fun ref stdout(process: ProcessMonitor ref, data: Array[U8] iso) =>
     _buffer.append(consume data)
 
     let msg_header_size: USize = _length_encoder.msg_header_length()
@@ -243,10 +243,10 @@ class ExternalProcessNotifier[In: Any val, Out: Any val] is ProcessNotify
     end
     consume holder
 
-  fun ref stderr(data: Array[U8] iso) =>
+  fun ref stderr(process: ProcessMonitor ref, data: Array[U8] iso) =>
     _log(String.from_array(consume data))
 
-  fun ref failed(err: ProcessError) =>
+  fun ref failed(process: ProcessMonitor ref, err: ProcessError) =>
     if not is_recoverable(err) then
       _step._mark_completed()
     end
@@ -274,7 +274,7 @@ class ExternalProcessNotifier[In: Any val, Out: Any val] is ProcessNotify
     // both.
     true 
 
-  fun dispose(child_exit_code: I32) =>
+  fun dispose(process: ProcessMonitor ref, child_exit_code: I32) =>
     let code: I32 = consume child_exit_code
     _log("External process exited:" + code.string())
     _step._mark_process_exited() 

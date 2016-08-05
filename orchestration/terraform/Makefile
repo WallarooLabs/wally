@@ -19,6 +19,15 @@ ansible_parallelism ?= default## Number of machines to process in parallel for A
 num_leaders ?= ## Number of leader nodes (1 by default)
 num_followers ?= ## Number of follower nodes (2 by default)
 ansible_num_system_cpus ?= ## Number of cpus to dedicate for system processes (the rest are isolated for user processes)
+ansible_isolcpus ?= false## Use isolcpus kernel boot param
+
+# Make sure we have a valid value for ansible_isolcpus
+ifdef ansible_isolcpus
+  ifeq (,$(filter $(ansible_isolcpus),false true))
+    $(error Unknown ansible_isolcpus option "$(ansible_isolcpus). \
+      Valid options are 'true' and 'false'")
+  endif
+endif
 
 # set arguments for ansible num_system_cpus variable
 ifeq ($(ansible_num_system_cpus),)
@@ -211,10 +220,12 @@ configure: check-cluster-name ## Configure nodes using ansible
           password file ($(ansible_vault_password)) is missing!))
 	@echo "\033[36m==> Running ansible playbook for cluster \
 '$(cluster_name)' in region '$(region)'...\033[0m"
-	ansible-playbook $(ansible_parallelism_arg) --vault-password-file $(ansible_vault_password) -i\
+	ansible-playbook $(ansible_parallelism_arg) --vault-password-file \
+          $(ansible_vault_password) -i \
           ../ansible/ec2.py --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
-          aws_region=$(region) $(ansible_num_sys_cpus_arg)" -u ubuntu \
+          aws_region=$(region) isolcpus=$(ansible_isolcpus) \
+          $(ansible_num_sys_cpus_arg)" -u ubuntu \
           ../ansible/playbooks/aws.yml
 	@echo "\033[36m==> Successfully ran ansible playbook for cluster \
 '$(cluster_name)' in region '$(region)'!\033[0m"
@@ -263,7 +274,8 @@ setup_ci_arg: tmp_ci_args=$(if $(filter $(use_automagic_instances),true),$(if \
        "$(availability_zone)" $(no_spot_arg) --instance_type "$(force_instance)")))
 setup_ci_arg: # set up automagic instances arg
 	@echo $(if $(filter $(exists),{), $(if \
-          $(in_cluster),$(error Can't create an existing cluster! Use apply instead.)))
+          $(in_cluster),$(error Can't create an existing cluster! Use apply \
+          instead to modify it.)))
 	@echo $(if $(filter $(use_automagic_instances),true),"\033[36m==> Using \
 automagic instance logic...\033[0m",\
           "\033[36m==> Not using automagic instance logic...\033[0m")
