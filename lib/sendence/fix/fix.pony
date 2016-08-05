@@ -44,9 +44,11 @@ primitive  FixParser
       error
     end
 
+    let account = i("1").substring(6).u32()
+
     FixOrderMessage(
       side
-      , i("1")
+      , account
       , i("11")
       , i("55")
       , i("38").f64()
@@ -94,7 +96,7 @@ class FixNbboMessage is (Equatable[FixNbboMessage] & Stringable)
 
 class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
   let _side: Side val
-  let _account: String
+  let _account: U32
   let _order_id: String
   let _symbol: String
   let _order_qty: F64
@@ -103,7 +105,7 @@ class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
 
   new val create(
     side': Side val
-    , account': String
+    , account': U32
     , order_id': String
     , symbol': String
     , order_qty': F64
@@ -120,7 +122,7 @@ class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
     _transact_time = transact_time'
 
   fun side(): Side val => _side
-  fun account(): String => _account
+  fun account(): U32 => _account
   fun order_id(): String => _order_id
   fun symbol(): String => _symbol
   fun order_qty(): F64 => _order_qty
@@ -137,7 +139,15 @@ class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
     and (_transact_time == o._transact_time)
 
   fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-    "FixOrderMessage".string(fmt)
+    (_side.string()
+      + "," + _account.string()
+      + "," + _order_id
+      + "," + _symbol
+      + "," + _order_qty.string()
+      + "," + _price.string()
+      + "," + _transact_time).clone()
+  // fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+    // "FixOrderMessage".string(fmt)
 
 
 primitive OtherFixMessage

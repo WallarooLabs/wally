@@ -1,7 +1,7 @@
-use "buffered"
 use "collections"
 use "buffy/messages"
 use "net"
+use "buffered"
 use "buffy/metrics"
 use "sendence/messages"
 use "sendence/guid"

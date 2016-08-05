@@ -1,7 +1,7 @@
-use "buffered"
 use "promises"
 use "sendence/bytes"
 use "net"
+use "buffered"
 
 primitive MetricsCategories
   fun sinks(): String => "source-sink-metrics"

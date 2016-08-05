@@ -1,6 +1,6 @@
-use "buffered"
 use "collections"
 use "net"
+use "buffered"
 use "options"
 use "time"
 use "sendence/fix"
@@ -41,6 +41,8 @@ class IncomingNotify is TCPConnectionNotify
         let s = String.from_array(consume data)
         match FixParser(s)
         | let m: FixOrderMessage val =>
+          @printf[I32]("Parsed Fix\n".cstring())        
+
           _sender.write(m.string())
         else
           @printf[I32]("Error parsing Fix\n".cstring())

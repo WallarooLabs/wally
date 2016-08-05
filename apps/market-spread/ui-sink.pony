@@ -14,9 +14,9 @@ class ClientSummary
     rejected_total = rejected_total + 1
 
 class RejectedResultStore
-  let client_order_counts: Map[String, ClientSummary] = 
-    Map[String, ClientSummary]
-  let client_orders_updated: Set[String] = Set[String]
+  let client_order_counts: Map[U32, ClientSummary] = 
+    Map[U32, ClientSummary]
+  let client_orders_updated: Set[U32] = Set[U32]
   let rejected: Array[OrderResult val] = Array[OrderResult val]
 
   fun ref add_result(tr: OrderResult val) =>
@@ -42,7 +42,7 @@ class MarketSpreadSinkCollector is SinkCollector[RejectedResultStore]
       let symbol = input(0)
       let order_id = input(1)
       let timestamp = input(2).u64()
-      let client_id = input(3)
+      let client_id = input(3).u32()
       let price = input(4).f64()
       let qty = input(5).u64()
       let side = input(6)
@@ -93,7 +93,7 @@ class MarketSpreadSinkStringify
       let next = recover Map[String, JsonType] end
       next("order_id") = order.order_id
       next("timestamp") = order.timestamp.i64()
-      next("client_id") = order.client_id
+      next("client_id") = order.client_id.i64()
       next("symbol") = order.symbol
       next("price") = order.price
       next("qty") = order.qty.i64()
@@ -112,7 +112,7 @@ class MarketSpreadSinkStringify
     for client_id in diff.client_orders_updated.values() do
       try
         let next = recover Map[String, JsonType] end
-        next("client_id") = client_id
+        next("client_id") = client_id.i64()
         next("total_orders") = diff.client_order_counts(client_id).total
         next("rejected_count") = 
           diff.client_order_counts(client_id).rejected_total

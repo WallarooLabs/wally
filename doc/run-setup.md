@@ -137,7 +137,7 @@ TOP
 ---------------------------------
 
 ```
-top | grep 'buffy\|double\|word-count\|market-spread'
+top | grep 'buffy\|double\|word-count\|market-spread\|passthrough'
 ```
 
 ---------------------------------
