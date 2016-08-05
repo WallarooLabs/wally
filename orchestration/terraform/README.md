@@ -155,13 +155,13 @@ of CPU] values):
   `make destroy cluster_name=sample`
 * Create a cluster using spot pricing and m3.medium instances (and not using 
   automagic instance logic):
-  `make apply use_automagic_instances=false terraform_args="-var leader_spot_price=0.02 -var follower_spot_price=0.02 -var leader_instance_type=m3.medium -var follower_instance_type=m3.medium"`
+  `make apply use_automagic_instances=false terraform_args="-var leader_spot_price=0.02 -var follower_spot_price=0.02 -var leader_instance_type=m3.medium -var follower_instance_type=m3.medium" cluster_name=example`
 * Create a cluster using placement group and m4.large instances (and not
   using automagic instance logic):
-  `make apply use_automagic_instances=false use_placement_group=true terraform_args="-var leader_instance_type=m4.large -var follower_instance_type=m4.large"`
+  `make apply use_automagic_instances=false use_placement_group=true terraform_args="-var leader_instance_type=m4.large -var follower_instance_type=m4.large" cluster_name=example`
 * Create a cluster using placement group and m4.xlarge instances and spot pricing
   (and not using automagic instance logic):
-  `make apply use_automagic_instances=false use_placement_group=true terraform_args="-var leader_spot_price=0.05 -var follower_spot_price=0.05 -var leader_instance_type=m4.large -var follower_instance_type=m4.large"`
+  `make apply use_automagic_instances=false use_placement_group=true terraform_args="-var leader_spot_price=0.05 -var follower_spot_price=0.05 -var leader_instance_type=m4.large -var follower_instance_type=m4.large" cluster_name=example`
 * Create and configure (with ansible) a cluster with name `sample`:
   `make cluster cluster_name=sample`
 * Create and configure (with ansible) a cluster with name `sample` in region
@@ -172,8 +172,8 @@ of CPU] values):
   `make cluster cluster_name=sample region=us-east-1 availability_zone=us-east-1a`
 * Create and configure (with ansible) a cluster with name `example` where
   the instances have at least 8 cpus and 16 GB of RAM:
-  `make cluster mem_required=16 cpus_required=8`
+  `make cluster mem_required=16 cpus_required=8 cluster_name=example`
 * Create and configure (with ansible) a cluster with name `example` where
   the instances have at least 8 cpus and 16 GB of RAM and don't use spot pricing:
-  `make cluster mem_required=16 cpus_required=8 no_spot=true`
+  `make cluster mem_required=16 cpus_required=8 no_spot=true cluster_name=example`
 

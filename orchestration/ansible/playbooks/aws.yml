@@ -11,6 +11,17 @@
   tasks:
   - name: Create a group of all followers for buffy
     group_by: key=buffy-followers
+  - name: set hostname
+    hostname: name=buffy-follower-{{ groups['buffy-followers'].index(inventory_hostname) + 1 }}
+    become: yes
+  - name: "Add hostname to hosts file"
+    lineinfile:
+      dest: /etc/hosts
+      regexp: .*buffy-follower-{{ groups['buffy-followers'].index(inventory_hostname) + 1 }}$
+      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} buffy-follower-{{ groups['buffy-followers'].index(inventory_hostname) + 1 }}"
+      state: present
+    become: yes
+
 
 - hosts: tag_Project_buffy:&tag_Role_leader:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
   vars:
@@ -20,6 +31,16 @@
     group_by: key=buffy-leaders
   - name: Set IPs for ptpd unicast
     set_fact: ptpd_destinations="{% if groups['buffy-followers'] is defined %}{% for host in groups['buffy-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}{% else %}127.0.0.1{% endif %}"
+  - name: set hostname
+    hostname: name=buffy-leader-{{ groups['buffy-leaders'].index(inventory_hostname) + 1 }}
+    become: yes
+  - name: "Add hostname to hosts file"
+    lineinfile:
+      dest: /etc/hosts
+      regexp: .*buffy-leader-{{ groups['buffy-leaders'].index(inventory_hostname) + 1 }}$
+      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} buffy-leader-{{ groups['buffy-leaders'].index(inventory_hostname) + 1 }}"
+      state: present
+    become: yes
 
 - hosts: buffy-leaders:buffy-followers
   tasks:
@@ -30,6 +51,16 @@
 - hosts: buffy-all
   roles:
   - { role: common, become: yes }
+  tasks:
+  - name: Gather ec2 facts
+    action: ec2_facts
+  - name: Rename ec2 instance name tag
+    ec2_tag:
+      region: "{{ ansible_ec2_placement_region }}"
+      resource: "{{ ansible_ec2_instance_id }}"
+      state: present
+      tags:
+        Name: "{{ cluster_name }}:{{ ansible_hostname }}"
 
 # Configure and deploy leader servers.
 - hosts: buffy-leaders
@@ -41,7 +72,7 @@
     ptpd_transport: unicast
     swarm_image: swarm
     consul_image: gliderlabs/consul
-    docker_users: ubuntu
+    docker_users: [ ubuntu, sendence ]
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
@@ -57,7 +88,7 @@
     leader_ip: "{{ hostvars[groups['buffy-leaders'][0]]['ansible_' + ethernet_interface]['ipv4']['address'] }}"
     swarm_image: swarm
     consul_image: gliderlabs/consul
-    docker_users: ubuntu
+    docker_users: [ ubuntu, sendence ]
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
