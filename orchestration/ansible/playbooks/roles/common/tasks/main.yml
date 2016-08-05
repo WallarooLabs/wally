@@ -82,7 +82,9 @@
    - htop
    - numactl
    - cpuset
-
+   - linux-tools-{{ ansible_kernel }}
+   - trace-cmd
+   - stress-ng
 
 - name: Install python3 click
   pip: name=click executable=pip3
