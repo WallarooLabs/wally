@@ -1,3 +1,10 @@
+
+* Preparations
+** Disable Docker TLS
+Follow these instructions to disable TLS encryption between your
+docker host and the docker daemon running inside the VM.
+[[https://coderwall.com/p/siqnjg/disable-tls-on-boot2docker][https://coderwall.com/p/siqnjg/disable-tls-on-boot2docker]]
+
 * How to test Dagon Process
 ** Context
 1. We are running the double-divice test
