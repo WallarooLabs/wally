@@ -7,6 +7,8 @@ value. e.g. 3->bin:4, 4->bin:4, 5->bin:8, etc.
 """
   let _counts: Array[U64] ref
   let _max_val: U64 = U64.max_value()
+  var _min: (U64|None) = None
+  var _max: (U64|None) = None
 
   new ref create() =>
     _counts = Array[U64].init(0, 65)
@@ -33,16 +35,47 @@ value. e.g. 3->bin:4, 4->bin:4, 5->bin:8, etc.
 		let idx = get_idx(v)
     try
       _counts.update(idx, _counts(idx) + 1)
+      try
+        if v < (_min as U64) then _min = v end
+      else
+        _min = v
+      end
+      try
+        if v > (_max as U64) then _max = v end
+      else
+        _max = v
+      end
     end
 
   fun ref update(i: USize, v: U64) ? =>
   """
   Update the value at index i to v, overwriting any existing value in that bin,
   raising an error if index is out of bounds.
+  The values of `min()` and `max()` are updated as if the minimum value of the
+  bin was counted for `min()` and as if the maximum value of the bin was counted
+  for `max()`.
   """
     _counts.update(i, v)
+    let mi = pow2(i-1)
+    let ma = pow2(i)
+    try
+      if mi < (_min as U64) then _min = mi end
+    else
+      _min = mi
+    end
+    try
+      if ma > (_max as U64) then _max = ma end
+    else
+      _max = ma
+    end
 
-fun ref add(h: PowersOf2Histogram): PowersOf2Histogram ref =>
+  fun max(): U64 ? =>
+    (_max as U64)
+
+  fun min(): U64 ? =>
+    (_min as U64)
+
+  fun ref add(h: PowersOf2Histogram): PowersOf2Histogram ref =>
   """
   Add another histogram to the current histogram, returning a new histogram.
   """
@@ -66,6 +99,9 @@ fun ref add(h: PowersOf2Histogram): PowersOf2Histogram ref =>
       end
     end
     consume h'
+
+  fun pow2(i: USize): U64 =>
+		U64(1) << i.u64()
 
 	fun idx_pairs(): ArrayPairs[U64, this->Array[U64]]^ =>
 		_counts.pairs()
