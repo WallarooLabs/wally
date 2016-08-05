@@ -320,3 +320,218 @@ docker run -u 0 \
 Performance tests using containers on a Docker Swarm cluster on top of EC2 nodes need to optimize the following parameters:
 - Use placement groups
 - Use high network bandwidth instance types
+* Dipin Tuning
+NOTE: It is possible to reconfigure a cluster by using the appropriate
+make command with =configure= instead of =cluster=.
+
+**  ISOCPUS Off
+Make cluster of 1 leader node only with 2 cpus reserved for system use
+and the rest for user processes and the =isolcpus= boot option
+disabled.
+
+*** (create) 
+#+BEGIN_SRC sh
+make cluster cluster_name=dh num_followers=0 \
+ force_instance=c3.4xlarge ansible_num_system_cpus=2
+#+END_SRC
+
+*** (configure) 
+#+BEGIN_SRC sh
+make configure cluster_name=dh num_followers=0 \
+ force_instance=c3.4xlarge ansible_num_system_cpus=2
+#+END_SRC
+
+** ISOCPUS On 
+Make cluster of 1 leader node only with 2 cpus reserved for
+system use and the rest for user processes and the =isolcpus= boot
+option enabled.
+
+*** (create) 
+#+BEGIN_SRC sh
+make cluster cluster_name=dh num_followers=0 \
+force_instance=c3.4xlarge ansible_num_system_cpus=2 ansible_isolcpus=true
+#+END_SRC
+Result:
+#+BEGIN_EXAMPLE
+PLAY RECAP *********************************************************************
+54.165.9.39                : ok=70   changed=39   unreachable=0    failed=0
+#+END_EXAMPLE
+
+*** (configure) 
+#+BEGIN_SRC sh
+make configure cluster_name=dh num_followers=0 \
+force_instance=c3.4xlarge ansible_num_system_cpus=2 ansible_isolcpus=true
+#+END_SRC
+
+** Run stress-ng to burn cpu on all cores within default/system cpuset
+#+BEGIN_SRC sh
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@54.165.9.39
+sudo apt-get install -y stress-ng
+stress-ng --cpu 0 --cpu-method all -t 1m
+#+END_SRC
+
+*** Confirm CPU is Pinned
+In another shell, run htop to confirm cpu is pinned into system
+isolated cpus.
+
+#+BEGIN_SRC sh
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@54.165.9.39
+htop
+#+END_SRC
+
+** Run stress-ng to burn cpu on all cores within user cpuset
+Must use sudo else command is executed in default/system cpuset
+silently.
+
+#+BEGIN_SRC sh
+sudo cset proc -s user -e stress-ng -- --cpu 0 --cpu-method all -t 1m
+#+END_SRC
+
+*** Confirm CPU is Pinned
+In another shell, run =htop= to confirm cpu is pinned into user isolated
+cpus. 
+
+** NUMACTL
+Run =stress-ng= to burn cpu within user cpuset bound to specific
+cpu nodes via =numactl=.
+
+Note: Must use sudo else command is executed in default/system cpuset silently.
+
+#+BEGIN_SRC sh
+sudo cset proc -s user -e numactl -- -C 4-6 stress-ng --cpu 14 \
+ --cpu-method all -t 1m
+#+END_SRC
+
+*** Confirm CPU is Pinned
+In another shell, run htop to confirm cpu is pinned into user isolated
+cpus.
+#+BEGIN_SRC sh
+htop
+#+END_SRC
+
+** Taskset
+Run stress-ng to burn cpu within user cpuset bound to specific cpu
+nodes via =taskset=.
+
+Note: Must use sudo else command is executed in default/system cpuset
+silently.
+
+#+BEGIN_SRC sh
+sudo cset proc -s user -e taskset -- -c 4-6 stress-ng --cpu 14 \
+ --cpu-method all -t 1m
+#+END_SRC
+
+*** Confirm CPU is Pinned
+In another shell, run htop to confirm cpu is pinned into user isolated
+cpus.
+#+BEGIN_SRC sh
+htop
+#+END_SRC
+
+** Taskset with =chrt SCHED_FIFO=
+Run =stress-ng= to burn cpu within user cpuset bound to specific cpu
+nodes via =taskset= using =chrt= to run with =SCHED_FIFO= scheduling.
+
+Note: Must use sudo else command is executed in default/system cpuset
+silently.
+
+#+BEGIN_SRC sh
+sudo cset proc -s user -e taskset -- -c 4-6 chrt -f 80 \
+ stress-ng --cpu 14 --cpu-method all -t 1m
+#+END_SRC
+
+*** Confirm CPU is Pinned
+In another shell, run htop to confirm cpu is pinned into user isolated
+cpus.
+#+BEGIN_SRC sh
+htop
+#+END_SRC
+
+*** Check Scheduling Priority
+Run the command below to check scheduling priority of stress-ng.
+#+BEGIN_SRC sh
+ps aux | grep -i stress-ng | grep -v grep | grep -v sudo | \
+ grep -v docker | awk '{print $2}' | xargs -L 1 chrt -p
+#+END_SRC
+
+** Run stress-ng in docker to burn cpu on all cores
+#+BEGIN_SRC sh
+docker run -it --privileged  -v /usr/bin:/usr/bin:ro  \
+ -v /var/run/docker.sock:/var/run/docker.sock  -v /bin:/bin:ro \
+ -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro \
+ --entrypoint stress-ng \
+ docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-683-g6680f9e \
+ --cpu 0 --cpu-method all -t 1m
+#+END_SRC
+
+*** Check CPU is Pinned
+In another shell, run htop to confirm cpu is pinned into all cpus.
+#+BEGIN_SRC sh
+htop
+#+END_SRC
+
+** Docker CPUset Feature
+Run stress-ng in docker to burn cpu bound to specific cpu nodes using
+docker cpuset feature.
+#+BEGIN_SRC sh
+docker run -it --privileged  -v /usr/bin:/usr/bin:ro  \
+ -v /var/run/docker.sock:/var/run/docker.sock  -v /bin:/bin:ro  \
+ -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro \
+ --entrypoint stress-ng --cpuset-cpus 4-6 \
+ docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-683-g6680f9e \
+ --cpu 0 --cpu-method all -t 1m
+#+END_SRC
+
+** Docker CPUset and Chrt SCHED_FIFO
+Run stress-ng in docker to burn cpu bound to specific cpu nodes using
+docker cpuset feature using chrt to run with SCHED_FIFO scheduling.
+
+Note: Must use sudo else command is executed in default/system cpuset
+silently.
+#+BEGIN_SRC sh
+docker run -it --privileged  -v /usr/bin:/usr/bin:ro  \
+ -v /var/run/docker.sock:/var/run/docker.sock  -v /bin:/bin:ro  \
+ -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro \
+ --entrypoint chrt --cpuset-cpus 4-6 \
+ docker.sendence.com:5043/sendence/dagon.amd64:sendence-2.3.0-683-g6680f9e \
+ -f 80 stress-ng --cpu 14 --cpu-method all -t 1m
+#+END_SRC
+
+
+*** Confirm CPU is Pinned
+In another shell, run htop to confirm cpu is pinned into user isolated
+cpus and run the command below to check scheduling priority of =stress-ng=.
+#+BEGIN_SRC sh
+ps aux | grep -i stress-ng | grep -v grep | grep -v sudo | \
+ grep -v docker | awk '{print $2}' | xargs -L 1 chrt -p
+#+END_SRC
+
+
+*** NOTE
+When using =ansible_isolcpus=true= as a make argument the
+workload for =stress-ng= is not spread across cpus automatigally anymore
+because the linux kernel doesn’t manage thread load balancing for
+processes running on these cores any longer. 
+This is exactly what we want because pony will take care of
+managing/spreading it’s own threads.
+
+
+
+** Documentation Links
+*** Links
+1. https://github.com/lpechacek/cpuset/blob/master/doc/tutorial.txt
+2. http://stackoverflow.com/questions/9392415/linux-sched-other-sched-fifo-and-sched-rr-differences
+3. http://linux.die.net/man/1/chrt
+4. http://linux.die.net/man/1/taskset
+5. http://linux.die.net/man/8/numactl
+
+*** Script for Kernel Tweaks
+(sysctl stuff, etc)
+#+BEGIN_SRC 
+<buffy repo>/orchestration/ansible/playbooks/roles/common/files/kerneltweaks.sh
+#+END_SRC
+
+*** Script That Creates the Cpusets to Isolate Cpu Cores
+#+BEGIN_SRC sh
+<buffy repo>/orchestration/ansible/playbooks/roles/common/files/create_cpu_shield.sh
+#+END_SRC
