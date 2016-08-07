@@ -1,6 +1,7 @@
 """
 Giles Sender
 """
+use "buffered"
 use "collections"
 use "files"
 use "net"
@@ -340,7 +341,7 @@ actor SendingActor
   var _finished: Bool = false
   let _batch_size: USize
   let _interval: U64
-  let _wb: WriteBuffer
+  let _wb: Writer
   // let _msg_encoder: BufferedExternalMsgEncoder
 
   new create(messages_to_send: USize,
@@ -359,7 +360,7 @@ actor SendingActor
     _timers = Timers
     _batch_size = batch_size
     _interval = interval
-    _wb = WriteBuffer
+    _wb = Writer
     // _msg_encoder = BufferedExternalMsgEncoder(where chunks = _batch_size)
 
   be go() =>

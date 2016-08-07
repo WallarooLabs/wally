@@ -1,3 +1,4 @@
+use "buffered"
 use "collections"
 use "net"
 use "options"
@@ -116,7 +117,7 @@ actor State
   let _expected: USize
   let _sender: TCPConnection
   let _metrics: Metrics
-  let buffer: WriteBuffer = WriteBuffer
+  let buffer: Writer = Writer
   let _size: USize = 64
   let words: Map[String, U64] = Map[String, U64]
 
@@ -308,7 +309,7 @@ actor Metrics
 primitive Bytes
   fun length_encode(data: ByteSeq val): Array[ByteSeq] val =>
     let len: U32 = data.size().u32()
-    let wb = WriteBuffer
+    let wb = Writer
     wb.u32_be(len)
     wb.write(data)
     wb.done()

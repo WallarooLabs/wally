@@ -1,3 +1,4 @@
+use "buffered"
 use "collections"
 use "net"
 use "options"
@@ -127,7 +128,7 @@ actor LastPass
   let _expected: USize
   let _sender: TCPConnection
   let _metrics: Metrics
-  let _buffer: WriteBuffer = WriteBuffer
+  let _buffer: Writer = Writer
 
   new create(sender: TCPConnection, metrics: Metrics, expected: USize) =>
     _sender = sender
@@ -161,7 +162,7 @@ actor Metrics
   var next_start_t: U64 = 0
   var end_t: U64 = 0
 
-  be set_start(s: U64) => 
+  be set_start(s: U64) =>
     if start_t != 0 then
       next_start_t = s
     else
@@ -169,13 +170,13 @@ actor Metrics
     end
     @printf[I32]("Start: %zu\n".cstring(), start_t)
 
-  be set_end(e: U64, expected: USize) => 
+  be set_end(e: U64, expected: USize) =>
     end_t = e
     let overall = (end_t - start_t).f64() / 1_000_000_000
     let throughput = ((expected.f64() / overall) / 1_000).usize()
     @printf[I32]("End: %zu\n".cstring(), end_t)
-    @printf[I32]("Overall: %f\n".cstring(), overall) 
-    @printf[I32]("Throughput: %zuk\n".cstring(), throughput) 
+    @printf[I32]("Overall: %f\n".cstring(), overall)
+    @printf[I32]("Throughput: %zuk\n".cstring(), throughput)
     start_t = next_start_t
     next_start_t = 0
     end_t = 0
@@ -183,7 +184,7 @@ actor Metrics
 primitive Bytes
   fun length_encode(data: ByteSeq val): Array[ByteSeq] val =>
     let len: U32 = data.size().u32()
-    let wb = WriteBuffer
+    let wb = Writer
     wb.u32_be(len)
     wb.write(data)
     wb.done()

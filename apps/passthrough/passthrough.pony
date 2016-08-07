@@ -1,3 +1,4 @@
+use "buffered"
 use "collections"
 use "net"
 use "options"
@@ -144,7 +145,7 @@ actor Metrics
 primitive Bytes
   fun length_encode(data: ByteSeq val): Array[ByteSeq] val =>
     let len: U32 = data.size().u32()
-    let wb = WriteBuffer
+    let wb = Writer
     wb.u32_be(len)
     wb.write(data)
     wb.done()

@@ -1,3 +1,4 @@
+use "buffered"
 use "promises"
 use "sendence/bytes"
 use "net"
@@ -17,7 +18,7 @@ interface MetricsCollectionOutputHandler
   fun dispose(): None val => None
 
 actor MetricsAccumulatorActor is MetricsOutputActor
-  let _wb: WriteBuffer = WriteBuffer
+  let _wb: Writer = Writer
   let _promise: Promise[Array[ByteSeq] val]
 
   new create(promise: Promise[Array[ByteSeq] val]) =>

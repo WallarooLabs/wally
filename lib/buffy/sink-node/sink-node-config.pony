@@ -1,3 +1,4 @@
+use "buffered"
 use "net"
 use "../topology"
 use "sendence/bytes"
@@ -10,9 +11,9 @@ class SinkNodeConfig[Diff: Any #read] is SinkNodeStepBuilder
   let collector_builder: {(): SinkCollector[Diff]} val
   let connector: SinkConnector val
   let stringify: ArrayStringify[Diff] val
-  
+
   new val create(collector_builder': {(): SinkCollector[Diff]} val,
-    connector': SinkConnector val, stringify': ArrayStringify[Diff] val) 
+    connector': SinkConnector val, stringify': ArrayStringify[Diff] val)
   =>
     collector_builder = collector_builder'
     connector = connector'
@@ -36,7 +37,7 @@ trait SinkConnector
   fun apply(conn: TCPConnection)
 
 actor SinkConnection
-  let _wb: WriteBuffer = WriteBuffer
+  let _wb: Writer = Writer
   var _conn: TCPConnection
 
   new create(conn: TCPConnection, sink_connector: SinkConnector val) =>

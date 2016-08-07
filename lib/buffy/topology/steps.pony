@@ -1,3 +1,4 @@
+use "buffered"
 use "collections"
 use "buffy/messages"
 use "net"
@@ -35,7 +36,7 @@ trait StepManaged
   be add_step_manager(step_manager: StepManager)
 
 trait BasicSharedStateStep
-  be send[D: Any val, State: Any #read](msg_id: U64, source_ts: U64, 
+  be send[D: Any val, State: Any #read](msg_id: U64, source_ts: U64,
     ingress_ts: U64, msg_data: D, sp: StateProcessor[State] val)
 
 actor EmptyStep is BasicStep
@@ -45,8 +46,8 @@ actor EmptyStep is BasicStep
       .cstring())
 
 actor EmptySharedStateStep is BasicSharedStateStep
-  be send[D: Any val, State: Any #read](msg_id: U64, source_ts: U64, 
-    ingress_ts: U64, msg_data: D, sp: StateProcessor[State] val) => 
+  be send[D: Any val, State: Any #read](msg_id: U64, source_ts: U64,
+    ingress_ts: U64, msg_data: D, sp: StateProcessor[State] val) =>
     @printf[I32]("Shared state step was not set as output\n".cstring())
 
 
@@ -69,10 +70,10 @@ trait ComputeLocalStep[In] is BasicLocalStep
 
 trait OutputLocalStep[Out] is BasicOutputLocalStep
 
-trait ThroughLocalStep[In, Out] is 
+trait ThroughLocalStep[In, Out] is
   (ComputeLocalStep[In] & OutputLocalStep[Out])
 
-trait ThroughStateLocalStep[In: Any val, Out: Any val, State: Any #read] is 
+trait ThroughStateLocalStep[In: Any val, Out: Any val, State: Any #read] is
   (BasicStateLocalStep & ThroughLocalStep[In, Out])
 
 class EmptyLocalStep is BasicOutputLocalStep
@@ -85,15 +86,15 @@ class EmptyLocalStep is BasicOutputLocalStep
 // Computation Steps
 ////////////////////
 trait BasicComputationStep
-  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D)
 
 trait BasicOutputComputationStep is BasicComputationStep
   fun ref add_local_output(to: BasicComputationStep)
 
 class EmptyComputationStep is BasicComputationStep
-  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
-    msg_data: D) => 
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
     None
   fun ref add_output(to: BasicComputationStep) => None
 
@@ -104,8 +105,8 @@ class ComputationStep[In: Any val, Out: Any val] is BasicOutputComputationStep
   new create(f: Computation[In, Out]) =>
     _f = f
 
-  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
-    msg_data: D) => 
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
     match msg_data
     | let input: In =>
       match _f(input)
@@ -117,7 +118,7 @@ class ComputationStep[In: Any val, Out: Any val] is BasicOutputComputationStep
   fun ref add_local_output(to: BasicComputationStep) =>
     _output = to
 
-class MapComputationStep[In: Any val, Out: Any val] 
+class MapComputationStep[In: Any val, Out: Any val]
   is BasicOutputComputationStep
   var _output: BasicComputationStep = EmptyComputationStep
   let _f: MapComputation[In, Out]
@@ -125,8 +126,8 @@ class MapComputationStep[In: Any val, Out: Any val]
   new create(f: MapComputation[In, Out]) =>
     _f = f
 
-  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
-    msg_data: D) => 
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
     match msg_data
     | let input: In =>
       for v in _f(input).values() do
@@ -143,8 +144,8 @@ class ComputationForwardStep[In: Any val] is BasicComputationStep
   new create(output: BasicStep tag) =>
     _output = output
 
-  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
-    msg_data: D) => 
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D) =>
     match msg_data
     | let input: In =>
       _output.send[In](msg_id, source_ts, ingress_ts, input)
@@ -154,17 +155,17 @@ class ComputationSteps[In: Any val, Out: Any val] is BasicComputationStep
   let _first_step: BasicOutputComputationStep
   let _last_step: BasicOutputComputationStep
 
-  new create(f: BasicOutputComputationStep, l: BasicOutputComputationStep) => 
+  new create(f: BasicOutputComputationStep, l: BasicOutputComputationStep) =>
     _first_step = f
     _last_step = l
 
-  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
-    msg_data: D) 
+  fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
+    msg_data: D)
   =>
     match msg_data
     | let input: In =>
       _first_step.send[In](msg_id, source_ts, ingress_ts, input)
-    end    
+    end
 
   fun ref add_output(to: BasicStep tag) =>
     match _last_step
@@ -180,7 +181,7 @@ class ComputationSteps[In: Any val, Out: Any val] is BasicComputationStep
       s.add_shared_state(shared_state)
     end
 
-actor CoalesceStep[In: Any val, Out: Any val] 
+actor CoalesceStep[In: Any val, Out: Any val]
   is (ThroughStep[In, Out] & BasicStateStep)
   let _f: ComputationSteps[In, Out]
   var _step_reporter: (StepReporter val | None) = None
@@ -210,7 +211,7 @@ actor CoalesceStep[In: Any val, Out: Any val]
       // end
     end
 
-class CoalesceLocalStep[In: Any val, Out: Any val] 
+class CoalesceLocalStep[In: Any val, Out: Any val]
   is (ThroughLocalStep[In, Out] & BasicStateLocalStep)
   let _f: ComputationSteps[In, Out]
   var _step_reporter: (StepReporter val | None) = None
@@ -570,7 +571,7 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
   is ThroughStateStep[In, Out, State]
   var _step_reporter: (StepReporter val | None) = None
   var _output: BasicStep tag = EmptyStep
-  var _shared_state: BasicSharedStateStep tag 
+  var _shared_state: BasicSharedStateStep tag
     = EmptySharedStateStep
   let _state_comp: StateComputation[In, Out, State] val
   var _state_comp_wrapper: StateComputationWrapper[In, Out, State] val
@@ -610,12 +611,12 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
       // end
     end
 
-class StateLocalStep[In: Any val, Out: Any val, State: Any #read] 
+class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
   is (ThroughStateLocalStep[In, Out, State] & BasicOutputComputationStep
     & BasicStateLocalStep)
   var _output: BasicStep tag = EmptyStep
   var _step_reporter: (StepReporter val | None) = None
-  var _shared_state: BasicSharedStateStep tag 
+  var _shared_state: BasicSharedStateStep tag
     = EmptySharedStateStep
   let _state_comp: StateComputation[In, Out, State] val
   var _state_comp_wrapper: StateComputationWrapper[In, Out, State] val
@@ -628,7 +629,7 @@ class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
     _state_id = state_id
     _partition_function = pf
     _state_comp_wrapper = StateComputationWrapper[In, Out, State](_state_comp,
-      EmptyStep, _partition_function) 
+      EmptyStep, _partition_function)
 
   fun ref add_step_reporter(sr: StepReporter val) =>
     _step_reporter = sr
@@ -668,8 +669,8 @@ actor SharedStateStep[State: Any #read]
   be add_step_reporter(sr: StepReporter val) =>
     _step_reporter = sr
 
-  be send[D: Any val, S: Any #read](msg_id: U64, source_ts: U64, 
-    ingress_ts: U64, msg_data: D, sp: StateProcessor[S] val) 
+  be send[D: Any val, S: Any #read](msg_id: U64, source_ts: U64,
+    ingress_ts: U64, msg_data: D, sp: StateProcessor[S] val)
   =>
     match sp
     | let s_processor: StateProcessor[State] val =>
@@ -690,7 +691,7 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
   let _conns: Array[TCPConnection]
   let _metrics_collector: MetricsCollector tag
   let _pipeline_name: String
-  embed _write_buffer: WriteBuffer = WriteBuffer
+  embed _write_buffer: Writer = Writer
 
   new create(array_stringify: ArrayStringify[In] val, conns: Array[TCPConnection] iso =
     recover Array[TCPConnection] end, m_coll: MetricsCollector tag,

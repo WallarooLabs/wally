@@ -1,3 +1,4 @@
+use "buffered"
 use "collections"
 use "net"
 use "options"
@@ -42,7 +43,7 @@ class IncomingNotify is TCPConnectionNotify
         | let m: FixOrderMessage val =>
           _sender.write(m.string())
         else
-          @printf[I32]("Error parsing Fix\n".cstring())        
+          @printf[I32]("Error parsing Fix\n".cstring())
         end
       end
 
@@ -151,7 +152,7 @@ actor Metrics
 primitive Bytes
   fun length_encode(data: ByteSeq val): Array[ByteSeq] val =>
     let len: U32 = data.size().u32()
-    let wb = WriteBuffer
+    let wb = Writer
     wb.u32_be(len)
     wb.write(data)
     wb.done()

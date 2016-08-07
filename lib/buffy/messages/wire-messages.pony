@@ -1,3 +1,4 @@
+use "buffered"
 use "sendence/bytes"
 use "buffy/network"
 use "buffy/topology"
@@ -6,7 +7,7 @@ use "net"
 
 primitive WireMsgEncoder
   fun _encode(msg: WireMsg val, auth: AmbientAuth): Array[ByteSeq] val ? =>
-    let wb = WriteBuffer
+    let wb = Writer
     let serialised: Array[U8] val =
       Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
     let size = serialised.size()
@@ -57,9 +58,9 @@ primitive WireMsgEncoder
     : Array[ByteSeq] val ? =>
     _encode(SpinUpMsg(step_id, step_builder), auth)
 
-  fun spin_up_shared_state(step_id: U64, 
+  fun spin_up_shared_state(step_id: U64,
     step_builder: BasicSharedStateStepBuilder val, auth: AmbientAuth)
-    : Array[ByteSeq] val ? 
+    : Array[ByteSeq] val ?
   =>
     _encode(SpinUpSharedStateMsg(step_id, step_builder), auth)
 
@@ -92,7 +93,7 @@ primitive WireMsgEncoder
   fun ack_message_id(node_name: String, msg_id: U64,
     auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(AckMsgIdMsg(node_name, msg_id), auth)
- 
+
   fun reconnect_data(node_name: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(ReconnectDataMsg(node_name), auth)
 
@@ -120,12 +121,12 @@ primitive WireMsgEncoder
     auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(AckConnectMsgIdMsg(node_name, msg_id), auth)
 
-  fun data_channel[D: Any val](data_ch_id: U64, step_id: U64, 
+  fun data_channel[D: Any val](data_ch_id: U64, step_id: U64,
     from_node_name: String, msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D, auth: AmbientAuth)
-    : Array[ByteSeq] val ? 
+    : Array[ByteSeq] val ?
   =>
-    _encode(ForwardMsg[D](data_ch_id, step_id, from_node_name, msg_id, 
+    _encode(ForwardMsg[D](data_ch_id, step_id, from_node_name, msg_id,
       source_ts, ingress_ts, msg_data), auth)
 
 primitive WireMsgDecoder
@@ -170,7 +171,7 @@ class IdentifyDataPortMsg is WireMsg
   new val create(name: String, s: String) =>
     node_name = name
     service = s
-    
+
 class AddControlMsg is WireMsg
   let node_name: String
   let host: String
@@ -347,7 +348,7 @@ class AckFinishedConnectionsMsg is WireMsg
 trait DataChannelMsg is WireMsg
   fun data_channel_id(): U64
   fun from_name(): String
-  fun deliver(data_receiver: DataReceiver, step_manager: StepManager tag)  
+  fun deliver(data_receiver: DataReceiver, step_manager: StepManager tag)
 
 class ForwardMsg[D: Any val] is DataChannelMsg
   let _data_ch_id: U64
@@ -358,7 +359,7 @@ class ForwardMsg[D: Any val] is DataChannelMsg
   let _ingress_ts: U64
   let _data: D
 
-  new val create(data_ch_id: U64, s_id: U64, from: String, m_id: U64, 
+  new val create(data_ch_id: U64, s_id: U64, from: String, m_id: U64,
     s_ts: U64, i_ts: U64, m_data: D) =>
     _data_ch_id = data_ch_id
     _step_id = s_id
@@ -371,5 +372,5 @@ class ForwardMsg[D: Any val] is DataChannelMsg
   fun data_channel_id(): U64 => _data_ch_id
   fun from_name(): String => _from_node_name
   fun deliver(data_receiver: DataReceiver, step_manager: StepManager tag) =>
-    data_receiver.received[D](_data_ch_id, _step_id, _msg_id, _source_ts, 
+    data_receiver.received[D](_data_ch_id, _step_id, _msg_id, _source_ts,
       _ingress_ts, _data, step_manager)
