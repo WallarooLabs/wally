@@ -25,16 +25,17 @@ class IncomingNotify is TCPConnectionNotify
     if _header then
       try
         _count = _count + 1
-        if ((_count % 100_000) == 0) and (_count <= _expected) then
-          @printf[I32]("%zu received\n".cstring(), _count)
-        end
 
         if _count == 1 then
           _metrics.set_start(Time.nanos())
         end
-        // if _count == 1_000_000 then
-        //   _count = 0
-        // end
+        //if (_count % 100_000) == 0 then
+        //  @printf[None]("%zu received\n".cstring(), _count)
+        //end
+        if _count == _expected then
+          _metrics.set_end(Time.nanos(), _expected)
+        end
+
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
         conn.expect(expect)
@@ -42,20 +43,13 @@ class IncomingNotify is TCPConnectionNotify
       end
     else
       if _count <= _expected then
-        let now = Time.cycles()//Epoch.nanoseconds()
+        let now = Time.cycles()
 
         _state.run(_guid_gen(), now, now, consume data)
-      else
-        _count = 0
       end
 
       conn.expect(4)
       _header = true
-
-      _msg_count = _msg_count + 1
-      if _msg_count >= 100 then
-        return false
-      end
     end
     false
 
@@ -70,40 +64,11 @@ class OutNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     @printf[None]("outgoing connected\n".cstring())
 
-actor First
-  let _r: (Regex | None)
-  let _state: State
-
-  new create(s: State) =>
-    _r = try Regex("[\\W_]+") else None end
-    _state = s
-
-  be run(a: U64, b: U64, c: U64, data: String) =>
-    /*
-    let updated_d = match _r
-      | let r: Regex =>
-        try r.replace(data, " " where global = true) else data end
-      else data end
-
-
-    for word in data.split(" ").values() do
-      let next = _lower(data)
-      if next.size() > 0 then
-        _state.run(WordCount(data, 1))
-      end
-    end
-    */
-    None
-
-
-  fun _lower(s: String): String =>
-    recover s.lower() end
-
 class WordCount
   let word: String
-  let count: U64
+  let count: U32
 
-  new val create(w: String, c: U64) =>
+  new val create(w: String, c: U32) =>
     word = w
     count = c
 
@@ -117,99 +82,59 @@ actor State
   let _expected: USize
   let _sender: TCPConnection
   let _metrics: Metrics
-  let buffer: Writer = Writer
-  let _size: USize = 64
-  let words: Map[String, U64] = Map[String, U64]
 
   new create(sender: TCPConnection, metrics: Metrics, expected: USize) =>
     _wct = WordCountTotals
     _sender = sender
     _expected = expected
     _metrics = metrics
-    buffer.reserve_chunks(_size)
 
-  be run(a: U64, b: U64, c: U64, od: Array[U8] val) =>
-    let string = Converter(od)
+  be run(a: U64, b: U64, c: U64, od: Array[U8] iso) =>
+    _count = _count + 1
+
+    let string = Converter(consume od)
 
     for word in string.split(" ").values() do
-      let next = _lower(word)
-      if next.size() > 0 then
-        let computation = WordCount(next, 1)
-        let data = computation(_wct)
-        _count = _count + 1
-        if (_count % 100_000) == 0 then
-          @printf[I32]("%zu sent\n".cstring(), _count)
-        end
-        // if (_count % 1_000_000) == 0 then
-        //   // @printf[I32]("%zu sent\n".cstring(), _count)
-        //   @printf[None]("%s is at %zu\n".cstring(), data.word.cstring(), data.count)
-        // end
+      if word.size() > 0 then
+        let computation = WordCount(word, 1)
+        let wc = computation(_wct)
 
-        //if (_count % _size) == 0 then
-        //  buffer.reserve_chunks(_size)
-        //end
+        let dws = 4 + 4 + wc.word.size()
+        let dws' = dws.u32()
+        var current: Array[U8] iso = recover Array[U8](1) end
 
-/*
-        let cs: String val = data.count.string()
-        var current: Array[U8] iso = recover Array[U8](data.word.size() + 1 + cs.size() + 4) end
-        current.append(data.word)
-        current.append("=")
-        current.append(cs)
-        //buffer.u32_be((s.size() + 8).u32())
-        //Message size field
-        //buffer.u32_be((s.size() + 4).u32())
-        buffer.u32_be(data.word.size().u32())
-        buffer.write(consume current)
-        if (_count % _size) == 0 then
-          _sender.writev(buffer.done())
-        end
-*/
+        current.push((dws' >> 24).u8())
+        /*current.push((dws' >> 16).u8())
+        current.push((dws' >> 8).u8())
+        current.push(dws'.u8())
+        current.push((wc.count >> 24).u8())
+        current.push((wc.count >> 16).u8())
+        current.push((wc.count >> 8).u8())
+        current.push(wc.count.u8())
+        current.append(wc.word)*/
 
-        Sender(_sender, data)
-
-        if _count == _expected then
-          _metrics.set_end(Time.nanos(), _expected)
-          _count = 0
-        end
+        _sender.write("hi")
       end
     end
 
-  fun _lower(s: String): String =>
-    recover s.lower() end
+    if (_count % 1_000_000) == 0 then
+      @printf[None]("%zu received\n".cstring(), _count)
+    end
 
 primitive Converter
-  fun apply(input: Array[U8] val): String =>
-    String.from_array(input)
-
-primitive Sender
-  fun apply(sender: TCPConnection tag, data: WordCount val) =>
-        // try
-          let cs: String val = data.count.string()
-          let dws = data.word.size() + cs.size() + 1
-          var current: Array[U8] iso = recover Array[U8](dws + 4) end
-          let dws' = dws.u32()
-          current.push((dws' >> 24).u8())
-          current.push((dws' >> 16).u8())
-          current.push((dws' >> 8).u8())
-          current.push(dws'.u8())
-          current.append(data.word)
-          current.append("=")
-          current.append(cs)
-
-          sender.write(consume current)
-        // else
-        //   @printf[I32]("Problem sending!\n".cstring())
-        // end
+  fun apply(input: Array[U8] iso): String =>
+    recover String.from_iso_array(consume input).lower_in_place() end
 
 class WordCountTotals
-  let words: Map[String, U64] = Map[String, U64]
+  let words: Map[String, U32] = Map[String, U32](50_000)
 
-  fun ref apply(word: String, count: U64): WordCount val =>
+  fun ref apply(word: String, count: U32): WordCount val =>
+
     try
-     let new_count = words.upsert(word, count,
-      lambda(x1: U64, x2: U64): U64 => x1 + x2 end)
+      let x = words.upsert(word, count,
+        lambda(x1: U32, x2: U32): U32 => x1 + x2 end)
 
-      WordCount(word, new_count)
+      WordCount(word, x)
     else
       WordCount(word, count)
     end
@@ -246,7 +171,7 @@ actor Main
       let metrics2 = Metrics
 
       let connect_auth = TCPConnectAuth(env.root as AmbientAuth)
-      let out_socket = TCPConnection(connect_auth,
+      let out_socket = TCPConnection.ip4(connect_auth,
             OutNotify,
             out_addr(0),
             out_addr(1))
@@ -307,66 +232,5 @@ actor Metrics
   be report(r: U64, s: U64, e: U64) => last_report = (r + s + e) + last_report
 
 primitive Bytes
-  fun length_encode(data: ByteSeq val): Array[ByteSeq] val =>
-    let len: U32 = data.size().u32()
-    let wb = Writer
-    wb.u32_be(len)
-    wb.write(data)
-    wb.done()
-
-  fun to_u16(high: U8, low: U8): U16 =>
-    (high.u16() << 8) or low.u16()
-
   fun to_u32(a: U8, b: U8, c: U8, d: U8): U32 =>
     (a.u32() << 24) or (b.u32() << 16) or (c.u32() << 8) or d.u32()
-
-  fun to_u64(a: U8, b: U8, c: U8, d: U8, e: U8, f: U8, g: U8, h: U8): U64 =>
-    (a.u64() << 56) or (b.u64() << 48) or (c.u64() << 40) or (d.u64() << 32)
-    or (e.u64() << 24) or (f.u64() << 16) or (g.u64() << 8) or h.u64()
-
-  fun from_u16(u16: U16, arr: Array[U8] iso = recover Array[U8] end): Array[U8] iso^ =>
-    let l1: U8 = (u16 and 0xFF).u8()
-    let l2: U8 = ((u16 >> 8) and 0xFF).u8()
-    arr.push(l2)
-    arr.push(l1)
-    consume arr
-
-  fun from_u32(u32: U32, arr: Array[U8] iso = recover Array[U8] end): Array[U8] iso^ =>
-    let l1: U8 = (u32 and 0xFF).u8()
-    let l2: U8 = ((u32 >> 8) and 0xFF).u8()
-    let l3: U8 = ((u32 >> 16) and 0xFF).u8()
-    let l4: U8 = ((u32 >> 24) and 0xFF).u8()
-    arr.push(l4)
-    arr.push(l3)
-    arr.push(l2)
-    arr.push(l1)
-    consume arr
-
-  fun from_u64(u64: U64, arr: Array[U8] iso = recover Array[U8] end): Array[U8] iso^ =>
-    let l1: U8 = (u64 and 0xFF).u8()
-    let l2: U8 = ((u64 >> 8) and 0xFF).u8()
-    let l3: U8 = ((u64 >> 16) and 0xFF).u8()
-    let l4: U8 = ((u64 >> 24) and 0xFF).u8()
-    let l5: U8 = ((u64 >> 32) and 0xFF).u8()
-    let l6: U8 = ((u64 >> 40) and 0xFF).u8()
-    let l7: U8 = ((u64 >> 48) and 0xFF).u8()
-    let l8: U8 = ((u64 >> 56) and 0xFF).u8()
-    arr.push(l8)
-    arr.push(l7)
-    arr.push(l6)
-    arr.push(l5)
-    arr.push(l4)
-    arr.push(l3)
-    arr.push(l2)
-    arr.push(l1)
-    consume arr
-
-  fun u16_from_idx(idx: USize, arr: Array[U8]): U16 ? =>
-    Bytes.to_u16(arr(idx), arr(idx + 1))
-
-  fun u32_from_idx(idx: USize, arr: Array[U8]): U32 ? =>
-    Bytes.to_u32(arr(idx), arr(idx + 1), arr(idx + 2), arr(idx + 3))
-
-  fun u64_from_idx(idx: USize, arr: Array[U8]): U64 ? =>
-    Bytes.to_u64(arr(idx), arr(idx + 1), arr(idx + 2), arr(idx + 3),
-      arr(idx + 4), arr(idx + 5), arr(idx + 6), arr(idx + 7))
