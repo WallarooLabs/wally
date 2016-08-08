@@ -401,12 +401,12 @@ actor SendingActor
     if (current_batch_size > 0) and _data_source.has_next() then
       _wb.reserve_chunks(current_batch_size)
 
-      //let d' = recover Array[ByteSeq](current_batch_size) end
+      let d' = recover Array[ByteSeq](current_batch_size) end
       for i in Range(0, current_batch_size) do
         try
           let n = _data_source.next()
           if n.size() > 0 then
-            //d'.push(n)
+            d'.push(n)
             _wb.u32_be(n.size().u32())
             _wb.write(n)
             _messages_sent = _messages_sent + 1
@@ -420,7 +420,7 @@ actor SendingActor
       end
 
       _to_buffy_socket.writev(_wb.done())
-      //_store.sentv(consume d', Time.wall_to_nanos(Time.now()))
+      _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
     else
       _finished = true
       _timers.dispose()
