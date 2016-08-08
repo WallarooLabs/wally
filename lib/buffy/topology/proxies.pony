@@ -73,7 +73,7 @@ actor StepManager
       let auth = _env.root as AmbientAuth
       pipeline.initialize_source(source_id, host, service, 
         _env, auth, coordinator, target_step, local_step_builder,
-        shared_state) 
+        shared_state, _metrics_collector) 
     else
       _env.err.print("StepManager: Could not initialize source")
     end
