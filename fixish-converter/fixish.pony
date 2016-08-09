@@ -68,7 +68,6 @@ actor Main
         for line in input_file.lines() do
           match FixParser(line)
           | let m: FixOrderMessage val => 
-            if p then @printf[I32](m.string().cstring()); p = false end
             try
               if m.order_id().size() != 6 then error end
               if m.transact_time().size() != 21 then error end
@@ -111,7 +110,6 @@ actor Main
       else
         0
       end
-    @printf[I32]((symbol_diff.string() + "\n").cstring())
     for i in Range(0 , symbol_diff) do
       symbol = " " + symbol
     end

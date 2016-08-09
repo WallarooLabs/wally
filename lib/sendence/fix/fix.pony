@@ -139,13 +139,13 @@ class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
     and (_transact_time == o._transact_time)
 
   fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-    (_side.string()
-      + "," + _account.string()
-      + "," + _order_id
-      + "," + _symbol
-      + "," + _order_qty.string()
-      + "," + _price.string()
-      + "," + _transact_time).clone()
+    (_side.string().clone()
+      .append(_account.string())
+      .append(_order_id)
+      .append(_symbol)
+      .append(_order_qty.string())
+      .append(_price.string())
+      .append(_transact_time)).clone()
   // fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
     // "FixOrderMessage".string(fmt)
 

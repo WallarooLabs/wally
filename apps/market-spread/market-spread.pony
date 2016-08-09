@@ -202,10 +202,10 @@ class OrderResult
     is_rejected = is_rejected'
 
   fun string(): String =>
-    symbol + "," + order_id + "," + timestamp.string() + "," 
-      + client_id.string() + "," + price.string() + "," + qty.string() + "," 
-      + side + "," + bid.string() + "," + offer.string() + "," 
-      + is_rejected.string()
+    (symbol.clone().append(order_id).append(timestamp.string())
+      .append(client_id.string()).append(price.string())
+      .append(qty.string()).append(side).append(bid.string())
+      .append(offer.string()).append(is_rejected.string())).clone()
 
 interface Symboly
   fun symbol(): String
