@@ -11,11 +11,8 @@ actor Main is TestList
   new make(env: Env) => None
 
   fun tag tests(test: PonyTest) =>
-    None
-//    test(_TestMonitoringHubEncoder)
-//    test(_TestTimeline)
+    test(_TestTimeline)
 
-/*
 class iso _TestTimeline is UnitTest
   fun name(): String => "buffy:Timeline"
 
@@ -35,5 +32,4 @@ class iso _TestTimeline is UnitTest
       .data("latency_bins") as JsonObject)
       .data("29") as I64), 2680)
     true
-*/
 
