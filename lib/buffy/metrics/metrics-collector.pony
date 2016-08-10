@@ -11,7 +11,7 @@ actor JsonAccumulator
   let _event: String
   let _topic: String
   let _pretty_print: Bool
-  var j: JsonArray iso = JsonArray(100)
+  var j: JsonArray ref = JsonArray(100)
 
   new create(event: String, topic: String, pretty_print: Bool=false,
     output: MetricsOutputActor tag)
@@ -21,11 +21,12 @@ actor JsonAccumulator
     _topic = topic
     _pretty_print = pretty_print
 
-  be append(j': JsonArray iso^) =>
-    j.data.concat(j'.data.values())
+  be append(j': JsonArray iso) =>
+    let j'': JsonArray ref = consume j'
+    j.data.concat(j''.data.values())
 
   be flush() =>
-    let j': JsonArray iso = j = JsonArray(100)
+    let j': JsonArray ref = j = JsonArray(100)
     _output(HubJson.payload(_event, _topic, consume j', _pretty_print))
 
 actor TimelineCollector
@@ -46,18 +47,21 @@ sink's MetricsRecorder
   """
     timelines.push(consume t)
 
-  be flush(collectors: Iterator[TimelineCollector tag] iso,
+  be flush(collectors: Array[TimelineCollector tag] iso,
     output: JsonAccumulator tag)
   =>
-    t' = timelines = recover Array[Timeline iso](10) end
-    for tl in t'.values() do
+    let t: Array[Timeline iso] iso = timelines = recover Array[Timeline iso](10) end
+    while t.size() > 0 do
       try
-        output.append(tl.json(_show_empty))
+        output.append(recover
+          let tl: Timeline ref = t.pop()
+          tl.json(_show_empty)
+          end)
       end
     end
-    if collectors.has_next() then
-      let tlc:TimelineCollector tag = collectors.next()
-      tlc.flush(collectors, output)
+    try
+      let tlc:TimelineCollector tag = collectors.pop()
+      tlc.flush(consume collectors, output)
     else
       output.flush()
     end
@@ -66,13 +70,14 @@ actor MetricsCollector is FlushingActor
   let _stdout: StdStream
   let _stderr: StdStream
   let _auth: AmbientAuth
-  let _node_name: String
+  let _node_name: String val
+  let _app_name: String val
   let _timelines: Array[TimelineCollector tag] ref = recover
     Array[TimelineCollector tag](50) end
-  let _event: String
-  let _topic: String
+  let _event: String val
+  let _topic: String val
   let _pretty_print: Bool val = true
-  var _output: (MetricsOutputActor tag | None)
+  var _output: (MetricsOutputActor tag | None) = None
 
   new create(stdout: StdStream,
     stderr: StdStream,
@@ -90,9 +95,12 @@ actor MetricsCollector is FlushingActor
     _node_name = node_name
     _app_name = app_name
     _event = "metrics"
-    _topic = String(50)
-    _topic.append("metrics:")
-    _topic.append(_app_name)
+    _topic = recover
+      let s: String ref = String(50)
+      s.append("metrics:")
+      s.append(app_name)
+      consume s
+    end
 
     // Create connections and actors here
 
@@ -113,17 +121,22 @@ actor MetricsCollector is FlushingActor
   be flush() => _flush()
 
   fun _flush() =>
+    // TODO: Rerwite this so we don't have to copy the _timelines array
+    // and use promises and a known count at the accumulator instead.
+    // TODO: Add backoff to the flushing timer
     match _output
     | let output: MetricsOutputActor tag =>
       let j: JsonAccumulator tag = recover JsonAccumulator(_event, _topic,
         _pretty_print, output) end
-      let cloned_collectors: Array[TimelineCollector tag] ref =
-        _timelines.clone()
-      let collectors: Iterator[TimelineCollector tag] =
-        cloned_collectors.values()
+      let size: USize val = _timelines.size()
+      var col: Array[TimelineCollector tag] iso = recover
+        Array[TimelineCollector tag](size) end
+      for tc in _timelines.values() do
+        col.push(tc)
+      end
       try
-        let tlc: TimelineCollector tag = collectors.next()
-        tlc.flush(consume collectors, j)
+        let tlc: TimelineCollector tag = col.pop()
+        tlc.flush(consume col, j)
       end
     end
 
