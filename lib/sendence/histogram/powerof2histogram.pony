@@ -75,7 +75,22 @@ value. e.g. 3->bin:4, 4->bin:4, 5->bin:8, etc.
   fun min(): U64 ? =>
     (_min as U64)
 
-  fun ref add(h: PowersOf2Histogram): PowersOf2Histogram ref =>
+  fun ref update_min(v: U64) =>
+    _min = v
+
+  fun ref update_max(v: U64) =>
+    _max = v
+
+  fun clone(): PowersOf2Histogram ref =>
+  """
+  Clone the current PowersOf2Histogram
+  """
+    let h': PowersOf2Histogram = PowersOf2Histogram.from_array(_counts.clone())
+    try h'.update_min((_min as U64)) end
+    try h'.update_max((_max as U64)) end
+    consume h'
+
+  fun add(h: PowersOf2Histogram): PowersOf2Histogram ref =>
   """
   Add another histogram to the current histogram, returning a new histogram.
   """
@@ -85,9 +100,11 @@ value. e.g. 3->bin:4, 4->bin:4, 5->bin:8, etc.
         h'.update(i, h'.get(i) + v)
       end
     end
+    try h'.update_min((_min as U64)) end
+    try h'.update_max((_max as U64)) end
     consume h'
 
-  fun ref sub(h: PowersOf2Histogram): PowersOf2Histogram ref =>
+  fun sub(h: PowersOf2Histogram): PowersOf2Histogram ref =>
   """
   Subtract another histogram from the current histogram, returning a new
   histogram.
@@ -98,6 +115,8 @@ value. e.g. 3->bin:4, 4->bin:4, 5->bin:8, etc.
         h'.update(i, h'.get(i) - v)
       end
     end
+    try h'.update_min((_min as U64)) end
+    try h'.update_max((_max as U64)) end
     consume h'
 
   fun pow2(i: USize): U64 =>
