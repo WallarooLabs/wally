@@ -8,10 +8,10 @@ class Timeline
 The metrics timeline of a single step, boundary, or application, including both
 a latency histogram and a throughput history.
 """
-  let _offsets: Array[U64] ref = Array[U64](100).push(0)
+  let _offsets: Array[U64] ref = Array[U64](10).push(0)
   let _latencies: Array[PowersOf2Histogram ref] ref =
-    Array[PowersOf2Histogram ref](100).push(PowersOf2Histogram)
-  let _throughputs: Array[U64] ref = Array[U64](100).push(0)
+    Array[PowersOf2Histogram ref](10).push(PowersOf2Histogram)
+  let _throughputs: Array[U64] ref = Array[U64](10).push(0)
   var _current_offset: U64
   var _current_index: USize = 0
   let _period: U64

@@ -81,7 +81,7 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
     _process_monitor = _start_process(config, length_encoder)
 
   be add_step_reporter(sr: MetricsReporter iso) =>
-    _step_reporter = sr
+    _step_reporter = consume sr
 
   be add_output(to: BasicStep tag) =>
     _output = to

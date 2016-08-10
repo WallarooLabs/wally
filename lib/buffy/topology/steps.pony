@@ -190,7 +190,7 @@ actor CoalesceStep[In: Any val, Out: Any val]
     _f = (consume f)()
 
   be add_step_reporter(sr: MetricsReporter iso) =>
-    _step_reporter = sr
+    _step_reporter = consume sr
 
   be add_output(to: BasicStep tag) =>
     _f.add_output(to)
@@ -219,8 +219,8 @@ class CoalesceLocalStep[In: Any val, Out: Any val]
   new create(f: ComputationStepsBuilder[In, Out] iso) =>
     _f = (consume f)()
 
-  fun ref add_step_reporter(sr: MetricsReporter iso) =>
-    _step_reporter = sr
+  fun ref add_step_reporter(sr: MetricsReporter ref) =>
+    _step_reporter = consume sr
 
   fun ref add_output(to: BasicStep tag) =>
     _f.add_output(to)
@@ -250,7 +250,7 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
     _f = consume f
 
   be add_step_reporter(sr: MetricsReporter iso) =>
-    _step_reporter = sr
+    _step_reporter = consume sr
 
   be add_output(to: BasicStep tag) =>
     _output = to
@@ -280,7 +280,7 @@ class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
     _f = consume f
 
   fun ref add_step_reporter(sr: MetricsReporter ref) =>
-    _step_reporter = sr
+    _step_reporter = consume sr
 
   fun ref add_output(to: BasicStep tag) =>
     _output = to
@@ -310,7 +310,7 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
     _f = consume f
 
   be add_step_reporter(sr: MetricsReporter iso) =>
-    _step_reporter = sr
+    _step_reporter = consume sr
 
   be add_output(to: BasicStep tag) =>
     _output = to
@@ -339,7 +339,7 @@ class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
     _f = consume f
 
   fun ref add_step_reporter(sr: MetricsReporter ref) =>
-    _step_reporter = sr
+    _step_reporter = consume sr
 
   fun ref add_output(to: BasicStep tag) =>
     _output = to
@@ -587,7 +587,7 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
       EmptyStep, _partition_function)
 
   be add_step_reporter(sr: MetricsReporter iso) =>
-    _step_reporter = sr
+    _step_reporter = consume sr
 
   be add_output(to: BasicStep tag) =>
     _output = to
@@ -632,7 +632,7 @@ class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
       EmptyStep, _partition_function)
 
   fun ref add_step_reporter(sr: MetricsReporter ref) =>
-    _step_reporter = sr
+    _step_reporter = consume sr
 
   fun ref add_shared_state(shared_state: BasicSharedStateStep tag) =>
     _shared_state = shared_state
@@ -667,7 +667,7 @@ actor SharedStateStep[State: Any #read]
     _state = state_initializer()
 
   be add_step_reporter(sr: MetricsReporter iso) =>
-    _step_reporter = sr
+    _step_reporter = consume sr
 
   be send[D: Any val, S: Any #read](msg_id: U64, source_ts: U64,
     ingress_ts: U64, msg_data: D, sp: StateProcessor[S] val)

@@ -68,7 +68,7 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
     parser: Parser[In] val, output: BasicStep tag,
     shared_state_step: (BasicSharedStateStep tag | None),
     local_step_builder: LocalStepBuilder val,
-    metrics_collector: MetricsCollector tag) 
+    metrics_collector: MetricsCollector tag)
   =>
     _env = env
     _source_id = source_id
@@ -80,8 +80,8 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
 
     let step_id = _guid_gen()
     let step_builder_name = local_step_builder.name()
-    _local_step.add_step_reporter(StepReporter(step_id, step_builder_name,
-      _metrics_collector))
+    _local_step.add_step_reporter(MetricsReporter(step_id, step_builder_name,
+      "source-sink", _metrics_collector))
     match _local_step
     | let state_step: BasicStateLocalStep =>
       match shared_state_step

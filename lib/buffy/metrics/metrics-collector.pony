@@ -67,11 +67,11 @@ actor MetricsCollector is FlushingActor
   let _stderr: StdStream
   let _auth: AmbientAuth
   let _node_name: String
-  let _timelines: Array[TimelineCollector tag] iso = recover
+  let _timelines: Array[TimelineCollector tag] ref = recover
     Array[TimelineCollector tag](50) end
   let _event: String
   let _topic: String
-  let _pretty_print: Bool = true
+  let _pretty_print: Bool val = true
   var _output: (MetricsOutputActor tag | None)
 
   new create(stdout: StdStream,
@@ -113,12 +113,19 @@ actor MetricsCollector is FlushingActor
   be flush() => _flush()
 
   fun _flush() =>
-    let j: JsonAccumulator tag = recover JsonAccumulator(_event, _topic,
-      _pretty_print, _output) end
-    let collectors: Iterator[TimelineCollector tag] iso = recover
-      _timelines.values() end
-    let tl: TimelineCollector tag = collectors.next()
-    tl.flush(collectors, j)
+    match _output
+    | let output: MetricsOutputActor tag =>
+      let j: JsonAccumulator tag = recover JsonAccumulator(_event, _topic,
+        _pretty_print, output) end
+      let cloned_collectors: Array[TimelineCollector tag] ref =
+        _timelines.clone()
+      let collectors: Iterator[TimelineCollector tag] =
+        cloned_collectors.values()
+      try
+        let tlc: TimelineCollector tag = collectors.next()
+        tlc.flush(consume collectors, j)
+      end
+    end
 
   be add_collector(t: TimelineCollector tag) =>
   """
@@ -135,8 +142,8 @@ class MetricsReporter
   let _timelinecollector: TimelineCollector tag
   var _timeline: Timeline iso
 
-	new val create(id: U64, name: String, category: String,
-    period: U64=1_000_000_000, metrics_collector: MetricsCollector tag)
+	new iso create(id: U64, name: String, category: String,
+    metrics_collector: MetricsCollector tag, period: U64=1_000_000_000)
   =>
 		_id = id
     _name = name
