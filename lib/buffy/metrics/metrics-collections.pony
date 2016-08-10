@@ -1,207 +1,90 @@
 use "collections"
+use "json"
 use "sendence/histogram"
+use "sendence/epoch"
 
-class ThroughputHistory
+class Timeline
 """
-A history of throughput counts per second
+The metrics timeline of a single step, boundary, or application, including both
+a latency histogram and a throughput history.
 """
-  let _map: Map[U64, U64] = Map[U64, U64]
-  var _max_time: U64 = U64.min_value()
-  var _min_time: U64 = U64.max_value()
+  let _offsets: Array[U64] ref = Array[U64](100).push(0)
+  let _latencies: Array[PowersOf2Histogram ref] ref =
+    Array[PowersOf2Histogram ref](100).push(PowersOf2Histogram)
+  let _throughputs: Array[U64] ref = Array[U64](100).push(0)
+  var _current_offset: U64
+  var _current_index: USize = 0
+  let _period: U64
+  let name: String
+  let category: String
+  var _shift: USize = 0
+  var _size: USize = 0
+  var _base_time: U64 = 0
 
-  fun ref apply(end_time: U64) =>
-    // Round end_time down to nearest second
-    let t': U64 = (end_time/1_000_000_000) + (if (end_time % 1_000_000_000) == 0
-      then 0 else 1 end)
-    _map.update(t', try _map(t') + 1 else 1 end)
-    _max_time = _max_time.max(t')
-    _min_time = _min_time.min(t')
+  new create(name': String, category': String,
+    period: U64 = 1_000_000_000)
+  =>
+  """
+  `period` specifies the unit size for both latency measurement periods
+  and the throughput history.
+  """
+    name = name'
+    category = category'
+    _period = period
+    _current_offset = 0
+    _base_time = get_offset(Epoch.nanoseconds())
 
-  fun values(): ArrayValues[(U64, U64), Array[(U64, U64)]]^  =>
-  """
-  The dense representation of the throughput history in the time ranges
-  counted so far
-  """
-    let s = size()
-    let arr = Array[(U64, U64)](s)
-    for ts in Range[U64](_min_time, (_max_time + 1), 1) do
-      arr.push((ts, try _map(ts) else 0 end))
+  fun ref apply(start_time: U64, end_time: U64) =>
+    let dt = end_time - start_time
+    if end_time > _current_offset then
+      // Create new entries in _offsets, _latencies, and _throughputs
+      // and update _current_offset and _current_index
+      _current_offset = get_offset(end_time)
+      _offsets.push(_current_offset)
+      _latencies.push(PowersOf2Histogram)
+      _throughputs.push(0)
+      _current_index = _current_index + 1
+      _size = _size + 1
     end
-    ArrayValues[(U64, U64), Array[(U64, U64)]](arr)
+    // update latencies and throughputs
+    try
+      _latencies(_current_index)(dt)
+      _throughputs.update(_current_index, _throughputs(_current_index) + 1)
+    end
 
   fun size(): USize =>
-    ((_max_time - _min_time) + 1).usize()
+    _size
 
-type TimeBuckets is Map[U64, (PowersOf2Histogram, ThroughputHistory)]
-
-type Steps is Set[String]
-type StepTimeranges is Map[U64, Steps]
-type StepMetrics is Map[String, TimeBuckets]
-
-type Boundaries is Set[String]
-type BoundaryTimeranges is Map[U64, Boundaries]
-type BoundaryMetrics is Map[String, TimeBuckets]
-
-type Sinks is Set[String]
-type SinkTimeranges is Map[U64, Sinks]
-type SinkMetrics is Map[String, TimeBuckets]
-
-actor MetricsCollection
-"""
-A hierarchical collection of PowersOf2Histograms and ThroughputHistorys keyed
-on category and id
-"""
-  // Timeranges are anchored to the end of the time range
-  var _stepmetrics: StepMetrics = StepMetrics
-  var _steptimeranges: StepTimeranges = StepTimeranges
-  var _boundarymetrics: BoundaryMetrics = BoundaryMetrics
-  var _boundarytimeranges: BoundaryTimeranges = BoundaryTimeranges
-  var _sinkmetrics: SinkMetrics = SinkMetrics
-  var _sinktimeranges: SinkTimeranges = SinkTimeranges
-  let _period: U64 val
-  let _handler: MetricsCollectionOutputHandler val
-
-  new create(period: U64=1_000_000_000,
-             handler: MetricsCollectionOutputHandler val) =>
-    _period = period
-    _handler = handler
-
-  be dispose() =>
-    _handler.dispose()
-
-  fun ref reset_collection() =>
-    _stepmetrics = StepMetrics
-    _steptimeranges = StepTimeranges
-    _boundarymetrics = BoundaryMetrics
-    _boundarytimeranges = BoundaryTimeranges
-    _sinkmetrics = SinkMetrics
-    _sinktimeranges = SinkTimeranges
-
-  be process_step(step_name: String, start_time: U64, end_time: U64) =>
-    _process_step(step_name, start_time, end_time)
-
-  fun ref _process_step(step_name: String, start_time: U64, end_time: U64) =>
-    let time_bucket: U64 = get_time_bucket(end_time)
-    let dt: U64 = end_time - start_time
-    // Bookkeeping
-    try
-      _steptimeranges(time_bucket).set(step_name)
-    else
-      let steps' = Steps
-      steps'.set(step_name)
-      _steptimeranges.update(time_bucket, steps')
-    end
-    try
-      let time_buckets:TimeBuckets = _stepmetrics(step_name)
-      try
-        (let lh, let th) = time_buckets(time_bucket)
-        lh(dt)
-        th(dt)
-      else
-        (let lh, let th) =(PowersOf2Histogram,
-                           recover ref ThroughputHistory end)
-        lh(dt)
-        th(dt)
-        time_buckets.update(time_bucket, (lh, th))
-      end
-    else
-      let time_buckets = TimeBuckets
-      _stepmetrics.update(step_name, time_buckets)
-      (let lh, let th) = (PowersOf2Histogram,
-                          recover ref ThroughputHistory end)
-      lh(dt)
-      th(dt)
-      time_buckets.update(time_bucket, (lh, th))
-    end
-
-  be process_boundary(name: String, start_time: U64, end_time: U64) =>
-    _process_boundary(name, start_time, end_time)
-
-  fun ref _process_boundary(name: String, start_time: U64, end_time: U64) =>
-    let time_bucket: U64 = get_time_bucket(end_time)
-    let dt: U64 = end_time - start_time
-    try
-      _boundarytimeranges(time_bucket).set(name)
-    else
-      let boundaries' = Boundaries
-      boundaries'.set(name)
-      _boundarytimeranges.update(time_bucket, boundaries')
-    end
-    try
-      let time_buckets: TimeBuckets = _boundarymetrics(name)
-      try
-        (let lh, let th) = time_buckets(time_bucket)
-        lh(dt)
-        th(dt)
-      else
-        (let lh, let th) = (PowersOf2Histogram,
-                            recover ref ThroughputHistory end)
-        lh(dt)
-        th(dt)
-        time_buckets.update(time_bucket, (lh, th))
-      end
-    else
-      let time_buckets = TimeBuckets
-      _boundarymetrics.update(name, time_buckets)
-      (let lh, let th) = (PowersOf2Histogram,
-                          recover ref ThroughputHistory end)
-      lh(dt)
-      th(dt)
-      time_buckets.update(time_bucket, (lh, th))
-    end
-
-  be process_sink(name: String, start_time: U64, end_time: U64) =>
-    _process_sink(name, start_time, end_time)
-
-  fun ref _process_sink(name: String, start_time: U64, end_time: U64) =>
-    let time_bucket: U64 = get_time_bucket(end_time)
-    let dt: U64 = end_time - start_time
-    try
-      _sinktimeranges(time_bucket).set(name)
-    else
-      let sinks' = Sinks
-      sinks'.set(name)
-      _sinktimeranges.update(time_bucket, sinks')
-    end
-    try
-      let time_buckets: TimeBuckets = _sinkmetrics(name)
-      try
-        (let lh, let th) = time_buckets(time_bucket)
-        lh(dt)
-        th(dt)
-      else
-        (let lh, let th) = (PowersOf2Histogram,
-                            recover ref ThroughputHistory end)
-        lh(dt)
-        th(dt)
-        time_buckets.update(time_bucket, (lh, th))
-      end
-    else
-      let time_buckets = TimeBuckets
-      _sinkmetrics.update(name, time_buckets)
-      (let lh, let th) = (PowersOf2Histogram,
-                          recover ref ThroughputHistory end)
-      lh(dt)
-      th(dt)
-      time_buckets.update(time_bucket, (lh, th))
-    end
-
-  fun get_time_bucket(time: U64): U64 =>
-  """Use nanoseconds for the timebucket"""
+  fun get_offset(time: U64): U64 =>
+  """
+  Nanosecond offset for the end_time of a measurement period
+  """
     time + (_period - (time % _period))
 
-  be send_output(resumable: (Resumable tag | None) = None) =>
-    handle_output()
-    match resumable
-    | let r: Resumable tag => r.resume()
+  fun json(show_empty: Bool=false): JsonArray iso^ ? =>
+    var j: JsonArray iso^ = JsonArray(_size)
+    for idx in Range[USize](_shift, _size, 1) do
+      let t1: I64 = ((_base_time + _offsets(idx))/1_000_000_000).i64()
+      let t0: I64 = (((_base_time + _offsets(idx)) - _period)/1_000_000_000).i64()
+      let j': JsonObject ref = JsonObject
+      j'.data.update("category", category)
+      j'.data.update("pipeline_key", name)
+      j'.data.update("t1", t1)
+      j'.data.update("t0", t0)
+      let topics: JsonObject ref = JsonObject
+      j'.data.update("topics", topics)
+      let latencies: JsonObject ref = JsonObject
+      let throughputs: JsonObject ref = JsonObject
+      topics.data.update("latency_bins", latencies)
+      topics.data.update("throughput_out", throughputs)
+      for (bin, count) in _latencies(idx).idx_pairs() do
+        if count > 0 then
+          latencies.data.update(bin.string(), count.i64())
+        elseif show_empty then
+          latencies.data.update(bin.string(), count.i64())
+        end
+      end
+      throughputs.data.update(t1.string() , _throughputs(idx).i64())
+      j.data.push(j')
     end
-
-  fun ref handle_output() =>
-    _handler.handle(_sinkmetrics, _boundarymetrics, _stepmetrics, _period)
-    reset_collection()
-
-  be flush() =>
-    send_output()
-
-interface Resumable
-  be resume()
+    consume j
