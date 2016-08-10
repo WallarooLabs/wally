@@ -5,6 +5,10 @@ use "json"
 use "collections"
 use "sendence/hub"
 
+interface MetricsOutputActor
+  be apply(payload: ByteSeq)
+  be dispose()
+
 actor MonitoringHubOutput is MetricsOutputActor
   let _stdout: StdStream
   let _stderr: StdStream
