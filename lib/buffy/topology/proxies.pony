@@ -26,6 +26,7 @@ actor Proxy is BasicStep
     _coordinator.send_data_message[D](_target_node_name, _step_id, _node_name, msg_id, source_ts, ingress_ts, msg_data)
     // _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
     //   msg_id, ingress_ts, Epoch.nanoseconds())
+    // TODO: ^ What is this? @jtfmumm @seantallen
 
 actor StepManager
   let _env: Env
@@ -84,8 +85,8 @@ actor StepManager
     | let s: StepManaged tag =>
       s.add_step_manager(this)
     end
-    step.add_step_reporter(StepReporter(step_id, step_builder.name(), 
-      _metrics_collector))
+    step.add_step_reporter(MetricsReporter(step_id, step_builder.name(),
+      "step", _metrics_collector))
     _steps(step_id) = step
 
   be add_shared_state_step(step_id: U64, 
@@ -104,8 +105,8 @@ actor StepManager
     | let s: StepManaged tag =>
       s.add_step_manager(this)
     end
-    step.add_step_reporter(StepReporter(partition_report_id, 
-      step_builder.name(), _metrics_collector))
+    step.add_step_reporter(MetricsReporter(partition_report_id,
+      step_builder.name(), "step", _metrics_collector))
     _steps(step_id) = step
     partition.ack(partition_id, step_id)
 
@@ -141,8 +142,8 @@ actor StepManager
     end
 
     let step: BasicStep tag = bssb()
-    step.add_step_reporter(StepReporter(step_id, bssb.name(), 
-      _metrics_collector))
+    step.add_step_reporter(MetricsReporter(step_id, bssb.name(),
+      "step", _metrics_collector))
     try
       let shared_state_step = _shared_state_steps(shared_state_step_id)
       match step

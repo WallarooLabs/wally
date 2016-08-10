@@ -12,7 +12,7 @@ use "debug"
 trait BasicStep
   be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D)
-  be add_step_reporter(sr: StepReporter val) => None
+  be add_step_reporter(sr: MetricsReporter iso) => None
 
 trait BasicOutputStep is BasicStep
   be add_output(to: BasicStep tag)
@@ -57,7 +57,7 @@ actor EmptySharedStateStep is BasicSharedStateStep
 trait BasicLocalStep
   fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D)
-  fun ref add_step_reporter(sr: StepReporter val) => None
+  fun ref add_step_reporter(sr: MetricsReporter ref) => None
 
 trait BasicOutputLocalStep is BasicLocalStep
   fun ref add_output(to: BasicStep tag)
@@ -184,12 +184,12 @@ class ComputationSteps[In: Any val, Out: Any val] is BasicComputationStep
 actor CoalesceStep[In: Any val, Out: Any val]
   is (ThroughStep[In, Out] & BasicStateStep)
   let _f: ComputationSteps[In, Out]
-  var _step_reporter: (StepReporter val | None) = None
+  var _step_reporter: (MetricsReporter ref | None) = None
 
   new create(f: ComputationStepsBuilder[In, Out] iso) =>
     _f = (consume f)()
 
-  be add_step_reporter(sr: StepReporter val) =>
+  be add_step_reporter(sr: MetricsReporter iso) =>
     _step_reporter = sr
 
   be add_output(to: BasicStep tag) =>
@@ -206,7 +206,7 @@ actor CoalesceStep[In: Any val, Out: Any val]
       _f.send[In](msg_id, source_ts, ingress_ts, input)
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
-      // | let sr: StepReporter val =>
+      // | let sr: MetricsReporter ref =>
       //   sr.report(start_time, end_time)
       // end
     end
@@ -214,12 +214,12 @@ actor CoalesceStep[In: Any val, Out: Any val]
 class CoalesceLocalStep[In: Any val, Out: Any val]
   is (ThroughLocalStep[In, Out] & BasicStateLocalStep)
   let _f: ComputationSteps[In, Out]
-  var _step_reporter: (StepReporter val | None) = None
+  var _step_reporter: (MetricsReporter ref | None) = None
 
   new create(f: ComputationStepsBuilder[In, Out] iso) =>
     _f = (consume f)()
 
-  fun ref add_step_reporter(sr: StepReporter val) =>
+  fun ref add_step_reporter(sr: MetricsReporter iso) =>
     _step_reporter = sr
 
   fun ref add_output(to: BasicStep tag) =>
@@ -236,7 +236,7 @@ class CoalesceLocalStep[In: Any val, Out: Any val]
       _f.send[In](msg_id, source_ts, ingress_ts, input)
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
-      // | let sr: StepReporter val =>
+      // | let sr: MetricsReporter ref =>
       //   sr.report(start_time, end_time)
       // end
     end
@@ -244,12 +244,12 @@ class CoalesceLocalStep[In: Any val, Out: Any val]
 actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _f: Computation[In, Out]
   var _output: BasicStep tag = EmptyStep
-  var _step_reporter: (StepReporter val | None) = None
+  var _step_reporter: (MetricsReporter ref | None) = None
 
   new create(f: Computation[In, Out] iso) =>
     _f = consume f
 
-  be add_step_reporter(sr: StepReporter val) =>
+  be add_step_reporter(sr: MetricsReporter iso) =>
     _step_reporter = sr
 
   be add_output(to: BasicStep tag) =>
@@ -266,7 +266,7 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
-      // | let sr: StepReporter val =>
+      // | let sr: MetricsReporter ref =>
       //   sr.report(start_time, end_time)
       // end
     end
@@ -274,12 +274,12 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
 class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
   let _f: Computation[In, Out]
   var _output: BasicStep tag = EmptyStep
-  var _step_reporter: (StepReporter val | None) = None
+  var _step_reporter: (MetricsReporter ref | None) = None
 
   new create(f: Computation[In, Out] iso) =>
     _f = consume f
 
-  fun ref add_step_reporter(sr: StepReporter val) =>
+  fun ref add_step_reporter(sr: MetricsReporter ref) =>
     _step_reporter = sr
 
   fun ref add_output(to: BasicStep tag) =>
@@ -296,7 +296,7 @@ class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
       end
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
-      // | let sr: StepReporter val =>
+      // | let sr: MetricsReporter ref =>
       //   sr.report(start_time, end_time)
       // end
     end
@@ -304,12 +304,12 @@ class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
 actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _f: MapComputation[In, Out]
   var _output: BasicStep tag = EmptyStep
-  var _step_reporter: (StepReporter val | None) = None
+  var _step_reporter: (MetricsReporter ref | None) = None
 
   new create(f: MapComputation[In, Out] iso) =>
     _f = consume f
 
-  be add_step_reporter(sr: StepReporter val) =>
+  be add_step_reporter(sr: MetricsReporter iso) =>
     _step_reporter = sr
 
   be add_output(to: BasicStep tag) =>
@@ -325,7 +325,7 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
-      // | let sr: StepReporter val =>
+      // | let sr: MetricsReporter ref =>
       //   sr.report(start_time, end_time)
       // end
     end
@@ -333,12 +333,12 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
 class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
   let _f: MapComputation[In, Out]
   var _output: BasicStep tag = EmptyStep
-  var _step_reporter: (StepReporter val | None) = None
+  var _step_reporter: (MetricsReporter ref | None) = None
 
   new create(f: MapComputation[In, Out] iso) =>
     _f = consume f
 
-  fun ref add_step_reporter(sr: StepReporter val) =>
+  fun ref add_step_reporter(sr: MetricsReporter ref) =>
     _step_reporter = sr
 
   fun ref add_output(to: BasicStep tag) =>
@@ -354,7 +354,7 @@ class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
       end
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
-      // | let sr: StepReporter val =>
+      // | let sr: MetricsReporter ref =>
       //   sr.report(start_time, end_time)
       // end
     end
@@ -569,7 +569,7 @@ actor Partition[In: Any val, Out: Any val]
 
 actor StateStep[In: Any val, Out: Any val, State: Any #read]
   is ThroughStateStep[In, Out, State]
-  var _step_reporter: (StepReporter val | None) = None
+  var _step_reporter: (MetricsReporter ref | None) = None
   var _output: BasicStep tag = EmptyStep
   var _shared_state: BasicSharedStateStep tag
     = EmptySharedStateStep
@@ -586,7 +586,7 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
     _state_comp_wrapper = StateComputationWrapper[In, Out, State](_state_comp,
       EmptyStep, _partition_function)
 
-  be add_step_reporter(sr: StepReporter val) =>
+  be add_step_reporter(sr: MetricsReporter iso) =>
     _step_reporter = sr
 
   be add_output(to: BasicStep tag) =>
@@ -606,7 +606,7 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
         ingress_ts, input, _state_comp_wrapper)
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
-      // | let sr: StepReporter val =>
+      // | let sr: MetricsReporter ref =>
       //   sr.report(start_time, end_time)
       // end
     end
@@ -615,7 +615,7 @@ class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
   is (ThroughStateLocalStep[In, Out, State] & BasicOutputComputationStep
     & BasicStateLocalStep)
   var _output: BasicStep tag = EmptyStep
-  var _step_reporter: (StepReporter val | None) = None
+  var _step_reporter: (MetricsReporter ref | None) = None
   var _shared_state: BasicSharedStateStep tag
     = EmptySharedStateStep
   let _state_comp: StateComputation[In, Out, State] val
@@ -631,7 +631,7 @@ class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
     _state_comp_wrapper = StateComputationWrapper[In, Out, State](_state_comp,
       EmptyStep, _partition_function)
 
-  fun ref add_step_reporter(sr: StepReporter val) =>
+  fun ref add_step_reporter(sr: MetricsReporter ref) =>
     _step_reporter = sr
 
   fun ref add_shared_state(shared_state: BasicSharedStateStep tag) =>
@@ -653,20 +653,20 @@ class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
         ingress_ts, input, _state_comp_wrapper)
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
-      // | let sr: StepReporter val =>
+      // | let sr: MetricsReporter ref =>
       //   sr.report(start_time, end_time)
       // end
     end
 
 actor SharedStateStep[State: Any #read]
   is BasicSharedStateStep
-  var _step_reporter: (StepReporter val | None) = None
+  var _step_reporter: (MetricsReporter ref | None) = None
   var _state: State
 
   new create(state_initializer: StateInitializer[State] val) =>
     _state = state_initializer()
 
-  be add_step_reporter(sr: StepReporter val) =>
+  be add_step_reporter(sr: MetricsReporter iso) =>
     _step_reporter = sr
 
   be send[D: Any val, S: Any #read](msg_id: U64, source_ts: U64,
@@ -678,7 +678,7 @@ actor SharedStateStep[State: Any #read]
       _state = s_processor(msg_id, source_ts, ingress_ts, msg_data, _state)
       let end_time = Epoch.nanoseconds()
       // match _step_reporter
-      // | let sr: StepReporter val =>
+      // | let sr: MetricsReporter ref =>
       //   sr.report(start_time, end_time)
       // end
     end
