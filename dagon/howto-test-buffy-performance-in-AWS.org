@@ -580,7 +580,7 @@ sudo cset proc -s user -e numactl -- -C 14-15 chrt -f 80 \
 
 *** Script for Kernel Tweaks
 (sysctl stuff, etc)
-#+BEGIN_SRC 
+#+BEGIN_SRC sh 
 <buffy repo>/orchestration/ansible/playbooks/roles/common/files/kerneltweaks.sh
 #+END_SRC
 
