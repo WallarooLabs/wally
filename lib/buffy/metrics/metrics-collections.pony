@@ -61,8 +61,8 @@ a latency histogram and a throughput history.
   """
     time + (_period - (time % _period))
 
-  fun json(show_empty: Bool=false): JsonArray iso^ ? =>
-    var j: JsonArray iso^ = JsonArray(_size)
+  fun json(show_empty: Bool=false): JsonArray ref^ ? =>
+    var j: JsonArray ref = JsonArray(_size)
     for idx in Range[USize](_shift, _size, 1) do
       let t1: I64 = ((_base_time + _offsets(idx))/1_000_000_000).i64()
       let t0: I64 = (((_base_time + _offsets(idx)) - _period)/1_000_000_000).i64()

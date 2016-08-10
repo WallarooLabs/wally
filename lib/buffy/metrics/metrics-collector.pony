@@ -11,7 +11,7 @@ actor JsonAccumulator
   let _event: String
   let _topic: String
   let _pretty_print: Bool
-  var j: JsonArray iso^ = JsonArray(100)
+  var j: JsonArray iso = JsonArray(100)
 
   new create(event: String, topic: String, pretty_print: Bool=false,
     output: MetricsOutputActor tag)
@@ -25,7 +25,8 @@ actor JsonAccumulator
     j.data.concat(j'.data.values())
 
   be flush() =>
-    _output(HubJson.payload(_event, _topic, consume j, _pretty_print))
+    let j': JsonArray iso = j = JsonArray(100)
+    _output(HubJson.payload(_event, _topic, consume j', _pretty_print))
 
 actor TimelineCollector
 """
@@ -43,9 +44,9 @@ sink's MetricsRecorder
   """
   Add a new Timeline to the local collection
   """
-    timelines.push(t)
+    timelines.push(consume t)
 
-  be flush(collectors: Iterator[TimelineCollector tag],
+  be flush(collectors: Iterator[TimelineCollector tag] iso,
     output: JsonAccumulator tag)
   =>
     t' = timelines = recover Array[Timeline iso](10) end
@@ -55,8 +56,8 @@ sink's MetricsRecorder
       end
     end
     if collectors.has_next() then
-      let tl = collectors.next()
-      tl.flush(collectors, output)
+      let tlc:TimelineCollector tag = collectors.next()
+      tlc.flush(collectors, output)
     else
       output.flush()
     end
@@ -114,8 +115,9 @@ actor MetricsCollector is FlushingActor
   fun _flush() =>
     let j: JsonAccumulator tag = recover JsonAccumulator(_event, _topic,
       _pretty_print, _output) end
-    let collectors = timelines.values()
-    let tl = collectors.next()
+    let collectors: Iterator[TimelineCollector tag] iso = recover
+      _timelines.values() end
+    let tl: TimelineCollector tag = collectors.next()
     tl.flush(collectors, j)
 
   be add_collector(t: TimelineCollector tag) =>
@@ -128,7 +130,7 @@ actor MetricsCollector is FlushingActor
 class MetricsReporter
 	let _id: U64
   let _name: String
-  let _catgeory: String
+  let _category: String
   let _period: U64
   let _timelinecollector: TimelineCollector tag
   var _timeline: Timeline iso
@@ -136,11 +138,10 @@ class MetricsReporter
 	new val create(id: U64, name: String, category: String,
     period: U64=1_000_000_000, metrics_collector: MetricsCollector tag)
   =>
-		_step_id = id
-    _step_name = name
+		_id = id
+    _name = name
     _category = category
     _period = period
-    _show_empty = show_empty
     _timelinecollector = TimelineCollector
     metrics_collector.add_collector(_timelinecollector)
     _timeline = recover Timeline(_name, _category, _period) end
