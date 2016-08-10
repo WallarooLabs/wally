@@ -1,7 +1,7 @@
-use "buffered"
 use "buffy/topology"
 use "files"
 use "net"
+use "buffered"
 use "ini"
 
 class JavaLengthEncoder is ByteLengthEncoder

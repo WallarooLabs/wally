@@ -1,8 +1,8 @@
-use "buffered"
 use "sendence/bytes"
 use "collections"
 use "serialise"
 use "net"
+use "buffered"
 
 primitive ReportTypes
   fun step(): U64 => 0

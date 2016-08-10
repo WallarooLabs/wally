@@ -19,7 +19,7 @@ class _TestFixTradeParsing is UnitTest
   let expected: FixOrderMessage val =
     FixOrderMessage(
       Buy
-      , "CLIENT35"
+      , 35
       , "s0XCIa"
       , "TSLA"
       , 4000.0

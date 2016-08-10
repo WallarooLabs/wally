@@ -9,6 +9,7 @@
 *.ll
 *.pyc
 fallor-readable.txt
+fixish-readable.txt
 sent.txt
 received.txt
 readable.txt

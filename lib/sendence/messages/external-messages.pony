@@ -1,5 +1,5 @@
-use "buffered"
 use "net"
+use "buffered"
 
 primitive _Data                                 fun apply(): U16 => 1
 primitive _Ready                                fun apply(): U16 => 2

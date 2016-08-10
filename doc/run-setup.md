@@ -61,7 +61,7 @@ apps/market-spread/market-spread -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 
 
 Giles sender:
 ```
-giles/sender/sender -b 127.0.0.1:7000 -m 1000000 -f ./demos/marketspread/trades.msg -r --ponythreads 1 -s 500
+giles/sender/sender -b 127.0.0.1:7000 -m 1000000 -f ./demos/marketspread/trades-fixish.msg -r --ponythreads 1 -s 500
 
 giles/sender/sender -b 127.0.0.1:7001 -m 1000000 -f ./demos/marketspread/nbbo.msg -r --ponythreads 1 -s 500
 ```
@@ -126,7 +126,7 @@ sudo cset proc -s user -e numactl -- -C 5-11 chrt -f 80 apps/market-spread/marke
 
 Giles sender:
 ```
-sudo cset proc -s user -e numactl -- -C 12-13 chrt -f 80 giles/sender/sender -b 127.0.0.1:7000 -m 1000000 -f ./demos/marketspread/trades.msg -r --ponythreads 1 -s 500
+sudo cset proc -s user -e numactl -- -C 12-13 chrt -f 80 giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -f ./demos/marketspread/trades-fixish.msg -r --ponythreads 1 -s 50000 -y -g 52
 
 sudo cset proc -s user -e numactl -- -C 14-15 chrt -f 80 giles/sender/sender -b 127.0.0.1:7001 -m 1000000 -f ./demos/marketspread/nbbo.msg -r --ponythreads 1 -s 500
 ```
@@ -137,8 +137,17 @@ TOP
 ---------------------------------
 
 ```
-top | grep 'buffy\|double\|word-count\|market-spread'
+top | grep 'buffy\|double\|word-count\|market-spread\|passthrough\|fixish\|fixparse'
 ```
 
 ---------------------------------
+JR
+---------------------------------
+```
+apps/x/x -i 127.0.0.1:7000 -o 127.0.0.1:8000 -e 10000000 --ponythreads 3 --ponynoblock
+```
+
+```
+nc -l 127.0.0.1 8000 >> /dev/null
+```
 

@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "buffy/topology"
 use "buffy/sink-node"
 use "sendence/fix"
+use "sendence/new-fix"
 use "sendence/epoch"
 use "net"
 use "random"
@@ -57,7 +58,7 @@ actor Main
     let path = FilePath(auth, "./demos/marketspread/100nbbo.msg")
     let data_source = FileDataSource(auth, path)
     for line in consume data_source do
-      let fix_message = FixParser(line)
+      let fix_message = FixishMsgDecoder(line.array())
       match fix_message
       | let nbbo: FixNbboMessage val =>
         let mid = (nbbo.bid_px() + nbbo.offer_px()) / 2
@@ -169,7 +170,7 @@ class CheckStatus is StateComputation[FixOrderMessage val, OrderResult val,
 class OrderResult
   let order_id: String
   let timestamp: U64
-  let client_id: String
+  let client_id: U32
   let symbol: String
   let price: F64
   let qty: U64
@@ -180,7 +181,7 @@ class OrderResult
 
   new val create(order_id': String,
     timestamp': U64,
-    client_id': String,
+    client_id': U32,
     symbol': String,
     price': F64,
     qty': U64,
@@ -201,9 +202,10 @@ class OrderResult
     is_rejected = is_rejected'
 
   fun string(): String =>
-    symbol + "," + order_id + "," + timestamp.string() + "," + client_id + ","
-      + price.string() + "," + qty.string() + "," + side + "," 
-      + bid.string() + "," + offer.string() + "," + is_rejected.string()
+    (symbol.clone().append(order_id).append(timestamp.string())
+      .append(client_id.string()).append(price.string())
+      .append(qty.string()).append(side).append(bid.string())
+      .append(offer.string()).append(is_rejected.string())).clone()
 
 interface Symboly
   fun symbol(): String
@@ -214,17 +216,26 @@ class SymbolPartition is PartitionFunction[Symboly val]
 
 class NbboParser is Parser[FixNbboMessage val]
   fun apply(s: String): (FixNbboMessage val | None) =>
-    match FixParser(s)
-    | let m: FixNbboMessage val => m
+    try
+      match FixishMsgDecoder(s.array())
+      | let m: FixNbboMessage val => m
+      else
+        None
+      end
     else
-      None
+      None  
     end
 
 class TradeParser is Parser[FixOrderMessage val]
   fun apply(s: String): (FixOrderMessage val | None) =>
-    match FixParser(s)
-    | let m: FixOrderMessage val => m
+    try
+      match FixishMsgDecoder(s.array())
+      | let m: FixOrderMessage val => m
+      else
+        None
+      end
     else
+      @printf[I32]("Error parsing fixish\n".cstring())
       None
     end
 
@@ -238,7 +249,7 @@ primitive ResultArrayStringify
     result.push(input.symbol)
     result.push(input.order_id)
     result.push(input.timestamp.string())
-    result.push(input.client_id)
+    result.push(input.client_id.string())
     result.push(input.price.string())
     result.push(input.qty.string())
     result.push(input.side)
