@@ -1,11 +1,11 @@
 debug: true
 
-# only build for master and tags
-branches:
-  - master
-  - python-buffy
-  - refs/tags/*
-  - add-monitoring-hub
+## only build for master and tags
+#branches:
+#  - master
+#  - python-buffy
+#  - refs/tags/*
+#  - add-monitoring-hub
 
 
 # clone source code with tags
@@ -16,7 +16,7 @@ clone:
 build:
   # main build of buffy
   main_build:
-    image: sendence/ponyc:sendence-9.0.0-$$PONYC_CONFIG
+    image: sendence/ponyc:sendence-12.1.0-$$PONYC_CONFIG
     pull: true
     commands:
       - make clean arch=$$PONYC_VERSION in_docker=true
@@ -113,6 +113,9 @@ build:
     pull: true
     commands:
       - make test-monitoring-hub
+    when:
+      matrix:
+        PONYC_VERSION: amd64
 
   # build metrics reporter ui
   build_metrics_reporter_ui:
@@ -123,6 +126,9 @@ build:
     pull: true
     commands:
       - make build-metrics-reporter-ui
+    when:
+      matrix:
+        PONYC_VERSION: amd64
 
   # build market spread reports ui
   build_market_spread_reports_ui:
@@ -133,6 +139,9 @@ build:
     pull: true
     commands:
       - make build-market-spread-reports-ui
+    when:
+      matrix:
+        PONYC_VERSION: amd64
 
   # build monitoring hub ui docker images
   build_monitoring_hub_ui_docker_images:
@@ -151,6 +160,9 @@ build:
         make build-metrics-reporter-ui-docker arch=$$PONYC_VERSION
         docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
     privileged: true
+    when:
+      matrix:
+        PONYC_VERSION: amd64
 
   # build and push final monitoring hub ui docker images on a push event
   build_monitoring_hub_ui_docker_images_push:
@@ -172,6 +184,8 @@ build:
     privileged: true
     when:
       event: push
+      matrix:
+        PONYC_VERSION: amd64
 
   # build and push monitoring hub ui docker images on tag event
   build_monitoring_hub_ui_docker_images_tag:
@@ -193,6 +207,19 @@ build:
     privileged: true
     when:
       event: tag
+      matrix:
+        PONYC_VERSION: amd64
+
+  # run dagon spike tests
+  run_dagon_spike_test:
+    image: sendence/$$PONYC_VERSION-python-runner:0.0.4
+    pull: true
+    environment:
+      - LC_ALL=C.UTF-8
+      - LANG=C.UTF-8
+    commands:
+      - chrt -f 80 make dagon-spike-test arch=$$PONYC_VERSION
+    privileged: true
 
 # send notifications to slack
 notify:

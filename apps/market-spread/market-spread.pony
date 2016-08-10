@@ -156,12 +156,14 @@ class CheckStatus is StateComputation[FixOrderMessage val, OrderResult val,
       else
         MarketDataEntry(true, 0, 0)
       end
-    let result: OrderResult val = OrderResult(order.order_id(),
-      Epoch.seconds(), order.account(), order.symbol(), 
-      order.price(), order.order_qty().u64(), order.side().string(), 
-      market_data_entry.bid, market_data_entry.offer, 
-      market_data_entry.is_rejected)
-    output(result)
+    // if market_data_entry.is_rejected then
+      let result: OrderResult val = OrderResult(order.order_id(),
+        Epoch.seconds(), order.account(), order.symbol(),
+        order.price(), order.order_qty().u64(), order.side().string(),
+        market_data_entry.bid, market_data_entry.offer,
+        market_data_entry.is_rejected)
+      output(result)
+    // end
     state
  
 class OrderResult

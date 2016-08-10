@@ -11,7 +11,7 @@
   replace:
     dest: /lib/systemd/system/docker.service
     regexp: ^ExecStart.*
-    replace: ExecStart=/usr/bin/docker daemon --insecure-registry docker.sendence.com:5043 --storage-driver=overlay -D -H tcp://{{ my_ip }}:2375 -H fd:// {{ '-H tcp://' + ansible_hostname + ':2375' if ((use_hostname is defined) and (use_hostname == true)) else '' }} --cluster-advertise {{ my_ip }}:2375 --cluster-store consul://{{ my_ip }}:8500
+    replace: ExecStart=/usr/bin/docker daemon --insecure-registry docker.sendence.com:5043 {{ '' if ((userland_proxy is defined) and (userland_proxy == true)) else '--userland-proxy=false' }} --storage-driver=overlay -D -H tcp://{{ my_ip }}:2375 -H fd:// {{ '-H tcp://' + ansible_hostname + ':2375' if ((use_hostname is defined) and (use_hostname == true)) else '' }} --cluster-advertise {{ my_ip }}:2375 --cluster-store consul://{{ my_ip }}:8500
 
 - name: Update docker startup dependency for network
   replace:
@@ -65,5 +65,6 @@
     reauth: yes
 
 - name: login to private Docker remote registry for user
-  command: cp -rf /root/.docker /home/{{ docker_users }}/
+  command: creates=/home/{{ item }}/.docker cp -rf /root/.docker /home/{{ item }}/
+  with_items: '{{ docker_users or [] }}'
 

@@ -17,9 +17,10 @@ trait BasicSharedStateStepBuilder
 
 trait LocalStepBuilder is BasicStepBuilder
   fun local(): BasicOutputLocalStep
+  fun state_id(): (U64 | None) => None
 
 trait BasicStateStepBuilder is BasicStepBuilder
-  fun state_id(): U64
+  fun state_id(): (U64 | None)
 
 trait SinkBuilder
   fun apply(conns: Array[TCPConnection] iso, metrics_collector: MetricsCollector)
@@ -36,7 +37,7 @@ trait BasicOutputComputationStepBuilder
   fun apply(): BasicOutputComputationStep
   fun name(): String
 
-class TypedBasicOutputComputationStepBuilder[In: Any val, Out: Any val] is
+class ComputationStepBuilder[In: Any val, Out: Any val] is
   BasicOutputComputationStepBuilder
   let _comp_builder: ComputationBuilder[In, Out] val
   let _name: String
@@ -47,6 +48,44 @@ class TypedBasicOutputComputationStepBuilder[In: Any val, Out: Any val] is
 
   fun apply(): BasicOutputComputationStep =>
     ComputationStep[In, Out](_comp_builder())
+
+  fun name(): String => _name
+
+class MapComputationStepBuilder[In: Any val, Out: Any val] is
+  BasicOutputComputationStepBuilder
+  let _comp_builder: MapComputationBuilder[In, Out] val
+  let _name: String
+
+  new val create(c: MapComputationBuilder[In, Out] val) =>
+    _comp_builder = c
+    _name = c().name()
+
+  fun apply(): BasicOutputComputationStep =>
+    MapComputationStep[In, Out](_comp_builder())
+
+  fun name(): String => _name
+
+class StateLocalStepBuilder[In: Any val, Out: Any val, State: Any #read]
+  is BasicOutputComputationStepBuilder
+  let _s_comp: StateComputation[In, Out, State] val
+  let _shared_state_step_builder: SharedStateStepBuilder[State] val
+  let _state_id: U64
+  let _name: String
+
+  new val create(s_comp: StateComputation[In, Out, State] val,
+    state_initializer: StateInitializer[State] val, s_id: U64) =>
+    _s_comp = s_comp
+    _shared_state_step_builder =
+      SharedStateStepBuilder[State](state_initializer)
+    _state_id = s_id
+    _name = _s_comp.name()
+
+  fun apply(): BasicOutputComputationStep =>
+    StateLocalStep[In, Out, State](_s_comp, _state_id)
+
+  fun state_id(): (U64 | None) => _state_id
+  fun shared_state_step_builder(): BasicSharedStateStepBuilder val =>
+    _shared_state_step_builder
 
   fun name(): String => _name
 
@@ -61,22 +100,33 @@ class ComputationStepsBuilder[In: Any val, Out: Any val]
 
   fun ref add(f: BasicOutputComputationStepBuilder val) =>
     let next_step = f()
-    _last_step.add_output(next_step)
+    _last_step.add_local_output(next_step)
     _last_step = next_step
 
   fun ref apply(): ComputationSteps[In, Out] => 
     ComputationSteps[In, Out](_first_step, _last_step)
 
 class CoalesceStepBuilder[In: Any val, Out: Any val]
-  is (ThroughStepBuilder[In, Out] & LocalStepBuilder)
+  is (ThroughStepBuilder[In, Out] & LocalStepBuilder & BasicStateStepBuilder)
   let _comp_step_builders: Array[BasicOutputComputationStepBuilder val] val
+  let _shared_state_step_builder: BasicSharedStateStepBuilder val
+  let _state_id: (U64 | None)
   var _name: String = ""
 
-  new val create(cs: Array[BasicOutputComputationStepBuilder val] iso) =>
+  new val create(cs: Array[BasicOutputComputationStepBuilder val] iso,
+    s_id: (U64 | None) = None, 
+    sssb: BasicSharedStateStepBuilder val = EmptySharedStateStepBuilder) 
+  =>
     _comp_step_builders = consume cs
     for builder in _comp_step_builders.values() do
-      _name = _name + builder.name()
+      _name = if _name == "" then
+        builder.name()
+      else
+        _name + "->" + builder.name()
+      end
     end
+    _state_id = s_id
+    _shared_state_step_builder = sssb
 
   fun apply(): BasicStep tag =>
     try
@@ -110,21 +160,64 @@ class CoalesceStepBuilder[In: Any val, Out: Any val]
       EmptyLocalStep
     end
 
+  fun shared_state_step_builder(): BasicSharedStateStepBuilder val =>
+    _shared_state_step_builder
+
   fun name(): String => _name
+  fun state_id(): (U64 | None) => _state_id
 
-class SourceBuilder[Out: Any val]
-  is ThroughStepBuilder[String, Out]
-  let _parser: Parser[Out] val
-  let _pipeline_name: String
+// class CoalesceStateStepBuilder[In: Any val, Out: Any val, State: Any #read]
+//   is (ThroughStepBuilder[In, Out] & LocalStepBuilder & BasicStateStepBuilder)
+//   let _comp_step_builders: Array[BasicOutputComputationStepBuilder val] val
+//   let _state_comp: StateComputation[In, Out, State] val
+//   let _name: String
+//   let _state_id: U64 
 
-  new val create(p: Parser[Out] val, pipeline_name: String) =>
-    _parser = p
-    _pipeline_name = pipeline_name
+//   new val create(cs: Array[BasicOutputComputationStepBuilder val] iso,
+//     state_comp: StateComputation[In, Out, State] val, s_id: U64) =>
+//     _comp_step_builders = consume cs
+//     _state_comp = state_comp
+//     _state_id = s_id
+//     for builder in _comp_step_builders.values() do
+//       _name = _name + builder.name()
+//     end
 
-  fun apply(): BasicStep tag =>
-    Source[Out](_parser)
+//   fun apply(): BasicStep tag =>
+//     try
+//       let first_step_builder = _comp_step_builders(0)
+//       let c_steps_builder: ComputationStepsBuilder[In, Out] iso = 
+//         ComputationStepsBuilder[In, Out](first_step_builder)
+//       for (idx, builder) in _comp_step_builders.pairs() do
+//         if idx > 0 then
+//           c_steps_builder.add(builder)
+//         end
+//       end
 
-  fun name(): String => _pipeline_name + " Source"
+//       CoalesceStateStep[In, Out](consume c_steps_builder, _state_comp, 
+//         _state_id)
+//     else
+//       EmptyStep
+//     end
+
+//   fun local(): BasicOutputLocalStep =>
+//     try
+//       let first_step_builder = _comp_step_builders(0)
+//       let c_steps_builder: ComputationStepsBuilder[In, Out] iso = 
+//         ComputationStepsBuilder[In, Out](first_step_builder)
+//       for (idx, builder) in _comp_step_builders.pairs() do
+//         if idx > 0 then
+//           c_steps_builder.add(builder)
+//         end
+//       end
+
+//       CoalesceLocalStateStep[In, Out](consume c_steps_builder, _state_comp,
+//         _state_id)
+//     else
+//       EmptyLocalStep
+//     end
+
+//   fun name(): String => _name
+//   fun state_id(): U64 => _state_id
 
 class StepBuilder[In: Any val, Out: Any val]
   is (ThroughStepBuilder[In, Out] & LocalStepBuilder)
@@ -160,10 +253,8 @@ class MapStepBuilder[In: Any val, Out: Any val]
 
   fun name(): String => _name
 
-class PassThroughStepBuilder[In: Any val, Out: Any val]
-  is (ThroughStepBuilder[In, Out] & LocalStepBuilder)
-  fun apply(): BasicStep tag =>
-    PassThrough
+class PassThroughStepBuilder[In: Any val, Out: Any val] is LocalStepBuilder
+  fun apply(): BasicStep tag => EmptyStep
 
   fun local(): BasicOutputLocalStep =>
     PassThroughLocalStep
@@ -212,10 +303,11 @@ class PartitionBuilder[In: Any val, Out: Any val]
 //   fun name(): String => _name
 
 class StateStepBuilder[In: Any val, Out: Any val, State: Any #read]
-  is (ThroughStepBuilder[In, Out] & BasicStateStepBuilder)
+  is (ThroughStepBuilder[In, Out] & BasicStateStepBuilder & LocalStepBuilder)
   let _s_comp: StateComputation[In, Out, State] val
   let _shared_state_step_builder: SharedStateStepBuilder[State] val
   let _state_id: U64
+  let _state_initializer: StateInitializer[State] val
   let _name: String
 
   new val create(s_comp: StateComputation[In, Out, State] val,
@@ -224,10 +316,14 @@ class StateStepBuilder[In: Any val, Out: Any val, State: Any #read]
     _shared_state_step_builder =
       SharedStateStepBuilder[State](state_initializer)
     _state_id = s_id
+    _state_initializer = state_initializer
     _name = _s_comp.name()
 
   fun apply(): BasicStateStep tag =>
     StateStep[In, Out, State](_s_comp, _state_id)
+
+  fun local(): BasicOutputLocalStep =>
+    StateLocalStep[In, Out, State](_s_comp, _state_id)
 
   fun state_id(): U64 => _state_id
   fun shared_state_step_builder(): BasicSharedStateStepBuilder val =>

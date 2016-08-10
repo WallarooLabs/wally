@@ -1,3 +1,4 @@
+use "buffered"
 use "net"
 use "sendence/messages"
 
@@ -6,8 +7,8 @@ trait MessageFileParser
 
 interface TextMessageFileParser is MessageFileParser
 """
-The TextMessageFileParser interface provides default methods for splitting a 
-block of input text into an array of Strings, which can overridden by a 
+The TextMessageFileParser interface provides default methods for splitting a
+block of input text into an array of Strings, which can overridden by a
 subclass.
 """
   fun ls(): (String|None) =>
@@ -68,7 +69,7 @@ class TextMessageFileReader
                 end
               end
             else
-              env.err.print("Failed reading on line " 
+              env.err.print("Failed reading on line "
                 + cur_line_number.string() + ":")
               env.err.print(
                 "---------------------------------------------------")
@@ -88,23 +89,23 @@ class TextMessageFileReader
 
 class ReceivedMessageFileReader
   fun ref apply(input: Array[U8] val, parser: MessageFileParser ref,
-    env: Env) ? 
+    env: Env) ?
   =>
   """
   """
-    let rb: ReadBuffer = ReadBuffer
+    let rb: Reader = Reader
     rb.append(input)
     var bytes_left = input.size()
     while bytes_left > 0 do
-      // Msg size, msg size u32, and timestamp together make up next payload 
+      // Msg size, msg size u32, and timestamp together make up next payload
       // size
-      let next_payload_size = rb.peek_u32_be() + 12 
-      let fields = 
+      let next_payload_size = rb.peek_u32_be() + 12
+      let fields =
         try
           FallorMsgDecoder.with_timestamp(rb.block(next_payload_size.usize()))
         else
           env.err.print("Problem decoding!")
-          error 
+          error
         end
       bytes_left = bytes_left - next_payload_size.usize()
       parser(fields)

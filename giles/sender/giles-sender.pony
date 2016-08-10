@@ -1,6 +1,7 @@
 """
 Giles Sender
 """
+use "buffered"
 use "collections"
 use "files"
 use "net"
@@ -157,6 +158,9 @@ class ToBuffyNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     _coordinator.to_buffy_socket(sock, Ready)
 
+  fun ref throttled(sock: TCPConnection ref, value: Bool) =>
+    _coordinator.pause_sending(value)
+
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator
   let _framer: Framer = Framer
@@ -218,6 +222,7 @@ interface tag Coordinator
   be finished()
   be sending_actor(sa: SendingActor)
   be to_buffy_socket(sock: TCPConnection, state: WorkerState)
+  be pause_sending(v: Bool)
 
 primitive Waiting
 primitive Ready
@@ -253,6 +258,12 @@ actor WithoutDagonCoordinator
       x.dispose()
     end
     _store.dispose()
+
+  be pause_sending(v: Bool) =>
+    try
+      let sa = _sending_actor as SendingActor
+      sa.pause(v)
+    end
 
   fun _go_if_ready() =>
     if _to_buffy_socket._2 is Ready then
@@ -314,6 +325,12 @@ actor WithDagonCoordinator
     end
     _store.dispose()
 
+  be pause_sending(v: Bool) =>
+    try
+      let sa = _sending_actor as SendingActor
+      sa.pause(v)
+    end
+
   fun _go_if_ready() =>
     if (_to_dagon_socket._2 is Ready) and (_to_buffy_socket._2 is Ready) then
       _send_ready()
@@ -337,10 +354,11 @@ actor SendingActor
   let _coordinator: Coordinator
   let _timers: Timers
   let _data_source: Iterator[String] iso
+  var _paused: Bool = false
   var _finished: Bool = false
   let _batch_size: USize
   let _interval: U64
-  let _wb: WriteBuffer
+  let _wb: Writer
   // let _msg_encoder: BufferedExternalMsgEncoder
 
   new create(messages_to_send: USize,
@@ -359,15 +377,19 @@ actor SendingActor
     _timers = Timers
     _batch_size = batch_size
     _interval = interval
-    _wb = WriteBuffer
+    _wb = Writer
     // _msg_encoder = BufferedExternalMsgEncoder(where chunks = _batch_size)
 
   be go() =>
     let t = Timer(SendBatch(this), 0, _interval)
     _timers(consume t)
 
+  be pause(v: Bool) =>
+    @printf[None]("pause received\n".cstring())
+    _paused = v
+
   be send_batch() =>
-    if _finished then return end
+    if _paused or _finished then return end
 
     var current_batch_size =
       if (_messages_to_send - _messages_sent) > _batch_size then
@@ -462,7 +484,7 @@ class SentLogEncoder
 //
 
 class IntegerDataSource is Iterator[String]
-  var _counter: U64
+  var _counter: U32
 
   new iso create() =>
     _counter = 0

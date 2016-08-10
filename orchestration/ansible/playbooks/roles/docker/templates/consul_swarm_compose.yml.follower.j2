@@ -4,6 +4,7 @@ services:
     image: {{ swarm_image }}
     restart: always
     command: join --advertise {{ my_ip }}:2375 consul://{{ my_ip }}:8500
+    cpuset: 0-{{ ((num_system_cpus|int)-1) if num_system_cpus is defined else 0 }}
 
   consul:
     image: {{ consul_image }}
@@ -20,4 +21,5 @@ services:
       - {{ my_ip }}:8302:8302/udp
     command: agent -server -rejoin -data-dir /data -ui -bind {{ my_ip }} -client {{ my_ip }} -join {{ leader_ip }}:8301
     network_mode: host
+    cpuset: 0-{{ ((num_system_cpus|int)-1) if num_system_cpus is defined else 0 }}
 

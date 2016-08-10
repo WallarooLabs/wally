@@ -1,3 +1,4 @@
+use "buffered"
 use "net"
 use "options"
 use "files"
@@ -18,7 +19,7 @@ actor Main
         match option
         | ("input", let arg: String) => input_file_path = arg
         | ("output", let arg: String) => output_file_path = arg
-        | ("help", None) => 
+        | ("help", None) =>
           env.out.print(
             """
             PARAMETERS:
@@ -40,19 +41,19 @@ actor Main
 
       let output_file = File(FilePath(auth, output_file_path))
 
-      let rb = ReadBuffer
+      let rb = Reader
       rb.append(input)
       var bytes_left = input.size()
       while bytes_left > 0 do
-        // Msg size, msg size u32, and timestamp together make up next payload 
+        // Msg size, msg size u32, and timestamp together make up next payload
         // size
-        let next_payload_size = rb.peek_u32_be() + 12 
-        let fields = 
+        let next_payload_size = rb.peek_u32_be() + 12
+        let fields =
           try
             FallorMsgDecoder.with_timestamp(rb.block(next_payload_size.usize()))
           else
             env.err.print("Problem decoding!")
-            error 
+            error
           end
         output_file.print(", ".join(fields))
         bytes_left = bytes_left - next_payload_size.usize()

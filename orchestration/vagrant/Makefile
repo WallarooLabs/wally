@@ -19,9 +19,9 @@ endif
 default: build
 
 sleep10: # sleep 10 seconds
-        @echo "\033[36m==> Sleeping 10 seconds for vagrant machines to \
+	@echo "\033[36m==> Sleeping 10 seconds for vagrant machines to \
  spin up...\033[0m"
-        @sleep 10
+	@sleep 10
 
 cluster: build sleep10 configure ## Creates a cluster and configures it with Ansible
 

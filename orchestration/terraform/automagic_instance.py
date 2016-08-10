@@ -16,6 +16,13 @@ def get_instances_for_placement_groups(url):
         "'\\w{2,3}\\.\\w{5,}' | grep -v amazon"
   popen_proc = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
   proc_out, proc_err = popen_proc.communicate()
+  if popen_proc.wait() != 0:
+    sys.stderr.write("Command failed! {0}\n".format(cmd))
+    sys.stderr.write("Stdout:\n")
+    sys.stderr.write(proc_out)
+    sys.stderr.write("Stderr:\n")
+    sys.stderr.write(proc_err)
+    sys.exit(1)
   return proc_out
 
 # use curl/jq to get a json array of instances/prices from aws
@@ -27,6 +34,13 @@ def get_instances_for_region(url, region):
         " | jq -s add").format(url, region)
   popen_proc = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
   proc_out, proc_err = popen_proc.communicate()
+  if popen_proc.wait() != 0:
+    sys.stderr.write("Command failed! {0}\n".format(cmd))
+    sys.stderr.write("Stdout:\n")
+    sys.stderr.write(proc_out)
+    sys.stderr.write("Stderr:\n")
+    sys.stderr.write(proc_err)
+    sys.exit(1)
   return json.loads(proc_out)
 
 # get an array of instances for a region
@@ -61,6 +75,13 @@ def get_spot_price_history(region, availability_zone, instances, start_offset
   cmd = cmd + az_arg
   popen_proc = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
   proc_out, proc_err = popen_proc.communicate()
+  if popen_proc.wait() != 0:
+    sys.stderr.write("Command failed! {0}\n".format(cmd))
+    sys.stderr.write("Stdout:\n")
+    sys.stderr.write(proc_out)
+    sys.stderr.write("Stderr:\n")
+    sys.stderr.write(proc_err)
+    sys.exit(1)
   return json.loads(proc_out)
 
 CURRENT_GEN_URL = "https://a0.awsstatic.com/pricing/1/ec2/linux-od.js"

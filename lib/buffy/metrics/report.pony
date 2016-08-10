@@ -1,3 +1,4 @@
+use "buffered"
 use "sendence/bytes"
 use "collections"
 use "serialise"
@@ -22,12 +23,12 @@ class UnknownMetricsMsg is MetricsWireMsg
     data = d
 
 primitive MetricsMsgEncoder
-  fun _encode(msg: MetricsWireMsg val, auth: AmbientAuth): 
-    Array[ByteSeq] val ? 
+  fun _encode(msg: MetricsWireMsg val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
     let serialised: Array[U8] val =
       Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
-    let wb = WriteBuffer
+    let wb = Writer
     let size = serialised.size()
     if size > 0 then
       wb.u32_be(size.u32())
@@ -115,7 +116,7 @@ class BoundaryMetricsReport is MetricsReport
   let end_time: U64
   let pipeline: String
 
-  new val create(b_type: U64, m_id: U64, s_ts: U64, e_ts: U64, 
+  new val create(b_type: U64, m_id: U64, s_ts: U64, e_ts: U64,
     p: String = "") =>
     boundary_type = b_type
     msg_id = m_id
@@ -129,7 +130,7 @@ class BoundaryMetricsReport is MetricsReport
 
 class BoundaryMetricsSummary is MetricsWireMsg
   let node_name: String
-  let reports: BoundaryReports trn 
+  let reports: BoundaryReports trn
 
   new create(name: String, len: USize = 0) =>
     node_name = name

@@ -1,9 +1,10 @@
+use "buffered"
 use "net"
 use "debug"
 
 primitive FallorMsgEncoder
-  fun apply(data: (String | Seq[String] val), wb: WriteBuffer = WriteBuffer): 
-    Array[ByteSeq] val 
+  fun apply(data: (String | Seq[String] val), wb: Writer = Writer):
+    Array[ByteSeq] val
   =>
   """
     [Header | Total size | (String size | String) ... ]
@@ -30,24 +31,24 @@ primitive FallorMsgEncoder
         wb.u32_be(s.size().u32())
         wb.write(s)
       end
-    end     
+    end
     wb.done()
 
-  fun timestamp_raw(timestamp: U64, data: Array[U8] val, 
-    wb: WriteBuffer = WriteBuffer): Array[ByteSeq] val 
+  fun timestamp_raw(timestamp: U64, data: Array[U8] val,
+    wb: Writer = Writer): Array[ByteSeq] val
   =>
     let size = data.size()
     wb.u32_be(size.u32())
     wb.u64_be(timestamp)
     wb.write(data)
     wb.done()
-    
+
 primitive FallorMsgDecoder
   fun apply(data: Array[U8] val): Array[String] val ? =>
     _decode(data)
 
   fun _decode(data: Array[U8] val): Array[String] val ? =>
-    let rb = ReadBuffer
+    let rb = Reader
     rb.append(data)
     var total_size = rb.u32_be()
     let arr: Array[String] iso = recover Array[String](total_size.usize()) end
@@ -62,10 +63,10 @@ primitive FallorMsgDecoder
 
     consume arr
 
-  fun with_timestamp(data: Array[U8] val): Array[String] val ? 
+  fun with_timestamp(data: Array[U8] val): Array[String] val ?
   =>
     let arr: Array[String] iso = recover Array[String] end
-    let rb = ReadBuffer
+    let rb = Reader
     rb.append(data)
     var bytes_left = rb.u32_be()
     let timestamp = rb.u64_be()
@@ -80,6 +81,6 @@ primitive FallorMsgDecoder
         arr.push(next_str)
         next_bytes_left = next_bytes_left - s_len
       end
-      bytes_left = bytes_left - (next_total_size + 4)   
+      bytes_left = bytes_left - (next_total_size + 4)
     end
     consume arr

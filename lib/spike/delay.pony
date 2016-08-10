@@ -1,3 +1,4 @@
+use "buffered"
 use "collections"
 use "net"
 use "random"
@@ -126,7 +127,7 @@ class DelaySent is TCPConnectionNotify
 
 class _ReceivedDelayer is _Delayer
   var _delaying: Bool = false
-  embed _delayed: ReadBuffer = ReadBuffer
+  embed _delayed: Reader = Reader
   let _config: DelayerConfig
   let _dice: Dice
   var _next_delaying_flip: USize = 0
@@ -191,7 +192,7 @@ class _ReceivedDelayer is _Delayer
 class _SentDelayer is _Delayer
   let _config: DelayerConfig
   let _dice: Dice
-  embed _delayed: ReadBuffer = ReadBuffer
+  embed _delayed: Reader = Reader
   var _delaying: Bool = false
   var _next_delaying_flip: USize = 0
 
@@ -266,7 +267,7 @@ class _SentDelayer is _Delayer
     _next_delaying_flip = _bytes_to_delay(_config, _dice)
 
 trait _Delayer
-  fun ref _bytes_to_allow(c: DelayerConfig, b: ReadBuffer, d: Dice): USize =>
+  fun ref _bytes_to_allow(c: DelayerConfig, b: Reader, d: Dice): USize =>
     let i = _next_interval(c.through_min_bytes, c.through_max_bytes, d)
     i + b.size()
 
@@ -275,4 +276,4 @@ trait _Delayer
 
   fun ref _next_interval(min: USize, max: USize, d: Dice): USize =>
     d(min.u64(), max.u64()).usize()
-    
+

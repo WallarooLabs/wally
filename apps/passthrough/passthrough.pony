@@ -4,6 +4,62 @@ use "net"
 use "options"
 use "time"
 
+class IncomingNotify is TCPConnectionNotify
+  let _sender: TCPConnection
+  let _metrics: Metrics
+  let _expected: USize
+  var _header: Bool = true
+  var _count: USize = 0
+
+  var _msg_count: USize = 0
+
+  new iso create(sender: TCPConnection, metrics: Metrics, expected: USize) =>
+    _sender = sender
+    _metrics = metrics
+    _expected = expected
+
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+    if _header then
+      try
+        _count = _count + 1
+
+        if _count == 1 then
+          _metrics.set_start(Time.nanos())
+        end
+        if _count == _expected then
+          _metrics.set_end(Time.nanos(), _expected)
+        end
+
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+
+        conn.expect(expect)
+        _header = false
+      end
+    else
+      if _count <= _expected then
+        _sender.write(consume data)
+      end
+
+      conn.expect(4)
+      _header = true
+    end
+    false
+
+  fun ref accepted(conn: TCPConnection ref) =>
+    @printf[None]("accepted\n".cstring())
+    conn.expect(4)
+
+  fun ref connected(sock: TCPConnection ref) =>
+    @printf[None]("incoming connected\n".cstring())
+
+class OutNotify is TCPConnectionNotify
+  fun ref connected(sock: TCPConnection ref) =>
+    @printf[None]("outgoing connected\n".cstring())
+
+///
+/// YAWN from here on down
+///
+
 actor Main
   new create(env: Env) =>
     var i_arg: (Array[String] | None) = None
@@ -29,6 +85,7 @@ actor Main
       let in_addr = i_arg as Array[String]
       let out_addr = o_arg as Array[String]
       let metrics = Metrics
+      let metrics2 = Metrics
 
       let connect_auth = TCPConnectAuth(env.root as AmbientAuth)
       let out_socket = TCPConnection(connect_auth,
@@ -36,12 +93,9 @@ actor Main
             out_addr(0),
             out_addr(1))
 
-      let last_pass = LastPass(out_socket, metrics, expected)
-      let first_pass = FirstPass(last_pass, metrics)
-
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       let listener = TCPListener(listen_auth,
-            ListenerNotify(first_pass, metrics, expected),
+            ListenerNotify(out_socket, metrics, expected),
             in_addr(0),
             in_addr(1))
 
@@ -49,11 +103,11 @@ actor Main
     end
 
 class ListenerNotify is TCPListenNotify
-  let _fp: FirstPass
+  let _fp: TCPConnection
   let _metrics: Metrics
   let _expected: USize
 
-  new iso create(fp: FirstPass, metrics: Metrics, expected: USize) =>
+  new iso create(fp: TCPConnection, metrics: Metrics, expected: USize) =>
     _fp = fp
     _metrics = metrics
     _expected = expected
@@ -61,106 +115,11 @@ class ListenerNotify is TCPListenNotify
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     IncomingNotify(_fp, _metrics, _expected)
 
-class IncomingNotify is TCPConnectionNotify
-  let _fp: FirstPass
-  let _metrics: Metrics
-  let _expected: USize
-  var _header: Bool = true
-  var _count: USize = 0
-
-  new iso create(fp: FirstPass, metrics: Metrics, expected: USize) =>
-    _fp = fp
-    _metrics = metrics
-    _expected = expected
-
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso) =>
-    if _header then
-      try
-        _count = _count + 1
-        if ((_count % 100_000) == 0) and (_count <= _expected) then
-          @printf[I32]("%zu received\n".cstring(), _count)
-        end
-
-        if _count == 1 then
-          _metrics.set_start(Time.wall_to_nanos(Time.now()))
-          // @printf[I32]("Start: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
-        end
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
-
-        conn.expect(expect)
-        _header = false
-      end
-    else
-      if _count <= _expected then
-        _fp.take(1, 1, 1, consume data)
-      else
-        _count = 0
-      end
-
-      conn.expect(4)
-      _header = true
-    end
-
-  fun ref accepted(conn: TCPConnection ref) =>
-    @printf[None]("accepted\n".cstring())
-    conn.expect(4)
-
-  fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("incoming connected\n".cstring())
-
-class OutNotify is TCPConnectionNotify
-  fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("outgoing connected\n".cstring())
-
-actor FirstPass
-  let _last: LastPass
-  let _metrics: Metrics
-
-  new create(last: LastPass, metrics: Metrics) =>
-    _last = last
-    _metrics = metrics
-
-  be take(a: U64, b: U64, c: U64, data: Array[U8] val) =>
-    _last.take(a, b, c, data)
-
-actor LastPass
-  var _count: USize = 0
-  let _expected: USize
-  let _sender: TCPConnection
-  let _metrics: Metrics
-  let _buffer: Writer = Writer
-
-  new create(sender: TCPConnection, metrics: Metrics, expected: USize) =>
-    _sender = sender
-    _expected = expected
-    _metrics = metrics
-
-  be take(a: U64, b: U64, c: U64, data: Array[U8] val) =>
-    _count = _count + 1
-    if (_count % 100_000) == 0 then
-      @printf[I32]("%zu sent\n".cstring(), _count)
-    end
-
-    if _count == _expected then
-      _metrics.set_end(Time.wall_to_nanos(Time.now()), _expected)
-      // @printf[None]("End: %s\n".cstring(), Time.wall_to_nanos(Time.now()).string().cstring())
-      _count = 0
-    end
-
-    _buffer.reserve_chunks(100)
-
-    let s = data
-    _buffer.u32_be((s.size() + 8).u32())
-    //Message size field
-    _buffer.u32_be((s.size() + 4).u32())
-    _buffer.u32_be(s.size().u32())
-    _buffer.write(s)
-    _sender.writev(_buffer.done())
-
 actor Metrics
   var start_t: U64 = 0
   var next_start_t: U64 = 0
   var end_t: U64 = 0
+  var last_report: U64 = 0
 
   be set_start(s: U64) =>
     if start_t != 0 then
@@ -180,6 +139,8 @@ actor Metrics
     start_t = next_start_t
     next_start_t = 0
     end_t = 0
+
+  be report(r: U64, s: U64, e: U64) => last_report = (r + s + e) + last_report
 
 primitive Bytes
   fun length_encode(data: ByteSeq val): Array[ByteSeq] val =>

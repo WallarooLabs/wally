@@ -1,5 +1,6 @@
 use "net"
 use "collections"
+use "buffy/metrics"
 use "buffy/messages"
 use "sendence/messages"
 use "sendence/bytes"
@@ -18,11 +19,15 @@ class SourceNotifier[In: Any val] is TCPListenNotify
   let _parser: Parser[In] val
   let _local_step_builder: LocalStepBuilder val
   let _output: BasicStep tag
+  let _shared_state_step: (BasicSharedStateStep tag | None)
+  let _metrics_collector: MetricsCollector tag
 
   new iso create(env: Env, source_host: String,
     source_service: String, source_id: U64, 
     coordinator: Coordinator, parser: Parser[In] val, output: BasicStep tag,
-    local_step_builder: LocalStepBuilder val = PassThroughStepBuilder[In, In])
+    shared_state_step: (BasicSharedStateStep tag | None) = None,
+    local_step_builder: LocalStepBuilder val = PassThroughStepBuilder[In, In],
+    metrics_collector: MetricsCollector tag)
   =>
     _env = env
     _host = source_host
@@ -30,8 +35,10 @@ class SourceNotifier[In: Any val] is TCPListenNotify
     _source_id = source_id
     _coordinator = coordinator
     _parser = parser
+    _shared_state_step = shared_state_step
     _local_step_builder = local_step_builder
     _output = output
+    _metrics_collector = metrics_collector
 
   fun ref listening(listen: TCPListener ref) =>
     _env.out.print("Source " + _source_id.string() + ": listening on "
@@ -43,7 +50,8 @@ class SourceNotifier[In: Any val] is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     SourceConnectNotify[In](_env, _source_id, _coordinator,
-      _parser, _output, _local_step_builder)
+      _parser, _output, _shared_state_step, _local_step_builder,
+      _metrics_collector)
 
 class SourceConnectNotify[In: Any val] is TCPConnectionNotify
   let _guid_gen: GuidGenerator = GuidGenerator
@@ -54,17 +62,33 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
   let _local_step: BasicOutputLocalStep
   var _header: Bool = true
   var _msg_count: USize = 0
+  let _metrics_collector: MetricsCollector tag
 
   new iso create(env: Env, source_id: U64, coordinator: Coordinator,
     parser: Parser[In] val, output: BasicStep tag,
-    local_step_builder: LocalStepBuilder val) 
+    shared_state_step: (BasicSharedStateStep tag | None),
+    local_step_builder: LocalStepBuilder val,
+    metrics_collector: MetricsCollector tag) 
   =>
     _env = env
     _source_id = source_id
     _coordinator = coordinator
     _parser = parser
     _local_step = local_step_builder.local()
+    _metrics_collector = metrics_collector
     _local_step.add_output(output)
+
+    let step_id = _guid_gen()
+    let step_builder_name = local_step_builder.name()
+    _local_step.add_step_reporter(StepReporter(step_id, step_builder_name,
+      _metrics_collector))
+    match _local_step
+    | let state_step: BasicStateLocalStep =>
+      match shared_state_step
+      | let ss: BasicSharedStateStep tag =>
+        state_step.add_shared_state(ss)
+      end
+    end
 
   fun ref accepted(conn: TCPConnection ref) =>
     ifdef debug then
