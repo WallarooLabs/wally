@@ -3,6 +3,7 @@ use "net"
 use "buffy/messages"
 use "buffy/metrics"
 use "buffy/network"
+use "buffy/flusher"
 use "sendence/epoch"
 
 actor Proxy is BasicStep
@@ -25,7 +26,7 @@ actor Proxy is BasicStep
     msg_data: D) =>
     _coordinator.send_data_message[D](_target_node_name, _step_id, _node_name, msg_id, source_ts, ingress_ts, msg_data)
 
-actor StepManager
+actor StepManager is FlushingActor
   let _env: Env
   let _node_name: String
   let _metrics_collector: MetricsCollector tag
@@ -41,12 +42,16 @@ actor StepManager
     _node_name = node_name
     _sink_addrs = sink_addrs
     _metrics_collector = metrics_collector
+    Flusher(this, 1_000_000_000)
+
+  be flush() =>
+    shutdown()
 
   be shutdown() =>
     for step in _steps.values() do
       step.shutdown()
     end
-    _metrics_collector.dispose()
+    _metrics_collector.flush()
 
   fun lookup(i: U64): BasicStep tag ? => _steps(i) 
 

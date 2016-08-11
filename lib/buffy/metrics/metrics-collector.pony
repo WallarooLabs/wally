@@ -181,10 +181,6 @@ actor MetricsCollector is FlushingActor
   """
     _timelines.push(t)
 
-  be dispose() =>
-    _flush()
-
-
 class MetricsReporter
 	let _id: U64
   let _name: String
