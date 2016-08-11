@@ -8,10 +8,10 @@ class Timeline
 The metrics timeline of a single step, boundary, or application, including both
 a latency histogram and a throughput history.
 """
-  let _offsets: Array[U64] ref = Array[U64](10).push(0)
-  let _latencies: Array[PowersOf2Histogram ref] ref =
-    Array[PowersOf2Histogram ref](10).push(PowersOf2Histogram)
-  let _throughputs: Array[U64] ref = Array[U64](10).push(0)
+  let _offsets: Array[U64] = Array[U64](10).push(0)
+  let _latencies: Array[PowersOf2Histogram] =
+    Array[PowersOf2Histogram](10).push(PowersOf2Histogram)
+  let _throughputs: Array[U64] = Array[U64](10).push(0)
   var _current_offset: U64
   var _current_index: USize = 0
   let _period: U64
@@ -49,7 +49,7 @@ a latency histogram and a throughput history.
     // update latencies and throughputs
     try
       _latencies(_current_index)(dt)
-      _throughputs.update(_current_index, _throughputs(_current_index) + 1)
+      _throughputs(_current_index) = _throughputs(_current_index) + 1
     end
 
   fun size(): USize =>
