@@ -12,13 +12,15 @@ class ControlNotifier is TCPListenNotify
   let _auth: AmbientAuth
   let _name: String
   let _coordinator: Coordinator
-  let _metrics_collector: MetricsCollector
+  let _metrics_collector: (MetricsCollector | None)
   var _host: String = ""
   var _service: String = ""
   let _is_worker: Bool
 
   new iso create(env: Env, auth: AmbientAuth, name: String,
-    coordinator: Coordinator, metrics_collector: MetricsCollector, is_worker: Bool = true) =>
+    coordinator: Coordinator, metrics_collector: (MetricsCollector | None),
+    is_worker: Bool = true)
+  =>
     _env = env
     _auth = auth
     _name = name
@@ -49,12 +51,12 @@ class ControlConnectNotify is TCPConnectionNotify
   let _env: Env
   let _auth: AmbientAuth
   let _coordinator: Coordinator
-  let _metrics_collector: MetricsCollector
+  let _metrics_collector: (MetricsCollector | None)
   let _name: String
   var _header: Bool = true
 
   new iso create(env: Env, auth: AmbientAuth, name: String, coordinator: Coordinator,
-    metrics_collector: MetricsCollector) =>
+    metrics_collector: (MetricsCollector | None)) =>
     _env = env
     _auth = auth
     _name = name

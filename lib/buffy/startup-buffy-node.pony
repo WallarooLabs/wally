@@ -14,12 +14,15 @@ class StartupBuffyNode
     var node_name: String = "0"
     var phone_home_addr = Array[String]
     var metrics_addr = Array[String]
+    var metrics_period: U64 = 1_000_000_000
+    var metrics_file: (String | None) = None
+    var metrics_file_period: U64 = 300_000_000_000
     var options = Options(env, false)
     var leader_control_addr = Array[String]
     var leader_data_addr = Array[String]
     var source_addrs: Array[String] iso = recover Array[String] end
     var sink_addrs = Array[String]
-
+    var app_name: String = ""
     var spike_delay = false
     var spike_drop = false
     var spike_seed: U64 = Time.millis()
@@ -36,9 +39,12 @@ class StartupBuffyNode
       .add("source", "r", StringArgument)
       .add("sink", "k", StringArgument)
       .add("metrics", "m", StringArgument)
+      .add("metrics-period", "", I64Argument)
+      .add("metrics-file", "", StringArgument)
       .add("spike-delay", "", None)
       .add("spike-drop", "", None)
       .add("spike-seed", "", I64Argument)
+      .add("app-name", "", StringArgument)
       .add("help", "h", None)
 
     for option in options do
@@ -52,6 +58,9 @@ class StartupBuffyNode
       | ("source", let arg: String) => source_addrs.append(arg.split(","))
       | ("sink", let arg: String) => sink_addrs.append(arg.split(","))
       | ("metrics", let arg: String) => metrics_addr = arg.split(":")
+      | ("metrics-period", let arg: I64) =>
+        metrics_period = arg.u64()*1_000_000_000
+      | ("metrics-file", let arg: String) => metrics_file = arg
       | ("spike-delay", None) =>
         env.out.print("%%SPIKE-DELAY%%")
         spike_delay = true
@@ -59,7 +68,8 @@ class StartupBuffyNode
         env.out.print("%%SPIKE-DROP%%")
         spike_drop = true
       | ("spike-seed", let arg: I64) => spike_seed = arg.u64()
-      | ("help", None) => 
+      | ("app-name", let arg: String) => app_name = arg
+      | ("help", None) =>
         StartupHelp(env)
         return
       end
@@ -85,20 +95,20 @@ class StartupBuffyNode
         sinks(i.u64()) = (sink_host, sink_service)
       end
 
+      var metrics_host: (String | None) = None
+      var metrics_service: (String | None) = None
+      if metrics_addr.size() > 0 then
+        metrics_host = metrics_addr(0)
+        metrics_service = metrics_addr(1)
+      end
       let metrics_collector =
-        if metrics_addr.size() > 0 then
-          let metrics_host = metrics_addr(0)
-          let metrics_service = metrics_addr(1)
-
-          let metrics_notifier: TCPConnectionNotify iso =
-            MetricsCollectorConnectNotify(auth, env.out, env.err)
-          let metrics_conn: TCPConnection =
-            TCPConnection(auth, consume metrics_notifier, metrics_host,
-              metrics_service)
-
-          MetricsCollector(env.err, auth, node_name, metrics_conn)
+        if (metrics_host isnt None) and (metrics_service isnt None) then
+          MetricsCollector(env.out, env.err, auth
+            where node_name=node_name, app_name=app_name,
+            metrics_host=metrics_host, metrics_service=metrics_service,
+            report_file=metrics_file, period=metrics_period)
         else
-          MetricsCollector(env.err, auth, node_name)
+          None
         end
 
       let step_manager = StepManager(env, node_name, consume sinks,

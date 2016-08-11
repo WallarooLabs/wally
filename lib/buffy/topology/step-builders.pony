@@ -23,7 +23,8 @@ trait BasicStateStepBuilder is BasicStepBuilder
   fun state_id(): (U64 | None)
 
 trait SinkBuilder
-  fun apply(conns: Array[TCPConnection] iso, metrics_collector: MetricsCollector)
+  fun apply(conns: Array[TCPConnection] iso, metrics_collector:
+    (MetricsCollector | None))
     : BasicStep tag
   fun is_state_builder(): Bool => false
   fun name(): String => "Sink"
@@ -391,7 +392,8 @@ class ExternalConnectionBuilder[In: Any val] is SinkBuilder
     _array_stringify = array_stringify
     _pipeline_name = pipeline_name
 
-  fun apply(conns: Array[TCPConnection] iso, metrics_collector: MetricsCollector)
+  fun apply(conns: Array[TCPConnection] iso, metrics_collector:
+    (MetricsCollector | None))
     : BasicStep tag =>
     ExternalConnection[In](_array_stringify, consume conns, metrics_collector, 
       _pipeline_name)

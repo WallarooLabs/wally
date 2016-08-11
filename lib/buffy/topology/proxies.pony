@@ -3,6 +3,7 @@ use "net"
 use "buffy/messages"
 use "buffy/metrics"
 use "buffy/network"
+use "buffy/flusher"
 use "sendence/epoch"
 
 actor Proxy is BasicStep
@@ -10,11 +11,11 @@ actor Proxy is BasicStep
   let _step_id: U64
   let _target_node_name: String
   let _coordinator: Coordinator
-  let _metrics_collector: MetricsCollector tag
+  let _metrics_collector: (MetricsCollector tag | None)
 
   new create(node_name: String, step_id: U64,
     target_node_name: String, coordinator: Coordinator,
-    metrics_collector: MetricsCollector tag) =>
+    metrics_collector: (MetricsCollector tag | None)) =>
     _node_name = node_name
     _step_id = step_id
     _target_node_name = target_node_name
@@ -24,13 +25,11 @@ actor Proxy is BasicStep
   be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
     msg_data: D) =>
     _coordinator.send_data_message[D](_target_node_name, _step_id, _node_name, msg_id, source_ts, ingress_ts, msg_data)
-    // _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
-    //   msg_id, ingress_ts, Epoch.nanoseconds())
 
-actor StepManager
+actor StepManager is FlushingActor
   let _env: Env
   let _node_name: String
-  let _metrics_collector: MetricsCollector tag
+  let _metrics_collector: (MetricsCollector tag | None)
   let _steps: Map[U64, BasicStep tag] = Map[U64, BasicStep tag]
   let _shared_state_steps: Map[U64, BasicSharedStateStep tag] 
     = Map[U64, BasicSharedStateStep tag]
@@ -38,11 +37,21 @@ actor StepManager
 
   new create(env: Env, node_name: String,
     sink_addrs: Map[U64, (String, String)] val,
-    metrics_collector: MetricsCollector tag) =>
+    metrics_collector: (MetricsCollector tag | None)) =>
     _env = env
     _node_name = node_name
     _sink_addrs = sink_addrs
     _metrics_collector = metrics_collector
+    Flusher(this, 1_000_000_000)
+
+  be flush() =>
+    match _metrics_collector
+    | let m: MetricsCollector tag =>
+      for step in _steps.values() do
+        step.flush()
+      end
+      m.flush()
+    end
 
   fun lookup(i: U64): BasicStep tag ? => _steps(i) 
 
@@ -84,8 +93,11 @@ actor StepManager
     | let s: StepManaged tag =>
       s.add_step_manager(this)
     end
-    step.add_step_reporter(StepReporter(step_id, step_builder.name(), 
-      _metrics_collector))
+    match _metrics_collector
+    | let m: MetricsCollector tag =>
+      step.add_step_reporter(MetricsReporter(step_id, step_builder.name(),
+        "step", m))
+    end
     _steps(step_id) = step
 
   be add_shared_state_step(step_id: U64, 
@@ -104,8 +116,11 @@ actor StepManager
     | let s: StepManaged tag =>
       s.add_step_manager(this)
     end
-    step.add_step_reporter(StepReporter(partition_report_id, 
-      step_builder.name(), _metrics_collector))
+    match _metrics_collector
+    | let m: MetricsCollector tag =>
+      step.add_step_reporter(MetricsReporter(partition_report_id,
+        step_builder.name(), "step", m))
+    end
     _steps(step_id) = step
     partition.ack(partition_id, step_id)
 
@@ -141,8 +156,11 @@ actor StepManager
     end
 
     let step: BasicStep tag = bssb()
-    step.add_step_reporter(StepReporter(step_id, bssb.name(), 
-      _metrics_collector))
+    match _metrics_collector
+    | let m: MetricsCollector tag =>
+      step.add_step_reporter(MetricsReporter(step_id, bssb.name(),
+        "step", m))
+    end
     try
       let shared_state_step = _shared_state_steps(shared_state_step_id)
       match step

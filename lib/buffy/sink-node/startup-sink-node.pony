@@ -1,6 +1,5 @@
 use "options"
 use "net"
-use "buffy/metrics/receiver"
 use "buffy"
 
 class StartupSinkNode
@@ -11,7 +10,6 @@ class StartupSinkNode
     var phone_home_addr: (Array[String] | None) = None
     var target_addr = Array[String]
     var step_builder_idx: I64 = 0
-    var is_metrics_receiver: Bool = false
     var name: String = ""
 
     options
@@ -30,7 +28,6 @@ class StartupSinkNode
       | ("listen", let arg: String) => addr = arg.split(":")
       | ("target-addr", let arg: String) => target_addr = arg.split(":")
       | ("step-builder", let arg: I64) => step_builder_idx = arg
-      | ("metrics-receiver", None) => is_metrics_receiver = true
       | ("phone-home", let arg: String) => phone_home_addr = arg.split(":")
       | ("name", let arg: String) => name = arg
       | ("help", None) =>
@@ -40,41 +37,37 @@ class StartupSinkNode
     end
 
     try
-      if is_metrics_receiver then
-        Receiver(env)
-      else
-        if name == "" then
-          StartupHelp.sink_node(env)
-          env.err.print("You must provide a name (--name/-n)\n")
-          return
-        end
-
-        if sink_builders.size() == 0 then
-          env.err.print("This app is not configured to use a sink node")
-          return
-        end          
-
-        let coordinator = SinkNodeCoordinatorFactory(env, name, 
-          phone_home_addr)
-
-        let sink_builder = sink_builders(step_builder_idx.usize())
-        let auth = env.root as AmbientAuth
-
-        let host = addr(0)
-        let service = addr(1)
-
-        let target_host = target_addr(0)
-        let target_service = target_addr(1)
-
-        let notifier = SinkNodeOutConnectNotify(env, coordinator)
-        let out_conn = TCPConnection(auth, consume notifier,
-          target_host, target_service)
-
-        let sink_node_step = sink_builder(out_conn)
-
-        TCPListener(auth, SinkNodeNotifier(env, auth, sink_node_step, host,
-          service, coordinator), host, service)
+      if name == "" then
+        StartupHelp.sink_node(env)
+        env.err.print("You must provide a name (--name/-n)\n")
+        return
       end
+
+      if sink_builders.size() == 0 then
+        env.err.print("This app is not configured to use a sink node")
+        return
+      end
+
+      let coordinator = SinkNodeCoordinatorFactory(env, name,
+        phone_home_addr)
+
+      let sink_builder = sink_builders(step_builder_idx.usize())
+      let auth = env.root as AmbientAuth
+
+      let host = addr(0)
+      let service = addr(1)
+
+      let target_host = target_addr(0)
+      let target_service = target_addr(1)
+
+      let notifier = SinkNodeOutConnectNotify(env, coordinator)
+      let out_conn = TCPConnection(auth, consume notifier,
+        target_host, target_service)
+
+      let sink_node_step = sink_builder(out_conn)
+
+      TCPListener(auth, SinkNodeNotifier(env, auth, sink_node_step, host,
+        service, coordinator), host, service)
     else
       StartupHelp.sink_node(env)
     end
