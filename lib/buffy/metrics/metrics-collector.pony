@@ -13,6 +13,7 @@ actor JsonAccumulator
   let _topic: String
   let _pretty_print: Bool
   var j: JsonArray ref = JsonArray(100)
+  var _size: USize = 0
 
   new create(event: String, topic: String, pretty_print: Bool=false,
     output: (MetricsOutputActor tag | None),
@@ -26,18 +27,24 @@ actor JsonAccumulator
 
   be append(j': JsonArray iso) =>
     let j'': JsonArray ref = consume j'
-    j.data.concat(j''.data.values())
+    if j''.data.size() > 0 then
+      j.data.concat(j''.data.values())
+      _size = j.data.size()
+    end
 
   be flush() =>
-    let j': JsonArray ref = j = JsonArray(100)
-    if (_output isnt None) or (_file_output isnt None) then
-      let s: ByteSeq val = HubJson.payload(_event, _topic, consume j',
-        _pretty_print)
-      match _output
-      | let o: MetricsOutputActor tag => o(s)
-      end
-      match _file_output
-      | let o: MetricsOutputActor tag => o(s)
+    if _size > 0 then
+      let j': JsonArray ref = j = JsonArray(100)
+      _size = 0
+      if (_output isnt None) or (_file_output isnt None) then
+        let s: ByteSeq val = HubJson.payload(_event, _topic, consume j',
+          _pretty_print)
+        match _output
+        | let o: MetricsOutputActor tag => o(s)
+        end
+        match _file_output
+        | let o: MetricsOutputActor tag => o(s)
+        end
       end
     end
 
@@ -65,10 +72,17 @@ sink's MetricsRecorder
     let t: Array[Timeline iso] iso = timelines = recover Array[Timeline iso](10) end
     while t.size() > 0 do
       try
-        output.append(recover
+        let json: (JsonArray iso | None) = recover
           let tl: Timeline ref = t.pop()
-          tl.json(_show_empty)
-          end)
+          if tl.size() > 0 then
+            tl.json(_show_empty)
+          else
+            None
+          end
+        end
+        match consume json
+        | let j: JsonArray iso => output.append(consume j)
+        end
       end
     end
     try
@@ -167,6 +181,9 @@ actor MetricsCollector is FlushingActor
   """
     _timelines.push(t)
 
+  be dispose() =>
+    _flush()
+
 
 class MetricsReporter
 	let _id: U64
@@ -198,6 +215,10 @@ class MetricsReporter
   """
   Flush the current Timeline to the TimelineCollector
   """
-    let t = _timeline = recover Timeline(_name, _category, _period) end
-    _timelinecollector(consume t)
+    if _timeline.size() > 0 then
+      let t = _timeline = recover Timeline(_name, _category, _period) end
+      _timelinecollector(consume t)
+    end
 
+  fun ref dispose() =>
+    flush()
