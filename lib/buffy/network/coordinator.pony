@@ -28,13 +28,13 @@ actor Coordinator
   let _control_addrs: Map[String, (String, String)] = Map[String, (String, String)]
   let _data_addrs: Map[String, (String, String)] = Map[String, (String, String)]
   let _spike_config: SpikeConfig val
-  let _metrics_collector: MetricsCollector
+  let _metrics_collector: (MetricsCollector | None)
   let _is_worker: Bool
 
   new create(name: String, env: Env, auth: AmbientAuth, leader_control_host: String,
     leader_control_service: String, leader_data_host: String,
     leader_data_service: String, step_manager: StepManager,
-    spike_config: SpikeConfig val, metrics_collector: MetricsCollector,
+    spike_config: SpikeConfig val, metrics_collector: (MetricsCollector | None),
     is_worker: Bool) =>
     _node_name = name
     _env = env
@@ -388,7 +388,7 @@ actor Coordinator
       for c in _connections.values() do
         c.dispose()
       end
-      _step_manager.shutdown()
+      _step_manager.flush()
 
 
       match _phone_home_connection

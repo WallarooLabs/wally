@@ -101,11 +101,15 @@ class StartupBuffyNode
         metrics_host = metrics_addr(0)
         metrics_service = metrics_addr(1)
       end
-
-      let metrics_collector = MetricsCollector(env.out, env.err, auth
-        where node_name=node_name, app_name=app_name,
-        metrics_host=metrics_host, metrics_service=metrics_service,
-        report_file=metrics_file, period=metrics_period)
+      let metrics_collector =
+        if (metrics_host isnt None) and (metrics_service isnt None) then
+          MetricsCollector(env.out, env.err, auth
+            where node_name=node_name, app_name=app_name,
+            metrics_host=metrics_host, metrics_service=metrics_service,
+            report_file=metrics_file, period=metrics_period)
+        else
+          None
+        end
 
       let step_manager = StepManager(env, node_name, consume sinks,
         metrics_collector)

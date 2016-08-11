@@ -190,15 +190,19 @@ class MetricsReporter
   var _timeline: Timeline iso
 
 	new iso create(id: U64, name: String, category: String,
-    metrics_collector: MetricsCollector tag, period: U64=1_000_000_000)
+    metrics_collector: (MetricsCollector tag | None),
+    period: U64=1_000_000_000)
   =>
-		_id = id
+    _id = id
     _name = name
     _category = category
     _period = period
     _timelinecollector = TimelineCollector
-    metrics_collector.add_collector(_timelinecollector)
     _timeline = recover Timeline(_name, _category, _period) end
+    match metrics_collector
+    | let m: MetricsCollector tag =>
+      m.add_collector(_timelinecollector)
+    end
 
   fun ref report(start_time: U64, end_time: U64) =>
     apply(start_time, end_time)

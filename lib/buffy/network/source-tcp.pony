@@ -20,14 +20,14 @@ class SourceNotifier[In: Any val] is TCPListenNotify
   let _local_step_builder: LocalStepBuilder val
   let _output: BasicStep tag
   let _shared_state_step: (BasicSharedStateStep tag | None)
-  let _metrics_collector: MetricsCollector tag
+  let _metrics_collector: (MetricsCollector tag | None)
 
   new iso create(env: Env, source_host: String,
     source_service: String, source_id: U64, 
     coordinator: Coordinator, parser: Parser[In] val, output: BasicStep tag,
     shared_state_step: (BasicSharedStateStep tag | None) = None,
     local_step_builder: LocalStepBuilder val = PassThroughStepBuilder[In, In],
-    metrics_collector: MetricsCollector tag)
+    metrics_collector: (MetricsCollector tag | None))
   =>
     _env = env
     _host = source_host
@@ -62,13 +62,13 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
   let _local_step: BasicOutputLocalStep
   var _header: Bool = true
   var _msg_count: USize = 0
-  let _metrics_collector: MetricsCollector tag
+  let _metrics_collector: (MetricsCollector tag | None)
 
   new iso create(env: Env, source_id: U64, coordinator: Coordinator,
     parser: Parser[In] val, output: BasicStep tag,
     shared_state_step: (BasicSharedStateStep tag | None),
     local_step_builder: LocalStepBuilder val,
-    metrics_collector: MetricsCollector tag)
+    metrics_collector: (MetricsCollector tag | None))
   =>
     _env = env
     _source_id = source_id
@@ -80,8 +80,11 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
 
     let step_id = _guid_gen()
     let step_builder_name = local_step_builder.name()
-    _local_step.add_step_reporter(MetricsReporter(step_id, step_builder_name,
-      "source-sink", _metrics_collector))
+    match _metrics_collector
+    | let m: MetricsCollector tag =>
+      _local_step.add_step_reporter(MetricsReporter(step_id, step_builder_name,
+        "source-sink", m))
+    end
     match _local_step
     | let state_step: BasicStateLocalStep =>
       match shared_state_step

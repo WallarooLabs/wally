@@ -14,7 +14,7 @@ trait BasicStep
     msg_data: D)
   be add_step_reporter(sr: MetricsReporter iso) =>
     None
-  be shutdown() => None
+  be flush() => None
 
 trait BasicOutputStep is BasicStep
   be add_output(to: BasicStep tag)
@@ -61,7 +61,7 @@ trait BasicLocalStep
     msg_data: D)
   fun ref add_step_reporter(sr: MetricsReporter ref) =>
     None
-  fun ref shutdown() => None
+  fun ref flush() => None
 
 trait BasicOutputLocalStep is BasicLocalStep
   fun ref add_output(to: BasicStep tag)
@@ -215,7 +215,7 @@ actor CoalesceStep[In: Any val, Out: Any val]
       end
     end
 
-  be shutdown() =>
+  be flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
       sr.dispose()
@@ -251,7 +251,7 @@ class CoalesceLocalStep[In: Any val, Out: Any val]
       end
     end
 
-  fun ref shutdown() =>
+  fun ref flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
       sr.dispose()
@@ -287,7 +287,7 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
-  be shutdown() =>
+  be flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
       sr.dispose()
@@ -323,7 +323,7 @@ class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
       end
     end
 
-  fun ref shutdown() =>
+  fun ref flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
       sr.dispose()
@@ -358,7 +358,7 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
-  be shutdown() =>
+  be flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
       sr.dispose()
@@ -393,7 +393,7 @@ class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
       end
     end
 
-  fun ref shutdown() =>
+  fun ref flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
       sr.dispose()
@@ -651,7 +651,7 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
       end
     end
 
-  be shutdown() =>
+  be flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
       sr.dispose()
@@ -704,7 +704,7 @@ class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
       end
     end
 
-  fun ref shutdown() =>
+  fun ref flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
       sr.dispose()
@@ -738,7 +738,7 @@ actor SharedStateStep[State: Any #read]
   be update_state(state: {(): State} val) =>
     _state = state()
 
-  be shutdown() =>
+  be flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
       sr.dispose()
@@ -747,13 +747,13 @@ actor SharedStateStep[State: Any #read]
 actor ExternalConnection[In: Any val] is ComputeStep[In]
   let _array_stringify: ArrayStringify[In] val
   let _conns: Array[TCPConnection]
-  let _metrics_collector: MetricsCollector tag
+  let _metrics_collector: (MetricsCollector tag | None)
   let _pipeline_name: String
   var _step_reporter: (MetricsReporter ref | None) = None
   embed _write_buffer: Writer = Writer
 
   new create(array_stringify: ArrayStringify[In] val, conns: Array[TCPConnection] iso =
-    recover Array[TCPConnection] end, m_coll: MetricsCollector tag,
+    recover Array[TCPConnection] end, m_coll: (MetricsCollector tag | None),
     pipeline_name: String) =>
     _array_stringify = array_stringify
     _conns = consume conns
