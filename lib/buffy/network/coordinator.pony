@@ -388,6 +388,7 @@ actor Coordinator
       for c in _connections.values() do
         c.dispose()
       end
+      _step_manager.shutdown()
 
 
       match _phone_home_connection

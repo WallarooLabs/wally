@@ -12,7 +12,9 @@ use "debug"
 trait BasicStep
   be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D)
-  be add_step_reporter(sr: MetricsReporter iso) => None
+  be add_step_reporter(sr: MetricsReporter iso) =>
+    None
+  be shutdown() => None
 
 trait BasicOutputStep is BasicStep
   be add_output(to: BasicStep tag)
@@ -57,7 +59,9 @@ actor EmptySharedStateStep is BasicSharedStateStep
 trait BasicLocalStep
   fun ref send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64,
     msg_data: D)
-  fun ref add_step_reporter(sr: MetricsReporter ref) => None
+  fun ref add_step_reporter(sr: MetricsReporter ref) =>
+    None
+  fun ref shutdown() => None
 
 trait BasicOutputLocalStep is BasicLocalStep
   fun ref add_output(to: BasicStep tag)
@@ -211,6 +215,12 @@ actor CoalesceStep[In: Any val, Out: Any val]
       end
     end
 
+  be shutdown() =>
+    match _step_reporter
+    | let sr: MetricsReporter ref =>
+      sr.dispose()
+    end
+
 class CoalesceLocalStep[In: Any val, Out: Any val]
   is (ThroughLocalStep[In, Out] & BasicStateLocalStep)
   let _f: ComputationSteps[In, Out]
@@ -239,6 +249,12 @@ class CoalesceLocalStep[In: Any val, Out: Any val]
       | let sr: MetricsReporter ref =>
         sr.report(start_time, end_time)
       end
+    end
+
+  fun ref shutdown() =>
+    match _step_reporter
+    | let sr: MetricsReporter ref =>
+      sr.dispose()
     end
 
 actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
@@ -271,6 +287,12 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
+  be shutdown() =>
+    match _step_reporter
+    | let sr: MetricsReporter ref =>
+      sr.dispose()
+    end
+
 class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
   let _f: Computation[In, Out]
   var _output: BasicStep tag = EmptyStep
@@ -299,6 +321,12 @@ class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
       | let sr: MetricsReporter ref =>
         sr.report(start_time, end_time)
       end
+    end
+
+  fun ref shutdown() =>
+    match _step_reporter
+    | let sr: MetricsReporter ref =>
+      sr.dispose()
     end
 
 actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
@@ -330,6 +358,12 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
       end
     end
 
+  be shutdown() =>
+    match _step_reporter
+    | let sr: MetricsReporter ref =>
+      sr.dispose()
+    end
+
 class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
   let _f: MapComputation[In, Out]
   var _output: BasicStep tag = EmptyStep
@@ -357,6 +391,12 @@ class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
       | let sr: MetricsReporter ref =>
         sr.report(start_time, end_time)
       end
+    end
+
+  fun ref shutdown() =>
+    match _step_reporter
+    | let sr: MetricsReporter ref =>
+      sr.dispose()
     end
 
 class PassThroughLocalStep is BasicOutputLocalStep
@@ -611,6 +651,12 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
       end
     end
 
+  be shutdown() =>
+    match _step_reporter
+    | let sr: MetricsReporter ref =>
+      sr.dispose()
+    end
+
 class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
   is (ThroughStateLocalStep[In, Out, State] & BasicOutputComputationStep
     & BasicStateLocalStep)
@@ -658,6 +704,12 @@ class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
       end
     end
 
+  fun ref shutdown() =>
+    match _step_reporter
+    | let sr: MetricsReporter ref =>
+      sr.dispose()
+    end
+
 actor SharedStateStep[State: Any #read]
   is BasicSharedStateStep
   var _step_reporter: (MetricsReporter ref | None) = None
@@ -685,6 +737,12 @@ actor SharedStateStep[State: Any #read]
 
   be update_state(state: {(): State} val) =>
     _state = state()
+
+  be shutdown() =>
+    match _step_reporter
+    | let sr: MetricsReporter ref =>
+      sr.dispose()
+    end
 
 actor ExternalConnection[In: Any val] is ComputeStep[In]
   let _array_stringify: ArrayStringify[In] val

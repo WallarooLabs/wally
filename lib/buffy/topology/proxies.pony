@@ -24,9 +24,6 @@ actor Proxy is BasicStep
   be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
     msg_data: D) =>
     _coordinator.send_data_message[D](_target_node_name, _step_id, _node_name, msg_id, source_ts, ingress_ts, msg_data)
-    // _metrics_collector.report_boundary_metrics(BoundaryTypes.ingress_egress(),
-    //   msg_id, ingress_ts, Epoch.nanoseconds())
-    // TODO: ^ What is this? @jtfmumm @seantallen
 
 actor StepManager
   let _env: Env
@@ -44,6 +41,12 @@ actor StepManager
     _node_name = node_name
     _sink_addrs = sink_addrs
     _metrics_collector = metrics_collector
+
+  be shutdown() =>
+    for step in _steps.values() do
+      step.shutdown()
+    end
+    _metrics_collector.dispose()
 
   fun lookup(i: U64): BasicStep tag ? => _steps(i) 
 
