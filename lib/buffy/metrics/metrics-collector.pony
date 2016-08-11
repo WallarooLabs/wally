@@ -7,16 +7,19 @@ use "sendence/epoch"
 use "sendence/hub"
 
 actor JsonAccumulator
-  let _output: MetricsOutputActor tag
+  let _output: (MetricsOutputActor tag | None)
+  let _file_output: (MetricsOutputActor tag | None)
   let _event: String
   let _topic: String
   let _pretty_print: Bool
   var j: JsonArray ref = JsonArray(100)
 
   new create(event: String, topic: String, pretty_print: Bool=false,
-    output: MetricsOutputActor tag)
+    output: (MetricsOutputActor tag | None),
+    file_output: (MetricsOutputActor tag | None))
   =>
     _output = output
+    _file_output = file_output
     _event = event
     _topic = topic
     _pretty_print = pretty_print
@@ -27,7 +30,16 @@ actor JsonAccumulator
 
   be flush() =>
     let j': JsonArray ref = j = JsonArray(100)
-    _output(HubJson.payload(_event, _topic, consume j', _pretty_print))
+    if (_output isnt None) or (_file_output isnt None) then
+      let s: ByteSeq val = HubJson.payload(_event, _topic, consume j',
+        _pretty_print)
+      match _output
+      | let o: MetricsOutputActor tag => o(s)
+      end
+      match _file_output
+      | let o: MetricsOutputActor tag => o(s)
+      end
+    end
 
 actor TimelineCollector
 """
@@ -78,6 +90,7 @@ actor MetricsCollector is FlushingActor
   let _topic: String val
   let _pretty_print: Bool val = true
   var _output: (MetricsOutputActor tag | None) = None
+  var _file_output: (MetricsOutputActor tag | None) = None
 
   new create(stdout: StdStream,
     stderr: StdStream,
@@ -86,6 +99,7 @@ actor MetricsCollector is FlushingActor
     app_name: String,
     metrics_host: (String | None) = None,
     metrics_service: (String | None) = None,
+    report_file: (String | None) = None,
     period: U64 = 1_000_000_000,
     flush_period: U64 = 1_000_000_000)
   =>
@@ -111,6 +125,16 @@ actor MetricsCollector is FlushingActor
         recover MonitoringHubConnectNotify(stdout, stderr) end
       let conn' = TCPConnection(auth, consume notifier, host, service)
       _output = MonitoringHubOutput(stdout, stderr, conn', app_name)
+    end
+
+    // File output
+    match report_file
+    | let arg: String =>
+      _file_output = MetricsFileOutput(stdout, stderr, auth, app_name, arg)
+    end
+
+    // If there is at least one output, start the flusher
+    if (_output isnt None) or (_file_output isnt None) then
       // start a timer to flush the metrics-collection
       Flusher(this, flush_period)
     end
@@ -124,20 +148,17 @@ actor MetricsCollector is FlushingActor
     // TODO: Rerwite this so we don't have to copy the _timelines array
     // and use promises and a known count at the accumulator instead.
     // TODO: Add backoff to the flushing timer
-    match _output
-    | let output: MetricsOutputActor tag =>
-      let j: JsonAccumulator tag = recover JsonAccumulator(_event, _topic,
-        _pretty_print, output) end
-      let size: USize val = _timelines.size()
-      var col: Array[TimelineCollector tag] iso = recover
-        Array[TimelineCollector tag](size) end
-      for tc in _timelines.values() do
-        col.push(tc)
-      end
-      try
-        let tlc: TimelineCollector tag = col.pop()
-        tlc.flush(consume col, j)
-      end
+    let j: JsonAccumulator tag = recover JsonAccumulator(_event, _topic,
+      _pretty_print, _output, _file_output) end
+    let size: USize val = _timelines.size()
+    var col: Array[TimelineCollector tag] iso = recover
+      Array[TimelineCollector tag](size) end
+    for tc in _timelines.values() do
+      col.push(tc)
+    end
+    try
+      let tlc: TimelineCollector tag = col.pop()
+      tlc.flush(consume col, j)
     end
 
   be add_collector(t: TimelineCollector tag) =>

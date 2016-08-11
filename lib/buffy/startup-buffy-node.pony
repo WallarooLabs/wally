@@ -41,7 +41,6 @@ class StartupBuffyNode
       .add("metrics", "m", StringArgument)
       .add("metrics-period", "", I64Argument)
       .add("metrics-file", "", StringArgument)
-      .add("metrics-file-period", "", I64Argument)
       .add("spike-delay", "", None)
       .add("spike-drop", "", None)
       .add("spike-seed", "", I64Argument)
@@ -62,8 +61,6 @@ class StartupBuffyNode
       | ("metrics-period", let arg: I64) =>
         metrics_period = arg.u64()*1_000_000_000
       | ("metrics-file", let arg: String) => metrics_file = arg
-      | ("metrics-file-period", let arg: I64) =>
-        metrics_file_period = arg.u64()*1_000_000_000
       | ("spike-delay", None) =>
         env.out.print("%%SPIKE-DELAY%%")
         spike_delay = true
@@ -108,8 +105,7 @@ class StartupBuffyNode
       let metrics_collector = MetricsCollector(env.out, env.err, auth
         where node_name=node_name, app_name=app_name,
         metrics_host=metrics_host, metrics_service=metrics_service,
-        report_file=metrics_file, period=metrics_period,
-        report_period=metrics_file_period)
+        report_file=metrics_file, period=metrics_period)
 
       let step_manager = StepManager(env, node_name, consume sinks,
         metrics_collector)
