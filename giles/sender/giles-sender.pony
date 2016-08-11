@@ -1,10 +1,10 @@
 """
 Giles Sender
 """
-use "buffered"
 use "collections"
 use "files"
 use "net"
+use "buffered"
 use "options"
 use "time"
 use "sendence/messages"
@@ -21,6 +21,8 @@ actor Main
     var batch_size: USize = 500
     var interval: U64 = 5_000_000
     var should_repeat = false
+    var binary_fmt = false
+    var msg_size: USize = 80
 
     if run_tests then
       TestMain(env)
@@ -43,6 +45,8 @@ actor Main
           .add("batch-size", "s", I64Argument)
           .add("interval", "i", I64Argument)
           .add("repeat", "r", None)
+          .add("binary", "y", None)
+          .add("msg-size", "g", I64Argument)
 
         for option in options do
           match option
@@ -54,6 +58,8 @@ actor Main
           | ("batch-size", let arg: I64) => batch_size = arg.usize()
           | ("interval", let arg: I64) => interval = arg.u64()
           | ("repeat", None) => should_repeat = true
+          | ("binary", None) => binary_fmt = true
+          | ("msg-size", let arg: I64) => msg_size = arg.usize()
           end
         end
 
@@ -119,13 +125,18 @@ actor Main
           let data_source =
             match f_arg
             | let mfn': String =>
-              let fs: Array[String] iso = recover mfn'.split(",") end
-              let paths: Array[FilePath] iso =
-                recover Array[FilePath] end
-              for str in (consume fs).values() do
-                paths.push(FilePath(env.root as AmbientAuth, str))
+              if binary_fmt then
+                BinaryFileDataSource(FilePath(env.root as AmbientAuth,
+                  mfn'), msg_size)
+              else
+                let fs: Array[String] iso = recover mfn'.split(",") end
+                let paths: Array[FilePath] iso =
+                  recover Array[FilePath] end
+                for str in (consume fs).values() do
+                  paths.push(FilePath(env.root as AmbientAuth, str))
+                end
+                MultiFileDataSource(consume paths, should_repeat)
               end
-              MultiFileDataSource(consume paths, should_repeat)
             else
               IntegerDataSource
             end
@@ -137,7 +148,8 @@ actor Main
             coordinator,
             consume data_source,
             batch_size,
-            interval)
+            interval,
+            binary_fmt)
 
           coordinator.sending_actor(sa)
         end
@@ -353,7 +365,8 @@ actor SendingActor
   let _store: Store
   let _coordinator: Coordinator
   let _timers: Timers
-  let _data_source: Iterator[String] iso
+  let _data_source: Iterator[ByteSeq] iso
+  let _binary_fmt: Bool
   var _paused: Bool = false
   var _finished: Bool = false
   let _batch_size: USize
@@ -365,9 +378,10 @@ actor SendingActor
     to_buffy_socket: TCPConnection,
     store: Store,
     coordinator: Coordinator,
-    data_source: Iterator[String] iso,
+    data_source: Iterator[ByteSeq] iso,
     batch_size: USize,
-    interval: U64)
+    interval: U64,
+    binary_fmt: Bool)
   =>
     _messages_to_send = messages_to_send
     _to_buffy_socket = to_buffy_socket
@@ -377,6 +391,7 @@ actor SendingActor
     _timers = Timers
     _batch_size = batch_size
     _interval = interval
+    _binary_fmt = binary_fmt
     _wb = Writer
     // _msg_encoder = BufferedExternalMsgEncoder(where chunks = _batch_size)
 
@@ -404,12 +419,20 @@ actor SendingActor
       let d' = recover Array[ByteSeq](current_batch_size) end
       for i in Range(0, current_batch_size) do
         try
-          let n = _data_source.next()
-          if n.size() > 0 then
-            d'.push(n)
-            _wb.u32_be(n.size().u32())
-            _wb.write(n)
-            _messages_sent = _messages_sent + 1
+          if _binary_fmt then
+            let n = _data_source.next()
+            if n.size() > 0 then
+              _wb.write(n)
+              _messages_sent = _messages_sent + 1
+            end
+          else
+            let n = _data_source.next()
+            if n.size() > 0 then
+              d'.push(n)
+              _wb.u32_be(n.size().u32())
+              _wb.write(n)
+              _messages_sent = _messages_sent + 1
+            end
           end
         else
           ifdef debug then
@@ -569,4 +592,22 @@ class MultiFileDataSource is Iterator[String]
       end
     else
       error
+    end
+
+class BinaryFileDataSource is Iterator[Array[U8] val]
+  let _file: File
+  let _msg_size: USize
+
+  new iso create(path: FilePath val, msg_size: USize) =>
+    _file = File(path)
+    _msg_size = msg_size
+
+  fun ref has_next(): Bool => true
+
+  fun ref next(): Array[U8] val =>
+    if _file.position() < _file.size() then 
+      _file.read(_msg_size)
+    else
+      _file.seek_start(0)
+      _file.read(_msg_size)
     end

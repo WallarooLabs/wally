@@ -1,5 +1,5 @@
-use "buffered"
 use "net"
+use "buffered"
 use "../topology"
 use "sendence/bytes"
 use "buffy/messages"

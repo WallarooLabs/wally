@@ -1,6 +1,6 @@
-use "buffered"
 use "collections"
 use "net"
+use "buffered"
 use "options"
 use "regex"
 use "time"

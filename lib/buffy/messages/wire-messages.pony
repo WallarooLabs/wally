@@ -1,9 +1,9 @@
-use "buffered"
 use "sendence/bytes"
 use "buffy/network"
 use "buffy/topology"
 use "serialise"
 use "net"
+use "buffered"
 
 primitive WireMsgEncoder
   fun _encode(msg: WireMsg val, auth: AmbientAuth): Array[ByteSeq] val ? =>
