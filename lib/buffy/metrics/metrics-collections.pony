@@ -39,7 +39,7 @@ a latency histogram and a throughput history.
     if end_time > _current_offset then
       // Create new entries in _offsets, _latencies, and _throughputs
       // and update _current_offset and _current_index
-      _current_offset = get_offset(end_time)
+      _current_offset = get_offset(end_time, _base_time)
       _offsets.push(_current_offset)
       _latencies.push(PowersOf2Histogram)
       _throughputs.push(0)
@@ -55,11 +55,11 @@ a latency histogram and a throughput history.
   fun size(): USize =>
     _size
 
-  fun get_offset(time: U64): U64 =>
+  fun get_offset(time: U64, base_time: U64=0): U64 =>
   """
   Nanosecond offset for the end_time of a measurement period
   """
-    time + (_period - (time % _period))
+    (time + (_period - (time % _period))) - base_time
 
   fun json(show_empty: Bool=false): JsonArray ref^ ? =>
     var j: JsonArray ref = JsonArray(_size)
