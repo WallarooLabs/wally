@@ -102,7 +102,8 @@ class StartupBuffyNode
         metrics_service = metrics_addr(1)
       end
       let metrics_collector =
-        if (metrics_host isnt None) and (metrics_service isnt None) then
+        if (((metrics_host isnt None) and (metrics_service isnt None)) or
+          (metrics_file isnt None)) then
           MetricsCollector(env.out, env.err, auth
             where node_name=node_name, app_name=app_name,
             metrics_host=metrics_host, metrics_service=metrics_service,
