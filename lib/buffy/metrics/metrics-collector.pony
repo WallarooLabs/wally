@@ -220,5 +220,3 @@ class MetricsReporter
       _timelinecollector(consume t)
     end
 
-  fun ref dispose() =>
-    flush()

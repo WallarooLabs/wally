@@ -218,7 +218,7 @@ actor CoalesceStep[In: Any val, Out: Any val]
   be flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
-      sr.dispose()
+      sr.flush()
     end
 
 class CoalesceLocalStep[In: Any val, Out: Any val]
@@ -254,7 +254,7 @@ class CoalesceLocalStep[In: Any val, Out: Any val]
   fun ref flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
-      sr.dispose()
+      sr.flush()
     end
 
 actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
@@ -290,7 +290,7 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
-      sr.dispose()
+      sr.flush()
     end
 
 class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
@@ -326,7 +326,7 @@ class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
   fun ref flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
-      sr.dispose()
+      sr.flush()
     end
 
 actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
@@ -361,7 +361,7 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   be flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
-      sr.dispose()
+      sr.flush()
     end
 
 class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
@@ -396,7 +396,7 @@ class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
   fun ref flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
-      sr.dispose()
+      sr.flush()
     end
 
 class PassThroughLocalStep is BasicOutputLocalStep
@@ -654,7 +654,7 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
   be flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
-      sr.dispose()
+      sr.flush()
     end
 
 class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
@@ -707,7 +707,7 @@ class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
   fun ref flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
-      sr.dispose()
+      sr.flush()
     end
 
 actor SharedStateStep[State: Any #read]
@@ -741,7 +741,7 @@ actor SharedStateStep[State: Any #read]
   be flush() =>
     match _step_reporter
     | let sr: MetricsReporter ref =>
-      sr.dispose()
+      sr.flush()
     end
 
 actor ExternalConnection[In: Any val] is ComputeStep[In]
