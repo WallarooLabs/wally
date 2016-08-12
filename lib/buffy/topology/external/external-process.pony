@@ -68,7 +68,7 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   let _length_encoder: ByteLengthEncoder val
 
   var _output: BasicStep tag = EmptyStep
-  var _step_reporter: (StepReporter val | None) = None
+  var _step_reporter: (MetricsReporter ref | None) = None
   var _process_monitor: (ProcessMonitor | None) = None
   var _completed: Bool = false
 
@@ -80,8 +80,8 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
     _length_encoder = length_encoder
     _process_monitor = _start_process(config, length_encoder)
 
-  be add_step_reporter(sr: StepReporter val) =>
-    _step_reporter = sr
+  be add_step_reporter(sr: MetricsReporter iso) =>
+    _step_reporter = consume sr
 
   be add_output(to: BasicStep tag) =>
     _output = to
@@ -137,7 +137,7 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
       _output.send[Out](ext_msg.id(), ext_msg.source_ts(),
         ext_msg.last_ingress_ts(), ext_msg.data())
       match _step_reporter
-      | let sr: StepReporter val =>
+      | let sr: MetricsReporter ref => 
         let end_time: U64 = Epoch.milliseconds()
         sr.report(ext_msg.sent_to_external_ts(), end_time)
       end

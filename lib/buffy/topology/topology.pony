@@ -28,7 +28,7 @@ trait PipelineSteps
     output: BasicStep tag, 
     local_step_builder: (LocalStepBuilder val | None),
     shared_state_step: (BasicSharedStateStep tag | None) = None,
-    metrics_collector: MetricsCollector tag)
+    metrics_collector: (MetricsCollector tag | None))
   fun sink_builder(): SinkBuilder val
   fun sink_target_ids(): Array[U64] val
   fun apply(i: USize): PipelineStep box ?
@@ -59,7 +59,7 @@ class Pipeline[In: Any val, Out: Any val] is PipelineSteps
     output: BasicStep tag, 
     local_step_builder: (LocalStepBuilder val | None),
     shared_state_step: (BasicSharedStateStep tag | None),
-    metrics_collector: MetricsCollector tag)
+    metrics_collector: (MetricsCollector tag | None))
   =>
     let source_notifier: TCPListenNotify iso = 
       match local_step_builder

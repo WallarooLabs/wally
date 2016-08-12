@@ -1,10 +1,13 @@
 use "files"
 use "net"
 use "sendence/bytes"
-use "buffy/metrics"
 use "json"
 use "collections"
 use "sendence/hub"
+
+interface MetricsOutputActor
+  be apply(payload: ByteSeq)
+  be dispose()
 
 actor MonitoringHubOutput is MetricsOutputActor
   let _stdout: StdStream
