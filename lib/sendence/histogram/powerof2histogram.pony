@@ -6,6 +6,7 @@ A Histogram where each value is counted into the bin of its next power of 2
 value. e.g. 3->bin:4, 4->bin:4, 5->bin:8, etc.
 """
   let _counts: Array[U64] ref
+  var _size: USize = 0
   let _max_val: U64 = U64.max_value()
   var _min: (U64|None) = None
   var _max: (U64|None) = None
@@ -28,13 +29,17 @@ value. e.g. 3->bin:4, 4->bin:4, 5->bin:8, etc.
   """
     _counts(i)
 
+  fun size(): USize =>
+    _size
+
   fun ref apply(v: U64) =>
   """
   Count a U64 value in the correct bin in the histogram
   """
 		let idx = get_idx(v)
     try
-      _counts.update(idx, _counts(idx) + 1)
+      _counts(idx) =  _counts(idx) + 1
+      _size = _size + 1
       try
         if v < (_min as U64) then _min = v end
       else
@@ -56,6 +61,7 @@ value. e.g. 3->bin:4, 4->bin:4, 5->bin:8, etc.
   for `max()`.
   """
     _counts.update(i, v)
+    _size = _size + v.usize()
     let mi = pow2(i-1)
     let ma = pow2(i)
     try
