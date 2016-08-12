@@ -10,6 +10,8 @@ use "time"
 use "sendence/messages"
 use "sendence/tcp"
 use "debug"
+use "sendence/fix"
+use "sendence/new-fix"
 
 // documentation
 // more tests
@@ -113,7 +115,7 @@ actor Main
           let messages_to_send = m_arg as USize
           let to_buffy_addr = b_arg as Array[String]
 
-          let store = Store(env.root as AmbientAuth)
+          let store = Store(env.root as AmbientAuth, binary_fmt)
           let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
@@ -140,7 +142,7 @@ actor Main
             else
               IntegerDataSource
             end
-
+          
           let sa = SendingActor(
             messages_to_send,
             to_buffy_socket,
@@ -422,6 +424,7 @@ actor SendingActor
           if _binary_fmt then
             let n = _data_source.next()
             if n.size() > 0 then
+              d'.push(n)
               _wb.write(n)
               _messages_sent = _messages_sent + 1
             end
@@ -465,10 +468,11 @@ class SendBatch is TimerNotify
 //
 
 actor Store
-  let _encoder: SentLogEncoder = SentLogEncoder
-  var _sent_file: (File|None)
+  let _sent_file: (File|None)
+  let _binary_fmt: Bool
 
-  new create(auth: AmbientAuth) =>
+  new create(auth: AmbientAuth, binary_fmt: Bool) =>
+    _binary_fmt = binary_fmt
     _sent_file = try
       let f = File(FilePath(auth, "sent.txt"))
       f.set_length(0)
@@ -480,9 +484,15 @@ actor Store
   be sentv(msgs: Array[ByteSeq] val, at: U64) =>
     match _sent_file
       | let file: File =>
-      for m in msgs.values() do
-        file.print(_encoder((m, at)))
-      end
+        if _binary_fmt then
+          for m in msgs.values() do
+            file.writev(FallorMsgEncoder.timestamp_unencoded_payload(at, m))
+          end
+        else
+          for m in msgs.values() do
+            file.print(TextOutputEncoder((m, at)))
+          end
+        end
     end
 
   be dispose() =>
@@ -490,7 +500,7 @@ actor Store
       | let file: File => file.dispose()
     end
 
-class SentLogEncoder
+primitive TextOutputEncoder
   fun apply(tuple: (ByteSeq, U64)): String =>
     let time: String = tuple._2.string()
     let payload = tuple._1
@@ -610,4 +620,4 @@ class BinaryFileDataSource is Iterator[Array[U8] val]
     else
       _file.seek_start(0)
       _file.read(_msg_size)
-    end
+    end 

@@ -1,4 +1,5 @@
 use ".."
+use "sendence/messages"
 
 actor Main
   new create(env: Env) =>
@@ -28,7 +29,7 @@ class DoubleReceivedMessage
   fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
     ("(" + ts.string() + ", " + v.string() + ")").clone()
 
-class DoubleSentParser is SentParser[DoubleSentMessage val]
+class DoubleSentParser is (SentParser[DoubleSentMessage val] & TextMessageFileParser)
   let _messages: Array[DoubleSentMessage val] = 
     Array[DoubleSentMessage val]
 
@@ -40,7 +41,7 @@ class DoubleSentParser is SentParser[DoubleSentMessage val]
   fun ref sent_messages(): Array[DoubleSentMessage val] =>
     _messages
 
-class DoubleReceivedParser is ReceivedParser[DoubleReceivedMessage val]
+class DoubleReceivedParser is (ReceivedParser[DoubleReceivedMessage val] & FallorMessageFileParser)
   let _messages: Array[DoubleReceivedMessage val] = 
     Array[DoubleReceivedMessage val]
 

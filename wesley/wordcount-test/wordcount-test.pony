@@ -1,4 +1,5 @@
 use ".."
+use "sendence/messages"
 
 actor Main
   new create(env: Env) =>
@@ -30,7 +31,7 @@ class WordcountReceivedMessage
   fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
     ("(" + ts.string() + ", " + word + ": " + count.string() + ")").clone()
 
-class WordcountSentParser is SentParser[WordcountSentMessage val]
+class WordcountSentParser is (SentParser[WordcountSentMessage val] & TextMessageFileParser)
   let _messages: Array[WordcountSentMessage val] = 
     Array[WordcountSentMessage val]
 
@@ -44,7 +45,7 @@ class WordcountSentParser is SentParser[WordcountSentMessage val]
   fun ref sent_messages(): Array[WordcountSentMessage val] =>
     _messages
 
-class WordcountReceivedParser is ReceivedParser[WordcountReceivedMessage val]
+class WordcountReceivedParser is (ReceivedParser[WordcountReceivedMessage val] & FallorMessageFileParser)
   let _messages: Array[WordcountReceivedMessage val] =
     Array[WordcountReceivedMessage val]
 

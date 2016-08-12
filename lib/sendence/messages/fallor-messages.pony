@@ -3,7 +3,7 @@ use "net"
 use "debug"
 
 primitive FallorMsgEncoder
-  fun apply(data: (String | Seq[String] val), wb: Writer = Writer):
+  fun apply(data: (String | Array[U8] val | Seq[String] val), wb: Writer = Writer):
     Array[ByteSeq] val
   =>
   """
@@ -17,6 +17,13 @@ primitive FallorMsgEncoder
       wb.u32_be((s.size() + 4).u32())
       wb.u32_be(s.size().u32())
       wb.write(s)
+    | let a: Array[U8] val =>
+      //Header
+      wb.u32_be((a.size() + 8).u32())
+      //Message size field
+      wb.u32_be((a.size() + 4).u32())
+      wb.u32_be(a.size().u32())
+      wb.write(a)
     | let seq: Seq[String] val =>
       let sizes_size = seq.size() * 4
       var strings_size: USize = 0
@@ -37,11 +44,36 @@ primitive FallorMsgEncoder
   fun timestamp_raw(timestamp: U64, data: Array[U8] val,
     wb: Writer = Writer): Array[ByteSeq] val
   =>
+    """
+    Encodes with a payload already encoded with Fallor (usually messages received at a sink as they are already in Fallor format as sent by ExternalConnection). In this case, this just provides the outer wrapper
+      encoding for the payload and timestamp.
+    """
     let size = data.size()
     wb.u32_be(size.u32())
     wb.u64_be(timestamp)
     wb.write(data)
     wb.done()
+
+  fun timestamp_unencoded_payload(timestamp: U64, data: ByteSeq,
+    wb: Writer = Writer): Array[ByteSeq] val =>
+    """
+    Encodes with a payload not already in Fallor format. So in addition to encoding the payload, it also provides the Fallor outer wrapper for the payload and timestamp.
+    """
+    let encoded_payload = apply(data)
+    var size: USize = 0
+    for v in encoded_payload.values() do
+      match v
+      | let s: String => size = size + s.array().size().usize()
+      | let a: Array[U8] val => size = size + a.size().usize()
+      else
+        None
+      end
+    end
+    wb.u32_be(size.u32())
+    wb.u64_be(timestamp)
+    wb.writev(encoded_payload)
+    wb.done()
+
 
 primitive FallorMsgDecoder
   fun apply(data: Array[U8] val): Array[String] val ? =>
@@ -84,3 +116,4 @@ primitive FallorMsgDecoder
       bytes_left = bytes_left - (next_total_size + 4)
     end
     consume arr
+
