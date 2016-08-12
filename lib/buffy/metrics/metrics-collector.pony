@@ -198,7 +198,7 @@ class MetricsReporter
     _category = category
     _period = period
     _timelinecollector = TimelineCollector
-    _timeline = recover Timeline(_name, _category, _period) end
+    _timeline = recover Timeline(_id, _name, _category, _period) end
     match metrics_collector
     | let m: MetricsCollector tag =>
       m.add_collector(_timelinecollector)
@@ -216,7 +216,7 @@ class MetricsReporter
   Flush the current Timeline to the TimelineCollector
   """
     if _timeline.size() > 0 then
-      let t = _timeline = recover Timeline(_name, _category, _period) end
+      let t = _timeline = recover Timeline(_id, _name, _category, _period) end
       _timelinecollector(consume t)
     end
 

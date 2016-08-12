@@ -17,7 +17,7 @@ class iso _TestTimeline is UnitTest
   fun name(): String => "buffy:Timeline"
 
   fun apply(h: TestHelper) ? =>
-    let tl = Timeline("test", "step", 1_000_000_000)
+    let tl = Timeline(1234, "test", "step", 1_000_000_000)
     let base: U64 = 1469658500_000000001
     let ceil: U64 = base + 10_000_000_000
     for v in Range[U64](base, ceil, 100_000_000) do
