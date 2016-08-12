@@ -51,7 +51,7 @@ apps/market-spread/market-spread --run-sink -l 127.0.0.1:8001 -t 127.0.0.1:5555 
 
 Giles receiver:
 ```
-giles/receiver/receiver -l 127.0.0.1:8000 --ponythreads 1
+giles/receiver/receiver -l 127.0.0.1:8000 --ponythreads 1 -m -w -e 10000000
 ```
 
 Buffy:
@@ -61,7 +61,7 @@ apps/market-spread/market-spread -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 
 
 Giles sender:
 ```
-giles/sender/sender -b 127.0.0.1:7000 -m 1000000 -f ./demos/marketspread/trades-fixish.msg -r --ponythreads 1 -s 500
+giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -f ./demos/marketspread/trades-fixish.msg -r --ponythreads 1 -s 500 -y -g 52
 
 giles/sender/sender -b 127.0.0.1:7001 -m 1000000 -f ./demos/marketspread/nbbo.msg -r --ponythreads 1 -s 500
 ```
