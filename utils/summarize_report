@@ -5,7 +5,6 @@ import click
 from summarize import (file_line_iter,
                        load_report,
                        Summarizer,
-                       FixedBins, Log10Bins,
                        IncongruentReportError)
 
 from textwrap import indent
@@ -13,14 +12,9 @@ from textwrap import indent
 @click.command()
 @click.option('--report', '-r', nargs=1, required=True,
               help="Path of report file to verify")
-@click.option('--bin-type', '-b', type=click.Choice(['FixedBins', 'Log10Bins']),
-              default='Log10Bins')
 @click.option('--verify/--no-verify', ' /-V', default=True)
-def summarize(report, bin_type, verify):
-    if bin_type == 'FixedBins':
-        bins = FixedBins
-    else:
-        bins = Log10Bins
+@click.option('--strip', '-s', default=True)
+def summarize(report, verify, strip):
     topics = {}
     try:
         for line in file_line_iter(report):
@@ -29,7 +23,7 @@ def summarize(report, bin_type, verify):
             for p in r['payload']:
                 s = topic.setdefault(
                     '{}: {}'.format(p['category'], p['pipeline_key']),
-                    Summarizer(bins))
+                    Summarizer(strip))
                 s.load(p['topics']['latency_bins'], p['topics']['throughput_out'])
         if verify:
             for topic in topics:

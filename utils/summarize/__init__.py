@@ -57,12 +57,7 @@ def verify_report(report):
                                            t, l))
 
 
-Log10Bins = [0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 'overflow']
-FixedBins = [0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15,
-         0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7,
-         0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0,
-         8.0, 9.0, 10.0, 'overflow']
-
+P2Bins = list(range(66))
 
 def select_bin(v, bins):
     """Binary search bins keys for the smallest value that is greater than
@@ -91,22 +86,29 @@ def select_bin(v, bins):
 
 
 class Summarizer:
-    def __init__(self, bins=Log10Bins):
-        self.bins = bins
+    def __init__(self, strip=False):
+        self.bins = P2Bins
         self.counts = {b:0 for b in self.bins}
         self.throughputs = {}
         self.base = None
+        self.strip = strip
+        self._min_bin = self.bins[-1]
+        self._max_bin = self.bins[0]
 
     def load(self, counts, throughputs):
         for k, v in counts.items():
             try:
-                k = select_bin(float(k), self.bins)
+                k = select_bin(int(k), self.bins)
             except:
                 pass
             try:
                 self.counts[k] += v
             except KeyError:
                 self.counts[k] = v
+            if k < self._min_bin:
+                self._min_bin = k
+            if k > self._max_bin:
+                self._max_bin = k
         for t, v in throughputs.items():
             t = int(t)
             if self.base is None:
@@ -122,10 +124,14 @@ class Summarizer:
     def count(self, t0, t1):
         dt = t1 - t0
         if dt > 0:
-            v = select_bin(dt, self.bins)
+            k = select_bin(int(math.ceil(math.log(dt, 2))), self.bins)
         else:
-            v = self.bins[0]
+            k = self.bins[0]
         self.counts[v] += 1
+        if k < self._min_bin:
+            self._min_bin = k
+        if k > self._max_bin:
+            self._max_bin = k
         t = int(math.ceil(t1))
         if self.base is None:
             self.base = t
@@ -143,7 +149,7 @@ class Summarizer:
                 for k, v in sorted(self.throughputs.items(),
                     key=lambda x: x[0]))),
             "\n".join(("{:<10}: {}".format(k, self.counts[k])
-                      for k in self.bins))))
+                      for k in self.bins if k >= self._min_bin and k <= self._max_bin))))
 
 
 def test_select_bin():
