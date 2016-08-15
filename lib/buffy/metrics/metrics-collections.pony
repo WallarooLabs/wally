@@ -31,12 +31,19 @@ a latency histogram and a throughput history.
     category = category'
     _period = period
 
-  fun ref apply(start_time: U64, end_time: U64) =>
-    let dt = end_time - start_time
-    if end_time > _current_period then
+  fun ref apply(dt: U64 val, end_time: (U64 | None)=None) =>
+    match end_time
+    | let ts: None =>
+      apply_to_ts(dt, Epoch.nanoseconds())
+    | let ts: U64 =>
+      apply_to_ts(dt, ts)
+    end
+
+  fun ref apply_to_ts(dt: U64 val, timestamp: U64) =>
+    if timestamp > _current_period then
       // Create new entries in _periods, _latencies
       // and update _current_period and _current_index
-      _current_period = get_period(end_time)
+      _current_period = get_period(timestamp)
       _periods.push(_current_period)
       _latencies.push(PowersOf2Histogram)
       _size = _size + 1
