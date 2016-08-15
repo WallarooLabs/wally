@@ -102,7 +102,7 @@ actor MetricsCollector is FlushingActor
     Array[TimelineCollector tag](50) end
   let _event: String val
   let _topic: String val
-  let _pretty_print: Bool val = true
+  let _pretty_print: Bool val = false
   var _output: (MetricsOutputActor tag | None) = None
   var _file_output: (MetricsOutputActor tag | None) = None
 

@@ -64,7 +64,7 @@ a latency histogram and a throughput history.
       let j': JsonObject ref = JsonObject
       j'.data.update("category", category)
       j'.data.update("pipeline_key", recover
-        let s = String(30)
+        let s = String(50)
         s.append(name)
         s.append(":")
         s.append(id.string())
