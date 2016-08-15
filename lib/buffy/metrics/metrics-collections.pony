@@ -13,12 +13,13 @@ a latency histogram and a throughput history.
   var _current_period: U64 = 0
   var _current_index: USize = 0
   let _period: U64
+  let id: U64
   let name: String
   let category: String
   var _shift: USize = 0
   var _size: USize = 0
 
-  new create(name': String, category': String,
+  new create(id': U64, name': String, category': String,
     period: U64 = 1_000_000_000)
   =>
   """
@@ -26,6 +27,7 @@ a latency histogram and a throughput history.
   and the throughput history.
   """
     name = name'
+    id = id'
     category = category'
     _period = period
 
@@ -61,7 +63,13 @@ a latency histogram and a throughput history.
       let t0: I64 = ((_periods(idx) - _period)/1_000_000_000).i64()
       let j': JsonObject ref = JsonObject
       j'.data.update("category", category)
-      j'.data.update("pipeline_key", name)
+      j'.data.update("pipeline_key", recover
+        let s = String(30)
+        s.append(name)
+        s.append(":")
+        s.append(id.string())
+        consume s
+        end)
       j'.data.update("t1", t1)
       j'.data.update("t0", t0)
       let topics: JsonObject ref = JsonObject

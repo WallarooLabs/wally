@@ -50,7 +50,6 @@ actor StepManager is FlushingActor
       for step in _steps.values() do
         step.flush()
       end
-      m.flush()
     end
 
   fun lookup(i: U64): BasicStep tag ? => _steps(i) 
