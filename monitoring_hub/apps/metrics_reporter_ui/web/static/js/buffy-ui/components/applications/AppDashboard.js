@@ -12,24 +12,21 @@ export default class AppDashboard extends React.Component {
 		return(
 			<div>
 				<h1>{titleize(appName)}</h1>
-				<Panel>
-					<h2>Overall (Source -> Sink) Stats</h2>
+				<Panel header={<h2>Overall (Source -> Sink) Stats</h2>} >
 					<SourcesTable
 						appName={appName}
 						linked={true}
 						sourceType="source-sink" 
 						sourceKeys={sourceSinkKeys} />
 				</Panel>
-				<Panel>
-					<h2>Boundary (Ingress-> Egress) Stats</h2>
+				<Panel header={<h2>Node Stats</h2>} >
 					<SourcesTable
 						appName={appName}
 						linked={true}
 						sourceType="ingress-egress" 
 						sourceKeys={ingressEgressKeys} />
 				</Panel>
-				<Panel>
-					<h2>Step Stats</h2>
+				<Panel header={<h2>Step Stats</h2>} >
 					<SourcesTable
 						appName={appName}
 						linked={true}

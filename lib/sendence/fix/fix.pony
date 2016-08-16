@@ -92,7 +92,12 @@ class FixNbboMessage is (Equatable[FixNbboMessage] & Stringable)
     and (_mid == o._mid)
 
   fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-    "FixNbboMessage".string(fmt)
+    (_symbol.clone()
+      .append(_transact_time)
+      .append(_bid_px.string())
+      .append(_offer_px.string())
+      .append(_mid.string())).clone()
+    // "FixNbboMessage".string(fmt)
 
 class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
   let _side: Side val

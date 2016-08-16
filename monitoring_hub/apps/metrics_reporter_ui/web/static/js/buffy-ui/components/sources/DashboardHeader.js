@@ -14,14 +14,14 @@ export default class DashboardHeader extends React.Component {
 				sourceHeader = "Step";
 				break;
 			case "ingress-egress":
-				sourceHeader = "Boundary";
+				sourceHeader = "Node";
 				break;
 			case "source-sink":
 				sourceHeader = "Overall";
 				break;
 		}
 		return(
-			<h1>{sourceHeader + ": " + titleize(sourceName)}</h1>
+			<h1>{sourceHeader + ": "} <span className="text-info">{titleize(sourceName)}</span></h1>
 		)
 	}
 }

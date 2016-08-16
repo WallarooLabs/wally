@@ -1,12 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import BarChartBuilder from "./chartBuilders/OrdinalBarChartBuilder.js";
+import OrdinalBarChartBuilder from "./chartBuilders/OrdinalBarChartBuilder.js";
 import Immutable from "immutable";
 
-export default class BarChart extends React.Component {
+export default class OrdinalBarChart extends React.Component {
     constructor(props) {
         super(props);
-        this.chartBuilder = new BarChartBuilder({
+        this.chartBuilder = new OrdinalBarChartBuilder({
             w: this.props.w,
             h: this.props.h,
             padding: this.props.padding,
@@ -18,7 +18,6 @@ export default class BarChart extends React.Component {
             xValueTransformer: this.props.xValueTransformer,
             yLeftValueFormatter: this.props.yLeftValueFormatter,
             yLeftValueTransformer: this.props.yLeftValueTransformer,
-            yLabelColor: this.props.yLabelColor,
             xLogScale: this.props.xLogScale,
             xPowScale: this.props.xPowScale,
             xPowScaleExponent: this.props.xPowScaleExponent,
