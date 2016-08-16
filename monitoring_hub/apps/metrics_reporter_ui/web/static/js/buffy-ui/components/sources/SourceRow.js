@@ -17,8 +17,8 @@ export default class SourceRow extends React.Component {
 			sourceNameElement = titleize(sourceName);
 		}
 		return(
-			<tr>
-				<td>{sourceNameElement}</td>
+			<tr className="text-info">
+				<td className="text-primary">{sourceNameElement}</td>
 				<td><SourceLatencyStatsCol latencyPercentileBinStats={latencyPercentileBinStats} /></td>
 				<td><SourceThroughputStatsCol throughputStats={throughputStats} /></td>
 			</tr>

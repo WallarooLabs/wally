@@ -11,7 +11,7 @@ export default class ChartHeader extends React.Component {
 		const {chartInterval, title} = this.props;
 		return(
 			<Col md={10}>
-				<h5 className="text-center">Last {displayInterval(chartInterval)} - {this.props.title}</h5>
+				<h4 className="text-center">Last {displayInterval(chartInterval)} - {this.props.title}</h4>
 			</Col>
 		)
 	}

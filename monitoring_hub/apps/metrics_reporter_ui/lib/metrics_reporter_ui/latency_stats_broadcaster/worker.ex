@@ -34,13 +34,14 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
     :timer.sleep(1000)
     time_now = :os.system_time(:seconds)
     start_time = time_now - aggregate_interval
+    expected_latency_bins = ["0", "10", "19", "20", "21", "22", "23", "24", "25", "26", "27", "30", "64"]
     case get_latency_bins_list(log_name, start_time) do
       [] ->
         :ok
       [_partial_latency_bin_msg] ->
         :ok
       latency_bins_list ->
-        latency_percentage_bins_data = LatencyStatsCalculator.calculate_latency_percentage_bins_data(latency_bins_list)
+        latency_percentage_bins_data = LatencyStatsCalculator.calculate_latency_percentage_bins_data(latency_bins_list, expected_latency_bins)
         latency_percentage_bins_msg = generate_latency_percentage_bins_msg(latency_percentage_bins_data, pipeline_key, time_now)
         cumalative_latency_percentage_bins_data = LatencyStatsCalculator.calculate_cumalative_latency_percentage_bins_data(latency_percentage_bins_data)
         latency_bins_percentile_data = LatencyStatsCalculator.calculate_latency_percentile_bin_stats(cumalative_latency_percentage_bins_data)

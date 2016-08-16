@@ -70,28 +70,32 @@ function formatOrderId(orderId) {
 
 function formatLatencyBin(bin) {
     switch(bin) {
-        case "100.0":
-            return "> 10 s";
-        case "10.0":
-            return "< 10 s";
-        case "10":
-            return "< 10 s"; 
         case "1":
-            return "< 1 s";
-        case "1.0":
-            return "< 1 s";
-        case "0.1":
-            return "< 100 ms";
-        case "0.01":
-            return "< 10 ms";
-        case "0.001":
-            return "< 1 ms";
-        case "0.0001":
-            return "< 100 μs";
-        case "0.00001":
-            return "< 10 μs";
-        case "0.000001":
-            return "< 1 μs";
+            return "≤ 1 ns";
+        case "1024":
+            return "≤ 1 μs";
+        case "524288":
+            return "≤ 0.5 ms";
+        case "1048576":
+            return "≤ 1 ms";
+        case "2097152":
+            return "≤ 2 ms";
+        case "4194304":
+            return "≤ 4 ms";
+        case "8388608":
+            return "≤ 8 ms";
+        case "16777216":
+            return "≤ 17 ms";
+        case "33554432":
+            return "≤ 34 ms";
+        case "67108864":
+            return "≤ 67 ms";
+        case "134217728":
+            return "≤ 134 ms";
+        case "1073741824":
+            return "≤ 1 s";
+        case "18446744073709551616":
+            return "≤ Max Bin";
         default:
             return bin;
     }

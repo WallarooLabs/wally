@@ -1,10 +1,10 @@
 defmodule MetricsReporter.LatencyStatsCalculator do
 
-  def calculate_latency_percentage_bins_data(latency_bins_list) do
+  def calculate_latency_percentage_bins_data(latency_bins_list, expected_latency_bins) do
     time_sorted_latency_bins_list = time_sort_latency_bins_list(latency_bins_list)
     aggregated_latency_bins_data = aggregate_latency_bins_data(time_sorted_latency_bins_list)
     total_count = calculate_latency_bins_total(aggregated_latency_bins_data)
-    aggregated_latency_percentage_bins_data = do_calculate_latency_percentage_bins_data(aggregated_latency_bins_data, total_count)
+    do_calculate_latency_percentage_bins_data(aggregated_latency_bins_data, expected_latency_bins, total_count)
   end
 
   def calculate_cumalative_latency_percentage_bins_data(latency_percentage_bins_data) do
@@ -19,18 +19,15 @@ defmodule MetricsReporter.LatencyStatsCalculator do
 
   defp aggregate_latency_bins_data(latency_bins_list) do
     latency_bins_list
-      |> Enum.reduce([], fn latency_bins_data, list ->
-        fixed_latency_bins_data = fix_latency_bins_keys(latency_bins_data)
-        List.insert_at(list, -1, fixed_latency_bins_data)
-      end)
       |> Enum.reduce(%{}, &Map.merge(&1["latency_bins"], &2, fn _k, v1, v2 -> v1 + v2 end))
   end
 
   def get_empty_latency_percentage_bins_data do
-    %{
-      "0.000001" => 0, "0.00001" => 0, "0.0001" => 0, "0.001" => 0, "0.01" => 0,
-      "0.1" => 0, "1" => 0, "10" => 0, "100.0" => 0
-    }
+    0..64 |> Enum.reduce(%{}, fn(pow, map) -> Map.put(map, to_string(pow), 0) end)
+  end
+
+  def get_empty_latency_percentage_bins_data(expected_latency_bins) do
+    Map.new(expected_latency_bins, & {&1, 0})
   end
 
   defp get_percentiles do
@@ -54,8 +51,36 @@ defmodule MetricsReporter.LatencyStatsCalculator do
       |> Enum.reduce(0, &(latency_bins_data[&1] + &2))
   end
 
-  defp do_calculate_latency_percentage_bins_data(aggregated_latency_bins_data, total_count) do
-    get_empty_latency_percentage_bins_data
+  defp do_calculate_latency_percentage_bins_data(aggregated_latency_bins_data, expected_latency_bins, total_count) do
+      sorted_keys = Map.keys(aggregated_latency_bins_data)
+        |> Enum.sort(&(String.to_integer(&1)< String.to_integer(&2)))
+
+      {_, aggregated_map} = 
+        expected_latency_bins
+          |> Enum.sort(&(String.to_integer(&1) < String.to_integer(&2)))
+          |>  Enum.reduce({sorted_keys, %{}}, fn(bin, {keys_list, acc_map}) ->
+                {acc_count, updated_keys_list} =         
+                  Enum.reduce_while(keys_list, {0, keys_list}, fn (key, {acc, remaining_keys}) ->
+                    if String.to_integer(key) <= String.to_integer(bin) do
+                      {:cont, {acc + Map.get(aggregated_latency_bins_data, key), List.delete(remaining_keys, key)}}
+                    else
+                      {:halt, {acc, remaining_keys}}
+                    end
+                  end)
+                {updated_keys_list, Map.put(acc_map, bin, acc_count)}
+              end)
+
+      get_empty_latency_percentage_bins_data(expected_latency_bins)
+        |> Map.merge(aggregated_map, fn _k, v1, v2 ->
+          calculate_percentile(v2, total_count)
+        end)
+        |> Map.new(fn {k, v} ->
+          pow_key = :math.pow(2, String.to_integer(k)) |> round |> to_string
+          {pow_key, v} end)
+  end
+
+  defp do_calculate_latency_percentage_bins_data(aggregated_latency_bins_data, expected_bins, total_count) do
+    get_empty_latency_percentage_bins_data(expected_bins)
       |> Map.merge(aggregated_latency_bins_data, fn _k, _v1, v2 ->
         calculate_percentile(v2, total_count)
       end)
