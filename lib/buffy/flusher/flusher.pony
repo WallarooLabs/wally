@@ -17,7 +17,6 @@ Use FlushTimer to invoke a periodic flush() behaviour on a target actor
     true
 
 primitive Flusher
-  fun apply(target: FlushingActor tag, delay: U64 val) =>
-    let timers = Timers
+  fun apply(timers: Timers, target: FlushingActor tag, delay: U64 val) =>
     let timer = Timer(FlushTimer(target), 0, delay)
     timers(consume timer)

@@ -2,6 +2,7 @@ use "net"
 use "options"
 use "collections"
 use "buffy/metrics"
+use "buffy/flusher"
 use "spike"
 use "./network"
 use "./topology"
@@ -39,7 +40,7 @@ class StartupBuffyNode
       .add("source", "r", StringArgument)
       .add("sink", "k", StringArgument)
       .add("metrics", "m", StringArgument)
-      .add("metrics-period", "", I64Argument)
+      .add("metrics-period", "", F64Argument)
       .add("metrics-file", "", StringArgument)
       .add("spike-delay", "", None)
       .add("spike-drop", "", None)
@@ -58,8 +59,8 @@ class StartupBuffyNode
       | ("source", let arg: String) => source_addrs.append(arg.split(","))
       | ("sink", let arg: String) => sink_addrs.append(arg.split(","))
       | ("metrics", let arg: String) => metrics_addr = arg.split(":")
-      | ("metrics-period", let arg: I64) =>
-        metrics_period = arg.u64()*1_000_000_000
+      | ("metrics-period", let arg: F64) =>
+        metrics_period = (arg*1_000_000_000).u64()
       | ("metrics-file", let arg: String) => metrics_file = arg
       | ("spike-delay", None) =>
         env.out.print("%%SPIKE-DELAY%%")
@@ -115,10 +116,18 @@ class StartupBuffyNode
       let step_manager = StepManager(env, node_name, consume sinks,
         metrics_collector)
 
+      let timers = Timers
+      match metrics_collector
+      | let m: MetricsCollector tag =>
+        Flusher(timers, m, metrics_period)
+        Flusher(timers, step_manager, 1_000_000_000)
+      end
+
       let coordinator: Coordinator = Coordinator(node_name, env, auth,
         leader_control_host, leader_control_service, leader_data_host,
         leader_data_service, step_manager, spike_config, metrics_collector,
         is_worker)
+      coordinator.add_timers(timers)
 
       let phone_home_host = phone_home_addr(0)
       let phone_home_service = phone_home_addr(1)

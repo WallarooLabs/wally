@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "../topology"
 use "spike"
 use "collections"
+use "time"
 
 actor Coordinator
   let _env: Env
@@ -30,6 +31,7 @@ actor Coordinator
   let _spike_config: SpikeConfig val
   let _metrics_collector: (MetricsCollector | None)
   let _is_worker: Bool
+  var _timers: (Timers | None) = None
 
   new create(name: String, env: Env, auth: AmbientAuth, leader_control_host: String,
     leader_control_service: String, leader_data_host: String,
@@ -134,12 +136,15 @@ actor Coordinator
     | let t: TopologyManager =>
       t.ack_finished_connections()
     end
-      
+
   be process_initialized_msg_ack() =>
     match _topology_manager
     | let t: TopologyManager =>
       t.ack_initialized()
     end
+
+  be add_timers(timers: Timers) =>
+    _timers = consume timers
 
   ////////////
   // TOPOLOGY
@@ -370,6 +375,7 @@ actor Coordinator
     try
       let shutdown_msg = WireMsgEncoder.shutdown(_node_name, _auth)
 
+      _step_manager.flush()
       for listener in _listeners.values() do
         listener.dispose()
       end
@@ -388,13 +394,18 @@ actor Coordinator
       for c in _connections.values() do
         c.dispose()
       end
-      _step_manager.flush()
-
 
       match _phone_home_connection
       | let phc: TCPConnection =>
         phc.writev(ExternalMsgEncoder.done_shutdown(_node_name))
         phc.dispose()
+      end
+      match _timers
+      | let t: Timers =>
+        t.dispose()
+      end
+      match _metrics_collector
+      | let m: MetricsCollector => m.dispose()
       end
     else
       _env.out.print("Coordinator: problem shutting down!")
