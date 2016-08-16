@@ -22,7 +22,7 @@ export default class MonitoringGraphsContainer extends React.Component {
 		return new Map({ bars: chartData });
 	}
 	binsFor(lBins) {
-		return lBins.keySeq().toArray().sort();
+		return lBins.keySeq().toArray().sort((bin1, bin2) => {return parseInt(bin1) - parseInt(bin2)});
 	}
 	shouldComponentUpdate(nextProps) {
 		return !is(this.props.throughputs, nextProps.throughputs) || !is(this.props.latencyPercentageBins, nextProps.latencyPercentageBins);

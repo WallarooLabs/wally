@@ -1,6 +1,3 @@
-.bar_fill {
-    fill: steelblue;
-}
 .bar {
     display: inline-block;
     width: 20px;
@@ -80,4 +77,12 @@ table.applications tbody.applications tr td a {
 
 div.panel-body h4 {
     padding: 0 15px;
+}
+
+div.panel-heading h2.panel-title {
+    font-size: 32px;
+}
+
+div.metrics-box div.panel-heading {
+    padding: 10px;
 }

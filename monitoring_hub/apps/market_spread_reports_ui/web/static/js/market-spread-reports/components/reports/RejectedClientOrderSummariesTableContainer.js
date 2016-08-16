@@ -16,13 +16,13 @@ export default class RejectedCLientOrderSummariesTableContainer extends React.Co
 		const { ascending } = this.state;
 		if (ascending) {
 			if(prop == "client_id") {
-				return summaries.sort(Comparators.propForNaturalSort("client_id"));
+				return summaries.sort(Comparators.propFor("client_id"));
 			} else {
 				return summaries.sort(Comparators.propFor(prop));
 			} 
 		} else {
 			if (prop == "client_id") {
-				return summaries.sort(Comparators.reverseOf(Comparators.propForNaturalSort("client_id")));
+				return summaries.sort(Comparators.reverseOf(Comparators.propFor("client_id")));
 			} else {
 				return summaries.sort(Comparators.reverseOf(Comparators.propFor(prop)));
 			}

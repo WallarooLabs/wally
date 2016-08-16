@@ -6,9 +6,8 @@ export default class LatencyMetricBox extends React.Component {
 	render() {
 		const { value, title } = this.props;
 		return(
-			<Panel>
-				{title}
-				<h3>{formatLatencyBin(value)}</h3>
+			<Panel header={title} className="metrics-box">
+				<h3 className="text-info">{formatLatencyBin(value)}</h3>
 			</Panel>
 		)
 	}

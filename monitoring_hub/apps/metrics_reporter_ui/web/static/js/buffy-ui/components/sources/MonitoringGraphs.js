@@ -24,11 +24,7 @@ export default class MonitoringGraphs extends React.Component {
 								h="400"
 								w="600"
 								yLeftLabel="Percent by Bin"
-								xTicks={["0.0000001", "0.000001","0.00001", "0.0001", "0.001", "0.01", "0.1", "1.0", "10.0", "100.0"]}
 								xTickFormatter={formatLatencyBin}
-								xLogScale={true}
-								interval={chartInterval}
-								interpolation="step"
 								yLeftDomain={[0,100]} />
 						</Col>
 						<Col md={6}>
@@ -39,6 +35,7 @@ export default class MonitoringGraphs extends React.Component {
 								w="600"
 								yLeftLabel="Throughput (msgs/sec)"
 								colorForLine1="teal"
+								interpolation="linear"
 								interval={toSeconds(chartInterval)} />
 						</Col>
 					</Panel>
