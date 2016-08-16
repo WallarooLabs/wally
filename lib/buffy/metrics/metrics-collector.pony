@@ -147,12 +147,6 @@ actor MetricsCollector is FlushingActor
       _file_output = MetricsFileOutput(stdout, stderr, auth, app_name, arg)
     end
 
-    // If there is at least one output, start the flusher
-    if (_output isnt None) or (_file_output isnt None) then
-      // start a timer to flush the metrics-collection
-      Flusher(this, flush_period)
-    end
-
   be finished() =>
     _flush()
 

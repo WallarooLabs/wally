@@ -42,7 +42,6 @@ actor StepManager is FlushingActor
     _node_name = node_name
     _sink_addrs = sink_addrs
     _metrics_collector = metrics_collector
-    Flusher(this, 1_000_000_000)
 
   be flush() =>
     match _metrics_collector
