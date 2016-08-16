@@ -1,6 +1,7 @@
 use "collections"
 use "buffy/messages"
 use "net"
+use "time"
 use "buffered"
 use "buffy/metrics"
 use "sendence/messages"
@@ -206,12 +207,11 @@ actor CoalesceStep[In: Any val, Out: Any val]
     msg_data: D) =>
     match msg_data
     | let input: In =>
-      let start_time = Epoch.nanoseconds()
+      let start_time = Time.nanos()
       _f.send[In](msg_id, source_ts, ingress_ts, input)
-      let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: MetricsReporter ref =>
-        sr.report(start_time, end_time)
+        sr.report((Time.nanos() - start_time))
       end
     end
 
@@ -242,12 +242,11 @@ class CoalesceLocalStep[In: Any val, Out: Any val]
     msg_data: D) =>
     match msg_data
     | let input: In =>
-      let start_time = Epoch.nanoseconds()
+      let start_time = Time.nanos()
       _f.send[In](msg_id, source_ts, ingress_ts, input)
-      let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: MetricsReporter ref =>
-        sr.report(start_time, end_time)
+        sr.report((Time.nanos() - start_time))
       end
     end
 
@@ -275,15 +274,14 @@ actor Step[In: Any val, Out: Any val] is ThroughStep[In, Out]
     msg_data: D) =>
     match msg_data
     | let input: In =>
-      let start_time = Epoch.nanoseconds()
+      let start_time = Time.nanos()
       match _f(input)
       | let o: Out =>
         _output.send[Out](msg_id, source_ts, ingress_ts, o)
       end
-      let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: MetricsReporter ref =>
-        sr.report(start_time, end_time)
+        sr.report((Time.nanos() - start_time))
       end
     end
 
@@ -311,15 +309,14 @@ class LocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
     msg_data: D) =>
     match msg_data
     | let input: In =>
-      let start_time = Epoch.nanoseconds()
+      let start_time = Time.nanos()
       match _f(input)
       | let o: Out =>
         _output.send[Out](msg_id, source_ts, ingress_ts, o)
       end
-      let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: MetricsReporter ref =>
-        sr.report(start_time, end_time)
+        sr.report((Time.nanos() - start_time))
       end
     end
 
@@ -347,14 +344,13 @@ actor MapStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
     msg_data: D) =>
     match msg_data
     | let input: In =>
-      let start_time = Epoch.nanoseconds()
+      let start_time = Time.nanos()
       for res in _f(input).values() do
         _output.send[Out](msg_id, source_ts, ingress_ts, res)
       end
-      let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: MetricsReporter ref =>
-        sr.report(start_time, end_time)
+        sr.report((Time.nanos() - start_time))
       end
     end
 
@@ -382,14 +378,13 @@ class MapLocalStep[In: Any val, Out: Any val] is ThroughLocalStep[In, Out]
     msg_data: D) =>
     match msg_data
     | let input: In =>
-      let start_time = Epoch.nanoseconds()
+      let start_time = Time.nanos()
       for res in _f(input).values() do
         _output.send[Out](msg_id, source_ts, ingress_ts, res)
       end
-      let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: MetricsReporter ref =>
-        sr.report(start_time, end_time)
+        sr.report((Time.nanos() - start_time))
       end
     end
 
@@ -641,13 +636,12 @@ actor StateStep[In: Any val, Out: Any val, State: Any #read]
     msg_data: D) =>
     match msg_data
     | let input: In =>
-      let start_time = Epoch.nanoseconds()
+      let start_time = Time.nanos()
       _shared_state.send[In, State](msg_id, source_ts,
         ingress_ts, input, _state_comp_wrapper)
-      let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: MetricsReporter ref =>
-        sr.report(start_time, end_time)
+        sr.report((Time.nanos() - start_time))
       end
     end
 
@@ -694,13 +688,12 @@ class StateLocalStep[In: Any val, Out: Any val, State: Any #read]
     msg_data: D) =>
     match msg_data
     | let input: In =>
-      let start_time = Epoch.nanoseconds()
+      let start_time = Time.nanos()
       _shared_state.send[In, State](msg_id, source_ts,
         ingress_ts, input, _state_comp_wrapper)
-      let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: MetricsReporter ref =>
-        sr.report(start_time, end_time)
+        sr.report((Time.nanos() - start_time))
       end
     end
 
@@ -726,12 +719,11 @@ actor SharedStateStep[State: Any #read]
   =>
     match sp
     | let s_processor: StateProcessor[State] val =>
-      let start_time = Epoch.nanoseconds()
+      let start_time = Time.nanos()
       _state = s_processor(msg_id, source_ts, ingress_ts, msg_data, _state)
-      let end_time = Epoch.nanoseconds()
       match _step_reporter
       | let sr: MetricsReporter ref =>
-        sr.report(start_time, end_time)
+        sr.report((Time.nanos() - start_time))
       end
     end
 
@@ -785,10 +777,9 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
         for conn in _conns.values() do
           conn.writev(tcp_msg)
         end
-        let now = Epoch.nanoseconds()
         match _step_reporter
         | let sr: MetricsReporter ref =>
-          sr.report(ingress_ts, now)
+          sr.report((Epoch.nanoseconds() - ingress_ts))
         end
         // _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
         //   msg_id, source_ts, now, _pipeline_name)

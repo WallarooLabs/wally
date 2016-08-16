@@ -102,7 +102,7 @@ actor MetricsCollector is FlushingActor
     Array[TimelineCollector tag](50) end
   let _event: String val
   let _topic: String val
-  let _pretty_print: Bool val = true
+  let _pretty_print: Bool val = false
   var _output: (MetricsOutputActor tag | None) = None
   var _file_output: (MetricsOutputActor tag | None) = None
 
@@ -204,11 +204,11 @@ class MetricsReporter
       m.add_collector(_timelinecollector)
     end
 
-  fun ref report(start_time: U64, end_time: U64) =>
-    apply(start_time, end_time)
+  fun ref report(dt: U64, end_time: (U64 | None)=None) =>
+    apply(dt, end_time)
 
-	fun ref apply(start_time: U64, end_time: U64) =>
-    _timeline(start_time, end_time)
+	fun ref apply(dt: U64, end_time: (U64 | None)=None) =>
+    _timeline(dt, end_time)
     if _timeline.size() > 1 then flush() end
 
   fun ref flush() =>

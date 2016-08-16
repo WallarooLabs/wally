@@ -22,16 +22,16 @@ class iso _TestTimeline is UnitTest
     let ceil: U64 = base + 10_000_000_000
     for v in Range[U64](base, ceil, 100_000_000) do
       for v' in Range[U64](0, 1_000_000_000, 1_000_000) do
-        tl(v, v+v')
+        tl(v', v)
       end
     end
 
     // Make sure we've got 11 periods in timeline
-    h.assert_eq[USize](tl.size(), 11)
+    h.assert_eq[USize](tl.size(), 10)
     // Verify the JSON output structure
     let j = tl.json()
-    h.assert_eq[USize](j.data.size(), 11)
-    h.assert_eq[I64](((((j.data(10) as JsonObject)
+    h.assert_eq[USize](j.data.size(), 10)
+    h.assert_eq[I64](((((j.data(9) as JsonObject)
       .data("topics") as JsonObject)
       .data("latency_bins") as JsonObject)
       .data("29") as I64), 2680)
