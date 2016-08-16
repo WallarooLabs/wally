@@ -169,6 +169,14 @@ actor MetricsCollector is FlushingActor
       tlc.flush(consume col, j)
     end
 
+  be dispose() =>
+    match _output
+    | let o: MetricsOutputActor tag => o.dispose()
+    end
+    match _file_output
+    | let o: MetricsOutputActor tag => o.dispose()
+    end
+
   be add_collector(t: TimelineCollector tag) =>
   """
   Save a tag to TimelineCollector to the local collection
