@@ -59,31 +59,6 @@ def verify_report(report):
 
 P2Bins = list(range(66))
 
-def select_bin(v, bins):
-    """Binary search bins keys for the smallest value that is greater than
-    or equal to the value v."""
-    if v > bins[-2]:
-        return 'overflow'
-#    elif v < bins[0]:
-#        return bins[0]
-    l = 0
-    r = len(bins)-2
-    m = (l+r)//2
-    while True:
-        b = bins[m]
-        if (l == r) or ((r-l) == 1):
-            break
-        elif b < v:
-            l = m
-            m = (l+r)//2
-        elif b >= v:
-            r = m
-            m = (l+r)//2
-    b = bins[m]
-    if v > b:
-        return bins[m+1]
-    return b
-
 
 class Summarizer:
     def __init__(self, strip=False):
@@ -98,7 +73,7 @@ class Summarizer:
     def load(self, counts, throughputs):
         for k, v in counts.items():
             try:
-                k = select_bin(int(k), self.bins)
+                k = int(k)
             except:
                 pass
             try:
@@ -124,15 +99,15 @@ class Summarizer:
     def count(self, t0, t1):
         dt = t1 - t0
         if dt > 0:
-            k = select_bin(int(math.ceil(math.log(dt, 2))), self.bins)
+            k = min(int(math.log(dt, 2)), 65)
         else:
-            k = self.bins[0]
-        self.counts[v] += 1
+            k = 0
+        self.counts[k] += 1
         if k < self._min_bin:
             self._min_bin = k
         if k > self._max_bin:
             self._max_bin = k
-        t = int(math.ceil(t1))
+        t = t1 // int(1e9)
         if self.base is None:
             self.base = t
         else:
@@ -148,51 +123,96 @@ class Summarizer:
             "\n".join(("{:<10}: {}".format(k-self.base, v)
                 for k, v in sorted(self.throughputs.items(),
                     key=lambda x: x[0]))),
-            "\n".join(("{:<10}: {}".format(k, self.counts[k])
+            "\n".join(("{:<3}: {}".format(k, self.counts[k])
                       for k in self.bins if k >= self._min_bin and k <= self._max_bin))))
 
 
-def test_select_bin():
-    assert(select_bin(5, FixedBins) == 5)
-    assert(select_bin(4.95, FixedBins) == 5)
-    assert(select_bin(4.99, FixedBins) == 5)
-    assert(select_bin(3.95, FixedBins) == 4)
-    assert(select_bin(4.0, FixedBins) == 4)
-    assert(select_bin(0.149, FixedBins) == 0.15)
-    assert(select_bin(0, FixedBins) == 0.000001)
-    assert(select_bin(11, FixedBins) == 'overflow')
-    assert(select_bin(0.005, Log10Bins) == 0.01)
-    assert(select_bin(0.001, Log10Bins) == 0.001)
-
-
 def test_summarizer():
-    s = Summarizer()
-    t0 = 14213851300
+    s = Summarizer(True)
+    t0 = 14213851300 * int(1e9)
     for x in range(100):
-        s.count(t0, t0 + 0.1)
+        s.count(t0, t0 + int(1e7))
     for k in s.counts.keys():
-        if k == 'overflow':
-            s.count(t0, t0 + 90.0)
-        else:
-            s.count(t0, t0 + (k - k/10.0))
+        dt = int(1e9)*(k//10)
+        s.count(t0 - 2**k + dt, t0 + dt)
     exp = """Throughput
 ----------
-0         : 1
-1         : 106
-9         : 1
-90        : 1
+0         : 110
+1         : 10
+2         : 10
+3         : 10
+4         : 10
+5         : 10
+6         : 6
 
 Latency
 -------
-1e-06     : 1
-1e-05     : 1
-0.0001    : 1
-0.001     : 1
-0.01      : 1
-0.1       : 1
-1.0       : 101
-10.0      : 1
-overflow  : 1"""
+0  : 1
+1  : 1
+2  : 1
+3  : 1
+4  : 1
+5  : 1
+6  : 1
+7  : 1
+8  : 1
+9  : 1
+10 : 1
+11 : 1
+12 : 1
+13 : 1
+14 : 1
+15 : 1
+16 : 1
+17 : 1
+18 : 1
+19 : 1
+20 : 1
+21 : 1
+22 : 1
+23 : 101
+24 : 1
+25 : 1
+26 : 1
+27 : 1
+28 : 1
+29 : 1
+30 : 1
+31 : 1
+32 : 1
+33 : 1
+34 : 1
+35 : 1
+36 : 1
+37 : 1
+38 : 1
+39 : 1
+40 : 1
+41 : 1
+42 : 1
+43 : 1
+44 : 1
+45 : 1
+46 : 1
+47 : 1
+48 : 1
+49 : 1
+50 : 1
+51 : 1
+52 : 1
+53 : 1
+54 : 1
+55 : 1
+56 : 1
+57 : 1
+58 : 1
+59 : 1
+60 : 1
+61 : 1
+62 : 1
+63 : 1
+64 : 1
+65 : 1"""
     assert(exp == str(s))
 
     s = Summarizer()
@@ -207,13 +227,5 @@ overflow  : 1"""
 
 Latency
 -------
-1e-06     : 0
-1e-05     : 0
-0.0001    : 800
-0.001     : 900
-0.01      : 0
-0.1       : 100
-1.0       : 0
-10.0      : 0
-overflow  : 0"""
+0  : 1800"""
     assert(exp == str(s))
