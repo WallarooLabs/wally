@@ -69,6 +69,7 @@ class Summarizer:
         self.strip = strip
         self._min_bin = self.bins[-1]
         self._max_bin = self.bins[0]
+        self._total = 0
 
     def load(self, counts, throughputs):
         for k, v in counts.items():
@@ -78,8 +79,10 @@ class Summarizer:
                 pass
             try:
                 self.counts[k] += v
+                self._total += v
             except KeyError:
                 self.counts[k] = v
+                self._total += v
             if k < self._min_bin:
                 self._min_bin = k
             if k > self._max_bin:
@@ -103,6 +106,7 @@ class Summarizer:
         else:
             k = 0
         self.counts[k] += 1
+        self._total += 1
         if k < self._min_bin:
             self._min_bin = k
         if k > self._max_bin:
@@ -119,12 +123,14 @@ class Summarizer:
 
     def __str__(self):
         return ("Throughput\n----------\n{}\n\n"
-                "Latency\n-------\n{}".format(
+                "Latency\n-------\n{}\n\n"
+                "Total\n-----\n{}".format(
             "\n".join(("{:<10}: {}".format(k-self.base, v)
                 for k, v in sorted(self.throughputs.items(),
                     key=lambda x: x[0]))),
             "\n".join(("{:<3}: {}".format(k, self.counts[k])
-                      for k in self.bins if k >= self._min_bin and k <= self._max_bin))))
+                      for k in self.bins if k >= self._min_bin and k <= self._max_bin)),
+            self._total))
 
 
 def test_summarizer():
@@ -212,7 +218,11 @@ Latency
 62 : 1
 63 : 1
 64 : 1
-65 : 1"""
+65 : 1
+
+Total
+-----
+166"""
     assert(exp == str(s))
 
     s = Summarizer()
@@ -227,5 +237,9 @@ Latency
 
 Latency
 -------
-0  : 1800"""
+0  : 1800
+
+Total
+-----
+1800"""
     assert(exp == str(s))
