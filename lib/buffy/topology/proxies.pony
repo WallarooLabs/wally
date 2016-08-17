@@ -11,6 +11,7 @@ actor Proxy is BasicStep
   let _step_id: U64
   let _target_node_name: String
   let _coordinator: Coordinator
+  var _node_reporter: (MetricsReporter | None) = None
   let _metrics_collector: (MetricsCollector tag | None)
 
   new create(node_name: String, step_id: U64,
@@ -21,10 +22,16 @@ actor Proxy is BasicStep
     _target_node_name = target_node_name
     _coordinator = coordinator
     _metrics_collector = metrics_collector
+    _node_reporter = MetricsReporter(0, _node_name, "ingress-egress", 
+      _metrics_collector)
 
   be send[D: Any val](msg_id: U64, source_ts: U64, ingress_ts: U64, 
     msg_data: D) =>
     _coordinator.send_data_message[D](_target_node_name, _step_id, _node_name, msg_id, source_ts, ingress_ts, msg_data)
+    match _node_reporter
+    | let sr: MetricsReporter ref =>
+      sr.report((Epoch.nanoseconds() - ingress_ts))
+    end
 
 actor StepManager is FlushingActor
   let _env: Env

@@ -741,7 +741,8 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
   let _conns: Array[TCPConnection]
   let _metrics_collector: (MetricsCollector tag | None)
   let _pipeline_name: String
-  var _step_reporter: (MetricsReporter ref | None) = None
+  var _sink_reporter: (MetricsReporter | None) = None
+  var _node_reporter: (MetricsReporter | None) = None
   embed _write_buffer: Writer = Writer
 
   new create(array_stringify: ArrayStringify[In] val, conns: Array[TCPConnection] iso =
@@ -751,8 +752,10 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
     _conns = consume conns
     _metrics_collector = m_coll
     _pipeline_name = pipeline_name
-    // TODO: Create StepReporter with correct id and name, and category
-    // "source-sink"
+    _sink_reporter = MetricsReporter(0, _pipeline_name, "source-sink", 
+      _metrics_collector)
+    _node_reporter = MetricsReporter(0, "leader", "ingress-egress", 
+      _metrics_collector)
 
   be add_conn(conn: TCPConnection) =>
     _conns.push(conn)
@@ -777,8 +780,12 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
         for conn in _conns.values() do
           conn.writev(tcp_msg)
         end
-        match _step_reporter
-        | let sr: MetricsReporter ref =>
+        match _sink_reporter
+        | let sr: MetricsReporter =>
+          sr.report((Epoch.nanoseconds() - source_ts))
+        end
+        match _node_reporter
+        | let sr: MetricsReporter =>
           sr.report((Epoch.nanoseconds() - ingress_ts))
         end
         // _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
