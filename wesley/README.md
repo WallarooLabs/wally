@@ -7,6 +7,7 @@ Verfication of the results of tests run by Giles.
 ## Verification
 
 Wesley does the following:
+
 1. applies a transforming function to convert the messages sent by Giles to
    Buffy to a canonical form defined by user (after first applying the relevant
    computations for the current test)
