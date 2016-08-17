@@ -13,7 +13,7 @@ from textwrap import indent
 @click.option('--report', '-r', nargs=1, required=True,
               help="Path of report file to verify")
 @click.option('--verify/--no-verify', ' /-V', default=True)
-@click.option('--strip', '-s', default=True)
+@click.option('--strip/--no-strip', ' /-S', default=True)
 def summarize(report, verify, strip):
     topics = {}
     try:

@@ -129,7 +129,8 @@ class Summarizer:
                 for k, v in sorted(self.throughputs.items(),
                     key=lambda x: x[0]))),
             "\n".join(("{:<3}: {}".format(k, self.counts[k])
-                      for k in self.bins if k >= self._min_bin and k <= self._max_bin)),
+                for k in self.bins[self._min_bin if self.strip else 0:
+                    self._max_bin if self.strip else None])),
             self._total))
 
 
