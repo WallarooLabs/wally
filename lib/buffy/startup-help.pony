@@ -25,6 +25,7 @@ primitive StartupHelp
       --metrics-period <period> [Sets the aggregation period for metrics, in seconds]
       --metrics-file <file path> [Sets the filepath for metrics report file]
       --metrics-file-period <period> [Sets the aggregatin period for metrics report file, in seconds]
+      --app-name <name> [Monitoring hub app name]
       --spike-seed <seed> [Optionally sets seed for spike]
       --spike-delay [Set flag for spike delay]
       --spike-drop [Set flag for spike drop]
