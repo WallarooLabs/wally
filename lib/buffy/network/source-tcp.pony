@@ -83,7 +83,7 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
     match _metrics_collector
     | let m: MetricsCollector tag =>
       _local_step.add_step_reporter(MetricsReporter(step_id, step_builder_name,
-        "source-sink", m))
+        "step", m))
     end
     match _local_step
     | let state_step: BasicStateLocalStep =>
