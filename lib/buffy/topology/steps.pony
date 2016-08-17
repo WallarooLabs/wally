@@ -788,10 +788,6 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
         | let sr: MetricsReporter =>
           sr.report((Epoch.nanoseconds() - ingress_ts))
         end
-        // _metrics_collector.report_boundary_metrics(BoundaryTypes.source_sink(),
-        //   msg_id, source_ts, now, _pipeline_name)
-        // _metrics_collector.report_boundary_metrics(
-        //   BoundaryTypes.ingress_egress(), msg_id, ingress_ts, now)
       end
     end
 
