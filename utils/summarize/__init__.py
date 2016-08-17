@@ -130,7 +130,7 @@ class Summarizer:
                     key=lambda x: x[0]))),
             "\n".join(("{:<3}: {}".format(k, self.counts[k])
                 for k in self.bins[self._min_bin if self.strip else 0:
-                    self._max_bin if self.strip else None])),
+                    self._max_bin+1 if self.strip else None])),
             self._total))
 
 
