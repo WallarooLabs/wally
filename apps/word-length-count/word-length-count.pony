@@ -20,9 +20,9 @@ actor Main
         )
       let topology = recover val
         Topology
-          .new_pipeline[String, String](P, S, recover [0] end, "word-length-count")
-          .to_external[String](WordLengthCountProcessBuilder(jvmConfig))
-          .build()
+          .new_pipeline[String, String](P, "word-length-count")
+            .to_external[String](WordLengthCountProcessBuilder(jvmConfig))
+            .to_simple_sink(S, recover [0] end)
       end
       Startup(env, topology, 1)
     else

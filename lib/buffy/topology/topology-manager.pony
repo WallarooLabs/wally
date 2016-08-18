@@ -116,6 +116,7 @@ actor TopologyManager
     let guid_gen = GuidGenerator
     try
       for pipeline in _topology.pipelines.values() do
+        _env.out.print("|--Starting pipeline " + pipeline.name() + "--|")
         let source_addr: Array[String] = 
           _source_addrs(_init_data.cur_source_id.usize()).split(":")
         let source_host = source_addr(0)
@@ -183,6 +184,7 @@ actor TopologyManager
           sendable_sink_ids.push(id)
         end
 
+
         if sink_node_idx == 0 then // if cur_node is the leader
           _coordinator.add_sink(consume sendable_sink_ids, _init_data.step_id,
             pipeline.sink_builder(), _auth)
@@ -197,9 +199,8 @@ actor TopologyManager
             WireMsgEncoder.spin_up_sink(consume sendable_sink_ids, 
               _init_data.step_id,
               pipeline.sink_builder(), _auth)
-            _coordinator.send_control_message(sink_node, create_sink_msg)
+          _coordinator.send_control_message(sink_node, create_sink_msg)
         end
-
 
         _coordinator.initialize_source(_init_data.cur_source_id, pipeline,
           initial_step_id, source_host, source_service, 

@@ -8,11 +8,11 @@ trait SinkNodeStepBuilder
   fun apply(conn: TCPConnection): StringInStep tag
 
 class SinkNodeConfig[Diff: Any #read] is SinkNodeStepBuilder
-  let collector_builder: {(): SinkCollector[Diff]} val
+  let collector_builder: {(): SimpleSinkCollector[Diff]} val
   let connector: SinkConnector val
   let stringify: ArrayStringify[Diff] val
 
-  new val create(collector_builder': {(): SinkCollector[Diff]} val,
+  new val create(collector_builder': {(): SimpleSinkCollector[Diff]} val,
     connector': SinkConnector val, stringify': ArrayStringify[Diff] val)
   =>
     collector_builder = collector_builder'
@@ -24,7 +24,7 @@ class SinkNodeConfig[Diff: Any #read] is SinkNodeStepBuilder
 
     SinkNodeStep[Diff](collector_builder, stringify, sink_connection)
 
-trait SinkCollector[Diff: Any #read]
+trait SimpleSinkCollector[Diff: Any #read]
   fun ref apply(input: Array[String] val)
 
   fun has_diff(): Bool

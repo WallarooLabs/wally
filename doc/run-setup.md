@@ -22,7 +22,7 @@ giles/receiver/receiver -l 127.0.0.1:8000 --ponythreads 1 -e 1000000 -m -w
 
 Buffy:
 ```
-apps/double-divide/double-divide -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000 -k 127.0.0.1:8000 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 3
+apps/double-divide/double-divide -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000 -k 127.0.0.1:8000 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --app-name double-divide --ponythreads 3
 ```
 
 Giles sender:
@@ -51,14 +51,14 @@ apps/market-spread/market-spread --run-sink -l 127.0.0.1:8001 -t 127.0.0.1:5555 
 
 Buffy:
 ```
-apps/market-spread/market-spread -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000,127.0.0.1:7001 -k 127.0.0.1:8000,127.0.0.1:8001,127.0.0.1:8002 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 1
+apps/market-spread/market-spread -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000,127.0.0.1:7001 -k 127.0.0.1:5555,127.0.0.1:8002 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:5001 --ponythreads 1
 ```
 
 Giles sender:
 ```
-giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -f ./demos/marketspread/trades-fixish.msg -r --ponythreads 1 -s 500 -y -g 58
+giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -f ./demos/marketspread/trades-fixish.msg -r --ponythreads 1 -y -g 58 -s 500 
 
-giles/sender/sender -b 127.0.0.1:7001 -m 100000000 -f ./demos/marketspread/nbbo.msg -r --ponythreads 1 -s 500 -y -g 48
+giles/sender/sender -b 127.0.0.1:7001 -m 100000000 -f ./demos/marketspread/nbbo-fixish.msg -r --ponythreads 1 -y -g 48 -s 500 
 ```
 
 ---------------------------------
@@ -72,7 +72,7 @@ giles/receiver/receiver -l 127.0.0.1:8000 --ponythreads 1
 
 Buffy:
 ```
-apps/word-count/word-count -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000 -k 127.0.0.1:8000 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 3
+apps/word-count/word-count -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000 -k 127.0.0.1:8000 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --app-name word-count --ponythreads 3
 ```
 
 Giles sender:
@@ -97,7 +97,7 @@ sudo cset proc -s user -e numactl -- -C 2-5 chrt -f 80 giles/receiver/receiver -
 
 Buffy:
 ```
-sudo cset proc -s user -e numactl -- -C 6-12 chrt -f 80 apps/double-divide/double-divide -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000 -k 127.0.0.1:8000 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 3
+sudo cset proc -s user -e numactl -- -C 6-12 chrt -f 80 apps/double-divide/double-divide -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000 -k 127.0.0.1:8000 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --app-name double-divide --ponythreads 3
 ```
 
 Giles sender:
@@ -116,7 +116,7 @@ sudo cset proc -s user -e numactl -- -C 2-4 chrt -f 80 giles/receiver/receiver -
 
 Buffy:  
 ```
-sudo cset proc -s user -e numactl -- -C 5-11 chrt -f 80 apps/market-spread/market-spread -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000,127.0.0.1:7001 -k 127.0.0.1:8000,127.0.0.1:8001,127.0.0.1:8002 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 3
+sudo cset proc -s user -e numactl -- -C 5-11 chrt -f 80 apps/market-spread/market-spread -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000,127.0.0.1:7001 -k 127.0.0.1:8000,127.0.0.1:8001,127.0.0.1:8002 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --app-name market-spread --ponythreads 3
 ```
 
 Giles sender:
@@ -132,7 +132,7 @@ TOP
 ---------------------------------
 
 ```
-top | grep 'buffy\|double\|word-count\|market-spread\|passthrough\|fixish\|fixparse'
+top | grep 'buffy\|double\|word-count\|market-spread\|passthrough\|fixish\|fixparse\|sender'
 ```
 
 ---------------------------------

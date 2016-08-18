@@ -7,12 +7,12 @@ trait StringInStep
 
 actor SinkNodeStep[Diff: Any #read] 
   is StringInStep
-  let _collector: SinkCollector[Diff]
+  let _collector: SimpleSinkCollector[Diff]
   let _array_stringify: ArrayStringify[Diff] val
   var _output: SinkConnection
   let _timers: Timers = Timers
 
-  new create(collector_builder: {(): SinkCollector[Diff]} val, 
+  new create(collector_builder: {(): SimpleSinkCollector[Diff]} val, 
     array_stringify: ArrayStringify[Diff] val,
     output: SinkConnection) =>
     _collector = collector_builder()
