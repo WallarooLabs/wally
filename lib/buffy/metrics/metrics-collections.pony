@@ -70,13 +70,14 @@ a latency histogram and a throughput history.
       let t0: I64 = ((_periods(idx) - _period)/1_000_000_000).i64()
       let j': JsonObject ref = JsonObject
       j'.data.update("category", category)
-      j'.data.update("pipeline_key", recover
-        let s = String(50)
-        s.append(name)
-        s.append(":")
-        s.append(id.string())
-        consume s
-        end)
+      j'.data.update("pipeline_key", name)
+      // j'.data.update("pipeline_key", recover
+      //   let s = String(50)
+      //   s.append(name)
+      //   s.append(":")
+      //   s.append(id.string())
+      //   consume s
+      //   end)
       j'.data.update("t1", t1)
       j'.data.update("t0", t0)
       let topics: JsonObject ref = JsonObject
