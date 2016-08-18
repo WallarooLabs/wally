@@ -1,6 +1,9 @@
 use ".."
 use "sendence/fix"
+use "sendence/new-fix"
 use "collections"
+use "buffered"
+use "sendence/messages"
 
 actor Main
   new create(env: Env) =>
@@ -23,7 +26,7 @@ class MarketSpreadReceivedMessage
     ("(" + ts.string() + ", " + symbol + ": " + is_rejected.string() + ")")
       .clone()
 
-class MarketSpreadInitParser is InitializationParser[FixNbboMessage val]
+class MarketSpreadInitParser is (InitializationParser[FixNbboMessage val] & TextMessageFileParser)
   let _messages: Array[FixNbboMessage val] = Array[FixNbboMessage val]
 
   fun fs(): (String|None) => None
@@ -39,14 +42,14 @@ class MarketSpreadInitParser is InitializationParser[FixNbboMessage val]
   fun ref initialization_messages(): Array[FixNbboMessage val] =>
     _messages
 
-class MarketSpreadSentParser is SentParser[FixOrderMessage val]
+class MarketSpreadSentParser is (SentParser[FixOrderMessage val] & FallorMessageFileParser)
   let _messages: Array[FixOrderMessage val] = Array[FixOrderMessage val]
 
-  fun fs(): (String|None) => None
 
   fun ref apply(fields: Array[String] val) ? =>
-    let fix_raw = fields(0)
-    let fix_message = FixParser(fix_raw)
+    let ts = fields(0)
+    let fix_raw = fields(1).array().trim(8)
+    let fix_message = FixishMsgDecoder(fix_raw)
     match fix_message
     | let trade: FixOrderMessage val =>
       _messages.push(trade)
@@ -55,8 +58,9 @@ class MarketSpreadSentParser is SentParser[FixOrderMessage val]
   fun ref sent_messages(): Array[FixOrderMessage val] =>
     _messages
 
+
 class MarketSpreadReceivedParser is 
-  ReceivedParser[MarketSpreadReceivedMessage val]
+  (ReceivedParser[MarketSpreadReceivedMessage val] & FallorMessageFileParser)
 
   let _messages: Array[MarketSpreadReceivedMessage val] =
     Array[MarketSpreadReceivedMessage val]
@@ -71,6 +75,21 @@ class MarketSpreadReceivedParser is
   fun ref received_messages(): Array[MarketSpreadReceivedMessage val] =>
     _messages
 
+
+primitive SymbolPadder
+  fun apply(symbol': String): String =>
+    var symbol = symbol'
+    var symbol_diff = 
+      if symbol.size() < 4 then
+        4 - symbol.size()
+      else
+        0
+      end
+    for i in Range(0 , symbol_diff) do
+      symbol = " " + symbol
+    end
+    symbol    
+
 class MarketSpreadResultMapper is StatefulResultMapper[FixOrderMessage val, 
   MarketSpreadReceivedMessage val, FixNbboMessage val, MarketData]
 
@@ -80,11 +99,12 @@ class MarketSpreadResultMapper is StatefulResultMapper[FixOrderMessage val,
     
     for m in init.values() do
       let mid = (m.bid_px() + m.offer_px()) / 2
+      let sym = SymbolPadder(m.symbol())
       if ((m.offer_px() - m.bid_px()) >= 0.05) or
         (((m.offer_px() - m.bid_px()) / mid) >= 0.05) then
-        state(m.symbol()) = true
+        state(sym) = true
       else
-        state(m.symbol()) = false
+        state(sym) = false
       end      
     end
     state
@@ -94,7 +114,7 @@ class MarketSpreadResultMapper is StatefulResultMapper[FixOrderMessage val,
     let tr = TradeResults
     
     for m in sent.values() do
-      let symbol = m.symbol()
+      let symbol: String = SymbolPadder(m.symbol())
       tr(symbol) = state.is_rejected(symbol)
     end
     tr
@@ -104,7 +124,8 @@ class MarketSpreadResultMapper is StatefulResultMapper[FixOrderMessage val,
     let tr = TradeResults
 
     for m in received.values() do
-      tr(m.symbol) = m.is_rejected
+      let symbol: String = SymbolPadder(m.symbol)
+      tr(symbol) = m.is_rejected
     end
     tr
 
@@ -119,14 +140,23 @@ class TradeResults is CanonicalForm
     match that
     | let tr: TradeResults =>
       if results.size() != tr.results.size() then 
+        //@printf[I32]((results.size().string() + " size expected, " + tr.results.size().string() + " size received").cstring())
         return (ResultsDoNotMatch, "Trade results sizes do not match up")
       end
+      // for (symbol, is_rejected) in results.pairs() do
+      //   @printf[I32](("> results: " + symbol + ":" + is_rejected.string() + "\n").cstring())
+      // end
+      // for (symbol, is_rejected) in tr.results.pairs() do
+      //   @printf[I32](("< results: " + symbol + ":" + is_rejected.string() + "\n").cstring())
+      // end
+
       for (symbol, is_rejected) in results.pairs() do
         try
           if is_rejected != tr(symbol) then
             let msg = "Expected " + symbol + " rejection to be " 
               + is_rejected.string() + " but it was " 
               + (not is_rejected).string()
+              //@printf[I32]((msg + "\n").cstring())
             return (ResultsDoNotMatch, msg)
           end
         else

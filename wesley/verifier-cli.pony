@@ -71,15 +71,14 @@ primitive VerifierCLI[S: Message val, R: Message val]
     end
 
     try
-      _read_text_message_file_with_parser(sent_file, sent_parser, env.root,
-        env)
+      _read_file_with_parser(sent_file, sent_parser, env)
     else
       return SetupErrorProblemReadingMessageFile(sent_file)
     end
 
     try
-      _read_received_message_file_with_parser(received_file, received_parser, 
-        env.root, env)
+      _read_file_with_parser(received_file, received_parser,
+       env)
     else
       return SetupErrorProblemReadingMessageFile(received_file)
     end
@@ -122,22 +121,19 @@ primitive VerifierCLI[S: Message val, R: Message val]
     end
 
     try
-      _read_text_message_file_with_parser(init_file, init_parser, env.root,
-        env)
+      _read_file_with_parser(init_file, init_parser, env)
     else
       return SetupErrorProblemReadingMessageFile(init_file)
     end
 
     try
-      _read_text_message_file_with_parser(sent_file, sent_parser, env.root,
-        env)
+      _read_file_with_parser(sent_file, sent_parser, env)
     else
       return SetupErrorProblemReadingMessageFile(sent_file)
     end
 
     try
-      _read_received_message_file_with_parser(received_file, received_parser,
-       env.root, env)
+      _read_file_with_parser(received_file, received_parser, env)
     else
       return SetupErrorProblemReadingMessageFile(received_file)
     end
@@ -195,6 +191,18 @@ primitive VerifierCLI[S: Message val, R: Message val]
       error
     end
 
+  fun _read_file_with_parser(file_name: String, parser: MessageFileParser, env: Env) ? =>
+    match parser
+    | let text_parser: TextMessageFileParser =>
+        _read_text_message_file_with_parser(file_name, text_parser, env.root,
+        env)
+    | let binary_parser: BinaryMessageFileParser =>
+        _read_binary_message_file_with_parser(file_name, binary_parser, env.root, env)
+    else
+      env.err.print("Unknown type of parser. Expected text or binary parser")
+      error
+    end
+
   fun _read_text_message_file_with_parser(file_name: String, 
     parser: TextMessageFileParser, root: (AmbientAuth | None),
     env: Env) ? 
@@ -207,13 +215,14 @@ primitive VerifierCLI[S: Message val, R: Message val]
       error
     end
 
-  fun _read_received_message_file_with_parser(file_name: String, 
-    parser: MessageFileParser, root: (AmbientAuth | None), env: Env) ? 
+  fun _read_binary_message_file_with_parser(file_name: String, 
+    parser: BinaryMessageFileParser, root: (AmbientAuth | None),
+    env: Env) ? 
   =>
     let caps = recover val FileCaps.set(FileRead).set(FileStat) end
     with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)) 
       as File do
-      ReceivedMessageFileReader(file.read(file.size()), parser, env)
+      BinaryMessageFileReader(file.read(file.size()), parser, env)
     else
       error
     end

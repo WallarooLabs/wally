@@ -11,9 +11,17 @@ primitive SideTypes
   fun sell(): U8 => 2
 
 primitive FixishMsgEncoder
-  fun order(side: Side val, account: U32, order_id: String, symbol: String, 
-    order_qty: F64, price: F64, transact_time: String, 
+  fun order(side: Side val, account: U32, order_id': String, symbol': String, 
+    order_qty: F64, price: F64, transact_time': String, 
     wb: Writer = Writer): Array[ByteSeq] val =>
+      let order_id: String = _with_max_length(order_id', 6)
+      let symbol: String = _with_max_length(symbol', 4)
+      // TODO: truncating time is probably a bad idea as this will make time 
+      // unparseable. until we have a better solution for handling variable
+      // message sizes, going with this for now. warn: you may end up with 
+      // unparseable times in some subset of messages with this.
+      let transact_time: String = _with_max_length(transact_time', 21)
+      
       //Header
       let msgs_size: USize = 1 + 1 + 4 + order_id.size() 
         + symbol.size() + 8 + 8 + transact_time.size()
@@ -44,6 +52,14 @@ primitive FixishMsgEncoder
       wb.f64_be(bid_px)
       wb.f64_be(offer_px)
       wb.done()
+
+    fun _with_max_length(s: String, max: USize): String =>
+      if s.size() <= max then
+        s
+      else
+        s.trim(0, max)
+      end
+
 
 primitive FixishMsgDecoder
   fun apply(data: Array[U8] val): FixMessage val ? =>

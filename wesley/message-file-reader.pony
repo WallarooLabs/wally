@@ -87,26 +87,43 @@ class TextMessageFileReader
       parser(recover val [input] end)
     end
 
-class ReceivedMessageFileReader
-  fun ref apply(input: Array[U8] val, parser: MessageFileParser ref,
-    env: Env) ?
-  =>
-  """
-  """
-    let rb: Reader = Reader
-    rb.append(input)
-    var bytes_left = input.size()
-    while bytes_left > 0 do
-      // Msg size, msg size u32, and timestamp together make up next payload
-      // size
-      let next_payload_size = rb.peek_u32_be() + 12
-      let fields =
+interface BinaryMessageFileParser is MessageFileParser
+  fun msg_size(reader: Reader): USize ?
+    """
+    Read the size of the next message in bytes
+    """
+
+  fun decode(data: Array[U8] val): Array[String] val ?
+    """
+    Decode the byte array into array of string fields
+    """
+
+interface FallorMessageFileParser is BinaryMessageFileParser
+  fun msg_size(reader: Reader): USize ? =>
+    reader.peek_u32_be().usize() + 4 /*MSG_SIZE*/ + 8 /*TIMESTAMP*/
+
+  fun decode(data: Array[U8] val): Array[String] val ? =>
+    FallorMsgDecoder.with_timestamp(data)
+
+
+class BinaryMessageFileReader
+  fun ref apply(input: Array[U8] val, parser: BinaryMessageFileParser ref,
+    env: Env) ? =>
+    let reader: Reader = Reader
+    reader.append(input)
+    var count: USize = 0
+    var left = input.size()
+    while left > 0 do
+      let msg_size = parser.msg_size(reader)
+      let msg_bytes: Array[U8] iso = reader.block(msg_size)
+      left = left - msg_size
+      let fields = 
         try
-          FallorMsgDecoder.with_timestamp(rb.block(next_payload_size.usize()))
+          parser.decode(consume msg_bytes)
         else
-          env.err.print("Problem decoding!")
+          env.err.print("Failed decoding message " + count.string())
           error
         end
-      bytes_left = bytes_left - next_payload_size.usize()
       parser(fields)
+      count = count + 1
     end
