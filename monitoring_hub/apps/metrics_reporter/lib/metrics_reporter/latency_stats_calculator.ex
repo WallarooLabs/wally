@@ -8,8 +8,12 @@ defmodule MetricsReporter.LatencyStatsCalculator do
   end
 
   def calculate_cumalative_latency_percentage_bins_data(latency_percentage_bins_data) do
-    {_, cumalative_latency_percentage_bins_data} = latency_percentage_bins_data
-      |> Enum.reduce({0, %{}}, fn {key, val}, {cumalative_percentage, cumalative_latency_percentage_bins_data} ->
+      sorted_keys = Map.keys(latency_percentage_bins_data)
+        |> Enum.sort(&(String.to_integer(&1)< String.to_integer(&2)))
+
+    {_, cumalative_latency_percentage_bins_data} = sorted_keys
+      |> Enum.reduce({0, %{}}, fn key, {cumalative_percentage, cumalative_latency_percentage_bins_data} ->
+        val = Map.get(latency_percentage_bins_data, key)
         cumalative_percentage = calculate_cumalative_percentage(val, cumalative_percentage)
         cumalative_latency_percentage_bins_data = Map.put(cumalative_latency_percentage_bins_data, key, cumalative_percentage)
         {cumalative_percentage, cumalative_latency_percentage_bins_data}
@@ -70,10 +74,11 @@ defmodule MetricsReporter.LatencyStatsCalculator do
                 {updated_keys_list, Map.put(acc_map, bin, acc_count)}
               end)
 
-      get_empty_latency_percentage_bins_data(expected_latency_bins)
+      map = get_empty_latency_percentage_bins_data(expected_latency_bins)
         |> Map.merge(aggregated_map, fn _k, v1, v2 ->
           calculate_percentile(v2, total_count)
         end)
+      map
         |> Map.new(fn {k, v} ->
           pow_key = :math.pow(2, String.to_integer(k)) |> round |> to_string
           {pow_key, v} end)
