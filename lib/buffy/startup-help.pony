@@ -1,10 +1,6 @@
 primitive StartupHelp
   fun apply(env: Env) =>
-    sink_node(env)
     platform(env)
-
-  fun sink_node(env: Env) =>
-    _sink_node(env)
 
   fun platform(env: Env) =>
     env.out.print(
@@ -29,21 +25,6 @@ primitive StartupHelp
       --spike-seed <seed> [Optionally sets seed for spike]
       --spike-delay [Set flag for spike delay]
       --spike-drop [Set flag for spike drop]
-      -----------------------------------------------------------------------------------
-      """
-    )
-
-  fun _sink_node(env: Env) =>
-    env.out.print(
-      """
-      To run as generic Sink Node:
-      -----------------------------------------------------------------------------------
-      --run-sink [Runs as sink node]
-      --listen/-l <address> [Address sink node is listening on]
-      --target-addr/-t <address> [Address sink node sends reports to]
-      --step-builder <idx> [Index of sink step builder for this sink node]
-      --phone-home/-p [Address external coordinator is listening on]
-      --name/-n <name> [Name of sink node]
       -----------------------------------------------------------------------------------
       """
     )

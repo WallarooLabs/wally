@@ -11,16 +11,15 @@ actor Main
     try
       let topology: Topology val = recover val
         Topology
-          .new_pipeline[String, WordCount val](P, O, recover [0] end, 
-            "Word Count")
-          .coalesce[WordCount val]()
-            .to_map[WordCount val](
-              lambda(): MapComputation[String, WordCount val] iso^ => Split end)
-            .to_stateful[WordCount val, WordCountTotals](
-              Count,
-              lambda(): WordCountTotals => WordCountTotals end,
-              1)
-          .close()
+          .new_pipeline[String, WordCount val](P, "Word Count")
+            .coalesce[WordCount val]()
+              .to_map[WordCount val](
+                lambda(): MapComputation[String, WordCount val] iso^ => Split end)
+              .to_stateful[WordCount val, WordCountTotals](
+                Count,
+                lambda(): WordCountTotals => WordCountTotals end,
+                1)
+            .close()
           // .to_stateful_partition[WordCount val, WordCountTotals](
           //   recover
           //     StatePartitionConfig[WordCount val, WordCount val, WordCountTotals](
@@ -30,7 +29,7 @@ actor Main
           //       FirstLetterPartition, 0)
           //   end
           //   )
-          .build()
+            .to_simple_sink(O, recover [0] end)
       end
       let sink_builders = recover Array[SinkNodeStepBuilder val] end
       // let ui_sink_builder = SinkNodeConfig[Map[String, U64]](

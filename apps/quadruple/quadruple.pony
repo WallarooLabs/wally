@@ -10,12 +10,12 @@ actor Main
     try
       let topology: Topology val = recover val
         Topology
-          .new_pipeline[U64, U64](P, S, recover [0] end, "Quadruple")
+          .new_pipeline[U64, U64](P, "Quadruple")
           .to_partition[U64](
             lambda(): Computation[U64, U64] iso^ => Double end, Mod4Partition)
           .to_partition[U64](
             lambda(): Computation[U64, U64] iso^ => Double end, Mod4Partition)
-          .build()
+          .to_simple_sink(S, recover [0] end)
       end
       Startup(env, topology, 1)
     else

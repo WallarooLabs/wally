@@ -7,10 +7,13 @@ use "buffy/sink-node"
 use "sendence/fix"
 use "sendence/new-fix"
 use "sendence/epoch"
+use "sendence/hub"
+use "sendence/bytes"
 use "net"
 use "random"
 use "time"
 use "files"
+use "buffered"
 
 actor Main
   new create(env: Env) =>
@@ -18,34 +21,40 @@ actor Main
       let auth = env.root as AmbientAuth
       let initial_market_data = generate_initial_data(auth)
 
+      let initial_report_msgs: Array[Array[ByteSeq] val] iso = 
+        recover Array[Array[ByteSeq] val] end
+      let connect_msg = Bytes.length_encode(HubJson.connect())
+      let join_msg = Bytes.length_encode(HubJson.join("reports:market-spread"))
+      initial_report_msgs.push(connect_msg)
+      initial_report_msgs.push(join_msg)
+
       let topology = recover val
         Topology
           .new_pipeline[FixOrderMessage val, OrderResult val](
-            TradeParser, ResultArrayStringify, recover [0, 1] end, "Orders")
-          .to_stateful[OrderResult val, MarketData](
-            CheckStatus,
-            recover 
-              lambda()(initial_market_data): MarketData => 
-                MarketData.from(initial_market_data) end
-            end,
-            1)
-          .build()
-          .new_pipeline[FixNbboMessage val, None](NbboParser, NoneStringify,
-            recover [2] end, "NBBO")
-          .to_stateful[None, MarketData](
-            UpdateData,
-            lambda(): MarketData => MarketData end,
-            1)
-          .build()
+            TradeParser, "Orders")
+            .to_stateful[OrderResult val, MarketData](
+              CheckStatus,
+              recover 
+                lambda()(initial_market_data): MarketData => 
+                  MarketData.from(initial_market_data) end
+              end,
+              1)
+            .to_collector_sink[RejectedResultStore](
+              lambda(): SinkCollector[OrderResult val, RejectedResultStore] =>
+                MarketSpreadSinkCollector end,
+              MarketSpreadSinkStringify, 
+              recover [0] end,
+              consume initial_report_msgs
+            )
+            // .to_simple_sink(SimpleStringify, recover [0] end)
+          .new_pipeline[FixNbboMessage val, None](NbboParser, "NBBO")
+            .to_stateful[None, MarketData](
+              UpdateData,
+              lambda(): MarketData => MarketData end,
+              1)
+            .to_empty_sink()
       end
       let sink_builders = recover Array[SinkNodeStepBuilder val] end
-      let ui_sink_builder = SinkNodeConfig[RejectedResultStore](
-        lambda(): SinkCollector[RejectedResultStore] => 
-          MarketSpreadSinkCollector end,
-        MarketSpreadSinkConnector,
-        MarketSpreadSinkStringify
-      )
-      sink_builders.push(ui_sink_builder)
       Startup(env, topology, 2, consume sink_builders)
     else
       env.out.print("Couldn't build topology")
@@ -100,25 +109,26 @@ class MarketDataEntry
     offer = o
 
 class MarketData
-  let _entries: Map[String, MarketDataEntry val] = 
-    Map[String, MarketDataEntry val]
+  // symbol => (is_rejected, bid, offer)
+  let _entries: Map[String, (Bool, F64, F64)] = 
+    Map[String, (Bool, F64, F64)]
   
   new create() => None
 
   new from(md: Map[String, MarketDataEntry val] val) =>
     for (key, value) in md.pairs() do
-      _entries(key) = value
+      _entries(key) = (value.is_rejected, value.bid, value.offer)
     end
 
-  fun ref apply(symbol: String): MarketDataEntry val ? => _entries(symbol) 
+  fun ref apply(symbol: String): (Bool, F64, F64) ? => _entries(symbol) 
 
-  fun ref update(symbol: String, entry: MarketDataEntry val): MarketData =>
+  fun ref update(symbol: String, entry: (Bool, F64, F64)): MarketData =>
     _entries(symbol) = entry
     this
 
   fun is_rejected(symbol: String): Bool =>
     try
-      _entries(symbol).is_rejected
+      _entries(symbol)._1 //is_rejected
     else
       true
     end
@@ -132,11 +142,11 @@ class UpdateData is StateComputation[FixNbboMessage val, None, MarketData]
     if ((nbbo.offer_px() - nbbo.bid_px()) >= 0.05) or
       (((nbbo.offer_px() - nbbo.bid_px()) / nbbo.mid()) >= 0.05) then
       output(None)
-      state.update(nbbo.symbol(), MarketDataEntry(true, nbbo.bid_px(), 
+      state.update(nbbo.symbol(), (true, nbbo.bid_px(), 
         nbbo.offer_px()))
     else
       output(None)
-      state.update(nbbo.symbol(), MarketDataEntry(false, nbbo.bid_px(), 
+      state.update(nbbo.symbol(), (false, nbbo.bid_px(), 
         nbbo.offer_px()))
     end
 
@@ -152,60 +162,45 @@ class CheckStatus is StateComputation[FixOrderMessage val, OrderResult val,
         try
           state(order.symbol())
         else
-          MarketDataEntry(true, 0, 0)
+          (true, 0, 0)
         end
       else
-        MarketDataEntry(true, 0, 0)
+        (true, 0, 0)
       end
     // if market_data_entry.is_rejected then
-      let result: OrderResult val = OrderResult(order.order_id(),
-        Epoch.seconds(), order.account(), order.symbol(),
-        order.price(), order.order_qty().u64(), order.side().string(),
-        market_data_entry.bid, market_data_entry.offer,
-        market_data_entry.is_rejected)
+      let result: OrderResult val = OrderResult(order,
+        market_data_entry._2, market_data_entry._3,
+        market_data_entry._1, Epoch.seconds())
       output(result)
     // end
     state
  
 class OrderResult
-  let order_id: String
-  let timestamp: U64
-  let client_id: U32
-  let symbol: String
-  let price: F64
-  let qty: U64
-  let side: String
+  let order: FixOrderMessage val
   let bid: F64
   let offer: F64
   let is_rejected: Bool
+  let timestamp: U64
 
-  new val create(order_id': String,
-    timestamp': U64,
-    client_id': U32,
-    symbol': String,
-    price': F64,
-    qty': U64,
-    side': String,
+  new val create(order': FixOrderMessage val,
     bid': F64,
     offer': F64,
-    is_rejected': Bool) 
+    is_rejected': Bool,
+    timestamp': U64) 
   =>
-    order_id = order_id'
-    timestamp = timestamp'
-    client_id = client_id'
-    symbol = symbol'
-    price = price'
-    qty = qty'
-    side = side'
+    order = order'
     bid = bid'
     offer = offer'
     is_rejected = is_rejected'
+    timestamp = timestamp'
 
   fun string(): String =>
-    (symbol.clone().append(order_id).append(timestamp.string())
-      .append(client_id.string()).append(price.string())
-      .append(qty.string()).append(side).append(bid.string())
-      .append(offer.string()).append(is_rejected.string())).clone()
+    (order.symbol().clone().append(order.order_id())
+      .append(order.account().string())
+      .append(order.price().string()).append(order.order_qty().string())
+      .append(order.side().string()).append(bid.string()).append(offer.string())
+      .append(is_rejected.string())
+      .append(timestamp.string())).clone()
 
 interface Symboly
   fun symbol(): String
@@ -239,21 +234,60 @@ class TradeParser is Parser[FixOrderMessage val]
       None
     end
 
-class ResultStringify
-  fun apply(input: OrderResult val): String =>
-    input.string()
+// class ToMonitoring is ArrayByteSeqify[RejectedResultStore]
+//   fun apply(i: RejectedResultStore, wb: Writer): Array[ByteSeq] val =>
+//     let rejected_payload = RejectedResultsStoreBytes.rejected(i, wb)
+//     let summaries_payload = RejectedResultsStoreBytes.client_summaries(i, wb)
 
-primitive ResultArrayStringify
-  fun apply(input: OrderResult val): Array[String] val =>
-    let result: Array[String] iso = recover Array[String] end
-    result.push(input.symbol)
-    result.push(input.order_id)
-    result.push(input.timestamp.string())
-    result.push(input.client_id.string())
-    result.push(input.price.string())
-    result.push(input.qty.string())
-    result.push(input.side)
-    result.push(input.bid.string())
-    result.push(input.offer.string())
-    result.push(input.is_rejected.string())
-    consume result
+//     let rejected = HubProtocol.payload("rejected-orders", 
+//       "reports:market-spread", rejected_payload)
+//     let summaries_string = HubJson.payload("client-order-summaries", 
+//         "reports:market-spread", summaries_payload)
+//     wb.done()
+
+// primitive RejectedResultsStoreBytes
+//   fun rejected(i: RejectedResultStore, wb: Writer): Array[ByteSeq] val  =>
+//     let rejected_size = ((i.rejected.size() * 53) + 16).u32()
+//     wb.u32_be(rejected_size)
+//     for order_result in i.rejected.values() do
+//       match order_result.order.side()
+//       | Buy => wb.u8(SideTypes.buy())
+//       | Sell => wb.u8(SideTypes.sell())
+//       end
+//       wb.u32_be(order_result.order.account())
+//       wb.write(order_result.order.order_id())
+//       wb.write(order_result.order.symbol())
+//       wb.f64_be(order_result.order.order_qty())
+//       wb.f64_be(order_result.order.price())
+//       wb.f64_be(order_result.bid)
+//       wb.f64_be(order_result.offer)
+//     end
+//     wb.done()
+
+//   fun client_summaries(i: RejectedResultStore, wb: Writer): Array[ByteSeq] val
+//   =>
+//     let client_orders_size = i.client_orders_updated.size() * 16
+//     for client in i.client_orders_updated.values() do
+//       try
+//         let summary = i.client_order_counts(client)
+//         wb.u32_be(client)
+//         // Change this to U64 once Json is removed
+//         wb.i64_be(summary.total)
+//         wb.i64_be(summary.rejected_total)
+//       end
+//     end
+//     wb.done()
+
+
+
+
+
+
+
+
+
+
+
+
+
+

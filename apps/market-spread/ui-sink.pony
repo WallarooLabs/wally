@@ -1,9 +1,24 @@
 use "sendence/bytes"
 use "sendence/hub"
+use "sendence/fix"
+use "buffy/topology"
 use "json"
 use "buffy/sink-node"
 use "net"
 use "collections"
+
+class MarketSpreadSinkCollector is SinkCollector[OrderResult val, 
+  RejectedResultStore]
+  let _diff: RejectedResultStore = RejectedResultStore
+
+  fun ref apply(input: OrderResult val) =>
+    _diff.add_result(input)
+
+  fun has_diff(): Bool => _diff.rejected.size() > 0
+
+  fun ref diff(): RejectedResultStore => _diff
+
+  fun ref clear_diff() => _diff.clear()
 
 class ClientSummary
   var total: I64 = 0
@@ -20,56 +35,19 @@ class RejectedResultStore
   let rejected: Array[OrderResult val] = Array[OrderResult val]
 
   fun ref add_result(tr: OrderResult val) =>
-    client_orders_updated.set(tr.client_id) 
+    client_orders_updated.set(tr.order.account()) 
     let summary = 
-      try client_order_counts(tr.client_id) else ClientSummary end
+      try client_order_counts(tr.order.account()) else ClientSummary end
     summary.increment_total()
     if tr.is_rejected then
       rejected.push(tr)
       summary.increment_rejected_total()
     end
-    client_order_counts(tr.client_id) = summary
+    client_order_counts(tr.order.account()) = summary
 
   fun ref clear() => 
     client_orders_updated.clear()
     rejected.clear()
-
-class MarketSpreadSinkCollector is SinkCollector[RejectedResultStore]
-  let _diff: RejectedResultStore = RejectedResultStore
-
-  fun ref apply(input: Array[String] val) =>
-    try
-      let symbol = input(0)
-      let order_id = input(1)
-      let timestamp = input(2).u64()
-      let client_id = input(3).u32()
-      let price = input(4).f64()
-      let qty = input(5).u64()
-      let side = input(6)
-      let bid = input(7).f64()
-      let offer = input(8).f64()
-      let is_rejected = input(9).bool()
-      let trade_result = OrderResult(order_id, timestamp, client_id, symbol,
-        price, qty, side, bid, offer, is_rejected)
-      _diff.add_result(trade_result)
-    end
-
-  fun has_diff(): Bool => _diff.rejected.size() > 0
-
-  fun ref diff(): RejectedResultStore => _diff
-
-  fun ref clear_diff() => _diff.clear()
-
-class MarketSpreadSinkConnector is SinkConnector
-  fun apply(conn: TCPConnection) =>
-    _send_connect(conn)
-    _send_join(conn)
-
-  fun _send_connect(conn: TCPConnection) =>
-    conn.writev(Bytes.length_encode(HubJson.connect()))
-
-  fun _send_join(conn: TCPConnection) =>
-    conn.writev(Bytes.length_encode(HubJson.join("reports:market-spread")))
 
 class MarketSpreadSinkStringify
   fun apply(diff: RejectedResultStore): (String | Array[String] val) =>
@@ -91,13 +69,13 @@ class MarketSpreadSinkStringify
       recover Array[JsonType](len) end
     for order in diff.rejected.values() do
       let next = recover Map[String, JsonType] end
-      next("order_id") = order.order_id
+      next("order_id") = order.order.order_id()
       next("timestamp") = order.timestamp.i64()
-      next("client_id") = order.client_id.i64()
-      next("symbol") = order.symbol
-      next("price") = order.price
-      next("qty") = order.qty.i64()
-      next("side") = order.side
+      next("client_id") = order.order.account().i64()
+      next("symbol") = order.order.symbol()
+      next("price") = order.order.price()
+      next("qty") = order.order.order_qty().i64()
+      next("side") = order.order.side().string()
       next("bid") = order.bid
       next("offer") = order.offer
       next("is_rejected") = order.is_rejected
@@ -121,5 +99,49 @@ class MarketSpreadSinkStringify
     end
     JsonArray.from_array(consume values)
 
+
+
+// class MarketSpreadSinkCollector is SinkCollector[RejectedResultStore]
+//   let _diff: RejectedResultStore = RejectedResultStore
+
+//   fun ref apply(input: Array[String] val) =>
+//     try
+//       let symbol = input(0)
+//       let order_id = input(1)
+//       let timestamp = input(2)
+//       let account = input(3).u32()
+//       let price = input(4).f64()
+//       let qty = input(5).f64()
+//       let side = 
+//         match input(6)
+//         | Buy.string() => Buy
+//         | Sell.string() => Sell
+//         else
+//           Buy 
+//         end
+//       let bid = input(7).f64()
+//       let offer = input(8).f64()
+//       let is_rejected = input(9).bool()
+//       let trade_result = OrderResult(FixOrderMessage(side, account, 
+//         order_id, symbol, qty, price, timestamp), bid, offer, is_rejected)
+//       _diff.add_result(trade_result)
+//     end
+
+//   fun has_diff(): Bool => _diff.rejected.size() > 0
+
+//   fun ref diff(): RejectedResultStore => _diff
+
+//   fun ref clear_diff() => _diff.clear()
+
+// class MarketSpreadSinkConnector is SinkConnector
+//   fun apply(conn: TCPConnection) =>
+//     _send_connect(conn)
+//     _send_join(conn)
+
+//   fun _send_connect(conn: TCPConnection) =>
+//     conn.writev(Bytes.length_encode(HubJson.connect()))
+
+//   fun _send_join(conn: TCPConnection) =>
+//     conn.writev(Bytes.length_encode(HubJson.join("reports:market-spread")))
 
 

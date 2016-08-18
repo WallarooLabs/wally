@@ -11,10 +11,10 @@ actor Main
     try
       let topology: Topology val = recover val
         Topology
-          .new_pipeline[FixOrderMessage val, FixOrderMessage val](TradeParser, TradeS, recover [0] end, "Identity")
+          .new_pipeline[FixOrderMessage val, FixOrderMessage val](TradeParser, "Identity")
           .to[FixOrderMessage val](lambda(): Computation[FixOrderMessage val, FixOrderMessage val] iso^ => Identity end)
           .to[FixOrderMessage val](lambda(): Computation[FixOrderMessage val, FixOrderMessage val] iso^ => Identity end)
-          .build()
+          .to_simple_sink(TradeS, recover [0] end)
       end
       Startup(env, topology, 1)
     else

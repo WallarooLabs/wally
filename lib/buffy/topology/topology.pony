@@ -7,15 +7,10 @@ use "buffy/network"
 class Topology
   let pipelines: Array[PipelineSteps] = Array[PipelineSteps]
 
-  fun ref new_pipeline[In: Any val, Out: Any val] (
-    parser: Parser[In] val,
-    array_stringify: ArrayStringify[Out] val,
-    sink_target_ids: Array[U64] val,
-    pipeline_name: String    
-    ): PipelineBuilder[In, Out, In]
+  fun ref new_pipeline[In: Any val, Out: Any val] (parser: Parser[In] val,
+    pipeline_name: String): PipelineBuilder[In, Out, In]
   =>
-    let pipeline = Pipeline[In, Out](parser, array_stringify, sink_target_ids, 
-      pipeline_name)
+    let pipeline = Pipeline[In, Out](parser, pipeline_name)
     PipelineBuilder[In, Out, In](this, pipeline)
 
   fun ref add_pipeline(p: PipelineSteps) =>
@@ -38,16 +33,14 @@ class Pipeline[In: Any val, Out: Any val] is PipelineSteps
   let _name: String
   let _parser: Parser[In] val
   let _steps: Array[PipelineStep]
-  let _sink_target_ids: Array[U64] val
-  let _sink_builder: SinkBuilder val
+  var _sink_target_ids: Array[U64] val = recover Array[U64] end
+  var _sink_builder: SinkBuilder val
 
-  new create(p: Parser[In] val, o: ArrayStringify[Out] val,
-    s_target_ids: Array[U64] val, n: String) =>
+  new create(p: Parser[In] val, n: String) =>
     _parser = p
     _steps = Array[PipelineStep]
-    _sink_target_ids = s_target_ids
     _name = n
-    _sink_builder = ExternalConnectionBuilder[Out](o, _name)
+    _sink_builder = EmptySinkBuilder(_name)
 
   fun ref add_step(p: PipelineStep) =>
     _steps.push(p)
@@ -74,6 +67,12 @@ class Pipeline[In: Any val, Out: Any val] is PipelineSteps
       end
     coordinator.add_listener(TCPListener(auth, consume source_notifier,
       host, service))
+
+  fun ref update_sink(sink_builder': SinkBuilder val, 
+    sink_ids: Array[U64] val) 
+  =>
+    _sink_builder = sink_builder'
+    _sink_target_ids = sink_ids
 
   fun sink_builder(): SinkBuilder val => _sink_builder
 
@@ -147,6 +146,31 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
+  fun ref to_empty_sink(): Topology ? =>
+    _t.add_pipeline(_p as PipelineSteps)
+    _t
+
+  fun ref to_simple_sink(o: ArrayStringify[Out] val, 
+    sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val 
+      = recover Array[Array[ByteSeq] val] end): Topology ? 
+  =>
+    _p.update_sink(ExternalConnectionBuilder[Out](o, _p.name(),
+      initial_msgs), sink_ids)
+    _t.add_pipeline(_p as PipelineSteps)
+    _t
+
+  fun ref to_collector_sink[Diff: Any #read](
+    collector_builder: {(): SinkCollector[Out, Diff]} val,
+    array_stringify: ArrayStringify[Diff] val,
+    sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val 
+      = recover Array[Array[ByteSeq] val] end): Topology ?
+  =>
+    let collector_sink_builder = CollectorSinkStepBuilder[Out, Diff](
+      collector_builder, array_stringify, _p.name(), initial_msgs)
+    _p.update_sink(collector_sink_builder, sink_ids)
+    _t.add_pipeline(_p as PipelineSteps)
+    _t
+
   // fun ref to_stateful_partition[Next: Any val, State: Any ref](
   //   config: StatePartitionConfig[Last, Next, State] iso)
   //     : PipelineBuilder[In, Out, Next] =>
@@ -167,9 +191,9 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_step(next_step)
     PipelineBuilder[In, Out, Next](_t, _p)
 
-  fun ref build(): Topology ? =>
-    _t.add_pipeline(_p as PipelineSteps)
-    _t
+  // fun ref build(): Topology ? =>
+  //   _t.add_pipeline(_p as PipelineSteps)
+  //   _t
 
 class CoalesceBuilder[CIn: Any val, COut: Any val, PIn: Any val, 
   POut: Any val, Last: Any val] 

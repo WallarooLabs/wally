@@ -31,14 +31,14 @@ class StartupSinkNode
       | ("phone-home", let arg: String) => phone_home_addr = arg.split(":")
       | ("name", let arg: String) => name = arg
       | ("help", None) =>
-        StartupHelp.sink_node(env)
+        // StartupHelp.sink_node(env)
         return
       end
     end
 
     try
       if name == "" then
-        StartupHelp.sink_node(env)
+        // StartupHelp.sink_node(env)
         env.err.print("You must provide a name (--name/-n)\n")
         return
       end
@@ -68,6 +68,5 @@ class StartupSinkNode
 
       TCPListener(auth, SinkNodeNotifier(env, auth, sink_node_step, host,
         service, coordinator), host, service)
-    else
-      StartupHelp.sink_node(env)
+      // StartupHelp.sink_node(env)
     end

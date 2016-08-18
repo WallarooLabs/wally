@@ -1,6 +1,7 @@
 use "buffy/messages"
 use "buffy/topology/external"
 use "collections"
+use "buffered"
 
 interface Computation[In, Out]
   fun ref apply(input: In): (Out | None)
@@ -104,6 +105,9 @@ interface Stringify[In]
 
 interface ArrayStringify[In]
   fun apply(i: In): (String | Array[String] val) ?
+
+interface ArrayByteSeqify[In]
+  fun apply(i: In, wb: Writer): Array[ByteSeq] val ?
 
 class NoneStringify is Stringify[None]
   fun apply(i: None): String => ""

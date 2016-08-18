@@ -10,7 +10,7 @@ class SinkConnectNotify is TCPConnectionNotify
     _env.out.print("sink: sink connection accepted")
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
-    _env.out.print("sink: received")
+    _env.out.print("sink: received: " + String.from_array(consume data))
     true
 
   fun ref closed(conn: TCPConnection ref) =>
