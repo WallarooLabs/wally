@@ -63,8 +63,8 @@ primitive FixishMsgDecoder
     //16 -  8b - order qty (F64)
     //24 -  8b - price (F64)
     //32 - 21b - transact_time (String)
-    // --
-    // 52 bytes
+    //     --
+    //     53b (+ header -> 57b)
 
     let side = match data(1)
     | SideTypes.buy() => Buy
@@ -75,8 +75,8 @@ primitive FixishMsgDecoder
     let account = Bytes.to_u32(data(2), data(3), data(4), data(5))
     let order_id = _trim_string(data, 6, 6)
     let symbol = _trim_string(data, 12, 4)
-    let order_qty: F64 = 6.66
-    let price: F64 = 66.6
+    let order_qty: F64 = F64.from_bits(_u64_for(data, 16))
+    let price: F64 = F64.from_bits(_u64_for(data, 24))
     let transact_time = _trim_string(data, 32, 21)
     FixOrderMessage(side, account, order_id, symbol, order_qty, price, 
       transact_time)  
@@ -87,15 +87,15 @@ primitive FixishMsgDecoder
     // 5 - 21b - transact_time (String)
     //26 -  8b - bid_px (F64)
     //34 -  8b - offer_px (F64)
-    // --
-    // 42 bytes
+    //      --
+    //     42b (+ header -> 46b)
     var idx: USize = 1
     var cur_size: USize = 0
 
     let symbol = _trim_string(data, 1, 4)
     let transact_time = _trim_string(data, 5, 21)
-    let bid_px: F64 = 666
-    let offer_px: F64 = 666
+    let bid_px: F64 = F64.from_bits(_u64_for(data, 26))
+    let offer_px: F64 = F64.from_bits(_u64_for(data, 34))
 
     FixNbboMessage(symbol, transact_time, bid_px, offer_px)  
 
@@ -105,3 +105,18 @@ primitive FixishMsgDecoder
 
   fun _trim_string(data: Array[U8] val, idx: USize, size: USize): String =>
     String.from_array(data.trim(idx, idx + size))
+
+  fun _u64_for(data: Array[U8] val, idx: USize): U64 =>
+    try
+      (data(idx).u64() << 56) 
+        or (data(idx + 1).u64() << 48)
+        or (data(idx + 2).u64() << 40)
+        or (data(idx + 3).u64() << 32)
+        or (data(idx + 4).u64() << 24)
+        or (data(idx + 5).u64() << 16)
+        or (data(idx + 6).u64() << 8)
+        or data(idx + 7).u64()
+    else
+      @printf[I32]("Problem decoding bits for 8 byte chunk.")
+      0
+    end
