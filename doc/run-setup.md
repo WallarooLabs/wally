@@ -49,14 +49,9 @@ UI Report Sink node:
 apps/market-spread/market-spread --run-sink -l 127.0.0.1:8001 -t 127.0.0.1:5555 -p 127.0.0.1:11000 -n reports --ponythreads 1
 ```
 
-Giles receiver:
-```
-giles/receiver/receiver -l 127.0.0.1:8000 --ponythreads 1 -m -w -e 10000000
-```
-
 Buffy:
 ```
-apps/market-spread/market-spread -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000,127.0.0.1:7001 -k 127.0.0.1:8000,127.0.0.1:8001,127.0.0.1:8002 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 3
+apps/market-spread/market-spread -l -w 0 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -r 127.0.0.1:7000,127.0.0.1:7001 -k 127.0.0.1:8000,127.0.0.1:8001,127.0.0.1:8002 -n leader -p 127.0.0.1:11000 -m 127.0.0.1:9000 --ponythreads 1
 ```
 
 Giles sender:

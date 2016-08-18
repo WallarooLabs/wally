@@ -33,13 +33,13 @@ actor Main
           .build()
       end
       let sink_builders = recover Array[SinkNodeStepBuilder val] end
-      let ui_sink_builder = SinkNodeConfig[Map[String, U64]](
-        lambda(): SinkCollector[Map[String, U64]] => 
-          WordCountSinkCollector end,
-        WordCountSinkConnector,
-        WordCountSinkStringify
-      )
-      sink_builders.push(ui_sink_builder)
+      // let ui_sink_builder = SinkNodeConfig[Map[String, U64]](
+      //   lambda(): SinkCollector[Map[String, U64]] => 
+      //     WordCountSinkCollector end,
+      //   WordCountSinkConnector,
+      //   WordCountSinkStringify
+      // )
+      // sink_builders.push(ui_sink_builder)
       Startup(env, topology, 1, consume sink_builders)
     else
       env.out.print("Couldn't build topology")
