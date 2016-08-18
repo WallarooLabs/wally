@@ -109,7 +109,7 @@ actor ExternalConnection[In: Any val] is ComputeStep[In]
 
 actor CollectorSinkStep[In: Any val, Diff: Any #read] is ComputeStep[In]
   let _collector: SinkCollector[In, Diff]
-  let _array_stringify: ArrayStringify[Diff] val
+  let _array_byteseqify: ArrayByteSeqify[Diff] val
   let _conns: Array[TCPConnection]
   let _metrics_collector: (MetricsCollector tag | None)
   let _pipeline_name: String
@@ -119,14 +119,14 @@ actor CollectorSinkStep[In: Any val, Diff: Any #read] is ComputeStep[In]
   embed _wb: Writer = Writer
 
   new create(collector_builder: {(): SinkCollector[In, Diff]} val, 
-    array_stringify: ArrayStringify[Diff] val,
+    array_byteseqify: ArrayByteSeqify[Diff] val,
     conns: Array[TCPConnection] iso = recover Array[TCPConnection] end, 
     m_coll: (MetricsCollector tag | None), pipeline_name: String,
     initial_msgs: Array[Array[ByteSeq] val] val 
       = recover Array[Array[ByteSeq] val] end) 
   =>
     _collector = collector_builder()
-    _array_stringify = array_stringify
+    _array_byteseqify = array_byteseqify
     _conns = consume conns
     _metrics_collector = m_coll
     _pipeline_name = pipeline_name
@@ -161,14 +161,15 @@ actor CollectorSinkStep[In: Any val, Diff: Any #read] is ComputeStep[In]
   be send_diff() =>
     if _collector.has_diff() then
       try
-        let stringified = _array_stringify(_collector.diff())
+        let byteseqified = _array_byteseqify(_collector.diff(), _wb)
         for conn in _conns.values() do
-          match stringified
-          | let s: String val => 
-            conn.write(s)
-          | let a: Array[String val] val => 
-            conn.writev(a)
-          end
+          conn.writev(byteseqified)
+          // match stringified
+          // | let s: String val => 
+          //   conn.write(s)
+          // | let a: Array[String val] val => 
+          //   conn.writev(a)
+          // end
         end
         _collector.clear_diff()
       end

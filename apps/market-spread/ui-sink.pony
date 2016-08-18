@@ -6,6 +6,7 @@ use "json"
 use "buffy/sink-node"
 use "net"
 use "collections"
+use "buffered"
 
 class MarketSpreadSinkCollector is SinkCollector[OrderResult val, 
   RejectedResultStore]
@@ -49,19 +50,20 @@ class RejectedResultStore
     client_orders_updated.clear()
     rejected.clear()
 
-class MarketSpreadSinkStringify
-  fun apply(diff: RejectedResultStore): (String | Array[String] val) =>
+class MarketSpreadSinkByteSeqify
+  fun apply(diff: RejectedResultStore, wb: Writer = Writer): 
+    Array[ByteSeq] val =>
     let rejected_payload = _rejected_to_json(diff)
     let summaries_payload = _client_summaries_to_json(diff)
     let rejected_string = HubJson.payload("rejected-orders", 
       "reports:market-spread", rejected_payload)
     let summaries_string = HubJson.payload("client-order-summaries", 
       "reports:market-spread", summaries_payload)
-    let len = rejected_string.size() + summaries_string.size()
-    let arr: Array[String] iso = recover Array[String](len) end
-    arr.push(rejected_string)
-    arr.push(summaries_string)
-    consume arr
+    wb.u32_be(rejected_string.size().u32())
+    wb.write(rejected_string)
+    wb.u32_be(summaries_string.size().u32())
+    wb.write(summaries_string)
+    wb.done()
 
   fun _rejected_to_json(diff: RejectedResultStore): JsonArray =>
     let len: USize = diff.rejected.size() * 100

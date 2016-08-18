@@ -42,7 +42,7 @@ actor Main
             .to_collector_sink[RejectedResultStore](
               lambda(): SinkCollector[OrderResult val, RejectedResultStore] =>
                 MarketSpreadSinkCollector end,
-              MarketSpreadSinkStringify, 
+              MarketSpreadSinkByteSeqify, 
               recover [0] end,
               consume initial_report_msgs
             )

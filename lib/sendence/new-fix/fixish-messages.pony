@@ -117,6 +117,6 @@ primitive FixishMsgDecoder
         or (data(idx + 6).u64() << 8)
         or data(idx + 7).u64()
     else
-      @printf[I32]("Problem decoding bits for 8 byte chunk.")
+      @printf[I32]("FIXISH: Problem decoding bits for 8 byte chunk\n".cstring())
       0
     end

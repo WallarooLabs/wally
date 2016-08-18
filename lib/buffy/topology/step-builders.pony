@@ -417,25 +417,25 @@ class ExternalConnectionBuilder[In: Any val] is SinkBuilder
   fun name(): String => _pipeline_name + " Sink"
 
 class CollectorSinkStepBuilder[In: Any val, Diff: Any #read] is SinkBuilder
-  let _array_stringify: ArrayStringify[Diff] val
+  let _array_byteseqify: ArrayByteSeqify[Diff] val
   let _pipeline_name: String
   let _collector_builder: {(): SinkCollector[In, Diff]} val
   let _initial_msgs: Array[Array[ByteSeq] val] val 
 
   new val create(collector_builder: {(): SinkCollector[In, Diff]} val,
-    array_stringify: ArrayStringify[Diff] val,
+    array_byteseqify: ArrayByteSeqify[Diff] val,
     pipeline_name: String, initial_msgs: Array[Array[ByteSeq] val] val =
       recover Array[Array[ByteSeq] val] end)
   =>
     _collector_builder = collector_builder
-    _array_stringify = array_stringify
+    _array_byteseqify = array_byteseqify
     _pipeline_name = pipeline_name
     _initial_msgs = initial_msgs
 
   fun apply(conns: Array[TCPConnection] iso, metrics_collector:
     (MetricsCollector | None))
     : BasicStep tag =>
-    CollectorSinkStep[In, Diff](_collector_builder, _array_stringify,
+    CollectorSinkStep[In, Diff](_collector_builder, _array_byteseqify,
       consume conns, metrics_collector, _pipeline_name, _initial_msgs)
 
   fun name(): String => _pipeline_name + " Sink"

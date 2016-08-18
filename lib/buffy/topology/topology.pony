@@ -161,12 +161,12 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
   fun ref to_collector_sink[Diff: Any #read](
     collector_builder: {(): SinkCollector[Out, Diff]} val,
-    array_stringify: ArrayStringify[Diff] val,
+    array_byteseqify: ArrayByteSeqify[Diff] val,
     sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val 
       = recover Array[Array[ByteSeq] val] end): Topology ?
   =>
     let collector_sink_builder = CollectorSinkStepBuilder[Out, Diff](
-      collector_builder, array_stringify, _p.name(), initial_msgs)
+      collector_builder, array_byteseqify, _p.name(), initial_msgs)
     _p.update_sink(collector_sink_builder, sink_ids)
     _t.add_pipeline(_p as PipelineSteps)
     _t
