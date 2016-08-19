@@ -400,7 +400,6 @@ actor SendingActor
     _timers(consume t)
 
   be pause(v: Bool) =>
-    @printf[None]("pause received\n".cstring())
     _paused = v
 
   be send_batch() =>
@@ -605,7 +604,7 @@ class BinaryFileDataSource is Iterator[Array[U8] val]
   fun ref has_next(): Bool => true
 
   fun ref next(): Array[U8] val =>
-    if _file.position() < _file.size() then 
+    if _file.position() < _file.size() then
       _file.read(_msg_size)
     else
       _file.seek_start(0)
