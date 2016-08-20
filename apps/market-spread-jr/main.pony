@@ -2,10 +2,22 @@ use "collections"
 use "net"
 use "options"
 
+class OutNotify is TCPConnectionNotify
+  fun ref connected(sock: TCPConnection ref) =>
+    @printf[None]("outgoing connected\n".cstring())
+
+  fun ref throttled(sock: TCPConnection ref, x: Bool) =>
+    if x then
+      @printf[None]("outgoing throttled\n".cstring())
+    else
+      @printf[None]("outgoing no longer throttled\n".cstring())
+    end
+
 actor Main
   new create(env: Env) =>
     var i_arg: (Array[String] | None) = None
     var j_arg: (Array[String] | None) = None
+    var o_arg: (Array[String] | None) = None
     var expected: USize = 1_000_000
 
     try
@@ -14,24 +26,33 @@ actor Main
       options
         .add("nbbo", "i", StringArgument)
         .add("order", "j", StringArgument)
+        .add("out", "o", StringArgument)
         .add("expected", "e", I64Argument)
 
       for option in options do
         match option
         | ("nbbo", let arg: String) => i_arg = arg.split(":")
         | ("order", let arg: String) => j_arg = arg.split(":")
+        | ("out", let arg: String) => o_arg = arg.split(":")
         | ("expected", let arg: I64) => expected = arg.usize()
         end
       end
 
       let i_addr = i_arg as Array[String]
       let j_addr = j_arg as Array[String]
+      let o_addr = o_arg as Array[String]
       let metrics1 = Metrics("NBBO")
       let metrics2 = Metrics("Orders")
 
+      let connect_auth = TCPConnectAuth(env.root as AmbientAuth)
+      let out_socket = TCPConnection(connect_auth,
+            OutNotify,
+            o_addr(0),
+            o_addr(1))
+
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
-        let s = NBBOData(i)
+        let s = NBBOData(i, OnlyRejectionsRouter(out_socket))
         symbol_actors(i) = s
       end
 

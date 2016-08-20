@@ -21,7 +21,10 @@ I started nbbo sender as:
 /usr/bin/time -l ./sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -f ../../demos/marketspread/1000nbbo-fixish.msg --ponythreads=1 -y -g 47
 
 I started market-spread-jr as:
-./market-spread-jr -i 127.0.0.1:7000 -j 127.0.0.1:7001 -e 10000000
+./market-spread-jr -i 127.0.0.1:7000 -j 127.0.0.1:7001 -o 127.0.0.1:7002 -e 10000000
+
+I started a sink for the output as:
+nc -l 127.0.0.1 7002 >> /dev/null
 
 With the above settings, based on the albeit, hacky perf tracking, I got:
 
@@ -42,12 +45,18 @@ the previous version that was partitioning across 2 NBBOData actors based on
 last letter of the symbol (not first due to so many having a leading "_" as
 padding) this version performs much better.
 
-I'm commiting this as is for posterity and then making a few changes.
+This version is a much more full featured "buffy" from where we started.
+There's still a lot to add though. At this point, it has rejections going
+to an outgoing socket. One of out every 10 per symbol. There's been no impact
+on throughput or performance, however, we send the same String each time,
+by way of output. This should be switched over to info about the order for
+more info.
 
 N.B. as part of startup, we really should be setting initial values for each
 symbol. This would be equiv to "end of day on last previous trading data".
 """
 use "collections"
+use "net"
 use "sendence/fix"
 use "sendence/new-fix"
 
@@ -63,16 +72,27 @@ class SymbolData
 actor NBBOData is StateHandler[SymbolData ref]
   let _symbol: String
   let _symbol_data: SymbolData = SymbolData
+  let _router: OnlyRejectionsRouter
 
   var _count: USize = 0
 
-  new create(symbol: String) =>
+  new create(symbol: String, router: OnlyRejectionsRouter iso) =>
     // Should remove leading whitespace padding from symbol here
     _symbol = symbol
+    _router = consume router
 
   be run[In: Any val](input: In, computation: StateComputation[In, SymbolData] val) =>
     _count = _count + 1
     computation(input, _symbol_data)
+
+    // we don't have output from computation yet, fake it
+    let result = if (_count % 10) == 0 then true else false end
+
+    match _router.route(result)
+    | let p: TCPConnection =>
+      p.write(_symbol)
+    end
+
 
 primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
   fun name(): String =>
@@ -165,4 +185,11 @@ class SymbolRouter is Router[String, NBBOData]
       end
     end
 
+class OnlyRejectionsRouter is Router[Bool, TCPConnection]
+  let _sink: TCPConnection
 
+  new iso create(sink: TCPConnection) =>
+    _sink = sink
+
+  fun route(rejected: Bool): (TCPConnection | None)  =>
+    if rejected then _sink end

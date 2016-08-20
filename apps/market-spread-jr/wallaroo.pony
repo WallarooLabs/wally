@@ -35,17 +35,6 @@ class SourceNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     @printf[None]("incoming connected\n".cstring())
 
-class OutNotify is TCPConnectionNotify
-  fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("outgoing connected\n".cstring())
-
-  fun ref throttled(sock: TCPConnection ref, x: Bool) =>
-    if x then
-      @printf[None]("outgoing throttled\n".cstring())
-    else
-      @printf[None]("outgoing no longerthrottled\n".cstring())
-    end
-
 class SourceListenerNotify is TCPListenNotify
   let _source: Source val
   let _metrics: Metrics
