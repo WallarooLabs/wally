@@ -29,15 +29,15 @@ actor Main
       let metrics1 = Metrics("NBBO")
       let metrics2 = Metrics("Orders")
 
-      let partitions: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
+      let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
         let s = NBBOData(i)
-        partitions(i) = s
+        symbol_actors(i) = s
       end
 
-      let partitions_val: Map[String, NBBOData] val = consume partitions
+      let symbol_to_actor: Map[String, NBBOData] val = consume symbol_actors
 
-      let nbbo_source = NBBOSource(SymbolPartitioner(partitions_val))
+      let nbbo_source = NBBOSource(SymbolRouter(symbol_to_actor))
 
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       let nbbo = TCPListener(listen_auth,
@@ -45,7 +45,7 @@ actor Main
             i_addr(0),
             i_addr(1))
 
-      let order_source = OrderSource(SymbolPartitioner(partitions_val))
+      let order_source = OrderSource(SymbolRouter(symbol_to_actor))
 
       let order = TCPListener(listen_auth,
             SourceListenerNotify(order_source, metrics2, (expected/2)),

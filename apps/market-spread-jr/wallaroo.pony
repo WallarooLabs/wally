@@ -93,8 +93,8 @@ interface Source
   fun name(): String val
   fun process(data: Array[U8 val] iso)
 
-interface Partitioner[On: Any val, RoutesTo: Any tag]
-  fun partition(key: On): (RoutesTo | None)
+interface Router[On: Any val, RoutesTo: Any tag]
+  fun route(key: On): (RoutesTo | None)
 
 interface StateHandler[State: Any ref]
   be run[In: Any val](input: In, computation: StateComputation[In, State] val)

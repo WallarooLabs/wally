@@ -98,10 +98,10 @@ primitive CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
     end
 
 class NBBOSource is Source
-  let _partitioner: SymbolPartitioner
+  let _router: SymbolRouter
 
-  new val create(partitioner: SymbolPartitioner iso) =>
-    _partitioner = consume partitioner
+  new val create(router: SymbolRouter iso) =>
+    _router = consume router
 
   fun name(): String val =>
     "Nbbo source"
@@ -109,7 +109,7 @@ class NBBOSource is Source
   fun process(data: Array[U8 val] iso) =>
     let m = FixishMsgDecoder.nbbo(consume data)
 
-    match _partitioner.partition(m.symbol())
+    match _router.route(m.symbol())
     | let p: StateHandler[SymbolData] tag =>
       p.run[FixNbboMessage val](m, UpdateNBBO)
     else
@@ -118,10 +118,10 @@ class NBBOSource is Source
     end
 
 class OrderSource is Source
-  let _partitioner: SymbolPartitioner
+  let _router: SymbolRouter
 
-  new val create(partitioner: SymbolPartitioner iso) =>
-    _partitioner = consume partitioner
+  new val create(router: SymbolRouter iso) =>
+    _router = consume router
 
   fun name(): String val =>
     "Order source"
@@ -136,15 +136,15 @@ class OrderSource is Source
     try
       let m = FixishMsgDecoder.order(consume data)
 
-      match _partitioner.partition(m.symbol())
+      match _router.route(m.symbol())
       | let p: StateHandler[SymbolData] tag =>
         p.run[FixOrderMessage val](m, CheckOrder)
       else
         // DONT DO THIS RIGHT NOW BECAUSE WE HAVE BAD DATA
         // AND THIS FLOODS STDOUT
 
-        // drop data that has no partition
-        //@printf[None]("Order source: Fake logging lack of partition for %s\n".cstring(), m.symbol().null_terminated().cstring())
+        // drop data that has no route
+        //@printf[None]("Order source: Fake logging lack of route for %s\n".cstring(), m.symbol().null_terminated().cstring())
         None
       end
     else
@@ -152,16 +152,16 @@ class OrderSource is Source
       @printf[None]("Order Source: Fake logging bad data a message\n".cstring())
     end
 
-class SymbolPartitioner is Partitioner[String, NBBOData]
-  let _partitions: Map[String, NBBOData] val
+class SymbolRouter is Router[String, NBBOData]
+  let _routes: Map[String, NBBOData] val
 
-  new iso create(partitions: Map[String, NBBOData] val) =>
-    _partitions = partitions
+  new iso create(routes: Map[String, NBBOData] val) =>
+    _routes = routes
 
-  fun partition(symbol: String): (NBBOData | None) =>
-    if _partitions.contains(symbol) then
+  fun route(symbol: String): (NBBOData | None) =>
+    if _routes.contains(symbol) then
       try
-        _partitions(symbol)
+        _routes(symbol)
       end
     end
 
