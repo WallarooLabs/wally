@@ -69,7 +69,7 @@ class SourceRunner
     if _count == 1 then
       _metrics.set_start(Time.nanos())
     end
-    if (_count % 500_000) == 0 then
+    if (_count % 1_000_000) == 0 then
       @printf[None]("%s %zu\n".cstring(), _source.name().null_terminated().cstring(), _count)
     end
 

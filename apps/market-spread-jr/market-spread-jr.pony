@@ -90,7 +90,7 @@ actor NBBOData is StateHandler[SymbolData ref]
 
     match _router.route(result)
     | let p: TCPConnection =>
-      p.write(_symbol)
+      p.write(_count.string())
     end
 
 
