@@ -1,12 +1,12 @@
 """
 This market-spread-jr partitions by symbol. In order to accomplish this,
 given that partitioning happens inside the TCPConnection, we set up the
-map from Symbol to State actor on startup using a hard coded list of symbols.
-For many scenarios, this is a reasonable alternative. What would be ideal is
-for classes like a TCPConnectionNotify to be able to receive messages as
-callbacks. Something Sylvan and I are calling "async lambda". Its a cool idea.
-Sylvan thinks it could be done but its not coming anytime soon, so...
-Here we have this.
+map from Symbol to NBBOData actor on startup using a hard coded list
+of symbols. For many scenarios, this is a reasonable alternative. What
+would be ideal is for classes like a TCPConnectionNotify to be able to receive
+messages as callbacks. Something Sylvan and I are calling "async lambda". Its
+a cool idea. Sylvan thinks it could be done but its not coming anytime soon,
+so... Here we have this.
 
 I tested this on my laptop (4 cores). Important to note, I used giles-sender
 and data files from the "market-spread-perf-runs-08-19" which has a fix to
@@ -38,8 +38,8 @@ with no appreciable change in memory.
 22 Megs of memory used.
 
 While I don't have the exact performance numbers for this version compared to
-the previous version that was partitioning across 2 State actors based on last
-letter of the symbol (not first due to so many having a leading "_" as
+the previous version that was partitioning across 2 NBBOData actors based on
+last letter of the symbol (not first due to so many having a leading "_" as
 padding) this version performs much better.
 
 I'm commiting this as is for posterity and then making a few changes.
@@ -56,13 +56,13 @@ use "sendence/fix"
 use "sendence/new-fix"
 
 class NbboNotify is TCPConnectionNotify
-  let _partitions: Map[String, State] val
+  let _partitions: Map[String, NBBOData] val
   let _metrics: Metrics
   let _expected: USize
   var _header: Bool = true
   var _count: USize = 0
 
-  new iso create(partitions: Map[String, State] val, metrics: Metrics, expected: USize) =>
+  new iso create(partitions: Map[String, NBBOData] val, metrics: Metrics, expected: USize) =>
     _partitions = partitions
     _metrics = metrics
     _expected = expected
@@ -86,12 +86,12 @@ class NbboNotify is TCPConnectionNotify
     else
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
-        let  m = FixishMsgDecoder.nbbo(consume data)
+        let m = FixishMsgDecoder.nbbo(consume data)
 
         if _partitions.contains(m.symbol()) then
           try
             let s = _partitions(m.symbol())
-            s.nbbo(m)
+            s.run[FixNbboMessage val](m, UpdateNBBO)
           end
         end
       else
@@ -116,13 +116,13 @@ class NbboNotify is TCPConnectionNotify
     @printf[None]("incoming connected\n".cstring())
 
 class OrderNotify is TCPConnectionNotify
-  let _partitions: Map[String, State] val
+  let _partitions: Map[String, NBBOData] val
   let _metrics: Metrics
   let _expected: USize
   var _header: Bool = true
   var _count: USize = 0
 
-  new iso create(partitions: Map[String, State] val, metrics: Metrics, expected: USize) =>
+  new iso create(partitions: Map[String, NBBOData] val, metrics: Metrics, expected: USize) =>
     _partitions = partitions
     _metrics = metrics
     _expected = expected
@@ -145,11 +145,11 @@ class OrderNotify is TCPConnectionNotify
     else
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
-        let  m = FixishMsgDecoder.order(consume data)
+        let m = FixishMsgDecoder.order(consume data)
         if _partitions.contains(m.symbol()) then
           try
             let s = _partitions(m.symbol())
-            s.order(m)
+            s.run[FixOrderMessage val](m, CheckOrder)
           end
         end
       else
@@ -183,44 +183,73 @@ class OutNotify is TCPConnectionNotify
       @printf[None]("outgoing no longerthrottled\n".cstring())
     end
 
-actor State
+actor NBBOData
   let _outgoing: TCPConnection
 
   let _symbol: String
-  var _should_reject_trades: Bool = true
-  var _last_bid: F64 = 0
-  var _last_offer: F64 = 0
+  let _symbol_data: SymbolData = SymbolData
 
   var _count: USize = 0
-  var _order_count: USize = 0
-  var _rejections: USize = 0
+  //var _order_count: USize = 0
+  //var _rejections: USize = 0
 
   new create(symbol: String, outgoing: TCPConnection) =>
     // Should remove leading whitespace padding from symbol here
     _symbol = symbol
     _outgoing = outgoing
 
-  be nbbo(msg: FixNbboMessage val) =>
+  be run[In: Any val](input: In, computation: StateComputation[In, SymbolData] val) =>
+    _count = _count + 1
+    computation(input, _symbol_data)
+
+class SymbolData
+  var should_reject_trades: Bool = true
+  var last_bid: F64 = 0
+  var last_offer: F64 = 0
+
+///
+/// NBBO state calculation
+///
+
+primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
+  fun name(): String =>
+    "Update NBBO"
+
+  fun apply(msg: FixNbboMessage val, state: SymbolData) =>
     let offer_bid_difference = msg.offer_px() - msg.bid_px()
 
-    _should_reject_trades = (offer_bid_difference >= 0.05) or
+    state.should_reject_trades = (offer_bid_difference >= 0.05) or
       ((offer_bid_difference / msg.mid()) >= 0.05)
 
-    _last_bid = msg.bid_px()
-    _last_offer =  msg.offer_px()
+    state.last_bid = msg.bid_px()
+    state.last_offer = msg.offer_px()
 
-    _count = _count + 1
-    if ((_count % 25_000) == 0) and (_rejections > 0) then
-      @printf[None]("%s rejections %zu\n".cstring(), _symbol.null_terminated().cstring(), _rejections)
+primitive CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
+  fun name(): String =>
+    "Check Order against NBBO"
+
+  fun apply(msg: FixOrderMessage val, state: SymbolData) =>
+    if state.should_reject_trades then
+      None
+      // do rejection here
     end
 
-  be order(msg: FixOrderMessage val) =>
-    if _should_reject_trades then
-      _rejections = _rejections + 1
-    end
+///
+/// Buffy-ness
+///
 
-    _order_count = _order_count + 1
+interface StateComputation[In: Any val, State: Any #read]
+  fun apply(input: In, state: State)
+    : None
+  fun name(): String
 
+/*
+// Actual buffy signature
+interface StateComputation[In: Any val, Out: Any val, State: Any #read]
+  fun apply(input: In, state: State, output: MessageTarget[Out] val)
+    : State
+  fun name(): String
+*/
 ///
 /// YAWN from here on down
 ///
@@ -611,13 +640,13 @@ actor Main
             out_addr(0),
             out_addr(1))
 
-      let partitions: Map[String, State] trn = recover trn Map[String, State] end
+      let partitions: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols.values() do
-        let s = State(i, out_socket)
+        let s = NBBOData(i, out_socket)
         partitions(i) = s
       end
 
-      let partitions_val: Map[String, State] val = consume partitions
+      let partitions_val: Map[String, NBBOData] val = consume partitions
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       let nbbo = TCPListener(listen_auth,
             NbboListenerNotify(partitions_val, metrics1, expected),
@@ -633,11 +662,11 @@ actor Main
     end
 
 class NbboListenerNotify is TCPListenNotify
-  let _partitions: Map[String, State] val
+  let _partitions: Map[String, NBBOData] val
   let _metrics: Metrics
   let _expected: USize
 
-  new iso create(partitions: Map[String, State] val, metrics: Metrics, expected: USize) =>
+  new iso create(partitions: Map[String, NBBOData] val, metrics: Metrics, expected: USize) =>
     _partitions = partitions
     _metrics = metrics
     _expected = expected
@@ -646,11 +675,11 @@ class NbboListenerNotify is TCPListenNotify
     NbboNotify(_partitions, _metrics, _expected)
 
 class OrderListenerNotify is TCPListenNotify
-  let _partitions: Map[String, State] val
+  let _partitions: Map[String, NBBOData] val
   let _metrics: Metrics
   let _expected: USize
 
-  new iso create(partitions: Map[String, State] val, metrics: Metrics, expected: USize) =>
+  new iso create(partitions: Map[String, NBBOData] val, metrics: Metrics, expected: USize) =>
     _partitions = partitions
     _metrics = metrics
     _expected = expected
