@@ -100,8 +100,7 @@ interface StateHandler[State: Any ref]
   be run[In: Any val](input: In, computation: StateComputation[In, State] val)
 
 interface StateComputation[In: Any val, State: Any #read]
-  fun apply(input: In, state: State)
-    : None
+  fun apply(input: In, state: State): None
   fun name(): String
 
 /*
