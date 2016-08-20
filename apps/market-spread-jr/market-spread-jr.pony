@@ -56,14 +56,14 @@ use "sendence/fix"
 use "sendence/new-fix"
 
 class NbboNotify is TCPConnectionNotify
-  let _partitions: Map[String, NBBOData] val
+  let _source: NBBOSource val
   let _metrics: Metrics
   let _expected: USize
   var _header: Bool = true
   var _count: USize = 0
 
-  new iso create(partitions: Map[String, NBBOData] val, metrics: Metrics, expected: USize) =>
-    _partitions = partitions
+  new iso create(source: NBBOSource val, metrics: Metrics, expected: USize) =>
+    _source = source
     _metrics = metrics
     _expected = expected
 
@@ -84,19 +84,7 @@ class NbboNotify is TCPConnectionNotify
         _header = false
       end
     else
-      try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
-        let m = FixishMsgDecoder.nbbo(consume data)
-
-        if _partitions.contains(m.symbol()) then
-          try
-            let s = _partitions(m.symbol())
-            s.run[FixNbboMessage val](m, UpdateNBBO)
-          end
-        end
-      else
-        @printf[I32]("Error parsing Fixish\n".cstring())
-      end
+      _source.process(consume data)
 
       conn.expect(4)
       _header = true
@@ -116,14 +104,14 @@ class NbboNotify is TCPConnectionNotify
     @printf[None]("incoming connected\n".cstring())
 
 class OrderNotify is TCPConnectionNotify
-  let _partitions: Map[String, NBBOData] val
+  let _source: OrderSource val
   let _metrics: Metrics
   let _expected: USize
   var _header: Bool = true
   var _count: USize = 0
 
-  new iso create(partitions: Map[String, NBBOData] val, metrics: Metrics, expected: USize) =>
-    _partitions = partitions
+  new iso create(source: OrderSource val, metrics: Metrics, expected: USize) =>
+    _source = source
     _metrics = metrics
     _expected = expected
 
@@ -143,18 +131,7 @@ class OrderNotify is TCPConnectionNotify
         _header = false
       end
     else
-      try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
-        let m = FixishMsgDecoder.order(consume data)
-        if _partitions.contains(m.symbol()) then
-          try
-            let s = _partitions(m.symbol())
-            s.run[FixOrderMessage val](m, CheckOrder)
-          end
-        end
-      else
-        @printf[I32]("Error parsing Fixish\n".cstring())
-      end
+      _source.process(consume data)
 
       conn.expect(4)
       _header = true
@@ -183,15 +160,22 @@ class OutNotify is TCPConnectionNotify
       @printf[None]("outgoing no longerthrottled\n".cstring())
     end
 
-actor NBBOData
+//
+// State handling
+//
+
+class SymbolData
+  var should_reject_trades: Bool = true
+  var last_bid: F64 = 0
+  var last_offer: F64 = 0
+
+actor NBBOData is StateHandler[SymbolData ref]
   let _outgoing: TCPConnection
 
   let _symbol: String
   let _symbol_data: SymbolData = SymbolData
 
   var _count: USize = 0
-  //var _order_count: USize = 0
-  //var _rejections: USize = 0
 
   new create(symbol: String, outgoing: TCPConnection) =>
     // Should remove leading whitespace padding from symbol here
@@ -201,15 +185,6 @@ actor NBBOData
   be run[In: Any val](input: In, computation: StateComputation[In, SymbolData] val) =>
     _count = _count + 1
     computation(input, _symbol_data)
-
-class SymbolData
-  var should_reject_trades: Bool = true
-  var last_bid: F64 = 0
-  var last_offer: F64 = 0
-
-///
-/// NBBO state calculation
-///
 
 primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
   fun name(): String =>
@@ -234,9 +209,80 @@ primitive CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
       // do rejection here
     end
 
+class NBBOSource is Source
+  let _partitioner: SymbolPartitioner
+
+  new val create(partitioner: SymbolPartitioner iso) =>
+    _partitioner = consume partitioner
+
+  fun process(data: Array[U8 val] iso) =>
+    let m = FixishMsgDecoder.nbbo(consume data)
+
+    match _partitioner.partition(m.symbol())
+    | let p: StateHandler[SymbolData] tag =>
+      p.run[FixNbboMessage val](m, UpdateNBBO)
+    else
+      // drop data that has no partition
+      @printf[None]("NBBO Source: Fake logging lack of partition for %s\n".cstring(), m.symbol().null_terminated().cstring())
+    end
+
+class OrderSource is Source
+  let _partitioner: SymbolPartitioner
+
+  new val create(partitioner: SymbolPartitioner iso) =>
+    _partitioner = consume partitioner
+
+  fun process(data: Array[U8 val] iso) =>
+    // I DONT LIKE THAT ORDER THROWS AN ERROR IF IT ISNT AN ORDER
+    // BUT.... when we are processing trades in general, this would
+    // probably make us really slow because of tons of errors being
+    // thrown. Use apply here?
+    // FIXISH decoder has a broken API, because I could hand an
+    // order to nbbo and it would process it. :(
+    try
+      let m = FixishMsgDecoder.order(consume data)
+
+      match _partitioner.partition(m.symbol())
+      | let p: StateHandler[SymbolData] tag =>
+        p.run[FixOrderMessage val](m, CheckOrder)
+      else
+        // DONT DO THIS RIGHT NOW BECAUSE WE HAVE BAD DATA
+        // AND THIS FLOODS STDOUT
+
+        // drop data that has no partition
+        //@printf[None]("Order source: Fake logging lack of partition for %s\n".cstring(), m.symbol().null_terminated().cstring())
+        None
+      end
+    else
+      // drop bad data that isn't an order
+      @printf[None]("Order Source: Fake logging bad data a message\n".cstring())
+    end
+
+class SymbolPartitioner is Partitioner[String, NBBOData]
+  let _partitions: Map[String, NBBOData] val
+
+  new iso create(partitions: Map[String, NBBOData] val) =>
+    _partitions = partitions
+
+  fun partition(symbol: String): (NBBOData | None) =>
+    if _partitions.contains(symbol) then
+      try
+        _partitions(symbol)
+      end
+    end
+
 ///
 /// Buffy-ness
 ///
+
+interface Source
+  fun process(data: Array[U8 val] iso)
+
+interface Partitioner[On: Any val, RoutesTo: Any tag]
+  fun partition(key: On): (RoutesTo | None)
+
+interface StateHandler[State: Any ref]
+  be run[In: Any val](input: In, computation: StateComputation[In, State] val)
 
 interface StateComputation[In: Any val, State: Any #read]
   fun apply(input: In, state: State)
@@ -250,6 +296,7 @@ interface StateComputation[In: Any val, Out: Any val, State: Any #read]
     : State
   fun name(): String
 */
+
 ///
 /// YAWN from here on down
 ///
@@ -647,14 +694,19 @@ actor Main
       end
 
       let partitions_val: Map[String, NBBOData] val = consume partitions
+
+      let nbbo_source = NBBOSource(SymbolPartitioner(partitions_val))
+
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       let nbbo = TCPListener(listen_auth,
-            NbboListenerNotify(partitions_val, metrics1, expected),
+            NbboListenerNotify(nbbo_source, metrics1, expected),
             i_addr(0),
             i_addr(1))
 
+      let order_source = OrderSource(SymbolPartitioner(partitions_val))
+
       let order = TCPListener(listen_auth,
-            OrderListenerNotify(partitions_val, metrics2, (expected/2)),
+            OrderListenerNotify(order_source, metrics2, (expected/2)),
             j_addr(0),
             j_addr(1))
 
@@ -662,30 +714,30 @@ actor Main
     end
 
 class NbboListenerNotify is TCPListenNotify
-  let _partitions: Map[String, NBBOData] val
+  let _source: NBBOSource val
   let _metrics: Metrics
   let _expected: USize
 
-  new iso create(partitions: Map[String, NBBOData] val, metrics: Metrics, expected: USize) =>
-    _partitions = partitions
+  new iso create(source: NBBOSource val, metrics: Metrics, expected: USize) =>
+    _source = source
     _metrics = metrics
     _expected = expected
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    NbboNotify(_partitions, _metrics, _expected)
+    NbboNotify(_source, _metrics, _expected)
 
 class OrderListenerNotify is TCPListenNotify
-  let _partitions: Map[String, NBBOData] val
+  let _source: OrderSource val
   let _metrics: Metrics
   let _expected: USize
 
-  new iso create(partitions: Map[String, NBBOData] val, metrics: Metrics, expected: USize) =>
-    _partitions = partitions
+  new iso create(source: OrderSource val, metrics: Metrics, expected: USize) =>
+    _source = source
     _metrics = metrics
     _expected = expected
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    OrderNotify(_partitions, _metrics, _expected)
+    OrderNotify(_source, _metrics, _expected)
 
 actor Metrics
   var start_t: U64 = 0
