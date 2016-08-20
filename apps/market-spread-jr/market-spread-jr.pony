@@ -55,29 +55,16 @@ use "time"
 use "sendence/fix"
 use "sendence/new-fix"
 
-class NbboNotify is TCPConnectionNotify
-  let _source: NBBOSource val
-  let _metrics: Metrics
-  let _expected: USize
+class SourceNotify is TCPConnectionNotify
+  let _source: SourceRunner
   var _header: Bool = true
-  var _count: USize = 0
 
-  new iso create(source: NBBOSource val, metrics: Metrics, expected: USize) =>
-    _source = source
-    _metrics = metrics
-    _expected = expected
+  new iso create(source: SourceRunner iso) =>
+    _source = consume source
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
       try
-        _count = _count + 1
-
-        if _count == 1 then
-          _metrics.set_start(Time.nanos())
-        end
-        if (_count % 500_000) == 0 then
-          @printf[None]("Nbbo %zu\n".cstring(), _count)
-        end
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
         conn.expect(expect)
@@ -88,57 +75,6 @@ class NbboNotify is TCPConnectionNotify
 
       conn.expect(4)
       _header = true
-
-
-      if _count == _expected then
-        _metrics.set_end(Time.nanos(), _expected)
-      end
-    end
-    false
-
-  fun ref accepted(conn: TCPConnection ref) =>
-    @printf[None]("accepted\n".cstring())
-    conn.expect(4)
-
-  fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("incoming connected\n".cstring())
-
-class OrderNotify is TCPConnectionNotify
-  let _source: OrderSource val
-  let _metrics: Metrics
-  let _expected: USize
-  var _header: Bool = true
-  var _count: USize = 0
-
-  new iso create(source: OrderSource val, metrics: Metrics, expected: USize) =>
-    _source = source
-    _metrics = metrics
-    _expected = expected
-
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
-    if _header then
-      try
-        _count = _count + 1
-        if _count == 1 then
-          _metrics.set_start(Time.nanos())
-        end
-        if (_count % 500_000) == 0 then
-          @printf[None]("Order %zu\n".cstring(), _count)
-        end
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
-
-        conn.expect(expect)
-        _header = false
-      end
-    else
-      _source.process(consume data)
-
-      conn.expect(4)
-      _header = true
-
-      if _count == _expected then
-        _metrics.set_end(Time.nanos(), _expected)
-      end
     end
     false
 
@@ -215,6 +151,9 @@ class NBBOSource is Source
   new val create(partitioner: SymbolPartitioner iso) =>
     _partitioner = consume partitioner
 
+  fun name(): String val =>
+    "Nbbo source"
+
   fun process(data: Array[U8 val] iso) =>
     let m = FixishMsgDecoder.nbbo(consume data)
 
@@ -231,6 +170,9 @@ class OrderSource is Source
 
   new val create(partitioner: SymbolPartitioner iso) =>
     _partitioner = consume partitioner
+
+  fun name(): String val =>
+    "Order source"
 
   fun process(data: Array[U8 val] iso) =>
     // I DONT LIKE THAT ORDER THROWS AN ERROR IF IT ISNT AN ORDER
@@ -275,7 +217,38 @@ class SymbolPartitioner is Partitioner[String, NBBOData]
 /// Buffy-ness
 ///
 
+class SourceRunner
+  let _source: Source val
+  let _metrics: Metrics
+  let _expected: USize
+  var _count: USize = 0
+
+  new iso create(source: Source val, metrics: Metrics, expected: USize) =>
+    _source = source
+    _metrics = metrics
+    _expected = expected
+
+  fun ref process(data: Array[U8 val] iso) =>
+    _begin_tracking()
+    _source.process(consume data)
+    _end_tracking()
+
+  fun ref _begin_tracking() =>
+    _count = _count + 1
+    if _count == 1 then
+      _metrics.set_start(Time.nanos())
+    end
+    if (_count % 500_000) == 0 then
+      @printf[None]("%s %zu\n".cstring(), _source.name().null_terminated().cstring(), _count)
+    end
+
+  fun ref _end_tracking() =>
+    if _count == _expected then
+      _metrics.set_end(Time.nanos(), _expected)
+    end
+
 interface Source
+  fun name(): String val
   fun process(data: Array[U8 val] iso)
 
 interface Partitioner[On: Any val, RoutesTo: Any tag]
@@ -699,45 +672,32 @@ actor Main
 
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       let nbbo = TCPListener(listen_auth,
-            NbboListenerNotify(nbbo_source, metrics1, expected),
+            SourceListenerNotify(nbbo_source, metrics1, expected),
             i_addr(0),
             i_addr(1))
 
       let order_source = OrderSource(SymbolPartitioner(partitions_val))
 
       let order = TCPListener(listen_auth,
-            OrderListenerNotify(order_source, metrics2, (expected/2)),
+            SourceListenerNotify(order_source, metrics2, (expected/2)),
             j_addr(0),
             j_addr(1))
 
       @printf[I32]("Expecting %zu total messages\n".cstring(), expected)
     end
 
-class NbboListenerNotify is TCPListenNotify
-  let _source: NBBOSource val
+class SourceListenerNotify is TCPListenNotify
+  let _source: Source val
   let _metrics: Metrics
   let _expected: USize
 
-  new iso create(source: NBBOSource val, metrics: Metrics, expected: USize) =>
+  new iso create(source: Source val, metrics: Metrics, expected: USize) =>
     _source = source
     _metrics = metrics
     _expected = expected
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    NbboNotify(_source, _metrics, _expected)
-
-class OrderListenerNotify is TCPListenNotify
-  let _source: OrderSource val
-  let _metrics: Metrics
-  let _expected: USize
-
-  new iso create(source: OrderSource val, metrics: Metrics, expected: USize) =>
-    _source = source
-    _metrics = metrics
-    _expected = expected
-
-  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    OrderNotify(_source, _metrics, _expected)
+    SourceNotify(SourceRunner(_source, _metrics, _expected))
 
 actor Metrics
   var start_t: U64 = 0
