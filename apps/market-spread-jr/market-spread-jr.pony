@@ -8,10 +8,10 @@ callbacks. Something Sylvan and I are calling "async lambda". Its a cool idea.
 Sylvan thinks it could be done but its not coming anytime soon, so...
 Here we have this.
 
-I tested this on my laptop. Important to note, I used giles sender and data
-files from the "market-spread-perf-runs-08-19" which has a fix to correct
-data handling for the fixish binary files. This will be merged to master
-shortly but hasn't been yet.
+I tested this on my laptop (4 cores). Important to note, I used giles-sender
+and data files from the "market-spread-perf-runs-08-19" which has a fix to
+correct data handling for the fixish binary files. This will be merged to
+master shortly but hasn't been yet.
 
 I started trades/orders sender as:
 
@@ -185,29 +185,29 @@ class OutNotify is TCPConnectionNotify
 
 actor State
   let _outgoing: TCPConnection
-  let _metrics: Metrics
-  let _expected: USize
 
   let _symbol: String
-  var _value: (Bool, F64, F64) = (true, 0, 0)
+  var _should_reject_trades: Bool = true
+  var _last_bid: F64 = 0
+  var _last_offer: F64 = 0
+
   var _count: USize = 0
   var _order_count: USize = 0
   var _rejections: USize = 0
 
-  new create(symbol: String, outgoing: TCPConnection, metrics: Metrics, expected: USize) =>
+  new create(symbol: String, outgoing: TCPConnection) =>
+    // Should remove leading whitespace padding from symbol here
     _symbol = symbol
     _outgoing = outgoing
-    _metrics = metrics
-    _expected = expected
 
   be nbbo(msg: FixNbboMessage val) =>
-    // assumes everything is nbbo at the moment
     let offer_bid_difference = msg.offer_px() - msg.bid_px()
-    if (offer_bid_difference >= 0.05) or ((offer_bid_difference / msg.mid()) >= 0.05) then
-      _value = (true, msg.bid_px(), msg.offer_px())
-    else
-      _value = (false, msg.bid_px(), msg.offer_px())
-    end
+
+    _should_reject_trades = (offer_bid_difference >= 0.05) or
+      ((offer_bid_difference / msg.mid()) >= 0.05)
+
+    _last_bid = msg.bid_px()
+    _last_offer =  msg.offer_px()
 
     _count = _count + 1
     if ((_count % 25_000) == 0) and (_rejections > 0) then
@@ -215,7 +215,7 @@ actor State
     end
 
   be order(msg: FixOrderMessage val) =>
-    if _value._1 == true then
+    if _should_reject_trades then
       _rejections = _rejections + 1
     end
 
@@ -226,7 +226,7 @@ actor State
 ///
 
 actor Main
-  let available_symbols: Array[String] =
+  let legal_symbols: Array[String] =
   [
 " PWR",
 " AIG",
@@ -612,8 +612,8 @@ actor Main
             out_addr(1))
 
       let partitions: Map[String, State] trn = recover trn Map[String, State] end
-      for i in available_symbols.values() do
-        let s = State(i, out_socket, metrics1, expected)
+      for i in legal_symbols.values() do
+        let s = State(i, out_socket)
         partitions(i) = s
       end
 
