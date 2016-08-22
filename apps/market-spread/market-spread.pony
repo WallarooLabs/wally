@@ -63,8 +63,8 @@ actor Main
   fun generate_initial_data(auth: AmbientAuth): 
     Map[String, MarketDataEntry val] val ? =>
     let map: Map[String, MarketDataEntry val] iso = 
-      recover Map[String, MarketDataEntry val] end
-    let path = FilePath(auth, "./demos/marketspread/100nbbo.msg")
+      recover Map[String, MarketDataEntry val](87) end
+    let path = FilePath(auth, "./demos/marketspread/100nbbo-fixish.msg")
     let data_source = FileDataSource(auth, path)
     for line in consume data_source do
       let fix_message = FixishMsgDecoder(line.array())
@@ -111,7 +111,7 @@ class MarketDataEntry
 class MarketData
   // symbol => (is_rejected, bid, offer)
   let _entries: Map[String, (Bool, F64, F64)] = 
-    Map[String, (Bool, F64, F64)]
+    Map[String, (Bool, F64, F64)](346)
   
   new create() => None
 
@@ -214,11 +214,7 @@ class NbboParser is Parser[FixNbboMessage val]
     try
       match FixishMsgDecoder(s.array())
       | let m: FixNbboMessage val => m
-      else
-        None
       end
-    else
-      None  
     end
 
 class TradeParser is Parser[FixOrderMessage val]
@@ -226,12 +222,7 @@ class TradeParser is Parser[FixOrderMessage val]
     try
       match FixishMsgDecoder(s.array())
       | let m: FixOrderMessage val => m
-      else
-        None
       end
-    else
-      @printf[I32]("Error parsing fixish\n".cstring())
-      None
     end
 
 // class ToMonitoring is ArrayByteSeqify[RejectedResultStore]
