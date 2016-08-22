@@ -178,7 +178,8 @@ if args.instance_type not in TINY_INSTS and args.spot:
 
 # see if a cheaper regular on-demand instance suffices
 for i in instances:
-  if float(i['USD']) < cheapest_instance['Price'] \
+  if i['USD'] != 'N/A' and \
+  float(i['USD']) < cheapest_instance['Price'] \
   and i['size'] in valid_instances:
     cheapest_instance['Price'] = float(i['USD'])
     cheapest_instance['CurrentPrice'] = float(i['USD'])
