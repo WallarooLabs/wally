@@ -86,3 +86,29 @@ div.panel-heading h2.panel-title {
 div.metrics-box div.panel-heading {
     padding: 10px;
 }
+
+footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: 40px;
+    background-color: #2C3E50;
+}
+
+footer img {
+    height: 30px;
+}
+
+footer span {
+    color: white;
+    vertical-align: bottom;
+    margin: 0px 10px;
+}
+
+footer div.container, nav div.container {
+    margin-bottom: 0px;
+}
+
+.container {
+    margin-bottom: 60px;
+}
