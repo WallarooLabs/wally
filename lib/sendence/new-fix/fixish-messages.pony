@@ -40,7 +40,7 @@ primitive FixishMsgEncoder
       wb.write(transact_time.array())
       wb.done()
 
-  fun nbbo(symbol: String, transact_time: String, bid_px: F64, offer_px: F64,
+  fun nbbo(symbol': String, transact_time': String, bid_px: F64, offer_px: F64,
     wb: Writer = Writer): Array[ByteSeq] val =>
       let symbol: String = _with_max_length(symbol', 4)
       let transact_time: String = _with_max_length(transact_time', 21)
