@@ -23,9 +23,9 @@ primitive FixishMsgEncoder
       let transact_time: String = _with_max_length(transact_time', 21)
 
       //Header
-      let msgs_size: USize = 1 + 1 + 4 + order_id.size() 
+      let msgs_size: USize = 1 + 1 + 4 + order_id.size()
         + symbol.size() + 8 + 8 + transact_time.size()
-      wb.u32_be(msgs_size.u32()) 
+      wb.u32_be(msgs_size.u32())
       //Fields
       wb.u8(FixTypes.order())
       match side
@@ -40,11 +40,14 @@ primitive FixishMsgEncoder
       wb.write(transact_time.array())
       wb.done()
 
-  fun nbbo(symbol: String, transact_time: String, bid_px: F64, offer_px: F64, 
+  fun nbbo(symbol: String, transact_time: String, bid_px: F64, offer_px: F64,
     wb: Writer = Writer): Array[ByteSeq] val =>
+      let symbol: String = _with_max_length(symbol', 4)
+      let transact_time: String = _with_max_length(transact_time', 21)
+
       //Header
       let msgs_size: USize = 1 + symbol.size() + transact_time.size() + 8 + 8
-      wb.u32_be(msgs_size.u32()) 
+      wb.u32_be(msgs_size.u32())
       //Fields
       wb.u8(FixTypes.nbbo())
       wb.write(symbol)
@@ -94,8 +97,8 @@ primitive FixishMsgDecoder
     let order_qty: F64 = F64.from_bits(_u64_for(data, 16))
     let price: F64 = F64.from_bits(_u64_for(data, 24))
     let transact_time = _trim_string(data, 32, 21)
-    FixOrderMessage(side, account, order_id, symbol, order_qty, price, 
-      transact_time)  
+    FixOrderMessage(side, account, order_id, symbol, order_qty, price,
+      transact_time)
 
   fun nbbo(data: Array[U8] val): FixNbboMessage val =>
     // 0 -  1b - FixType (U8)
@@ -113,10 +116,10 @@ primitive FixishMsgDecoder
     let bid_px: F64 = F64.from_bits(_u64_for(data, 26))
     let offer_px: F64 = F64.from_bits(_u64_for(data, 34))
 
-    FixNbboMessage(symbol, transact_time, bid_px, offer_px)  
+    FixNbboMessage(symbol, transact_time, bid_px, offer_px)
 
   fun _size_for(data: Array[U8] val, idx: USize): USize ? =>
-    Bytes.to_u32(data(idx), data(idx + 1), data(idx + 2), 
+    Bytes.to_u32(data(idx), data(idx + 1), data(idx + 2),
       data(idx + 3)).usize()
 
   fun _trim_string(data: Array[U8] val, idx: USize, size: USize): String =>
@@ -124,7 +127,7 @@ primitive FixishMsgDecoder
 
   fun _u64_for(data: Array[U8] val, idx: USize): U64 =>
     try
-      (data(idx).u64() << 56) 
+      (data(idx).u64() << 56)
         or (data(idx + 1).u64() << 48)
         or (data(idx + 2).u64() << 40)
         or (data(idx + 3).u64() << 32)
