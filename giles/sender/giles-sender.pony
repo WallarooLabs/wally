@@ -421,6 +421,7 @@ actor SendingActor
           if _binary_fmt then
             let n = _data_source.next()
             if n.size() > 0 then
+              d'.push(n)
               _wb.write(n)
               _messages_sent = _messages_sent + 1
             end
