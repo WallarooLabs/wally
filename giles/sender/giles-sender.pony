@@ -605,9 +605,8 @@ class BinaryFileDataSource is Iterator[Array[U8] val]
   fun ref has_next(): Bool => true
 
   fun ref next(): Array[U8] val =>
-    if _file.position() < _file.size() then
-      _file.read(_msg_size)
-    else
+    if _file.position() >= _file.size() then
       _file.seek_start(0)
-      _file.read(_msg_size)
     end
+
+    _file.read(_msg_size)
