@@ -385,7 +385,7 @@ setup_az_arg: tmp_az_arg=$(if $(availability_zone),-var aws_subnet_id=$(shell \
                 aws ec2 --region $(region) describe-subnets --filters \
                 Name=availabilityZone,Values=$(availability_zone) \
                 Name=tag:Project,Values=buffy --query \
-                'Subnets[*].{SubnetId:SubnetId}' --output text),)
+                'Subnets[*].{SubnetId:SubnetId}' --output text | head -n 1),)
 setup_az_arg: # set up availability zone arg
 	$(if $(availability_zone),$(if $(subst -var \
           aws_subnet_id=,,$(tmp_az_arg)),,$(error Unable to look up\
