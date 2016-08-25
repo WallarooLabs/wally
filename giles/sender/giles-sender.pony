@@ -372,7 +372,6 @@ actor SendingActor
   let _batch_size: USize
   let _interval: U64
   let _wb: Writer
-  // let _msg_encoder: BufferedExternalMsgEncoder
 
   new create(messages_to_send: USize,
     to_buffy_socket: TCPConnection,
@@ -393,7 +392,6 @@ actor SendingActor
     _interval = interval
     _binary_fmt = binary_fmt
     _wb = Writer
-    // _msg_encoder = BufferedExternalMsgEncoder(where chunks = _batch_size)
 
   be go() =>
     let t = Timer(SendBatch(this), 0, _interval)
