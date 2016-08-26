@@ -30,9 +30,9 @@ actor Main
 
       let topology = recover val
         Topology
-          .new_pipeline[FixOrderMessage val, OrderResult val](
+          .new_pipeline[FixOrderMessage val, (OrderResult val | None)](
             TradeParser, "Orders")
-            .to_stateful[OrderResult val, MarketData](
+            .to_stateful[(OrderResult val | None), MarketData](
               CheckStatus,
               recover 
                 lambda()(initial_market_data): MarketData => 
@@ -40,7 +40,7 @@ actor Main
               end,
               1)
             .to_collector_sink[RejectedResultStore](
-              lambda(): SinkCollector[OrderResult val, RejectedResultStore] =>
+              lambda(): SinkCollector[(OrderResult val | None), RejectedResultStore] =>
                 MarketSpreadSinkCollector end,
               MarketSpreadSinkByteSeqify, 
               recover [0] end,
@@ -63,11 +63,11 @@ actor Main
   fun generate_initial_data(auth: AmbientAuth): 
     Map[String, MarketDataEntry val] val ? =>
     let map: Map[String, MarketDataEntry val] iso = 
-      recover Map[String, MarketDataEntry val](87) end
-    let path = FilePath(auth, "./demos/marketspread/100nbbo-fixish.msg")
+      recover Map[String, MarketDataEntry val](1024) end
+    let path = FilePath(auth, "./demos/marketspread/initial-nbbo.msg")
     let data_source = FileDataSource(auth, path)
     for line in consume data_source do
-      let fix_message = FixishMsgDecoder(line.array())
+      let fix_message = FixParser(line)
       match fix_message
       | let nbbo: FixNbboMessage val =>
         let mid = (nbbo.bid_px() + nbbo.offer_px()) / 2
@@ -75,7 +75,7 @@ actor Main
           ((nbbo.offer_px() - nbbo.bid_px()) >= 0.05) or
             (((nbbo.offer_px() - nbbo.bid_px()) / mid) >= 0.05)
 
-        let partition_id = nbbo.symbol().hash()       
+        let partition_id = nbbo.symbol().hash()    
         map(nbbo.symbol()) =  
           MarketDataEntry(is_rejected, nbbo.bid_px(), nbbo.offer_px())
       end
@@ -111,7 +111,7 @@ class MarketDataEntry
 class MarketData
   // symbol => (is_rejected, bid, offer)
   let _entries: Map[String, (Bool, F64, F64)] = 
-    Map[String, (Bool, F64, F64)](346)
+    Map[String, (Bool, F64, F64)](1024)
   
   new create() => None
 
@@ -139,8 +139,9 @@ class UpdateData is StateComputation[FixNbboMessage val, None, MarketData]
   fun name(): String => "Update Market Data"
   fun apply(nbbo: FixNbboMessage val, state: MarketData, 
     output: MessageTarget[None] val): MarketData =>
-    if ((nbbo.offer_px() - nbbo.bid_px()) >= 0.05) or
-      (((nbbo.offer_px() - nbbo.bid_px()) / nbbo.mid()) >= 0.05) then
+    let offer_bid_diff = (nbbo.offer_px() - nbbo.bid_px())
+    if (offer_bid_diff >= 0.05) or
+      ((offer_bid_diff / nbbo.mid()) >= 0.05) then
       output(None)
       state.update(nbbo.symbol(), (true, nbbo.bid_px(), 
         nbbo.offer_px()))
@@ -150,29 +151,32 @@ class UpdateData is StateComputation[FixNbboMessage val, None, MarketData]
         nbbo.offer_px()))
     end
 
-class CheckStatus is StateComputation[FixOrderMessage val, OrderResult val, 
+class CheckStatus is StateComputation[FixOrderMessage val, (OrderResult val | None), 
   MarketData]
   fun name(): String => "Check Order Result"
   fun apply(order: FixOrderMessage val, state: MarketData, 
-    output: MessageTarget[OrderResult val] val):
+    output: MessageTarget[(OrderResult val | None)] val):
     MarketData =>
     let symbol = order.symbol()
+    let rejected_tuple: (Bool, F64, F64)  = (true, 0, 0)
     let market_data_entry = 
       if state.contains(symbol) then
         try
-          state(order.symbol())
+          state(symbol)
         else
-          (true, 0, 0)
+          rejected_tuple
         end
       else
-        (true, 0, 0)
+        rejected_tuple
       end
-    // if market_data_entry.is_rejected then
+    if market_data_entry._1 then
       let result: OrderResult val = OrderResult(order,
         market_data_entry._2, market_data_entry._3,
         market_data_entry._1, Epoch.seconds())
       output(result)
-    // end
+    else
+      output(None)
+    end
     state
  
 class OrderResult
