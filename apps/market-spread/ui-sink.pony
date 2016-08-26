@@ -8,12 +8,14 @@ use "net"
 use "collections"
 use "buffered"
 
-class MarketSpreadSinkCollector is SinkCollector[OrderResult val, 
+class MarketSpreadSinkCollector is SinkCollector[(OrderResult val | None), 
   RejectedResultStore]
   let _diff: RejectedResultStore = RejectedResultStore
 
-  fun ref apply(input: OrderResult val) =>
-    _diff.add_result(input)
+  fun ref apply(input: (OrderResult val | None)) =>
+    match input
+    | let i: OrderResult val => _diff.add_result(i)
+    end
 
   fun has_diff(): Bool => _diff.rejected.size() > 0
 
