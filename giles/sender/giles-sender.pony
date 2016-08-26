@@ -125,16 +125,16 @@ actor Main
           let data_source =
             match f_arg
             | let mfn': String =>
+              let fs: Array[String] iso = recover mfn'.split(",") end
+              let paths: Array[FilePath] iso =
+                recover Array[FilePath] end
+              for str in (consume fs).values() do
+                paths.push(FilePath(env.root as AmbientAuth, str))
+              end
               if binary_fmt then
-                BinaryFileDataSource(FilePath(env.root as AmbientAuth,
-                  mfn'), msg_size)
+                MultiFileBinaryDataSource(consume paths, 
+                  should_repeat, msg_size)
               else
-                let fs: Array[String] iso = recover mfn'.split(",") end
-                let paths: Array[FilePath] iso =
-                  recover Array[FilePath] end
-                for str in (consume fs).values() do
-                  paths.push(FilePath(env.root as AmbientAuth, str))
-                end
                 MultiFileDataSource(consume paths, should_repeat)
               end
             else
@@ -591,6 +591,67 @@ class MultiFileDataSource is Iterator[String]
     else
       error
     end
+
+class MultiFileBinaryDataSource is Iterator[Array[U8 val] val]
+  let _paths: Array[FilePath val] val
+  var _cur_source: (BinaryFileDataSource | None)
+  var _idx: USize = 0
+  var _should_repeat: Bool
+  var _msg_size: USize
+
+  new iso create(paths: Array[FilePath val] val, should_repeat: Bool = false,
+    msg_size: USize) =>
+    _paths = paths
+    _msg_size = msg_size
+    _cur_source =
+      try
+        BinaryFileDataSource(_paths(_idx), _msg_size)
+      else
+        None
+      end
+    _should_repeat = should_repeat
+
+  fun ref has_next(): Bool =>
+    match _cur_source
+    | let f: BinaryFileDataSource =>
+      if f.has_next() then
+        true
+      else
+        _idx = _idx + 1
+        try
+          _cur_source = BinaryFileDataSource(_paths(_idx), _msg_size)
+          has_next()
+        else
+          if _should_repeat then
+            _idx = 0
+            _cur_source =
+              try
+                BinaryFileDataSource(_paths(_idx), _msg_size)
+              else
+                None
+              end
+            has_next()
+          else
+            false
+          end
+        end
+      end
+    else
+      false
+    end
+
+  fun ref next(): Array[U8 val] val ? =>
+    if has_next() then
+      match _cur_source
+      | let f: BinaryFileDataSource =>
+        f.next()
+      else
+        error
+      end
+    else
+      error
+    end
+
 
 class BinaryFileDataSource is Iterator[Array[U8] val]
   let _file: File
