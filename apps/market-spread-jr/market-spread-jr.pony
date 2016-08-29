@@ -89,8 +89,8 @@ actor NBBOData is StateHandler[SymbolData ref]
     let result = if (_count % 10) == 0 then true else false end
 
     match _router.route(result)
-    | let r: Reporter =>
-      r.process[ByteSeq](_count.string())
+    | let conn: TCPConnection =>
+      conn.write(_count.string())
     end
 
 
@@ -185,23 +185,23 @@ class SymbolRouter is Router[String, NBBOData]
       end
     end
 
-actor Reporter is Sink
-  let _conn: TCPConnection
+class OnlyRejectionsRouter is Router[Bool, TCPConnection]
+  let _sink: TCPConnection
 
-  new create(conn: TCPConnection) =>
-    _conn = conn
-
-  be process[D: Any val](data: D)  =>
-    match data
-    | let b: ByteSeq => _conn.write(b)
-    end
-
-class OnlyRejectionsRouter is Router[Bool, Reporter]
-  let _sink: Reporter
-
-  new iso create(sink: Reporter) =>
+  new iso create(sink: TCPConnection) =>
     _sink = sink
 
-  fun route(rejected: Bool): (Reporter | None)  =>
+  fun route(rejected: Bool): (TCPConnection | None)  =>
     if rejected then _sink end
 
+
+//actor Reporter is Sink
+//   let _conn: TCPConnection
+
+//   new create(conn: TCPConnection) =>
+//     _conn = conn
+
+//   be process[D: Any val](data: D) =>
+//     match data
+//     | let b: ByteSeq => _conn.write(b)
+//     end

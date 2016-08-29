@@ -50,11 +50,11 @@ actor Main
             o_addr(0),
             o_addr(1))
 
-      let sink = Reporter(out_socket)
+      // let sink = Reporter(out_socket)
 
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
-        let s = NBBOData(i, OnlyRejectionsRouter(sink))
+        let s = NBBOData(i, OnlyRejectionsRouter(out_socket))
         symbol_actors(i) = s
       end
 
