@@ -414,83 +414,27 @@ actor ProcessManager
     Parse ini file and register process nodes
     """
     _env.out.print("dagon: parse_and_register_processes")
-    var name: String = ""
-    var path: String = ""
-    var wrapper_path: String = ""
-    var docker_image = ""
-    var docker_constraint = ""
-    var docker_dir = ""
-    var docker_tag = ""
-    var docker_userid = ""
-    var is_canary: Bool = false
-    var is_leader: Bool = false
-    var is_expect: Bool = false
-
+    var ini_file: (File | None) = None
     try
-      let ini_file = File(FilePath(_env.root as AmbientAuth, _path))
-      let sections = IniParse(ini_file.lines())
-      for section in sections.keys() do
-        let argsbuilder: Array[String] iso = recover Array[String](6) end
-        let wrapper_args: Array[String] iso = recover Array[String](4) end
-        name = ""
-        path = ""
-        wrapper_path = ""
-        is_canary = false
-        is_leader = false
-        is_expect = false
-
-        for key in sections(section).keys() do
-          match key
-          | "path" =>
-            path = sections(section)(key)
-          | "name" =>
-            name = sections(section)(key)
-            argsbuilder.push("--" + key + "=" + sections(section)(key))
-          | "sender" =>
-            match sections(section)(key)
-            | "true" =>
-              is_canary = true
-            else
-              is_canary = false
-            end
-          | "leader" =>
-            match sections(section)(key)
-            | "true" =>
-              is_leader = true
-              argsbuilder.push("-l")
-            else
-              is_leader = false
-            end
-          | "expect" =>
-            is_expect = true
-            argsbuilder.push("--" + key + "=" + sections(section)(key))
-          | "wrapper_path" =>
-            wrapper_path = sections(section)(key)
-          else
-           if key.at("wrapper_args") then
-             wrapper_args.push(sections(section)(key))
-           else
-             argsbuilder.push("--" + key + "=" + sections(section)(key))
-           end
-          end
-        end
-        argsbuilder.push("--phone-home=" + _host + ":" + _service)
-        let a: Array[String] val = consume argsbuilder
-        let vars: Array[String] iso = recover Array[String](0) end
-        if is_expect and (name == "giles-receiver") then
-          _expect = true
-        end
-
-        register_node(name, is_canary, is_leader, path, wrapper_path,
-          docker_image, docker_constraint, docker_dir,
-          docker_tag, docker_userid,
-          a, consume wrapper_args, consume vars)
-      end
-      _env.out.print("dagon: finished registration of nodes")
-      _finished_registration = true
+      ini_file = _file_from_path(_env.root as AmbientAuth, _path)
     else
-      _env.out.print("dagon: Could not create FilePath for ini file")
+      _env.out.print("dagon: can't read File from path: " + _path)
     end
+
+    if ini_file isnt None then
+      let sections = _parse_config(ini_file)
+      for section in sections.keys() do
+        match section
+        | "docker-env" => None // Skip because running with processes
+        | "docker" => None // Skip because running with processes
+        else
+          _parse_node_section(sections, section)
+        end
+      end
+    end
+
+    _env.out.print("dagon: finished registration of nodes")
+    _finished_registration = true
 
   be parse_and_register_container_nodes() =>
     """
@@ -593,17 +537,13 @@ actor ProcessManager
           is_expect = true
           argsbuilder.push("--" + key + "=" + sections(section)(key))
         | "wrapper_path" =>
-          wrapper_path = sections(section)(key)          
-        | "wrapper_args_1" =>
-          wrapper_args.push(sections(section)(key))
-        | "wrapper_args_2" =>
-          wrapper_args.push(sections(section)(key))
-        | "wrapper_args_3" =>
-          wrapper_args.push(sections(section)(key))
-        | "wrapper_args_4" =>
-          wrapper_args.push(sections(section)(key))
+          wrapper_path = sections(section)(key)
         else
-          argsbuilder.push("--" + key + "=" + sections(section)(key))
+          if key.at("wrapper_args") then
+            wrapper_args.push(sections(section)(key))
+          else
+            argsbuilder.push("--" + key + "=" + sections(section)(key))
+          end
         end
       end
     else
@@ -613,6 +553,10 @@ actor ProcessManager
     argsbuilder.push("--phone-home=" + _host + ":" + _service)
     let a: Array[String] val = consume argsbuilder
     let vars: Array[String] iso = recover Array[String](0) end
+
+    if is_expect and (name == "giles-receiver") then
+      _expect = true
+    end
 
     register_node(name, is_canary, is_leader, path, wrapper_path,
       docker_image, docker_constraint, docker_dir,
@@ -845,7 +789,7 @@ actor ProcessManager
             // append wrapper_args
             for value in node.wrapper_args.values() do
               args.push(value)
-            end          
+            end
             // append node specific args
             args.push(node.path) // the command to run inside the container
             for value in node.args.values() do
@@ -952,8 +896,8 @@ actor ProcessManager
     for arg in args.values() do // add parameters for our binary
       result.push(arg)
     end
-    result    
-    
+    result
+
   be send_shutdown(name: String) =>
     """
     Shutdown a running process
@@ -1265,7 +1209,7 @@ actor ProcessManager
   fun ref _print_transition(old_state: DagonState, state': DagonState) =>
     _env.out.print("dagon: transitioned from: " + _print_state(old_state) + " to: " + _print_state(state'))
 
-  fun ref _print_state(state': DagonState): String =>  
+  fun ref _print_state(state': DagonState): String =>
     """
     Print the state to stdout.
     """
