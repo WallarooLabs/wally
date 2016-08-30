@@ -8,10 +8,8 @@ messages as callbacks. Something Sylvan and I are calling "async lambda". Its
 a cool idea. Sylvan thinks it could be done but its not coming anytime soon,
 so... Here we have this.
 
-I tested this on my laptop (4 cores). Important to note, I used giles-sender
-and data files from the "market-spread-perf-runs-08-19" which has a fix to
-correct data handling for the fixish binary files. This will be merged to
-master shortly but hasn't been yet.
+I tested this on my laptop (4 cores/2.8 Ghz Intel core i7).
+I compiled everything with Sendence-13.0.0
 
 I started trades/orders sender as:
 
@@ -28,17 +26,17 @@ nc -l 127.0.0.1 7002 >> /dev/null
 
 With the above settings, based on the albeit, hacky perf tracking, I got:
 
-145k/sec NBBO throughput
-71k/sec Trades throughput
+137k/sec NBBO throughput
+70k/sec Trades throughput
 
-Memory usage for market-spread-jr was stable and came in around 22 megs. After
+Memory usage for market-spread-jr was stable and came in around 28 megs. After
 run was completed, I left market-spread-jr running and started up the senders
 using the same parameters again and it performed equivalently to the first run
 with no appreciable change in memory.
 
-145k/sec NBBO throughput
-71k/sec Trades throughput
-22 Megs of memory used.
+137k/sec NBBO throughput
+70k/sec Trades throughput
+28 Megs of memory used.
 
 While I don't have the exact performance numbers for this version compared to
 the previous version that was partitioning across 2 NBBOData actors based on
@@ -55,11 +53,12 @@ more info.
 N.B. as part of startup, we really should be setting initial values for each
 symbol. This would be equiv to "end of day on last previous trading data".
 """
-use "time"
 use "collections"
 use "net"
+use "time"
 use "sendence/fix"
 use "sendence/new-fix"
+use "metrics"
 
 //
 // State handling
@@ -74,6 +73,7 @@ actor NBBOData is StateHandler[SymbolData ref]
   let _symbol: String
   let _symbol_data: SymbolData = SymbolData
   let _router: OnlyRejectionsRouter
+  let _metrics_map: Map[String, MetricsReporter] = _metrics_map.create()
 
   var _count: USize = 0
 
@@ -84,7 +84,21 @@ actor NBBOData is StateHandler[SymbolData ref]
 
   be run[In: Any val](input: In, computation: StateComputation[In, SymbolData] val) =>
     _count = _count + 1
+
+    let computation_start = Time.nanos()
     computation(input, _symbol_data)
+    let computation_end = Time.nanos()
+
+    let metrics = try
+      _metrics_map(computation.name())
+    else
+      let reporter =
+        MetricsReporter(1, computation.name(), ComputationCategory)
+      _metrics_map(computation.name()) = reporter
+      reporter
+    end
+
+    metrics.report(computation_start - computation_end)
 
     // we don't have output from computation yet, fake it
     let result = if (_count % 10) == 0 then true else false end
@@ -93,7 +107,6 @@ actor NBBOData is StateHandler[SymbolData ref]
     | let conn: TCPConnection =>
       conn.write(_count.string())
     end
-
 
 primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
   fun name(): String =>

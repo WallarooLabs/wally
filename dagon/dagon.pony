@@ -71,7 +71,7 @@ actor Main
     var phone_home_host: String = ""
     var phone_home_service: String = ""
     var service: String = ""
-    var options = Options(env)
+    var options = Options(env.args)
     var delay_senders = false
 
     options

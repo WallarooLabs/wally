@@ -5,7 +5,7 @@ use "buffy"
 class StartupSinkNode
 
   new create(env: Env, sink_builders: Array[SinkNodeStepBuilder val] val) =>
-    let options = Options(env, false)
+    let options = Options(env.args, false)
     var addr = Array[String]
     var phone_home_addr: (Array[String] | None) = None
     var target_addr = Array[String]

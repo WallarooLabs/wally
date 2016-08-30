@@ -6,7 +6,7 @@ use "sendence/tcp"
 actor Main
 
   new create(env: Env) =>
-    var options = Options(env)
+    var options = Options(env.args)
     var args = options.remaining()
     var d_arg: (Array[String] | None) = None
     var m_arg: (String | None) = None

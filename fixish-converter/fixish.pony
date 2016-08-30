@@ -12,7 +12,7 @@ actor Main
 
   new create(env: Env) =>
     _env = env
-    let options = Options(env)
+    let options = Options(env.args)
     var input_file_path = ""
     var output_file_path = ""
     var readable = false

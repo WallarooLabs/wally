@@ -37,10 +37,10 @@ class SourceNotify is TCPConnectionNotify
 
 class SourceListenerNotify is TCPListenNotify
   let _source: Source val
-  let _metrics: Metrics
+  let _metrics: JrMetrics
   let _expected: USize
 
-  new iso create(source: Source val, metrics: Metrics, expected: USize) =>
+  new iso create(source: Source val, metrics: JrMetrics, expected: USize) =>
     _source = source
     _metrics = metrics
     _expected = expected
@@ -50,11 +50,11 @@ class SourceListenerNotify is TCPListenNotify
 
 class SourceRunner
   let _source: Source val
-  let _metrics: Metrics
+  let _metrics: JrMetrics
   let _expected: USize
   var _count: USize = 0
 
-  new iso create(source: Source val, metrics: Metrics, expected: USize) =>
+  new iso create(source: Source val, metrics: JrMetrics, expected: USize) =>
     _source = source
     _metrics = metrics
     _expected = expected
@@ -112,7 +112,7 @@ primitive Bytes
   fun to_u32(a: U8, b: U8, c: U8, d: U8): U32 =>
     (a.u32() << 24) or (b.u32() << 16) or (c.u32() << 8) or d.u32()
 
-actor Metrics
+actor JrMetrics
   var start_t: U64 = 0
   var next_start_t: U64 = 0
   var end_t: U64 = 0
