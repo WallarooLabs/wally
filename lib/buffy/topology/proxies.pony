@@ -5,6 +5,7 @@ use "buffy/metrics"
 use "buffy/network"
 use "buffy/flusher"
 use "sendence/epoch"
+use "logger"
 
 actor Proxy is BasicStep
   let _node_name: String
@@ -41,14 +42,16 @@ actor StepManager is FlushingActor
   let _shared_state_steps: Map[U64, BasicSharedStateStep tag] 
     = Map[U64, BasicSharedStateStep tag]
   let _sink_addrs: Map[U64, (String, String)] val
+  let _logger: Logger[String]
 
   new create(env: Env, node_name: String,
     sink_addrs: Map[U64, (String, String)] val,
-    metrics_collector: (MetricsCollector tag | None)) =>
+    metrics_collector: (MetricsCollector tag | None), logger': Logger[String]) =>
     _env = env
     _node_name = node_name
     _sink_addrs = sink_addrs
     _metrics_collector = metrics_collector
+    _logger = logger'
 
   be flush() =>
     match _metrics_collector
@@ -66,7 +69,7 @@ actor StepManager is FlushingActor
     try
       _steps(step_id).send[D](msg_id, source_ts, ingress_ts, msg_data)
     else
-      _env.out.print("StepManager: Could not forward message")
+      _logger(Warn) and _logger.log("StepManager: Could not forward message")
     end
 
   be initialize_source(source_id: U64, pipeline: PipelineSteps val, 
@@ -87,9 +90,9 @@ actor StepManager is FlushingActor
       let auth = _env.root as AmbientAuth
       pipeline.initialize_source(source_id, host, service, 
         _env, auth, coordinator, target_step, local_step_builder,
-        shared_state, _metrics_collector) 
+        shared_state, _metrics_collector, _logger) 
     else
-      _env.err.print("StepManager: Could not initialize source")
+      _logger(Warn) and _logger.log("StepManager: Could not initialize source")
     end
 
   be add_step(step_id: U64, step_builder: BasicStepBuilder val) =>
@@ -183,14 +186,14 @@ actor StepManager is FlushingActor
         let sink_addr = _sink_addrs(sink_id)
         let sink_host = sink_addr._1
         let sink_service = sink_addr._2
-        let conn = TCPConnection(auth, SinkConnectNotify(_env), sink_host,
+        let conn = TCPConnection(auth, SinkConnectNotify(_env, _logger), sink_host,
           sink_service)
         conns.push(conn)
       end
       let sink = sink_builder(consume conns, _metrics_collector)
       _steps(sink_step_id) = sink
     else
-      _env.out.print("StepManager: Could not add sink. Did you supply enough"
+      _logger(Warn) and _logger.log("StepManager: Could not add sink. Did you supply enough"
       + " sink addresses?")
     end
 
@@ -202,10 +205,10 @@ actor StepManager is FlushingActor
       | let i: BasicOutputStep tag =>
         i.add_output(output_step)
       else
-        _env.out.print("StepManager: Could not connect steps")
+        _logger(Warn) and _logger.log("StepManager: Could not connect steps")
       end
     else
-      _env.out.print("StepManager: Failed to connect steps")
+      _logger(Warn) and _logger.log("StepManager: Failed to connect steps")
     end
 
   be add_output_to(in_id: U64, output: BasicStep tag) =>
@@ -215,8 +218,8 @@ actor StepManager is FlushingActor
       | let i: BasicOutputStep tag =>
         i.add_output(output)
       else
-        _env.out.print("StepManager: Could not add output to step")
+        _logger(Warn) and _logger.log("StepManager: Could not add output to step")
       end
     else
-      _env.out.print("StepManager: Failed to add output to step")
+      _logger(Warn) and _logger.log("StepManager: Failed to add output to step")
     end

@@ -4,6 +4,7 @@ use "buffy/messages"
 use "buffy/metrics"
 use "sendence/bytes"
 use "spike"
+use "logger"
 
 class LeaderIntraclusterDataNotifier is TCPListenNotify
   let _env: Env
@@ -13,33 +14,35 @@ class LeaderIntraclusterDataNotifier is TCPListenNotify
   let _coordinator: Coordinator
   var _host: String = ""
   var _service: String = ""
+  let _logger: Logger[String]
 
   new iso create(env: Env, auth: AmbientAuth, name: String,
-    coordinator: Coordinator, spike_config: SpikeConfig val) =>
+    coordinator: Coordinator, spike_config: SpikeConfig val, logger': Logger[String]) =>
     _env = env
     _auth = auth
     _name = name
     _coordinator = coordinator
     _spike_config = spike_config
+    _logger = logger'
 
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
-      _env.out.print(_name + " data: listening on " + _host + ":" + _service)
+      _logger(Info) and _logger.log(_name + " data: listening on " + _host + ":" + _service)
     else
-      _env.out.print(_name + " data: couldn't get local address")
+      _logger(Warn) and _logger.log(_name + " data: couldn't get local address")
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
-    _env.out.print(_name + " data: couldn't listen")
+    _logger(Info) and _logger.log(_name + " data: couldn't listen")
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     _spike_config = SpikeConfig(_spike_config.delay, _spike_config.drop,
       _spike_config.seed + 1)
     SpikeWrapper(IntraclusterDataReceiverConnectNotify(_env, _auth, _name,
-      _coordinator), _spike_config)
+      _coordinator, _logger), _spike_config)
 
 class WorkerIntraclusterDataNotifier is TCPListenNotify
   let _env: Env
@@ -51,10 +54,11 @@ class WorkerIntraclusterDataNotifier is TCPListenNotify
   let _coordinator: Coordinator
   var _host: String = ""
   var _service: String = ""
+  let _logger: Logger[String]
 
   new iso create(env: Env, auth: AmbientAuth, name: String, leader_host: String,
     leader_service: String, coordinator: Coordinator,
-    spike_config: SpikeConfig val) =>
+    spike_config: SpikeConfig val, logger': Logger[String]) =>
     _env = env
     _auth = auth
     _name = name
@@ -62,27 +66,28 @@ class WorkerIntraclusterDataNotifier is TCPListenNotify
     _leader_service = leader_service
     _coordinator = coordinator
     _spike_config = spike_config
+    _logger = logger'
 
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
-      _env.out.print(_name + " data: listening on " + _host + ":" + _service)
+      _logger(Info) and _logger.log(_name + " data: listening on " + _host + ":" + _service)
 
       _coordinator.identify_data_channel(_service)
     else
-      _env.out.print(_name + " data: couldn't get local address")
+      _logger(Warn) and _logger.log(_name + " data: couldn't get local address")
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
-    _env.out.print(_name + " data: couldn't listen")
+    _logger(Info) and _logger.log(_name + " data: couldn't listen")
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     _spike_config = SpikeConfig(_spike_config.delay, _spike_config.drop,
       _spike_config.seed + 1)
     SpikeWrapper(IntraclusterDataReceiverConnectNotify(_env, _auth, _name,
-      _coordinator), _spike_config)
+      _coordinator, _logger), _spike_config)
 
 class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
   let _env: Env
@@ -92,13 +97,15 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
   let _coordinator: Coordinator
   var _header: Bool = true
   var _msg_count: U64 = 0
+  let _logger: Logger[String]
 
   new iso create(env: Env, auth: AmbientAuth, name: String,
-    coordinator: Coordinator) =>
+    coordinator: Coordinator, logger': Logger[String]) =>
     _env = env
     _auth = auth
     _name = name
     _coordinator = coordinator
+    _logger = logger'
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -111,7 +118,7 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        _env.err.print("Error reading header on data channel")
+        _logger(Error) and _logger.log("Error reading header on data channel")
       end
     else
       let msg = WireMsgDecoder(consume data, _auth)
@@ -122,7 +129,7 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
         _sender_name = m.node_name
         _coordinator.connect_receiver(m.node_name)
       | let m: UnknownMsg val =>
-        _env.err.print("Unknown data Buffy message type.")
+        _logger(Error) and _logger.log("Unknown data Buffy message type.")
       end
 
       conn.expect(4)
@@ -137,7 +144,7 @@ class IntraclusterDataReceiverConnectNotify is TCPConnectionNotify
 
   fun ref closed(conn: TCPConnection ref) =>
     _coordinator.close_receiver(_sender_name)
-    _env.out.print("DataReceiverNotify: closed!")
+    _logger(Info) and _logger.log("DataReceiverNotify: closed!")
 
 class IntraclusterDataSenderConnectNotify is TCPConnectionNotify
   let _env: Env
@@ -145,21 +152,23 @@ class IntraclusterDataSenderConnectNotify is TCPConnectionNotify
   let _name: String
   let _target_name: String
   let _coordinator: Coordinator
+  let _logger: Logger[String]
 
   new iso create(env: Env, auth: AmbientAuth, name: String, 
-    target_name: String, coordinator: Coordinator)
+    target_name: String, coordinator: Coordinator, logger': Logger[String])
   =>
     _env = env
     _auth = auth
     _name = name
     _target_name = target_name
     _coordinator = coordinator
+    _logger = logger'
 
   fun ref accepted(conn: TCPConnection ref) =>
     _coordinator.add_connection(conn)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
-    _env.out.print("Data sender channel received data.")
+    _logger(Info) and _logger.log("Data sender channel received data.")
     true
 
   fun ref closed(conn: TCPConnection ref) =>

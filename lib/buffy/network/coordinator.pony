@@ -6,6 +6,7 @@ use "../topology"
 use "spike"
 use "collections"
 use "time"
+use "logger"
 
 actor Coordinator
   let _env: Env
@@ -32,12 +33,13 @@ actor Coordinator
   let _metrics_collector: (MetricsCollector | None)
   let _is_worker: Bool
   var _timers: (Timers | None) = None
+  let _logger: Logger[String]
 
   new create(name: String, env: Env, auth: AmbientAuth, leader_control_host: String,
     leader_control_service: String, leader_data_host: String,
     leader_data_service: String, step_manager: StepManager,
     spike_config: SpikeConfig val, metrics_collector: (MetricsCollector | None),
-    is_worker: Bool) =>
+    is_worker: Bool, logger': Logger[String]) =>
     _node_name = name
     _env = env
     _auth = auth
@@ -49,13 +51,14 @@ actor Coordinator
     _spike_config = spike_config
     _metrics_collector = metrics_collector
     _is_worker = is_worker
+    _logger = logger'
 
     if _is_worker then
       _control_addrs("leader") = (_leader_control_host, _leader_control_service)
       _data_addrs("leader") = (_leader_data_host, _leader_data_service)
 
       let control_notifier: TCPConnectionNotify iso =
-        ControlConnectNotify(_env, _auth, _node_name, this, metrics_collector)
+        ControlConnectNotify(_env, _auth, _node_name, this, metrics_collector, _logger)
       let control_conn: TCPConnection =
         TCPConnection(_auth, consume control_notifier, _leader_control_host,
           _leader_control_service)
@@ -63,7 +66,7 @@ actor Coordinator
 
       let data_notifier: TCPConnectionNotify iso =
         SpikeWrapper(IntraclusterDataSenderConnectNotify(_env, _auth, _node_name,
-          "leader", this), _spike_config)
+          "leader", this, _logger), _spike_config)
       let data_conn: TCPConnection =
         TCPConnection(_auth, consume data_notifier, _leader_data_host,
           _leader_data_service)
@@ -105,7 +108,7 @@ actor Coordinator
         _auth)
       _control_connections("leader").writev(message)
     else
-      _env.out.print("Coordinator: data connection to leader was not set up")
+      _logger(Warn) and _logger.log("Coordinator: data connection to leader was not set up")
     end
 
   be identify_control_channel(service: String) =>
@@ -114,18 +117,18 @@ actor Coordinator
         _auth)
       _control_connections("leader").writev(message)
     else
-      _env.out.print("Coordinator: control connection to leader was not set up")
+      _logger(Warn) and _logger.log("Coordinator: control connection to leader was not set up")
     end
 
   be ack_finished_connections(target_name: String) =>
-    _env.out.print("Acking connections finished!")
+    _logger(Info) and _logger.log("Acking connections finished!")
     try
       let ack_msg = WireMsgEncoder.ack_finished_connections(_node_name, _auth)
       _control_connections(target_name).writev(ack_msg)
     end
 
   be ack_initialization_msgs_finished(target_name: String) =>
-    _env.out.print("Acking initialization messages finished!")
+    _logger(Info) and _logger.log("Acking initialization messages finished!")
     try
       let ack_msg = WireMsgEncoder.ack_initialized(_node_name, _auth)
       _control_connections(target_name).writev(ack_msg)
@@ -215,7 +218,7 @@ actor Coordinator
     target_service: String) =>
     _control_addrs(target_name) = (target_host, target_service)
     let notifier: TCPConnectionNotify iso =
-      ControlConnectNotify(_env, _auth, _node_name, this, _metrics_collector)
+      ControlConnectNotify(_env, _auth, _node_name, this, _metrics_collector, _logger)
     let conn: TCPConnection =
       TCPConnection(_auth, consume notifier, target_host,
         target_service)
@@ -237,7 +240,7 @@ actor Coordinator
     target_service: String) =>
     _data_addrs(target_name) = (target_host, target_service)
     let notifier: TCPConnectionNotify iso =
-      IntraclusterDataSenderConnectNotify(_env, _auth, _node_name, target_name, this)
+      IntraclusterDataSenderConnectNotify(_env, _auth, _node_name, target_name, this, _logger)
     let conn: TCPConnection =
       TCPConnection(_auth, consume notifier, target_host,
         target_service)
@@ -262,7 +265,7 @@ actor Coordinator
     try
       _control_connections(target_name).writev(msg)
     else
-      _env.out.print("Coordinator: no control conn to " + target_name)
+      _logger(Warn) and _logger.log("Coordinator: no control conn to " + target_name)
     end
 
   be send_data_message[D: Any val](target_name: String, step_id: U64, 
@@ -273,7 +276,7 @@ actor Coordinator
       _data_connection_senders(target_name).forward[D](step_id, from_node_name,
         msg_id, source_ts, ingress_ts, msg_data)
     else
-      _env.out.print("Coordinator: no data conn for " + target_name)
+      _logger(Warn) and _logger.log("Coordinator: no data conn for " + target_name)
     end
 
   be deliver(data_ch_msg: DataChannelMsg val) =>
@@ -292,7 +295,7 @@ actor Coordinator
     try
       _data_connection_senders(target_name).send_ready()
     else
-      _env.out.print("Coordinator: could not send data sender ready to "
+      _logger(Warn) and _logger.log("Coordinator: could not send data sender ready to "
          + target_name + "--no data conn available")
     end
 
@@ -314,7 +317,7 @@ actor Coordinator
       (let target_host: String, let target_service: String) =
         _data_addrs(target_name)
       let notifier: TCPConnectionNotify iso =
-        IntraclusterDataSenderConnectNotify(_env, _auth, _node_name, target_name, this)
+        IntraclusterDataSenderConnectNotify(_env, _auth, _node_name, target_name, this, _logger)
       let conn: TCPConnection =
         TCPConnection(_auth, consume notifier, target_host,
           target_service)
@@ -324,7 +327,7 @@ actor Coordinator
       let reconnect_message = WireMsgEncoder.reconnect_data(_node_name, _auth)
       try _control_connections(target_name).writev(reconnect_message) end
     else
-      _env.err.print("Coordinator: couldn't reconnect to " + target_name)
+      _logger(Error) and _logger.log("Coordinator: couldn't reconnect to " + target_name)
     end
 
   be connect_receiver(from_name: String) =>
@@ -408,5 +411,5 @@ actor Coordinator
       | let m: MetricsCollector => m.dispose()
       end
     else
-      _env.out.print("Coordinator: problem shutting down!")
+      _logger(Warn) and _logger.log("Coordinator: problem shutting down!")
     end

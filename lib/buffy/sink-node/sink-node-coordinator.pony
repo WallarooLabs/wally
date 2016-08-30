@@ -1,26 +1,28 @@
 use "net"
 use "sendence/messages"
+use "logger"
 
 primitive SinkNodeCoordinatorFactory
   fun apply(env: Env,
     node_id: (String | None),
-    phone_home_addr: (Array[String] | None)): SinkNodeCoordinator ?
+    phone_home_addr: (Array[String] | None),
+    logger: Logger[String]): SinkNodeCoordinator ?
   =>
     if (node_id isnt None) and (phone_home_addr isnt None) then
       let n = node_id as String
       let ph = phone_home_addr as Array[String]
-      let coordinator = WithPhoneHomeSinkNodeCoordinator(env, n)
+      let coordinator = WithPhoneHomeSinkNodeCoordinator(env, n, logger)
 
       let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
       TCPConnection(
         tcp_auth,
-        SinkNodeHomeConnectNotify(env, n, coordinator),
+        SinkNodeHomeConnectNotify(env, n, coordinator, logger),
         ph(0),
         ph(1))
 
       coordinator
     else
-      WithoutPhoneHomeSinkNodeCoordinator(env)
+      WithoutPhoneHomeSinkNodeCoordinator(env, logger)
     end
 
 interface tag SinkNodeCoordinator
@@ -33,9 +35,11 @@ actor WithoutPhoneHomeSinkNodeCoordinator is SinkNodeCoordinator
   let _env: Env
   var _buffy_listener: (TCPListener | None) = None
   let _connections: Array[TCPConnection] = Array[TCPConnection]
+  let _logger: Logger[String]
 
-  new create(env: Env) =>
+  new create(env: Env, logger': Logger[String]) =>
     _env = env
+    _logger = logger'
 
   be shutdown() =>
     try
@@ -46,10 +50,10 @@ actor WithoutPhoneHomeSinkNodeCoordinator is SinkNodeCoordinator
 
   be buffy_ready(listener: TCPListener) =>
     _buffy_listener = listener
-    _env.out.print("Listening for data")
+    _logger(Info) and _logger.log("Listening for data")
 
   be buffy_failed(listener: TCPListener) =>
-    _env.err.print("Unable to open listener")
+    _logger(Error) and _logger.log("Unable to open listener")
     listener.dispose()
 
   be add_connection(conn: TCPConnection) =>
@@ -63,10 +67,12 @@ actor WithPhoneHomeSinkNodeCoordinator is SinkNodeCoordinator
   let _connections: Array[TCPConnection] = Array[TCPConnection]
   var _phone_home_is_ready: Bool = false
   var _buffy_is_ready: Bool = false
+  let _logger: Logger[String]
 
-  new create(env: Env, node_id: String) =>
+  new create(env: Env, node_id: String, logger': Logger[String]) =>
     _env = env
     _node_id = node_id
+    _logger = logger'
 
   be shutdown() =>
     try
@@ -83,11 +89,11 @@ actor WithPhoneHomeSinkNodeCoordinator is SinkNodeCoordinator
   be buffy_ready(listener: TCPListener) =>
     _from_buffy_listener = listener
     _buffy_is_ready = true
-    _env.out.print("Listening for data")
+    _logger(Info) and _logger.log("Listening for data")
     _alert_ready_if_ready()
 
   be buffy_failed(listener: TCPListener) =>
-    _env.err.print("Unable to open listener")
+    _logger(Error) and _logger.log("Unable to open listener")
     listener.dispose()
 
   be phone_home_ready(conn: TCPConnection) =>
@@ -96,7 +102,7 @@ actor WithPhoneHomeSinkNodeCoordinator is SinkNodeCoordinator
     _alert_ready_if_ready()
 
   be phone_home_failed(conn: TCPConnection) =>
-    _env.err.print("Unable to open phone home connection")
+    _logger(Error) and _logger.log("Unable to open phone home connection")
     conn.dispose()
 
   fun _alert_ready_if_ready() =>

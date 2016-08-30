@@ -5,6 +5,7 @@ use "buffy/messages"
 use "buffy/flusher"
 use "sendence/epoch"
 use "sendence/hub"
+use "logger"
 
 actor JsonAccumulator
   let _output: (MetricsOutputActor tag | None)
@@ -93,8 +94,6 @@ sink's MetricsRecorder
     end
 
 actor MetricsCollector is FlushingActor
-  let _stdout: StdStream
-  let _stderr: StdStream
   let _auth: AmbientAuth
   let _node_name: String val
   let _app_name: String val
@@ -106,19 +105,16 @@ actor MetricsCollector is FlushingActor
   var _output: (MetricsOutputActor tag | None) = None
   var _file_output: (MetricsOutputActor tag | None) = None
 
-  new create(stdout: StdStream,
-    stderr: StdStream,
-    auth: AmbientAuth,
+  new create(auth: AmbientAuth,
     node_name: String,
     app_name: String,
+    logger: Logger[String],
     metrics_host: (String | None) = None,
     metrics_service: (String | None) = None,
     report_file: (String | None) = None,
     period: U64 = 1_000_000_000,
     flush_period: U64 = 1_000_000_000)
   =>
-    _stdout = stdout
-    _stderr = stderr
 	  _auth = auth
     _node_name = node_name
     _app_name = app_name
@@ -136,15 +132,15 @@ actor MetricsCollector is FlushingActor
     match (metrics_host, metrics_service)
     | (let host: String, let service: String) =>
       let notifier: TCPConnectionNotify iso =
-        recover MonitoringHubConnectNotify(stdout, stderr) end
+        recover MonitoringHubConnectNotify(logger) end
       let conn' = TCPConnection(auth, consume notifier, host, service)
-      _output = MonitoringHubOutput(stdout, stderr, conn', app_name)
+      _output = MonitoringHubOutput(conn', app_name, logger)
     end
 
     // File output
     match report_file
     | let arg: String =>
-      _file_output = MetricsFileOutput(stdout, stderr, auth, app_name, arg)
+      _file_output = MetricsFileOutput(auth, app_name, arg, logger)
     end
 
   be finished() =>

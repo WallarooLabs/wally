@@ -6,6 +6,7 @@ use "sendence/guid"
 use "../network"
 use "random"
 use "time"
+use "logger"
 
 class SharedStateAddress
   let node_name: String
@@ -40,12 +41,13 @@ actor TopologyManager
     = Map[U64, SharedStateAddress] // map from state_id to shared state address
 
   let _guid_gen: GuidGenerator = GuidGenerator
+  let _logger: Logger[String]
 
   new create(env: Env, auth: AmbientAuth, name: String, worker_count: USize,
     leader_control_host: String, leader_control_service: String,
     leader_data_host: String, leader_data_service: String,
     coordinator: Coordinator, topology: Topology val,
-    source_addrs: Array[String] val) =>
+    source_addrs: Array[String] val, logger': Logger[String]) =>
     _env = env
     _auth = auth
     _coordinator = coordinator
@@ -58,6 +60,7 @@ actor TopologyManager
     _leader_data_service = leader_data_service
     _source_addrs = source_addrs
     _nodes.push(name)
+    _logger = logger'
 
     if _worker_count == 0 then _initialize_topology(true) end
 
@@ -65,18 +68,18 @@ actor TopologyManager
     control_service: String) =>
     _nodes.push(node_name)
     _coordinator.establish_control_connection(node_name, control_host, control_service)
-    _env.out.print("Identified worker " + node_name + " control channel")
+    _logger(Info) and _logger.log("Identified worker " + node_name + " control channel")
 
   be assign_data_conn(node_name: String, data_host: String,
     data_service: String) =>
     _coordinator.establish_data_connection(node_name, data_host, data_service)
-    _env.out.print("Identified worker " + node_name + " data channel")
+    _logger(Info) and _logger.log("Identified worker " + node_name + " data channel")
 
   be ack_control() =>
     if _control_hellos < _worker_count then
       _control_hellos = _control_hellos + 1
       if _control_hellos == _worker_count then
-        _env.out.print("_--- All worker control channels accounted for! ---_")
+        _logger(Info) and _logger.log("_--- All worker control channels accounted for! ---_")
         if (_control_hellos == _worker_count) and (_data_hellos == _worker_count) then
           _coordinator.initialize_topology_connections()
         end
@@ -87,7 +90,7 @@ actor TopologyManager
     if _data_hellos < _worker_count then
       _data_hellos = _data_hellos + 1
       if _data_hellos == _worker_count then
-        _env.out.print("_--- All worker data channels accounted for! ---_")
+        _logger(Info) and _logger.log("_--- All worker data channels accounted for! ---_")
         if (_control_hellos == _worker_count) and (_data_hellos == _worker_count) then
           _coordinator.initialize_topology_connections()
         end
@@ -98,7 +101,7 @@ actor TopologyManager
     if _connection_hellos < _worker_count then
       _connection_hellos = _connection_hellos + 1
       if _connection_hellos == _worker_count then
-        _env.out.print("_--- All worker interconnections complete! ---_")
+        _logger(Info) and _logger.log("_--- All worker interconnections complete! ---_")
         _initialize_topology()
       end
     end
@@ -116,7 +119,7 @@ actor TopologyManager
     let guid_gen = GuidGenerator
     try
       for pipeline in _topology.pipelines.values() do
-        _env.out.print("|--Starting pipeline " + pipeline.name() + "--|")
+        _logger(Info) and _logger.log("|--Starting pipeline " + pipeline.name() + "--|")
         let source_addr: Array[String] = 
           _source_addrs(_init_data.cur_source_id.usize()).split(":")
         let source_host = source_addr(0)
@@ -177,7 +180,7 @@ actor TopologyManager
         _init_data.set_cur_node(_nodes(pipeline_idx % _nodes.size()))
         let sink_node_idx = pipeline_idx % _nodes.size()
         let sink_node = _nodes(sink_node_idx)
-        _env.out.print("Spinning up sink on node " + sink_node)
+        _logger(Info) and _logger.log("Spinning up sink on node " + sink_node)
 
         let sendable_sink_ids: Array[U64] iso = recover Array[U64] end
         for id in pipeline.sink_target_ids().values() do
@@ -207,10 +210,10 @@ actor TopologyManager
           local_step_builder)
         match local_step_builder
         | let l: LocalStepBuilder val =>
-          _env.out.print("Initializing source with " 
+          _logger(Info) and _logger.log("Initializing source with " 
             + l.name() + " on leader node")
         else
-          _env.out.print("Initializing source on leader node")
+          _logger(Info) and _logger.log("Initializing source on leader node")
         end
 
         _init_data.update_for_next_pipeline()
@@ -226,7 +229,7 @@ actor TopologyManager
 
       if single_node then _complete_initialization() end
     else
-      _env.err.print("Buffy Leader: Failed to initialize topology")
+      _logger(Error) and _logger.log("Buffy Leader: Failed to initialize topology")
     end
 
   fun ref _spin_up_step(pipeline_idx: USize, pipeline: PipelineSteps val, 
@@ -256,7 +259,7 @@ actor TopologyManager
       end
     end
 
-    _env.out.print("Spinning up computation " + pipeline_step.name() 
+    _logger(Info) and _logger.log("Spinning up computation " + pipeline_step.name() 
       + " on node '" + _init_data.cur_node + "'")
 
     let is_leader = (cur_node_idx == 0)
@@ -376,7 +379,7 @@ actor TopologyManager
     end
 
   fun _complete_initialization() =>
-    _env.out.print("_--- Topology successfully initialized ---_")
+    _logger(Info) and _logger.log("_--- Topology successfully initialized ---_")
     let message = ExternalMsgEncoder.topology_ready(_name)
     _coordinator.send_phone_home_message(message)
 

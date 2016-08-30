@@ -3,6 +3,7 @@ use "net"
 use "buffy/messages"
 use "buffy/metrics"
 use "buffy/network"
+use "logger"
 
 class Topology
   let pipelines: Array[PipelineSteps] = Array[PipelineSteps]
@@ -23,7 +24,7 @@ trait PipelineSteps
     output: BasicStep tag, 
     local_step_builder: (LocalStepBuilder val | None),
     shared_state_step: (BasicSharedStateStep tag | None) = None,
-    metrics_collector: (MetricsCollector tag | None))
+    metrics_collector: (MetricsCollector tag | None), logger: Logger[String])
   fun sink_builder(): SinkBuilder val
   fun sink_target_ids(): Array[U64] val
   fun apply(i: USize): PipelineStep box ?
@@ -52,18 +53,18 @@ class Pipeline[In: Any val, Out: Any val] is PipelineSteps
     output: BasicStep tag, 
     local_step_builder: (LocalStepBuilder val | None),
     shared_state_step: (BasicSharedStateStep tag | None),
-    metrics_collector: (MetricsCollector tag | None))
+    metrics_collector: (MetricsCollector tag | None), logger: Logger[String])
   =>
     let source_notifier: TCPListenNotify iso = 
       match local_step_builder
       | let l: LocalStepBuilder val =>
         SourceNotifier[In](
           env, host, service, source_id, coordinator, _parser, output, 
-          shared_state_step, l, metrics_collector)
+          shared_state_step, l, metrics_collector, logger)
       else
         SourceNotifier[In](
           env, host, service, source_id, coordinator, _parser, output,
-          shared_state_step where metrics_collector = metrics_collector)
+          shared_state_step where metrics_collector = metrics_collector, logger' = logger)
       end
     coordinator.add_listener(TCPListener(auth, consume source_notifier,
       host, service))

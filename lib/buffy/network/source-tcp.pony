@@ -8,7 +8,7 @@ use "sendence/guid"
 use "sendence/epoch"
 use "../topology"
 use "random"
-use "debug"
+use "logger"
 
 class SourceNotifier[In: Any val] is TCPListenNotify
   let _env: Env
@@ -21,13 +21,14 @@ class SourceNotifier[In: Any val] is TCPListenNotify
   let _output: BasicStep tag
   let _shared_state_step: (BasicSharedStateStep tag | None)
   let _metrics_collector: (MetricsCollector tag | None)
+  let _logger: Logger[String]
 
   new iso create(env: Env, source_host: String,
     source_service: String, source_id: U64, 
     coordinator: Coordinator, parser: Parser[In] val, output: BasicStep tag,
     shared_state_step: (BasicSharedStateStep tag | None) = None,
     local_step_builder: LocalStepBuilder val = PassThroughStepBuilder[In, In],
-    metrics_collector: (MetricsCollector tag | None))
+    metrics_collector: (MetricsCollector tag | None), logger': Logger[String])
   =>
     _env = env
     _host = source_host
@@ -39,19 +40,20 @@ class SourceNotifier[In: Any val] is TCPListenNotify
     _local_step_builder = local_step_builder
     _output = output
     _metrics_collector = metrics_collector
+    _logger = logger'
 
   fun ref listening(listen: TCPListener ref) =>
-    _env.out.print("Source " + _source_id.string() + ": listening on "
+    _logger(Info) and _logger.log("Source " + _source_id.string() + ": listening on "
       + _host + ":" + _service)
 
   fun ref not_listening(listen: TCPListener ref) =>
-    _env.out.print("Source " + _source_id.string() + ": couldn't listen")
+    _logger(Info) and _logger.log("Source " + _source_id.string() + ": couldn't listen")
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     SourceConnectNotify[In](_env, _source_id, _coordinator,
       _parser, _output, _shared_state_step, _local_step_builder,
-      _metrics_collector)
+      _metrics_collector, _logger)
 
 class SourceConnectNotify[In: Any val] is TCPConnectionNotify
   let _guid_gen: GuidGenerator = GuidGenerator
@@ -63,12 +65,13 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
   var _header: Bool = true
   var _msg_count: USize = 0
   let _metrics_collector: (MetricsCollector tag | None)
+  let _logger: Logger[String]
 
   new iso create(env: Env, source_id: U64, coordinator: Coordinator,
     parser: Parser[In] val, output: BasicStep tag,
     shared_state_step: (BasicSharedStateStep tag | None),
     local_step_builder: LocalStepBuilder val,
-    metrics_collector: (MetricsCollector tag | None))
+    metrics_collector: (MetricsCollector tag | None), logger': Logger[String])
   =>
     _env = env
     _source_id = source_id
@@ -77,6 +80,7 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
     _local_step = local_step_builder.local()
     _metrics_collector = metrics_collector
     _local_step.add_output(output)
+    _logger = logger'
 
     let step_id = _guid_gen()
     let step_builder_name = local_step_builder.name()
@@ -97,7 +101,7 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
     ifdef debug then
       try
         (let host, _) = conn.remote_address().name()
-        Debug.out("SourceConnectNotify.accepted() " + host)
+        _logger(Fine) and _logger.log("SourceConnectNotify.accepted() " + host)
       end
     end
 
@@ -111,7 +115,7 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        _env.err.print("Error reading header from external source")
+        _logger(Warn) and _logger.log("Error reading header from external source")
       end
     else
 
@@ -122,10 +126,10 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
         | let input: In =>
           _local_step.send[In](_guid_gen(), now, now, input)
         else
-          _env.out.print("Error parsing input at source")
+          _logger(Warn) and _logger.log("Error parsing input at source")
         end
       else
-        _env.out.print("Error parsing input at source")
+        _logger(Warn) and _logger.log("Error parsing input at source")
       end
 
       conn.expect(4)
@@ -139,10 +143,10 @@ class SourceConnectNotify[In: Any val] is TCPConnectionNotify
     true
 
   fun ref connected(conn: TCPConnection ref) =>
-    _env.out.print("Source " + _source_id.string() + ": connected.")
+    _logger(Info) and _logger.log("Source " + _source_id.string() + ": connected.")
 
   fun ref connect_failed(conn: TCPConnection ref) =>
-    _env.out.print("Source " + _source_id.string() + ": connection failed.")
+    _logger(Info) and _logger.log("Source " + _source_id.string() + ": connection failed.")
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print("Source " + _source_id.string() + ": server closed")
+    _logger(Info) and _logger.log("Source " + _source_id.string() + ": server closed")
