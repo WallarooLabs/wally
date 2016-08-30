@@ -55,6 +55,7 @@ more info.
 N.B. as part of startup, we really should be setting initial values for each
 symbol. This would be equiv to "end of day on last previous trading data".
 """
+use "time"
 use "collections"
 use "net"
 use "sendence/fix"
@@ -107,14 +108,20 @@ primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
     state.last_bid = msg.bid_px()
     state.last_offer = msg.offer_px()
 
-primitive CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
+class CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
+  let _conn: TCPConnection tag
+
+  new val create(conn: TCPConnection tag) =>
+    _conn = conn
+
   fun name(): String =>
     "Check Order against NBBO"
 
   fun apply(msg: FixOrderMessage val, state: SymbolData) =>
     if state.should_reject_trades then
-      None
-      // do rejection here
+      let result = OrderResult(msg, state.last_bid, state.last_offer,
+        Time.nanos())
+      _conn.write(result.order.order_id())
     end
 
 class NBBOSource is Source
@@ -139,9 +146,11 @@ class NBBOSource is Source
 
 class OrderSource is Source
   let _router: SymbolRouter
+  let _state_comp: CheckOrder val
 
-  new val create(router: SymbolRouter iso) =>
+  new val create(router: SymbolRouter iso, state_comp: CheckOrder val) =>
     _router = consume router
+    _state_comp = state_comp
 
   fun name(): String val =>
     "Order source"
@@ -158,7 +167,7 @@ class OrderSource is Source
 
       match _router.route(m.symbol())
       | let p: StateHandler[SymbolData] tag =>
-        p.run[FixOrderMessage val](m, CheckOrder)
+        p.run[FixOrderMessage val](m, _state_comp)
       else
         // DONT DO THIS RIGHT NOW BECAUSE WE HAVE BAD DATA
         // AND THIS FLOODS STDOUT
@@ -193,6 +202,29 @@ class OnlyRejectionsRouter is Router[Bool, TCPConnection]
 
   fun route(rejected: Bool): (TCPConnection | None)  =>
     if rejected then _sink end
+
+class OrderResult
+  let order: FixOrderMessage val
+  let bid: F64
+  let offer: F64
+  let timestamp: U64
+
+  new val create(order': FixOrderMessage val,
+    bid': F64,
+    offer': F64,
+    timestamp': U64) 
+  =>
+    order = order'
+    bid = bid'
+    offer = offer'
+    timestamp = timestamp'
+
+  fun string(): String =>
+    (order.symbol().clone().append(order.order_id())
+      .append(order.account().string())
+      .append(order.price().string()).append(order.order_qty().string())
+      .append(order.side().string()).append(bid.string()).append(offer.string())
+      .append(timestamp.string())).clone()
 
 
 //actor Reporter is Sink

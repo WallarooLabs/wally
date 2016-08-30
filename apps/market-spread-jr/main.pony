@@ -68,7 +68,9 @@ actor Main
             i_addr(0),
             i_addr(1))
 
-      let order_source = OrderSource(SymbolRouter(symbol_to_actor))
+      let check_order = CheckOrder(out_socket)
+      let order_source = OrderSource(SymbolRouter(symbol_to_actor), 
+        check_order)
 
       let order = TCPListener(listen_auth,
             SourceListenerNotify(order_source, metrics2, (expected/2)),
