@@ -28,17 +28,17 @@ nc -l 127.0.0.1 7002 >> /dev/null
 
 With the above settings, based on the albeit, hacky perf tracking, I got:
 
-145k/sec NBBO throughput
-71k/sec Trades throughput
+137k/sec NBBO throughput
+70k/sec Trades throughput
 
-Memory usage for market-spread-jr was stable and came in around 22 megs. After
+Memory usage for market-spread-jr was stable and came in around 28 megs. After
 run was completed, I left market-spread-jr running and started up the senders
 using the same parameters again and it performed equivalently to the first run
 with no appreciable change in memory.
 
-145k/sec NBBO throughput
-71k/sec Trades throughput
-22 Megs of memory used.
+137k/sec NBBO throughput
+70k/sec Trades throughput
+28 Megs of memory used.
 
 While I don't have the exact performance numbers for this version compared to
 the previous version that was partitioning across 2 NBBOData actors based on
@@ -57,6 +57,7 @@ symbol. This would be equiv to "end of day on last previous trading data".
 """
 use "collections"
 use "net"
+use "time"
 use "sendence/fix"
 use "sendence/new-fix"
 use "metrics"
@@ -91,7 +92,11 @@ actor NBBOData is StateHandler[SymbolData ref]
 
   be run[In: Any val](input: In, computation: StateComputation[In, SymbolData] val) =>
     _count = _count + 1
+
+    let computation_start = Time.nanos()
     computation(input, _symbol_data)
+    let computation_end = Time.nanos()
+    _metrics.report(computation_start - computation_end)
 
     // we don't have output from computation yet, fake it
     let result = if (_count % 10) == 0 then true else false end
@@ -100,8 +105,6 @@ actor NBBOData is StateHandler[SymbolData ref]
     | let p: TCPConnection =>
       p.write(_count.string())
     end
-
-    _metrics.report(5_041_000)
 
 primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
   fun name(): String =>
