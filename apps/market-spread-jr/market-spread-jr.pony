@@ -59,6 +59,7 @@ use "time"
 use "sendence/fix"
 use "sendence/new-fix"
 use "metrics"
+use "buffered"
 
 //
 // State handling
@@ -134,7 +135,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
     if state.should_reject_trades then
       let result = OrderResult(msg, state.last_bid, state.last_offer,
         Time.nanos())
-      _conn.write(result.order.order_id())
+      _conn.writev(OrderResultEncoder(result))
     end
 
 class NBBOSource is Source
@@ -238,6 +239,26 @@ class OrderResult
       .append(order.price().string()).append(order.order_qty().string())
       .append(order.side().string()).append(bid.string()).append(offer.string())
       .append(timestamp.string())).clone()
+
+primitive OrderResultEncoder
+  fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
+    //Header (size == 55 bytes)
+    let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
+    wb.u32_be(msgs_size.u32())
+    //Fields
+    match r.order.side()
+    | Buy => wb.u8(SideTypes.buy())
+    | Sell => wb.u8(SideTypes.sell())
+    end
+    wb.u32_be(r.order.account())
+    wb.write(r.order.order_id().array()) // assumption: 6 bytes
+    wb.write(r.order.symbol().array()) // assumption: 4 bytes
+    wb.f64_be(r.order.order_qty())
+    wb.f64_be(r.order.price())
+    wb.f64_be(r.bid)
+    wb.f64_be(r.offer)
+    wb.u64_be(r.timestamp)
+    wb.done()  
 
 
 //actor Reporter is Sink
