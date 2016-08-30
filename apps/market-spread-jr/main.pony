@@ -64,14 +64,11 @@ actor Main
             o_addr(0),
             o_addr(1))
 
-//
-
 //      let metrics = Metrics
 
       //let timers = Timers
       //let mc_flush = Timer(FlushMetrics(metrics), 0, 1_000_000_000)
       //timers(consume mc_flush)
-
 
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
@@ -79,7 +76,7 @@ actor Main
         symbol_actors(i) = s
       end
 
-      let symbol_to_actor: Map[String, NBBOData] val = consume symbol_actors
+      let symbol_to_actor: Map[String, NBBOData] val = consume symbol_actors 
 
       let nbbo_source = NBBOSource(SymbolRouter(symbol_to_actor))
 
@@ -89,7 +86,9 @@ actor Main
             i_addr(0),
             i_addr(1))
 
-      let order_source = OrderSource(SymbolRouter(symbol_to_actor))
+      let check_order = CheckOrder(out_socket)
+      let order_source = OrderSource(SymbolRouter(symbol_to_actor), 
+        check_order)
 
       let order = TCPListener(listen_auth,
             SourceListenerNotify(order_source, metrics2, (expected/2)),
