@@ -9,7 +9,6 @@ class Histogram
   and total number of values seen (throughput) for reporting.
   """
   embed _counts: Array[U64] ref = Array[U64].init(0, 64)
-  let _max_val: U64 = U64.max_value()
   var _min: U64 = U64.max_value()
   var _max: U64 = U64.min_value()
 
