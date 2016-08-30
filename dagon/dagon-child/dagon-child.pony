@@ -8,7 +8,7 @@ use "sendence/tcp"
 actor Main
   
   new create(env: Env) =>
-    var options = Options(env)
+    var options = Options(env.args)
     var args = options.remaining()
     var node_name: String = ""
     var phone_home: String = ""

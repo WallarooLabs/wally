@@ -30,7 +30,7 @@ actor Main
       var e_arg: (USize | None) = None
 
       try
-        var options = Options(env)
+        var options = Options(env.args)
 
         options
           .add("phone-home", "d", StringArgument)

@@ -7,7 +7,7 @@ use "options"
 
 actor Main
   new create(env: Env) =>
-    var options = Options(env)
+    var options = Options(env.args)
     var args = options.remaining()
     try
       let auth = env.root as AmbientAuth

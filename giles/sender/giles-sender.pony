@@ -34,7 +34,7 @@ actor Main
       var f_arg: (String | None) = None
 
       try
-        var options = Options(env)
+        var options = Options(env.args)
 
         options
           .add("buffy", "b", StringArgument)

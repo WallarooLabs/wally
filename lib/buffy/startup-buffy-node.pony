@@ -18,7 +18,7 @@ class StartupBuffyNode
     var metrics_period: U64 = 1_000_000_000
     var metrics_file: (String | None) = None
     var metrics_file_period: U64 = 300_000_000_000
-    var options = Options(env, false)
+    var options = Options(env.args, false)
     var leader_control_addr = Array[String]
     var leader_data_addr = Array[String]
     var source_addrs: Array[String] iso = recover Array[String] end

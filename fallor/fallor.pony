@@ -6,7 +6,7 @@ use "sendence/messages"
 
 actor Main
   new create(env: Env) =>
-    let options = Options(env)
+    let options = Options(env.args)
     var input_file_path = "received.txt"
     var output_file_path = "fallor-readable.txt"
 
