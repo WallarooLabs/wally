@@ -2,17 +2,29 @@ use "collections"
 use "json"
 use "sendence/epoch"
 
+type MetricsCategory is
+  (ComputationCategory | StartToEndCategory | NodeIngressEgressCategory)
+
+primitive ComputationCategory
+  fun apply() => "computation"
+
+primitive StartToEndCategory
+  fun apply() => "start-to-end"
+
+primitive NodeIngressEgressCategory
+  fun apply() => "node-ingress-egress"
+
 class MetricsReporter
   let _id: U64
   let _name: String
-  let _category: String
+  let _category: MetricsCategory
   let _period: U64
   var _histogram: Histogram = Histogram
   var _period_ends_at: U64 = 0
 
-  new iso create(id: U64,
+  new create(id: U64,
     name: String,
-    category: String,
+    category: MetricsCategory,
     period: U64 = 1_000_000_000)
   =>
     _id = id

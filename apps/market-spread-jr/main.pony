@@ -73,13 +73,9 @@ actor Main
       //timers(consume mc_flush)
 
 
-      var mr_id: U64 = 0
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
-        mr_id = mr_id + 1
-        let m: MetricsReporter iso =
-          MetricsReporter(mr_id, i, "foo")
-        let s = NBBOData(i, OnlyRejectionsRouter(out_socket), consume m)
+        let s = NBBOData(i, OnlyRejectionsRouter(out_socket))
         symbol_actors(i) = s
       end
 

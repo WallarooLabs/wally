@@ -8,10 +8,8 @@ messages as callbacks. Something Sylvan and I are calling "async lambda". Its
 a cool idea. Sylvan thinks it could be done but its not coming anytime soon,
 so... Here we have this.
 
-I tested this on my laptop (4 cores). Important to note, I used giles-sender
-and data files from the "market-spread-perf-runs-08-19" which has a fix to
-correct data handling for the fixish binary files. This will be merged to
-master shortly but hasn't been yet.
+I tested this on my laptop (4 cores/2.8 Ghz Intel core i7).
+I compiled everything with Sendence-13.0.0
 
 I started trades/orders sender as:
 
@@ -75,20 +73,14 @@ actor NBBOData is StateHandler[SymbolData ref]
   let _symbol: String
   let _symbol_data: SymbolData = SymbolData
   let _router: OnlyRejectionsRouter
-
-  // needs to be a map
-  // computation name => MetricsReporter
-  let _metrics: MetricsReporter
+  let _metrics_map: Map[String, MetricsReporter] = _metrics_map.create()
 
   var _count: USize = 0
 
-  new create(symbol: String,
-    router: OnlyRejectionsRouter iso, metrics: MetricsReporter iso)
-  =>
+  new create(symbol: String, router: OnlyRejectionsRouter iso) =>
     // Should remove leading whitespace padding from symbol here
     _symbol = symbol
     _router = consume router
-    _metrics = consume metrics
 
   be run[In: Any val](input: In, computation: StateComputation[In, SymbolData] val) =>
     _count = _count + 1
@@ -96,7 +88,17 @@ actor NBBOData is StateHandler[SymbolData ref]
     let computation_start = Time.nanos()
     computation(input, _symbol_data)
     let computation_end = Time.nanos()
-    _metrics.report(computation_start - computation_end)
+
+    let metrics = try
+      _metrics_map(computation.name())
+    else
+      let reporter =
+        MetricsReporter(1, computation.name(), ComputationCategory)
+      _metrics_map(computation.name()) = reporter
+      reporter
+    end
+
+    metrics.report(computation_start - computation_end)
 
     // we don't have output from computation yet, fake it
     let result = if (_count % 10) == 0 then true else false end
