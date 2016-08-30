@@ -70,6 +70,7 @@ sink's MetricsRecorder
     output: JsonAccumulator tag)
   =>
     let t: Array[Timeline iso] iso = timelines = recover Array[Timeline iso](10) end
+
     while t.size() > 0 do
       try
         let json: (JsonArray iso | None) = recover
@@ -85,6 +86,7 @@ sink's MetricsRecorder
         end
       end
     end
+
     try
       let tlc:TimelineCollector tag = collectors.pop()
       tlc.flush(consume collectors, output)
@@ -99,7 +101,7 @@ actor MetricsCollector is FlushingActor
   let _node_name: String val
   let _app_name: String val
   let _timelines: Array[TimelineCollector tag] ref = recover
-    Array[TimelineCollector tag](50) end
+    Array[TimelineCollector tag](1024) end
   let _event: String val
   let _topic: String val
   let _pretty_print: Bool val = false
@@ -124,7 +126,7 @@ actor MetricsCollector is FlushingActor
     _app_name = app_name
     _event = "metrics"
     _topic = recover
-      let s: String ref = String(50)
+      let s: String ref = String(8 + app_name.size())
       s.append("metrics:")
       s.append(app_name)
       consume s
@@ -156,6 +158,7 @@ actor MetricsCollector is FlushingActor
     // TODO: Rerwite this so we don't have to copy the _timelines array
     // and use promises and a known count at the accumulator instead.
     // TODO: Add backoff to the flushing timer
+
     let j: JsonAccumulator tag = recover JsonAccumulator(_event, _topic,
       _pretty_print, _output, _file_output) end
     let size: USize val = _timelines.size()
