@@ -82,6 +82,9 @@ interface Source
   fun name(): String val
   fun process(data: Array[U8 val] iso)
 
+interface Sink
+  be process[D: Any val](data: D)
+
 interface Router[On: Any val, RoutesTo: Any tag]
   fun route(key: On): (RoutesTo | None)
 
