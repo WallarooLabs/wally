@@ -1,6 +1,8 @@
 use "collections"
 use "net"
 use "options"
+use "time"
+use "metrics"
 
 class OutNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
@@ -12,6 +14,18 @@ class OutNotify is TCPConnectionNotify
     else
       @printf[None]("outgoing no longer throttled\n".cstring())
     end
+
+/*
+class FlushMetrics is TimerNotify
+  let _metrics: Metrics
+
+  new iso create(m: Metrics) =>
+    _metrics = m
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _metrics.run()
+    true
+*/
 
 actor Main
   new create(env: Env) =>
@@ -41,8 +55,8 @@ actor Main
       let i_addr = i_arg as Array[String]
       let j_addr = j_arg as Array[String]
       let o_addr = o_arg as Array[String]
-      let metrics1 = Metrics("NBBO")
-      let metrics2 = Metrics("Orders")
+      let metrics1 = JrMetrics("NBBO")
+      let metrics2 = JrMetrics("Orders")
 
       let connect_auth = TCPConnectAuth(env.root as AmbientAuth)
       let out_socket = TCPConnection(connect_auth,
@@ -50,9 +64,22 @@ actor Main
             o_addr(0),
             o_addr(1))
 
+//
+
+//      let metrics = Metrics
+
+      //let timers = Timers
+      //let mc_flush = Timer(FlushMetrics(metrics), 0, 1_000_000_000)
+      //timers(consume mc_flush)
+
+
+      var mr_id: U64 = 0
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
-        let s = NBBOData(i, OnlyRejectionsRouter(out_socket))
+        mr_id = mr_id + 1
+        let m: MetricsReporter iso =
+          MetricsReporter(mr_id, i, "foo")
+        let s = NBBOData(i, OnlyRejectionsRouter(out_socket), consume m)
         symbol_actors(i) = s
       end
 

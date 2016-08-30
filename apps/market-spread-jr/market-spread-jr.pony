@@ -59,6 +59,7 @@ use "collections"
 use "net"
 use "sendence/fix"
 use "sendence/new-fix"
+use "metrics"
 
 //
 // State handling
@@ -74,12 +75,19 @@ actor NBBOData is StateHandler[SymbolData ref]
   let _symbol_data: SymbolData = SymbolData
   let _router: OnlyRejectionsRouter
 
+  // needs to be a map
+  // computation name => MetricsReporter
+  let _metrics: MetricsReporter
+
   var _count: USize = 0
 
-  new create(symbol: String, router: OnlyRejectionsRouter iso) =>
+  new create(symbol: String,
+    router: OnlyRejectionsRouter iso, metrics: MetricsReporter iso)
+  =>
     // Should remove leading whitespace padding from symbol here
     _symbol = symbol
     _router = consume router
+    _metrics = consume metrics
 
   be run[In: Any val](input: In, computation: StateComputation[In, SymbolData] val) =>
     _count = _count + 1
@@ -93,6 +101,7 @@ actor NBBOData is StateHandler[SymbolData ref]
       p.write(_count.string())
     end
 
+    _metrics.report(5_041_000)
 
 primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
   fun name(): String =>
