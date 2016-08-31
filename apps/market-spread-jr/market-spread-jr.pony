@@ -39,7 +39,7 @@ with no appreciable change in memory.
 
 139k/sec NBBO throughput
 70k/sec Trades throughput
-27 Megs of memory used.
+16-30 Megs of memory used.
 
 While I don't have the exact performance numbers for this version compared to
 the previous version that was partitioning across 2 NBBOData actors based on
