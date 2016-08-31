@@ -18,7 +18,7 @@ force_instance ?= ## Force a specific instance type (for use_automagic_instances
 ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
 num_leaders ?= ## Number of leader nodes (1 by default)
 num_followers ?= ## Number of follower nodes (2 by default)
-ansible_num_system_cpus ?= ## Number of cpus to dedicate for system processes (the rest are isolated for user processes)
+ansible_system_cpus ?= ## Number of cpus to dedicate for system processes (the rest are isolated for user processes)
 ansible_isolcpus ?= false## Use isolcpus kernel boot param
 ansible_install_devtools ?= false## Install dev tools on nodes
 
@@ -38,11 +38,11 @@ ifdef ansible_install_devtools
   endif
 endif
 
-# set arguments for ansible num_system_cpus variable
-ifeq ($(ansible_num_system_cpus),)
-  ansible_num_sys_cpus_arg :=
+# set arguments for ansible system_cpus variable
+ifeq ($(ansible_system_cpus),)
+  ansible_sys_cpus_arg :=
 else
-  ansible_num_sys_cpus_arg := num_system_cpus=$(ansible_num_system_cpus)
+  ansible_sys_cpus_arg := system_cpus=$(ansible_system_cpus)
 endif
 
 # set arguments for ansible parallelism
@@ -235,7 +235,7 @@ configure: check-cluster-name ## Configure nodes using ansible
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
           aws_region=$(region) isolcpus=$(ansible_isolcpus) \
 	  install_devtools=$(ansible_install_devtools) \
-          $(ansible_num_sys_cpus_arg)" -u ubuntu \
+          $(ansible_sys_cpus_arg)" -u ubuntu \
           ../ansible/playbooks/aws.yml
 	@echo "\033[36m==> Successfully ran ansible playbook for cluster \
 '$(cluster_name)' in region '$(region)'!\033[0m"
