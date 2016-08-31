@@ -80,7 +80,9 @@ actor NBBOData is StateHandler[SymbolData ref]
 
   new create(symbol: String) =>
     // Should remove leading whitespace padding from symbol here
-    _symbol = symbol
+    let symbol': String iso = symbol.clone()
+    symbol'.lstrip()
+    _symbol = consume symbol'
 
   be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, SymbolData] val) =>
     let computation_start = Time.nanos()

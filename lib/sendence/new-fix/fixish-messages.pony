@@ -93,11 +93,12 @@ primitive FixishMsgDecoder
     end
     let account = Bytes.to_u32(data(2), data(3), data(4), data(5))
     let order_id = _trim_string(data, 6, 6)
-    let symbol = _trim_string(data, 12, 4)
+    let symbol: String iso = _trim_string(data, 12, 4).clone()
+    symbol.lstrip()
     let order_qty: F64 = F64.from_bits(_u64_for(data, 16))
     let price: F64 = F64.from_bits(_u64_for(data, 24))
     let transact_time = _trim_string(data, 32, 21)
-    FixOrderMessage(side, account, order_id, symbol, order_qty, price,
+    FixOrderMessage(side, account, order_id, consume symbol, order_qty, price,
       transact_time)
 
   fun nbbo(data: Array[U8] val): FixNbboMessage val =>
@@ -111,12 +112,13 @@ primitive FixishMsgDecoder
     var idx: USize = 1
     var cur_size: USize = 0
 
-    let symbol = _trim_string(data, 1, 4)
+    let symbol: String iso = _trim_string(data, 1, 4).clone()
+    symbol.lstrip()
     let transact_time = _trim_string(data, 5, 21)
     let bid_px: F64 = F64.from_bits(_u64_for(data, 26))
     let offer_px: F64 = F64.from_bits(_u64_for(data, 34))
 
-    FixNbboMessage(symbol, transact_time, bid_px, offer_px)
+    FixNbboMessage(consume symbol, transact_time, bid_px, offer_px)
 
   fun _size_for(data: Array[U8] val, idx: USize): USize ? =>
     Bytes.to_u32(data(idx), data(idx + 1), data(idx + 2),

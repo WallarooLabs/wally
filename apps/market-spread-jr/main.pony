@@ -72,8 +72,9 @@ actor Main
 
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
-        let s = NBBOData(i)
-        symbol_actors(i) = s
+        let cleaned: String = i.clone().lstrip().clone()
+        let s = NBBOData(cleaned)
+        symbol_actors(cleaned) = s
       end
 
       let symbol_to_actor: Map[String, NBBOData] val = consume symbol_actors 
