@@ -1,5 +1,6 @@
 use "collections"
 use "json"
+use "net"
 use "sendence/epoch"
 
 type MetricsCategory is
@@ -19,10 +20,12 @@ class MetricsReporter
   let _name: String
   let _category: MetricsCategory
   let _period: U64
+  let _output_to: TCPConnection
   var _histogram: Histogram = Histogram
   var _period_ends_at: U64 = 0
 
-  new create(id: U64,
+  new create(output_to: TCPConnection,
+    id: U64,
     name: String,
     category: MetricsCategory,
     period: U64 = 1_000_000_000)
@@ -31,6 +34,7 @@ class MetricsReporter
     _name = name
     _category = category
     _period = period
+    _output_to = output_to
     let now = Epoch.nanoseconds()
     _period_ends_at = _next_period_endtime(now, period)
 
@@ -51,4 +55,4 @@ class MetricsReporter
     time + (length - (time % length))
 
   fun _send_histogram(h: Histogram) =>
-    None
+    _output_to.write(_histogram.size().string())
