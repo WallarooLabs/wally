@@ -74,7 +74,10 @@ actor NBBOData is StateHandler[SymbolData ref]
   let _symbol: String
   let _symbol_data: SymbolData = SymbolData
   let _router: OnlyRejectionsRouter
-  let _metrics_map: Map[String, MetricsReporter] = _metrics_map.create()
+  let _step_metrics_map: Map[String, MetricsReporter] =
+    _step_metrics_map.create()
+  let _pipeline_metrics_map: Map[String, MetricsReporter] =
+    _pipeline_metrics_map.create()
 
   var _count: USize = 0
 
@@ -83,23 +86,12 @@ actor NBBOData is StateHandler[SymbolData ref]
     _symbol = symbol
     _router = consume router
 
-  be run[In: Any val](input: In, computation: StateComputation[In, SymbolData] val) =>
+  be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, SymbolData] val) =>
     _count = _count + 1
 
     let computation_start = Time.nanos()
     computation(input, _symbol_data)
     let computation_end = Time.nanos()
-
-    let metrics = try
-      _metrics_map(computation.name())
-    else
-      let reporter =
-        MetricsReporter(1, computation.name(), ComputationCategory)
-      _metrics_map(computation.name()) = reporter
-      reporter
-    end
-
-    metrics.report(computation_start - computation_end)
 
     // we don't have output from computation yet, fake it
     let result = if (_count % 10) == 0 then true else false end
@@ -107,7 +99,41 @@ actor NBBOData is StateHandler[SymbolData ref]
     match _router.route(result)
     | let conn: TCPConnection =>
       conn.write(_count.string())
+      // right now count this as the end for rejections
+      _record_pipeline_metrics(source_name, source_ts)
+    else
+      // end of the line!
+      _record_pipeline_metrics(source_name, source_ts)
     end
+
+    // Do this at the end. Because ¯\_(ツ)_/¯.
+    // Real work first? Sure, that was what Sean was thinking
+    _record_step_metrics(computation.name(),
+      computation_start, computation_end)
+
+  fun ref _record_step_metrics(name: String, start_ts: U64, end_ts: U64) =>
+     let metrics = try
+      _step_metrics_map(name)
+    else
+      let reporter =
+        MetricsReporter(1, name, ComputationCategory)
+      _step_metrics_map(name) = reporter
+      reporter
+    end
+
+    metrics.report(start_ts - end_ts)
+
+  fun ref _record_pipeline_metrics(source_name: String val, source_ts: U64) =>
+    let metrics = try
+      _pipeline_metrics_map(source_name)
+    else
+      let reporter =
+        MetricsReporter(1, source_name, StartToEndCategory)
+      _pipeline_metrics_map(source_name) = reporter
+      reporter
+    end
+
+    metrics.report(source_ts - Time.nanos())
 
 primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
   fun name(): String =>
@@ -148,11 +174,13 @@ class NBBOSource is Source
     "Nbbo source"
 
   fun process(data: Array[U8 val] iso) =>
+    // A lot of this needs to be moved out into more generic code
+    let ingest_ts = Time.nanos()
     let m = FixishMsgDecoder.nbbo(consume data)
 
     match _router.route(m.symbol())
     | let p: StateHandler[SymbolData] tag =>
-      p.run[FixNbboMessage val](m, UpdateNBBO)
+      p.run[FixNbboMessage val](name(), ingest_ts, m, UpdateNBBO)
     else
       // drop data that has no partition
       @printf[None]("NBBO Source: Fake logging lack of partition for %s\n".cstring(), m.symbol().null_terminated().cstring())
@@ -177,11 +205,12 @@ class OrderSource is Source
     // FIXISH decoder has a broken API, because I could hand an
     // order to nbbo and it would process it. :(
     try
+      let ingest_ts = Time.nanos()
       let m = FixishMsgDecoder.order(consume data)
 
       match _router.route(m.symbol())
       | let p: StateHandler[SymbolData] tag =>
-        p.run[FixOrderMessage val](m, _state_comp)
+        p.run[FixOrderMessage val](name(), ingest_ts, m, _state_comp)
       else
         // DONT DO THIS RIGHT NOW BECAUSE WE HAVE BAD DATA
         // AND THIS FLOODS STDOUT
@@ -226,7 +255,7 @@ class OrderResult
   new val create(order': FixOrderMessage val,
     bid': F64,
     offer': F64,
-    timestamp': U64) 
+    timestamp': U64)
   =>
     order = order'
     bid = bid'
@@ -258,7 +287,7 @@ primitive OrderResultEncoder
     wb.f64_be(r.bid)
     wb.f64_be(r.offer)
     wb.u64_be(r.timestamp)
-    wb.done()  
+    wb.done()
 
 
 //actor Reporter is Sink

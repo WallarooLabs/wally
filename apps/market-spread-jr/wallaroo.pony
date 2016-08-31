@@ -1,5 +1,6 @@
 use "net"
 use "time"
+use "metrics"
 
 ///
 /// Buffy-ness
@@ -89,7 +90,7 @@ interface Router[On: Any val, RoutesTo: Any tag]
   fun route(key: On): (RoutesTo | None)
 
 interface StateHandler[State: Any ref]
-  be run[In: Any val](input: In, computation: StateComputation[In, State] val)
+  be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, State] val)
 
 interface StateComputation[In: Any val, State: Any #read]
   fun apply(input: In, state: State): None
