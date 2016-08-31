@@ -61,6 +61,7 @@ use "net"
 use "time"
 use "sendence/fix"
 use "sendence/new-fix"
+use "sendence/hub"
 use "metrics"
 use "buffered"
 
@@ -283,7 +284,9 @@ primitive OrderResultEncoder
     wb.f64_be(r.bid)
     wb.f64_be(r.offer)
     wb.u64_be(r.timestamp)
-    wb.done()
+    let payload = wb.done()
+    HubProtocol.payload("rejected-orders", "reports:market-spread", 
+      consume payload, wb)
 
 
 //actor Reporter is Sink

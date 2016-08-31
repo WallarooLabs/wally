@@ -3,6 +3,7 @@ use "net"
 use "options"
 use "time"
 use "metrics"
+use "sendence/hub"
 
 class OutNotify is TCPConnectionNotify
   let _name: String
@@ -68,6 +69,10 @@ actor Main
             OutNotify("rejections"),
             o_addr(0),
             o_addr(1))
+      let connect_msg = HubProtocol.connect()
+      let join_msg = HubProtocol.join("reports:market-spread")
+      out_socket.writev(connect_msg)
+      out_socket.writev(join_msg)
 
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
