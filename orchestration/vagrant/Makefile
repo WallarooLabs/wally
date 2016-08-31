@@ -2,6 +2,15 @@ ansible_vault_password ?= ~/.ansible_vault_pass.txt## Ansible Vault password fil
 ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
 num_leaders ?= 1## Number of leader nodes
 num_followers ?= 2## Number of follower nodes
+ansible_install_devtools ?= false## Install dev tools on nodes
+
+# Make sure we have a valid value for ansible_install_devtools
+ifdef ansible_install_devtools
+  ifeq (,$(filter $(ansible_install_devtools),false true))
+    $(error Unknown ansible_install_devtools option "$(ansible_install_devtools). \
+      Valid options are 'true' and 'false'")
+  endif
+endif
 
 # set arguments for # of nodes
 num_leaders_arg := NUM_LEADERS=$(num_leaders)
@@ -36,7 +45,8 @@ configure: ## Configure nodes using ansible
 	$(num_leaders_arg) $(num_followers_arg) ansible-playbook --vault-password-file $(ansible_vault_password)\
           $(ansible_parallelism_arg) -i ../ansible/vagrant.py \
           --ssh-common-args="-o StrictHostKeyChecking=no" \
-          --extra-vars "cluster_name=$(cluster_name)" \
+          --extra-vars "cluster_name=$(cluster_name) \
+          install_devtools=$(ansible_install_devtools) " \
           ../ansible/playbooks/vagrant.yml
 	@echo "\033[32m==> Successfully ran ansible playbook!\033[0m"
 

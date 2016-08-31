@@ -20,11 +20,20 @@ num_leaders ?= ## Number of leader nodes (1 by default)
 num_followers ?= ## Number of follower nodes (2 by default)
 ansible_num_system_cpus ?= ## Number of cpus to dedicate for system processes (the rest are isolated for user processes)
 ansible_isolcpus ?= false## Use isolcpus kernel boot param
+ansible_install_devtools ?= false## Install dev tools on nodes
 
 # Make sure we have a valid value for ansible_isolcpus
 ifdef ansible_isolcpus
   ifeq (,$(filter $(ansible_isolcpus),false true))
     $(error Unknown ansible_isolcpus option "$(ansible_isolcpus). \
+      Valid options are 'true' and 'false'")
+  endif
+endif
+
+# Make sure we have a valid value for ansible_install_devtools
+ifdef ansible_install_devtools
+  ifeq (,$(filter $(ansible_install_devtools),false true))
+    $(error Unknown ansible_install_devtools option "$(ansible_install_devtools). \
       Valid options are 'true' and 'false'")
   endif
 endif
@@ -225,6 +234,7 @@ configure: check-cluster-name ## Configure nodes using ansible
           ../ansible/ec2.py --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
           aws_region=$(region) isolcpus=$(ansible_isolcpus) \
+	  install_devtools=$(ansible_install_devtools) \
           $(ansible_num_sys_cpus_arg)" -u ubuntu \
           ../ansible/playbooks/aws.yml
 	@echo "\033[36m==> Successfully ran ansible playbook for cluster \
