@@ -31,7 +31,7 @@ class MetricsReporter
     app_name: String,
     metric_name: String,
     category: MetricsCategory,
-    period: U64 = 1_000_000_000)
+    period: U64 = 2_000_000_000)
   =>
     _id = id
     _topic = "metrics:" + app_name
