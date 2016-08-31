@@ -77,6 +77,7 @@ actor NBBOData is StateHandler[SymbolData ref]
     _step_metrics_map.create()
   let _pipeline_metrics_map: Map[String, MetricsReporter] =
     _pipeline_metrics_map.create()
+  let _wb: Writer = Writer
 
   new create(symbol: String) =>
     // Should remove leading whitespace padding from symbol here
@@ -86,7 +87,7 @@ actor NBBOData is StateHandler[SymbolData ref]
 
   be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, SymbolData] val) =>
     let computation_start = Time.nanos()
-    computation(input, _symbol_data)
+    computation(input, _symbol_data, _wb)
     let computation_end = Time.nanos()
 
     _record_pipeline_metrics(source_name, source_ts)
@@ -124,7 +125,7 @@ primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
   fun name(): String =>
     "Update NBBO"
 
-  fun apply(msg: FixNbboMessage val, state: SymbolData) =>
+  fun apply(msg: FixNbboMessage val, state: SymbolData, wb: (Writer | None)) =>
     let offer_bid_difference = msg.offer_px() - msg.bid_px()
 
     state.should_reject_trades = (offer_bid_difference >= 0.05) or
@@ -142,11 +143,17 @@ class CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
   fun name(): String =>
     "Check Order against NBBO"
 
-  fun apply(msg: FixOrderMessage val, state: SymbolData) =>
+  fun apply(msg: FixOrderMessage val, state: SymbolData, 
+    wb: (Writer | None)) =>
     if state.should_reject_trades then
       let result = OrderResult(msg, state.last_bid, state.last_offer,
         Time.nanos())
-      _conn.writev(OrderResultEncoder(result))
+      match wb
+      | let w: Writer =>
+        _conn.writev(OrderResultEncoder(result, w))
+      else
+        @printf[I32]("No write buffer for some reason\n".cstring())
+      end
     end
 
 class NBBOSource is Source

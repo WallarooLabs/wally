@@ -1,6 +1,7 @@
 use "net"
 use "time"
 use "metrics"
+use "buffered"
 
 ///
 /// Buffy-ness
@@ -93,7 +94,7 @@ interface StateHandler[State: Any ref]
   be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, State] val)
 
 interface StateComputation[In: Any val, State: Any #read]
-  fun apply(input: In, state: State): None
+  fun apply(input: In, state: State, wb: (Writer | None)): None
   fun name(): String
 
 /*
