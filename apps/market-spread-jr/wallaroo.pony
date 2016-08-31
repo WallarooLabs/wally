@@ -97,19 +97,6 @@ interface StateComputation[In: Any val, State: Any #read]
   fun apply(input: In, state: State, wb: (Writer | None)): None
   fun name(): String
 
-/*
-// Actual buffy signature
-interface StateComputation[In: Any val, Out: Any val, State: Any #read]
-  fun apply(input: In, state: State, output: MessageTarget[Out] val)
-    : State
-  fun name(): String
-*/
-
-//
-// SUPPORT
-// Not so BUFFYNESS
-//
-
 primitive Bytes
   fun to_u32(a: U8, b: U8, c: U8, d: U8): U32 =>
     (a.u32() << 24) or (b.u32() << 16) or (c.u32() << 8) or d.u32()
