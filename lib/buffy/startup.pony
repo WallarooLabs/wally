@@ -8,7 +8,7 @@ actor Startup
     sink_step_builders: Array[SinkNodeStepBuilder val] val =
     recover Array[SinkNodeStepBuilder val] end)
   =>
-    let options = Options(env, false)
+    let options = Options(env.args, false)
     var node_type: NodeType = BuffyNode
 
     options

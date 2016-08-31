@@ -1,6 +1,8 @@
 use "collections"
 use "net"
 use "options"
+use "time"
+use "metrics"
 
 class OutNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
@@ -13,6 +15,18 @@ class OutNotify is TCPConnectionNotify
       @printf[None]("outgoing no longer throttled\n".cstring())
     end
 
+/*
+class FlushMetrics is TimerNotify
+  let _metrics: Metrics
+
+  new iso create(m: Metrics) =>
+    _metrics = m
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _metrics.run()
+    true
+*/
+
 actor Main
   new create(env: Env) =>
     var i_arg: (Array[String] | None) = None
@@ -21,7 +35,7 @@ actor Main
     var expected: USize = 1_000_000
 
     try
-      var options = Options(env)
+      var options = Options(env.args)
 
       options
         .add("nbbo", "i", StringArgument)
@@ -41,8 +55,8 @@ actor Main
       let i_addr = i_arg as Array[String]
       let j_addr = j_arg as Array[String]
       let o_addr = o_arg as Array[String]
-      let metrics1 = Metrics("NBBO")
-      let metrics2 = Metrics("Orders")
+      let metrics1 = JrMetrics("NBBO")
+      let metrics2 = JrMetrics("Orders")
 
       let connect_auth = TCPConnectAuth(env.root as AmbientAuth)
       let out_socket = TCPConnection(connect_auth,
@@ -50,13 +64,20 @@ actor Main
             o_addr(0),
             o_addr(1))
 
+//      let metrics = Metrics
+
+      //let timers = Timers
+      //let mc_flush = Timer(FlushMetrics(metrics), 0, 1_000_000_000)
+      //timers(consume mc_flush)
+
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
-        let s = NBBOData(i, OnlyRejectionsRouter(out_socket))
-        symbol_actors(i) = s
+        let cleaned: String = i.clone().lstrip().clone()
+        let s = NBBOData(cleaned)
+        symbol_actors(cleaned) = s
       end
 
-      let symbol_to_actor: Map[String, NBBOData] val = consume symbol_actors
+      let symbol_to_actor: Map[String, NBBOData] val = consume symbol_actors 
 
       let nbbo_source = NBBOSource(SymbolRouter(symbol_to_actor))
 
@@ -66,7 +87,9 @@ actor Main
             i_addr(0),
             i_addr(1))
 
-      let order_source = OrderSource(SymbolRouter(symbol_to_actor))
+      let check_order = CheckOrder(out_socket)
+      let order_source = OrderSource(SymbolRouter(symbol_to_actor), 
+        check_order)
 
       let order = TCPListener(listen_auth,
             SourceListenerNotify(order_source, metrics2, (expected/2)),

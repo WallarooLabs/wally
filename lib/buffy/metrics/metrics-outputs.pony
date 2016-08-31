@@ -45,7 +45,7 @@ actor MonitoringHubOutput is MetricsOutputActor
     """
     Send a metrics messsage to Monitoring Hub
     """
-    _stdout.print("    metrics-receiver: Sending metrics")
+    // _stdout.print("    metrics-receiver: Sending metrics")
     _conn.writev(Bytes.length_encode(payload))
 
 

@@ -16,7 +16,7 @@ clone:
 build:
   # main build of buffy
   main_build:
-    image: sendence/ponyc:sendence-12.1.4-$$PONYC_CONFIG
+    image: sendence/ponyc:sendence-13.0.0-$$PONYC_CONFIG
     pull: true
     commands:
       - make clean arch=$$PONYC_VERSION in_docker=true

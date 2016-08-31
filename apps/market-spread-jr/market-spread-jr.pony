@@ -8,10 +8,8 @@ messages as callbacks. Something Sylvan and I are calling "async lambda". Its
 a cool idea. Sylvan thinks it could be done but its not coming anytime soon,
 so... Here we have this.
 
-I tested this on my laptop (4 cores). Important to note, I used giles-sender
-and data files from the "market-spread-perf-runs-08-19" which has a fix to
-correct data handling for the fixish binary files. This will be merged to
-master shortly but hasn't been yet.
+I tested this on my laptop (4 cores/2.8 Ghz Intel core i7).
+I compiled everything with Sendence-13.0.0
 
 I started trades/orders sender as:
 
@@ -28,17 +26,17 @@ nc -l 127.0.0.1 7002 >> /dev/null
 
 With the above settings, based on the albeit, hacky perf tracking, I got:
 
-145k/sec NBBO throughput
-71k/sec Trades throughput
+137k/sec NBBO throughput
+70k/sec Trades throughput
 
-Memory usage for market-spread-jr was stable and came in around 22 megs. After
+Memory usage for market-spread-jr was stable and came in around 28 megs. After
 run was completed, I left market-spread-jr running and started up the senders
 using the same parameters again and it performed equivalently to the first run
 with no appreciable change in memory.
 
-145k/sec NBBO throughput
-71k/sec Trades throughput
-22 Megs of memory used.
+137k/sec NBBO throughput
+70k/sec Trades throughput
+28 Megs of memory used.
 
 While I don't have the exact performance numbers for this version compared to
 the previous version that was partitioning across 2 NBBOData actors based on
@@ -57,8 +55,11 @@ symbol. This would be equiv to "end of day on last previous trading data".
 """
 use "collections"
 use "net"
+use "time"
 use "sendence/fix"
 use "sendence/new-fix"
+use "metrics"
+use "buffered"
 
 //
 // State handling
@@ -72,27 +73,52 @@ class SymbolData
 actor NBBOData is StateHandler[SymbolData ref]
   let _symbol: String
   let _symbol_data: SymbolData = SymbolData
-  let _router: OnlyRejectionsRouter
+  let _step_metrics_map: Map[String, MetricsReporter] =
+    _step_metrics_map.create()
+  let _pipeline_metrics_map: Map[String, MetricsReporter] =
+    _pipeline_metrics_map.create()
 
-  var _count: USize = 0
-
-  new create(symbol: String, router: OnlyRejectionsRouter iso) =>
+  new create(symbol: String) =>
     // Should remove leading whitespace padding from symbol here
-    _symbol = symbol
-    _router = consume router
+    let symbol': String iso = symbol.clone()
+    symbol'.lstrip()
+    _symbol = consume symbol'
 
-  be run[In: Any val](input: In, computation: StateComputation[In, SymbolData] val) =>
-    _count = _count + 1
+  be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, SymbolData] val) =>
+    let computation_start = Time.nanos()
     computation(input, _symbol_data)
+    let computation_end = Time.nanos()
 
-    // we don't have output from computation yet, fake it
-    let result = if (_count % 10) == 0 then true else false end
+    _record_pipeline_metrics(source_name, source_ts)
 
-    match _router.route(result)
-    | let p: TCPConnection =>
-      p.write(_count.string())
+    // Do this at the end. Because ¯\_(ツ)_/¯.
+    // Real work first? Sure, that was what Sean was thinking
+    _record_step_metrics(computation.name(),
+      computation_start, computation_end)
+
+  fun ref _record_step_metrics(name: String, start_ts: U64, end_ts: U64) =>
+     let metrics = try
+      _step_metrics_map(name)
+    else
+      let reporter =
+        MetricsReporter(1, name, ComputationCategory)
+      _step_metrics_map(name) = reporter
+      reporter
     end
 
+    metrics.report(start_ts - end_ts)
+
+  fun ref _record_pipeline_metrics(source_name: String val, source_ts: U64) =>
+    let metrics = try
+      _pipeline_metrics_map(source_name)
+    else
+      let reporter =
+        MetricsReporter(1, source_name, StartToEndCategory)
+      _pipeline_metrics_map(source_name) = reporter
+      reporter
+    end
+
+    metrics.report(source_ts - Time.nanos())
 
 primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
   fun name(): String =>
@@ -107,14 +133,20 @@ primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
     state.last_bid = msg.bid_px()
     state.last_offer = msg.offer_px()
 
-primitive CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
+class CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
+  let _conn: TCPConnection tag
+
+  new val create(conn: TCPConnection tag) =>
+    _conn = conn
+
   fun name(): String =>
     "Check Order against NBBO"
 
   fun apply(msg: FixOrderMessage val, state: SymbolData) =>
     if state.should_reject_trades then
-      None
-      // do rejection here
+      let result = OrderResult(msg, state.last_bid, state.last_offer,
+        Time.nanos())
+      _conn.writev(OrderResultEncoder(result))
     end
 
 class NBBOSource is Source
@@ -127,11 +159,13 @@ class NBBOSource is Source
     "Nbbo source"
 
   fun process(data: Array[U8 val] iso) =>
+    // A lot of this needs to be moved out into more generic code
+    let ingest_ts = Time.nanos()
     let m = FixishMsgDecoder.nbbo(consume data)
 
     match _router.route(m.symbol())
     | let p: StateHandler[SymbolData] tag =>
-      p.run[FixNbboMessage val](m, UpdateNBBO)
+      p.run[FixNbboMessage val](name(), ingest_ts, m, UpdateNBBO)
     else
       // drop data that has no partition
       @printf[None]("NBBO Source: Fake logging lack of partition for %s\n".cstring(), m.symbol().null_terminated().cstring())
@@ -139,9 +173,11 @@ class NBBOSource is Source
 
 class OrderSource is Source
   let _router: SymbolRouter
+  let _state_comp: CheckOrder val
 
-  new val create(router: SymbolRouter iso) =>
+  new val create(router: SymbolRouter iso, state_comp: CheckOrder val) =>
     _router = consume router
+    _state_comp = state_comp
 
   fun name(): String val =>
     "Order source"
@@ -154,11 +190,12 @@ class OrderSource is Source
     // FIXISH decoder has a broken API, because I could hand an
     // order to nbbo and it would process it. :(
     try
+      let ingest_ts = Time.nanos()
       let m = FixishMsgDecoder.order(consume data)
 
       match _router.route(m.symbol())
       | let p: StateHandler[SymbolData] tag =>
-        p.run[FixOrderMessage val](m, CheckOrder)
+        p.run[FixOrderMessage val](name(), ingest_ts, m, _state_comp)
       else
         // DONT DO THIS RIGHT NOW BECAUSE WE HAVE BAD DATA
         // AND THIS FLOODS STDOUT
@@ -193,3 +230,58 @@ class OnlyRejectionsRouter is Router[Bool, TCPConnection]
 
   fun route(rejected: Bool): (TCPConnection | None)  =>
     if rejected then _sink end
+
+class OrderResult
+  let order: FixOrderMessage val
+  let bid: F64
+  let offer: F64
+  let timestamp: U64
+
+  new val create(order': FixOrderMessage val,
+    bid': F64,
+    offer': F64,
+    timestamp': U64)
+  =>
+    order = order'
+    bid = bid'
+    offer = offer'
+    timestamp = timestamp'
+
+  fun string(): String =>
+    (order.symbol().clone().append(order.order_id())
+      .append(order.account().string())
+      .append(order.price().string()).append(order.order_qty().string())
+      .append(order.side().string()).append(bid.string()).append(offer.string())
+      .append(timestamp.string())).clone()
+
+primitive OrderResultEncoder
+  fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
+    //Header (size == 55 bytes)
+    let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
+    wb.u32_be(msgs_size.u32())
+    //Fields
+    match r.order.side()
+    | Buy => wb.u8(SideTypes.buy())
+    | Sell => wb.u8(SideTypes.sell())
+    end
+    wb.u32_be(r.order.account())
+    wb.write(r.order.order_id().array()) // assumption: 6 bytes
+    wb.write(r.order.symbol().array()) // assumption: 4 bytes
+    wb.f64_be(r.order.order_qty())
+    wb.f64_be(r.order.price())
+    wb.f64_be(r.bid)
+    wb.f64_be(r.offer)
+    wb.u64_be(r.timestamp)
+    wb.done()
+
+
+//actor Reporter is Sink
+//   let _conn: TCPConnection
+
+//   new create(conn: TCPConnection) =>
+//     _conn = conn
+
+//   be process[D: Any val](data: D) =>
+//     match data
+//     | let b: ByteSeq => _conn.write(b)
+//     end

@@ -29,8 +29,10 @@ primitive  FixParser
     out
 
   fun _nbbo(i: Map[String, String]): FixNbboMessage val  ? =>
+    let padded_symbol = pad_symbol(i("55"))
+    let symbol = _with_max_length(padded_symbol, 4)
     FixNbboMessage(
-      i("55")
+      symbol
       , i("60")
       , i("132").f64()
       , i("133").f64()
@@ -46,15 +48,38 @@ primitive  FixParser
 
     let account = i("1").substring(6).u32()
 
+    let padded_symbol = pad_symbol(i("55"))
+    let symbol = _with_max_length(padded_symbol, 4)
+
     FixOrderMessage(
       side
       , account
       , i("11")
-      , i("55")
+      , symbol
       , i("38").f64()
       , i("44").f64()
       , i("60")
       )
+
+  fun pad_symbol(symbol': String): String =>
+    var symbol = symbol'
+    var symbol_diff =
+      if symbol.size() < 4 then
+        4 - symbol.size()
+      else
+        0
+      end
+    for i in Range(0, symbol_diff) do
+      symbol = " " + symbol
+    end
+    symbol
+
+  fun _with_max_length(s: String, max: USize): String =>
+    if s.size() <= max then
+      s
+    else
+      s.trim(0, max)
+    end
 
 type FixMessage is (FixNbboMessage | FixOrderMessage | OtherFixMessage)
 

@@ -5,7 +5,7 @@ use "options"
 
 actor Main
   new create(env: Env) =>
-    let options = Options(env)
+    let options = Options(env.args)
     let args = options.remaining()
 
     try

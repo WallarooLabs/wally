@@ -85,7 +85,7 @@ actor Main
     var expected: USize = 1_000_000
 
     try
-      var options = Options(env)
+      var options = Options(env.args)
 
       options
         .add("in", "i", StringArgument)

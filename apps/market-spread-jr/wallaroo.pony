@@ -1,5 +1,6 @@
 use "net"
 use "time"
+use "metrics"
 
 ///
 /// Buffy-ness
@@ -37,10 +38,10 @@ class SourceNotify is TCPConnectionNotify
 
 class SourceListenerNotify is TCPListenNotify
   let _source: Source val
-  let _metrics: Metrics
+  let _metrics: JrMetrics
   let _expected: USize
 
-  new iso create(source: Source val, metrics: Metrics, expected: USize) =>
+  new iso create(source: Source val, metrics: JrMetrics, expected: USize) =>
     _source = source
     _metrics = metrics
     _expected = expected
@@ -50,11 +51,11 @@ class SourceListenerNotify is TCPListenNotify
 
 class SourceRunner
   let _source: Source val
-  let _metrics: Metrics
+  let _metrics: JrMetrics
   let _expected: USize
   var _count: USize = 0
 
-  new iso create(source: Source val, metrics: Metrics, expected: USize) =>
+  new iso create(source: Source val, metrics: JrMetrics, expected: USize) =>
     _source = source
     _metrics = metrics
     _expected = expected
@@ -82,11 +83,14 @@ interface Source
   fun name(): String val
   fun process(data: Array[U8 val] iso)
 
+interface Sink
+  be process[D: Any val](data: D)
+
 interface Router[On: Any val, RoutesTo: Any tag]
   fun route(key: On): (RoutesTo | None)
 
 interface StateHandler[State: Any ref]
-  be run[In: Any val](input: In, computation: StateComputation[In, State] val)
+  be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, State] val)
 
 interface StateComputation[In: Any val, State: Any #read]
   fun apply(input: In, state: State): None
@@ -109,7 +113,7 @@ primitive Bytes
   fun to_u32(a: U8, b: U8, c: U8, d: U8): U32 =>
     (a.u32() << 24) or (b.u32() << 16) or (c.u32() << 8) or d.u32()
 
-actor Metrics
+actor JrMetrics
   var start_t: U64 = 0
   var next_start_t: U64 = 0
   var end_t: U64 = 0
