@@ -80,7 +80,6 @@ actor NBBOData is StateHandler[SymbolData ref]
   let _wb: Writer = Writer
 
   new create(symbol: String) =>
-    // Should remove leading whitespace padding from symbol here
     let symbol': String iso = symbol.clone()
     symbol'.lstrip()
     _symbol = consume symbol'
