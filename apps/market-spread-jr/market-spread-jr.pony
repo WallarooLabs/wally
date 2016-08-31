@@ -19,14 +19,17 @@ I started nbbo sender as:
 /usr/bin/time -l ./sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -f ../../demos/marketspread/1000nbbo-fixish.msg --ponythreads=1 -y -g 47
 
 I started market-spread-jr as:
-./market-spread-jr -i 127.0.0.1:7000 -j 127.0.0.1:7001 -o 127.0.0.1:7002 -e 10000000
+./market-spread-jr -i 127.0.0.1:7000 -j 127.0.0.1:7001 -o 127.0.0.1:7002 -m 127.0.0.1:7003 -e 10000000
 
 I started a sink for the output as:
 nc -l 127.0.0.1 7002 >> /dev/null
 
+I started a sink for the metrics as:
+nc -l 127.0.0.1 7003 >> /dev/null
+
 With the above settings, based on the albeit, hacky perf tracking, I got:
 
-137k/sec NBBO throughput
+139k/sec NBBO throughput
 70k/sec Trades throughput
 
 Memory usage for market-spread-jr was stable and came in around 28 megs. After
@@ -34,9 +37,9 @@ run was completed, I left market-spread-jr running and started up the senders
 using the same parameters again and it performed equivalently to the first run
 with no appreciable change in memory.
 
-137k/sec NBBO throughput
+139k/sec NBBO throughput
 70k/sec Trades throughput
-28 Megs of memory used.
+16-30 Megs of memory used.
 
 While I don't have the exact performance numbers for this version compared to
 the previous version that was partitioning across 2 NBBOData actors based on
@@ -58,6 +61,7 @@ use "net"
 use "time"
 use "sendence/fix"
 use "sendence/new-fix"
+use "sendence/hub"
 use "metrics"
 use "buffered"
 
@@ -73,20 +77,22 @@ class SymbolData
 actor NBBOData is StateHandler[SymbolData ref]
   let _symbol: String
   let _symbol_data: SymbolData = SymbolData
+  let _metrics_socket: TCPConnection
   let _step_metrics_map: Map[String, MetricsReporter] =
     _step_metrics_map.create()
   let _pipeline_metrics_map: Map[String, MetricsReporter] =
     _pipeline_metrics_map.create()
+  let _wb: Writer = Writer
 
-  new create(symbol: String) =>
-    // Should remove leading whitespace padding from symbol here
+  new create(symbol: String, metrics_socket: TCPConnection) =>
     let symbol': String iso = symbol.clone()
     symbol'.lstrip()
     _symbol = consume symbol'
+    _metrics_socket = metrics_socket
 
   be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, SymbolData] val) =>
     let computation_start = Time.nanos()
-    computation(input, _symbol_data)
+    computation(input, _symbol_data, _wb)
     let computation_end = Time.nanos()
 
     _record_pipeline_metrics(source_name, source_ts)
@@ -101,7 +107,7 @@ actor NBBOData is StateHandler[SymbolData ref]
       _step_metrics_map(name)
     else
       let reporter =
-        MetricsReporter(1, name, ComputationCategory)
+        MetricsReporter(_metrics_socket, 1, name, ComputationCategory)
       _step_metrics_map(name) = reporter
       reporter
     end
@@ -113,7 +119,7 @@ actor NBBOData is StateHandler[SymbolData ref]
       _pipeline_metrics_map(source_name)
     else
       let reporter =
-        MetricsReporter(1, source_name, StartToEndCategory)
+        MetricsReporter(_metrics_socket, 1, source_name, StartToEndCategory)
       _pipeline_metrics_map(source_name) = reporter
       reporter
     end
@@ -124,7 +130,7 @@ primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
   fun name(): String =>
     "Update NBBO"
 
-  fun apply(msg: FixNbboMessage val, state: SymbolData) =>
+  fun apply(msg: FixNbboMessage val, state: SymbolData, wb: (Writer | None)) =>
     let offer_bid_difference = msg.offer_px() - msg.bid_px()
 
     state.should_reject_trades = (offer_bid_difference >= 0.05) or
@@ -142,11 +148,17 @@ class CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
   fun name(): String =>
     "Check Order against NBBO"
 
-  fun apply(msg: FixOrderMessage val, state: SymbolData) =>
+  fun apply(msg: FixOrderMessage val, state: SymbolData,
+    wb: (Writer | None)) =>
     if state.should_reject_trades then
       let result = OrderResult(msg, state.last_bid, state.last_offer,
         Time.nanos())
-      _conn.writev(OrderResultEncoder(result))
+      match wb
+      | let w: Writer =>
+        _conn.writev(OrderResultEncoder(result, w))
+      else
+        @printf[I32]("No write buffer for some reason\n".cstring())
+      end
     end
 
 class NBBOSource is Source
@@ -272,7 +284,9 @@ primitive OrderResultEncoder
     wb.f64_be(r.bid)
     wb.f64_be(r.offer)
     wb.u64_be(r.timestamp)
-    wb.done()
+    let payload = wb.done()
+    HubProtocol.payload("rejected-orders", "reports:market-spread", 
+      consume payload, wb)
 
 
 //actor Reporter is Sink

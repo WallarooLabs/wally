@@ -3,34 +3,32 @@ use "net"
 use "options"
 use "time"
 use "metrics"
+use "sendence/hub"
 
 class OutNotify is TCPConnectionNotify
+  let _name: String
+
+  new iso create(name: String) =>
+    _name = name
+
   fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("outgoing connected\n".cstring())
+    @printf[None]("%s outgoing connected\n".cstring(),
+      _name.null_terminated().cstring())
 
   fun ref throttled(sock: TCPConnection ref, x: Bool) =>
     if x then
-      @printf[None]("outgoing throttled\n".cstring())
+      @printf[None]("%s outgoing throttled\n".cstring(),
+        _name.null_terminated().cstring())
     else
-      @printf[None]("outgoing no longer throttled\n".cstring())
+      @printf[None]("%s outgoing no longer throttled\n".cstring(),
+        _name.null_terminated().cstring())
     end
-
-/*
-class FlushMetrics is TimerNotify
-  let _metrics: Metrics
-
-  new iso create(m: Metrics) =>
-    _metrics = m
-
-  fun ref apply(timer: Timer, count: U64): Bool =>
-    _metrics.run()
-    true
-*/
 
 actor Main
   new create(env: Env) =>
     var i_arg: (Array[String] | None) = None
     var j_arg: (Array[String] | None) = None
+    var m_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
     var expected: USize = 1_000_000
 
@@ -38,46 +36,51 @@ actor Main
       var options = Options(env.args)
 
       options
+        .add("expected", "e", I64Argument)
+        .add("metrics", "m", StringArgument)
         .add("nbbo", "i", StringArgument)
         .add("order", "j", StringArgument)
         .add("out", "o", StringArgument)
-        .add("expected", "e", I64Argument)
 
       for option in options do
         match option
+        | ("expected", let arg: I64) => expected = arg.usize()
+        | ("metrics", let arg: String) => m_arg = arg.split(":")
         | ("nbbo", let arg: String) => i_arg = arg.split(":")
         | ("order", let arg: String) => j_arg = arg.split(":")
         | ("out", let arg: String) => o_arg = arg.split(":")
-        | ("expected", let arg: I64) => expected = arg.usize()
         end
       end
 
       let i_addr = i_arg as Array[String]
       let j_addr = j_arg as Array[String]
+      let m_addr = m_arg as Array[String]
       let o_addr = o_arg as Array[String]
       let metrics1 = JrMetrics("NBBO")
       let metrics2 = JrMetrics("Orders")
 
       let connect_auth = TCPConnectAuth(env.root as AmbientAuth)
+      let metrics_socket = TCPConnection(connect_auth,
+            OutNotify("metrics"),
+            m_addr(0),
+            m_addr(1))
+
       let out_socket = TCPConnection(connect_auth,
-            OutNotify,
+            OutNotify("rejections"),
             o_addr(0),
             o_addr(1))
-
-//      let metrics = Metrics
-
-      //let timers = Timers
-      //let mc_flush = Timer(FlushMetrics(metrics), 0, 1_000_000_000)
-      //timers(consume mc_flush)
+      let connect_msg = HubProtocol.connect()
+      let join_msg = HubProtocol.join("reports:market-spread")
+      out_socket.writev(connect_msg)
+      out_socket.writev(join_msg)
 
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
-        let cleaned: String = i.clone().lstrip().clone()
-        let s = NBBOData(cleaned)
-        symbol_actors(cleaned) = s
+        let s = NBBOData(i, metrics_socket)
+        symbol_actors(i) = s
       end
 
-      let symbol_to_actor: Map[String, NBBOData] val = consume symbol_actors 
+      let symbol_to_actor: Map[String, NBBOData] val = consume symbol_actors
 
       let nbbo_source = NBBOSource(SymbolRouter(symbol_to_actor))
 
@@ -88,7 +91,7 @@ actor Main
             i_addr(1))
 
       let check_order = CheckOrder(out_socket)
-      let order_source = OrderSource(SymbolRouter(symbol_to_actor), 
+      let order_source = OrderSource(SymbolRouter(symbol_to_actor),
         check_order)
 
       let order = TCPListener(listen_auth,

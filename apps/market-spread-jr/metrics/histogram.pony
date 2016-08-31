@@ -32,6 +32,8 @@ class Histogram
     end
     s
 
+  fun ref counts(): Array[U64] ref => _counts
+
   fun ref apply(v: U64) =>
   """
   Count a U64 value in the correct bin in the histogram
