@@ -73,38 +73,21 @@ class SymbolData
 actor NBBOData is StateHandler[SymbolData ref]
   let _symbol: String
   let _symbol_data: SymbolData = SymbolData
-  let _router: OnlyRejectionsRouter
   let _step_metrics_map: Map[String, MetricsReporter] =
     _step_metrics_map.create()
   let _pipeline_metrics_map: Map[String, MetricsReporter] =
     _pipeline_metrics_map.create()
 
-  var _count: USize = 0
-
-  new create(symbol: String, router: OnlyRejectionsRouter iso) =>
+  new create(symbol: String) =>
     // Should remove leading whitespace padding from symbol here
     _symbol = symbol
-    _router = consume router
 
   be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, SymbolData] val) =>
-    _count = _count + 1
-
     let computation_start = Time.nanos()
     computation(input, _symbol_data)
     let computation_end = Time.nanos()
 
-    // we don't have output from computation yet, fake it
-    let result = if (_count % 10) == 0 then true else false end
-
-    match _router.route(result)
-    | let conn: TCPConnection =>
-      conn.write(_count.string())
-      // right now count this as the end for rejections
-      _record_pipeline_metrics(source_name, source_ts)
-    else
-      // end of the line!
-      _record_pipeline_metrics(source_name, source_ts)
-    end
+    _record_pipeline_metrics(source_name, source_ts)
 
     // Do this at the end. Because ¯\_(ツ)_/¯.
     // Real work first? Sure, that was what Sean was thinking

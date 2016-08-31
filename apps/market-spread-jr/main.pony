@@ -72,7 +72,7 @@ actor Main
 
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
-        let s = NBBOData(i, OnlyRejectionsRouter(out_socket))
+        let s = NBBOData(i)
         symbol_actors(i) = s
       end
 
