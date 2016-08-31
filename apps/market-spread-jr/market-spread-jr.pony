@@ -107,7 +107,7 @@ actor NBBOData is StateHandler[SymbolData ref]
       _step_metrics_map(name)
     else
       let reporter =
-        MetricsReporter(_metrics_socket, 1, name, ComputationCategory)
+        MetricsReporter(_metrics_socket, 1, "market-spread", name, ComputationCategory)
       _step_metrics_map(name) = reporter
       reporter
     end
@@ -119,7 +119,8 @@ actor NBBOData is StateHandler[SymbolData ref]
       _pipeline_metrics_map(source_name)
     else
       let reporter =
-        MetricsReporter(_metrics_socket, 1, source_name, StartToEndCategory)
+        MetricsReporter(_metrics_socket, 1, "market-spread", source_name, 
+          StartToEndCategory)
       _pipeline_metrics_map(source_name) = reporter
       reporter
     end
