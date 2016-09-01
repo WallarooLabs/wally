@@ -1,60 +1,26 @@
 """
-This market-spread-jr partitions by symbol. In order to accomplish this,
-given that partitioning happens inside the TCPConnection, we set up the
-map from Symbol to NBBOData actor on startup using a hard coded list
-of symbols. For many scenarios, this is a reasonable alternative. What
-would be ideal is for classes like a TCPConnectionNotify to be able to receive
-messages as callbacks. Something Sylvan and I are calling "async lambda". Its
-a cool idea. Sylvan thinks it could be done but its not coming anytime soon,
-so... Here we have this.
+JUNIOR (on its way to Senior)
 
-I tested this on my laptop (4 cores/2.8 Ghz Intel core i7).
-I compiled everything with Sendence-13.0.0
-
-I started trades/orders sender as:
-
-/usr/bin/time -l ./sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f ../../demos/marketspread/1000trades-fixish.msg --ponythreads=1 -y -g 57
-
-I started nbbo sender as:
-/usr/bin/time -l ./sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -f ../../demos/marketspread/1000nbbo-fixish.msg --ponythreads=1 -y -g 47
-
-I started market-spread-jr as:
-./market-spread-jr -i 127.0.0.1:7000 -j 127.0.0.1:7001 -o 127.0.0.1:7002 -m 127.0.0.1:7003 -e 10000000
-
-I started a sink for the output as:
+Setting up a market spread run:
+1) reports sink
 nc -l 127.0.0.1 7002 >> /dev/null
 
-I started a sink for the metrics as:
+2) metrics sink
 nc -l 127.0.0.1 7003 >> /dev/null
 
-With the above settings, based on the albeit, hacky perf tracking, I got:
+3) Junior itself (market spread)
+apps/market-spread-jr/market-spread-jr -i 127.0.0.1:7000 -j 127.0.0.1:7001 -o 127.0.0.1:7002 -m 127.0.0.1:7003 -e 10000000
 
-139k/sec NBBO throughput
+4) orders:
+giles/sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/1000trades-fixish.msg --ponythreads=1 -y -g 57
+
+5) nbbo:
+giles/sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/1000nbbo-fixish.msg --ponythreads=1 -y -g 47
+
+Baseline using Junior metrics (on John's 4 core, Sean sees similar):
+20-30mb of memory used
 70k/sec Trades throughput
-
-Memory usage for market-spread-jr was stable and came in around 28 megs. After
-run was completed, I left market-spread-jr running and started up the senders
-using the same parameters again and it performed equivalently to the first run
-with no appreciable change in memory.
-
-139k/sec NBBO throughput
-70k/sec Trades throughput
-16-30 Megs of memory used.
-
-While I don't have the exact performance numbers for this version compared to
-the previous version that was partitioning across 2 NBBOData actors based on
-last letter of the symbol (not first due to so many having a leading "_" as
-padding) this version performs much better.
-
-This version is a much more full featured "buffy" from where we started.
-There's still a lot to add though. At this point, it has rejections going
-to an outgoing socket. One of out every 10 per symbol. There's been no impact
-on throughput or performance, however, we send the same String each time,
-by way of output. This should be switched over to info about the order for
-more info.
-
-N.B. as part of startup, we really should be setting initial values for each
-symbol. This would be equiv to "end of day on last previous trading data".
+120-140k/sec NBBO throughput
 """
 use "collections"
 use "net"
