@@ -1,6 +1,7 @@
 use "collections"
 use "json"
 use "net"
+use "time"
 use "sendence/epoch"
 use "sendence/hub"
 
@@ -16,7 +17,7 @@ primitive StartToEndCategory
 primitive NodeIngressEgressCategory
   fun apply(): String => "node-ingress-egress"
 
-class MetricsReporter
+class _MetricsReporter
   let _id: U64
   let _topic: String
   let _metric_name: String
@@ -62,3 +63,41 @@ class MetricsReporter
     let payload = HubProtocol.metrics(_metric_name, _category(), _histogram)
     let hub_msg = HubProtocol.payload("metrics", _topic, payload)
     _output_to.writev(hub_msg)
+
+class MetricsReporter
+  let _app_name: String
+  let _metrics_conn: TCPConnection
+  let _step_metrics_map: Map[String, _MetricsReporter] =
+    _step_metrics_map.create()
+  let _pipeline_metrics_map: Map[String, _MetricsReporter] =
+    _pipeline_metrics_map.create()
+
+  new iso create(app_name: String, metrics_conn: TCPConnection) =>
+    _app_name = app_name
+    _metrics_conn = metrics_conn
+
+  fun ref step_metric(name: String, start_ts: U64, end_ts: U64) =>
+     let metrics = try
+      _step_metrics_map(name)
+    else
+      let reporter =
+        _MetricsReporter(_metrics_conn, 1, _app_name, name, 
+          ComputationCategory)
+      _step_metrics_map(name) = reporter
+      reporter
+    end
+
+    metrics.report(start_ts - end_ts)
+
+  fun ref pipeline_metric(source_name: String val, source_ts: U64) =>
+    let metrics = try
+      _pipeline_metrics_map(source_name)
+    else
+      let reporter =
+        _MetricsReporter(_metrics_conn, 1, _app_name, source_name, 
+          StartToEndCategory)
+      _pipeline_metrics_map(source_name) = reporter
+      reporter
+    end
+
+    metrics.report(source_ts - Time.nanos())  

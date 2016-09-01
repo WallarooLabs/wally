@@ -80,29 +80,44 @@ actor Main
 
       let symbol_actors: Map[String, StateRunner[SymbolData]] trn = recover trn Map[String, StateRunner[SymbolData]] end
       for i in legal_symbols().values() do
+        let reporter = MetricsReporter("market-spread", metrics_socket)
         let s = StateRunner[SymbolData](
-          lambda(): SymbolData => SymbolData end, metrics_socket, 
-            "market-spread")
+          lambda(): SymbolData => SymbolData end, consume reporter)
         symbol_actors(i) = s
       end
 
       let symbol_to_actor: Map[String, StateRunner[SymbolData]] val = 
         consume symbol_actors
 
-      let nbbo_source = StateSource[FixNbboMessage val, SymbolData](
-        "Nbbo source", NbboSourceParser, SymbolRouter(symbol_to_actor), 
-        UpdateNbbo)
+      let nbbo_source_builder: {(): Source iso^} val = 
+        recover 
+          lambda()(symbol_to_actor, metrics_socket): Source iso^ =>
+            let nbbo_reporter = MetricsReporter("market-spread", metrics_socket)
+            StateSource[FixNbboMessage val, SymbolData](
+            "Nbbo source", NbboSourceParser, SymbolRouter(symbol_to_actor), 
+            UpdateNbbo, consume nbbo_reporter)
+          end
+        end
 
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       let nbbo = TCPListener(listen_auth,
-            SourceListenerNotify(nbbo_source, metrics1, expected),
+            SourceListenerNotify(nbbo_source_builder, metrics1, expected),
             i_addr(0),
             i_addr(1))
 
       let check_order = CheckOrder(reports_socket)
-      let order_source = StateSource[FixOrderMessage val, 
-        SymbolData]("Order source", OrderSourceParser, 
-        SymbolRouter(symbol_to_actor), check_order)
+      let order_source: {(): Source iso^} val =
+        recover 
+          lambda()(symbol_to_actor, metrics_socket, check_order): Source iso^ 
+          =>
+            let order_reporter = MetricsReporter("market-spread", 
+              metrics_socket)
+            StateSource[FixOrderMessage val, 
+              SymbolData]("Order source", OrderSourceParser, 
+              SymbolRouter(symbol_to_actor), check_order, 
+                consume order_reporter)
+          end
+        end
 
       let order = TCPListener(listen_auth,
             SourceListenerNotify(order_source, metrics2, (expected/2)),

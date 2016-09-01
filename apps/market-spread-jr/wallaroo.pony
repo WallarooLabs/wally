@@ -39,26 +39,27 @@ class SourceNotify is TCPConnectionNotify
     @printf[None]("incoming connected\n".cstring())
 
 class SourceListenerNotify is TCPListenNotify
-  let _source: Source val
+  let _source_builder: {(): Source iso^} val
   let _metrics: JrMetrics
   let _expected: USize
 
-  new iso create(source: Source val, metrics: JrMetrics, expected: USize) =>
-    _source = source
+  new iso create(source_builder: {(): Source iso^} val, metrics: JrMetrics, 
+    expected: USize) =>
+    _source_builder = source_builder
     _metrics = metrics
     _expected = expected
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    SourceNotify(SourceRunner(_source, _metrics, _expected))
+    SourceNotify(SourceRunner(_source_builder(), _metrics, _expected))
 
 class SourceRunner
-  let _source: Source val
+  let _source: Source
   let _metrics: JrMetrics
   let _expected: USize
   var _count: USize = 0
 
-  new iso create(source: Source val, metrics: JrMetrics, expected: USize) =>
-    _source = source
+  new iso create(source: Source iso, metrics: JrMetrics, expected: USize) =>
+    _source = consume source
     _metrics = metrics
     _expected = expected
 
@@ -83,91 +84,74 @@ class SourceRunner
 
 actor StateRunner[State: Any #read]
   let _state: State
-  let _metrics_socket: TCPConnection
-  let _step_metrics_map: Map[String, MetricsReporter] =
-    _step_metrics_map.create()
-  let _pipeline_metrics_map: Map[String, MetricsReporter] =
-    _pipeline_metrics_map.create()
-  let _app_name: String
+  let _metrics_reporter: MetricsReporter
   let _wb: Writer = Writer
 
-  new create(state_builder: {(): State} val, metrics_socket: TCPConnection, 
-    app_name: String) =>
+  new create(state_builder: {(): State} val, 
+    metrics_reporter: MetricsReporter iso) 
+  =>
     _state = state_builder()
-    _metrics_socket = metrics_socket
-    _app_name = app_name
+    _metrics_reporter = consume metrics_reporter
 
   be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, State] val) =>
     let computation_start = Time.nanos()
     computation(input, _state, _wb)
     let computation_end = Time.nanos()
 
-    _record_pipeline_metrics(source_name, source_ts)
+    _metrics_reporter.pipeline_metric(source_name, source_ts)
 
-    _record_step_metrics(computation.name(),
+    _metrics_reporter.step_metric(computation.name(),
       computation_start, computation_end)
-
-  fun ref _record_step_metrics(name: String, start_ts: U64, end_ts: U64) =>
-     let metrics = try
-      _step_metrics_map(name)
-    else
-      let reporter =
-        MetricsReporter(_metrics_socket, 1, _app_name, name, 
-          ComputationCategory)
-      _step_metrics_map(name) = reporter
-      reporter
-    end
-
-    metrics.report(start_ts - end_ts)
-
-  fun ref _record_pipeline_metrics(source_name: String val, source_ts: U64) =>
-    let metrics = try
-      _pipeline_metrics_map(source_name)
-    else
-      let reporter =
-        MetricsReporter(_metrics_socket, 1, "market-spread", source_name, 
-          StartToEndCategory)
-      _pipeline_metrics_map(source_name) = reporter
-      reporter
-    end
-
-    metrics.report(source_ts - Time.nanos())
 
 interface Source
   fun name(): String val
-  fun process(data: Array[U8 val] iso)
+  fun ref process(data: Array[U8 val] iso)
 
 interface SourceParser[In: Any val]
-  fun apply(data: Array[U8] iso): In ?
+  fun apply(data: Array[U8] iso): (In | None) ?
 
 class StateSource[In: Any val, State: Any #read]
   let _name: String
   let _parser: SourceParser[In] val
   let _router: Router[In, StateRunner[State]]
   let _state_comp: StateComputation[In, State] val
+  let _metrics_reporter: MetricsReporter
 
-  new val create(name': String, parser: SourceParser[In] val, 
+  new iso create(name': String, parser: SourceParser[In] val, 
     router: Router[In, StateRunner[State]] iso, 
-    state_comp: StateComputation[In, State] val) =>
+    state_comp: StateComputation[In, State] val,
+    metrics_reporter: MetricsReporter iso) =>
     _name = name'
     _parser = parser
     _router = consume router
     _state_comp = state_comp
+    _metrics_reporter = consume metrics_reporter
 
   fun name(): String val => _name
 
-  fun process(data: Array[U8 val] iso) =>
+  fun ref process(data: Array[U8 val] iso) =>
     let ingest_ts = Time.nanos()
     try
-      let input = _parser(consume data)
+      // For recording metrics for filtered messages
+      let computation_start = Time.nanos()
 
-      match _router.route(input)
-      | let p: StateRunner[State] tag =>
-        p.run[In](_name, ingest_ts, input, _state_comp)
+      match _parser(consume data)
+      | let input: In =>
+        match _router.route(input)
+        | let p: StateRunner[State] tag =>
+          p.run[In](_name, ingest_ts, input, _state_comp)
+        else
+          // drop data that has no partition
+          //@printf[I32]((_name + ": Fake logging lack of partition\n").cstring())
+          None
+        end
       else
-        // drop data that has no partition
-        //@printf[I32]((_name + ": Fake logging lack of partition\n").cstring())
-        None
+        // If parser returns None, we're filtering the message out already
+        let computation_end = Time.nanos()
+        _metrics_reporter.pipeline_metric(_name, ingest_ts)
+
+        _metrics_reporter.step_metric(_state_comp.name(),
+          computation_start, computation_end)
       end
     else 
       @printf[I32]((_name + ": Problem parsing source input\n").cstring())

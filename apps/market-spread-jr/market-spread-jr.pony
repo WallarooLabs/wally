@@ -72,12 +72,20 @@ class CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
     end
 
 class NbboSourceParser 
-  fun apply(data: Array[U8] iso): FixNbboMessage val =>
-    FixishMsgDecoder.nbbo(consume data)
+  fun apply(data: Array[U8] iso): (FixNbboMessage val | None) =>
+    try
+      match FixishMsgDecoder(consume data)
+      | let m: FixNbboMessage val => m
+      end
+    end
 
 class OrderSourceParser 
-  fun apply(data: Array[U8] iso): FixOrderMessage val ? =>
-    FixishMsgDecoder.order(consume data)
+  fun apply(data: Array[U8] iso): (FixOrderMessage val | None) =>
+    try
+      match FixishMsgDecoder(consume data)
+      | let m: FixOrderMessage val => m
+      end
+    end
 
 class SymbolRouter is Router[(FixNbboMessage val | FixOrderMessage val),
   StateRunner[SymbolData]]

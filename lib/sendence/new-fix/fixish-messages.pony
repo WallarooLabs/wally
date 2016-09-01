@@ -67,13 +67,13 @@ primitive FixishMsgEncoder
 primitive FixishMsgDecoder
   fun apply(data: Array[U8] val): FixMessage val ? =>
     match data(0)
-    | FixTypes.order() => order(data)
-    | FixTypes.nbbo() => nbbo(data)
+    | FixTypes.order() => _order(data)
+    | FixTypes.nbbo() => _nbbo(data)
     else
       OtherFixMessage
     end
 
-  fun order(data: Array[U8] val): FixOrderMessage val ? =>
+  fun _order(data: Array[U8] val): FixOrderMessage val ? =>
     // 0 -  1b - FixType (U8)
     // 1 -  1b - side (U8)
     // 2 -  4b - account (U32)
@@ -100,7 +100,7 @@ primitive FixishMsgDecoder
     FixOrderMessage(side, account, order_id, symbol, order_qty, price,
       transact_time)
 
-  fun nbbo(data: Array[U8] val): FixNbboMessage val =>
+  fun _nbbo(data: Array[U8] val): FixNbboMessage val =>
     // 0 -  1b - FixType (U8)
     // 1 -  4b - symbol (String)
     // 5 - 21b - transact_time (String)
