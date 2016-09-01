@@ -250,16 +250,16 @@ setup_ci_arg: num_instances_args=num_leaders_arg=$(if $(leader_num),-var \
                 follower_default_nodes=$(follower_num),)
 setup_ci_arg: old_price=$(shell egrep 'spot_price' \
                 $(current_dir)/cluster/.terraform/terraform.tfstate | sort -u \
-                | sed -e 's/.*: "\(.*\)",/\1/')
+                | sed -e 's/.*: "\(.*\)",/\1/' | head -n 1)
 setup_ci_arg: old_az=$(shell egrep 'availability_zones' \
                 $(current_dir)/cluster/.terraform/terraform.tfstate | sort -u \
-                | grep -v '#' | sed -e 's/.*: "\(.*\)",/\1/')
+                | grep -v '#' | sed -e 's/.*: "\(.*\)",/\1/' | head -n 1)
 setup_ci_arg: old_type=$(shell egrep 'instance_type' \
                 $(current_dir)/cluster/.terraform/terraform.tfstate | sort -u \
-                | sed -e 's/.*: "\(.*\)",/\1/')
+                | sed -e 's/.*: "\(.*\)",/\1/' | head -n 1)
 setup_ci_arg: old_pg=$(shell egrep 'placement_group.:' \
                 $(current_dir)/cluster/.terraform/terraform.tfstate | sort -u \
-                | sed -e 's/.*: "\(.*\)",/\1/')
+                | sed -e 's/.*: "\(.*\)",/\1/' | head -n 1)
 setup_ci_arg: old_pg_args=$(if $(old_pg),ci_pg=is using placement groups\
        #pg_arg=-var placement_group=$(old_pg),ci_pg=is not using placement groups)
 setup_ci_arg: tmp_ci_args=$(if $(filter $(use_automagic_instances),true),$(if \
