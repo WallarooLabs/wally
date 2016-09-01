@@ -20,6 +20,8 @@ docker_host_arg := --host=$(docker_host)# docker host argument
 dagon_docker_host ?= ## Dagon docker host arg (defaults to docker_host value)
 monhub_builder ?= monitoring-hub-builder
 monhub_builder_tag ?= latest
+custom_dagon_config ?= ## Custom config file for a Dagon run
+custom_dagon_timeout ?= ## Custom timeout for a Dagon run
 
 ifeq ($(dagon_docker_host),)
   dagon_docker_host := $(docker_host)
@@ -102,6 +104,12 @@ define MONHUBC
     $(if $(filter $(monhub_docker_args),docker),$(quote))
 endef
 
+define RUN_DAGON
+$1: dagon_config_file=$(if $(custom_dagon_config),$(custom_dagon_config),$2)
+$1: dagon_timeout=$(if $(custom_dagon_timeout),$(custom_dagon_timeout),$3)
+$1: run-dagon
+	$4
+endef
 
 default: build
 
@@ -227,57 +235,102 @@ dagon-test: dagon-identity dagon-word-count dagon-market-spread #dagon-word-leng
 
 dagon-spike-test: dagon-identity-drop ## Run dagon spike tests
 
-dagon-identity: ## Run identity test with dagon
-	./dagon/dagon --timeout=15 -f apps/double-divide/double-divide.ini -h 127.0.0.1:8080
-	./wesley/identity-test/identity-test ./sent.txt ./received.txt match
+run-dagon: # run dagon command
+	./dagon/dagon --timeout=$(dagon_timeout) -f $(dagon_config_file) \
+          -h 127.0.0.1:8080
 
-dagon-identity-drop: ## Run identity test with dagon
-	./dagon/dagon --timeout=15 -f apps/double-divide/double-divide-drop.ini -h 127.0.0.1:8080
-	./wesley/identity-test/identity-test ./sent.txt ./received.txt match
+#dagon-identity: ## Run identity test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-identity \
+,apps/double-divide/double-divide.ini \
+,15 \
+,./wesley/identity-test/identity-test ./sent.txt ./received.txt match))
 
-dagon-word-count: ## Run word count test with dagon
-	./dagon/dagon --timeout=15 -f apps/word-count/word-count.ini -h 127.0.0.1:8080
-	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+#dagon-identity-drop: ## Run identity drop test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-identity-drop \
+,apps/double-divide/double-divide-drop.ini \
+,15 \
+,./wesley/identity-test/identity-test ./sent.txt ./received.txt match))
 
-dagon-word-count-single: ## Run word count test with dagon
-	./dagon/dagon --timeout=15 -f apps/word-count/word-count-single.ini -h 127.0.0.1:8080
-	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+#dagon-word-count: ## Run word count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-count \
+,apps/word-count/word-count.ini \
+,15 \
+,./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match))
 
-dagon-word-count-3: ## Run 3 minute word count test with dagon
-	./dagon/dagon --timeout=800 -f apps/word-count/3-min-run.ini -h 127.0.0.1:8080
-	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+#dagon-word-count-single: ## Run word count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-count-single \
+,apps/word-count/word-count-single.ini \
+,15 \
+,./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match))
 
-dagon-word-count-3-single: ## Run 7 minute word count test with dagon
-	./dagon/dagon --timeout=800 -f apps/word-count/3-min-run-single.ini -h 127.0.0.1:8080
-	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+#dagon-word-count-3: ## Run 3 minute word count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-count-3 \
+,apps/word-count/3-min-run.ini \
+,800 \
+,./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match))
 
-dagon-word-count-7: ## Run 7 minute word count test with dagon
-	./dagon/dagon --timeout=3200 -f apps/word-count/7-min-run.ini -h 127.0.0.1:8080
-	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+#dagon-word-count-3-single: ## Run 7 minute word count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-count-3-single \
+,apps/word-count/3-min-run-single.ini \
+,800 \
+,./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match))
 
-dagon-word-count-7-single: ## Run 7 minute word count test with dagon
-	./dagon/dagon --timeout=30 -f apps/word-count/7-min-run-single.ini -h 127.0.0.1:8080
-	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+#dagon-word-count-7: ## Run 7 minute word count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-count-7 \
+,apps/word-count/7-min-run.ini \
+,3200 \
+,./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match))
 
-dagon-word-count-15: ## Run 15 minute word count test with dagon
-	./dagon/dagon --timeout=3200 -f apps/word-count/15-min-run.ini -h 127.0.0.1:8080
-	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+#dagon-word-count-7-single: ## Run 7 minute word count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-count-7-single \
+,apps/word-count/7-min-run-single.ini \
+,3200 \
+,./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match))
 
-dagon-word-count-30: ## Run word count test with dagon
-	./dagon/dagon --timeout=3200 -f apps/word-count/30-min-run.ini -h 127.0.0.1:8080
-	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match
+#dagon-word-count-15: ## Run 15 minute word count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-count-15 \
+,apps/word-count/15-min-run.ini \
+,3200 \
+,./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match))
 
-dagon-word-count-60: ## Run word count test with dagon
-	./dagon/dagon --timeout=6400 -f apps/word-count/60-min-run.ini -h 127.0.0.1:8080
-	./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match	
+#dagon-word-count-30: ## Run word count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-count-30 \
+,apps/word-count/30-min-run.ini \
+,3200 \
+,./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match))
 
-dagon-market-spread: ## Run market spread test with dagon
-	./dagon/dagon --timeout=25 -f apps/market-spread/market-spread.ini -h 127.0.0.1:8080
-	./wesley/market-spread-test/market-spread-test ./demos/marketspread/100nbbo.msg ./sent.txt ./received.txt match
+#dagon-word-count-60: ## Run word count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-count-60 \
+,apps/word-count/60-min-run.ini \
+,6400 \
+,./wesley/wordcount-test/wordcount-test ./sent.txt ./received.txt match))
 
-dagon-word-length-count: ## Run word length count test with dagon
-	./dagon/dagon --timeout=15 -f apps/word-length-count/word-length-count.ini -h 127.0.0.1:8080
-	./wesley/word-length-count-test/word-length-count-test ./sent.txt ./received.txt match
+#dagon-market-spread: ## Run market spread test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-market-spread \
+,apps/market-spread/market-spread.ini \
+,25 \
+,./wesley/market-spread-test/market-spread-test \
+./demos/marketspread/100nbbo.msg ./sent.txt ./received.txt match))
+
+#dagon-word-length-count: ## Run word length count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-length-count \
+,apps/word-length-count/word-length-count.ini \
+,15 \
+,./wesley/word-length-count-test/word-length-count-test ./sent.txt \
+./received.txt match))
 
 build-docker: docker-arch-check ## Build docker images for Buffy
 	docker $(docker_host_arg) build -t \
