@@ -40,8 +40,6 @@ resource "aws_autoscaling_group" "leaders" {
 # placement groups don't work with t2.nano which is our default instance type
   placement_group = "${var.placement_group}"
 
-  placement_tenancy = "${var.placement_tenancy}"
-
   depends_on = [ "aws_placement_group.default" ]
 
   tag {
@@ -84,8 +82,6 @@ resource "aws_autoscaling_group" "followers" {
 
 # placement groups don't work with t2.nano which is our default instance type
   placement_group = "${var.placement_group}"
-
-  placement_tenancy = "${var.placement_tenancy}"
 
   depends_on = [ "aws_placement_group.default" ]
 
@@ -130,6 +126,8 @@ resource "aws_launch_configuration" "follower_launch_config" {
   key_name = "${var.aws_key_name}"
   security_groups = [ "${terraform_remote_state.vpc.output.SECURITY_GROUP_ID}" ]
   user_data = "${file("${var.follower_user_data}")}"
+  placement_tenancy = "${var.placement_tenancy}"
+
   root_block_device {
     volume_size = "${var.instance_volume_size}"
   }
@@ -150,6 +148,8 @@ resource "aws_launch_configuration" "leader_launch_config" {
   key_name = "${var.aws_key_name}"
   security_groups = [ "${terraform_remote_state.vpc.output.SECURITY_GROUP_ID}" ]
   user_data = "${file("${var.leader_user_data}")}"
+  placement_tenancy = "${var.placement_tenancy}"
+
   root_block_device {
     volume_size = "${var.instance_volume_size}"
   }
