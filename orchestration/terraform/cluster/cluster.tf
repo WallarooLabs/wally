@@ -40,6 +40,8 @@ resource "aws_autoscaling_group" "leaders" {
 # placement groups don't work with t2.nano which is our default instance type
   placement_group = "${var.placement_group}"
 
+  placement_tenancy = "${var.placement_tenancy}"
+
   depends_on = [ "aws_placement_group.default" ]
 
   tag {
@@ -82,6 +84,8 @@ resource "aws_autoscaling_group" "followers" {
 
 # placement groups don't work with t2.nano which is our default instance type
   placement_group = "${var.placement_group}"
+
+  placement_tenancy = "${var.placement_tenancy}"
 
   depends_on = [ "aws_placement_group.default" ]
 

@@ -43,6 +43,11 @@ variable "placement_group" {
   default = ""
 }
 
+variable "placement_tenancy" {
+  description = "Whther to use dedicated hosts for cluster or not."
+  default = "default"
+}
+
 variable "leader_instance_type" {
   description = "Instance type for the leader nodes."
   default = "t2.nano"
