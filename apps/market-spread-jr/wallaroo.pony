@@ -2,6 +2,7 @@ use "net"
 use "time"
 use "metrics"
 use "buffered"
+use "collections"
 
 ///
 /// Buffy-ness
@@ -79,6 +80,58 @@ class SourceRunner
     if _count == _expected then
       _metrics.set_end(Time.nanos(), _expected)
     end
+
+actor StateRunner[State: Any #read]
+  let _state: State
+  let _metrics_socket: TCPConnection
+  let _step_metrics_map: Map[String, MetricsReporter] =
+    _step_metrics_map.create()
+  let _pipeline_metrics_map: Map[String, MetricsReporter] =
+    _pipeline_metrics_map.create()
+  let _app_name: String
+  let _wb: Writer = Writer
+
+  new create(state_builder: {(): State} val, metrics_socket: TCPConnection, 
+    app_name: String) =>
+    _state = state_builder()
+    _metrics_socket = metrics_socket
+    _app_name = app_name
+
+  be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, State] val) =>
+    let computation_start = Time.nanos()
+    computation(input, _state, _wb)
+    let computation_end = Time.nanos()
+
+    _record_pipeline_metrics(source_name, source_ts)
+
+    _record_step_metrics(computation.name(),
+      computation_start, computation_end)
+
+  fun ref _record_step_metrics(name: String, start_ts: U64, end_ts: U64) =>
+     let metrics = try
+      _step_metrics_map(name)
+    else
+      let reporter =
+        MetricsReporter(_metrics_socket, 1, _app_name, name, 
+          ComputationCategory)
+      _step_metrics_map(name) = reporter
+      reporter
+    end
+
+    metrics.report(start_ts - end_ts)
+
+  fun ref _record_pipeline_metrics(source_name: String val, source_ts: U64) =>
+    let metrics = try
+      _pipeline_metrics_map(source_name)
+    else
+      let reporter =
+        MetricsReporter(_metrics_socket, 1, "market-spread", source_name, 
+          StartToEndCategory)
+      _pipeline_metrics_map(source_name) = reporter
+      reporter
+    end
+
+    metrics.report(source_ts - Time.nanos())
 
 interface Source
   fun name(): String val

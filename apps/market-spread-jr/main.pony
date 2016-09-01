@@ -77,13 +77,16 @@ actor Main
       reports_socket.writev(connect_msg)
       reports_socket.writev(reports_join_msg)
 
-      let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
+      let symbol_actors: Map[String, StateRunner[SymbolData]] trn = recover trn Map[String, StateRunner[SymbolData]] end
       for i in legal_symbols().values() do
-        let s = NBBOData(i, metrics_socket)
+        let s = StateRunner[SymbolData](
+          lambda(): SymbolData => SymbolData end, metrics_socket, 
+            "market-spread")
         symbol_actors(i) = s
       end
 
-      let symbol_to_actor: Map[String, NBBOData] val = consume symbol_actors
+      let symbol_to_actor: Map[String, StateRunner[SymbolData]] val = 
+        consume symbol_actors
 
       let nbbo_source = NBBOSource(SymbolRouter(symbol_to_actor))
 
