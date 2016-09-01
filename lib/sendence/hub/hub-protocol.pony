@@ -48,8 +48,6 @@ primitive HubProtocol
     end
     wb.done()
 
-
-
 primitive HubMsgTypes
   fun connect(): U8 => 1
   fun join(): U8 => 2

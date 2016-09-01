@@ -64,15 +64,18 @@ actor Main
             OutNotify("metrics"),
             m_addr(0),
             m_addr(1))
+      let connect_msg = HubProtocol.connect()
+      let metrics_join_msg = HubProtocol.join("metrics:market-spread")
+      metrics_socket.writev(connect_msg)
+      metrics_socket.writev(metrics_join_msg)
 
-      let out_socket = TCPConnection(connect_auth,
+      let reports_socket = TCPConnection(connect_auth,
             OutNotify("rejections"),
             o_addr(0),
             o_addr(1))
-      let connect_msg = HubProtocol.connect()
-      let join_msg = HubProtocol.join("reports:market-spread")
-      out_socket.writev(connect_msg)
-      out_socket.writev(join_msg)
+      let reports_join_msg = HubProtocol.join("reports:market-spread")
+      reports_socket.writev(connect_msg)
+      reports_socket.writev(reports_join_msg)
 
       let symbol_actors: Map[String, NBBOData] trn = recover trn Map[String, NBBOData] end
       for i in legal_symbols().values() do
@@ -90,7 +93,7 @@ actor Main
             i_addr(0),
             i_addr(1))
 
-      let check_order = CheckOrder(out_socket)
+      let check_order = CheckOrder(reports_socket)
       let order_source = OrderSource(SymbolRouter(symbol_to_actor),
         check_order)
 
