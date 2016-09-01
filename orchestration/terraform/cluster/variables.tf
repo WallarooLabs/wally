@@ -103,6 +103,11 @@ variable "follower_spot_price" {
   default = ""
 }
 
+variable "instance_volume_size" {
+  description = "Root volume size for all nodes."
+  default = "32"
+}
+
 variable "instance_amis" {
   description = "AMI for all instances."
   default = {

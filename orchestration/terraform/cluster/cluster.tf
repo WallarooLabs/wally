@@ -126,6 +126,9 @@ resource "aws_launch_configuration" "follower_launch_config" {
   key_name = "${var.aws_key_name}"
   security_groups = [ "${terraform_remote_state.vpc.output.SECURITY_GROUP_ID}" ]
   user_data = "${file("${var.follower_user_data}")}"
+  root_block_device {
+    volume_size = "${var.instance_volume_size}"
+  }
 
   lifecycle {
     create_before_destroy = true
@@ -143,6 +146,9 @@ resource "aws_launch_configuration" "leader_launch_config" {
   key_name = "${var.aws_key_name}"
   security_groups = [ "${terraform_remote_state.vpc.output.SECURITY_GROUP_ID}" ]
   user_data = "${file("${var.leader_user_data}")}"
+  root_block_device {
+    volume_size = "${var.instance_volume_size}"
+  }
 
   lifecycle {
     create_before_destroy = true
