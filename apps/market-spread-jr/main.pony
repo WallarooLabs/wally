@@ -4,6 +4,7 @@ use "options"
 use "time"
 use "metrics"
 use "sendence/hub"
+use "sendence/fix"
 
 class OutNotify is TCPConnectionNotify
   let _name: String
@@ -88,7 +89,9 @@ actor Main
       let symbol_to_actor: Map[String, StateRunner[SymbolData]] val = 
         consume symbol_actors
 
-      let nbbo_source = NBBOSource(SymbolRouter(symbol_to_actor))
+      let nbbo_source = StateSource[FixNbboMessage val, SymbolData](
+        "Nbbo source", NbboSourceParser, SymbolRouter(symbol_to_actor), 
+        UpdateNbbo)
 
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       let nbbo = TCPListener(listen_auth,
@@ -97,8 +100,9 @@ actor Main
             i_addr(1))
 
       let check_order = CheckOrder(reports_socket)
-      let order_source = OrderSource(SymbolRouter(symbol_to_actor),
-        check_order)
+      let order_source = StateSource[FixOrderMessage val, 
+        SymbolData]("Order source", OrderSourceParser, 
+        SymbolRouter(symbol_to_actor), check_order)
 
       let order = TCPListener(listen_auth,
             SourceListenerNotify(order_source, metrics2, (expected/2)),

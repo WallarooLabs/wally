@@ -31,16 +31,12 @@ use "sendence/hub"
 use "metrics"
 use "buffered"
 
-//
-// State handling
-//
-
 class SymbolData
   var should_reject_trades: Bool = true
   var last_bid: F64 = 0
   var last_offer: F64 = 0
 
-primitive UpdateNBBO is StateComputation[FixNbboMessage val, SymbolData]
+primitive UpdateNbbo is StateComputation[FixNbboMessage val, SymbolData]
   fun name(): String =>
     "Update NBBO"
 
@@ -75,76 +71,27 @@ class CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
       end
     end
 
-class NBBOSource is Source
-  let _router: SymbolRouter
+class NbboSourceParser 
+  fun apply(data: Array[U8] iso): FixNbboMessage val =>
+    FixishMsgDecoder.nbbo(consume data)
 
-  new val create(router: SymbolRouter iso) =>
-    _router = consume router
+class OrderSourceParser 
+  fun apply(data: Array[U8] iso): FixOrderMessage val ? =>
+    FixishMsgDecoder.order(consume data)
 
-  fun name(): String val =>
-    "Nbbo source"
-
-  fun process(data: Array[U8 val] iso) =>
-    // A lot of this needs to be moved out into more generic code
-    let ingest_ts = Time.nanos()
-    let m = FixishMsgDecoder.nbbo(consume data)
-
-    match _router.route(m.symbol())
-    | let p: StateHandler[SymbolData] tag =>
-      p.run[FixNbboMessage val](name(), ingest_ts, m, UpdateNBBO)
-    else
-      // drop data that has no partition
-      @printf[None]("NBBO Source: Fake logging lack of partition for %s\n".cstring(), m.symbol().null_terminated().cstring())
-    end
-
-class OrderSource is Source
-  let _router: SymbolRouter
-  let _state_comp: CheckOrder val
-
-  new val create(router: SymbolRouter iso, state_comp: CheckOrder val) =>
-    _router = consume router
-    _state_comp = state_comp
-
-  fun name(): String val =>
-    "Order source"
-
-  fun process(data: Array[U8 val] iso) =>
-    // I DONT LIKE THAT ORDER THROWS AN ERROR IF IT ISNT AN ORDER
-    // BUT.... when we are processing trades in general, this would
-    // probably make us really slow because of tons of errors being
-    // thrown. Use apply here?
-    // FIXISH decoder has a broken API, because I could hand an
-    // order to nbbo and it would process it. :(
-    try
-      let ingest_ts = Time.nanos()
-      let m = FixishMsgDecoder.order(consume data)
-
-      match _router.route(m.symbol())
-      | let p: StateHandler[SymbolData] tag =>
-        p.run[FixOrderMessage val](name(), ingest_ts, m, _state_comp)
-      else
-        // DONT DO THIS RIGHT NOW BECAUSE WE HAVE BAD DATA
-        // AND THIS FLOODS STDOUT
-
-        // drop data that has no route
-        //@printf[None]("Order source: Fake logging lack of route for %s\n".cstring(), m.symbol().null_terminated().cstring())
-        None
-      end
-    else
-      // drop bad data that isn't an order
-      @printf[None]("Order Source: Fake logging bad data a message\n".cstring())
-    end
-
-class SymbolRouter is Router[String, StateRunner[SymbolData]]
+class SymbolRouter is Router[(FixNbboMessage val | FixOrderMessage val),
+  StateRunner[SymbolData]]
   let _routes: Map[String, StateRunner[SymbolData]] val
 
   new iso create(routes: Map[String, StateRunner[SymbolData]] val) =>
     _routes = routes
 
-  fun route(symbol: String): (StateRunner[SymbolData] | None) =>
-    if _routes.contains(symbol) then
+  fun route(input: (FixNbboMessage val | FixOrderMessage val)): 
+    (StateRunner[SymbolData] | None) 
+  =>
+    if _routes.contains(input.symbol()) then
       try
-        _routes(symbol)
+        _routes(input.symbol())
       end
     end
 
@@ -201,15 +148,3 @@ primitive OrderResultEncoder
     let payload = wb.done()
     HubProtocol.payload("rejected-orders", "reports:market-spread", 
       consume payload, wb)
-
-
-//actor Reporter is Sink
-//   let _conn: TCPConnection
-
-//   new create(conn: TCPConnection) =>
-//     _conn = conn
-
-//   be process[D: Any val](data: D) =>
-//     match data
-//     | let b: ByteSeq => _conn.write(b)
-//     end

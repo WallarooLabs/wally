@@ -5,7 +5,7 @@ use "buffered"
 use "collections"
 
 ///
-/// Buffy-ness
+/// Junior-to-Senior
 ///
 
 class SourceNotify is TCPConnectionNotify
@@ -137,14 +137,47 @@ interface Source
   fun name(): String val
   fun process(data: Array[U8 val] iso)
 
+interface SourceParser[In: Any val]
+  fun apply(data: Array[U8] iso): In ?
+
+class StateSource[In: Any val, State: Any #read]
+  let _name: String
+  let _parser: SourceParser[In] val
+  let _router: Router[In, StateRunner[State]]
+  let _state_comp: StateComputation[In, State] val
+
+  new val create(name': String, parser: SourceParser[In] val, 
+    router: Router[In, StateRunner[State]] iso, 
+    state_comp: StateComputation[In, State] val) =>
+    _name = name'
+    _parser = parser
+    _router = consume router
+    _state_comp = state_comp
+
+  fun name(): String val => _name
+
+  fun process(data: Array[U8 val] iso) =>
+    let ingest_ts = Time.nanos()
+    try
+      let input = _parser(consume data)
+
+      match _router.route(input)
+      | let p: StateRunner[State] tag =>
+        p.run[In](_name, ingest_ts, input, _state_comp)
+      else
+        // drop data that has no partition
+        //@printf[I32]((_name + ": Fake logging lack of partition\n").cstring())
+        None
+      end
+    else 
+      @printf[I32]((_name + ": Problem parsing source input\n").cstring())
+    end
+
 interface Sink
   be process[D: Any val](data: D)
 
-interface Router[On: Any val, RoutesTo: Any tag]
-  fun route(key: On): (RoutesTo | None)
-
-interface StateHandler[State: Any ref]
-  be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, State] val)
+interface Router[In: Any val, RoutesTo: Any tag]
+  fun route(input: In): (RoutesTo | None)
 
 interface StateComputation[In: Any val, State: Any #read]
   fun apply(input: In, state: State, wb: (Writer | None)): None
