@@ -3,6 +3,7 @@ import AppConfigStore from "../stores/AppConfigStore"
 import AppStreamConnections from "../streaming/AppStreamConnections"
 import PhoenixConnector from "../streaming/PhoenixConnector"
 import GlobalNav from "./GlobalNav"
+import GlobalFooter from "./GlobalFooter"
 import Applications from "./Applications"
 
 export default class App extends React.Component {
@@ -40,6 +41,7 @@ export default class App extends React.Component {
         <div className="container">
           {this.props.children || <Applications appConfigs={appConfigs} />}
         </div>
+        <GlobalFooter />
       </div>
     )
   };
