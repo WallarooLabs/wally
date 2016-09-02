@@ -37,7 +37,7 @@ primitive HubProtocol
     wb: Writer = Writer): Array[ByteSeq] val =>
     let name_size = name.size().u32()
     let category_size = category.size().u32()
-    let size = 4 + 4 + name_size + category_size + (64 * 8)
+    let size = 4 + 4 + name_size + category_size + (64 * 11)
     wb.u32_be(size)
     wb.u32_be(name_size)
     wb.write(name)
@@ -46,6 +46,8 @@ primitive HubProtocol
     for metric in histogram.counts().values() do
       wb.u64_be(metric)
     end
+    wb.u64_be(histogram.min())
+    wb.u64_be(histogram.max())
     wb.done()
 
 primitive HubMsgTypes
