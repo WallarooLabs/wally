@@ -590,7 +590,11 @@ actor ProcessManager
         | "docker.userid" =>
           docker_userid = final_arg
         | "path" =>
-          path = _relative_path_to_ini(final_arg)
+          path = if _use_docker then
+                   Path.base(final_arg)
+                 else
+                   _relative_path_to_ini(final_arg)
+                 end
         | "sender" =>
           match sections(section)(key)
             | "true" =>
@@ -894,11 +898,18 @@ actor ProcessManager
       args.push(node.docker_dir)
       args.push("--net=" + docker_network)     // connect to network
 
+      args.push("--entrypoint")                // container entrypoint
+
+      if node.wrapper_path.size() > 0 then // we are wrapping the executable
+        args.push(node.wrapper_path)
+      else
+        args.push(node.path) // the command to run inside the container
+      end
+
       args.push(node.docker_image + ":"
         + node.docker_tag)                     // image path
 
       if node.wrapper_path.size() > 0 then // we are wrapping the executable
-        args.push(node.wrapper_path)
         // append wrapper_args
         for value in node.wrapper_args.values() do
           args.push(value)
@@ -910,7 +921,6 @@ actor ProcessManager
         end
       else // we are executing directly
         // append node specific args
-        args.push(node.path) // the command to run inside the container
         for value in node.args.values() do
           args.push(value)
         end
