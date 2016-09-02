@@ -417,11 +417,8 @@ actor ProcessManager
       _env.exitcode(-1)
       return
     end
-    if _use_docker then
-      parse_and_register_container_nodes()
-    else
-      parse_and_register_process_nodes()
-    end
+
+    parse_and_register_nodes()
     transition_to(Booting)
 
   be listening() =>
@@ -477,7 +474,7 @@ actor ProcessManager
       _env.out.print("dagon: listener is not ready.")
     end
 
-  be parse_and_register_process_nodes() =>
+  be parse_and_register_nodes() =>
     """
     Parse ini file and register process nodes
     """
@@ -494,8 +491,18 @@ actor ProcessManager
       let sections = _parse_config(ini_file)
       for section in sections.keys() do
         match section
-        | "docker-env" => None // Skip because running with processes
-        | "docker" => None // Skip because running with processes
+        | "docker-env" =>
+          if _use_docker then
+            _docker_vars = _parse_docker_section(sections, section)
+					else
+					  None // Skip because running with processes
+				  end
+        | "docker" =>
+          if _use_docker then
+            _docker_vars = _parse_docker_section(sections, section)
+					else
+					  None // Skip because running with processes
+				  end
         else
           _parse_node_section(sections, section)
         end
@@ -504,40 +511,11 @@ actor ProcessManager
       transition_to(ErrorShutdown)
     end
 
-    _env.out.print("dagon: finished registration of nodes")
-    _finished_registration = true
-
-  be parse_and_register_container_nodes() =>
-    """
-    Parse ini file and register container nodes.
-    """
-    _env.out.print("dagon: parse_and_register_container_nodes")
-    var ini_file: (File | None) = None
-    try
-      ini_file = _file_from_path(_env.root as AmbientAuth, _ini_path)
-    else
-      _env.out.print("dagon: can't read File from path: " + _ini_path)
-      transition_to(ErrorShutdown)
-    end
-
-    if ini_file isnt None then
-      let sections = _parse_config(ini_file)
-      for section in sections.keys() do
-        match section
-        | "docker-env" =>
-          _docker_vars = _parse_docker_section(sections, section)
-        | "docker" =>
-          _docker_args = _parse_docker_section(sections, section)
-        else
-          _parse_node_section(sections, section)
-        end
-      end
-    else
-      transition_to(ErrorShutdown)
-    end
-
     // dump docker configs
-    _dump_map(_docker_args)
+    if _use_docker then
+      _dump_map(_docker_args)
+	  end
+
     // we're done with registration
     _env.out.print("dagon: finished registration of nodes")
     _finished_registration = true
