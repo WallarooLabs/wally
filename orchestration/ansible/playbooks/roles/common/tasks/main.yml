@@ -2,12 +2,12 @@
   lineinfile:
     dest: /etc/default/grub.d/50-cloudimg-settings.cfg
     regexp: '(^GRUB_CMDLINE_LINUX_DEFAULT="(\s*(?!isolcpus)[\w=/\-\.]+)*\s*)"\s*$'
-    line: '\1 isolcpus={{ num_system_cpus }}-{{ ansible_processor_vcpus - 1 }}"'
+    line: '\1 isolcpus={{ system_cpus }}"'
     backrefs: true
     state: present
     backup: true
   register: grubfile
-  when: ({{ 'vagrant' != ansible_ssh_user }} and {{ num_system_cpus is defined }} and {{ isolcpus is defined }} and {{ isolcpus == 'true' }})
+  when: ({{ 'vagrant' != ansible_ssh_user }} and {{ system_cpus is defined }} and {{ isolcpus is defined }} and {{ isolcpus == 'true' }})
 
 - name: remove isolcpus boot param if it exists
   lineinfile:
@@ -22,11 +22,11 @@
 
 - name: update grub
   command: update-grub
-  when: ('vagrant' != '{{ ansible_ssh_user }}' and {{ num_system_cpus is defined }} and (grubfile|changed or grubfile2|changed))
+  when: ('vagrant' != '{{ ansible_ssh_user }}' and {{ system_cpus is defined }} and (grubfile|changed or grubfile2|changed))
 
 - name: reboot to apply isolcpus boot param
   shell: sleep 2 && /sbin/shutdown -r now "Apply isolcpus boot param"
-  when: ('vagrant' != '{{ ansible_ssh_user }}' and {{ num_system_cpus is defined }} and (grubfile|changed or grubfile2|changed))
+  when: ('vagrant' != '{{ ansible_ssh_user }}' and {{ system_cpus is defined }} and (grubfile|changed or grubfile2|changed))
   async: 1
   poll: 0
   ignore_errors: true
@@ -34,7 +34,7 @@
 - name: waiting for server to come back
   local_action: wait_for host={{ inventory_hostname }} state=started delay=30 timeout=300 port=22
   become: false
-  when: ('vagrant' != '{{ ansible_ssh_user }}' and {{ num_system_cpus is defined }} and (grubfile|changed or grubfile2|changed))
+  when: ('vagrant' != '{{ ansible_ssh_user }}' and {{ system_cpus is defined }} and (grubfile|changed or grubfile2|changed))
 
 - name: Get groups for ssh user
   command: groups {{ ansible_ssh_user }}
@@ -112,6 +112,79 @@
   apt: deb=/tmp/ptpd_2.3.2-master-1_amd64.deb
   when: (ansible_architecture == "x86_64") and (not ptpd.stat.exists)
 
+- name: add llvm apt repo key
+  apt_key:
+    url: 'http://apt.llvm.org/llvm-snapshot.gpg.key'
+    state: present
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
+- name: add llvm apt repo
+  apt_repository:
+    repo: 'deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.8 main'
+    state: present
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
+- name: add llvm src apt repo
+  apt_repository:
+    repo: 'deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.8 main'
+    state: present
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
+- name: Install dev packages
+  apt: name={{ item }} state=latest update_cache=yes
+  with_items:
+   - automake
+   - autotools-dev
+   - build-essential
+   - file
+   - git
+   - libicu-dev
+   - libncurses5-dev
+   - libpcre3
+   - libssl-dev
+   - libxml2-dev
+   - zlib1g-dev
+   - software-properties-common
+   - llvm-3.8
+   - llvm
+   - lldb
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
+- name: Download pcre2
+  get_url:
+    url: "ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2"
+    dest: "/tmp/pcre2-src.tbz2"
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
+- name: Expand pcre2 archive
+  unarchive:
+    src: "/tmp/pcre2-src.tbz2"
+    dest: "/tmp"
+    creates: "/tmp/pcre2-10.21/README"
+    copy: no
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
+- name: configure pcre2
+  command: >
+    ./configure prefix=/usr
+    chdir=/tmp/pcre2-10.21
+    creates=/tmp/pcre2-10.21/libtool
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
+- name: build pcre2
+  command: >
+    make
+    chdir=/tmp/pcre2-10.21
+    creates=/tmp/pcre2-10.21/pcre2test
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
+- name: install pcre2
+  command: >
+    make install
+    chdir=/tmp/pcre2-10.21
+    creates=/usr/bin/pcre2test
+  when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
+
 - name: List ponyc custom C libs from S3
   s3:
     mode=list
@@ -149,6 +222,6 @@
   when: ('vagrant' != '{{ ansible_ssh_user }}')
 
 - name: create cpu shield
-  script: create_cpu_shield.sh {{ num_system_cpus }} > /create_cpu_shield.out
-  when: ('vagrant' != '{{ ansible_ssh_user }}' and {{ num_system_cpus is defined }})
+  script: create_cpu_shield.sh {{ system_cpus }} > /create_cpu_shield.out
+  when: ('vagrant' != '{{ ansible_ssh_user }}' and {{ system_cpus is defined }})
 

@@ -43,6 +43,11 @@ variable "placement_group" {
   default = ""
 }
 
+variable "placement_tenancy" {
+  description = "Whther to use dedicated hosts for cluster or not."
+  default = "default"
+}
+
 variable "leader_instance_type" {
   description = "Instance type for the leader nodes."
   default = "t2.nano"
@@ -101,6 +106,11 @@ variable "follower_user_data" {
 variable "follower_spot_price" {
   description = "Spot price to bid for the follower nodes."
   default = ""
+}
+
+variable "instance_volume_size" {
+  description = "Root volume size for all nodes."
+  default = "32"
 }
 
 variable "instance_amis" {
