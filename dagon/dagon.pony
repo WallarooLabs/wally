@@ -135,7 +135,7 @@ actor Main
 
     options
     .add("docker", "d", StringArgument)
-    .add("tag", "T", StringArgument)
+    .add("docker_tag", "T", StringArgument)
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
@@ -144,7 +144,7 @@ actor Main
       for option in options do
         match option
         | ("docker", let arg: String) => docker_host = arg
-        | ("tag", let arg: String) => docker_tag = arg
+        | ("docker-tag", let arg: String) => docker_tag = arg
         | ("timeout", let arg: I64) => timeout = arg
         | ("filepath", let arg: String) => ini_path = arg
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
@@ -156,7 +156,7 @@ actor Main
       end
     else
       env.err.print("""dagon: usage: [--docker=<host:port>
---tag/-T <tag>]
+--docker-tag/-T <docker-tag>]
 --timeout/-t <seconds>
 --filepath/-f <path>
 --phone-home/-h <host:port>
@@ -178,7 +178,7 @@ actor Main
       else
         docker_tag = ""
         if use_docker then
-          env.err.print("dagon: Must supply required '--tag' argument")
+          env.err.print("dagon: Must supply required '--docker-tag' argument")
           required_args_are_present = false
         end
       end
