@@ -161,7 +161,7 @@ class StateSource[In: Any val, State: Any #read]
           p.run[In](_name, ingest_ts, input, _state_comp)
         else
           // drop data that has no partition
-          //@printf[I32]((_name + ": Fake logging lack of partition\n").cstring())
+          @printf[I32]((_name + ": Fake logging lack of partition\n").cstring())
           None
         end
       else

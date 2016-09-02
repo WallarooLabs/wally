@@ -129,10 +129,14 @@ class OrderResult
     timestamp = timestamp'
 
   fun string(): String =>
-    (order.symbol().clone().append(order.order_id())
-      .append(order.account().string())
-      .append(order.price().string()).append(order.order_qty().string())
-      .append(order.side().string()).append(bid.string()).append(offer.string())
+    (order.symbol().clone().append(", ")
+      .append(order.order_id()).append(", ")
+      .append(order.account().string()).append(", ")
+      .append(order.price().string()).append(", ")
+      .append(order.order_qty().string()).append(", ")
+      .append(order.side().string()).append(", ")
+      .append(bid.string()).append(", ")
+      .append(offer.string()).append(", ")
       .append(timestamp.string())).clone()
 
 primitive OrderResultEncoder
