@@ -1,7 +1,7 @@
 """
 JUNIOR (on its way to Senior)
 
-Setting up a market spread run:
+Setting up a market spread run (in order):
 1) reports sink
 nc -l 127.0.0.1 7002 >> /dev/null
 
