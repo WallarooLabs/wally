@@ -123,6 +123,7 @@ actor Main
     var required_args_are_present = true
     var docker_host: (String | None) = None
     var docker_tag: (String | None) = None
+    var docker_network: (String | None) = None
     var use_docker: Bool = false
     var timeout: (I64 | None) = None
     var ini_path: (String | None) = None
@@ -135,7 +136,8 @@ actor Main
 
     options
     .add("docker", "d", StringArgument)
-    .add("docker_tag", "T", StringArgument)
+    .add("docker-tag", "T", StringArgument)
+    .add("docker-network", "N", StringArgument)
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
@@ -145,6 +147,7 @@ actor Main
         match option
         | ("docker", let arg: String) => docker_host = arg
         | ("docker-tag", let arg: String) => docker_tag = arg
+        | ("docker-network", let arg: String) => docker_network = arg
         | ("timeout", let arg: I64) => timeout = arg
         | ("filepath", let arg: String) => ini_path = arg
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
@@ -157,6 +160,7 @@ actor Main
     else
       env.err.print("""dagon: usage: [--docker=<host:port>
 --docker-tag/-T <docker-tag>]
+--docker-network/-N <docker-network>]
 --timeout/-t <seconds>
 --filepath/-f <path>
 --phone-home/-h <host:port>
@@ -181,6 +185,12 @@ actor Main
           env.err.print("dagon: Must supply required '--docker-tag' argument")
           required_args_are_present = false
         end
+      end
+
+      if docker_network isnt None then
+        env.out.print("dagon: docker_network: " + (docker_network as String))
+      else
+        docker_network = ""
       end
 
       if timeout is None then
@@ -221,7 +231,7 @@ actor Main
 
       ProcessManager(env, delay_senders, use_docker, docker_host as String,
         docker_tag as String, timeout as I64, ini_path as String,
-        phone_home_host, phone_home_service)
+        phone_home_host, phone_home_service, docker_network as String)
     else
       env.err.print("dagon: error parsing arguments")
       env.exitcode(-1)
@@ -368,6 +378,7 @@ actor ProcessManager
   let _use_docker: Bool
   let _docker_host: String
   let _docker_tag: String
+  let _docker_network: String
   let _timeout: I64
   let _ini_path: String
   let _host: String
@@ -392,13 +403,15 @@ actor ProcessManager
   new create(env: Env, delay_senders: Bool, use_docker: Bool, docker_host: String,
     docker_tag: String,
     timeout: I64, ini_path: String,
-    host: String, service: String)
+    host: String, service: String,
+    docker_network: String)
   =>
     _env = env
     _delay_senders = delay_senders
     _use_docker = use_docker
     _docker_host = docker_host
     _docker_tag = docker_tag
+    _docker_network = docker_network
     _timeout = timeout
     _ini_path = ini_path
     _host = host
@@ -478,7 +491,7 @@ actor ProcessManager
     """
     Parse ini file and register process nodes
     """
-    _env.out.print("dagon: parse_and_register_processes")
+    _env.out.print("dagon: parse_and_register_nodes")
     var ini_file: (File | None) = None
     try
       ini_file = _file_from_path(_env.root as AmbientAuth, _ini_path)
@@ -494,15 +507,15 @@ actor ProcessManager
         | "docker-env" =>
           if _use_docker then
             _docker_vars = _parse_docker_section(sections, section)
-					else
-					  None // Skip because running with processes
-				  end
+          else
+            None // Skip because running with processes
+          end
         | "docker" =>
           if _use_docker then
-            _docker_vars = _parse_docker_section(sections, section)
-					else
-					  None // Skip because running with processes
-				  end
+            _docker_args = _parse_docker_section(sections, section)
+          else
+            None // Skip because running with processes
+          end
         else
           _parse_node_section(sections, section)
         end
@@ -514,7 +527,7 @@ actor ProcessManager
     // dump docker configs
     if _use_docker then
       _dump_map(_docker_args)
-	  end
+    end
 
     // we're done with registration
     _env.out.print("dagon: finished registration of nodes")
@@ -665,9 +678,9 @@ actor ProcessManager
           args(key) = _relative_path_to_ini(sections(section)(key))
         | "DOCKER_CERT_PATH" =>
           args(key) = _relative_path_to_ini(sections(section)(key))
-				else
+        else
           args(key) = sections(section)(key)
-				end
+        end
       end
     else
       _env.out.print("dagon: couldn't parse args in section: " + section)
@@ -823,12 +836,12 @@ actor ProcessManager
 
     var docker: (FilePath | None) = None
     var docker_opts: String = ""
-    var docker_network: String = ""
+    var docker_network: String = _docker_network
     var docker_repo: String = ""
     try
       let docker_path = _docker_args("docker_path")
       docker = _filepath_from_path(docker_path)
-      docker_network = _docker_args("docker_network")
+      docker_network = _docker_args.get_or_else("docker_network", _docker_network)
       docker_repo = _docker_args("docker_repo")
     else
       _env.out.print("dagon: could not get docker info from map")
