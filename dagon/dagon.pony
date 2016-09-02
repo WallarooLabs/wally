@@ -124,6 +124,7 @@ actor Main
     var docker_host: (String | None) = None
     var docker_tag: (String | None) = None
     var docker_network: (String | None) = None
+    var docker_arch: String = "amd64"
     var use_docker: Bool = false
     var timeout: (I64 | None) = None
     var ini_path: (String | None) = None
@@ -138,6 +139,7 @@ actor Main
     .add("docker", "d", StringArgument)
     .add("docker-tag", "T", StringArgument)
     .add("docker-network", "N", StringArgument)
+    .add("docker-arch", "A", StringArgument)
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
@@ -148,6 +150,7 @@ actor Main
         | ("docker", let arg: String) => docker_host = arg
         | ("docker-tag", let arg: String) => docker_tag = arg
         | ("docker-network", let arg: String) => docker_network = arg
+        | ("docker-arch", let arg: String) => docker_arch = arg
         | ("timeout", let arg: I64) => timeout = arg
         | ("filepath", let arg: String) => ini_path = arg
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
@@ -161,6 +164,7 @@ actor Main
       env.err.print("""dagon: usage: [--docker=<host:port>
 --docker-tag/-T <docker-tag>]
 --docker-network/-N <docker-network>]
+--docker-arch/-A <docker-arch>]
 --timeout/-t <seconds>
 --filepath/-f <path>
 --phone-home/-h <host:port>
@@ -231,7 +235,8 @@ actor Main
 
       ProcessManager(env, delay_senders, use_docker, docker_host as String,
         docker_tag as String, timeout as I64, ini_path as String,
-        phone_home_host, phone_home_service, docker_network as String)
+        phone_home_host, phone_home_service, docker_network as String,
+        docker_arch)
     else
       env.err.print("dagon: error parsing arguments")
       env.exitcode(-1)
@@ -379,6 +384,7 @@ actor ProcessManager
   let _docker_host: String
   let _docker_tag: String
   let _docker_network: String
+  let _docker_arch: String
   let _timeout: I64
   let _ini_path: String
   let _host: String
@@ -404,7 +410,7 @@ actor ProcessManager
     docker_tag: String,
     timeout: I64, ini_path: String,
     host: String, service: String,
-    docker_network: String)
+    docker_network: String, docker_arch: String)
   =>
     _env = env
     _delay_senders = delay_senders
@@ -412,6 +418,7 @@ actor ProcessManager
     _docker_host = docker_host
     _docker_tag = docker_tag
     _docker_network = docker_network
+    _docker_arch = docker_arch
     _timeout = timeout
     _ini_path = ini_path
     _host = host
@@ -906,7 +913,7 @@ actor ProcessManager
         args.push(node.path) // the command to run inside the container
       end
 
-      args.push(node.docker_image + ":"
+      args.push(node.docker_image + "." + _docker_arch + ":"
         + node.docker_tag)                     // image path
 
       if node.wrapper_path.size() > 0 then // we are wrapping the executable
