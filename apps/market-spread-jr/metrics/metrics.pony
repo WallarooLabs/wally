@@ -2,6 +2,7 @@ use "collections"
 use "json"
 use "net"
 use "time"
+use "buffered"
 use "sendence/epoch"
 use "sendence/hub"
 
@@ -26,6 +27,7 @@ class _MetricsReporter
   let _output_to: TCPConnection
   var _histogram: Histogram = Histogram
   var _period_ends_at: U64 = 0
+  let _wb: Writer = Writer
 
   new create(output_to: TCPConnection,
     id: U64,
@@ -60,7 +62,8 @@ class _MetricsReporter
     time + (length - (time % length))
 
   fun ref _send_histogram(h: Histogram) =>
-    let payload = HubProtocol.metrics(_metric_name, _category(), _histogram)
+    let payload = HubProtocol.metrics(_metric_name, _category(), _histogram,
+      _period, _period_ends_at, _wb)
     let hub_msg = HubProtocol.payload("metrics", _topic, payload)
     _output_to.writev(hub_msg)
 

@@ -33,8 +33,9 @@ primitive HubProtocol
     wb.writev(data)
     wb.done()
 
-  fun metrics(name: String, category: String, histogram: Histogram, 
-    wb: Writer = Writer): Array[ByteSeq] val =>
+  fun metrics(name: String, category: String, histogram: Histogram,
+    period: U64, period_ends_at: U64, wb: Writer = Writer): Array[ByteSeq] val
+  =>
     let name_size = name.size().u32()
     let category_size = category.size().u32()
     let size = 4 + 4 + name_size + category_size + (64 * 11)
@@ -48,6 +49,8 @@ primitive HubProtocol
     end
     wb.u64_be(histogram.min())
     wb.u64_be(histogram.max())
+    wb.u64_be(period)
+    wb.u64_be(period_ends_at)
     wb.done()
 
 primitive HubMsgTypes
