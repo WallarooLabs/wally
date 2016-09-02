@@ -9,7 +9,7 @@ nc -l 127.0.0.1 7002 >> /dev/null
 nc -l 127.0.0.1 7003 >> /dev/null
 
 3) Junior itself (market spread)
-apps/market-spread-jr/market-spread-jr -i 127.0.0.1:7000 -j 127.0.0.1:7001 -o 127.0.0.1:7002 -m 127.0.0.1:7003 -e 10000000
+apps/market-spread-jr/market-spread-jr -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:7002 -m 127.0.0.1:7003 -e 10000000
 
 4) orders:
 giles/sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/1000trades-fixish.msg --ponythreads=1 -y -g 57

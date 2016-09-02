@@ -27,10 +27,9 @@ class OutNotify is TCPConnectionNotify
 
 actor Main
   new create(env: Env) =>
-    var i_arg: (Array[String] | None) = None
-    var j_arg: (Array[String] | None) = None
     var m_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
+    var input_addrs: Array[Array[String]] = input_addrs.create()
     var expected: USize = 1_000_000
 
     try
@@ -39,22 +38,21 @@ actor Main
       options
         .add("expected", "e", I64Argument)
         .add("metrics", "m", StringArgument)
-        .add("nbbo", "i", StringArgument)
-        .add("order", "j", StringArgument)
+        .add("in", "i", StringArgument)
         .add("out", "o", StringArgument)
 
       for option in options do
         match option
         | ("expected", let arg: I64) => expected = arg.usize()
         | ("metrics", let arg: String) => m_arg = arg.split(":")
-        | ("nbbo", let arg: String) => i_arg = arg.split(":")
-        | ("order", let arg: String) => j_arg = arg.split(":")
+        | ("in", let arg: String) => 
+          for addr in arg.split(",").values() do
+            input_addrs.push(addr.split(":"))
+          end
         | ("out", let arg: String) => o_arg = arg.split(":")
         end
       end
 
-      let i_addr = i_arg as Array[String]
-      let j_addr = j_arg as Array[String]
       let m_addr = m_arg as Array[String]
       let o_addr = o_arg as Array[String]
       let metrics1 = JrMetrics("NBBO")
@@ -99,11 +97,13 @@ actor Main
           end
         end
 
+      let nbbo_addr = input_addrs(0)
+
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       let nbbo = TCPListener(listen_auth,
             SourceListenerNotify(nbbo_source_builder, metrics1, expected),
-            i_addr(0),
-            i_addr(1))
+            nbbo_addr(0),
+            nbbo_addr(1))
 
       let check_order = CheckOrder(reports_socket)
       let order_source: {(): Source iso^} val =
@@ -119,10 +119,12 @@ actor Main
           end
         end
 
+      let order_addr = input_addrs(1)
+
       let order = TCPListener(listen_auth,
             SourceListenerNotify(order_source, metrics2, (expected/2)),
-            j_addr(0),
-            j_addr(1))
+            order_addr(0),
+            order_addr(1))
 
       @printf[I32]("Expecting %zu total messages\n".cstring(), expected)
     end
