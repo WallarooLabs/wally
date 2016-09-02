@@ -124,6 +124,8 @@ actor Main
     var docker_host: (String | None) = None
     var docker_tag: (String | None) = None
     var docker_network: (String | None) = None
+    var docker_userid: (String | None) = None
+    var metrics_addr: (String | None) = None
     var docker_arch: String = ""
     var use_docker: Bool = false
     var timeout: (I64 | None) = None
@@ -140,6 +142,8 @@ actor Main
     .add("docker-tag", "T", StringArgument)
     .add("docker-network", "N", StringArgument)
     .add("docker-arch", "A", StringArgument)
+    .add("docker-userid", "U", StringArgument)
+    .add("metrics-addr", "M", StringArgument)
     .add("timeout", "t", I64Argument)
     .add("filepath", "f", StringArgument)
     .add("phone-home", "h", StringArgument)
@@ -151,6 +155,8 @@ actor Main
         | ("docker-tag", let arg: String) => docker_tag = arg
         | ("docker-network", let arg: String) => docker_network = arg
         | ("docker-arch", let arg: String) => docker_arch = arg
+        | ("docker-userid", let arg: String) => docker_userid = arg
+        | ("metrics-addr", let arg: String) => metrics_addr = arg
         | ("timeout", let arg: I64) => timeout = arg
         | ("filepath", let arg: String) => ini_path = arg
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
@@ -161,10 +167,13 @@ actor Main
         end
       end
     else
-      env.err.print("""dagon: usage: [--docker=<host:port>
---docker-tag/-T <docker-tag>]
---docker-network/-N <docker-network>]
---docker-arch/-A <docker-arch>]
+      env.err.print("""dagon: usage: [
+--docker=<host:port>
+--docker-tag/-T <docker-tag>
+--docker-network/-N <docker-network>
+--docker-arch/-A <docker-arch>
+--docker-userid/-U <docker-userid>]
+--metrics-addr/-M <metrics-addr>
 --timeout/-t <seconds>
 --filepath/-f <path>
 --phone-home/-h <host:port>
@@ -185,10 +194,12 @@ actor Main
         env.out.print("dagon: docker_tag: " + (docker_tag as String))
       else
         docker_tag = ""
-        if use_docker then
-          env.err.print("dagon: Must supply required '--docker-tag' argument")
-          required_args_are_present = false
-        end
+      end
+
+      if docker_userid isnt None then
+        env.out.print("dagon: docker_userid: " + (docker_userid as String))
+      else
+        docker_userid = ""
       end
 
       if docker_network isnt None then
@@ -236,7 +247,7 @@ actor Main
       ProcessManager(env, delay_senders, use_docker, docker_host as String,
         docker_tag as String, timeout as I64, ini_path as String,
         phone_home_host, phone_home_service, docker_network as String,
-        docker_arch)
+        docker_arch, metrics_addr, docker_userid as String)
     else
       env.err.print("dagon: error parsing arguments")
       env.exitcode(-1)
@@ -307,10 +318,12 @@ class ConnectNotify is TCPConnectionNotify
         else
           _env.out.print("dagon: Unexpected message from child")
           _p_mgr.transition_to(ErrorShutdown)
+          return false
         end
       else
         _env.out.print("dagon: Unable to decode message from child")
         _p_mgr.transition_to(ErrorShutdown)
+        return false
       end
     end
     true
@@ -385,6 +398,8 @@ actor ProcessManager
   let _docker_tag: String
   let _docker_network: String
   let _docker_arch: String
+  let _docker_userid: String
+  let _metrics_addr: (String | None)
   let _timeout: I64
   let _ini_path: String
   let _host: String
@@ -410,7 +425,8 @@ actor ProcessManager
     docker_tag: String,
     timeout: I64, ini_path: String,
     host: String, service: String,
-    docker_network: String, docker_arch: String)
+    docker_network: String, docker_arch: String, metrics_addr: (String | None),
+    docker_userid: String)
   =>
     _env = env
     _delay_senders = delay_senders
@@ -419,6 +435,8 @@ actor ProcessManager
     _docker_tag = docker_tag
     _docker_network = docker_network
     _docker_arch = docker_arch
+    _docker_userid = docker_userid
+    _metrics_addr = metrics_addr
     _timeout = timeout
     _ini_path = ini_path
     _host = host
@@ -505,6 +523,7 @@ actor ProcessManager
     else
       _env.out.print("dagon: can't read File from path: " + _ini_path)
       transition_to(ErrorShutdown)
+      return
     end
 
     if ini_file isnt None then
@@ -529,6 +548,7 @@ actor ProcessManager
       end
      else
       transition_to(ErrorShutdown)
+      return
     end
 
     // dump docker configs
@@ -583,8 +603,7 @@ actor ProcessManager
       end
       argsbuilder.push("--name=" + section)
       for key in sections(section).keys() do
-        docker_tag = _docker_tag // set default tag
-        let final_arg = _replace_host_names(host_name, sections(section)(key))
+        let final_arg = _replace_placeholders(host_name, name, sections(section)(key))
         match key
         | "docker.image" =>
           docker_image = final_arg
@@ -593,9 +612,9 @@ actor ProcessManager
         | "docker.dir" =>
           docker_dir = _relative_path_to_ini(final_arg)
         | "docker.tag" =>
-          docker_tag = final_arg
+          docker_tag = if _docker_tag == "" then final_arg else _docker_tag end
         | "docker.userid" =>
-          docker_userid = final_arg
+          docker_userid = if _docker_userid == "" then final_arg else _docker_userid end
         | "path" =>
           path = if _use_docker then
                    Path.base(final_arg)
@@ -609,6 +628,12 @@ actor ProcessManager
             else
               is_canary = false
             end
+        | "metrics" =>
+          if _metrics_addr is None then
+            argsbuilder.push("--" + key + "=" + final_arg)
+          else
+            argsbuilder.push("--" + key + "=" + (_metrics_addr as String))
+          end
         | "leader" =>
           match sections(section)(key)
           | "true" =>
@@ -635,7 +660,10 @@ actor ProcessManager
     else
       _env.out.print("dagon: can't parse node section: " + section)
       transition_to(ErrorShutdown)
+      return
     end
+
+    docker_tag = if docker_tag == "" then "latest" else docker_tag end
 
     argsbuilder.push("--phone-home=" + _host + ":" + _service)
     let a: Array[String] val = consume argsbuilder
@@ -657,12 +685,15 @@ actor ProcessManager
     """
     Path.join(Path.dir(_ini_path), path)
 
-  fun ref _replace_host_names(self: String, arg: String): String
+  fun ref _replace_placeholders(hostname: String, name: String, arg: String):
+    String
   =>
     """
     Replace host name placeholders with final values
     """
-    var updated_arg = recover val arg.clone().replace("<SELF>", self) end
+    var updated_arg = recover val
+                        arg.clone().replace("<SELF>", hostname).replace("<NAME>", name)
+                      end
     try
       let r = Regex("<([-\\w]+)>")
       updated_arg = if _use_docker then
@@ -778,24 +809,18 @@ actor ProcessManager
     """
     Register a node with the appropriate map.
     """
+    _env.out.print("dagon: registering node. canary: " + is_canary.string()
+      + "; leader: " + is_leader.string() + "; name: " + name)
+    let node: Node val = recover Node(name, is_canary, is_leader,
+        path, wrapper_path, docker_image, docker_constraint, docker_dir,
+        docker_tag, docker_userid,
+        args, wrapper_args, vars, host_name) end
     if is_canary then
-      _env.out.print("dagon: registering canary node: " + name)
-      _canaries(name) = recover Node(name, is_canary, is_leader,
-        path, wrapper_path, docker_image, docker_constraint, docker_dir,
-        docker_tag, docker_userid,
-        args, wrapper_args, vars, host_name) end
+      _canaries(name) = consume node
     elseif is_leader then
-      _env.out.print("dagon: registering leader node: " + name)
-      _leaders(name) = recover Node(name, is_canary, is_leader,
-        path, wrapper_path, docker_image, docker_constraint, docker_dir,
-        docker_tag, docker_userid,
-        args, wrapper_args, vars, host_name) end
+      _leaders(name) = consume node
     else
-      _env.out.print("dagon: registering node: " + name)
-      _workers_receivers(name) = recover Node(name, is_canary, is_leader,
-        path, wrapper_path, docker_image, docker_constraint, docker_dir,
-        docker_tag, docker_userid,
-        args, wrapper_args, vars, host_name) end
+      _workers_receivers(name) = consume node
     end
 
   be boot_leaders() =>
@@ -853,11 +878,22 @@ actor ProcessManager
     try
       let docker_path = _docker_args("docker_path")
       docker = _filepath_from_path(docker_path)
-      docker_network = _docker_args.get_or_else("docker_network", _docker_network)
+      docker_network = if docker_network == "" then
+                         _docker_args.get_or_else("docker_network", _docker_network)
+                       else
+                         docker_network
+                       end
       docker_repo = _docker_args("docker_repo")
     else
       _env.out.print("dagon: could not get docker info from map")
       transition_to(ErrorShutdown)
+      return
+    end
+
+    if docker_network == "" then
+      _env.out.print("dagon: docker network cannot be empty")
+      transition_to(ErrorShutdown)
+      return
     end
 
     if docker isnt None then
@@ -949,15 +985,18 @@ actor ProcessManager
         else
           _env.out.print("dagon: booting docker process failed: " + node.name)
           transition_to(ErrorShutdown)
+          return
         end
       else
         _env.out.print("dagon: docker is None: " + node.name)
         transition_to(ErrorShutdown)
+        return
       end
 
     else
       _env.out.print("dagon: don't have Docker info. Can't boot node.")
       transition_to(ErrorShutdown)
+      return
     end
 
   fun ref _dump_docker_command(args: Array[String val] val) =>
@@ -1008,6 +1047,7 @@ actor ProcessManager
       else
         _env.out.print("dagon: booting process failed")
         transition_to(ErrorShutdown)
+        return
       end
     else
       _env.out.print("dagon: filepath is None: " + node.name)
@@ -1071,6 +1111,7 @@ actor ProcessManager
     else
       _env.out.print("dagon: failed to find child in roster")
       transition_to(ErrorShutdown)
+      return
     end
     // Boot workers and receivers if leader is ready
     if _is_leader(name) then // fixme
@@ -1092,6 +1133,7 @@ actor ProcessManager
       else
         _env.out.print("dagon: failed to find leader in roster")
         transition_to(ErrorShutdown)
+        return
       end
       transition_to(TopologyReady)
     else
@@ -1177,6 +1219,7 @@ actor ProcessManager
     else
       _env.out.print("dagon: failed to set child to done")
       transition_to(ErrorShutdown)
+      return
     end
     verify_senders_done()
 
@@ -1253,6 +1296,7 @@ actor ProcessManager
     else
       _env.out.print("dagon: failed to set child state to done_shutdown")
       transition_to(ErrorShutdown)
+      return
     end
     verify_senders_shutdown()
 
