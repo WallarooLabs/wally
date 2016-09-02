@@ -72,17 +72,17 @@ class CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
     end
 
 class NbboSourceParser 
-  fun apply(data: Array[U8] iso): (FixNbboMessage val | None) =>
+  fun apply(data: Array[U8] val): (FixNbboMessage val | None) =>
     try
-      match FixishMsgDecoder(consume data)
+      match FixishMsgDecoder(data)
       | let m: FixNbboMessage val => m
       end
     end
 
 class OrderSourceParser 
-  fun apply(data: Array[U8] iso): (FixOrderMessage val | None) =>
+  fun apply(data: Array[U8] val): (FixOrderMessage val | None) =>
     try
-      match FixishMsgDecoder(consume data)
+      match FixishMsgDecoder(data)
       | let m: FixOrderMessage val => m
       end
     end

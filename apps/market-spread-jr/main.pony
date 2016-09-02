@@ -3,6 +3,8 @@ use "net"
 use "options"
 use "time"
 use "metrics"
+use "buffered"
+use "files"
 use "sendence/hub"
 use "sendence/fix"
 
@@ -33,6 +35,8 @@ actor Main
         | ("out", let arg: String) => o_arg = arg.split(":")
         end
       end
+
+      let auth = env.root as AmbientAuth
 
       let m_addr = m_arg as Array[String]
       let o_addr = o_arg as Array[String]
@@ -69,13 +73,17 @@ actor Main
       let symbol_to_actor: Map[String, StateRunner[SymbolData]] val = 
         consume symbol_actors
 
+      let initial_nbbo = _initial_nbbo_msgs(auth)
+
       let nbbo_source_builder: {(): Source iso^} val = 
         recover 
-          lambda()(symbol_to_actor, metrics_socket): Source iso^ =>
+          lambda()(symbol_to_actor, metrics_socket, initial_nbbo): 
+            Source iso^ 
+          =>
             let nbbo_reporter = MetricsReporter("market-spread", metrics_socket)
             StateSource[FixNbboMessage val, SymbolData](
             "Nbbo source", NbboSourceParser, SymbolRouter(symbol_to_actor), 
-            UpdateNbbo, consume nbbo_reporter)
+            UpdateNbbo, consume nbbo_reporter, initial_nbbo)
           end
         end
 
@@ -112,6 +120,24 @@ actor Main
     else
       JrStartupHelp(env)
     end
+
+  fun _initial_nbbo_msgs(auth: AmbientAuth): Array[Array[U8] val] val ? =>
+    let nbbo_msgs: Array[Array[U8] val] trn = recover Array[Array[U8] val] end
+    let path = FilePath(auth, "./demos/marketspread/initial-nbbo-fixish.msg")
+    let init_file = File(path)
+    let init_data: Array[U8] val = init_file.read(init_file.size())
+
+    let rb = Reader
+    rb.append(init_data)
+    var byte: USize = 0
+    var bytes_left = init_data.size()
+    while bytes_left > 0 do
+      nbbo_msgs.push(rb.block(47))
+      byte = byte + 47
+      bytes_left = bytes_left - 47
+    end
+    init_file.dispose()
+    consume nbbo_msgs
 
   fun _pad_symbol(s: String): String =>
     if s.size() == 4 then

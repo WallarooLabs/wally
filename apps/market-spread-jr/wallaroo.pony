@@ -127,7 +127,7 @@ interface Source
   fun ref process(data: Array[U8 val] iso)
 
 interface SourceParser[In: Any val]
-  fun apply(data: Array[U8] iso): (In | None) ?
+  fun apply(data: Array[U8] val): (In | None) ?
 
 class StateSource[In: Any val, State: Any #read]
   let _name: String
@@ -139,16 +139,21 @@ class StateSource[In: Any val, State: Any #read]
   new iso create(name': String, parser: SourceParser[In] val, 
     router: Router[In, StateRunner[State]] iso, 
     state_comp: StateComputation[In, State] val,
-    metrics_reporter: MetricsReporter iso) =>
+    metrics_reporter: MetricsReporter iso,
+    initial_msgs: Array[Array[U8] val] val = 
+      recover Array[Array[U8] val] end) =>
     _name = name'
     _parser = parser
     _router = consume router
     _state_comp = state_comp
     _metrics_reporter = consume metrics_reporter
+    for msg in initial_msgs.values() do
+      process(msg)
+    end
 
   fun name(): String val => _name
 
-  fun ref process(data: Array[U8 val] iso) =>
+  fun ref process(data: Array[U8] val) =>
     let ingest_ts = Time.nanos()
     try
       // For recording metrics for filtered messages
