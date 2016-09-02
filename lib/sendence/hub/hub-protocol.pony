@@ -20,7 +20,10 @@ primitive HubProtocol
   =>
     let event_size = event.size().u32()
     let topic_size = topic.size().u32()
-    let data_size = data.size().u32()
+    var data_size: U32 = 0
+    for seq in data.values() do
+      data_size = data_size + seq.size().u32()
+    end
     let size_of_sizes: U32  = 12
     let size = 1 + event_size + topic_size + data_size + size_of_sizes
     wb.u32_be(size)
