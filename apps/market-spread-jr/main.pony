@@ -14,6 +14,7 @@ actor Main
     var o_arg: (Array[String] | None) = None
     var input_addrs: Array[Array[String]] = input_addrs.create()
     var expected: USize = 1_000_000
+    var init_path = ""
 
     try
       var options = Options(env.args)
@@ -23,6 +24,7 @@ actor Main
         .add("metrics", "m", StringArgument)
         .add("in", "i", StringArgument)
         .add("out", "o", StringArgument)
+        .add("file", "f", StringArgument)
 
       for option in options do
         match option
@@ -33,6 +35,7 @@ actor Main
             input_addrs.push(addr.split(":"))
           end
         | ("out", let arg: String) => o_arg = arg.split(":")
+        | ("file", let arg: String) => init_path = arg
         end
       end
 
@@ -73,7 +76,12 @@ actor Main
       let symbol_to_actor: Map[String, StateRunner[SymbolData]] val = 
         consume symbol_actors
 
-      let initial_nbbo = _initial_nbbo_msgs(auth)
+      let initial_nbbo: Array[Array[U8] val] val = 
+        if init_path == "" then
+          recover Array[Array[U8] val] end
+        else
+          _initial_nbbo_msgs(init_path, auth)
+        end
 
       let nbbo_source_builder: {(): Source iso^} val = 
         recover 
@@ -121,21 +129,22 @@ actor Main
       JrStartupHelp(env)
     end
 
-  fun _initial_nbbo_msgs(auth: AmbientAuth): Array[Array[U8] val] val ? =>
+  fun _initial_nbbo_msgs(init_path: String, auth: AmbientAuth): 
+    Array[Array[U8] val] val ?
+  =>
     let nbbo_msgs: Array[Array[U8] val] trn = recover Array[Array[U8] val] end
-    let path = FilePath(auth, "./demos/marketspread/initial-nbbo-fixish.msg")
+    let path = FilePath(auth, init_path)
     let init_file = File(path)
     let init_data: Array[U8] val = init_file.read(init_file.size())
 
     let rb = Reader
     rb.append(init_data)
-    var byte: USize = 0
     var bytes_left = init_data.size()
     while bytes_left > 0 do
-      nbbo_msgs.push(rb.block(47))
-      byte = byte + 47
-      bytes_left = bytes_left - 47
+      nbbo_msgs.push(rb.block(46))
+      bytes_left = bytes_left - 46
     end
+
     init_file.dispose()
     consume nbbo_msgs
 
