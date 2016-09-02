@@ -11,22 +11,78 @@ use "sendence/tcp"
 use "regex"
 
 
-primitive Booting
-primitive Ready
-primitive Started
-primitive TopologyReady
-primitive Done
-primitive DoneShutdown
-primitive StartSenders
-primitive SendersReady
-primitive SendersStarted
-primitive SendersDone
-primitive SendersDoneShutdown
-primitive AwaitingSendersReady
-primitive AwaitingSendersStart
-primitive AwaitingSendersDoneShutdown
-primitive TopologyDoneShutdown
-primitive Initialized
+primitive Booting is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "Booting".string(fmt)
+
+primitive Ready is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "Ready".string(fmt)
+
+primitive Started is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "Started".string(fmt)
+
+primitive TopologyReady is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "TopologyReady".string(fmt)
+
+primitive Done is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "Done".string(fmt)
+
+primitive Killed is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "Killed".string(fmt)
+
+primitive DoneShutdown is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "DoneShutdown".string(fmt)
+
+primitive StartSenders is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "StartSenders".string(fmt)
+
+primitive SendersReady is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "SendersReady".string(fmt)
+
+primitive SendersStarted is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "SendersStarted".string(fmt)
+
+primitive SendersDone is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "SendersDone".string(fmt)
+
+primitive SendersDoneShutdown is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "SendersDoneShutdown".string(fmt)
+
+primitive AwaitingSendersReady is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "AwaitingSendersReady".string(fmt)
+
+primitive AwaitingSendersStart is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "AwaitingSendersStart".string(fmt)
+
+primitive AwaitingSendersDoneShutdown is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "AwaitingSendersDoneShutdown".string(fmt)
+
+primitive TopologyDoneShutdown is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "TopologyDoneShutdown".string(fmt)
+
+primitive Initialized is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "Booting".string(fmt)
+
+primitive ErrorShutdown is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+      "ErrorShutdown".string(fmt)
+
 
 type DagonState is
   ( Initialized
@@ -41,6 +97,7 @@ type DagonState is
   | SendersDone
   | SendersDoneShutdown
   | TopologyDoneShutdown
+  | ErrorShutdown
   | Done
   )
 
@@ -51,6 +108,7 @@ type ChildState is
   | TopologyReady
   | Done
   | DoneShutdown
+  | Killed
   )
 
 
@@ -166,6 +224,7 @@ actor Main
         phone_home_host, phone_home_service)
     else
       env.err.print("dagon: error parsing arguments")
+      env.exitcode(-1)
     end
 
 
@@ -186,11 +245,13 @@ class Notifier is TCPListenNotify
       _p_mgr.listening()
     else
       _env.out.print("dagon: couldn't get local address")
+      _p_mgr.transition_to(ErrorShutdown)
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
     _env.out.print("dagon: couldn't listen")
+    _p_mgr.transition_to(ErrorShutdown)
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
@@ -230,9 +291,11 @@ class ConnectNotify is TCPConnectionNotify
           _p_mgr.received_start_senders(conn)
         else
           _env.out.print("dagon: Unexpected message from child")
+          _p_mgr.transition_to(ErrorShutdown)
         end
       else
         _env.out.print("dagon: Unable to decode message from child")
+        _p_mgr.transition_to(ErrorShutdown)
       end
     end
     true
@@ -351,6 +414,7 @@ actor ProcessManager
       _timers(consume timer)
     else
       _env.out.print("Failed creating tcp listener")
+      _env.exitcode(-1)
       return
     end
     if _use_docker then
@@ -423,7 +487,7 @@ actor ProcessManager
       ini_file = _file_from_path(_env.root as AmbientAuth, _path)
     else
       _env.out.print("dagon: can't read File from path: " + _path)
-      // TODO: Shutdown with error if this occurs
+      transition_to(ErrorShutdown)
     end
 
     if ini_file isnt None then
@@ -436,8 +500,9 @@ actor ProcessManager
           _parse_node_section(sections, section)
         end
       end
+     else
+      transition_to(ErrorShutdown)
     end
-    // TODO: Shutdown with error if it is None
 
     _env.out.print("dagon: finished registration of nodes")
     _finished_registration = true
@@ -452,6 +517,7 @@ actor ProcessManager
       ini_file = _file_from_path(_env.root as AmbientAuth, _path)
     else
       _env.out.print("dagon: can't read File from path: " + _path)
+      transition_to(ErrorShutdown)
     end
 
     if ini_file isnt None then
@@ -466,7 +532,10 @@ actor ProcessManager
           _parse_node_section(sections, section)
         end
       end
+    else
+      transition_to(ErrorShutdown)
     end
+
     // dump docker configs
     _dump_map(_docker_args)
     // we're done with registration
@@ -482,6 +551,7 @@ actor ProcessManager
       map = IniParse((ini_file as File).lines())
     else
       _env.out.print("dagon: failed parsing ini file")
+      transition_to(ErrorShutdown)
     end
     map
 
@@ -560,6 +630,7 @@ actor ProcessManager
       end
     else
       _env.out.print("dagon: can't parse node section: " + section)
+      transition_to(ErrorShutdown)
     end
 
     argsbuilder.push("--phone-home=" + _host + ":" + _service)
@@ -606,6 +677,7 @@ actor ProcessManager
       end
     else
       _env.out.print("dagon: couldn't parse args in section: " + section)
+      transition_to(ErrorShutdown)
     end
     args
 
@@ -618,9 +690,10 @@ actor ProcessManager
     """
     var file: (File | None) = None
     try
-      file = File(FilePath(auth, path))
+      file = OpenFile(FilePath(auth, path)) as File
     else
       _env.out.print("dagon: Could not create File: " + path)
+      transition_to(ErrorShutdown)
     end
     file
 
@@ -634,6 +707,7 @@ actor ProcessManager
       filepath = FilePath(_env.root as AmbientAuth, path)
     else
       _env.out.print("dagon: Could not create FilePath: " + path)
+      transition_to(ErrorShutdown)
     end
     filepath
 
@@ -647,6 +721,7 @@ actor ProcessManager
       end
     else
       _env.out.print("dagon: could not dump map of args")
+      transition_to(ErrorShutdown)
     end
 
   fun ref _dump_args(args: Array[String]) =>
@@ -763,7 +838,7 @@ actor ProcessManager
       docker_repo = _docker_args("docker_repo")
     else
       _env.out.print("dagon: could not get docker info from map")
-      // TODO: Shutdown with error if this occurs
+      transition_to(ErrorShutdown)
     end
 
     if docker isnt None then
@@ -848,16 +923,16 @@ actor ProcessManager
             roster.insert(node.name, child)
         else
           _env.out.print("dagon: booting docker process failed: " + node.name)
-          // TODO: Shutdown with error if this occurs
+          transition_to(ErrorShutdown)
         end
       else
         _env.out.print("dagon: docker is None: " + node.name)
-        // TODO: Shutdown with error if this occurs
+        transition_to(ErrorShutdown)
       end
 
     else
       _env.out.print("dagon: don't have Docker info. Can't boot node.")
-      // TODO: Shutdown with error if this occurs
+      transition_to(ErrorShutdown)
     end
 
   fun ref _dump_docker_command(args: Array[String val] val) =>
@@ -907,11 +982,11 @@ actor ProcessManager
         roster.insert(node.name, child)
       else
         _env.out.print("dagon: booting process failed")
-        // TODO: Shutdown with error if this occurs
+        transition_to(ErrorShutdown)
       end
     else
       _env.out.print("dagon: filepath is None: " + node.name)
-      // TODO: Shutdown with error if this occurs
+      transition_to(ErrorShutdown)
     end
 
   fun ref _prepend_name(name: String,
@@ -954,6 +1029,7 @@ actor ProcessManager
       end
     else
       _env.out.print("dagon: Failed sending shutdown to " + name)
+      transition_to(ErrorShutdown)
     end
 
   be received_ready(conn: TCPConnection, name: String) =>
@@ -969,6 +1045,7 @@ actor ProcessManager
       child.conn  = conn
     else
       _env.out.print("dagon: failed to find child in roster")
+      transition_to(ErrorShutdown)
     end
     // Boot workers and receivers if leader is ready
     if _is_leader(name) then // fixme
@@ -989,6 +1066,7 @@ actor ProcessManager
         child.state = TopologyReady
       else
         _env.out.print("dagon: failed to find leader in roster")
+        transition_to(ErrorShutdown)
       end
       transition_to(TopologyReady)
     else
@@ -1013,9 +1091,8 @@ actor ProcessManager
     try
       let child = roster(name)
       let child_state = child.state
-      _env.out.print("dagon: " + name + " state: " + _print_child_state(child))
+      _env.out.print("dagon: " + name + " state: " + child.state.string())
       _env.out.print("dagon: " + name + " iscanary: " + child.is_canary.string())
-      // _env.out.print("dagon: iscanary:" + child.is_canary.string())
       if child.is_canary then
         match child_state
         | Ready =>  return true
@@ -1023,22 +1100,9 @@ actor ProcessManager
       end
     else
       _env.out.print("dagon: could not get canary")
+      transition_to(ErrorShutdown)
     end
     false
-
-  fun ref _print_child_state(child: Child): String =>
-    """
-    Print the state to stdout.
-    """
-    match child.state
-    | Booting        => return "Booting"
-    | Ready          => return "Ready"
-    | Started        => return "Started"
-    | TopologyReady  => return "TopologyReady"
-    | Done           => return "Done"
-    | DoneShutdown   => return "DoneShutdown"
-    end
-    ""
 
   be start_canary_node(name: String) =>
     """
@@ -1056,9 +1120,11 @@ actor ProcessManager
         end
       else
         _env.out.print("dagon: failed sending start to canary node")
+        transition_to(ErrorShutdown)
       end
     else
       _env.out.print("dagon: could not get canary node from roster")
+      transition_to(ErrorShutdown)
     end
 
   be send_start(conn: TCPConnection, name: String) =>
@@ -1072,6 +1138,7 @@ actor ProcessManager
       c.writev(message)
     else
       _env.out.print("dagon: Failed sending start")
+      transition_to(ErrorShutdown)
     end
 
   be received_done(conn: TCPConnection, name: String) =>
@@ -1084,6 +1151,7 @@ actor ProcessManager
       child.state = Done
     else
       _env.out.print("dagon: failed to set child to done")
+      transition_to(ErrorShutdown)
     end
     verify_senders_done()
 
@@ -1102,6 +1170,8 @@ actor ProcessManager
     TODO: Get the value pairs and iterate over those.
     """
     _env.out.print("dagon: shutting down topology")
+    let timer = Timer(WaitForShutdown(_env, this), 1_000_000_000, 1_000_000_000)
+    _timers(consume timer)
     try
       for key in roster.keys() do
         let child = roster(key)
@@ -1110,6 +1180,37 @@ actor ProcessManager
       transition_to(TopologyDoneShutdown)
     else
       _env.out.print("dagon: can't iterate over roster")
+      transition_to(ErrorShutdown)
+    end
+
+  be handle_shutdown() =>
+    """
+    Print state of each child in roster.
+    TODO: Get the value pairs and iterate over those.
+    """
+    var num_left: I32 = 0
+    try
+      for key in roster.keys() do
+        let child = roster(key)
+        if (child.state isnt Done) then
+          num_left = num_left + 1
+          if child.state isnt Killed then
+            _env.out.print("Child: " + child.name + ", State: " + child.state.string())
+            child.pm.dispose()
+            child.state = Killed
+          end
+        end
+      end
+      if num_left > 0 then
+        _env.out.print("waiting for " + num_left.string() + " children.")
+        let timer = Timer(WaitForShutdown(_env, this), 250_000_000, 1_000_000_000)
+        _timers(consume timer)
+      else
+        shutdown_listener()
+      end
+    else
+      _env.out.print("dagon: can't iterate over roster")
+      transition_to(ErrorShutdown)
     end
 
   be received_done_shutdown(conn: TCPConnection, name: String) =>
@@ -1126,6 +1227,7 @@ actor ProcessManager
       end
     else
       _env.out.print("dagon: failed to set child state to done_shutdown")
+      transition_to(ErrorShutdown)
     end
     verify_senders_shutdown()
 
@@ -1142,10 +1244,11 @@ actor ProcessManager
       end
     else
       _env.out.print("dagon: could not get state for " + name)
+      transition_to(ErrorShutdown)
     end
     false
 
-  be received_exit_code(name: String) =>
+  be received_exit_code(name: String, exit_code: I32) =>
     """
     Node has exited.
     """
@@ -1155,6 +1258,10 @@ actor ProcessManager
     elseif (name == "giles-receiver") and _expect then
       _env.out.print("Expected termination occured for: giles-receiver")
       cancel_timeout_timer()
+    end
+    try
+      let child = roster(name)
+      child.state = Done
     end
 
   be received_start_senders(conn: TCPConnection) =>
@@ -1194,13 +1301,20 @@ actor ProcessManager
     | (SendersDoneShutdown, TopologyDoneShutdown) =>
       old_state = state = state'
       shutdown_topology()
+    | (ErrorShutdown, _) =>
+      old_state = state
+    | (_, ErrorShutdown) =>
+      old_state = state = state'
+      _env.exitcode(-1)
+      shutdown_topology()
     | (_, TopologyDoneShutdown) =>
       old_state = state = state'
     else
-      _env.err.print("Unable to transition from state: " + _print_state(state) + " to: " + _print_state(state'))
+      _env.err.print("Unable to transition from state: " + state.string() + " to: " + state'.string())
+      transition_to(ErrorShutdown)
       return
     end
-    _print_transition(old_state, state)
+    _env.out.print("dagon: transitioned from: " + old_state.string() + " to: " + state'.string())
 
   be start_canary_nodes() =>
     for node in _canaries.values() do
@@ -1243,30 +1357,6 @@ actor ProcessManager
         end
       end
       transition_to(SendersDoneShutdown)
-    end
-
-  fun ref _print_transition(old_state: DagonState, state': DagonState) =>
-    _env.out.print("dagon: transitioned from: " + _print_state(old_state) + " to: " + _print_state(state'))
-
-  fun ref _print_state(state': DagonState): String =>
-    """
-    Print the state to stdout.
-    """
-    match state'
-    | Initialized => return "Initialized"
-    | Booting     => return "Booting"
-    | TopologyReady => return "TopologyReady"
-    | AwaitingSendersReady => return "AwaitingSendersReady"
-    | AwaitingSendersStart => return "AwaitingSendersStart"
-    | StartSenders => return "StartSenders"
-    | SendersReady => return "SendersReady"
-    | SendersStarted => return "SendersStarted"
-    | SendersDone => return "SendersDone"
-    | SendersDoneShutdown => return "SendersDoneShutdown"
-    | TopologyDoneShutdown => return "TopologyDoneShutdown"
-    | Done => return "Done"
-    else
-      return "Unknown state"
     end
 
   be send_senders_started(conn: TCPConnection) =>
@@ -1316,13 +1406,16 @@ class ProcessClient is ProcessNotify
     | Unsupported   => _env.out.print("dagon: ProcessError: Unsupported")
     else
       _env.out.print("dagon: Unknown ProcessError!")
+      _p_mgr.transition_to(ErrorShutdown)
     end
 
   fun ref dispose(process: ProcessMonitor ref, child_exit_code: I32) =>
     _env.out.print("dagon: " + _name + " exited with exit code: "
       + child_exit_code.string())
-    _p_mgr.received_exit_code(_name)
-
+    _p_mgr.received_exit_code(_name, child_exit_code)
+    if child_exit_code != 0 then
+      _p_mgr.transition_to(ErrorShutdown)
+    end
 
 class WaitForProcessing is TimerNotify
   let _env: Env
@@ -1382,3 +1475,17 @@ class WaitForListener is TimerNotify
 
   fun ref cancel(timer: Timer) =>
     _env.out.print("dagon: timer got canceled")
+
+class WaitForShutdown is TimerNotify
+  let _env: Env
+  let _p_mgr: ProcessManager
+
+  new iso create(env: Env, p_mgr: ProcessManager) =>
+    _env = env
+    _p_mgr = p_mgr
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _env.out.print("dagon: wait for shutdown to finish.")
+    _p_mgr.handle_shutdown()
+    false
+
