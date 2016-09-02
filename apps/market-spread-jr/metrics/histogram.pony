@@ -8,7 +8,7 @@ class Histogram
   In addition to the histogram itself, we are storing the min, max_value
   and total number of values seen (throughput) for reporting.
   """
-  embed _counts: Array[U64] ref = Array[U64].init(0, 64)
+  embed _counts: Array[U64] ref = Array[U64].init(0, 65)
   var _min: U64 = U64.max_value()
   var _max: U64 = U64.min_value()
 
