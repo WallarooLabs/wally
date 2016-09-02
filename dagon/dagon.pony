@@ -124,7 +124,7 @@ actor Main
     var docker_host: (String | None) = None
     var docker_tag: (String | None) = None
     var docker_network: (String | None) = None
-    var docker_arch: String = "amd64"
+    var docker_arch: String = ""
     var use_docker: Bool = false
     var timeout: (I64 | None) = None
     var ini_path: (String | None) = None
@@ -849,6 +849,7 @@ actor ProcessManager
     var docker_opts: String = ""
     var docker_network: String = _docker_network
     var docker_repo: String = ""
+    let docker_arch = if _docker_arch != "" then "." + _docker_arch else "" end
     try
       let docker_path = _docker_args("docker_path")
       docker = _filepath_from_path(docker_path)
@@ -913,7 +914,7 @@ actor ProcessManager
         args.push(node.path) // the command to run inside the container
       end
 
-      args.push(node.docker_image + "." + _docker_arch + ":"
+      args.push(docker_repo + node.docker_image + docker_arch + ":"
         + node.docker_tag)                     // image path
 
       if node.wrapper_path.size() > 0 then // we are wrapping the executable
