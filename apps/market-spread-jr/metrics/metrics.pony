@@ -3,7 +3,6 @@ use "json"
 use "net"
 use "time"
 use "buffered"
-use "sendence/epoch"
 use "sendence/hub"
 
 type MetricsCategory is
@@ -42,11 +41,11 @@ class _MetricsReporter
     _category = category
     _period = period
     _output_to = output_to
-    let now = Epoch.nanoseconds()
+    let now = Time.nanos()
     _period_ends_at = _next_period_endtime(now, period)
 
   fun ref report(duration: U64) =>
-    let now = Epoch.nanoseconds()
+    let now = Time.nanos()
 
     if now > _period_ends_at then
       _period_ends_at = _next_period_endtime(now, _period)
@@ -62,7 +61,7 @@ class _MetricsReporter
     time + (length - (time % length))
 
   fun ref _send_histogram(h: Histogram) =>
-    let payload = HubProtocol.metrics(_metric_name, _category(), _histogram,
+    let payload = HubProtocol.metrics(_metric_name, _category(), h,
       _period, _period_ends_at, _wb)
     let hub_msg = HubProtocol.payload("metrics", _topic, payload)
     _output_to.writev(hub_msg)
