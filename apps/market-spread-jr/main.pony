@@ -127,6 +127,8 @@ actor Main
             order_addr(1))
 
       @printf[I32]("Expecting %zu total messages\n".cstring(), expected)
+    else
+      JrStartupHelp(env)
     end
 
   fun legal_symbols(): Array[String] =>
