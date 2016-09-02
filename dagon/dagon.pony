@@ -125,7 +125,7 @@ actor Main
     var docker_tag: (String | None) = None
     var use_docker: Bool = false
     var timeout: (I64 | None) = None
-    var path: (String | None) = None
+    var ini_path: (String | None) = None
     var p_arg: (Array[String] | None) = None
     var phone_home_host: String = ""
     var phone_home_service: String = ""
@@ -146,7 +146,7 @@ actor Main
         | ("docker", let arg: String) => docker_host = arg
         | ("tag", let arg: String) => docker_tag = arg
         | ("timeout", let arg: I64) => timeout = arg
-        | ("filepath", let arg: String) => path = arg
+        | ("filepath", let arg: String) => ini_path = arg
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
         | ("delay-senders", None) => delay_senders = true
         | let err: ParseError =>
@@ -191,7 +191,7 @@ actor Main
         required_args_are_present = false
       end
 
-      if path is None then
+      if ini_path is None then
         env.err.print("dagon error: Must supply required '--filepath' argument")
         required_args_are_present = false
       end
@@ -211,7 +211,7 @@ actor Main
       end
 
       env.out.print("dagon: timeout: " + timeout.string())
-      env.out.print("dagon: path: " + (path as String))
+      env.out.print("dagon: ini_path: " + (ini_path as String))
 
       phone_home_host = (p_arg as Array[String])(0)
       phone_home_service = (p_arg as Array[String])(1)
@@ -220,7 +220,7 @@ actor Main
       env.out.print("dagon: service: " + phone_home_service)
 
       ProcessManager(env, delay_senders, use_docker, docker_host as String,
-        docker_tag as String, timeout as I64, path as String,
+        docker_tag as String, timeout as I64, ini_path as String,
         phone_home_host, phone_home_service)
     else
       env.err.print("dagon: error parsing arguments")
@@ -369,7 +369,7 @@ actor ProcessManager
   let _docker_host: String
   let _docker_tag: String
   let _timeout: I64
-  let _path: String
+  let _ini_path: String
   let _host: String
   let _service: String
   var _docker_args: Map[String, String] = Map[String, String](4)
@@ -391,7 +391,7 @@ actor ProcessManager
 
   new create(env: Env, delay_senders: Bool, use_docker: Bool, docker_host: String,
     docker_tag: String,
-    timeout: I64, path: String,
+    timeout: I64, ini_path: String,
     host: String, service: String)
   =>
     _env = env
@@ -400,7 +400,7 @@ actor ProcessManager
     _docker_host = docker_host
     _docker_tag = docker_tag
     _timeout = timeout
-    _path = path
+    _ini_path = ini_path
     _host = host
     _service = service
     _name_postfix = Time.wall_to_nanos(Time.now()).string()
@@ -484,9 +484,9 @@ actor ProcessManager
     _env.out.print("dagon: parse_and_register_processes")
     var ini_file: (File | None) = None
     try
-      ini_file = _file_from_path(_env.root as AmbientAuth, _path)
+      ini_file = _file_from_path(_env.root as AmbientAuth, _ini_path)
     else
-      _env.out.print("dagon: can't read File from path: " + _path)
+      _env.out.print("dagon: can't read File from path: " + _ini_path)
       transition_to(ErrorShutdown)
     end
 
@@ -514,9 +514,9 @@ actor ProcessManager
     _env.out.print("dagon: parse_and_register_container_nodes")
     var ini_file: (File | None) = None
     try
-      ini_file = _file_from_path(_env.root as AmbientAuth, _path)
+      ini_file = _file_from_path(_env.root as AmbientAuth, _ini_path)
     else
-      _env.out.print("dagon: can't read File from path: " + _path)
+      _env.out.print("dagon: can't read File from path: " + _ini_path)
       transition_to(ErrorShutdown)
     end
 
@@ -593,13 +593,13 @@ actor ProcessManager
         | "docker.constraint" =>
           docker_constraint = final_arg
         | "docker.dir" =>
-          docker_dir = final_arg
+          docker_dir = _relative_path_to_ini(final_arg)
         | "docker.tag" =>
           docker_tag = final_arg
         | "docker.userid" =>
           docker_userid = final_arg
         | "path" =>
-          path = final_arg
+          path = _relative_path_to_ini(final_arg)
         | "sender" =>
           match sections(section)(key)
             | "true" =>
@@ -618,8 +618,10 @@ actor ProcessManager
         | "expect" =>
           is_expect = true
           argsbuilder.push("--" + key + "=" + final_arg)
+        | "file" =>
+          argsbuilder.push("--" + key + "=" + _relative_path_to_ini(final_arg))
         | "wrapper_path" =>
-          wrapper_path = final_arg
+          wrapper_path = _relative_path_to_ini(final_arg)
         else
           if key.at("wrapper_args") then
             wrapper_args.push(final_arg)
@@ -645,6 +647,13 @@ actor ProcessManager
       docker_image, docker_constraint, docker_dir,
       docker_tag, docker_userid,
       a, consume wrapper_args, consume vars, host_name)
+
+  fun ref _relative_path_to_ini(path: String): String
+  =>
+    """
+    Make the path relative to the ini file unless it's an absolute path
+    """
+    Path.join(Path.dir(_ini_path), path)
 
   fun ref _replace_host_names(self: String, arg: String): String
   =>
@@ -673,7 +682,14 @@ actor ProcessManager
     let args: Map[String, String] = Map[String, String]
     try
       for key in sections(section).keys() do
-        args(key) = sections(section)(key)
+        match key
+        | "docker_path" =>
+          args(key) = _relative_path_to_ini(sections(section)(key))
+        | "DOCKER_CERT_PATH" =>
+          args(key) = _relative_path_to_ini(sections(section)(key))
+				else
+          args(key) = sections(section)(key)
+				end
       end
     else
       _env.out.print("dagon: couldn't parse args in section: " + section)
