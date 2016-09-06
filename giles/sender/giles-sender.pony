@@ -641,9 +641,9 @@ class MultiFileBinaryDataSource is Iterator[Array[U8 val] val]
     end
 
   fun ref next(): Array[U8 val] val ? =>
-    if has_next() then
-      match _cur_source
-      | let f: BinaryFileDataSource =>
+    match _cur_source
+    | let f: BinaryFileDataSource =>
+      if f.has_next() then
         f.next()
       else
         error
@@ -651,7 +651,6 @@ class MultiFileBinaryDataSource is Iterator[Array[U8 val] val]
     else
       error
     end
-
 
 class BinaryFileDataSource is Iterator[Array[U8] val]
   let _file: File
@@ -662,15 +661,11 @@ class BinaryFileDataSource is Iterator[Array[U8] val]
     _msg_size = msg_size
 
   fun ref has_next(): Bool =>
-    if _file.position() >= _file.size() then
-      false
-    else
+    if _file.position() < _file.size() then
       true
+    else
+      false
     end
 
   fun ref next(): Array[U8] val =>
-    if _file.position() >= _file.size() then
-      _file.seek_start(0)
-    end
-
     _file.read(_msg_size)
