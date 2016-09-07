@@ -2,21 +2,33 @@ use "buffered"
 use "time"
 use "../metrics"
 
-interface Step
-  be run[In: Any val](metric_name: String, source_ts: U64, input: In)
+interface Router[In: Any val, RoutesTo: Any tag]
+  fun route(input: In): (RoutesTo | None)
 
-actor StateRunner[State: Any #read]
+actor Step
+  let _runner: Runner
+
+  new create(runner: Runner iso) =>
+    _runner = consume runner
+
+  be run[In: Any val](metric_name: String, source_ts: U64, input: In) =>
+    _runner.run[In](metric_name, source_ts, input)
+
+interface Runner
+  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In)
+
+class StateRunner[State: Any #read]
   let _state: State
   let _metrics_reporter: MetricsReporter
   let _wb: Writer = Writer
 
-  new create(state_builder: {(): State} val, 
+  new iso create(state_builder: {(): State} val, 
     metrics_reporter: MetricsReporter iso) 
   =>
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
 
-  be run[In: Any val](source_name: String val, source_ts: U64, input: In) =>
+  fun ref run[In: Any val](source_name: String val, source_ts: U64, input: In) =>
     match input
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
@@ -30,6 +42,3 @@ actor StateRunner[State: Any #read]
     else
       @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
     end
-
-interface Router[In: Any val, RoutesTo: Any tag]
-  fun route(input: In): (RoutesTo | None)

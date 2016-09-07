@@ -44,12 +44,12 @@ interface SourceParser[In: Any val]
 class StateSource[In: Any val, State: Any #read]
   let _name: String
   let _parser: SourceParser[In] val
-  let _router: Router[In, StateRunner[State]]
+  let _router: Router[In, Step tag]
   let _state_comp: StateComputation[In, State] val
   let _metrics_reporter: MetricsReporter
 
   new iso create(name': String, parser: SourceParser[In] val, 
-    router: Router[In, StateRunner[State]] iso, 
+    router: Router[In, Step tag] iso, 
     state_comp: StateComputation[In, State] val,
     metrics_reporter: MetricsReporter iso,
     initial_msgs: Array[Array[U8] val] val = 
@@ -74,10 +74,10 @@ class StateSource[In: Any val, State: Any #read]
       match _parser(consume data)
       | let input: In =>
         match _router.route(input)
-        | let p: StateRunner[State] tag =>
+        | let r: Step tag =>
           let processor = 
             StateComputationWrapper[In, State](input, _state_comp)
-          p.run[StateProcessor[State] val](_name, ingest_ts, processor)
+          r.run[StateProcessor[State] val](_name, ingest_ts, processor)
         else
           // drop data that has no partition
           @printf[I32]((_name + ": Fake logging lack of partition\n").cstring())

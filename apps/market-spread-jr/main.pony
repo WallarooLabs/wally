@@ -85,16 +85,16 @@ actor Main
       reports_socket.writev(connect_msg)
       reports_socket.writev(reports_join_msg)
 
-      let symbol_actors: Map[String, StateRunner[SymbolData]] trn = recover trn Map[String, StateRunner[SymbolData]] end
+      let symbol_actors: Map[String, Step tag] trn = recover trn Map[String, Step tag] end
       for i in legal_symbols().values() do
         let padded = _pad_symbol(i)
         let reporter = MetricsReporter("market-spread", metrics_socket)
         let s = StateRunner[SymbolData](
           lambda(): SymbolData => SymbolData end, consume reporter)
-        symbol_actors(padded) = s
+        symbol_actors(padded) = Step(consume s)
       end
 
-      let symbol_to_actor: Map[String, StateRunner[SymbolData]] val = 
+      let symbol_to_actor: Map[String, Step tag] val = 
         consume symbol_actors
 
       let initial_nbbo: Array[Array[U8] val] val = 

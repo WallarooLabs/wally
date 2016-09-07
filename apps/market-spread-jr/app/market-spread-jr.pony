@@ -89,14 +89,14 @@ class OrderSourceParser
     end
 
 class SymbolRouter is Router[(FixNbboMessage val | FixOrderMessage val),
-  StateRunner[SymbolData]]
-  let _routes: Map[String, StateRunner[SymbolData]] val
+  Step tag]
+  let _routes: Map[String, Step tag] val
 
-  new iso create(routes: Map[String, StateRunner[SymbolData]] val) =>
+  new iso create(routes: Map[String, Step tag] val) =>
     _routes = routes
 
   fun route(input: (FixNbboMessage val | FixOrderMessage val)): 
-    (StateRunner[SymbolData] | None) 
+    (Step tag | None) 
   =>
     if _routes.contains(input.symbol()) then
       try
