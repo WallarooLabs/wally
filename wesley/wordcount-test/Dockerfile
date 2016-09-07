@@ -1,6 +1,8 @@
 FROM scratch
 
-ADD wordcount-test /wesley/wordcount
+ADD wordcount-test /wesley/wordcount-test
 
-ENTRYPOINT ["/wesley/wordcount"]
+ENV PATH /wesley:$PATH
+
+ENTRYPOINT ["/wesley/wordcount-test"]
 
