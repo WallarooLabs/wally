@@ -1,4 +1,4 @@
-rules_mk_path := rules.mk
+rules_mk_path := ../../rules.mk
 
 # uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
 #PONY_TARGET := false
@@ -27,11 +27,12 @@ include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)
 
-##<NAME OF TARGET>: #used as part of `make help` command ## <DESCRIPTION OF TARGET>
-#$(eval $(call RUN_DAGON\
-#,<NAME OF TARGET> \
-#,$(buffy_path)/<PATH TO INI FILE> \
-#,<TIMEOUT VALUE> \
-#,<WESLEY TEST COMMAND> \
-#,<INCLUDE IN CI>))
+#dagon-word-length-count: #used as part of `make help` command ## Run word length count test with dagon
+$(eval $(call RUN_DAGON\
+,dagon-word-length-count \
+,$(buffy_path)/apps/word-length-count/word-length-count.ini \
+,15 \
+,$(buffy_path)/wesley/word-length-count-test/word-length-count-test $(buffy_path)/sent.txt \
+$(buffy_path)/received.txt match \
+,false))
 

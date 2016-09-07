@@ -1,0 +1,502 @@
+# detemine makefile that included this one and it's path
+PREV_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),x $(MAKEFILE_LIST))
+PREV_PATH := $(dir $(PREV_MAKEFILE))
+
+# prevent rules from being evaluated/included multiple times
+ifndef RULES_MK
+RULES_MK := 1
+
+# path of rules.mk file
+RULES_MK_PATH := $(dir $(lastword $(MAKEFILE_LIST)))
+
+# path of original makefile
+ROOT_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),x $(MAKEFILE_LIST))
+ROOT_PATH := $(dir $(ROOT_MAKEFILE))
+
+# if debug shell command output requested
+ifdef DEBUG_SHELL
+ SHELL = /bin/sh -x
+endif
+
+# if verbose output not requested
+ifndef VERBOSE
+ QUIET := @
+endif
+
+# set buffy project directory
+buffy_dir := $(RULES_MK_PATH)
+abs_buffy_dir := $(abspath $(buffy_dir))
+buffy_path := $(abs_buffy_dir)
+
+# initialize default for some normal targets and variables
+build-buffyroot-all :=
+test-buffyroot-all :=
+clean-buffyroot-all :=
+build-docker-buffyroot-all :=
+push-docker-buffyroot-all :=
+
+PONY_TARGET :=
+DOCKER_TARGET :=
+EXS_TARGET :=
+RECURSE_SUBMAKEFILES :=
+ponyc_docker_args :=
+monhub_docker_args :=
+quote :=
+ponyc_arch_args :=
+
+# function to lazily initialize a variable on first use and to only evaluate the expression once
+# see: http://www.oreilly.com/openbook/make3/book/ch10.pdf
+# $(call lazy-init,variable-name,value)
+define lazy-init
+ $1 = $$(redefine-$1) $$($1)
+ redefine-$1 = $$(eval $1 := $2)
+endef
+
+# how to get the latest ponyc tag
+latest_ponyc_tag_src = $(shell curl -s \
+  https://hub.docker.com/r/sendence/ponyc/tags/ | grep -o \
+  'sendence-[0-9.-]*-' | sed 's/sendence-\([0-9.-]*\)-/\1/' \
+  | sort -un | tail -n 1)# latest ponyc tag
+
+# latest_ponyc_tag - a lazy init of latest_ponyc_tag (will only be evaluated if used)
+$(eval \
+  $(call lazy-init,latest_ponyc_tag,\
+    $$(call latest_ponyc_tag_src)))
+
+docker_image_version_src = $(shell git describe --tags --always)# Docker Image Tag to use
+
+# docker_image_version_val - a lazy init of docker_image_version_val (will only be evaluated if used)
+$(eval \
+  $(call lazy-init,docker_image_version_val,\
+    $$(call docker_image_version_src)))
+
+docker_image_version ?= $(docker_image_version_val)## Docker Image Tag to use
+docker_image_repo_host ?= docker.sendence.com:5043## Docker Repository to use
+docker_image_repo ?= $(docker_image_repo_host)/sendence## Docker Repository to use
+arch ?= native## Architecture to build for
+in_docker ?= false## Whether already in docker or not (used by CI)
+ponyc_tag ?= sendence-$(strip $(latest_ponyc_tag))-debug## tag for ponyc docker to use
+ponyc_runner ?= sendence/ponyc## ponyc docker image to use
+debug ?= false## Use ponyc debug option (-d)
+debug_arg :=# Final argument string for docker no pull
+docker_host ?= $(DOCKER_HOST)## docker host to build/run containers on
+ifeq ($(docker_host),)
+  docker_host := unix:///var/run/docker.sock
+endif
+docker_host_arg := --host=$(docker_host)# docker host argument
+dagon_docker_host ?= ## Dagon docker host arg (defaults to docker_host value)
+monhub_builder ?= monitoring-hub-builder
+monhub_builder_tag ?= latest
+
+ifeq ($(dagon_docker_host),)
+  dagon_docker_host := $(docker_host)
+endif
+
+dagon_docker_host_arg := --host=$(dagon_docker_host)# dagon docker host argument
+
+ifeq ($(shell uname -s),Linux)
+  extra_xargs_arg := -r
+  docker_user_arg := -u `id -u`
+  extra_awk_arg := \\
+endif
+
+ifeq ($(debug),true)
+  debug_arg := -d
+endif
+
+# validation of variable
+ifdef arch
+  ifeq (,$(filter $(arch),amd64 armhf native))
+    $(error Unknown architecture "$(arch)")
+  endif
+endif
+
+# validation of variable
+ifdef in_docker
+  ifeq (,$(filter $(in_docker),false true))
+    $(error Unknown in_docker option "$(in_docker)")
+  endif
+endif
+
+# additional ponyc arguments when building for armhf
+ifeq ($(arch),armhf)
+  ponyc_arch_args := --triple arm-unknown-linux-gnueabihf --link-arch armv7-a \
+                       --linker arm-linux-gnueabihf-gcc
+endif
+
+# only set docker arguments if building for a non-native platform and not in docker
+ifneq ($(arch),native)
+  ifneq ($(in_docker),true)
+    quote = '
+    ponyc_docker_args = docker run --rm -i $(docker_user_arg) -v \
+        $(abs_buffy_dir):$(abs_buffy_dir) \
+        -v $(HOME)/.gitconfig:/.gitconfig \
+        -v $(HOME)/.gitconfig:/root/.gitconfig \
+        -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
+        -v $(HOME)/.git-credential-cache:/.git-credential-cache \
+        -w $(1) --entrypoint bash \
+        $(ponyc_runner):$(ponyc_tag) -c $(quote)
+
+    monhub_docker_args = docker run --rm -i -v \
+        $(abs_buffy_dir):$(abs_buffy_dir) \
+        -v $(HOME)/.gitconfig:/.gitconfig \
+        -v $(HOME)/.gitconfig:/root/.gitconfig \
+        -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
+        -v $(HOME)/.git-credential-cache:/.git-credential-cache \
+        -w $(1) --entrypoint bash \
+        $(docker_image_repo_host)/$(monhub_builder):$(monhub_builder_tag) -c $(quote)
+  endif
+endif
+
+# function call for compiling with ponyc and generating dependency info
+define PONYC
+  $(QUIET)cd $(1) && $(ponyc_docker_args) stable fetch \
+    $(if $(filter $(ponyc_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
+    $(debug_arg) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && echo "$@:" | tr '\n' ' ' > $(notdir $(abspath $(1:%/=%))).d
+  $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
+    $(debug_arg) . --pass import --files $(if $(filter \
+    $(ponyc_docker_args),docker),$(quote)) 2>/dev/null | grep -o "$(abs_buffy_dir).*.pony" \
+    | awk 'BEGIN { a="" } {a=a$$1":\n"; printf "%s ",$$1} END {print "\n"a}' \
+    >> $(notdir $(abspath $(1:%/=%))).d
+endef
+
+# function call for compiling monhub projects
+define MONHUBC
+  $(QUIET)cd $(1) && $(monhub_docker_args) mix deps.get \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) mix compile \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+endef
+
+# function call for compiling ui projects for release
+define MONHUBR
+  $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix deps.clean --all \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix deps.get --only prod \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix compile \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) npm install \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) npm run build:production \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix phoenix.digest \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix release.clean \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+  $(QUIET)cd $(1) && $(monhub_docker_args) MIX_ENV=prod mix release \
+    $(if $(filter $(monhub_docker_args),docker),$(quote))
+endef
+
+# rule to add a new dagon target
+define RUN_DAGON
+$(if $(filter $5,false true),,\
+    $(error Unknown 'include in CI' option "$5"))
+dagon-test: $(if $(filter $5,true),$1,)
+$(call RUN_DAGON_TARGET,$1,$2,$3,$4)
+endef
+
+# rule to add a new dagon spike target
+define RUN_DAGON_SPIKE
+$(if $(filter $5,false true),,\
+    $(error Unknown 'include in CI' option "$5"))
+dagon-spike-test: $(if $(filter $5,true),$1,)
+$(call RUN_DAGON_TARGET,$1,$2,$3,$4)
+endef
+
+# rule to add a new dagon target
+define RUN_DAGON_TARGET
+.PHONY: $1
+$1: dagon_config_file=$(if $(custom_dagon_config),$(custom_dagon_config),$2)
+$1: dagon_timeout=$(if $(custom_dagon_timeout),$(custom_dagon_timeout),$3)
+$1:
+	$$(call run-dagon)
+	$4
+endef
+
+# function call for running dagon
+define run-dagon
+  $(QUIET)cd $(abs_buffy_dir) && $(abs_buffy_dir:%/=%)/dagon/dagon --timeout=$(dagon_timeout) -f $(dagon_config_file) \
+          -h 127.0.0.1:8080
+endef
+
+# rule to generate includes for makefiles in subdirs of first argument
+define make-goal
+$(eval MAKEDIRS := $(sort $(dir $(wildcard $(1:%/=%)/*/Makefile))))
+$(foreach mdir,$(MAKEDIRS),$(eval $(notdir $(mdir:%/=%)) := $(mdir)))
+$(foreach mdir,$(MAKEDIRS),$(eval include $($(notdir $(mdir:%/=%)))Makefile))
+endef
+
+# rule to generate targets for building actual pony executable including dependencies to relevant *.pony files so incremental builds work properly
+define ponyc-goal
+# include dependencies for already compiled executables
+-include $(1:%/=%)/$(notdir $(abspath $(1:%/=%))).d
+$(1:%/=%)/$(notdir $(abspath $(1:%/=%))):
+	$$(call PONYC,$(abspath $(1:%/=%)))
+endef
+
+.PHONY: build-pony-all build-docker-pony-all push-docker-pony-all test-pony-all clean-pony-all
+
+# rule to generate targets for build-* for devs to use
+define pony-build-goal
+build-pony-all: build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+build-docker-pony-all: build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+push-docker-pony-all: push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): $(1:%/=%)/$(notdir $(abspath $(1:%/=%)))
+.PHONY: build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+endef
+
+# rule to generate targets for test-* for devs to use
+define pony-test-goal
+test-pony-all: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+	cd $(abspath $(1:%/=%)) && ./$(notdir $(abspath $(1:%/=%)))
+.PHONY: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+endef
+
+# rule to generate targets for clean-* for devs to use
+define pony-clean-goal
+clean-pony-all: clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))):
+	$(QUIET)rm -f $(abspath $1)/$(notdir $(abspath $(1:%/=%))) $(abspath $1)/$(notdir $(abspath $(1:%/=%))).o
+	$(QUIET)rm -f $(abspath $1)/$(notdir $(abspath $(1:%/=%))).d
+	$(QUIET)rm -rf $(abspath $1)/.deps
+	$(QUIET)rm -rf $(abspath $1)/$(notdir $(abspath $(1:%/=%))).dSYM
+.PHONY: clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+endef
+
+# rule to generate targets for building actual monhub executable including dependencies to relevant files so incremental builds work properly
+define monhub-goal
+$(1:%/=%)/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app: $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
+	$$(call MONHUBC,$(abspath $(1:%/=%)))
+endef
+
+# rule to generate targets for building actual monhub executable including dependencies to relevant files so incremental builds work properly
+define monhub-release-goal
+$(1:%/=%)/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%))): $(shell find $(wildcard $(abspath $1)/config) $(wildcard $(abspath $1)/lib) $(wildcard $(abspath $1)/mix.exs) $(wildcard $(abspath $1)/priv) $(wildcard $(abspath $1)/web) $(wildcard $(abspath $1)/package.json) -type f)
+	$$(call MONHUBR,$(abspath $(1:%/=%)))
+release-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): monhub-arch-check $(1:%/=%)/rel/$(notdir $(abspath $(1:%/=%)))/bin/$(notdir $(abspath $(1:%/=%)))
+release-monhub-all: release-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+.PHONY: release-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+endef
+
+.PHONY: build-monhub-all build-docker-monhub-all push-docker-monhub-all test-monhub-all clean-monhub-all release-monhub-all
+
+# rule to generate targets for build-* for devs to use
+define monhub-build-goal
+build-monhub-all: build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+build-docker-monhub-all: build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+push-docker-monhub-all: push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): $(1:%/=%)/../../_build/dev/lib/$(notdir $(abspath $(1:%/=%)))/ebin/$(notdir $(abspath $(1:%/=%))).app
+.PHONY: build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+endef
+
+# rule to generate targets for test-* for devs to use
+define monhub-test-goal
+test-monhub-all: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+	cd $(abspath $(1:%/=%)) && mix test
+.PHONY: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+endef
+
+# rule to generate targets for clean-* for devs to use
+define monhub-clean-goal
+clean-monhub-all: clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))):
+	$(QUIET)rm -rf $(abspath $1)/rel
+	$(QUIET)rm -rf $(abspath $1)/node_modules
+	$(QUIET)rm -rf $(abspath $1)/../../_build
+.PHONY: clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
+endef
+
+# rule to generate targets for build-docker-* for devs to use
+define build-docker-goal
+build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): docker-arch-check $(if $(wildcard $($(PREV_MAKEFILE)_PATH)/package.json),release-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))),)
+	docker $(docker_host_arg) build -t \
+          $(docker_image_repo)/$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))).$(arch):$(docker_image_version) \
+          $(abspath $1)
+.PHONY: build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+endef
+
+# rule to generate targets for push-docker-* for devs to use
+define push-docker-goal
+push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+	docker $(docker_host_arg) push \
+          $(docker_image_repo)/$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))).$(arch):$(docker_image_version)
+.PHONY: push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+endef
+
+# rule to generate targets for *-all for devs to use
+define subdir-goal
+$(eval MAKEDIRS := $(sort $(dir $(wildcard $(1:%/=%)/*/Makefile))))
+$(eval MY_TARGET_SUFFIX := $(if $(filter $(abs_buffy_dir),$(abspath $1)),buffyroot-all,$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all))
+
+$(foreach mdir,$(MAKEDIRS),$(eval build-$(MY_TARGET_SUFFIX) += build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval test-$(MY_TARGET_SUFFIX) += test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval clean-$(MY_TARGET_SUFFIX) += clean-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
+$(eval build-$(MY_TARGET_SUFFIX): $(build-$(MY_TARGET_SUFFIX)))
+$(eval test-$(MY_TARGET_SUFFIX): $(test-$(MY_TARGET_SUFFIX)))
+$(eval clean-$(MY_TARGET_SUFFIX): $(clean-$(MY_TARGET_SUFFIX)))
+
+$(foreach mdir,$(MAKEDIRS),$(eval build-docker-$(MY_TARGET_SUFFIX) += build-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
+$(foreach mdir,$(MAKEDIRS),$(eval push-docker-$(MY_TARGET_SUFFIX) += push-docker-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(mdir))))-all))
+$(eval build-docker-$(MY_TARGET_SUFFIX): $(build-docker-$(MY_TARGET_SUFFIX)))
+$(eval push-docker-$(MY_TARGET_SUFFIX): $(push-docker-$(MY_TARGET_SUFFIX)))
+
+.PHONY: build-$(MY_TARGET_SUFFIX) test-$(MY_TARGET_SUFFIX) clean-$(MY_TARGET_SUFFIX) build-docker-$(MY_TARGET_SUFFIX) push-docker-$(MY_TARGET_SUFFIX)
+endef
+
+
+ROOT_TARGET_SUFFIX := $(if $(filter $(abs_buffy_dir),$(abspath $(ROOT_PATH))),buffyroot-all,$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(ROOT_PATH))))-all)
+
+# phony targets
+.PHONY: build build-docker build-monhub build-pony clean clean-docker clean-monhub clean-pony dagon-spike-test dagon-test list push-docker test-monhub test-pony test docker-arch-check monhub-arch-check help
+
+
+# default targets
+.DEFAULT_GOAL := build
+build: build-$(ROOT_TARGET_SUFFIX) ## Build all projects (pony & monhub) (DEFAULT)
+test: test-$(ROOT_TARGET_SUFFIX) ## Test all projects (pony & monhub)
+build-pony: build-pony-all ## Build all pony projects
+test-pony: test-pony-all ## Test all pony projects
+clean-pony: clean-pony-all ## Clean all pony projects
+build-monhub: build-monhub-all ## Build all monhub projects
+release-monhub: release-monhub-all ## Create release packages for all monhub projects
+test-monhub: test-monhub-all ## Test all monhub projects
+clean-monhub: clean-monhub-all ## Clean all monhub projects
+build-docker: build-docker-$(ROOT_TARGET_SUFFIX) ## Build all docker images
+push-docker: push-docker-$(ROOT_TARGET_SUFFIX) ## Push all docker images
+
+# rule to print info about make variables, works only with make 3.81 and above
+# to use invoke make with a target of print-VARNAME, e.g.,
+# make print-CCFLAGS
+print-%:
+	$(QUIET)echo '$*=$($*)'
+	$(QUIET)echo '  origin = $(origin $*)'
+	$(QUIET)echo '  flavor = $(flavor $*)'
+	$(QUIET)echo '   value = $(value  $*)'
+
+
+dagon-test: ## Run dagon tests
+
+dagon-spike-test: ## Run dagon spike tests
+
+# rule to confirm we are building for a real docker architecture we support
+docker-arch-check:
+	$(if $(filter $(arch),native),$(error Arch cannot be 'native' \
+          for docker build!),)
+
+# rule to confirm we are building for a real monitoring architecture we support
+monhub-arch-check:
+	$(if $(filter $(arch),armhf),$(error Arch cannot be 'armhf' \
+          for building of monitoring hub!),)
+
+# different types of docker images
+exited = $(shell docker $(docker_host_arg) ps -a -q -f status=exited)
+untagged = $(shell (docker $(docker_host_arg) images | grep "^<none>" | awk \
+              -F " " '{print $$3}'))
+dangling = $(shell docker $(docker_host_arg) images -f "dangling=true" -q)
+tag = $(shell docker $(docker_host_arg) images | grep \
+         "$(docker_image_version)" | awk -F " " '{print $$1 ":" $$2}')
+
+# rule to clean up docker images/containers
+clean-docker: ## cleanup docker images and containers
+	$(if $(strip $(exited)),$(QUIET)echo "Cleaning exited containers: $(exited)",)
+	$(if $(strip $(exited)),$(QUIET)docker $(docker_host_arg) rm -v $(exited),)
+	$(if $(strip $(tag)),$(QUIET)echo "Removing tag $(tag) image",)
+	$(if $(strip $(tag)),$(QUIET)docker $(docker_host_arg) rmi $(tag),)
+	$(if $(strip $(dangling)),$(QUIET)echo "Cleaning dangling images: $(dangling)",)
+	$(if $(strip $(dangling)),$(QUIET)docker $(docker_host_arg) rmi $(dangling),)
+
+# rule to clean everything
+clean: clean-$(ROOT_TARGET_SUFFIX) clean-docker ## Clean all projects (pony & monhub) and cleanup docker images
+	$(QUIET)rm -f lib/buffy/buffy lib/buffy/buffy.o
+	$(QUIET)rm -f sent.txt received.txt
+	$(QUIET)echo 'Done cleaning.'
+
+list: ## List all targets (including automagically generated ones)
+	$(QUIET)$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'
+
+help: ## this help message
+	$(QUIET)echo 'Usage: make [option1=value] [option2=value,...] [target]'
+	$(QUIET)echo ''
+	$(QUIET)echo 'Options:'
+	$(QUIET)grep -h -E '^[a-zA-Z0-9_-]+ *\?=.*?## .*$$' $(MAKEFILE_LIST) | sort -u | awk \
+          'BEGIN {FS = "$(extra_awk_arg)?="}; {printf "\033[36m%-30s\033[0m ##%s\n", $$1, \
+          $$2}' | awk 'BEGIN {FS = "## "}; {printf "%s %s \033[36m(Default:\
+ %s)\033[0m\n", $$1, $$3, $$2}'
+	$(QUIET)grep -h -E 'filter.*arch.*\)$$' $(MAKEFILE_LIST) | sort -u | awk \
+          'BEGIN {FS = "[(),]"}; {printf "\033[36m%-30s\033[0m %s\n", \
+          "  Valid values for " $$5 ":", $$7}'
+	$(QUIET)grep -h -E 'filter.*in_docker.*\)$$' $(MAKEFILE_LIST) | sort -u | awk \
+          'BEGIN {FS = "[(),]"}; {printf "\033[36m%-30s\033[0m %s\n", \
+          "  Valid values for " $$5 ":", $$7}'
+	$(QUIET)echo ''
+	$(QUIET)echo 'Targets:'
+	$(QUIET)echo "\033[36m{command}-{dir}-all            \033[0mRun command for a directory and all it's sub-projects."
+	$(QUIET)echo "                               Where command is one of: build,test,clean,build-docker,push-docker"
+	$(QUIET)grep -h -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort -u | awk \
+          'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", \
+          $$1, $$2}'
+	$(QUIET)grep -h -E '^#[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort -u | awk \
+          'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", \
+          substr($$1,2), $$2}'
+
+endif # RULES_MK
+
+# if there's a pony source file, create the appropriate rules for it unless disabled
+ifneq ($(PONY_TARGET),false)
+  ifneq ($(wildcard $($(PREV_MAKEFILE)_PATH)/*.pony),)
+    $(eval $(call ponyc-goal,$($(PREV_MAKEFILE)_PATH)))
+    $(eval $(call pony-build-goal,$($(PREV_MAKEFILE)_PATH)))
+    $(eval $(call pony-test-goal,$($(PREV_MAKEFILE)_PATH)))
+    $(eval $(call pony-clean-goal,$($(PREV_MAKEFILE)_PATH)))
+  endif
+endif
+
+# if there's a exs source file, create the appropriate rules for it unless disabled
+ifneq ($(EXS_TARGET),false)
+  ifneq ($(wildcard $($(PREV_MAKEFILE)_PATH)/*.exs),)
+    $(eval $(call monhub-goal,$($(PREV_MAKEFILE)_PATH)))
+    $(eval $(call monhub-build-goal,$($(PREV_MAKEFILE)_PATH)))
+    $(eval $(call monhub-test-goal,$($(PREV_MAKEFILE)_PATH)))
+    $(eval $(call monhub-clean-goal,$($(PREV_MAKEFILE)_PATH)))
+    ifneq ($(wildcard $($(PREV_MAKEFILE)_PATH)/package.json),)
+      $(eval $(call monhub-release-goal,$($(PREV_MAKEFILE)_PATH)))
+    endif
+  endif
+endif
+
+# if there's a Dockerfile, create the appropriate rules for it unless disabled
+ifneq ($(DOCKER_TARGET),false)
+  ifneq ($(wildcard $($(PREV_MAKEFILE)_PATH)/Dockerfile),)
+    $(eval $(call build-docker-goal,$($(PREV_MAKEFILE)_PATH)))
+    $(eval $(call push-docker-goal,$($(PREV_MAKEFILE)_PATH)))
+  endif
+endif
+
+# include rules for directory level "-all" targets
+$(eval $(call subdir-goal,$(PREV_PATH)))
+
+# reset variables before including sub-makefiles
+PONY_TARGET :=
+DOCKER_TARGET :=
+EXS_TARGET :=
+RECURSE_SUBMAKEFILES :=
+
+# include makefiles from 1 level down in directory tree if they exist (and by recursion every makefile in the tree that is referenced) unless disabled
+ifneq ($(RECURSE_SUBMAKEFILES),false)
+  $(eval $(call make-goal,$(PREV_PATH)))
+endif
+
+

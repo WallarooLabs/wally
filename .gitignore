@@ -19,6 +19,9 @@ metrics-report.txt
 # partial compilation files
 *.o
 
+# make dependency fragments
+*.d
+
 #LaTeX files
 *.lof
 *.tex
