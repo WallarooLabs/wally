@@ -2,11 +2,32 @@ use "collections"
 use "net"
 use "options"
 use "time"
-use "metrics"
 use "buffered"
 use "files"
 use "sendence/hub"
 use "sendence/fix"
+use "./metrics"
+use "./core"
+use "./app"
+
+class OutNotify is TCPConnectionNotify
+  let _name: String
+
+  new iso create(name: String) =>
+    _name = name
+
+  fun ref connected(sock: TCPConnection ref) =>
+    @printf[None]("%s outgoing connected\n".cstring(),
+      _name.null_terminated().cstring())
+
+  fun ref throttled(sock: TCPConnection ref, x: Bool) =>
+    if x then
+      @printf[None]("%s outgoing throttled\n".cstring(),
+        _name.null_terminated().cstring())
+    else
+      @printf[None]("%s outgoing no longer throttled\n".cstring(),
+        _name.null_terminated().cstring())
+    end
 
 actor Main
   new create(env: Env) =>

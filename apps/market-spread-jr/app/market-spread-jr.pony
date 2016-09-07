@@ -25,11 +25,12 @@ Baseline using Junior metrics (on John's 4 core, Sean sees similar):
 use "collections"
 use "net"
 use "time"
+use "buffered"
 use "sendence/fix"
 use "sendence/new-fix"
 use "sendence/hub"
-use "metrics"
-use "buffered"
+use "../metrics"
+use "../core"
 
 class SymbolData
   var should_reject_trades: Bool = true
