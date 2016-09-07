@@ -101,6 +101,9 @@ class SourceRunner
       _metrics.set_end(Time.nanos(), _expected)
     end
 
+interface Step
+  be run[In: Any val](metric_name: String, source_ts: U64, input: In)
+
 actor StateRunner[State: Any #read]
   let _state: State
   let _metrics_reporter: MetricsReporter
@@ -112,15 +115,20 @@ actor StateRunner[State: Any #read]
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
 
-  be run[In: Any val](source_name: String val, source_ts: U64, input: In, computation: StateComputation[In, State] val) =>
-    let computation_start = Time.nanos()
-    computation(input, _state, _wb)
-    let computation_end = Time.nanos()
+  be run[In: Any val](source_name: String val, source_ts: U64, input: In) =>
+    match input
+    | let sp: StateProcessor[State] val =>
+      let computation_start = Time.nanos()
+      sp(_state, _wb)
+      let computation_end = Time.nanos()
 
-    _metrics_reporter.pipeline_metric(source_name, source_ts)
+      _metrics_reporter.pipeline_metric(source_name, source_ts)
 
-    _metrics_reporter.step_metric(computation.name(),
-      computation_start, computation_end)
+      _metrics_reporter.step_metric(sp.name(),
+        computation_start, computation_end)
+    else
+      @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
+    end
 
 interface Source
   fun name(): String val
@@ -163,7 +171,9 @@ class StateSource[In: Any val, State: Any #read]
       | let input: In =>
         match _router.route(input)
         | let p: StateRunner[State] tag =>
-          p.run[In](_name, ingest_ts, input, _state_comp)
+          let processor = 
+            StateComputationWrapper[In, State](input, _state_comp)
+          p.run[StateProcessor[State] val](_name, ingest_ts, processor)
         else
           // drop data that has no partition
           @printf[I32]((_name + ": Fake logging lack of partition\n").cstring())
@@ -186,6 +196,23 @@ interface Sink
 
 interface Router[In: Any val, RoutesTo: Any tag]
   fun route(input: In): (RoutesTo | None)
+
+interface StateProcessor[State: Any #read]
+  fun name(): String
+  fun apply(state: State, wb: (Writer | None)): None
+
+class StateComputationWrapper[In: Any val, State: Any #read]
+  let _state_comp: StateComputation[In, State] val
+  let _input: In
+
+  new val create(input: In, state_comp: StateComputation[In, State] val) =>
+    _state_comp = state_comp
+    _input = input
+
+  fun apply(state: State, wb: (Writer | None)): None =>
+    _state_comp(_input, state, wb)
+
+  fun name(): String => _state_comp.name()
 
 interface StateComputation[In: Any val, State: Any #read]
   fun apply(input: In, state: State, wb: (Writer | None)): None
