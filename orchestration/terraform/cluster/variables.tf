@@ -45,7 +45,7 @@ variable "placement_group" {
 
 variable "placement_tenancy" {
   description = "Whther to use dedicated hosts for cluster or not."
-  default = "default"
+  default = ""
 }
 
 variable "leader_instance_type" {
