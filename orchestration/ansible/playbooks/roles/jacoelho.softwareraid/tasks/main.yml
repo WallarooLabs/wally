@@ -1,0 +1,54 @@
+---
+  - include: validate.yml
+
+  - name: software raid - install raid package
+    apt: pkg=mdadm state=installed update_cache=yes cache_valid_time=3600
+    when: software_raid_devices is defined and ansible_os_family == "Debian"
+
+  - name: software raid - check existing raid devices
+    shell: "mdadm -D {{ item.device }}"
+    ignore_errors: yes
+    register: mdadm_check
+    with_items: software_raid_devices
+    when: software_raid_devices is defined
+
+  - name: software raid - initialise raid devices
+    shell: mdadm -v --create {{ item.0.device }} --level={{ item.0.level }} {{ "--force" if item.0.components | length == 1 else "" }} --raid-devices={{ item.0.components | length }} {{ item.0.components | join(" ") }} {{ software_raid_create_kwargs }}
+    with_together:
+      - software_raid_devices
+      - mdadm_check.results
+    when: software_raid_devices is defined and item.1.rc != 0
+
+  - name: software raid - scan raid devices
+    shell: "mdadm --detail --scan"
+    ignore_errors: yes
+    register: mdadm_scan
+    when: software_raid_devices is defined
+
+  - name: software raid - create mdadm config file
+    template: src=mdadm.conf.j2 dest=/etc/mdadm/mdadm.conf
+    when: software_raid_devices is defined
+
+  - name: software raid - update initramfs
+    shell: "update-initramfs -u"
+    ignore_errors: yes
+    when: software_raid_devices is defined and ansible_os_family == "Debian"
+
+  - name: software raid - filesystem creation
+    filesystem:
+      fstype: "{{ item.filesystem_type }}"
+      dev: "{{ item.device }}"
+    with_items: software_raid_devices
+    when: software_raid_devices is defined and item.mount_point is defined
+
+  - name: software raid - mount raid devices
+    mount:
+      name: "{{ item.mount_point }}"
+      src: "{{ item.device }}"
+      fstype: "{{ item.filesystem_type }}"
+      opts: "{{ item.mount_options }}"
+      dump: "{{ item.dump }}"
+      passno: "{{ item.passno }}"
+      state: mounted
+    with_items: software_raid_devices
+    when: software_raid_devices is defined and item.mount_point is defined
