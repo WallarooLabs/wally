@@ -2,6 +2,7 @@ use "net"
 use "time"
 use "buffered"
 use "collections"
+use "sendence/epoch"
 use "../metrics"
 
 class SourceRunner
@@ -23,7 +24,7 @@ class SourceRunner
   fun ref _begin_tracking() =>
     _count = _count + 1
     if _count == 1 then
-      _metrics.set_start(Time.nanos())
+      _metrics.set_start(Epoch.nanoseconds())
     end
     if (_count % 1_000_000) == 0 then
       @printf[None]("%s %zu\n".cstring(), _source.name().null_terminated().cstring(), _count)
@@ -31,7 +32,7 @@ class SourceRunner
 
   fun ref _end_tracking() =>
     if _count == _expected then
-      _metrics.set_end(Time.nanos(), _expected)
+      _metrics.set_end(Epoch.nanoseconds(), _expected)
     end
 
 interface Source
@@ -66,10 +67,10 @@ class StateSource[In: Any val, State: Any #read]
   fun name(): String val => _name
 
   fun ref process(data: Array[U8] val) =>
-    let ingest_ts = Time.nanos()
+    let ingest_ts = Epoch.nanoseconds()
     try
       // For recording metrics for filtered messages
-      let computation_start = Time.nanos()
+      let computation_start = Epoch.nanoseconds()
 
       match _parser(consume data)
       | let input: In =>
@@ -85,7 +86,7 @@ class StateSource[In: Any val, State: Any #read]
         end
       else
         // If parser returns None, we're filtering the message out already
-        let computation_end = Time.nanos()
+        let computation_end = Epoch.nanoseconds()
         _metrics_reporter.pipeline_metric(_name, ingest_ts)
 
         _metrics_reporter.step_metric(_state_comp.name(),

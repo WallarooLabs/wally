@@ -90,17 +90,17 @@ class MetricsReporter
       reporter
     end
 
-    metrics.report(start_ts - end_ts)
+    metrics.report(end_ts - start_ts)
 
   fun ref pipeline_metric(source_name: String val, source_ts: U64) =>
     let metrics = try
-      _pipeline_metrics_map(source_name)
-    else
-      let reporter =
-        _MetricsReporter(_metrics_conn, 1, _app_name, source_name, 
-          StartToEndCategory)
-      _pipeline_metrics_map(source_name) = reporter
-      reporter
-    end
+        _pipeline_metrics_map(source_name)
+      else
+        let reporter =
+          _MetricsReporter(_metrics_conn, 1, _app_name, source_name, 
+            StartToEndCategory)
+        _pipeline_metrics_map(source_name) = reporter
+        reporter
+      end
 
-    metrics.report(source_ts - Epoch.nanoseconds())  
+    metrics.report(Epoch.nanoseconds() - source_ts)  

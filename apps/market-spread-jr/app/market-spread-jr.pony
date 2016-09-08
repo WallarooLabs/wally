@@ -29,6 +29,7 @@ use "buffered"
 use "sendence/fix"
 use "sendence/new-fix"
 use "sendence/hub"
+use "sendence/epoch"
 use "../metrics"
 use "../core"
 

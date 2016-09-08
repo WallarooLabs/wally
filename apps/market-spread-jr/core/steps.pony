@@ -1,5 +1,6 @@
 use "buffered"
 use "time"
+use "sendence/epoch"
 use "../metrics"
 
 interface Router[In: Any val, RoutesTo: Any tag]
