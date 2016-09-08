@@ -63,7 +63,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
     wb: (Writer | None)) =>
     if state.should_reject_trades then
       let result = OrderResult(msg, state.last_bid, state.last_offer,
-        Time.nanos())
+        Epoch.nanoseconds())
       match wb
       | let w: Writer =>
         _conn.writev(OrderResultEncoder(result, w))
