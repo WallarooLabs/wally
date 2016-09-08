@@ -4,6 +4,7 @@ use "net"
 use "time"
 use "buffered"
 use "sendence/hub"
+use "sendence/epoch"
 
 type MetricsCategory is
   (ComputationCategory | StartToEndCategory | NodeIngressEgressCategory)
@@ -41,11 +42,11 @@ class _MetricsReporter
     _category = category
     _period = period
     _output_to = output_to
-    let now = Time.nanos()
+    let now = Epoch.nanoseconds()
     _period_ends_at = _next_period_endtime(now, period)
 
   fun ref report(duration: U64) =>
-    let now = Time.nanos()
+    let now = Epoch.nanoseconds()
 
     if now > _period_ends_at then
       _period_ends_at = _next_period_endtime(now, _period)
@@ -102,4 +103,4 @@ class MetricsReporter
       reporter
     end
 
-    metrics.report(source_ts - Time.nanos())  
+    metrics.report(source_ts - Epoch.nanoseconds())  
