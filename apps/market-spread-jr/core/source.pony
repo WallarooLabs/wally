@@ -67,10 +67,10 @@ class StateSource[In: Any val, State: Any #read]
   fun name(): String val => _name
 
   fun ref process(data: Array[U8] val) =>
-    let ingest_ts = Epoch.nanoseconds()
+    let ingest_ts = Time.nanos()
     try
       // For recording metrics for filtered messages
-      let computation_start = Epoch.nanoseconds()
+      let computation_start = Time.nanos()
 
       match _parser(consume data)
       | let input: In =>
@@ -86,7 +86,7 @@ class StateSource[In: Any val, State: Any #read]
         end
       else
         // If parser returns None, we're filtering the message out already
-        let computation_end = Epoch.nanoseconds()
+        let computation_end = Time.nanos()
         _metrics_reporter.pipeline_metric(_name, ingest_ts)
 
         _metrics_reporter.step_metric(_state_comp.name(),

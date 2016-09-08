@@ -11,8 +11,8 @@ export default class StatsTableHeader extends React.Component {
 				<th></th>
 				<th>
 					<Col lg={4}>50% of latencies are:</Col>
-					<Col lg={4}>75% of latencies are:</Col>
-					<Col lg={4}>90% of latencies are:</Col>
+					<Col lg={4}>95% of latencies are:</Col>
+					<Col lg={4}>99% of latencies are:</Col>
 				</th>
 				<th>
 					<Col lg={4}>Minimum</Col>

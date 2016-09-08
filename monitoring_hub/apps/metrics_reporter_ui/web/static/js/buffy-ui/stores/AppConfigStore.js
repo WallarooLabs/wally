@@ -4,9 +4,9 @@ import Dispatcher from "../../dispatcher/Dispatcher";
 import {fromJS, List, Map} from "immutable";
 
 const emptyAppConfig = Map({
-	metrics: Map().set("step", List())
-				  .set("ingress-egress", List())
-				  .set("source-sink", List())
+	metrics: Map().set("computation", List())
+				  .set("node-ingress-egress", List())
+				  .set("start-to-end", List())
 });
 
 class AppConfigStore extends ReduceStore {

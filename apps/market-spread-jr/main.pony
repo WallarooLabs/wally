@@ -162,7 +162,7 @@ actor Main
     rb.append(init_data)
     var bytes_left = init_data.size()
     while bytes_left > 0 do
-      nbbo_msgs.push(rb.block(46))
+      nbbo_msgs.push(rb.block(46).trim(4))
       bytes_left = bytes_left - 46
     end
 

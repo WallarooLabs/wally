@@ -16,7 +16,7 @@
   "phoenix_ecto": {:hex, :phoenix_ecto, "2.0.2", "1aff51d1cd21cc39d7891cae2284399cbf4b8e32fb7864e68f5d272d2934e48a", [:mix], [{:poison, "~> 1.3 or ~> 2.0", [hex: :poison, optional: true]}, {:phoenix_html, "~> 2.2", [hex: :phoenix_html, optional: true]}, {:ecto, "~> 1.1.2", [hex: :ecto, optional: false]}]},
   "phoenix_html": {:hex, :phoenix_html, "2.6.0", "b9f7e091eb3d908586d9634596478fb9e577ee033d76f4ff327a745569bdd2d8", [:mix], [{:plug, "~> 0.13 or ~> 1.0", [hex: :plug, optional: false]}]},
   "phoenix_live_reload": {:hex, :phoenix_live_reload, "1.0.5", "829218c4152ba1e9848e2bf8e161fcde6b4ec679a516259442561d21fde68d0b", [:mix], [{:fs, "~> 0.9.1", [hex: :fs, optional: false]}, {:phoenix, "~> 1.0 or ~> 1.2-rc", [hex: :phoenix, optional: false]}]},
-  "phoenix_tcp": {:git, "https://github.com/Sendence/phoenix_tcp.git", "9817c7a4b834f1907d23352cbc89a3c64c3702a3", [branch: "master"]},
+  "phoenix_tcp": {:git, "https://github.com/Sendence/phoenix_tcp.git", "cbf2a941815633e93e60f2889d202ae4ad7c9e28", [branch: "add-hub-protocol"]},
   "plug": {:hex, :plug, "1.1.6", "8927e4028433fcb859e000b9389ee9c37c80eb28378eeeea31b0273350bf668b", [:mix], [{:cowboy, "~> 1.0", [hex: :cowboy, optional: true]}]},
   "poison": {:hex, :poison, "1.5.2", "560bdfb7449e3ddd23a096929fb9fc2122f709bcc758b2d5d5a5c7d0ea848910", [:mix], []},
   "poolboy": {:hex, :poolboy, "1.5.1", "6b46163901cfd0a1b43d692657ed9d7e599853b3b21b95ae5ae0a777cf9b6ca8", [:rebar], []},

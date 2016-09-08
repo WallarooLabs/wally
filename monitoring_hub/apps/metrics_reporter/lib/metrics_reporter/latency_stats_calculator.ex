@@ -35,16 +35,23 @@ defmodule MetricsReporter.LatencyStatsCalculator do
   end
 
   defp get_percentiles do
-    ["50.0", "75.0", "90.0", "99.0", "99.9"]
+    ["50.0", "95.0", "99.0", "99.9", "99.99"]
   end
 
   def calculate_latency_percentile_bin_stats(cumalative_latency_percentage_bins_msg) do
-    bin_keys = Map.keys(cumalative_latency_percentage_bins_msg)
+    sorted_bin_keys = Map.keys(cumalative_latency_percentage_bins_msg)
+      |> Enum.sort(&(String.to_integer(&1)< String.to_integer(&2)))
     latency_percent_bin_stats = get_percentiles
       |> Enum.reduce(%{}, fn percentile, percentile_map ->
-        bin = Enum.reduce_while(bin_keys, 0, fn bin, acc ->
+        bin = Enum.reduce_while(sorted_bin_keys, 0, fn bin, acc ->
           percentage_at_bin = cumalative_latency_percentage_bins_msg[bin]
-          if String.to_float(percentile) > percentage_at_bin, do: {:cont, Enum.max(bin_keys)}, else: {:halt, bin}
+          if String.to_float(percentile) > percentage_at_bin do
+            {:cont, Enum.max_by(sorted_bin_keys, fn bin ->
+              String.to_integer(bin)
+            end)}
+          else
+            {:halt, bin}
+          end
         end)
         Map.put(percentile_map, percentile, bin)
       end)
@@ -57,7 +64,7 @@ defmodule MetricsReporter.LatencyStatsCalculator do
 
   defp do_calculate_latency_percentage_bins_data(aggregated_latency_bins_data, expected_latency_bins, total_count) do
       sorted_keys = Map.keys(aggregated_latency_bins_data)
-        |> Enum.sort(&(String.to_integer(&1)< String.to_integer(&2)))
+        |> Enum.sort(&(String.to_integer(&1) < String.to_integer(&2)))
 
       {_, aggregated_map} = 
         expected_latency_bins
@@ -84,13 +91,6 @@ defmodule MetricsReporter.LatencyStatsCalculator do
           {pow_key, v} end)
   end
 
-  defp do_calculate_latency_percentage_bins_data(aggregated_latency_bins_data, expected_bins, total_count) do
-    get_empty_latency_percentage_bins_data(expected_bins)
-      |> Map.merge(aggregated_latency_bins_data, fn _k, _v1, v2 ->
-        calculate_percentile(v2, total_count)
-      end)
-  end
-
   defp time_sort_latency_bins_list(latency_bins_list) do
     latency_bins_list
     |> Enum.sort(&(&1["time"] < &2["time"]))
@@ -100,7 +100,7 @@ defmodule MetricsReporter.LatencyStatsCalculator do
     if total_count == 0 do
       0
     else
-      Float.round((value / total_count) * 100, 2)
+      Float.round((value / total_count) * 100, 4)
     end
   end
 
@@ -111,7 +111,7 @@ defmodule MetricsReporter.LatencyStatsCalculator do
       (value + cumalative_percentage == 0) ->
         0
       true ->
-        Float.round(value + cumalative_percentage, 2)
+        Float.round(value + cumalative_percentage, 4)
     end
   end
 

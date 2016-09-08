@@ -97,9 +97,9 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 	defp do_create_initial_app_config(app_name) do
 		%{"app_name" => app_name,
 			"metrics" => %{
-				"source-sink" => [],
-				"ingress-egress" => [],
-				"step" => [],
+				"start-to-end" => [],
+				"node-ingress-egress" => [],
+				"computation" => [],
 				"pipeline" => []
 				}}
 	end

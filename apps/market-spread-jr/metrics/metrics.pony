@@ -103,4 +103,4 @@ class MetricsReporter
         reporter
       end
 
-    metrics.report(Epoch.nanoseconds() - source_ts)  
+    metrics.report(Time.nanos() - source_ts)

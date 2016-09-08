@@ -7,9 +7,9 @@ defmodule MonitoringHubUtils.Stores.AppConfigStoreTest do
   setup do
   	AppConfigStore.start_link
   	empty_app_config = %{"metrics" => %{
-  		"source-sink" => [],
-  		"step" => [],
-  		"ingress-egress" => [],
+  		"start-to-end" => [],
+  		"computation" => [],
+  		"node-ingress-egress" => [],
   		"pipeline" => []
   		}}
   	{:ok, empty_app_config: empty_app_config}
@@ -38,7 +38,7 @@ defmodule MonitoringHubUtils.Stores.AppConfigStoreTest do
   test "it retrieves or creates an app config", %{empty_app_config: empty_app_config} do
   	existing_app_config = empty_app_config
   		|> Map.put("app_name", "existing-app-config")
-  		|> update_in(["metrics", "step"], fn _ -> ["step:step1"] end)
+  		|> update_in(["metrics", "computation"], fn _ -> ["computation:step1"] end)
     {:ok, ^existing_app_config} = AppConfigStore.store_app_config "existing-app-config", existing_app_config
     {:ok, retrieved_exisiting_app_config} = AppConfigStore.get_or_create_app_config "existing-app-config"
     
@@ -51,8 +51,8 @@ defmodule MonitoringHubUtils.Stores.AppConfigStoreTest do
   test "it adds a metrics channel to an existing app config" do
   	app_config = AppConfigStore.get_or_create_app_config "metrics-app-config"
 
-    {:ok, _updated_app_config} = AppConfigStore.add_metrics_channel_to_app_config "metrics-app-config", "step", "step1"
+    {:ok, _updated_app_config} = AppConfigStore.add_metrics_channel_to_app_config "metrics-app-config", "computation", "step1"
     {:ok, updated_app_config} = AppConfigStore.get_app_config "metrics-app-config"
-    assert get_in(updated_app_config, ["metrics", "step"]) == ["step1"]
+    assert get_in(updated_app_config, ["metrics", "computation"]) == ["step1"]
   end
 end

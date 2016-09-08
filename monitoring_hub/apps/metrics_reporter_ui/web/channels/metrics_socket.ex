@@ -8,6 +8,9 @@ defmodule MetricsReporterUI.MetricsSocket do
   channel "step:*", MetricsReporterUI.StepChannel
   channel "ingress-egress:*", MetricsReporterUI.IngressEgressChannel
   channel "source-sink:*", MetricsReporterUI.SourceSinkChannel
+  channel "computation:*", MetricsReporterUI.ComputationChannel
+  channel "start-to-end:*", MetricsReporterUI.StartEndChannel
+  channel "node-ingress-egress:*", MetricsReporterUI.NodeIngressEgressChannel
 
   transport :websocket, Phoenix.Transports.WebSocket
   transport :longpoll, Phoenix.Transports.LongPoll

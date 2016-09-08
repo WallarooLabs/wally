@@ -142,6 +142,9 @@ build-quadruple: ## build quadruple app
 build-market-spread: ## build market spread app
 	$(call PONYC,apps/market-spread)
 
+build-market-spread-jr: ## build market spread app
+	$(call PONYC,apps/market-spread-jr)
+
 build-word-count: ## build word count app
 	$(call PONYC,apps/word-count)
 

@@ -9,8 +9,8 @@ defmodule MarketSpreadReportsUI.ReportsChannel do
     {:ok, socket}
   end
 
-  def handle_in("rejected-orders", rejected_order_msgs, socket) do
-    {:ok, updated_rejected_order_msgs} = RejectedOrdersStore.store_rejected_order_msgs(rejected_order_msgs)
+  def handle_in("rejected-orders", rejected_order_msg, socket) do
+    {:ok, updated_rejected_order_msgs} = RejectedOrdersStore.store_rejected_order_msgs([rejected_order_msg])
     data = %{rejected_orders: updated_rejected_order_msgs}
     broadcast! socket, "rejected-order-msgs", data
     {:reply, :ok, socket}

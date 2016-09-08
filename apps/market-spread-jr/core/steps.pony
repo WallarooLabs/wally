@@ -32,9 +32,9 @@ class StateRunner[State: Any #read]
   fun ref run[In: Any val](source_name: String val, source_ts: U64, input: In) =>
     match input
     | let sp: StateProcessor[State] val =>
-      let computation_start = Epoch.nanoseconds()
+      let computation_start = Time.nanos()
       sp(_state, _wb)
-      let computation_end = Epoch.nanoseconds()
+      let computation_end = Time.nanos()
 
       _metrics_reporter.pipeline_metric(source_name, source_ts)
 

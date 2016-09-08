@@ -45,9 +45,9 @@ export default class AppDashboardContainer extends React.Component {
 	render() {
 		const { appName } = this.props.params;
 		const { appConfig } = this.state;
-		const sourceSinkKeys = appConfig.getIn(["metrics", "source-sink"]);
-		const ingressEgressKeys = appConfig.getIn(["metrics", "ingress-egress"]);
-		const stepKeys = appConfig.getIn(["metrics", "step"]);
+		const sourceSinkKeys = appConfig.getIn(["metrics", "start-to-end"]);
+		const ingressEgressKeys = appConfig.getIn(["metrics", "node-ingress-egress"]);
+		const stepKeys = appConfig.getIn(["metrics", "computation"]);
 		return(
 			<div>
 				{ this.props.children || 

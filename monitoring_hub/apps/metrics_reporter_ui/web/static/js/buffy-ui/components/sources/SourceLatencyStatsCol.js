@@ -11,13 +11,13 @@ export default class SourceLatencyStatsCol extends React.Component {
 	render() {
 		const { latencyPercentileBinStats } = this.props;
 		const fiftiethBin = latencyPercentileBinStats.get("50.0");
-		const seventyFifthBin = latencyPercentileBinStats.get("75.0");
-		const ninetiethBin = latencyPercentileBinStats.get("90.0");
+		const ninetyFifthBin = latencyPercentileBinStats.get("95.0");
+		const ninetyNinthBin = latencyPercentileBinStats.get("99.0");
 		return(
 			<div>
 				<Col lg={4}><p>{formatLatencyBin(fiftiethBin)}</p></Col>
-				<Col lg={4}><p>{formatLatencyBin(seventyFifthBin)}</p></Col>
-				<Col lg={4}><p>{formatLatencyBin(ninetiethBin)}</p></Col>
+				<Col lg={4}><p>{formatLatencyBin(ninetyFifthBin)}</p></Col>
+				<Col lg={4}><p>{formatLatencyBin(ninetyNinthBin)}</p></Col>
 			</div>
 		)
 	}
