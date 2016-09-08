@@ -1,0 +1,19 @@
+---
+
+- hosts: all
+  roles:
+    - .
+
+  vars:
+    software_raid_alerts_email: "email@example.com"
+    software_raid_devices:
+      - device: /dev/md0
+        level: 0
+        components:
+          - /dev/sdb
+          - /dev/sdc
+        filesystem_type: "ext4"
+        mount_point: "/mnt/volume"
+        mount_options: "noatime,noexec,nodiratime"
+        dump: 0
+        passno: 0
