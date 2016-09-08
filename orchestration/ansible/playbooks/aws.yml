@@ -83,9 +83,9 @@
     software_raid_create_kwargs: "--run" # force the creation if there are any prompts
     software_raid_devices:
       - device: /dev/md0
-        level: 0
+        level: "{{ raid_level if raid_level is defined else '0' }}"
         components: "{{ disks_list }}"
-        filesystem_type: "ext4"
+        filesystem_type: "{{ raid_fs if raid_fs is defined else 'ext4' }}"
         mount_point: "/data"
         mount_options: "noatime,noexec,nodiratime"
         dump: 0
