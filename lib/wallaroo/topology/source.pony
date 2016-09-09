@@ -42,6 +42,41 @@ interface Source
 interface SourceParser[In: Any val]
   fun apply(data: Array[U8] val): (In | None) ?
 
+class StatelessSource[In: Any val]
+  let _name: String
+  let _parser: SourceParser[In] val
+  let _router: Router[In, Step tag]
+
+  new iso create(name': String, parser: SourceParser[In] val, 
+    router: Router[In, Step tag] iso) 
+  =>
+    _name = name'
+    _parser = parser
+    _router = consume router
+
+  fun name(): String val => _name
+
+  fun ref process(data: Array[U8] val) =>
+    let ingest_ts = Epoch.nanoseconds()
+    try
+      // For recording metrics for filtered messages
+      let computation_start = Epoch.nanoseconds()
+
+      match _parser(data)
+      | let input: In =>
+        match _router.route(input)
+        | let r: Step tag =>
+          r.run[In](_name, ingest_ts, input)
+        else
+          // drop data that has no partition
+          @printf[I32]((_name + ": Fake logging lack of partition\n").cstring())
+          None
+        end
+      end
+    else 
+      @printf[I32]((_name + ": Problem parsing source input\n").cstring())
+    end
+    
 class StateSource[In: Any val, State: Any #read]
   let _name: String
   let _parser: SourceParser[In] val
