@@ -30,8 +30,8 @@ use "sendence/fix"
 use "sendence/new-fix"
 use "sendence/hub"
 use "sendence/epoch"
-use "../metrics"
-use "../core"
+use "wallaroo/metrics"
+use "wallaroo/topology"
 
 class SymbolData
   var should_reject_trades: Bool = true

@@ -1,5 +1,5 @@
 use "buffered"
-use "../../../apps/market-spread-jr/metrics"
+use "wallaroo/metrics"
 
 primitive HubProtocol
   fun connect(wb: Writer = Writer): Array[ByteSeq] val =>

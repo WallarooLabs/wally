@@ -3,7 +3,8 @@ use "time"
 use "buffered"
 use "collections"
 use "sendence/bytes"
-use "../metrics"
+use "wallaroo/metrics"
+use "wallaroo/topology"
 
 class SourceNotify is TCPConnectionNotify
   let _source: SourceRunner
