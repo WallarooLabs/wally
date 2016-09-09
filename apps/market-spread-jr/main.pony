@@ -33,9 +33,11 @@ actor Main
   new create(env: Env) =>
     var m_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
+    var d_arg: (Array[String] | None) = None
     var input_addrs: Array[Array[String]] = input_addrs.create()
     var expected: USize = 1_000_000
     var init_path = ""
+    var worker_count: USize = 1
 
     try
       var options = Options(env.args)
@@ -45,7 +47,11 @@ actor Main
         .add("metrics", "m", StringArgument)
         .add("in", "i", StringArgument)
         .add("out", "o", StringArgument)
+        .add("data", "d", StringArgument)
         .add("file", "f", StringArgument)
+        // worker count includes the initial "leader" since there is no
+        // persisting leader
+        .add("worker-count", "w", I64Argument)
 
       for option in options do
         match option
@@ -56,7 +62,9 @@ actor Main
             input_addrs.push(addr.split(":"))
           end
         | ("out", let arg: String) => o_arg = arg.split(":")
+        | ("data", let arg: String) => d_arg = arg.split(":")
         | ("file", let arg: String) => init_path = arg
+        | ("worker-count", let arg: I64) => worker_count = arg.usize()
         end
       end
 
