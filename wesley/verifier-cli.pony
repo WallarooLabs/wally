@@ -49,7 +49,11 @@ primitive VerifierCLI[S: Message val, R: Message val]
       let expectation_str: String) = try
       _parse_args(env.args)
     else
-      return SetupErrorWrongArgs(try env.args(0) else "???" end)
+      if env.args.size() == 1 then
+        return SetupErrorNoArgs(try env.args(0) else "???" end)
+      else
+        return SetupErrorWrongArgs(try env.args(0) else "???" end)
+      end
     end
 
     let expected_match_result: MatchStatus val = try
@@ -100,7 +104,11 @@ primitive VerifierCLI[S: Message val, R: Message val]
       try
         _parse_args_with_initialization(env.args)
       else
-        return SetupErrorWrongArgs(try env.args(0) else "???" end)
+        if env.args.size() == 1 then
+          return SetupErrorNoArgs(try env.args(0) else "???" end)
+        else
+          return SetupErrorWrongArgs(try env.args(0) else "???" end)
+        end
       end
 
     let expected_match_result: MatchStatus val = try
@@ -226,6 +234,13 @@ primitive VerifierCLI[S: Message val, R: Message val]
 interface SetupError
   fun exitcode(): I32 => 0
   fun message(): String => ""
+
+class SetupErrorNoArgs is SetupError
+  let _message: String val
+  new create(command: String) =>
+    _message = Usage.message(command)
+  fun exitcode(): I32 => 0
+  fun message(): String => _message
 
 class SetupErrorWrongArgs is SetupError
   let _message: String val
