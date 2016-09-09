@@ -14,23 +14,27 @@ clone:
 
 # main build steps
 build:
-  # main build of buffy
+  # run monitoring hub tests
+  run_monitoring_hub_test:
+    image: docker.sendence.com:5043/monitoring-hub-builder:latest
+    auth_config:
+      username: $$DOCKER_USERNAME
+      password: $$DOCKER_PASSWORD
+    pull: true
+    commands:
+      - make test-monhub VERBOSE=true
+      - make release-monhub VERBOSE=true
+    when:
+      matrix:
+        PONYC_VERSION: amd64
+
+  # main build and test of buffy
   main_build:
     image: sendence/ponyc:sendence-13.1.0-$$PONYC_CONFIG
     pull: true
     commands:
-      - make clean arch=$$PONYC_VERSION in_docker=true
-      - make arch=$$PONYC_VERSION in_docker=true
-
-  # run tests
-  main_test:
-    image: sendence/$$PONYC_VERSION-python-runner:0.0.4
-    pull: true
-    environment:
-      - LC_ALL=C.UTF-8
-      - LANG=C.UTF-8
-    commands:
-      - make test
+      - make clean arch=$$PONYC_VERSION in_docker=true VERBOSE=true
+      - make build-pony arch=$$PONYC_VERSION in_docker=true VERBOSE=true -j`nproc`
 
   # run dagon tests
   run_dagon_test:
@@ -40,124 +44,35 @@ build:
       - LC_ALL=C.UTF-8
       - LANG=C.UTF-8
     commands:
-      - chrt -f 80 make dagon-test arch=$$PONYC_VERSION
+      - make test-pony VERBOSE=true -j`nproc`
     privileged: true
 
-  # build docker images and test dagon
-  build_docker_images_dagon_test:
-    image: sendence/docker-runner:0.0.3
+  # run dagon tests
+  run_dagon_test:
+    image: sendence/$$PONYC_VERSION-python-runner:0.0.4
     pull: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - LC_ALL=C.UTF-8
+      - LANG=C.UTF-8
     commands:
-      - >
-        make clean-docker arch=$$PONYC_VERSION
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-      - >
-        make build-docker arch=$$PONYC_VERSION
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-      - >
-        make dagon-docker-test arch=$$PONYC_VERSION
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-        docker_no_pull=true
+      - chrt -f 80 make dagon-test arch=$$PONYC_VERSION VERBOSE=true
     privileged: true
-
-  # build and push final docker images on a push event
-  build_docker_images_push:
-    image: sendence/docker-runner:0.0.3
-    pull: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /root/.docker/config.json:/root/.docker/config.json
-    commands:
-      - >
-        make push-docker arch=$$PONYC_VERSION
-        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG
-      - >
-        make arch=$$PONYC_VERSION
-        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG clean-docker
-      - >
-        make arch=$$PONYC_VERSION
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
-    privileged: true
-    when:
-      event: push
-
-  # build and push final docker images on a tag event
-  build_docker_images_tag:
-    image: sendence/docker-runner:0.0.3
-    pull: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /root/.docker/config.json:/root/.docker/config.json
-    commands:
-      - >
-        make push-docker arch=$$PONYC_VERSION
-        docker_image_version=$$TAG-$$PONYC_CONFIG
-      - >
-        make arch=$$PONYC_VERSION docker_image_version=$$TAG-$$PONYC_CONFIG
-        clean-docker
-      - >
-        make arch=$$PONYC_VERSION
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
-    privileged: true
-    when:
-      event: tag
-
-  # run monitoring hub tests
-  run_monitoring_hub_test:
-    image: docker.sendence.com:5043/monitoring-hub-builder:latest
-    auth_config:
-      username: $$DOCKER_USERNAME
-      password: $$DOCKER_PASSWORD
-    pull: true
-    commands:
-      - make test-monitoring-hub
-    when:
-      matrix:
-        PONYC_VERSION: amd64
-
-  # build metrics reporter ui
-  build_metrics_reporter_ui:
-    image: docker.sendence.com:5043/monitoring-hub-builder:latest
-    auth_config:
-      username: $$DOCKER_USERNAME
-      password: $$DOCKER_PASSWORD
-    pull: true
-    commands:
-      - make build-metrics-reporter-ui
-    when:
-      matrix:
-        PONYC_VERSION: amd64
-
-  # build market spread reports ui
-  build_market_spread_reports_ui:
-    image: docker.sendence.com:5043/monitoring-hub-builder:latest
-    auth_config:
-      username: $$DOCKER_USERNAME
-      password: $$DOCKER_PASSWORD
-    pull: true
-    commands:
-      - make build-market-spread-reports-ui
     when:
       matrix:
         PONYC_VERSION: amd64
 
   # build monitoring hub ui docker images
   build_monitoring_hub_ui_docker_images:
-    image: sendence/docker-runner:0.0.3
+    image: sendence/docker-runner:0.0.4
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
       - >
-        make clean-docker arch=$$PONYC_VERSION
+        make clean-docker arch=$$PONYC_VERSION VERBOSE=true
         docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
       - >
-        make build-market-spread-reports-ui-docker arch=$$PONYC_VERSION
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-      - >
-        make build-metrics-reporter-ui-docker arch=$$PONYC_VERSION
+        make build-docker-monhub arch=$$PONYC_VERSION VERBOSE=true
         docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
     privileged: true
     when:
@@ -166,20 +81,20 @@ build:
 
   # build and push final monitoring hub ui docker images on a push event
   build_monitoring_hub_ui_docker_images_push:
-    image: sendence/docker-runner:0.0.3
+    image: sendence/docker-runner:0.0.4
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /root/.docker/config.json:/root/.docker/config.json
     commands:
       - >
-        make push-monitoring-hub-ui-docker arch=$$PONYC_VERSION
+        make push-docker-monhub arch=$$PONYC_VERSION VERBOSE=true
         docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG
       - >
-        make arch=$$PONYC_VERSION
+        make arch=$$PONYC_VERSION VERBOSE=true
         docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG clean-docker
       - >
-        make arch=$$PONYC_VERSION
+        make arch=$$PONYC_VERSION VERBOSE=true
         docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
     privileged: true
     when:
@@ -189,26 +104,87 @@ build:
 
   # build and push monitoring hub ui docker images on tag event
   build_monitoring_hub_ui_docker_images_tag:
-    image: sendence/docker-runner:0.0.3
+    image: sendence/docker-runner:0.0.4
     pull: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /root/.docker/config.json:/root/.docker/config.json
     commands:
       - >
-        make push-monitoring-hub-ui-docker arch=$$PONYC_VERSION
+        make push-docker-monhub arch=$$PONYC_VERSION VERBOSE=true
         docker_image_version=$$BRANCH-$$TAG-$$PONYC_CONFIG
       - >
-        make arch=$$PONYC_VERSION
+        make arch=$$PONYC_VERSION VERBOSE=true
         docker_image_version=$$BRANCH-$$TAG-$$PONYC_CONFIG clean-docker
       - >
-        make arch=$$PONYC_VERSION
+        make arch=$$PONYC_VERSION VERBOSE=true
         docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
     privileged: true
     when:
       event: tag
       matrix:
         PONYC_VERSION: amd64
+
+  # build docker images and test dagon
+  build_docker_images_dagon_test:
+    image: sendence/docker-runner:0.0.4
+    pull: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - >
+        make clean-docker arch=$$PONYC_VERSION VERBOSE=true
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+      - >
+        make build-docker-pony arch=$$PONYC_VERSION VERBOSE=true
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+      - >
+        make dagon-docker-test arch=$$PONYC_VERSION VERBOSE=true
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+        docker_no_pull=true
+    privileged: true
+
+  # build and push final docker images on a push event
+  build_docker_images_push:
+    image: sendence/docker-runner:0.0.4
+    pull: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/root/.docker/config.json
+    commands:
+      - >
+        make push-docker-pony arch=$$PONYC_VERSION VERBOSE=true
+        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG
+      - >
+        make arch=$$PONYC_VERSION VERBOSE=true
+        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG clean-docker
+      - >
+        make arch=$$PONYC_VERSION VERBOSE=true
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
+    privileged: true
+    when:
+      event: push
+
+  # build and push final docker images on a tag event
+  build_docker_images_tag:
+    image: sendence/docker-runner:0.0.4
+    pull: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/root/.docker/config.json
+    commands:
+      - >
+        make push-docker-pony arch=$$PONYC_VERSION VERBOSE=true
+        docker_image_version=$$TAG-$$PONYC_CONFIG
+      - >
+        make arch=$$PONYC_VERSION docker_image_version=$$TAG-$$PONYC_CONFIG
+        VERBOSE=true clean-docker
+      - >
+        make arch=$$PONYC_VERSION VERBOSE=true
+        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
+    privileged: true
+    when:
+      event: tag
 
   # run dagon spike tests
   run_dagon_spike_test:
@@ -218,7 +194,7 @@ build:
       - LC_ALL=C.UTF-8
       - LANG=C.UTF-8
     commands:
-      - chrt -f 80 make dagon-spike-test arch=$$PONYC_VERSION
+      - chrt -f 80 make dagon-spike-test arch=$$PONYC_VERSION VERBOSE=true
     privileged: true
 
 # send notifications to slack

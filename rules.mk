@@ -360,7 +360,7 @@ endef
 ROOT_TARGET_SUFFIX := $(if $(filter $(abs_buffy_dir),$(abspath $(ROOT_PATH))),buffyroot-all,$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(ROOT_PATH))))-all)
 
 # phony targets
-.PHONY: build build-docker build-monhub build-pony clean clean-docker clean-monhub clean-pony dagon-spike-test dagon-test list push-docker test-monhub test-pony test docker-arch-check monhub-arch-check help
+.PHONY: build build-docker build-monhub build-pony clean clean-docker clean-monhub clean-pony dagon-spike-test dagon-test list push-docker test-monhub test-pony test docker-arch-check monhub-arch-check help build-docker-pony push-docker-pony build-docker-monhub push-docker-monhub
 
 
 # default targets
@@ -370,10 +370,14 @@ test: test-$(ROOT_TARGET_SUFFIX) ## Test all projects (pony & monhub)
 build-pony: build-pony-all ## Build all pony projects
 test-pony: test-pony-all ## Test all pony projects
 clean-pony: clean-pony-all ## Clean all pony projects
+build-docker-pony: build-docker-pony-all ## Build docker containers for all pony projects
+push-docker-pony: push-docker-pony-all ## Push docker containers for all pony projects
 build-monhub: build-monhub-all ## Build all monhub projects
 release-monhub: release-monhub-all ## Create release packages for all monhub projects
 test-monhub: test-monhub-all ## Test all monhub projects
 clean-monhub: clean-monhub-all ## Clean all monhub projects
+build-docker-monhub: build-docker-monhub-all ## Build docker containers for all monhub projects
+push-docker-monhub: push-docker-monhub-all ## Push docker containers for all monhub projects
 build-docker: build-docker-$(ROOT_TARGET_SUFFIX) ## Build all docker images
 push-docker: push-docker-$(ROOT_TARGET_SUFFIX) ## Push all docker images
 
