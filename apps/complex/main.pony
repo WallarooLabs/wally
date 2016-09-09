@@ -43,16 +43,23 @@ primitive ComplexStarter
     reports_socket.writev(connect_msg)
     reports_socket.writev(reports_join_msg)
 
+    let sink_reporter = MetricsReporter("complex-numbers", metrics_socket)
+    let sink = Step(SimpleSink(consume sink_reporter))
+    let scale_reporter = MetricsReporter("complex-numbers", metrics_socket)
+    let scale_runner = ComputationRunner[Complex val, Complex val](Scale,
+      sink, consume scale_reporter)
+    let scale_step = Step(consume scale_runner)
+
     let complex_source_builder: {(): Source iso^} val = 
       recover 
-        lambda()(metrics_socket): Source iso^ 
+        lambda()(metrics_socket, scale_step): Source iso^ 
         =>
           let complex_reporter = MetricsReporter("complex-numbers",
             metrics_socket)
           let runner = ComputationRunner[Complex val, Complex val](Conjugate, 
-            Step(SimpleSink), consume complex_reporter)
-          let step = Step(consume runner)
-          let router = DirectRouter[Complex val, Step tag](step) 
+            scale_step, consume complex_reporter)
+          let conjugate_step = Step(consume runner)
+          let router = DirectRouter[Complex val, Step tag](conjugate_step) 
           StatelessSource[Complex val]("Complex Numbers Source",
             ComplexSourceParser, consume router)
         end
