@@ -27,7 +27,8 @@ class OutNotify is TCPConnectionNotify
 interface AppStarter
   fun apply(env: Env, input_addrs: Array[Array[String]], 
     output_addr: Array[String], metrics_addr: Array[String], 
-    expected: USize, init_path: String, worker_count: USize) ? 
+    expected: USize, init_path: String, worker_count: USize,
+    initializer: Bool) ? 
 
 actor Startup
   new create(env: Env, app_runner: AppStarter val) =>
@@ -38,6 +39,7 @@ actor Startup
     var expected: USize = 1_000_000
     var init_path = ""
     var worker_count: USize = 1
+    var initializer = false
 
     try
       var options = Options(env.args)
@@ -52,6 +54,7 @@ actor Startup
         // worker count includes the initial "leader" since there is no
         // persisting leader
         .add("worker-count", "w", I64Argument)
+        .add("topology-initializer", "t", None)
 
       for option in options do
         match option
@@ -65,6 +68,7 @@ actor Startup
         | ("data", let arg: String) => d_arg = arg.split(":")
         | ("file", let arg: String) => init_path = arg
         | ("worker-count", let arg: I64) => worker_count = arg.usize()
+        | ("topology-initializer", None) => initializer = true
         end
       end
 
@@ -72,7 +76,7 @@ actor Startup
       let o_addr = o_arg as Array[String]
 
       app_runner(env, input_addrs, o_addr, m_addr, expected, init_path, 
-        worker_count)
+        worker_count, initializer)
     else
       JrStartupHelp(env)
     end
