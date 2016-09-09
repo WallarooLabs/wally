@@ -1,0 +1,14 @@
+# mdadm.conf
+#DEVICE partitions containers
+
+# auto-create devices with Debian standard permissions
+CREATE owner=root group=disk mode=0660 auto=yes
+
+# automatically tag new arrays as belonging to the local system
+HOMEHOST <system>
+
+# instruct the monitoring daemon where to send mail alerts
+MAILADDR {{ software_raid_alerts_email }}
+
+# definitions of existing MD arrays
+{{ mdadm_scan.stdout }}

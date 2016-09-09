@@ -46,11 +46,53 @@
   tasks:
   - name: Create a group of all hosts for buffy
     group_by: key=buffy-all
+  - name: set variable for disks that can be raided
+    set_fact:
+      disks: "{{ hostvars[inventory_hostname]['ansible_devices'].keys() | difference(['xvda','sda']) }}"
+  - name: set variable for disks that can be raided
+    set_fact:
+      interim_string: "{% for item in disks %}/dev/{{item}} {% endfor %}"
+  - name: set variable for disks that can be raided
+    set_fact:
+      disks_list: "{{ interim_string.split() }}"
+  - name: unmount /mnt for raid
+    mount:
+      name: "/mnt"
+      state: absent
+      src: ""
+      fstype: ""
+    become: yes
+  - name: sysctl speed change for raid build
+    sysctl:
+      name: dev.raid.speed_limit_min
+      value: 30720
+      state: present
+      sysctl_set: yes
+      reload: yes
+    become: yes
+  - name: create /data
+    file:
+      path: /data
+      state: directory
+      mode: 0777
+    become: yes
 
 # Apply common configuration to all hosts
 - hosts: buffy-all
+  vars:
+    software_raid_create_kwargs: "--run" # force the creation if there are any prompts
+    software_raid_devices:
+      - device: /dev/md0
+        level: "{{ raid_level if raid_level is defined else '0' }}"
+        components: "{{ disks_list }}"
+        filesystem_type: "{{ raid_fs if raid_fs is defined else 'ext4' }}"
+        mount_point: "/data"
+        mount_options: "noatime,noexec,nodiratime"
+        dump: 0
+        passno: 0
   roles:
   - { role: common, become: yes }
+  - { role: jacoelho.softwareraid, become: yes, when: disks_list | length > 0}
   tasks:
   - name: Gather ec2 facts
     action: ec2_facts
