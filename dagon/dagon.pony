@@ -1018,12 +1018,11 @@ actor ProcessManager
     var final_args: Array[String] val = recover Array[String](0) end
     if node.wrapper_path.size() > 0 then // wrap if path is set
       filepath = _filepath_from_path(node.wrapper_path)
-      final_args = _prepend_name(node.name, _prepend_wrapper(
+      final_args = _prepend_arg(Path.clean(node.wrapper_path), _prepend_wrapper(
         node.path, node.wrapper_args, node.args))
     else // normal, unwrapped execution
       filepath = _filepath_from_path(node.path)
-      final_args = _prepend_name(node.name, node.args)
-      final_args = node.args
+      final_args = _prepend_arg(Path.clean(node.path), node.args)
     end
     let final_vars = node.vars
     _env.out.print("dagon: " + node.name + " command: ")
@@ -1054,11 +1053,11 @@ actor ProcessManager
       transition_to(ErrorShutdown)
     end
 
-  fun ref _prepend_name(name: String,
+  fun ref _prepend_arg(new_arg: String,
     args: Array[String] val): Array[String] val
   =>
     let result: Array[String] iso = recover Array[String](7) end
-    result.push(name)
+    result.push(new_arg)
     for arg in args.values() do
       result.push(arg)
     end
