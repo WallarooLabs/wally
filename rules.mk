@@ -92,8 +92,6 @@ ifeq ($(dagon_docker_host),)
   dagon_docker_host := $(docker_host)
 endif
 
-dagon_docker_host_arg := --host=$(dagon_docker_host)# dagon docker host argument
-
 ifeq ($(shell uname -s),Linux)
   extra_xargs_arg := -r
   docker_user_arg := -u `id -u`
@@ -195,6 +193,7 @@ define RUN_DAGON
 $(if $(filter $5,false true),,\
     $(error Unknown 'include in CI' option "$5"))
 dagon-test: $(if $(filter $5,true),$1,)
+dagon-docker-test: $(if $(filter $5,true),$(subst dagon-,dagon-docker-,$1),)
 $(call RUN_DAGON_TARGET,$1,$2,$3,$4)
 endef
 
@@ -203,12 +202,22 @@ define RUN_DAGON_SPIKE
 $(if $(filter $5,false true),,\
     $(error Unknown 'include in CI' option "$5"))
 dagon-spike-test: $(if $(filter $5,true),$1,)
+dagon-docker-spike-test: $(if $(filter $5,true),$(subst dagon-,dagon-docker-,$1),)
 $(call RUN_DAGON_TARGET,$1,$2,$3,$4)
 endef
 
 # rule to add a new dagon target
 define RUN_DAGON_TARGET
-.PHONY: $1
+$(if $(findstring dagon,$(word 1, $(subst -, ,$1))),,$(error Dagon tests must \
+begin with 'dagon-'! Current test name '$(strip $1)' is invalid!))
+.PHONY: $1 $(subst dagon-,dagon-docker-,$1)
+$(subst dagon-,dagon-docker-,$1): dagon_use_docker=--docker=$(dagon_docker_host) \
+--docker-tag=$(docker_image_version) --docker-arch=$(if $(filter $(arch),native),amd64,$(arch))
+$(subst dagon-,dagon-docker-,$1): dagon_config_file=$(if $(custom_dagon_config),$(custom_dagon_config),$2)
+$(subst dagon-,dagon-docker-,$1): dagon_timeout=$(if $(custom_dagon_timeout),$(custom_dagon_timeout),$3)
+$(subst dagon-,dagon-docker-,$1):
+	$$(call run-dagon)
+	$4
 $1: dagon_config_file=$(if $(custom_dagon_config),$(custom_dagon_config),$2)
 $1: dagon_timeout=$(if $(custom_dagon_timeout),$(custom_dagon_timeout),$3)
 $1:
@@ -219,7 +228,7 @@ endef
 # function call for running dagon
 define run-dagon
   $(QUIET)cd $(abs_buffy_dir) && $(abs_buffy_dir:%/=%)/dagon/dagon --timeout=$(dagon_timeout) -f $(dagon_config_file) \
-          -h 127.0.0.1:8080
+          -h 127.0.0.1:8080 $(dagon_use_docker)
 endef
 
 # rule to generate includes for makefiles in subdirs of first argument
@@ -360,7 +369,7 @@ endef
 ROOT_TARGET_SUFFIX := $(if $(filter $(abs_buffy_dir),$(abspath $(ROOT_PATH))),buffyroot-all,$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $(ROOT_PATH))))-all)
 
 # phony targets
-.PHONY: build build-docker build-monhub build-pony clean clean-docker clean-monhub clean-pony dagon-spike-test dagon-test list push-docker test-monhub test-pony test docker-arch-check monhub-arch-check help build-docker-pony push-docker-pony build-docker-monhub push-docker-monhub
+.PHONY: build build-docker build-monhub build-pony clean clean-docker clean-monhub clean-pony dagon-spike-test dagon-test list push-docker test-monhub test-pony test docker-arch-check monhub-arch-check help build-docker-pony push-docker-pony build-docker-monhub push-docker-monhub dagon-docker-test dagon-docker-spike-test
 
 
 # default targets
@@ -393,7 +402,11 @@ print-%:
 
 dagon-test: ## Run dagon tests
 
+dagon-docker-test: ## Run dagon tests (using docker)
+
 dagon-spike-test: ## Run dagon spike tests
+
+dagon-docker-spike-test: ## Run dagon spike tests (using docker)
 
 # rule to confirm we are building for a real docker architecture we support
 docker-arch-check:
@@ -436,25 +449,26 @@ help: ## this help message
 	$(QUIET)echo ''
 	$(QUIET)echo 'Options:'
 	$(QUIET)grep -h -E '^[a-zA-Z0-9_-]+ *\?=.*?## .*$$' $(MAKEFILE_LIST) | sort -u | awk \
-          'BEGIN {FS = "$(extra_awk_arg)?="}; {printf "\033[36m%-30s\033[0m ##%s\n", $$1, \
-          $$2}' | awk 'BEGIN {FS = "## "}; {printf "%s %s \033[36m(Default:\
+          'BEGIN {FS = "$(extra_awk_arg)?="}; {printf "\033[36m%-40s\033[0m ##%s\n", $$1, \
+          $$2}' | awk 'BEGIN {FS = "## "}; {printf "%s%s \033[36m(Default:\
  %s)\033[0m\n", $$1, $$3, $$2}'
 	$(QUIET)grep -h -E 'filter.*arch.*\)$$' $(MAKEFILE_LIST) | sort -u | awk \
-          'BEGIN {FS = "[(),]"}; {printf "\033[36m%-30s\033[0m %s\n", \
+          'BEGIN {FS = "[(),]"}; {printf "\033[36m%-40s\033[0m %s\n", \
           "  Valid values for " $$5 ":", $$7}'
 	$(QUIET)grep -h -E 'filter.*in_docker.*\)$$' $(MAKEFILE_LIST) | sort -u | awk \
-          'BEGIN {FS = "[(),]"}; {printf "\033[36m%-30s\033[0m %s\n", \
+          'BEGIN {FS = "[(),]"}; {printf "\033[36m%-40s\033[0m %s\n", \
           "  Valid values for " $$5 ":", $$7}'
 	$(QUIET)echo ''
 	$(QUIET)echo 'Targets:'
-	$(QUIET)echo "\033[36m{command}-{dir}-all            \033[0mRun command for a directory and all it's sub-projects."
-	$(QUIET)echo "                               Where command is one of: build,test,clean,build-docker,push-docker"
+	$(QUIET)echo "\033[36m{command}-{dir}-all                      \033[0mRun command for a directory and all it's sub-projects."
+	$(QUIET)echo "                                         Where command is one of: build,test,clean,build-docker,push-docker"
 	$(QUIET)grep -h -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort -u | awk \
-          'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", \
+          'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-40s\033[0m %s\n", \
           $$1, $$2}'
 	$(QUIET)grep -h -E '^#[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort -u | awk \
-          'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", \
-          substr($$1,2), $$2}'
+          'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-40s\033[0m %s\n", \
+          substr($$1,2), $$2; str=$$1; sub(/#dagon-/,"dagon-docker-",str); printf \
+          "\033[36m%-40s\033[0m %s (using docker)\n", str, $$2}'
 
 endif # RULES_MK
 
