@@ -6,7 +6,12 @@ use "../metrics"
 interface Runner
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In)
 
-class iso SimpleSink
+class SimpleSink
+  let _metrics_reporter: MetricsReporter
+
+  new iso create(metrics_reporter: MetricsReporter iso) =>
+    _metrics_reporter = consume metrics_reporter
+
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In) =>
     match input
     | let s: Stringable val =>
@@ -14,6 +19,8 @@ class iso SimpleSink
     else
       @printf[I32]("Simple sink: Got it!\n".cstring())
     end
+
+    _metrics_reporter.pipeline_metric(metric_name, source_ts)
 
 class ComputationRunner[In: Any val, Out: Any val]
   let _computation: Computation[In, Out] val
