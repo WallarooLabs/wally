@@ -70,7 +70,7 @@ $(eval \
   $(call lazy-init,docker_image_version_val,\
     $$(call docker_image_version_src)))
 
-docker_image_version ?= $(docker_image_version_val)## Docker Image Tag to use
+docker_image_version ?= $(strip $(docker_image_version_val))## Docker Image Tag to use
 docker_image_repo_host ?= docker.sendence.com:5043## Docker Repository to use
 docker_image_repo ?= $(docker_image_repo_host)/sendence## Docker Repository to use
 arch ?= native## Architecture to build for
@@ -87,6 +87,7 @@ docker_host_arg := --host=$(docker_host)# docker host argument
 dagon_docker_host ?= ## Dagon docker host arg (defaults to docker_host value)
 monhub_builder ?= monitoring-hub-builder
 monhub_builder_tag ?= latest
+unix_timestamp := $(shell date +%s) # unix timestamp for docker network name
 
 ifeq ($(dagon_docker_host),)
   dagon_docker_host := $(docker_host)
@@ -96,6 +97,9 @@ ifeq ($(shell uname -s),Linux)
   extra_xargs_arg := -r
   docker_user_arg := -u `id -u`
   extra_awk_arg := \\
+  host_ip := $(shell ifconfig `route -n | grep '^0.0.0.0' | awk '{print $$8}'` | egrep -o 'inet addr:[^ ]+' | awk -F: '{print $$2}')
+else
+  host_ip := $(shell ifconfig `route -n get 0.0.0.0 2>/dev/null | awk '/interface: / {print $2}'` | egrep -o 'inet [^ ]+' | awk '{print $2}')
 endif
 
 ifeq ($(debug),true)
@@ -215,11 +219,13 @@ $(subst dagon-,dagon-docker-,$1): dagon_use_docker=--docker=$(dagon_docker_host)
 --docker-tag=$(docker_image_version) --docker-arch=$(if $(filter $(arch),native),amd64,$(arch))
 $(subst dagon-,dagon-docker-,$1): dagon_config_file=$(if $(custom_dagon_config),$(custom_dagon_config),$2)
 $(subst dagon-,dagon-docker-,$1): dagon_timeout=$(if $(custom_dagon_timeout),$(custom_dagon_timeout),$3)
+$(subst dagon-,dagon-docker-,$1): dagon_phone_home=$(host_ip):8080
 $(subst dagon-,dagon-docker-,$1):
 	$$(call run-dagon)
 	$4
 $1: dagon_config_file=$(if $(custom_dagon_config),$(custom_dagon_config),$2)
 $1: dagon_timeout=$(if $(custom_dagon_timeout),$(custom_dagon_timeout),$3)
+$1: dagon_phone_home=127.0.0.1:8080
 $1:
 	$$(call run-dagon)
 	$4
@@ -227,8 +233,9 @@ endef
 
 # function call for running dagon
 define run-dagon
+  $(if $(dagon_use_docker),$(QUIET)docker --host=$(dagon_docker_host) network create buffy-$(unix_timestamp),)
   $(QUIET)cd $(abs_buffy_dir) && $(abs_buffy_dir:%/=%)/dagon/dagon --timeout=$(dagon_timeout) -f $(dagon_config_file) \
-          -h 127.0.0.1:8080 $(dagon_use_docker)
+          -h $(dagon_phone_home) $(dagon_use_docker) --docker-network=buffy-$(unix_timestamp)
 endef
 
 # rule to generate includes for makefiles in subdirs of first argument

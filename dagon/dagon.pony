@@ -4,6 +4,7 @@ use "files"
 use "time"
 use "sendence/messages"
 use "net"
+use "signals"
 use "options"
 use "ini"
 use "process"
@@ -334,13 +335,15 @@ class ConnectNotify is TCPConnectionNotify
 
 class Child
   let name: String
+  let host_name: String
   let is_canary: Bool
   let pm: ProcessMonitor
   var conn: (TCPConnection | None) = None
   var state: ChildState = Booting
 
-  new create(name': String, is_canary': Bool, pm': ProcessMonitor) =>
+  new create(name': String, is_canary': Bool, pm': ProcessMonitor, host_name': String) =>
     name = name'
+    host_name = host_name'
     is_canary = is_canary'
     pm = pm'
 
@@ -442,6 +445,9 @@ actor ProcessManager
     _host = host
     _service = service
     _name_postfix = Time.wall_to_nanos(Time.now()).string()
+
+    SignalHandler(TermHandler(this), Sig.term())
+    SignalHandler(TermHandler(this), Sig.int())
 
     let tcp_n = recover Notifier(env, this) end
     try
@@ -587,7 +593,7 @@ actor ProcessManager
     var docker_image = ""
     var docker_constraint = ""
     var docker_dir = ""
-    var docker_tag = ""
+    var docker_tag = _docker_tag
     var docker_userid = ""
     var path: String = ""
     var wrapper_path: String = ""
@@ -864,6 +870,72 @@ actor ProcessManager
       boot_process(node)
     end
 
+  fun ref kill_child(child: Child ref) =>
+    """
+    Kill a child (process or container).
+    """
+    _env.out.print("Killing Child: " + child.name + ", State: " + child.state.string())
+    if _use_docker then
+      kill_container(child)
+    else
+      child.pm.dispose()
+    end
+    child.state = Killed
+
+  fun ref kill_container(child: Child ref) =>
+    """
+    Kill a child running as a container.
+    """
+    var docker: (FilePath | None) = None
+    var docker_path: String = ""
+    var docker_opts: String = ""
+    try
+      docker_path = _docker_args("docker_path")
+      docker = _filepath_from_path(docker_path)
+    else
+      _env.out.print("dagon: could not get docker info from map")
+      transition_to(ErrorShutdown)
+      return
+    end
+
+    if docker isnt None then
+      // prepare the environment
+      let vars: Array[String] iso = recover Array[String](4) end
+      vars.push("DOCKER_HOST=" + _docker_host)
+      // add more specific Docker env variables
+      for pair in _docker_vars.pairs() do
+        _env.out.print("dagon: adding to docker env: " +
+          pair._1 + "=" + pair._2)
+        vars.push(pair._1 + "=" + pair._2)
+      end
+
+      // prepare the Docker args
+      let args: Array[String] iso = recover Array[String](6) end
+      args.push(Path.clean(docker_path))   // first arg is always "docker"
+      args.push("kill")                         // our Docker command
+      args.push(child.host_name)
+
+      // dump args
+      let a: Array[String val] val = consume args
+      _dump_docker_command(a)
+
+      try
+        _env.out.print("dagon: killing docker container: " + child.host_name)
+        let pn: ProcessNotify iso = ProcessClient(_env, child.name + "-killer", this)
+        let pm: ProcessMonitor = ProcessMonitor(consume pn,
+          docker as FilePath, a, consume vars)
+      else
+        _env.out.print("dagon: booting docker process failed: " + child.name)
+        transition_to(ErrorShutdown)
+        return
+      end
+
+    else
+      _env.out.print("dagon: docker is None: " + child.name)
+      transition_to(ErrorShutdown)
+      return
+    end
+
   be boot_container(node: Node val) =>
     """
     Boot a node as container.
@@ -872,11 +944,12 @@ actor ProcessManager
 
     var docker: (FilePath | None) = None
     var docker_opts: String = ""
+    var docker_path: String = ""
     var docker_network: String = _docker_network
     var docker_repo: String = ""
     let docker_arch = if _docker_arch != "" then "." + _docker_arch else "" end
     try
-      let docker_path = _docker_args("docker_path")
+      docker_path = _docker_args("docker_path")
       docker = _filepath_from_path(docker_path)
       docker_network = if docker_network == "" then
                          _docker_args.get_or_else("docker_network", _docker_network)
@@ -909,7 +982,7 @@ actor ProcessManager
 
       // prepare the Docker args
       let args: Array[String] iso = recover Array[String](6) end
-      args.push("docker")                      // first arg is always "docker"
+      args.push(Path.clean(docker_path))       // first arg is always "docker"
       args.push("run")                         // our Docker command
       args.push("-u")                          // the userid to use
       args.push(node.docker_userid)
@@ -980,7 +1053,7 @@ actor ProcessManager
           let pn: ProcessNotify iso = ProcessClient(_env, node.name, this)
           let pm: ProcessMonitor = ProcessMonitor(consume pn,
             docker as FilePath, a, consume vars)
-          let child = Child(node.name, node.is_canary, pm)
+          let child = Child(node.name, node.is_canary, pm, node.host_name)
             roster.insert(node.name, child)
         else
           _env.out.print("dagon: booting docker process failed: " + node.name)
@@ -1041,7 +1114,7 @@ actor ProcessManager
         let pn: ProcessNotify iso = ProcessClient(_env, node.name, this)
         let pm: ProcessMonitor = ProcessMonitor(consume pn, filepath as FilePath,
           consume final_args, consume final_vars)
-        let child = Child(node.name, node.is_canary, pm)
+        let child = Child(node.name, node.is_canary, pm, node.name)
         roster.insert(node.name, child)
       else
         _env.out.print("dagon: booting process failed")
@@ -1262,9 +1335,7 @@ actor ProcessManager
         if (child.state isnt Done) then
           num_left = num_left + 1
           if child.state isnt Killed then
-            _env.out.print("Child: " + child.name + ", State: " + child.state.string())
-            child.pm.dispose()
-            child.state = Killed
+            kill_child(child)
           end
         end
       end
@@ -1556,4 +1627,18 @@ class WaitForShutdown is TimerNotify
     _env.out.print("dagon: wait for shutdown to finish.")
     _p_mgr.handle_shutdown()
     false
+
+//
+// SHUTDOWN GRACEFULLY ON SIGTERM
+//
+
+class TermHandler is SignalNotify
+  let _p_mgr: ProcessManager
+
+  new iso create(p_mgr: ProcessManager) =>
+    _p_mgr = p_mgr
+
+  fun ref apply(count: U32): Bool =>
+    _p_mgr.transition_to(ErrorShutdown)
+    true
 
