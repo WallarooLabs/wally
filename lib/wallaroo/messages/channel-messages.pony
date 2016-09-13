@@ -31,15 +31,15 @@ primitive ChannelMsgEncoder
     auth: AmbientAuth): Array[ByteSeq] val ? =>
     _encode(IdentifyDataPortMsg(node_name, service), auth)
 
-  fun add_control(node_name: String, service: String, auth: AmbientAuth): 
-    Array[ByteSeq] val ? 
+  fun add_control(node_name: String, host: String, service: String, 
+    auth: AmbientAuth): Array[ByteSeq] val ? 
   =>
-    _encode(AddControlMsg(node_name, service), auth)
+    _encode(AddControlMsg(node_name, host, service), auth)
 
-  fun add_data(node_name: String, service: String, auth: AmbientAuth): 
-    Array[ByteSeq] val ? 
+  fun add_data(node_name: String, host: String, service: String, 
+    auth: AmbientAuth): Array[ByteSeq] val ? 
   =>
-    _encode(AddDataMsg(node_name, service), auth)
+    _encode(AddDataMsg(node_name, host, service), auth)
 
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg val =>
@@ -83,18 +83,22 @@ class IdentifyDataPortMsg is ChannelMsg
 
 class AddControlMsg is ChannelMsg
   let node_name: String
+  let host: String
   let service: String
 
-  new val create(name: String, s: String) =>
+  new val create(name: String, h: String, s: String) =>
     node_name = name
+    host = h
     service = s
 
 class AddDataMsg is ChannelMsg
   let node_name: String
+  let host: String
   let service: String
 
-  new val create(name: String, s: String) =>
+  new val create(name: String, h: String, s: String) =>
     node_name = name
+    host = h
     service = s
 
 class ForwardMsg[D: Any val] is ChannelMsg
