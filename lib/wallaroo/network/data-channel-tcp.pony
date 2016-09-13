@@ -7,11 +7,12 @@ use "wallaroo/metrics"
 use "wallaroo/topology"
 
 class DataChannelNotify is TCPConnectionNotify
-  let _router: Router val
+  let _router: Router[Array[U8] val, Step tag] val
   let _metrics: JrMetrics
   var _header: Bool = true
 
-  new iso create(router: Router val, metrics: JrMetrics) =>
+  new iso create(router: Router[Array[U8] val, Step tag] val, 
+    metrics: JrMetrics) =>
     _router = router
     _metrics = metrics
 
@@ -39,10 +40,11 @@ class DataChannelNotify is TCPConnectionNotify
     @printf[None]("incoming connected\n".cstring())
 
 class DataChannelListenerNotify is TCPListenNotify
-  let _router: Router val
+  let _router: Router[Array[U8] val, Step tag] val
   let _metrics: JrMetrics
 
-  new iso create(router: Router val, metrics: JrMetrics) =>
+  new iso create(router: Router[Array[U8] val, Step tag] val, 
+    metrics: JrMetrics) =>
     _router = router
     _metrics = metrics
 
