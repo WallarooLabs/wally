@@ -56,10 +56,17 @@ class StatelessSource[In: Any val]
   fun name(): String val => _name
 
   fun ref process(data: Array[U8] val) =>
+<<<<<<< HEAD:lib/wallaroo/topology/source.pony
     let ingest_ts = Time.nanos()
     try
       // For recording metrics for filtered messages
       let computation_start = Time.nanos()
+=======
+    let ingest_ts = Epoch.nanoseconds()
+    try
+      // For recording metrics for filtered messages
+      let computation_start = Epoch.nanoseconds()
+>>>>>>> master:lib/wallaroo/topology/source.pony
 
       match _parser(data)
       | let input: In =>
