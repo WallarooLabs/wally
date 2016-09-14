@@ -28,7 +28,7 @@ interface AppStarter
   fun apply(env: Env, input_addrs: Array[Array[String]], 
     output_addr: Array[String], metrics_addr: Array[String], 
     expected: USize, init_path: String, worker_count: USize,
-    initializer: Bool) ? 
+    initializer: Bool, node_name: String) ? 
 
 actor Startup
   new create(env: Env, app_runner: AppStarter val) =>
@@ -40,7 +40,7 @@ actor Startup
     var init_path = ""
     var worker_count: USize = 1
     var initializer = false
-
+    var node_name = ""
     try
       var options = Options(env.args)
 
@@ -55,6 +55,7 @@ actor Startup
         // persisting leader
         .add("worker-count", "w", I64Argument)
         .add("topology-initializer", "t", None)
+        .add("node-name", "n", StringArgument)
 
       for option in options do
         match option
@@ -69,14 +70,20 @@ actor Startup
         | ("file", let arg: String) => init_path = arg
         | ("worker-count", let arg: I64) => worker_count = arg.usize()
         | ("topology-initializer", None) => initializer = true
+        | ("node-name", let arg: String) => node_name = arg
         end
       end
 
       let m_addr = m_arg as Array[String]
       let o_addr = o_arg as Array[String]
 
+      if node_name == "" then
+        env.out.print("You must specify a node name via --node-name/-n.")
+        error
+      end
+
       app_runner(env, input_addrs, o_addr, m_addr, expected, init_path, 
-        worker_count, initializer)
+        worker_count, initializer, node_name)
     else
       JrStartupHelp(env)
     end

@@ -9,7 +9,7 @@ nc -l 127.0.0.1 7002 >> /dev/null
 nc -l 127.0.0.1 7003 >> /dev/null
 
 3) Junior itself (market spread)
-./market-spread-jr -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:7002 -m 127.0.0.1:7003 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 10000000
+./market-spread-jr -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:7002 -m 127.0.0.1:7003 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 10000000 -n node-name
 
 4) orders:
 ./sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-trades-fixish.msg -r --ponythreads=1 -y -g 57
