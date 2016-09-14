@@ -49,9 +49,9 @@ class _MetricsReporter
     let now = Epoch.nanoseconds()
 
     if now > _period_ends_at then
-      _period_ends_at = _next_period_endtime(now, _period)
       let h = _histogram = Histogram
       _send_histogram(h)
+      _period_ends_at = _next_period_endtime(now, _period)
     end
     _histogram(duration)
 
@@ -84,7 +84,7 @@ class MetricsReporter
       _step_metrics_map(name)
     else
       let reporter =
-        _MetricsReporter(_metrics_conn, 1, _app_name, name, 
+        _MetricsReporter(_metrics_conn, 1, _app_name, name,
           ComputationCategory)
       _step_metrics_map(name) = reporter
       reporter
@@ -97,7 +97,7 @@ class MetricsReporter
         _pipeline_metrics_map(source_name)
       else
         let reporter =
-          _MetricsReporter(_metrics_conn, 1, _app_name, source_name, 
+          _MetricsReporter(_metrics_conn, 1, _app_name, source_name,
             StartToEndCategory)
         _pipeline_metrics_map(source_name) = reporter
         reporter
