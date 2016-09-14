@@ -2,7 +2,6 @@ use "net"
 use "time"
 use "buffered"
 use "collections"
-use "sendence/epoch"
 use "../metrics"
 
 class SourceRunner
@@ -24,7 +23,7 @@ class SourceRunner
   fun ref _begin_tracking() =>
     _count = _count + 1
     if _count == 1 then
-      _metrics.set_start(Epoch.nanoseconds())
+      _metrics.set_start(Time.nanos())
     end
     if (_count % 1_000_000) == 0 then
       @printf[None]("%s %zu\n".cstring(), _source.name().null_terminated().cstring(), _count)
@@ -32,7 +31,7 @@ class SourceRunner
 
   fun ref _end_tracking() =>
     if _count == _expected then
-      _metrics.set_end(Epoch.nanoseconds(), _expected)
+      _metrics.set_end(Time.nanos(), _expected)
     end
 
 interface Source
@@ -57,10 +56,17 @@ class StatelessSource[In: Any val]
   fun name(): String val => _name
 
   fun ref process(data: Array[U8] val) =>
+<<<<<<< HEAD:lib/wallaroo/topology/source.pony
+    let ingest_ts = Time.nanos()
+    try
+      // For recording metrics for filtered messages
+      let computation_start = Time.nanos()
+=======
     let ingest_ts = Epoch.nanoseconds()
     try
       // For recording metrics for filtered messages
       let computation_start = Epoch.nanoseconds()
+>>>>>>> master:lib/wallaroo/topology/source.pony
 
       match _parser(data)
       | let input: In =>
@@ -102,10 +108,10 @@ class StateSource[In: Any val, State: Any #read]
   fun name(): String val => _name
 
   fun ref process(data: Array[U8] val) =>
-    let ingest_ts = Epoch.nanoseconds()
+    let ingest_ts = Time.nanos()
     try
       // For recording metrics for filtered messages
-      let computation_start = Epoch.nanoseconds()
+      let computation_start = Time.nanos()
 
       match _parser(consume data)
       | let input: In =>
@@ -121,7 +127,7 @@ class StateSource[In: Any val, State: Any #read]
         end
       else
         // If parser returns None, we're filtering the message out already
-        let computation_end = Epoch.nanoseconds()
+        let computation_end = Time.nanos()
         _metrics_reporter.pipeline_metric(_name, ingest_ts)
 
         _metrics_reporter.step_metric(_state_comp.name(),

@@ -16,8 +16,18 @@ defmodule MonitoringHubUtils.MessageLog do
     GenServer.call(via_tuple(log_name), {:log_throughput_message, message})
   end
 
+  def log_period_throughput_message(log_name, %{"total_throughput" => _, "time" => _,
+    "period" => _} = message)
+  do
+    GenServer.call(via_tuple(log_name), {:log_period_throughput_message, message})
+  end
+
   def log_latency_bins_message(log_name, %{"latency_bins" => _, "time" => _} = message) do
     GenServer.call(via_tuple(log_name), {:log_latency_bins_message, message})
+  end
+
+  def log_latency_list_message(log_name, %{"latency_list" => _, "time" => _} = message) do
+    GenServer.call(via_tuple(log_name), {:log_latency_list_message, message})
   end
 
   def get_logs(log_name) do
@@ -59,11 +69,27 @@ defmodule MonitoringHubUtils.MessageLog do
     {:reply, result, state}
   end
 
+  def handle_call({:log_period_throughput_message, message}, _from, state) do
+    %{tid: tid, log_limit: log_limit} = state
+
+    remove_old_messages(tid, log_limit)
+    result = do_log_period_throughput_message(tid, message)
+    {:reply, result, state}
+  end
+
   def handle_call({:log_latency_bins_message, message}, _from, state) do
     %{tid: tid, log_limit: log_limit} = state
 
     remove_old_messages(tid, log_limit)
     result = do_log_latency_bins_message(tid, message)
+    {:reply, result, state}
+  end
+
+  def handle_call({:log_latency_list_message, message}, _from, state) do
+    %{tid: tid, log_limit: log_limit} = state
+
+    remove_old_messages(tid, log_limit)
+    result = do_log_latency_list_message(tid, message)
     {:reply, result, state}
   end
 
@@ -153,6 +179,25 @@ defmodule MonitoringHubUtils.MessageLog do
       end
   end
 
+  defp do_log_period_throughput_message(tid, throughput_message) do
+    %{"period" => period, "time" => end_timestamp, 
+      "total_throughput" => total_throughput, "pipeline_key" => pipeline_key} = throughput_message
+    start_timestamp = end_timestamp - period
+    per_sec_throughput = round(total_throughput / period)
+    # IO.inspect "logging for ts: #{end_timestamp}, period: #{period}, tt: #{total_throughput}, pst: #{per_sec_throughput}, pipeline_key: #{pipeline_key}"
+    do_log_sec_throughput_message(tid, start_timestamp, end_timestamp, per_sec_throughput, pipeline_key)
+  end
+
+  defp do_log_sec_throughput_message(tid, start_timestamp, current_timestamp, total_throughput, pipeline_key)
+  when start_timestamp == current_timestamp do
+  end
+
+  defp do_log_sec_throughput_message(tid, start_timestamp, current_timestamp, total_throughput, pipeline_key) do
+    throughput_message = create_throughput_msg(current_timestamp, pipeline_key, total_throughput)
+    _result = do_log_throughput_message(tid, throughput_message)
+    do_log_sec_throughput_message(tid, start_timestamp, current_timestamp - 1, total_throughput, pipeline_key)
+  end
+
   defp do_log_latency_bins_message(tid, latency_bins_message) do
     timestamp = latency_bins_message["timestamp"]
     case :ets.lookup(tid, timestamp) do
@@ -166,6 +211,19 @@ defmodule MonitoringHubUtils.MessageLog do
     end
   end
 
+  defp do_log_latency_list_message(tid, latency_list_message) do
+    timestamp = latency_list_message["time"]
+    latency_bins_message = convert_latency_list_to_map(latency_list_message)
+    case :ets.lookup(tid, timestamp) do
+      [{^timestamp, old_latency_bins_message}] ->
+        updated_latency_bins_message = update_latency_bins_message(old_latency_bins_message, latency_bins_message)
+        true = :ets.insert(tid, {timestamp, updated_latency_bins_message})
+        {:ok, updated_latency_bins_message}
+      [] ->
+        true = :ets.insert(tid, {timestamp, latency_bins_message})
+    end
+  end
+
   defp update_throughput_message(old_throughput_message, throughput_message) do
     Map.update!(old_throughput_message, "total_throughput", &(&1 + throughput_message["total_throughput"]))
   end
@@ -176,6 +234,18 @@ defmodule MonitoringHubUtils.MessageLog do
         v1 + v2
       end)
     end)
+  end
+
+  defp convert_latency_list_to_map(latency_list_message) do
+    list = latency_list_message["latency_list"]
+    {latency_bin_map, _} = list
+      |> Enum.reduce({%{}, 0}, fn(bin, {map, i}) ->
+        key = i |> to_string
+        {Map.put(map, key, bin), i + 1}
+      end)
+    latency_list_message
+      |> Map.put("latency_bins", latency_bin_map)
+      |> Map.delete("latency_list")
   end
 
   def remove_old_messages(tid, log_limit) do
@@ -204,6 +274,10 @@ defmodule MonitoringHubUtils.MessageLog do
         # we are at the end of the set
         :ok
     end
+  end
+
+  defp create_throughput_msg(timestamp, pipeline_key, throughput) do
+    %{"time" => timestamp, "pipeline_key" => pipeline_key, "total_throughput" => throughput}
   end
 
   defp via_tuple(log_name) do

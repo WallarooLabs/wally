@@ -1,6 +1,7 @@
 defmodule MetricsReporterUI.ThroughputsBroadcaster.Worker do
   use GenServer
   require Logger
+  require Integer
 
   alias MonitoringHubUtils.MessageLog
   alias MonitoringHubUtils.Stores.AppConfigStore
@@ -29,13 +30,23 @@ defmodule MetricsReporterUI.ThroughputsBroadcaster.Worker do
       case get_throughput_msgs(log_name, last_msg_ts) do
         [] ->
           :ok
+        [single_throughput_msg] ->
+          :ok
+        [first_throughput_msg, second_throughput_msg] ->
+          :ok
         throughput_msgs ->
-          store_latest_throughput_msgs(msg_log_name, throughput_msgs)
+          %{"time" => timestamp} = last_throughput_msg = List.last(throughput_msgs)
+          updated_throughput_msgs = if Integer.is_odd(timestamp) do
+            List.delete_at(throughput_msgs, -1)
+          else
+            throughput_msgs
+          end
+          store_latest_throughput_msgs(msg_log_name, updated_throughput_msgs)
           topic_name =  category <> ":" <> pipeline_key
           event_name = get_event_name(interval_key)
           {:ok, _app_config} = AppConfigStore.add_metrics_channel_to_app_config(app_name, category, topic_name)
-          broadcast_latest_throughput_msgs(topic_name, event_name, throughput_msgs)
-          new_last_msg_ts = get_last_throughput_msg_ts(throughput_msgs)
+          broadcast_latest_throughput_msgs(topic_name, event_name, updated_throughput_msgs)
+          new_last_msg_ts = get_last_throughput_msg_ts(updated_throughput_msgs)
           state = Map.put(state, :last_msg_ts, new_last_msg_ts)
       end
       send(self, :get_and_broadcast_latest_throughput_msgs)

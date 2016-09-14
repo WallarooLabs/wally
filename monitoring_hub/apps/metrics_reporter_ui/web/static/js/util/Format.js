@@ -68,12 +68,83 @@ function formatOrderId(orderId) {
     }
 }
 
+// function formatLatencyBin(bin) {
+//     switch(bin) {
+//         case "1":
+//             return "≤ 1 ns";
+//         case "1024":
+//             return "≤ 1 μs";
+//         case "524288":
+//             return "≤ 0.5 ms";
+//         case "1048576":
+//             return "≤ 1 ms";
+//         case "2097152":
+//             return "≤ 2 ms";
+//         case "4194304":
+//             return "≤ 4 ms";
+//         case "8388608":
+//             return "≤ 8 ms";
+//         case "16777216":
+//             return "≤ 17 ms";
+//         case "33554432":
+//             return "≤ 34 ms";
+//         case "67108864":
+//             return "≤ 67 ms";
+//         case "134217728":
+//             return "≤ 134 ms";
+//         case "1073741824":
+//             return "≤ 1 s";
+//         case "18446744073709551616":
+//             return "≤ Max Bin";
+//         default:
+//             return bin;
+//     }
+// }
+
 function formatLatencyBin(bin) {
     switch(bin) {
+        case 0:
+            return "0";
+        case "0":
+            return "0"; 
         case "1":
             return "≤ 1 ns";
+        case "2":
+            return "≤ 2 ns";
+        case "4":
+            return "≤ 4 ns";
+        case "8":
+            return "≤ 8 ns";
+        case "16":
+            return "≤ 16 ns";
+        case "32":
+            return "≤ 32 ns";
+        case "64":
+            return "≤ 64 ns";
+        case "128":
+            return "≤ 128 ns";
+        case "256":
+            return "≤ 256 ns";
+        case "512":
+            return "≤ 512 ns";
         case "1024":
             return "≤ 1 μs";
+        case "2048":
+            return "≤ 2 μs";
+        case "4096":
+            return "≤ 4 μs";
+        case "8192":
+            return "≤ 8 μs";
+        case "16384":
+            return "≤ 16 μs";
+        case "32768":
+            return "≤ 32 μs";
+        case "65536":
+            return "≤ 66 μs";
+        case "131072":
+            return "≤ 130 μs";
+        case "262144":
+            return "≤ 260 μs";
         case "524288":
             return "≤ 0.5 ms";
         case "1048576":
@@ -85,19 +156,23 @@ function formatLatencyBin(bin) {
         case "8388608":
             return "≤ 8 ms";
         case "16777216":
-            return "≤ 17 ms";
+            return "≤ 16 ms";
         case "33554432":
             return "≤ 34 ms";
         case "67108864":
-            return "≤ 67 ms";
+            return "≤ 66 ms";
         case "134217728":
             return "≤ 134 ms";
+        case "268435456":
+            return "≤ 260 ms";
+        case "536870912":
+            return "≤ 0.5 s";
         case "1073741824":
             return "≤ 1 s";
         case "18446744073709551616":
-            return "≤ Max Bin";
+            return "> 1 s";
         default:
-            return bin;
+            return "> 1 s";
     }
 }
 

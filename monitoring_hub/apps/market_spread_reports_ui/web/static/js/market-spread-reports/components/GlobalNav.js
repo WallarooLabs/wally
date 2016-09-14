@@ -16,9 +16,6 @@ export default class GlobalNav extends React.Component {
           <LinkContainer to="/reports/rejected-orders-report">
             <NavItem>Rejected Orders Report</NavItem>
           </LinkContainer>
-          <LinkContainer to="/reports/rejected-client-order-summaries-report">
-            <NavItem>Rejected Client Order Summaries Report</NavItem>
-          </LinkContainer>
         </Nav>
         <Nav right>
           <CurrentTime />

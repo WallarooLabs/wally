@@ -22,27 +22,27 @@ export default class AppNav extends React.Component {
 		const { appConfig } = this.props;
 		const appName = appConfig.get("app_name");
 		const appPath = "/applications/" + appName;
-		const stepKeys = appConfig.getIn(["metrics", "step"]);
-		const sourceSinkKeys = appConfig.getIn(["metrics", "source-sink"]);
-		const ingressEgressKeys = appConfig.getIn(["metrics", "ingress-egress"]);
-		const stepLinks = this.generateSourceLinks(appPath, "step", stepKeys);
-		const sourceSinkLinks = this.generateSourceLinks(appPath, "source-sink", sourceSinkKeys);
-		const ingressEgressLinks = this.generateSourceLinks(appPath, "ingress-egress", ingressEgressKeys);
+		const stepKeys = appConfig.getIn(["metrics", "computation"]);
+		const sourceSinkKeys = appConfig.getIn(["metrics", "start-to-end"]);
+		const ingressEgressKeys = appConfig.getIn(["metrics", "node-ingress-egress"]);
+		const stepLinks = this.generateSourceLinks(appPath, "computation", stepKeys);
+		const sourceSinkLinks = this.generateSourceLinks(appPath, "start-to-end", sourceSinkKeys);
+		const ingressEgressLinks = this.generateSourceLinks(appPath, "node-ingress-egress", ingressEgressKeys);
 		return(
 			<NavDropdown title={"App: "+ titleize(appName)}>
 				<LinkContainer to={appPath  + "/dashboard"}>
 					<MenuItem>Dashboard</MenuItem>
 				</LinkContainer>
 				<MenuItem divider />
-				<MenuItem header>Overall (Source -> Sink)</MenuItem>
+				<MenuItem header>Overall (Start -> End)</MenuItem>
 				<MenuItem divider />
 				{sourceSinkLinks}
 				<MenuItem divider />
-				<MenuItem header>Boundary (Ingress -> Egress)</MenuItem>
+				<MenuItem header>Node (Ingress -> Egress)</MenuItem>
 				<MenuItem divider />
 				{ingressEgressLinks}
 				<MenuItem divider />
-				<MenuItem header>Step</MenuItem>
+				<MenuItem header>Computation</MenuItem>
 				<MenuItem divider />
 				{stepLinks}
 				<MenuItem divider />

@@ -10,9 +10,9 @@ class LatencyPercentageBinsStore extends ReduceStore {
 		super(dispatcher);
 	}
 	getInitialState() {
-		let state = Map().set("source-sink", Map())
-						 .set("step", Map())
-						 .set("ingress-egress", Map());
+		let state = Map().set("start-to-end", Map())
+						 .set("computation", Map())
+						 .set("node-ingress-egress", Map());
 		return state;
 	}
 	getLatencyPercentageBins(category, metricsKey) {
@@ -31,15 +31,15 @@ class LatencyPercentageBinsStore extends ReduceStore {
 		let metricsKey;
 		switch(action.actionType) {
 			case Actions.RECEIVE_STEP_LATENCY_PERCENTAGE_BINS.actionType:
-				category = "step";
+				category = "computation";
 				metricsKey = action["latency-percentage-bins"].pipeline_key;
 				return this.updateLatencyPercentaneBins(state, category, metricsKey, action["latency-percentage-bins"]);
 			case Actions.RECEIVE_INGRESS_EGRESS_LATENCY_PERCENTAGE_BINS.actionType:
-				category = "ingress-egress";
+				category = "node-ingress-egress";
 				metricsKey = action["latency-percentage-bins"].pipeline_key;
 				return this.updateLatencyPercentaneBins(state, category, metricsKey, action["latency-percentage-bins"]);
 			case Actions.RECEIVE_SOURCE_SINK_LATENCY_PERCENTAGE_BINS.actionType:
-				category = "source-sink";
+				category = "start-to-end";
 				metricsKey = action["latency-percentage-bins"].pipeline_key;
 				return this.updateLatencyPercentaneBins(state, category, metricsKey, action["latency-percentage-bins"]);
 			default:

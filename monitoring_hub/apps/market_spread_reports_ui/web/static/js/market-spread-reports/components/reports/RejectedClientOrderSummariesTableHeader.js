@@ -29,14 +29,8 @@ export default class RejectedClientOrderSummariesTableHeader extends React.Compo
 					<th onClick={this.colToggleSort.bind(this, "client_id")} className="hover-pointer">
 						Client {this.sortSymbol("client_id")}
 					</th>
-					<th onClick={this.colToggleSort.bind(this, "total_orders")} className="hover-pointer">
-						Total Orders {this.sortSymbol("total_orders")}
-					</th>
 					<th onClick={this.colToggleSort.bind(this, "rejected_count")} className="hover-pointer">
 						Number of Rejected Orders {this.sortSymbol("rejected_count")}
-					</th>
-					<th onClick={this.colToggleSort.bind(this, "rejected_pct")} className="hover-pointer">
-						% of Orders Rejected {this.sortSymbol("rejected_pct")}
 					</th>
 				</tr>
 			</thead>

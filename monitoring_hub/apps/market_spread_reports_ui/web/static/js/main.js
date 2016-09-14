@@ -20,7 +20,7 @@ render(
 		<Route path="/" component={App}>
 			<Route path="reports" component={Reports}>
 				<Route path="rejected-orders-report" component={RejectedOrdersReportContainer} />
-				<Route path="rejected-client-order-summaries-report" component={RejectedClientOrderSummariesReportContainer} />
+				// <Route path="rejected-client-order-summaries-report" component={RejectedClientOrderSummariesReportContainer} />
 			</Route>
 		</Route>
 	</Router>),

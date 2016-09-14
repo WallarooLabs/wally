@@ -32,3 +32,6 @@ config :logger, :console, format: "[$level] $message\n"
 # Do not configure such in production as keeping
 # and calculating stacktraces is usually expensive.
 config :phoenix, :stacktrace_depth, 20
+
+config :metrics_reporter_ui,
+  bins_type: System.get_env("BINS_TYPE") || "${BINS_TYPE}"

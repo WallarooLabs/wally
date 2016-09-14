@@ -23,29 +23,29 @@ function appConfigsToDispatcherWith(connector, appConfigs) {
 
 function metricsChannelsToDispatcherWith(connector, appConfig) {
     let metrics = appConfig.get("metrics");
-    let stepChannels = metrics.get("step");
+    let stepChannels = metrics.get("computation");
     stepMetricsChannelToDispatcherWith(connector, stepChannels);
-    let ingressEgressChannels = metrics.get("ingress-egress");
+    let ingressEgressChannels = metrics.get("node-ingress-egress");
     ingressEgressMetricsChannelToDispatcherWith(connector, ingressEgressChannels);
-    let sourceSinkChannels = metrics.get("source-sink");
+    let sourceSinkChannels = metrics.get("start-to-end");
     sourceSinkMetricsChannelToDispatcherWith(connector, sourceSinkChannels);
 }
 
 function stepMetricsChannelToDispatcherWith(connector, channels) {
     channels.forEach((channel) => {
-        dispatchMetricsForSource(connector, "step", channel);
+        dispatchMetricsForSource(connector, "computation", channel);
     });
 }
 
 function ingressEgressMetricsChannelToDispatcherWith(connector, channels) {
     channels.forEach((channel) => {
-        dispatchMetricsForSource(connector, "ingress-egress", channel);
+        dispatchMetricsForSource(connector, "node-ingress-egress", channel);
     });
 }
 
 function sourceSinkMetricsChannelToDispatcherWith(connector, channels) {
     channels.forEach((channel) => {
-        dispatchMetricsForSource(connector, "source-sink", channel);
+        dispatchMetricsForSource(connector, "start-to-end", channel);
     });
 }
 
@@ -56,21 +56,21 @@ function wordCountReportChannelToDispatcherWith(connector) {
 
 function dispatchMetricsForSource(connector, sourceType, channel) {
     switch(sourceType) {
-        case "source-sink":
+        case "start-to-end":
             connector.connectTo(channel)
                 .dispatchOn("initial-total-throughputs:last-1-sec", ActionCreators[Actions.RECEIVE_SOURCE_SINK_INITIAL_TOTAL_THROUGHPUTS.actionType])
                 .dispatchOn("latency-percentage-bins:last-5-mins", ActionCreators[Actions.RECEIVE_SOURCE_SINK_LATENCY_PERCENTAGE_BINS.actionType])
                 .dispatchOn("total-throughput:last-1-sec", ActionCreators[Actions.RECEIVE_SOURCE_SINK_TOTAL_THROUGHPUT.actionType])
                 .dispatchOn("throughput-stats:last-5-mins", ActionCreators[Actions.RECEIVE_SOURCE_SINK_THROUGHPUT_STATS.actionType])
                 .dispatchOn("latency-percentile-bin-stats:last-5-mins", ActionCreators[Actions.RECEIVE_SOURCE_SINK_LATENCY_PERCENTILE_BIN_STATS.actionType]);
-        case "step":
+        case "computation":
             connector.connectTo(channel)
                 .dispatchOn("initial-total-throughputs:last-1-sec", ActionCreators[Actions.RECEIVE_STEP_INITIAL_TOTAL_THROUGHPUTS.actionType])
                 .dispatchOn("latency-percentage-bins:last-5-mins", ActionCreators[Actions.RECEIVE_STEP_LATENCY_PERCENTAGE_BINS.actionType])
                 .dispatchOn("total-throughput:last-1-sec", ActionCreators[Actions.RECEIVE_STEP_TOTAL_THROUGHPUT.actionType])
                 .dispatchOn("throughput-stats:last-5-mins", ActionCreators[Actions.RECEIVE_STEP_THROUGHPUT_STATS.actionType])
                 .dispatchOn("latency-percentile-bin-stats:last-5-mins", ActionCreators[Actions.RECEIVE_STEP_LATENCY_PERCENTILE_BIN_STATS.actionType]);
-        case "ingress-egress":
+        case "node-ingress-egress":
             connector.connectTo(channel)
                 .dispatchOn("initial-total-throughputs:last-1-sec", ActionCreators[Actions.RECEIVE_INGRESS_EGRESS_INITIAL_TOTAL_THROUGHPUTS.actionType])
                 .dispatchOn("latency-percentage-bins:last-5-mins", ActionCreators[Actions.RECEIVE_INGRESS_EGRESS_LATENCY_PERCENTAGE_BINS.actionType])
