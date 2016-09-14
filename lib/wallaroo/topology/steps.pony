@@ -1,9 +1,5 @@
 use "buffered"
 use "time"
-<<<<<<< HEAD
-=======
-use "sendence/epoch"
->>>>>>> master
 use "../metrics"
 
 actor Step
