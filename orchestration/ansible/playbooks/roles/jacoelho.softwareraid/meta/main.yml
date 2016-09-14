@@ -1,0 +1,18 @@
+---
+
+galaxy_info:
+  author: Jose Coelho
+  description: Ansible role for software raid configuration.
+  license: MIT
+  min_ansible_version: 1.7
+  platforms:
+  - name: Debian
+    versions:
+    - all
+  - name: Ubuntu
+    versions:
+    - all
+  categories:
+    - system
+dependencies: []
+

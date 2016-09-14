@@ -6,149 +6,106 @@ use "buffered"
 use "files"
 use "sendence/hub"
 use "sendence/fix"
-use "./metrics"
-use "./core"
-use "./app"
-
-class OutNotify is TCPConnectionNotify
-  let _name: String
-
-  new iso create(name: String) =>
-    _name = name
-
-  fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("%s outgoing connected\n".cstring(),
-      _name.null_terminated().cstring())
-
-  fun ref throttled(sock: TCPConnection ref, x: Bool) =>
-    if x then
-      @printf[None]("%s outgoing throttled\n".cstring(),
-        _name.null_terminated().cstring())
-    else
-      @printf[None]("%s outgoing no longer throttled\n".cstring(),
-        _name.null_terminated().cstring())
-    end
+use "wallaroo"
+use "wallaroo/network"
+use "wallaroo/metrics"
+use "wallaroo/topology"
 
 actor Main
   new create(env: Env) =>
-    var m_arg: (Array[String] | None) = None
-    var o_arg: (Array[String] | None) = None
-    var input_addrs: Array[Array[String]] = input_addrs.create()
-    var expected: USize = 1_000_000
-    var init_path = ""
+    Startup(env, MarketSpreadStarter)
 
-    try
-      var options = Options(env.args)
+primitive MarketSpreadStarter
+  fun apply(env: Env, input_addrs: Array[Array[String]], 
+    output_addr: Array[String], metrics_addr: Array[String], 
+    expected: USize, init_path: String, worker_count: USize,
+    initializer: Bool) ? 
+  =>
+    let auth = env.root as AmbientAuth
 
-      options
-        .add("expected", "e", I64Argument)
-        .add("metrics", "m", StringArgument)
-        .add("in", "i", StringArgument)
-        .add("out", "o", StringArgument)
-        .add("file", "f", StringArgument)
+    let metrics1 = JrMetrics("NBBO")
+    let metrics2 = JrMetrics("Orders")
 
-      for option in options do
-        match option
-        | ("expected", let arg: I64) => expected = arg.usize()
-        | ("metrics", let arg: String) => m_arg = arg.split(":")
-        | ("in", let arg: String) => 
-          for addr in arg.split(",").values() do
-            input_addrs.push(addr.split(":"))
-          end
-        | ("out", let arg: String) => o_arg = arg.split(":")
-        | ("file", let arg: String) => init_path = arg
-        end
-      end
+    let connect_auth = TCPConnectAuth(auth)
+    let metrics_socket = TCPConnection(connect_auth,
+          OutNotify("metrics"),
+          metrics_addr(0),
+          metrics_addr(1))
+    let connect_msg = HubProtocol.connect()
+    let metrics_join_msg = HubProtocol.join("metrics:market-spread")
+    metrics_socket.writev(connect_msg)
+    metrics_socket.writev(metrics_join_msg)
 
-      let auth = env.root as AmbientAuth
+    let reports_socket = TCPConnection(connect_auth,
+          OutNotify("rejections"),
+          output_addr(0),
+          output_addr(1))
+    let reports_join_msg = HubProtocol.join("reports:market-spread")
+    reports_socket.writev(connect_msg)
+    reports_socket.writev(reports_join_msg)
 
-      let m_addr = m_arg as Array[String]
-      let o_addr = o_arg as Array[String]
-      let metrics1 = JrMetrics("NBBO")
-      let metrics2 = JrMetrics("Orders")
 
-      let connect_auth = TCPConnectAuth(env.root as AmbientAuth)
-      let metrics_socket = TCPConnection(connect_auth,
-            OutNotify("metrics"),
-            m_addr(0),
-            m_addr(1))
-      let connect_msg = HubProtocol.connect()
-      let metrics_join_msg = HubProtocol.join("metrics:market-spread")
-      metrics_socket.writev(connect_msg)
-      metrics_socket.writev(metrics_join_msg)
-
-      let reports_socket = TCPConnection(connect_auth,
-            OutNotify("rejections"),
-            o_addr(0),
-            o_addr(1))
-      let reports_join_msg = HubProtocol.join("reports:market-spread")
-      reports_socket.writev(connect_msg)
-      reports_socket.writev(reports_join_msg)
-
-      let symbol_actors: Map[String, Step tag] trn = recover trn Map[String, Step tag] end
-      for i in legal_symbols().values() do
-        let padded = _pad_symbol(i)
-        let reporter = MetricsReporter("market-spread", metrics_socket)
-        let s = StateRunner[SymbolData](
-          lambda(): SymbolData => SymbolData end, consume reporter)
-        symbol_actors(padded) = Step(consume s)
-      end
-
-      let symbol_to_actor: Map[String, Step tag] val = 
-        consume symbol_actors
-
-      let initial_nbbo: Array[Array[U8] val] val = 
-        if init_path == "" then
-          recover Array[Array[U8] val] end
-        else
-          _initial_nbbo_msgs(init_path, auth)
-        end
-
-      let nbbo_source_builder: {(): Source iso^} val = 
-        recover 
-          lambda()(symbol_to_actor, metrics_socket, initial_nbbo): 
-            Source iso^ 
-          =>
-            let nbbo_reporter = MetricsReporter("market-spread", metrics_socket)
-            StateSource[FixNbboMessage val, SymbolData](
-            "Nbbo source", NbboSourceParser, SymbolRouter(symbol_to_actor), 
-            UpdateNbbo, consume nbbo_reporter, initial_nbbo)
-          end
-        end
-
-      let nbbo_addr = input_addrs(0)
-
-      let listen_auth = TCPListenAuth(env.root as AmbientAuth)
-      let nbbo = TCPListener(listen_auth,
-            SourceListenerNotify(nbbo_source_builder, metrics1, expected),
-            nbbo_addr(0),
-            nbbo_addr(1))
-
-      let check_order = CheckOrder(reports_socket)
-      let order_source: {(): Source iso^} val =
-        recover 
-          lambda()(symbol_to_actor, metrics_socket, check_order): Source iso^ 
-          =>
-            let order_reporter = MetricsReporter("market-spread", 
-              metrics_socket)
-            StateSource[FixOrderMessage val, 
-              SymbolData]("Order source", OrderSourceParser, 
-              SymbolRouter(symbol_to_actor), check_order, 
-                consume order_reporter)
-          end
-        end
-
-      let order_addr = input_addrs(1)
-
-      let order = TCPListener(listen_auth,
-            SourceListenerNotify(order_source, metrics2, (expected/2)),
-            order_addr(0),
-            order_addr(1))
-
-      @printf[I32]("Expecting %zu total messages\n".cstring(), expected)
-    else
-      JrStartupHelp(env)
+    let symbol_actors: Map[String, Step tag] trn = recover trn Map[String, Step tag] end
+    for i in legal_symbols().values() do
+      let padded = _pad_symbol(i)
+      let reporter = MetricsReporter("market-spread", metrics_socket)
+      let s = StateRunner[SymbolData](
+        lambda(): SymbolData => SymbolData end, consume reporter)
+      symbol_actors(padded) = Step(consume s)
     end
+
+    let symbol_to_actor: Map[String, Step tag] val = 
+      consume symbol_actors
+
+    let initial_nbbo: Array[Array[U8] val] val = 
+      if init_path == "" then
+        recover Array[Array[U8] val] end
+      else
+        _initial_nbbo_msgs(init_path, auth)
+      end
+
+    let nbbo_source_builder: {(): Source iso^} val = 
+      recover 
+        lambda()(symbol_to_actor, metrics_socket, initial_nbbo): 
+          Source iso^ 
+        =>
+          let nbbo_reporter = MetricsReporter("market-spread", metrics_socket)
+          StateSource[FixNbboMessage val, SymbolData](
+          "Nbbo source", NbboSourceParser, SymbolRouter(symbol_to_actor), 
+          UpdateNbbo, consume nbbo_reporter, initial_nbbo)
+        end
+      end
+
+    let nbboutput_addr = input_addrs(0)
+
+    let listen_auth = TCPListenAuth(env.root as AmbientAuth)
+    let nbbo = TCPListener(listen_auth,
+          SourceListenerNotify(nbbo_source_builder, metrics1, expected),
+          nbboutput_addr(0),
+          nbboutput_addr(1))
+
+    let check_order = CheckOrder(reports_socket)
+    let order_source: {(): Source iso^} val =
+      recover 
+        lambda()(symbol_to_actor, metrics_socket, check_order): Source iso^ 
+        =>
+          let order_reporter = MetricsReporter("market-spread", 
+            metrics_socket)
+          StateSource[FixOrderMessage val, 
+            SymbolData]("Order source", OrderSourceParser, 
+            SymbolRouter(symbol_to_actor), check_order, 
+              consume order_reporter)
+        end
+      end
+
+    let order_addr = input_addrs(1)
+
+    let order = TCPListener(listen_auth,
+          SourceListenerNotify(order_source, metrics2, (expected/2)),
+          order_addr(0),
+          order_addr(1))
+
+    @printf[I32]("Expecting %zu total messages\n".cstring(), expected)
 
   fun _initial_nbbo_msgs(init_path: String, auth: AmbientAuth): 
     Array[Array[U8] val] val ?

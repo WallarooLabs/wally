@@ -21,6 +21,8 @@ num_followers ?= ## Number of follower nodes (2 by default)
 ansible_system_cpus ?= ## Number of cpus to dedicate for system processes (the rest are isolated for user processes)
 ansible_isolcpus ?= false## Use isolcpus kernel boot param
 ansible_install_devtools ?= false## Install dev tools on nodes
+ansible_raid_level ?= 0## raid level for ansible for local instance store ssds
+ansible_raid_fs ?= ext4## raid filesystem for ansible for local instance store ssds
 
 # Make sure we have a valid value for ansible_isolcpus
 ifdef ansible_isolcpus
@@ -36,6 +38,20 @@ ifdef ansible_install_devtools
     $(error Unknown ansible_install_devtools option "$(ansible_install_devtools). \
       Valid options are 'true' and 'false'")
   endif
+endif
+
+# set arguments for ansible raid_level variable
+ifeq ($(ansible_raid_level),)
+  ansible_raid_level_arg :=
+else
+  ansible_raid_level_arg := raid_level=$(ansible_raid_level)
+endif
+
+# set arguments for ansible system_cpus variable
+ifeq ($(ansible_raid_fs),)
+  ansible_raid_fs_arg :=
+else
+  ansible_raid_fs_arg := raid_fs=$(ansible_raid_fs)
 endif
 
 # set arguments for ansible system_cpus variable
@@ -235,6 +251,7 @@ configure: check-cluster-name ## Configure nodes using ansible
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
           aws_region=$(region) isolcpus=$(ansible_isolcpus) \
 	  install_devtools=$(ansible_install_devtools) \
+          $(ansible_raid_level_arg) $(ansible_raid_fs_arg) \
           $(ansible_sys_cpus_arg)" -u ubuntu \
           ../ansible/playbooks/aws.yml
 	@echo "\033[36m==> Successfully ran ansible playbook for cluster \

@@ -1,0 +1,4 @@
+---
+
+software_raid_alerts_email: "root"
+software_raid_create_kwargs: ""
