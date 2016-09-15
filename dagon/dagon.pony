@@ -123,6 +123,7 @@ actor Main
     """
     var required_args_are_present = true
     var docker_host: (String | None) = None
+    var docker_path: (String | None) = None
     var docker_tag: (String | None) = None
     var docker_network: (String | None) = None
     var docker_userid: (String | None) = None
@@ -143,6 +144,7 @@ actor Main
     .add("docker-tag", "T", StringArgument)
     .add("docker-network", "N", StringArgument)
     .add("docker-arch", "A", StringArgument)
+    .add("docker-path", "P", StringArgument)
     .add("docker-userid", "U", StringArgument)
     .add("metrics-addr", "M", StringArgument)
     .add("timeout", "t", I64Argument)
@@ -156,6 +158,7 @@ actor Main
         | ("docker-tag", let arg: String) => docker_tag = arg
         | ("docker-network", let arg: String) => docker_network = arg
         | ("docker-arch", let arg: String) => docker_arch = arg
+        | ("docker-path", let arg: String) => docker_path = arg
         | ("docker-userid", let arg: String) => docker_userid = arg
         | ("metrics-addr", let arg: String) => metrics_addr = arg
         | ("timeout", let arg: I64) => timeout = arg
@@ -173,6 +176,7 @@ actor Main
 --docker-tag/-T <docker-tag>
 --docker-network/-N <docker-network>
 --docker-arch/-A <docker-arch>
+--docker-path/-P <docker-path>
 --docker-userid/-U <docker-userid>]
 --metrics-addr/-M <metrics-addr>
 --timeout/-t <seconds>
@@ -201,6 +205,12 @@ actor Main
         env.out.print("dagon: docker_userid: " + (docker_userid as String))
       else
         docker_userid = ""
+      end
+
+      if docker_path isnt None then
+        env.out.print("dagon: docker_path: " + (docker_path as String))
+      else
+        docker_path = ""
       end
 
       if docker_network isnt None then
@@ -248,7 +258,8 @@ actor Main
       ProcessManager(env, delay_senders, use_docker, docker_host as String,
         docker_tag as String, timeout as I64, ini_path as String,
         phone_home_host, phone_home_service, docker_network as String,
-        docker_arch, metrics_addr, docker_userid as String)
+        docker_arch, metrics_addr, docker_userid as String, docker_path
+        as String)
     else
       env.err.print("dagon: error parsing arguments")
       env.exitcode(-1)
@@ -400,6 +411,7 @@ actor ProcessManager
   let _docker_host: String
   let _docker_tag: String
   let _docker_network: String
+  let _docker_path: String
   let _docker_arch: String
   let _docker_userid: String
   let _metrics_addr: (String | None)
@@ -429,7 +441,7 @@ actor ProcessManager
     timeout: I64, ini_path: String,
     host: String, service: String,
     docker_network: String, docker_arch: String, metrics_addr: (String | None),
-    docker_userid: String)
+    docker_userid: String, docker_path: String)
   =>
     _env = env
     _delay_senders = delay_senders
@@ -437,6 +449,7 @@ actor ProcessManager
     _docker_host = docker_host
     _docker_tag = docker_tag
     _docker_network = docker_network
+    _docker_path = docker_path
     _docker_arch = docker_arch
     _docker_userid = docker_userid
     _metrics_addr = metrics_addr
@@ -729,6 +742,11 @@ actor ProcessManager
         else
           args(key) = sections(section)(key)
         end
+      end
+
+      // override docker path from command line if provided
+      if _docker_path != "" then
+        args("docker_path") = _docker_path
       end
     else
       _env.out.print("dagon: couldn't parse args in section: " + section)
