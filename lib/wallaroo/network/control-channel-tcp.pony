@@ -4,22 +4,25 @@ use "wallaroo/messages"
 use "sendence/bytes"
 use "time"
 
-class ControlChannelNotifier is TCPListenNotify
+class ControlChannelListenNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
   var _host: String = ""
   var _service: String = ""
   let _is_initializer: Bool
+  let _initializer: (Initializer | None)
   let _connections: Connections
 
-  new iso create(env: Env, auth: AmbientAuth, name: String, 
-    connections: Connections, is_initializer: Bool = false)
+  new iso create(name: String, env: Env, auth: AmbientAuth,
+    connections: Connections, is_initializer: Bool,
+    initializer: (Initializer | None) = None)
   =>
     _env = env
     _auth = auth
     _name = name
     _is_initializer = is_initializer
+    _initializer = initializer
     _connections = connections
 
   fun ref listening(listen: TCPListener ref) =>
@@ -41,22 +44,25 @@ class ControlChannelNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    ControlChannelConnectNotify(_env, _auth, _name, _connections)
+    ControlChannelConnectNotifier(_name, _env, _auth, _connections, 
+      _initializer)
 
-class ControlChannelConnectNotify is TCPConnectionNotify
+class ControlChannelConnectNotifier is TCPConnectionNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
   let _connections: Connections
+  let _initializer: (Initializer | None)
   var _header: Bool = true
 
-  new iso create(env: Env, auth: AmbientAuth, name: String, 
-    connections: Connections) 
+  new iso create(name: String, env: Env, auth: AmbientAuth, 
+    connections: Connections, initializer: (Initializer | None)) 
   =>
     _env = env
     _auth = auth
     _name = name
     _connections = connections
+    _initializer = initializer
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -76,14 +82,21 @@ class ControlChannelConnectNotify is TCPConnectionNotify
       | let m: IdentifyControlPortMsg val =>
         try
           (let host, _) = conn.remote_address().name()
-
-          // use host and m.service
+          match _initializer
+          | let i: Initializer =>
+            i.identify_control_address(m.worker_name, host, m.service)
+          end
+          _connections.create_control_connection(m.worker_name, host, m.service)
         end
       | let m: IdentifyDataPortMsg val =>
+        _env.out.print("Got data message!")
         try
           (let host, _) = conn.remote_address().name()
-
-          // use host and m.service
+          match _initializer
+          | let i: Initializer =>
+            i.identify_data_address(m.worker_name, host, m.service)
+          end
+          _connections.create_data_connection(m.worker_name, host, m.service)
         end
       | let m: AddControlMsg val =>
         None
@@ -113,7 +126,7 @@ class ControlChannelConnectNotify is TCPConnectionNotify
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print(_name + ": server closed")
 
-class ControlSenderConnectNotify is TCPConnectionNotify
+class ControlSenderConnectNotifier is TCPConnectionNotify
   let _env: Env
 
   new iso create(env: Env)

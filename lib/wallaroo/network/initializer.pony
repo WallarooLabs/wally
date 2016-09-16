@@ -5,8 +5,8 @@ actor Initializer
   let _auth: AmbientAuth
   let _expected: USize
   let _connections: Connections
-  var _control_identified: USize = 0
-  var _data_identified: USize = 0
+  var _control_identified: USize = 1
+  var _data_identified: USize = 1
   // var interconnected: USize = 0
   var _initialized: USize = 0
 
@@ -22,6 +22,7 @@ actor Initializer
     if _control_addrs.contains(worker) then
       @printf[I32](("Initializer: " + worker + " tried registering control channel twice.\n").cstring())
     else  
+      @printf[I32]("Identifying control!\n".cstring())
       _control_addrs(worker) = (host, service)
       _control_identified = _control_identified + 1
       if (_control_identified == _expected) and 
@@ -36,6 +37,7 @@ actor Initializer
     if _control_addrs.contains(worker) then
       @printf[I32](("Initializer: " + worker + " tried registering data channel twice.\n").cstring())
     else  
+      @printf[I32]("Identifying data!\n".cstring())
       _data_addrs(worker) = (host, service)
       _data_identified = _data_identified + 1
       if (_control_identified == _expected) and 

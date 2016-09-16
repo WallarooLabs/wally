@@ -42,6 +42,7 @@ actor Startup
     var init_path = ""
     var worker_count: USize = 1
     var is_initializer = false
+    var initializer: (Initializer | None) = None
     var worker_name = ""
     try
       var options = Options(env.args)
@@ -97,14 +98,24 @@ actor Startup
         d_host, d_service, is_initializer)
 
       if is_initializer then
-        let control_notifier: TCPListenNotify iso =
-          ControlChannelNotifier(env, auth, worker_name, connections, true)
-        TCPListener(auth, consume control_notifier, c_host, c_service) 
+        initializer = Initializer(auth, worker_count, connections)
+        worker_name = "initializer"
+      end
 
-        let data_notifier: TCPListenNotify iso =
-          DataChannelListenerNotifier(worker_name, env, auth, 
-            connections, is_initializer)
+      let control_notifier: TCPListenNotify iso =
+        ControlChannelListenNotifier(worker_name, env, auth, connections, 
+          is_initializer, initializer)
+
+      let data_notifier: TCPListenNotify iso =
+        DataChannelListenNotifier(worker_name, env, auth, connections, 
+          is_initializer, initializer)
+
+      if is_initializer then
+        TCPListener(auth, consume control_notifier, c_host, c_service) 
         TCPListener(auth, consume data_notifier, d_host, d_service)
+      else
+        TCPListener(auth, consume control_notifier) 
+        TCPListener(auth, consume data_notifier)
       end
 
       app_runner(env, input_addrs, o_addr, m_addr, expected, init_path, 

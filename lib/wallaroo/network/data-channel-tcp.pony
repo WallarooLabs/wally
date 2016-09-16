@@ -7,8 +7,51 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 
-class DataChannelNotifier is TCPConnectionNotify
+
+class DataChannelListenNotifier is TCPListenNotify
+  let _name: String
+  let _env: Env
+  let _auth: AmbientAuth
+  let _is_initializer: Bool
+  let _initializer: (Initializer | None)
+  var _host: String = ""
+  var _service: String = ""
+  let _connections: Connections
+
+  new iso create(name: String, env: Env, auth: AmbientAuth, 
+    connections: Connections, is_initializer: Bool, 
+    initializer: (Initializer | None) = None)
+  =>
+    _name = name
+    _env = env
+    _auth = auth
+    _is_initializer = is_initializer
+    _initializer = initializer
+    _connections = connections
+
+  fun ref listening(listen: TCPListener ref) =>
+    try
+      (_host, _service) = listen.local_address().name()
+      _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
+      if not _is_initializer then
+        let message = ChannelMsgEncoder.identify_data_port(_name, _service,
+          _auth)
+        _connections.send_control("initializer", message)
+      end
+    else
+      _env.out.print(_name + "control : couldn't get local address")
+      listen.close()
+    end
+
+  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
+    DataChannelConnectNotifier(_initializer)
+
+class DataChannelConnectNotifier is TCPConnectionNotify
+  let _initializer: (Initializer | None)
   var _header: Bool = true
+
+  new iso create(initializer: (Initializer | None) = None) =>
+    _initializer = initializer
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -33,42 +76,7 @@ class DataChannelNotifier is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     @printf[None]("incoming connected\n".cstring())
 
-class DataChannelListenerNotifier is TCPListenNotify
-  let _name: String
-  let _env: Env
-  let _auth: AmbientAuth
-  let _is_initializer: Bool
-  var _host: String = ""
-  var _service: String = ""
-  let _connections: Connections
-
-  new iso create(name: String, env: Env, auth: AmbientAuth, 
-    connections: Connections, is_initializer: Bool = false)
-  =>
-    _name = name
-    _env = env
-    _auth = auth
-    _is_initializer = is_initializer
-    _connections = connections
-
-  fun ref listening(listen: TCPListener ref) =>
-    try
-      (_host, _service) = listen.local_address().name()
-      _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
-      if not _is_initializer then
-        let message = ChannelMsgEncoder.identify_data_port(_name, _service,
-          _auth)
-        _connections.send_data("initializer", message)
-      end
-    else
-      _env.out.print(_name + "control : couldn't get local address")
-      listen.close()
-    end
-
-  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelNotifier
-
-class DataSenderConnectNotify is TCPConnectionNotify
+class DataSenderConnectNotifier is TCPConnectionNotify
   let _env: Env
 
   new iso create(env: Env)
