@@ -34,7 +34,7 @@ actor Initializer
     end
 
   be identify_data_address(worker: String, host: String, service: String) =>
-    if _control_addrs.contains(worker) then
+    if _data_addrs.contains(worker) then
       @printf[I32](("Initializer: " + worker + " tried registering data channel twice.\n").cstring())
     else  
       @printf[I32]("Identifying data!\n".cstring())
