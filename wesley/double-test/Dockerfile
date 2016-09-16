@@ -1,6 +1,8 @@
 FROM scratch
 
-ADD double-test /wesley/double
+ADD double-test /wesley/double-test
 
-ENTRYPOINT ["/wesley/double"]
+ENV PATH /wesley:$PATH
+
+ENTRYPOINT ["/wesley/double-test"]
 

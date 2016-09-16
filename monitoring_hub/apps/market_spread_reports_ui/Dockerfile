@@ -17,4 +17,6 @@ RUN tar xfv /rel/market_spread_reports_ui.tar.gz -C /apps/market_spread_reports_
 
 EXPOSE 4001 5555
 
+ENV PATH /apps/market_spread_reports_ui/bin:$PATH
+
 ENTRYPOINT ["/apps/market_spread_reports_ui/bin/market_spread_reports_ui", "foreground"]

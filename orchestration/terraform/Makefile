@@ -240,6 +240,23 @@ cluster: check-cluster-name apply sleep60 configure ## Creates a cluster and con
 
 destroy: check-cluster-name acquire-cluster-lock init-terraform setup_ci_arg setup_az_arg terraform-destroy release-cluster-lock ## Run terraform destroy step
 
+sync-buffy: check-cluster-name ## Rsync buffy repo to nodes
+	@echo "\033[36m==> Running ansible to rsync buffy repo to cluster \
+'$(cluster_name)' in region '$(region)'...\033[0m"
+	ansible 'tag_Project_buffy:&tag_ClusterName_$(cluster_name):&$(region)' \
+          -i ../ansible/ec2.py --ssh-common-args="-o StrictHostKeyChecking=no \
+          -i  $(cluster_full_pem)"  -u ubuntu -m file -a "path=$(abspath $(dir $(MAKEFILE_LIST))/../../..) mode=0777 \
+          state=directory" --become
+	ansible 'tag_Project_buffy:&tag_ClusterName_$(cluster_name):&$(region)' \
+          -i ../ansible/ec2.py --ssh-common-args="-o StrictHostKeyChecking=no \
+          -i  $(cluster_full_pem)"  -u ubuntu -m synchronize -a "src=$(abspath \
+          $(dir $(MAKEFILE_LIST))/../..) dest=$(abspath $(dir $(MAKEFILE_LIST))/../../..) \
+          recursive=yes rsync_opts=\"--exclude=.git -e 'ssh  -o StrictHostKeyChecking=no \
+          -i $(cluster_full_pem)'\""
+	@echo "\033[36m==> Successfully ran ansible to rsync buffy repo to cluster \
+'$(cluster_name)' in region '$(region)'!\033[0m"
+
+
 configure: check-cluster-name ## Configure nodes using ansible
 	$(if $(wildcard $(ansible_vault_password)),,$(error Ansible Vault \
           password file ($(ansible_vault_password)) is missing!))
