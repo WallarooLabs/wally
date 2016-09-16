@@ -19,7 +19,7 @@ primitive MarketSpreadStarter
   fun apply(env: Env, input_addrs: Array[Array[String]], 
     output_addr: Array[String], metrics_addr: Array[String], 
     expected: USize, init_path: String, worker_count: USize,
-    initializer: Bool, node_name: String) ? 
+    initializer: Bool, node_name: String, connections: Connections) ? 
   =>
     let auth = env.root as AmbientAuth
 

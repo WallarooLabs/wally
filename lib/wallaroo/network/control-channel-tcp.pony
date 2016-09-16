@@ -11,14 +11,16 @@ class ControlChannelNotifier is TCPListenNotify
   var _host: String = ""
   var _service: String = ""
   let _is_initializer: Bool
+  let _connections: Connections
 
   new iso create(env: Env, auth: AmbientAuth, name: String, 
-    is_initializer: Bool = false)
+    connections: Connections, is_initializer: Bool = false)
   =>
     _env = env
     _auth = auth
     _name = name
     _is_initializer = is_initializer
+    _connections = connections
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -27,7 +29,7 @@ class ControlChannelNotifier is TCPListenNotify
       if not _is_initializer then
         let message = ChannelMsgEncoder.identify_control_port(_name, 
           _service, _auth)
-        //CONTROL_CONN.writev(message)
+        _connections.send_control("initializer", message)
       end
     else
       _env.out.print(_name + "control : couldn't get local address")
@@ -39,18 +41,22 @@ class ControlChannelNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    ControlChannelConnectNotify(_env, _auth, _name)
+    ControlChannelConnectNotify(_env, _auth, _name, _connections)
 
 class ControlChannelConnectNotify is TCPConnectionNotify
   let _env: Env
   let _auth: AmbientAuth
   let _name: String
+  let _connections: Connections
   var _header: Bool = true
 
-  new iso create(env: Env, auth: AmbientAuth, name: String) =>
+  new iso create(env: Env, auth: AmbientAuth, name: String, 
+    connections: Connections) 
+  =>
     _env = env
     _auth = auth
     _name = name
+    _connections = connections
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -85,6 +91,8 @@ class ControlChannelConnectNotify is TCPConnectionNotify
       | let m: AddDataMsg val =>
         None
         // do something
+      | let m: CreateConnectionsMsg val =>
+        _connections.create_connections(m.addresses)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")
       else
@@ -104,3 +112,14 @@ class ControlChannelConnectNotify is TCPConnectionNotify
 
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print(_name + ": server closed")
+
+class ControlSenderConnectNotify is TCPConnectionNotify
+  let _env: Env
+
+  new iso create(env: Env)
+  =>
+    _env = env
+
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+    _env.out.print("Control sender channel received data.")
+    true

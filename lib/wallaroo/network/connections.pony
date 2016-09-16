@@ -2,25 +2,77 @@ use "collections"
 use "net"
 
 actor Connections
-  let control_conns: Map[String, TCPConnection] = control_conns.create()
-  let data_conns: Map[String, TCPConnection] = data_conns.create()
+  let _name: String
+  let _env: Env
+  let _auth: AmbientAuth
+  let _control_conns: Map[String, TCPConnection] = _control_conns.create()
+  let _data_conns: Map[String, TCPConnection] = _data_conns.create()
 
-  be add_control_connection(node: String, conn: TCPConnection) =>
-    control_conns(node) = conn
+  new create(name: String, env: Env, auth: AmbientAuth,
+    c_host: String, c_service: String, d_host: String, d_service: String, 
+    is_initializer: Bool) 
+  =>
+    _name = name
+    _env = env
+    _auth = auth
 
-  be add_data_connection(node: String, conn: TCPConnection) =>
-    data_conns(node) = conn
-
-  be send_control(node: String, data: Array[ByteSeq] val) =>
-    try
-      control_conns(node).writev(data)
-    else
-      @printf[I32](("No control connection for node " + node + "\n").cstring())
+    if not is_initializer then
+      create_control_connection("initializer", c_host, c_service)
+      create_data_connection("initializer", d_host, d_service)
     end
 
-  be send_data(node: String, data: Array[ByteSeq] val) =>
+  be add_control_connection(worker: String, conn: TCPConnection) =>
+    _control_conns(worker) = conn
+
+  be add_data_connection(worker: String, conn: TCPConnection) =>
+    _data_conns(worker) = conn
+
+  be send_control(worker: String, data: Array[ByteSeq] val) =>
     try
-      data_conns(node).writev(data)
+      _control_conns(worker).writev(data)
     else
-      @printf[I32](("No data connection for node " + node + "\n").cstring())
+      @printf[I32](("No control connection for worker " + worker + "\n").cstring())
     end
+
+  be send_data(worker: String, data: Array[ByteSeq] val) =>
+    try
+      _data_conns(worker).writev(data)
+    else
+      @printf[I32](("No data connection for worker " + worker + "\n").cstring())
+    end
+
+  be create_connections(
+    addresses: Map[String, Map[String, (String, String)]] val) 
+  =>
+    try
+      let control_addrs = addresses("control")
+      let data_addrs = addresses("data")
+      for (target, address) in control_addrs.pairs() do
+        create_control_connection(target, address._1, address._2)
+      end
+      for (target, address) in data_addrs.pairs() do
+        create_data_connection(target, address._1, address._2)
+      end
+      _env.out.print(_name + ": Interconnections with other workers created.")
+    else
+      _env.out.print("Problem creating interconnections with other workers")
+    end
+
+  be create_control_connection(target_name: String, host: String, 
+    service: String) 
+  =>
+    let control_notifier: TCPConnectionNotify iso =
+      ControlSenderConnectNotify(_env)
+    let control_conn: TCPConnection =
+      TCPConnection(_auth, consume control_notifier, host, service)
+    _control_conns(target_name) = control_conn    
+
+  be create_data_connection(target_name: String, host: String, 
+    service: String) 
+  =>
+    let data_notifier: TCPConnectionNotify iso = 
+      DataSenderConnectNotify(_env)
+    let data_conn: TCPConnection =
+      TCPConnection(_auth, consume data_notifier, host, service)
+    _data_conns(target_name) = data_conn
+

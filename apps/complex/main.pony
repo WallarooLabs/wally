@@ -19,7 +19,7 @@ primitive ComplexStarter
   fun apply(env: Env, input_addrs: Array[Array[String]], 
     output_addr: Array[String], metrics_addr: Array[String], 
     expected: USize, init_path: String, worker_count: USize,
-    initializer: Bool, node_name: String) ? 
+    initializer: Bool, node_name: String, connections: Connections) ? 
   =>
     // Complex numbers app
     // Complex number -> Get conjugate -> Scale by 5
@@ -90,5 +90,7 @@ primitive ComplexStarter
       // tell workers what to spin up and how to connect
     else
       @printf[I32](("I'm " + node_name + " and I'm not the initializer!\n").cstring())
+
+      // set up control and data listeners
     end
 

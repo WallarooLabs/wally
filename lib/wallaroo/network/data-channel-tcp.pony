@@ -7,15 +7,8 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 
-class DataChannelNotify is TCPConnectionNotify
-  let _router: Router[Array[U8] val, Step tag] val
-  let _metrics: JrMetrics
+class DataChannelNotifier is TCPConnectionNotify
   var _header: Bool = true
-
-  new iso create(router: Router[Array[U8] val, Step tag] val, 
-    metrics: JrMetrics) =>
-    _router = router
-    _metrics = metrics
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -40,26 +33,23 @@ class DataChannelNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     @printf[None]("incoming connected\n".cstring())
 
-class DataChannelListenerNotify is TCPListenNotify
+class DataChannelListenerNotifier is TCPListenNotify
   let _name: String
   let _env: Env
   let _auth: AmbientAuth
   let _is_initializer: Bool
-  let _router: Router[Array[U8] val, Step tag] val
-  let _metrics: JrMetrics
   var _host: String = ""
   var _service: String = ""
+  let _connections: Connections
 
   new iso create(name: String, env: Env, auth: AmbientAuth, 
-    router: Router[Array[U8] val, Step tag] val, metrics: JrMetrics, 
-    is_initializer: Bool = false) 
+    connections: Connections, is_initializer: Bool = false)
   =>
     _name = name
     _env = env
     _auth = auth
     _is_initializer = is_initializer
-    _router = router
-    _metrics = metrics
+    _connections = connections
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -68,7 +58,7 @@ class DataChannelListenerNotify is TCPListenNotify
       if not _is_initializer then
         let message = ChannelMsgEncoder.identify_data_port(_name, _service,
           _auth)
-        //CONTROL_CONN.writev(message)
+        _connections.send_data("initializer", message)
       end
     else
       _env.out.print(_name + "control : couldn't get local address")
@@ -76,4 +66,18 @@ class DataChannelListenerNotify is TCPListenNotify
     end
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelNotify(_router, _metrics)
+    DataChannelNotifier
+
+class DataSenderConnectNotify is TCPConnectionNotify
+  let _env: Env
+
+  new iso create(env: Env)
+  =>
+    _env = env
+
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+    _env.out.print("Data sender channel received data.")
+    true
+
+  // fun ref closed(conn: TCPConnection ref) =>
+  //   _coordinator.reconnect_data(_target_name)
