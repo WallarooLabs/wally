@@ -1,3 +1,14 @@
+# Based on:
+# https://mischasan.wordpress.com/2013/03/30/non-recursive-make-gmake-part-1-the-basic-gnumakefile-layouts/
+# https://github.com/mischasan/aho-corasick/blob/master/rules.mk
+# https://github.com/dmoulding/boilermake/blob/master/Makefile
+#
+# With optimizations from:
+# http://www.oreilly.com/openbook/make3/book/ch12.pdf
+#
+# More advanced functionality should likely use:
+# http://gmsl.sourceforge.net/
+
 # detemine makefile that included this one and it's path
 PREV_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),x $(MAKEFILE_LIST))
 PREV_PATH := $(dir $(PREV_MAKEFILE))
