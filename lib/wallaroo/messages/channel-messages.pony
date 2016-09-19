@@ -2,6 +2,7 @@ use "buffered"
 use "serialise"
 use "net"
 use "collections"
+use "wallaroo/topology"
 
 primitive ChannelMsgEncoder
   fun _encode(msg: ChannelMsg val, auth: AmbientAuth, 
@@ -16,12 +17,12 @@ primitive ChannelMsgEncoder
     end
     wb.done()
 
-  fun data_channel[D: Any val](ack_id: U64, from_worker_name: String, 
-    msg_id: U64, source_ts: U64, msg_data: D, auth: AmbientAuth)
-    : Array[ByteSeq] val ?
+  fun data_channel[D: Any val](target_id: U64, ack_id: U64, 
+    from_worker_name: String, msg_id: U64, source_ts: U64, msg_data: D,
+    metric_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ForwardMsg[D](ack_id, from_worker_name, msg_id, source_ts, 
-      msg_data), auth)
+    _encode(ForwardMsg[D](target_id, ack_id, from_worker_name, msg_id, 
+      source_ts, msg_data, metric_name), auth)
 
   fun identify_control_port(worker_name: String, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ? =>
@@ -113,24 +114,37 @@ class CreateConnectionsMsg is ChannelMsg
   new val create(addrs: Map[String, Map[String, (String, String)]] val) =>
     addresses = addrs
 
+interface DeliveryMsg is ChannelMsg
+  fun target_id(): U64
+  fun ack_id(): U64
+  fun from_name(): String
+  fun deliver(step: Step tag)
+
 class ForwardMsg[D: Any val] is ChannelMsg
+  let _target_id: U64
   let _ack_id: U64
   let _from_worker_name: String
   let _msg_id: U64
   let _source_ts: U64
   let _data: D
+  let _metric_name: String
 
-  new val create(a_id: U64, from: String, m_id: U64, s_ts: U64, m_data: D) 
+  new val create(t_id: U64, a_id: U64, from: String, m_id: U64, s_ts: U64, 
+    m_data: D, m_name: String) 
   =>
+    _target_id = t_id
     _ack_id = a_id
     _from_worker_name = from
     _msg_id = m_id
     _source_ts = s_ts
     _data = m_data
+    _metric_name = m_name
 
+  fun target_id(): U64 => _target_id
   fun ack_id(): U64 => _ack_id
   fun from_name(): String => _from_worker_name
 
-  // fun deliver(data_receiver: DataReceiver) =>
-  //   data_receiver.received[D](_data_ch_id, _step_id, _msg_id, _source_ts,
-  //     _ingress_ts, _data, step_manager)
+  fun deliver(step: Step tag) =>//data_receiver: DataReceiver) =>
+    step.run[D](_metric_name, _source_ts, _data)
+    // data_receiver.received[D](_data_ch_id, _step_id, _msg_id, _source_ts,
+      // _ingress_ts, _data, step_manager)

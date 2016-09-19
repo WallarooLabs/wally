@@ -16,10 +16,11 @@ class DataChannelListenNotifier is TCPListenNotify
   let _initializer: (Initializer | None)
   var _host: String = ""
   var _service: String = ""
+  let _routes: DataRouter val
   let _connections: Connections
 
   new iso create(name: String, env: Env, auth: AmbientAuth, 
-    connections: Connections, is_initializer: Bool, 
+    routes: DataRouter val, connections: Connections, is_initializer: Bool, 
     initializer: (Initializer | None) = None)
   =>
     _name = name
@@ -27,6 +28,7 @@ class DataChannelListenNotifier is TCPListenNotify
     _auth = auth
     _is_initializer = is_initializer
     _initializer = initializer
+    _routes = routes
     _connections = connections
 
   fun ref listening(listen: TCPListener ref) =>
@@ -44,14 +46,21 @@ class DataChannelListenNotifier is TCPListenNotify
     end
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelConnectNotifier(_initializer)
+    DataChannelConnectNotifier(_initializer, _routes, _env, _auth)
 
 class DataChannelConnectNotifier is TCPConnectionNotify
   let _initializer: (Initializer | None)
+  let _routes: DataRouter val
+  let _env: Env
+  let _auth: AmbientAuth
   var _header: Bool = true
 
-  new iso create(initializer: (Initializer | None) = None) =>
+  new iso create(initializer: (Initializer | None) = None, 
+    routes: DataRouter val, env: Env, auth: AmbientAuth) =>
     _initializer = initializer
+    _routes = routes
+    _env = env
+    _auth = auth
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -62,7 +71,21 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         _header = false
       end
     else
-      // process consume data
+      let msg = ChannelMsgDecoder(consume data, _auth)
+      match msg
+      | let d: DeliveryMsg val =>
+        match _routes.route(d.target_id())
+        | let s: Step tag =>
+          d.deliver(s)
+        else
+          _env.err.print("Data channel: Target id not found for incoming data.")
+        end
+      // | let m: DataSenderReadyMsg val =>
+      //   _sender_name = m.node_name
+      //   _coordinator.connect_receiver(m.node_name)
+      | let m: UnknownChannelMsg val =>
+        _env.err.print("Unknown Wallaroo data message type.")
+      end
 
       conn.expect(4)
       _header = true
@@ -70,11 +93,11 @@ class DataChannelConnectNotifier is TCPConnectionNotify
     false
 
   fun ref accepted(conn: TCPConnection ref) =>
-    @printf[None]("accepted\n".cstring())
+    _env.out.print("accepted")
     conn.expect(4)
 
   fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("incoming connected\n".cstring())
+    _env.out.print("incoming connected")
 
 class DataSenderConnectNotifier is TCPConnectionNotify
   let _env: Env

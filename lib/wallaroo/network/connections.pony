@@ -77,7 +77,7 @@ actor Connections
     service: String) 
   =>
     let data_notifier: TCPConnectionNotify iso = 
-      DataChannelConnectNotifier(_initializer)
+      DataSenderConnectNotifier(_env)
     let data_conn: TCPConnection =
       TCPConnection(_auth, consume data_notifier, host, service)
     _data_conns(target_name) = data_conn

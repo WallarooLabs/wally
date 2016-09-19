@@ -106,16 +106,16 @@ actor Startup
         ControlChannelListenNotifier(worker_name, env, auth, connections, 
           is_initializer, initializer)
 
-      let data_notifier: TCPListenNotify iso =
-        DataChannelListenNotifier(worker_name, env, auth, connections, 
-          is_initializer, initializer)
+      // let data_notifier: TCPListenNotify iso =
+      //   DataChannelListenNotifier(worker_name, env, auth, connections, 
+      //     is_initializer, initializer)
 
       if is_initializer then
         TCPListener(auth, consume control_notifier, c_host, c_service) 
-        TCPListener(auth, consume data_notifier, d_host, d_service)
+        // TCPListener(auth, consume data_notifier, d_host, d_service)
       else
         TCPListener(auth, consume control_notifier) 
-        TCPListener(auth, consume data_notifier)
+        // TCPListener(auth, consume data_notifier)
       end
 
       app_runner(env, input_addrs, o_addr, m_addr, expected, init_path, 

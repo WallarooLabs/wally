@@ -22,12 +22,10 @@ actor Initializer
     if _control_addrs.contains(worker) then
       @printf[I32](("Initializer: " + worker + " tried registering control channel twice.\n").cstring())
     else  
-      @printf[I32]("Identifying control!\n".cstring())
       _control_addrs(worker) = (host, service)
       _control_identified = _control_identified + 1
-      if (_control_identified == _expected) and 
-        (_data_identified == _expected) then
-        @printf[I32]("All worker channels identified\n".cstring())
+      if _control_identified == _expected then
+        @printf[I32]("All worker control channels identified\n".cstring())
 
         _initialize()      
       end
@@ -37,18 +35,19 @@ actor Initializer
     if _data_addrs.contains(worker) then
       @printf[I32](("Initializer: " + worker + " tried registering data channel twice.\n").cstring())
     else  
-      @printf[I32]("Identifying data!\n".cstring())
       _data_addrs(worker) = (host, service)
       _data_identified = _data_identified + 1
-      if (_control_identified == _expected) and 
-        (_data_identified == _expected) then
-        @printf[I32]("All worker channels identified\n".cstring())
+      if _data_identified == _expected then
+        @printf[I32]("All worker data channels identified\n".cstring())
 
-        _initialize()
+        _create_interconnections()
       end
     end
 
   fun _initialize() =>
+    @printf[I32]("Initializing topology\n".cstring())
+
+  fun _create_interconnections() =>
     let addresses = _generate_addresses_map()
     try
       let message = ChannelMsgEncoder.create_connections(addresses, _auth)
@@ -56,7 +55,7 @@ actor Initializer
         _connections.send_control(key, message)
       end
     else
-      @printf[I32]("Initializer: Error initializing workers\n".cstring())
+      @printf[I32]("Initializer: Error initializing interconnections\n".cstring())
     end
 
   fun _generate_addresses_map(): Map[String, Map[String, (String, String)]] val
