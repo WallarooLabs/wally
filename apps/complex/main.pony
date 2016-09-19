@@ -93,9 +93,13 @@ primitive ComplexStarter
       let d_service = initializer_data_addr(1)
       TCPListener(auth, consume data_notifier, d_host, d_service)
 
+      let sendable_output_addr: Array[String] trn = recover Array[String] end
+      sendable_output_addr.push(output_addr(0)) 
+      sendable_output_addr.push(output_addr(1)) 
+
       // determine layout
-      let topology_starter = ComplexTopologyStarter((output_addr(0), 
-        output_addr(1)), metrics_conn)
+      let topology_starter = ComplexTopologyStarter(
+        consume sendable_output_addr, metrics_conn)
 
       match initializer
       | let init: Initializer =>
@@ -114,15 +118,15 @@ primitive ComplexStarter
     end
 
 class ComplexTopologyStarter is TopologyStarter
-  let _output_addr: (String, String)
+  let _output_addr: Array[String] val
   let _metrics_conn: TCPConnection
 
-  new val create(output_addr: (String, String),
+  new val create(output_addr: Array[String] val,
     metrics_conn: TCPConnection) =>
     _output_addr = output_addr
     _metrics_conn = metrics_conn
 
-  fun apply() =>
+  fun apply(initializer: Initializer) =>
     let scale_builder = GeneralStepBuilder[Complex val, Complex val](
       lambda(): Computation[Complex val, Complex val] val => Scale end,
       _metrics_conn, "complex-numbers")
@@ -142,13 +146,20 @@ class ComplexTopologyStarter is TopologyStarter
     worker_3_builders.push(scale_builder)
 
 
-    let worker_2_topology = LocalTopology(consume worker_2_builders,
-      2)
+    let worker_2_topology = LocalTopology(consume worker_2_builders
+      where local_sink = 2)
 
-    let worker_3_topology = LocalTopology(consume worker_3_builders,
-      _output_addr)
+    let worker_3_topology = LocalTopology(consume worker_3_builders
+      where global_sink = _output_addr)
+
+    let local_topologies: Array[LocalTopology val] trn = 
+      recover Array[LocalTopology val] end
+    local_topologies.push(worker_2_topology)
+    local_topologies.push(worker_3_topology)
 
     @printf[I32]("Topology starter has run!\n".cstring())
+
+    initializer.distribute_local_topologies(consume local_topologies)
 
 class GeneralStepBuilder[In: Any val, Out: Any val]
   let _metrics_conn: TCPConnection
