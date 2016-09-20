@@ -11,7 +11,7 @@ class SpikeConfig
     drop = drop'
     seed = seed'
 
-primitive SpikeWrapper
+primitive SpikedConnectionNotify
   fun apply(letter: TCPConnectionNotify iso, config: SpikeConfig val)
     : TCPConnectionNotify iso^ =>
     var notify: TCPConnectionNotify iso = consume letter
