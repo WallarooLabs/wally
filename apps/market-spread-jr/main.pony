@@ -38,7 +38,7 @@ primitive MarketSpreadStarter
     metrics_socket.writev(metrics_join_msg)
 
     let reports_socket = TCPConnection(connect_auth,
-          SpikeWrapper(OutNotify("rejections"), spike_config),
+          OutNotify("rejections"),
           output_addr(0),
           output_addr(1))
     let reports_join_msg = HubProtocol.join("reports:market-spread")
