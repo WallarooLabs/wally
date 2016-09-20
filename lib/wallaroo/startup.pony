@@ -4,6 +4,7 @@ use "options"
 use "time"
 use "buffered"
 use "files"
+use "spike"
 
 class OutNotify is TCPConnectionNotify
   let _name: String
@@ -28,7 +29,7 @@ interface AppStarter
   fun apply(env: Env, input_addrs: Array[Array[String]], 
     output_addr: Array[String], metrics_addr: Array[String], 
     expected: USize, init_path: String, worker_count: USize,
-    initializer: Bool) ? 
+    initializer: Bool, spike_config: SpikeConfig val) ?
 
 actor Startup
   new create(env: Env, app_runner: AppStarter val) =>
@@ -40,6 +41,9 @@ actor Startup
     var init_path = ""
     var worker_count: USize = 1
     var initializer = false
+    var spike_delay = false
+    var spike_drop = false
+    var spike_seed: U64 = Time.millis()
 
     try
       var options = Options(env.args)
@@ -55,6 +59,9 @@ actor Startup
         // persisting leader
         .add("worker-count", "w", I64Argument)
         .add("topology-initializer", "t", None)
+        .add("spike-delay", "", None)
+        .add("spike-drop", "", None)
+        .add("spike-seed", "", I64Argument)
 
       for option in options do
         match option
@@ -69,14 +76,23 @@ actor Startup
         | ("file", let arg: String) => init_path = arg
         | ("worker-count", let arg: I64) => worker_count = arg.usize()
         | ("topology-initializer", None) => initializer = true
-        end
+        | ("spike-delay", None) =>
+          env.out.print("%%SPIKE-DELAY%%")
+          spike_delay = true
+        | ("spike-drop", None) =>
+          env.out.print("%%SPIKE-DROP%%")
+          spike_drop = true
+        | ("spike-seed", let arg: I64) => spike_seed = arg.u64()
+          end
       end
 
       let m_addr = m_arg as Array[String]
       let o_addr = o_arg as Array[String]
 
+      env.out.print("Using Spike seed " + spike_seed.string())
+      let spike_config = SpikeConfig(spike_delay, spike_drop, spike_seed)
       app_runner(env, input_addrs, o_addr, m_addr, expected, init_path, 
-        worker_count, initializer)
+        worker_count, initializer, spike_config)
     else
       JrStartupHelp(env)
     end

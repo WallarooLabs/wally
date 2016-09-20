@@ -10,6 +10,7 @@ use "wallaroo"
 use "wallaroo/network"
 use "wallaroo/metrics"
 use "wallaroo/topology"
+use "wallaroo/spike"
 
 actor Main
   new create(env: Env) =>
@@ -19,7 +20,7 @@ primitive MarketSpreadStarter
   fun apply(env: Env, input_addrs: Array[Array[String]], 
     output_addr: Array[String], metrics_addr: Array[String], 
     expected: USize, init_path: String, worker_count: USize,
-    initializer: Bool) ? 
+    initializer: Bool, spike_config: SpikeConfig val) ? 
   =>
     let auth = env.root as AmbientAuth
 
