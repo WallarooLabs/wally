@@ -28,6 +28,7 @@ ansible_raid_fs ?= ext4## raid filesystem for ansible for local instance store s
 
 inventory_script := ec2.py
 ansible_user := ubuntu
+all_instances := 'tag_Project_buffy:&tag_ClusterName_$(cluster_name):&$(region)'
 
 # if debug shell command output requested
 ifdef DEBUG_SHELL
@@ -56,6 +57,7 @@ ifneq (,$(filter $(provider),packet))
   cluster_pem := ~/.ssh/ec2/us-east-1.pem
   inventory_script := packet_net.py
   ansible_user := root
+  all_instances := 'tag_buffy:&tag_Cluster_$(cluster_name):&$(region)'
 endif
 
 
@@ -290,15 +292,24 @@ cluster: check-cluster-name apply sleep60 configure ## Creates a cluster and con
 
 destroy: check-cluster-name acquire-cluster-lock init-terraform setup_$(provider)_ci_arg setup_$(provider)_az_arg terraform-destroy release-cluster-lock ## Run terraform destroy step
 
+test-ansible-connection: check-cluster-name ## Check ansible connectivity/authentication with servers
+	@echo "\033[36m==> Running ansible connectivity/authentication check for cluster \
+'$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
+	PACKET_NET_API_KEY=$(packet_api_key) ansible $(all_instances) \
+          -i ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no \
+          -i  $(cluster_full_pem)"  -u $(ansible_user) -m raw -a "hostname -A"
+	@echo "\033[36m==> Successfully ran ansible connectivity/authentication check for cluster \
+'$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
+
 sync-buffy: check-cluster-name ## Rsync buffy repo to nodes
 	@echo "\033[36m==> Running ansible to rsync buffy repo to cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
-	ansible 'tag_Project_buffy:&tag_ClusterName_$(cluster_name):&$(region)' \
-          -i ../ansible/ec2.py --ssh-common-args="-o StrictHostKeyChecking=no \
+	PACKET_NET_API_KEY=$(packet_api_key) ansible $(all_instances) \
+          -i ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no \
           -i  $(cluster_full_pem)"  -u $(ansible_user) -m file -a "path=$(abspath $(dir $(MAKEFILE_LIST))/../../..) mode=0777 \
           state=directory" --become
-	ansible 'tag_Project_buffy:&tag_ClusterName_$(cluster_name):&$(region)' \
-          -i ../ansible/ec2.py --ssh-common-args="-o StrictHostKeyChecking=no \
+	PACKET_NET_API_KEY=$(packet_api_key) ansible $(all_instances) \
+          -i ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no \
           -i  $(cluster_full_pem)"  -u $(ansible_user) -m synchronize -a "src=$(abspath \
           $(dir $(MAKEFILE_LIST))/../..) dest=$(abspath $(dir $(MAKEFILE_LIST))/../../..) \
           recursive=yes rsync_opts=\"--exclude=.git -e 'ssh  -o StrictHostKeyChecking=no \
