@@ -61,7 +61,7 @@ Software needed:
 * terraform (need version `0.6.*`)
 * Installing ansible (need version `ansible-2.1.1.0`): `pip install ansible`
 * Installing boto: `pip install boto`
-* Installing packet: `pip install packet`
+* Installing packet: `pip install packet-python`
 
 Accounts needed:
 
