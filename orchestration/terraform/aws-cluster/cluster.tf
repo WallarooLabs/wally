@@ -187,6 +187,39 @@ resource "aws_launch_configuration" "leader_launch_config" {
     volume_size = "${var.instance_volume_size}"
   }
 
+  ephemeral_block_device {
+    device_name = "xvdb"
+    virtual_name = "ephemeral0"
+  }
+  ephemeral_block_device {
+    device_name = "xvdc"
+    virtual_name = "ephemeral1"
+  }
+  ephemeral_block_device {
+    device_name = "xvdd"
+    virtual_name = "ephemeral2"
+  }
+  ephemeral_block_device {
+    device_name = "xvde"
+    virtual_name = "ephemeral3"
+  }
+  ephemeral_block_device {
+    device_name = "xvdf"
+    virtual_name = "ephemeral4"
+  }
+  ephemeral_block_device {
+    device_name = "xvdg"
+    virtual_name = "ephemeral5"
+  }
+  ephemeral_block_device {
+    device_name = "xvdh"
+    virtual_name = "ephemeral6"
+  }
+  ephemeral_block_device {
+    device_name = "xvdi"
+    virtual_name = "ephemeral7"
+  }
+
   lifecycle {
     create_before_destroy = true
   }
