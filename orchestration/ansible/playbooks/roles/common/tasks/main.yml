@@ -85,6 +85,14 @@
 - name: Change ownership ssh keys for sendence user
   file: path=/home/sendence/.ssh owner=sendence group=sendence recurse=yes state=directory
 
+- name: allow sendence user to sudo without password
+  lineinfile:
+    dest: /etc/sudoers
+    regexp: '^sendence'
+    line: 'sendence ALL=(ALL) NOPASSWD:ALL'
+    state: present
+    backup: true
+
 - name: Install common packages
   apt: name={{ item }} state=latest update_cache=yes
   with_items:
