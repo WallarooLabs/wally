@@ -56,32 +56,36 @@ actor LocalTopologyInitializer
     _topology = t
 
   be initialize() =>
-    match _topology
-    | let t: LocalTopology val =>
-      @printf[I32]("Local Topology Initializer: Initializing local topology\n".cstring())
-      let routes: Map[U128, Step tag] trn = 
-        recover Map[U128, Step tag] end
+    try
+      match _topology
+      | let t: LocalTopology val =>
+        @printf[I32]("Local Topology Initializer: Initializing local topology\n".cstring())
+        let routes: Map[U128, Step tag] trn = 
+          recover Map[U128, Step tag] end
 
-      let sink = _create_sink(t)  
+        let sink = _create_sink(t)  
 
-      let builders = t.builders()
-      let builder_count = builders.size()
-      var latest_step = sink
-      for rev_idx in Range(0, builder_count) do
-        let idx = (builder_count - idx) - 1
-        let builder = builders(idx)
-        latest_step = builder(latest_step, _metrics_conn)
-        // routes(builder.id()) = latest_step
-      end  
+        let builders = t.builders()
+        var builder_idx: I64 = (builders.size() - 1).i64()
+        var latest_step = sink
+        while builder_idx >= 0 do 
+          let builder = builders(builder_idx.usize())
+          latest_step = builder(latest_step, _metrics_conn)
+          routes(builder.id()) = latest_step
+          builder_idx = builder_idx - 1
+        end  
 
-      if not _is_initializer then
-        let data_notifier: TCPListenNotify iso =
-          DataChannelListenNotifier(_worker_name, _env, _auth, _connections, 
-            _is_initializer, DataRouter(consume routes))
-        TCPListener(_auth, consume data_notifier)
+        if not _is_initializer then
+          let data_notifier: TCPListenNotify iso =
+            DataChannelListenNotifier(_worker_name, _env, _auth, _connections, 
+              _is_initializer, DataRouter(consume routes))
+          TCPListener(_auth, consume data_notifier)
+        end
+      else
+        @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end
     else
-      @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
+      _env.err.print("Error initializing local topology")
     end
 
   fun _create_sink(t: LocalTopology val): Step tag ? =>

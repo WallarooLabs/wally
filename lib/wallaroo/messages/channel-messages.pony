@@ -18,11 +18,11 @@ primitive ChannelMsgEncoder
     wb.done()
 
   fun data_channel[D: Any val](target_id: U128, ack_id: U64, 
-    from_worker_name: String, msg_id: U128, source_ts: U64, msg_data: D,
+    from_worker_name: String, source_ts: U64, msg_data: D,
     metric_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(ForwardMsg[D](target_id, ack_id, from_worker_name, msg_id, 
-      source_ts, msg_data, metric_name), auth)
+    _encode(ForwardMsg[D](target_id, ack_id, from_worker_name, source_ts, 
+      msg_data, metric_name), auth)
 
   fun identify_control_port(worker_name: String, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ? 
@@ -150,18 +150,16 @@ class ForwardMsg[D: Any val] is ChannelMsg
   let _target_id: U128
   let _ack_id: U64
   let _from_worker_name: String
-  let _msg_id: U128
   let _source_ts: U64
   let _data: D
   let _metric_name: String
 
-  new val create(t_id: U128, a_id: U64, from: String, m_id: U128, s_ts: U64, 
+  new val create(t_id: U128, a_id: U64, from: String, s_ts: U64, 
     m_data: D, m_name: String) 
   =>
     _target_id = t_id
     _ack_id = a_id
     _from_worker_name = from
-    _msg_id = m_id
     _source_ts = s_ts
     _data = m_data
     _metric_name = m_name

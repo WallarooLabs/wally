@@ -3,9 +3,11 @@ use "time"
 use "net"
 use "sendence/epoch"
 use "wallaroo/metrics"
+use "wallaroo/messages"
 
 interface Runner
-  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In)
+  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
+    conn: (TCPConnection | None))
 
 class ComputationRunner[In: Any val, Out: Any val]
   let _computation: Computation[In, Out] val
@@ -22,7 +24,8 @@ class ComputationRunner[In: Any val, Out: Any val]
     _target = target
     _metrics_reporter = consume metrics_reporter
 
-  fun ref run[D: Any val](source_name: String val, source_ts: U64, input: D) 
+  fun ref run[D: Any val](source_name: String val, source_ts: U64, input: D,
+    conn: (TCPConnection | None))
   =>
     let computation_start = Time.nanos()
     match input
@@ -51,7 +54,9 @@ class StateRunner[State: Any #read]
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
 
-  fun ref run[In: Any val](source_name: String val, source_ts: U64, input: In) =>
+  fun ref run[In: Any val](source_name: String val, source_ts: U64, input: In,
+    conn: (TCPConnection | None))
+  =>
     match input
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
@@ -66,13 +71,45 @@ class StateRunner[State: Any #read]
       @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
     end
 
+class Proxy
+  let _worker_name: String
+  let _target_step_id: U128
+  let _metrics_reporter: MetricsReporter
+  let _auth: AmbientAuth
+
+  new iso create(worker_name: String, target_step_id: U128, 
+    metrics_reporter: MetricsReporter iso, auth: AmbientAuth) 
+  =>
+    _worker_name = worker_name
+    _target_step_id = target_step_id
+    _metrics_reporter = consume metrics_reporter
+    _auth = auth
+
+  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
+    conn: (TCPConnection | None))
+  =>
+    match conn
+    | let tcp: TCPConnection =>
+      try
+        let forward_msg = ChannelMsgEncoder.data_channel[In](_target_step_id, 
+          0, _worker_name, source_ts, input, metric_name, _auth)
+        tcp.writev(forward_msg)
+      else
+        @printf[I32]("Problem encoding forwarded message\n".cstring())
+      end
+    end
+
+    // _metrics_reporter.worker_metric(metric_name, source_ts)  
+
 class SimpleSink
   let _metrics_reporter: MetricsReporter
 
   new iso create(metrics_reporter: MetricsReporter iso) =>
     _metrics_reporter = consume metrics_reporter
 
-  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In) =>
+  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
+    conn: (TCPConnection | None))
+  =>
     match input
     | let s: Stringable val =>
       @printf[I32](("Simple sink: Received " + s.string() + "\n").cstring())
@@ -95,7 +132,9 @@ class EncoderSink//[Out: Any val]
     _conn = conn
     // _encoder = encoder
 
-  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In) =>
+  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
+    conn: (TCPConnection | None))
+  =>
     _conn.write("hi")
     // match input
     // | let o: Out =>
