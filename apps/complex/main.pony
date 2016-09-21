@@ -18,18 +18,17 @@ actor Main
 
 primitive ComplexStarter
   fun apply(env: Env, initializer_data_addr: Array[String],
-    input_addrs: Array[Array[String]], 
+    input_addrs: Array[Array[String]] val, 
     output_addr: Array[String], metrics_conn: TCPConnection, 
     expected: USize, init_path: String, worker_count: USize,
     is_initializer: Bool, worker_name: String, connections: Connections,
     initializer: (Initializer | None)) ? 
   =>
     // Complex numbers app
-    // Complex number -> Get conjugate -> Scale by 5
+    // Complex number -> Scale by 3 -> Get conjugate -> Scale by 5
 
     let auth = env.root as AmbientAuth
 
-    let jr_metrics = JrMetrics("Complex Numbers")
 
     let connect_auth = TCPConnectAuth(auth)
 
@@ -40,6 +39,8 @@ primitive ComplexStarter
     metrics_conn.writev(metrics_join_msg)
 
     if worker_count == 1 then
+      let jr_metrics = JrMetrics("Complex Numbers")
+
       let reports_conn = TCPConnection(connect_auth,
         OutNotify("results"),
         output_addr(0),
@@ -73,7 +74,7 @@ primitive ComplexStarter
       let source_addr = input_addrs(0)
 
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
-      let nbbo = TCPListener(listen_auth,
+      TCPListener(listen_auth,
             SourceListenerNotify(complex_source_builder, jr_metrics, expected),
             source_addr(0),
             source_addr(1))
@@ -98,7 +99,7 @@ primitive ComplexStarter
 
       // determine layout
       let topology_starter = ComplexTopologyStarter(
-        consume sendable_output_addr, metrics_conn)
+        consume sendable_output_addr, metrics_conn, auth)
 
       match initializer
       | let init: Initializer =>
@@ -119,37 +120,50 @@ primitive ComplexStarter
 class ComplexTopologyStarter is TopologyStarter
   let _output_addr: Array[String] val
   let _metrics_conn: TCPConnection
+  let _auth: AmbientAuth
 
   new val create(output_addr: Array[String] val,
-    metrics_conn: TCPConnection) =>
+    metrics_conn: TCPConnection, auth: AmbientAuth) =>
     _output_addr = output_addr
     _metrics_conn = metrics_conn
+    _auth = auth
 
-  fun apply(initializer: Initializer) =>
+  fun apply(initializer: Initializer, workers: Array[String] box,
+    input_addrs: Array[Array[String]] val, expected: USize) ? =>
     let pipeline_name = "complex-numbers"
     let guid_gen = GuidGenerator
 
-    let scale_builder = GeneralStepBuilder[Complex val, Complex val](
-      lambda(): Computation[Complex val, Complex val] val => Scale end,
-      pipeline_name, guid_gen.u128())
+    let worker2 = workers(0) 
+    let worker3 = workers(1) 
 
+    // Worker 1 (self)
+    let worker_1_builders: Array[StepBuilder val] trn = 
+      recover Array[StepBuilder val] end
+
+    // Worker 2
+    let conjugate_step_id = guid_gen.u128()
     let conjugate_builder = GeneralStepBuilder[Complex val, Complex val](
       lambda(): Computation[Complex val, Complex val] val => Conjugate end,
-      pipeline_name, guid_gen.u128())
+      pipeline_name, conjugate_step_id)
 
     let worker_2_builders: Array[StepBuilder val] trn = 
       recover Array[StepBuilder val] end
 
     worker_2_builders.push(conjugate_builder) 
 
+    // Worker 3
+    let scale_step_id = guid_gen.u128()
+    let scale_builder = GeneralStepBuilder[Complex val, Complex val](
+      lambda(): Computation[Complex val, Complex val] val => Scale end,
+      pipeline_name, scale_step_id)
+
     let worker_3_builders: Array[StepBuilder val] trn = 
       recover Array[StepBuilder val] end
 
     worker_3_builders.push(scale_builder)
 
-
     let worker_2_topology = LocalTopology(pipeline_name, consume worker_2_builders
-      where local_sink = 2)
+      where local_sink = ProxyAddress(worker3, scale_step_id))
 
     let worker_3_topology = LocalTopology(pipeline_name, consume worker_3_builders
       where global_sink = _output_addr)
@@ -162,6 +176,34 @@ class ComplexTopologyStarter is TopologyStarter
     @printf[I32]("Topology starter has run!\n".cstring())
 
     initializer.distribute_local_topologies(consume local_topologies)
+
+    // Configure local topology on initializer, including source
+    let sink_reporter = MetricsReporter(pipeline_name, _metrics_conn)
+
+    let proxy = Proxy("initializer", conjugate_step_id, consume sink_reporter, _auth)
+    let proxy_step = Step(consume proxy)
+
+    initializer.register_proxy(worker2, proxy_step)
+
+    let complex_source_builder: {(): Source iso^} val = 
+      recover 
+        lambda()(proxy_step): Source iso^ 
+        =>
+          let router = DirectRouter[Complex val, Step tag](proxy_step) 
+          StatelessSource[Complex val]("Complex Numbers Source",
+            ComplexSourceParser, consume router)
+        end
+      end
+
+    let source_addr = input_addrs(0)
+
+    let jr_metrics = JrMetrics("Complex Numbers")
+
+    let listen_auth = TCPListenAuth(_auth)
+    TCPListener(listen_auth,
+      SourceListenerNotify(complex_source_builder, jr_metrics, expected),
+      source_addr(0),
+      source_addr(1))    
 
 class GeneralStepBuilder[In: Any val, Out: Any val]
   let _computation_builder: {(): Computation[In, Out] val} val

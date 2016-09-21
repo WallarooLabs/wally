@@ -4,14 +4,22 @@ use "sendence/guid"
 use "wallaroo/metrics"
 use "wallaroo/network"
 
+class ProxyAddress
+  let worker: String
+  let step_id: U128
+
+  new val create(w: String, s_id: U128) =>
+    worker = w
+    step_id = s_id
+
 class LocalTopology
   let _pipeline_name: String
   let _builders: Array[StepBuilder val] val
-  let _local_sink: U64
+  let _local_sink: (ProxyAddress val | None)
   let _global_sink: Array[String] val
 
   new val create(p_name: String, bs: Array[StepBuilder val] val,
-    local_sink: U64 = 0,
+    local_sink: (ProxyAddress val | None) = None,
     global_sink: Array[String] val = recover Array[String] end) 
   =>
     _pipeline_name = p_name
@@ -25,11 +33,12 @@ class LocalTopology
   fun builders(): Array[StepBuilder val] val =>
     _builders
 
-  fun sink(): (Array[String] val | U64) =>
-    if _local_sink == 0 then
-      _global_sink
+  fun sink(): (Array[String] val | ProxyAddress val) =>
+    match _local_sink
+    | let p: ProxyAddress val => 
+      p
     else
-      _local_sink
+      _global_sink
     end
 
 actor LocalTopologyInitializer
@@ -62,8 +71,9 @@ actor LocalTopologyInitializer
         @printf[I32]("Local Topology Initializer: Initializing local topology\n".cstring())
         let routes: Map[U128, Step tag] trn = 
           recover Map[U128, Step tag] end
+        let proxies: Map[String, Array[Step tag]] = proxies.create()
 
-        let sink = _create_sink(t)  
+        let sink = _create_sink(t, proxies)  
 
         let builders = t.builders()
         var builder_idx: I64 = (builders.size() - 1).i64()
@@ -75,12 +85,15 @@ actor LocalTopologyInitializer
           builder_idx = builder_idx - 1
         end  
 
+        _register_proxies(proxies)
+
         if not _is_initializer then
           let data_notifier: TCPListenNotify iso =
             DataChannelListenNotifier(_worker_name, _env, _auth, _connections, 
               _is_initializer, DataRouter(consume routes))
           TCPListener(_auth, consume data_notifier)
         end
+
       else
         @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end
@@ -88,7 +101,9 @@ actor LocalTopologyInitializer
       _env.err.print("Error initializing local topology")
     end
 
-  fun _create_sink(t: LocalTopology val): Step tag ? =>
+  fun _create_sink(t: LocalTopology val, 
+    proxies: Map[String, Array[Step tag]]): Step tag ? 
+  =>
     let sink_reporter = MetricsReporter(t.pipeline_name(), _metrics_conn)
     
     match t.sink()
@@ -104,10 +119,24 @@ actor LocalTopologyInitializer
         _env.out.print("Error connecting to sink.")
         error
       end
-    | let proxy_id: U64 =>
-      @printf[I32]("Sink is a proxy id.\n".cstring())
-      Step(SimpleSink(consume sink_reporter))
+    | let p: ProxyAddress val =>
+      let proxy = Proxy(_worker_name, p.step_id, consume sink_reporter, _auth)
+      let proxy_step = Step(consume proxy)
+      if proxies.contains(_worker_name) then
+        proxies(p.worker).push(proxy_step)
+      else
+        proxies(p.worker) = Array[Step tag]
+        proxies(p.worker).push(proxy_step)
+      end
+      proxy_step
     else
       // The match is exhaustive, so this can't happen
       error
     end 
+
+  fun _register_proxies(proxies: Map[String, Array[Step tag]]) =>
+    for (worker, ps) in proxies.pairs() do
+      for proxy in ps.values() do
+        _connections.register_proxy(worker, proxy)
+      end
+    end

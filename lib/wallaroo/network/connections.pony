@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "wallaroo/topology"
 
 actor Connections
   let _name: String
@@ -8,6 +9,7 @@ actor Connections
   let _is_initializer: Bool
   let _control_conns: Map[String, TCPConnection] = _control_conns.create()
   let _data_conns: Map[String, TCPConnection] = _data_conns.create()
+  let _proxies: Map[String, Array[Step tag]] = _proxies.create()
 
   new create(name: String, env: Env, auth: AmbientAuth,
     c_host: String, c_service: String, d_host: String, d_service: String, 
@@ -79,4 +81,19 @@ actor Connections
     let data_conn: TCPConnection =
       TCPConnection(_auth, consume data_notifier, host, service)
     _data_conns(target_name) = data_conn
+    try
+      for proxy in _proxies(target_name).values() do
+        proxy.update_connection(data_conn)
+      end
+    end
+
+  be register_proxy(worker: String, proxy: Step tag) =>
+    try
+      if _proxies.contains(worker) then
+        _proxies(worker).push(proxy)
+      else
+        _proxies(worker) = Array[Step tag]
+        _proxies(worker).push(proxy)
+      end
+    end
 

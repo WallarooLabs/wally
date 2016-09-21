@@ -9,7 +9,7 @@ use "wallaroo/topology"
 
 interface AppStarter
   fun apply(env: Env, data_addr: Array[String],
-    input_addrs: Array[Array[String]], 
+    input_addrs: Array[Array[String]] val, 
     output_addr: Array[String], metrics_conn: TCPConnection, 
     expected: USize, init_path: String, worker_count: USize,
     is_initializer: Bool, worker_name: String, connections: Connections,
@@ -21,7 +21,8 @@ actor Startup
     var o_arg: (Array[String] | None) = None
     var c_arg: (Array[String] | None) = None
     var d_arg: (Array[String] | None) = None
-    var input_addrs: Array[Array[String]] = input_addrs.create()
+    var i_addrs_write: Array[Array[String]] trn = 
+      recover Array[Array[String]] end
     var expected: USize = 1_000_000
     var init_path = ""
     var worker_count: USize = 1
@@ -52,7 +53,7 @@ actor Startup
         | ("metrics", let arg: String) => m_arg = arg.split(":")
         | ("in", let arg: String) => 
           for addr in arg.split(",").values() do
-            input_addrs.push(addr.split(":"))
+            i_addrs_write.push(addr.split(":"))
           end
         | ("out", let arg: String) => o_arg = arg.split(":")
         | ("control", let arg: String) => c_arg = arg.split(":")
@@ -64,6 +65,7 @@ actor Startup
         end
       end
 
+      let input_addrs: Array[Array[String]] val = consume i_addrs_write
       let m_addr = m_arg as Array[String]
       let o_addr = o_arg as Array[String]
       let c_addr = c_arg as Array[String]
@@ -87,13 +89,14 @@ actor Startup
       let connections = Connections(worker_name, env, auth, c_host, c_service, 
         d_host, d_service, is_initializer)
 
-      if is_initializer then
-        initializer = Initializer(auth, worker_count, connections)
-        worker_name = "initializer"
-      end
-
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
         env, auth, connections, metrics_conn, is_initializer)
+
+      if is_initializer then
+        initializer = Initializer(auth, worker_count, connections, 
+          local_topology_initializer, input_addrs)
+        worker_name = "initializer"
+      end
 
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(worker_name, env, auth, connections, 
