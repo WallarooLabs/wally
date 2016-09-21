@@ -127,15 +127,15 @@ class ComplexTopologyStarter is TopologyStarter
 
   fun apply(initializer: Initializer) =>
     let pipeline_name = "complex-numbers"
-    // let guid_gen = GuidGenerator
+    let guid_gen = GuidGenerator
 
     let scale_builder = GeneralStepBuilder[Complex val, Complex val](
       lambda(): Computation[Complex val, Complex val] val => Scale end,
-      pipeline_name)//, guid_gen.u128())
+      pipeline_name, guid_gen.u128())
 
     let conjugate_builder = GeneralStepBuilder[Complex val, Complex val](
       lambda(): Computation[Complex val, Complex val] val => Conjugate end,
-      pipeline_name)//, guid_gen.u128())
+      pipeline_name, guid_gen.u128())
 
     let worker_2_builders: Array[StepBuilder val] trn = 
       recover Array[StepBuilder val] end
@@ -166,15 +166,15 @@ class ComplexTopologyStarter is TopologyStarter
 class GeneralStepBuilder[In: Any val, Out: Any val]
   let _computation_builder: {(): Computation[In, Out] val} val
   let _pipeline_name: String 
-  // let _id: U128
+  let _id: U128
 
   new val create(c: {(): Computation[In, Out] val} val,
-    pipeline_name: String) =>//, id': U128) =>
+    pipeline_name: String, id': U128) =>
     _computation_builder = c
     _pipeline_name = pipeline_name
-    // _id = id'
+    _id = id'
 
-  // fun id(): U128 => _id
+  fun id(): U128 => _id
 
   fun apply(target: Step tag, metrics_conn: TCPConnection): Step tag =>
     let reporter = MetricsReporter(_pipeline_name, metrics_conn)
