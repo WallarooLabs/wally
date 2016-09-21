@@ -78,6 +78,7 @@
     consul_image: hypriot/rpi-consul
     docker_users: [ root, sendence ]
     use_hostname: true
+    docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
@@ -95,6 +96,7 @@
     consul_image: hypriot/rpi-consul
     docker_users: [ root, sendence ]
     use_hostname: true
+    docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }

@@ -115,6 +115,7 @@
     swarm_image: swarm
     consul_image: gliderlabs/consul
     docker_users: [ ubuntu, sendence ]
+    docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
@@ -131,6 +132,7 @@
     swarm_image: swarm
     consul_image: gliderlabs/consul
     docker_users: [ ubuntu, sendence ]
+    docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }

@@ -35,6 +35,7 @@
     consul_image: gliderlabs/consul
     docker_users: [ vagrant, sendence ]
     userland_proxy: true
+    docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
@@ -52,6 +53,7 @@
     consul_image: gliderlabs/consul
     docker_users: [ vagrant, sendence ]
     userland_proxy: true
+    docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
