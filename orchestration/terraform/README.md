@@ -1,13 +1,13 @@
 # Buffy Terraform Orchestration
 
 This module consists of the orchestration for Buffy using Terraform.
-So far we have only implemented AWS as a provider.
+So far we have only implemented AWS and Packet as the providers.
 
 ## Modules
 
-The two modules are `vpc` and `cluster`.
+The three modules are `aws-vpc`, `aws-cluster` and `packet-cluster`.
 
-### VPC
+### AWS-VPC
 
 The VPC module handles creating the VPC along with the subnet, security group,
 etc. The state for this is stored in a shared S3 bucket.
@@ -15,9 +15,9 @@ etc. The state for this is stored in a shared S3 bucket.
 NOTE: This does *not* guarantee safety for multiple developers to work
 concurrently (see: https://www.terraform.io/docs/state/remote/).
 
-### Cluster
+### AWS-Cluster
 
-The cluster module handles creating the actual cluster of nodes and the related
+The AWS cluster module handles creating the actual cluster of nodes in EC2 and the related
 AutoScalingGroups, LaunchConfigurations, etc. The state for this is store in a
 shared S3 bucket. 
 
@@ -25,47 +25,71 @@ NOTE: This does *not* guarantee safety for multiple developers to work
 concurrently (see: https://www.terraform.io/docs/state/remote/). See section for
 `Makefile` for a safe multi-developer workflow.
 
-The cluster module depends on the `vpc` module and will fail if the `vpc` module
+The cluster module depends on the `aws-vpc` module and will fail if the `aws-vpc` module
 hasn't been created yet.
 
-## Ansible
+### Packet-Cluster
+
+The Packet cluster module handles creating the actual cluster of nodes in Packet.net.
+The state for this is store in a shared S3 bucket. 
+
+NOTE: This does *not* guarantee safety for multiple developers to work
+concurrently (see: https://www.terraform.io/docs/state/remote/). See section for
+`Makefile` for a safe multi-developer workflow.
+
+## Configuration
 
 ### General
 
-Once the cluster has been created, you can manage it with Ansible and its Dynamic 
-Inventory feature (http://docs.ansible.com/ansible/intro_dynamic_inventory.html#example-aws-ec2-external-inventory-script).
+Software needed:
 
-* Installing ansible: `pip install ansible`
+* aws cli
+* git
+* make
+* python
+* pip
+* sed
+* awk
+* tr
+* grep
+* egrep
+* curl
+* sort
+* wc
+* head
+* tail
+* terraform (need version `0.6.*`)
+* Installing ansible (need version `ansible-2.1.1.0`): `pip install ansible`
 * Installing boto: `pip install boto`
-* Setup ec2.py script: Get the linked `ec2.py` and `ec2.ini` from 
-http://docs.ansible.com/ansible/intro_dynamic_inventory.html#example-aws-ec2-external-inventory-script
-and save them in the same directory. Make `ec2.py` executable.
+* Installing packet: `pip install packet-python`
 
-Test ansible communication with the all cluster nodes:
+Accounts needed:
 
-`ansible -i ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_buffy' -m ping`
+* AWS Console (ask Dipin or Sean)
+* Packet.net Console (ask Dipin)
 
-Test ansible communication with the follower nodes only:
+Configuration needed:
 
-`ansible -i ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_buffy:&tag_Role_follower' -m ping`
+* Create `~/.ansible_vault_pass.txt` with password for Ansible Vault (same password
+  as for Docker registry; ask Dipin if needed)
+* Create AWS config using `aws configure` command
+* Set up shared ssh keys in `~/.ssh/ec2/` (ask Dipin or someone else for where to get the
+  key files)
+* Create Packet.net account based on invitation to project and generate API key
+* Create `~/.terraform_packet_vars` with the following format including Packet project id
+  (use the one specified here) and API token:
+```
+packet_api_key = "<PACKET API KEY FROM WEBSITE>"
+packet_project_id = "3d35c26a-5d26-4188-bb70-c648410919c1"
+```
 
-Test ansible communication with the leader nodes only:
-
-`ansible -i ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_buffy:&tag_Role_leader' -m ping`
-
-### Playbook
-
-There is an ansible playbook for configuring the nodes. It can be run using the
-following command:
-
-`ansible-playbook --ask-vault-pass -i ../ansible/ec2.py --ssh-common-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu --extra-vars "cluster_name=<NAME_OF_CLUSTER>" ../ansible/playbooks/aws.yml`
 
 ## Makefile
 
 It is recommended that `make` be used to manage the AWS clusters (including
 running Ansible) for a safe workflow for concurrent use by multiple developers.
 
-Command/options can be identified by running: `make help`
+NOTE: Command/options can be identified by running: `make help`
 
 The `Makefile` enforces the following:
 
@@ -73,7 +97,7 @@ The `Makefile` enforces the following:
   acquired by the current user and not properly released
 * Reset terraform state file (based on cluster name) from S3 or initialize if
   new
-* Make sure VPC is created
+* Make sure VPC is created (if required)
 * Run terraform plan/apply/destroy command
 * Release lock from simpledb if it is held by the current user (throw error
   otherwise)
@@ -91,8 +115,8 @@ there is an error running any commands after acquiring the lock.
 ### Automagic Instance logic
 
 The `Makefile` uses a python script to automagically figure out the
-appropriate instance available that will meet the requirements. The way it
-works is the python script outputs a `Makefile` fragment which is then
+appropriate instance available that will meet the requirements for AWS clusters.
+The way it works is the python script outputs a `Makefile` fragment which is then
 `eval`'d by make.
 
 This automagic instance logic can be controlled via the following
@@ -107,6 +131,7 @@ The inputs into this script are the following `make` options:
 * `availability_zone` Availability Zone to launch cluster in. (Default: )
 * `mem_required` Minimum amount of memory in GB per instance (Default: 0.5)
 * `cpus_required` Minimum amount of CPUs per instance (Default: 0.05)
+* `force_instance` The instance type to use for all nodes (Default: )
 
 The script uses the following logic to find cheapest prices:
 
@@ -130,13 +155,13 @@ The script uses the following logic to find cheapest prices:
   for the spot instance (this will be the same as what the user requested
   or the one for the best spot pricing based on the logic described above).
 
-### Examples
+### AWS Examples
 
 The following examples are to illustrate the features available and common use
-cases (unless `use_automagic_instances=false` is used, it will automagically
-figure out the appropriate instance available for use based on `mem_required`
-[defaults to 0.5 GB] and `cpus_required` [defaults to 0.05 for t2.nano level
-of CPU] values):
+cases for the AWS provider (unless `use_automagic_instances=false` is used, it
+will automagically figure out the appropriate instance available for use based
+on `mem_required` [defaults to 0.5 GB] and `cpus_required` [defaults to 0.05 
+for t2.nano level of CPU] values):
 
 * Detailed options/targets/help:
   `make help`
@@ -176,4 +201,54 @@ of CPU] values):
 * Create and configure (with ansible) a cluster with name `example` where
   the instances have at least 8 cpus and 16 GB of RAM and don't use spot pricing:
   `make cluster mem_required=16 cpus_required=8 no_spot=true cluster_name=example`
+
+### Packet Examples
+
+The following examples are to illustrate the features available and common use
+cases for the Packet provider.
+
+* Detailed options/targets/help:
+  `make help`
+* Plan a new cluster with name `sample` using Packet:
+  `make plan cluster_name=sample provider=packet use_automagic_instances=false`
+* Create a new cluster with name `sample`:
+  `make apply cluster_name=sample provider=packet use_automagic_instances=false`
+* Configure (with ansible) a cluster with name `sample`:
+  `make configure cluster_name=sample provider=packet use_automagic_instances=false`
+* Plan a new cluster with name `sample` with extra terraform arguments
+  (`--version` in this case but could be anything):
+  `make plan cluster_name=sample provider=packet use_automagic_instances=false terraform_args="--version"`
+* Destroy a cluster with name `sample`:
+  `make destroy cluster_name=sample provider=packet use_automagic_instances=false`
+
+
+## Debugging Ansible for AWS
+
+Test ansible communication with the all cluster nodes:
+
+`ansible -i ../ansible/ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_buffy' -m ping`
+
+Test ansible communication with the follower nodes only:
+
+`ansible -i ../ansible/ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_buffy:&tag_Role_follower' -m ping`
+
+Test ansible communication with the leader nodes only:
+
+`ansible -i ../ansible/ec2.py --ssh-extra-args="-o StrictHostKeyChecking=no -i PATH_TO_PEM_FILE" -u ubuntu 'tag_Project_buffy:&tag_Role_leader' -m ping`
+
+
+## Debugging Ansible for Packet
+
+Test ansible communication with the all cluster nodes:
+
+`ansible -i ../ansible/packet_net.py --ssh-extra-args="-o StrictHostKeyChecking=no -i ~/.ssh/ec2/us-east-1.pem" -u root 'tag_buffy' -m ping`
+
+Test ansible communication with the follower nodes only:
+
+`ansible -i ../ansible/packet_net.py --ssh-extra-args="-o StrictHostKeyChecking=no -i ~/.ssh/ec2/us-east-1.pem" -u root 'tag_buffy:&tag_Role_follower' -m ping`
+
+Test ansible communication with the leader nodes only:
+
+`ansible -i ../ansible/packet_net.py --ssh-extra-args="-o StrictHostKeyChecking=no -i ~/.ssh/ec2/us-east-1.pem" -u root 'tag_Project_buffy:&tag_Role_leader' -m ping`
+
 

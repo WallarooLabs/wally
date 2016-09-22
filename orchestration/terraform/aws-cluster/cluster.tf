@@ -1,14 +1,10 @@
 # Shared infrastructure state stored in Atlas
-resource "terraform_remote_state" "vpc" {
+data "terraform_remote_state" "vpc" {
   backend = "s3"
   "config" {
     "bucket" = "sendence-dev"
     "key" = "terraform-state/vpc/${var.aws_region}-terraform.tfstate"
     "region" = "us-east-1"
-  }
-
-  lifecycle {
-    create_before_destroy = true
   }
 
 }
@@ -30,7 +26,7 @@ resource "aws_placement_group" "default" {
 }
 
 resource "aws_autoscaling_group" "leaders" {
-  vpc_zone_identifier = [ "${coalesce(var.aws_subnet_id, terraform_remote_state.vpc.output.SUBNET_1_ID)}" ]
+  vpc_zone_identifier = [ "${coalesce(var.aws_subnet_id, data.terraform_remote_state.vpc.SUBNET_1_ID)}" ]
   max_size = "${var.leader_max_nodes}"
   min_size = "${var.leader_min_nodes}"
   desired_capacity = "${var.leader_default_nodes}"
@@ -73,7 +69,7 @@ resource "aws_autoscaling_group" "leaders" {
 }
 
 resource "aws_autoscaling_group" "followers" {
-  vpc_zone_identifier = [ "${coalesce(var.aws_subnet_id, terraform_remote_state.vpc.output.SUBNET_1_ID)}" ]
+  vpc_zone_identifier = [ "${coalesce(var.aws_subnet_id, data.terraform_remote_state.vpc.SUBNET_1_ID)}" ]
   max_size = "${var.follower_max_nodes}"
   min_size = "${var.follower_min_nodes}"
   desired_capacity = "${var.follower_default_nodes}"
@@ -124,7 +120,7 @@ resource "aws_launch_configuration" "follower_launch_config" {
   iam_instance_profile = "${var.aws_iam_role}"
   enable_monitoring = "${var.aws_detailed_monitoring}"
   key_name = "${var.aws_key_name}"
-  security_groups = [ "${terraform_remote_state.vpc.output.SECURITY_GROUP_ID}" ]
+  security_groups = [ "${data.terraform_remote_state.vpc.SECURITY_GROUP_ID}" ]
   user_data = "${file("${var.follower_user_data}")}"
   placement_tenancy = "${var.placement_tenancy}"
 
@@ -179,12 +175,45 @@ resource "aws_launch_configuration" "leader_launch_config" {
   iam_instance_profile = "${var.aws_iam_role}"
   enable_monitoring = "${var.aws_detailed_monitoring}"
   key_name = "${var.aws_key_name}"
-  security_groups = [ "${terraform_remote_state.vpc.output.SECURITY_GROUP_ID}" ]
+  security_groups = [ "${data.terraform_remote_state.vpc.SECURITY_GROUP_ID}" ]
   user_data = "${file("${var.leader_user_data}")}"
   placement_tenancy = "${var.placement_tenancy}"
 
   root_block_device {
     volume_size = "${var.instance_volume_size}"
+  }
+
+  ephemeral_block_device {
+    device_name = "xvdb"
+    virtual_name = "ephemeral0"
+  }
+  ephemeral_block_device {
+    device_name = "xvdc"
+    virtual_name = "ephemeral1"
+  }
+  ephemeral_block_device {
+    device_name = "xvdd"
+    virtual_name = "ephemeral2"
+  }
+  ephemeral_block_device {
+    device_name = "xvde"
+    virtual_name = "ephemeral3"
+  }
+  ephemeral_block_device {
+    device_name = "xvdf"
+    virtual_name = "ephemeral4"
+  }
+  ephemeral_block_device {
+    device_name = "xvdg"
+    virtual_name = "ephemeral5"
+  }
+  ephemeral_block_device {
+    device_name = "xvdh"
+    virtual_name = "ephemeral6"
+  }
+  ephemeral_block_device {
+    device_name = "xvdi"
+    virtual_name = "ephemeral7"
   }
 
   lifecycle {
