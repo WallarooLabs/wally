@@ -20,7 +20,8 @@ else
   echo "Isolating general system processes to cpus '${SYS_CPUS}'."
   echo "Current process map by cpuset:"
   cset set -l -r
-  cset set -c ${SYS_CPUS} -s system
+  mem_nodes=`cset set -l -r root | grep '/$' | awk '{print $4}'`
+  cset set -c ${SYS_CPUS} -m ${mem_nodes} -s system
   sys_cpus=`cset set -l -r -x system | grep '/system$' | awk '{print $2}'`
   all_cpus=`cset set -l -r -x root | grep '/$' | awk '{print $2}'`
   user_cpus=$(( 0x${all_cpus} - 0x${sys_cpus} ))
@@ -44,7 +45,7 @@ else
   if [ "${current_cpuspec_frag}" != "" ]; then
     user_cpuspec=${user_cpuspec},${current_cpuspec_frag}-${bit}
   fi
-  cset set -c ${user_cpuspec} -s user
+  cset set -c ${user_cpuspec} -m ${mem_nodes} -s user
   cset proc -m -k --threads -f root -t system
   echo "Modified process map by cpuset:"
   cset set -l -r

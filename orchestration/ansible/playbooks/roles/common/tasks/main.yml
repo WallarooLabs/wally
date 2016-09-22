@@ -38,7 +38,7 @@
 - name: remove isolcpus boot param if it exists (not ec2)
   lineinfile:
     dest: /boot/grub/grub.cfg
-    regexp: '(^ +linux.*) isolcpus={{ system_cpus }} +(.*)$'
+    regexp: '(^ +linux.*) isolcpus=\d+ +(.*)$'
     line: '\1 \2'
     backrefs: true
     state: present
