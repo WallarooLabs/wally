@@ -35,6 +35,22 @@ ifdef DEBUG_SHELL
  SHELL = /bin/sh -x
 endif
 
+ansible_version := $(shell ansible --version | grep ansible | awk '{print $$2}')
+ansible_required := 2.1.1.0
+
+# check ansible version
+ifneq ($(ansible_required),$(ansible_version))
+  $(error Ansible version '$(ansible_required)' required! Your ansible version is '$(ansible_version)'.)
+endif
+
+terraform_version := $(shell terraform --version | grep -i terraform | awk '{print $$2}')
+terraform_required := v0.7.4
+
+# check terraform version
+ifneq ($(terraform_required),$(terraform_version))
+  $(error Terraform version '$(terraform_required)' required! Your terraform version is '$(terraform_version)'.)
+endif
+
 # Make sure we have a valid value for provider
 ifdef provider
   ifeq (,$(filter $(provider),aws packet))
@@ -351,8 +367,8 @@ setup_aws_ci_arg: old_num_leaders=$(shell egrep -A 15 'leaders' \
 setup_aws_ci_arg: leader_num=$(if $(num_leaders),$(num_leaders),$(old_num_leaders))
 setup_aws_ci_arg: follower_num=$(if $(num_followers),$(num_followers),$(old_num_followers))
 setup_aws_ci_arg: num_instances_args=num_leaders_arg=$(if $(leader_num),-var \
-                leader_default_nodes=$(leader_num),)@num_followers_arg=$(if $(follower_num),-var \
-                follower_default_nodes=$(follower_num),)
+                'leader_default_nodes="$(leader_num)"',)@num_followers_arg=$(if $(follower_num),-var \
+                'follower_default_nodes="$(follower_num)"',)
 setup_aws_ci_arg: old_price=$(shell egrep 'spot_price' \
                 $(current_dir)/$(provider)-cluster/.terraform/terraform.tfstate | sort -u \
                 | sed -e 's/.*: "\(.*\)",/\1/' | head -n 1)
@@ -408,8 +424,8 @@ setup_packet_ci_arg: old_num_leaders=$(shell egrep -o 'buffy-leader-\d+' \
 setup_packet_ci_arg: leader_num=$(if $(num_leaders),$(num_leaders),$(old_num_leaders))
 setup_packet_ci_arg: follower_num=$(if $(num_followers),$(num_followers),$(old_num_followers))
 setup_packet_ci_arg: num_instances_args=num_leaders_arg=$(if $(leader_num),-var \
-                leader_default_nodes=$(leader_num),)@num_followers_arg=$(if $(follower_num),-var \
-                follower_default_nodes=$(follower_num),)
+                'leader_default_nodes="$(leader_num)"',)@num_followers_arg=$(if $(follower_num),-var \
+                'follower_default_nodes="$(follower_num)"',)
 setup_packet_ci_arg: old_type=$(shell egrep 'plan' \
                 $(current_dir)/$(provider)-cluster/.terraform/terraform.tfstate | sort -u \
                 | sed -e 's/.*: "\(.*\)",/\1/' | head -n 1)
