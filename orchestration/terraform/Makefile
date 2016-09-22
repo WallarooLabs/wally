@@ -503,6 +503,7 @@ acquire-vpc-lock: check-cluster-name ## Acquire vpc lock in order to safely run 
 
 check-cluster-name: # check for valid cluster name
 	$(if $(cluster_name),,$(error 'cluster_name' cannot be empty!))
+	$(if $(filter $(cluster_name),$(shell echo '$(cluster_name)' | sed 's/[^a-zA-Z0-9\-\.]//g')),,$(error 'cluster_name' can only have [a-zA-Z0-9-.] in it!))
 
 init-vpc-terraform: check-cluster-name ## Initialize/reset local terraform state based on what is in S3 for vpc
 	@echo "\033[36m==> Initializing terraform state for VPC in region \
@@ -602,4 +603,13 @@ use_automagic_instances=true.\033[0m"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk \
           'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", \
           $$1, $$2}'
+
+# rule to print info about make variables, works only with make 3.81 and above
+# to use invoke make with a target of print-VARNAME, e.g.,
+# make print-CCFLAGS
+print-%:
+	@echo '$*=$($*)'
+	@echo '  origin = $(origin $*)'
+	@echo '  flavor = $(flavor $*)'
+	@echo '   value = $(value  $*)'
 
