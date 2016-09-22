@@ -13,6 +13,9 @@ primitive JrStartupHelp
         initializer]
       --topology-initializer/-t [Sets this process as the topology 
         initializing process (that status is meaningless after init is done)]
+      --spike-delay [Turn on Spike TCP delay fault injection]
+      --spike-drop [Turn on Spike TCP connection drop fault injection]
+      --spike-seed [Provide Spike with a seed for deterministic replay]
       -----------------------------------------------------------------------------------
       """
     )
