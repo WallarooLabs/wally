@@ -6,10 +6,10 @@ import { fromJS, List, Map } from "immutable"
 
 const emptyLatencyPercentileBinStats = Map()
 	.set("50.0", 0)
-	.set("75.0", 0)
-	.set("90.0", 0)
+	.set("95.0", 0)
 	.set("99.0", 0)
-	.set("99.9", 0);
+	.set("99.9", 0)
+	.set("99.99", 0);
 
 class LatencyPercentileBinStatsStore extends ReduceStore {
 	constructor(dispatcher) {
@@ -17,9 +17,9 @@ class LatencyPercentileBinStatsStore extends ReduceStore {
 	}
 	getInitialState() {
 		let state = Map()
-			.set("source-sink", Map())
-			.set("ingress-egress", Map())
-			.set("step", Map())
+			.set("start-to-end", Map())
+			.set("node-ingress-egress", Map())
+			.set("computation", Map())
 		return state;
 	}
 	getLatencyPercentileBinStats(category, metricsKey) {
@@ -37,15 +37,15 @@ class LatencyPercentileBinStatsStore extends ReduceStore {
 		let metricsKey;
 		switch(action.actionType) {
 			case Actions.RECEIVE_STEP_LATENCY_PERCENTILE_BIN_STATS.actionType:
-				category = "step";
+				category = "computation";
 				metricsKey = action["latency-percentile-bin-stats"].pipeline_key;
 				return this.storeLatencyPercentileBinStats(category, metricsKey, action["latency-percentile-bin-stats"], state);
 			case Actions.RECEIVE_INGRESS_EGRESS_LATENCY_PERCENTILE_BIN_STATS.actionType:
-				category = "ingress-egress";
+				category = "node-ingress-egress";
 				metricsKey = action["latency-percentile-bin-stats"].pipeline_key;
 				return this.storeLatencyPercentileBinStats(category, metricsKey, action["latency-percentile-bin-stats"], state);
 			case Actions.RECEIVE_SOURCE_SINK_LATENCY_PERCENTILE_BIN_STATS.actionType:
-				category = "source-sink";
+				category = "start-to-end";
 				metricsKey = action["latency-percentile-bin-stats"].pipeline_key;
 				return this.storeLatencyPercentileBinStats(category, metricsKey, action["latency-percentile-bin-stats"], state);
 			default:

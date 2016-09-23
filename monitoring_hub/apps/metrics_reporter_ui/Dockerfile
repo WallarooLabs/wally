@@ -17,4 +17,6 @@ RUN tar xfv /rel/metrics_reporter_ui.tar.gz -C /apps/metrics_reporter_ui
 
 EXPOSE 4000 5001
 
+ENV PATH /apps/metrics_reporter_ui/bin:$PATH
+
 ENTRYPOINT ["/apps/metrics_reporter_ui/bin/metrics_reporter_ui", "foreground"]

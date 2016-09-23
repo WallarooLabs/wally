@@ -1,6 +1,5 @@
 use "buffered"
 use "time"
-use "sendence/epoch"
 use "../metrics"
 
 interface Runner
@@ -39,7 +38,7 @@ class ComputationRunner[In: Any val, Out: Any val]
 
   fun ref run[D: Any val](source_name: String val, source_ts: U64, input: D) 
   =>
-    let computation_start = Epoch.nanoseconds()
+    let computation_start = Time.nanos()
     match input
     | let i: In =>
       match _computation(i)
@@ -49,7 +48,7 @@ class ComputationRunner[In: Any val, Out: Any val]
         _metrics_reporter.pipeline_metric(source_name, source_ts)
       end
 
-      let computation_end = Epoch.nanoseconds()   
+      let computation_end = Time.nanos()   
 
       _metrics_reporter.step_metric(_computation_name,
         computation_start, computation_end)
@@ -69,9 +68,9 @@ class StateRunner[State: Any #read]
   fun ref run[In: Any val](source_name: String val, source_ts: U64, input: In) =>
     match input
     | let sp: StateProcessor[State] val =>
-      let computation_start = Epoch.nanoseconds()
+      let computation_start = Time.nanos()
       sp(_state, _wb)
-      let computation_end = Epoch.nanoseconds()
+      let computation_end = Time.nanos()
 
       _metrics_reporter.pipeline_metric(source_name, source_ts)
 

@@ -17,7 +17,7 @@ export default class RejectedOrderRow extends React.Component {
 		const symbol = order.get("symbol");
 		const symbolDescription = symbolDescriptions(symbol);
 		const stockPrice = formatMoney(order.get("price"));
-		const stockQty = formatNumber(order.get("qty"));
+		const stockQty = formatNumber(order.get("order_qty"));
 		const side = order.get("side");
 		const bid = formatMoney(order.get("bid"));
 		const offer = formatMoney(order.get("offer"));

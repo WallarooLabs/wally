@@ -12,9 +12,9 @@ class ThroughputsStore extends ReduceStore {
 		super(dispatcher);
 	}
 	getInitialState() {
-		let state = Map().set("source-sink", Map())
-					 .set("ingress-egress", Map())
-					 .set("step", Map())
+		let state = Map().set("start-to-end", Map())
+					 .set("node-ingress-egress", Map())
+					 .set("computation", Map())
 		return state;
 	}
 	getThroughputs(category, metricsKey) {
@@ -52,27 +52,27 @@ class ThroughputsStore extends ReduceStore {
 		let metricsKey;
 		switch(action.actionType) {
 			case Actions.RECEIVE_STEP_TOTAL_THROUGHPUT.actionType:
-				category = "step";
+				category = "computation";
 				metricsKey = action["total-throughput"].pipeline_key;
 				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
 			case Actions.RECEIVE_SOURCE_SINK_TOTAL_THROUGHPUT.actionType:
-				category = "source-sink";
+				category = "start-to-end";
 				metricsKey = action["total-throughput"].pipeline_key;
 				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
 			case Actions.RECEIVE_INGRESS_EGRESS_TOTAL_THROUGHPUT.actionType:
-				category = "ingress-egress";
+				category = "node-ingress-egress";
 				metricsKey = action["total-throughput"].pipeline_key;
 				return this.filterTotalThroughputData(state, category, metricsKey, action["total-throughput"]);
 			case Actions.RECEIVE_STEP_INITIAL_TOTAL_THROUGHPUTS.actionType:
-				category = "step";
+				category = "computation";
 				metricsKey = action["initial-total-throughputs"].pipeline_key;
 				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
 			case Actions.RECEIVE_SOURCE_SINK_INITIAL_TOTAL_THROUGHPUTS.actionType:
-				category = "source-sink";
+				category = "start-to-end";
 				metricsKey = action["initial-total-throughputs"].pipeline_key;
 				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
 			case Actions.RECEIVE_INGRESS_EGRESS_INITIAL_TOTAL_THROUGHPUTS.actionType:
-				category = "ingress-egress";
+				category = "node-ingress-egress";
 				metricsKey = action["initial-total-throughputs"].pipeline_key;
 				return this.filterInitialTotalThroughputsData(state, category, metricsKey, action["initial-total-throughputs"]);
 			default:

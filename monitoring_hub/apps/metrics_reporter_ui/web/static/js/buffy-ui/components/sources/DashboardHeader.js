@@ -10,13 +10,13 @@ export default class DashboardHeader extends React.Component {
 		const {sourceType, sourceName} = this.props;
 		let sourceHeader;
 		switch(sourceType) {
-			case "step":
-				sourceHeader = "Step";
+			case "computation":
+				sourceHeader = "Computation";
 				break;
-			case "ingress-egress":
+			case "node-ingress-egress":
 				sourceHeader = "Node";
 				break;
-			case "source-sink":
+			case "start-to-end":
 				sourceHeader = "Overall";
 				break;
 		}

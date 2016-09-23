@@ -46,6 +46,8 @@
   tasks:
   - name: Create a group of all hosts for buffy
     group_by: key=buffy-all
+  - name: Gather ec2 facts
+    action: ec2_facts
   - name: set variable for disks that can be raided
     set_fact:
       disks: "{{ hostvars[inventory_hostname]['ansible_devices'].keys() | difference(['xvda','sda']) }}"
@@ -94,8 +96,6 @@
   - { role: common, become: yes }
   - { role: jacoelho.softwareraid, become: yes, when: disks_list | length > 0}
   tasks:
-  - name: Gather ec2 facts
-    action: ec2_facts
   - name: Rename ec2 instance name tag
     ec2_tag:
       region: "{{ ansible_ec2_placement_region }}"
@@ -115,6 +115,7 @@
     swarm_image: swarm
     consul_image: gliderlabs/consul
     docker_users: [ ubuntu, sendence ]
+    docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
@@ -131,6 +132,7 @@
     swarm_image: swarm
     consul_image: gliderlabs/consul
     docker_users: [ ubuntu, sendence ]
+    docker_dockerpy_version: "1.9.0"
   roles:
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }

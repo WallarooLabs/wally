@@ -77,6 +77,10 @@ table.applications tbody.applications tr td a {
     text-decoration: none;
 }
 
+table.table tbody tr.list-group-item-success {
+    color: black;
+}
+
 div.panel-body h4 {
     padding: 0 15px;
 }

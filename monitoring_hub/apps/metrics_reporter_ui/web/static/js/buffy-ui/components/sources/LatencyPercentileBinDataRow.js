@@ -17,16 +17,16 @@ export default class LatencyPercentileBinDataRow extends React.Component {
 						<LatencyMetricBox value={latencyPercentileBinStats.get("50.0")} title={<p>50% of latencies<br/>are:</p>} />
 					</Col>
 					<Col lg={2}>
-						<LatencyMetricBox value={latencyPercentileBinStats.get("75.0")} title={<p>75% of latencies<br/>are:</p>} />
-					</Col>
-					<Col lg={2}>
-						<LatencyMetricBox value={latencyPercentileBinStats.get("90.0")} title={<p>90% of latencies<br/>are:</p>} />
+						<LatencyMetricBox value={latencyPercentileBinStats.get("95.0")} title={<p>95% of latencies<br/>are:</p>} />
 					</Col>
 					<Col lg={2}>
 						<LatencyMetricBox value={latencyPercentileBinStats.get("99.0")} title={<p>99% of latencies<br/>are:</p>} />
 					</Col>
 					<Col lg={2}>
 						<LatencyMetricBox value={latencyPercentileBinStats.get("99.9")} title={<p>99.9% of latencies<br/>are:</p>} />
+					</Col>
+					<Col lg={2}>
+						<LatencyMetricBox value={latencyPercentileBinStats.get("99.99")} title={<p>99.99% of latencies<br/>are:</p>} />
 					</Col>
 				</Panel>
 			</Row>

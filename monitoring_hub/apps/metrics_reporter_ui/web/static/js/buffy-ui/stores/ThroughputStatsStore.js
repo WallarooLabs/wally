@@ -15,9 +15,9 @@ class ThroughputStatsStore extends ReduceStore {
 	}
 	getInitialState() {
 		let state = Map()
-			.set("source-sink", Map())
-			.set("ingress-egress", Map())
-			.set("step", Map())
+			.set("start-to-end", Map())
+			.set("node-ingress-egress", Map())
+			.set("computation", Map())
 		return state;
 	}
 	getThroughputStats(category, metricsKey) {
@@ -35,15 +35,15 @@ class ThroughputStatsStore extends ReduceStore {
 		let metricsKey;
 		switch(action.actionType) {
 			case Actions.RECEIVE_STEP_THROUGHPUT_STATS.actionType:
-				category = "step";
+				category = "computation";
 				metricsKey = action["throughput-stats"].pipeline_key;
 				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_INGRESS_EGRESS_THROUGHPUT_STATS.actionType:
-				category = "ingress-egress";
+				category = "node-ingress-egress";
 				metricsKey = action["throughput-stats"].pipeline_key;
 				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
 			case Actions.RECEIVE_SOURCE_SINK_THROUGHPUT_STATS.actionType:
-				category = "source-sink";
+				category = "start-to-end";
 				metricsKey = action["throughput-stats"].pipeline_key;
 				return this.storeThroughputStats(category, metricsKey, action["throughput-stats"], state);
 			default:

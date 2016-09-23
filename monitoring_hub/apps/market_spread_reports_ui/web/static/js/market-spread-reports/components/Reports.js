@@ -10,9 +10,6 @@ export default class Reports extends React.Component {
 						<Link to="/reports/rejected-orders-report">
 							<h1>Rejected Orders Report</h1>
 						</Link>
-						<Link to="/reports/rejected-client-order-summaries-report">
-							<h1>Rejected Client Order Summaries Report</h1>
-						</Link>
 					</div>
 				}
 			</div>

@@ -1,7 +1,8 @@
 FROM scratch
 
 ADD dagon /dagon/dagon
-ADD *.ini /dagon/
+
+ENV PATH /dagon:$PATH
 
 ENTRYPOINT ["/dagon/dagon"]
 
