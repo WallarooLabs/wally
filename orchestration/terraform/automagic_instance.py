@@ -240,8 +240,8 @@ if cheapest_instance['Spot']:
          cheapest_instance['CurrentPrice']) + \
         "ci_inst_type={0}#ci_inst_price={1}#ci_az={2}#availability_zone={2}" +\
         "#ci_args=-var leader_instance_type={0} -var follower_instance_type" +\
-        "={0} -var leader_spot_price={1} -var follower_spot_price=" + \
-        "{1}").format(cheapest_instance['InstanceType']
+        "={0} -var 'leader_spot_price=\"{1}\"' -var 'follower_spot_price=\"" + \
+        "{1}\"'").format(cheapest_instance['InstanceType']
         , cheapest_instance['Price'], cheapest_instance['AvailabilityZone'])
 
 else:

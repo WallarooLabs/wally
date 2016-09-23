@@ -387,8 +387,8 @@ setup_aws_ci_arg: tmp_ci_args=$(if $(filter $(use_automagic_instances),true),$(i
        $(old_type),ci_old_values=true#ci_inst_type=$(old_type)#$(old_pg_args)\
        #ci_inst_price=$(old_price)#ci_az=$(old_az)#availability_zone=$(old_az)\
        #ci_current_price=???#ci_args=-var leader_instance_type=$(old_type) -var \
-       follower_instance_type=$(old_type) -var leader_spot_price=$(old_price) \
-       -var follower_spot_price=$(old_price),$(shell\
+       follower_instance_type=$(old_type) -var 'leader_spot_price="$(old_price)"' \
+       -var 'follower_spot_price="$(old_price)"',$(shell\
        $(current_dir)/automagic_instance.py --region $(region) --cpus \
        $(cpus_required) --mem $(mem_required) $(no_burst_arg) \
        --spot-bid-factor $(spot_bid_factor) --availability_zone \
