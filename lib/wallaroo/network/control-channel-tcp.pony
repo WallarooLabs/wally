@@ -1,8 +1,9 @@
 use "net"
 use "collections"
-use "wallaroo/messages"
-use "sendence/bytes"
 use "time"
+use "sendence/bytes"
+use "wallaroo/messages"
+use "wallaroo/topology"
 
 class ControlChannelListenNotifier is TCPListenNotify
   let _env: Env
@@ -12,17 +13,20 @@ class ControlChannelListenNotifier is TCPListenNotify
   var _service: String = ""
   let _is_initializer: Bool
   let _initializer: (Initializer | None)
+  let _local_topology_initializer: LocalTopologyInitializer
   let _connections: Connections
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
-    initializer: (Initializer | None) = None)
+    initializer: (Initializer | None) = None,
+    local_topology_initializer: LocalTopologyInitializer)
   =>
     _env = env
     _auth = auth
     _name = name
     _is_initializer = is_initializer
     _initializer = initializer
+    _local_topology_initializer = local_topology_initializer
     _connections = connections
 
   fun ref listening(listen: TCPListener ref) =>
@@ -45,7 +49,7 @@ class ControlChannelListenNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _env, _auth, _connections, 
-      _initializer)
+      _initializer, _local_topology_initializer)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
   let _env: Env
@@ -53,16 +57,19 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _name: String
   let _connections: Connections
   let _initializer: (Initializer | None)
+  let _local_topology_initializer: LocalTopologyInitializer
   var _header: Bool = true
 
   new iso create(name: String, env: Env, auth: AmbientAuth, 
-    connections: Connections, initializer: (Initializer | None)) 
+    connections: Connections, initializer: (Initializer | None),
+    local_topology_initializer: LocalTopologyInitializer) 
   =>
     _env = env
     _auth = auth
     _name = name
     _connections = connections
     _initializer = initializer
+    _local_topology_initializer = local_topology_initializer
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -104,12 +111,15 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: AddDataMsg val =>
         None
         // do something
+      | let m: SpinUpLocalTopologyMsg val =>
+        _local_topology_initializer.update_topology(m.local_topology)
+        _local_topology_initializer.initialize()
       | let m: CreateConnectionsMsg val =>
         _connections.create_connections(m.addresses)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")
       else
-        _env.err.print("Error decoding incoming message.")
+        _env.err.print("Incoming Channel Message type not handled by control channel.")
       end
 
       conn.expect(4)

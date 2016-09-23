@@ -6,19 +6,17 @@ actor Connections
   let _env: Env
   let _auth: AmbientAuth
   let _is_initializer: Bool
-  let _initializer: (Initializer | None)
   let _control_conns: Map[String, TCPConnection] = _control_conns.create()
   let _data_conns: Map[String, TCPConnection] = _data_conns.create()
 
   new create(name: String, env: Env, auth: AmbientAuth,
     c_host: String, c_service: String, d_host: String, d_service: String, 
-    is_initializer: Bool, initializer: (Initializer | None) = None) 
+    is_initializer: Bool) 
   =>
     _name = name
     _env = env
     _auth = auth
     _is_initializer = is_initializer
-    _initializer = initializer
 
     if not _is_initializer then
       create_control_connection("initializer", c_host, c_service)
@@ -68,7 +66,7 @@ actor Connections
     service: String) 
   =>
     let control_notifier: TCPConnectionNotify iso =
-      ControlChannelConnectNotifier(_name, _env, _auth, this, _initializer)
+      ControlSenderConnectNotifier(_env)
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
     _control_conns(target_name) = control_conn    

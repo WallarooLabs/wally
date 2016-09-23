@@ -13,21 +13,19 @@ class DataChannelListenNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
   let _is_initializer: Bool
-  let _initializer: (Initializer | None)
   var _host: String = ""
   var _service: String = ""
   let _routes: DataRouter val
   let _connections: Connections
 
   new iso create(name: String, env: Env, auth: AmbientAuth, 
-    routes: DataRouter val, connections: Connections, is_initializer: Bool, 
-    initializer: (Initializer | None) = None)
+    connections: Connections, is_initializer: Bool, routes: DataRouter val = 
+    DataRouter)
   =>
     _name = name
     _env = env
     _auth = auth
     _is_initializer = is_initializer
-    _initializer = initializer
     _routes = routes
     _connections = connections
 
@@ -46,18 +44,15 @@ class DataChannelListenNotifier is TCPListenNotify
     end
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelConnectNotifier(_initializer, _routes, _env, _auth)
+    DataChannelConnectNotifier(_routes, _env, _auth)
 
 class DataChannelConnectNotifier is TCPConnectionNotify
-  let _initializer: (Initializer | None)
   let _routes: DataRouter val
   let _env: Env
   let _auth: AmbientAuth
   var _header: Bool = true
 
-  new iso create(initializer: (Initializer | None) = None, 
-    routes: DataRouter val, env: Env, auth: AmbientAuth) =>
-    _initializer = initializer
+  new iso create(routes: DataRouter val, env: Env, auth: AmbientAuth) =>
     _routes = routes
     _env = env
     _auth = auth
@@ -83,6 +78,8 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       // | let m: DataSenderReadyMsg val =>
       //   _sender_name = m.node_name
       //   _coordinator.connect_receiver(m.node_name)
+      | let m: SpinUpLocalTopologyMsg val =>
+        _env.out.print("Received spin up local topology message!")
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown Wallaroo data message type.")
       end

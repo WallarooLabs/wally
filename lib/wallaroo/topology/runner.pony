@@ -1,25 +1,11 @@
 use "buffered"
 use "time"
-use "../metrics"
+use "net"
+use "sendence/epoch"
+use "wallaroo/metrics"
 
 interface Runner
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In)
-
-class SimpleSink
-  let _metrics_reporter: MetricsReporter
-
-  new iso create(metrics_reporter: MetricsReporter iso) =>
-    _metrics_reporter = consume metrics_reporter
-
-  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In) =>
-    match input
-    | let s: Stringable val =>
-      @printf[I32](("Simple sink: Received " + s.string() + "\n").cstring())
-    else
-      @printf[I32]("Simple sink: Got it!\n".cstring())
-    end
-
-    _metrics_reporter.pipeline_metric(metric_name, source_ts)
 
 class ComputationRunner[In: Any val, Out: Any val]
   let _computation: Computation[In, Out] val
@@ -79,3 +65,41 @@ class StateRunner[State: Any #read]
     else
       @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
     end
+
+class SimpleSink
+  let _metrics_reporter: MetricsReporter
+
+  new iso create(metrics_reporter: MetricsReporter iso) =>
+    _metrics_reporter = consume metrics_reporter
+
+  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In) =>
+    match input
+    | let s: Stringable val =>
+      @printf[I32](("Simple sink: Received " + s.string() + "\n").cstring())
+    else
+      @printf[I32]("Simple sink: Got it!\n".cstring())
+    end
+
+    _metrics_reporter.pipeline_metric(metric_name, source_ts)
+
+class EncoderSink//[Out: Any val]
+  let _metrics_reporter: MetricsReporter
+  let _conn: TCPConnection
+  // let _encoder: {(Out): Array[ByteSeq] val} val
+
+  new iso create(metrics_reporter: MetricsReporter iso,
+    conn: TCPConnection)
+  // , encoder: {(Out): Array[ByteSeq] val} val)
+  =>
+    _metrics_reporter = consume metrics_reporter
+    _conn = conn
+    // _encoder = encoder
+
+  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In) =>
+    _conn.write("hi")
+    // match input
+    // | let o: Out =>
+      // let encoded = _encoder(o)
+    // end
+
+    _metrics_reporter.pipeline_metric(metric_name, source_ts)

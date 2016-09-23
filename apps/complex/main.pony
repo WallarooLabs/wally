@@ -6,6 +6,7 @@ use "buffered"
 use "files"
 use "sendence/hub"
 use "sendence/fix"
+use "sendence/guid"
 use "wallaroo"
 use "wallaroo/network"
 use "wallaroo/metrics"
@@ -18,7 +19,7 @@ actor Main
 primitive ComplexStarter
   fun apply(env: Env, initializer_data_addr: Array[String],
     input_addrs: Array[Array[String]], 
-    output_addr: Array[String], metrics_addr: Array[String], 
+    output_addr: Array[String], metrics_conn: TCPConnection, 
     expected: USize, init_path: String, worker_count: USize,
     is_initializer: Bool, worker_name: String, connections: Connections,
     initializer: (Initializer | None)) ? 
@@ -31,23 +32,21 @@ primitive ComplexStarter
     let jr_metrics = JrMetrics("Complex Numbers")
 
     let connect_auth = TCPConnectAuth(auth)
-    let metrics_conn = TCPConnection(connect_auth,
-          OutNotify("metrics"),
-          metrics_addr(0),
-          metrics_addr(1))
+
+    // Set up metrics
     let connect_msg = HubProtocol.connect()
     let metrics_join_msg = HubProtocol.join("metrics:complex-numbers")
     metrics_conn.writev(connect_msg)
     metrics_conn.writev(metrics_join_msg)
 
     if worker_count == 1 then
-      let reports_socket = TCPConnection(connect_auth,
+      let reports_conn = TCPConnection(connect_auth,
         OutNotify("results"),
         output_addr(0),
         output_addr(1))
       let reports_join_msg = HubProtocol.join("reports:complex-numbers")
-      reports_socket.writev(connect_msg)
-      reports_socket.writev(reports_join_msg)
+      reports_conn.writev(connect_msg)
+      reports_conn.writev(reports_join_msg)
 
       let sink_reporter = MetricsReporter("complex-numbers", metrics_conn)
       let sink = Step(SimpleSink(consume sink_reporter))
@@ -127,13 +126,16 @@ class ComplexTopologyStarter is TopologyStarter
     _metrics_conn = metrics_conn
 
   fun apply(initializer: Initializer) =>
+    let pipeline_name = "complex-numbers"
+    // let guid_gen = GuidGenerator
+
     let scale_builder = GeneralStepBuilder[Complex val, Complex val](
       lambda(): Computation[Complex val, Complex val] val => Scale end,
-      _metrics_conn, "complex-numbers")
+      pipeline_name)//, guid_gen.u128())
 
     let conjugate_builder = GeneralStepBuilder[Complex val, Complex val](
       lambda(): Computation[Complex val, Complex val] val => Conjugate end,
-      _metrics_conn, "complex-numbers")
+      pipeline_name)//, guid_gen.u128())
 
     let worker_2_builders: Array[StepBuilder val] trn = 
       recover Array[StepBuilder val] end
@@ -146,10 +148,10 @@ class ComplexTopologyStarter is TopologyStarter
     worker_3_builders.push(scale_builder)
 
 
-    let worker_2_topology = LocalTopology(consume worker_2_builders
+    let worker_2_topology = LocalTopology(pipeline_name, consume worker_2_builders
       where local_sink = 2)
 
-    let worker_3_topology = LocalTopology(consume worker_3_builders
+    let worker_3_topology = LocalTopology(pipeline_name, consume worker_3_builders
       where global_sink = _output_addr)
 
     let local_topologies: Array[LocalTopology val] trn = 
@@ -162,19 +164,20 @@ class ComplexTopologyStarter is TopologyStarter
     initializer.distribute_local_topologies(consume local_topologies)
 
 class GeneralStepBuilder[In: Any val, Out: Any val]
-  let _metrics_conn: TCPConnection
   let _computation_builder: {(): Computation[In, Out] val} val
   let _pipeline_name: String 
+  // let _id: U128
 
   new val create(c: {(): Computation[In, Out] val} val,
-    metrics_conn: TCPConnection,
-    pipeline_name: String) =>
-    _metrics_conn = metrics_conn
+    pipeline_name: String) =>//, id': U128) =>
     _computation_builder = c
     _pipeline_name = pipeline_name
+    // _id = id'
 
-  fun apply(target: Step tag): Step tag =>
-    let reporter = MetricsReporter(_pipeline_name, _metrics_conn)
+  // fun id(): U128 => _id
+
+  fun apply(target: Step tag, metrics_conn: TCPConnection): Step tag =>
+    let reporter = MetricsReporter(_pipeline_name, metrics_conn)
     let runner = ComputationRunner[In, Out](
       _computation_builder(), target, consume reporter)    
     Step(consume runner)

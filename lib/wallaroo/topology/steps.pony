@@ -1,6 +1,8 @@
 use "buffered"
 use "time"
-use "../metrics"
+use "net"
+use "sendence/epoch"
+use "wallaroo/metrics"
 
 actor Step
   let _runner: Runner
@@ -11,3 +13,7 @@ actor Step
   be run[In: Any val](metric_name: String, source_ts: U64, input: In) =>
     _runner.run[In](metric_name, source_ts, input)
 
+interface StepBuilder
+  // fun id(): U128
+
+  fun apply(target: Step tag, metrics_conn: TCPConnection): Step tag

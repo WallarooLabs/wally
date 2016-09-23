@@ -4,32 +4,16 @@ use "options"
 use "time"
 use "buffered"
 use "files"
-use "./network"
-
-class OutNotify is TCPConnectionNotify
-  let _name: String
-
-  new iso create(name: String) =>
-    _name = name
-
-  fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("%s outgoing connected\n".cstring(),
-      _name.null_terminated().cstring())
-
-  fun ref throttled(sock: TCPConnection ref, x: Bool) =>
-    if x then
-      @printf[None]("%s outgoing throttled\n".cstring(),
-        _name.null_terminated().cstring())
-    else
-      @printf[None]("%s outgoing no longer throttled\n".cstring(),
-        _name.null_terminated().cstring())
-    end
+use "wallaroo/network"
+use "wallaroo/topology"
 
 interface AppStarter
-  fun apply(env: Env, input_addrs: Array[Array[String]], 
-    output_addr: Array[String], metrics_addr: Array[String], 
+  fun apply(env: Env, data_addr: Array[String],
+    input_addrs: Array[Array[String]], 
+    output_addr: Array[String], metrics_conn: TCPConnection, 
     expected: USize, init_path: String, worker_count: USize,
-    initializer: Bool, worker_name: String, connections: Connections) ? 
+    is_initializer: Bool, worker_name: String, connections: Connections,
+    initializer: (Initializer | None)) ? 
 
 actor Startup
   new create(env: Env, app_runner: AppStarter val) =>
@@ -94,6 +78,12 @@ actor Startup
         error
       end
 
+      let connect_auth = TCPConnectAuth(auth)
+      let metrics_conn = TCPConnection(connect_auth,
+          OutNotify("metrics"),
+          m_addr(0),
+          m_addr(1))
+
       let connections = Connections(worker_name, env, auth, c_host, c_service, 
         d_host, d_service, is_initializer)
 
@@ -102,24 +92,22 @@ actor Startup
         worker_name = "initializer"
       end
 
+      let local_topology_initializer = LocalTopologyInitializer(worker_name, 
+        env, auth, connections, metrics_conn, is_initializer)
+
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(worker_name, env, auth, connections, 
-          is_initializer, initializer)
-
-      // let data_notifier: TCPListenNotify iso =
-      //   DataChannelListenNotifier(worker_name, env, auth, connections, 
-      //     is_initializer, initializer)
+          is_initializer, initializer, local_topology_initializer)
 
       if is_initializer then
         TCPListener(auth, consume control_notifier, c_host, c_service) 
-        // TCPListener(auth, consume data_notifier, d_host, d_service)
       else
         TCPListener(auth, consume control_notifier) 
-        // TCPListener(auth, consume data_notifier)
       end
 
-      app_runner(env, input_addrs, o_addr, m_addr, expected, init_path, 
-        worker_count, is_initializer, worker_name, connections)
+      app_runner(env, d_addr, input_addrs, o_addr, metrics_conn, expected,
+        init_path, worker_count, is_initializer, worker_name, connections, 
+        initializer)
     else
       JrStartupHelp(env)
     end
