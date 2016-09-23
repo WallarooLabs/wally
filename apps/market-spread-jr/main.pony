@@ -71,7 +71,7 @@ primitive MarketSpreadStarter
         =>
           let nbbo_reporter = MetricsReporter("market-spread", metrics_socket)
           StateSource[FixNbboMessage val, SymbolData](
-          "Nbbo source", NbboSourceParser, SymbolRouter(symbol_to_actor), 
+          "Nbbo", NbboSourceParser, SymbolRouter(symbol_to_actor), 
           UpdateNbbo, consume nbbo_reporter, initial_nbbo)
         end
       end
@@ -92,7 +92,7 @@ primitive MarketSpreadStarter
           let order_reporter = MetricsReporter("market-spread", 
             metrics_socket)
           StateSource[FixOrderMessage val, 
-            SymbolData]("Order source", OrderSourceParser, 
+            SymbolData]("Order", OrderSourceParser, 
             SymbolRouter(symbol_to_actor), check_order, 
               consume order_reporter)
         end

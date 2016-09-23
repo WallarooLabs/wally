@@ -78,7 +78,8 @@ class StatelessSource[In: Any val]
     end
     
 class StateSource[In: Any val, State: Any #read]
-  let _name: String
+  let _pipeline_name: String
+  let _source_name: String
   let _parser: SourceParser[In] val
   let _router: Router[In, Step tag]
   let _state_comp: StateComputation[In, State] val
@@ -90,7 +91,8 @@ class StateSource[In: Any val, State: Any #read]
     metrics_reporter: MetricsReporter iso,
     initial_msgs: Array[Array[U8] val] val = 
       recover Array[Array[U8] val] end) =>
-    _name = name'
+    _pipeline_name = name'
+    _source_name = _pipeline_name + " source"
     _parser = parser
     _router = consume router
     _state_comp = state_comp
@@ -99,7 +101,7 @@ class StateSource[In: Any val, State: Any #read]
       process(msg)
     end
 
-  fun name(): String val => _name
+  fun name(): String val => _source_name
 
   fun ref process(data: Array[U8] val) =>
     let ingest_ts = Epoch.nanoseconds()
@@ -113,20 +115,21 @@ class StateSource[In: Any val, State: Any #read]
         | let r: Step tag =>
           let processor = 
             StateComputationWrapper[In, State](input, _state_comp)
-          r.run[StateProcessor[State] val](_name, ingest_ts, processor)
+          r.run[StateProcessor[State] val](_pipeline_name, ingest_ts, 
+            processor)
         else
           // drop data that has no partition
-          @printf[I32]((_name + ": Fake logging lack of partition\n").cstring())
+          @printf[I32]((_source_name + ": Fake logging lack of partition\n").cstring())
           None
         end
       else
         // If parser returns None, we're filtering the message out already
         let computation_end = Epoch.nanoseconds()
-        _metrics_reporter.pipeline_metric(_name, ingest_ts)
+        _metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
 
-        _metrics_reporter.step_metric(_state_comp.name(),
+        _metrics_reporter.step_metric(_source_name,
           computation_start, computation_end)
       end
     else 
-      @printf[I32]((_name + ": Problem parsing source input\n").cstring())
+      @printf[I32]((_source_name + ": Problem parsing source input\n").cstring())
     end
