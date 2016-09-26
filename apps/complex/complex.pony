@@ -1,3 +1,18 @@
+"""
+Setting up a complex app run (in order):
+1) reports sink
+nc -l 127.0.0.1 7002 >> /dev/null
+
+2) metrics sink
+nc -l 127.0.0.1 7003 >> /dev/null
+
+3) Complex app
+./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 1000 -w 3 -t -n worker-name
+
+4) orders:
+giles/sender/sender -b 127.0.0.1:7010 -m 5000000 -s 300 -i 5_000_000 -f apps/complex/complex_numbers.msg -r --ponythreads=1 -y -g 12
+"""
+
 use "buffered"
 use "sendence/bytes"
 use "wallaroo/topology"

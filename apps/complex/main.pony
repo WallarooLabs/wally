@@ -203,7 +203,9 @@ class ComplexTopologyStarter is TopologyStarter
     TCPListener(listen_auth,
       SourceListenerNotify(complex_source_builder, jr_metrics, expected),
       source_addr(0),
-      source_addr(1))    
+      source_addr(1)) 
+
+    @printf[I32]("Finished running startup code!\n".cstring())   
 
 class GeneralStepBuilder[In: Any val, Out: Any val]
   let _computation_builder: {(): Computation[In, Out] val} val
