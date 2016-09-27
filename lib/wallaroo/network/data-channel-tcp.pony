@@ -3,18 +3,59 @@ use "time"
 use "buffered"
 use "collections"
 use "sendence/bytes"
+use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 
-class DataChannelNotify is TCPConnectionNotify
-  let _router: Router[Array[U8] val, Step tag] val
-  let _metrics: JrMetrics
+
+class DataChannelListenNotifier is TCPListenNotify
+  let _name: String
+  let _env: Env
+  let _auth: AmbientAuth
+  let _is_initializer: Bool
+  var _host: String = ""
+  var _service: String = ""
+  let _routes: DataRouter val
+  let _connections: Connections
+
+  new iso create(name: String, env: Env, auth: AmbientAuth, 
+    connections: Connections, is_initializer: Bool, routes: DataRouter val = 
+    DataRouter)
+  =>
+    _name = name
+    _env = env
+    _auth = auth
+    _is_initializer = is_initializer
+    _routes = routes
+    _connections = connections
+
+  fun ref listening(listen: TCPListener ref) =>
+    try
+      (_host, _service) = listen.local_address().name()
+      _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
+      if not _is_initializer then
+        let message = ChannelMsgEncoder.identify_data_port(_name, _service,
+          _auth)
+        _connections.send_control("initializer", message)
+      end
+    else
+      _env.out.print(_name + "control : couldn't get local address")
+      listen.close()
+    end
+
+  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
+    DataChannelConnectNotifier(_routes, _env, _auth)
+
+class DataChannelConnectNotifier is TCPConnectionNotify
+  let _routes: DataRouter val
+  let _env: Env
+  let _auth: AmbientAuth
   var _header: Bool = true
 
-  new iso create(router: Router[Array[U8] val, Step tag] val, 
-    metrics: JrMetrics) =>
-    _router = router
-    _metrics = metrics
+  new iso create(routes: DataRouter val, env: Env, auth: AmbientAuth) =>
+    _routes = routes
+    _env = env
+    _auth = auth
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -25,7 +66,23 @@ class DataChannelNotify is TCPConnectionNotify
         _header = false
       end
     else
-      // process consume data
+      let msg = ChannelMsgDecoder(consume data, _auth)
+      match msg
+      | let d: DeliveryMsg val =>
+        match _routes.route(d.target_id())
+        | let s: Step tag =>
+          d.deliver(s)
+        else
+          _env.err.print("Data channel: Target id not found for incoming data.")
+        end
+      // | let m: DataSenderReadyMsg val =>
+      //   _sender_name = m.node_name
+      //   _coordinator.connect_receiver(m.node_name)
+      | let m: SpinUpLocalTopologyMsg val =>
+        _env.out.print("Received spin up local topology message!")
+      | let m: UnknownChannelMsg val =>
+        _env.err.print("Unknown Wallaroo data message type.")
+      end
 
       conn.expect(4)
       _header = true
@@ -33,20 +90,22 @@ class DataChannelNotify is TCPConnectionNotify
     false
 
   fun ref accepted(conn: TCPConnection ref) =>
-    @printf[None]("accepted\n".cstring())
+    _env.out.print("accepted")
     conn.expect(4)
 
   fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("incoming connected\n".cstring())
+    _env.out.print("incoming connected")
 
-class DataChannelListenerNotify is TCPListenNotify
-  let _router: Router[Array[U8] val, Step tag] val
-  let _metrics: JrMetrics
+class DataSenderConnectNotifier is TCPConnectionNotify
+  let _env: Env
 
-  new iso create(router: Router[Array[U8] val, Step tag] val, 
-    metrics: JrMetrics) =>
-    _router = router
-    _metrics = metrics
+  new iso create(env: Env)
+  =>
+    _env = env
 
-  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelNotify(_router, _metrics)
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+    _env.out.print("Data sender channel received data.")
+    true
+
+  // fun ref closed(conn: TCPConnection ref) =>
+  //   _coordinator.reconnect_data(_target_name)
