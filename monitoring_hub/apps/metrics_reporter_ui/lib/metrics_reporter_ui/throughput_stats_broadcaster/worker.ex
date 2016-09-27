@@ -1,6 +1,7 @@
 defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
 	use GenServer
   require Logger
+  require Integer
 
   alias MonitoringHubUtils.MessageLog
 
@@ -30,8 +31,18 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
     case get_throughput_msgs(log_name, start_time) do
       [] ->
         :ok
+      [partial_throughput_msg] ->
+        :ok
+      [first_throughput_msg, second_throughput_msg] ->
+        :ok
       throughput_msgs ->
-        throughput_stats = MetricsReporter.ThroughputStatsCalculator.calculate_throughput_stats(throughput_msgs)
+        %{"time" => timestamp} = last_throughput_msg = List.last(throughput_msgs)
+        updated_throughput_msgs = if Integer.is_odd(timestamp) do
+          List.delete_at(throughput_msgs, -1)
+        else
+          throughput_msgs
+        end
+        throughput_stats = MetricsReporter.ThroughputStatsCalculator.calculate_throughput_stats(updated_throughput_msgs)
         throughput_stats_msg = create_throughput_stats_msg(throughput_stats, pipeline_key, time_now)
         {:ok, ^throughput_stats_msg} = store_throughput_stats_msg(msg_log_name, throughput_stats_msg)
         broadcast_throughput_stats_msg(category, pipeline_key, interval_key, throughput_stats_msg)
@@ -43,7 +54,6 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
   defp get_throughput_msgs(log_name, start_time) do
     :ok = MessageLog.Supervisor.lookup_or_create log_name
     throughput_msgs = MessageLog.get_logs(log_name, [start_time: start_time])
-    List.delete_at(throughput_msgs, -1)
   end
 
   defp create_throughput_stats_msg(throughput_stats, pipeline_key, time_now) do
