@@ -190,7 +190,7 @@ class ComplexTopologyStarter is TopologyStarter
         lambda()(proxy_step): Source iso^ 
         =>
           let router = DirectRouter[Complex val, Step tag](proxy_step) 
-          StatelessSource[Complex val]("Complex Numbers Source",
+          StatelessSource[Complex val]("Complex Numbers",
             ComplexSourceParser, consume router)
         end
       end

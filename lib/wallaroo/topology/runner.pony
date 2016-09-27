@@ -111,8 +111,8 @@ class SimpleSink
     conn: (TCPConnection | None))
   =>
     match input
-    | let s: Stringable val =>
-      @printf[I32](("Simple sink: Received " + s.string() + "\n").cstring())
+    | let s: Stringable val => None
+      // @printf[I32](("Simple sink: Received " + s.string() + "\n").cstring())
     else
       @printf[I32]("Simple sink: Got it!\n".cstring())
     end
