@@ -5,7 +5,7 @@ interface Computation[In: Any val, Out: Any val]
   fun name(): String
 
 interface StateComputation[In: Any val, State: Any #read]
-  fun apply(input: In, state: State, wb: (Writer | None)): None
+  fun apply(input: In, state: State, wb: (Writer | None)): (None | StateChange[State])
   fun name(): String
 
 interface StateProcessor[State: Any #read]

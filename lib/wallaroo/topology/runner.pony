@@ -1,3 +1,4 @@
+use "collections"
 use "buffered"
 use "time"
 use "../metrics"
@@ -58,12 +59,17 @@ class StateRunner[State: Any #read]
   let _state: State
   let _metrics_reporter: MetricsReporter
   let _wb: Writer = Writer
+  let _state_change_repository: Map[String val, StateChange[State] ref] ref =
+    Map[String val, StateChange[State] ref]
 
   new iso create(state_builder: {(): State} val, 
     metrics_reporter: MetricsReporter iso) 
   =>
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
+
+  fun ref register_state_change(sc: StateChange[State] ref) =>
+    _state_change_repository.update(sc.name(), sc)
 
   fun ref run[In: Any val](source_name: String val, source_ts: U64, input: In) =>
     match input
