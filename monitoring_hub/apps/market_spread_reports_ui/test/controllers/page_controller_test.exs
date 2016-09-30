@@ -3,6 +3,6 @@ defmodule MarketSpreadReportsUI.PageControllerTest do
 
   test "GET /", %{conn: conn} do
     conn = get conn, "/"
-    assert html_response(conn, 200) =~ "Buffy: Market Spread Reports"
+    assert html_response(conn, 200) =~ "Wallaroo: Market Spread Reports"
   end
 end
