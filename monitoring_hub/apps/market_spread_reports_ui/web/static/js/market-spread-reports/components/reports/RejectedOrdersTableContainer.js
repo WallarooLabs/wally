@@ -32,7 +32,7 @@ export default class RejectedOrdersTableContainer extends React.Component {
 		const sortedRejectedOrders = this.sortRejectedOrders(rejectedOrders, sortByProp);
 		return(
 			<RejectedOrdersTable
-				rejectedOrders={sortedRejectedOrders.slice(0,100)}
+				rejectedOrders={sortedRejectedOrders}
 				ascending={this.state.ascending}
 				toggleSort={this.toggleSort.bind(this)}
 				sortedProp={sortByProp} />

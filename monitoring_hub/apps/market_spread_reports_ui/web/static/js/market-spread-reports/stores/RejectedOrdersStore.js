@@ -1,7 +1,7 @@
 import {ReduceStore} from "flux/utils"
 import Actions from "../actions/Actions"
 import Dispatcher from "../../dispatcher/Dispatcher"
-import {Map, fromJS} from "immutable"
+import {List, fromJS} from "immutable"
 import UIDGen from "../../util/UIDGen"
 
 class RejectedOrdersStore extends ReduceStore {
@@ -10,18 +10,18 @@ class RejectedOrdersStore extends ReduceStore {
 		this.UIDGen = new UIDGen(1);
 	}
 	getInitialState() {
-		return Map();
+		return List();
 	}
 	getRejectedOrders() {
-		return this.getState().toList();
+		return this.getState();
 	}
 	addRejectedOrders(state, rejectedOrders) {
 		let orderId;
 		rejectedOrders.forEach((rejectedOrder) => {
 			orderId = rejectedOrder["order_id"];
-			state = state.set(orderId, fromJS(rejectedOrder).set("UCID", this.UIDGen.next()));
+			state = state.unshift(fromJS(rejectedOrder).set("UCID", this.UIDGen.next()));
 		});
-		return state;
+		return state.slice(0,100);
 	}
 	reduce(state, action) {
 		switch(action.actionType) {

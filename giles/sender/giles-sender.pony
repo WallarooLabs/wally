@@ -23,6 +23,7 @@ actor Main
     var should_repeat = false
     var binary_fmt = false
     var msg_size: USize = 80
+    var write_to_file: Bool = true
 
     if run_tests then
       TestMain(env)
@@ -47,6 +48,7 @@ actor Main
           .add("repeat", "r", None)
           .add("binary", "y", None)
           .add("msg-size", "g", I64Argument)
+          .add("no-write", "w", None)
 
         for option in options do
           match option
@@ -60,6 +62,7 @@ actor Main
           | ("repeat", None) => should_repeat = true
           | ("binary", None) => binary_fmt = true
           | ("msg-size", let arg: I64) => msg_size = arg.usize()
+          | ("no-write", None) => write_to_file = false
           end
         end
 
@@ -149,7 +152,8 @@ actor Main
             consume data_source,
             batch_size,
             interval,
-            binary_fmt)
+            binary_fmt,
+            write_to_file)
 
           coordinator.sending_actor(sa)
         end
@@ -372,6 +376,7 @@ actor SendingActor
   let _batch_size: USize
   let _interval: U64
   let _wb: Writer
+  var _write_to_file: Bool = true
 
   new create(messages_to_send: USize,
     to_buffy_socket: TCPConnection,
@@ -380,7 +385,8 @@ actor SendingActor
     data_source: Iterator[ByteSeq] iso,
     batch_size: USize,
     interval: U64,
-    binary_fmt: Bool)
+    binary_fmt: Bool,
+    write_to_file: Bool)
   =>
     _messages_to_send = messages_to_send
     _to_buffy_socket = to_buffy_socket
@@ -391,6 +397,7 @@ actor SendingActor
     _batch_size = batch_size
     _interval = interval
     _binary_fmt = binary_fmt
+    _write_to_file = write_to_file
     _wb = Writer
 
   be go() =>
@@ -441,7 +448,9 @@ actor SendingActor
       end
 
       _to_buffy_socket.writev(_wb.done())
-      _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
+      if _write_to_file then
+        _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
+      end
     else
       _finished = true
       _timers.dispose()

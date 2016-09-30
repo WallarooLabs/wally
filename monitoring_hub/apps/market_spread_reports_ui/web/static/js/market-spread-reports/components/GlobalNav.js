@@ -9,7 +9,7 @@ export default class GlobalNav extends React.Component {
 			<Navbar>
         <Nav>
           <IndexLinkContainer to="/">
-            <NavItem>Buffy: Market Spread Reports</NavItem>
+            <NavItem>Wallaroo: Market Spread Reports</NavItem>
           </IndexLinkContainer>
         </Nav>
         <Nav>

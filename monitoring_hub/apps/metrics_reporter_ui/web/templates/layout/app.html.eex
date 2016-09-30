@@ -8,8 +8,8 @@
     <meta name="author" content="">
 
     <title>Metrics Reporter</title>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" integrity="sha512-dTfge/zgoMYpP7QbHy4gWMEGsbsdZeCXz7irItjcC3sPUFtf0kuFbDz/ixG7ArTxmDjLXDmezHubeNikyKGVyQ==" crossorigin="anonymous">
-    <link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.6/flatly/bootstrap.min.css" rel="stylesheet" integrity="sha384-XYCjB+hFAjSbgf9yKUgbysEjaVLOXhCgATTEBpCqT1R3jvG5LGRAK5ZIyRbH5vpX" crossorigin="anonymous">
+    <link rel="stylesheet" href="<%= static_path(@conn, "/css/bootstrap-3.3.5.min.css")%>">
+    <link rel="stylesheet" href="<%= static_path(@conn, "/css/bootstrap-flatly.min.css")%>">
     <link rel="stylesheet" href="<%= static_path(@conn, "/css/style.css") %>">
   </head>
 

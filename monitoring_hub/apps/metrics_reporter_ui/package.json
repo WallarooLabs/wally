@@ -5,8 +5,9 @@
   "main": "main.js",
   "scripts": {
     "compile": "mkdir -p priv/static/js && browserify web/static/js/main.js -t babelify --outfile priv/static/js/bundle.js",
-    "build:css": "mkdir -p priv/static/css && node-sass --include-path web/static/css web/static/css/style.scss priv/static/css/style.css && cp web/static/css/bootstrap-flatly.min.css priv/static/css/bootstrap-flatly.min.css",
-    "build": "npm run compile && npm run build:css",
+    "build:css": "mkdir -p priv/static/css && node-sass --include-path web/static/css web/static/css/style.scss priv/static/css/style.css && cp web/static/css/bootstrap-flatly.min.css priv/static/css/bootstrap-flatly.min.css  && cp web/static/css/bootstrap-3.3.5.min.css priv/static/css/bootstrap-3.3.5.min.css",
+    "build:assets": "mkdir -p priv/static/fonts && mkdir -p priv/static/images && cp web/static/fonts/* priv/static/fonts/ && cp web/static/images/* priv/static/images/",
+    "build": "npm run compile && npm run build:css && npm run build:assets",
     "build:production": "NODE_ENV=production npm run build",
     "pretest": "npm run compile",
     "test:jest": "jest",
