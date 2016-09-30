@@ -34,16 +34,6 @@ primitive ChannelMsgEncoder
   =>
     _encode(IdentifyDataPortMsg(worker_name, service), auth)
 
-  fun add_control(worker_name: String, host: String, service: String, 
-    auth: AmbientAuth): Array[ByteSeq] val ? 
-  =>
-    _encode(AddControlMsg(worker_name, host, service), auth)
-
-  fun add_data(worker_name: String, host: String, service: String, 
-    auth: AmbientAuth): Array[ByteSeq] val ? 
-  =>
-    _encode(AddDataMsg(worker_name, host, service), auth)
-
   fun spin_up_local_topology(local_topology: LocalTopology val, 
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -98,26 +88,6 @@ class IdentifyDataPortMsg is ChannelMsg
 
   new val create(name: String, s: String) =>
     worker_name = name
-    service = s
-
-class AddControlMsg is ChannelMsg
-  let worker_name: String
-  let host: String
-  let service: String
-
-  new val create(name: String, h: String, s: String) =>
-    worker_name = name
-    host = h
-    service = s
-
-class AddDataMsg is ChannelMsg
-  let worker_name: String
-  let host: String
-  let service: String
-
-  new val create(name: String, h: String, s: String) =>
-    worker_name = name
-    host = h
     service = s
 
 class SpinUpLocalTopologyMsg is ChannelMsg

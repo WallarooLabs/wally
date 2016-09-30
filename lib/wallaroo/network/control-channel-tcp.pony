@@ -105,12 +105,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           end
           _connections.create_data_connection(m.worker_name, host, m.service)
         end
-      | let m: AddControlMsg val =>
-        None
-        // do something
-      | let m: AddDataMsg val =>
-        None
-        // do something
       | let m: SpinUpLocalTopologyMsg val =>
         _local_topology_initializer.update_topology(m.local_topology)
         _local_topology_initializer.initialize()
