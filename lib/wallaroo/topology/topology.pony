@@ -1,6 +1,7 @@
 use "net"
 use "collections"
 use "sendence/guid"
+use "sendence/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 
@@ -68,7 +69,6 @@ actor LocalTopologyInitializer
     try
       match _topology
       | let t: LocalTopology val =>
-        @printf[I32]("Local Topology Initializer: Initializing local topology\n".cstring())
         let routes: Map[U128, Step tag] trn = 
           recover Map[U128, Step tag] end
         let proxies: Map[String, Array[Step tag]] = proxies.create()
@@ -94,6 +94,11 @@ actor LocalTopologyInitializer
           TCPListener(_auth, consume data_notifier)
         end
 
+        let topology_ready_msg = 
+          ExternalMsgEncoder.topology_ready(_worker_name)
+        _connections.send_phone_home(topology_ready_msg)
+
+        @printf[I32]("Local topology initialized\n".cstring())
       else
         @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end

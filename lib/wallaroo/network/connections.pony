@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "sendence/messages"
 use "wallaroo/topology"
 
 actor Connections
@@ -9,11 +10,12 @@ actor Connections
   let _is_initializer: Bool
   let _control_conns: Map[String, TCPConnection] = _control_conns.create()
   let _data_conns: Map[String, TCPConnection] = _data_conns.create()
+  var _phone_home: (TCPConnection | None) = None
   let _proxies: Map[String, Array[Step tag]] = _proxies.create()
 
   new create(name: String, env: Env, auth: AmbientAuth,
     c_host: String, c_service: String, d_host: String, d_service: String, 
-    is_initializer: Bool) 
+    ph_host: String, ph_service: String, is_initializer: Bool) 
   =>
     _name = name
     _env = env
@@ -24,6 +26,13 @@ actor Connections
       create_control_connection("initializer", c_host, c_service)
       create_data_connection("initializer", d_host, d_service)
     end
+
+    _phone_home = 
+      if (ph_host != "") and (ph_service != "") then
+        let phone_home: TCPConnection = TCPConnection(auth,
+          HomeConnectNotify(env, _name, this), ph_host, ph_service)
+        _phone_home = phone_home
+      end
 
   be add_control_connection(worker: String, conn: TCPConnection) =>
     _control_conns(worker) = conn
@@ -45,6 +54,12 @@ actor Connections
       @printf[I32](("Sent data message to " + worker + "\n").cstring())
     else
       @printf[I32](("No data connection for worker " + worker + "\n").cstring())
+    end
+
+  be send_phone_home(msg: Array[ByteSeq] val) =>
+    match _phone_home
+    | let tcp: TCPConnection =>
+      tcp.writev(msg)
     end
 
   be create_connections(
@@ -96,4 +111,28 @@ actor Connections
         _proxies(worker).push(proxy)
       end
     end
+
+  be shutdown() =>
+    // for listener in _listeners.values() do
+    //   listener.dispose()
+    // end
+
+    for (key, conn) in _control_conns.pairs() do
+      conn.dispose()
+    end
+    for (name, proxies) in _proxies.pairs() do
+      for proxy in proxies.values() do
+        proxy.dispose()
+      end
+    end
+    // for (key, receiver) in _data_connection_receivers.pairs() do
+    //   receiver.dispose()
+    // end
+
+    match _phone_home
+    | let phc: TCPConnection =>
+      phc.writev(ExternalMsgEncoder.done_shutdown(_name))
+      phc.dispose()
+    end
+
 

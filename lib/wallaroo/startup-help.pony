@@ -1,13 +1,14 @@
-primitive JrStartupHelp
+primitive StartupHelp
   fun apply(env: Env) =>
     env.out.print(
       """
-      To run Junior:
+      To run Wallaroo:
       -----------------------------------------------------------------------------------
       --in/-i *[Comma-separated list of input addresses sources listen on]
       --out/-o *[Sets address for sink outputs]
       --control/-c *[Sets address for control channel]
       --data/-d *[Sets address for data channel]
+      --phone-home/-p [Sets address for phone home connection]
       --expected/-e [Sets number of messages expected for jr metrics]
       --worker-count/-w *[Sets total number of workers, including topology
         initializer]

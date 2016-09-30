@@ -1,4 +1,5 @@
 use "collections"
+use "sendence/messages"
 use "wallaroo/messages"
 use "wallaroo/topology"
 
@@ -79,6 +80,10 @@ actor Initializer
     | let t: TopologyStarter val =>
       try
         t(this, _worker_names, _input_addrs, _expected)
+
+        let topology_ready_msg = 
+          ExternalMsgEncoder.topology_ready("initializer")
+        _connections.send_phone_home(topology_ready_msg)
       else
         @printf[I32]("Error running TopologyStarter.\n".cstring())
       end

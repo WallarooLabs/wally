@@ -21,6 +21,7 @@ actor Startup
     var o_arg: (Array[String] | None) = None
     var c_arg: (Array[String] | None) = None
     var d_arg: (Array[String] | None) = None
+    var p_arg: (Array[String] | None) = None
     var i_addrs_write: Array[Array[String]] trn = 
       recover Array[Array[String]] end
     var expected: USize = 1_000_000
@@ -40,6 +41,7 @@ actor Startup
         .add("out", "o", StringArgument)
         .add("control", "c", StringArgument)
         .add("data", "d", StringArgument)
+        .add("phone-home", "p", StringArgument)
         .add("file", "f", StringArgument)
         // worker count includes the initial "leader" since there is no
         // persisting leader
@@ -58,6 +60,7 @@ actor Startup
         | ("out", let arg: String) => o_arg = arg.split(":")
         | ("control", let arg: String) => c_arg = arg.split(":")
         | ("data", let arg: String) => d_arg = arg.split(":")
+        | ("phone-home", let arg: String) => p_arg = arg.split(":")
         | ("file", let arg: String) => init_path = arg
         | ("worker-count", let arg: I64) => worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
@@ -86,8 +89,15 @@ actor Startup
           m_addr(0),
           m_addr(1))
 
+      (let ph_host, let ph_service) = 
+        match p_arg
+        | let addr: Array[String] => (addr(0), addr(1))
+        else
+          ("", "")
+        end
+
       let connections = Connections(worker_name, env, auth, c_host, c_service, 
-        d_host, d_service, is_initializer)
+        d_host, d_service, ph_host, ph_service, is_initializer)
 
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
         env, auth, connections, metrics_conn, is_initializer)
@@ -112,5 +122,5 @@ actor Startup
         init_path, worker_count, is_initializer, worker_name, connections, 
         initializer)
     else
-      JrStartupHelp(env)
+      StartupHelp(env)
     end

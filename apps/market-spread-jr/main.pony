@@ -6,6 +6,7 @@ use "buffered"
 use "files"
 use "sendence/hub"
 use "sendence/fix"
+use "sendence/messages"
 use "wallaroo"
 use "wallaroo/network"
 use "wallaroo/metrics"
@@ -104,6 +105,10 @@ primitive MarketSpreadStarter
           order_addr(1))
 
     @printf[I32]("Expecting %zu total messages\n".cstring(), expected)
+
+    let topology_ready_msg = 
+      ExternalMsgEncoder.topology_ready("initializer")
+    connections.send_phone_home(topology_ready_msg)
 
   fun _initial_nbbo_msgs(init_path: String, auth: AmbientAuth): 
     Array[Array[U8] val] val ?

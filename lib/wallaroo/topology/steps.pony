@@ -17,6 +17,14 @@ actor Step
   be run[In: Any val](metric_name: String, source_ts: U64, input: In) =>
     _runner.run[In](metric_name, source_ts, input, _conn)
 
+  be dispose() =>
+    match _conn
+    | let tcp: TCPConnection =>
+      tcp.dispose()
+    // | let sender: DataSender =>
+    //   sender.dispose()
+    end
+
 interface StepBuilder
   fun id(): U128
 
