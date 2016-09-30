@@ -661,6 +661,8 @@ actor ProcessManager
           else
             is_leader = false
           end
+        | "initializer" =>
+          is_leader = true
         | "expect" =>
           is_expect = true
           argsbuilder.push("--" + key + "=" + final_arg)
@@ -1197,7 +1199,7 @@ actor ProcessManager
       let child = roster(name)
       // update child state and connection
       child.state = Ready
-      child.conn  = conn
+      child.conn = conn
     else
       _env.out.print("dagon: failed to find child in roster")
       transition_to(ErrorShutdown)
@@ -1235,7 +1237,7 @@ actor ProcessManager
     Check if a child is the leader.
     TODO: Find better predicate to decide if child is a leader.
     """
-    if name == "leader" then
+    if (name == "leader") or (name == "initializer") then
       return true
     else
       return false
@@ -1350,9 +1352,11 @@ actor ProcessManager
     try
       for key in roster.keys() do
         let child = roster(key)
-        if (child.state isnt Done) then
+        if child.state isnt Done then
           num_left = num_left + 1
+          _env.out.print(key + " isn't Done yet")
           if child.state isnt Killed then
+            _env.out.print(key + " isn't Killed yet")
             kill_child(child)
           end
         end

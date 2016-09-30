@@ -47,7 +47,8 @@ actor Startup
         // persisting leader
         .add("worker-count", "w", I64Argument)
         .add("topology-initializer", "t", None)
-        .add("worker-name", "n", StringArgument)
+        .add("leader", "l", None)
+        .add("name", "n", StringArgument)
 
       for option in options do
         match option
@@ -64,7 +65,7 @@ actor Startup
         | ("file", let arg: String) => init_path = arg
         | ("worker-count", let arg: I64) => worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
-        | ("worker-name", let arg: String) => worker_name = arg
+        | ("name", let arg: String) => worker_name = arg
         end
       end
 
@@ -91,7 +92,8 @@ actor Startup
 
       (let ph_host, let ph_service) = 
         match p_arg
-        | let addr: Array[String] => (addr(0), addr(1))
+        | let addr: Array[String] => 
+          (addr(0), addr(1))
         else
           ("", "")
         end
@@ -113,9 +115,13 @@ actor Startup
           is_initializer, initializer, local_topology_initializer)
 
       if is_initializer then
-        TCPListener(auth, consume control_notifier, c_host, c_service) 
+        connections.register_listener(
+          TCPListener(auth, consume control_notifier, c_host, c_service) 
+        )
       else
-        TCPListener(auth, consume control_notifier) 
+        connections.register_listener(
+          TCPListener(auth, consume control_notifier) 
+        )
       end
 
       app_runner(env, d_addr, input_addrs, o_addr, metrics_conn, expected,

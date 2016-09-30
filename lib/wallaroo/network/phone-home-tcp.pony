@@ -34,6 +34,7 @@ class HomeConnectNotify is TCPConnectionNotify
         let external_msg = ExternalMsgDecoder(consume data)
         match external_msg
         | let m: ExternalShutdownMsg val =>
+          _env.out.print("Received ExternalShutdownMsg")
           _connections.shutdown()
         end
       else

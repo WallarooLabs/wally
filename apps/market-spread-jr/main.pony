@@ -78,10 +78,12 @@ primitive MarketSpreadStarter
     let nbboutput_addr = input_addrs(0)
 
     let listen_auth = TCPListenAuth(env.root as AmbientAuth)
-    let nbbo = TCPListener(listen_auth,
-          SourceListenerNotify(nbbo_source_builder, metrics1, expected),
-          nbboutput_addr(0),
-          nbboutput_addr(1))
+    connections.register_listener(
+      TCPListener(listen_auth,
+        SourceListenerNotify(nbbo_source_builder, metrics1, expected),
+        nbboutput_addr(0),
+        nbboutput_addr(1))
+    )
 
     let check_order = CheckOrder(reports_socket)
     let order_source: {(): Source iso^} val =
@@ -99,16 +101,19 @@ primitive MarketSpreadStarter
 
     let order_addr = input_addrs(1)
 
-    let order = TCPListener(listen_auth,
-          SourceListenerNotify(order_source, metrics2, (expected/2)),
-          order_addr(0),
-          order_addr(1))
+    connections.register_listener(
+      TCPListener(listen_auth,
+        SourceListenerNotify(order_source, metrics2, (expected/2)),
+        order_addr(0),
+        order_addr(1))
+    )
 
     @printf[I32]("Expecting %zu total messages\n".cstring(), expected)
 
     let topology_ready_msg = 
       ExternalMsgEncoder.topology_ready("initializer")
     connections.send_phone_home(topology_ready_msg)
+    @printf[I32]("Sent TopologyReady\n".cstring())
 
   fun _initial_nbbo_msgs(init_path: String, auth: AmbientAuth): 
     Array[Array[U8] val] val ?

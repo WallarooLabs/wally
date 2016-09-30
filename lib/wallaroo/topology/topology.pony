@@ -91,7 +91,9 @@ actor LocalTopologyInitializer
           let data_notifier: TCPListenNotify iso =
             DataChannelListenNotifier(_worker_name, _env, _auth, _connections, 
               _is_initializer, DataRouter(consume routes))
-          TCPListener(_auth, consume data_notifier)
+          _connections.register_listener(
+            TCPListener(_auth, consume data_notifier)
+          )
         end
 
         let topology_ready_msg = 

@@ -74,10 +74,12 @@ primitive ComplexStarter
       let source_addr = input_addrs(0)
 
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
-      TCPListener(listen_auth,
-            SourceListenerNotify(complex_source_builder, jr_metrics, expected),
-            source_addr(0),
-            source_addr(1))
+      connections.register_listener(
+        TCPListener(listen_auth,
+          SourceListenerNotify(complex_source_builder, jr_metrics, expected),
+          source_addr(0),
+          source_addr(1))
+      )
     elseif is_initializer then
       @printf[I32](("I'm " + worker_name + ", the Initializer!\n").cstring())
 
@@ -91,7 +93,9 @@ primitive ComplexStarter
 
       let d_host = initializer_data_addr(0)
       let d_service = initializer_data_addr(1)
-      TCPListener(auth, consume data_notifier, d_host, d_service)
+      connections.register_listener(
+        TCPListener(auth, consume data_notifier, d_host, d_service)
+      )
 
       let sendable_output_addr: Array[String] trn = recover Array[String] end
       sendable_output_addr.push(output_addr(0)) 
