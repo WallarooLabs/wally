@@ -10,7 +10,8 @@ interface StateComputation[In: Any val, State: Any #read]
 
 interface StateProcessor[State: Any #read]
   fun name(): String
-  fun apply(state: State, wb: (Writer | None)): (None | StateChange[State])
+  fun apply(state: State, sc_repo: StateChangeRepository[State],
+    wb: (Writer | None)): (None | StateChange[State])
 
 class StateComputationWrapper[In: Any val, State: Any #read]
   let _state_comp: StateComputation[In, State] val
@@ -20,7 +21,8 @@ class StateComputationWrapper[In: Any val, State: Any #read]
     _state_comp = state_comp
     _input = input
 
-  fun apply(state: State, wb: (Writer | None)): None =>
+  fun apply(state: State, sc_repo: StateChangeRepository[State],
+    wb: (Writer | None)): None =>
     _state_comp(_input, state, wb)
 
   fun name(): String => _state_comp.name()
