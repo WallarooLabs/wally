@@ -29,3 +29,5 @@ interface StepBuilder
   fun id(): U128
 
   fun apply(target: Step tag, metrics_conn: TCPConnection): Step tag
+
+trait ThroughStepBuilder[In: Any val, Out: Any val] is StepBuilder
