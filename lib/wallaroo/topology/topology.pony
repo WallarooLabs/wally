@@ -1,153 +1,198 @@
-use "net"
 use "collections"
-use "sendence/guid"
-use "sendence/messages"
+use "net"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 
-class ProxyAddress
-  let worker: String
-  let step_id: U128
+class Topology
+  let pipelines: Array[PipelineSteps] = Array[PipelineSteps]
 
-  new val create(w: String, s_id: U128) =>
-    worker = w
-    step_id = s_id
-
-class LocalTopology
-  let _pipeline_name: String
-  let _builders: Array[StepBuilder val] val
-  let _local_sink: (ProxyAddress val | None)
-  let _global_sink: Array[String] val
-
-  new val create(p_name: String, bs: Array[StepBuilder val] val,
-    local_sink: (ProxyAddress val | None) = None,
-    global_sink: Array[String] val = recover Array[String] end) 
+  fun ref new_pipeline[In: Any val, Out: Any val] (parser: Parser[In] val,
+    pipeline_name: String): PipelineBuilder[In, Out, In]
   =>
-    _pipeline_name = p_name
-    _builders = bs
-    _local_sink = local_sink
-    _global_sink = global_sink
+    let pipeline = Pipeline[In, Out](parser, pipeline_name)
+    PipelineBuilder[In, Out, In](this, pipeline)
 
-  fun pipeline_name(): String =>
-    _pipeline_name
+  fun ref add_pipeline(p: PipelineSteps) =>
+    pipelines.push(p)
 
-  fun builders(): Array[StepBuilder val] val =>
-    _builders
+trait PipelineSteps
+  fun name(): String
+  fun initialize_source(source_id: U64, host: String, service: String, 
+    env: Env, auth: AmbientAuth, coordinator: Coordinator, 
+    output: BasicStep tag, 
+    local_step_builder: (LocalStepBuilder val | None),
+    shared_state_step: (BasicSharedStateStep tag | None) = None,
+    metrics_collector: (MetricsCollector tag | None))
+  fun sink_builder(): SinkBuilder val
+  fun sink_target_ids(): Array[U64] val
+  fun apply(i: USize): PipelineStep val ?
+  fun size(): USize
 
-  fun sink(): (Array[String] val | ProxyAddress val) =>
-    match _local_sink
-    | let p: ProxyAddress val => 
-      p
-    else
-      _global_sink
-    end
+class Pipeline[In: Any val, Out: Any val] is PipelineSteps
+  let _name: String
+  let _parser: Parser[In] val
+  let _steps: Array[PipelineStep val]
+  var _sink_target_ids: Array[U64] val = recover Array[U64] end
+  var _sink_builder: SinkBuilder val
 
-actor LocalTopologyInitializer
-  let _worker_name: String
-  let _env: Env
-  let _auth: AmbientAuth
-  let _connections: Connections
-  let _metrics_conn: TCPConnection
-  let _is_initializer: Bool
-  var _topology: (LocalTopology val | None) = None
+  new create(p: Parser[In] val, n: String) =>
+    _parser = p
+    _steps = Array[PipelineStep val]
+    _name = n
+    _sink_builder = EmptySinkBuilder(_name)
 
-  new create(worker_name: String, env: Env, auth: AmbientAuth, 
-    connections: Connections, metrics_conn: TCPConnection,
-    is_initializer: Bool) 
+  fun ref add_step(p: PipelineStep val) =>
+    _steps.push(p)
+
+  fun apply(i: USize): PipelineStep val ? => _steps(i)
+
+  fun initialize_source(source_id: U64, host: String, service: String, 
+    env: Env, auth: AmbientAuth, coordinator: Coordinator, 
+    output: BasicStep tag, 
+    local_step_builder: (LocalStepBuilder val | None),
+    shared_state_step: (BasicSharedStateStep tag | None),
+    metrics_collector: (MetricsCollector tag | None))
   =>
-    _worker_name = worker_name
-    _env = env
-    _auth = auth
-    _connections = connections
-    _metrics_conn = metrics_conn
-    _is_initializer = is_initializer
-
-  be update_topology(t: LocalTopology val) =>
-    _topology = t
-
-  be initialize() =>
-    try
-      match _topology
-      | let t: LocalTopology val =>
-        let routes: Map[U128, Step tag] trn = 
-          recover Map[U128, Step tag] end
-        let proxies: Map[String, Array[Step tag]] = proxies.create()
-
-        let sink = _create_sink(t, proxies)  
-
-        let builders = t.builders()
-        var builder_idx: I64 = (builders.size() - 1).i64()
-        var latest_step = sink
-        while builder_idx >= 0 do 
-          let builder = builders(builder_idx.usize())
-          latest_step = builder(latest_step, _metrics_conn)
-          routes(builder.id()) = latest_step
-          builder_idx = builder_idx - 1
-        end  
-
-        _register_proxies(proxies)
-
-        if not _is_initializer then
-          let data_notifier: TCPListenNotify iso =
-            DataChannelListenNotifier(_worker_name, _env, _auth, _connections, 
-              _is_initializer, DataRouter(consume routes))
-          _connections.register_listener(
-            TCPListener(_auth, consume data_notifier)
-          )
-        end
-
-        let topology_ready_msg = 
-          ChannelMsgEncoder.topology_ready(_worker_name, _auth)
-        _connections.send_control("initializer", topology_ready_msg)
-
-        let ready_msg = ExternalMsgEncoder.ready(_worker_name)
-        _connections.send_phone_home(ready_msg)
-
-        @printf[I32]("Local topology initialized\n".cstring())
+    let source_notifier: TCPListenNotify iso = 
+      match local_step_builder
+      | let l: LocalStepBuilder val =>
+        SourceNotifier[In](
+          env, host, service, source_id, coordinator, _parser, output, 
+          shared_state_step, l, metrics_collector)
       else
-        @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
+        SourceNotifier[In](
+          env, host, service, source_id, coordinator, _parser, output,
+          shared_state_step where metrics_collector = metrics_collector)
       end
-    else
-      _env.err.print("Error initializing local topology")
-    end
+    coordinator.add_listener(TCPListener(auth, consume source_notifier,
+      host, service))
 
-  fun _create_sink(t: LocalTopology val, 
-    proxies: Map[String, Array[Step tag]]): Step tag ? 
+  fun ref update_sink(sink_builder': SinkBuilder val, 
+    sink_ids: Array[U64] val) 
   =>
-    let sink_reporter = MetricsReporter(t.pipeline_name(), _metrics_conn)
-    
-    match t.sink()
-    | let addr: Array[String] val =>
-      try
-        let connect_auth = TCPConnectAuth(_auth)
+    _sink_builder = sink_builder'
+    _sink_target_ids = sink_ids
 
-        let out_conn = TCPConnection(connect_auth,
-          OutNotify("results"), addr(0), addr(1))
+  fun sink_builder(): SinkBuilder val => _sink_builder
 
-        Step(EncoderSink(consume sink_reporter, out_conn))
-      else
-        _env.out.print("Error connecting to sink.")
-        error
-      end
-    | let p: ProxyAddress val =>
-      let proxy = Proxy(_worker_name, p.step_id, consume sink_reporter, _auth)
-      let proxy_step = Step(consume proxy)
-      if proxies.contains(_worker_name) then
-        proxies(p.worker).push(proxy_step)
-      else
-        proxies(p.worker) = Array[Step tag]
-        proxies(p.worker).push(proxy_step)
-      end
-      proxy_step
-    else
-      // The match is exhaustive, so this can't happen
-      error
-    end 
+  fun sink_target_ids(): Array[U64] val => _sink_target_ids
 
-  fun _register_proxies(proxies: Map[String, Array[Step tag]]) =>
-    for (worker, ps) in proxies.pairs() do
-      for proxy in ps.values() do
-        _connections.register_proxy(worker, proxy)
-      end
+  fun size(): USize => _steps.size()
+
+  fun name(): String => _name
+
+trait PipelineStep
+  fun id(): U64
+  fun step_builder(): StepBuilder val
+  fun name(): String => step_builder().name()
+
+class PipelineThroughStep[In: Any val, Out: Any val] is PipelineStep
+  let _id: U64
+  let _step_builder: StepBuilder val
+
+  new val create(s_builder: ThroughStepBuilder[In, Out] val,
+    pipeline_id: U64 = 0) =>
+    _step_builder = s_builder
+    _id = pipeline_id
+
+  fun id(): U64 => _id
+  fun step_builder(): StepBuilder val => _step_builder
+
+class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
+  let _t: Topology
+  let _p: Pipeline[In, Out]
+
+  new create(t: Topology, p: Pipeline[In, Out]) =>
+    _t = t
+    _p = p
+
+  fun ref coalesce[COut: Any val](id: U64 = 0): 
+    CoalesceBuilder[Last, COut, In, Out, Last] 
+  =>
+    CoalesceBuilder[Last, COut, In, Out, Last](_t, _p where id = id)
+
+  fun ref to[Next: Any val](
+    comp_builder: ComputationBuilder[Last, Next] val, id: U64 = 0)
+      : PipelineBuilder[In, Out, Next] =>
+    let next_builder = StepBuilder[Last, Next](comp_builder)
+    let next_step = PipelineThroughStep[Last, Next](next_builder, id)
+    _p.add_step(next_step)
+    PipelineBuilder[In, Out, Next](_t, _p)
+
+  // fun ref to_partition[Next: Any val](
+  //   comp_builder: ComputationBuilder[Last, Next] val,
+  //   p_fun: PartitionFunction[Last] val, id: U64 = 0)
+  //     : PipelineBuilder[In, Out, Next] =>
+  //   let next_builder = PartitionBuilder[Last, Next](comp_builder, p_fun)
+  //   let next_step = PipelineThroughStep[Last, Next](next_builder, id)
+  //   _p.add_step(next_step)
+  //   PipelineBuilder[In, Out, Next](_t, _p)
+
+  // fun ref to_stateful[Next: Any val, State: Any ref](
+  //   state_comp: StateComputation[Last, Next, State] val,
+  //   state_initializer: {(): State} val, state_id: U64, id: U64 = 0)
+  //     : PipelineBuilder[In, Out, Next] =>
+  //   let next_builder = StateStepBuilder[Last, Next, State](state_comp, state_initializer, state_id)
+  //   let next_step = PipelineThroughStep[Last, Next](next_builder, id)
+  //   _p.add_step(next_step)
+  //   PipelineBuilder[In, Out, Next](_t, _p)
+
+  fun ref to_empty_sink(): Topology ? =>
+    _t.add_pipeline(_p as PipelineSteps)
+    _t
+
+  fun ref to_simple_sink(o: ArrayStringify[Out] val, 
+    sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val 
+      = recover Array[Array[ByteSeq] val] end): Topology ? 
+  =>
+    _p.update_sink(ExternalConnectionBuilder[Out](o, _p.name(),
+      initial_msgs), sink_ids)
+    _t.add_pipeline(_p as PipelineSteps)
+    _t
+
+class CoalesceBuilder[CIn: Any val, COut: Any val, PIn: Any val, 
+  POut: Any val, Last: Any val] 
+  let _t: Topology
+  let _p: Pipeline[PIn, POut]
+  let _builders: Array[BasicOutputComputationStepBuilder val]
+  let _id: U64
+
+  new create(t: Topology, p: Pipeline[PIn, POut],
+    builders: Array[BasicOutputComputationStepBuilder val] = 
+    Array[BasicOutputComputationStepBuilder val], id: U64) 
+  =>
+    _t = t
+    _p = p
+    _builders = builders
+    _id = id
+
+  fun ref to[Next: Any val](
+    comp_builder: ComputationBuilder[Last, Next] val, id: U64 = 0)
+    : CoalesceBuilder[CIn, COut, PIn, POut, Next] 
+  =>
+    _builders.push(
+      ComputationStepBuilder[Last, Next](comp_builder)
+    )
+    CoalesceBuilder[CIn, COut, PIn, POut, Next](_t, _p, _builders, _id)    
+
+  fun ref to_stateful[Next: Any val, State: Any ref](
+    state_comp: StateComputation[Last, Next, State] val,
+    state_initializer: {(): State} val, state_id: U64, id: U64 = 0)
+      : CoalesceStateBuilder[CIn, COut, PIn, POut, Last, Next, State] =>
+    CoalesceStateBuilder[CIn, COut, PIn, POut, Last, Next, State](
+      _t, _p, state_comp, state_initializer, state_id, _builders, id
+    )
+
+  fun ref close(): PipelineBuilder[PIn, POut, COut] =>
+    let builders: Array[BasicOutputComputationStepBuilder val] iso = 
+      recover Array[BasicOutputComputationStepBuilder val] end
+    for b in _builders.values() do
+      builders.push(b)
     end
+    let coalesce_step_builder: CoalesceStepBuilder[CIn, COut] val =
+      CoalesceStepBuilder[CIn, COut](consume builders)
+    let next_step = PipelineThroughStep[CIn, COut](coalesce_step_builder, _id)
+    _p.add_step(next_step)
+    PipelineBuilder[PIn, POut, COut](_t, _p)
+
