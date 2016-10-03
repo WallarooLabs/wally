@@ -661,8 +661,14 @@ actor ProcessManager
           else
             is_leader = false
           end
-        | "initializer" =>
-          is_leader = true
+        | "topology-initializer" =>
+          match sections(section)(key)
+          | "true" =>
+            is_leader = true
+            argsbuilder.push("-t")
+          else
+            is_leader = false
+          end
         | "expect" =>
           is_expect = true
           argsbuilder.push("--" + key + "=" + final_arg)

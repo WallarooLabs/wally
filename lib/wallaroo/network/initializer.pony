@@ -9,6 +9,7 @@ actor Initializer
   let _connections: Connections
   let _local_topology_initializer: LocalTopologyInitializer
   let _input_addrs: Array[Array[String]] val
+  let _ready_workers: Set[String] = Set[String]
   var _topology_starter: (TopologyStarter val | None) = None
   var _control_identified: USize = 1
   var _data_identified: USize = 1
@@ -71,6 +72,17 @@ actor Initializer
       end
     end
 
+  be topology_ready(worker_name: String) =>
+    if not _ready_workers.contains(worker_name) then
+      _ready_workers.set(worker_name)
+      _initialized = _initialized + 1
+      if _initialized == (_expected - 1) then
+        let topology_ready_msg = 
+          ExternalMsgEncoder.topology_ready("initializer")
+        _connections.send_phone_home(topology_ready_msg)
+      end
+    end
+
   be register_proxy(worker: String, proxy: Step tag) =>
     _connections.register_proxy(worker, proxy)
 
@@ -80,10 +92,6 @@ actor Initializer
     | let t: TopologyStarter val =>
       try
         t(this, _worker_names, _input_addrs, _expected)
-
-        let topology_ready_msg = 
-          ExternalMsgEncoder.topology_ready("initializer")
-        _connections.send_phone_home(topology_ready_msg)
       else
         @printf[I32]("Error running TopologyStarter.\n".cstring())
       end

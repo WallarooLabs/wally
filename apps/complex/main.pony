@@ -7,6 +7,7 @@ use "files"
 use "sendence/hub"
 use "sendence/fix"
 use "sendence/guid"
+use "sendence/messages"
 use "wallaroo"
 use "wallaroo/network"
 use "wallaroo/metrics"
@@ -80,6 +81,11 @@ primitive ComplexStarter
           source_addr(0),
           source_addr(1))
       )
+      
+      let topology_ready_msg = 
+        ExternalMsgEncoder.topology_ready("initializer")
+      connections.send_phone_home(topology_ready_msg)
+      @printf[I32]("Sent TopologyReady\n".cstring())
     elseif is_initializer then
       @printf[I32](("I'm " + worker_name + ", the Initializer!\n").cstring())
 

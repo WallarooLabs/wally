@@ -44,6 +44,11 @@ primitive ChannelMsgEncoder
   =>
     _encode(SpinUpStepMsg(step_id, step_builder), auth)
 
+  fun topology_ready(worker_name: String, auth: AmbientAuth): 
+    Array[ByteSeq] val ? 
+  =>
+    _encode(TopologyReadyMsg(worker_name), auth)
+
   fun create_connections(
     addresses: Map[String, Map[String, (String, String)]] val, 
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -103,6 +108,12 @@ class SpinUpStepMsg is ChannelMsg
   new val create(s_id: U64, s_builder: StepBuilder val) =>
     step_id = s_id
     step_builder = s_builder
+
+class TopologyReadyMsg is ChannelMsg
+  let worker_name: String
+
+  new val create(name: String) =>
+    worker_name = name
 
 class CreateConnectionsMsg is ChannelMsg
   let addresses: Map[String, Map[String, (String, String)]] val

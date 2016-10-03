@@ -108,6 +108,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: SpinUpLocalTopologyMsg val =>
         _local_topology_initializer.update_topology(m.local_topology)
         _local_topology_initializer.initialize()
+      | let m: TopologyReadyMsg val =>
+        match _initializer
+        | let i: Initializer =>
+          i.topology_ready(m.worker_name)
+        end
       | let m: CreateConnectionsMsg val =>
         _connections.create_connections(m.addresses)
       | let m: UnknownChannelMsg val =>

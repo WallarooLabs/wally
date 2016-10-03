@@ -32,8 +32,10 @@ actor Connections
       let phone_home = TCPConnection(auth,
         HomeConnectNotify(env, _worker_name, this), ph_host, ph_service)
       _phone_home = phone_home
-      let ready_msg = ExternalMsgEncoder.ready(_worker_name)
-      phone_home.writev(ready_msg)
+      if is_initializer then
+        let ready_msg = ExternalMsgEncoder.ready(_worker_name)
+        phone_home.writev(ready_msg)
+      end
       _env.out.print("Set up phone home connection on " + ph_host 
         + ":" + ph_service)
     end

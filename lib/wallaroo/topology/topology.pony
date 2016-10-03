@@ -2,6 +2,7 @@ use "net"
 use "collections"
 use "sendence/guid"
 use "sendence/messages"
+use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 
@@ -97,8 +98,11 @@ actor LocalTopologyInitializer
         end
 
         let topology_ready_msg = 
-          ExternalMsgEncoder.topology_ready(_worker_name)
-        _connections.send_phone_home(topology_ready_msg)
+          ChannelMsgEncoder.topology_ready(_worker_name, _auth)
+        _connections.send_control("initializer", topology_ready_msg)
+
+        let ready_msg = ExternalMsgEncoder.ready(_worker_name)
+        _connections.send_phone_home(ready_msg)
 
         @printf[I32]("Local topology initialized\n".cstring())
       else
