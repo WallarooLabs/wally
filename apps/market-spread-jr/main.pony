@@ -6,6 +6,7 @@ use "buffered"
 use "files"
 use "sendence/hub"
 use "sendence/fix"
+use "sendence/messages"
 use "wallaroo"
 use "wallaroo/network"
 use "wallaroo/metrics"
@@ -16,10 +17,12 @@ actor Main
     Startup(env, MarketSpreadStarter)
 
 primitive MarketSpreadStarter
-  fun apply(env: Env, input_addrs: Array[Array[String]], 
-    output_addr: Array[String], metrics_addr: Array[String], 
+  fun apply(env: Env, initializer_data_addr: Array[String],
+    input_addrs: Array[Array[String]] val, 
+    output_addr: Array[String], metrics_conn: TCPConnection, 
     expected: USize, init_path: String, worker_count: USize,
-    initializer: Bool) ? 
+    is_initializer: Bool, worker_name: String, connections: Connections,
+    initializer: (Initializer | None)) ? 
   =>
     let auth = env.root as AmbientAuth
 
@@ -27,14 +30,10 @@ primitive MarketSpreadStarter
     let metrics2 = JrMetrics("Orders")
 
     let connect_auth = TCPConnectAuth(auth)
-    let metrics_socket = TCPConnection(connect_auth,
-          OutNotify("metrics"),
-          metrics_addr(0),
-          metrics_addr(1))
     let connect_msg = HubProtocol.connect()
     let metrics_join_msg = HubProtocol.join("metrics:market-spread")
-    metrics_socket.writev(connect_msg)
-    metrics_socket.writev(metrics_join_msg)
+    metrics_conn.writev(connect_msg)
+    metrics_conn.writev(metrics_join_msg)
 
     let reports_socket = TCPConnection(connect_auth,
           OutNotify("rejections"),
@@ -48,7 +47,7 @@ primitive MarketSpreadStarter
     let symbol_actors: Map[String, Step tag] trn = recover trn Map[String, Step tag] end
     for i in legal_symbols().values() do
       let padded = _pad_symbol(i)
-      let reporter = MetricsReporter("market-spread", metrics_socket)
+      let reporter = MetricsReporter("market-spread", metrics_conn)
       let s = StateRunner[SymbolData](
         lambda(): SymbolData => SymbolData end, consume reporter)
       symbol_actors(padded) = Step(consume s)
@@ -66,10 +65,10 @@ primitive MarketSpreadStarter
 
     let nbbo_source_builder: {(): Source iso^} val = 
       recover 
-        lambda()(symbol_to_actor, metrics_socket, initial_nbbo): 
+        lambda()(symbol_to_actor, metrics_conn, initial_nbbo): 
           Source iso^ 
         =>
-          let nbbo_reporter = MetricsReporter("market-spread", metrics_socket)
+          let nbbo_reporter = MetricsReporter("market-spread", metrics_conn)
           StateSource[FixNbboMessage val, SymbolData](
           "Nbbo", NbboSourceParser, SymbolRouter(symbol_to_actor), 
           UpdateNbbo, consume nbbo_reporter, initial_nbbo)
@@ -79,18 +78,20 @@ primitive MarketSpreadStarter
     let nbboutput_addr = input_addrs(0)
 
     let listen_auth = TCPListenAuth(env.root as AmbientAuth)
-    let nbbo = TCPListener(listen_auth,
-          SourceListenerNotify(nbbo_source_builder, metrics1, expected),
-          nbboutput_addr(0),
-          nbboutput_addr(1))
+    connections.register_listener(
+      TCPListener(listen_auth,
+        SourceListenerNotify(nbbo_source_builder, metrics1, expected),
+        nbboutput_addr(0),
+        nbboutput_addr(1))
+    )
 
     let check_order = CheckOrder(reports_socket)
     let order_source: {(): Source iso^} val =
       recover 
-        lambda()(symbol_to_actor, metrics_socket, check_order): Source iso^ 
+        lambda()(symbol_to_actor, metrics_conn, check_order): Source iso^ 
         =>
           let order_reporter = MetricsReporter("market-spread", 
-            metrics_socket)
+            metrics_conn)
           StateSource[FixOrderMessage val, 
             SymbolData]("Order", OrderSourceParser, 
             SymbolRouter(symbol_to_actor), check_order, 
@@ -100,12 +101,19 @@ primitive MarketSpreadStarter
 
     let order_addr = input_addrs(1)
 
-    let order = TCPListener(listen_auth,
-          SourceListenerNotify(order_source, metrics2, (expected/2)),
-          order_addr(0),
-          order_addr(1))
+    connections.register_listener(
+      TCPListener(listen_auth,
+        SourceListenerNotify(order_source, metrics2, (expected/2)),
+        order_addr(0),
+        order_addr(1))
+    )
 
     @printf[I32]("Expecting %zu total messages\n".cstring(), expected)
+
+    let topology_ready_msg = 
+      ExternalMsgEncoder.topology_ready("initializer")
+    connections.send_phone_home(topology_ready_msg)
+    @printf[I32]("Sent TopologyReady\n".cstring())
 
   fun _initial_nbbo_msgs(init_path: String, auth: AmbientAuth): 
     Array[Array[U8] val] val ?

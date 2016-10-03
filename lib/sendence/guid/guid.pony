@@ -9,3 +9,6 @@ class GuidGenerator
 
   fun ref apply(): U64 =>
     _rand.next()
+
+  fun ref u128(): U128 =>
+    _rand.next().u128() or (_rand.next().u128() << 64)

@@ -49,3 +49,12 @@ class SourceListenerNotify is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     SourceNotify(SourceRunner(_source_builder(), _metrics, _expected))
+
+  fun ref listening(listen: TCPListener ref) =>
+    try
+      (let host, let service) = listen.local_address().name()
+      @printf[I32](("Source: listening on " + host + ":" + service + "\n").cstring())
+    else
+      @printf[I32]("Source: couldn't get local address\n".cstring())
+      listen.close()
+    end
