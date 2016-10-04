@@ -48,13 +48,17 @@ class StateRunner[State: Any #read]
   let _metrics_reporter: MetricsReporter
   let _wb: Writer = Writer
   let _state_change_repository: StateChangeRepository[State] ref
+  let _alfred: Alfred
 
   new iso create(state_builder: {(): State} val, 
-    metrics_reporter: MetricsReporter iso) 
+    metrics_reporter: MetricsReporter iso,
+    alfred: Alfred
+    ) 
   =>
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
     _state_change_repository = StateChangeRepository[State]
+    _alfred = alfred
 
   fun ref register_state_change(sc: StateChange[State] ref) : U64 =>
     _state_change_repository.register(sc)
