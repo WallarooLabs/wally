@@ -6,47 +6,75 @@ use "time"
 use "serialise"
 use "sendence/bytes"
 use "sendence/fix"
+use "sendence/hub"
 use "sendence/new-fix"
+use "wallaroo/metrics"
+
 
 interface Processor
-  fun apply(d: Array[U8] val) ?
+  fun ref apply(d: Array[U8] val) ?
 
 class SourceProcessor
   let _target: TCPConnection
+  let _reporter: MetricsReporter
   let _auth: AmbientAuth
 
-  new create(target: TCPConnection, auth: AmbientAuth) =>
+  new create(target: TCPConnection, metrics_reporter: MetricsReporter, 
+    auth: AmbientAuth)
+  =>
     _target = target
+    _reporter = metrics_reporter
     _auth = auth
     @printf[I32]("Configured as Source!\n".cstring())
 
-  fun apply(d: Array[U8] val) ? =>
-    let msg = MsgEncoder.forward(d, "Multi-Pass", Time.nanos(), _auth)
-    _target.writev(msg)
+  fun ref apply(d: Array[U8] val) ? =>
+    let m = MsgEncoder.forward(d, "Multi-Passthrough", Time.nanos(), _auth)
+    _target.writev(m)
 
 class PassProcessor
   let _target: TCPConnection
+  let _reporter: MetricsReporter
+  let _auth: AmbientAuth
 
-  new create(target: TCPConnection) =>
+  new create(target: TCPConnection, metrics_reporter: MetricsReporter, 
+    auth: AmbientAuth) =>
     _target = target
+    _reporter = metrics_reporter
+    _auth = auth
     @printf[I32]("Configured as Passthrough!\n".cstring())
 
-  fun apply(d: Array[U8] val) =>
-    @printf[I32]("Received!\n".cstring())
-    _target.write(Bytes.from_u32(d.size().u32()))
-    _target.write(d)
+  fun ref apply(d: Array[U8] val) ? =>
+    let msg = MsgDecoder(d, _auth)
+    match msg
+    | let f: ForwardMsg val =>
+      let m = MsgEncoder.forward(f.data, f.metric_name, f.source_ts, _auth)
+      _target.writev(m)
+    else
+      @printf[I32]("Could not decode incoming message!\n".cstring())
+    end
 
 class SinkProcessor
   let _target: TCPConnection
+  let _reporter: MetricsReporter
+  let _auth: AmbientAuth
 
-  new create(target: TCPConnection) =>
+  new create(target: TCPConnection, metrics_reporter: MetricsReporter, 
+    auth: AmbientAuth) =>
     _target = target
+    _reporter = metrics_reporter
+    _auth = auth
     @printf[I32]("Configured as Sink!\n".cstring())
 
-  fun apply(d: Array[U8] val) =>
-    @printf[I32]("Received!\n".cstring())
-    _target.write(Bytes.from_u32(d.size().u32()))
-    _target.write(d)
+  fun ref apply(d: Array[U8] val) ? =>
+    let msg = MsgDecoder(d, _auth)
+    match msg
+    | let f: ForwardMsg val =>
+      let m = MsgEncoder.forward(f.data, f.metric_name, f.source_ts, _auth)
+      _target.writev(m)
+      _reporter.pipeline_metric("Multi-Passthrough", f.source_ts)
+    else
+      @printf[I32]("Could not decode incoming message!\n".cstring())
+    end
 
 class IncomingNotify is TCPConnectionNotify
   let _auth: AmbientAuth
@@ -59,15 +87,17 @@ class IncomingNotify is TCPConnectionNotify
   var _msg_count: USize = 0
 
   new iso create(auth: AmbientAuth, target: TCPConnection, expected: USize,
-    is_source: Bool, is_sink: Bool) 
+    is_source: Bool, is_sink: Bool, metrics_conn: TCPConnection) 
   =>
+    let metrics_reporter = MetricsReporter("multi-passthrough", metrics_conn)
+
     _processor = 
       if is_source then
-        SourceProcessor(target, auth)
+        SourceProcessor(target, consume metrics_reporter, auth)
       elseif is_sink then
-        SinkProcessor(target)
+        SinkProcessor(target, consume metrics_reporter, auth)
       else
-        PassProcessor(target)
+        PassProcessor(target, consume metrics_reporter, auth)
       end
     _expected = expected
     _auth = auth
@@ -102,8 +132,13 @@ class IncomingNotify is TCPConnectionNotify
     @printf[None]("incoming connected\n".cstring())
 
 class OutNotify is TCPConnectionNotify
+  let _name: String
+
+  new iso create(n: String) =>
+    _name = n
+
   fun ref connected(sock: TCPConnection ref) =>
-    @printf[None]("outgoing connected\n".cstring())
+    @printf[None](("outgoing connected to " + _name + "\n").cstring())
 
 ///
 /// YAWN from here on down
@@ -142,18 +177,31 @@ actor Main
 
       let in_addr = i_arg as Array[String]
       let out_addr = o_arg as Array[String]
-      let metrics_addr = m_arg as Array[String]
+      let m_addr = m_arg as Array[String]
       let auth = env.root as AmbientAuth
+
+      let metrics_auth = TCPConnectAuth(auth)
+      let metrics_conn = TCPConnection(metrics_auth,
+          OutNotify("metrics"),
+          m_addr(0),
+          m_addr(1))
+
+      // Set up metrics
+      let connect_msg = HubProtocol.connect()
+      let metrics_join_msg = HubProtocol.join("metrics:multi-passthrough")
+      metrics_conn.writev(connect_msg)
+      metrics_conn.writev(metrics_join_msg)
 
       let connect_auth = TCPConnectAuth(auth)
       let out_socket = TCPConnection(connect_auth,
-            OutNotify,
+            OutNotify("passthrough"),
             out_addr(0),
             out_addr(1))
 
       let listen_auth = TCPListenAuth(auth)
       let listener = TCPListener(listen_auth,
-            ListenerNotify(auth, out_socket, expected, is_source, is_sink),
+            ListenerNotify(auth, out_socket, expected, is_source, is_sink,
+              metrics_conn),
             in_addr(0),
             in_addr(1))
 
@@ -166,17 +214,19 @@ class ListenerNotify is TCPListenNotify
   let _auth: AmbientAuth
   let _is_source: Bool
   let _is_sink: Bool
+  let _metrics_conn: TCPConnection
 
   new iso create(auth: AmbientAuth, fp: TCPConnection, expected: USize,
-    is_source: Bool, is_sink: Bool) =>
+    is_source: Bool, is_sink: Bool, metrics_conn: TCPConnection) =>
     _fp = fp
     _expected = expected
     _auth = auth
     _is_source = is_source
     _is_sink = is_sink
+    _metrics_conn = metrics_conn
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    IncomingNotify(_auth, _fp, _expected, _is_source, _is_sink)
+    IncomingNotify(_auth, _fp, _expected, _is_source, _is_sink, _metrics_conn)
 
 
 class Complex
@@ -240,7 +290,28 @@ primitive MsgEncoder
   =>
     _encode(ForwardMsg(data, metric_name, source_ts), auth)
 
-class ForwardMsg
+primitive MsgDecoder
+  fun apply(data: Array[U8] val, auth: AmbientAuth): Msg val =>
+    try
+      match Serialised.input(InputSerialisedAuth(auth), data)(
+        DeserialiseAuth(auth))
+      | let m: Msg val => m
+      else
+        UnknownMsg(data)
+      end
+    else
+      UnknownMsg(data)
+    end
+
+trait Msg
+
+class UnknownMsg is Msg
+  let data: Array[U8] val
+
+  new val create(d: Array[U8] val) =>
+    data = d
+
+class ForwardMsg is Msg
   let data: Array[U8] val
   let metric_name: String
   let source_ts: U64
