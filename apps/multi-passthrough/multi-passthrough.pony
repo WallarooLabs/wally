@@ -125,13 +125,13 @@ class IncomingNotify is TCPConnectionNotify
         _header = false
       end
     else
-      if _count <= _expected then
+      // if _count <= _expected then
         try
           _processor(consume data)
         else
           @printf[I32]("Error processing incoming message\n".cstring())
         end
-      end
+      // end
 
       conn.expect(4)
       _header = true
@@ -176,7 +176,6 @@ actor Main
         .add("metrics", "m", StringArgument)
         .add("source", "r", None)
         .add("sink", "s", None)
-        .add("expected", "e", I64Argument)
 
       for option in options do
         match option
@@ -185,7 +184,6 @@ actor Main
         | ("metrics", let arg: String) => m_arg = arg.split(":")
         | ("source", None) => is_source = true
         | ("sink", None) => is_sink = true
-        | ("expected", let arg: I64) => expected = arg.usize()
         end
       end
 
@@ -218,8 +216,6 @@ actor Main
               metrics_conn),
             in_addr(0),
             in_addr(1))
-
-      @printf[I32]("Expecting %zu messages\n".cstring(), expected)
     end
 
 class ListenerNotify is TCPListenNotify
