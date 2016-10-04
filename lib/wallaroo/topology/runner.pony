@@ -47,12 +47,17 @@ class StateRunner[State: Any #read]
   let _state: State
   let _metrics_reporter: MetricsReporter
   let _wb: Writer = Writer
+  let _state_change_repository: StateChangeRepository[State] ref
 
   new iso create(state_builder: {(): State} val, 
     metrics_reporter: MetricsReporter iso) 
   =>
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
+    _state_change_repository = StateChangeRepository[State]
+
+  fun ref register_state_change(sc: StateChange[State] ref) : U64 =>
+    _state_change_repository.register(sc)
 
   fun ref run[In: Any val](source_name: String val, source_ts: U64, input: In,
     conn: (TCPConnection | None))
@@ -60,7 +65,7 @@ class StateRunner[State: Any #read]
     match input
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
-      sp(_state, _wb)
+      sp(_state, _state_change_repository, _wb)
       let computation_end = Time.nanos()
 
       _metrics_reporter.pipeline_metric(source_name, source_ts)
