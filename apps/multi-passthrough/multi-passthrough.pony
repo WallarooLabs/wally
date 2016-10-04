@@ -8,6 +8,8 @@ nc -l 127.0.0.1 8000 >> /dev/null
 ./multi-passthrough -i 127.0.0.1:6001 -o 127.0.0.1:6002 -m 127.0.0.1:5001
 4) Source
 ./multi-passthrough -i 127.0.0.1:6000 -o 127.0.0.1:6001 -m 127.0.0.1:5001 -r
+5) Sender
+giles/sender/sender -b 127.0.0.1:6000 -m 10000000 -s 300 -i 2_500_000 -f apps/complex/complex_numbers.msg -r --ponythreads=1 -y -g 12
 """
 
 use "collections"
