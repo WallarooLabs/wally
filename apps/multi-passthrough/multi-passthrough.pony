@@ -10,6 +10,8 @@ nc -l 127.0.0.1 8000 >> /dev/null
 ./multi-passthrough -i 127.0.0.1:6000 -o 127.0.0.1:6001 -m 127.0.0.1:5001 -r
 5) Sender
 giles/sender/sender -b 127.0.0.1:6000 -m 10000000 -s 300 -i 2_500_000 -f apps/complex/complex_numbers.msg -r --ponythreads=1 -y -g 12
+
+Use `-n` to switch Nagle nodelay to false
 """
 
 use "collections"
@@ -94,6 +96,7 @@ class IncomingNotify is TCPConnectionNotify
   let _auth: AmbientAuth
   let _processor: Processor
   let _expected: USize
+  let _no_delay: Bool
   var _header: Bool = true
   var _count: USize = 0
   var _latest: (Complex val | None) = None
@@ -101,7 +104,8 @@ class IncomingNotify is TCPConnectionNotify
   var _msg_count: USize = 0
 
   new iso create(auth: AmbientAuth, target: TCPConnection, expected: USize,
-    is_source: Bool, is_sink: Bool, metrics_conn: TCPConnection) 
+    is_source: Bool, is_sink: Bool, metrics_conn: TCPConnection,
+    no_delay: Bool) 
   =>
     let metrics_reporter = MetricsReporter("multi-passthrough", metrics_conn)
 
@@ -115,6 +119,7 @@ class IncomingNotify is TCPConnectionNotify
       end
     _expected = expected
     _auth = auth
+    _no_delay = no_delay
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -142,16 +147,20 @@ class IncomingNotify is TCPConnectionNotify
     @printf[None]("accepted\n".cstring())
     conn.expect(4)
 
-  fun ref connected(sock: TCPConnection ref) =>
+  fun ref connected(conn: TCPConnection ref) =>
+    conn.set_nodelay(_no_delay)
     @printf[None]("incoming connected\n".cstring())
 
 class OutNotify is TCPConnectionNotify
   let _name: String
+  let _no_delay: Bool
 
-  new iso create(n: String) =>
+  new iso create(n: String, no_delay: Bool) =>
     _name = n
+    _no_delay = no_delay
 
-  fun ref connected(sock: TCPConnection ref) =>
+  fun ref connected(conn: TCPConnection ref) =>
+    conn.set_nodelay(_no_delay)  
     @printf[None](("outgoing connected to " + _name + "\n").cstring())
 
 ///
@@ -166,6 +175,7 @@ actor Main
     var is_source: Bool = false
     var is_sink: Bool = false
     var expected: USize = 1_000_000
+    var no_delay: Bool = true
 
     try
       var options = Options(env.args)
@@ -176,6 +186,7 @@ actor Main
         .add("metrics", "m", StringArgument)
         .add("source", "r", None)
         .add("sink", "s", None)
+        .add("nagle-switch", "n", None)
 
       for option in options do
         match option
@@ -184,6 +195,7 @@ actor Main
         | ("metrics", let arg: String) => m_arg = arg.split(":")
         | ("source", None) => is_source = true
         | ("sink", None) => is_sink = true
+        | ("nagle-switch", None) => no_delay = false
         end
       end
 
@@ -194,7 +206,7 @@ actor Main
 
       let metrics_auth = TCPConnectAuth(auth)
       let metrics_conn = TCPConnection(metrics_auth,
-          OutNotify("metrics"),
+          OutNotify("metrics", no_delay),
           m_addr(0),
           m_addr(1))
 
@@ -206,14 +218,14 @@ actor Main
 
       let connect_auth = TCPConnectAuth(auth)
       let out_socket = TCPConnection(connect_auth,
-            OutNotify("passthrough"),
+            OutNotify("passthrough", no_delay),
             out_addr(0),
             out_addr(1))
 
       let listen_auth = TCPListenAuth(auth)
       let listener = TCPListener(listen_auth,
             ListenerNotify(auth, out_socket, expected, is_source, is_sink,
-              metrics_conn),
+              metrics_conn, no_delay),
             in_addr(0),
             in_addr(1))
     end
@@ -225,18 +237,22 @@ class ListenerNotify is TCPListenNotify
   let _is_source: Bool
   let _is_sink: Bool
   let _metrics_conn: TCPConnection
+  let _no_delay: Bool
 
   new iso create(auth: AmbientAuth, fp: TCPConnection, expected: USize,
-    is_source: Bool, is_sink: Bool, metrics_conn: TCPConnection) =>
+    is_source: Bool, is_sink: Bool, metrics_conn: TCPConnection,
+    no_delay: Bool) =>
     _fp = fp
     _expected = expected
     _auth = auth
     _is_source = is_source
     _is_sink = is_sink
     _metrics_conn = metrics_conn
+    _no_delay = no_delay
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    IncomingNotify(_auth, _fp, _expected, _is_source, _is_sink, _metrics_conn)
+    IncomingNotify(_auth, _fp, _expected, _is_source, _is_sink, _metrics_conn,
+      _no_delay)
 
 
 class Complex
