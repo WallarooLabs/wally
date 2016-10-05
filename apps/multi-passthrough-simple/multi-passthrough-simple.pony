@@ -78,6 +78,26 @@ class SinkProcessor
     let ts = Bytes.to_u64(d(0), d(1), d(2), d(3), d(4), d(5), d(6), d(7))
     _reporter.pipeline_metric("Multi-Passthrough", ts)
 
+class UniqueProcessor
+  let _target: TCPConnection
+  let _reporter: MetricsReporter
+  let _auth: AmbientAuth
+  let _msg_size: Array[U8] val = Bytes.from_u32(U32(8))
+
+  new create(target: TCPConnection, metrics_reporter: MetricsReporter, 
+    auth: AmbientAuth) =>
+    _target = target
+    _reporter = metrics_reporter
+    _auth = auth
+    @printf[I32]("Configured as Sink!\n".cstring())
+
+  fun ref apply(d: Array[U8] val) =>
+    let ts = Time.nanos()
+    let bytes = Bytes.from_u64(ts)
+    _target.write(_msg_size)
+    _target.write(consume bytes) 
+    _reporter.pipeline_metric("Multi-Passthrough", ts)
+
 class IncomingNotify is TCPConnectionNotify
   let _auth: AmbientAuth
   let _processor: Processor
@@ -90,8 +110,8 @@ class IncomingNotify is TCPConnectionNotify
   var _msg_count: USize = 0
 
   new iso create(auth: AmbientAuth, target: TCPConnection, expected: USize,
-    is_source: Bool, is_sink: Bool, metrics_conn: TCPConnection,
-    no_delay: Bool) 
+    is_source: Bool, is_sink: Bool, is_unique_worker: Bool, 
+    metrics_conn: TCPConnection, no_delay: Bool) 
   =>
     let metrics_reporter = MetricsReporter("multi-passthrough", metrics_conn)
 
@@ -100,6 +120,8 @@ class IncomingNotify is TCPConnectionNotify
         SourceProcessor(target, auth)
       elseif is_sink then
         SinkProcessor(target, consume metrics_reporter, auth)
+      elseif is_unique_worker then
+        UniqueProcessor(target, consume metrics_reporter, auth)
       else
         PassProcessor(target, auth)
       end
@@ -160,6 +182,7 @@ actor Main
     var m_arg: (Array[String] | None) = None
     var is_source: Bool = false
     var is_sink: Bool = false
+    var is_unique_worker: Bool = false
     var expected: USize = 1_000_000
     var no_delay: Bool = false
 
@@ -172,6 +195,7 @@ actor Main
         .add("metrics", "m", StringArgument)
         .add("source", "r", None)
         .add("sink", "s", None)
+        .add("unique", "u", None)
         .add("nagle-switch", "n", None)
 
       for option in options do
@@ -181,7 +205,10 @@ actor Main
         | ("metrics", let arg: String) => m_arg = arg.split(":")
         | ("source", None) => is_source = true
         | ("sink", None) => is_sink = true
-        | ("nagle-switch", None) => no_delay = true
+        | ("unique", None) => is_unique_worker = true
+        | ("nagle-switch", None) => 
+          no_delay = true
+          env.out.print("Turning Nagle off!")
         end
       end
 
@@ -211,7 +238,7 @@ actor Main
       let listen_auth = TCPListenAuth(auth)
       let listener = TCPListener(listen_auth,
             ListenerNotify(auth, out_socket, expected, is_source, is_sink,
-              metrics_conn, no_delay),
+              is_unique_worker, metrics_conn, no_delay),
             in_addr(0),
             in_addr(1))
     end
@@ -222,23 +249,26 @@ class ListenerNotify is TCPListenNotify
   let _auth: AmbientAuth
   let _is_source: Bool
   let _is_sink: Bool
+  let _is_unique_worker: Bool
   let _metrics_conn: TCPConnection
   let _no_delay: Bool
 
   new iso create(auth: AmbientAuth, fp: TCPConnection, expected: USize,
-    is_source: Bool, is_sink: Bool, metrics_conn: TCPConnection,
-    no_delay: Bool) =>
+    is_source: Bool, is_sink: Bool, is_unique_worker: Bool, 
+    metrics_conn: TCPConnection, no_delay: Bool) 
+  =>
     _fp = fp
     _expected = expected
     _auth = auth
     _is_source = is_source
     _is_sink = is_sink
+    _is_unique_worker = is_unique_worker
     _metrics_conn = metrics_conn
     _no_delay = no_delay
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    IncomingNotify(_auth, _fp, _expected, _is_source, _is_sink, _metrics_conn,
-      _no_delay)
+    IncomingNotify(_auth, _fp, _expected, _is_source, _is_sink, 
+      _is_unique_worker, _metrics_conn, _no_delay)
 
 
 class Complex

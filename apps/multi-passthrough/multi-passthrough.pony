@@ -195,7 +195,9 @@ actor Main
         | ("metrics", let arg: String) => m_arg = arg.split(":")
         | ("source", None) => is_source = true
         | ("sink", None) => is_sink = true
-        | ("nagle-switch", None) => no_delay = true
+        | ("nagle-switch", None) => 
+          no_delay = true
+          env.out.print("Turning Nagle off!")
         end
       end
 
