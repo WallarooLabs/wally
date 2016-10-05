@@ -161,7 +161,7 @@ actor Main
     var is_source: Bool = false
     var is_sink: Bool = false
     var expected: USize = 1_000_000
-    var no_delay: Bool = true
+    var no_delay: Bool = false
 
     try
       var options = Options(env.args)
@@ -181,7 +181,7 @@ actor Main
         | ("metrics", let arg: String) => m_arg = arg.split(":")
         | ("source", None) => is_source = true
         | ("sink", None) => is_sink = true
-        | ("nagle-switch", None) => no_delay = false
+        | ("nagle-switch", None) => no_delay = true
         end
       end
 
