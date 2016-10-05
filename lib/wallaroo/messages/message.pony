@@ -2,14 +2,14 @@ use "collections"
 
 
 class MsgEnvelope
-  let _msg_uid: String
-  let _fractional_msg_id_list: List[String]
+  let _msg_uid: U64
+  let _fractional_msg_ids: Array[U64]
 
-  new val create(msg_uid: String, fractional_msg_id_list: List[String],
+  new val create(msg_uid: String, fractional_msg_ids: Array[U64],
     payload: StateChange[State])
   =>
     _msg_uid = msg_uid
-    _fractional_msg_id_list = fractional_msg_id_list
+    _fractional_msg_ids = fractional_msg_ids
 
 class Message
   let _envelope: MessageEnvelope
