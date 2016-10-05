@@ -4,6 +4,7 @@ use "net"
 use "sendence/epoch"
 use "wallaroo/metrics"
 use "wallaroo/messages"
+use "wallaroo/resilience"
 
 interface Runner
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,

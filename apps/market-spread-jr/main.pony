@@ -11,6 +11,7 @@ use "wallaroo"
 use "wallaroo/network"
 use "wallaroo/metrics"
 use "wallaroo/topology"
+use "wallaroo/resilience"
 
 actor Main
   new create(env: Env) =>
@@ -45,11 +46,12 @@ primitive MarketSpreadStarter
 
 
     let symbol_actors: Map[String, Step tag] trn = recover trn Map[String, Step tag] end
+    let alfred = Alfred
     for i in legal_symbols().values() do
       let padded = _pad_symbol(i)
       let reporter = MetricsReporter("market-spread", metrics_conn)
       let s = StateRunner[SymbolData](
-        lambda(): SymbolData => SymbolData end, consume reporter)
+        lambda(): SymbolData => SymbolData end, consume reporter, alfred)
       symbol_actors(padded) = Step(consume s)
     end
 
