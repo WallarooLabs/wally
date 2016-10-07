@@ -94,16 +94,21 @@ sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/sender/send
 ```
 
 ###Packet
+
 to run the Market Spread Jr application you must be in it's directory:
+
 ```
 sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread-jr -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 150000000 --ponythreads 4 --ponypinasio
 ```
 
 To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+
 ```
-sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio```
+sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio
+```
 
 To run the Orders Sender:
+
 ```
 sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 50000000 -s 300 -i 5_000_000 -f ~/buffy/demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio
 ```

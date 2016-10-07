@@ -89,10 +89,6 @@ primitive ComplexStarter
     elseif is_initializer then
       @printf[I32](("I'm " + worker_name + ", the Initializer!\n").cstring())
 
-      // setup control and data channels
-
-      // setup local data channel
-
       let data_notifier: TCPListenNotify iso =
         DataChannelListenNotifier(worker_name, env, auth, connections, 
           is_initializer)
@@ -115,16 +111,8 @@ primitive ComplexStarter
       | let init: Initializer =>
         init.start(topology_starter)
       end
-
-      // wait for all workers to connect
-
-      // inform workers of each other
-
-      // tell workers what to spin up and how to connect
     else
       @printf[I32](("I'm " + worker_name + " and I'm not the initializer!\n").cstring())
-
-      // set up control and data listeners
     end
 
 class ComplexTopologyStarter is TopologyStarter
@@ -142,50 +130,25 @@ class ComplexTopologyStarter is TopologyStarter
     input_addrs: Array[Array[String]] val, expected: USize) ? =>
     let pipeline_name = "complex-numbers"
     let guid_gen = GuidGenerator
-
-    let worker2 = workers(0) 
-    let worker3 = workers(1) 
-
-    // Worker 1 (self)
-    let worker_1_builders: Array[StepBuilder val] trn = 
-      recover Array[StepBuilder val] end
-
-    // Worker 2
     let conjugate_step_id = guid_gen.u128()
-    let conjugate_builder = GeneralStepBuilder[Complex val, Complex val](
-      lambda(): Computation[Complex val, Complex val] val => Conjugate end,
-      pipeline_name, conjugate_step_id)
-
-    let worker_2_builders: Array[StepBuilder val] trn = 
-      recover Array[StepBuilder val] end
-
-    worker_2_builders.push(conjugate_builder) 
-
-    // Worker 3
     let scale_step_id = guid_gen.u128()
-    let scale_builder = GeneralStepBuilder[Complex val, Complex val](
-      lambda(): Computation[Complex val, Complex val] val => Scale end,
-      pipeline_name, scale_step_id)
+    let worker2 = workers(0)
 
-    let worker_3_builders: Array[StepBuilder val] trn = 
-      recover Array[StepBuilder val] end
-
-    worker_3_builders.push(scale_builder)
-
-    let worker_2_topology = LocalTopology(pipeline_name, consume worker_2_builders
-      where local_sink = ProxyAddress(worker3, scale_step_id))
-
-    let worker_3_topology = LocalTopology(pipeline_name, consume worker_3_builders
-      where global_sink = _output_addr)
-
-    let local_topologies: Array[LocalTopology val] trn = 
-      recover Array[LocalTopology val] end
-    local_topologies.push(worker_2_topology)
-    local_topologies.push(worker_3_topology)
+    let local_topologies =
+      if workers.size() == 1 then
+        create_local_topologies_for_2(pipeline_name, conjugate_step_id, 
+          scale_step_id, workers)
+      elseif workers.size() == 2 then 
+        create_local_topologies_for_3(pipeline_name, conjugate_step_id, 
+          scale_step_id, workers)
+      else
+        @printf[I32]("Complex app only works with 1-3 workers!\n".cstring())
+        error
+      end
 
     @printf[I32]("Topology starter has run!\n".cstring())
 
-    initializer.distribute_local_topologies(consume local_topologies)
+    initializer.distribute_local_topologies(local_topologies)
 
     // Configure local topology on initializer, including source
     let sink_reporter = MetricsReporter(pipeline_name, _metrics_conn)
@@ -216,6 +179,85 @@ class ComplexTopologyStarter is TopologyStarter
       source_addr(1)) 
 
     @printf[I32]("Finished running startup code!\n".cstring())   
+
+  fun create_local_topologies_for_2(pipeline_name: String, 
+    conjugate_step_id: U128, scale_step_id: U128, workers: Array[String] box): 
+    Array[LocalTopology val] val ?
+  =>
+    let worker2 = workers(0) 
+
+    // Worker 1 (self)
+    let worker_1_builders: Array[StepBuilder val] trn = 
+      recover Array[StepBuilder val] end
+
+    // Worker 2
+    let conjugate_builder = GeneralStepBuilder[Complex val, Complex val](
+      lambda(): Computation[Complex val, Complex val] val => Conjugate end,
+      pipeline_name, conjugate_step_id)
+
+    let scale_builder = GeneralStepBuilder[Complex val, Complex val](
+      lambda(): Computation[Complex val, Complex val] val => Scale end,
+      pipeline_name, scale_step_id)
+
+    let worker_2_builders: Array[StepBuilder val] trn = 
+      recover Array[StepBuilder val] end
+
+    worker_2_builders.push(conjugate_builder) 
+    worker_2_builders.push(scale_builder) 
+
+    let worker_2_topology = LocalTopology(pipeline_name, consume worker_2_builders where global_sink = _output_addr)
+
+    let local_topologies: Array[LocalTopology val] trn = 
+      recover Array[LocalTopology val] end
+    local_topologies.push(worker_2_topology)
+
+    consume local_topologies
+
+  fun create_local_topologies_for_3(pipeline_name: String, 
+    conjugate_step_id: U128, scale_step_id: U128, workers: Array[String] box): 
+    Array[LocalTopology val] val ?
+  =>
+    let guid_gen = GuidGenerator
+
+    let worker2 = workers(0) 
+    let worker3 = workers(1) 
+
+    // Worker 1 (self)
+    let worker_1_builders: Array[StepBuilder val] trn = 
+      recover Array[StepBuilder val] end
+
+    // Worker 2
+    let conjugate_builder = GeneralStepBuilder[Complex val, Complex val](
+      lambda(): Computation[Complex val, Complex val] val => Conjugate end,
+      pipeline_name, conjugate_step_id)
+
+    let worker_2_builders: Array[StepBuilder val] trn = 
+      recover Array[StepBuilder val] end
+
+    worker_2_builders.push(conjugate_builder) 
+
+    // Worker 3
+    let scale_builder = GeneralStepBuilder[Complex val, Complex val](
+      lambda(): Computation[Complex val, Complex val] val => Scale end,
+      pipeline_name, scale_step_id)
+
+    let worker_3_builders: Array[StepBuilder val] trn = 
+      recover Array[StepBuilder val] end
+
+    worker_3_builders.push(scale_builder)
+
+    let worker_2_topology = LocalTopology(pipeline_name, consume worker_2_builders
+      where local_sink = ProxyAddress(worker3, scale_step_id))
+
+    let worker_3_topology = LocalTopology(pipeline_name, consume worker_3_builders
+      where global_sink = _output_addr)
+
+    let local_topologies: Array[LocalTopology val] trn = 
+      recover Array[LocalTopology val] end
+    local_topologies.push(worker_2_topology)
+    local_topologies.push(worker_3_topology)
+
+    consume local_topologies 
 
 class GeneralStepBuilder[In: Any val, Out: Any val]
   let _computation_builder: {(): Computation[In, Out] val} val
