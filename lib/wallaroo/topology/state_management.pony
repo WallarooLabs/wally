@@ -2,9 +2,10 @@ use "collections"
 
 trait StateChange[State: Any #read]
   fun name(): String val
+  fun id(): U64
   fun apply(state: State)
-  fun to_log_entry(): Array[U8]
-  fun read_log_entry(entry: Array[U8])
+  fun to_log_entry(): Array[U8] val
+  fun read_log_entry(entry: Array[U8] val)
 
 class StateChangeRepository[State: Any #read]
   let _state_changes: Array[StateChange[State] ref] ref

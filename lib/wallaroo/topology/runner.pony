@@ -49,17 +49,19 @@ class StateRunner[State: Any #read]
   let _metrics_reporter: MetricsReporter
   let _wb: Writer = Writer
   let _state_change_repository: StateChangeRepository[State] ref
+  let _event_log_buffer: EventLogBuffer tag
   let _alfred: Alfred
 
   new iso create(state_builder: {(): State} val, 
     metrics_reporter: MetricsReporter iso,
-    alfred: Alfred
+    alfred: Alfred, event_log_buffer: EventLogBuffer tag
     ) 
   =>
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
     _state_change_repository = StateChangeRepository[State]
     _alfred = alfred
+    _event_log_buffer = consume event_log_buffer
 
   fun ref register_state_change(sc: StateChange[State] ref) : U64 =>
     _state_change_repository.register(sc)
@@ -70,7 +72,14 @@ class StateRunner[State: Any #read]
     match input
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
-      sp(_state, _state_change_repository, _wb)
+      match sp(_state, _state_change_repository, _wb)
+      | let sc: StateChange[State] =>
+        //TODO: these two should come from the deduplication stuff
+        let uid: U64 = 0
+        let fractional_list: Array[U64] val = recover val Array[U64] end
+        let log_entry = LogEntry(uid, fractional_list, sc.id(), sc.to_log_entry()) 
+        _event_log_buffer.queue(log_entry)
+      end
       let computation_end = Time.nanos()
 
       _metrics_reporter.pipeline_metric(source_name, source_ts)
