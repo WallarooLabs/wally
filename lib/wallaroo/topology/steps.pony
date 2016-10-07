@@ -16,7 +16,8 @@ actor Step
     _conn = conn
 
   be run[In: Any val](metric_name: String, source_ts: U64,
-    input: In, envelope: MsgEnvelope val)
+    input: In)
+    // input: In, envelope: MsgEnvelope val)
   =>
     _runner.run[In](metric_name, source_ts, input, _conn)
 
