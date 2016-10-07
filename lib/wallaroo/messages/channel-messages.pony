@@ -125,7 +125,7 @@ interface DeliveryMsg is ChannelMsg
   fun target_id(): U128
   fun ack_id(): U64
   fun from_name(): String
-  fun deliver(step: Step tag)
+  fun deliver(router: Router val)
 
 class ForwardMsg[D: Any val] is ChannelMsg
   let _target_id: U128
@@ -149,7 +149,7 @@ class ForwardMsg[D: Any val] is ChannelMsg
   fun ack_id(): U64 => _ack_id
   fun from_name(): String => _from_worker_name
 
-  fun deliver(step: Step tag) =>//data_receiver: DataReceiver) =>
-    step.run[D](_metric_name, _source_ts, _data)
+  fun deliver(router: Router val): Bool =>//data_receiver: DataReceiver) =>
+    router.route[D](_metric_name, _source_ts, _data)
     // data_receiver.received[D](_data_ch_id, _step_id, _msg_id, _source_ts,
       // _ingress_ts, _data, step_manager)

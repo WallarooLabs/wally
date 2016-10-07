@@ -7,11 +7,11 @@ use "wallaroo/metrics"
 use "wallaroo/topology"
 
 class SourceNotify is TCPConnectionNotify
-  let _source: SourceRunner
+  let _source: BytesProcessor
   var _header: Bool = true
   var _msg_count: USize = 0
 
-  new iso create(source: SourceRunner iso) =>
+  new iso create(source: BytesProcessor iso) =>
     _source = consume source
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
@@ -46,19 +46,21 @@ class SourceNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     @printf[None]("incoming connected\n".cstring())
 
-class SourceListenerNotify is TCPListenNotify
-  let _source_builder: {(): Source iso^} val
+class SourceListenerNotify[In: Any val] is TCPListenNotify
+  let _source_builder: {(): BytesProcessor iso^} val
   let _metrics: JrMetrics
   let _expected: USize
 
-  new iso create(source_builder: {(): Source iso^} val, metrics: JrMetrics, 
-    expected: USize) =>
+  new iso create(source_builder: {(): BytesProcessor iso^} val,
+    metrics: JrMetrics, expected: USize) 
+  =>
     _source_builder = source_builder
     _metrics = metrics
     _expected = expected
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    SourceNotify(SourceRunner(_source_builder(), _metrics, _expected))
+    SourceNotify(Source[In](_source_builder(), _metrics, 
+      _expected))
 
   fun ref listening(listen: TCPListener ref) =>
     try

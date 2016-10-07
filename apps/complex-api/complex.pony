@@ -22,6 +22,23 @@ use "buffered"
 use "sendence/bytes"
 use "wallaroo/topology"
 
+actor Main
+  new create(env: Env) =>
+    try
+      let topology = recover val
+        Topology
+          .new_pipeline[Complex val, Complex val](ComplexDecoder, 
+            "Complex Numbers")
+          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
+            => Conjugate end)
+          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^=> Scale(5) end)
+          .to_sink(ComplexEncoder, recover [0] end)
+      end
+      // Startup(env, topology, 1)
+    else
+      env.out.print("Couldn't build topology")
+    end
+
 class Complex
   let _real: I32
   let _imaginary: I32
@@ -52,26 +69,33 @@ class Complex
   =>
     ("C(" + _real.string() + ", " + _imaginary.string() + ")").clone()
 
-class val Conjugate is Computation[Complex val, Complex val]
+class iso Conjugate is Computation[Complex val, Complex val]
   fun apply(input: Complex val): Complex val =>
     input.conjugate()
 
   fun name(): String => "Get Conjugate"
 
-class val Scale is Computation[Complex val, Complex val]
+class Scale is Computation[Complex val, Complex val]
+  let _scalar: I32
+  let _name: String
+
+  new iso create(scalar: I32) =>
+    _scalar = scalar
+    _name = "Scale by " + _scalar.string()
+
   fun apply(input: Complex val): Complex val =>
-    input * 5
+    input * _scalar
 
-  fun name(): String => "Scale by 5"
+  fun name(): String => _name
 
-class ComplexSourceParser 
+primitive ComplexDecoder
   fun apply(data: Array[U8] val): Complex val ? => 
     let real = Bytes.to_u32(data(0), data(1), data(2), data(3))
     let imaginary = Bytes.to_u32(data(4), data(5), data(6), data(7))
     Complex(real.i32(), imaginary.i32())
 
 primitive ComplexEncoder
-  fun apply(c: Complex val, wb: Writer = Writer): Array[ByteSeq] val =>
+  fun apply(c: Complex val, wb: Writer): Array[ByteSeq] val =>
     // Header
     wb.u32_be(8)
     // Fields
