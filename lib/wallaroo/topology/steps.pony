@@ -3,6 +3,7 @@ use "time"
 use "net"
 use "sendence/epoch"
 use "wallaroo/metrics"
+use "wallaroo/messages"
 
 actor Step
   let _runner: Runner
