@@ -17,14 +17,25 @@ class MsgEnvelope
     route_id = route_id'
 
     
+primitive HashTuple
+  fun hash(t: (U64, U64)): U64 =>
+    cantorPair(t)
+
+  fun eq(t1: (U64, U64), t2: (U64, U64)): Bool =>
+    cantorPair(t1) == cantorPair(t2)
+
+  fun cantorPair(t: (U64, U64)): U64 =>
+    (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
+
+    
 class HighWaterMarkTable
   """
   Keep track of a high watermark for each message coming into a step.
   We store the seq_id as assigned to a message by the upstream origin
   that sent the message.
   """
-  let _hwmt: HashMap[(U64, U64), U64, HashIs[(U64, U64)]] =
-    HashMap[(U64, U64), U64, HashIs[(U64, U64)]]()
+  let _hwmt: HashMap[(U64, U64), U64, HashTuple] =
+    HashMap[(U64, U64), U64, HashTuple]()
   // tuple access to high watermark
 
   fun ref updateHighWatermark(origin_tag: U64, route_id: U64, seq_id: U64)
@@ -43,10 +54,8 @@ class TranslationTable
   Create a new entry every time we send a message downstream.
   Remove old entries every time we receive a new low watermark.
   """
-  let _inToOut: HashMap[U64, U64, HashEq[U64]] =
-    HashMap[U64, U64, HashEq[U64]]()
-  let _outToIn: HashMap[U64, U64, HashEq[U64]] =
-    HashMap[U64, U64, HashEq[U64]]()
+  let _inToOut: Map[U64, U64] = Map[U64, U64]()
+  let _outToIn: Map[U64, U64] = Map[U64, U64]()
   
   fun ref update(in_seq_id: U64, out_seq_id: U64)
   =>
@@ -95,7 +104,7 @@ class LowWaterMarkTable
   Keep track of low watermark values per route as reported by downstream 
   steps.
   """
-  let _lwmt: Array[U64] = Array[U64]()
+  let _lwmt: Map[U64, U64] = Map[U64, U64]()
 
   fun ref updateLowWatermark(route_id: U64, seq_id: U64)
   =>
