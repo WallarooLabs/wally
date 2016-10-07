@@ -38,11 +38,10 @@ class SymbolData
   var last_bid: F64 = 0
   var last_offer: F64 = 0
 
-primitive UpdateNbbo is StateComputation[FixNbboMessage val, SymbolData]
-  fun name(): String =>
-    "Update NBBO"
+primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
+  fun name(): String => "Update NBBO"
 
-  fun apply(msg: FixNbboMessage val, state: SymbolData, wb: (Writer | None)) =>
+  fun apply(msg: FixNbboMessage val, state: SymbolData): None =>
     let offer_bid_difference = msg.offer_px() - msg.bid_px()
 
     state.should_reject_trades = (offer_bid_difference >= 0.05) or
@@ -50,69 +49,61 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, SymbolData]
 
     state.last_bid = msg.bid_px()
     state.last_offer = msg.offer_px()
+    None
 
-class CheckOrder is StateComputation[FixOrderMessage val, SymbolData]
-  let _conn: TCPConnection tag
+class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val, 
+  SymbolData]
+  fun name(): String => "Check Order against NBBO"
 
-  new val create(conn: TCPConnection tag) =>
-    _conn = conn
-
-  fun name(): String =>
-    "Check Order against NBBO"
-
-  fun apply(msg: FixOrderMessage val, state: SymbolData,
-    wb: (Writer | None)) =>
+  fun apply(msg: FixOrderMessage val, state: SymbolData): 
+    (OrderResult val | None) =>
     if state.should_reject_trades then
-      let result = OrderResult(msg, state.last_bid, state.last_offer,
+      OrderResult(msg, state.last_bid, state.last_offer,
         Epoch.nanoseconds())
-      match wb
-      | let w: Writer =>
-        _conn.writev(OrderResultEncoder(result, w))
-      else
-        @printf[I32]("No write buffer for some reason\n".cstring())
-      end
+    else
+      None
     end
 
-class NbboSourceParser 
-  fun apply(data: Array[U8] val): (FixNbboMessage val | None) =>
-    try
-      match FixishMsgDecoder(data)
-      | let m: FixNbboMessage val => m
-      end
+primitive NbboSourceDecoder 
+  fun apply(data: Array[U8] val): FixNbboMessage val ? =>
+    match FixishMsgDecoder(data)
+    | let m: FixNbboMessage val => m
+    else
+      error
     end
 
-class OrderSourceParser 
-  fun apply(data: Array[U8] val): (FixOrderMessage val | None) =>
-    try
-      match FixishMsgDecoder(data)
-      | let m: FixOrderMessage val => m
-      end
+primitive OrderSourceDecoder 
+  fun apply(data: Array[U8] val): FixOrderMessage val ? =>
+    match FixishMsgDecoder(data)
+    | let m: FixOrderMessage val => m
+    else
+      error
     end
 
-class SymbolRouter is Router[(FixNbboMessage val | FixOrderMessage val),
-  Step tag]
-  let _routes: Map[String, Step tag] val
+class val SymbolDataBuilder
+  fun apply(): SymbolData => SymbolData
+  fun name(): String => "Market Data"
 
-  new iso create(routes: Map[String, Step tag] val) =>
-    _routes = routes
+// class SymbolRouter is Router[(FixNbboMessage val | FixOrderMessage val),
+//   Step tag]
+//   let _routes: Map[String, Step tag] val
 
-  fun route(input: (FixNbboMessage val | FixOrderMessage val)): 
-    (Step tag | None) 
+//   new iso create(routes: Map[String, Step tag] val) =>
+//     _routes = routes
+
+//   fun route(input: (FixNbboMessage val | FixOrderMessage val)): 
+//     (Step tag | None) 
+//   =>
+//     if _routes.contains(input.symbol()) then
+//       try
+//         _routes(input.symbol())
+//       end
+//     end
+
+primitive SymbolPartitionFunction
+  fun apply(input: (FixNbboMessage val | FixOrderMessage val)): String 
   =>
-    if _routes.contains(input.symbol()) then
-      try
-        _routes(input.symbol())
-      end
-    end
-
-class OnlyRejectionsRouter is Router[Bool, TCPConnection]
-  let _sink: TCPConnection
-
-  new iso create(sink: TCPConnection) =>
-    _sink = sink
-
-  fun route(rejected: Bool): (TCPConnection | None)  =>
-    if rejected then _sink end
+    input.symbol()
 
 class OrderResult
   let order: FixOrderMessage val
