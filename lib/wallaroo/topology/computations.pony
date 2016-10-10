@@ -21,6 +21,7 @@ trait StateProcessor[State: Any #read] is BasicComputation
   fun find_partition(finder: PartitionFinder val): Router val
 
 class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
+  is StateProcessor[State]
   let _state_comp: StateComputation[In, Out, State] val
   let _input: In
   let _router: Router val

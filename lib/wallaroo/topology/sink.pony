@@ -24,19 +24,24 @@ class SimpleSinkRunner
 
 class EncoderSinkRunner[In: Any val]
   let _metrics_reporter: MetricsReporter
-  let _next: Runner = RouterRunner
+  let _target: Router val
   let _encoder: SinkEncoder[In] val
   let _wb: Writer = Writer
 
   new iso create(encoder: SinkEncoder[In] val,
+    target: Router val,
     metrics_reporter: MetricsReporter iso,
     initial_msgs: Array[Array[ByteSeq] val] val 
       = recover Array[Array[ByteSeq] val] end)
   =>
     _metrics_reporter = consume metrics_reporter
+    _target = target
     _encoder = encoder
-    for msg in initial_msgs.values() do
-      _target.writev(msg)
+    match _target
+    | let tcp: TCPRouter val =>
+      for msg in initial_msgs.values() do
+        tcp.writev(msg)
+      end
     end
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -45,35 +50,33 @@ class EncoderSinkRunner[In: Any val]
     match data
     | let input: In =>
       let encoded = _encoder(input, _wb)
-      _next.run[Array[ByteSeq] val](metric_name, source_ts, encoded, router)
+      _target.route[Array[ByteSeq] val](metric_name, source_ts, encoded)
     else
       @printf[I32]("Encoder sink received unrecognized input type.")
     end
     _metrics_reporter.pipeline_metric(metric_name, source_ts)
     true
 
-trait SinkBuilder
-  fun apply(metrics_reporter: MetricsReporter iso, next: (Router val | None) = 
-    None): Runner iso^
+trait SinkRunnerBuilder
+  fun apply(metrics_reporter: MetricsReporter iso, next: Router val = 
+    EmptyRouter): Runner iso^
 
-  fun name(): String
-  // fun is_stateful(): Bool
+  fun name(): String 
 
-class SimpleSinkRunnerBuilder[In: Any val] is SinkBuilder
+class SimpleSinkRunnerBuilder[In: Any val] is SinkRunnerBuilder
   let _pipeline_name: String
 
   new val create(pipeline_name: String) =>
     _pipeline_name = pipeline_name
 
-  fun apply(metrics_reporter: MetricsReporter iso, next: (Router val | None)): 
-    Runner iso^ 
+  fun apply(metrics_reporter: MetricsReporter iso, next: Router val =
+      EmptyRouter): Runner iso^ 
   =>
     SimpleSinkRunner(consume metrics_reporter) 
 
   fun name(): String => _pipeline_name + " sink"
-  fun is_stateful(): Bool => false
 
-class EncoderSinkRunnerBuilder[In: Any val] is SinkBuilder
+class EncoderSinkRunnerBuilder[In: Any val] is SinkRunnerBuilder
   let _encoder: SinkEncoder[In] val
   let _pipeline_name: String
   let _initial_msgs: Array[Array[ByteSeq] val] val 
@@ -86,13 +89,13 @@ class EncoderSinkRunnerBuilder[In: Any val] is SinkBuilder
     _pipeline_name = pipeline_name
     _initial_msgs = initial_msgs
 
-  fun apply(metrics_reporter: MetricsReporter iso, next: (Router val | None)): 
+  fun apply(metrics_reporter: MetricsReporter iso, next: Router val): 
     Runner iso^ 
   =>
-    EncoderSinkRunner[In](_encoder, consume metrics_reporter, _initial_msgs) 
+    EncoderSinkRunner[In](_encoder, next, consume metrics_reporter, 
+      _initial_msgs) 
 
   fun name(): String => _pipeline_name + " sink"
-  fun is_stateful(): Bool => false
 
 
 // class SimpleSink

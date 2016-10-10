@@ -26,7 +26,7 @@ trait BasicPipeline
   //   local_step_builder: (LocalStepBuilder val | None),
   //   shared_state_step: (BasicSharedStateStep tag | None) = None,
   //   metrics_collector: (MetricsCollector tag | None))
-  fun sink_builder(): SinkBuilder val
+  fun sink_builder(): SinkRunnerBuilder val
   fun sink_target_ids(): Array[U64] val
   fun apply(i: USize): RunnerBuilder val ?
   fun size(): USize
@@ -36,7 +36,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _decoder: SourceDecoder[In] val
   let _runner_builders: Array[RunnerBuilder val]
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
-  var _sink_builder: SinkBuilder val
+  var _sink_builder: SinkRunnerBuilder val
 
   new create(d: SourceDecoder[In] val, n: String) =>
     _decoder = d
@@ -70,13 +70,13 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   //   coordinator.add_listener(TCPListener(auth, consume source_notifier,
   //     host, service))
 
-  fun ref update_sink(sink_builder': SinkBuilder val, 
+  fun ref update_sink(sink_builder': SinkRunnerBuilder val, 
     sink_ids: Array[U64] val) 
   =>
     _sink_builder = sink_builder'
     _sink_target_ids = sink_ids
 
-  fun sink_builder(): SinkBuilder val => _sink_builder
+  fun sink_builder(): SinkRunnerBuilder val => _sink_builder
 
   fun sink_target_ids(): Array[U64] val => _sink_target_ids
 

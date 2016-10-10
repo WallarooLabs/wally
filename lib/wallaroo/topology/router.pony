@@ -11,20 +11,15 @@ class EmptyRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
     true
 
-class DirectRouter[In: Any val]
+class DirectRouter
   let _target: Step tag
 
   new val create(target: Step tag) =>
     _target = target
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
-    match data
-    | let input: In =>
-      _target.run[In](metric_name, source_ts, input)
-      true
-    else
-      false
-    end
+    _target.run[D](metric_name, source_ts, data)
+    true
 
 class DataRouter
   let _routes: Map[U128, Step tag] val
