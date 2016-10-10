@@ -12,7 +12,7 @@ interface Runner
 
 interface RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None) = 
-    None): Runner iso
+    None): Runner iso^
 
   fun name(): String
   fun is_stateful(): Bool
@@ -24,7 +24,7 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
     _comp_builder = comp_builder
 
   fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None)): 
-    Runner iso
+    Runner iso^
   =>
     match (consume next)
     | let r: Runner iso =>
@@ -48,7 +48,7 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
     _router = router
 
   fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None)): 
-    Runner iso
+    Runner iso^
   =>
     PreStateRunner[In, Out, State](_state_comp, _router, 
       consume metrics_reporter)
