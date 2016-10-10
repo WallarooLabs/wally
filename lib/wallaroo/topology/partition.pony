@@ -4,7 +4,7 @@ interface PartitionFunction[In: Any val, Key: (Hashable val & Equatable[Key] val
   fun apply(input: In): Key
 
 interface PartitionFindable
-  fun find_partition(finder: PartitionFinder val)
+  fun find_partition(finder: PartitionFinder val): Router val
 
 interface PartitionFinder
   fun find[D: Any val](data: D): Router val
