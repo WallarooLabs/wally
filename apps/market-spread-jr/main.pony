@@ -40,8 +40,6 @@ primitive MarketSpreadStarter
           output_addr(0),
           output_addr(1))
     let reports_join_msg = HubProtocol.join("reports:market-spread")
-    reports_conn.writev(connect_msg)
-    reports_conn.writev(reports_join_msg)
 
     let router_builder = 
       recover
@@ -96,11 +94,18 @@ primitive MarketSpreadStarter
           nbboutput_addr(1))
     )
 
-    let external_sink = TCPRouter(reports_conn)
+    let sink_reporter = MetricsReporter("market-spread", 
+      metrics_conn)
+
+    let external_sink_runner = EncoderSinkRunner[OrderResult val](
+      OrderResultEncoder, TCPRouter(reports_conn), consume sink_reporter,
+      recover [connect_msg, reports_join_msg] end)
+
+    let sink_router = DirectRouter(Step(consume external_sink_runner))
 
     let order_runner_builder: RunnerBuilder val =
       PreStateRunnerBuilder[FixOrderMessage val, OrderResult val, SymbolData](
-        CheckOrder, external_sink)
+        CheckOrder, sink_router)
 
     let order_source_builder: {(): Source[FixOrderMessage val] iso^} val =
       recover 
