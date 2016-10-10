@@ -20,7 +20,7 @@ class DirectRouter
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
     _target.run[D](metric_name, source_ts, data)
-    true
+    false
 
 class DataRouter
   let _routes: Map[U128, Step tag] val
@@ -36,12 +36,12 @@ class DataRouter
       | let delivery_msg: DeliveryMsg val =>
         let target_id = delivery_msg.target_id()
         delivery_msg.deliver(_routes(target_id))
-        true
-      else
         false
+      else
+        true
       end
     else
-      false
+      true
     end
 
 class PartitionRouter
@@ -85,7 +85,7 @@ class TCPRouter
     | let d: Array[ByteSeq] val =>
       _tcp_writer(d)
     end
-    true
+    false
 
   fun writev(d: Array[ByteSeq] val) =>
     _tcp_writer(d)
