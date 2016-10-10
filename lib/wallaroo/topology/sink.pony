@@ -14,7 +14,7 @@ class SimpleSinkRunner
   =>
     match data
     | let s: Stringable val => None
-      // @printf[I32](("Simple sink: Received " + s.string() + "\n").cstring())
+      @printf[I32](("Simple sink: Received " + s.string() + "\n").cstring())
     else
       @printf[I32]("Simple sink: Got it!\n".cstring())
     end
@@ -81,8 +81,8 @@ class EncoderSinkRunnerBuilder[In: Any val] is SinkRunnerBuilder
   let _pipeline_name: String
   let _initial_msgs: Array[Array[ByteSeq] val] val 
 
-  new val create(encoder: SinkEncoder[In] val, 
-    pipeline_name: String, initial_msgs: Array[Array[ByteSeq] val] val 
+  new val create(pipeline_name: String, encoder: SinkEncoder[In] val, 
+    initial_msgs: Array[Array[ByteSeq] val] val 
       = recover Array[Array[ByteSeq] val] end) 
   =>
     _encoder = encoder

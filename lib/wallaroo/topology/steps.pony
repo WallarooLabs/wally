@@ -37,7 +37,7 @@ class StatelessStepBuilder
   let _runner_sequence_builder: RunnerSequenceBuilder val
   let _id: U128
 
-  new create(r: RunnerSequenceBuilder val, id': U128) =>
+  new val create(r: RunnerSequenceBuilder val, id': U128) =>
     _runner_sequence_builder = r
     _id = id'
 

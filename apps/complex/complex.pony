@@ -58,17 +58,19 @@ class Complex
 
 class val Conjugate is Computation[Complex val, Complex val]
   fun apply(input: Complex val): Complex val =>
+    // @printf[I32]("Conjugating...\n".cstring())
     input.conjugate()
 
   fun name(): String => "Get Conjugate"
 
 class val Scale is Computation[Complex val, Complex val]
   fun apply(input: Complex val): Complex val =>
+    // @printf[I32]("Scaling...\n".cstring())
     input * 5
 
   fun name(): String => "Scale by 5"
 
-class ComplexSourceParser 
+class ComplexSourceDecoder 
   fun apply(data: Array[U8] val): Complex val ? => 
     let real = Bytes.to_u32(data(0), data(1), data(2), data(3))
     let imaginary = Bytes.to_u32(data(4), data(5), data(6), data(7))

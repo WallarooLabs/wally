@@ -66,17 +66,15 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         _header = false
       end
     else
-      let msg = ChannelMsgDecoder(consume data, _auth)
-      match msg
+      match ChannelMsgDecoder(consume data, _auth)
       | let d: DeliveryMsg val =>
-        d.deliver(_router)
-        // match _router.route[U128](d.target_id())
-      // | let m: DataSenderReadyMsg val =>
-      //   _sender_name = m.node_name
-      //   _coordinator.connect_receiver(m.node_name)
+        @printf[I32]("Received delivery msg!!\n".cstring())
+        _router.route[DeliveryMsg val](d.metric_name(), d.source_ts(), d)
       | let m: SpinUpLocalTopologyMsg val =>
         _env.out.print("Received spin up local topology message!")
       | let m: UnknownChannelMsg val =>
+        _env.err.print("Unknown Wallaroo data message type.")
+      else
         _env.err.print("Unknown Wallaroo data message type.")
       end
 

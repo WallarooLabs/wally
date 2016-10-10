@@ -13,20 +13,14 @@ class ProxyAddress
   new val create(w: String, s_id: U128) =>
     worker = w
     step_id = s_id
- 
-
-interface BasicEgressBuilder
 
 class EgressBuilder
-  let _egress_name: String
   let _addr: (Array[String] val | ProxyAddress val)
   let _sink_runner_builder: (SinkRunnerBuilder val | None)
 
-  new create(addr: (Array[String] val | ProxyAddress val), 
-    sink_runner_builder: (SinkRunnerBuilder val | None) = None,
-    name: String = "")
+  new val create(addr: (Array[String] val | ProxyAddress val), 
+    sink_runner_builder: (SinkRunnerBuilder val | None) = None)
   =>
-    _egress_name = name
     _addr = addr
     _sink_runner_builder = sink_runner_builder
 
@@ -41,9 +35,10 @@ class EgressBuilder
         match _sink_runner_builder
         | let srb: SinkRunnerBuilder val =>
           let connect_auth = TCPConnectAuth(auth)
+          let sink_name = "sink at " + a(0) + ":" + a(1)
 
           let out_conn = TCPConnection(connect_auth,
-            OutNotify(_egress_name), a(0), a(1))
+            OutNotify(sink_name), a(0), a(1))
 
           Step(srb(consume reporter, TCPRouter(out_conn)))
         else
@@ -136,10 +131,10 @@ actor LocalTopologyInitializer
             consume sink_reporter, _auth, proxies)
 
           let builders = pipeline.builders()
-          var builder_idx: I64 = (builders.size() - 1).i64()
+          var builder_idx = builders.size()
           var latest_step = sink
-          while builder_idx >= 0 do 
-            let builder = builders(builder_idx.usize())
+          while builder_idx > 0 do 
+            let builder = builders((builder_idx - 1).usize())
             let next = DirectRouter(latest_step)
             latest_step = builder(next, _metrics_conn, pipeline.name())
             routes(builder.id()) = latest_step
