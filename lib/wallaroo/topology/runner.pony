@@ -205,7 +205,9 @@ class StateRunner[State: Any #read]
       let is_finished = sp(_state, metric_name, source_ts)
       let computation_end = Time.nanos()
 
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
+      if is_finished then
+        _metrics_reporter.pipeline_metric(metric_name, source_ts)
+      end
 
       _metrics_reporter.step_metric(sp.name(),
         computation_start, computation_end)
