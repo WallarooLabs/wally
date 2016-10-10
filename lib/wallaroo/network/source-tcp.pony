@@ -9,6 +9,7 @@ use "wallaroo/topology"
 class SourceNotify is TCPConnectionNotify
   let _source: SourceRunner
   var _header: Bool = true
+  var _msg_count: USize = 0
 
   new iso create(source: SourceRunner iso) =>
     _source = consume source
@@ -27,7 +28,16 @@ class SourceNotify is TCPConnectionNotify
       conn.expect(4)
       _header = true
     end
-    false
+    ifdef linux then
+      _msg_count = _msg_count + 1
+      if ((_msg_count % 50) == 0) then
+        false
+      else
+        true
+      end
+    else
+      false
+    end
 
   fun ref accepted(conn: TCPConnection ref) =>
     @printf[None]("accepted\n".cstring())
