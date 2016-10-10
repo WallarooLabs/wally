@@ -78,8 +78,8 @@ primitive MarketSpreadStarter
         =>
           let nbbo_reporter = MetricsReporter("market-spread", metrics_conn)
           
-          Source[FixNbboMessage val](NbboSourceDecoder,
-            "Nbbo", nbbo_runner_builder, partition_router, 
+          Source[FixNbboMessage val]("Nbbo", NbboSourceDecoder,
+            nbbo_runner_builder, partition_router, 
             consume nbbo_reporter)
         end
       end
@@ -115,8 +115,8 @@ primitive MarketSpreadStarter
           let order_reporter = MetricsReporter("market-spread", 
             metrics_conn)
 
-          Source[FixOrderMessage val](OrderSourceDecoder, 
-            "Order", order_runner_builder, partition_router, 
+          Source[FixOrderMessage val]("Order", OrderSourceDecoder, 
+            order_runner_builder, partition_router, 
             consume order_reporter)
         end
       end
