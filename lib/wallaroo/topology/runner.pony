@@ -17,10 +17,19 @@ interface RunnerBuilder
   fun name(): String
   fun is_stateful(): Bool
 
+primitive RouterRunnerBuilder
+  fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None) = 
+    None): Runner iso^ 
+  => 
+    RouterRunner
+
+  fun name(): String => "router"
+  fun is_stateful(): Bool => false
+
 class RunnerSequenceBuilder
   let _runner_builders: Array[RunnerBuilder val] val
 
-  new create(bs: Array[RunnerBuilder val] val) =>
+  new val create(bs: Array[RunnerBuilder val] val) =>
     _runner_builders = bs
 
   fun apply(metrics_reporter: MetricsReporter iso): Runner iso^ =>
@@ -121,7 +130,7 @@ class ComputationRunner[In: Any val, Out: Any val]
         match result
         | None => true
         | let output: Out =>
-          _next.run[Out](metric_name, source_ts, output)
+          _next.run[Out](metric_name, source_ts, output, router)
         else
           true
         end

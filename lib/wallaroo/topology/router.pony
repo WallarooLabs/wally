@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "wallaroo/messages"
 
 interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool
@@ -32,8 +33,9 @@ class DataRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
     try
       match data
-      | let step_id: U128 =>
-        _routes(step_id).run[U128](metric_name, source_ts, step_id)
+      | let delivery_msg: DeliveryMsg val =>
+        let target_id = delivery_msg.target_id()
+        delivery_msg.deliver(_routes(target_id))
         true
       else
         false

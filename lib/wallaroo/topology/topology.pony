@@ -107,7 +107,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val 
       = recover Array[Array[ByteSeq] val] end): Topology ? 
   =>
-    _p.update_sink(EncoderSinkRunnerBuilder[Out](encoder, _p.name(),
+    _p.update_sink(EncoderSinkRunnerBuilder[Out](_p.name(), encoder,
       initial_msgs), sink_ids)
     _t.add_pipeline(_p as BasicPipeline)
     _t

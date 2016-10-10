@@ -17,7 +17,7 @@ class Source[In: Any val]
   let _metrics_reporter: MetricsReporter
   var _count: USize = 0
 
-  new iso create(decoder: SourceDecoder[In] val, pipeline_name: String, 
+  new iso create(pipeline_name: String, decoder: SourceDecoder[In] val, 
     runner_builder: RunnerBuilder val, router: Router val,
     metrics_reporter: MetricsReporter iso) 
   =>
