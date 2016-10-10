@@ -24,9 +24,9 @@ class Source[In: Any val]
     _decoder = decoder
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
-    _runner = runner_builder()
-    _router = router
     _metrics_reporter = consume metrics_reporter
+    _runner = runner_builder(_metrics_reporter.clone())
+    _router = router
 
   fun ref process(data: Array[U8 val] iso) =>
     let ingest_ts = Time.nanos()
