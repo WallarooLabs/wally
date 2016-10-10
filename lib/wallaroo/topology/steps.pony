@@ -7,15 +7,19 @@ use "wallaroo/metrics"
 actor Step
   let _runner: Runner
   var _router: Router val = EmptyRouter
+  let _metrics_reporter: MetricsReporter 
 
-  new create(runner: Runner iso) =>
+  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso) =>
     _runner = consume runner
+    _metrics_reporter = consume metrics_reporter
 
   be update_router(router: Router val) =>
     _router = router
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D) =>
-    _runner.run[D](metric_name, source_ts, data, _router)
+    if _runner.run[D](metric_name, source_ts, data, _router) then
+      _metrics_reporter.pipeline_metric(metric_name, source_ts)
+    end
 
   be dispose() =>
     match _router
@@ -49,6 +53,7 @@ class StatelessStepBuilder
       metrics_conn))
     // let runner = ComputationRunner[In, Out](_computation_builder(),
       // consume next, MetricsReporter(pipeline_name, metrics_conn))
-    let step = Step(consume runner)
+    let step = Step(consume runner, 
+      MetricsReporter(pipeline_name, metrics_conn))
     step.update_router(next)
     step

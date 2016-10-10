@@ -49,13 +49,14 @@ primitive ComplexStarter
       let reports_join_msg = HubProtocol.join("reports:complex-numbers")
 
       let sink_reporter = MetricsReporter("complex-numbers", metrics_conn)
-      let sink = Step(SimpleSinkRunner(consume sink_reporter))
+      let sink = Step(SimpleSinkRunner(sink_reporter.clone()), consume
+        sink_reporter)
       let sink_router = DirectRouter(sink)
 
       let scale_reporter = MetricsReporter("complex-numbers", metrics_conn)
       let scale_runner = ComputationRunner[Complex val, Complex val](Scale,
-        RouterRunner, consume scale_reporter)
-      let scale_step = Step(consume scale_runner)
+        RouterRunner, scale_reporter.clone())
+      let scale_step = Step(consume scale_runner, consume scale_reporter)
       scale_step.update_router(sink_router)
       let scale_step_router = DirectRouter(scale_step)
 
@@ -67,7 +68,8 @@ primitive ComplexStarter
               metrics_conn)
             let conjugate_runner = ComputationRunner[Complex val, Complex val](
               Conjugate, RouterRunner, complex_reporter.clone())
-            let conjugate_step = Step(consume conjugate_runner)
+            let conjugate_step = Step(consume conjugate_runner, 
+              complex_reporter.clone())
             conjugate_step.update_router(scale_step_router)
             let conjugate_router = DirectRouter(conjugate_step) 
 
@@ -157,8 +159,9 @@ class ComplexTopologyStarter is TopologyStarter
     // Configure local topology on initializer, including source
     let sink_reporter = MetricsReporter(pipeline_name, _metrics_conn)
 
-    let proxy = Proxy("initializer", conjugate_step_id, consume sink_reporter, _auth)
-    let proxy_step = Step(consume proxy)
+    let proxy = Proxy("initializer", conjugate_step_id, sink_reporter.clone(),
+      _auth)
+    let proxy_step = Step(consume proxy, consume sink_reporter)
 
     initializer.register_proxy(worker2, proxy_step)
 
