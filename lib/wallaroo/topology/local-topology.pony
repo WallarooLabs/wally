@@ -40,7 +40,7 @@ class EgressBuilder
           let out_conn = TCPConnection(connect_auth,
             OutNotify(sink_name), a(0), a(1))
 
-          Step(srb(consume reporter, TCPRouter(out_conn)))
+          Step(srb(reporter.clone(), TCPRouter(out_conn)), consume reporter)
         else
           @printf[I32]("No sink runner builder!\n".cstring())
           error
@@ -50,8 +50,8 @@ class EgressBuilder
         error
       end
     | let p: ProxyAddress val =>
-      let proxy = Proxy(worker_name, p.step_id, consume reporter, auth)
-      let proxy_step = Step(consume proxy)
+      let proxy = Proxy(worker_name, p.step_id, reporter.clone(), auth)
+      let proxy_step = Step(consume proxy, consume reporter)
       if proxies.contains(worker_name) then
         proxies(p.worker).push(proxy_step)
       else

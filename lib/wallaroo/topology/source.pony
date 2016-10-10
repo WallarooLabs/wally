@@ -95,7 +95,6 @@ class Source[In: Any val]
 //       else
 //         // If parser returns None, we're filtering the message out already
 //         let computation_end = Time.nanos()
-//         _metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
 
 //         _metrics_reporter.step_metric(_source_name,
 //           computation_start, computation_end)

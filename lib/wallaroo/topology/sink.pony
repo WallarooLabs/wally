@@ -19,7 +19,6 @@ class SimpleSinkRunner
       @printf[I32]("Simple sink: Got it!\n".cstring())
     end
 
-    _metrics_reporter.pipeline_metric(metric_name, source_ts)
     true
 
 class EncoderSinkRunner[In: Any val]
@@ -54,7 +53,7 @@ class EncoderSinkRunner[In: Any val]
     else
       @printf[I32]("Encoder sink received unrecognized input type.")
     end
-    _metrics_reporter.pipeline_metric(metric_name, source_ts)
+
     true
 
 trait SinkRunnerBuilder
@@ -96,46 +95,3 @@ class EncoderSinkRunnerBuilder[In: Any val] is SinkRunnerBuilder
       _initial_msgs) 
 
   fun name(): String => _pipeline_name + " sink"
-
-
-// class SimpleSink
-//   let _metrics_reporter: MetricsReporter
-
-//   new iso create(metrics_reporter: MetricsReporter iso) =>
-//     _metrics_reporter = consume metrics_reporter
-
-//   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-//     conn: (TCPConnection | None))
-//   =>
-//     match input
-//     | let s: Stringable val => None
-//       // @printf[I32](("Simple sink: Received " + s.string() + "\n").cstring())
-//     else
-//       @printf[I32]("Simple sink: Got it!\n".cstring())
-//     end
-
-//     _metrics_reporter.pipeline_metric(metric_name, source_ts)
-
-// class EncoderSink//[Out: Any val]
-//   let _metrics_reporter: MetricsReporter
-//   let _conn: TCPConnection
-//   // let _encoder: {(Out): Array[ByteSeq] val} val
-
-//   new iso create(metrics_reporter: MetricsReporter iso,
-//     conn: TCPConnection)
-//   // , encoder: {(Out): Array[ByteSeq] val} val)
-//   =>
-//     _metrics_reporter = consume metrics_reporter
-//     _conn = conn
-//     // _encoder = encoder
-
-//   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-//     conn: (TCPConnection | None))
-//   =>
-//     _conn.write("hi")
-//     // match input
-//     // | let o: Out =>
-//       // let encoded = _encoder(o)
-//     // end
-
-//     _metrics_reporter.pipeline_metric(metric_name, source_ts)

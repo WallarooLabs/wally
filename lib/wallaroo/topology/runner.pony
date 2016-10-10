@@ -181,9 +181,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
 
     _metrics_reporter.step_metric(_name, computation_start, 
       computation_end)
-    if is_finished then
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
-    end
+
     is_finished
 
 class StateRunner[State: Any #read]
@@ -204,10 +202,6 @@ class StateRunner[State: Any #read]
       let computation_start = Time.nanos()
       let is_finished = sp(_state, metric_name, source_ts)
       let computation_end = Time.nanos()
-
-      if is_finished then
-        _metrics_reporter.pipeline_metric(metric_name, source_ts)
-      end
 
       _metrics_reporter.step_metric(sp.name(),
         computation_start, computation_end)
