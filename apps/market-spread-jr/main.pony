@@ -48,8 +48,7 @@ primitive MarketSpreadStarter
         lambda()(metrics_conn): Router val =>
           let reporter = MetricsReporter("market-spread", metrics_conn)
           let s = StateRunner[SymbolData](SymbolDataBuilder, consume reporter)
-          DirectRouter[(FixNbboMessage val | FixOrderMessage val)](
-            Step(consume s))
+          DirectRouter(Step(consume s))
         end
       end
 
@@ -92,8 +91,7 @@ primitive MarketSpreadStarter
     let listen_auth = TCPListenAuth(env.root as AmbientAuth)
     connections.register_listener(
       TCPListener(listen_auth,
-        SourceListenerNotify[FixNbboMessage val](nbbo_source_builder, metrics1,
-          expected),
+        SourceListenerNotify(nbbo_source_builder, metrics1, expected),
           nbboutput_addr(0),
           nbboutput_addr(1))
     )
@@ -122,8 +120,7 @@ primitive MarketSpreadStarter
 
     connections.register_listener(
       TCPListener(listen_auth,
-        SourceListenerNotify[FixOrderMessage val](order_source_builder, 
-          metrics2, (expected/2)),
+        SourceListenerNotify(order_source_builder, metrics2, (expected/2)),
           order_addr(0),
           order_addr(1))
     )

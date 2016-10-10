@@ -17,6 +17,30 @@ interface RunnerBuilder
   fun name(): String
   fun is_stateful(): Bool
 
+class RunnerSequenceBuilder
+  let _runner_builders: Array[RunnerBuilder val] val
+
+  new create(bs: Array[RunnerBuilder val] val) =>
+    _runner_builders = bs
+
+  fun apply(metrics_reporter: MetricsReporter iso): Runner iso^ =>
+    var remaining: USize = _runner_builders.size()
+    var latest_runner: Runner iso = RouterRunner
+    while remaining > 0 do
+      let next_builder: (RunnerBuilder val | None) = 
+        try
+          _runner_builders(remaining - 1)
+        else
+          None
+        end
+      match next_builder
+      | let rb: RunnerBuilder val =>
+        latest_runner = rb(metrics_reporter.clone(), consume latest_runner)
+      end
+      remaining = remaining - 1
+    end
+    consume latest_runner
+
 class ComputationRunnerBuilder[In: Any val, Out: Any val]
   let _comp_builder: ComputationBuilder[In, Out] val
 
@@ -132,7 +156,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
       | let input: In =>
         match router
         | let shared_state_router: Router val =>
-          let processor = 
+          let processor: StateProcessor[State] val = 
             StateComputationWrapper[In, Out, State](input, _state_comp, 
               _output_router)
           shared_state_router.route[StateProcessor[State] val](metric_name,

@@ -46,7 +46,7 @@ class SourceNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     @printf[None]("incoming connected\n".cstring())
 
-class SourceListenerNotify[In: Any val] is TCPListenNotify
+class SourceListenerNotify is TCPListenNotify
   let _source_builder: {(): BytesProcessor iso^} val
   let _metrics: JrMetrics
   let _expected: USize
@@ -59,8 +59,7 @@ class SourceListenerNotify[In: Any val] is TCPListenNotify
     _expected = expected
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    SourceNotify(Source[In](_source_builder(), _metrics, 
-      _expected))
+    SourceNotify(_source_builder())
 
   fun ref listening(listen: TCPListener ref) =>
     try

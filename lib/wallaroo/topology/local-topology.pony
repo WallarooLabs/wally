@@ -13,35 +13,90 @@ class ProxyAddress
   new val create(w: String, s_id: U128) =>
     worker = w
     step_id = s_id
+ 
+
+interface BasicEgressBuilder
+
+class EgressBuilder
+  let _egress_name: String
+  let _addr: (Array[String] val | ProxyAddress val)
+  let _sink_runner_builder: (SinkRunnerBuilder val | None)
+
+  new create(addr: (Array[String] val | ProxyAddress val), 
+    sink_runner_builder: (SinkRunnerBuilder val | None) = None,
+    name: String = "")
+  =>
+    _egress_name = name
+    _addr = addr
+    _sink_runner_builder = sink_runner_builder
+
+  fun apply(worker_name: String, reporter: MetricsReporter iso, 
+    auth: AmbientAuth,
+    proxies: Map[String, Array[Step tag]] = Map[String, Array[Step tag]]): 
+    Step tag ?
+  =>    
+    match _addr
+    | let a: Array[String] val =>
+      try
+        match _sink_runner_builder
+        | let srb: SinkRunnerBuilder val =>
+          let connect_auth = TCPConnectAuth(auth)
+
+          let out_conn = TCPConnection(connect_auth,
+            OutNotify(_egress_name), a(0), a(1))
+
+          Step(srb(consume reporter, TCPRouter(out_conn)))
+        else
+          @printf[I32]("No sink runner builder!\n".cstring())
+          error
+        end
+      else
+        @printf[I32]("Error connecting to sink.\n".cstring())
+        error
+      end
+    | let p: ProxyAddress val =>
+      let proxy = Proxy(worker_name, p.step_id, consume reporter, auth)
+      let proxy_step = Step(consume proxy)
+      if proxies.contains(worker_name) then
+        proxies(p.worker).push(proxy_step)
+      else
+        proxies(p.worker) = Array[Step tag]
+        proxies(p.worker).push(proxy_step)
+      end
+      proxy_step
+    else
+      // The match is exhaustive, so this can't happen
+      error
+    end 
+
+class LocalPipeline
+  let _name: String
+  let _builders: Array[StepBuilder val] val
+  // var _sink_target_ids: Array[U64] val = recover Array[U64] end
+  var _egress_builder: EgressBuilder val
+
+  new val create(name': String, builders': Array[StepBuilder val] val, 
+    egress_builder': EgressBuilder val) =>
+    _name = name'
+    _builders = builders'
+    _egress_builder = egress_builder'
+
+  fun name(): String => _name
+  fun builders(): Array[StepBuilder val] val => _builders
+  fun egress_builder(): EgressBuilder val => _egress_builder
 
 class LocalTopology
-  let _pipeline_name: String
-  let _builders: Array[StepBuilder val] val
-  let _local_sink: (ProxyAddress val | None)
-  let _global_sink: Array[String] val
+  let _app_name: String
+  let _pipelines: Array[LocalPipeline val] val
 
-  new val create(p_name: String, bs: Array[StepBuilder val] val,
-    local_sink: (ProxyAddress val | None) = None,
-    global_sink: Array[String] val = recover Array[String] end) 
+  new val create(app_name': String, pipelines': Array[LocalPipeline val] val)
   =>
-    _pipeline_name = p_name
-    _builders = bs
-    _local_sink = local_sink
-    _global_sink = global_sink
+    _app_name = app_name'
+    _pipelines = pipelines'
 
-  fun pipeline_name(): String =>
-    _pipeline_name
+  fun app_name(): String => _app_name
 
-  fun builders(): Array[StepBuilder val] val =>
-    _builders
-
-  fun sink(): (Array[String] val | ProxyAddress val) =>
-    match _local_sink
-    | let p: ProxyAddress val => 
-      p
-    else
-      _global_sink
-    end
+  fun pipelines(): Array[LocalPipeline val] val => _pipelines
 
 actor LocalTopologyInitializer
   let _worker_name: String
@@ -72,21 +127,27 @@ actor LocalTopologyInitializer
       | let t: LocalTopology val =>
         let routes: Map[U128, Step tag] trn = 
           recover Map[U128, Step tag] end
-        let proxies: Map[String, Array[Step tag]] = proxies.create()
+        for pipeline in t.pipelines().values() do
+          let proxies: Map[String, Array[Step tag]] = proxies.create()
 
-        let sink = _create_sink(t, proxies)  
+          let sink_reporter = MetricsReporter(pipeline.name(), _metrics_conn)
 
-        let builders = t.builders()
-        var builder_idx: I64 = (builders.size() - 1).i64()
-        var latest_step = sink
-        while builder_idx >= 0 do 
-          let builder = builders(builder_idx.usize())
-          latest_step = builder(latest_step, _metrics_conn)
-          routes(builder.id()) = latest_step
-          builder_idx = builder_idx - 1
-        end  
+          let sink = pipeline.egress_builder()(_worker_name, 
+            consume sink_reporter, _auth, proxies)
 
-        _register_proxies(proxies)
+          let builders = pipeline.builders()
+          var builder_idx: I64 = (builders.size() - 1).i64()
+          var latest_step = sink
+          while builder_idx >= 0 do 
+            let builder = builders(builder_idx.usize())
+            let next = DirectRouter(latest_step)
+            latest_step = builder(next, _metrics_conn, pipeline.name())
+            routes(builder.id()) = latest_step
+            builder_idx = builder_idx - 1
+          end  
+
+          _register_proxies(proxies)
+        end
 
         if not _is_initializer then
           let data_notifier: TCPListenNotify iso =
@@ -111,39 +172,6 @@ actor LocalTopologyInitializer
     else
       _env.err.print("Error initializing local topology")
     end
-
-  fun _create_sink(t: LocalTopology val, 
-    proxies: Map[String, Array[Step tag]]): Step tag ? 
-  =>
-    let sink_reporter = MetricsReporter(t.pipeline_name(), _metrics_conn)
-    
-    match t.sink()
-    | let addr: Array[String] val =>
-      try
-        let connect_auth = TCPConnectAuth(_auth)
-
-        let out_conn = TCPConnection(connect_auth,
-          OutNotify("results"), addr(0), addr(1))
-
-        Step(EncoderSink(consume sink_reporter, out_conn))
-      else
-        _env.out.print("Error connecting to sink.")
-        error
-      end
-    | let p: ProxyAddress val =>
-      let proxy = Proxy(_worker_name, p.step_id, consume sink_reporter, _auth)
-      let proxy_step = Step(consume proxy)
-      if proxies.contains(_worker_name) then
-        proxies(p.worker).push(proxy_step)
-      else
-        proxies(p.worker) = Array[Step tag]
-        proxies(p.worker).push(proxy_step)
-      end
-      proxy_step
-    else
-      // The match is exhaustive, so this can't happen
-      error
-    end 
 
   fun _register_proxies(proxies: Map[String, Array[Step tag]]) =>
     for (worker, ps) in proxies.pairs() do
