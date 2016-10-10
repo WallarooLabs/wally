@@ -147,6 +147,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _output_router: Router val
   let _state_comp: StateComputation[In, Out, State] val
   let _name: String
+  let _prep_name: String
 
   new iso create(state_comp: StateComputation[In, Out, State] val,
     router: Router val, metrics_reporter: MetricsReporter iso) 
@@ -155,6 +156,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     _output_router = router
     _state_comp = state_comp
     _name = _state_comp.name()
+    _prep_name = _name + " prep"
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     router: (Router val | None)): Bool
@@ -179,7 +181,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
       end
     let computation_end = Time.nanos()
 
-    _metrics_reporter.step_metric(_name, computation_start, 
+    _metrics_reporter.step_metric(_prep_name, computation_start, 
       computation_end)
 
     is_finished
