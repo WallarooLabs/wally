@@ -33,7 +33,11 @@ class ComputationRunner[In: Any val, Out: Any val]
     | let i: In =>
       match _computation(i)
       | let output: Out =>
-        _target.run[Out](source_name, source_ts, output)
+        //start: just to get this to compile
+        let envelope = MsgEnvelope(_target, U64(0), U64(0), U64(0))
+        //end: just-to-get-this-to-compile
+          
+        _target.run[Out](source_name, source_ts, output, envelope)
       else
         _metrics_reporter.pipeline_metric(source_name, source_ts)
       end

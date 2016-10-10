@@ -8,7 +8,10 @@ use "wallaroo/messages"
 actor Step
   let _runner: Runner
   var _conn: (TCPConnection | None) = None
-
+  // let _h-wm: HighWaterMarkTable = HighWaterMarkTable()
+  // let _l-wm: LowWaterMarkTable = LowWaterMarkTable()
+  // let _translate: TranslationTable = TranslationTable()
+  
   new create(runner: Runner iso) =>
     _runner = consume runner
 
@@ -16,11 +19,20 @@ actor Step
     _conn = conn
 
   be run[In: Any val](metric_name: String, source_ts: U64,
-    input: In)
-    // input: In, envelope: MsgEnvelope val)
+    input: In, envelope: MsgEnvelope val)
   =>
-    _runner.run[In](metric_name, source_ts, input, _conn)
+    // this only works with John's new API  
+    // let done: Bool = _runner.run[In](metric_name, source_ts, input, _conn)
 
+    _runner.run[In](metric_name, source_ts, input, _conn)
+    let done = true
+    // Process envelope if we're done
+    // Note: We do the bookkeeping _after_ handing the computation result
+    //       to the next Step.
+    if done then
+      _bookkeeping(envelope)
+    end
+    
   be dispose() =>
     match _conn
     | let tcp: TCPConnection =>
@@ -29,6 +41,14 @@ actor Step
     //   sender.dispose()
     end
 
+  fun ref _bookkeeping(envelope: MsgEnvelope val)
+  =>
+    """
+    Process envelope and keep track of things
+    """
+    
+
+    
 interface StepBuilder
   fun id(): U128
 
