@@ -20,6 +20,7 @@ giles/sender/sender -b 127.0.0.1:7010 -m 10000000 -s 300 -i 2_500_000 -f apps/co
 
 use "buffered"
 use "sendence/bytes"
+use "wallaroo"
 use "wallaroo/topology"
 
 actor Main
@@ -34,7 +35,7 @@ actor Main
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^=> Scale(5) end)
           .to_sink(ComplexEncoder, recover [0] end)
       end
-      // Startup(env, topology, 1)
+      Startup(env, topology)//, 1)
     else
       env.out.print("Couldn't build topology")
     end

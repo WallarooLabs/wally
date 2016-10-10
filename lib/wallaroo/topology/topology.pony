@@ -26,7 +26,7 @@ trait BasicPipeline
   //   local_step_builder: (LocalStepBuilder val | None),
   //   shared_state_step: (BasicSharedStateStep tag | None) = None,
   //   metrics_collector: (MetricsCollector tag | None))
-  fun sink_builder(): SinkRunnerBuilder val
+  fun sink_runner_builder(): SinkRunnerBuilder val
   fun sink_target_ids(): Array[U64] val
   fun apply(i: USize): RunnerBuilder val ?
   fun size(): USize
@@ -76,7 +76,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _sink_builder = sink_builder'
     _sink_target_ids = sink_ids
 
-  fun sink_builder(): SinkRunnerBuilder val => _sink_builder
+  fun sink_runner_builder(): SinkRunnerBuilder val => _sink_builder
 
   fun sink_target_ids(): Array[U64] val => _sink_target_ids
 
