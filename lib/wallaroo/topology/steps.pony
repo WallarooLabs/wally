@@ -9,9 +9,9 @@ use "wallaroo/messages"
 actor Step is EventLogReplayTarget
   let _runner: Runner
   var _conn: (TCPConnection | None) = None
-  // let _h-wm: HighWaterMarkTable = HighWaterMarkTable()
-  // let _l-wm: LowWaterMarkTable = LowWaterMarkTable()
-  // let _translate: TranslationTable = TranslationTable()
+  let _hwm: HighWaterMarkTable = HighWaterMarkTable(10)
+  let _lwm: LowWaterMarkTable = LowWaterMarkTable(10)
+  let _translate: TranslationTable = TranslationTable(10)
   
   new create(runner: Runner iso) =>
     _runner = consume runner

@@ -36,10 +36,13 @@ class HighWaterMarkTable
   We store the seq_id as assigned to a message by the upstream origin
   that sent the message.
   """
-  let _hwmt: HashMap[(U64, U64), U64, HashTuple] =
-    HashMap[(U64, U64), U64, HashTuple]()
+  let _hwmt: HashMap[(U64, U64), U64, HashTuple]
   // tuple access to high watermark
 
+  new create(size: USize)
+  =>
+    _hwmt = HashMap[(U64, U64), U64, HashTuple](size)
+  
   fun ref updateHighWatermark(origin_tag: U64, route_id: U64, seq_id: U64)
   =>
     try
@@ -56,9 +59,14 @@ class TranslationTable
   Create a new entry every time we send a message downstream.
   Remove old entries every time we receive a new low watermark.
   """
-  let _inToOut: Map[U64, U64] = Map[U64, U64]()
-  let _outToIn: Map[U64, U64] = Map[U64, U64]()
-  
+  let _inToOut: Map[U64, U64]
+  let _outToIn: Map[U64, U64]
+
+  new create(size: USize)
+  =>
+    _inToOut = Map[U64, U64](size)
+    _outToIn = Map[U64, U64](size)
+      
   fun ref update(in_seq_id: U64, out_seq_id: U64)
   =>
     try
@@ -106,8 +114,12 @@ class LowWaterMarkTable
   Keep track of low watermark values per route as reported by downstream 
   steps.
   """
-  let _lwmt: Map[U64, U64] = Map[U64, U64]()
+  let _lwmt: Map[U64, U64]
 
+  new create(size: USize)
+  =>
+    _lwmt = Map[U64, U64](size)
+  
   fun ref updateLowWatermark(route_id: U64, seq_id: U64)
   =>
     _lwmt(route_id) = seq_id
