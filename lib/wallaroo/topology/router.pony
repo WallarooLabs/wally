@@ -139,7 +139,8 @@ class SingleTCPWriter
   new create(conn: TCPConnection) =>
     _conn = conn
 
-  fun apply(d: Array[ByteSeq] val) => _conn.writev(d)
+  fun apply(d: Array[ByteSeq] val) => 
+    _conn.writev(d)
 
   fun dispose() => _conn.dispose()
 

@@ -37,6 +37,7 @@ class EgressBuilder
           let connect_auth = TCPConnectAuth(auth)
           let sink_name = "sink at " + a(0) + ":" + a(1)
 
+          @printf[I32](("Connecting to sink at " + a(0) + ":" + a(1) + "\n").cstring())
           let out_conn = TCPConnection(connect_auth,
             OutNotify(sink_name), a(0), a(1))
 
@@ -50,6 +51,7 @@ class EgressBuilder
         error
       end
     | let p: ProxyAddress val =>
+      @printf[I32](("Creating Proxy to " + p.worker + "\n").cstring())
       let proxy = Proxy(worker_name, p.step_id, reporter.clone(), auth)
       let proxy_step = Step(consume proxy, consume reporter)
       if proxies.contains(worker_name) then
