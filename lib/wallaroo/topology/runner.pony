@@ -8,7 +8,7 @@ use "wallaroo/resilience"
 
 trait Runner
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-    conn: (TCPConnection | None))
+    conn: (TCPConnection | None), envelope: MsgEnvelope val)
   fun ref replay_log_entry(log_entry: LogEntry val) => None
   fun ref set_buffer_target(target: EventLogReplayTarget) => None
 
@@ -28,7 +28,7 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
     _metrics_reporter = consume metrics_reporter
 
   fun ref run[D: Any val](source_name: String val, source_ts: U64, input: D,
-    conn: (TCPConnection | None))
+    conn: (TCPConnection | None), envelope: MsgEnvelope val)
   =>
     let computation_start = Time.nanos()
     match input
@@ -36,10 +36,11 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
       match _computation(i)
       | let output: Out =>
         //start: just to get this to compile
-        let envelope = MsgEnvelope(_target, U64(0), None, U64(0), U64(0))
+        //TODO: generate new ids etc 
+        let new_envelope = MsgEnvelope(_target, U64(0), None, U64(0), U64(0))
         //end: just-to-get-this-to-compile
           
-        _target.run[Out](source_name, source_ts, output, envelope)
+        _target.run[Out](source_name, source_ts, output, new_envelope)
       else
         _metrics_reporter.pipeline_metric(source_name, source_ts)
       end
@@ -75,19 +76,19 @@ class StateRunner[State: Any #read] is Runner
   fun ref set_buffer_target(target: EventLogReplayTarget) =>
     _event_log_buffer.set_target(target)
 
-  fun check_duplicate(uid: U64, fractional_list: Array[U64] val) : Bool =>
+  fun check_duplicate(uid: U64, frac_ids: (Array[U64] val | None)) : Bool =>
     true
 
   fun ref replay_run[In: Any val](source_name: String val, source_ts: U64, input: In,
-    conn: (TCPConnection | None), uid: U64, fractional_list: Array[U64] val) =>
-    if not check_duplicate(uid, fractional_list) then 
+    conn: (TCPConnection | None), uid: U64, frac_ids: Array[U64] val) =>
+    if not check_duplicate(uid, frac_ids) then 
       //TODO: add to seen msgs
       //TODO: rerun message and call replay_run on downstream step
       None
     end
   
   fun ref replay_log_entry(log_entry: LogEntry val) =>
-    if not check_duplicate(log_entry.uid(), log_entry.fractional_list()) then 
+    if not check_duplicate(log_entry.uid(), log_entry.frac_ids()) then 
       //TODO: add to seen msgs
       try
         let sc = _state_change_repository(log_entry.statechange_id())
@@ -104,7 +105,7 @@ class StateRunner[State: Any #read] is Runner
     None
 
   fun ref run[In: Any val](source_name: String val, source_ts: U64, input: In,
-    conn: (TCPConnection | None))
+    conn: (TCPConnection | None), envelope: MsgEnvelope val)
   =>
     match input
     | let sp: StateProcessor[State] val =>
@@ -112,9 +113,7 @@ class StateRunner[State: Any #read] is Runner
       match sp(_state, _state_change_repository, _wb)
       | let sc: StateChange[State] =>
         //TODO: these two should come from the deduplication stuff
-        let uid: U64 = 0
-        let fractional_list: Array[U64] val = recover val Array[U64] end
-        let log_entry = LogEntry(uid, fractional_list, sc.id(), sc.to_log_entry()) 
+        let log_entry = LogEntry(envelope.msg_uid, envelope.frac_ids, sc.id(), sc.to_log_entry()) 
         _event_log_buffer.queue(log_entry)
         sc.apply(_state)
       end
@@ -148,7 +147,7 @@ class Proxy is Runner
     _auth = auth
 
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-    conn: (TCPConnection | None))
+    conn: (TCPConnection | None), envelope: MsgEnvelope val)
   =>
     match conn
     | let tcp: TCPConnection =>
@@ -170,7 +169,7 @@ class SimpleSink is Runner
     _metrics_reporter = consume metrics_reporter
 
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-    conn: (TCPConnection | None))
+    conn: (TCPConnection | None), envelope: MsgEnvelope val)
   =>
     match input
     | let s: Stringable val => None
@@ -195,7 +194,7 @@ class EncoderSink is Runner//[Out: Any val]
     // _encoder = encoder
 
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-    conn: (TCPConnection | None))
+    conn: (TCPConnection | None), envelope: MsgEnvelope val)
   =>
     _conn.write("hi")
     // match input

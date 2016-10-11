@@ -25,7 +25,7 @@ actor Step is EventLogReplayTarget
   =>
     // this only works with John's new API  
     // let done: Bool = _runner.run[In](metric_name, source_ts, input, _conn)
-    _runner.run[In](metric_name, source_ts, input, _conn)
+    _runner.run[In](metric_name, source_ts, input, _conn, envelope)
     let done = true
     // Process envelope if we're done
     // Note: We do the bookkeeping _after_ handing the computation result

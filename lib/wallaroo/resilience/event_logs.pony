@@ -1,14 +1,14 @@
 use "wallaroo/topology"
 class LogEntry
   let _uid: U64
-  let _fractional_list: Array[U64] val
+  let _frac_ids: (Array[U64] val | None)
   let _statechange_id: U64
   let _payload: Array[U8] val
 
-  new val create(uid': U64, fractional_list': Array[U64] val,
+  new val create(uid': U64, frac_ids': (Array[U64] val | None),
     statechange_id': U64, payload': Array[U8] val) =>
     _uid = uid'
-    _fractional_list = fractional_list'
+    _frac_ids = frac_ids'
     _statechange_id = statechange_id'
     _payload = payload'
 
@@ -17,7 +17,7 @@ class LogEntry
     _uid < watermark
 
   fun uid(): U64 val => _uid
-  fun fractional_list(): Array[U64] val => _fractional_list
+  fun frac_ids(): (Array[U64] val | None) => _frac_ids
   fun statechange_id(): U64 => _statechange_id
   fun payload(): Array[U8] val => _payload
 

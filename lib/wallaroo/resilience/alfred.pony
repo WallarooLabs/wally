@@ -43,17 +43,23 @@ class FileBackend is Backend
           let buffer_id = r.u64_be()
           let uid = r.u64_be()
           let fractional_size = r.u64_be()
-          let fractional_list = recover val
-            let l = Array[U64]
-            for i in Range(0,fractional_size.usize()) do
-              l.push(r.u64_be())
+          let frac_ids = recover val
+            if fractional_size > 0 then
+              let l = Array[U64]
+              for i in Range(0,fractional_size.usize()) do
+                l.push(r.u64_be())
+              end
+              l
+            else
+              //None is faster if we have no frac_ids, which will probably be
+              //true most of the time
+              None
             end
-            l
           end
           let statechange_id = r.u64_be()
           let payload_length = r.u64_be()
           let payload = recover val _file.read(payload_length.usize()) end
-          let log_entry = LogEntry(uid, fractional_list, statechange_id, payload)
+          let log_entry = LogEntry(uid, frac_ids, statechange_id, payload)
           _alfred.replay_log_entry(buffer_id, log_entry)
         end
         _file.seek_end(0)
@@ -106,6 +112,7 @@ actor Alfred
       logbuffer.set_id(id)
 
     be log(buffer_id: U64, log_entries: Array[LogEntry val] iso) =>
+    //TODO: move this serialisation to the file backend
       try
         for i in Range(0,log_entries.size()) do
           //a record looks like this:
@@ -118,10 +125,16 @@ actor Alfred
           let entry = log_entries(i)
           _writer.u64_be(buffer_id)
           _writer.u64_be(entry.uid())
-          let s = entry.fractional_list().size()
-          _writer.u64_be(s.u64())
-          for j in Range(0,s) do
-            _writer.u64_be(entry.fractional_list()(j))
+          match entry.frac_ids()
+          | let ids: Array[U64] val =>
+            let s = ids.size()
+            _writer.u64_be(s.u64())
+            for j in Range(0,s) do
+              _writer.u64_be(ids(j))
+            end
+          else
+            //we have no frac_ids
+            _writer.u64_be(0)
           end
           _writer.u64_be(entry.statechange_id())
           _writer.u64_be(entry.payload().size().u64())
