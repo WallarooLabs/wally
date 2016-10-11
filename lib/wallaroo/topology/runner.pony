@@ -6,11 +6,13 @@ use "wallaroo/metrics"
 use "wallaroo/messages"
 use "wallaroo/resilience"
 
-interface Runner
+trait Runner
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
     conn: (TCPConnection | None))
+  fun ref replay_log_entry(log_entry: LogEntry val) => None
+  fun ref set_buffer_target(target: EventLogReplayTarget) => None
 
-class ComputationRunner[In: Any val, Out: Any val]
+class ComputationRunner[In: Any val, Out: Any val] is Runner
   let _computation: Computation[In, Out] val
   let _computation_name: String
   let _target: Step tag
@@ -44,7 +46,7 @@ class ComputationRunner[In: Any val, Out: Any val]
         computation_start, computation_end)
     end
 
-class StateRunner[State: Any #read]
+class StateRunner[State: Any #read] is Runner
   let _state: State
   let _metrics_reporter: MetricsReporter
   let _wb: Writer = Writer
@@ -54,17 +56,48 @@ class StateRunner[State: Any #read]
 
   new iso create(state_builder: {(): State} val, 
     metrics_reporter: MetricsReporter iso,
-    alfred: Alfred, event_log_buffer: EventLogBuffer tag
+    alfred: Alfred, log_buffer: EventLogBuffer tag
     ) 
   =>
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
     _state_change_repository = StateChangeRepository[State]
     _alfred = alfred
-    _event_log_buffer = consume event_log_buffer
+    _event_log_buffer = log_buffer
 
   fun ref register_state_change(sc: StateChange[State] ref) : U64 =>
     _state_change_repository.register(sc)
+
+  fun ref set_buffer_target(target: EventLogReplayTarget) =>
+    _event_log_buffer.set_target(target)
+
+  fun check_duplicate(uid: U64, fractional_list: Array[U64] val) : Bool =>
+    true
+
+  fun ref replay_run[In: Any val](source_name: String val, source_ts: U64, input: In,
+    conn: (TCPConnection | None), uid: U64, fractional_list: Array[U64] val) =>
+    if not check_duplicate(uid, fractional_list) then 
+      //TODO: add to seen msgs
+      //TODO: rerun message and call replay_run on downstream step
+      None
+    end
+  
+  fun ref replay_log_entry(log_entry: LogEntry val) =>
+    if not check_duplicate(log_entry.uid(), log_entry.fractional_list()) then 
+      //TODO: add to seen msgs
+      try
+        let sc = _state_change_repository(log_entry.statechange_id())
+        sc.read_log_entry(log_entry.payload())
+        sc.apply(_state)
+      else
+        @printf[I32]("FATAL: could not look up state_change with id %d".cstring(),
+          log_entry.statechange_id())
+      end
+    end
+
+  fun ref replay_finished() =>
+    //TODO: clear deduplication logs
+    None
 
   fun ref run[In: Any val](source_name: String val, source_ts: U64, input: In,
     conn: (TCPConnection | None))
@@ -79,6 +112,7 @@ class StateRunner[State: Any #read]
         let fractional_list: Array[U64] val = recover val Array[U64] end
         let log_entry = LogEntry(uid, fractional_list, sc.id(), sc.to_log_entry()) 
         _event_log_buffer.queue(log_entry)
+        sc.apply(_state)
       end
       let computation_end = Time.nanos()
 
@@ -90,7 +124,12 @@ class StateRunner[State: Any #read]
       @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
     end
 
-class Proxy
+  fun rotate_log() =>
+    //we need to be able to conflate all the current logs to a checkpoint and
+    //rotate
+    None
+
+class Proxy is Runner
   let _worker_name: String
   let _target_step_id: U128
   let _metrics_reporter: MetricsReporter
@@ -120,7 +159,7 @@ class Proxy
 
     // _metrics_reporter.worker_metric(metric_name, source_ts)  
 
-class SimpleSink
+class SimpleSink is Runner
   let _metrics_reporter: MetricsReporter
 
   new iso create(metrics_reporter: MetricsReporter iso) =>
@@ -138,7 +177,7 @@ class SimpleSink
 
     _metrics_reporter.pipeline_metric(metric_name, source_ts)
 
-class EncoderSink//[Out: Any val]
+class EncoderSink is Runner//[Out: Any val]
   let _metrics_reporter: MetricsReporter
   let _conn: TCPConnection
   // let _encoder: {(Out): Array[ByteSeq] val} val
