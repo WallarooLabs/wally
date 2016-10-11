@@ -25,13 +25,6 @@ actor Step is EventLogReplayTarget
   =>
     // this only works with John's new API  
     // let done: Bool = _runner.run[In](metric_name, source_ts, input, _conn)
-
-  be replay_log_entry(log_entry: LogEntry val) =>
-    _runner.replay_log_entry(log_entry)
-
-  be replay_finished() =>
-    //TODO: clear deduplication logs
-    None
     _runner.run[In](metric_name, source_ts, input, _conn)
     let done = true
     // Process envelope if we're done
@@ -41,6 +34,13 @@ actor Step is EventLogReplayTarget
       _bookkeeping(envelope)
     end
     
+  be replay_log_entry(log_entry: LogEntry val) =>
+    _runner.replay_log_entry(log_entry)
+
+  be replay_finished() =>
+    //TODO: clear deduplication logs
+    None
+
   be dispose() =>
     match _conn
     | let tcp: TCPConnection =>
