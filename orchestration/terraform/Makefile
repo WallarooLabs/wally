@@ -43,7 +43,7 @@ ifneq ($(ansible_required),$(ansible_version))
   $(error Ansible version '$(ansible_required)' required! Your ansible version is '$(ansible_version)'.)
 endif
 
-terraform_version := $(shell terraform --version | grep -i terraform | awk '{print $$2}')
+terraform_version := $(shell terraform --version | head -n 1 | grep -i terraform | awk '{print $$2}')
 terraform_required := v0.7.4
 
 # check terraform version

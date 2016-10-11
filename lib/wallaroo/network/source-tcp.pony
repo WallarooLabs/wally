@@ -7,10 +7,11 @@ use "wallaroo/metrics"
 use "wallaroo/topology"
 
 class SourceNotify is TCPConnectionNotify
-  let _source: SourceRunner
+  let _source: BytesProcessor
   var _header: Bool = true
+  var _msg_count: USize = 0
 
-  new iso create(source: SourceRunner iso) =>
+  new iso create(source: BytesProcessor iso) =>
     _source = consume source
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
@@ -27,7 +28,16 @@ class SourceNotify is TCPConnectionNotify
       conn.expect(4)
       _header = true
     end
-    false
+    ifdef linux then
+      _msg_count = _msg_count + 1
+      if ((_msg_count % 50) == 0) then
+        false
+      else
+        true
+      end
+    else
+      false
+    end
 
   fun ref accepted(conn: TCPConnection ref) =>
     @printf[None]("accepted\n".cstring())
@@ -37,18 +47,19 @@ class SourceNotify is TCPConnectionNotify
     @printf[None]("incoming connected\n".cstring())
 
 class SourceListenerNotify is TCPListenNotify
-  let _source_builder: {(): Source iso^} val
+  let _source_builder: {(): BytesProcessor iso^} val
   let _metrics: JrMetrics
   let _expected: USize
 
-  new iso create(source_builder: {(): Source iso^} val, metrics: JrMetrics, 
-    expected: USize) =>
+  new iso create(source_builder: {(): BytesProcessor iso^} val,
+    metrics: JrMetrics, expected: USize) 
+  =>
     _source_builder = source_builder
     _metrics = metrics
     _expected = expected
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    SourceNotify(SourceRunner(_source_builder(), _metrics, _expected))
+    SourceNotify(_source_builder())
 
   fun ref listening(listen: TCPListener ref) =>
     try

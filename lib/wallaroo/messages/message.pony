@@ -1,23 +1,32 @@
 use "collections"
 use "wallaroo/topology"
 
+trait Origin
+  fun send_watermark()
 
 class MsgEnvelope
-  let origin_tag: (Step tag | Source tag) // tag referencing upstream origin for msg
-  let msg_uid: U64         // Source assigned UID; universally unique
-  let frac_ids: (Array[U64] val| None) // fractional msg ids
-  let seq_id: U64          // assigned by immediate upstream origin
-  let route_id: U64        // assigned by immediate upstream origin
+  var origin: Origin tag   // tag referencing upstream origin for msg
+  var msg_uid: U64         // Source assigned UID; universally unique
+  var frac_ids: (Array[U64] val| None) // fractional msg ids
+  var seq_id: U64          // assigned by immediate upstream origin
+  var route_id: U64        // assigned by immediate upstream origin
 
-  new val create(origin_tag': (Step tag | Source tag), msg_uid': U64,
+  new create(origin': Origin tag, msg_uid': U64,
     frac_ids': (Array[U64] val| None), seq_id': U64, route_id': U64)
   =>
-    origin_tag = origin_tag'
+    origin = origin'
     msg_uid = msg_uid'
     frac_ids = frac_ids'
     seq_id = seq_id'
     route_id = route_id'
 
+  fun clone(): MsgEnvelope val =>
+    match frac_ids
+    | let f_ids: Array[U64] val =>
+      recover val MsgEnvelope(origin,msg_uid,recover val f_ids.clone() end,seq_id,route_id) end
+    else
+      recover val MsgEnvelope(origin,msg_uid,frac_ids,seq_id,route_id) end
+    end
     
 primitive HashTuple
   fun hash(t: (U64, U64)): U64 =>
@@ -43,10 +52,10 @@ class HighWaterMarkTable
   =>
     _hwmt = HashMap[(U64, U64), U64, HashTuple](size)
   
-  fun ref updateHighWatermark(origin_tag: U64, route_id: U64, seq_id: U64)
+  fun ref updateHighWatermark(origin: U64, route_id: U64, seq_id: U64)
   =>
     try
-      _hwmt.upsert((origin_tag, route_id), seq_id,
+      _hwmt.upsert((origin, route_id), seq_id,
         lambda(x: U64, y: U64): U64 =>  y end)
     else
       @printf[I32]("Error upserting into _hwmt\n".cstring())      

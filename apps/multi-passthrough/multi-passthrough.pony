@@ -3,11 +3,11 @@ To run multi-passthrough (in order):
 1) External Sink
 nc -l 127.0.0.1 8000 >> /dev/null
 2) Sink
-./multi-passthrough -i 127.0.0.1:6002 -o 127.0.0.1:8000 -m 127.0.0.1:5001 -s
+./multi-passthrough -i 127.0.0.1:6002 -o 127.0.0.1:8000 -m 127.0.0.1:5001 -s --ponythreads=1
 3) Passthrough Worker
-./multi-passthrough -i 127.0.0.1:6001 -o 127.0.0.1:6002 -m 127.0.0.1:5001
+./multi-passthrough -i 127.0.0.1:6001 -o 127.0.0.1:6002 -m 127.0.0.1:5001 --ponythreads=1
 4) Source
-./multi-passthrough -i 127.0.0.1:6000 -o 127.0.0.1:6001 -m 127.0.0.1:5001 -r
+./multi-passthrough -i 127.0.0.1:6000 -o 127.0.0.1:6001 -m 127.0.0.1:5001 -r --ponythreads=1
 5) Sender
 giles/sender/sender -b 127.0.0.1:6000 -m 10000000 -s 300 -i 2_500_000 -f apps/complex/complex_numbers.msg -r --ponythreads=1 -y -g 12
 

@@ -1,4 +1,10 @@
 use "wallaroo/topology"
+use "wallaroo/messages"
+
+trait ResilientOrigin is Origin
+  be replay_log_entry(log_entry: LogEntry val)
+  be replay_finished()
+
 class LogEntry
   let _uid: U64
   let _frac_ids: (Array[U64] val | None)
@@ -21,16 +27,12 @@ class LogEntry
   fun statechange_id(): U64 => _statechange_id
   fun payload(): Array[U8] val => _payload
 
-trait EventLogReplayTarget
-  be replay_log_entry(log_entry: LogEntry val)
-  be replay_finished()
-
 trait EventLogBuffer
    be queue(log_entry: LogEntry val)
    be flush(watermark: U64)
    be set_id(id: U64)
    be replay_log_entry(log_entry: LogEntry val)
-   be set_target(target: EventLogReplayTarget tag)
+   be set_target(target: ResilientOrigin tag)
 
 actor DeactivatedEventLogBuffer is EventLogBuffer
   new create() =>
@@ -48,12 +50,12 @@ actor DeactivatedEventLogBuffer is EventLogBuffer
   be replay_log_entry(log_entry: LogEntry val) =>
     None
 
-  be set_target(target: EventLogReplayTarget tag) =>
+  be set_target(target: ResilientOrigin tag) =>
     None
 
 actor StandardEventLogBuffer is EventLogBuffer
   let _alfred: Alfred
-  var _target: (EventLogReplayTarget tag | None)
+  var _target: (ResilientOrigin tag | None)
   var _id: (U64 | None)
   var _buf: Array[LogEntry val] ref
 
@@ -67,7 +69,7 @@ actor StandardEventLogBuffer is EventLogBuffer
    be set_id(id:U64) =>
     _id = id
 
-   be set_target(target: EventLogReplayTarget tag) =>
+   be set_target(target: ResilientOrigin tag) =>
     _target = target
 
    be queue(log_entry: LogEntry val) =>
@@ -91,7 +93,7 @@ actor StandardEventLogBuffer is EventLogBuffer
 
   be replay_log_entry(log_entry: LogEntry val) =>
     match _target
-    | let t: EventLogReplayTarget tag => t.replay_log_entry(log_entry)
+    | let t: ResilientOrigin tag => t.replay_log_entry(log_entry)
     else
       //TODO: explode
       @printf[I32]("FATAL: trying to replay event log to a None target".cstring())

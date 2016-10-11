@@ -7,16 +7,16 @@ nc -l 127.0.0.1 7002 >> /dev/null
 nc -l 127.0.0.1 7003 >> /dev/null
 
 3a) single worker complex app:
-./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n worker-name
+./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n worker-name --ponythreads=1
 
 3b) 2-worker complex app:
-./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 2 -t -n worker1
-./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 2 -n worker2
+./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 2 -t -n worker1 --ponythreads=1
+./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 2 -n worker2 --ponythreads=1
 
 3c) 3-worker complex app:
-./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -t -n worker1
-./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -n worker2
-./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -n worker3
+./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -t -n worker1 --ponythreads=1
+./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -n worker2 --ponythreads=1
+./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -n worker3 --ponythreads=1
 
 4) complex numbers:
 giles/sender/sender -b 127.0.0.1:7010 -m 10000000 -s 300 -i 2_500_000 -f apps/complex/complex_numbers.msg -r --ponythreads=1 -y -g 12
@@ -58,17 +58,19 @@ class Complex
 
 class val Conjugate is Computation[Complex val, Complex val]
   fun apply(input: Complex val): Complex val =>
+    // @printf[I32]("Conjugating...\n".cstring())
     input.conjugate()
 
   fun name(): String => "Get Conjugate"
 
 class val Scale is Computation[Complex val, Complex val]
   fun apply(input: Complex val): Complex val =>
+    // @printf[I32]("Scaling...\n".cstring())
     input * 5
 
   fun name(): String => "Scale by 5"
 
-class ComplexSourceParser 
+class ComplexSourceDecoder 
   fun apply(data: Array[U8] val): Complex val ? => 
     let real = Bytes.to_u32(data(0), data(1), data(2), data(3))
     let imaginary = Bytes.to_u32(data(4), data(5), data(6), data(7))
