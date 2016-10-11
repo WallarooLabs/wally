@@ -17,7 +17,9 @@ actor Step
     _router = router
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D) =>
-    if _runner.run[D](metric_name, source_ts, data, _router) then
+    let is_finished = _runner.run[D](metric_name, source_ts, data, _router)
+
+    if is_finished then
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
 
