@@ -45,9 +45,9 @@ actor Main
     Startup(env, MarketSpreadStarter)
 
 primitive MarketSpreadStarter
-  fun apply(env: Env, initializer_data_addr: Array[String],
+  fun apply(env: Env, initializer_data_addr: Array[String] val,
     input_addrs: Array[Array[String]] val, 
-    output_addr: Array[String], metrics_conn: TCPConnection, 
+    output_addr: Array[String] val, metrics_conn: TCPConnection, 
     expected: USize, init_path: String, worker_count: USize,
     is_initializer: Bool, worker_name: String, connections: Connections,
     initializer: (Initializer | None)) ? 
