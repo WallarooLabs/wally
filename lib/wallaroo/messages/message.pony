@@ -5,14 +5,16 @@ use "wallaroo/topology"
 class MsgEnvelope
   let origin_tag: Step tag // tag referencing upstream origin for msg
   let msg_uid: U64         // Source assigned UID; universally unique
+  let frac_ids: (Array[U64] val| None) // fractional msg ids
   let seq_id: U64          // assigned by immediate upstream origin
   let route_id: U64        // assigned by immediate upstream origin
 
   new val create(origin_tag': Step tag, msg_uid': U64,
-    seq_id': U64, route_id': U64)
+    frac_ids': (Array[U64] val| None), seq_id': U64, route_id': U64)
   =>
     origin_tag = origin_tag'
     msg_uid = msg_uid'
+    frac_ids = frac_ids'
     seq_id = seq_id'
     route_id = route_id'
 

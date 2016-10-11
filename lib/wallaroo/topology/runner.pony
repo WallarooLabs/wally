@@ -34,7 +34,7 @@ class ComputationRunner[In: Any val, Out: Any val]
       match _computation(i)
       | let output: Out =>
         //start: just to get this to compile
-        let envelope = MsgEnvelope(_target, U64(0), U64(0), U64(0))
+        let envelope = MsgEnvelope(_target, U64(0), None, U64(0), U64(0))
         //end: just-to-get-this-to-compile
           
         _target.run[Out](source_name, source_ts, output, envelope)

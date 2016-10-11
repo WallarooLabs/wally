@@ -67,7 +67,7 @@ class StatelessSource[In: Any val]
         match _router.route(input)
         | let r: Step tag =>
           //start: just to get this to compile
-          let envelope = MsgEnvelope(r, U64(0), U64(0), U64(0))
+          let envelope = MsgEnvelope(r, U64(0), None, U64(0), U64(0))
           //end: just-to-get-this-to-compile
           
           r.run[In](_name, ingest_ts, input, envelope)
@@ -118,7 +118,7 @@ class StateSource[In: Any val, State: Any #read]
         match _router.route(input)
         | let r: Step tag =>
           //start: just to get this to compile
-          let envelope = MsgEnvelope(r, U64(0), U64(0), U64(0))
+          let envelope = MsgEnvelope(r, U64(0), None, U64(0), U64(0))
           //end: just-to-get-this-to-compile
 
           let processor = 

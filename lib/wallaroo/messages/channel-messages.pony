@@ -151,7 +151,7 @@ class ForwardMsg[D: Any val] is ChannelMsg
 
   fun deliver(step: Step tag) =>//data_receiver: DataReceiver) =>
     //start: just to get this to compile
-    let envelope = MsgEnvelope(step, U64(0), U64(0), U64(0))
+    let envelope = MsgEnvelope(step, U64(0), None, U64(0), U64(0))
     //end: just-to-get-this-to-compile
 
     step.run[D](_metric_name, _source_ts, _data, envelope)
