@@ -3,6 +3,7 @@ use "time"
 use "buffered"
 use "collections"
 use "../metrics"
+use "wallaroo/messages"
 
 class SourceRunner
   let _source: Source
@@ -65,7 +66,11 @@ class StatelessSource[In: Any val]
       | let input: In =>
         match _router.route(input)
         | let r: Step tag =>
-          r.run[In](_name, ingest_ts, input)
+          //start: just to get this to compile
+          let envelope = MsgEnvelope(r, U64(0), None, U64(0), U64(0))
+          //end: just-to-get-this-to-compile
+          
+          r.run[In](_name, ingest_ts, input, envelope)
         else
           // drop data that has no partition
           @printf[I32]((_name + ": Fake logging lack of partition\n").cstring())
@@ -112,10 +117,14 @@ class StateSource[In: Any val, State: Any #read]
       | let input: In =>
         match _router.route(input)
         | let r: Step tag =>
+          //start: just to get this to compile
+          let envelope = MsgEnvelope(r, U64(0), None, U64(0), U64(0))
+          //end: just-to-get-this-to-compile
+
           let processor = 
             StateComputationWrapper[In, State](input, _state_comp)
           r.run[StateProcessor[State] val](_pipeline_name, ingest_ts, 
-            processor)
+            processor, envelope)
         else
           // drop data that has no partition
           @printf[I32]((_source_name + ": Fake logging lack of partition\n").cstring())
