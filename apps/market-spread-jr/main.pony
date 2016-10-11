@@ -133,8 +133,6 @@ primitive MarketSpreadStarter
         //   order_addr(1))
     )
 
-    @printf[I32]("Expecting %zu total messages\n".cstring(), expected)
-
     let topology_ready_msg = 
       ExternalMsgEncoder.topology_ready("initializer")
     connections.send_phone_home(topology_ready_msg)

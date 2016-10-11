@@ -70,11 +70,14 @@ actor Startup
         | ("data", let arg: String) => d_arg = arg.split(":")
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
         | ("file", let arg: String) => init_path = arg
-        | ("worker-count", let arg: I64) => worker_count = arg.usize()
+        | ("worker-count", let arg: I64) => 
+          worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
         | ("name", let arg: String) => worker_name = arg
         end
       end
+
+      if worker_count == 1 then is_initializer = true end
 
       let input_addrs: Array[Array[String]] val = consume i_addrs_write
       let m_addr = m_arg as Array[String]
@@ -123,6 +126,7 @@ actor Startup
         env, auth, connections, metrics_conn, is_initializer)
 
       if is_initializer then
+        env.out.print("Running as Initializer...")
         initializer = Initializer(auth, worker_count, connections, 
           local_topology_initializer, input_addrs, o_addr, d_addr,
           metrics_conn, is_automated_initialization)
@@ -149,6 +153,10 @@ actor Startup
         | let i: Initializer =>
           i.start(topology)
         end
+      | let starter: AppStarter val =>
+        starter(env, d_addr, input_addrs, o_addr, metrics_conn, expected,
+          init_path, worker_count, is_initializer, worker_name, connections, 
+          initializer)
       end
     else
       StartupHelp(env)
