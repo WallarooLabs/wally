@@ -70,7 +70,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       match msg
       | let d: DeliveryMsg val =>
         match _routes.route(d.target_id())
-        | let s: Step tag =>
+        | (let route_id: U64, let s: Step tag) =>
           d.deliver(s)
         else
           _env.err.print("Data channel: Target id not found for incoming data.")

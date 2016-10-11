@@ -91,13 +91,21 @@ class OrderSourceParser
 
 class SymbolRouter is Router[(FixNbboMessage val | FixOrderMessage val),
   Step tag]
-  let _routes: Map[String, Step tag] val
+  let _routes: Map[String, (U64, Step tag)] val
 
   new iso create(routes: Map[String, Step tag] val) =>
-    _routes = routes
+    _routes = recover val
+      var i: U64 = 1
+      let r = Map[String, (U64, Step tag)]
+      for (k,v) in routes.pairs() do
+        r.update(k,(i,v))
+      end
+      i = i + 1
+      r
+    end
 
   fun route(input: (FixNbboMessage val | FixOrderMessage val)): 
-    (Step tag | None) 
+    ((U64, Step tag) | None) 
   =>
     if _routes.contains(input.symbol()) then
       try
@@ -111,8 +119,8 @@ class OnlyRejectionsRouter is Router[Bool, TCPConnection]
   new iso create(sink: TCPConnection) =>
     _sink = sink
 
-  fun route(rejected: Bool): (TCPConnection | None)  =>
-    if rejected then _sink end
+  fun route(rejected: Bool): ((U64, TCPConnection) | None)  =>
+    if rejected then (0,_sink) end
 
 class OrderResult
   let order: FixOrderMessage val
