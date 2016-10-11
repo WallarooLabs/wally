@@ -32,7 +32,10 @@ actor Main
             "Complex Numbers")
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Conjugate end)
-          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^=> Scale(5) end)
+          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
+            => Scale(5) end)
+          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
+            => Conjugate end)
           .to_sink(ComplexEncoder, recover [0] end)
       end
       Startup(env, topology)//, 1)
