@@ -37,7 +37,7 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
       | let output: Out =>
         //start: just to get this to compile
         //TODO: generate new ids etc 
-        let new_envelope = MsgEnvelope(_target, U64(0), None, U64(0), U64(0))
+        let new_envelope = envelope
         //end: just-to-get-this-to-compile
           
         _target.run[Out](source_name, source_ts, output, new_envelope)

@@ -18,7 +18,7 @@ class SourceRunner
 
   fun ref process(data: Array[U8 val] iso) =>
     _begin_tracking()
-    _source.process(consume data)
+    _source.process(consume data, _count.u64())
     _end_tracking()
 
   fun ref _begin_tracking() =>
@@ -37,7 +37,7 @@ class SourceRunner
 
 interface Source
   fun name(): String val
-  fun ref process(data: Array[U8 val] iso)
+  fun ref process(data: Array[U8 val] iso, count: U64)
 
 interface SourceParser[In: Any val]
   fun apply(data: Array[U8] val): (In | None) ?
@@ -56,7 +56,7 @@ class StatelessSource[In: Any val]
 
   fun name(): String val => _name
 
-  fun ref process(data: Array[U8] val) =>
+  fun ref process(data: Array[U8] val, count: U64) =>
     let ingest_ts = Time.nanos()
     try
       // For recording metrics for filtered messages
@@ -65,11 +65,9 @@ class StatelessSource[In: Any val]
       match _parser(data)
       | let input: In =>
         match _router.route(input)
-        | let r: Step tag =>
-          //start: just to get this to compile
-          let envelope = MsgEnvelope(r, U64(0), None, U64(0), U64(0))
-          //end: just-to-get-this-to-compile
-          
+        | (let route_id: U64,let r: Step tag) =>
+          //TODO: modify the Router to return an id
+          let envelope = recover val MsgEnvelope(this, count, None, count, route_id) end
           r.run[In](_name, ingest_ts, input, envelope)
         else
           // drop data that has no partition
@@ -102,12 +100,12 @@ class StateSource[In: Any val, State: Any #read]
     _state_comp = state_comp
     _metrics_reporter = consume metrics_reporter
     for msg in initial_msgs.values() do
-      process(msg)
+      process(msg,0)
     end
 
   fun name(): String val => _source_name
 
-  fun ref process(data: Array[U8] val) =>
+  fun ref process(data: Array[U8] val, count: U64) =>
     let ingest_ts = Time.nanos()
     try
       // For recording metrics for filtered messages
@@ -116,11 +114,8 @@ class StateSource[In: Any val, State: Any #read]
       match _parser(consume data)
       | let input: In =>
         match _router.route(input)
-        | let r: Step tag =>
-          //start: just to get this to compile
-          let envelope = MsgEnvelope(r, U64(0), None, U64(0), U64(0))
-          //end: just-to-get-this-to-compile
-
+        | (let route_id: U64,let r: Step tag) =>
+          let envelope = recover val MsgEnvelope(this, count, None, count, route_id) end
           let processor = 
             StateComputationWrapper[In, State](input, _state_comp)
           r.run[StateProcessor[State] val](_pipeline_name, ingest_ts, 
