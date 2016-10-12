@@ -69,11 +69,17 @@ actor Step is ResilientOrigin
     //   sender.dispose()
     end
 
-  fun ref _bookkeeping(envelope: MsgEnvelope val)
+  fun ref _bookkeeping(inEnvelope: MsgEnvelope val,
+    outEnvelope: MsgEnvelope val)
   =>
     """
     Process envelope and keep track of things
     """
+    // keep track of messages we've received from upstream
+    _hwm.update(inEnvelope.origin_tag , inEnvelope.route_id, inEnvelope.seq_id)
+    // keep track of mapping between incoming / outgoing seq_id
+   _translate.update(inEnvelope.seq_id, outEnvelope.seq_id)
+
     
 interface StepBuilder
   fun id(): U128
