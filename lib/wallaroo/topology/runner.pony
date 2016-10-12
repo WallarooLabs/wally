@@ -1,4 +1,5 @@
 use "buffered"
+use "collections"
 use "time"
 use "net"
 use "sendence/epoch"
@@ -117,6 +118,28 @@ class StateRunnerBuilder[State: Any #read]
     id': U128) =>
     _state_builder = state_builder
     _id = id'
+
+  fun apply(metrics_reporter: MetricsReporter iso, 
+    next_runner: (Runner iso | None) = None,
+    router: (Router val | None) = None): Runner iso^
+  =>
+    StateRunner[State](_state_builder, consume metrics_reporter)
+
+  fun name(): String => _state_builder.name()
+  fun is_stateful(): Bool => true
+  fun id(): U128 => _id
+
+class PartitionedStateRunnerBuilder[PIn: Any val, 
+  Key: (Hashable val & Equatable[Key]), State: Any #read]
+  let _state_builder: StateBuilder[State] val
+  let _id: U128
+  let _partition: Partition[PIn, Key] val
+
+  new val create(state_builder: StateBuilder[State] val, 
+    id': U128, partition': Partition[PIn, Key] val) =>
+    _state_builder = state_builder
+    _id = id'
+    _partition = partition'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     next_runner: (Runner iso | None) = None,

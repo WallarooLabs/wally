@@ -1,5 +1,13 @@
 use "collections"
 
+class Partition[In: Any val, Key: (Hashable val & Equatable[Key])]
+  let _function: PartitionFunction[In, Key] val
+  let _keys: Array[Key] val
+
+  new val create(f: PartitionFunction[In, Key] val, ks: Array[Key] val) =>
+    _function = f
+    _keys = ks
+
 interface PartitionFunction[In: Any val, Key: (Hashable val & Equatable[Key] val)]
   fun apply(input: In): Key
 

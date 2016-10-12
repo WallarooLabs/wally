@@ -114,13 +114,31 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   fun ref to_stateful[Next: Any val, State: Any #read](
     s_comp: StateComputation[Last, Next, State] val,
     s_initializer: StateBuilder[State] val,
-    id: U128)
+    id: U128) 
       : PipelineBuilder[In, Out, Next] =>
 
     let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp)
     _p.add_runner_builder(next_builder)
     let state_builder = StateRunnerBuilder[State](s_initializer, id)
     _p.add_runner_builder(state_builder)
+    PipelineBuilder[In, Out, Next](_t, _p)
+
+  fun ref to_state_partition[PIn: Any val,
+    Key: (Hashable val & Equatable[Key]), Next: Any val = PIn, 
+    State: Any #read](
+      s_comp: StateComputation[Last, Next, State] val,
+      s_initializer: StateBuilder[State] val,
+      id: U128, 
+      partition: Partition[PIn, Key] val
+    ): PipelineBuilder[In, Out, Next] 
+  =>
+    let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp)
+    _p.add_runner_builder(next_builder)
+
+    let state_builder = PartitionedStateRunnerBuilder[PIn, Key, State](
+      s_initializer, id, partition)
+    _p.add_runner_builder(state_builder)      
+
     PipelineBuilder[In, Out, Next](_t, _p)
 
   fun ref to_empty_sink(): Topology ? =>
