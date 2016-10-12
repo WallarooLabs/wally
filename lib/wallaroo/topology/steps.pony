@@ -25,11 +25,11 @@ actor Step is ResilientOrigin
     //TODO: receive watermark, flush buffers and send another watermark
     None
 
-  be update_router(router: Router val) =>
-    _router = router
+  be update_router(router: Router val) => _router = router
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope val) =>
+    incoming_envelope: MsgEnvelope val)
+  =>
     //TODO: make outgoing envelope
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       _outgoing_envelope, incoming_envelope, _router)
@@ -41,12 +41,25 @@ actor Step is ResilientOrigin
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
     
+  be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+    incoming_envelope: MsgEnvelope val)
+  =>
+    //TODO: make outgoing envelope
+    let is_finished = _runner.recovery_run[D](metric_name, source_ts, data,
+      _outgoing_envelope, incoming_envelope, _router)
+    // Process envelope if we're done
+    // Note: We do the bookkeeping _after_ handing the computation result
+    //       to the next Step.
+    if is_finished then
+      _bookkeeping(incoming_envelope)
+      _metrics_reporter.pipeline_metric(metric_name, source_ts)
+    end
+    
   be replay_log_entry(log_entry: LogEntry val) =>
-    _runner.replay_log_entry(log_entry)
+    _runner.replay_log_entry(log_entry, this)
 
   be replay_finished() =>
-    //TODO: clear deduplication logs
-    None
+    _runner.replay_finished()
 
   be dispose() =>
     match _router

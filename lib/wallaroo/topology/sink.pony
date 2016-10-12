@@ -1,13 +1,16 @@
 use "buffered"
 use "net"
+use "collections"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 
 class SimpleSinkRunner is Runner
   let _metrics_reporter: MetricsReporter
+  let _deduplication_list: Array[MsgEnvelope val]
 
   new iso create(metrics_reporter: MetricsReporter iso) =>
     _metrics_reporter = consume metrics_reporter
+    _deduplication_list = Array[MsgEnvelope val]
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
@@ -20,14 +23,61 @@ class SimpleSinkRunner is Runner
     else
       @printf[I32]("Simple sink: Got it!\n".cstring())
     end
-
     true
+
+  fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
+  =>
+    if not is_duplicate_message(incoming_envelope) then
+      _deduplication_list.push(incoming_envelope)
+      run[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope,
+        router)
+    else
+      //we can pretend it stopped here because everything downstream know about
+      //this
+      true
+    end
+
+  fun is_duplicate_message(env: MsgEnvelope val): Bool =>
+    for e in _deduplication_list.values() do
+      //TODO: Bloom filter maybe?
+      if e.msg_uid != env.msg_uid then
+        continue
+      else
+        match (e.frac_ids, env.frac_ids)
+        | (let efa: Array[U64] val, let efb: Array[U64] val) => 
+          if efa.size() == efb.size() then
+            var found = false
+            for i in Range(0,efa.size()) do
+              try
+                if efa(i) != efb(i) then
+                  found = false
+                  break
+                end
+              else
+                found = false
+                break
+              end
+            end
+            if found then
+              return true
+            end
+          end
+        | (None,None) => return true
+        else
+          continue
+        end
+      end
+    end
+    false
 
 class EncoderSinkRunner[In: Any val] is Runner
   let _metrics_reporter: MetricsReporter
   let _target: Router val
   let _encoder: SinkEncoder[In] val
   let _wb: Writer = Writer
+  let _deduplication_list: Array[MsgEnvelope val]
 
   new iso create(encoder: SinkEncoder[In] val,
     target: Router val,
@@ -38,12 +88,14 @@ class EncoderSinkRunner[In: Any val] is Runner
     _metrics_reporter = consume metrics_reporter
     _target = target
     _encoder = encoder
+    //TODO: we need to make sure we only send these when we're not recovering
     match _target
     | let tcp: TCPRouter val =>
       for msg in initial_msgs.values() do
         tcp.writev(msg)
       end
     end
+    _deduplication_list = Array[MsgEnvelope val]
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
@@ -57,8 +109,54 @@ class EncoderSinkRunner[In: Any val] is Runner
     else
       @printf[I32]("Encoder sink received unrecognized input type.")
     end
-
     true
+
+  fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
+  =>
+    if not is_duplicate_message(incoming_envelope) then
+      _deduplication_list.push(incoming_envelope)
+      run[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope,
+        router)
+    else
+      //we can pretend it stopped here because everything downstream know about
+      //this
+      true
+    end
+
+  fun is_duplicate_message(env: MsgEnvelope val): Bool =>
+    for e in _deduplication_list.values() do
+      //TODO: Bloom filter maybe?
+      if e.msg_uid != env.msg_uid then
+        continue
+      else
+        match (e.frac_ids, env.frac_ids)
+        | (let efa: Array[U64] val, let efb: Array[U64] val) => 
+          if efa.size() == efb.size() then
+            var found = false
+            for i in Range(0,efa.size()) do
+              try
+                if efa(i) != efb(i) then
+                  found = false
+                  break
+                end
+              else
+                found = false
+                break
+              end
+            end
+            if found then
+              return true
+            end
+          end
+        | (None,None) => return true
+        else
+          continue
+        end
+      end
+    end
+    false
 
 trait SinkRunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, next: Router val = 

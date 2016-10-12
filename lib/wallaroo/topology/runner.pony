@@ -1,6 +1,7 @@
 use "buffered"
 use "time"
 use "net"
+use "collections"
 use "sendence/epoch"
 use "wallaroo/metrics"
 use "wallaroo/messages"
@@ -11,8 +12,12 @@ trait Runner
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
     router: (Router val | None) = None): Bool
-  fun ref replay_log_entry(log_entry: LogEntry val) => None
+  fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
+  fun ref replay_log_entry(log_entry: LogEntry val, origin: Origin tag) => None
   fun ref set_buffer_target(target: ResilientOrigin tag) => None
+  fun ref replay_finished() => None
 
 interface RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None) = 
@@ -122,6 +127,7 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
   let _computation: Computation[In, Out] val
   let _computation_name: String
   let _metrics_reporter: MetricsReporter
+  let _deduplication_list: Array[MsgEnvelope val]
 
   new iso create(computation: Computation[In, Out] val, 
     next: Runner iso,
@@ -131,6 +137,7 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
     _computation_name = _computation.name()
     _next = consume next
     _metrics_reporter = consume metrics_reporter
+    _deduplication_list = Array[MsgEnvelope val]
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
@@ -160,12 +167,20 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
       computation_start, computation_end)
     is_finished
 
+  fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
+  =>
+    run[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope,
+      router)
+
 class PreStateRunner[In: Any val, Out: Any val, State: Any #read] is Runner
   let _metrics_reporter: MetricsReporter
   let _output_router: Router val
   let _state_comp: StateComputation[In, Out, State] val
   let _name: String
   let _prep_name: String
+  let _deduplication_list: Array[MsgEnvelope val]
 
   new iso create(state_comp: StateComputation[In, Out, State] val,
     router: Router val, metrics_reporter: MetricsReporter iso) 
@@ -175,6 +190,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read] is Runner
     _state_comp = state_comp
     _name = _state_comp.name()
     _prep_name = _name + " prep"
+    _deduplication_list = Array[MsgEnvelope val]
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
@@ -199,11 +215,56 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read] is Runner
         true
       end
     let computation_end = Time.nanos()
-
     _metrics_reporter.step_metric(_prep_name, computation_start, 
       computation_end)
-
     is_finished
+
+  fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
+  =>
+    if not is_duplicate_message(incoming_envelope) then
+      _deduplication_list.push(incoming_envelope)
+      run[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope,
+        router)
+    else
+      //we can pretend it stopped here because everything downstream know about
+      //this
+      true
+    end
+
+  fun is_duplicate_message(env: MsgEnvelope val): Bool =>
+    for e in _deduplication_list.values() do
+      //TODO: Bloom filter maybe?
+      if e.msg_uid != env.msg_uid then
+        continue
+      else
+        match (e.frac_ids, env.frac_ids)
+        | (let efa: Array[U64] val, let efb: Array[U64] val) => 
+          if efa.size() == efb.size() then
+            var found = false
+            for i in Range(0,efa.size()) do
+              try
+                if efa(i) != efb(i) then
+                  found = false
+                  break
+                end
+              else
+                found = false
+                break
+              end
+            end
+            if found then
+              return true
+            end
+          end
+        | (None,None) => return true
+        else
+          continue
+        end
+      end
+    end
+    false
 
 class StateRunner[State: Any #read] is Runner
   let _state: State
@@ -211,6 +272,7 @@ class StateRunner[State: Any #read] is Runner
   let _state_change_repository: StateChangeRepository[State] ref
   let _event_log_buffer: EventLogBuffer tag
   let _alfred: Alfred
+  let _deduplication_list: Array[MsgEnvelope val]
 
   new iso create(state_builder: {(): State} val, 
       metrics_reporter: MetricsReporter iso,
@@ -222,6 +284,7 @@ class StateRunner[State: Any #read] is Runner
     _state_change_repository = StateChangeRepository[State]
     _alfred = alfred
     _event_log_buffer = log_buffer
+    _deduplication_list = Array[MsgEnvelope val]
 
   fun ref register_state_change(sc: StateChange[State] ref) : U64 =>
     _state_change_repository.register(sc)
@@ -229,20 +292,59 @@ class StateRunner[State: Any #read] is Runner
   fun ref set_buffer_target(target: ResilientOrigin tag) =>
     _event_log_buffer.set_target(target)
 
-  fun check_duplicate(uid: U64, frac_ids: (Array[U64] val | None)) : Bool =>
-    true
-
-  fun ref replay_run[In: Any val](source_name: String val, source_ts: U64, input: In,
-    conn: (TCPConnection | None), uid: U64, frac_ids: Array[U64] val) =>
-    if not check_duplicate(uid, frac_ids) then 
-      //TODO: add to seen msgs
-      //TODO: rerun message and call replay_run on downstream step
-      None
+  fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
+  =>
+    if not is_duplicate_message(incoming_envelope) then
+      _deduplication_list.push(incoming_envelope)
+      run[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope,
+        router)
+    else
+      //we can pretend it stopped here because everything downstream know about
+      //this
+      true
     end
-  
-  fun ref replay_log_entry(log_entry: LogEntry val) =>
-    if not check_duplicate(log_entry.uid(), log_entry.frac_ids()) then 
-      //TODO: add to seen msgs
+
+  fun is_duplicate_message(env: MsgEnvelope val): Bool =>
+    for e in _deduplication_list.values() do
+      //TODO: Bloom filter maybe?
+      if e.msg_uid != env.msg_uid then
+        continue
+      else
+        match (e.frac_ids, env.frac_ids)
+        | (let efa: Array[U64] val, let efb: Array[U64] val) => 
+          if efa.size() == efb.size() then
+            var found = false
+            for i in Range(0,efa.size()) do
+              try
+                if efa(i) != efb(i) then
+                  found = false
+                  break
+                end
+              else
+                found = false
+                break
+              end
+            end
+            if found then
+              return true
+            end
+          end
+        | (None,None) => return true
+        else
+          continue
+        end
+      end
+    end
+    false
+
+  fun ref replay_log_entry(log_entry: LogEntry val, origin: Origin tag) =>
+    let me = recover val MsgEnvelope(origin, log_entry.uid(),
+      log_entry.frac_ids(),0,0)
+    end
+    if not is_duplicate_message(me) then 
+      _deduplication_list.push(me)
       try
         let sc = _state_change_repository(log_entry.statechange_id())
         sc.read_log_entry(log_entry.payload())
@@ -254,7 +356,7 @@ class StateRunner[State: Any #read] is Runner
     end
 
   fun ref replay_finished() =>
-    //TODO: clear deduplication logs
+    _deduplication_list.clear()
     None
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
@@ -271,6 +373,7 @@ class StateRunner[State: Any #read] is Runner
         let log_entry = LogEntry(incoming_envelope.msg_uid,
             incoming_envelope.frac_ids,
             sc.id(),
+            outgoing_envelope.seq_id,
             sc.to_log_entry()) 
         _event_log_buffer.queue(log_entry)
         sc.apply(_state)
@@ -290,7 +393,17 @@ class StateRunner[State: Any #read] is Runner
       true
     end
 
+  fun rotate_log() =>
+    //we need to be able to conflate all the current logs to a checkpoint and
+    //rotate
+    None
+
 class iso RouterRunner is Runner
+  let _deduplication_list: Array[MsgEnvelope val]
+
+  new iso create() =>
+    _deduplication_list = Array[MsgEnvelope val]
+
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
     router: (Router val | None) = None): Bool
@@ -304,16 +417,19 @@ class iso RouterRunner is Runner
       true
     end
 
-  fun rotate_log() =>
-    //we need to be able to conflate all the current logs to a checkpoint and
-    //rotate
-    None
+  fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
+  =>
+    run[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope,
+      router)
 
 class Proxy is Runner
   let _worker_name: String
   let _target_step_id: U128
   let _metrics_reporter: MetricsReporter
   let _auth: AmbientAuth
+  let _deduplication_list: Array[MsgEnvelope val]
 
   new iso create(worker_name: String, target_step_id: U128, 
     metrics_reporter: MetricsReporter iso, auth: AmbientAuth) 
@@ -322,6 +438,7 @@ class Proxy is Runner
     _target_step_id = target_step_id
     _metrics_reporter = consume metrics_reporter
     _auth = auth
+    _deduplication_list = Array[MsgEnvelope val]
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
@@ -343,3 +460,11 @@ class Proxy is Runner
       true
     end
     // _metrics_reporter.worker_metric(metric_name, source_ts)  
+
+  fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
+  =>
+    run[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope,
+      router)
+

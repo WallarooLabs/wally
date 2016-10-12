@@ -39,6 +39,7 @@ class FileBackend is Backend
           // - size of fractional id list
           // - fractional id list (may be empty)
           // - statechange id
+          // - sequence id
           // - payload
           let buffer_id = r.u64_be()
           let uid = r.u64_be()
@@ -57,9 +58,10 @@ class FileBackend is Backend
             end
           end
           let statechange_id = r.u64_be()
+          let seq_id = r.u64_be()
           let payload_length = r.u64_be()
           let payload = recover val _file.read(payload_length.usize()) end
-          let log_entry = LogEntry(uid, frac_ids, statechange_id, payload)
+          let log_entry = LogEntry(uid, frac_ids, statechange_id, seq_id, payload)
           _alfred.replay_log_entry(buffer_id, log_entry)
         end
         _file.seek_end(0)
@@ -95,8 +97,10 @@ actor Alfred
       //_status = Ready
 
     be replay_finished() =>
-      //TODO: Signal all buffers that replay is finished
-      None
+      //signal all buffers that event log replay is finished
+      for b in _log_buffers.values() do
+        b.replay_finished()
+      end
 
     be replay_log_entry(buffer_id: U64, log_entry: LogEntry val) =>
       try
@@ -111,7 +115,7 @@ actor Alfred
       let id = _log_buffers.size().u64()
       logbuffer.set_id(id)
 
-    be log(buffer_id: U64, log_entries: Array[LogEntry val] iso) =>
+    be log(buffer_id: U64, log_entries: Array[LogEntry val] iso, low_watermark: U64) =>
     //TODO: move this serialisation to the file backend
       try
         for i in Range(0,log_entries.size()) do
@@ -121,6 +125,7 @@ actor Alfred
           // - size of fractional id list
           // - fractional id list (may be empty)
           // - statechange id
+          // - sequence id
           // - payload
           let entry = log_entries(i)
           _writer.u64_be(buffer_id)
@@ -137,12 +142,14 @@ actor Alfred
             _writer.u64_be(0)
           end
           _writer.u64_be(entry.statechange_id())
+          _writer.u64_be(entry.seq_id())
           _writer.u64_be(entry.payload().size().u64())
           _writer.write(entry.payload())
           _backend.write(recover val _writer.done() end)
         end
         _backend.flush()
         //TODO: communicate that writing is finished
+        _log_buffers(buffer_id.usize()).log_flushed(low_watermark)
       else
         @printf[I32]("unrecoverable error while trying to write event log".cstring())
       end
