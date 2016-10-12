@@ -56,8 +56,8 @@ class Source[In: Any val] is Origin
 
     let computation_end = Time.nanos()
 
-    _metrics_reporter.step_metric(_source_name,
-      computation_start, computation_end)
-    if is_finished then
-      _metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
-    end
+    //_metrics_reporter.step_metric(_source_name,
+    //  computation_start, computation_end)
+    //if is_finished then
+      //_metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
+    //end

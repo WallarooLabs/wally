@@ -163,8 +163,8 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
         true
       end
     let computation_end = Time.nanos()   
-    _metrics_reporter.step_metric(_computation_name,
-      computation_start, computation_end)
+    //_metrics_reporter.step_metric(_computation_name,
+    //  computation_start, computation_end)
     is_finished
 
   fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
@@ -215,8 +215,8 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read] is Runner
         true
       end
     let computation_end = Time.nanos()
-    _metrics_reporter.step_metric(_prep_name, computation_start, 
-      computation_end)
+    //_metrics_reporter.step_metric(_prep_name, computation_start, 
+    //  computation_end)
     is_finished
 
   fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
@@ -377,11 +377,11 @@ class StateRunner[State: Any #read] is Runner
         _event_log_buffer.queue(log_entry)
         sc.apply(_state)
         let computation_end = Time.nanos()
-        _metrics_reporter.step_metric(sp.name(), computation_start, computation_end)
+        //_metrics_reporter.step_metric(sp.name(), computation_start, computation_end)
         is_finished
       | let is_finished: Bool =>
         let computation_end = Time.nanos()
-        _metrics_reporter.step_metric(sp.name(), computation_start, computation_end)
+        //_metrics_reporter.step_metric(sp.name(), computation_start, computation_end)
         is_finished
       else
         @printf[I32]("StateRunner: StateProcessor did not return ((StateChange[State], Bool) | Bool)\n".cstring())
