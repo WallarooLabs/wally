@@ -8,8 +8,8 @@ use "wallaroo/messages"
 
 actor Step is ResilientOrigin
   let _runner: Runner
-  let _hwm: HighWaterMarkTable = HighWaterMarkTable(10)
-  let _lwm: LowWaterMarkTable = LowWaterMarkTable(10)
+  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
+  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
   let _translate: TranslationTable = TranslationTable(10)
   var _router: Router val = EmptyRouter
   let _metrics_reporter: MetricsReporter 
@@ -69,16 +69,16 @@ actor Step is ResilientOrigin
     //   sender.dispose()
     end
 
-  fun ref _bookkeeping(inEnvelope: MsgEnvelope val,
-    outEnvelope: MsgEnvelope val)
+  fun ref _bookkeeping(incoming_envelope: MsgEnvelope val)
   =>
     """
-    Process envelope and keep track of things
+    Process envelopes and keep track of things
     """
     // keep track of messages we've received from upstream
-    _hwm.update(inEnvelope.origin_tag , inEnvelope.route_id, inEnvelope.seq_id)
+    _hwm.update((incoming_envelope.origin , incoming_envelope.route_id),
+      incoming_envelope.seq_id)
     // keep track of mapping between incoming / outgoing seq_id
-   _translate.update(inEnvelope.seq_id, outEnvelope.seq_id)
+   _translate.update(incoming_envelope.seq_id, _outgoing_envelope.seq_id)
 
     
 interface StepBuilder

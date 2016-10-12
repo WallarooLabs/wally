@@ -3,6 +3,8 @@ use "wallaroo/topology"
 
 trait Origin
   fun send_watermark()
+  fun tag hash(): U64 =>
+    (digestof this).hash()
 
 class MsgEnvelope
   var origin: Origin tag   // tag referencing upstream origin for msg
@@ -11,7 +13,7 @@ class MsgEnvelope
   var seq_id: U64          // assigned by immediate upstream origin
   var route_id: U64        // assigned by immediate upstream origin
 
-  new val create(origin_tag': (Step tag | Source tag), msg_uid': U64,
+  new create(origin': Origin tag, msg_uid': U64,
     frac_ids': (Array[U64] val| None), seq_id': U64, route_id': U64)
   =>
     origin = origin'
@@ -39,26 +41,51 @@ primitive HashTuple
     (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
 
     
-class HighWaterMarkTable
+type OriginRoutePair is (Origin tag, U64)
+
+
+primitive HashOriginRoute
+  fun hash(t: OriginRoutePair): U64
+  =>
+    cantorPair((t._1.hash(), t._2.hash()))
+
+  fun eq(t1: OriginRoutePair, t2: OriginRoutePair): Bool
+  =>
+    hash(t1) == hash(t2)
+
+  fun cantorPair(t: (U64, U64)): U64 =>
+    (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
+    
+
+class HighWatermarkTable
   """
   Keep track of a high watermark for each message coming into a step.
   We store the seq_id as assigned to a message by the upstream origin
   that sent the message.
   """
-  let _hwmt: HashMap[(U64, U64), U64, HashTuple]
+  let _hwmt: HashMap[OriginRoutePair, U64, HashOriginRoute]
 
   new create(size: USize)
   =>
-    _hwmt = HashMap[(U64, U64), U64, HashTuple](size)
+    _hwmt = HashMap[OriginRoutePair, U64, HashOriginRoute](size)
   
-  fun ref updateHighWatermark(origin: U64, route_id: U64, seq_id: U64)
+  fun ref update(key: OriginRoutePair, seq_id: U64)
   =>
     try
-      _hwmt.upsert((origin, route_id), seq_id,
-        lambda(x: U64, y: U64): U64 =>  y end)
+      _hwmt.upsert(key, seq_id, lambda(x: U64, y: U64): U64 =>  y end)
     else
-      @printf[I32]("Error upserting into _hwmt\n".cstring())      
+      @printf[I32]("Error upserting into HighWaterMarkTable\n".cstring())      
     end
+
+  fun high_watermark(key: OriginRoutePair): U64 ?
+  =>
+    try
+      _hwmt(key)
+    else
+      @printf[I32]("Error fetching a seq_id from HighWaterMarkTable\n".cstring())
+      error
+    end
+
 
 class TranslationTable
   """
@@ -114,10 +141,10 @@ class TranslationTable
       _inToOut.remove(_outToIn(out_seq_id))
       _outToIn.remove(out_seq_id)
     else
-      @printf[I32]("Error in remove\n".cstring())
+      @printf[I32]("Error removing key from TranslationTable\n".cstring())
     end
 
-class LowWaterMarkTable
+class LowWatermarkTable
   """
   Keep track of low watermark values per route as reported by downstream 
   steps.
@@ -128,9 +155,24 @@ class LowWaterMarkTable
   =>
     _lwmt = Map[U64, U64](size)
   
-  fun ref updateLowWatermark(route_id: U64, seq_id: U64)
+  fun ref update(route_id: U64, seq_id: U64)
   =>
     _lwmt(route_id) = seq_id
 
+  fun low_watermark(route_id: U64): U64 ?
+  =>
+    try
+      _lwmt(route_id)
+    else
+      @printf[I32]("Error fetching a seq_id from LowWaterMarkTable\n".cstring())
+      error
+    end
 
+  fun ref remove(route_id: U64)
+  =>
+    try
+      _lwmt.remove(route_id)
+    else
+      @printf[I32]("Error removing key from LowWaterMarkTable\n".cstring())
+    end
     
