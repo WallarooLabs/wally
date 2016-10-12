@@ -11,7 +11,7 @@ class MsgEnvelope
   var seq_id: U64          // assigned by immediate upstream origin
   var route_id: U64        // assigned by immediate upstream origin
 
-  new create(origin': Origin tag, msg_uid': U64,
+  new val create(origin_tag': (Step tag | Source tag), msg_uid': U64,
     frac_ids': (Array[U64] val| None), seq_id': U64, route_id': U64)
   =>
     origin = origin'
@@ -46,7 +46,6 @@ class HighWaterMarkTable
   that sent the message.
   """
   let _hwmt: HashMap[(U64, U64), U64, HashTuple]
-  // tuple access to high watermark
 
   new create(size: USize)
   =>
