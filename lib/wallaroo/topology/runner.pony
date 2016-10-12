@@ -369,7 +369,6 @@ class StateRunner[State: Any #read] is Runner
       match sp(_state, _state_change_repository, metric_name, source_ts,
           outgoing_envelope, incoming_envelope)
       | (let sc: StateChange[State] val, let is_finished: Bool) =>
-        //TODO: these two should come from the deduplication stuff
         let log_entry = LogEntry(incoming_envelope.msg_uid,
             incoming_envelope.frac_ids,
             sc.id(),

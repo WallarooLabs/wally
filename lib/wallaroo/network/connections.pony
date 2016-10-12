@@ -109,7 +109,7 @@ actor Connections
     _data_conns(target_name) = data_conn
     try
       for proxy in _proxies(target_name).values() do
-        proxy.update_router(TCPRouter(data_conn))
+        proxy.update_router(TCPRouter(data_conn,0))
       end
     end
 

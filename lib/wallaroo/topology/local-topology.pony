@@ -40,7 +40,7 @@ class EgressBuilder
           let out_conn = TCPConnection(connect_auth,
             OutNotify(sink_name), a(0), a(1))
 
-          Step(srb(reporter.clone(), TCPRouter(out_conn)), consume reporter)
+          Step(srb(reporter.clone(), TCPRouter(out_conn,0)), consume reporter)
         else
           @printf[I32]("No sink runner builder!\n".cstring())
           error
@@ -135,7 +135,7 @@ actor LocalTopologyInitializer
           var latest_step = sink
           while builder_idx > 0 do 
             let builder = builders((builder_idx - 1).usize())
-            let next = DirectRouter(latest_step)
+            let next = DirectRouter(latest_step, builder_idx.u64())
             latest_step = builder(next, _metrics_conn, pipeline.name())
             routes(builder.id()) = latest_step
             builder_idx = builder_idx - 1

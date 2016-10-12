@@ -2,8 +2,6 @@ use "collections"
 use "net"
 use "wallaroo/messages"
 
-//TODO: generate route ids somewhere
-
 trait Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
                         outgoing_envelope: MsgEnvelope ref,
@@ -24,7 +22,7 @@ class DirectRouter is Router
   let _target: Step tag
   let _id: U64
 
-  new val create(target: Step tag, id: U64 = 0) =>
+  new val create(target: Step tag, id: U64) =>
     _target = target
     _id = id
 
@@ -68,7 +66,7 @@ class PartitionRouter is Router
   let _partition_finder: PartitionFinder val
   let _id: U64
 
-  new val create(p_finder: PartitionFinder val, id: U64 = 0) =>
+  new val create(p_finder: PartitionFinder val, id: U64) =>
     _partition_finder = p_finder
     _id = id
 
@@ -95,7 +93,7 @@ class TCPRouter is Router
   let _tcp_writer: TCPWriter
   let _id: U64
 
-  new val create(target: (TCPConnection | Array[TCPConnection] val), id: U64 = 0) =>
+  new val create(target: (TCPConnection | Array[TCPConnection] val), id: U64) =>
     _tcp_writer = 
       match target
       | let c: TCPConnection =>

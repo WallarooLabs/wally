@@ -65,7 +65,7 @@ primitive MarketSpreadStarter
     let paritition_finder = StatePartitionFinder[(FixNbboMessage val | FixOrderMessage val), String](SymbolPartitionFunction, 
         consume padded_symbols, consume router_builder)
 
-    let partition_router = PartitionRouter(paritition_finder)
+    let partition_router = PartitionRouter(paritition_finder,0)
 
     let initial_nbbo: Array[Array[U8] val] val = 
       if init_path == "" then
@@ -105,11 +105,11 @@ primitive MarketSpreadStarter
       metrics_conn)
 
     let external_sink_runner = EncoderSinkRunner[OrderResult val](
-      OrderResultEncoder, TCPRouter(reports_conn), sink_reporter.clone(),
+      OrderResultEncoder, TCPRouter(reports_conn,0), sink_reporter.clone(),
       recover [connect_msg, reports_join_msg] end)
 
     let sink_router = DirectRouter(Step(consume external_sink_runner,
-      consume sink_reporter))
+      consume sink_reporter),0)
 
     let order_runner_builder: RunnerBuilder val =
       PreStateRunnerBuilder[FixOrderMessage val, OrderResult val, SymbolData](
