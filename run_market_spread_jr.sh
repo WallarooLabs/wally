@@ -7,8 +7,8 @@ DOWNLOAD=0
 
 mkdir -p $TMPDIR/metrics_reporter_ui
 mkdir -p $TMPDIR/market_spread_reports_ui
-wget -N https://s3.amazonaws.com/sendence-dev/wallaroo/ui-bins/market_spread_reports_ui.tar.gz -O $DESTDIR/market_spread_reports_ui.tar.gz
-wget -N https://s3.amazonaws.com/sendence-dev/wallaroo/ui-bins/metrics_reporter_ui.tar.gz -O $DESTDIR/metrics_reporter_ui.tar.gz
+wget -N https://s3.amazonaws.com/sendence-dev/wallaroo/ui-bins/market_spread_reports_ui.tar.gz -O $TMPDIR/market_spread_reports_ui.tar.gz
+wget -N https://s3.amazonaws.com/sendence-dev/wallaroo/ui-bins/metrics_reporter_ui.tar.gz -O $TMPDIR/metrics_reporter_ui.tar.gz
 
 tar zxf $TMPDIR/market_spread_reports_ui.tar.gz -C $TMPDIR/market_spread_reports_ui
 tar zxf $TMPDIR/metrics_reporter_ui.tar.gz -C $TMPDIR/metrics_reporter_ui
