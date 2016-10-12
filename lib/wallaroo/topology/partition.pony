@@ -14,7 +14,7 @@ class StatelessPartitionFinder[In: Any val, Key: (Hashable val & Equatable[Key] 
   let _partitions: Map[Key, Router val] = Map[Key, Router val]
 
   new val create(pf: PartitionFunction[In, Key] val, keys: Array[Key] val,
-    router_builder: RouterBuilder val) =>
+    router_builder: RouterBuilder iso) =>
     _partition_function = pf
     for key in keys.values() do
       _partitions(key) = router_builder()
@@ -37,7 +37,7 @@ class StatePartitionFinder[In: Any val, Key: (Hashable val & Equatable[Key] val)
   let _partitions: Map[Key, Router val] = Map[Key, Router val]
 
   new val create(pf: PartitionFunction[In, Key] val, keys: Array[Key] val,
-    router_builder: RouterBuilder val) =>
+    router_builder: RouterBuilder iso) =>
     _partition_function = pf
     for key in keys.values() do
       _partitions(key) = router_builder()

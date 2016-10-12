@@ -9,7 +9,8 @@ use "wallaroo/resilience"
 trait Runner
   // Return a Bool indicating whether the message is finished processing
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    envelope: MsgEnvelope ref, router: (Router val | None) = None): Bool
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
   fun ref replay_log_entry(log_entry: LogEntry val) => None
   fun ref set_buffer_target(target: ResilientOrigin tag) => None
 
@@ -132,7 +133,8 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
     _metrics_reporter = consume metrics_reporter
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    envelope: MsgEnvelope ref, router: (Router val | None) = None): Bool
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
   =>
     let computation_start = Time.nanos()
 
@@ -143,11 +145,10 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
         match result
         | None => true
         | let output: Out =>
-          //start: just to get this to compile
-          //TODO: generate new ids etc 
-          let new_envelope = envelope
-          //end: just-to-get-this-to-compile
-          _next.run[Out](metric_name, source_ts, output, new_envelope, router)
+          //TODO: figure out if we want to chain the envelopes here? Probably
+          //not though
+          _next.run[Out](metric_name, source_ts, output, outgoing_envelope,
+          incoming_envelope, router)
         else
           true
         end
@@ -176,7 +177,8 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read] is Runner
     _prep_name = _name + " prep"
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    envelope: MsgEnvelope ref, router: (Router val | None) = None): Bool
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
   =>
     let computation_start = Time.nanos()
     let is_finished = 
@@ -188,12 +190,12 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read] is Runner
             StateComputationWrapper[In, Out, State](input, _state_comp, 
               _output_router)
           shared_state_router.route[StateProcessor[State] val](metric_name,
-            source_ts, processor, envelope)
+            source_ts, processor, outgoing_envelope, incoming_envelope)
         else
           true
         end
       else
-        @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
+        @printf[I32]("PreStateRunner: Input was not a StateProcessor!\n".cstring())
         true
       end
     let computation_end = Time.nanos()
@@ -256,23 +258,31 @@ class StateRunner[State: Any #read] is Runner
     None
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    envelope: MsgEnvelope ref, router: (Router val | None) = None): Bool
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
   =>
     match data
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
-      match sp(_state, _state_change_repository, metric_name, source_ts, envelope)
+      match sp(_state, _state_change_repository, metric_name, source_ts,
+          outgoing_envelope, incoming_envelope)
       | (let sc: StateChange[State] val, let is_finished: Bool) =>
         //TODO: these two should come from the deduplication stuff
-        let log_entry = LogEntry(envelope.msg_uid, envelope.frac_ids, sc.id(), sc.to_log_entry()) 
+        let log_entry = LogEntry(incoming_envelope.msg_uid,
+            incoming_envelope.frac_ids,
+            sc.id(),
+            sc.to_log_entry()) 
         _event_log_buffer.queue(log_entry)
         sc.apply(_state)
         let computation_end = Time.nanos()
-        _metrics_reporter.step_metric(sp.name(),
-          computation_start, computation_end)
+        _metrics_reporter.step_metric(sp.name(), computation_start, computation_end)
+        is_finished
+      | let is_finished: Bool =>
+        let computation_end = Time.nanos()
+        _metrics_reporter.step_metric(sp.name(), computation_start, computation_end)
         is_finished
       else
-        @printf[I32]("StateRunner: StateProcessor did not return (Bool, StateChange[State])\n".cstring())
+        @printf[I32]("StateRunner: StateProcessor did not return ((StateChange[State], Bool) | Bool)\n".cstring())
         true
       end
     else
@@ -282,11 +292,13 @@ class StateRunner[State: Any #read] is Runner
 
 class iso RouterRunner is Runner
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    envelope: MsgEnvelope ref, router: (Router val | None) = None): Bool
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
   =>
     match router
     | let r: Router val =>
-      r.route[D](metric_name, source_ts, data, envelope)
+      r.route[D](metric_name, source_ts, data, outgoing_envelope,
+      incoming_envelope)
       false
     else
       true
@@ -312,14 +324,16 @@ class Proxy is Runner
     _auth = auth
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    envelope: MsgEnvelope ref, router: (Router val | None) = None): Bool
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
   =>
     match router
     | let r: Router val =>
       try
         let forward_msg = ChannelMsgEncoder.data_channel[D](_target_step_id, 
           0, _worker_name, source_ts, data, metric_name, _auth)
-        r.route[Array[ByteSeq] val](metric_name, source_ts, forward_msg, envelope)
+        r.route[Array[ByteSeq] val](metric_name, source_ts, forward_msg,
+        outgoing_envelope, incoming_envelope)
         false
       else
         @printf[I32]("Problem encoding forwarded message\n".cstring())

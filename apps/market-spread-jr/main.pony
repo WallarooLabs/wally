@@ -43,14 +43,17 @@ primitive MarketSpreadStarter
     let reports_join_msg = HubProtocol.join("reports:market-spread")
 
     let alfred : Alfred tag = Alfred(DummyBackend)
+
     let router_builder = 
-      recover
-        lambda()(metrics_conn,alfred): Router val =>
+      recover iso
+        var i: U64 = 1
+        lambda ref()(metrics_conn,alfred,i): Router val =>
           let reporter = MetricsReporter("market-spread", metrics_conn)
           let log_buffer = DeactivatedEventLogBuffer
           let s = StateRunner[SymbolData](SymbolDataBuilder, reporter.clone(),
             alfred, log_buffer)
-          DirectRouter(Step(consume s, consume reporter))
+          i = i + 1
+          DirectRouter(Step(consume s, consume reporter), i)
         end
       end
 

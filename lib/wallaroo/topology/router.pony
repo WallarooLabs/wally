@@ -4,31 +4,41 @@ use "wallaroo/messages"
 
 //TODO: generate route ids somewhere
 
-interface Router
+trait Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref): Bool
+                        outgoing_envelope: MsgEnvelope ref,
+                        incoming_envelope: MsgEnvelope val): Bool
+  //TODO: outgoing_envelope to become MsgEnvelope trn so we don't clone?
 
 interface RouterBuilder
-  fun apply(): Router val
+  fun ref apply(): Router val
 
-class EmptyRouter
+class EmptyRouter is Router
+
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref): Bool =>
+                        outgoing_envelope: MsgEnvelope ref,
+                        incoming_envelope: MsgEnvelope val): Bool =>
     true
 
-class DirectRouter
+class DirectRouter is Router
   let _target: Step tag
+  let _id: U64
 
-  new val create(target: Step tag) =>
+  new val create(target: Step tag, id: U64 = 0) =>
     _target = target
+    _id = id
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref): Bool
+                        outgoing_envelope: MsgEnvelope ref,
+                        incoming_envelope: MsgEnvelope val): Bool
   =>
+    outgoing_envelope.route_id = _id
     _target.run[D](metric_name, source_ts, data, outgoing_envelope.clone())
     false
 
-class DataRouter
+  fun route_id(): U64 => _id
+
+class DataRouter is Router
   let _routes: Map[U128, Step tag] val
 
   new val create(routes: Map[U128, Step tag] val = 
@@ -37,11 +47,14 @@ class DataRouter
     _routes = routes
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref): Bool =>
+                        outgoing_envelope: MsgEnvelope ref,
+                        incoming_envelope: MsgEnvelope val): Bool =>
     try
       match data
       | let delivery_msg: DeliveryMsg val =>
         let target_id = delivery_msg.target_id()
+        //TODO: deliver envelope
+        outgoing_envelope.route_id = target_id.u64()
         delivery_msg.deliver(_routes(target_id))
         false
       else
@@ -51,14 +64,17 @@ class DataRouter
       true
     end
 
-class PartitionRouter
+class PartitionRouter is Router
   let _partition_finder: PartitionFinder val
+  let _id: U64
 
-  new val create(p_finder: PartitionFinder val) =>
+  new val create(p_finder: PartitionFinder val, id: U64 = 0) =>
     _partition_finder = p_finder
+    _id = id
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref): Bool =>
+                        outgoing_envelope: MsgEnvelope ref,
+                        incoming_envelope: MsgEnvelope val): Bool =>
     let router = 
       match data
       | let pfable: PartitionFindable val =>
@@ -69,15 +85,17 @@ class PartitionRouter
 
     match router
     | let r: Router val =>
-      r.route[D](metric_name, source_ts, data, outgoing_envelope)
+      //delegate to the actual router to stamp the route_id
+      r.route[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope)
     else
       true
     end
 
-class TCPRouter
+class TCPRouter is Router
   let _tcp_writer: TCPWriter
+  let _id: U64
 
-  new val create(target: (TCPConnection | Array[TCPConnection] val)) =>
+  new val create(target: (TCPConnection | Array[TCPConnection] val), id: U64 = 0) =>
     _tcp_writer = 
       match target
       | let c: TCPConnection =>
@@ -87,12 +105,16 @@ class TCPRouter
       else
         EmptyTCPWriter
       end
+    _id = id
 
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D, 
-                        outgoing_envelope: MsgEnvelope ref): Bool
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+                        outgoing_envelope: MsgEnvelope ref,
+                        incoming_envelope: MsgEnvelope val): Bool
   =>
     match data
     | let d: Array[ByteSeq] val =>
+      //TODO: pass the envelope
+      outgoing_envelope.route_id = _id
       _tcp_writer(d)
     end
     false

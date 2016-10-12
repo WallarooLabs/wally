@@ -43,7 +43,10 @@ class Source[In: Any val] is Origin
         | let input: In =>
           _outgoing_envelope.msg_uid = _count.u64()
           _outgoing_envelope.seq_id = _count.u64()
-          _runner.run[In](_pipeline_name, ingest_ts, input, _outgoing_envelope, _router)
+          //TODO: incoming envelope?
+          let incoming_envelope = _outgoing_envelope.clone()
+          _runner.run[In](_pipeline_name, ingest_ts, input, _outgoing_envelope,
+          incoming_envelope, _router)
         else
           true
         end

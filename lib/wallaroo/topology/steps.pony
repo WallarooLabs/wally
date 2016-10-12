@@ -29,15 +29,15 @@ actor Step is ResilientOrigin
     _router = router
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    envelope: MsgEnvelope val) =>
+    incoming_envelope: MsgEnvelope val) =>
     //TODO: make outgoing envelope
-    //TODO: pass incoming envelope
-    let is_finished = _runner.run[D](metric_name, source_ts, data, _outgoing_envelope, _router)
+    let is_finished = _runner.run[D](metric_name, source_ts, data,
+      _outgoing_envelope, incoming_envelope, _router)
     // Process envelope if we're done
     // Note: We do the bookkeeping _after_ handing the computation result
     //       to the next Step.
     if is_finished then
-      _bookkeeping(envelope)
+      _bookkeeping(incoming_envelope)
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
     

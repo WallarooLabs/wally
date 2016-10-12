@@ -10,8 +10,10 @@ class SimpleSinkRunner is Runner
     _metrics_reporter = consume metrics_reporter
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    envelope: MsgEnvelope ref, router: (Router val | None) = None): Bool
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
   =>
+    //TODO: stamp outgoing envelope?
     match data
     | let s: Stringable val => None
       @printf[I32](("Simple sink: Received " + s.string() + "\n").cstring())
@@ -44,12 +46,14 @@ class EncoderSinkRunner[In: Any val] is Runner
     end
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    envelope: MsgEnvelope ref, router: (Router val | None) = None): Bool
+    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    router: (Router val | None) = None): Bool
   =>
     match data
     | let input: In =>
       let encoded = _encoder(input, _wb)
-      _target.route[Array[ByteSeq] val](metric_name, source_ts, encoded, envelope)
+      _target.route[Array[ByteSeq] val](metric_name, source_ts, encoded,
+        outgoing_envelope, incoming_envelope)
     else
       @printf[I32]("Encoder sink received unrecognized input type.")
     end

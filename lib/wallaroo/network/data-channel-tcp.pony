@@ -76,10 +76,12 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       match ChannelMsgDecoder(consume data, _auth)
       | let d: DeliveryMsg val =>
         @printf[I32]("Received delivery msg!!\n".cstring())
-        //TODO: create a real envelope
+        //TODO: create real envelope
         let outgoing_envelope = MsgEnvelope(_origin,0,None,0,0)
+        //TODO: read envelope from data
+        let incoming_envelope = outgoing_envelope.clone()
         _router.route[DeliveryMsg val](d.metric_name(), d.source_ts(), d,
-          outgoing_envelope)
+          outgoing_envelope, incoming_envelope)
       | let m: SpinUpLocalTopologyMsg val =>
         _env.out.print("Received spin up local topology message!")
       | let m: UnknownChannelMsg val =>

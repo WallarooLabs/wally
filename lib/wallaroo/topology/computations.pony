@@ -19,7 +19,8 @@ trait StateProcessor[State: Any #read] is BasicComputation
   // Return a Bool indicating whether the message was finished processing here
   // Return false to indicate the message was sent on to the next step.
   fun apply(state: State, sc_repo: StateChangeRepository[State],
-            metric_name: String, source_ts: U64, outgoing_envelope: MsgEnvelope):
+            metric_name: String, source_ts: U64, outgoing_envelope: MsgEnvelope,
+            incoming_envelope: MsgEnvelope val):
             ((StateChange[State] val, Bool) | Bool)
 
   fun find_partition(finder: PartitionFinder val): Router val
@@ -37,16 +38,19 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     _router = router
 
   fun apply(state: State, sc_repo: StateChangeRepository[State],
-            metric_name: String, source_ts: U64, outgoing_envelope: MsgEnvelope):
+            metric_name: String, source_ts: U64, outgoing_envelope: MsgEnvelope,
+            incoming_envelope: MsgEnvelope val):
         ((StateChange[State] val, Bool) | Bool)
   =>
     match _state_comp(_input, state)
     | None => true
     | let output: Out =>
-      _router.route[Out](metric_name, source_ts, output, outgoing_envelope)
+      _router.route[Out](metric_name, source_ts, output, outgoing_envelope,
+      incoming_envelope)
       false
     | (let output: Out, let state_change: StateChange[State] val) =>
-      _router.route[Out](metric_name, source_ts, output, outgoing_envelope)
+      _router.route[Out](metric_name, source_ts, output, outgoing_envelope,
+      incoming_envelope)
       (state_change, false)
     | let state_change: StateChange[State] val =>
       (state_change, true)
