@@ -38,7 +38,7 @@ actor Step is ResilientOrigin
     //       to the next Step.
     if is_finished then
       _bookkeeping(incoming_envelope)
-      //_metrics_reporter.pipeline_metric(metric_name, source_ts)
+      _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
     
   be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -52,7 +52,7 @@ actor Step is ResilientOrigin
     //       to the next Step.
     if is_finished then
       _bookkeeping(incoming_envelope)
-      //_metrics_reporter.pipeline_metric(metric_name, source_ts)
+      _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
     
   be replay_log_entry(log_entry: LogEntry val) =>

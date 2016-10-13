@@ -34,7 +34,7 @@ class Source[In: Any val] is Origin
     //TODO: receive watermark, flush buffers and ack upstream (maybe?)
     None
 
-  fun ref process(data: Array[U8] val) =>
+  fun ref process(data: Array[U8 val] iso) =>
     let ingest_ts = Time.nanos()
     let computation_start = Time.nanos()
     let is_finished = 
@@ -58,6 +58,6 @@ class Source[In: Any val] is Origin
 
     //_metrics_reporter.step_metric(_source_name,
     //  computation_start, computation_end)
-    //if is_finished then
-      //_metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
-    //end
+    if is_finished then
+      _metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
+    end

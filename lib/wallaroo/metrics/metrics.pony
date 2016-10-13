@@ -80,7 +80,7 @@ class MetricsReporter
     _metrics_conn = metrics_conn
 
   fun ref step_metric(name: String, start_ts: U64, end_ts: U64) =>
-     let metrics = try
+    let metrics = try
       _step_metrics_map(name)
     else
       let reporter =

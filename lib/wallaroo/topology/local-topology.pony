@@ -135,7 +135,7 @@ actor LocalTopologyInitializer
           var latest_step = sink
           while builder_idx > 0 do 
             let builder = builders((builder_idx - 1).usize())
-            let next = DirectRouter(latest_step, builder_idx.u64())
+            let next = DirectRouter(latest_step, builder.id().u64())
             latest_step = builder(next, _metrics_conn, pipeline.name())
             routes(builder.id()) = latest_step
             builder_idx = builder_idx - 1

@@ -398,10 +398,6 @@ class StateRunner[State: Any #read] is Runner
     None
 
 class iso RouterRunner is Runner
-  let _deduplication_list: Array[MsgEnvelope val]
-
-  new iso create() =>
-    _deduplication_list = Array[MsgEnvelope val]
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
