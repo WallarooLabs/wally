@@ -42,6 +42,8 @@ screen -dmS $SCREEN_SESSION_NAME
 screen -S $SCREEN_SESSION_NAME -p 0 -X stuff "apps/market-spread-jr/market-spread-jr -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e $MESSAGES -n node-name
 "
 
+sleep 5
+
 screen -S $SCREEN_SESSION_NAME -X screen 0
 screen -S $SCREEN_SESSION_NAME -p 1 -X stuff "giles/sender/sender -b 127.0.0.1:7000 -m $(( 1 + $MESSAGES * 2 / 3)) -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 "
@@ -58,8 +60,8 @@ cd $TMPDIR/market_spread_reports_ui
 bin/market_spread_reports_ui stop
 popd
 
-screen -S $SCREEN_SESSION_NAME -p 0 -X stuff ^C
-screen -S $SCREEN_SESSION_NAME -p 1 -X stuff ^C
-screen -S $SCREEN_SESSION_NAME -p 2 -X stuff ^C
+screen -S $SCREEN_SESSION_NAME -p 0 -X stuff $'\003'
+screen -S $SCREEN_SESSION_NAME -p 1 -X stuff $'\003'
+screen -S $SCREEN_SESSION_NAME -p 2 -X stuff $'\003'
 sleep 5
 screen -X -S $SCREEN_SESSION_NAME quit
