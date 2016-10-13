@@ -62,13 +62,17 @@ class HighWatermarkTable
   Keep track of a high watermark for each message coming into a step.
   We store the seq_id as assigned to a message by the upstream origin
   that sent the message.
+  TODO: Make this a proper table with (Origin, Route) -> seq_id instead
+        of a hashmap. We know that the number of origins and routes is
+        smallish and can be derived from the topology object. The size
+        of this table is static.
   """
   let _hwmt: HashMap[OriginRoutePair, U64, HashOriginRoute]
-
+  
   new create(size: USize)
   =>
     _hwmt = HashMap[OriginRoutePair, U64, HashOriginRoute](size)
-  
+     
   fun ref update(key: OriginRoutePair, seq_id: U64)
   =>
     try
@@ -77,7 +81,7 @@ class HighWatermarkTable
       @printf[I32]("Error upserting into HighWaterMarkTable\n".cstring())      
     end
 
-  fun high_watermark(key: OriginRoutePair): U64 ?
+  fun apply(key: OriginRoutePair): U64 ?
   =>
     try
       _hwmt(key)
@@ -159,7 +163,7 @@ class LowWatermarkTable
   =>
     _lwmt(route_id) = seq_id
 
-  fun low_watermark(route_id: U64): U64 ?
+  fun apply(route_id: U64): U64 ?
   =>
     try
       _lwmt(route_id)
