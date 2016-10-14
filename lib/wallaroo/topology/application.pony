@@ -5,7 +5,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 
-class Topology
+class Application
   let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
 
@@ -13,10 +13,10 @@ class Topology
     _name = name'
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
-    decoder: SourceDecoder[In] val, pipeline_name: String): 
-    PipelineBuilder[In, Out, In]
+    pipeline_name: String, decoder: SourceDecoder[In] val, 
+    coalescing: Bool = true): PipelineBuilder[In, Out, In]
   =>
-    let pipeline = Pipeline[In, Out](decoder, pipeline_name)
+    let pipeline = Pipeline[In, Out](pipeline_name, decoder, coalescing)
     PipelineBuilder[In, Out, In](this, pipeline)
 
   fun ref add_pipeline(p: BasicPipeline) =>
@@ -48,14 +48,14 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _sink_builder: SinkRunnerBuilder val
   let _is_coalesced: Bool
 
-  new create(d: SourceDecoder[In] val, n: String, is_coalesced': Bool = true) 
+  new create(n: String, d: SourceDecoder[In] val, coalescing: Bool) 
   =>
     _decoder = d
     _runner_builders = Array[RunnerBuilder val]
     _name = n
     _source_builder = SourceBuilder[In](_name, _decoder)
     _sink_builder = SimpleSinkRunnerBuilder[Out](_name)
-    _is_coalesced = is_coalesced'
+    _is_coalesced = coalescing
 
   fun ref add_runner_builder(p: RunnerBuilder val) =>
     _runner_builders.push(p)
@@ -102,11 +102,11 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun name(): String => _name
 
 class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
-  let _t: Topology
+  let _a: Application
   let _p: Pipeline[In, Out]
 
-  new create(t: Topology, p: Pipeline[In, Out]) =>
-    _t = t
+  new create(a: Application, p: Pipeline[In, Out]) =>
+    _a = a
     _p = p
 
   fun ref to[Next: Any val](
@@ -115,7 +115,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       : PipelineBuilder[In, Out, Next] =>
     let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder)
     _p.add_runner_builder(next_builder)
-    PipelineBuilder[In, Out, Next](_t, _p)
+    PipelineBuilder[In, Out, Next](_a, _p)
 
   fun ref to_stateful[Next: Any val, State: Any #read](
     s_comp: StateComputation[Last, Next, State] val,
@@ -127,7 +127,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_runner_builder(next_builder)
     let state_builder = StateRunnerBuilder[State](s_initializer, id)
     _p.add_runner_builder(state_builder)
-    PipelineBuilder[In, Out, Next](_t, _p)
+    PipelineBuilder[In, Out, Next](_a, _p)
 
   fun ref to_state_partition[PIn: Any val,
     Key: (Hashable val & Equatable[Key]), Next: Any val = PIn, 
@@ -145,35 +145,17 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       s_initializer, id, partition)
     _p.add_runner_builder(state_builder)      
 
-    PipelineBuilder[In, Out, Next](_t, _p)
+    PipelineBuilder[In, Out, Next](_a, _p)
 
-  fun ref to_empty_sink(): Topology ? =>
-    _t.add_pipeline(_p as BasicPipeline)
-    _t
+  fun ref to_empty_sink(): Application ? =>
+    _a.add_pipeline(_p as BasicPipeline)
+    _a
 
   fun ref to_sink(encoder: SinkEncoder[Out] val, 
     sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val 
-      = recover Array[Array[ByteSeq] val] end): Topology ? 
+      = recover Array[Array[ByteSeq] val] end): Application ? 
   =>
     _p.update_sink(EncoderSinkRunnerBuilder[Out](_p.name(), encoder,
       initial_msgs), sink_ids)
-    _t.add_pipeline(_p as BasicPipeline)
-    _t
-
-  // fun ref to_partition[Next: Any val](
-  //   comp_builder: ComputationBuilder[Last, Next] val,
-  //   p_fun: PartitionFunction[Last] val, id: U64 = 0)
-  //     : PipelineBuilder[In, Out, Next] =>
-  //   let next_builder = PartitionBuilder[Last, Next](comp_builder, p_fun)
-  //   let next_step = PipelineThroughStep[Last, Next](next_builder, id)
-  //   _p.add_step(next_step)
-  //   PipelineBuilder[In, Out, Next](_t, _p)
-
-  // fun ref to_stateful[Next: Any val, State: Any ref](
-  //   state_comp: StateComputation[Last, Next, State] val,
-  //   state_initializer: {(): State} val, state_id: U64, id: U64 = 0)
-  //     : PipelineBuilder[In, Out, Next] =>
-  //   let next_builder = StateStepBuilder[Last, Next, State](state_comp, state_initializer, state_id)
-  //   let next_step = PipelineThroughStep[Last, Next](next_builder, id)
-  //   _p.add_step(next_step)
-  //   PipelineBuilder[In, Out, Next](_t, _p)
+    _a.add_pipeline(_p as BasicPipeline)
+    _a

@@ -16,7 +16,7 @@ interface AppStarter
     initializer: (Initializer | None)) ? 
 
 actor Startup
-  new create(env: Env, app_runner: (AppStarter val | Topology val)) =>
+  new create(env: Env, app_runner: (AppStarter val | Application val)) =>
     var m_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
     var c_arg: (Array[String] | None) = None
@@ -30,7 +30,7 @@ actor Startup
     var is_initializer = false
     var is_automated_initialization = 
       match app_runner
-      | let topology: Topology val => 
+      | let application: Application val => 
         true
       else
         false
@@ -148,10 +148,10 @@ actor Startup
       end
 
       match app_runner
-      | let topology: Topology val =>
+      | let application: Application val =>
         match initializer 
         | let i: Initializer =>
-          i.start(topology)
+          i.start(application)
         end
       | let starter: AppStarter val =>
         starter(env, d_addr, input_addrs, o_addr, metrics_conn, expected,

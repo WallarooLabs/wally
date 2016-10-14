@@ -18,8 +18,8 @@ actor Initializer
   let _metrics_conn: TCPConnection
   let _ready_workers: Set[String] = Set[String]
   let _is_automated: Bool
-  var _topology_starter: (TopologyStarter val | None) = None
-  var _topology: (Topology val | None) = None
+  var _application_starter: (ApplicationStarter val | None) = None
+  var _application: (Application val | None) = None
   var _control_identified: USize = 1
   var _data_identified: USize = 1
   // var interconnected: USize = 0
@@ -45,12 +45,12 @@ actor Initializer
     _local_topology_initializer = local_topology_initializer
     _is_automated = is_automated
 
-  be start(t: (TopologyStarter val | Topology val)) =>
+  be start(t: (ApplicationStarter val | Application val)) =>
     match t
-    | let starter: TopologyStarter val =>
-      _topology_starter = starter
-    | let topology: Topology val =>
-      _topology = topology
+    | let starter: ApplicationStarter val =>
+      _application_starter = starter
+    | let application: Application val =>
+      _application = application
     end
 
   be identify_control_address(worker: String, host: String, service: String) =>
@@ -111,21 +111,21 @@ actor Initializer
     @printf[I32]("Initializing topology\n".cstring())
     if _is_automated then
       @printf[I32]("Automating...\n".cstring())
-      match _topology
-      | let t: Topology val =>
-        _automate_initialization(t)
+      match _application
+      | let a: Application val =>
+        _automate_initialization(a)
       end
     else
-      match _topology_starter
-      | let t: TopologyStarter val =>
-        @printf[I32]("Using user-defined TopologyStarter...\n".cstring())
+      match _application_starter
+      | let a: ApplicationStarter val =>
+        @printf[I32]("Using user-defined ApplicationStarter...\n".cstring())
         try
-          t(this, _worker_names, _input_addrs, _expected)
+          a(this, _worker_names, _input_addrs, _expected)
         else
-          @printf[I32]("Error running TopologyStarter.\n".cstring())
+          @printf[I32]("Error running ApplicationStarter.\n".cstring())
         end
       else
-        @printf[I32]("No topology starter!\n".cstring())
+        @printf[I32]("No application starter!\n".cstring())
       end
     end
 
@@ -159,10 +159,10 @@ actor Initializer
     map("data") = consume data_map
     consume map
 
-  fun ref _automate_initialization(topology: Topology val) =>
+  fun ref _automate_initialization(application: Application val) =>
     try
       // REMOVE LATER (for try block)
-      topology.pipelines(0)
+      application.pipelines(0)
 
       let worker_topology_data = Array[WorkerTopologyData val]
 
@@ -179,7 +179,7 @@ actor Initializer
         local_pipelines(name) = Array[LocalPipeline val]
       end
 
-      for pipeline in topology.pipelines.values() do
+      for pipeline in application.pipelines.values() do
         let source_addr_trn: Array[String] trn = recover Array[String] end
         source_addr_trn.push(_input_addrs(0)(0))
         source_addr_trn.push(_input_addrs(0)(1))
@@ -331,7 +331,7 @@ actor Initializer
         for p in ps.values() do
           pvals.push(p)
         end
-        let local_topology = LocalTopology(topology.name(), consume pvals)
+        let local_topology = LocalTopology(application.name(), consume pvals)
 
         if w == "initializer" then
           _local_topology_initializer.update_topology(local_topology)
@@ -343,7 +343,7 @@ actor Initializer
 
       distribute_local_topologies(consume other_local_topologies)
     else
-      @printf[I32]("Error initializating topology!/n".cstring())
+      @printf[I32]("Error initializating application!/n".cstring())
     end
 
 
@@ -357,6 +357,6 @@ class WorkerTopologyData
     boundary_step_id = id
     step_builders = sb
 
-trait TopologyStarter
+trait ApplicationStarter
   fun apply(initializer: Initializer, workers: Array[String] box,
     input_addrs: Array[Array[String]] val, expected: USize) ?

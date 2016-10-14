@@ -26,10 +26,9 @@ use "wallaroo/topology"
 actor Main
   new create(env: Env) =>
     try
-      let topology = recover val
-        Topology("Complex Numbers App")
-          .new_pipeline[Complex val, Complex val](ComplexDecoder, 
-            "Complex Numbers")
+      let application = recover val
+        Application("Complex Numbers App")
+          .new_pipeline[Complex val, Complex val]("Complex Numbers", ComplexDecoder where coalescing = false)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Conjugate end)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
@@ -40,7 +39,7 @@ actor Main
             => Conjugate end)
           .to_sink(ComplexEncoder, recover [0] end)
       end
-      Startup(env, topology)//, 1)
+      Startup(env, application)//, 1)
     else
       env.out.print("Couldn't build topology")
     end

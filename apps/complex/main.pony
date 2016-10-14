@@ -105,18 +105,18 @@ primitive ComplexStarter
       sendable_output_addr.push(output_addr(1)) 
 
       // determine layout
-      let topology_starter = ComplexTopologyStarter(
+      let application_starter = ComplexApplicationStarter(
         consume sendable_output_addr, metrics_conn, auth)
 
       match initializer
       | let init: Initializer =>
-        init.start(topology_starter)
+        init.start(application_starter)
       end
     else
       @printf[I32](("I'm " + worker_name + " and I'm not the initializer!\n").cstring())
     end
 
-class ComplexTopologyStarter is TopologyStarter
+class ComplexApplicationStarter is ApplicationStarter
   let _output_addr: Array[String] val
   let _metrics_conn: TCPConnection
   let _auth: AmbientAuth
