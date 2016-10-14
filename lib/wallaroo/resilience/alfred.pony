@@ -3,13 +3,13 @@ use "files"
 use "collections"
 
 trait Backend
-  fun ref write(log: Array[ByteSeq] val)
+  fun ref writev(log: Array[ByteSeq] val)
   //fun read(from: U64, to: U64): Array[Array[U8] val] val
   fun ref flush()
   fun ref start()
 
 class DummyBackend is Backend
-  fun ref write(log: Array[ByteSeq] val) => None
+  fun ref writev(log: Array[ByteSeq] val) => None
   fun ref flush() => None
   fun ref start() => None
 
@@ -60,7 +60,12 @@ class FileBackend is Backend
           let statechange_id = r.u64_be()
           let seq_id = r.u64_be()
           let payload_length = r.u64_be()
-          let payload = recover val _file.read(payload_length.usize()) end
+          let payload_single = recover val _file.read(payload_length.usize()) end
+          let payload = recover val
+            let p = Array[ByteSeq]
+            p.push(payload_single)
+            p
+          end
           let log_entry = LogEntry(uid, frac_ids, statechange_id, seq_id, payload)
           _alfred.replay_log_entry(buffer_id, log_entry)
         end
@@ -73,7 +78,7 @@ class FileBackend is Backend
       //start writing a new one
     end
 
-  fun ref write(log: Array[ByteSeq] val) =>
+  fun ref writev(log: Array[ByteSeq] val) =>
     _file.writev(log)
 
   fun ref flush() =>
@@ -144,8 +149,8 @@ actor Alfred
           _writer.u64_be(entry.statechange_id())
           _writer.u64_be(entry.seq_id())
           _writer.u64_be(entry.payload().size().u64())
-          _writer.write(entry.payload())
-          _backend.write(recover val _writer.done() end)
+          _writer.writev(entry.payload())
+          _backend.writev(recover val _writer.done() end)
         end
         _backend.flush()
         //TODO: communicate that writing is finished

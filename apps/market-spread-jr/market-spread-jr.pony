@@ -38,23 +38,82 @@ class SymbolData
   var last_bid: F64 = 0
   var last_offer: F64 = 0
 
+class SymbolDataStateChange is StateChange[SymbolData]
+
+  let _name: String = "SymbolDataStateChange"
+  let _id: U64
+  var should_reject_trades: Bool = false
+  var last_bid: F64 = 0
+  var last_offer: F64 = 0
+
+  new create(id': U64) =>
+    _id = id'
+
+  fun name(): String => _name
+  fun id(): U64 => _id
+
+  fun apply(state: SymbolData ref) =>
+    state.last_bid = last_bid
+    state.last_offer = last_offer
+    state.should_reject_trades = should_reject_trades
+
+  fun to_log_entry(out_writer: Writer) : Array[ByteSeq] val =>
+    out_writer.f64_be(last_bid)
+    out_writer.f64_be(last_offer)
+    //TODO: this is terrible, bigly
+    if should_reject_trades then
+      out_writer.u8(0)
+    else
+      out_writer.u8(1)
+    end
+    out_writer.done()
+
+  fun ref read_log_entry(in_reader: Reader) ? =>
+    last_bid =
+      try 
+        in_reader.f64_be()
+      else
+        error
+      end
+    last_offer =
+      try 
+        in_reader.f64_be()
+      else
+        error
+      end
+    should_reject_trades =
+      try
+        let reject_orders = in_reader.u8()
+        if reject_orders == 1 then
+          true
+        else
+          false
+        end
+      else
+        error
+      end
+
 primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
+
   fun name(): String => "Update NBBO"
 
-  fun apply(msg: FixNbboMessage val, state: SymbolData): None =>
+  fun apply(msg: FixNbboMessage val, sc_repo: StateChangeRepository[SymbolData], state: SymbolData): None =>
     let offer_bid_difference = msg.offer_px() - msg.bid_px()
 
-    state.should_reject_trades = (offer_bid_difference >= 0.05) or
-      ((offer_bid_difference / msg.mid()) >= 0.05)
+    try
+      let sc = sc_repo.lookup_by_name("SymbolDataStateChange") as SymbolDataStateChange
+      sc.should_reject_trades = (offer_bid_difference >= 0.05) or
+        ((offer_bid_difference / msg.mid()) >= 0.05)
 
-    state.last_bid = msg.bid_px()
-    state.last_offer = msg.offer_px()
-    None
+      sc.last_bid = msg.bid_px()
+      sc.last_offer = msg.offer_px()
+      sc
+    end
 
 class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val, SymbolData]
   fun name(): String => "Check Order against NBBO"
 
-  fun apply(msg: FixOrderMessage val, state: SymbolData): 
+  fun apply(msg: FixOrderMessage val, sc_repo: StateChangeRepository[SymbolData], state: SymbolData): 
     (OrderResult val | None) =>
     if state.should_reject_trades then
       OrderResult(msg, state.last_bid, state.last_offer,

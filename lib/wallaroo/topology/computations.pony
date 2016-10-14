@@ -11,7 +11,7 @@ interface Computation[In: Any val, Out: Any val] is BasicComputation
 interface StateComputation[In: Any val, Out: Any val, State: Any #read] is BasicComputation
   // Return a Bool indicating whether the message was finished processing here
   // Return false to indicate the message was sent on to the next step.
-  fun apply(input: In, state: State): ((Out, StateChange[State] val) | Out | StateChange[State] val |  None)
+  fun apply(input: In, sc_repo: StateChangeRepository[State], state: State): ((Out, StateChange[State] val) | Out | StateChange[State] val |  None)
   fun name(): String
 
 trait StateProcessor[State: Any #read] is BasicComputation
@@ -42,7 +42,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
             incoming_envelope: MsgEnvelope val):
         ((StateChange[State] val, Bool) | Bool)
   =>
-    match _state_comp(_input, state)
+    match _state_comp(_input, sc_repo, state)
     | None => true
     | let output: Out =>
       _router.route[Out](metric_name, source_ts, output, outgoing_envelope,

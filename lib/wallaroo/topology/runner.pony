@@ -273,6 +273,8 @@ class StateRunner[State: Any #read] is Runner
   let _event_log_buffer: EventLogBuffer tag
   let _alfred: Alfred
   let _deduplication_list: Array[MsgEnvelope val]
+  let _wb : Writer
+  let _rb : Reader
 
   new iso create(state_builder: {(): State} val, 
       metrics_reporter: MetricsReporter iso,
@@ -285,9 +287,11 @@ class StateRunner[State: Any #read] is Runner
     _alfred = alfred
     _event_log_buffer = log_buffer
     _deduplication_list = Array[MsgEnvelope val]
+    _wb = Writer
+    _rb = Reader
 
-  fun ref register_state_change(sc: StateChange[State] ref) : U64 =>
-    _state_change_repository.register(sc)
+  fun ref register_state_change(scb: StateChangeBuilder[State] ref) : U64 =>
+    _state_change_repository.make_and_register(scb)
 
   fun ref set_buffer_target(target: ResilientOrigin tag) =>
     _event_log_buffer.set_target(target)
@@ -347,8 +351,13 @@ class StateRunner[State: Any #read] is Runner
       _deduplication_list.push(me)
       try
         let sc = _state_change_repository(log_entry.statechange_id())
-        sc.read_log_entry(log_entry.payload())
-        sc.apply(_state)
+        for e in log_entry.payload().values() do
+          _rb.append(e as Array[U8] val)
+        end
+        try
+          sc.read_log_entry(_rb)
+          sc.apply(_state)
+        end
       else
         @printf[I32]("FATAL: could not look up state_change with id %d".cstring(),
           log_entry.statechange_id())
@@ -373,7 +382,7 @@ class StateRunner[State: Any #read] is Runner
             incoming_envelope.frac_ids,
             sc.id(),
             outgoing_envelope.seq_id,
-            sc.to_log_entry()) 
+            sc.to_log_entry(_wb)) 
         _event_log_buffer.queue(log_entry)
         sc.apply(_state)
         let computation_end = Time.nanos()

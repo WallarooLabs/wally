@@ -10,10 +10,10 @@ class LogEntry
   let _frac_ids: (Array[U64] val | None)
   let _statechange_id: U64
   let _seq_id: U64
-  let _payload: Array[U8] val
+  let _payload: Array[ByteSeq] val
 
   new val create(uid': U64, frac_ids': (Array[U64] val | None),
-    statechange_id': U64, seq_id': U64,payload': Array[U8] val) =>
+    statechange_id': U64, seq_id': U64,payload': Array[ByteSeq] val) =>
     _uid = uid'
     _frac_ids = frac_ids'
     _statechange_id = statechange_id'
@@ -28,7 +28,7 @@ class LogEntry
   fun frac_ids(): (Array[U64] val | None) => _frac_ids
   fun statechange_id(): U64 => _statechange_id
   fun seq_id(): U64 => _seq_id
-  fun payload(): Array[U8] val => _payload
+  fun payload(): Array[ByteSeq] val => _payload
 
 trait EventLogBuffer
    be queue(log_entry: LogEntry val)
