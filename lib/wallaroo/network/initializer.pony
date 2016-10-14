@@ -263,6 +263,15 @@ actor Initializer
                 steps(cur_step_id) = worker
 
                 cur_step_id = _guid_gen.u128()
+              elseif not pipeline.is_coalesced() then
+                let seq_builder = RunnerSequenceBuilder(
+                  runner_builders = recover Array[RunnerBuilder val] end)
+                let step_builder = StepBuilder(seq_builder, 
+                  cur_step_id)
+                step_builders.push(step_builder)
+                steps(cur_step_id) = worker
+
+                cur_step_id = _guid_gen.u128()                
               else
                 runner_builders.push(pipeline(i.usize()))
               end

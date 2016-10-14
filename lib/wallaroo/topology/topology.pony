@@ -35,6 +35,7 @@ trait BasicPipeline
   fun source_builder(): BytesProcessorBuilder val
   fun sink_runner_builder(): SinkRunnerBuilder val
   fun sink_target_ids(): Array[U64] val
+  fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder val ?
   fun size(): USize
 
@@ -45,13 +46,16 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
   let _source_builder: BytesProcessorBuilder val
   var _sink_builder: SinkRunnerBuilder val
+  let _is_coalesced: Bool
 
-  new create(d: SourceDecoder[In] val, n: String) =>
+  new create(d: SourceDecoder[In] val, n: String, is_coalesced': Bool = true) 
+  =>
     _decoder = d
     _runner_builders = Array[RunnerBuilder val]
     _name = n
     _source_builder = SourceBuilder[In](_name, _decoder)
     _sink_builder = SimpleSinkRunnerBuilder[Out](_name)
+    _is_coalesced = is_coalesced'
 
   fun ref add_runner_builder(p: RunnerBuilder val) =>
     _runner_builders.push(p)
@@ -90,6 +94,8 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun sink_runner_builder(): SinkRunnerBuilder val => _sink_builder
 
   fun sink_target_ids(): Array[U64] val => _sink_target_ids
+
+  fun is_coalesced(): Bool => _is_coalesced
 
   fun size(): USize => _runner_builders.size()
 
