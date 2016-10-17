@@ -47,28 +47,34 @@ primitive ComplexStarter
         output_addr(0),
         output_addr(1))
       let reports_join_msg = HubProtocol.join("reports:complex-numbers")
-      reports_conn.writev(connect_msg)
-      reports_conn.writev(reports_join_msg)
 
       let sink_reporter = MetricsReporter("complex-numbers", metrics_conn)
-      let sink = Step(SimpleSink(consume sink_reporter))
+      let sink = Step(SimpleSinkRunner(sink_reporter.clone()), consume
+        sink_reporter)
+      let sink_router = DirectRouter(sink)
+
       let scale_reporter = MetricsReporter("complex-numbers", metrics_conn)
       let scale_runner = ComputationRunner[Complex val, Complex val](Scale,
-        sink, consume scale_reporter)
-      let scale_step = Step(consume scale_runner)
+        RouterRunner, scale_reporter.clone())
+      let scale_step = Step(consume scale_runner, consume scale_reporter)
+      scale_step.update_router(sink_router)
+      let scale_step_router = DirectRouter(scale_step)
 
-      let complex_source_builder: {(): Source iso^} val = 
+      let complex_source_builder: {(): Source[Complex val] iso^} val = 
         recover 
-          lambda()(metrics_conn, scale_step): Source iso^ 
+          lambda()(metrics_conn, scale_step_router): Source[Complex val] iso^ 
           =>
             let complex_reporter = MetricsReporter("complex-numbers",
               metrics_conn)
-            let runner = ComputationRunner[Complex val, Complex val](Conjugate,
-              scale_step, consume complex_reporter)
-            let conjugate_step = Step(consume runner)
-            let router = DirectRouter[Complex val, Step tag](conjugate_step) 
-            StatelessSource[Complex val]("Complex Numbers Source",
-              ComplexSourceParser, consume router)
+            let conjugate_runner = ComputationRunner[Complex val, Complex val](
+              Conjugate, RouterRunner, complex_reporter.clone())
+            let conjugate_step = Step(consume conjugate_runner, 
+              complex_reporter.clone())
+            conjugate_step.update_router(scale_step_router)
+            let conjugate_router = DirectRouter(conjugate_step) 
+
+            Source[Complex val]("Complex Numbers", ComplexSourceDecoder, 
+              RouterRunnerBuilder, conjugate_router, consume complex_reporter)
           end
         end
 
@@ -153,18 +159,21 @@ class ComplexTopologyStarter is TopologyStarter
     // Configure local topology on initializer, including source
     let sink_reporter = MetricsReporter(pipeline_name, _metrics_conn)
 
-    let proxy = Proxy("initializer", conjugate_step_id, consume sink_reporter, _auth)
-    let proxy_step = Step(consume proxy)
+    let proxy = Proxy("initializer", conjugate_step_id, sink_reporter.clone(),
+      _auth)
+    let proxy_step = Step(consume proxy, consume sink_reporter)
 
     initializer.register_proxy(worker2, proxy_step)
 
-    let complex_source_builder: {(): Source iso^} val = 
+    let complex_source_builder: {(): Source[Complex val] iso^} val = 
       recover 
-        lambda()(proxy_step): Source iso^ 
+        lambda()(proxy_step, _metrics_conn): Source[Complex val] iso^ 
         =>
-          let router = DirectRouter[Complex val, Step tag](proxy_step) 
-          StatelessSource[Complex val]("Complex Numbers",
-            ComplexSourceParser, consume router)
+          let complex_reporter = MetricsReporter("complex-numbers",
+            _metrics_conn)
+          let proxy_router = DirectRouter(proxy_step) 
+          Source[Complex val]("Complex Numbers", ComplexSourceDecoder, 
+            RouterRunnerBuilder, proxy_router, consume complex_reporter)
         end
       end
 
@@ -191,21 +200,50 @@ class ComplexTopologyStarter is TopologyStarter
       recover Array[StepBuilder val] end
 
     // Worker 2
-    let conjugate_builder = GeneralStepBuilder[Complex val, Complex val](
-      lambda(): Computation[Complex val, Complex val] val => Conjugate end,
-      pipeline_name, conjugate_step_id)
+    let conjugate_builder = lambda(): Computation[Complex val, Complex val] val => Conjugate end
 
-    let scale_builder = GeneralStepBuilder[Complex val, Complex val](
-      lambda(): Computation[Complex val, Complex val] val => Scale end,
-      pipeline_name, scale_step_id)
+    let conjugate_runner_builders: Array[RunnerBuilder val] trn = recover
+      Array[RunnerBuilder val] end
+
+    conjugate_runner_builders.push(ComputationRunnerBuilder[Complex val,
+      Complex val](conjugate_builder))
+
+    let conjugate_step_builder = StatelessStepBuilder(
+      RunnerSequenceBuilder(consume conjugate_runner_builders),
+      conjugate_step_id)
+
+
+    let scale_builder = lambda(): Computation[Complex val, Complex val] val => Scale end
+
+    let scale_runner_builders: Array[RunnerBuilder val] trn = recover
+      Array[RunnerBuilder val] end
+
+    scale_runner_builders.push(ComputationRunnerBuilder[Complex val,
+      Complex val](scale_builder))
+
+    let scale_step_builder = StatelessStepBuilder(
+      RunnerSequenceBuilder(consume scale_runner_builders), scale_step_id)
+
 
     let worker_2_builders: Array[StepBuilder val] trn = 
       recover Array[StepBuilder val] end
 
-    worker_2_builders.push(conjugate_builder) 
-    worker_2_builders.push(scale_builder) 
+    worker_2_builders.push(conjugate_step_builder) 
+    worker_2_builders.push(scale_step_builder) 
 
-    let worker_2_topology = LocalTopology(pipeline_name, consume worker_2_builders where global_sink = _output_addr)
+    let sink_runner_builder = EncoderSinkRunnerBuilder[Complex val](
+      pipeline_name, ComplexEncoder)
+
+    let egress_builder = EgressBuilder(_output_addr, sink_runner_builder)
+
+    let worker_2_pipelines: Array[LocalPipeline val] trn = recover
+      Array[LocalPipeline val] end
+
+    worker_2_pipelines.push(LocalPipeline(pipeline_name, 
+      consume worker_2_builders, egress_builder))
+
+    let worker_2_topology = LocalTopology("complex numbers", 
+      consume worker_2_pipelines)
 
     let local_topologies: Array[LocalTopology val] trn = 
       recover Array[LocalTopology val] end
@@ -227,30 +265,69 @@ class ComplexTopologyStarter is TopologyStarter
       recover Array[StepBuilder val] end
 
     // Worker 2
-    let conjugate_builder = GeneralStepBuilder[Complex val, Complex val](
-      lambda(): Computation[Complex val, Complex val] val => Conjugate end,
-      pipeline_name, conjugate_step_id)
+    let conjugate_builder = lambda(): Computation[Complex val, Complex val] val => Conjugate end
+
+    let conjugate_runner_builders: Array[RunnerBuilder val] trn = recover
+      Array[RunnerBuilder val] end
+
+    conjugate_runner_builders.push(ComputationRunnerBuilder[Complex val,
+      Complex val](conjugate_builder))
+
+    let conjugate_step_builder = StatelessStepBuilder(
+      RunnerSequenceBuilder(consume conjugate_runner_builders),
+      conjugate_step_id)
+
 
     let worker_2_builders: Array[StepBuilder val] trn = 
       recover Array[StepBuilder val] end
 
-    worker_2_builders.push(conjugate_builder) 
+    worker_2_builders.push(conjugate_step_builder) 
 
     // Worker 3
-    let scale_builder = GeneralStepBuilder[Complex val, Complex val](
-      lambda(): Computation[Complex val, Complex val] val => Scale end,
-      pipeline_name, scale_step_id)
+    let scale_builder = lambda(): Computation[Complex val, Complex val] val => Scale end
+
+    let scale_runner_builders: Array[RunnerBuilder val] trn = recover
+      Array[RunnerBuilder val] end
+
+    scale_runner_builders.push(ComputationRunnerBuilder[Complex val,
+      Complex val](scale_builder))
+
+    let scale_step_builder = StatelessStepBuilder(
+      RunnerSequenceBuilder(consume scale_runner_builders), scale_step_id)
 
     let worker_3_builders: Array[StepBuilder val] trn = 
       recover Array[StepBuilder val] end
 
-    worker_3_builders.push(scale_builder)
+    worker_3_builders.push(scale_step_builder)
 
-    let worker_2_topology = LocalTopology(pipeline_name, consume worker_2_builders
-      where local_sink = ProxyAddress(worker3, scale_step_id))
 
-    let worker_3_topology = LocalTopology(pipeline_name, consume worker_3_builders
-      where global_sink = _output_addr)
+    let sink_runner_builder = EncoderSinkRunnerBuilder[Complex val](
+      pipeline_name, ComplexEncoder)
+
+    let worker_3_egress_builder = EgressBuilder(_output_addr, 
+      sink_runner_builder)
+
+    let worker_3_pipelines: Array[LocalPipeline val] trn = recover
+      Array[LocalPipeline val] end
+
+    worker_3_pipelines.push(LocalPipeline(pipeline_name, 
+      consume worker_3_builders, worker_3_egress_builder))
+
+
+
+    let worker_2_egress_builder = EgressBuilder(
+      ProxyAddress(worker3, scale_step_id), sink_runner_builder)
+
+    let worker_2_pipelines: Array[LocalPipeline val] trn = recover
+      Array[LocalPipeline val] end
+
+    worker_2_pipelines.push(LocalPipeline(pipeline_name, 
+      consume worker_2_builders, worker_2_egress_builder))
+
+
+    let worker_2_topology = LocalTopology(pipeline_name, consume worker_2_pipelines)
+
+    let worker_3_topology = LocalTopology(pipeline_name, consume worker_3_pipelines)
 
     let local_topologies: Array[LocalTopology val] trn = 
       recover Array[LocalTopology val] end
@@ -258,55 +335,4 @@ class ComplexTopologyStarter is TopologyStarter
     local_topologies.push(worker_3_topology)
 
     consume local_topologies 
-
-class GeneralStepBuilder[In: Any val, Out: Any val]
-  let _computation_builder: {(): Computation[In, Out] val} val
-  let _pipeline_name: String 
-  let _id: U128
-
-  new val create(c: {(): Computation[In, Out] val} val,
-    pipeline_name: String, id': U128) =>
-    _computation_builder = c
-    _pipeline_name = pipeline_name
-    _id = id'
-
-  fun id(): U128 => _id
-
-  fun apply(target: Step tag, metrics_conn: TCPConnection): Step tag =>
-    let reporter = MetricsReporter(_pipeline_name, metrics_conn)
-    let runner = ComputationRunner[In, Out](
-      _computation_builder(), target, consume reporter)    
-    Step(consume runner)
-
-
-
-// class val ConjugateStepBuilder
-//   let _metrics_builder: {(): MetricsReporter iso} val
-//   let _computation_builder: {(): Computation[Complex val, Complex val]} val
-
-//   new create(m: {(): MetricsReporter iso} val, 
-//     c: {(): Computation[Complex val, Complex val]} val) =>
-//     _metrics_builder = m
-//     _computation_builder = c
-
-//   fun apply(target: Step tag): Step tag =>
-//     let scale_reporter = MetricsReporter("complex-numbers", metrics_conn)
-//     let conjugate_runner = ComputationRunner[Complex val, Complex val](Conjugate,
-//       target, _metrics_builder())    
-//     Step(consume conjugate_runner)
-
-// class val ScaleStepBuilder
-//   let _metrics_builder: {(): MetricsReporter iso} val
-//   let _computation_builder: {(): Computation[Complex val, Complex val]} val
-
-//   new create(m: {(): MetricsReporter iso} val, 
-//     c: {(): Computation[Complex val, Complex val]} val) =>
-//     _metrics_builder = m
-//     _computation_builder = c
-
-//   fun apply(target: Step tag): Step tag =>
-//     let scale_reporter = MetricsReporter("complex-numbers", metrics_conn)
-//     let scale_runner = ComputationRunner[Complex val, Complex val](Scale,
-//       target, _metrics_builder())    
-//     Step(consume scale_runner)    
 

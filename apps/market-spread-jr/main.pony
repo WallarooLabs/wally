@@ -35,26 +35,30 @@ primitive MarketSpreadStarter
     metrics_conn.writev(connect_msg)
     metrics_conn.writev(metrics_join_msg)
 
-    let reports_socket = TCPConnection(connect_auth,
+    let reports_conn = TCPConnection(connect_auth,
           OutNotify("rejections"),
           output_addr(0),
           output_addr(1))
     let reports_join_msg = HubProtocol.join("reports:market-spread")
-    reports_socket.writev(connect_msg)
-    reports_socket.writev(reports_join_msg)
 
+    let router_builder = 
+      recover
+        lambda()(metrics_conn): Router val =>
+          let reporter = MetricsReporter("market-spread", metrics_conn)
+          let s = StateRunner[SymbolData](SymbolDataBuilder, reporter.clone())
+          DirectRouter(Step(consume s, consume reporter))
+        end
+      end
 
-    let symbol_actors: Map[String, Step tag] trn = recover trn Map[String, Step tag] end
-    for i in legal_symbols().values() do
-      let padded = _pad_symbol(i)
-      let reporter = MetricsReporter("market-spread", metrics_conn)
-      let s = StateRunner[SymbolData](
-        lambda(): SymbolData => SymbolData end, consume reporter)
-      symbol_actors(padded) = Step(consume s)
+    let padded_symbols: Array[String] iso = recover Array[String] end
+    for symbol in legal_symbols().values() do
+      padded_symbols.push(_pad_symbol(symbol))
     end
 
-    let symbol_to_actor: Map[String, Step tag] val = 
-      consume symbol_actors
+    let paritition_finder = StatePartitionFinder[(FixNbboMessage val | FixOrderMessage val), String](SymbolPartitionFunction, 
+        consume padded_symbols, consume router_builder)
+
+    let partition_router = PartitionRouter(paritition_finder)
 
     let initial_nbbo: Array[Array[U8] val] val = 
       if init_path == "" then
@@ -63,15 +67,20 @@ primitive MarketSpreadStarter
         _initial_nbbo_msgs(init_path, auth)
       end
 
-    let nbbo_source_builder: {(): Source iso^} val = 
+    let nbbo_runner_builder: RunnerBuilder val =
+      PreStateRunnerBuilder[FixNbboMessage val, None, SymbolData](
+        UpdateNbbo, EmptyRouter)
+
+    let nbbo_source_builder: {(): Source[FixNbboMessage val] iso^} val = 
       recover 
-        lambda()(symbol_to_actor, metrics_conn, initial_nbbo): 
-          Source iso^ 
+        lambda()(metrics_conn, nbbo_runner_builder, partition_router): 
+          Source[FixNbboMessage val] iso^ 
         =>
           let nbbo_reporter = MetricsReporter("market-spread", metrics_conn)
-          StateSource[FixNbboMessage val, SymbolData](
-          "Nbbo", NbboSourceParser, SymbolRouter(symbol_to_actor), 
-          UpdateNbbo, consume nbbo_reporter, initial_nbbo)
+          
+          Source[FixNbboMessage val]("Nbbo", NbboSourceDecoder,
+            nbbo_runner_builder, partition_router, 
+            consume nbbo_reporter)
         end
       end
 
@@ -81,21 +90,35 @@ primitive MarketSpreadStarter
     connections.register_listener(
       TCPListener(listen_auth,
         SourceListenerNotify(nbbo_source_builder, metrics1, expected),
-        nbboutput_addr(0),
-        nbboutput_addr(1))
+          nbboutput_addr(0),
+          nbboutput_addr(1))
     )
 
-    let check_order = CheckOrder(reports_socket)
-    let order_source: {(): Source iso^} val =
+    let sink_reporter = MetricsReporter("market-spread", 
+      metrics_conn)
+
+    let external_sink_runner = EncoderSinkRunner[OrderResult val](
+      OrderResultEncoder, TCPRouter(reports_conn), sink_reporter.clone(),
+      recover [connect_msg, reports_join_msg] end)
+
+    let sink_router = DirectRouter(Step(consume external_sink_runner,
+      consume sink_reporter))
+
+    let order_runner_builder: RunnerBuilder val =
+      PreStateRunnerBuilder[FixOrderMessage val, OrderResult val, SymbolData](
+        CheckOrder, sink_router)
+
+    let order_source_builder: {(): Source[FixOrderMessage val] iso^} val =
       recover 
-        lambda()(symbol_to_actor, metrics_conn, check_order): Source iso^ 
+        lambda()(metrics_conn, order_runner_builder, partition_router): 
+          Source[FixOrderMessage val] iso^ 
         =>
           let order_reporter = MetricsReporter("market-spread", 
             metrics_conn)
-          StateSource[FixOrderMessage val, 
-            SymbolData]("Order", OrderSourceParser, 
-            SymbolRouter(symbol_to_actor), check_order, 
-              consume order_reporter)
+
+          Source[FixOrderMessage val]("Order", OrderSourceDecoder, 
+            order_runner_builder, partition_router, 
+            consume order_reporter)
         end
       end
 
@@ -103,9 +126,9 @@ primitive MarketSpreadStarter
 
     connections.register_listener(
       TCPListener(listen_auth,
-        SourceListenerNotify(order_source, metrics2, (expected/2)),
-        order_addr(0),
-        order_addr(1))
+        SourceListenerNotify(order_source_builder, metrics2, (expected/2)),
+          order_addr(0),
+          order_addr(1))
     )
 
     @printf[I32]("Expecting %zu total messages\n".cstring(), expected)

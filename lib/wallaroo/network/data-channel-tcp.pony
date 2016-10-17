@@ -15,7 +15,7 @@ class DataChannelListenNotifier is TCPListenNotify
   let _is_initializer: Bool
   var _host: String = ""
   var _service: String = ""
-  let _routes: DataRouter val
+  let _router: DataRouter val
   let _connections: Connections
 
   new iso create(name: String, env: Env, auth: AmbientAuth, 
@@ -26,7 +26,7 @@ class DataChannelListenNotifier is TCPListenNotify
     _env = env
     _auth = auth
     _is_initializer = is_initializer
-    _routes = routes
+    _router = routes
     _connections = connections
 
   fun ref listening(listen: TCPListener ref) =>
@@ -44,16 +44,16 @@ class DataChannelListenNotifier is TCPListenNotify
     end
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelConnectNotifier(_routes, _env, _auth)
+    DataChannelConnectNotifier(_router, _env, _auth)
 
 class DataChannelConnectNotifier is TCPConnectionNotify
-  let _routes: DataRouter val
+  let _router: DataRouter val
   let _env: Env
   let _auth: AmbientAuth
   var _header: Bool = true
 
   new iso create(routes: DataRouter val, env: Env, auth: AmbientAuth) =>
-    _routes = routes
+    _router = routes
     _env = env
     _auth = auth
 
@@ -66,21 +66,15 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         _header = false
       end
     else
-      let msg = ChannelMsgDecoder(consume data, _auth)
-      match msg
+      match ChannelMsgDecoder(consume data, _auth)
       | let d: DeliveryMsg val =>
-        match _routes.route(d.target_id())
-        | let s: Step tag =>
-          d.deliver(s)
-        else
-          _env.err.print("Data channel: Target id not found for incoming data.")
-        end
-      // | let m: DataSenderReadyMsg val =>
-      //   _sender_name = m.node_name
-      //   _coordinator.connect_receiver(m.node_name)
+        @printf[I32]("Received delivery msg!!\n".cstring())
+        _router.route[DeliveryMsg val](d.metric_name(), d.source_ts(), d)
       | let m: SpinUpLocalTopologyMsg val =>
         _env.out.print("Received spin up local topology message!")
       | let m: UnknownChannelMsg val =>
+        _env.err.print("Unknown Wallaroo data message type.")
+      else
         _env.err.print("Unknown Wallaroo data message type.")
       end
 

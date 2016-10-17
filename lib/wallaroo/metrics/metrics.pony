@@ -104,3 +104,6 @@ class MetricsReporter
       end
 
     metrics.report(Time.nanos() - source_ts)
+
+  fun clone(): MetricsReporter iso^ =>
+    MetricsReporter(_app_name, _metrics_conn)
