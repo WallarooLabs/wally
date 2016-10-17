@@ -42,7 +42,7 @@ primitive MarketSpreadStarter
           output_addr(1))
     let reports_join_msg = HubProtocol.join("reports:market-spread")
 
-    let alfred : Alfred tag = Alfred(DummyBackend)
+    let alfred : Alfred tag = Alfred(env, "/tmp/market-spread-jr.logs")
 
     let router_builder = 
       recover iso

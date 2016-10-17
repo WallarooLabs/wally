@@ -152,8 +152,6 @@ class ComputationRunner[In: Any val, Out: Any val] is Runner
         match result
         | None => true
         | let output: Out =>
-          //TODO: figure out if we want to chain the envelopes here? Probably
-          //not though
           _next.run[Out](metric_name, source_ts, output, outgoing_envelope,
           incoming_envelope, router)
         else

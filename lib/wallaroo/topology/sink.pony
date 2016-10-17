@@ -88,7 +88,7 @@ class EncoderSinkRunner[In: Any val] is Runner
     _metrics_reporter = consume metrics_reporter
     _target = target
     _encoder = encoder
-    //TODO: we need to make sure we only send these when we're not recovering
+    //TODO: do we need to make sure we only send these when we're not recovering?
     match _target
     | let tcp: TCPRouter val =>
       for msg in initial_msgs.values() do

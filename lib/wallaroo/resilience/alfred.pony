@@ -9,6 +9,7 @@ trait Backend
   fun ref start()
 
 class DummyBackend is Backend
+  new iso create() => None
   fun ref writev(log: Array[ByteSeq] val) => None
   fun ref flush() => None
   fun ref start() => None
@@ -18,10 +19,10 @@ class FileBackend is Backend
   let _filepath: FilePath
   let _alfred: Alfred tag
 
-  new create(filepath: FilePath, alfred: Alfred) =>
-    _alfred = alfred
+  new iso create(filepath: FilePath, alfred: Alfred) =>
     _filepath = filepath
     _file = recover iso File(filepath) end
+    _alfred = alfred
 
   fun ref start() =>
     if _filepath.exists() then
@@ -89,17 +90,24 @@ actor Alfred
     let _log_buffers: Array[EventLogBuffer tag]
     let _backend: Backend iso
     let _writer: Writer iso
-    let resilient_mode: Bool
 
-    new create(backend: Backend iso, resilient_mode': Bool = true) =>
+    new create(env: Env, filename: (String val | None) = None) =>
       _log_buffers = Array[EventLogBuffer tag]
-      _backend = consume backend
       _writer = recover iso Writer end
-      resilient_mode = resilient_mode'
-
-    be ready() =>
-      _backend.start()
-      //_status = Ready
+      _backend = 
+      recover iso
+        match filename
+        | let f: String val =>
+          try 
+            FileBackend(FilePath(env.root as AmbientAuth, f), this)
+          else
+            DummyBackend
+          end
+        else
+          DummyBackend
+        end
+      end
+      //_backend.start(this)
 
     be replay_finished() =>
       //signal all buffers that event log replay is finished
