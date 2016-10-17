@@ -48,8 +48,8 @@ extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
 extern void w_sink_encoder_encode(wallaroo::SinkEncoder *sink_encoder,
   wallaroo::Data *data_, char *bytes);
 
-extern void w_source_decoder_encode(wallaroo::SourceDecoder *source_decoder,
-  char *bytes);
+extern wallaroo::Data *w_source_decoder_decode(wallaroo::SourceDecoder *source_decoder,
+  char *bytes, size_t sz_);
 
 extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_);
 }
