@@ -2,10 +2,11 @@ use "collections"
 use "wallaroo/topology"
 
 trait Origin
-  fun send_watermark()
   fun tag hash(): U64 =>
     (digestof this).hash()
 
+type OriginSet is HashSet[Origin tag, HashIs[Origin tag]] 
+    
 class MsgEnvelope
   var origin: Origin tag   // tag referencing upstream origin for msg
   var msg_uid: U64         // Source assigned UID; universally unique
@@ -75,8 +76,18 @@ class HighWatermarkTable
      
   fun ref update(key: OriginRoutePair, seq_id: U64)
   =>
+  """
+  Keep track of the highest seq_id per route per origin.
+  """  
     try
-      _hwmt.upsert(key, seq_id, lambda(x: U64, y: U64): U64 =>  y end)
+      _hwmt.upsert(key, seq_id, lambda(x: U64, y: U64): U64
+      =>
+        if y > x then
+          y
+        else
+          x
+        end
+      end)
     else
       @printf[I32]("Error upserting into HighWaterMarkTable\n".cstring())      
     end
@@ -154,15 +165,28 @@ class LowWatermarkTable
   steps.
   """
   let _lwmt: Map[U64, U64]
-
+  var _low_watermark: U64
+  
   new create(size: USize)
   =>
     _lwmt = Map[U64, U64](size)
-  
+    _low_watermark = U64(0)
+    
   fun ref update(route_id: U64, seq_id: U64)
   =>
     _lwmt(route_id) = seq_id
+    _new_low_watermark(seq_id)
 
+  fun ref _new_low_watermark(seq_id: U64)
+  =>
+    var min = seq_id
+    for value in _lwmt.values() do
+      if value < min then
+        min = value
+      end
+    end
+    _low_watermark = min
+    
   fun apply(route_id: U64): U64 ?
   =>
     try
@@ -179,4 +203,10 @@ class LowWatermarkTable
     else
       @printf[I32]("Error removing key from LowWaterMarkTable\n".cstring())
     end
-    
+
+  fun low_watermark(): U64
+  =>
+    _low_watermark
+
+
+  

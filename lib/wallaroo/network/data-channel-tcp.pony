@@ -47,9 +47,10 @@ class DataChannelListenNotifier is TCPListenNotify
     DataChannelConnectNotifier(_router, _env, _auth)
 
 class DataOrigin is Origin
-  fun send_watermark() =>
-    //TODO: ack on TCP?
-    None
+  // be update_watermark(route_id: U64, seq_id: U64)
+  // =>
+  //   //TODO: ack on TCP?
+  //   None
 
 class DataChannelConnectNotifier is TCPConnectionNotify
   let _router: DataRouter val

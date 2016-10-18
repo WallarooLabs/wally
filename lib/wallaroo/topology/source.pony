@@ -30,9 +30,10 @@ class Source[In: Any val] is Origin
     _outgoing_envelope = MsgEnvelope(this, 0, None, 0, 0)
     _router = router
 
-  fun send_watermark() =>
-    //TODO: receive watermark, flush buffers and ack upstream (maybe?)
-    None
+  // be update_watermark(route_id: U64, seq_id: U64)
+  // =>
+  //   //TODO: receive watermark, flush buffers and ack upstream (maybe?)
+  //   None
 
   fun ref process(data: Array[U8 val] iso) =>
     let ingest_ts = Time.nanos()
