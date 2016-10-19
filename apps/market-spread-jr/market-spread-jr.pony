@@ -93,10 +93,17 @@ class UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
     let should_reject_trades = (offer_bid_difference >= 0.05) or
           ((offer_bid_difference / msg.mid()) >= 0.05)
     try
-      recover val
-        let sc = SymbolDataStateChange(0)
-        sc.update(should_reject_trades, msg.bid_px(), msg.offer_px())
-        sc as StateChange[SymbolData]
+      ifdef "resilience" then
+        recover val
+          let sc = SymbolDataStateChange(0)
+          sc.update(should_reject_trades, msg.bid_px(), msg.offer_px())
+          sc as StateChange[SymbolData]
+        end
+      else
+        state.should_reject_trades = should_reject_trades
+        state.last_bid = msg.bid_px()
+        state.last_offer = msg.offer_px()
+        None
       end
     end
 
