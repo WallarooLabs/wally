@@ -1,6 +1,7 @@
 use "buffered"
 use "time"
 use "net"
+use "collections"
 use "sendence/epoch"
 use "wallaroo/metrics"
 use "wallaroo/resilience"
@@ -11,6 +12,7 @@ actor Step is ResilientOrigin
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
   let _translate: TranslationTable = TranslationTable(10)
+  let _origins: OriginSet = OriginSet(10)
   var _router: Router val = EmptyRouter
   let _metrics_reporter: MetricsReporter 
   let _outgoing_envelope: MsgEnvelope ref
@@ -21,24 +23,24 @@ actor Step is ResilientOrigin
     _metrics_reporter = consume metrics_reporter
     _outgoing_envelope = MsgEnvelope(this, 0, None, 0, 0)
 
-  fun send_watermark() =>
-    //TODO: receive watermark, flush buffers and send another watermark
+  fun _send_watermark()
+  =>
+    // for origin in _all_origins.values do
+    //   origin.update_watermark(route_id, seq_id)
+    // end
     None
-
+    
   be update_router(router: Router val) => _router = router
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope val)
   =>
-    //TODO: make outgoing envelope
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       _outgoing_envelope, incoming_envelope, _router)
-    // Process envelope if we're done
-    // Note: We do the bookkeeping _after_ handing the computation result
-    //       to the next Step.
     if is_finished then
       ifdef "resilience" then
         _bookkeeping(incoming_envelope)
+        // if Sink then _send_watermark()
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
@@ -46,12 +48,8 @@ actor Step is ResilientOrigin
   be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope val)
   =>
-    //TODO: make outgoing envelope
     let is_finished = _runner.recovery_run[D](metric_name, source_ts, data,
       _outgoing_envelope, incoming_envelope, _router)
-    // Process envelope if we're done
-    // Note: We do the bookkeeping _after_ handing the computation result
-    //       to the next Step.
     if is_finished then
       _bookkeeping(incoming_envelope)
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
@@ -71,6 +69,23 @@ actor Step is ResilientOrigin
     //   sender.dispose()
     end
 
+  be update_watermark(route_id: U64, seq_id: U64)
+  =>
+  """
+  Process a high watermark received from a downstream step.
+  TODO: receive watermark, flush buffers and send another watermark
+  """
+  // translate downstream seq_id to origin's seq_id
+  let origin_seq_id = _translate.outToIn(seq_id)
+  // update low watermark for this route_id
+  _lwm.update(route_id, seq_id)
+  // report low watermark to upstream origins
+  for origin in _origins.values() do
+    //   origin.update_watermark(_lwm.low_watermark())
+    None
+  end
+
+  
   fun ref _bookkeeping(incoming_envelope: MsgEnvelope val)
   =>
     """
@@ -80,8 +95,9 @@ actor Step is ResilientOrigin
     _hwm.update((incoming_envelope.origin , incoming_envelope.route_id),
       incoming_envelope.seq_id)
     // keep track of mapping between incoming / outgoing seq_id
-   _translate.update(incoming_envelope.seq_id, _outgoing_envelope.seq_id)
-
+    _translate.update(incoming_envelope.seq_id, _outgoing_envelope.seq_id)
+    // keep track of origins
+    _origins.set(incoming_envelope.origin)
     
 interface StepBuilder
   fun id(): U128
