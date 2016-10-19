@@ -6,6 +6,7 @@ trait ResilientOrigin is Origin
   be replay_finished()
 
 class LogEntry
+  //TODO-Alan: this object needs to go away
   let _uid: U64
   let _frac_ids: (Array[U64] val | None)
   let _statechange_id: U64
@@ -69,7 +70,12 @@ actor StandardEventLogBuffer is EventLogBuffer
     _target = target
 
    be queue(log_entry: LogEntry val) =>
-    _buf.push(log_entry)
+    ifdef "resilience" then
+      _buf.push(log_entry)
+    else
+      //prevent a memory leak
+      None
+    end
 
    be flush(low_watermark: U64) =>
     match _id

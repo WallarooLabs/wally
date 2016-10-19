@@ -78,7 +78,7 @@ class SymbolDataStateChange is StateChange[SymbolData]
           false
         end
 
-primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
+class UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
 
   fun name(): String => "Update NBBO"
 

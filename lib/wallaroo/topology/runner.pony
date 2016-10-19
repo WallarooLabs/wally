@@ -97,10 +97,6 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
   fun name(): String => _state_comp.name()
   fun is_stateful(): Bool => true
 
-primitive DeactivatedEventLogBufferType
-primitive StandardEventLogBufferType
-type EventLogBufferType is (DeactivatedEventLogBufferType | StandardEventLogBufferType)
-
 class StateRunnerBuilder[State: Any #read]
   let _state_builder: StateBuilder[State] val
 
@@ -108,16 +104,10 @@ class StateRunnerBuilder[State: Any #read]
     _state_builder = state_builder
 
   fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None),
-    alfred: Alfred, elbt: EventLogBufferType): 
+    alfred: Alfred):
     Runner iso
   =>
-    let elb: EventLogBuffer tag = match elbt
-    | DeactivatedEventLogBufferType => DeactivatedEventLogBuffer
-    | StandardEventLogBufferType => StandardEventLogBuffer(alfred)
-    else
-      DeactivatedEventLogBuffer
-    end
-    StateRunner[State](_state_builder, consume metrics_reporter, alfred, elb)
+    StateRunner[State](_state_builder, consume metrics_reporter, alfred)
 
   fun name(): String => _state_builder.name()
   fun is_stateful(): Bool => true
@@ -275,15 +265,18 @@ class StateRunner[State: Any #read] is Runner
   let _rb : Reader
 
   new iso create(state_builder: {(): State} val, 
-      metrics_reporter: MetricsReporter iso,
-      alfred: Alfred, log_buffer: EventLogBuffer tag
-    ) 
+      metrics_reporter: MetricsReporter iso, alfred: Alfred) 
   =>
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
     _state_change_repository = StateChangeRepository[State]
     _alfred = alfred
-    _event_log_buffer = log_buffer
+    _event_log_buffer =
+      ifdef "resilience" then
+        StandardEventLogBuffer(alfred)
+      else
+        DeactivatedEventLogBuffer
+      end
     _deduplication_list = Array[MsgEnvelope val]
     _wb = Writer
     _rb = Reader
@@ -376,12 +369,14 @@ class StateRunner[State: Any #read] is Runner
       match sp(_state, _state_change_repository, metric_name, source_ts,
           outgoing_envelope, incoming_envelope)
       | (let sc: StateChange[State] val, let is_finished: Bool) =>
-        let log_entry = LogEntry(incoming_envelope.msg_uid,
-            incoming_envelope.frac_ids,
-            sc.id(),
-            outgoing_envelope.seq_id,
-            sc.to_log_entry(_wb)) 
-        _event_log_buffer.queue(log_entry)
+        ifdef "resilience" then
+          let log_entry = LogEntry(incoming_envelope.msg_uid,
+              incoming_envelope.frac_ids,
+              sc.id(),
+              outgoing_envelope.seq_id,
+              sc.to_log_entry(_wb)) 
+          _event_log_buffer.queue(log_entry)
+        end
         sc.apply(_state)
         let computation_end = Time.nanos()
         //_metrics_reporter.step_metric(sp.name(), computation_start, computation_end)

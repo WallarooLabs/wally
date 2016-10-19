@@ -42,16 +42,19 @@ primitive MarketSpreadStarter
           output_addr(1))
     let reports_join_msg = HubProtocol.join("reports:market-spread")
 
-    let alfred : Alfred tag = Alfred(env, "/tmp/market-spread-jr.logs")
+    let alfred : Alfred tag =
+      ifdef "resilience" then
+        Alfred(env, "/tmp/market-spread-jr.logs")
+      else
+        Alfred(env)
+      end
 
     let router_builder = 
       recover iso
         var i: U64 = 1
         lambda ref()(metrics_conn,alfred,i): Router val =>
           let reporter = MetricsReporter("market-spread", metrics_conn)
-          let log_buffer = DeactivatedEventLogBuffer
-          let s = StateRunner[SymbolData](SymbolDataBuilder, reporter.clone(),
-            alfred, log_buffer)
+          let s = StateRunner[SymbolData](SymbolDataBuilder, reporter.clone(), alfred)
           i = i + 1
           DirectRouter(Step(consume s, consume reporter), i)
         end

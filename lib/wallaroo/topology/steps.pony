@@ -37,7 +37,9 @@ actor Step is ResilientOrigin
     // Note: We do the bookkeeping _after_ handing the computation result
     //       to the next Step.
     if is_finished then
-      _bookkeeping(incoming_envelope)
+      ifdef "resilience" then
+        _bookkeeping(incoming_envelope)
+      end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
     
