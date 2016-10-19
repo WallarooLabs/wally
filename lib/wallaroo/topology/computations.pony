@@ -44,6 +44,9 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
         ((StateChange[State] val, Bool) | Bool)
   =>
     match _state_comp(_input, sc_repo, state)
+    //TODO: this None match needs to stay here for now, because if Out is None
+    //things get a bit messy. Needs to be fixed properly.
+    | None => true
     | (let output: Out, let state_change: StateChange[State] val) =>
       _router.route[Out](metric_name, source_ts, output, outgoing_envelope,
         incoming_envelope)
