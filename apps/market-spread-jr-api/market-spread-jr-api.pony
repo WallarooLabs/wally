@@ -44,6 +44,7 @@ actor Main
         Application("Market Spread App")
           .new_pipeline[FixOrderMessage val, OrderResult val](
             "Orders", OrderSourceDecoder)
+            // .to[FixOrderMessage val](IdentityBuilder)
             .to_state_partition[Symboly val, String, 
               (OrderResult val | None), SymbolData](CheckOrder, 
               SymbolDataBuilder, "symbol-data", symbol_data_partition)
@@ -74,6 +75,15 @@ actor Main
       env.out.print("Couldn't build topology")
     end
 
+primitive Identity
+  fun name(): String => "identity"
+  fun apply(r: FixOrderMessage val): FixOrderMessage val =>
+    r
+
+primitive IdentityBuilder
+  fun apply(): Computation[FixOrderMessage val, FixOrderMessage val] val =>
+    Identity
+ 
 interface Symboly
   fun symbol(): String
 

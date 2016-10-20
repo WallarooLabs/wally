@@ -28,13 +28,13 @@ actor Main
     try
       let application = recover val
         Application("Complex Numbers App")
-          .new_pipeline[Complex val, Complex val]("Complex Numbers", ComplexDecoder where coalescing = false)
+          .new_pipeline[Complex val, Complex val]("Complex Numbers", ComplexDecoder)// where coalescing = false)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Conjugate end)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Scale(5) end)
-          .to_stateful[Complex val, Counter](UpdateCounter,
-            CounterBuilder, "counter-builder")
+          // .to_stateful[Complex val, Counter](UpdateCounter,
+            // CounterBuilder, "counter-builder")
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Conjugate end)
           .to_sink(ComplexEncoder, recover [0] end)
@@ -101,6 +101,7 @@ primitive ComplexDecoder
 
 primitive ComplexEncoder
   fun apply(c: Complex val, wb: Writer): Array[ByteSeq] val =>
+    @printf[I32]("Got a result!\n".cstring())
     // Header
     wb.u32_be(8)
     // Fields

@@ -226,9 +226,9 @@ actor ApplicationInitializer
                   if not state_partition_map.contains(state_name) then
                     state_partition_map(state_name) = pb.partition_addresses(worker)
                   end
-                else
-                  @printf[I32]("Non-partitioned state not currently supported\n".cstring())
-                  error
+                // else
+                //   @printf[I32]("Non-partitioned state not currently supported\n".cstring())
+                //   error
                 end
 
                 let next_initializer: StepInitializer val = 
@@ -247,12 +247,24 @@ actor ApplicationInitializer
                 step_initializers.push(next_initializer)
                 steps(next_runner_builder.id()) = worker
 
-                // try
-                //   next_runner_builder = pipeline(i.usize() + 1)
-                // end                     
+                match next_initializer
+                | let sb: StepBuilder val =>
+                  try
+                    runner_builders.push(pipeline(i.usize() + 1))
+                  end    
+                  let seq_builder = RunnerSequenceBuilder(
+                    runner_builders = recover Array[RunnerBuilder val] end)
 
+                  @printf[I32](("Preparing to spin up  " + seq_builder.name() + "on " + worker + "\n").cstring())
+
+                  let step_builder = StepBuilder(seq_builder, 
+                    cur_step_id)
+                  step_initializers.push(step_builder)
+                  steps(cur_step_id) = worker
+                  i = i + 1 // We've already handled the next runnerbuilder
+                end
+               
                 cur_step_id = _guid_gen.u128()
-                // i = i + 1 // We've already handled the next runnerbuilder
               elseif not pipeline.is_coalesced() then
                 let seq_builder = RunnerSequenceBuilder(
                   runner_builders = recover Array[RunnerBuilder val] end)
