@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "sendence/messages"
+use "wallaroo/tcp-source"
 use "wallaroo/topology"
 
 actor Connections
@@ -39,6 +40,10 @@ actor Connections
       _env.out.print("Set up phone home connection on " + ph_host 
         + ":" + ph_service)
     end
+
+  be register_source_listener(listener: TCPSourceListener) =>
+    // TODO: Handle source listeners for shutdown
+    None
 
   be register_listener(listener: TCPListener) =>
     _listeners.push(listener)

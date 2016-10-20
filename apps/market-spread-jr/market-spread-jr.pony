@@ -26,11 +26,13 @@ use "collections"
 use "net"
 use "time"
 use "buffered"
+use "sendence/bytes"
 use "sendence/fix"
 use "sendence/new-fix"
 use "sendence/hub"
 use "sendence/epoch"
 use "wallaroo/metrics"
+use "wallaroo/tcp-source"
 use "wallaroo/topology"
 
 class SymbolData
@@ -57,6 +59,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
 
   fun apply(msg: FixOrderMessage val, state: SymbolData): 
     (OrderResult val | None) =>
+    // @printf[I32]("Check order run\n".cstring())
     if state.should_reject_trades then
       OrderResult(msg, state.last_bid, state.last_offer,
         Epoch.nanoseconds())
@@ -105,6 +108,34 @@ primitive SymbolPartitionFunction
   =>
     input.symbol()
 
+primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
+  fun header_length(): USize =>
+    4
+
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+
+  fun decode(data: Array[U8] val): FixOrderMessage val ? =>
+    match FixishMsgDecoder(data)
+    | let m: FixOrderMessage val => m
+    else
+      error
+    end
+
+primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
+  fun header_length(): USize =>
+    4
+
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+
+  fun decode(data: Array[U8] val): FixNbboMessage val ? =>
+    match FixishMsgDecoder(data)
+    | let m: FixNbboMessage val => m
+    else
+      error
+    end
+
 class OrderResult
   let order: FixOrderMessage val
   let bid: F64
@@ -134,6 +165,7 @@ class OrderResult
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
+    // @printf[I32]("Encoding result\n".cstring())
     //Header (size == 55 bytes)
     let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
     wb.u32_be(msgs_size.u32())

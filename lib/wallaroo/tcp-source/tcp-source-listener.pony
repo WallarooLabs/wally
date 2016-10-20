@@ -15,7 +15,7 @@ actor TCPSourceListener
   var _init_size: USize
   var _max_size: USize
 
-  new create(source_builder: SourceBuilder iso,
+  new create(source_builder: SourceBuilder val,
     consumers: Array[CreditFlowConsumer] val,
     host: String = "", service: String = "0",
     limit: USize = 0,
@@ -24,7 +24,7 @@ actor TCPSourceListener
     """
     Listens for both IPv4 and IPv6 connections.
     """
-    _notify = SourceListenerNotify(consume source_builder)
+    _notify = SourceListenerNotify(source_builder)
     _consumers = consumers
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.null_terminated().cstring(), service.null_terminated().cstring())

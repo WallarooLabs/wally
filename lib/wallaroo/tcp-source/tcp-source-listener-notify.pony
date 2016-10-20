@@ -1,6 +1,6 @@
 interface SourceBuilder
-  fun ref apply(listen: TCPSourceListener ref): TCPSourceNotify iso^ ?
-
+  fun apply(): TCPSourceNotify iso^
+  
 interface TCPSourceListenerNotify
   """
   Notifications for TCPSource listeners.
@@ -24,13 +24,13 @@ interface TCPSourceListenerNotify
     """
 
 class SourceListenerNotify is TCPSourceListenerNotify
-  let _source_builder: SourceBuilder
+  let _source_builder: SourceBuilder val
 
-  new iso create(builder: SourceBuilder iso) =>
-    _source_builder = consume builder
+  new iso create(builder: SourceBuilder val) =>
+    _source_builder = builder
 
-  fun ref connected(listen: TCPSourceListener ref): TCPSourceNotify iso^ ? =>
-    _source_builder(listen)
+  fun ref connected(listen: TCPSourceListener ref): TCPSourceNotify iso^ =>
+    _source_builder()
 
   // TODO: implement listening and especially not_listening
 

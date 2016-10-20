@@ -8,11 +8,36 @@ use "sendence/hub"
 use "sendence/fix"
 use "sendence/messages"
 use "wallaroo"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/tcp-sink"
+use "wallaroo/tcp-source"
 use "wallaroo/topology"
+
+class PipelineSourceBuilder[In: Any val]
+  let _name: String
+  let _metrics_conn: TCPConnection
+  let _runner_builder: RunnerBuilder val
+  let _router: Router val
+  let _handler: FramedSourceHandler[In] val
+
+  new val create(name: String, metrics_conn: TCPConnection, 
+    runner_builder: RunnerBuilder val, router: Router val,
+    handler: FramedSourceHandler[In] val) 
+  =>
+    _name = name
+    _metrics_conn = metrics_conn
+    _runner_builder = runner_builder
+    _router = router
+    _handler = handler
+
+  fun apply(): TCPSourceNotify iso^ =>
+    let reporter = MetricsReporter(_name, _metrics_conn)
+
+    FramedSourceNotify[In](_name, _handler, _runner_builder, _router, 
+      consume reporter)    
 
 
 actor Main
@@ -74,38 +99,18 @@ primitive MarketSpreadStarter
       PreStateRunnerBuilder[FixNbboMessage val, None, SymbolData](
         UpdateNbbo, EmptyRouter)
 
-    let nbbo_source_builder: {(): Source[FixNbboMessage val] iso^} val = 
-      recover 
-        lambda()(metrics_conn, nbbo_runner_builder, partition_router): 
-          Source[FixNbboMessage val] iso^ 
-        =>
-          let nbbo_reporter = MetricsReporter("market-spread", metrics_conn)
-          
-          Source[FixNbboMessage val]("Nbbo", NbboSourceDecoder,
-            nbbo_runner_builder, partition_router, 
-            consume nbbo_reporter)
-        end
-      end
+    let nbbo_source_builder: SourceBuilder val =
+      PipelineSourceBuilder[FixNbboMessage val]("Nbbo", metrics_conn,
+        nbbo_runner_builder, partition_router, FixNbboFrameHandler)
 
-    let nbboutput_addr = input_addrs(0)
+    let nbbo_addr = input_addrs(0)
 
-    let listen_auth = TCPListenAuth(env.root as AmbientAuth)
-    connections.register_listener(
-      TCPListener(listen_auth,
-        SourceListenerNotify(nbbo_source_builder, metrics1, expected),
-          nbboutput_addr(0),
-          nbboutput_addr(1))
-    )
+    connections.register_source_listener(
+      TCPSourceListener(nbbo_source_builder, 
+        recover Array[CreditFlowConsumer] end, nbbo_addr(0), nbbo_addr(1)))
 
     let sink_reporter = MetricsReporter("market-spread", 
       metrics_conn)
-
-    // let external_sink_runner = EncoderSinkRunner[OrderResult val](
-    //   OrderResultEncoder, TCPRouter(reports_conn), sink_reporter.clone(),
-    //   recover [connect_msg, reports_join_msg] end)
-
-    // let sink_router = DirectRouter(Step(consume external_sink_runner,
-    //   consume sink_reporter))
 
     let sink_router = DirectRouter(TCPSink(
       TypedEncoderWrapper[OrderResult val](OrderResultEncoder), sink_reporter.
@@ -115,27 +120,19 @@ primitive MarketSpreadStarter
       PreStateRunnerBuilder[FixOrderMessage val, OrderResult val, SymbolData](
         CheckOrder, sink_router)
 
-    let order_source_builder: {(): Source[FixOrderMessage val] iso^} val =
-      recover 
-        lambda()(metrics_conn, order_runner_builder, partition_router): 
-          Source[FixOrderMessage val] iso^ 
-        =>
-          let order_reporter = MetricsReporter("market-spread", 
-            metrics_conn)
-
-          Source[FixOrderMessage val]("Order", OrderSourceDecoder, 
-            order_runner_builder, partition_router, 
-            consume order_reporter)
-        end
-      end
+    let order_source_builder: SourceBuilder val =
+      PipelineSourceBuilder[FixOrderMessage val]("Order", metrics_conn,
+        order_runner_builder, partition_router, FixOrderFrameHandler)
 
     let order_addr = input_addrs(1)
 
-    connections.register_listener(
-      TCPListener(listen_auth,
-        SourceListenerNotify(order_source_builder, metrics2, (expected/2)),
-          order_addr(0),
-          order_addr(1))
+    connections.register_source_listener(
+      TCPSourceListener(order_source_builder, 
+        recover Array[CreditFlowConsumer] end, order_addr(0), order_addr(1))
+
+        // TCPSourceListenerNotify(order_source_builder, metrics2, (expected/2)),
+        //   order_addr(0),
+        //   order_addr(1))
     )
 
     @printf[I32]("Expecting %zu total messages\n".cstring(), expected)
