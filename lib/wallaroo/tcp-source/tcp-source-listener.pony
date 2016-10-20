@@ -79,7 +79,7 @@ actor TCPSourceListener
         // Something other than EWOULDBLOCK, try again.
         None
       | 0 =>
-          // EWOULDBLOCK, don't try again.
+        // EWOULDBLOCK, don't try again.
         return
       else
         _spawn(fd)
