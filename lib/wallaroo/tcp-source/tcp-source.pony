@@ -56,12 +56,14 @@ actor TCPSource is CreditFlowProducer
     _next_size = init_size
     _max_size = max_size
 
-    _muted = 
-      ifdef use_backpressure then
-        true
-      else
-        false
-      end
+    _muted = false
+
+    // _muted =
+      // ifdef usebackpressure then
+      //   true
+      // else
+      //   false
+      // end
 
     _notify.accepted(this)
 
