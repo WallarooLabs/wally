@@ -49,7 +49,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
         try
           let decoded = _handler.decode(consume data)
           // TODO: Add sending Producer along
-          _runner.run[In](_pipeline_name, ingest_ts, decoded, _router)
+          _runner.run[In](_pipeline_name, ingest_ts, decoded, conn, _router)
         else
           // TODO: we need to provide a good error handling route for crap
           true

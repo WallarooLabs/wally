@@ -2,13 +2,15 @@ use "buffered"
 use "time"
 use "net"
 use "sendence/epoch"
+use "wallaroo/backpressure"
 use "wallaroo/metrics"
 use "wallaroo/messages"
 
+// TODO: Eliminate producer None when we can
 interface Runner
   // Return a Bool indicating whether the message is finished processing
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-    router: (Router val | None) = None): Bool
+    producer: (CreditFlowProducer ref | None), router: (Router val | None) = None): Bool
 
 interface RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None) = 
@@ -119,7 +121,7 @@ class ComputationRunner[In: Any val, Out: Any val]
     _metrics_reporter = consume metrics_reporter
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    router: (Router val | None)): Bool
+    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
     let computation_start = Time.nanos()
 
@@ -130,7 +132,7 @@ class ComputationRunner[In: Any val, Out: Any val]
         match result
         | None => true
         | let output: Out =>
-          _next.run[Out](metric_name, source_ts, output, router)
+          _next.run[Out](metric_name, source_ts, output, producer, router)
         else
           true
         end
@@ -159,7 +161,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     _prep_name = _name + " prep"
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    router: (Router val | None)): Bool
+    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
     let computation_start = Time.nanos()
     let is_finished = 
@@ -171,7 +173,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
             StateComputationWrapper[In, Out, State](input, _state_comp, 
               _output_router)
           shared_state_router.route[StateProcessor[State] val](metric_name,
-            source_ts, processor)
+            source_ts, processor, producer)
         else
           true
         end
@@ -197,12 +199,12 @@ class StateRunner[State: Any #read]
     _metrics_reporter = consume metrics_reporter
 
   fun ref run[In: Any val](metric_name: String val, source_ts: U64, input: In,
-    router: (Router val | None)): Bool
+    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
     match input
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
-      let is_finished = sp(_state, metric_name, source_ts)
+      let is_finished = sp(_state, metric_name, source_ts, producer)
       let computation_end = Time.nanos()
 
       _metrics_reporter.step_metric(sp.name(),
@@ -215,11 +217,11 @@ class StateRunner[State: Any #read]
 
 class iso RouterRunner
   fun ref run[In: Any val](metric_name: String val, source_ts: U64, input: In,
-    router: (Router val | None)): Bool
+    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
     match router
     | let r: Router val =>
-      r.route[In](metric_name, source_ts, input)
+      r.route[In](metric_name, source_ts, input, producer)
       false
     else
       true
@@ -240,14 +242,15 @@ class Proxy
     _auth = auth
 
   fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-    router: (Router val | None)): Bool
+    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
     match router
     | let r: Router val =>
       try
         let forward_msg = ChannelMsgEncoder.data_channel[In](_target_step_id, 
           0, _worker_name, source_ts, input, metric_name, _auth)
-        r.route[Array[ByteSeq] val](metric_name, source_ts, forward_msg)
+        r.route[Array[ByteSeq] val](metric_name, source_ts, forward_msg, 
+          producer)
         false
       else
         @printf[I32]("Problem encoding forwarded message\n".cstring())

@@ -1,16 +1,21 @@
 use "collections"
 use "net"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 
+// TODO: Eliminate producer None when we can
 interface Router
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None)): Bool
   // fun routes(): Array[CreditFlowConsumer tag] val
 
 interface RouterBuilder
   fun apply(): Router val
 
 class EmptyRouter
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None)): Bool 
+  =>
     true
 
 class DirectRouter
@@ -19,7 +24,11 @@ class DirectRouter
   new val create(target: RunnableStep tag) =>
     _target = target
 
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None)): Bool 
+  =>
+    // TODO: Use producer here
+
     _target.run[D](metric_name, source_ts, data)
     false
 
@@ -34,7 +43,9 @@ class DataRouter
   =>
     _routes = routes
 
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None)): Bool 
+  =>
     try
       match data
       | let delivery_msg: DeliveryMsg val =>
@@ -64,7 +75,9 @@ class PartitionRouter
   new val create(p_finder: PartitionFinder val) =>
     _partition_finder = p_finder
 
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None)): Bool 
+  =>
     let router = 
       match data
       | let pfable: PartitionFindable val =>
@@ -75,7 +88,7 @@ class PartitionRouter
 
     match router
     | let r: Router val =>
-      r.route[D](metric_name, source_ts, data)
+      r.route[D](metric_name, source_ts, data, producer)
     else
       true
     end
@@ -98,7 +111,9 @@ class TCPRouter
         EmptyTCPWriter
       end
 
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None)): Bool 
+  =>
     match data
     | let d: Array[ByteSeq] val =>
       _tcp_writer(d)

@@ -1,5 +1,6 @@
 use "buffered"
 use "net"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 
@@ -10,7 +11,7 @@ class SimpleSinkRunner
     _metrics_reporter = consume metrics_reporter
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    router: (Router val | None)): Bool
+    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
     match data
     | let s: Stringable val => None
@@ -44,12 +45,13 @@ class EncoderSinkRunner[In: Any val]
     end
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    router: (Router val | None)): Bool
+    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
     match data
     | let input: In =>
       let encoded = _encoder(input, _wb)
-      _target.route[Array[ByteSeq] val](metric_name, source_ts, encoded)
+      _target.route[Array[ByteSeq] val](metric_name, source_ts, encoded, 
+        producer)
     else
       @printf[I32]("Encoder sink received unrecognized input type.")
     end

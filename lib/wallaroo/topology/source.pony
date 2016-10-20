@@ -2,6 +2,7 @@ use "net"
 use "time"
 use "buffered"
 use "collections"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 
@@ -36,7 +37,8 @@ class Source[In: Any val]
       try
         match _decoder(consume data)
         | let input: In =>
-          _runner.run[In](_pipeline_name, ingest_ts, input, _router)
+          _runner.run[In](_pipeline_name, ingest_ts, input, None, 
+            _router)
         else
           true
         end

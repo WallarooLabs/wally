@@ -1,4 +1,5 @@
 use "buffered"
+use "wallaroo/backpressure"
 
 trait BasicComputation
   fun name(): String
@@ -17,7 +18,8 @@ trait StateProcessor[State: Any #read] is BasicComputation
   fun name(): String
   // Return a Bool indicating whether the message was finished processing here
   // Return false to indicate the message was sent on to the next step.
-  fun apply(state: State, metric_name: String, source_ts: U64): Bool
+  fun apply(state: State, metric_name: String, source_ts: U64,
+    producer: (CreditFlowProducer ref | None)): Bool
   fun find_partition(finder: PartitionFinder val): Router val
 
 class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
@@ -32,11 +34,13 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     _input = input
     _router = router
 
-  fun apply(state: State, metric_name: String, source_ts: U64): Bool =>
+  fun apply(state: State, metric_name: String, source_ts: U64, 
+    producer: (CreditFlowProducer ref | None)): Bool 
+  =>
     match _state_comp(_input, state)
     | None => true
     | let output: Out =>
-      _router.route[Out](metric_name, source_ts, output)
+      _router.route[Out](metric_name, source_ts, output, producer)
       false
     else
       true

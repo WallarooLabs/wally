@@ -2,6 +2,7 @@ use "buffered"
 use "serialise"
 use "net"
 use "collections"
+use "wallaroo/backpressure"
 use "wallaroo/topology"
 
 primitive ChannelMsgEncoder
