@@ -2,7 +2,15 @@
 # KAGR (kevin@sendence.com)
 #
 cmake_minimum_required(VERSION 3.5)
-
+project(WallarooCppApi)
+set(WallarooCppApi_VERSION_MAJOR 0)
+set(WallarooCppApi_VERSION_MINOR 81)
+set(PROJECT_DIR "${CMAKE_BINARY_DIR}")
+set(PROJECT_SOURCE_DIR "${PROJECT_DIR}/cpp")
+set(PROJECT_BINARY_DIR "${PROJECT_DIR}/build")
+set(EXECUTABLE_OUTPUT_PATH "${PROJECT_BINARY_DIR}/bin")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
 
 include (TestBigEndian)
 TEST_BIG_ENDIAN(IS_BIG_ENDIAN)
@@ -43,6 +51,7 @@ set(SOURCE_FILES
 	cpp/RawBuffer.cpp
 	cpp/ManagedBuffer.cpp
 	cpp/ManagedObject.cpp
+	cpp/Data.cpp
 	cpp/ApiHooks.cpp
 )
 
