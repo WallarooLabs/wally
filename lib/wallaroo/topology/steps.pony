@@ -15,13 +15,13 @@ actor Step is ResilientOrigin
   let _origins: OriginSet = OriginSet(10)
   var _router: Router val = EmptyRouter
   let _metrics_reporter: MetricsReporter 
-  let _outgoing_envelope: MsgEnvelope ref
+  var _seq_id: U64
   
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso) =>
     _runner = consume runner
     _runner.set_buffer_target(this)
     _metrics_reporter = consume metrics_reporter
-    _outgoing_envelope = MsgEnvelope(this, 0, None, 0, 0)
+    _seq_id = 0
 
   fun _send_watermark()
   =>
@@ -35,11 +35,12 @@ actor Step is ResilientOrigin
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope val)
   =>
+    _seq_id = _seq_id + 1
     let is_finished = _runner.run[D](metric_name, source_ts, data,
-      _outgoing_envelope, incoming_envelope, _router)
+      this, incoming_envelope.msg_uid, incoming_envelope.frac_ids, _seq_id, incoming_envelope, _router)
     if is_finished then
       ifdef "resilience" then
-        _bookkeeping(incoming_envelope)
+        _bookkeeping(incoming_envelope, _seq_id)
         // if Sink then _send_watermark()
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
@@ -48,10 +49,11 @@ actor Step is ResilientOrigin
   be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope val)
   =>
+    _seq_id = _seq_id + 1
     let is_finished = _runner.recovery_run[D](metric_name, source_ts, data,
-      _outgoing_envelope, incoming_envelope, _router)
+      this, incoming_envelope.msg_uid, incoming_envelope.frac_ids, _seq_id, incoming_envelope, _router)
     if is_finished then
-      _bookkeeping(incoming_envelope)
+      _bookkeeping(incoming_envelope, _seq_id)
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
     
@@ -86,7 +88,7 @@ actor Step is ResilientOrigin
   end
 
   
-  fun ref _bookkeeping(incoming_envelope: MsgEnvelope val)
+  fun ref _bookkeeping(incoming_envelope: MsgEnvelope val, seq_id: U64)
   =>
     """
     Process envelopes and keep track of things
@@ -95,7 +97,7 @@ actor Step is ResilientOrigin
     _hwm.update((incoming_envelope.origin , incoming_envelope.route_id),
       incoming_envelope.seq_id)
     // keep track of mapping between incoming / outgoing seq_id
-    _translate.update(incoming_envelope.seq_id, _outgoing_envelope.seq_id)
+    _translate.update(incoming_envelope.seq_id, seq_id)
     // keep track of origins
     _origins.set(incoming_envelope.origin)
     

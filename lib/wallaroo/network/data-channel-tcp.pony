@@ -56,7 +56,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
   let _router: DataRouter val
   let _env: Env
   let _auth: AmbientAuth
-  let _origin: DataOrigin 
+  let _origin: DataOrigin tag 
   var _header: Bool = true
 
   new iso create(routes: DataRouter val, env: Env, auth: AmbientAuth) =>
@@ -77,12 +77,10 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       match ChannelMsgDecoder(consume data, _auth)
       | let d: DeliveryMsg val =>
         @printf[I32]("Received delivery msg!!\n".cstring())
-        //TODO: create real envelope
-        let outgoing_envelope = MsgEnvelope(_origin,0,None,0,0)
         //TODO: read envelope from data
-        let incoming_envelope = outgoing_envelope.clone()
-        _router.route[DeliveryMsg val](d.metric_name(), d.source_ts(), d,
-          outgoing_envelope, incoming_envelope)
+        //TODO: manage values for outgoing envelope at router?
+        let incoming_envelope = recover val MsgEnvelope(_origin,0,None,0,0) end
+        _router.route[DeliveryMsg val](d.metric_name(), d.source_ts(), d, _origin, 0, None, 0, incoming_envelope)
       | let m: SpinUpLocalTopologyMsg val =>
         _env.out.print("Received spin up local topology message!")
       | let m: UnknownChannelMsg val =>

@@ -13,7 +13,7 @@ class SimpleSinkRunner is Runner
     _deduplication_list = Array[MsgEnvelope val]
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope val,
     router: (Router val | None) = None): Bool
   =>
     //TODO: stamp outgoing envelope?
@@ -26,12 +26,12 @@ class SimpleSinkRunner is Runner
     true
 
   fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope val,
     router: (Router val | None) = None): Bool
   =>
     if not is_duplicate_message(incoming_envelope) then
       _deduplication_list.push(incoming_envelope)
-      run[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope,
+      run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, seq_id, incoming_envelope,
         router)
     else
       //we can pretend it stopped here because everything downstream know about
@@ -98,26 +98,26 @@ class EncoderSinkRunner[In: Any val] is Runner
     _deduplication_list = Array[MsgEnvelope val]
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope val,
     router: (Router val | None) = None): Bool
   =>
     match data
     | let input: In =>
       let encoded = _encoder(input, _wb)
       _target.route[Array[ByteSeq] val](metric_name, source_ts, encoded,
-        outgoing_envelope, incoming_envelope)
+        origin, msg_uid, frac_ids, seq_id, incoming_envelope)
     else
       @printf[I32]("Encoder sink received unrecognized input type.")
     end
     true
 
   fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
+    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope val,
     router: (Router val | None) = None): Bool
   =>
     if not is_duplicate_message(incoming_envelope) then
       _deduplication_list.push(incoming_envelope)
-      run[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope,
+      run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, seq_id, incoming_envelope,
         router)
     else
       //we can pretend it stopped here because everything downstream know about

@@ -4,9 +4,8 @@ use "wallaroo/messages"
 
 trait Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref,
+                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
                         incoming_envelope: MsgEnvelope val): Bool
-  //TODO: outgoing_envelope to become MsgEnvelope trn so we don't clone?
 
 interface RouterBuilder
   fun ref apply(): Router val
@@ -14,7 +13,7 @@ interface RouterBuilder
 class EmptyRouter is Router
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref,
+                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
                         incoming_envelope: MsgEnvelope val): Bool =>
     true
 
@@ -27,11 +26,13 @@ class DirectRouter is Router
     _id = id
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref,
+                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
                         incoming_envelope: MsgEnvelope val): Bool
   =>
-    outgoing_envelope.route_id = _id
-    _target.run[D](metric_name, source_ts, data, outgoing_envelope.clone())
+    let outgoing_envelope = recover val
+      MsgEnvelope(origin, msg_uid, frac_ids, seq_id, _id)
+    end
+    _target.run[D](metric_name, source_ts, data, outgoing_envelope)
     false
 
   fun route_id(): U64 => _id
@@ -45,14 +46,13 @@ class DataRouter is Router
     _routes = routes
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref,
+                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
                         incoming_envelope: MsgEnvelope val): Bool =>
     try
       match data
       | let delivery_msg: DeliveryMsg val =>
         let target_id = delivery_msg.target_id()
-        //TODO: deliver envelope
-        outgoing_envelope.route_id = target_id.u64()
+        //TODO: create and deliver envelope
         delivery_msg.deliver(_routes(target_id))
         false
       else
@@ -71,7 +71,7 @@ class PartitionRouter is Router
     _id = id
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref,
+                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
                         incoming_envelope: MsgEnvelope val): Bool =>
     let router = 
       match data
@@ -84,7 +84,7 @@ class PartitionRouter is Router
     match router
     | let r: Router val =>
       //delegate to the actual router to stamp the route_id
-      r.route[D](metric_name, source_ts, data, outgoing_envelope, incoming_envelope)
+      r.route[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, seq_id, incoming_envelope)
     else
       true
     end
@@ -106,13 +106,12 @@ class TCPRouter is Router
     _id = id
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        outgoing_envelope: MsgEnvelope ref,
+                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
                         incoming_envelope: MsgEnvelope val): Bool
   =>
     match data
     | let d: Array[ByteSeq] val =>
-      //TODO: pass the envelope
-      outgoing_envelope.route_id = _id
+      //TODO: create and pass the envelope
       _tcp_writer(d)
     end
     false
