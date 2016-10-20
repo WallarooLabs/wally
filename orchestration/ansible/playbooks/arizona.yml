@@ -1,0 +1,87 @@
+# create dynamic groups
+- hosts: tag_Project_arizona:&tag_Role_follower:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
+  tasks:
+  - name: Create a group of all followers for arizona
+    group_by: key=arizona-followers
+  - name: set hostname
+    hostname: name=arizona-follower-{{ groups['arizona-followers'].index(inventory_hostname) + 1 }}
+    become: yes
+  - name: "Add hostname to hosts file"
+    lineinfile:
+      dest: /etc/hosts
+      regexp: .*arizona-follower-{{ groups['arizona-followers'].index(inventory_hostname) + 1 }}$
+      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} arizona-follower-{{ groups['arizona-followers'].index(inventory_hostname) + 1 }}"
+      state: present
+    become: yes
+
+- hosts: tag_Project_arizona:&tag_Role_leader:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
+  vars:
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
+  tasks:
+  - name: Create a group of all leaders for arizona
+    group_by: key=arizona-leaders
+  - name: Set IPs for ptpd unicast
+    set_fact: ptpd_destinations="{% if groups['arizona-followers'] is defined %}{% for host in groups['arizona-followers'] %}{{ hostvars[host]['ansible_' + ethernet_interface]['ipv4']['address'] }}{% if not loop.last %},{% endif %}{% endfor %}{% else %}127.0.0.1{% endif %}"
+  - name: set hostname
+    hostname: name=arizona-leader-{{ groups['arizona-leaders'].index(inventory_hostname) + 1 }}
+    become: yes
+  - name: "Add hostname to hosts file"
+    lineinfile:
+      dest: /etc/hosts
+      regexp: .*arizona-leader-{{ groups['arizona-leaders'].index(inventory_hostname) + 1 }}$
+      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} arizona-leader-{{ groups['arizona-leaders'].index(inventory_hostname) + 1 }}"
+      state: present
+    become: yes
+
+- hosts: arizona-leaders:arizona-followers
+  tasks:
+  - name: Create a group of all hosts for arizona
+    group_by: key=arizona-all
+  - name: Gather ec2 facts
+    action: ec2_facts
+
+# Apply common configuration to all hosts
+- hosts: arizona-all
+  tasks:
+  - name: Rename ec2 instance name tag
+    ec2_tag:
+      region: "{{ ansible_ec2_placement_region }}"
+      resource: "{{ ansible_ec2_instance_id }}"
+      state: present
+      tags:
+        Name: "{{ cluster_name }}:{{ ansible_hostname }}"
+
+# Configure and deploy leader servers.
+- hosts: arizona-leaders
+  vars:
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
+    ptpd_role: master
+    ptpd_transport: unicast
+  tasks:
+  - name: Update ptpd config
+    replace:
+      dest: /etc/sysconfig/ptpd
+      regexp: ^PTPD_EXTRA_OPTIONS=.*
+      replace: PTPD_EXTRA_OPTIONS="{{ '--unicast' if ptpd_transport == "unicast" else '' }} {{ '--unicast-destinations' if ptpd_destinations is defined else '' }} {{ ptpd_destinations if ptpd_destinations is defined else '' }} --log-file /var/log/ptpd.log --statistics-file /var/log/ptpd-stats.log --{{ ptpd_role }}only --interface {{ ethernet_interface }} --ptpengine:use_libpcap=Y --ptpengine:clock_class={{ 127 if ptpd_role == "master" else 255 }} --ptpengine:panic_mode=Y --ptpengine:panic_mode_exit_threshold=100000000 --clock:max_offset_ppm=1000 --global:cpuaffinity_cpucore=0"
+    become: yes
+  - name: restart ptpd
+    service: name=ptpd state=restarted
+    become: yes
+
+# Configure and deploy follower servers.
+- hosts: arizona-followers
+  vars:
+    ethernet_interface: "{{ ansible_default_ipv4.interface }}"
+    ptpd_role: slave
+    ptpd_transport: unicast
+  tasks:
+  - name: Update ptpd config
+    replace:
+      dest: /etc/sysconfig/ptpd
+      regexp: ^PTPD_EXTRA_OPTIONS=.*
+      replace: PTPD_EXTRA_OPTIONS="{{ '--unicast' if ptpd_transport == "unicast" else '' }} {{ '--unicast-destinations' if ptpd_destinations is defined else '' }} {{ ptpd_destinations if ptpd_destinations is defined else '' }} --log-file /var/log/ptpd.log --statistics-file /var/log/ptpd-stats.log --{{ ptpd_role }}only --interface {{ ethernet_interface }} --ptpengine:use_libpcap=Y --ptpengine:clock_class={{ 127 if ptpd_role == "master" else 255 }} --ptpengine:panic_mode=Y --ptpengine:panic_mode_exit_threshold=100000000 --clock:max_offset_ppm=1000 --global:cpuaffinity_cpucore=0"
+    become: yes
+  - name: restart ptpd
+    service: name=ptpd state=restarted
+    become: yes
+
