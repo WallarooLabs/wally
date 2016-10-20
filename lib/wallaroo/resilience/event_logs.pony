@@ -2,50 +2,53 @@ use "wallaroo/topology"
 use "wallaroo/messages"
 
 trait ResilientOrigin is Origin
-  be replay_log_entry(log_entry: LogEntry val)
+  be replay_log_entry(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
   be replay_finished()
 
-class LogEntry
-  //TODO-Alan: this object needs to go away
-  let _uid: U64
-  let _frac_ids: (Array[U64] val | None)
-  let _statechange_id: U64
-  let _seq_id: U64
-  let _payload: Array[ByteSeq] val
+//class LogEntry
+//  //TODO-Alan: this object needs to go away
+// replacement args: , uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val
+//  let _uid: U64
+//  let _frac_ids: (Array[U64] val | None)
+//  let _statechange_id: U64
+//  let _seq_id: U64
+//  let _payload: Array[ByteSeq] val
+//
+//  new val create(uid': U64, frac_ids': (Array[U64] val | None),
+//    statechange_id': U64, seq_id': U64,payload': Array[ByteSeq] val) =>
+//    _uid = uid'
+//    _frac_ids = frac_ids'
+//    _statechange_id = statechange_id'
+//    _payload = payload'
+//    _seq_id = seq_id'
+//
+//  fun is_below_watermark(watermark: U64): Bool =>
+//    //TODO: this will have to change once we have a Watermark type
+//    _uid < watermark
+//
+//  fun uid(): U64 val => _uid
+//  fun frac_ids(): (Array[U64] val | None) => _frac_ids
+//  fun statechange_id(): U64 => _statechange_id
+//  fun seq_id(): U64 => _seq_id
+//  fun payload(): Array[ByteSeq] val => _payload
 
-  new val create(uid': U64, frac_ids': (Array[U64] val | None),
-    statechange_id': U64, seq_id': U64,payload': Array[ByteSeq] val) =>
-    _uid = uid'
-    _frac_ids = frac_ids'
-    _statechange_id = statechange_id'
-    _payload = payload'
-    _seq_id = seq_id'
-
-  fun is_below_watermark(watermark: U64): Bool =>
-    //TODO: this will have to change once we have a Watermark type
-    _uid < watermark
-
-  fun uid(): U64 val => _uid
-  fun frac_ids(): (Array[U64] val | None) => _frac_ids
-  fun statechange_id(): U64 => _statechange_id
-  fun seq_id(): U64 => _seq_id
-  fun payload(): Array[ByteSeq] val => _payload
+type LogEntry is (U64, (Array[U64] val | None), U64, Array[ByteSeq] val)
 
 trait EventLogBuffer
-   be queue(log_entry: LogEntry val)
+   be queue(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
    be flush(watermark: U64)
    be set_id(id: U64)
-   be replay_log_entry(log_entry: LogEntry val)
+   be replay_log_entry(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
    be set_target(target: ResilientOrigin tag)
    be log_flushed(low_watermark: U64)
    be replay_finished()
 
 actor DeactivatedEventLogBuffer is EventLogBuffer
   new create() => None
-  be queue(log_entry: LogEntry val) => None
+  be queue(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) => None
   be flush(watermark: U64) => None
   be set_id(id:U64) => None
-  be replay_log_entry(log_entry: LogEntry val) => None
+  be replay_log_entry(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) => None
   be set_target(target: ResilientOrigin tag) => None
   be log_flushed(low_watermark: U64) => None
   be replay_finished() => None
@@ -69,9 +72,9 @@ actor StandardEventLogBuffer is EventLogBuffer
    be set_target(target: ResilientOrigin tag) =>
     _target = target
 
-   be queue(log_entry: LogEntry val) =>
+   be queue(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) =>
     ifdef "resilience" then
-      _buf.push(log_entry)
+      _buf.push((uid, frac_ids, statechange_id, payload))
     else
       //prevent a memory leak
       None
@@ -83,7 +86,7 @@ actor StandardEventLogBuffer is EventLogBuffer
       let out_buf: Array[LogEntry val] iso = recover iso Array[LogEntry val] end 
       let new_buf: Array[LogEntry val] = Array[LogEntry val]
       for entry in _buf.values() do
-        if entry.is_below_watermark(low_watermark) then
+        if entry._1 <= low_watermark then
             out_buf.push(entry)
         else
             new_buf.push(entry)
@@ -98,9 +101,9 @@ actor StandardEventLogBuffer is EventLogBuffer
     //upstream
     None
 
-  be replay_log_entry(log_entry: LogEntry val) =>
+  be replay_log_entry(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) =>
     match _target
-    | let t: ResilientOrigin tag => t.replay_log_entry(log_entry)
+    | let t: ResilientOrigin tag => t.replay_log_entry(uid, frac_ids, statechange_id, payload)
     else
       //TODO: explode
       @printf[I32]("FATAL: trying to replay event log to a None target".cstring())

@@ -59,7 +59,8 @@ class FileBackend is Backend
             end
           end
           let statechange_id = r.u64_be()
-          let seq_id = r.u64_be()
+          //do we need this?
+          //let seq_id = r.u64_be()
           let payload_length = r.u64_be()
           let payload_single = recover val _file.read(payload_length.usize()) end
           let payload = recover val
@@ -67,8 +68,7 @@ class FileBackend is Backend
             p.push(payload_single)
             p
           end
-          let log_entry = LogEntry(uid, frac_ids, statechange_id, seq_id, payload)
-          _alfred.replay_log_entry(buffer_id, log_entry)
+          _alfred.replay_log_entry(buffer_id, uid, frac_ids, statechange_id, payload)
         end
         _file.seek_end(0)
         _alfred.replay_finished()
@@ -115,9 +115,9 @@ actor Alfred
         b.replay_finished()
       end
 
-    be replay_log_entry(buffer_id: U64, log_entry: LogEntry val) =>
+    be replay_log_entry(buffer_id: U64, uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) =>
       try
-        _log_buffers(buffer_id.usize()).replay_log_entry(log_entry)
+        _log_buffers(buffer_id.usize()).replay_log_entry(uid, frac_ids, statechange_id, payload)
       else
         //TODO: explode here
         @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
@@ -140,10 +140,12 @@ actor Alfred
           // - statechange id
           // - sequence id
           // - payload
-          let entry = log_entries(i)
+          (let uid:U64, let frac_ids: (Array[U64] val | None),
+           let statechange_id: U64, let payload: Array[ByteSeq] val)
+          = log_entries(i)
           _writer.u64_be(buffer_id)
-          _writer.u64_be(entry.uid())
-          match entry.frac_ids()
+          _writer.u64_be(uid)
+          match frac_ids
           | let ids: Array[U64] val =>
             let s = ids.size()
             _writer.u64_be(s.u64())
@@ -154,10 +156,11 @@ actor Alfred
             //we have no frac_ids
             _writer.u64_be(0)
           end
-          _writer.u64_be(entry.statechange_id())
-          _writer.u64_be(entry.seq_id())
-          _writer.u64_be(entry.payload().size().u64())
-          _writer.writev(entry.payload())
+          _writer.u64_be(statechange_id)
+          //do we need this?
+          //_writer.u64_be(seq_id)
+          _writer.u64_be(payload.size().u64())
+          _writer.writev(payload)
           _backend.writev(recover val _writer.done() end)
         end
         _backend.flush()

@@ -55,8 +55,8 @@ actor Step is ResilientOrigin
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
     
-  be replay_log_entry(log_entry: LogEntry val) =>
-    _runner.replay_log_entry(log_entry, this)
+  be replay_log_entry(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) =>
+    _runner.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
 
   be replay_finished() =>
     _runner.replay_finished()

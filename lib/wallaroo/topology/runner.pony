@@ -15,7 +15,7 @@ trait Runner
   fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     outgoing_envelope: MsgEnvelope ref, incoming_envelope: MsgEnvelope val,
     router: (Router val | None) = None): Bool
-  fun ref replay_log_entry(log_entry: LogEntry val, origin: Origin tag) => None
+  fun ref replay_log_entry(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val, origin: Origin tag) => None
   fun ref set_buffer_target(target: ResilientOrigin tag) => None
   fun ref replay_finished() => None
 
@@ -334,15 +334,13 @@ class StateRunner[State: Any #read] is Runner
     end
     false
 
-  fun ref replay_log_entry(log_entry: LogEntry val, origin: Origin tag) =>
-    let me = recover val MsgEnvelope(origin, log_entry.uid(),
-      log_entry.frac_ids(),0,0)
-    end
+  fun ref replay_log_entry(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val, origin: Origin tag) =>
+    let me = recover val MsgEnvelope(origin, uid, frac_ids,0,0) end
     if not is_duplicate_message(me) then 
       _deduplication_list.push(me)
       try
-        let sc = _state_change_repository(log_entry.statechange_id())
-        for e in log_entry.payload().values() do
+        let sc = _state_change_repository(statechange_id)
+        for e in payload.values() do
           _rb.append(e as Array[U8] val)
         end
         try
@@ -351,7 +349,7 @@ class StateRunner[State: Any #read] is Runner
         end
       else
         @printf[I32]("FATAL: could not look up state_change with id %d".cstring(),
-          log_entry.statechange_id())
+          statechange_id)
       end
     end
 
@@ -370,12 +368,9 @@ class StateRunner[State: Any #read] is Runner
           outgoing_envelope, incoming_envelope)
       | (let sc: StateChange[State] val, let is_finished: Bool) =>
         ifdef "resilience" then
-          let log_entry = LogEntry(incoming_envelope.msg_uid,
-              incoming_envelope.frac_ids,
-              sc.id(),
-              outgoing_envelope.seq_id,
-              sc.to_log_entry(_wb)) 
-          _event_log_buffer.queue(log_entry)
+          let payload = sc.to_log_entry(_wb)
+          //TODO: deal with fractional message ids here
+          _event_log_buffer.queue(outgoing_envelope.msg_uid, None, sc.id(), payload)
         end
         sc.apply(_state)
         let computation_end = Time.nanos()
