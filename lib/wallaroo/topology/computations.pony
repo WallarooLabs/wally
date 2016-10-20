@@ -21,7 +21,7 @@ trait StateProcessor[State: Any #read] is BasicComputation
   // Return false to indicate the message was sent on to the next step.
   fun apply(state: State, sc_repo: StateChangeRepository[State],
             metric_name: String, source_ts: U64, origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-            incoming_envelope: MsgEnvelope val):
+            incoming_envelope: MsgEnvelope box):
             ((StateChange[State] val, Bool) | Bool)
 
   fun find_partition(finder: PartitionFinder val): Router val
@@ -40,7 +40,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
 
   fun apply(state: State, sc_repo: StateChangeRepository[State],
             metric_name: String, source_ts: U64, origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-            incoming_envelope: MsgEnvelope val):
+            incoming_envelope: MsgEnvelope box):
         ((StateChange[State] val, Bool) | Bool)
   =>
     match _state_comp(_input, sc_repo, state)

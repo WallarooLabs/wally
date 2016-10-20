@@ -5,7 +5,7 @@ use "wallaroo/messages"
 trait Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
                         origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope val): Bool
+                        incoming_envelope: MsgEnvelope box): Bool
 
 interface RouterBuilder
   fun ref apply(): Router val
@@ -14,7 +14,7 @@ class EmptyRouter is Router
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
                         origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope val): Bool =>
+                        incoming_envelope: MsgEnvelope box): Bool =>
     true
 
 class DirectRouter is Router
@@ -27,7 +27,7 @@ class DirectRouter is Router
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
                         origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope val): Bool
+                        incoming_envelope: MsgEnvelope box): Bool
   =>
     let outgoing_envelope = recover val
       MsgEnvelope(origin, msg_uid, frac_ids, seq_id, _id)
@@ -47,7 +47,7 @@ class DataRouter is Router
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
                         origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope val): Bool =>
+                        incoming_envelope: MsgEnvelope box): Bool =>
     try
       match data
       | let delivery_msg: DeliveryMsg val =>
@@ -72,7 +72,7 @@ class PartitionRouter is Router
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
                         origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope val): Bool =>
+                        incoming_envelope: MsgEnvelope box): Bool =>
     let router = 
       match data
       | let pfable: PartitionFindable val =>
@@ -107,7 +107,7 @@ class TCPRouter is Router
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
                         origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope val): Bool
+                        incoming_envelope: MsgEnvelope box): Bool
   =>
     match data
     | let d: Array[ByteSeq] val =>

@@ -88,7 +88,7 @@ actor Step is ResilientOrigin
   end
 
   
-  fun ref _bookkeeping(incoming_envelope: MsgEnvelope val, seq_id: U64)
+  fun ref _bookkeeping(incoming_envelope: MsgEnvelope box, seq_id: U64)
   =>
     """
     Process envelopes and keep track of things

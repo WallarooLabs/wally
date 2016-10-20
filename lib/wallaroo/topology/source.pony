@@ -15,7 +15,7 @@ class Source[In: Any val] is Origin
   let _runner: Runner
   let _router: Router val
   let _metrics_reporter: MetricsReporter
-  let _incoming_envelope: MsgEnvelope iso
+  let _incoming_envelope: MsgEnvelope ref
   var _count: USize = 0
 
   new iso create(pipeline_name: String, decoder: SourceDecoder[In] val, 
@@ -27,7 +27,7 @@ class Source[In: Any val] is Origin
     _source_name = pipeline_name + " source"
     _metrics_reporter = consume metrics_reporter
     _runner = runner_builder(_metrics_reporter.clone())
-    _incoming_envelope = recover iso MsgEnvelope(this, 0, None, 0, 0) end
+    _incoming_envelope = MsgEnvelope(this, 0, None, 0, 0)
     _router = router
 
   // be update_watermark(route_id: U64, seq_id: U64)
@@ -47,7 +47,7 @@ class Source[In: Any val] is Origin
           _incoming_envelope.seq_id = msg_uid
           //TODO: don't always clone new incoming envelope to make it a val?
           _runner.run[In](_pipeline_name, ingest_ts, input, this, msg_uid,
-            None, msg_uid, _incoming_envelope.clone(), _router)
+            None, msg_uid, _incoming_envelope, _router)
         else
           true
         end

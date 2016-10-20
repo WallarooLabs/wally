@@ -6,14 +6,14 @@ use "wallaroo/metrics"
 
 class SimpleSinkRunner is Runner
   let _metrics_reporter: MetricsReporter
-  let _deduplication_list: Array[MsgEnvelope val]
+  let _deduplication_list: Array[MsgEnvelope box]
 
   new iso create(metrics_reporter: MetricsReporter iso) =>
     _metrics_reporter = consume metrics_reporter
-    _deduplication_list = Array[MsgEnvelope val]
+    _deduplication_list = Array[MsgEnvelope box]
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope val,
+    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope box,
     router: (Router val | None) = None): Bool
   =>
     //TODO: stamp outgoing envelope?
@@ -26,7 +26,7 @@ class SimpleSinkRunner is Runner
     true
 
   fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope val,
+    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope box,
     router: (Router val | None) = None): Bool
   =>
     if not is_duplicate_message(incoming_envelope) then
@@ -39,7 +39,7 @@ class SimpleSinkRunner is Runner
       true
     end
 
-  fun is_duplicate_message(env: MsgEnvelope val): Bool =>
+  fun is_duplicate_message(env: MsgEnvelope box): Bool =>
     for e in _deduplication_list.values() do
       //TODO: Bloom filter maybe?
       if e.msg_uid != env.msg_uid then
@@ -77,7 +77,7 @@ class EncoderSinkRunner[In: Any val] is Runner
   let _target: Router val
   let _encoder: SinkEncoder[In] val
   let _wb: Writer = Writer
-  let _deduplication_list: Array[MsgEnvelope val]
+  let _deduplication_list: Array[MsgEnvelope box]
 
   new iso create(encoder: SinkEncoder[In] val,
     target: Router val,
@@ -95,10 +95,10 @@ class EncoderSinkRunner[In: Any val] is Runner
         tcp.writev(msg)
       end
     end
-    _deduplication_list = Array[MsgEnvelope val]
+    _deduplication_list = Array[MsgEnvelope box]
 
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope val,
+    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope box,
     router: (Router val | None) = None): Bool
   =>
     match data
@@ -112,7 +112,7 @@ class EncoderSinkRunner[In: Any val] is Runner
     true
 
   fun ref recovery_run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope val,
+    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope box,
     router: (Router val | None) = None): Bool
   =>
     if not is_duplicate_message(incoming_envelope) then
@@ -125,7 +125,7 @@ class EncoderSinkRunner[In: Any val] is Runner
       true
     end
 
-  fun is_duplicate_message(env: MsgEnvelope val): Bool =>
+  fun is_duplicate_message(env: MsgEnvelope box): Bool =>
     for e in _deduplication_list.values() do
       //TODO: Bloom filter maybe?
       if e.msg_uid != env.msg_uid then
