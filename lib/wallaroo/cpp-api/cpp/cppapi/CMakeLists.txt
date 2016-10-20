@@ -42,6 +42,7 @@ set(SOURCE_FILES
 	cpp/Buffer.cpp
 	cpp/RawBuffer.cpp
 	cpp/ManagedBuffer.cpp
+	cpp/ManagedObject.cpp
 	cpp/ApiHooks.cpp
 )
 
