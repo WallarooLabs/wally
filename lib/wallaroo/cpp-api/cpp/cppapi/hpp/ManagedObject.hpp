@@ -28,7 +28,7 @@ namespace wallaroo
 class ManagedObject
 {
 public:
-  virtual ~ManagedObject() = 0;
+  virtual ~ManagedObject();
 };
 }
 
