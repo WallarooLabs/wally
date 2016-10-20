@@ -37,8 +37,7 @@ actor TCPSource is CreditFlowProducer
   var _read_len: USize = 0
   var _shutdown: Bool = false
 
-  // TODO: When backpressure is implemented, this should be true
-  var _muted: Bool = false
+  var _muted: Bool
 
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     consumers: Array[CreditFlowConsumer] val, fd: U32, init_size: USize = 64,
@@ -56,6 +55,13 @@ actor TCPSource is CreditFlowProducer
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
+
+    _muted = 
+      ifdef use_backpressure then
+        true
+      else
+        false
+      end
 
     _notify.accepted(this)
 
