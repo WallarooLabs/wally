@@ -4,6 +4,7 @@ use "wallaroo/messages"
 
 interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool
+  // fun routes(): Array[CreditFlowConsumer tag] val
 
 interface RouterBuilder
   fun apply(): Router val
@@ -13,14 +14,17 @@ class EmptyRouter
     true
 
 class DirectRouter
-  let _target: Step tag
+  let _target: RunnableStep tag
 
-  new val create(target: Step tag) =>
+  new val create(target: RunnableStep tag) =>
     _target = target
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
     _target.run[D](metric_name, source_ts, data)
     false
+
+  // fun routes(): Array[CreditFlowConsumer tag] val =>
+  //   recover [_target] end
 
 class DataRouter
   let _routes: Map[U128, Step tag] val
@@ -44,6 +48,16 @@ class DataRouter
       true
     end
 
+  // fun routes(): Array[CreditFlowConsumer tag] val =>
+  //   let rs: Array[CreditFlowConsumer tag] trn = 
+  //     recover Array[CreditFlowConsumer tag] end
+
+  //   for (k, v) in _routes.pairs() do
+  //     rs.push(v)
+  //   end
+
+  //   consume rs
+
 class PartitionRouter
   let _partition_finder: PartitionFinder val
 
@@ -65,6 +79,10 @@ class PartitionRouter
     else
       true
     end
+
+  // fun routes(): Array[CreditFlowConsumer tag] val =>
+  //   // Fix this
+  //   recover [] end
 
 class TCPRouter
   let _tcp_writer: TCPWriter

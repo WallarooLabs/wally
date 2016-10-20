@@ -4,7 +4,10 @@ use "net"
 use "sendence/epoch"
 use "wallaroo/metrics"
 
-actor Step
+trait RunnableStep
+  be run[D: Any val](metric_name: String, source_ts: U64, data: D)
+
+actor Step is RunnableStep
   let _runner: Runner
   var _router: Router val = EmptyRouter
   let _metrics_reporter: MetricsReporter 

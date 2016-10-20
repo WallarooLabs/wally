@@ -8,9 +8,12 @@ use "sendence/hub"
 use "sendence/fix"
 use "sendence/messages"
 use "wallaroo"
-use "wallaroo/network"
+use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/network"
+use "wallaroo/tcp-sink"
 use "wallaroo/topology"
+
 
 actor Main
   new create(env: Env) =>
@@ -35,10 +38,10 @@ primitive MarketSpreadStarter
     metrics_conn.writev(connect_msg)
     metrics_conn.writev(metrics_join_msg)
 
-    let reports_conn = TCPConnection(connect_auth,
-          OutNotify("rejections"),
-          output_addr(0),
-          output_addr(1))
+    // let reports_conn = TCPConnection(connect_auth,
+    //       OutNotify("rejections"),
+    //       output_addr(0),
+    //       output_addr(1))
     let reports_join_msg = HubProtocol.join("reports:market-spread")
 
     let router_builder = 
@@ -97,12 +100,16 @@ primitive MarketSpreadStarter
     let sink_reporter = MetricsReporter("market-spread", 
       metrics_conn)
 
-    let external_sink_runner = EncoderSinkRunner[OrderResult val](
-      OrderResultEncoder, TCPRouter(reports_conn), sink_reporter.clone(),
-      recover [connect_msg, reports_join_msg] end)
+    // let external_sink_runner = EncoderSinkRunner[OrderResult val](
+    //   OrderResultEncoder, TCPRouter(reports_conn), sink_reporter.clone(),
+    //   recover [connect_msg, reports_join_msg] end)
 
-    let sink_router = DirectRouter(Step(consume external_sink_runner,
-      consume sink_reporter))
+    // let sink_router = DirectRouter(Step(consume external_sink_runner,
+    //   consume sink_reporter))
+
+    let sink_router = DirectRouter(TCPSink(
+      TypedEncoderWrapper[OrderResult val](OrderResultEncoder), sink_reporter.
+      clone(), output_addr(0), output_addr(1)))
 
     let order_runner_builder: RunnerBuilder val =
       PreStateRunnerBuilder[FixOrderMessage val, OrderResult val, SymbolData](

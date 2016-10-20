@@ -1,7 +1,11 @@
 use "assert"
+use "buffered"
 use "collections"
 use "net"
-use "../backpressure"
+use "wallaroo/backpressure"
+use "wallaroo/messages"
+use "wallaroo/metrics"
+use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -10,10 +14,9 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 // TODO: replace with real classes
-class MsgEnvelope
-class Router
+class val MsgEnvelope
 
-actor TCPSink is CreditFlowConsumer
+actor TCPSink is (CreditFlowConsumer & RunnableStep)
   """
   # TCPSink
 
@@ -42,6 +45,11 @@ actor TCPSink is CreditFlowConsumer
   - Optional in sink deduplication (this woud involve storing what we sent and
     was acknowleged.)
   """
+  // Steplike
+  let _encoder: EncoderWrapper val
+  let _wb: Writer = Writer
+  let _metrics_reporter: MetricsReporter
+
   // CreditFlow
   var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
   let _max_distributable_credits: USize = 500_000
@@ -66,13 +74,16 @@ actor TCPSink is CreditFlowConsumer
   var _read_len: USize = 0
   var _shutdown: Bool = false
 
-  new create(host: String, service: String, from: String = "",
-    init_size: USize = 64, max_size: USize = 16384)
+  new create(encoder_wrapper: EncoderWrapper val, 
+    metrics_reporter: MetricsReporter iso, host: String, service: String, 
+    from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
+    _encoder = encoder_wrapper
+    _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
@@ -83,15 +94,24 @@ actor TCPSink is CreditFlowConsumer
     _notify_connecting()
 
   // open question: how do we reconnect if our external system goes away?
-  //be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-  //  incoming_envelope: MsgEnvelope val) =>
-  be run(data: Array[U8] val) =>
-    // convert input to ByteSeqIter or ByteSeq
-    // call _writev with the data
-    // record metrics
-
-    let incoming_envelope: MsgEnvelope val = MsgEnvelope
-    _writev(recover val [data] end, incoming_envelope)
+  be run[D: Any val](metric_name: String, source_ts: U64, data: D) =>
+    try
+      let encoded = _encoder.encode[D](data, _wb)
+      _writev(encoded)
+      // TODO: Should happen when tracking info comes back from writev as
+      // being done.
+      _metrics_reporter.pipeline_metric(metric_name, source_ts)
+    else
+      ifdef debug then
+        try
+          Assert(false, "Encoder sink received unrecognized input type.")
+        else
+          _hard_close()
+          return
+        end
+      end
+      return
+    end
 
   be update_router(router: Router val) =>
     """
@@ -257,7 +277,8 @@ actor TCPSink is CreditFlowConsumer
       _try_shutdown()
     end
 
-  fun ref _writev(data: ByteSeqIter, tracking_info: MsgEnvelope val) =>
+  fun ref _writev(data: ByteSeqIter, tracking_info: MsgEnvelope val = 
+    MsgEnvelope) =>
     """
     Write a sequence of sequences of bytes.
     """
