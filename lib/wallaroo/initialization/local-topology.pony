@@ -114,6 +114,13 @@ class LocalTopology
 
   fun pipelines(): Array[LocalPipeline val] val => _pipelines
 
+  fun is_empty(): Bool =>
+    var r = true
+    for p in _pipelines.values() do
+      if p.initializers().size() > 0 then r = false end
+    end
+    r
+
 actor LocalTopologyInitializer
   let _worker_name: String
   let _env: Env
@@ -141,6 +148,10 @@ actor LocalTopologyInitializer
     try
       match _topology
       | let t: LocalTopology val =>
+        if t.is_empty() then 
+          @printf[I32]("This worker has no steps\n".cstring())
+        end
+
         let state_map: Map[String, StateAddresses val] = state_map.create()
 
         let routes: Map[U128, Step tag] trn = 

@@ -54,6 +54,20 @@ actor Main
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition)
             .done()
+
+      // let application = recover val
+      //   Application("Market Spread App")
+      //     .new_pipeline[FixOrderMessage val, OrderResult val](
+      //       "Orders", OrderSourceDecoder)
+      //       .to_stateful[(OrderResult val | None), SymbolData](CheckOrder, 
+      //         SymbolDataBuilder, "symbol-data")
+      //       .to_sink(OrderResultEncoder, recover [0] end)
+      //     .new_pipeline[FixNbboMessage val, None](
+      //       "Nbbo", NbboSourceDecoder)
+      //       .to_stateful[None, SymbolData](UpdateNbbo, SymbolDataBuilder, 
+      //         "symbol-data")
+      //       .done()
+      
       end
       Startup(env, application)
     else

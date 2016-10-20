@@ -62,6 +62,13 @@ class RunnerSequenceBuilder
     end
     consume latest_runner
 
+  fun name(): String =>
+    var n = ""
+    for r in _runner_builders.values() do
+      n = n + "|" + r.name()
+    end
+    n + "|"
+
 class ComputationRunnerBuilder[In: Any val, Out: Any val]
   let _comp_builder: ComputationBuilder[In, Out] val
   let _id: U128
@@ -244,6 +251,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
     producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
+    @printf[I32]("prestate runner received!\n".cstring())
     let computation_start = Time.nanos()
     let is_finished = 
       match data
@@ -282,6 +290,7 @@ class StateRunner[State: Any #read]
   fun ref run[In: Any val](metric_name: String val, source_ts: U64, input: In,
     producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
+    @printf[I32]("prestate runner received!\n".cstring())
     match input
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()

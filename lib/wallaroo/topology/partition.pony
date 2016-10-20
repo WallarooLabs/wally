@@ -192,7 +192,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
 
     let m: Map[U128, Step] trn = recover Map[U128, Step] end
 
-    @printf[I32](("Spinning up prestate partitions for " + _pipeline_name + " pipeline\n").cstring())
+    var partition_count: USize = 0
 
     for (key, id) in _id_map.pairs() do
       let proxy_address = _partition_addresses(key)
@@ -210,6 +210,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
               DirectRouter(s))
             m(id) = next_step
             routes(key) = next_step
+            partition_count = partition_count + 1
           else
             @printf[I32]("Subpartition: Missing state step!\n".cstring())
           end
@@ -224,6 +225,8 @@ class KeyedPreStateSubpartition[PIn: Any val,
         @printf[I32]("Missing proxy address!\n".cstring())
       end
     end
+
+    @printf[I32](("Spinning up " + partition_count.string() + " prestate partitions for " + _pipeline_name + " pipeline\n").cstring())
 
     LocalPartitionRouter[PIn, Key](consume m, _id_map, consume routes,
       _partition_function)
