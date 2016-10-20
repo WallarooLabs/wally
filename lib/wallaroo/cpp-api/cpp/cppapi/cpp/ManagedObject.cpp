@@ -19,6 +19,7 @@
  *
  * Copyright (c) 2016 Sendence LLC All rights reserved.
  */
+#include "ManagedObject.hpp"
 
 namespace wallaroo
 {
