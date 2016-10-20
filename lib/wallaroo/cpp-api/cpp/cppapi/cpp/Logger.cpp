@@ -25,7 +25,7 @@ Logger* Logger::_instance = nullptr;
 Logger::Logger ()
 {
 #if defined(CONSOLE)
-  _logger = spdlog::stdout_logger_mt("console", true);
+  _logger = spdlog::stdout_logger_mt("console");
 #else
   _logger = spdlog::basic_logger_mt("basic_logger", "debug_cppapi.log");
 #endif
