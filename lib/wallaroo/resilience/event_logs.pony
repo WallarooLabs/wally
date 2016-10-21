@@ -5,33 +5,6 @@ trait ResilientOrigin is Origin
   be replay_log_entry(uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
   be replay_finished()
 
-//class LogEntry
-//  //TODO-Alan: this object needs to go away
-// replacement args: , uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val
-//  let _uid: U64
-//  let _frac_ids: (Array[U64] val | None)
-//  let _statechange_id: U64
-//  let _seq_id: U64
-//  let _payload: Array[ByteSeq] val
-//
-//  new val create(uid': U64, frac_ids': (Array[U64] val | None),
-//    statechange_id': U64, seq_id': U64,payload': Array[ByteSeq] val) =>
-//    _uid = uid'
-//    _frac_ids = frac_ids'
-//    _statechange_id = statechange_id'
-//    _payload = payload'
-//    _seq_id = seq_id'
-//
-//  fun is_below_watermark(watermark: U64): Bool =>
-//    //TODO: this will have to change once we have a Watermark type
-//    _uid < watermark
-//
-//  fun uid(): U64 val => _uid
-//  fun frac_ids(): (Array[U64] val | None) => _frac_ids
-//  fun statechange_id(): U64 => _statechange_id
-//  fun seq_id(): U64 => _seq_id
-//  fun payload(): Array[ByteSeq] val => _payload
-
 type LogEntry is (U64, (Array[U64] val | None), U64, Array[ByteSeq] val)
 
 trait EventLogBuffer

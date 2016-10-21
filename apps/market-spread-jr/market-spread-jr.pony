@@ -66,22 +66,13 @@ class SymbolDataStateChange is StateChange[SymbolData]
     out_writer.f64_be(_last_bid)
     out_writer.f64_be(_last_offer)
     //TODO: this is terrible, bigly
-    if _should_reject_trades then
-      out_writer.u8(0)
-    else
-      out_writer.u8(1)
-    end
+    out_writer.bool(_should_reject_trades)
     out_writer.done()
 
   fun ref read_log_entry(in_reader: Reader) ? =>
     _last_bid = in_reader.f64_be()
     _last_offer = in_reader.f64_be()
-    _should_reject_trades =
-        if in_reader.u8() == 1 then
-          true
-        else
-          false
-        end
+    _should_reject_trades = in_reader.bool()
 
 class UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
 

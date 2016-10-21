@@ -45,7 +45,6 @@ class Source[In: Any val] is Origin
           let msg_uid = _count.u64()
           _incoming_envelope.msg_uid = msg_uid
           _incoming_envelope.seq_id = msg_uid
-          //TODO: don't always clone new incoming envelope to make it a val?
           _runner.run[In](_pipeline_name, ingest_ts, input, this, msg_uid,
             None, msg_uid, _incoming_envelope, _router)
         else

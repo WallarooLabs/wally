@@ -16,7 +16,7 @@ class SimpleSinkRunner is Runner
     origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64, incoming_envelope: MsgEnvelope box,
     router: (Router val | None) = None): Bool
   =>
-    //TODO: stamp outgoing envelope?
+    //TODO: create outgoing envelope?
     match data
     | let s: Stringable val => None
       @printf[I32](("Simple sink: Received " + s.string() + "\n").cstring())

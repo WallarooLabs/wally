@@ -164,7 +164,6 @@ actor Alfred
           _backend.writev(recover val _writer.done() end)
         end
         _backend.flush()
-        //TODO: communicate that writing is finished
         _log_buffers(buffer_id.usize()).log_flushed(low_watermark)
       else
         @printf[I32]("unrecoverable error while trying to write event log".cstring())
