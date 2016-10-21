@@ -161,26 +161,35 @@ actor LocalTopologyInitializer
           @printf[I32]("----This worker has no steps----\n".cstring())
         end
 
+        // Make sure we only create shared state once and reuse it
         let state_map: Map[String, StateAddresses val] = state_map.create()
 
+        // Keep track of all Steps by id so we can create a DataRouter
+        // for the data channel boundary
         let routes: Map[U128, Step tag] trn = 
           recover Map[U128, Step tag] end
 
+        // Keep track of which source address we're using
         var source_addr_idx: USize = 0
-
 
         for pipeline in t.pipelines().values() do
           @printf[I32](("\nInitializing " + pipeline.name() + " pipeline:\n\n").cstring())
 
+          // If need be, create shared state for this pipeline and add to our 
+          // map
           pipeline.update_state_map(state_map, _metrics_conn)
 
+          // We'll need to register our proxies later over Connections
           let proxies: Map[String, Array[Step tag]] = proxies.create()
 
+          // Create our sink or Proxy using this pipeline's egress builder
           let sink_reporter = MetricsReporter(pipeline.name(), _metrics_conn)
 
           let sink = pipeline.egress_builder()(_worker_name, 
             consume sink_reporter, _auth, proxies)
 
+          // For each step initializer in this pipeline, build the step
+          // working backwards so we can plug later steps into earlier ones
           let initializers = pipeline.initializers()
           var initializer_idx = initializers.size()
           var latest_router: Router val = DirectRouter(sink)
@@ -253,6 +262,8 @@ actor LocalTopologyInitializer
 
           end  
 
+          // Create source if there is source data specified for this worker's
+          // portion of the pipeline
           match pipeline.source_data()
           | let sd: SourceData val =>
             let source_reporter = MetricsReporter(pipeline.name(), 
@@ -275,7 +286,10 @@ actor LocalTopologyInitializer
 
           _register_proxies(proxies)
         end
+        // We're done with all LocalPipelines
 
+        // If this is not the initializer worker, then create the data channel
+        // incoming boundary
         if not _is_initializer then
           let data_notifier: TCPListenNotify iso =
             DataChannelListenNotifier(_worker_name, _env, _auth, _connections, 
@@ -285,6 +299,8 @@ actor LocalTopologyInitializer
           )
         end
 
+        // Inform the initializer that we're done initializing our local
+        // topology
         let topology_ready_msg = 
           try
             ChannelMsgEncoder.topology_ready(_worker_name, _auth)
@@ -308,6 +324,7 @@ actor LocalTopologyInitializer
       _env.err.print("Error initializing local topology")
     end
 
+  // Connections knows how to plug proxies into other workers via TCP
   fun _register_proxies(proxies: Map[String, Array[Step tag]]) =>
     for (worker, ps) in proxies.pairs() do
       for proxy in ps.values() do
