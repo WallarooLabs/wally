@@ -65,7 +65,6 @@ class SymbolDataStateChange is StateChange[SymbolData]
   fun to_log_entry(out_writer: Writer) : Array[ByteSeq] val =>
     out_writer.f64_be(_last_bid)
     out_writer.f64_be(_last_offer)
-    //TODO: this is terrible, bigly
     out_writer.bool(_should_reject_trades)
     out_writer.done()
 
