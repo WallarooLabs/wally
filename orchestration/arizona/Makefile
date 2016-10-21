@@ -13,6 +13,7 @@ force_instance ?= r3.4xlarge## Force a specific instance type (for use_automagic
 ansible_parallelism ?= default## Number of machines to process in parallel for Ansible
 num_leaders ?= ## Number of leader nodes (1 by default)
 num_followers ?= ## Number of follower nodes (2 by default)
+ansible_ptpd_experimental ?= false## Whether to use experimental PTPd or not
 
 inventory_script := ec2.py
 ansible_user := ec2-user
@@ -21,6 +22,13 @@ all_instances := 'tag_Project_arizona:&tag_ClusterName_$(cluster_name):&$(region
 # if debug shell command output requested
 ifdef DEBUG_SHELL
  SHELL = /bin/sh -x
+endif
+
+ifdef ansible_ptpd_experimental
+  ifeq (,$(filter $(ansible_ptpd_experimental),false true))
+    $(error Unknown ansible_ptpd_experimental option "$(ansible_ptpd_experimental). \
+      Valid options are 'true' and 'false'")
+  endif
 endif
 
 ifdef num_leaders
@@ -276,7 +284,7 @@ configure: check-cluster-name ## Configure nodes using ansible
 	PACKET_NET_API_KEY=$(packet_api_key) ansible-playbook $(ansible_parallelism_arg) -i \
           ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
-          $(provider)_region=$(region) \
+          $(provider)_region=$(region) ptpd_experimental=$(ansible_ptpd_experimental)\
           " -u $(ansible_user) \
           ../ansible/playbooks/arizona.yml
 	@echo "\033[36m==> Successfully ran ansible playbook for cluster \

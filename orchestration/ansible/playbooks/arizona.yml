@@ -58,6 +58,18 @@
     ptpd_role: master
     ptpd_transport: unicast
   tasks:
+  - name: uninstall normal ptpd
+    yum:
+      name: ptpd
+      state: absent
+    when: ptpd_experimental == 'true'
+    become: yes
+  - name: install ptpd experimental
+    yum:
+      name: https://s3.amazonaws.com/sendence-dev/installers/ptpd/ptpd-experimental-2.3.2-1.el6.x86_64.rpm
+      state: present
+    when: ptpd_experimental == 'true'
+    become: yes
   - name: Update ptpd config
     replace:
       dest: /etc/sysconfig/ptpd
@@ -75,6 +87,18 @@
     ptpd_role: slave
     ptpd_transport: unicast
   tasks:
+  - name: uninstall normal ptpd
+    yum:
+      name: ptpd
+      state: absent
+    when: ptpd_experimental == 'true'
+    become: yes
+  - name: install ptpd experimental
+    yum:
+      name: https://s3.amazonaws.com/sendence-dev/installers/ptpd/ptpd-experimental-2.3.2-1.el6.x86_64.rpm
+      state: present
+    when: ptpd_experimental == 'true'
+    become: yes
   - name: Update ptpd config
     replace:
       dest: /etc/sysconfig/ptpd
