@@ -68,7 +68,6 @@ class DataChannelConnectNotifier is TCPConnectionNotify
     else
       match ChannelMsgDecoder(consume data, _auth)
       | let d: DeliveryMsg val =>
-        @printf[I32]("Received delivery msg!!\n".cstring())
         _router.route[DeliveryMsg val](d.metric_name(), d.source_ts(), d, 
           None)
       | let m: SpinUpLocalTopologyMsg val =>
