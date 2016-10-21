@@ -3,6 +3,7 @@ use "serialise"
 use "net"
 use "collections"
 use "wallaroo/backpressure"
+use "wallaroo/initialization"
 use "wallaroo/topology"
 
 primitive ChannelMsgEncoder

@@ -6,121 +6,50 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 
-actor Initializer
+actor ApplicationInitializer
   let _guid_gen: GuidGenerator = GuidGenerator
-  let _auth: AmbientAuth
-  let _expected: USize
-  let _connections: Connections
   let _local_topology_initializer: LocalTopologyInitializer
-  let _initializer_data_addr: Array[String] val
   let _input_addrs: Array[Array[String]] val
   let _output_addr: Array[String] val
-  let _metrics_conn: TCPConnection
-  let _ready_workers: Set[String] = Set[String]
   let _is_automated: Bool
+
   var _application_starter: (ApplicationStarter val | None) = None
   var _application: (Application val | None) = None
-  var _control_identified: USize = 1
-  var _data_identified: USize = 1
-  // var interconnected: USize = 0
-  var _initialized: USize = 0
 
-  let _worker_names: Array[String] = Array[String]
-  let _control_addrs: Map[String, (String, String)] = _control_addrs.create()
-  let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
-
-  new create(auth: AmbientAuth, workers: USize, connections: Connections,
-    local_topology_initializer: LocalTopologyInitializer,
-    input_addrs: Array[Array[String]] val, output_addr: Array[String] val, 
-    data_addr: Array[String] val, metrics_conn: TCPConnection,
-    is_automated: Bool) 
+  new create(local_topology_initializer: LocalTopologyInitializer,
+    input_addrs: Array[Array[String]] val, 
+    output_addr: Array[String] val, is_automated: Bool) 
   =>
-    _auth = auth
-    _expected = workers
-    _connections = connections
+    _local_topology_initializer = local_topology_initializer
     _input_addrs = input_addrs
     _output_addr = output_addr
-    _initializer_data_addr = data_addr
-    _metrics_conn = metrics_conn
-    _local_topology_initializer = local_topology_initializer
     _is_automated = is_automated
 
-  be start(t: (ApplicationStarter val | Application val)) =>
-    match t
-    | let starter: ApplicationStarter val =>
-      _application_starter = starter
-    | let application: Application val =>
-      _application = application
+  be update_application(a: (ApplicationStarter val | Application val)) =>
+    match a
+    | let s: ApplicationStarter val =>
+      _application_starter = s
+    | let app: Application val =>
+      _application = app
     end
 
-  be identify_control_address(worker: String, host: String, service: String) =>
-    if _control_addrs.contains(worker) then
-      @printf[I32](("Initializer: " + worker + " tried registering control channel twice.\n").cstring())
-    else  
-      _worker_names.push(worker)
-      _control_addrs(worker) = (host, service)
-      _control_identified = _control_identified + 1
-      if _control_identified == _expected then
-        @printf[I32]("All worker control channels identified\n".cstring())
-
-        _initialize()      
-      end
-    end
-
-  be identify_data_address(worker: String, host: String, service: String) =>
-    if _data_addrs.contains(worker) then
-      @printf[I32](("Initializer: " + worker + " tried registering data channel twice.\n").cstring())
-    else  
-      _data_addrs(worker) = (host, service)
-      _data_identified = _data_identified + 1
-      if _data_identified == _expected then
-        @printf[I32]("All worker data channels identified\n".cstring())
-
-        _create_interconnections()
-      end
-    end
-
-  be distribute_local_topologies(ts: Array[LocalTopology val] val) =>
-    if _worker_names.size() != ts.size() then
-      @printf[I32]("We need one local topology for each worker\n".cstring())
-    else
-      for (idx, worker) in _worker_names.pairs() do
-        try
-          let spin_up_msg = ChannelMsgEncoder.spin_up_local_topology(ts(idx), 
-            _auth)
-          _connections.send_control(worker, spin_up_msg)
-        end
-      end
-    end
-
-  be topology_ready(worker_name: String) =>
-    if not _ready_workers.contains(worker_name) then
-      _ready_workers.set(worker_name)
-      _initialized = _initialized + 1
-      if _initialized == (_expected - 1) then
-        let topology_ready_msg = 
-          ExternalMsgEncoder.topology_ready("initializer")
-        _connections.send_phone_home(topology_ready_msg)
-      end
-    end
-
-  be register_proxy(worker: String, proxy: Step tag) =>
-    _connections.register_proxy(worker, proxy)
-
-  fun ref _initialize() =>
-    @printf[I32]("Initializing topology\n".cstring())
+  be initialize(worker_initializer: WorkerInitializer, worker_count: USize, 
+    worker_names: Array[String] val)
+  =>
+    @printf[I32]("Initializing application\n".cstring())
     if _is_automated then
       @printf[I32]("Automating...\n".cstring())
       match _application
       | let a: Application val =>
-        _automate_initialization(a)
+        _automate_initialization(a, worker_initializer, worker_count, 
+          worker_names)
       end
     else
       match _application_starter
       | let a: ApplicationStarter val =>
         @printf[I32]("Using user-defined ApplicationStarter...\n".cstring())
         try
-          a(this, _worker_names, _input_addrs, _expected)
+          a(worker_initializer, worker_names, _input_addrs, worker_count)
         else
           @printf[I32]("Error running ApplicationStarter.\n".cstring())
         end
@@ -129,37 +58,10 @@ actor Initializer
       end
     end
 
-  fun _create_interconnections() =>
-    let addresses = _generate_addresses_map()
-    try
-      let message = ChannelMsgEncoder.create_connections(addresses, _auth)
-      for key in _control_addrs.keys() do
-        _connections.send_control(key, message)
-      end
-    else
-      @printf[I32]("Initializer: Error initializing interconnections\n".cstring())
-    end
-
-  fun _generate_addresses_map(): Map[String, Map[String, (String, String)]] val
+  fun ref _automate_initialization(application: Application val,
+    worker_initializer: WorkerInitializer, worker_count: USize,
+    worker_names: Array[String] val) 
   =>
-    let map: Map[String, Map[String, (String, String)]] trn = 
-      recover Map[String, Map[String, (String, String)]] end
-    let control_map: Map[String, (String, String)] trn = 
-      recover Map[String, (String, String)] end
-    for (key, value) in _control_addrs.pairs() do
-      control_map(key) = value
-    end
-    let data_map: Map[String, (String, String)] trn =
-      recover Map[String, (String, String)] end
-    for (key, value) in _data_addrs.pairs() do
-      data_map(key) = value
-    end
-
-    map("control") = consume control_map
-    map("data") = consume data_map
-    consume map
-
-  fun ref _automate_initialization(application: Application val) =>
     try
       // REMOVE LATER (for try block)
       application.pipelines(0)
@@ -175,7 +77,7 @@ actor Initializer
         local_pipelines.create()
 
       local_pipelines("initializer") = Array[LocalPipeline val]
-      for name in _worker_names.values() do
+      for name in worker_names.values() do
         local_pipelines(name) = Array[LocalPipeline val]
       end
 
@@ -193,10 +95,10 @@ actor Initializer
           pipeline.sink_runner_builder())
 
         // Determine which steps go on which workers using boundary indices
-        let per_worker: USize = pipeline.size() / _expected
+        let per_worker: USize = pipeline.size() / worker_count
         let boundaries: Array[ISize] = boundaries.create()
         var count: USize = 0
-        for i in Range(0, _expected) do
+        for i in Range(0, worker_count) do
           if (count + per_worker) < pipeline.size() then
             count = count + per_worker
             boundaries.push(count.isize())
@@ -213,11 +115,11 @@ actor Initializer
             if boundaries_idx == 0 then
               "initializer"
             else
-              _worker_names(boundaries_idx - 1)
+              worker_names(boundaries_idx - 1)
             end
           let next_worker: (String | None) = 
             try
-              _worker_names(boundaries_idx)
+              worker_names(boundaries_idx)
             else
               None
             end
@@ -341,7 +243,12 @@ actor Initializer
         end
       end
 
-      distribute_local_topologies(consume other_local_topologies)
+      match worker_initializer
+      | let wi: WorkerInitializer =>
+        wi.distribute_local_topologies(consume other_local_topologies)
+      else
+        @printf[I32]("Error distributing local topologies!/n".cstring())
+      end
     else
       @printf[I32]("Error initializating application!/n".cstring())
     end
@@ -356,7 +263,3 @@ class WorkerTopologyData
     worker_name = n
     boundary_step_id = id
     step_builders = sb
-
-trait ApplicationStarter
-  fun apply(initializer: Initializer, workers: Array[String] box,
-    input_addrs: Array[Array[String]] val, expected: USize) ?

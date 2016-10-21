@@ -5,6 +5,7 @@ use "sendence/messages"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
+use "wallaroo/topology"
 
 class ProxyAddress
   let worker: String

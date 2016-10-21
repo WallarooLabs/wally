@@ -4,6 +4,7 @@ use "options"
 use "time"
 use "buffered"
 use "files"
+use "wallaroo/initialization"
 use "wallaroo/network"
 use "wallaroo/topology"
 
@@ -13,7 +14,7 @@ interface AppStarter
     output_addr: Array[String] val, metrics_conn: TCPConnection, 
     expected: USize, init_path: String, worker_count: USize,
     is_initializer: Bool, worker_name: String, connections: Connections,
-    initializer: (Initializer | None)) ? 
+    initializer: (WorkerInitializer | None)) ? 
 
 actor Startup
   new create(env: Env, app_runner: (AppStarter val | Application val)) =>
@@ -35,7 +36,7 @@ actor Startup
       else
         false
       end
-    var initializer: (Initializer | None) = None
+    var worker_initializer: (WorkerInitializer | None) = None
     var worker_name = ""
     try
       var options = Options(env.args)
@@ -127,15 +128,18 @@ actor Startup
 
       if is_initializer then
         env.out.print("Running as Initializer...")
-        initializer = Initializer(auth, worker_count, connections, 
-          local_topology_initializer, input_addrs, o_addr, d_addr,
-          metrics_conn, is_automated_initialization)
+        let application_initializer = ApplicationInitializer(
+          local_topology_initializer, input_addrs, o_addr,
+          is_automated_initialization)
+
+        worker_initializer = WorkerInitializer(auth, worker_count, connections,
+          application_initializer, d_addr, metrics_conn)
         worker_name = "initializer"
       end
 
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(worker_name, env, auth, connections, 
-          is_initializer, initializer, local_topology_initializer)
+          is_initializer, worker_initializer, local_topology_initializer)
 
       if is_initializer then
         connections.register_listener(
@@ -149,14 +153,14 @@ actor Startup
 
       match app_runner
       | let application: Application val =>
-        match initializer 
-        | let i: Initializer =>
-          i.start(application)
+        match worker_initializer 
+        | let w: WorkerInitializer =>
+          w.start(application)
         end
       | let starter: AppStarter val =>
         starter(env, d_addr, input_addrs, o_addr, metrics_conn, expected,
           init_path, worker_count, is_initializer, worker_name, connections, 
-          initializer)
+          worker_initializer)
       end
     else
       StartupHelp(env)
