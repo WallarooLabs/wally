@@ -108,23 +108,26 @@ actor ApplicationInitializer
             pipeline.size() / worker_count
           end
 
-        let boundaries: Array[ISize] = boundaries.create()
+        let boundaries: Array[USize] = boundaries.create()
         var count: USize = 0
         for i in Range(0, worker_count) do
           // if (count + per_worker) < pipeline.size() then
             count = count + per_worker
-            boundaries.push(count.isize())
+            boundaries.push(count)
           // else
             // boundaries.push((pipeline.size() - 1).isize())
           // end
         end
 
+        let pipeline_size = pipeline.size()
+
+        // var final_boundary = pipeline.size().isize() + 1
+
+        @printf[I32](("The pipeline has " + pipeline_size.string() + " runner builders\n").cstring())
+
+        var pipeline_idx: USize = 0
         var boundaries_idx: USize = 0
-        var final_boundary = pipeline.size().isize() + 1
 
-        @printf[I32](("The pipeline has " + pipeline.size().string() + " runner builders\n").cstring())
-
-        var last_boundary: ISize = -1
         while boundaries_idx < boundaries.size() do
           let worker = 
             if boundaries_idx == 0 then
@@ -149,19 +152,18 @@ actor ApplicationInitializer
           let step_initializers: Array[StepInitializer val] trn = 
             recover Array[StepInitializer val] end
 
-          if last_boundary < (final_boundary - 1) then
+          if pipeline_idx < pipeline_size then
             var runner_builders: Array[RunnerBuilder val] trn = 
               recover Array[RunnerBuilder val] end 
             var cur_step_id = _guid_gen.u128()
 
-            var i = last_boundary + 1
-            while i < boundary do
-              var next_runner_builder: RunnerBuilder val = pipeline(i.usize())
+            while pipeline_idx < boundary do
+              var next_runner_builder: RunnerBuilder val = pipeline(pipeline_idx)
 
-              if (i == (boundary - 1)) and 
+              if (pipeline_idx == (boundary - 1)) and 
                 (not next_runner_builder.is_stateful()) then
                 try
-                  runner_builders.push(pipeline(i.usize()))
+                  runner_builders.push(pipeline(pipeline_idx))
                 else
                   @printf[I32]("No runner builder found!\n".cstring())
                   error
@@ -170,7 +172,8 @@ actor ApplicationInitializer
                 let seq_builder = RunnerSequenceBuilder(
                   runner_builders = recover Array[RunnerBuilder val] end)
 
-                @printf[I32](("Preparing to spin up  " + seq_builder.name() + "on " + worker + "\n").cstring())
+                @printf[I32](("Preparing to spin up " + 
+                  seq_builder.name() + " on " + worker + "\n").cstring())
 
                 let step_builder = StepBuilder(seq_builder, 
                   cur_step_id)
@@ -189,7 +192,7 @@ actor ApplicationInitializer
                 end
 
                 let next_seq_builder = RunnerSequenceBuilder(
-                  recover [pipeline(i.usize())] end)
+                  recover [pipeline(pipeline_idx)] end)
 
                 @printf[I32](("Preparing to spin up  " + next_seq_builder.name() + "on " + worker + "\n").cstring())
 
@@ -213,7 +216,7 @@ actor ApplicationInitializer
                 end
 
                 let next_seq_builder = RunnerSequenceBuilder(
-                  recover [pipeline(i.usize())] end)
+                  recover [pipeline(pipeline_idx)] end)
 
                 // If we haven't handled this shared state before, 
                 // handle it.  Otherwise, just handle the prestate.
@@ -239,8 +242,22 @@ actor ApplicationInitializer
                       pb.pre_state_subpartition(worker), next_runner_builder, 
                       state_name)
                   else
-                    @printf[I32](("Preparing to spin up non-partitioned state on " + worker + "\n").cstring())                                           
-                    StepBuilder(next_seq_builder, next_runner_builder.id(), 
+                    @printf[I32](("Preparing to spin up non-partitioned state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())                                          
+                    step_initializers.push(StepBuilder(next_seq_builder, 
+                      next_runner_builder.id(),
+                      next_runner_builder.is_stateful()))
+                    steps(next_runner_builder.id()) = worker
+
+                    pipeline_idx = pipeline_idx + 1
+
+                    next_runner_builder = pipeline(pipeline_idx)
+                    runner_builders.push(next_runner_builder)
+
+                    @printf[I32](("Preparing to spin up non-partitioned state for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
+
+                    let seq_builder = RunnerSequenceBuilder(
+                      runner_builders = recover Array[RunnerBuilder val] end)
+                    StepBuilder(seq_builder, next_runner_builder.id(), 
                       next_runner_builder.is_stateful())
                   end
 
@@ -250,7 +267,7 @@ actor ApplicationInitializer
                 match next_initializer
                 | let sb: StepBuilder val =>
                   try
-                    runner_builders.push(pipeline(i.usize() + 1))
+                    runner_builders.push(pipeline(pipeline_idx + 1))
                   end    
                   let seq_builder = RunnerSequenceBuilder(
                     runner_builders = recover Array[RunnerBuilder val] end)
@@ -261,7 +278,7 @@ actor ApplicationInitializer
                     cur_step_id)
                   step_initializers.push(step_builder)
                   steps(cur_step_id) = worker
-                  i = i + 1 // We've already handled the next runnerbuilder
+                  pipeline_idx = pipeline_idx + 1 // We've already handled the next runnerbuilder
                 end
                
                 cur_step_id = _guid_gen.u128()
@@ -279,14 +296,14 @@ actor ApplicationInitializer
                 cur_step_id = _guid_gen.u128()                
               else
                 try
-                  runner_builders.push(pipeline(i.usize()))
+                  runner_builders.push(pipeline(pipeline_idx))
                 else
                   @printf[I32]("No runner builder found!\n".cstring())
                   error
                 end             
               end
 
-              i = i + 1 
+              pipeline_idx = pipeline_idx + 1 
             end
           end
 
@@ -297,7 +314,6 @@ actor ApplicationInitializer
             worker_topology_data.push(topology_data)
           end
 
-          last_boundary = boundary
           boundaries_idx = boundaries_idx + 1
         end
 

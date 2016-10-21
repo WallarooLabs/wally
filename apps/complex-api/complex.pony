@@ -33,8 +33,8 @@ actor Main
             => Conjugate end)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Scale(5) end)
-          // .to_stateful[Complex val, Counter](UpdateCounter,
-            // CounterBuilder, "counter-builder")
+          .to_stateful[Complex val, Counter](UpdateCounter,
+            CounterBuilder, "counter-builder")
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Conjugate end)
           .to_sink(ComplexEncoder, recover [0] end)
@@ -76,6 +76,7 @@ class Complex
 
 class iso Conjugate is Computation[Complex val, Complex val]
   fun apply(input: Complex val): Complex val =>
+    @printf[I32]("Conjugate\n".cstring())
     input.conjugate()
 
   fun name(): String => "Get Conjugate"
@@ -89,6 +90,7 @@ class Scale is Computation[Complex val, Complex val]
     _name = "Scale by " + _scalar.string()
 
   fun apply(input: Complex val): Complex val =>
+    @printf[I32]("Scale\n".cstring())
     input * _scalar
 
   fun name(): String => _name
@@ -123,7 +125,7 @@ class Counter
   fun reals(): I32 => _reals
 
 primitive CounterBuilder
-  fun name(): String => "counter"
+  fun name(): String => "Counter"
   fun apply(): Counter => Counter
 
 primitive UpdateCounter

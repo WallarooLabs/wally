@@ -38,7 +38,11 @@ class EgressBuilder
           let connect_auth = TCPConnectAuth(auth)
           let sink_name = "sink at " + a(0) + ":" + a(1)
 
-          @printf[I32](("Connecting to sink at " + a(0) + ":" + a(1) + "\n").cstring())
+          if srb.connects_to_tcp() then
+            @printf[I32](("Connecting to sink at " + a(0) + ":" + a(1) + "\n").cstring())
+          else
+            @printf[I32]("Creating empty sink\n".cstring())
+          end
           let out_conn = TCPConnection(connect_auth,
             OutNotify(sink_name), a(0), a(1))
 
@@ -183,6 +187,7 @@ actor LocalTopologyInitializer
               try
                 let state_addresses = state_map(p_builder.state_name())
 
+                @printf[I32](("Spinning up partition for " + p_builder.name() + "\n").cstring())
                 let partition_router: PartitionRouter val =
                   p_builder.build_partition(_worker_name, state_addresses, 
                     _metrics_conn, _auth, _connections, latest_router)
@@ -198,6 +203,7 @@ actor LocalTopologyInitializer
               end
             | let builder: StepBuilder val =>
               if builder.is_stateful() then
+                @printf[I32](("Spinning up state for " + builder.name() + "\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn, 
                   pipeline.name())
                 let state_step_router = DirectRouter(state_step)
@@ -210,6 +216,7 @@ actor LocalTopologyInitializer
                 try
                   match initializers((initializer_idx - 1).usize())
                   | let b: StepBuilder val =>
+                    @printf[I32](("Spinning up " + b.name() + "\n").cstring())
                     let next_step = b(state_step_router, _metrics_conn, 
                       pipeline.name(), latest_router)
                     latest_router = DirectRouter(next_step)
@@ -224,6 +231,7 @@ actor LocalTopologyInitializer
                 end
                 initializer_idx = initializer_idx - 1              
               else
+                @printf[I32](("Spinning up " + builder.name() + "\n").cstring())
                 let next_step = builder(latest_router, _metrics_conn, 
                   pipeline.name())
                 latest_router = DirectRouter(next_step)

@@ -63,6 +63,7 @@ trait SinkRunnerBuilder
     EmptyRouter): Runner iso^
 
   fun name(): String 
+  fun connects_to_tcp(): Bool => true
 
 class SimpleSinkRunnerBuilder[In: Any val] is SinkRunnerBuilder
   let _pipeline_name: String
@@ -76,6 +77,8 @@ class SimpleSinkRunnerBuilder[In: Any val] is SinkRunnerBuilder
     SimpleSinkRunner(consume metrics_reporter) 
 
   fun name(): String => _pipeline_name + " sink"
+
+  fun connects_to_tcp(): Bool => false
 
 class EncoderSinkRunnerBuilder[In: Any val] is SinkRunnerBuilder
   let _encoder: SinkEncoder[In] val

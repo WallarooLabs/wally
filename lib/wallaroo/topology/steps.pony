@@ -119,8 +119,10 @@ class StepBuilder
     _id = id'
     _is_stateful = is_stateful'
 
+  fun name(): String => _runner_sequence_builder.name()
   fun id(): U128 => _id
   fun is_stateful(): Bool => _is_stateful
+  fun is_partitioned(): Bool => false
 
   fun apply(next: Router val, metrics_conn: TCPConnection,
     pipeline_name: String, router: Router val = EmptyRouter): Step tag =>
@@ -143,9 +145,11 @@ class PartitionedPreStateStepBuilder
     _runner_builder = r
     _state_name = state_name'
 
+  fun name(): String => _runner_builder.name() + " partition"
   fun state_name(): String => _state_name
   fun id(): U128 => 0
   fun is_stateful(): Bool => true
+  fun is_partitioned(): Bool => true
   fun apply(next: Router val, metrics_conn: TCPConnection,
     pipeline_name: String, router: Router val = EmptyRouter): Step tag =>
     Step(RouterRunner, MetricsReporter(pipeline_name, metrics_conn))
