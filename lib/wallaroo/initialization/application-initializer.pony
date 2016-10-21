@@ -61,13 +61,14 @@ actor ApplicationInitializer
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("^^^^^^Initializing Topologies for Workers^^^^^^^\n\n".cstring())
     try
+      // Keep track of shared state so that it's only created once 
       let state_partition_map: Map[String, PartitionAddresses val] trn = 
         recover Map[String, PartitionAddresses val] end
 
+      // The worker-specific summaries
       var worker_topology_data = Array[WorkerTopologyData val]
 
       var pipeline_id: USize = 0
-      var source_addr_idx: USize = 0
 
       // Map from step_id to worker name
       let steps: Map[U128, String] = steps.create()
@@ -75,6 +76,7 @@ actor ApplicationInitializer
       let local_pipelines: Map[String, Array[LocalPipeline val]] =
         local_pipelines.create()
 
+      // Initialize values for local pipelines
       local_pipelines("initializer") = Array[LocalPipeline val]
       for name in worker_names.values() do
         local_pipelines(name) = Array[LocalPipeline val]
@@ -82,11 +84,12 @@ actor ApplicationInitializer
 
       @printf[I32](("Found " + application.pipelines.size().string()  + " pipelines in application\n").cstring())
 
+      // Break each pipeline into LocalPipelines to distribute to workers
       for pipeline in application.pipelines.values() do
         let source_addr_trn: Array[String] trn = recover Array[String] end
         try
-          source_addr_trn.push(_input_addrs(source_addr_idx)(0))
-          source_addr_trn.push(_input_addrs(source_addr_idx)(1))
+          source_addr_trn.push(_input_addrs(pipeline_id)(0))
+          source_addr_trn.push(_input_addrs(pipeline_id)(1))
         else
           @printf[I32]("No input address!\n".cstring())
           error
@@ -102,10 +105,9 @@ actor ApplicationInitializer
           error
         end
 
-        let sink_egress_builder = EgressBuilder(consume sink_addr, 
-          pipeline.sink_runner_builder())
-
         // Determine which steps go on which workers using boundary indices
+        // Each worker gets a near-equal share of the total computations
+        // in this naive algorithm
         let per_worker: USize = 
           if pipeline.size() <= worker_count then
             1
@@ -126,16 +128,19 @@ actor ApplicationInitializer
           end
         end
 
-        let pipeline_size = pipeline.size()
+        @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline.size().string() + " runner builders\n").cstring())
 
-        // var final_boundary = pipeline.size().isize() + 1
-
-        @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline_size.string() + " runner builders\n").cstring())
-
+        // Keep track of which runner_builder we're on in this pipeline
         var pipeline_idx: USize = 0
+        // Keep track of which worker's boundary we're using
         var boundaries_idx: USize = 0
 
+        // For each worker, use its boundary value to determine which
+        // runner_builders to use to create StepInitializers that will be
+        // added to its LocalTopology
         while boundaries_idx < boundaries.size() do
+          let boundary = boundaries(boundaries_idx)
+
           let worker = 
             if boundaries_idx == 0 then
               "initializer"
@@ -147,6 +152,7 @@ actor ApplicationInitializer
                 error
               end              
             end
+          // Keep track of which worker follows this one in order
           let next_worker: (String | None) = 
             try
               worker_names(boundaries_idx)
@@ -154,19 +160,27 @@ actor ApplicationInitializer
               None
             end
 
-          let boundary = boundaries(boundaries_idx)
-
+          // We'll use this to create the LocalTopology for this worker
           let step_initializers: Array[StepInitializer val] trn = 
             recover Array[StepInitializer val] end
 
-          if pipeline_idx < pipeline_size then
+          // Make sure there are still runner_builders left in the pipeline.
+          if pipeline_idx < pipeline.size() then
+            // Running array of recent runner_builders to be coalesced
+            // into a single StepInitializer
             var runner_builders: Array[RunnerBuilder val] trn = 
-              recover Array[RunnerBuilder val] end 
+              recover Array[RunnerBuilder val] end
+
             var cur_step_id = _guid_gen.u128()
 
+            // Until we hit the boundary for this worker, keep adding
+            // runner builders from the pipeline
             while pipeline_idx < boundary do
               var next_runner_builder: RunnerBuilder val = pipeline(pipeline_idx)
 
+              // If this is the last runner builder for this worker,
+              // then add it to the last StepInitializer along with
+              // anything we need to coalesce from runner_builders
               if (pipeline_idx == (boundary - 1)) and 
                 (not next_runner_builder.is_stateful()) then
                 try
@@ -188,6 +202,10 @@ actor ApplicationInitializer
                 steps(cur_step_id) = worker
 
                 cur_step_id = _guid_gen.u128()
+
+              // If this runner builder was given a unique id via the API,
+              // then it needs to be on its own Step since it can be used
+              // by multiple pipelines
               elseif (next_runner_builder.id() != 0) then
                 if runner_builders.size() > 0 then
                   let seq_builder = RunnerSequenceBuilder(
@@ -208,7 +226,11 @@ actor ApplicationInitializer
                 step_initializers.push(next_step_builder)
                 steps(next_runner_builder.id()) = worker
 
-                cur_step_id = _guid_gen.u128()              
+                cur_step_id = _guid_gen.u128()   
+
+              // Stateful steps have to be handled differently since pre state 
+              // steps must be on the same workers as their corresponding 
+              // state steps           
               elseif next_runner_builder.is_stateful() then
                 if runner_builders.size() > 0 then
                   let seq_builder = RunnerSequenceBuilder(
@@ -225,22 +247,20 @@ actor ApplicationInitializer
                 let next_seq_builder = RunnerSequenceBuilder(
                   recover [pipeline(pipeline_idx)] end)
 
-                // If we haven't handled this shared state before, 
-                // handle it.  Otherwise, just handle the prestate.
-          
+                // If this is partitioned state and we haven't handled this 
+                // shared state before, handle it.  Otherwise, just handle the 
+                // prestate.          
                 var state_name = ""
-
                 match next_runner_builder
                 | let pb: PartitionBuilder val =>
                   state_name = pb.state_name()
                   if not state_partition_map.contains(state_name) then
                     state_partition_map(state_name) = pb.partition_addresses(worker)
                   end
-                // else
-                //   @printf[I32]("Non-partitioned state not currently supported\n".cstring())
-                //   error
                 end
 
+                // Create the prestate initializer, and if this is not 
+                // partitioned state, then the state initializer as well
                 let next_initializer: StepInitializer val = 
                   match next_runner_builder
                   | let pb: PartitionBuilder val =>
@@ -271,24 +291,10 @@ actor ApplicationInitializer
                 step_initializers.push(next_initializer)
                 steps(next_runner_builder.id()) = worker
 
-                match next_initializer
-                | let sb: StepBuilder val =>
-                  try
-                    runner_builders.push(pipeline(pipeline_idx + 1))
-                  end    
-                  let seq_builder = RunnerSequenceBuilder(
-                    runner_builders = recover Array[RunnerBuilder val] end)
-
-                  @printf[I32](("Preparing to spin up " + seq_builder.name() + " on " + worker + "\n").cstring())
-
-                  let step_builder = StepBuilder(seq_builder, 
-                    cur_step_id)
-                  step_initializers.push(step_builder)
-                  steps(cur_step_id) = worker
-                  pipeline_idx = pipeline_idx + 1 // We've already handled the next runnerbuilder
-                end
-               
                 cur_step_id = _guid_gen.u128()
+
+              // If coalescing is off, then each runner_builder gets assigned
+              // to its own StepBuilder
               elseif not pipeline.is_coalesced() then
                 let seq_builder = RunnerSequenceBuilder(
                   runner_builders = recover Array[RunnerBuilder val] end)
@@ -314,8 +320,13 @@ actor ApplicationInitializer
             end
           end
 
+          // Having prepared all the step initializers for this worker,
+          // summarize this data in a WorkerTopologyData object
           try
-            let boundary_step_id = step_initializers(0).id()      
+            // This id is for the Step that will receive data via a 
+            // Proxy
+            let boundary_step_id = step_initializers(0).id() 
+
             let topology_data = WorkerTopologyData(worker, boundary_step_id,
               consume step_initializers)
             worker_topology_data.push(topology_data)
@@ -324,6 +335,8 @@ actor ApplicationInitializer
           boundaries_idx = boundaries_idx + 1
         end
 
+        // Set up the EgressBuilders and LocalPipelines for reach worker
+        // for our current pipeline
         for i in Range(0, worker_topology_data.size()) do
           let cur = 
             try
@@ -342,8 +355,9 @@ actor ApplicationInitializer
               None
             end
 
+          // If this worker has no steps (is_empty), then create a
+          // placeholder sink
           if cur.is_empty then
-            // We need a sink
             let egress_builder = EgressBuilder(_output_addr, pipeline_id
               pipeline.sink_runner_builder())
             let local_pipeline = LocalPipeline(pipeline.name(), 
@@ -355,11 +369,13 @@ actor ApplicationInitializer
               @printf[I32]("No pipeline list found!\n".cstring())
               error
             end 
+          // If this worker has steps, then we need either a Proxy or a sink
           else
             match next_worker_data
             | let next_w: WorkerTopologyData val =>
+              // If the next worker in order has no steps, then we need a 
+              // sink on this worker
               if next_w.is_empty then
-                // We need a sink
                 let egress_builder = EgressBuilder(_output_addr, pipeline_id
                   pipeline.sink_runner_builder())
                 let local_pipeline = LocalPipeline(pipeline.name(), 
@@ -371,8 +387,9 @@ actor ApplicationInitializer
                   @printf[I32]("No pipeline list found!\n".cstring())
                   error
                 end              
+              // If the next worker has steps (continues the pipeline), then
+              // we need a Proxy to it on this worker
               else
-                // We need a proxy to the next worker
                 let proxy_address = ProxyAddress(next_w.worker_name, 
                   next_w.boundary_step_id)
                 let egress_builder = EgressBuilder(proxy_address)
@@ -386,8 +403,9 @@ actor ApplicationInitializer
                   error
                 end 
               end
+            // If the match fails, then this is the last worker in order and
+            // we need a sink on it
             else
-              // We need a sink
               let egress_builder = EgressBuilder(_output_addr, pipeline_id
                 pipeline.sink_runner_builder())
               let local_pipeline = LocalPipeline(pipeline.name(), 
@@ -403,15 +421,21 @@ actor ApplicationInitializer
           end
         end
 
+        // Reset the WorkerTopologyData array for the next pipeline since
+        // we've used it for this one already
         worker_topology_data = Array[WorkerTopologyData val]
+
+        // Prepare to initialize the next pipeline
         pipeline_id = pipeline_id + 1
-        source_addr_idx = source_addr_idx + 1
       end
 
+      // Keep track of LocalTopologies that we need to send to other 
+      // (non-initializer) workers
       let other_local_topologies: Array[LocalTopology val] trn =
         recover Array[LocalTopology val] end
 
-      // For each worker in local_pipelines, generate a LocalTopology
+      // For each worker, generate a LocalTopology
+      // from all of its LocalPipelines
       for (w, ps) in local_pipelines.pairs() do
         let pvals: Array[LocalPipeline val] trn = 
           recover Array[LocalPipeline val] end
@@ -420,6 +444,9 @@ actor ApplicationInitializer
         end
         let local_topology = LocalTopology(application.name(), consume pvals)
 
+        // If this is the initializer's (i.e. our) turn, then 
+        // immediately (asynchronously) begin initializing it. If not, add it
+        // to the list we'll use to distribute to the other workers
         if w == "initializer" then
           _local_topology_initializer.update_topology(local_topology)
           _local_topology_initializer.initialize() 
@@ -428,6 +455,7 @@ actor ApplicationInitializer
         end
       end
 
+      // Distribute the LocalTopologies to the other (non-initializer) workers
       match worker_initializer
       | let wi: WorkerInitializer =>
         wi.distribute_local_topologies(consume other_local_topologies)
@@ -440,7 +468,6 @@ actor ApplicationInitializer
     else
       @printf[I32]("Error initializating application!\n".cstring())
     end
-
 
 class WorkerTopologyData
   let worker_name: String
