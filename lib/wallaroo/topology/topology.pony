@@ -6,7 +6,11 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 
 class Topology
+  let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
+
+  new create(name': String) =>
+    _name = name'
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
     decoder: SourceDecoder[In] val, pipeline_name: String): 
@@ -18,6 +22,8 @@ class Topology
   fun ref add_pipeline(p: BasicPipeline) =>
     pipelines.push(p)
 
+  fun name(): String => _name
+
 trait BasicPipeline
   fun name(): String
   // fun initialize_source(source_id: U64, host: String, service: String, 
@@ -26,6 +32,7 @@ trait BasicPipeline
   //   local_step_builder: (LocalStepBuilder val | None),
   //   shared_state_step: (BasicSharedStateStep tag | None) = None,
   //   metrics_collector: (MetricsCollector tag | None))
+  fun source_builder(): BytesProcessorBuilder val
   fun sink_runner_builder(): SinkRunnerBuilder val
   fun sink_target_ids(): Array[U64] val
   fun apply(i: USize): RunnerBuilder val ?
@@ -36,12 +43,14 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _decoder: SourceDecoder[In] val
   let _runner_builders: Array[RunnerBuilder val]
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
+  let _source_builder: BytesProcessorBuilder val
   var _sink_builder: SinkRunnerBuilder val
 
   new create(d: SourceDecoder[In] val, n: String) =>
     _decoder = d
     _runner_builders = Array[RunnerBuilder val]
     _name = n
+    _source_builder = SourceBuilder[In](_name, _decoder)
     _sink_builder = SimpleSinkRunnerBuilder[Out](_name)
 
   fun ref add_runner_builder(p: RunnerBuilder val) =>
@@ -75,6 +84,8 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   =>
     _sink_builder = sink_builder'
     _sink_target_ids = sink_ids
+
+  fun source_builder(): BytesProcessorBuilder val => _source_builder
 
   fun sink_runner_builder(): SinkRunnerBuilder val => _sink_builder
 

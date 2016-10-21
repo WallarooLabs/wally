@@ -67,18 +67,22 @@ class EgressBuilder
 class LocalPipeline
   let _name: String
   let _builders: Array[StepBuilder val] val
+  let _source_data: (SourceData val | None)
   // var _sink_target_ids: Array[U64] val = recover Array[U64] end
   var _egress_builder: EgressBuilder val
 
   new val create(name': String, builders': Array[StepBuilder val] val, 
-    egress_builder': EgressBuilder val) =>
+    egress_builder': EgressBuilder val,
+    source_data': (SourceData val | None) = None) =>
     _name = name'
     _builders = builders'
     _egress_builder = egress_builder'
+    _source_data = source_data'
 
   fun name(): String => _name
   fun builders(): Array[StepBuilder val] val => _builders
   fun egress_builder(): EgressBuilder val => _egress_builder
+  fun source_data(): (SourceData val | None) => _source_data
 
 class LocalTopology
   let _app_name: String
@@ -140,6 +144,20 @@ actor LocalTopologyInitializer
             routes(builder.id()) = latest_step
             builder_idx = builder_idx - 1
           end  
+
+          match pipeline.source_data()
+          | let sd: SourceData val =>
+            let next = DirectRouter(latest_step)
+            let source_reporter = MetricsReporter(pipeline.name(), 
+              _metrics_conn)
+
+            let listen_auth = TCPListenAuth(_auth)
+            TCPListener(listen_auth,
+              SourceListenerNotify(sd.builder(), next, consume 
+                source_reporter),
+              sd.address()(0),
+              sd.address()(1)) 
+          end
 
           _register_proxies(proxies)
         end

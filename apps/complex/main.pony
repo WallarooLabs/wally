@@ -40,8 +40,6 @@ primitive ComplexStarter
     metrics_conn.writev(metrics_join_msg)
 
     if worker_count == 1 then
-      let jr_metrics = JrMetrics("Complex Numbers")
-
       let reports_conn = TCPConnection(connect_auth,
         OutNotify("results"),
         output_addr(0),
@@ -83,7 +81,7 @@ primitive ComplexStarter
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       connections.register_listener(
         TCPListener(listen_auth,
-          SourceListenerNotify(complex_source_builder, jr_metrics, expected),
+          SourceListenerNotify(complex_source_builder),
           source_addr(0),
           source_addr(1))
       )
@@ -179,11 +177,9 @@ class ComplexTopologyStarter is TopologyStarter
 
     let source_addr = input_addrs(0)
 
-    let jr_metrics = JrMetrics("Complex Numbers")
-
     let listen_auth = TCPListenAuth(_auth)
     TCPListener(listen_auth,
-      SourceListenerNotify(complex_source_builder, jr_metrics, expected),
+      SourceListenerNotify(complex_source_builder),
       source_addr(0),
       source_addr(1)) 
 

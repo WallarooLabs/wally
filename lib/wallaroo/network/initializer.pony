@@ -1,10 +1,13 @@
 use "collections"
 use "net"
+use "sendence/guid"
 use "sendence/messages"
 use "wallaroo/messages"
+use "wallaroo/metrics"
 use "wallaroo/topology"
 
 actor Initializer
+  let _guid_gen: GuidGenerator = GuidGenerator
   let _auth: AmbientAuth
   let _expected: USize
   let _connections: Connections
@@ -104,7 +107,7 @@ actor Initializer
   be register_proxy(worker: String, proxy: Step tag) =>
     _connections.register_proxy(worker, proxy)
 
-  fun _initialize() =>
+  fun ref _initialize() =>
     @printf[I32]("Initializing topology\n".cstring())
     if _is_automated then
       @printf[I32]("Automating...\n".cstring())
@@ -156,10 +159,12 @@ actor Initializer
     map("data") = consume data_map
     consume map
 
-  fun _automate_initialization(topology: Topology val) =>
+  fun ref _automate_initialization(topology: Topology val) =>
     try
       // REMOVE LATER (for try block)
       topology.pipelines(0)
+
+      let worker_topology_data = Array[WorkerTopologyData val]
 
       var pipeline_id: USize = 0
 
@@ -169,9 +174,19 @@ actor Initializer
       let local_pipelines: Map[String, Array[LocalPipeline val]] =
         local_pipelines.create()
 
+      local_pipelines("initializer") = Array[LocalPipeline val]
+      for name in _worker_names.values() do
+        local_pipelines(name) = Array[LocalPipeline val]
+      end
+
       for pipeline in topology.pipelines.values() do
         // break down into LocalPipeline objects
         // and add to local_pipelines
+
+        let source_addr_trn: Array[String] trn = recover Array[String] end
+        source_addr_trn.push(_input_addrs(0)(0))
+        source_addr_trn.push(_input_addrs(0)(1))
+        let source_addr: Array[String] val = consume source_addr_trn
 
         let sink_addr: Array[String] trn = recover Array[String] end
         sink_addr.push(_output_addr(0))
@@ -184,44 +199,201 @@ actor Initializer
 
         // Determine which steps go on which workers using boundary indices
         let per_worker: USize = pipeline.size() / _expected
-        let boundaries: Array[USize] = boundaries.create()
+        let boundaries: Array[ISize] = boundaries.create()
         var count: USize = 0
         for i in Range(0, _expected) do
           if (count + per_worker) < pipeline.size() then
             count = count + per_worker
-            boundaries.push(count)
+            boundaries.push(count.isize())
           else
-            boundaries.push(pipeline.size() - 1)
+            boundaries.push((pipeline.size() - 1).isize())
           end
         end
 
         // Since we're dealing with StepBuilders, we should be able to 
         // go forward through the pipeline when building LocalPipelines
-        var boundaries_idx = boundaries.size()
-        var last_boundary = pipeline.size()
-        while boundaries_idx > 0 do
-          var last_runner = RouterRunnerBuilder
-          // if boundaries(boundaries_idx) < last_boundary then
-          //   // Create step builders
+        var boundaries_idx: USize = 0
+        var final_boundary = pipeline.size().isize()
+        var last_boundary: ISize = -1
+        while boundaries_idx < boundaries.size() do
+          let worker = 
+            if boundaries_idx == 0 then
+              "initializer"
+            else
+              _worker_names(boundaries_idx - 1)
+            end
+          let next_worker: (String | None) = 
+            try
+              _worker_names(boundaries_idx)
+            else
+              None
+            end
+
+          let boundary = boundaries(boundaries_idx)
+
+          let step_builders: Array[StepBuilder val] trn = 
+            recover Array[StepBuilder val] end
+
+          if worker == "initializer" then
+            // set up source
+            None
+          end
+
+          if boundary < final_boundary then
+            var runner_builders: Array[RunnerBuilder val] trn = 
+              recover Array[RunnerBuilder val] end 
+            var cur_step_id = _guid_gen.u128()
+
+            for i in Range[ISize](last_boundary + 1, boundary + 1) do
+              let next_runner_builder = pipeline(i.usize())
+              if next_runner_builder.id() != 0 then
+                let seq_builder = RunnerSequenceBuilder(
+                  runner_builders = recover Array[RunnerBuilder val] end)
+                let step_builder = StatelessStepBuilder(seq_builder, 
+                  cur_step_id)
+                step_builders.push(step_builder)
+                steps(cur_step_id) = worker
+
+                cur_step_id = next_runner_builder.id()
+
+                let next_seq_builder = RunnerSequenceBuilder(
+                  recover [pipeline(i.usize())] end)
+                let next_step_builder = StatelessStepBuilder(seq_builder, 
+                  cur_step_id)
+                step_builders.push(step_builder)
+                steps(cur_step_id) = worker
+
+                cur_step_id = _guid_gen.u128()
+              else
+                if i == boundary then
+                  let seq_builder = RunnerSequenceBuilder(
+                    runner_builders = recover Array[RunnerBuilder val] end)
+                  let step_builder = StatelessStepBuilder(seq_builder, 
+                    cur_step_id)
+                  step_builders.push(step_builder)
+                  steps(cur_step_id) = worker
+
+                  cur_step_id = _guid_gen.u128()
+                else
+                  runner_builders.push(pipeline(i.usize()))
+                end
+              end
+            end
+            // Create step builders
+          end
+
+          // // Check if this is the end to determine what kind of egress
+          // // egress_builder = ...
+          // if boundaries_idx == (boundaries.size() - 1) then
+          //   None
+          // else
+
           // end
 
-          // Check if this is the end to determine what kind of egress
-          // egress_builder = ...
-          boundaries_idx = boundaries_idx - 1
+          try
+            let boundary_step_id = step_builders(0).id()      
+            let top_data = WorkerTopologyData(worker, boundary_step_id,
+              consume step_builders)
+            worker_topology_data.push(top_data)
+          end
+
+          boundaries_idx = boundaries_idx + 1
         end
 
+        for i in Range(0, worker_topology_data.size()) do
+          let cur = worker_topology_data(i)
+          let next_worker_data: (WorkerTopologyData val | None) =
+            try worker_topology_data(i + 1) else None end
+
+          let source_data = 
+            if i == 0 then
+              SourceData(pipeline.source_builder(), source_addr)
+            else
+              None
+            end
+
+          match next_worker_data
+          | let w: WorkerTopologyData val =>
+            // We need a proxy to the next worker
+            let proxy_address = ProxyAddress(w.worker_name, w.boundary_step_id)
+            let egress_builder = EgressBuilder(proxy_address)
+            let local_pipeline = LocalPipeline(pipeline.name(), 
+              cur.step_builders, egress_builder, source_data)
+            local_pipelines(cur.worker_name).push(local_pipeline)
+          else
+            // We need a sink
+            let egress_builder = EgressBuilder(_output_addr, pipeline_id
+              pipeline.sink_runner_builder())
+            let local_pipeline = LocalPipeline(pipeline.name(), 
+              cur.step_builders, egress_builder, source_data)
+            local_pipelines(cur.worker_name).push(local_pipeline)
+          end 
+        end
 
         pipeline_id = pipeline_id + 1
       end
 
-      // For each worker in local_pipelines, generate a LocalTopology
+      let other_local_topologies: Array[LocalTopology val] trn =
+        recover Array[LocalTopology val] end
 
+      // For each worker in local_pipelines, generate a LocalTopology
+      for (w, ps) in local_pipelines.pairs() do
+        if w != "initializer" then
+          let pvals: Array[LocalPipeline val] trn = 
+            recover Array[LocalPipeline val] end
+          for p in ps.values() do
+            pvals.push(p)
+          end
+          let local_topology = LocalTopology(topology.name(), consume pvals)
+          other_local_topologies.push(local_topology)
+        end
+      end
+
+      distribute_local_topologies(consume other_local_topologies)
+
+      // Configure local topology on initializer, including source
+      for local_pipeline in local_pipelines("initializer").values() do
+        
+        let egress = local_pipeline.egress_builder()("initializer",
+          MetricsReporter(local_pipeline.name(), _metrics_conn),
+          _auth)
+
+      end
+
+
+      // let proxy_reporter = MetricsReporter(pipeline.name(), _metrics_conn)
+
+      // let proxy = Proxy("initializer", conjugate_step_id, 
+      //   proxy_reporter.clone(), _auth)
+      // let proxy_step = Step(consume proxy, consume proxy_reporter)
+
+      // register_proxy(worker2, proxy_step)
+
+      // let source_addr = input_addrs(0)
+
+
+      // match pipeline.source_data()
+      // | let s: SourceData val =>       
+      //   let listen_auth = TCPListenAuth(_auth)
+      //   TCPListener(listen_auth,
+      //     SourceListenerNotify(s.builder()),
+      //     s.address(0),
+      //     s.address(1)) 
+      // end
     else
       @printf[I32]("Error initializating topology!/n".cstring())
     end
 
 
+class WorkerTopologyData
+  let worker_name: String
+  let boundary_step_id: U128
+  let step_builders: Array[StepBuilder val] val
 
+  new val create(n: String, id: U128, sb: Array[StepBuilder val] val) =>
+    worker_name = n
+    boundary_step_id = id
+    step_builders = sb
 
 trait TopologyStarter
   fun apply(initializer: Initializer, workers: Array[String] box,

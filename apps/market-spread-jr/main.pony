@@ -54,9 +54,6 @@ primitive MarketSpreadStarter
   =>
     let auth = env.root as AmbientAuth
 
-    let metrics1 = JrMetrics("NBBO")
-    let metrics2 = JrMetrics("Orders")
-
     let connect_auth = TCPConnectAuth(auth)
     let connect_msg = HubProtocol.connect()
     let metrics_join_msg = HubProtocol.join("metrics:market-spread")
@@ -102,6 +99,7 @@ primitive MarketSpreadStarter
     let nbbo_source_builder: SourceBuilder val =
       PipelineSourceBuilder[FixNbboMessage val]("Nbbo", metrics_conn,
         nbbo_runner_builder, partition_router, FixNbboFrameHandler)
+
 
     let nbbo_addr = input_addrs(0)
 

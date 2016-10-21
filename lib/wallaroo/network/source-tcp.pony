@@ -46,20 +46,21 @@ class SourceNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     @printf[None]("incoming connected\n".cstring())
 
-// class SourceListenerNotify is TCPListenNotify
-//   let _source_builder: {(): BytesProcessor iso^} val
-//   let _metrics: JrMetrics
-//   let _expected: USize
 
-//   new iso create(source_builder: {(): BytesProcessor iso^} val,
-//     metrics: JrMetrics, expected: USize) 
+// class SourceListenerNotify is TCPListenNotify
+//   let _source_builder: BytesProcessorBuilder val
+//   let _router: Router val
+//   let _reporter: MetricsReporter
+
+//   new iso create(source_builder: BytesProcessorBuilder val,
+//     router: Router val, reporter: MetricsReporter iso) 
 //   =>
 //     _source_builder = source_builder
-//     _metrics = metrics
-//     _expected = expected
+//     _router = router
+//     _reporter = consume reporter
 
 //   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-//     SourceNotify(_source_builder())
+//     SourceNotify(_source_builder(_router, _reporter.clone()))
 
 //   fun ref listening(listen: TCPListener ref) =>
 //     try

@@ -18,6 +18,7 @@ interface RunnerBuilder
 
   fun name(): String
   fun is_stateful(): Bool
+  fun id(): U128
 
 primitive RouterRunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None) = 
@@ -27,6 +28,7 @@ primitive RouterRunnerBuilder
 
   fun name(): String => "router"
   fun is_stateful(): Bool => false
+  fun id(): U128 => 0
 
 class RunnerSequenceBuilder
   let _runner_builders: Array[RunnerBuilder val] val
@@ -54,9 +56,13 @@ class RunnerSequenceBuilder
 
 class ComputationRunnerBuilder[In: Any val, Out: Any val]
   let _comp_builder: ComputationBuilder[In, Out] val
+  let _id: U128
 
-  new val create(comp_builder: ComputationBuilder[In, Out] val) =>
+  new val create(comp_builder: ComputationBuilder[In, Out] val,
+    id': U128 = 0) 
+  =>
     _comp_builder = comp_builder
+    _id = id'
 
   fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None)): 
     Runner iso^
@@ -72,15 +78,18 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
 
   fun name(): String => _comp_builder().name()
   fun is_stateful(): Bool => false
+  fun id(): U128 => _id
 
 class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
   let _state_comp: StateComputation[In, Out, State] val
   let _router: Router val
+  let _id: U128
 
   new val create(state_comp: StateComputation[In, Out, State] val,
-    router: Router val) =>
+    router: Router val, id': U128 = 0) =>
     _state_comp = state_comp
     _router = router
+    _id = id'
 
   fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None)): 
     Runner iso^
@@ -90,12 +99,16 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
 
   fun name(): String => _state_comp.name()
   fun is_stateful(): Bool => true
+  fun id(): U128 => _id
 
 class StateRunnerBuilder[State: Any #read]
   let _state_builder: StateBuilder[State] val
+  let _id: U128
 
-  new val create(state_builder: StateBuilder[State] val) =>
+  new val create(state_builder: StateBuilder[State] val, 
+    id': U128 = 0) =>
     _state_builder = state_builder
+    _id = id'
 
   fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None)): 
     Runner iso
@@ -104,6 +117,7 @@ class StateRunnerBuilder[State: Any #read]
 
   fun name(): String => _state_builder.name()
   fun is_stateful(): Bool => true
+  fun id(): U128 => _id
 
 class ComputationRunner[In: Any val, Out: Any val]
   let _next: Runner
