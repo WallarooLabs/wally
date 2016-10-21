@@ -20,13 +20,15 @@ class Source[In: Any val]
 
   new iso create(pipeline_name: String, decoder: SourceDecoder[In] val, 
     runner_builder: RunnerBuilder val, router: Router val,
-    metrics_reporter: MetricsReporter iso) 
+    metrics_reporter: MetricsReporter iso, 
+    pre_state_router: (Router val | None) = None) 
   =>
     _decoder = decoder
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
     _metrics_reporter = consume metrics_reporter
-    _runner = runner_builder(_metrics_reporter.clone())
+    _runner = runner_builder(_metrics_reporter.clone() 
+      where router = pre_state_router)
     _router = router
 
   fun ref process(data: Array[U8 val] iso) =>
@@ -55,8 +57,8 @@ class Source[In: Any val]
     end
 
 trait BytesProcessorBuilder
-  fun apply(router: Router val, reporter: MetricsReporter iso): 
-    BytesProcessor iso^
+  fun apply(router: Router val, reporter: MetricsReporter iso,
+    pre_state_router: (Router val | None)): BytesProcessor iso^
 
 class SourceBuilder[In: Any val] is BytesProcessorBuilder
   let _pipeline_name: String
@@ -69,11 +71,11 @@ class SourceBuilder[In: Any val] is BytesProcessorBuilder
     _decoder = decoder
     _runner_builder = runner_builder
 
-  fun apply(router: Router val, reporter: MetricsReporter iso): 
-    BytesProcessor iso^ 
+  fun apply(router: Router val, reporter: MetricsReporter iso,
+    pre_state_router: (Router val | None) = None): BytesProcessor iso^ 
   =>
     Source[In](_pipeline_name, _decoder, _runner_builder, router, 
-      consume reporter)
+      consume reporter, pre_state_router)
 
 class SourceData
   let _builder: BytesProcessorBuilder val

@@ -9,7 +9,9 @@ use "sendence/fix"
 use "sendence/messages"
 use "wallaroo"
 use "wallaroo/backpressure"
+use "wallaroo/initialization"
 use "wallaroo/messages"
+use "wallaroo/network"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/tcp-sink"
@@ -50,7 +52,7 @@ primitive MarketSpreadStarter
     output_addr: Array[String] val, metrics_conn: TCPConnection, 
     expected: USize, init_path: String, worker_count: USize,
     is_initializer: Bool, worker_name: String, connections: Connections,
-    initializer: (Initializer | None)) ? 
+    initializer: (WorkerInitializer | None)) ? 
   =>
     let auth = env.root as AmbientAuth
 
@@ -83,7 +85,7 @@ primitive MarketSpreadStarter
     let paritition_finder = StatePartitionFinder[(FixNbboMessage val | FixOrderMessage val), String](SymbolPartitionFunction, 
         consume padded_symbols, consume router_builder)
 
-    let partition_router = PartitionRouter(paritition_finder)
+    let partition_router = OldPartitionRouter(paritition_finder)
 
     let initial_nbbo: Array[Array[U8] val] val = 
       if init_path == "" then
@@ -94,7 +96,7 @@ primitive MarketSpreadStarter
 
     let nbbo_runner_builder: RunnerBuilder val =
       PreStateRunnerBuilder[FixNbboMessage val, None, SymbolData](
-        UpdateNbbo, EmptyRouter)
+        UpdateNbbo)
 
     let nbbo_source_builder: SourceBuilder val =
       PipelineSourceBuilder[FixNbboMessage val]("Nbbo", metrics_conn,
@@ -116,7 +118,7 @@ primitive MarketSpreadStarter
 
     let order_runner_builder: RunnerBuilder val =
       PreStateRunnerBuilder[FixOrderMessage val, OrderResult val, SymbolData](
-        CheckOrder, sink_router)
+        CheckOrder)
 
     let order_source_builder: SourceBuilder val =
       PipelineSourceBuilder[FixOrderMessage val]("Order", metrics_conn,
@@ -127,10 +129,6 @@ primitive MarketSpreadStarter
     connections.register_source_listener(
       TCPSourceListener(order_source_builder, 
         recover Array[CreditFlowConsumer] end, order_addr(0), order_addr(1))
-
-        // TCPSourceListenerNotify(order_source_builder, metrics2, (expected/2)),
-        //   order_addr(0),
-        //   order_addr(1))
     )
 
     let topology_ready_msg = 

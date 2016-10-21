@@ -38,6 +38,12 @@ actor WorkerInitializer
   be start(a: (ApplicationStarter val | Application val)) =>
     _application_initializer.update_application(a)
 
+    if _expected == 1 then
+      _application_initializer.initialize(this, _expected, 
+        recover Array[String] end)     
+    end
+
+
   be identify_control_address(worker: String, host: String, service: String) =>
     if _control_addrs.contains(worker) then
       @printf[I32](("Initializer: " + worker + " tried registering control channel twice.\n").cstring())

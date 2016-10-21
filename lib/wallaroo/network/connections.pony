@@ -13,6 +13,8 @@ actor Connections
   let _data_conns: Map[String, TCPConnection] = _data_conns.create()
   var _phone_home: (TCPConnection | None) = None
   let _proxies: Map[String, Array[Step tag]] = _proxies.create()
+  let _partition_proxies: Map[String, Array[PartitionProxy tag]] = 
+    _partition_proxies.create()
   let _listeners: Array[TCPListener] = Array[TCPListener]
 
   new create(worker_name: String, env: Env, auth: AmbientAuth,
@@ -128,6 +130,22 @@ actor Connections
       end
     end
 
+  be register_partition_proxies(proxies: Map[String, PartitionProxy] val) =>
+    for (worker, proxy) in proxies.pairs() do
+      try
+        if _partition_proxies.contains(worker) then
+          _partition_proxies(worker).push(proxy)
+          let tcp_router = TCPRouter(_data_conns(worker))
+          proxy.update_router(tcp_router)
+        else
+          _partition_proxies(worker) = Array[PartitionProxy tag]
+          _partition_proxies(worker).push(proxy)
+          let tcp_router = TCPRouter(_data_conns(worker))
+          proxy.update_router(tcp_router)
+        end
+      end
+    end
+
   be shutdown() =>
     for listener in _listeners.values() do
       listener.dispose()
@@ -137,6 +155,11 @@ actor Connections
       conn.dispose()
     end
     for (name, proxies) in _proxies.pairs() do
+      for proxy in proxies.values() do
+        proxy.dispose()
+      end
+    end
+    for (name, proxies) in _partition_proxies.pairs() do
       for proxy in proxies.values() do
         proxy.dispose()
       end

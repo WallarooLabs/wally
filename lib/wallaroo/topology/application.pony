@@ -26,15 +26,11 @@ class Application
 
 trait BasicPipeline
   fun name(): String
-  // fun initialize_source(source_id: U64, host: String, service: String, 
-  //   env: Env, auth: AmbientAuth, coordinator: Coordinator, 
-  //   output: BasicStep tag, 
-  //   local_step_builder: (LocalStepBuilder val | None),
-  //   shared_state_step: (BasicSharedStateStep tag | None) = None,
-  //   metrics_collector: (MetricsCollector tag | None))
   fun source_builder(): BytesProcessorBuilder val
   fun sink_runner_builder(): SinkRunnerBuilder val
   fun sink_target_ids(): Array[U64] val
+  fun state_builder(state_name: String): StateSubpartition val ?
+  fun state_builders(): Map[String, StateSubpartition val] val
   fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder val ?
   fun size(): USize
@@ -46,6 +42,9 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
   let _source_builder: BytesProcessorBuilder val
   var _sink_builder: SinkRunnerBuilder val
+  // _state_builders maps from state_name to StateSubpartition
+  let _state_builders: Map[String, StateSubpartition val] = 
+    _state_builders.create()
   let _is_coalesced: Bool
 
   new create(n: String, d: SourceDecoder[In] val, coalescing: Bool) 
@@ -62,27 +61,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 
   fun apply(i: USize): RunnerBuilder val ? => _runner_builders(i)
 
-  // fun initialize_source(source_id: U64, host: String, service: String, 
-  //   env: Env, auth: AmbientAuth, coordinator: Coordinator, 
-  //   output: BasicStep tag, 
-  //   local_step_builder: (LocalStepBuilder val | None),
-  //   shared_state_step: (BasicSharedStateStep tag | None),
-  //   metrics_collector: (MetricsCollector tag | None))
-  // =>
-  //   let source_notifier: TCPListenNotify iso = 
-  //     match local_step_builder
-  //     | let l: LocalStepBuilder val =>
-  //       SourceNotifier[In](
-  //         env, host, service, source_id, coordinator, _parser, output, 
-  //         shared_state_step, l, metrics_collector)
-  //     else
-  //       SourceNotifier[In](
-  //         env, host, service, source_id, coordinator, _parser, output,
-  //         shared_state_step where metrics_collector = metrics_collector)
-  //     end
-  //   coordinator.add_listener(TCPListener(auth, consume source_notifier,
-  //     host, service))
-
   fun ref update_sink(sink_builder': SinkRunnerBuilder val, 
     sink_ids: Array[U64] val) 
   =>
@@ -94,6 +72,22 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun sink_runner_builder(): SinkRunnerBuilder val => _sink_builder
 
   fun sink_target_ids(): Array[U64] val => _sink_target_ids
+
+  fun ref add_state_builder(state_name: String, 
+    state_partition: StateSubpartition val) 
+  =>
+    _state_builders(state_name) = state_partition
+
+  fun state_builder(state_name: String): StateSubpartition val ? =>
+    _state_builders(state_name)
+
+  fun state_builders(): Map[String, StateSubpartition val] val =>
+    let builders: Map[String, StateSubpartition val] trn =
+      recover Map[String, StateSubpartition val] end
+    for (k, v) in _state_builders.pairs() do
+      builders(k) = v
+    end
+    consume builders
 
   fun is_coalesced(): Bool => _is_coalesced
 
@@ -120,12 +114,12 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   fun ref to_stateful[Next: Any val, State: Any #read](
     s_comp: StateComputation[Last, Next, State] val,
     s_initializer: StateBuilder[State] val,
-    id: U128) 
+    state_name: String) 
       : PipelineBuilder[In, Out, Next] =>
 
     let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp)
     _p.add_runner_builder(next_builder)
-    let state_builder = StateRunnerBuilder[State](s_initializer, id)
+    let state_builder = StateRunnerBuilder[State](s_initializer, state_name)
     _p.add_runner_builder(state_builder)
     PipelineBuilder[In, Out, Next](_a, _p)
 
@@ -134,20 +128,29 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     State: Any #read](
       s_comp: StateComputation[Last, Next, State] val,
       s_initializer: StateBuilder[State] val,
-      id: U128, 
+      state_name: String, 
       partition: Partition[PIn, Key] val
     ): PipelineBuilder[In, Out, Next] 
   =>
-    let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp)
+    let guid_gen = GuidGenerator
+    let step_id_map: Map[Key, U128] trn = recover Map[Key, U128] end
+
+    for key in partition.keys().values() do
+      step_id_map(key) = guid_gen.u128()
+    end
+
+    let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, PIn, State,
+      Key](_p.name(), state_name, s_comp, consume step_id_map, partition)
     _p.add_runner_builder(next_builder)
 
-    let state_builder = PartitionedStateRunnerBuilder[PIn, Key, State](
-      s_initializer, id, partition)
-    _p.add_runner_builder(state_builder)      
+    let state_partition = KeyedStateSubpartition[Key](partition.keys(),
+      StateRunnerBuilder[State](s_initializer, state_name))
+
+    _p.add_state_builder(state_name, state_partition)
 
     PipelineBuilder[In, Out, Next](_a, _p)
 
-  fun ref to_empty_sink(): Application ? =>
+  fun ref done(): Application ? =>
     _a.add_pipeline(_p as BasicPipeline)
     _a
 

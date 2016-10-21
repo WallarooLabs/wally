@@ -11,19 +11,17 @@ actor ApplicationInitializer
   let _local_topology_initializer: LocalTopologyInitializer
   let _input_addrs: Array[Array[String]] val
   let _output_addr: Array[String] val
-  let _is_automated: Bool
 
   var _application_starter: (ApplicationStarter val | None) = None
   var _application: (Application val | None) = None
 
   new create(local_topology_initializer: LocalTopologyInitializer,
     input_addrs: Array[Array[String]] val, 
-    output_addr: Array[String] val, is_automated: Bool) 
+    output_addr: Array[String] val) 
   =>
     _local_topology_initializer = local_topology_initializer
     _input_addrs = input_addrs
     _output_addr = output_addr
-    _is_automated = is_automated
 
   be update_application(a: (ApplicationStarter val | Application val)) =>
     match a
@@ -37,13 +35,11 @@ actor ApplicationInitializer
     worker_names: Array[String] val)
   =>
     @printf[I32]("Initializing application\n".cstring())
-    if _is_automated then
+    match _application
+    | let a: Application val =>
       @printf[I32]("Automating...\n".cstring())
-      match _application
-      | let a: Application val =>
-        _automate_initialization(a, worker_initializer, worker_count, 
-          worker_names)
-      end
+      _automate_initialization(a, worker_initializer, worker_count, 
+        worker_names)
     else
       match _application_starter
       | let a: ApplicationStarter val =>
@@ -54,7 +50,7 @@ actor ApplicationInitializer
           @printf[I32]("Error running ApplicationStarter.\n".cstring())
         end
       else
-        @printf[I32]("No application starter!\n".cstring())
+        @printf[I32]("No application or application starter!\n".cstring())
       end
     end
 
@@ -63,8 +59,8 @@ actor ApplicationInitializer
     worker_names: Array[String] val) 
   =>
     try
-      // REMOVE LATER (for try block)
-      application.pipelines(0)
+      let state_map: Map[String, PartitionAddresses val] trn = 
+        recover Map[String, PartitionAddresses val] end
 
       let worker_topology_data = Array[WorkerTopologyData val]
 
@@ -83,13 +79,23 @@ actor ApplicationInitializer
 
       for pipeline in application.pipelines.values() do
         let source_addr_trn: Array[String] trn = recover Array[String] end
-        source_addr_trn.push(_input_addrs(0)(0))
-        source_addr_trn.push(_input_addrs(0)(1))
+        try
+          source_addr_trn.push(_input_addrs(0)(0))
+          source_addr_trn.push(_input_addrs(0)(1))
+        else
+          @printf[I32]("No input address!\n".cstring())
+          error
+        end
         let source_addr: Array[String] val = consume source_addr_trn
 
         let sink_addr: Array[String] trn = recover Array[String] end
-        sink_addr.push(_output_addr(0))
-        sink_addr.push(_output_addr(1))
+        try
+          sink_addr.push(_output_addr(0))
+          sink_addr.push(_output_addr(1))
+        else
+          @printf[I32]("No output address!\n".cstring())
+          error
+        end
 
         let sink_egress_builder = EgressBuilder(consume sink_addr, 
           pipeline.sink_runner_builder())
@@ -115,7 +121,12 @@ actor ApplicationInitializer
             if boundaries_idx == 0 then
               "initializer"
             else
-              worker_names(boundaries_idx - 1)
+              try
+                worker_names(boundaries_idx - 1)
+              else
+                @printf[I32]("No worker found for idx!\n".cstring())
+                error
+              end              
             end
           let next_worker: (String | None) = 
             try
@@ -126,25 +137,25 @@ actor ApplicationInitializer
 
           let boundary = boundaries(boundaries_idx)
 
-          let step_builders: Array[StepBuilder val] trn = 
-            recover Array[StepBuilder val] end
+          let step_initializers: Array[StepInitializer val] trn = 
+            recover Array[StepInitializer val] end
 
           if boundary < final_boundary then
             var runner_builders: Array[RunnerBuilder val] trn = 
               recover Array[RunnerBuilder val] end 
             var cur_step_id = _guid_gen.u128()
 
-            for i in Range[ISize](last_boundary + 1, boundary + 1) do
-              let next_runner_builder = pipeline(i.usize())
-              
-              if (next_runner_builder.id() != 0) or 
-                  next_runner_builder.is_stateful() then
+            var i = last_boundary + 1
+            while i < (boundary + 1) do
+              var next_runner_builder: RunnerBuilder val = pipeline(i.usize())
+
+              if (next_runner_builder.id() != 0) then
                 if runner_builders.size() > 0 then
                   let seq_builder = RunnerSequenceBuilder(
                     runner_builders = recover Array[RunnerBuilder val] end)
                   let step_builder = StepBuilder(seq_builder, 
                     cur_step_id)
-                  step_builders.push(step_builder)
+                  step_initializers.push(step_builder)
                   steps(cur_step_id) = worker
                 end
 
@@ -152,16 +163,66 @@ actor ApplicationInitializer
                   recover [pipeline(i.usize())] end)
                 let next_step_builder = StepBuilder(next_seq_builder, 
                   next_runner_builder.id(), next_runner_builder.is_stateful())
-                step_builders.push(next_step_builder)
+                step_initializers.push(next_step_builder)
                 steps(next_runner_builder.id()) = worker
 
+                cur_step_id = _guid_gen.u128()              
+              elseif next_runner_builder.is_stateful() then
+                if runner_builders.size() > 0 then
+                  let seq_builder = RunnerSequenceBuilder(
+                    runner_builders = recover Array[RunnerBuilder val] end)
+                  let step_builder = StepBuilder(seq_builder, 
+                    cur_step_id)
+                  step_initializers.push(step_builder)
+                  steps(cur_step_id) = worker
+                end
+
+                let next_seq_builder = RunnerSequenceBuilder(
+                  recover [pipeline(i.usize())] end)
+
+                // If we haven't handled this shared state before, 
+                // handle it.  Otherwise, just handle the prestate.
+          
+                var state_name = ""
+                // let partition = 
+                match next_runner_builder
+                | let pb: PartitionBuilder val =>
+                  state_name = pb.state_name()
+                  if not state_map.contains(state_name) then
+                    state_map(state_name) = pb.partition_addresses(worker)
+                  end
+                else
+                  @printf[I32]("State initialization failed\n".cstring())
+                  error
+                end
+
+
+                let next_initializer: StepInitializer val = 
+                  match next_runner_builder
+                  | let pb: PartitionBuilder val =>
+                    PartitionedPreStateStepBuilder(
+                      pb.pre_state_subpartition(worker), next_runner_builder, 
+                      state_name)
+                  else
+                    StepBuilder(next_seq_builder, next_runner_builder.id(), 
+                      next_runner_builder.is_stateful())
+                  end
+
+                step_initializers.push(next_initializer)
+                steps(next_runner_builder.id()) = worker
+
+                try
+                  next_runner_builder = pipeline(i.usize() + 1)
+                end                     
+
                 cur_step_id = _guid_gen.u128()
+                i = i + 1 // We've already handled the next runnerbuilder
               elseif i == boundary then
                 let seq_builder = RunnerSequenceBuilder(
                   runner_builders = recover Array[RunnerBuilder val] end)
                 let step_builder = StepBuilder(seq_builder, 
                   cur_step_id)
-                step_builders.push(step_builder)
+                step_initializers.push(step_builder)
                 steps(cur_step_id) = worker
 
                 cur_step_id = _guid_gen.u128()
@@ -170,20 +231,27 @@ actor ApplicationInitializer
                   runner_builders = recover Array[RunnerBuilder val] end)
                 let step_builder = StepBuilder(seq_builder, 
                   cur_step_id)
-                step_builders.push(step_builder)
+                step_initializers.push(step_builder)
                 steps(cur_step_id) = worker
 
                 cur_step_id = _guid_gen.u128()                
               else
-                runner_builders.push(pipeline(i.usize()))
+                try
+                  runner_builders.push(pipeline(i.usize()))
+                else
+                  @printf[I32]("No runner builder found!\n".cstring())
+                  error
+                end             
               end
+
+              i = i + 1 
             end
           end
 
           try
-            let boundary_step_id = step_builders(0).id()      
+            let boundary_step_id = step_initializers(0).id()      
             let top_data = WorkerTopologyData(worker, boundary_step_id,
-              consume step_builders)
+              consume step_initializers)
             worker_topology_data.push(top_data)
           end
 
@@ -191,7 +259,13 @@ actor ApplicationInitializer
         end
 
         for i in Range(0, worker_topology_data.size()) do
-          let cur = worker_topology_data(i)
+          let cur = 
+            try
+              worker_topology_data(i)
+            else
+              @printf[I32]("No worker topology data found!\n".cstring())
+              error
+            end 
           let next_worker_data: (WorkerTopologyData val | None) =
             try worker_topology_data(i + 1) else None end
 
@@ -208,15 +282,27 @@ actor ApplicationInitializer
             let proxy_address = ProxyAddress(w.worker_name, w.boundary_step_id)
             let egress_builder = EgressBuilder(proxy_address)
             let local_pipeline = LocalPipeline(pipeline.name(), 
-              cur.step_builders, egress_builder, source_data)
-            local_pipelines(cur.worker_name).push(local_pipeline)
+              cur.step_initializers, egress_builder, source_data,
+              pipeline.state_builders())
+            try
+              local_pipelines(cur.worker_name).push(local_pipeline)
+            else
+              @printf[I32]("No pipeline list found!\n".cstring())
+              error
+            end 
           else
             // We need a sink
             let egress_builder = EgressBuilder(_output_addr, pipeline_id
               pipeline.sink_runner_builder())
             let local_pipeline = LocalPipeline(pipeline.name(), 
-              cur.step_builders, egress_builder, source_data)
-            local_pipelines(cur.worker_name).push(local_pipeline)
+              cur.step_initializers, egress_builder, source_data,
+              pipeline.state_builders())
+            try
+              local_pipelines(cur.worker_name).push(local_pipeline)
+            else
+              @printf[I32]("No pipeline list found!\n".cstring())
+              error
+            end            
           end 
         end
 
@@ -247,19 +333,19 @@ actor ApplicationInitializer
       | let wi: WorkerInitializer =>
         wi.distribute_local_topologies(consume other_local_topologies)
       else
-        @printf[I32]("Error distributing local topologies!/n".cstring())
+        @printf[I32]("Error distributing local topologies!\n".cstring())
       end
     else
-      @printf[I32]("Error initializating application!/n".cstring())
+      @printf[I32]("Error initializating application!\n".cstring())
     end
 
 
 class WorkerTopologyData
   let worker_name: String
   let boundary_step_id: U128
-  let step_builders: Array[StepBuilder val] val
+  let step_initializers: Array[StepInitializer val] val
 
-  new val create(n: String, id: U128, sb: Array[StepBuilder val] val) =>
+  new val create(n: String, id: U128, si: Array[StepInitializer val] val) =>
     worker_name = n
     boundary_step_id = id
-    step_builders = sb
+    step_initializers = si

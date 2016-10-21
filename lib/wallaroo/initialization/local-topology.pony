@@ -64,26 +64,40 @@ class EgressBuilder
       proxy_step
     else
       // The match is exhaustive, so this can't happen
+      @printf[I32]("Exhaustive match failed somehow\n".cstring())
       error
     end 
 
 class LocalPipeline
   let _name: String
-  let _builders: Array[StepBuilder val] val
+  let _initializers: Array[StepInitializer val] val
   let _source_data: (SourceData val | None)
-  // var _sink_target_ids: Array[U64] val = recover Array[U64] end
+  // _state_builders maps from state_name to StateSubpartition
+  let _state_builders: Map[String, StateSubpartition val] val
   var _egress_builder: EgressBuilder val
 
-  new val create(name': String, builders': Array[StepBuilder val] val, 
+  new val create(name': String, initializers': Array[StepInitializer val] val, 
     egress_builder': EgressBuilder val,
-    source_data': (SourceData val | None) = None) =>
+    source_data': (SourceData val | None) = None,
+    state_builders': Map[String, StateSubpartition val] val) 
+  =>
     _name = name'
-    _builders = builders'
+    _initializers = initializers'
     _egress_builder = egress_builder'
     _source_data = source_data'
+    _state_builders = state_builders'
+
+  fun update_state_map(state_map: Map[String, StateAddresses val], 
+    metrics_conn: TCPConnection) 
+  =>
+    for (state_name, subpartition) in _state_builders.pairs() do
+      if not state_map.contains(state_name) then
+        state_map(state_name) = subpartition.build(metrics_conn)
+      end
+    end
 
   fun name(): String => _name
-  fun builders(): Array[StepBuilder val] val => _builders
+  fun initializers(): Array[StepInitializer val] val => _initializers
   fun egress_builder(): EgressBuilder val => _egress_builder
   fun source_data(): (SourceData val | None) => _source_data
 
@@ -127,9 +141,13 @@ actor LocalTopologyInitializer
     try
       match _topology
       | let t: LocalTopology val =>
+        let state_map: Map[String, StateAddresses val] = state_map.create()
+
         let routes: Map[U128, Step tag] trn = 
           recover Map[U128, Step tag] end
         for pipeline in t.pipelines().values() do
+          pipeline.update_state_map(state_map, _metrics_conn)
+
           let proxies: Map[String, Array[Step tag]] = proxies.create()
 
           let sink_reporter = MetricsReporter(pipeline.name(), _metrics_conn)
@@ -137,43 +155,90 @@ actor LocalTopologyInitializer
           let sink = pipeline.egress_builder()(_worker_name, 
             consume sink_reporter, _auth, proxies)
 
-          let builders = pipeline.builders()
-          var builder_idx = builders.size()
-          var latest_step = sink
-          while builder_idx > 0 do 
-            var builder = builders((builder_idx - 1).usize())
-            var next = DirectRouter(latest_step)
-            if builder.is_stateful() then
-              let state_step = builder(EmptyRouter, _metrics_conn, 
-                pipeline.name())
-              let state_step_router = DirectRouter(state_step)
-              routes(builder.id()) = state_step
+          let initializers = pipeline.initializers()
+          var initializer_idx = initializers.size()
+          var latest_router: Router val = DirectRouter(sink)
+          while initializer_idx > 0 do 
+            var initializer = 
+              try
+                initializers((initializer_idx - 1).usize())
+              else
+                @printf[I32]("Initializers is empty when we expected one\n".cstring())
+                error
+              end
 
-              builder_idx = builder_idx - 1
-              builder = builders((builder_idx - 1).usize())
-              latest_step = builder(state_step_router, _metrics_conn, 
-                pipeline.name(), next)
-              routes(builder.id()) = latest_step
-              builder_idx = builder_idx - 1              
-            else
-              latest_step = builder(next, _metrics_conn, pipeline.name())
-              routes(builder.id()) = latest_step
-              builder_idx = builder_idx - 1
+            match initializer
+            | let p_builder: PartitionedPreStateStepBuilder val =>
+              try
+                let state_addresses = state_map(p_builder.state_name())
+
+                let partition_router: PartitionRouter val =
+                  p_builder.build_partition(_worker_name, state_addresses, 
+                    _metrics_conn, _auth, _connections, latest_router)
+                for (id, s) in partition_router.local_map().pairs() do 
+                  routes(id) = s
+                end
+                latest_router = partition_router
+
+                initializer_idx = initializer_idx - 1                
+              else
+                _env.err.print("Missing state step for " + p_builder.state_name() + "!")
+                error
+              end
+            | let builder: StepBuilder val =>
+              if builder.is_stateful() then
+                let state_step = builder(EmptyRouter, _metrics_conn, 
+                  pipeline.name())
+                let state_step_router = DirectRouter(state_step)
+                routes(builder.id()) = state_step
+
+                initializer_idx = initializer_idx - 1
+                
+                // Before a non-partitioned state builder, we should
+                // always have a non-partition pre-state builder
+                try
+                  match initializers((initializer_idx - 1).usize())
+                  | let b: StepBuilder val =>
+                    let next_step = b(state_step_router, _metrics_conn, 
+                      pipeline.name(), latest_router)
+                    latest_router = DirectRouter(next_step)
+                    routes(b.id()) = next_step 
+                  else
+                    @printf[I32]("Expected a StepBuilder\n".cstring())
+                    error
+                  end
+                else
+                  @printf[I32]("Expected a pre state StepBuilder\n".cstring())
+                  error
+                end
+                initializer_idx = initializer_idx - 1              
+              else
+                let next_step = builder(latest_router, _metrics_conn, 
+                  pipeline.name())
+                latest_router = DirectRouter(next_step)
+                routes(builder.id()) = next_step
+                initializer_idx = initializer_idx - 1
+              end
             end
           end  
 
           match pipeline.source_data()
           | let sd: SourceData val =>
-            let next = DirectRouter(latest_step)
             let source_reporter = MetricsReporter(pipeline.name(), 
               _metrics_conn)
 
             let listen_auth = TCPListenAuth(_auth)
-            TCPListener(listen_auth,
-              SourceListenerNotify(sd.builder(), next, consume 
-                source_reporter),
-              sd.address()(0),
-              sd.address()(1)) 
+            try
+              TCPListener(listen_auth,
+                SourceListenerNotify(sd.builder(), latest_router, 
+                  consume source_reporter),
+                sd.address()(0),
+                sd.address()(1)) 
+            else
+              @printf[I32]("Ill-formed source address\n".cstring())
+            end
+          else
+            @printf[I32]("No source data\n".cstring())
           end
 
           _register_proxies(proxies)
@@ -189,7 +254,12 @@ actor LocalTopologyInitializer
         end
 
         let topology_ready_msg = 
-          ChannelMsgEncoder.topology_ready(_worker_name, _auth)
+          try
+            ChannelMsgEncoder.topology_ready(_worker_name, _auth)
+          else
+            @printf[I32]("ChannelMsgEncoder failed\n".cstring())
+            error
+          end
         _connections.send_control("initializer", topology_ready_msg)
 
         let ready_msg = ExternalMsgEncoder.ready(_worker_name)

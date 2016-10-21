@@ -3,7 +3,9 @@ use "collections"
 use "time"
 use "net"
 use "sendence/epoch"
+use "sendence/guid"
 use "wallaroo/backpressure"
+use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/messages"
 
@@ -90,7 +92,8 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
 class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
   let _state_comp: StateComputation[In, Out, State] val
 
-  new val create(state_comp: StateComputation[In, Out, State] val) =>
+  new val create(state_comp: StateComputation[In, Out, State] val) 
+  =>
     _state_comp = state_comp
 
   fun apply(metrics_reporter: MetricsReporter iso, 
@@ -101,23 +104,23 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
     | let r: Router val =>
       PreStateRunner[In, Out, State](_state_comp, r, consume metrics_reporter)
     else
-      @printf[I32]("PreStateRunner should take a Runner on build!\n".cstring())
+      @printf[I32]("PreStateRunner should take a Router on build!\n".cstring())
       PreStateRunner[In, Out, State](_state_comp, EmptyRouter, 
         consume metrics_reporter)
     end
 
   fun name(): String => _state_comp.name()
-  fun is_stateful(): Bool => false
+  fun is_stateful(): Bool => true
   fun id(): U128 => 0
 
 class StateRunnerBuilder[State: Any #read]
   let _state_builder: StateBuilder[State] val
-  let _id: U128
+  let _name: String
 
   new val create(state_builder: StateBuilder[State] val, 
-    id': U128) =>
+    name': String) =>
     _state_builder = state_builder
-    _id = id'
+    _name = name'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     next_runner: (Runner iso | None) = None,
@@ -127,29 +130,61 @@ class StateRunnerBuilder[State: Any #read]
 
   fun name(): String => _state_builder.name()
   fun is_stateful(): Bool => true
-  fun id(): U128 => _id
+  fun id(): U128 => 0
 
-class PartitionedStateRunnerBuilder[PIn: Any val, 
-  Key: (Hashable val & Equatable[Key]), State: Any #read]
-  let _state_builder: StateBuilder[State] val
-  let _id: U128
+trait PartitionBuilder
+  fun pre_state_subpartition(worker: String): PreStateSubpartition val
+  fun partition_addresses(worker: String): PartitionAddresses val
+  fun state_name(): String
+
+class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val, 
+  PIn: Any val, State: Any #read, Key: (Hashable val & Equatable[Key])] is PartitionBuilder
+  let _pipeline_name: String
+  let _state_name: String
+  let _state_comp: StateComputation[In, Out, State] val
+  let _step_id_map: Map[Key, U128] val
   let _partition: Partition[PIn, Key] val
 
-  new val create(state_builder: StateBuilder[State] val, 
-    id': U128, partition': Partition[PIn, Key] val) =>
-    _state_builder = state_builder
-    _id = id'
+  new val create(pipeline_name: String, state_name': String,
+    state_comp: StateComputation[In, Out, State] val,
+    step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val) 
+  =>
+    _state_name = state_name'
+    _pipeline_name = pipeline_name
+    _state_comp = state_comp
+    _step_id_map = step_id_map'
     _partition = partition'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None): Runner iso^
   =>
-    StateRunner[State](_state_builder, consume metrics_reporter)
+    match router
+    | let r: Router val =>
+      PreStateRunner[In, Out, State](_state_comp, r, consume metrics_reporter)
+    else
+      @printf[I32]("PreStateRunner should take a Router on build!\n".cstring())
+      PreStateRunner[In, Out, State](_state_comp, EmptyRouter, 
+        consume metrics_reporter)
+    end
 
-  fun name(): String => _state_builder.name()
+  fun name(): String => _state_comp.name()
+  fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
-  fun id(): U128 => _id
+  fun id(): U128 => 0
+  fun step_id_map(): Map[Key, U128] val => _step_id_map
+  
+  fun pre_state_subpartition(worker: String): PreStateSubpartition val =>
+    KeyedPreStateSubpartition[PIn, Key](partition_addresses(worker),
+      _step_id_map, _partition.function(), _pipeline_name)
+
+  fun partition_addresses(worker: String): KeyedPartitionAddresses[Key] val =>
+    let m: Map[Key, ProxyAddress val] trn = 
+      recover Map[Key, ProxyAddress val] end
+    for key in _partition.keys().values() do
+      m(key) = ProxyAddress(worker, GuidGenerator.u128())
+    end
+    KeyedPartitionAddresses[Key](consume m)
 
 class ComputationRunner[In: Any val, Out: Any val]
   let _next: Runner

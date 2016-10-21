@@ -69,7 +69,55 @@ class DataRouter
 
   //   consume rs
 
-class PartitionRouter
+trait PartitionRouter is Router
+  fun local_map(): Map[U128, Step] val  
+
+class LocalPartitionRouter[In: Any val, 
+  Key: (Hashable val & Equatable[Key] val)] is PartitionRouter
+  let _local_map: Map[U128, Step] val
+  let _step_ids: Map[Key, U128] val
+  let _routes: Map[Key, (Step | PartitionProxy)] val
+  let _partition_function: PartitionFunction[In, Key] val
+
+  new val create(local_map': Map[U128, Step] val,
+    s_ids: Map[Key, U128] val, routes: Map[Key, (Step | PartitionProxy)] val,
+    partition_function: PartitionFunction[In, Key] val)
+  =>
+    _local_map = local_map'
+    _step_ids = s_ids
+    _routes = routes
+    _partition_function = partition_function
+
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
+    match data
+    | let input: In =>
+      let key = _partition_function(input)
+      try
+        match _routes(key)  
+        | let s: Step =>
+          s.run[In](metric_name, source_ts, input)
+          false
+        | let p: PartitionProxy =>
+          try
+            p.forward[In](metric_name, source_ts, input, _step_ids(key))
+            false
+          else
+            @printf[I32]("Missing step ID for partition key\n".cstring())
+            true
+          end
+        else
+          true
+        end
+      else
+        true
+      end
+    else
+      true
+    end
+
+  fun local_map(): Map[U128, Step] val => _local_map
+
+class OldPartitionRouter
   let _partition_finder: PartitionFinder val
 
   new val create(p_finder: PartitionFinder val) =>

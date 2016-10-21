@@ -29,13 +29,6 @@ actor Startup
     var init_path = ""
     var worker_count: USize = 1
     var is_initializer = false
-    var is_automated_initialization = 
-      match app_runner
-      | let application: Application val => 
-        true
-      else
-        false
-      end
     var worker_initializer: (WorkerInitializer | None) = None
     var worker_name = ""
     try
@@ -79,6 +72,8 @@ actor Startup
       end
 
       if worker_count == 1 then is_initializer = true end
+
+      if is_initializer then worker_name = "initializer" end
 
       let input_addrs: Array[Array[String]] val = consume i_addrs_write
       let m_addr = m_arg as Array[String]
@@ -129,8 +124,7 @@ actor Startup
       if is_initializer then
         env.out.print("Running as Initializer...")
         let application_initializer = ApplicationInitializer(
-          local_topology_initializer, input_addrs, o_addr,
-          is_automated_initialization)
+          local_topology_initializer, input_addrs, o_addr)
 
         worker_initializer = WorkerInitializer(auth, worker_count, connections,
           application_initializer, d_addr, metrics_conn)
