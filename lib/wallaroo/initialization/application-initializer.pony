@@ -58,13 +58,16 @@ actor ApplicationInitializer
     worker_initializer: WorkerInitializer, worker_count: USize,
     worker_names: Array[String] val) 
   =>
+    @printf[I32]("---------------------------------------------------------\n".cstring())
+    @printf[I32]("^^^^^^Initializing Topologies for Workers^^^^^^^\n\n".cstring())
     try
       let state_partition_map: Map[String, PartitionAddresses val] trn = 
         recover Map[String, PartitionAddresses val] end
 
-      let worker_topology_data = Array[WorkerTopologyData val]
+      var worker_topology_data = Array[WorkerTopologyData val]
 
       var pipeline_id: USize = 0
+      var source_addr_idx: USize = 0
 
       // Map from step_id to worker name
       let steps: Map[U128, String] = steps.create()
@@ -77,11 +80,13 @@ actor ApplicationInitializer
         local_pipelines(name) = Array[LocalPipeline val]
       end
 
+      @printf[I32](("Found " + application.pipelines.size().string()  + " pipelines in application\n").cstring())
+
       for pipeline in application.pipelines.values() do
         let source_addr_trn: Array[String] trn = recover Array[String] end
         try
-          source_addr_trn.push(_input_addrs(0)(0))
-          source_addr_trn.push(_input_addrs(0)(1))
+          source_addr_trn.push(_input_addrs(source_addr_idx)(0))
+          source_addr_trn.push(_input_addrs(source_addr_idx)(1))
         else
           @printf[I32]("No input address!\n".cstring())
           error
@@ -125,7 +130,7 @@ actor ApplicationInitializer
 
         // var final_boundary = pipeline.size().isize() + 1
 
-        @printf[I32](("The pipeline has " + pipeline_size.string() + " runner builders\n").cstring())
+        @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline_size.string() + " runner builders\n").cstring())
 
         var pipeline_idx: USize = 0
         var boundaries_idx: USize = 0
@@ -398,7 +403,9 @@ actor ApplicationInitializer
           end
         end
 
+        worker_topology_data = Array[WorkerTopologyData val]
         pipeline_id = pipeline_id + 1
+        source_addr_idx = source_addr_idx + 1
       end
 
       let other_local_topologies: Array[LocalTopology val] trn =
@@ -427,6 +434,9 @@ actor ApplicationInitializer
       else
         @printf[I32]("Error distributing local topologies!\n".cstring())
       end
+
+      @printf[I32]("\n^^^^^^Finished Initializing Topologies for Workers^^^^^^^\n".cstring())
+      @printf[I32]("---------------------------------------------------------\n".cstring())
     else
       @printf[I32]("Error initializating application!\n".cstring())
     end

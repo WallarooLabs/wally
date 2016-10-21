@@ -42,6 +42,12 @@ actor Main
 
       let application = recover val
         Application("Market Spread App")
+          .new_pipeline[FixNbboMessage val, None](
+            "Nbbo", NbboSourceDecoder)
+            .to_state_partition[Symboly val, String, None,
+               SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
+               symbol_data_partition)
+            .done()
           .new_pipeline[FixOrderMessage val, OrderResult val](
             "Orders", OrderSourceDecoder)
             // .to[FixOrderMessage val](IdentityBuilder)
@@ -49,27 +55,7 @@ actor Main
             .to_state_partition[Symboly val, String, 
               (OrderResult val | None), SymbolData](CheckOrder, 
               SymbolDataBuilder, "symbol-data", symbol_data_partition)
-            .to_sink(OrderResultEncoder, recover [0] end)
-          // .new_pipeline[FixNbboMessage val, None](
-          //   "Nbbo", NbboSourceDecoder)
-          //   .to_state_partition[Symboly val, String, None,
-          //      SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
-          //      symbol_data_partition)
-          //   .done()
-
-      // let application = recover val
-      //   Application("Market Spread App")
-      //     .new_pipeline[FixOrderMessage val, OrderResult val](
-      //       "Orders", OrderSourceDecoder)
-      //       .to_stateful[(OrderResult val | None), SymbolData](CheckOrder, 
-      //         SymbolDataBuilder, "symbol-data")
-      //       .to_sink(OrderResultEncoder, recover [0] end)
-      //     .new_pipeline[FixNbboMessage val, None](
-      //       "Nbbo", NbboSourceDecoder)
-      //       .to_stateful[None, SymbolData](UpdateNbbo, SymbolDataBuilder, 
-      //         "symbol-data")
-      //       .done()
-      
+            .to_sink(OrderResultEncoder, recover [0] end)     
       end
       Startup(env, application)
     else

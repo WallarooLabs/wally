@@ -65,3 +65,11 @@ class SourceNotify is TCPConnectionNotify
 //     SourceNotify(_source_builder(_router, _reporter.clone(), 
 //       _pre_state_router))
 
+  // fun ref listening(listen: TCPListener ref) =>
+  //   try
+  //     (let host, let service) = listen.local_address().name()
+  //     @printf[I32]((_source_builder.name() + " source: listening on " + host + ":" + service + "\n").cstring())
+  //   else
+  //     @printf[I32]("Source: couldn't get local address\n".cstring())
+  //     listen.close()
+  //   end

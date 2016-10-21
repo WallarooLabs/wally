@@ -290,7 +290,7 @@ class StateRunner[State: Any #read]
   fun ref run[In: Any val](metric_name: String val, source_ts: U64, input: In,
     producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
-    @printf[I32]("prestate runner received!\n".cstring())
+    @printf[I32]("state runner received!\n".cstring())
     match input
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()

@@ -59,15 +59,16 @@ class Source[In: Any val]
 trait BytesProcessorBuilder
   fun apply(router: Router val, reporter: MetricsReporter iso,
     pre_state_router: (Router val | None)): BytesProcessor iso^
+  fun name(): String
 
 class SourceBuilder[In: Any val] is BytesProcessorBuilder
   let _pipeline_name: String
   let _decoder: SourceDecoder[In] val
   let _runner_builder: RunnerBuilder val
 
-  new val create(name: String, decoder: SourceDecoder[In] val,
+  new val create(name': String, decoder: SourceDecoder[In] val,
     runner_builder: RunnerBuilder val = RouterRunnerBuilder) =>
-    _pipeline_name = name
+    _pipeline_name = name'
     _decoder = decoder
     _runner_builder = runner_builder
 
@@ -76,6 +77,8 @@ class SourceBuilder[In: Any val] is BytesProcessorBuilder
   =>
     Source[In](_pipeline_name, _decoder, _runner_builder, router, 
       consume reporter, pre_state_router)
+
+  fun name(): String => _pipeline_name
 
 class SourceData
   let _builder: BytesProcessorBuilder val

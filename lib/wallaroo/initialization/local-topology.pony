@@ -96,6 +96,7 @@ class LocalPipeline
   =>
     for (state_name, subpartition) in _state_builders.pairs() do
       if not state_map.contains(state_name) then
+        @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
         state_map(state_name) = subpartition.build(metrics_conn)
       end
     end
@@ -149,18 +150,28 @@ actor LocalTopologyInitializer
     _topology = t
 
   be initialize() =>
+    @printf[I32]("---------------------------------------------------------\n".cstring())
+    @printf[I32]("|^|^|^Initializing Local Topology^|^|^|\n\n".cstring())
     try
       match _topology
       | let t: LocalTopology val =>
+        @printf[I32](("Found " + t.pipelines().size().string() + " pipelines\n").cstring())
+
         if t.is_empty() then 
-          @printf[I32]("This worker has no steps\n".cstring())
+          @printf[I32]("----This worker has no steps----\n".cstring())
         end
 
         let state_map: Map[String, StateAddresses val] = state_map.create()
 
         let routes: Map[U128, Step tag] trn = 
           recover Map[U128, Step tag] end
+
+        var source_addr_idx: USize = 0
+
+
         for pipeline in t.pipelines().values() do
+          @printf[I32](("\nInitializing " + pipeline.name() + " pipeline:\n\n").cstring())
+
           pipeline.update_state_map(state_map, _metrics_conn)
 
           let proxies: Map[String, Array[Step tag]] = proxies.create()
@@ -187,7 +198,7 @@ actor LocalTopologyInitializer
               try
                 let state_addresses = state_map(p_builder.state_name())
 
-                @printf[I32](("Spinning up partition for " + p_builder.name() + "\n").cstring())
+                @printf[I32](("----Spinning up partition for " + p_builder.name() + "----\n").cstring())
                 let partition_router: PartitionRouter val =
                   p_builder.build_partition(_worker_name, state_addresses, 
                     _metrics_conn, _auth, _connections, latest_router)
@@ -203,7 +214,7 @@ actor LocalTopologyInitializer
               end
             | let builder: StepBuilder val =>
               if builder.is_stateful() then
-                @printf[I32](("Spinning up state for " + builder.name() + "\n").cstring())
+                @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn, 
                   pipeline.name())
                 let state_step_router = DirectRouter(state_step)
@@ -216,7 +227,7 @@ actor LocalTopologyInitializer
                 try
                   match initializers((initializer_idx - 1).usize())
                   | let b: StepBuilder val =>
-                    @printf[I32](("Spinning up " + b.name() + "\n").cstring())
+                    @printf[I32](("----Spinning up " + b.name() + "----\n").cstring())
                     let next_step = b(state_step_router, _metrics_conn, 
                       pipeline.name(), latest_router)
                     latest_router = DirectRouter(next_step)
@@ -231,7 +242,7 @@ actor LocalTopologyInitializer
                 end
                 initializer_idx = initializer_idx - 1              
               else
-                @printf[I32](("Spinning up " + builder.name() + "\n").cstring())
+                @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
                 let next_step = builder(latest_router, _metrics_conn, 
                   pipeline.name())
                 latest_router = DirectRouter(next_step)
@@ -239,6 +250,7 @@ actor LocalTopologyInitializer
                 initializer_idx = initializer_idx - 1
               end
             end
+
           end  
 
           match pipeline.source_data()
@@ -248,6 +260,7 @@ actor LocalTopologyInitializer
 
             let listen_auth = TCPListenAuth(_auth)
             try
+              @printf[I32](("----Creating source for " + pipeline.name() + " pipeline----\n").cstring())
               TCPListener(listen_auth,
                 SourceListenerNotify(sd.builder(), latest_router, 
                   consume source_reporter),
@@ -288,6 +301,9 @@ actor LocalTopologyInitializer
       else
         @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end
+    
+      @printf[I32]("\n|^|^|^Finished Initializing Local Topology^|^|^|\n".cstring())
+      @printf[I32]("---------------------------------------------------------\n".cstring())
     else
       _env.err.print("Error initializing local topology")
     end
