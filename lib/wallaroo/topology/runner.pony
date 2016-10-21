@@ -13,16 +13,18 @@ interface Runner
     producer: (CreditFlowProducer ref | None), router: (Router val | None) = None): Bool
 
 interface RunnerBuilder
-  fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None) = 
-    None): Runner iso^
+  fun apply(metrics_reporter: MetricsReporter iso, 
+    next_runner: (Runner iso | None) = None,
+    router: (Router val | None) = None): Runner iso^
 
   fun name(): String
   fun is_stateful(): Bool
   fun id(): U128
 
 primitive RouterRunnerBuilder
-  fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None) = 
-    None): Runner iso^ 
+  fun apply(metrics_reporter: MetricsReporter iso, 
+    next_runner: (Runner iso | None) = None,
+    router: (Router val | None) = None): Runner iso^
   => 
     RouterRunner
 
@@ -36,7 +38,9 @@ class RunnerSequenceBuilder
   new val create(bs: Array[RunnerBuilder val] val) =>
     _runner_builders = bs
 
-  fun apply(metrics_reporter: MetricsReporter iso): Runner iso^ =>
+  fun apply(metrics_reporter: MetricsReporter iso, router: Router val): 
+    Runner iso^ 
+  =>
     var remaining: USize = _runner_builders.size()
     var latest_runner: Runner iso = RouterRunner
     while remaining > 0 do
@@ -48,7 +52,8 @@ class RunnerSequenceBuilder
         end
       match next_builder
       | let rb: RunnerBuilder val =>
-        latest_runner = rb(metrics_reporter.clone(), consume latest_runner)
+        latest_runner = rb(metrics_reporter.clone(), consume latest_runner,
+          router)
       end
       remaining = remaining - 1
     end
@@ -64,10 +69,11 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
     _comp_builder = comp_builder
     _id = id'
 
-  fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None)): 
-    Runner iso^
+  fun apply(metrics_reporter: MetricsReporter iso, 
+    next_runner: (Runner iso | None) = None,
+    router: (Router val | None) = None): Runner iso^
   =>
-    match (consume next)
+    match (consume next_runner)
     | let r: Runner iso =>
       ComputationRunner[In, Out](_comp_builder(), consume r, 
         consume metrics_reporter)
@@ -82,36 +88,39 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
 
 class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
   let _state_comp: StateComputation[In, Out, State] val
-  let _router: Router val
-  let _id: U128
 
-  new val create(state_comp: StateComputation[In, Out, State] val,
-    router: Router val, id': U128 = 0) =>
+  new val create(state_comp: StateComputation[In, Out, State] val) =>
     _state_comp = state_comp
-    _router = router
-    _id = id'
 
-  fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None)): 
-    Runner iso^
+  fun apply(metrics_reporter: MetricsReporter iso, 
+    next_runner: (Runner iso | None) = None,
+    router: (Router val | None) = None): Runner iso^
   =>
-    PreStateRunner[In, Out, State](_state_comp, _router, 
-      consume metrics_reporter)
+    match router
+    | let r: Router val =>
+      PreStateRunner[In, Out, State](_state_comp, r, consume metrics_reporter)
+    else
+      @printf[I32]("PreStateRunner should take a Runner on build!\n".cstring())
+      PreStateRunner[In, Out, State](_state_comp, EmptyRouter, 
+        consume metrics_reporter)
+    end
 
   fun name(): String => _state_comp.name()
-  fun is_stateful(): Bool => true
-  fun id(): U128 => _id
+  fun is_stateful(): Bool => false
+  fun id(): U128 => 0
 
 class StateRunnerBuilder[State: Any #read]
   let _state_builder: StateBuilder[State] val
   let _id: U128
 
   new val create(state_builder: StateBuilder[State] val, 
-    id': U128 = 0) =>
+    id': U128) =>
     _state_builder = state_builder
     _id = id'
 
-  fun apply(metrics_reporter: MetricsReporter iso, next: (Runner iso | None)): 
-    Runner iso
+  fun apply(metrics_reporter: MetricsReporter iso, 
+    next_runner: (Runner iso | None) = None,
+    router: (Router val | None) = None): Runner iso^
   =>
     StateRunner[State](_state_builder, consume metrics_reporter)
 

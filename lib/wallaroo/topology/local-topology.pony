@@ -140,11 +140,25 @@ actor LocalTopologyInitializer
           var builder_idx = builders.size()
           var latest_step = sink
           while builder_idx > 0 do 
-            let builder = builders((builder_idx - 1).usize())
-            let next = DirectRouter(latest_step)
-            latest_step = builder(next, _metrics_conn, pipeline.name())
-            routes(builder.id()) = latest_step
-            builder_idx = builder_idx - 1
+            var builder = builders((builder_idx - 1).usize())
+            var next = DirectRouter(latest_step)
+            if builder.is_stateful() then
+              let state_step = builder(EmptyRouter, _metrics_conn, 
+                pipeline.name())
+              let state_step_router = DirectRouter(state_step)
+              routes(builder.id()) = state_step
+
+              builder_idx = builder_idx - 1
+              builder = builders((builder_idx - 1).usize())
+              latest_step = builder(state_step_router, _metrics_conn, 
+                pipeline.name(), next)
+              routes(builder.id()) = latest_step
+              builder_idx = builder_idx - 1              
+            else
+              latest_step = builder(next, _metrics_conn, pipeline.name())
+              routes(builder.id()) = latest_step
+              builder_idx = builder_idx - 1
+            end
           end  
 
           match pipeline.source_data()

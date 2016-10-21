@@ -34,6 +34,8 @@ actor Main
             => Conjugate end)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Scale(5) end)
+          .to_stateful[Complex val, Counter](UpdateCounter,
+            CounterBuilder, 1)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Conjugate end)
           .to_sink(ComplexEncoder, recover [0] end)
@@ -107,3 +109,24 @@ primitive ComplexEncoder
     wb.i32_be(c.imaginary())
     wb.done()
 
+class Counter
+  var _count: USize = 0 
+  var _reals: I32 = 0
+
+  fun ref apply(c: Complex val): Complex val =>
+    _count = _count + 1
+    _reals = _reals + c.real()
+    @printf[I32](("Updated Counter to " + _count.string() + "\n").cstring())
+    c
+
+  fun count(): USize => _count
+  fun reals(): I32 => _reals
+
+primitive CounterBuilder
+  fun name(): String => "counter"
+  fun apply(): Counter => Counter
+
+primitive UpdateCounter
+  fun name(): String => "UpdateCounter"
+  fun apply(c: Complex val, s: Counter): Complex val =>
+    s(c)

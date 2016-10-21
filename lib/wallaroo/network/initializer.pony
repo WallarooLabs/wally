@@ -180,9 +180,6 @@ actor Initializer
       end
 
       for pipeline in topology.pipelines.values() do
-        // break down into LocalPipeline objects
-        // and add to local_pipelines
-
         let source_addr_trn: Array[String] trn = recover Array[String] end
         source_addr_trn.push(_input_addrs(0)(0))
         source_addr_trn.push(_input_addrs(0)(1))
@@ -194,8 +191,6 @@ actor Initializer
 
         let sink_egress_builder = EgressBuilder(consume sink_addr, 
           pipeline.sink_runner_builder())
-
-        // Is _expected the right number?
 
         // Determine which steps go on which workers using boundary indices
         let per_worker: USize = pipeline.size() / _expected
@@ -210,8 +205,6 @@ actor Initializer
           end
         end
 
-        // Since we're dealing with StepBuilders, we should be able to 
-        // go forward through the pipeline when building LocalPipelines
         var boundaries_idx: USize = 0
         var final_boundary = pipeline.size().isize()
         var last_boundary: ISize = -1
@@ -234,11 +227,6 @@ actor Initializer
           let step_builders: Array[StepBuilder val] trn = 
             recover Array[StepBuilder val] end
 
-          if worker == "initializer" then
-            // set up source
-            None
-          end
-
           if boundary < final_boundary then
             var runner_builders: Array[RunnerBuilder val] trn = 
               recover Array[RunnerBuilder val] end 
@@ -246,49 +234,40 @@ actor Initializer
 
             for i in Range[ISize](last_boundary + 1, boundary + 1) do
               let next_runner_builder = pipeline(i.usize())
-              if next_runner_builder.id() != 0 then
-                let seq_builder = RunnerSequenceBuilder(
-                  runner_builders = recover Array[RunnerBuilder val] end)
-                let step_builder = StatelessStepBuilder(seq_builder, 
-                  cur_step_id)
-                step_builders.push(step_builder)
-                steps(cur_step_id) = worker
-
-                cur_step_id = next_runner_builder.id()
+              
+              if (next_runner_builder.id() != 0) or 
+                  next_runner_builder.is_stateful() then
+                if runner_builders.size() > 0 then
+                  let seq_builder = RunnerSequenceBuilder(
+                    runner_builders = recover Array[RunnerBuilder val] end)
+                  let step_builder = StepBuilder(seq_builder, 
+                    cur_step_id)
+                  step_builders.push(step_builder)
+                  steps(cur_step_id) = worker
+                end
 
                 let next_seq_builder = RunnerSequenceBuilder(
                   recover [pipeline(i.usize())] end)
-                let next_step_builder = StatelessStepBuilder(seq_builder, 
+                let next_step_builder = StepBuilder(next_seq_builder, 
+                  next_runner_builder.id(), next_runner_builder.is_stateful())
+                step_builders.push(next_step_builder)
+                steps(next_runner_builder.id()) = worker
+
+                cur_step_id = _guid_gen.u128()
+              elseif i == boundary then
+                let seq_builder = RunnerSequenceBuilder(
+                  runner_builders = recover Array[RunnerBuilder val] end)
+                let step_builder = StepBuilder(seq_builder, 
                   cur_step_id)
                 step_builders.push(step_builder)
                 steps(cur_step_id) = worker
 
                 cur_step_id = _guid_gen.u128()
               else
-                if i == boundary then
-                  let seq_builder = RunnerSequenceBuilder(
-                    runner_builders = recover Array[RunnerBuilder val] end)
-                  let step_builder = StatelessStepBuilder(seq_builder, 
-                    cur_step_id)
-                  step_builders.push(step_builder)
-                  steps(cur_step_id) = worker
-
-                  cur_step_id = _guid_gen.u128()
-                else
-                  runner_builders.push(pipeline(i.usize()))
-                end
+                runner_builders.push(pipeline(i.usize()))
               end
             end
-            // Create step builders
           end
-
-          // // Check if this is the end to determine what kind of egress
-          // // egress_builder = ...
-          // if boundaries_idx == (boundaries.size() - 1) then
-          //   None
-          // else
-
-          // end
 
           try
             let boundary_step_id = step_builders(0).id()      

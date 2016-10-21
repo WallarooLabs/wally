@@ -104,10 +104,23 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p = p
 
   fun ref to[Next: Any val](
-    comp_builder: ComputationBuilder[Last, Next] val)
+    comp_builder: ComputationBuilder[Last, Next] val,
+    id: U128 = 0)
       : PipelineBuilder[In, Out, Next] =>
     let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder)
     _p.add_runner_builder(next_builder)
+    PipelineBuilder[In, Out, Next](_t, _p)
+
+  fun ref to_stateful[Next: Any val, State: Any #read](
+    s_comp: StateComputation[Last, Next, State] val,
+    s_initializer: StateBuilder[State] val,
+    id: U128)
+      : PipelineBuilder[In, Out, Next] =>
+
+    let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp)
+    _p.add_runner_builder(next_builder)
+    let state_builder = StateRunnerBuilder[State](s_initializer, id)
+    _p.add_runner_builder(state_builder)
     PipelineBuilder[In, Out, Next](_t, _p)
 
   fun ref to_empty_sink(): Topology ? =>

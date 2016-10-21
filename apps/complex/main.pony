@@ -199,7 +199,7 @@ class ComplexTopologyStarter is TopologyStarter
     conjugate_runner_builders.push(ComputationRunnerBuilder[Complex val,
       Complex val](conjugate_builder))
 
-    let conjugate_step_builder = StatelessStepBuilder(
+    let conjugate_step_builder = StepBuilder(
       RunnerSequenceBuilder(consume conjugate_runner_builders),
       conjugate_step_id)
 
@@ -212,7 +212,7 @@ class ComplexTopologyStarter is TopologyStarter
     scale_runner_builders.push(ComputationRunnerBuilder[Complex val,
       Complex val](scale_builder))
 
-    let scale_step_builder = StatelessStepBuilder(
+    let scale_step_builder = StepBuilder(
       RunnerSequenceBuilder(consume scale_runner_builders), scale_step_id)
 
 
@@ -264,7 +264,7 @@ class ComplexTopologyStarter is TopologyStarter
     conjugate_runner_builders.push(ComputationRunnerBuilder[Complex val,
       Complex val](conjugate_builder))
 
-    let conjugate_step_builder = StatelessStepBuilder(
+    let conjugate_step_builder = StepBuilder(
       RunnerSequenceBuilder(consume conjugate_runner_builders),
       conjugate_step_id)
 
@@ -283,7 +283,7 @@ class ComplexTopologyStarter is TopologyStarter
     scale_runner_builders.push(ComputationRunnerBuilder[Complex val,
       Complex val](scale_builder))
 
-    let scale_step_builder = StatelessStepBuilder(
+    let scale_step_builder = StepBuilder(
       RunnerSequenceBuilder(consume scale_runner_builders), scale_step_id)
 
     let worker_3_builders: Array[StepBuilder val] trn = 
