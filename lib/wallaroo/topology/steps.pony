@@ -108,25 +108,25 @@ actor PartitionProxy is CreditFlowProducer
 type StepInitializer is (StepBuilder | PartitionedPreStateStepBuilder)
 
 class StepBuilder
-  let _runner_sequence_builder: RunnerSequenceBuilder val
+  let _runner_builder: RunnerBuilder val
   let _id: U128
   let _is_stateful: Bool
 
-  new val create(r: RunnerSequenceBuilder val, id': U128,
+  new val create(r: RunnerBuilder val, id': U128,
     is_stateful': Bool = false) 
   =>    
-    _runner_sequence_builder = r
+    _runner_builder = r
     _id = id'
     _is_stateful = is_stateful'
 
-  fun name(): String => _runner_sequence_builder.name()
+  fun name(): String => _runner_builder.name()
   fun id(): U128 => _id
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
 
   fun apply(next: Router val, metrics_conn: TCPConnection,
     pipeline_name: String, router: Router val = EmptyRouter): Step tag =>
-    let runner = _runner_sequence_builder(MetricsReporter(pipeline_name, 
+    let runner = _runner_builder(MetricsReporter(pipeline_name, 
       metrics_conn) where router = router)
     let step = Step(consume runner, 
       MetricsReporter(pipeline_name, metrics_conn), router)

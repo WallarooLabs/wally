@@ -1,288 +1,565 @@
+"""
+Market Spread App
+
+Setting up a market spread run (in order):
+1) reports sink:
+nc -l 127.0.0.1 7002 >> /dev/null
+
+2) metrics sink:
+nc -l 127.0.0.1 7003 >> /dev/null
+
+3) market spread app:
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:7002 -m 127.0.0.1:7003 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 10000000 -n node-name --ponythreads=4
+
+4) orders:
+giles/sender/sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57
+
+5) nbbo:
+giles/sender/sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46
+"""
 use "collections"
-use "buffy"
-use "buffy/messages"
-use "buffy/metrics"
-use "buffy/topology"
-use "buffy/sink-node"
+use "net"
+use "time"
+use "buffered"
+use "sendence/bytes"
 use "sendence/fix"
 use "sendence/new-fix"
-use "sendence/epoch"
 use "sendence/hub"
-use "sendence/bytes"
-use "net"
-use "random"
-use "time"
-use "files"
-use "buffered"
+use "sendence/epoch"
+use "wallaroo"
+use "wallaroo/metrics"
+use "wallaroo/tcp-source"
+use "wallaroo/topology"
 
 actor Main
   new create(env: Env) =>
     try
-      let auth = env.root as AmbientAuth
-      let initial_market_data = generate_initial_data(auth)
+      let symbol_data_partition = Partition[Symboly val, String](
+        SymbolPartitionFunction, LegalSymbols.symbols)
 
-      let initial_report_msgs: Array[Array[ByteSeq] val] iso = 
-        recover Array[Array[ByteSeq] val] end
-      let connect_msg = Bytes.length_encode(HubJson.connect())
-      let join_msg = Bytes.length_encode(HubJson.join("reports:market-spread"))
-      initial_report_msgs.push(connect_msg)
-      initial_report_msgs.push(join_msg)
-
-      let topology = recover val
-        Topology
-          .new_pipeline[FixOrderMessage val, (OrderResult val | None)](
-            TradeParser, "Orders")
-            .to_stateful[(OrderResult val | None), MarketData](
-              CheckStatus,
-              recover 
-                lambda()(initial_market_data): MarketData => 
-                  MarketData.from(initial_market_data) end
-              end,
-              1)
-            .to_collector_sink[RejectedResultStore](
-              lambda(): SinkCollector[(OrderResult val | None), RejectedResultStore] =>
-                MarketSpreadSinkCollector end,
-              MarketSpreadSinkByteSeqify, 
-              recover [0] end,
-              consume initial_report_msgs
-            )
-            // .to_simple_sink(SimpleStringify, recover [0] end)
-          .new_pipeline[FixNbboMessage val, None](NbboParser, "NBBO")
-            .to_stateful[None, MarketData](
-              UpdateData,
-              lambda(): MarketData => MarketData end,
-              1)
-            .to_empty_sink()
+      let application = recover val
+        Application("Market Spread App")
+          .new_pipeline[FixNbboMessage val, None](
+            "Nbbo", FixNbboFrameHandler)
+            .to_state_partition[Symboly val, String, None,
+               SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
+               symbol_data_partition)
+            .done()
+          .new_pipeline[FixOrderMessage val, OrderResult val](
+            "Orders", FixOrderFrameHandler)
+            // .to[FixOrderMessage val](IdentityBuilder)
+            // .to[FixOrderMessage val](IdentityBuilder)
+            .to_state_partition[Symboly val, String, 
+              (OrderResult val | None), SymbolData](CheckOrder, 
+              SymbolDataBuilder, "symbol-data", symbol_data_partition)
+            .to_sink(OrderResultEncoder, recover [0] end)     
       end
-      let sink_builders = recover Array[SinkNodeStepBuilder val] end
-      Startup(env, topology, 2, consume sink_builders)
+      Startup(env, application)
     else
       env.out.print("Couldn't build topology")
     end
 
-  fun generate_initial_data(auth: AmbientAuth): 
-    Map[String, MarketDataEntry val] val ? =>
-    let map: Map[String, MarketDataEntry val] iso = 
-      recover Map[String, MarketDataEntry val](1024) end
-    let path = FilePath(auth, "./demos/marketspread/initial-nbbo.msg")
-    let data_source = FileDataSource(auth, path)
-    for line in consume data_source do
-      let fix_message = FixParser(line)
-      match fix_message
-      | let nbbo: FixNbboMessage val =>
-        let mid = (nbbo.bid_px() + nbbo.offer_px()) / 2
-        let is_rejected =
-          ((nbbo.offer_px() - nbbo.bid_px()) >= 0.05) or
-            (((nbbo.offer_px() - nbbo.bid_px()) / mid) >= 0.05)
+primitive Identity
+  fun name(): String => "identity"
+  fun apply(r: FixOrderMessage val): FixOrderMessage val =>
+    @printf[I32]("Identity\n".cstring())
+    r
 
-        let partition_id = nbbo.symbol().hash()    
-        map(nbbo.symbol()) =  
-          MarketDataEntry(is_rejected, nbbo.bid_px(), nbbo.offer_px())
-      end
+primitive IdentityBuilder
+  fun apply(): Computation[FixOrderMessage val, FixOrderMessage val] val =>
+    Identity
+ 
+interface Symboly
+  fun symbol(): String
+
+class val SymbolDataBuilder
+  fun apply(): SymbolData => SymbolData
+  fun name(): String => "Market Data"
+
+class SymbolData
+  var should_reject_trades: Bool = true
+  var last_bid: F64 = 0
+  var last_offer: F64 = 0
+
+primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
+  fun name(): String => "Update NBBO"
+
+  fun apply(msg: FixNbboMessage val, state: SymbolData): None =>
+    let offer_bid_difference = msg.offer_px() - msg.bid_px()
+
+    state.should_reject_trades = (offer_bid_difference >= 0.05) or
+      ((offer_bid_difference / msg.mid()) >= 0.05)
+
+    state.last_bid = msg.bid_px()
+    state.last_offer = msg.offer_px()
+    None
+
+class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val, 
+  SymbolData]
+  fun name(): String => "Check Order against NBBO"
+
+  fun apply(msg: FixOrderMessage val, state: SymbolData): 
+    (OrderResult val | None) =>
+    if state.should_reject_trades then
+      OrderResult(msg, state.last_bid, state.last_offer,
+        Epoch.nanoseconds())
+    else
+      None
     end
-    consume map
 
-class FileDataSource is Iterator[String]
-  let _lines: Iterator[String]
+primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
+  fun header_length(): USize =>
+    4
 
-  new iso create(auth: AmbientAuth, path: FilePath) =>
-    _lines = File(path).lines()
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
-  fun ref has_next(): Bool =>
-    _lines.has_next()
-
-  fun ref next(): String ? =>
-    if has_next() then
-      _lines.next()
+  fun decode(data: Array[U8] val): FixOrderMessage val ? =>
+    match FixishMsgDecoder(data)
+    | let m: FixOrderMessage val => m
     else
       error
     end
 
-class MarketDataEntry
-  let is_rejected: Bool
-  let bid: F64
-  let offer: F64
+primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
+  fun header_length(): USize =>
+    4
 
-  new val create(is_rej: Bool, b: F64, o: F64) =>
-    is_rejected = is_rej
-    bid = b
-    offer = o
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
-class MarketData
-  // symbol => (is_rejected, bid, offer)
-  let _entries: Map[String, (Bool, F64, F64)] = 
-    Map[String, (Bool, F64, F64)](1024)
-  
-  new create() => None
-
-  new from(md: Map[String, MarketDataEntry val] val) =>
-    for (key, value) in md.pairs() do
-      _entries(key) = (value.is_rejected, value.bid, value.offer)
-    end
-
-  fun ref apply(symbol: String): (Bool, F64, F64) ? => _entries(symbol) 
-
-  fun ref update(symbol: String, entry: (Bool, F64, F64)): MarketData =>
-    _entries(symbol) = entry
-    this
-
-  fun is_rejected(symbol: String): Bool =>
-    try
-      _entries(symbol)._1 //is_rejected
+  fun decode(data: Array[U8] val): FixNbboMessage val ? =>
+    match FixishMsgDecoder(data)
+    | let m: FixNbboMessage val => m
     else
-      true
+      error
     end
 
-  fun contains(symbol: String): Bool => _entries.contains(symbol)
+// class SymbolRouter is Router[(FixNbboMessage val | FixOrderMessage val),
+//   Step tag]
+//   let _routes: Map[String, Step tag] val
 
-class UpdateData is StateComputation[FixNbboMessage val, None, MarketData]
-  fun name(): String => "Update Market Data"
-  fun apply(nbbo: FixNbboMessage val, state: MarketData, 
-    output: MessageTarget[None] val): MarketData =>
-    let offer_bid_diff = (nbbo.offer_px() - nbbo.bid_px())
-    if (offer_bid_diff >= 0.05) or
-      ((offer_bid_diff / nbbo.mid()) >= 0.05) then
-      output(None)
-      state.update(nbbo.symbol(), (true, nbbo.bid_px(), 
-        nbbo.offer_px()))
-    else
-      output(None)
-      state.update(nbbo.symbol(), (false, nbbo.bid_px(), 
-        nbbo.offer_px()))
-    end
+//   new iso create(routes: Map[String, Step tag] val) =>
+//     _routes = routes
 
-class CheckStatus is StateComputation[FixOrderMessage val, (OrderResult val | None), 
-  MarketData]
-  fun name(): String => "Check Order Result"
-  fun apply(order: FixOrderMessage val, state: MarketData, 
-    output: MessageTarget[(OrderResult val | None)] val):
-    MarketData =>
-    let symbol = order.symbol()
-    let rejected_tuple: (Bool, F64, F64)  = (true, 0, 0)
-    let market_data_entry = 
-      if state.contains(symbol) then
-        try
-          state(symbol)
-        else
-          rejected_tuple
-        end
-      else
-        rejected_tuple
-      end
-    if market_data_entry._1 then
-      let result: OrderResult val = OrderResult(order,
-        market_data_entry._2, market_data_entry._3,
-        market_data_entry._1, Epoch.seconds())
-      output(result)
-    else
-      output(None)
-    end
-    state
- 
+//   fun route(input: (FixNbboMessage val | FixOrderMessage val)): 
+//     (Step tag | None) 
+//   =>
+//     if _routes.contains(input.symbol()) then
+//       try
+//         _routes(input.symbol())
+//       end
+//     end
+
+primitive SymbolPartitionFunction
+  fun apply(input: Symboly val): String 
+  =>
+    input.symbol()
+
 class OrderResult
   let order: FixOrderMessage val
   let bid: F64
   let offer: F64
-  let is_rejected: Bool
   let timestamp: U64
 
   new val create(order': FixOrderMessage val,
     bid': F64,
     offer': F64,
-    is_rejected': Bool,
-    timestamp': U64) 
+    timestamp': U64)
   =>
     order = order'
     bid = bid'
     offer = offer'
-    is_rejected = is_rejected'
     timestamp = timestamp'
 
   fun string(): String =>
-    (order.symbol().clone().append(order.order_id())
-      .append(order.account().string())
-      .append(order.price().string()).append(order.order_qty().string())
-      .append(order.side().string()).append(bid.string()).append(offer.string())
-      .append(is_rejected.string())
+    (order.symbol().clone().append(", ")
+      .append(order.order_id()).append(", ")
+      .append(order.account().string()).append(", ")
+      .append(order.price().string()).append(", ")
+      .append(order.order_qty().string()).append(", ")
+      .append(order.side().string()).append(", ")
+      .append(bid.string()).append(", ")
+      .append(offer.string()).append(", ")
       .append(timestamp.string())).clone()
 
-interface Symboly
-  fun symbol(): String
-
-class SymbolPartition is PartitionFunction[Symboly val]
-  fun apply(s: Symboly val): U64 =>
-    s.symbol().hash()
-
-class NbboParser is Parser[FixNbboMessage val]
-  fun apply(s: String): (FixNbboMessage val | None) =>
-    try
-      match FixishMsgDecoder(s.array())
-      | let m: FixNbboMessage val => m
-      end
+primitive OrderResultEncoder
+  fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
+    @printf[I32]((r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
+    //Header (size == 55 bytes)
+    let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
+    wb.u32_be(msgs_size.u32())
+    //Fields
+    match r.order.side()
+    | Buy => wb.u8(SideTypes.buy())
+    | Sell => wb.u8(SideTypes.sell())
     end
+    wb.u32_be(r.order.account())
+    wb.write(r.order.order_id().array()) // assumption: 6 bytes
+    wb.write(r.order.symbol().array()) // assumption: 4 bytes
+    wb.f64_be(r.order.order_qty())
+    wb.f64_be(r.order.price())
+    wb.f64_be(r.bid)
+    wb.f64_be(r.offer)
+    wb.u64_be(r.timestamp)
+    let payload = wb.done()
+    HubProtocol.payload("rejected-orders", "reports:market-spread", 
+      consume payload, wb)
 
-class TradeParser is Parser[FixOrderMessage val]
-  fun apply(s: String): (FixOrderMessage val | None) =>
-    try
-      match FixishMsgDecoder(s.array())
-      | let m: FixOrderMessage val => m
-      end
-    end
+class LegalSymbols
+  let symbols: Array[String] val
 
-// class ToMonitoring is ArrayByteSeqify[RejectedResultStore]
-//   fun apply(i: RejectedResultStore, wb: Writer): Array[ByteSeq] val =>
-//     let rejected_payload = RejectedResultsStoreBytes.rejected(i, wb)
-//     let summaries_payload = RejectedResultsStoreBytes.client_summaries(i, wb)
-
-//     let rejected = HubProtocol.payload("rejected-orders", 
-//       "reports:market-spread", rejected_payload)
-//     let summaries_string = HubJson.payload("client-order-summaries", 
-//         "reports:market-spread", summaries_payload)
-//     wb.done()
-
-// primitive RejectedResultsStoreBytes
-//   fun rejected(i: RejectedResultStore, wb: Writer): Array[ByteSeq] val  =>
-//     let rejected_size = ((i.rejected.size() * 53) + 16).u32()
-//     wb.u32_be(rejected_size)
-//     for order_result in i.rejected.values() do
-//       match order_result.order.side()
-//       | Buy => wb.u8(SideTypes.buy())
-//       | Sell => wb.u8(SideTypes.sell())
-//       end
-//       wb.u32_be(order_result.order.account())
-//       wb.write(order_result.order.order_id())
-//       wb.write(order_result.order.symbol())
-//       wb.f64_be(order_result.order.order_qty())
-//       wb.f64_be(order_result.order.price())
-//       wb.f64_be(order_result.bid)
-//       wb.f64_be(order_result.offer)
-//     end
-//     wb.done()
-
-//   fun client_summaries(i: RejectedResultStore, wb: Writer): Array[ByteSeq] val
-//   =>
-//     let client_orders_size = i.client_orders_updated.size() * 16
-//     for client in i.client_orders_updated.values() do
-//       try
-//         let summary = i.client_order_counts(client)
-//         wb.u32_be(client)
-//         // Change this to U64 once Json is removed
-//         wb.i64_be(summary.total)
-//         wb.i64_be(summary.rejected_total)
-//       end
-//     end
-//     wb.done()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  new create() =>
+    symbols = recover      
+      [
+"AA",
+"BAC",
+"AAPL",
+"FCX",
+"SUNE",
+"FB",
+"RAD",
+"INTC",
+"GE",
+"WMB",
+"S",
+"ATML",
+"YHOO",
+"F",
+"T",
+"MU",
+"PFE",
+"CSCO",
+"MEG",
+"HUN",
+"GILD",
+"MSFT",
+"SIRI",
+"SD",
+"C",
+"NRF",
+"TWTR",
+"ABT",
+"VSTM",
+"NLY",
+"AMAT",
+"X",
+"NFLX",
+"SDRL",
+"CHK",
+"KO",
+"JCP",
+"MRK",
+"WFC",
+"XOM",
+"KMI",
+"EBAY",
+"MYL",
+"ZNGA",
+"FTR",
+"MS",
+"DOW",
+"ATVI",
+"ORCL",
+"JPM",
+"FOXA",
+"HPQ",
+"JBLU",
+"RF",
+"CELG",
+"HST",
+"QCOM",
+"AKS",
+"EXEL",
+"ABBV",
+"CY",
+"VZ",
+"GRPN",
+"HAL",
+"GPRO",
+"CAT",
+"OPK",
+"AAL",
+"JNJ",
+"XRX",
+"GM",
+"MHR",
+"DNR",
+"PIR",
+"MRO",
+"NKE",
+"MDLZ",
+"V",
+"HLT",
+"TXN",
+"SWN",
+"AGN",
+"EMC",
+"CVX",
+"BMY",
+"SLB",
+"SBUX",
+"NVAX",
+"ZIOP",
+"NE",
+"COP",
+"EXC",
+"OAS",
+"VVUS",
+"BSX",
+"SE",
+"NRG",
+"MDT",
+"WFM",
+"ARIA",
+"WFT",
+"MO",
+"PG",
+"CSX",
+"MGM",
+"SCHW",
+"NVDA",
+"KEY",
+"RAI",
+"AMGN",
+"HTZ",
+"ZTS",
+"USB",
+"WLL",
+"MAS",
+"LLY",
+"WPX",
+"CNW",
+"WMT",
+"ASNA",
+"LUV",
+"GLW",
+"BAX",
+"HCA",
+"NEM",
+"HRTX",
+"BEE",
+"ETN",
+"DD",
+"XPO",
+"HBAN",
+"VLO",
+"DIS",
+"NRZ",
+"NOV",
+"MET",
+"MNKD",
+"MDP",
+"DAL",
+"XON",
+"AEO",
+"THC",
+"AGNC",
+"ESV",
+"FITB",
+"ESRX",
+"BKD",
+"GNW",
+"KN",
+"GIS",
+"AIG",
+"SYMC",
+"OLN",
+"NBR",
+"CPN",
+"TWO",
+"SPLS",
+"AMZN",
+"UAL",
+"MRVL",
+"BTU",
+"ODP",
+"AMD",
+"GLNG",
+"APC",
+"HL",
+"PPL",
+"HK",
+"LNG",
+"CVS",
+"CYH",
+"CCL",
+"HD",
+"AET",
+"CVC",
+"MNK",
+"FOX",
+"CRC",
+"TSLA",
+"UNH",
+"VIAB",
+"P",
+"AMBA",
+"SWFT",
+"CNX",
+"BWC",
+"SRC",
+"WETF",
+"CNP",
+"ENDP",
+"JBL",
+"YUM",
+"MAT",
+"PAH",
+"FINL",
+"BK",
+"ARWR",
+"SO",
+"MTG",
+"BIIB",
+"CBS",
+"ARNA",
+"WYNN",
+"TAP",
+"CLR",
+"LOW",
+"NYMT",
+"AXTA",
+"BMRN",
+"ILMN",
+"MCD",
+"NAVI",
+"FNFG",
+"AVP",
+"ON",
+"DVN",
+"DHR",
+"OREX",
+"CFG",
+"DHI",
+"IBM",
+"HCP",
+"UA",
+"KR",
+"AES",
+"STWD",
+"BRCM",
+"APA",
+"STI",
+"MDVN",
+"EOG",
+"QRVO",
+"CBI",
+"CL",
+"ALLY",
+"CALM",
+"SN",
+"FEYE",
+"VRTX",
+"KBH",
+"ADXS",
+"HCBK",
+"OXY",
+"TROX",
+"NBL",
+"MON",
+"PM",
+"MA",
+"HDS",
+"EMR",
+"CLF",
+"AVGO",
+"INCY",
+"M",
+"PEP",
+"WU",
+"KERX",
+"CRM",
+"BCEI",
+"PEG",
+"NUE",
+"UNP",
+"SWKS",
+"SPW",
+"COG",
+"BURL",
+"MOS",
+"CIM",
+"CLNY",
+"BBT",
+"UTX",
+"LVS",
+"DE",
+"ACN",
+"DO",
+"LYB",
+"MPC",
+"SNDK",
+"AGEN",
+"GGP",
+"RRC",
+"CNC",
+"PLUG",
+"JOY",
+"HP",
+"CA",
+"LUK",
+"AMTD",
+"GERN",
+"PSX",
+"LULU",
+"SYY",
+"HON",
+"PTEN",
+"NWSA",
+"MCK",
+"SVU",
+"DSW",
+"MMM",
+"CTL",
+"BMR",
+"PHM",
+"CIE",
+"BRCD",
+"ATW",
+"BBBY",
+"BBY",
+"HRB",
+"ISIS",
+"NWL",
+"ADM",
+"HOLX",
+"MM",
+"GS",
+"AXP",
+"BA",
+"FAST",
+"KND",
+"NKTR",
+"ACHN",
+"REGN",
+"WEN",
+"CLDX",
+"BHI",
+"HFC",
+"GNTX",
+"GCA",
+"CPE",
+"ALL",
+"ALTR",
+"QEP",
+"NSAM",
+"ITCI",
+"ALNY",
+"SPF",
+"INSM",
+"PPHM",
+"NYCB",
+"NFX",
+"TMO",
+"TGT",
+"GOOG",
+"SIAL",
+"GPS",
+"MYGN",
+"MDRX",
+"TTPH",
+"NI",
+"IVR",
+"SLH"]
+end

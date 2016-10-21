@@ -268,7 +268,7 @@ actor LocalTopologyInitializer
 
             let listen_auth = TCPListenAuth(_auth)
             try
-              @printf[I32](("----Creating source for " + pipeline.name() + " pipeline----\n").cstring())
+              @printf[I32](("----Creating source for " + pipeline.name() + " pipeline with " + sd.runner_builder().name() + "----\n").cstring())
               TCPSourceListener(sd.builder()(sd.runner_builder(), 
                 latest_router, _metrics_conn), 
                 recover Array[CreditFlowConsumer] end, 

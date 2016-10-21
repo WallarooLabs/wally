@@ -84,16 +84,11 @@ actor ApplicationInitializer
 
       @printf[I32](("Found " + application.pipelines.size().string()  + " pipelines in application\n").cstring())
 
-
-      // The first set of runners goes on the Source for this pipeline if
-      // they're not partitioned, so we don't create a StepInitializer until // that's been handled
-      var source_runner_builders: Array[RunnerBuilder val] trn = 
-        recover Array[RunnerBuilder val] end
-
       // Break each pipeline into LocalPipelines to distribute to workers
       for pipeline in application.pipelines.values() do
-        // Have we handled the initial source runners?
-        var handled_first_runners = false
+        if not pipeline.is_coalesced() then
+          @printf[I32](("Coalescing is off for " + pipeline.name() + " pipeline\n").cstring())
+        end
 
         let source_addr_trn: Array[String] trn = recover Array[String] end
         try
@@ -114,33 +109,86 @@ actor ApplicationInitializer
           error
         end
 
+        @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline.size().string() + " uncoalesced runner builders\n").cstring())
+
+        //////////
+        // Coalesce runner builders if we can
+        var handled_source_runners = false
+        var source_runner_builders: Array[RunnerBuilder val] trn = 
+          recover Array[RunnerBuilder val] end
+
+        // We'll use this array when creating StepInitializers
+        let runner_builders: Array[RunnerBuilder val] trn = 
+          recover Array[RunnerBuilder val] end
+
+        var latest_runner_builders: Array[RunnerBuilder val] trn = 
+          recover Array[RunnerBuilder val] end
+
+        for i in Range(0, pipeline.size()) do
+          let r_builder = pipeline(i)
+          if r_builder.is_stateful() then
+            if latest_runner_builders.size() > 0 then
+              let seq_builder = RunnerSequenceBuilder(
+                latest_runner_builders = recover Array[RunnerBuilder val] end)
+              runner_builders.push(seq_builder)        
+            end
+            runner_builders.push(r_builder)
+            handled_source_runners = true
+          elseif not pipeline.is_coalesced() then
+            if handled_source_runners then
+              runner_builders.push(r_builder)
+            else
+              source_runner_builders.push(r_builder)
+              handled_source_runners = true
+            end
+          // If the developer specified an id, then this needs to be on
+          // a separate step to be accessed by multiple pipelines
+          elseif r_builder.id() != 0 then
+            runner_builders.push(r_builder)
+            handled_source_runners = true
+          else
+            if handled_source_runners then
+              latest_runner_builders.push(r_builder)
+            else
+              source_runner_builders.push(r_builder)
+            end
+          end
+        end
+
+        if latest_runner_builders.size() > 0 then
+          let seq_builder = RunnerSequenceBuilder(
+            latest_runner_builders = recover Array[RunnerBuilder val] end)
+          runner_builders.push(seq_builder)        
+        end
+
         // Determine which steps go on which workers using boundary indices
         // Each worker gets a near-equal share of the total computations
         // in this naive algorithm
         let per_worker: USize = 
-          if pipeline.size() <= worker_count then
+          if runner_builders.size() <= worker_count then
             1
           else
-            pipeline.size() / worker_count
+            runner_builders.size() / worker_count
           end
+
+        @printf[I32](("Each worker gets roughly " + per_worker.string() + " steps\n").cstring())
 
         let boundaries: Array[USize] = boundaries.create()
         var count: USize = 0
         for i in Range(0, worker_count) do
           count = count + per_worker
-          if (i == (worker_count - 1)) and (count < pipeline.size()) then
+          if (i == (worker_count - 1)) and 
+            (count < runner_builders.size()) then
             // Make sure we cover all steps by forcing the rest on the
             // last worker if need be
-            boundaries.push(pipeline.size())
+            boundaries.push(runner_builders.size())
           else
             boundaries.push(count)
           end
         end
 
-        @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline.size().string() + " runner builders\n").cstring())
-
         // Keep track of which runner_builder we're on in this pipeline
-        var pipeline_idx: USize = 0
+        var runner_builder_idx: USize = 0
         // Keep track of which worker's boundary we're using
         var boundaries_idx: USize = 0
 
@@ -174,97 +222,19 @@ actor ApplicationInitializer
             recover Array[StepInitializer val] end
 
           // Make sure there are still runner_builders left in the pipeline.
-          if pipeline_idx < pipeline.size() then
-            // Running array of recent runner_builders to be coalesced
-            // into a single StepInitializer
-            var runner_builders: Array[RunnerBuilder val] trn = 
-              recover Array[RunnerBuilder val] end
-
+          if runner_builder_idx < runner_builders.size() then
             var cur_step_id = _guid_gen.u128()
 
             // Until we hit the boundary for this worker, keep adding
-            // runner builders from the pipeline
-            while pipeline_idx < boundary do
-              var next_runner_builder: RunnerBuilder val = pipeline(pipeline_idx)
-
-              // If this is the last runner builder for this worker,
-              // then add it to the last StepInitializer along with
-              // anything we need to coalesce from runner_builders
-              if (pipeline_idx == (boundary - 1)) and 
-                (not next_runner_builder.is_stateful()) then
-                try
-                  if handled_first_runners then
-                    runner_builders.push(pipeline(pipeline_idx))
-                  
-                    let seq_builder = RunnerSequenceBuilder(
-                      runner_builders = recover Array[RunnerBuilder val] end)
-
-                    @printf[I32](("Preparing to spin up " + 
-                      seq_builder.name() + " on " + worker + "\n").cstring())
-
-                    let step_builder = StepBuilder(seq_builder, 
-                      cur_step_id)
-                    step_initializers.push(step_builder)
-                    steps(cur_step_id) = worker
-
-                    cur_step_id = _guid_gen.u128()
-                  else
-                    source_runner_builders.push(pipeline(pipeline_idx))
-                  end
-                else
-                  @printf[I32]("No runner builder found!\n".cstring())
-                  error
-                end  
-
-              // If this runner builder was given a unique id via the API,
-              // then it needs to be on its own Step since it can be used
-              // by multiple pipelines
-              elseif (next_runner_builder.id() != 0) then
-                if runner_builders.size() > 0 then
-                  let seq_builder = RunnerSequenceBuilder(
-                    runner_builders = recover Array[RunnerBuilder val] end)
-                  let step_builder = StepBuilder(seq_builder, 
-                    cur_step_id)
-                  step_initializers.push(step_builder)
-                  steps(cur_step_id) = worker
-                end
-
-                let next_seq_builder = RunnerSequenceBuilder(
-                  recover [pipeline(pipeline_idx)] end)
-
-                @printf[I32](("Preparing to spin up " + next_seq_builder.name() + " on " + worker + "\n").cstring())
-
-                let next_step_builder = StepBuilder(next_seq_builder, 
-                  next_runner_builder.id(), next_runner_builder.is_stateful())
-                step_initializers.push(next_step_builder)
-                steps(next_runner_builder.id()) = worker
-
-                handled_first_runners = true
-                cur_step_id = _guid_gen.u128()   
+            // stepinitializers from the pipeline
+            while runner_builder_idx < boundary do
+              var next_runner_builder: RunnerBuilder val = 
+                runner_builders(runner_builder_idx)
 
               // Stateful steps have to be handled differently since pre state 
               // steps must be on the same workers as their corresponding 
               // state steps           
-              elseif next_runner_builder.is_stateful() then
-                if runner_builders.size() > 0 then
-                  if handled_first_runners then
-                    let seq_builder = RunnerSequenceBuilder(
-                      runner_builders = recover Array[RunnerBuilder val] end)
-                    
-                    @printf[I32](("Preparing to spin up " + seq_builder.name() + " on " + worker + "\n").cstring())
-
-                    let step_builder = StepBuilder(seq_builder, 
-                      cur_step_id)
-                    step_initializers.push(step_builder)
-                    steps(cur_step_id) = worker
-                  else
-                    source_runner_builders.push(pipeline(pipeline_idx))
-                  end
-                end
-
-                let next_seq_builder = RunnerSequenceBuilder(
-                  recover [pipeline(pipeline_idx)] end)
-
+              if next_runner_builder.is_stateful() then
                 // If this is partitioned state and we haven't handled this 
                 // shared state before, handle it.  Otherwise, just handle the 
                 // prestate.          
@@ -288,65 +258,36 @@ actor ApplicationInitializer
                       state_name)
                   else
                     @printf[I32](("Preparing to spin up non-partitioned state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())                                          
-                    step_initializers.push(StepBuilder(next_seq_builder, 
+                    step_initializers.push(StepBuilder(next_runner_builder, 
                       next_runner_builder.id(),
                       next_runner_builder.is_stateful()))
                     steps(next_runner_builder.id()) = worker
 
-                    pipeline_idx = pipeline_idx + 1
+                    runner_builder_idx = runner_builder_idx + 1
 
-                    next_runner_builder = pipeline(pipeline_idx)
-                    runner_builders.push(next_runner_builder)
+                    next_runner_builder = runner_builders(runner_builder_idx)
 
                     @printf[I32](("Preparing to spin up non-partitioned state for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
 
-                    let seq_builder = RunnerSequenceBuilder(
-                      runner_builders = recover Array[RunnerBuilder val] end)
-                    StepBuilder(seq_builder, next_runner_builder.id(), 
+                    StepBuilder(next_runner_builder, next_runner_builder.id(), 
                       next_runner_builder.is_stateful())
                   end
 
                 step_initializers.push(next_initializer)
                 steps(next_runner_builder.id()) = worker
 
-                handled_first_runners = true
                 cur_step_id = _guid_gen.u128()
-
-              // If coalescing is off, then each runner_builder gets assigned
-              // to its own StepBuilder
-              elseif not pipeline.is_coalesced() then
-                if handled_first_runners then
-                  let seq_builder = RunnerSequenceBuilder(
-                    runner_builders = recover Array[RunnerBuilder val] end)
-
-                  @printf[I32](("Preparing to spin up " + seq_builder.name() + "\n").cstring())
-
-                  let step_builder = StepBuilder(seq_builder, 
-                    cur_step_id)
-                  step_initializers.push(step_builder)
-                  steps(cur_step_id) = worker
-                else
-                  source_runner_builders.push(pipeline(pipeline_idx))
-                end
-
-                handled_first_runners = true
-                cur_step_id = _guid_gen.u128()                
               else
-                try
-                  if handled_first_runners then
-                    runner_builders.push(pipeline(pipeline_idx))
-                  else
-                    source_runner_builders.push(pipeline(pipeline_idx))
-                  end
+                @printf[I32](("Preparing to spin up " + next_runner_builder.name() + " on " + worker + "\n").cstring())
+                let step_builder = StepBuilder(next_runner_builder, 
+                  cur_step_id)
+                step_initializers.push(step_builder)
+                steps(cur_step_id) = worker
 
-                  handled_first_runners = true
-                else
-                  @printf[I32]("No runner builder found!\n".cstring())
-                  error
-                end             
+                cur_step_id = _guid_gen.u128()
               end
 
-              pipeline_idx = pipeline_idx + 1 
+              runner_builder_idx = runner_builder_idx + 1 
             end
           end
 
@@ -383,6 +324,7 @@ actor ApplicationInitializer
 
           let source_data = 
             if i == 0 then
+              @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on " + cur.worker_name + "\n").cstring())
               SourceData(pipeline.source_builder(),
                 source_seq_builder, source_addr)
             else
