@@ -27,7 +27,7 @@ actor Main
   new create(env: Env) =>
     try
       let topology = recover val
-        Topology
+        Topology("Complex Numbers App")
           .new_pipeline[Complex val, Complex val](ComplexDecoder, 
             "Complex Numbers")
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^

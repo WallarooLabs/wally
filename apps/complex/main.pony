@@ -58,30 +58,27 @@ primitive ComplexStarter
       scale_step.update_router(sink_router)
       let scale_step_router = DirectRouter(scale_step)
 
-      let complex_source_builder: {(): Source[Complex val] iso^} val = 
-        recover 
-          lambda()(metrics_conn, scale_step_router): Source[Complex val] iso^ 
-          =>
-            let complex_reporter = MetricsReporter("complex-numbers",
-              metrics_conn)
-            let conjugate_runner = ComputationRunner[Complex val, Complex val](
-              Conjugate, RouterRunner, complex_reporter.clone())
-            let conjugate_step = Step(consume conjugate_runner, 
-              complex_reporter.clone())
-            conjugate_step.update_router(scale_step_router)
-            let conjugate_router = DirectRouter(conjugate_step) 
+      let complex_source_builder = SourceBuilder[Complex val](
+          "Complex Numbers", ComplexSourceDecoder)
 
-            Source[Complex val]("Complex Numbers", ComplexSourceDecoder, 
-              RouterRunnerBuilder, conjugate_router, consume complex_reporter)
-          end
-        end
+      let complex_reporter = MetricsReporter("complex-numbers", 
+        metrics_conn)
+
+      let conjugate_runner = ComputationRunner[Complex val, Complex val](
+        Conjugate, RouterRunner, complex_reporter.clone())
+      let conjugate_step = Step(consume conjugate_runner, 
+        complex_reporter.clone())
+
+      conjugate_step.update_router(scale_step_router)
+      let conjugate_router = DirectRouter(conjugate_step) 
 
       let source_addr = input_addrs(0)
 
       let listen_auth = TCPListenAuth(env.root as AmbientAuth)
       connections.register_listener(
         TCPListener(listen_auth,
-          SourceListenerNotify(complex_source_builder),
+          SourceListenerNotify(complex_source_builder, conjugate_router,
+            consume complex_reporter),
           source_addr(0),
           source_addr(1))
       )
@@ -163,23 +160,21 @@ class ComplexTopologyStarter is TopologyStarter
 
     initializer.register_proxy(worker2, proxy_step)
 
-    let complex_source_builder: {(): Source[Complex val] iso^} val = 
-      recover 
-        lambda()(proxy_step, _metrics_conn): Source[Complex val] iso^ 
-        =>
-          let complex_reporter = MetricsReporter("complex-numbers",
-            _metrics_conn)
-          let proxy_router = DirectRouter(proxy_step) 
-          Source[Complex val]("Complex Numbers", ComplexSourceDecoder, 
-            RouterRunnerBuilder, proxy_router, consume complex_reporter)
-        end
-      end
+
+    let complex_source_builder = SourceBuilder[Complex val](
+        "Complex Numbers", ComplexSourceDecoder)
+
+    let complex_reporter = MetricsReporter("complex-numbers", 
+      _metrics_conn)
+
+    let proxy_router = DirectRouter(proxy_step) 
 
     let source_addr = input_addrs(0)
 
     let listen_auth = TCPListenAuth(_auth)
     TCPListener(listen_auth,
-      SourceListenerNotify(complex_source_builder),
+      SourceListenerNotify(complex_source_builder, proxy_router, 
+        consume complex_reporter),
       source_addr(0),
       source_addr(1)) 
 

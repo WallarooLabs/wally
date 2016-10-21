@@ -338,48 +338,22 @@ actor Initializer
 
       // For each worker in local_pipelines, generate a LocalTopology
       for (w, ps) in local_pipelines.pairs() do
-        if w != "initializer" then
-          let pvals: Array[LocalPipeline val] trn = 
-            recover Array[LocalPipeline val] end
-          for p in ps.values() do
-            pvals.push(p)
-          end
-          let local_topology = LocalTopology(topology.name(), consume pvals)
+        let pvals: Array[LocalPipeline val] trn = 
+          recover Array[LocalPipeline val] end
+        for p in ps.values() do
+          pvals.push(p)
+        end
+        let local_topology = LocalTopology(topology.name(), consume pvals)
+
+        if w == "initializer" then
+          _local_topology_initializer.update_topology(local_topology)
+          _local_topology_initializer.initialize() 
+        else
           other_local_topologies.push(local_topology)
         end
       end
 
       distribute_local_topologies(consume other_local_topologies)
-
-      // Configure local topology on initializer, including source
-      for local_pipeline in local_pipelines("initializer").values() do
-        
-        let egress = local_pipeline.egress_builder()("initializer",
-          MetricsReporter(local_pipeline.name(), _metrics_conn),
-          _auth)
-
-      end
-
-
-      // let proxy_reporter = MetricsReporter(pipeline.name(), _metrics_conn)
-
-      // let proxy = Proxy("initializer", conjugate_step_id, 
-      //   proxy_reporter.clone(), _auth)
-      // let proxy_step = Step(consume proxy, consume proxy_reporter)
-
-      // register_proxy(worker2, proxy_step)
-
-      // let source_addr = input_addrs(0)
-
-
-      // match pipeline.source_data()
-      // | let s: SourceData val =>       
-      //   let listen_auth = TCPListenAuth(_auth)
-      //   TCPListener(listen_auth,
-      //     SourceListenerNotify(s.builder()),
-      //     s.address(0),
-      //     s.address(1)) 
-      // end
     else
       @printf[I32]("Error initializating topology!/n".cstring())
     end
