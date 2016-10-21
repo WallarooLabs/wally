@@ -111,12 +111,14 @@ actor ApplicationInitializer
         let boundaries: Array[USize] = boundaries.create()
         var count: USize = 0
         for i in Range(0, worker_count) do
-          // if (count + per_worker) < pipeline.size() then
-            count = count + per_worker
+          count = count + per_worker
+          if (i == (worker_count - 1)) and (count < pipeline.size()) then
+            // Make sure we cover all steps by forcing the rest on the
+            // last worker if need be
+            boundaries.push(pipeline.size())
+          else
             boundaries.push(count)
-          // else
-            // boundaries.push((pipeline.size() - 1).isize())
-          // end
+          end
         end
 
         let pipeline_size = pipeline.size()
@@ -194,7 +196,7 @@ actor ApplicationInitializer
                 let next_seq_builder = RunnerSequenceBuilder(
                   recover [pipeline(pipeline_idx)] end)
 
-                @printf[I32](("Preparing to spin up  " + next_seq_builder.name() + "on " + worker + "\n").cstring())
+                @printf[I32](("Preparing to spin up " + next_seq_builder.name() + " on " + worker + "\n").cstring())
 
                 let next_step_builder = StepBuilder(next_seq_builder, 
                   next_runner_builder.id(), next_runner_builder.is_stateful())
@@ -207,7 +209,7 @@ actor ApplicationInitializer
                   let seq_builder = RunnerSequenceBuilder(
                     runner_builders = recover Array[RunnerBuilder val] end)
                   
-                  @printf[I32](("Preparing to spin up  " + seq_builder.name() + "on " + worker + "\n").cstring())
+                  @printf[I32](("Preparing to spin up " + seq_builder.name() + " on " + worker + "\n").cstring())
 
                   let step_builder = StepBuilder(seq_builder, 
                     cur_step_id)
@@ -272,7 +274,7 @@ actor ApplicationInitializer
                   let seq_builder = RunnerSequenceBuilder(
                     runner_builders = recover Array[RunnerBuilder val] end)
 
-                  @printf[I32](("Preparing to spin up  " + seq_builder.name() + "on " + worker + "\n").cstring())
+                  @printf[I32](("Preparing to spin up " + seq_builder.name() + " on " + worker + "\n").cstring())
 
                   let step_builder = StepBuilder(seq_builder, 
                     cur_step_id)
@@ -286,7 +288,7 @@ actor ApplicationInitializer
                 let seq_builder = RunnerSequenceBuilder(
                   runner_builders = recover Array[RunnerBuilder val] end)
 
-                @printf[I32](("Preparing to spin up  " + seq_builder.name() + "\n").cstring())
+                @printf[I32](("Preparing to spin up " + seq_builder.name() + "\n").cstring())
 
                 let step_builder = StepBuilder(seq_builder, 
                   cur_step_id)

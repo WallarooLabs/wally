@@ -132,7 +132,7 @@ class StepBuilder
       MetricsReporter(pipeline_name, metrics_conn), router)
     step.update_router(next)
     step
- 
+
 class PartitionedPreStateStepBuilder
   let _pre_state_subpartition: PreStateSubpartition val
   let _runner_builder: RunnerBuilder val

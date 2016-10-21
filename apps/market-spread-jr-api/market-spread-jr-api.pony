@@ -45,16 +45,17 @@ actor Main
           .new_pipeline[FixOrderMessage val, OrderResult val](
             "Orders", OrderSourceDecoder)
             // .to[FixOrderMessage val](IdentityBuilder)
+            // .to[FixOrderMessage val](IdentityBuilder)
             .to_state_partition[Symboly val, String, 
               (OrderResult val | None), SymbolData](CheckOrder, 
               SymbolDataBuilder, "symbol-data", symbol_data_partition)
             .to_sink(OrderResultEncoder, recover [0] end)
-          .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", NbboSourceDecoder)
-            .to_state_partition[Symboly val, String, None,
-               SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
-               symbol_data_partition)
-            .done()
+          // .new_pipeline[FixNbboMessage val, None](
+          //   "Nbbo", NbboSourceDecoder)
+          //   .to_state_partition[Symboly val, String, None,
+          //      SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
+          //      symbol_data_partition)
+          //   .done()
 
       // let application = recover val
       //   Application("Market Spread App")
@@ -78,6 +79,7 @@ actor Main
 primitive Identity
   fun name(): String => "identity"
   fun apply(r: FixOrderMessage val): FixOrderMessage val =>
+    @printf[I32]("Identity\n".cstring())
     r
 
 primitive IdentityBuilder
