@@ -4,6 +4,8 @@ use "sendence/guid"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
+use "wallaroo/tcp-sink"
+use "wallaroo/tcp-source"
 
 class Application
   let _name: String
@@ -13,7 +15,7 @@ class Application
     _name = name'
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
-    pipeline_name: String, decoder: SourceDecoder[In] val, 
+    pipeline_name: String, decoder: FramedSourceHandler[In] val, 
     coalescing: Bool = true): PipelineBuilder[In, Out, In]
   =>
     let pipeline = Pipeline[In, Out](pipeline_name, decoder, coalescing)
@@ -26,8 +28,8 @@ class Application
 
 trait BasicPipeline
   fun name(): String
-  fun source_builder(): BytesProcessorBuilder val
-  fun sink_runner_builder(): SinkRunnerBuilder val
+  fun source_builder(): SourceBuilderBuilder val
+  fun sink_builder(): (TCPSinkBuilder val | None)
   fun sink_target_ids(): Array[U64] val
   fun state_builder(state_name: String): StateSubpartition val ?
   fun state_builders(): Map[String, StateSubpartition val] val
@@ -37,23 +39,22 @@ trait BasicPipeline
 
 class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _name: String
-  let _decoder: SourceDecoder[In] val
+  let _decoder: FramedSourceHandler[In] val
   let _runner_builders: Array[RunnerBuilder val]
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
-  let _source_builder: BytesProcessorBuilder val
-  var _sink_builder: SinkRunnerBuilder val
+  let _source_builder: SourceBuilderBuilder val
+  var _sink_builder: (TCPSinkBuilder val | None) = None
   // _state_builders maps from state_name to StateSubpartition
   let _state_builders: Map[String, StateSubpartition val] = 
     _state_builders.create()
   let _is_coalesced: Bool
 
-  new create(n: String, d: SourceDecoder[In] val, coalescing: Bool) 
+  new create(n: String, d: FramedSourceHandler[In] val, coalescing: Bool) 
   =>
     _decoder = d
     _runner_builders = Array[RunnerBuilder val]
     _name = n
-    _source_builder = SourceBuilder[In](_name, _decoder)
-    _sink_builder = SimpleSinkRunnerBuilder[Out](_name)
+    _source_builder = TypedSourceBuilderBuilder[In](_name, _decoder)
     _is_coalesced = coalescing
 
   fun ref add_runner_builder(p: RunnerBuilder val) =>
@@ -61,15 +62,15 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 
   fun apply(i: USize): RunnerBuilder val ? => _runner_builders(i)
 
-  fun ref update_sink(sink_builder': SinkRunnerBuilder val, 
+  fun ref update_sink(sink_builder': TCPSinkBuilder val, 
     sink_ids: Array[U64] val) 
   =>
     _sink_builder = sink_builder'
     _sink_target_ids = sink_ids
 
-  fun source_builder(): BytesProcessorBuilder val => _source_builder
+  fun source_builder(): SourceBuilderBuilder val => _source_builder
 
-  fun sink_runner_builder(): SinkRunnerBuilder val => _sink_builder
+  fun sink_builder(): (TCPSinkBuilder val | None) => _sink_builder
 
   fun sink_target_ids(): Array[U64] val => _sink_target_ids
 
@@ -158,7 +159,9 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val 
       = recover Array[Array[ByteSeq] val] end): Application ? 
   =>
-    _p.update_sink(EncoderSinkRunnerBuilder[Out](_p.name(), encoder,
-      initial_msgs), sink_ids)
+    let sink_builder: TCPSinkBuilder val = 
+      TCPSinkBuilder(TypedEncoderWrapper[Out](encoder))
+    _p.update_sink(sink_builder, sink_ids)
+      //, initial_msgs), sink_ids)
     _a.add_pipeline(_p as BasicPipeline)
     _a

@@ -84,8 +84,17 @@ actor ApplicationInitializer
 
       @printf[I32](("Found " + application.pipelines.size().string()  + " pipelines in application\n").cstring())
 
+
+      // The first set of runners goes on the Source for this pipeline if
+      // they're not partitioned, so we don't create a StepInitializer until // that's been handled
+      var source_runner_builders: Array[RunnerBuilder val] trn = 
+        recover Array[RunnerBuilder val] end
+
       // Break each pipeline into LocalPipelines to distribute to workers
       for pipeline in application.pipelines.values() do
+        // Have we handled the initial source runners?
+        var handled_first_runners = false
+
         let source_addr_trn: Array[String] trn = recover Array[String] end
         try
           source_addr_trn.push(_input_addrs(pipeline_id)(0))
@@ -184,24 +193,28 @@ actor ApplicationInitializer
               if (pipeline_idx == (boundary - 1)) and 
                 (not next_runner_builder.is_stateful()) then
                 try
-                  runner_builders.push(pipeline(pipeline_idx))
+                  if handled_first_runners then
+                    runner_builders.push(pipeline(pipeline_idx))
+                  
+                    let seq_builder = RunnerSequenceBuilder(
+                      runner_builders = recover Array[RunnerBuilder val] end)
+
+                    @printf[I32](("Preparing to spin up " + 
+                      seq_builder.name() + " on " + worker + "\n").cstring())
+
+                    let step_builder = StepBuilder(seq_builder, 
+                      cur_step_id)
+                    step_initializers.push(step_builder)
+                    steps(cur_step_id) = worker
+
+                    cur_step_id = _guid_gen.u128()
+                  else
+                    source_runner_builders.push(pipeline(pipeline_idx))
+                  end
                 else
                   @printf[I32]("No runner builder found!\n".cstring())
                   error
                 end  
-
-                let seq_builder = RunnerSequenceBuilder(
-                  runner_builders = recover Array[RunnerBuilder val] end)
-
-                @printf[I32](("Preparing to spin up " + 
-                  seq_builder.name() + " on " + worker + "\n").cstring())
-
-                let step_builder = StepBuilder(seq_builder, 
-                  cur_step_id)
-                step_initializers.push(step_builder)
-                steps(cur_step_id) = worker
-
-                cur_step_id = _guid_gen.u128()
 
               // If this runner builder was given a unique id via the API,
               // then it needs to be on its own Step since it can be used
@@ -226,6 +239,7 @@ actor ApplicationInitializer
                 step_initializers.push(next_step_builder)
                 steps(next_runner_builder.id()) = worker
 
+                handled_first_runners = true
                 cur_step_id = _guid_gen.u128()   
 
               // Stateful steps have to be handled differently since pre state 
@@ -233,15 +247,19 @@ actor ApplicationInitializer
               // state steps           
               elseif next_runner_builder.is_stateful() then
                 if runner_builders.size() > 0 then
-                  let seq_builder = RunnerSequenceBuilder(
-                    runner_builders = recover Array[RunnerBuilder val] end)
-                  
-                  @printf[I32](("Preparing to spin up " + seq_builder.name() + " on " + worker + "\n").cstring())
+                  if handled_first_runners then
+                    let seq_builder = RunnerSequenceBuilder(
+                      runner_builders = recover Array[RunnerBuilder val] end)
+                    
+                    @printf[I32](("Preparing to spin up " + seq_builder.name() + " on " + worker + "\n").cstring())
 
-                  let step_builder = StepBuilder(seq_builder, 
-                    cur_step_id)
-                  step_initializers.push(step_builder)
-                  steps(cur_step_id) = worker
+                    let step_builder = StepBuilder(seq_builder, 
+                      cur_step_id)
+                    step_initializers.push(step_builder)
+                    steps(cur_step_id) = worker
+                  else
+                    source_runner_builders.push(pipeline(pipeline_idx))
+                  end
                 end
 
                 let next_seq_builder = RunnerSequenceBuilder(
@@ -291,25 +309,37 @@ actor ApplicationInitializer
                 step_initializers.push(next_initializer)
                 steps(next_runner_builder.id()) = worker
 
+                handled_first_runners = true
                 cur_step_id = _guid_gen.u128()
 
               // If coalescing is off, then each runner_builder gets assigned
               // to its own StepBuilder
               elseif not pipeline.is_coalesced() then
-                let seq_builder = RunnerSequenceBuilder(
-                  runner_builders = recover Array[RunnerBuilder val] end)
+                if handled_first_runners then
+                  let seq_builder = RunnerSequenceBuilder(
+                    runner_builders = recover Array[RunnerBuilder val] end)
 
-                @printf[I32](("Preparing to spin up " + seq_builder.name() + "\n").cstring())
+                  @printf[I32](("Preparing to spin up " + seq_builder.name() + "\n").cstring())
 
-                let step_builder = StepBuilder(seq_builder, 
-                  cur_step_id)
-                step_initializers.push(step_builder)
-                steps(cur_step_id) = worker
+                  let step_builder = StepBuilder(seq_builder, 
+                    cur_step_id)
+                  step_initializers.push(step_builder)
+                  steps(cur_step_id) = worker
+                else
+                  source_runner_builders.push(pipeline(pipeline_idx))
+                end
 
+                handled_first_runners = true
                 cur_step_id = _guid_gen.u128()                
               else
                 try
-                  runner_builders.push(pipeline(pipeline_idx))
+                  if handled_first_runners then
+                    runner_builders.push(pipeline(pipeline_idx))
+                  else
+                    source_runner_builders.push(pipeline(pipeline_idx))
+                  end
+
+                  handled_first_runners = true
                 else
                   @printf[I32]("No runner builder found!\n".cstring())
                   error
@@ -348,9 +378,13 @@ actor ApplicationInitializer
           let next_worker_data: (WorkerTopologyData val | None) =
             try worker_topology_data(i + 1) else None end
 
+          let source_seq_builder = RunnerSequenceBuilder(
+            source_runner_builders = recover Array[RunnerBuilder val] end)
+
           let source_data = 
             if i == 0 then
-              SourceData(pipeline.source_builder(), source_addr)
+              SourceData(pipeline.source_builder(),
+                source_seq_builder, source_addr)
             else
               None
             end
@@ -359,7 +393,7 @@ actor ApplicationInitializer
           // placeholder sink
           if cur.is_empty then
             let egress_builder = EgressBuilder(_output_addr, pipeline_id
-              pipeline.sink_runner_builder())
+              pipeline.sink_builder())
             let local_pipeline = LocalPipeline(pipeline.name(), 
               cur.step_initializers, egress_builder, source_data,
               pipeline.state_builders())
@@ -377,7 +411,7 @@ actor ApplicationInitializer
               // sink on this worker
               if next_w.is_empty then
                 let egress_builder = EgressBuilder(_output_addr, pipeline_id
-                  pipeline.sink_runner_builder())
+                  pipeline.sink_builder())
                 let local_pipeline = LocalPipeline(pipeline.name(), 
                   cur.step_initializers, egress_builder, source_data,
                   pipeline.state_builders())
@@ -407,7 +441,7 @@ actor ApplicationInitializer
             // we need a sink on it
             else
               let egress_builder = EgressBuilder(_output_addr, pipeline_id
-                pipeline.sink_runner_builder())
+                pipeline.sink_builder())
               let local_pipeline = LocalPipeline(pipeline.name(), 
                 cur.step_initializers, egress_builder, source_data,
                 pipeline.state_builders())

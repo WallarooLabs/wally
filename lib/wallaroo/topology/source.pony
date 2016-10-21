@@ -5,6 +5,7 @@ use "collections"
 use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/tcp-source"
 
 interface BytesProcessor
   fun ref process(data: Array[U8 val] iso)
@@ -61,7 +62,7 @@ trait BytesProcessorBuilder
     pre_state_router: (Router val | None)): BytesProcessor iso^
   fun name(): String
 
-class SourceBuilder[In: Any val] is BytesProcessorBuilder
+class OldSourceBuilder[In: Any val] is BytesProcessorBuilder
   let _pipeline_name: String
   let _decoder: SourceDecoder[In] val
   let _runner_builder: RunnerBuilder val
@@ -81,13 +82,17 @@ class SourceBuilder[In: Any val] is BytesProcessorBuilder
   fun name(): String => _pipeline_name
 
 class SourceData
-  let _builder: BytesProcessorBuilder val
+  let _builder: SourceBuilderBuilder val
+  let _runner_builder: RunnerBuilder val
   let _address: Array[String] val
 
-  new val create(b: BytesProcessorBuilder val, a: Array[String] val) =>
+  new val create(b: SourceBuilderBuilder val, r: RunnerBuilder val, 
+    a: Array[String] val) 
+  =>
     _builder = b
+    _runner_builder = r
     _address = a
 
-  fun builder(): BytesProcessorBuilder val => _builder
+  fun builder(): SourceBuilderBuilder val => _builder
+  fun runner_builder(): RunnerBuilder val => _runner_builder
   fun address(): Array[String] val => _address
-

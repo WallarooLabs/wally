@@ -41,8 +41,9 @@ class RunnerSequenceBuilder
   new val create(bs: Array[RunnerBuilder val] val) =>
     _runner_builders = bs
 
-  fun apply(metrics_reporter: MetricsReporter iso, router: Router val): 
-    Runner iso^ 
+  fun apply(metrics_reporter: MetricsReporter iso, 
+    next_runner: (Runner iso | None) = None,
+    router: (Router val | None) = None): Runner iso^  
   =>
     var remaining: USize = _runner_builders.size()
     var latest_runner: Runner iso = RouterRunner
@@ -68,6 +69,9 @@ class RunnerSequenceBuilder
       n = n + "|" + r.name()
     end
     n + "|"
+
+  fun is_stateful(): Bool => false
+  fun id(): U128 => 0
 
 class ComputationRunnerBuilder[In: Any val, Out: Any val]
   let _comp_builder: ComputationBuilder[In, Out] val

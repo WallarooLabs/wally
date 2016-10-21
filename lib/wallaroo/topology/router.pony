@@ -88,7 +88,9 @@ class LocalPartitionRouter[In: Any val,
     _routes = routes
     _partition_function = partition_function
 
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D): Bool =>
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None)): Bool 
+  =>
     match data
     | let input: In =>
       let key = _partition_function(input)

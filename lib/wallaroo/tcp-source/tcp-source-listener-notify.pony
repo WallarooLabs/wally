@@ -1,5 +1,35 @@
+use "net"
+use "wallaroo/metrics"
+use "wallaroo/topology"
+
 interface SourceBuilder
   fun apply(): TCPSourceNotify iso^
+
+interface SourceBuilderBuilder
+  fun apply(runner_builder: RunnerBuilder val, router: Router val, 
+    metrics_conn: TCPConnection): SourceBuilder val 
+
+class TypedSourceBuilderBuilder[In: Any val]
+  let _name: String
+  let _handler: FramedSourceHandler[In] val
+
+  new val create(name': String, handler: FramedSourceHandler[In] val) =>
+    _name = name'
+    _handler = handler
+
+  fun apply(runner_builder: RunnerBuilder val, router: Router val, 
+    metrics_conn: TCPConnection): SourceBuilder val 
+  =>
+    recover
+      lambda()(runner_builder, router, metrics_conn, _name, _handler):
+        TCPSourceNotify iso^ 
+      =>
+        let reporter = MetricsReporter(_name, metrics_conn)
+
+        FramedSourceNotify[In](_name, _handler, runner_builder, router, 
+          consume reporter)
+      end
+    end
   
 interface TCPSourceListenerNotify
   """

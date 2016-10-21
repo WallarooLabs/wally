@@ -2,10 +2,13 @@ use "net"
 use "collections"
 use "sendence/guid"
 use "sendence/messages"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/topology"
+use "wallaroo/tcp-sink"
+use "wallaroo/tcp-source"
 
 class ProxyAddress
   let worker: String
@@ -17,39 +20,29 @@ class ProxyAddress
 
 class EgressBuilder
   let _addr: (Array[String] val | ProxyAddress val)
-  let _sink_runner_builder: (SinkRunnerBuilder val | None)
+  let _sink_builder: (TCPSinkBuilder val | None)
 
   new val create(addr: (Array[String] val | ProxyAddress val), 
-    sink_runner_builder: (SinkRunnerBuilder val | None) = None)
+    sink_builder: (TCPSinkBuilder val | None) = None)
   =>
     _addr = addr
-    _sink_runner_builder = sink_runner_builder
+    _sink_builder = sink_builder
 
   fun apply(worker_name: String, reporter: MetricsReporter iso, 
     auth: AmbientAuth,
     proxies: Map[String, Array[Step tag]] = Map[String, Array[Step tag]]): 
-    Step tag ?
+    RunnableStep tag ?
   =>    
     match _addr
     | let a: Array[String] val =>
       try
-        match _sink_runner_builder
-        | let srb: SinkRunnerBuilder val =>
-          let connect_auth = TCPConnectAuth(auth)
-          let sink_name = "sink at " + a(0) + ":" + a(1)
+        match _sink_builder
+        | let tsb: TCPSinkBuilder val =>
+          @printf[I32](("Connecting to sink at " + a(0) + ":" + a(1) + "\n").cstring())
 
-          if srb.connects_to_tcp() then
-            @printf[I32](("Connecting to sink at " + a(0) + ":" + a(1) + "\n").cstring())
-          else
-            @printf[I32]("Creating empty sink\n".cstring())
-          end
-          let out_conn = TCPConnection(connect_auth,
-            OutNotify(sink_name), a(0), a(1))
-
-          Step(srb(reporter.clone(), TCPRouter(out_conn)), consume reporter)
+          tsb(reporter.clone(), a(0), a(1))
         else
-          @printf[I32]("No sink runner builder!\n".cstring())
-          error
+          EmptySink
         end
       else
         @printf[I32]("Error connecting to sink.\n".cstring())
@@ -262,6 +255,10 @@ actor LocalTopologyInitializer
 
           end  
 
+
+                // SourceListenerNotify(sd.builder(), latest_router, 
+                //   consume source_reporter),
+
           // Create source if there is source data specified for this worker's
           // portion of the pipeline
           match pipeline.source_data()
@@ -272,11 +269,10 @@ actor LocalTopologyInitializer
             let listen_auth = TCPListenAuth(_auth)
             try
               @printf[I32](("----Creating source for " + pipeline.name() + " pipeline----\n").cstring())
-              TCPListener(listen_auth,
-                SourceListenerNotify(sd.builder(), latest_router, 
-                  consume source_reporter),
-                sd.address()(0),
-                sd.address()(1)) 
+              TCPSourceListener(sd.builder()(sd.runner_builder(), 
+                latest_router, _metrics_conn), 
+                recover Array[CreditFlowConsumer] end, 
+                sd.address()(0), sd.address()(1)) 
             else
               @printf[I32]("Ill-formed source address\n".cstring())
             end

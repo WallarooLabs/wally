@@ -53,10 +53,7 @@ actor Step is (RunnableStep & CreditFlowProducer)
   fun ref credit_used(c: CreditFlowConsumer, num: USize = 1) =>
     None
 
-interface StepBuilder
-  fun id(): U128
-
-actor PartitionProxy
+actor PartitionProxy is CreditFlowProducer
   let _worker_name: String
   var _router: (Router val | None) = None
   let _metrics_reporter: MetricsReporter
@@ -72,6 +69,9 @@ actor PartitionProxy
   be update_router(router: Router val) =>
     _router = router
 
+  be receive_credits(credits: USize, from: CreditFlowConsumer) => None
+  fun ref credit_used(c: CreditFlowConsumer, num: USize = 1) => None
+
   be forward[D: Any val](metric_name: String, source_ts: U64, data: D, 
     target_step_id: U128) 
   =>
@@ -82,7 +82,7 @@ actor PartitionProxy
         match _router
         | let r: Router val =>
           r.route[Array[ByteSeq] val](metric_name, source_ts, 
-            forward_msg)
+            forward_msg, this)
           false
         else
           @printf[I32]("PartitionProxy has no router\n".cstring())
@@ -127,7 +127,7 @@ class StepBuilder
   fun apply(next: Router val, metrics_conn: TCPConnection,
     pipeline_name: String, router: Router val = EmptyRouter): Step tag =>
     let runner = _runner_sequence_builder(MetricsReporter(pipeline_name, 
-      metrics_conn), router)
+      metrics_conn) where router = router)
     let step = Step(consume runner, 
       MetricsReporter(pipeline_name, metrics_conn), router)
     step.update_router(next)

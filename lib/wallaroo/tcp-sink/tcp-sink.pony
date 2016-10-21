@@ -16,6 +16,20 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 // TODO: replace with real classes
 class val MsgEnvelope
 
+actor EmptySink is RunnableStep
+  be run[D: Any val](metric_name: String, source_ts: U64, data: D) => None
+
+class TCPSinkBuilder
+  let _encoder_wrapper: EncoderWrapper val
+
+  new val create(encoder_wrapper: EncoderWrapper val) =>
+    _encoder_wrapper = encoder_wrapper
+
+  fun apply(reporter: MetricsReporter iso, host: String, service: String):
+    TCPSink 
+  =>
+    TCPSink(_encoder_wrapper, consume reporter, host, service)
+
 actor TCPSink is (CreditFlowConsumer & RunnableStep)
   """
   # TCPSink

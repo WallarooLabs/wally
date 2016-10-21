@@ -26,12 +26,14 @@ use "collections"
 use "net"
 use "time"
 use "buffered"
+use "sendence/bytes"
 use "sendence/fix"
 use "sendence/new-fix"
 use "sendence/hub"
 use "sendence/epoch"
 use "wallaroo"
 use "wallaroo/metrics"
+use "wallaroo/tcp-source"
 use "wallaroo/topology"
 
 actor Main
@@ -43,13 +45,13 @@ actor Main
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", NbboSourceDecoder)
+            "Nbbo", FixNbboFrameHandler)
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition)
             .done()
           .new_pipeline[FixOrderMessage val, OrderResult val](
-            "Orders", OrderSourceDecoder)
+            "Orders", FixOrderFrameHandler)
             // .to[FixOrderMessage val](IdentityBuilder)
             // .to[FixOrderMessage val](IdentityBuilder)
             .to_state_partition[Symboly val, String, 
@@ -110,18 +112,30 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
       None
     end
 
-primitive NbboSourceDecoder 
-  fun apply(data: Array[U8] val): FixNbboMessage val ? =>
+primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
+  fun header_length(): USize =>
+    4
+
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+
+  fun decode(data: Array[U8] val): FixOrderMessage val ? =>
     match FixishMsgDecoder(data)
-    | let m: FixNbboMessage val => m
+    | let m: FixOrderMessage val => m
     else
       error
     end
 
-primitive OrderSourceDecoder 
-  fun apply(data: Array[U8] val): FixOrderMessage val ? =>
+primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
+  fun header_length(): USize =>
+    4
+
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+
+  fun decode(data: Array[U8] val): FixNbboMessage val ? =>
     match FixishMsgDecoder(data)
-    | let m: FixOrderMessage val => m
+    | let m: FixNbboMessage val => m
     else
       error
     end
