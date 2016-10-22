@@ -13,7 +13,7 @@ class WordLengthCountSentMessage
     ts = ts'
     text = text'
 
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+  fun string(): String iso^ =>
     ("(" + ts.string() + ", " + text + ")").clone()
 
 class WordLengthCountReceivedMessage
@@ -26,13 +26,13 @@ class WordLengthCountReceivedMessage
     text = text'
     len = len'
 
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+  fun string(): String iso^ =>
     ("(" + ts.string() + ", " + text + ", " + len.string() + ")").clone()
 
 class WordLengthCountSentParser is SentParser[WordLengthCountSentMessage val]
   let _messages: Array[WordLengthCountSentMessage val] = Array[WordLengthCountSentMessage val]
 
-  fun ref apply(fields: Array[String] val) ? => 
+  fun ref apply(fields: Array[String] val) ? =>
     let ts: U64 val = fields(0).clone().strip().u64()
     let text: String val = recover val fields(1).clone().strip() end
     _messages.push(WordLengthCountSentMessage(ts, text))
@@ -44,7 +44,7 @@ class WordLengthCountSentParser is SentParser[WordLengthCountSentMessage val]
 class WordLengthReceivedReceivedParser is ReceivedParser[WordLengthCountReceivedMessage val]
   let _messages: Array[WordLengthCountReceivedMessage val] = Array[WordLengthCountReceivedMessage val]
 
-  fun ref apply(fields: Array[String] val) ? => 
+  fun ref apply(fields: Array[String] val) ? =>
     let ts: U64 val = fields(0).clone().strip().u64()
     let values = fields(1).split(":")
     if (values.size() != 2) then
@@ -60,25 +60,25 @@ class WordLengthReceivedReceivedParser is ReceivedParser[WordLengthCountReceived
 class WordLengthCountResultMapper is ResultMapper[WordLengthCountSentMessage val,
   WordLengthCountReceivedMessage val]
 
-  fun sent_transform(sent: Array[WordLengthCountSentMessage val]): 
+  fun sent_transform(sent: Array[WordLengthCountSentMessage val]):
     CanonicalForm =>
-    var rs = ResultStore 
+    var rs = ResultStore
 
     for m in sent.values() do
       rs(m.text) = m.text.size().u64()
     end
     rs
 
-  fun received_transform(received: Array[WordLengthCountReceivedMessage val]): 
+  fun received_transform(received: Array[WordLengthCountReceivedMessage val]):
     CanonicalForm =>
-    var rs = ResultStore 
+    var rs = ResultStore
 
     for m in received.values() do
       rs(m.text) = m.len
     end
     rs
 
-class ResultStore is CanonicalForm 
+class ResultStore is CanonicalForm
   let lengths: Map[String, U64] = Map[String, U64]
 
   fun apply(key: String): U64 ? =>
@@ -90,7 +90,7 @@ class ResultStore is CanonicalForm
     lengths(k) = value
 
   fun compare(that: CanonicalForm): (MatchStatus val, String) =>
-    match that 
+    match that
     | let rs: ResultStore =>
       if lengths.size() != rs.lengths.size() then
         return (ResultsDoNotMatch, "Count map sizes do not match up")

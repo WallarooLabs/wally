@@ -13,76 +13,76 @@ use "regex"
 
 
 primitive Booting is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "Booting".string(fmt)
+  fun string(): String iso^ =>
+      "Booting".string()
 
 primitive Ready is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "Ready".string(fmt)
+  fun string(): String iso^ =>
+      "Ready".string()
 
 primitive Started is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "Started".string(fmt)
+  fun string(): String iso^ =>
+      "Started".string()
 
 primitive TopologyReady is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "TopologyReady".string(fmt)
+  fun string(): String iso^ =>
+      "TopologyReady".string()
 
 primitive Done is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "Done".string(fmt)
+  fun string(): String iso^ =>
+      "Done".string()
 
 primitive Killed is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "Killed".string(fmt)
+  fun string(): String iso^ =>
+      "Killed".string()
 
 primitive DoneShutdown is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "DoneShutdown".string(fmt)
+  fun string(): String iso^ =>
+      "DoneShutdown".string()
 
 primitive StartSenders is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "StartSenders".string(fmt)
+  fun string(): String iso^ =>
+      "StartSenders".string()
 
 primitive SendersReady is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "SendersReady".string(fmt)
+  fun string(): String iso^ =>
+      "SendersReady".string()
 
 primitive SendersStarted is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "SendersStarted".string(fmt)
+  fun string(): String iso^ =>
+      "SendersStarted".string()
 
 primitive SendersDone is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "SendersDone".string(fmt)
+  fun string(): String iso^ =>
+      "SendersDone".string()
 
 primitive SendersDoneShutdown is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "SendersDoneShutdown".string(fmt)
+  fun string(): String iso^ =>
+      "SendersDoneShutdown".string()
 
 primitive AwaitingSendersReady is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "AwaitingSendersReady".string(fmt)
+  fun string(): String iso^ =>
+      "AwaitingSendersReady".string()
 
 primitive AwaitingSendersStart is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "AwaitingSendersStart".string(fmt)
+  fun string(): String iso^ =>
+      "AwaitingSendersStart".string()
 
 primitive AwaitingSendersDoneShutdown is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "AwaitingSendersDoneShutdown".string(fmt)
+  fun string(): String iso^ =>
+      "AwaitingSendersDoneShutdown".string()
 
 primitive TopologyDoneShutdown is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "TopologyDoneShutdown".string(fmt)
+  fun string(): String iso^ =>
+      "TopologyDoneShutdown".string()
 
 primitive Initialized is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "Booting".string(fmt)
+  fun string(): String iso^ =>
+      "Booting".string()
 
 primitive ErrorShutdown is Stringable
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
-      "ErrorShutdown".string(fmt)
+  fun string(): String iso^ =>
+      "ErrorShutdown".string()
 
 
 type DagonState is
@@ -948,8 +948,8 @@ actor ProcessManager
       try
         _env.out.print("dagon: killing docker container: " + child.host_name)
         let pn: ProcessNotify iso = ProcessClient(_env, child.name + "-killer", this)
-        let pm: ProcessMonitor = ProcessMonitor(consume pn,
-          docker as FilePath, a, consume vars)
+        let pm: ProcessMonitor = ProcessMonitor(_env.root as AmbientAuth,
+          consume pn, docker as FilePath, a, consume vars)
       else
         _env.out.print("dagon: booting docker process failed: " + child.name)
         transition_to(ErrorShutdown)
@@ -1077,8 +1077,8 @@ actor ProcessManager
       if docker isnt None then
         try
           let pn: ProcessNotify iso = ProcessClient(_env, node.name, this)
-          let pm: ProcessMonitor = ProcessMonitor(consume pn,
-            docker as FilePath, a, consume vars)
+          let pm: ProcessMonitor = ProcessMonitor(_env.root as AmbientAuth,
+            consume pn, docker as FilePath, a, consume vars)
           let child = Child(node.name, node.is_canary, pm, node.host_name)
             roster.insert(node.name, child)
         else
@@ -1138,8 +1138,9 @@ actor ProcessManager
     if filepath isnt None then
       try
         let pn: ProcessNotify iso = ProcessClient(_env, node.name, this)
-        let pm: ProcessMonitor = ProcessMonitor(consume pn, filepath as FilePath,
-          consume final_args, consume final_vars)
+        let pm: ProcessMonitor = ProcessMonitor(_env.root as AmbientAuth,
+          consume pn, filepath as FilePath, consume final_args,
+          consume final_vars)
         let child = Child(node.name, node.is_canary, pm, node.name)
         roster.insert(node.name, child)
       else
@@ -1562,12 +1563,8 @@ class ProcessClient is ProcessNotify
     match err
     | ExecveError   => _env.out.print("dagon: ProcessError: ExecveError")
     | PipeError     => _env.out.print("dagon: ProcessError: PipeError")
-    | Dup2Error     => _env.out.print("dagon: ProcessError: Dup2Error")
     | ForkError     => _env.out.print("dagon: ProcessError: ForkError")
-    | FcntlError    => _env.out.print("dagon: ProcessError: FcntlError")
     | WaitpidError  => _env.out.print("dagon: ProcessError: WaitpidError")
-    | CloseError    => _env.out.print("dagon: ProcessError: CloseError")
-    | ReadError     => _env.out.print("dagon: ProcessError: ReadError")
     | WriteError    => _env.out.print("dagon: ProcessError: WriteError")
     | KillError     => _env.out.print("dagon: ProcessError: KillError")
     | Unsupported   => _env.out.print("dagon: ProcessError: Unsupported")

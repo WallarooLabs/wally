@@ -3,7 +3,7 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[IdentitySentMessage val, IdentityReceivedMessage val]
-      .run(env, "Identity", IdentityResultMapper, IdentitySentParser, 
+      .run(env, "Identity", IdentityResultMapper, IdentitySentParser,
         IdentityReceivedParser)
 
 class IdentitySentMessage
@@ -14,7 +14,7 @@ class IdentitySentMessage
     ts = ts'
     v = v'
 
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+  fun string(): String iso^ =>
     ("(" + ts.string() + ", " + v.string() + ")").clone()
 
 class IdentityReceivedMessage
@@ -25,11 +25,11 @@ class IdentityReceivedMessage
     ts = ts'
     v = v'
 
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+  fun string(): String iso^ =>
     ("(" + ts.string() + ", " + v.string() + ")").clone()
 
 class IdentitySentParser is SentParser[IdentitySentMessage val]
-  let _messages: Array[IdentitySentMessage val] = 
+  let _messages: Array[IdentitySentMessage val] =
     Array[IdentitySentMessage val]
 
   fun ref apply(fields: Array[String] val): None ? =>
@@ -41,7 +41,7 @@ class IdentitySentParser is SentParser[IdentitySentMessage val]
     _messages
 
 class IdentityReceivedParser is ReceivedParser[IdentityReceivedMessage val]
-  let _messages: Array[IdentityReceivedMessage val] = 
+  let _messages: Array[IdentityReceivedMessage val] =
     Array[IdentityReceivedMessage val]
 
   fun ref apply(fields: Array[String] val): None ? =>
@@ -57,10 +57,10 @@ class IdentityReceivedParser is ReceivedParser[IdentityReceivedMessage val]
   fun ref received_messages(): Array[IdentityReceivedMessage val] =>
     _messages
 
-class IdentityResultMapper is 
+class IdentityResultMapper is
   ResultMapper[IdentitySentMessage val, IdentityReceivedMessage val]
 
-  fun sent_transform(sent: Array[IdentitySentMessage val]): 
+  fun sent_transform(sent: Array[IdentitySentMessage val]):
     CanonicalForm =>
     var results = ResultsList[I64]
 
@@ -69,7 +69,7 @@ class IdentityResultMapper is
     end
     results
 
-  fun received_transform(received: Array[IdentityReceivedMessage val]): 
+  fun received_transform(received: Array[IdentityReceivedMessage val]):
     CanonicalForm =>
     var results = ResultsList[I64]
 
