@@ -7,21 +7,21 @@ use "buffy/topology/external"
 actor Main
   """
   Instructions for running:
-  1. Update config: ./apps/word-length-count/word-length-count-java.ini 
+  1. Update config: ./apps/word-length-count/word-length-count-java.ini
     to match your environment
-  2. Build pony: make build-buffy-components && make build-word-length-count && make build-wesley 
+  2. Build pony: make build-buffy-components && make build-word-length-count && make build-wesley
   3. Build java: cd ./external-lang-api/java/ && mvn clean install && cd - & cd ./apps/word-length-count/ && mvn clean package && cd -
   4. Run: make dagon-word-length-count
   """
   new create(env: Env) =>
     try
-      let jvmConfig = JVMConfigBuilder.uberjar_from_ini(env, 
+      let jvmConfig = JVMConfigBuilder.uberjar_from_ini(env,
         "./apps/word-length-count/word-length-count-java.ini"
         )
       let topology = recover val
         Topology
           .new_pipeline[String, String](P, "word-length-count")
-            .to_external[String](WordLengthCountProcessBuilder(jvmConfig))
+            .to_external[String](WordLengthCountProcessBuilder(env.auth as AmbientAuth, jvmConfig))
             .to_simple_sink(S, recover [0] end)
       end
       Startup(env, topology, 1)
@@ -52,7 +52,7 @@ class CsvCodec is ExternalProcessCodec[String val, String val]
       error
     end
 
-    let msg = m.id().string() + _delimiter + 
+    let msg = m.id().string() + _delimiter +
       m.source_ts().string() + _delimiter +
       m.last_ingress_ts().string() + _delimiter +
       m.sent_to_external_ts().string() + _delimiter +
@@ -66,14 +66,14 @@ class CsvCodec is ExternalProcessCodec[String val, String val]
       _log("Unable to decode msg: does not contain all parts")
       error
     end
-    ExternalMessage[String].create(parts(0).u64(), 
-      parts(1).u64(), 
-      parts(2).u64(), 
-      parts(3).u64(), 
+    ExternalMessage[String].create(parts(0).u64(),
+      parts(1).u64(),
+      parts(2).u64(),
+      parts(3).u64(),
       parts(4)
     )
 
-  fun _log(s: String) =>   
+  fun _log(s: String) =>
     // TODO: replace w/ logger
     @printf[I32]((s + "\n").cstring())
 
@@ -82,11 +82,16 @@ class CsvCodec is ExternalProcessCodec[String val, String val]
     "POISON".array()
 
 class WordLengthCountProcessBuilder is ExternalProcessBuilder[String, String]
-  let _config: ExternalProcessConfig val 
+  let _auth: ProcessMonitorAuth
+  let _config: ExternalProcessConfig val
 
-  new iso create(config': ExternalProcessConfig val) =>
+  new iso create(auth': ProcessMonitorAuth,
+    config': ExternalProcessConfig val)
+  =>
+    _auth = auth'
     _config = config'
 
+  fun auth(): ProcessMonitorAuth => _auth
   fun config(): ExternalProcessConfig val => _config
   fun codec(): ExternalProcessCodec[String, String] val => CsvCodec
   fun length_encoder(): ByteLengthEncoder val => JavaLengthEncoder
