@@ -3,6 +3,7 @@ use "buffy/messages"
 use "buffy/metrics"
 use "buffy/topology"
 use "buffy/topology/external"
+use "process"
 
 actor Main
   """
