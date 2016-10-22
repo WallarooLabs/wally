@@ -2,6 +2,7 @@ use "buffy/messages"
 use "buffy/topology/external"
 use "collections"
 use "buffered"
+use "process"
 
 interface Computation[In, Out]
   fun ref apply(input: In): (Out | None)
@@ -34,15 +35,15 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
   let _partition_function: PartitionFunction[In] val
 
   new val create(sc: StateComputation[In, Out, State] val,
-    output_step: BasicStep tag, 
-    p_f: PartitionFunction[In] val = lambda(a: Any val): U64 => 0 end) 
+    output_step: BasicStep tag,
+    p_f: PartitionFunction[In] val = lambda(a: Any val): U64 => 0 end)
   =>
     _state_computation = sc
     _output = output_step
     _partition_function = p_f
 
-  fun apply(msg_id: U64, source_ts: U64, ingress_ts: U64, input: Any val, 
-    state: State): State 
+  fun apply(msg_id: U64, source_ts: U64, ingress_ts: U64, input: Any val,
+    state: State): State
   =>
     match input
     | let i: In =>
@@ -52,7 +53,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
       state
     end
 
-  fun partition_id(input: Any val): U64 => 
+  fun partition_id(input: Any val): U64 =>
     match input
     | let i: In => _partition_function(i)
     else
@@ -65,7 +66,7 @@ class MessageTarget[Out: Any val]
   let _source_ts: U64
   let _ingress_ts: U64
 
-  new val create(o: BasicStep tag, msg_id: U64, source_ts: U64, 
+  new val create(o: BasicStep tag, msg_id: U64, source_ts: U64,
     ingress_ts: U64) =>
     _output = o
     _id = msg_id
@@ -89,6 +90,7 @@ interface StateComputationBuilder[In: Any val, Out: Any val,
   fun apply(): StateComputation[In, Out, State] iso^
 
 trait ExternalProcessBuilder[In: Any val, Out: Any val]
+  fun auth(): ProcessMonitorAuth
   fun config(): ExternalProcessConfig val
   fun codec(): ExternalProcessCodec[In, Out] val
   fun length_encoder(): ByteLengthEncoder val
