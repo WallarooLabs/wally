@@ -39,9 +39,6 @@ public:
     virtual void deserialize (char* bytes) = 0;
     virtual void serialize (char* bytes, size_t nsz_) = 0;
     virtual size_t serialize_get_size () = 0;
-
-    virtual Buffer& deserialize (Buffer& buff_) = 0;
-    virtual Buffer& serialize (Buffer& buff_) = 0;
 };
 
 }
