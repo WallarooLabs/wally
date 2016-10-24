@@ -1,40 +1,50 @@
 use "collections"
 use "net"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 
-trait Router
+// TODO: Eliminate producer None when we can
+interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope box): Bool
+    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
+    producer: (CreditFlowProducer ref | None)): Bool
+  // fun routes(): Array[CreditFlowConsumer tag] val
 
 interface RouterBuilder
-  fun ref apply(): Router val
+  fun apply(): Router val
 
-class EmptyRouter is Router
-
+class EmptyRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope box): Bool =>
+    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
+    producer: (CreditFlowProducer ref | None)): Bool 
+  =>
     true
 
-class DirectRouter is Router
-  let _target: Step tag
-  let _id: U64
+class DirectRouter
+  let _target: RunnableStep tag
 
-  new val create(target: Step tag, id: U64) =>
+  new val create(target: RunnableStep tag) =>
     _target = target
-    _id = id
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope box): Bool
+    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
+    producer: (CreditFlowProducer ref | None)): Bool 
   =>
-    _target.run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, seq_id, _id)
+    // TODO: Use producer here
+    
+    _target.run[D](metric_name, source_ts, data, 
+      outgoing_envelope.origin,
+      outgoing_envelope.msg_uid,
+      outgoing_envelope.frac_ids,
+      outgoing_envelope.seq_id,
+      // TODO: Figure out how to determine route id
+      0)
     false
 
-  fun route_id(): U64 => _id
+  // fun routes(): Array[CreditFlowConsumer tag] val =>
+  //   recover [_target] end
 
-class DataRouter is Router
+class DataRouter
   let _routes: Map[U128, Step tag] val
 
   new val create(routes: Map[U128, Step tag] val = 
@@ -43,8 +53,9 @@ class DataRouter is Router
     _routes = routes
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope box): Bool =>
+    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
+    producer: (CreditFlowProducer ref | None)): Bool 
+  =>
     try
       match data
       | let delivery_msg: DeliveryMsg val =>
@@ -59,38 +70,84 @@ class DataRouter is Router
       true
     end
 
-class PartitionRouter is Router
-  let _partition_finder: PartitionFinder val
-  let _id: U64
+  // fun routes(): Array[CreditFlowConsumer tag] val =>
+  //   let rs: Array[CreditFlowConsumer tag] trn = 
+  //     recover Array[CreditFlowConsumer tag] end
 
-  new val create(p_finder: PartitionFinder val, id: U64) =>
-    _partition_finder = p_finder
-    _id = id
+  //   for (k, v) in _routes.pairs() do
+  //     rs.push(v)
+  //   end
+
+  //   consume rs
+
+trait PartitionRouter is Router
+  fun local_map(): Map[U128, Step] val  
+
+class LocalPartitionRouter[In: Any val, 
+  Key: (Hashable val & Equatable[Key] val)] is PartitionRouter
+  let _local_map: Map[U128, Step] val
+  let _step_ids: Map[Key, U128] val
+  let _routes: Map[Key, (Step | PartitionProxy)] val
+  let _partition_function: PartitionFunction[In, Key] val
+
+  new val create(local_map': Map[U128, Step] val,
+    s_ids: Map[Key, U128] val, routes: Map[Key, (Step | PartitionProxy)] val,
+    partition_function: PartitionFunction[In, Key] val)
+  =>
+    _local_map = local_map'
+    _step_ids = s_ids
+    _routes = routes
+    _partition_function = partition_function
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope box): Bool =>
-    let router = 
-      match data
-      | let pfable: PartitionFindable val =>
-        pfable.find_partition(_partition_finder)
+    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
+    producer: (CreditFlowProducer ref | None)): Bool 
+  =>
+    match data
+    | let input: In =>
+      let key = _partition_function(input)
+      try
+        match _routes(key)  
+        | let s: Step =>
+          s.run[In](metric_name, source_ts, input, 
+            outgoing_envelope.origin,
+            outgoing_envelope.msg_uid,
+            outgoing_envelope.frac_ids,
+            outgoing_envelope.seq_id,
+            // TODO: Generate correct route id 
+            0)
+          false
+        | let p: PartitionProxy =>
+          try
+            p.forward[In](metric_name, source_ts, input, _step_ids(key),
+              // TODO: We need to receive a from_step_id and pass it here
+              0,
+              outgoing_envelope.msg_uid,
+              outgoing_envelope.frac_ids,
+              outgoing_envelope.seq_id,
+              // TODO: Generate correct route id 
+              0)
+            false
+          else
+            @printf[I32]("Missing step ID for partition key\n".cstring())
+            true
+          end
+        else
+          true
+        end
       else
-        _partition_finder.find[D](data)
+        true
       end
-
-    match router
-    | let r: Router val =>
-      //delegate to the actual router to stamp the route_id
-      r.route[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, seq_id, incoming_envelope)
     else
       true
     end
 
-class TCPRouter is Router
-  let _tcp_writer: TCPWriter
-  let _id: U64
+  fun local_map(): Map[U128, Step] val => _local_map
 
-  new val create(target: (TCPConnection | Array[TCPConnection] val), id: U64) =>
+class TCPRouter
+  let _tcp_writer: TCPWriter
+
+  new val create(target: (TCPConnection | Array[TCPConnection] val)) =>
     _tcp_writer = 
       match target
       | let c: TCPConnection =>
@@ -100,15 +157,13 @@ class TCPRouter is Router
       else
         EmptyTCPWriter
       end
-    _id = id
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-                        origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
-                        incoming_envelope: MsgEnvelope box): Bool
+    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
+    producer: (CreditFlowProducer ref | None)): Bool 
   =>
     match data
     | let d: Array[ByteSeq] val =>
-      //TODO: create and pass the envelope
       _tcp_writer(d)
     end
     false
@@ -132,7 +187,8 @@ class SingleTCPWriter
   new create(conn: TCPConnection) =>
     _conn = conn
 
-  fun apply(d: Array[ByteSeq] val) => _conn.writev(d)
+  fun apply(d: Array[ByteSeq] val) => 
+    _conn.writev(d)
 
   fun dispose() => _conn.dispose()
 

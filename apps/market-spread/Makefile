@@ -27,12 +27,11 @@ include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
 # args to RUN_DAGON and RUN_DAGON_SPIKE: $1 = test name; $2 = ini file; $3 = timeout; $4 = wesley test command, $5 = include in CI
 # NOTE: all paths must be relative to buffy directory (use buffy_path variable)
 
-#dagon-market-spread: #used as part of `make help` command ## Run market spread test with dagon
-$(eval $(call RUN_DAGON\
-,dagon-market-spread \
-,$(buffy_path)/apps/market-spread/market-spread.ini \
-,25 \
-,$(buffy_path)/wesley/market-spread-test/market-spread-test \
-$(buffy_path)/demos/marketspread/100nbbo.msg $(buffy_path)/sent.txt $(buffy_path)/received.txt match \
-,true))
+##<NAME OF TARGET>: #used as part of `make help` command ## <DESCRIPTION OF TARGET>
+#$(eval $(call RUN_DAGON\
+#,<NAME OF TARGET> \
+#,$(buffy_path)/<PATH TO INI FILE> \
+#,<TIMEOUT VALUE> \
+#,<WESLEY TEST COMMAND> \
+#,<INCLUDE IN CI>))
 

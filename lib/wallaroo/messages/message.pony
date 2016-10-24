@@ -16,12 +16,14 @@ trait Origin
     Process envelopes and keep track of things
     """
     // keep track of messages we've received from upstream
-    _hwm_get().update((incoming_envelope.origin , incoming_envelope.route_id),
+    _hwm_get().update((incoming_envelope.origin, incoming_envelope.route_id),
       incoming_envelope.seq_id)
     // keep track of mapping between incoming / outgoing seq_id
     _translate_get().update(incoming_envelope.seq_id, seq_id)
     // keep track of origins
-    _origins_get().set(incoming_envelope.origin)
+    // TODO: Figure out how to get this to work with our temporary None
+    // value possibility
+    // _origins_get().set(incoming_envelope.origin)
 
   fun ref _update_watermark(route_id: U64, seq_id: U64)
   =>
@@ -39,20 +41,29 @@ trait Origin
     None
   end
 
-
-
     
 type OriginSet is HashSet[Origin tag, HashIs[Origin tag]] 
     
 class MsgEnvelope
-  var origin: Origin tag   // tag referencing upstream origin for msg
-  var msg_uid: U64         // Source assigned UID; universally unique
-  var frac_ids: (Array[U64] val| None) // fractional msg ids
+  // TODO: Fix the Origin None once we know how to look up Proxy
+  // for messages crossing boundary  
+  var origin: (Origin tag | None)   // tag referencing upstream origin for msg
+  var msg_uid: U128         // Source assigned UID; universally unique
+  var frac_ids: (Array[U64] val | None) // fractional msg ids
   var seq_id: U64          // assigned by immediate upstream origin
   var route_id: U64        // assigned by immediate upstream origin
 
-  new create(origin': Origin tag, msg_uid': U64,
-    frac_ids': (Array[U64] val| None), seq_id': U64, route_id': U64)
+  new create(origin': (Origin tag | None), msg_uid': U128,
+    frac_ids': (Array[U64] val | None), seq_id': U64, route_id': U64)
+  =>
+    origin = origin'
+    msg_uid = msg_uid'
+    frac_ids = frac_ids'
+    seq_id = seq_id'
+    route_id = route_id'
+
+  fun ref update(origin': (Origin tag | None), msg_uid': U128, 
+    frac_ids': (Array[U64] val | None), seq_id': U64, route_id': U64 = 0) 
   =>
     origin = origin'
     msg_uid = msg_uid'
@@ -63,9 +74,10 @@ class MsgEnvelope
   fun clone(): MsgEnvelope val =>
     match frac_ids
     | let f_ids: Array[U64] val =>
-      recover val MsgEnvelope(origin,msg_uid,recover val f_ids.clone() end,seq_id,route_id) end
+      recover val MsgEnvelope(origin, msg_uid, recover val f_ids.clone() end,
+        seq_id,route_id) end
     else
-      recover val MsgEnvelope(origin,msg_uid,frac_ids,seq_id,route_id) end
+      recover val MsgEnvelope(origin, msg_uid, frac_ids, seq_id, route_id) end
     end
     
 primitive HashTuple
@@ -79,20 +91,25 @@ primitive HashTuple
     (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
 
     
-type OriginRoutePair is (Origin tag, U64)
+// TODO: Get rid of None once we fix handling Proxy lookup when sending
+// across boundaries (to identify origin)
+type OriginRoutePair is ((Origin tag | None), U64)
 
 
+// TODO: Get this to work
 primitive HashOriginRoute
   fun hash(t: OriginRoutePair): U64
   =>
-    cantorPair((t._1.hash(), t._2.hash()))
+    // cantorPair((t._1.hash(), t._2.hash()))
+    0 // TODO: delete this line
 
   fun eq(t1: OriginRoutePair, t2: OriginRoutePair): Bool
   =>
-    hash(t1) == hash(t2)
+    false // TODO: delete this line
+    // hash(t1) == hash(t2)
 
-  fun cantorPair(t: (U64, U64)): U64 =>
-    (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
+  // fun cantorPair(t: (U64, U64)): U64 =>
+    // (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
     
 
 class HighWatermarkTable

@@ -2,6 +2,7 @@ use "net"
 use "collections"
 use "time"
 use "sendence/bytes"
+use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/topology"
 
@@ -12,13 +13,13 @@ class ControlChannelListenNotifier is TCPListenNotify
   var _host: String = ""
   var _service: String = ""
   let _is_initializer: Bool
-  let _initializer: (Initializer | None)
+  let _initializer: (WorkerInitializer | None)
   let _local_topology_initializer: LocalTopologyInitializer
   let _connections: Connections
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
-    initializer: (Initializer | None) = None,
+    initializer: (WorkerInitializer | None) = None,
     local_topology_initializer: LocalTopologyInitializer)
   =>
     _env = env
@@ -56,12 +57,12 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   let _name: String
   let _connections: Connections
-  let _initializer: (Initializer | None)
+  let _initializer: (WorkerInitializer | None)
   let _local_topology_initializer: LocalTopologyInitializer
   var _header: Bool = true
 
   new iso create(name: String, env: Env, auth: AmbientAuth, 
-    connections: Connections, initializer: (Initializer | None),
+    connections: Connections, initializer: (WorkerInitializer | None),
     local_topology_initializer: LocalTopologyInitializer) 
   =>
     _env = env
@@ -90,7 +91,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         try
           (let host, _) = conn.remote_address().name()
           match _initializer
-          | let i: Initializer =>
+          | let i: WorkerInitializer =>
             i.identify_control_address(m.worker_name, host, m.service)
           end
           _connections.create_control_connection(m.worker_name, host, m.service)
@@ -100,7 +101,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         try
           (let host, _) = conn.remote_address().name()
           match _initializer
-          | let i: Initializer =>
+          | let i: WorkerInitializer =>
             i.identify_data_address(m.worker_name, host, m.service)
           end
           _connections.create_data_connection(m.worker_name, host, m.service)
@@ -110,7 +111,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _local_topology_initializer.initialize()
       | let m: TopologyReadyMsg val =>
         match _initializer
-        | let i: Initializer =>
+        | let i: WorkerInitializer =>
           i.topology_ready(m.worker_name)
         end
       | let m: CreateConnectionsMsg val =>

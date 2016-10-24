@@ -7,7 +7,14 @@ trait StateChange[State: Any #read]
   fun apply(state: State)
   fun to_log_entry(out_writer: Writer): Array[ByteSeq] val
   fun ref read_log_entry(in_reader: Reader) ?
-  new create(id': U64)
+
+class EmptyStateChange[State: Any #read] is StateChange[State]
+  fun name(): String val => ""
+  fun id(): U64 => 0
+  fun apply(state: State) => None
+  fun to_log_entry(out_writer: Writer): Array[ByteSeq] val => 
+    recover Array[ByteSeq] end
+  fun ref read_log_entry(in_reader: Reader) => None
 
 trait StateChangeBuilder[State: Any #read]
   fun apply(id: U64): StateChange[State]

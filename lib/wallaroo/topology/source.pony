@@ -2,82 +2,26 @@ use "net"
 use "time"
 use "buffered"
 use "collections"
-use "wallaroo/metrics"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
+use "wallaroo/metrics"
+use "wallaroo/tcp-source"
 
 interface BytesProcessor
   fun ref process(data: Array[U8 val] iso)
 
-class Source[In: Any val] is Origin
-  let _decoder: SourceDecoder[In] val
-  let _pipeline_name: String
-  let _source_name: String
-  let _runner: Runner
-  let _router: Router val
-  let _metrics_reporter: MetricsReporter
-  let _incoming_envelope: MsgEnvelope ref
-  var _count: USize = 0
-  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
-  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _translate: TranslationTable = TranslationTable(10)
-  let _origins: OriginSet = OriginSet(10)
+class SourceData
+  let _builder: SourceBuilderBuilder val
+  let _runner_builder: RunnerBuilder val
+  let _address: Array[String] val
 
-  new iso create(pipeline_name: String, decoder: SourceDecoder[In] val, 
-    runner_builder: RunnerBuilder val, router: Router val,
-    metrics_reporter: MetricsReporter iso) 
+  new val create(b: SourceBuilderBuilder val, r: RunnerBuilder val, 
+    a: Array[String] val) 
   =>
-    _decoder = decoder
-    _pipeline_name = pipeline_name
-    _source_name = pipeline_name + " source"
-    _metrics_reporter = consume metrics_reporter
-    _runner = runner_builder(_metrics_reporter.clone())
-    _incoming_envelope = MsgEnvelope(this, 0, None, 0, 0)
-    _router = router
+    _builder = b
+    _runner_builder = r
+    _address = a
 
-  fun ref _hwm_get(): HighWatermarkTable
-  =>
-    _hwm
-  
-  fun ref _lwm_get(): LowWatermarkTable
-  =>
-    _lwm
-    
-  fun ref _translate_get(): TranslationTable
-  =>
-    _translate
-  
-  fun ref _origins_get(): OriginSet
-  =>
-    _origins
-
-  // be update_watermark(route_id: U64, seq_id: U64)
-  // =>
-  //   //TODO: receive watermark, flush buffers and ack upstream (maybe?)
-  //   None
-
-  fun ref process(data: Array[U8 val] iso) =>
-    let ingest_ts = Time.nanos()
-    let computation_start = Time.nanos()
-    let is_finished = 
-      try
-        match _decoder(consume data)
-        | let input: In =>
-          let msg_uid = _count.u64()
-          _incoming_envelope.msg_uid = msg_uid
-          _incoming_envelope.seq_id = msg_uid
-          _runner.run[In](_pipeline_name, ingest_ts, input, this, msg_uid,
-            None, msg_uid, _incoming_envelope, _router)
-        else
-          true
-        end
-      else
-        true
-      end
-
-    let computation_end = Time.nanos()
-
-    //_metrics_reporter.step_metric(_source_name,
-    //  computation_start, computation_end)
-    if is_finished then
-      _metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
-    end
+  fun builder(): SourceBuilderBuilder val => _builder
+  fun runner_builder(): RunnerBuilder val => _runner_builder
+  fun address(): Array[String] val => _address

@@ -2,6 +2,8 @@ use "buffered"
 use "serialise"
 use "net"
 use "collections"
+use "wallaroo/backpressure"
+use "wallaroo/initialization"
 use "wallaroo/topology"
 
 primitive ChannelMsgEncoder
@@ -19,10 +21,14 @@ primitive ChannelMsgEncoder
 
   fun data_channel[D: Any val](target_id: U128, ack_id: U64, 
     from_worker_name: String, source_ts: U64, msg_data: D,
-    metric_name: String, auth: AmbientAuth): Array[ByteSeq] val ?
+    metric_name: String, auth: AmbientAuth,
+    proxy_address: ProxyAddress val, msg_uid: U128, 
+    frac_ids: (Array[U64] val | None), seq_id: U64, 
+    route_id: U64): Array[ByteSeq] val ?
   =>
     _encode(ForwardMsg[D](target_id, ack_id, from_worker_name, source_ts, 
-      msg_data, metric_name), auth)
+      msg_data, metric_name, proxy_address, msg_uid, frac_ids,
+      seq_id, route_id), auth)
 
   fun identify_control_port(worker_name: String, service: String,
     auth: AmbientAuth): Array[ByteSeq] val ? 
@@ -136,9 +142,15 @@ class ForwardMsg[D: Any val] is DeliveryMsg
   let _source_ts: U64
   let _data: D
   let _metric_name: String
+  let _proxy_address: ProxyAddress val
+  let _msg_uid: U128
+  let _frac_ids: (Array[U64] val | None)
+  let _seq_id: U64
+  let _route_id: U64
 
   new val create(t_id: U128, a_id: U64, from: String, s_ts: U64, 
-    m_data: D, m_name: String) 
+    m_data: D, m_name: String, proxy_address: ProxyAddress val, msg_uid: U128, 
+    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64) 
   =>
     _target_id = t_id
     _ack_id = a_id
@@ -146,6 +158,11 @@ class ForwardMsg[D: Any val] is DeliveryMsg
     _source_ts = s_ts
     _data = m_data
     _metric_name = m_name
+    _proxy_address = proxy_address
+    _msg_uid = msg_uid
+    _frac_ids = frac_ids
+    _seq_id = seq_id
+    _route_id = route_id
 
   fun target_id(): U128 => _target_id
   fun ack_id(): U64 => _ack_id
@@ -153,7 +170,10 @@ class ForwardMsg[D: Any val] is DeliveryMsg
   fun source_ts(): U64 => _source_ts
   fun metric_name(): String => _metric_name
 
-  fun deliver(target_step: Step tag): Bool =>//data_receiver: DataReceiver) =>
-    //TODO: get envelope values
-    target_step.run[D](_metric_name, _source_ts, _data, target_step, 0, None, 0, 0)
+  fun deliver(target_step: Step tag): Bool =>
+    // TODO: We need to give the step a reference to the Proxy to the
+    // origin for this message using the ProxyAddress, and then replace None 
+    // below
+    target_step.run[D](_metric_name, _source_ts, _data, None, _msg_uid, 
+      _frac_ids, _seq_id, _route_id)
     false

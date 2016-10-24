@@ -28,8 +28,6 @@ class DataChannelListenNotifier is TCPListenNotify
     _is_initializer = is_initializer
     _router = routes
     _connections = connections
-
-
     
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -74,13 +72,16 @@ class DataOrigin is Origin
   //   //TODO: ack on TCP?
   //   None
     
-
 class DataChannelConnectNotifier is TCPConnectionNotify
   let _router: DataRouter val
   let _env: Env
   let _auth: AmbientAuth
   let _origin: DataOrigin tag 
   var _header: Bool = true
+  // TODO: The None for Origin will break when we fix identiyfing Proxy origin
+  // over a boundary
+  let _incoming_envelope: MsgEnvelope ref = MsgEnvelope(None, 0, None, 0, 0)
+  let _outgoing_envelope: MsgEnvelope ref = MsgEnvelope(None, 0, None, 0, 0)
 
   new iso create(routes: DataRouter val, env: Env, auth: AmbientAuth) =>
     _router = routes
@@ -102,8 +103,10 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         @printf[I32]("Received delivery msg!!\n".cstring())
         //TODO: read envelope from data
         //TODO: manage values for outgoing envelope at router?
-        let incoming_envelope = recover val MsgEnvelope(_origin,0,None,0,0) end
-        _router.route[DeliveryMsg val](d.metric_name(), d.source_ts(), d, _origin, 0, None, 0, incoming_envelope)
+        _incoming_envelope.update(_origin, 0, None, 0, 0)
+        _outgoing_envelope.update(None, 0, None, 0, 0)
+        _router.route[DeliveryMsg val](d.metric_name(), d.source_ts(), d,
+          _incoming_envelope, _outgoing_envelope, None)
       | let m: SpinUpLocalTopologyMsg val =>
         _env.out.print("Received spin up local topology message!")
       | let m: UnknownChannelMsg val =>

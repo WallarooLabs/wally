@@ -42,8 +42,8 @@ class FileBackend is Backend
           // - statechange id
           // - sequence id
           // - payload
-          let buffer_id = r.u64_be()
-          let uid = r.u64_be()
+          let buffer_id = r.u128_be()
+          let uid = r.u128_be()
           let fractional_size = r.u64_be()
           let frac_ids = recover val
             if fractional_size > 0 then
@@ -87,12 +87,13 @@ class FileBackend is Backend
     
 
 actor Alfred
-    let _log_buffers: Array[EventLogBuffer tag]
+    let _log_buffers: Map[U128, EventLogBuffer tag] = 
+      _log_buffers.create()
+    // TODO: Why are these things isos? 
     let _backend: Backend iso
     let _writer: Writer iso
 
     new create(env: Env, filename: (String val | None) = None) =>
-      _log_buffers = Array[EventLogBuffer tag]
       _writer = recover iso Writer end
       _backend = 
       recover iso
@@ -115,20 +116,20 @@ actor Alfred
         b.replay_finished()
       end
 
-    be replay_log_entry(buffer_id: U64, uid: U64, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) =>
+    be replay_log_entry(buffer_id: U128, uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) =>
       try
-        _log_buffers(buffer_id.usize()).replay_log_entry(uid, frac_ids, statechange_id, payload)
+        _log_buffers(buffer_id).replay_log_entry(uid, frac_ids, statechange_id, payload)
       else
         //TODO: explode here
         @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
       end
 
     be register_log_buffer(logbuffer: EventLogBuffer tag) =>
-      _log_buffers.push(logbuffer)
-      let id = _log_buffers.size().u64()
+      let id = _log_buffers.size().u128()
+      _log_buffers(id) = logbuffer
       logbuffer.set_id(id)
 
-    be log(buffer_id: U64, log_entries: Array[LogEntry val] iso, low_watermark: U64) =>
+    be log(buffer_id: U128, log_entries: Array[LogEntry val] iso, low_watermark: U64) =>
     //TODO: move this serialisation to the file backend
       try
         for i in Range(0,log_entries.size()) do
@@ -140,11 +141,11 @@ actor Alfred
           // - statechange id
           // - sequence id
           // - payload
-          (let uid:U64, let frac_ids: (Array[U64] val | None),
+          (let uid:U128, let frac_ids: (Array[U64] val | None),
            let statechange_id: U64, let payload: Array[ByteSeq] val)
           = log_entries(i)
-          _writer.u64_be(buffer_id)
-          _writer.u64_be(uid)
+          _writer.u128_be(buffer_id)
+          _writer.u128_be(uid)
           match frac_ids
           | let ids: Array[U64] val =>
             let s = ids.size()
@@ -164,7 +165,7 @@ actor Alfred
           _backend.writev(recover val _writer.done() end)
         end
         _backend.flush()
-        _log_buffers(buffer_id.usize()).log_flushed(low_watermark)
+        _log_buffers(buffer_id).log_flushed(low_watermark)
       else
         @printf[I32]("unrecoverable error while trying to write event log".cstring())
       end

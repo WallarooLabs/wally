@@ -45,27 +45,3 @@ class SourceNotify is TCPConnectionNotify
 
   fun ref connected(sock: TCPConnection ref) =>
     @printf[None]("incoming connected\n".cstring())
-
-class SourceListenerNotify is TCPListenNotify
-  let _source_builder: {(): BytesProcessor iso^} val
-  let _metrics: JrMetrics
-  let _expected: USize
-
-  new iso create(source_builder: {(): BytesProcessor iso^} val,
-    metrics: JrMetrics, expected: USize) 
-  =>
-    _source_builder = source_builder
-    _metrics = metrics
-    _expected = expected
-
-  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    SourceNotify(_source_builder())
-
-  fun ref listening(listen: TCPListener ref) =>
-    try
-      (let host, let service) = listen.local_address().name()
-      @printf[I32](("Source: listening on " + host + ":" + service + "\n").cstring())
-    else
-      @printf[I32]("Source: couldn't get local address\n".cstring())
-      listen.close()
-    end

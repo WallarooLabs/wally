@@ -26,11 +26,13 @@ use "collections"
 use "net"
 use "time"
 use "buffered"
+use "sendence/bytes"
 use "sendence/fix"
 use "sendence/new-fix"
 use "sendence/hub"
 use "sendence/epoch"
 use "wallaroo/metrics"
+use "wallaroo/tcp-source"
 use "wallaroo/topology"
 
 class SymbolData
@@ -38,6 +40,7 @@ class SymbolData
   var last_bid: F64 = 0
   var last_offer: F64 = 0
 
+<<<<<<< HEAD:apps/market-spread-jr/market-spread-jr.pony
 class SymbolDataStateChange is StateChange[SymbolData]
 
   let _name: String = "SymbolDataStateChange"
@@ -45,10 +48,18 @@ class SymbolDataStateChange is StateChange[SymbolData]
   var _should_reject_trades: Bool = false
   var _last_bid: F64 = 0
   var _last_offer: F64 = 0
+=======
+primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
+  fun name(): String => "Update NBBO"
+
+  fun apply(msg: FixNbboMessage val, state: SymbolData): None =>
+    let offer_bid_difference = msg.offer_px() - msg.bid_px()
+>>>>>>> api-automate-merge:apps/market-spread-jr/market-spread-jr.old
 
   new create(id': U64) =>
     _id = id'
 
+<<<<<<< HEAD:apps/market-spread-jr/market-spread-jr.pony
   fun name(): String => _name
   fun id(): U64 => _id
 
@@ -156,6 +167,94 @@ primitive SymbolPartitionFunction
   fun apply(input: (FixNbboMessage val | FixOrderMessage val)): String 
   =>
     input.symbol()
+=======
+    state.last_bid = msg.bid_px()
+    state.last_offer = msg.offer_px()
+    None
+
+class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val, 
+  SymbolData]
+  fun name(): String => "Check Order against NBBO"
+
+  fun apply(msg: FixOrderMessage val, state: SymbolData): 
+    (OrderResult val | None) =>
+    // @printf[I32]("Check order run\n".cstring())
+    if state.should_reject_trades then
+      OrderResult(msg, state.last_bid, state.last_offer,
+        Epoch.nanoseconds())
+    else
+      None
+    end
+
+primitive NbboSourceDecoder 
+  fun apply(data: Array[U8] val): FixNbboMessage val ? =>
+    match FixishMsgDecoder(data)
+    | let m: FixNbboMessage val => m
+    else
+      error
+    end
+
+primitive OrderSourceDecoder 
+  fun apply(data: Array[U8] val): FixOrderMessage val ? =>
+    match FixishMsgDecoder(data)
+    | let m: FixOrderMessage val => m
+    else
+      error
+    end
+
+class val SymbolDataBuilder
+  fun apply(): SymbolData => SymbolData
+  fun name(): String => "Market Data"
+
+// class SymbolRouter is Router[(FixNbboMessage val | FixOrderMessage val),
+//   Step tag]
+//   let _routes: Map[String, Step tag] val
+
+//   new iso create(routes: Map[String, Step tag] val) =>
+//     _routes = routes
+
+//   fun route(input: (FixNbboMessage val | FixOrderMessage val)): 
+//     (Step tag | None) 
+//   =>
+//     if _routes.contains(input.symbol()) then
+//       try
+//         _routes(input.symbol())
+//       end
+//     end
+
+primitive SymbolPartitionFunction
+  fun apply(input: (FixNbboMessage val | FixOrderMessage val)): String 
+  =>
+    input.symbol()
+
+primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
+  fun header_length(): USize =>
+    4
+
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+
+  fun decode(data: Array[U8] val): FixOrderMessage val ? =>
+    match FixishMsgDecoder(data)
+    | let m: FixOrderMessage val => m
+    else
+      error
+    end
+
+primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
+  fun header_length(): USize =>
+    4
+
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+
+  fun decode(data: Array[U8] val): FixNbboMessage val ? =>
+    match FixishMsgDecoder(data)
+    | let m: FixNbboMessage val => m
+    else
+      error
+    end
+>>>>>>> api-automate-merge:apps/market-spread-jr/market-spread-jr.old
 
 class OrderResult
   let order: FixOrderMessage val
@@ -186,6 +285,7 @@ class OrderResult
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
+    // @printf[I32]("Encoding result\n".cstring())
     //Header (size == 55 bytes)
     let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
     wb.u32_be(msgs_size.u32())

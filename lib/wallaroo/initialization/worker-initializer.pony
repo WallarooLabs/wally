@@ -1,16 +1,20 @@
 use "collections"
+use "net"
+use "sendence/guid"
 use "sendence/messages"
 use "wallaroo/messages"
+use "wallaroo/metrics"
+use "wallaroo/network"
 use "wallaroo/topology"
 
-actor Initializer
+actor WorkerInitializer
   let _auth: AmbientAuth
   let _expected: USize
   let _connections: Connections
-  let _local_topology_initializer: LocalTopologyInitializer
-  let _input_addrs: Array[Array[String]] val
+  let _application_initializer: ApplicationInitializer
+  let _initializer_data_addr: Array[String] val
+  let _metrics_conn: TCPConnection
   let _ready_workers: Set[String] = Set[String]
-  var _topology_starter: (TopologyStarter val | None) = None
   var _control_identified: USize = 1
   var _data_identified: USize = 1
   // var interconnected: USize = 0
@@ -21,16 +25,24 @@ actor Initializer
   let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
 
   new create(auth: AmbientAuth, workers: USize, connections: Connections,
-    local_topology_initializer: LocalTopologyInitializer,
-    input_addrs: Array[Array[String]] val) =>
+    application_initializer: ApplicationInitializer, 
+    data_addr: Array[String] val, metrics_conn: TCPConnection) 
+  =>
     _auth = auth
     _expected = workers
     _connections = connections
-    _input_addrs = input_addrs
-    _local_topology_initializer = local_topology_initializer
+    _initializer_data_addr = data_addr
+    _metrics_conn = metrics_conn
+    _application_initializer = application_initializer
 
-  be start(topology_starter: TopologyStarter val) =>
-    _topology_starter = topology_starter
+  be start(a: (ApplicationStarter val | Application val)) =>
+    _application_initializer.update_application(a)
+
+    if _expected == 1 then
+      _application_initializer.initialize(this, _expected, 
+        recover Array[String] end)     
+    end
+
 
   be identify_control_address(worker: String, host: String, service: String) =>
     if _control_addrs.contains(worker) then
@@ -42,7 +54,13 @@ actor Initializer
       if _control_identified == _expected then
         @printf[I32]("All worker control channels identified\n".cstring())
 
-        _initialize()      
+        let names: Array[String] trn = recover Array[String] end
+        for name in _worker_names.values() do
+          names.push(name)
+        end
+
+        _application_initializer.initialize(this, _expected, 
+          consume names)      
       end
     end
 
@@ -86,19 +104,6 @@ actor Initializer
   be register_proxy(worker: String, proxy: Step tag) =>
     _connections.register_proxy(worker, proxy)
 
-  fun _initialize() =>
-    @printf[I32]("Initializing topology\n".cstring())
-    match _topology_starter
-    | let t: TopologyStarter val =>
-      try
-        t(this, _worker_names, _input_addrs, _expected)
-      else
-        @printf[I32]("Error running TopologyStarter.\n".cstring())
-      end
-    else
-      @printf[I32]("No topology starter!\n".cstring())
-    end
-
   fun _create_interconnections() =>
     let addresses = _generate_addresses_map()
     try
@@ -129,6 +134,6 @@ actor Initializer
     map("data") = consume data_map
     consume map
 
-trait TopologyStarter
-  fun apply(initializer: Initializer, workers: Array[String] box,
+trait ApplicationStarter
+  fun apply(initializer: WorkerInitializer, workers: Array[String] box,
     input_addrs: Array[Array[String]] val, expected: USize) ?
