@@ -9,6 +9,8 @@ actor Main is TestList
     test(_TestOriginSet)
     test(_TestHashOriginRoute)
     test(_TestHighWatermarkTable)
+    test(_TestBookkeeping)
+    test(_TestUpdateWatermark)
 
 
 class _TestOrigin is Origin 
@@ -77,11 +79,21 @@ class iso _TestHighWatermarkTable is UnitTest
       h.fail("HighWatermarkTable lookup failed!")
     end
     
-  fun timed_out(h: TestHelper) =>
-    h.complete(false)
+class iso _TestBookkeeping is UnitTest
+  fun name(): String =>
+    "messages/bookkeeping"
 
+  fun apply(h: TestHelper) =>
+    None
 
+class iso _TestUpdateWatermark is UnitTest
+  fun name(): String =>
+    "messages/UpdateWatermark"
 
+  fun apply(h: TestHelper) =>
+    None
+
+    
     // h.complete(false)
     // h.fail("test failed")
     // h.long_test(5_000_000_000)
