@@ -39,6 +39,11 @@ namespace wallaroo
 {
 
 
+RawBuffer::RawBuffer () : Buffer()
+{
+}
+
+
 //------------------------------------------------
 RawBuffer::RawBuffer (char* str_, int sz_) : Buffer(str_,sz_)
 {

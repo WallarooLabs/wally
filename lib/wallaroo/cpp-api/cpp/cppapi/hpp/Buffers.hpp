@@ -104,6 +104,7 @@ public:
 class RawBuffer : public Buffer
 {
 public:
+    RawBuffer();
     RawBuffer (char* str_, int sz_);
     RawBuffer (const RawBuffer& rhs_);
     virtual ~RawBuffer ();

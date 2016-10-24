@@ -277,8 +277,9 @@ Buffer& Buffer::operator<< (const double param_)
 //------------------------------------------------
 Buffer& Buffer::operator<< (const string& str_)
 {
-  //writeData(&param_, sizeof(param_));
-  //Logger::getLogger()->error("Method not implemented yet!, method: {}", __PRETTY_FUNCTION__);
+  short sz = (short)str_.size();
+  writeData(&sz, sizeof(short));
+  writeData(str_.c_str(), sz);
   return *this;
 }
 
@@ -366,7 +367,15 @@ Buffer& Buffer::operator>> (double& param_)
 //------------------------------------------------
 Buffer& Buffer::operator>> (string& param_)
 {
-  //Logger::getLogger()->error("Method not implemented yet!, method: {}", __PRETTY_FUNCTION__);
+  short sz;
+  readData(&sz,sizeof(short));
+
+  char* newStrData = new char[sz+1];
+  newStrData[sz]='\0';
+  readData(newStrData, sz);
+
+  param_.copy(newStrData, sz);
+  delete[] newStrData;
   return *this;
 }
 }
