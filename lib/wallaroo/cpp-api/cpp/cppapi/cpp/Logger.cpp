@@ -3,7 +3,8 @@
 //
 
 #include "Logger.hpp"
-
+#include <exception>
+using std::exception;
 
 
 
@@ -25,7 +26,13 @@ Logger* Logger::_instance = nullptr;
 Logger::Logger ()
 {
 #if defined(CONSOLE)
-  _logger = spdlog::stdout_logger_mt("console");
+  try { 
+    _logger = spdlog::stdout_logger_mt("console");
+  }
+  catch(std::exception& e_)
+  {
+    _logger = spdlog::get("console");
+  }
 #else
   _logger = spdlog::basic_logger_mt("basic_logger", "debug_cppapi.log");
 #endif
