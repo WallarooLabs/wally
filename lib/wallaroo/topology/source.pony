@@ -17,6 +17,10 @@ class Source[In: Any val] is Origin
   let _metrics_reporter: MetricsReporter
   let _incoming_envelope: MsgEnvelope ref
   var _count: USize = 0
+  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
+  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
+  let _translate: TranslationTable = TranslationTable(10)
+  let _origins: OriginSet = OriginSet(10)
 
   new iso create(pipeline_name: String, decoder: SourceDecoder[In] val, 
     runner_builder: RunnerBuilder val, router: Router val,
@@ -29,6 +33,22 @@ class Source[In: Any val] is Origin
     _runner = runner_builder(_metrics_reporter.clone())
     _incoming_envelope = MsgEnvelope(this, 0, None, 0, 0)
     _router = router
+
+  fun ref _hwm_get(): HighWatermarkTable
+  =>
+    _hwm
+  
+  fun ref _lwm_get(): LowWatermarkTable
+  =>
+    _lwm
+    
+  fun ref _translate_get(): TranslationTable
+  =>
+    _translate
+  
+  fun ref _origins_get(): OriginSet
+  =>
+    _origins
 
   // be update_watermark(route_id: U64, seq_id: U64)
   // =>

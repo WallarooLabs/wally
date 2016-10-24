@@ -29,6 +29,8 @@ class DataChannelListenNotifier is TCPListenNotify
     _router = routes
     _connections = connections
 
+
+    
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
@@ -47,10 +49,31 @@ class DataChannelListenNotifier is TCPListenNotify
     DataChannelConnectNotifier(_router, _env, _auth)
 
 class DataOrigin is Origin
+  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
+  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
+  let _translate: TranslationTable = TranslationTable(10)
+  let _origins: OriginSet = OriginSet(10)
+  fun ref _hwm_get(): HighWatermarkTable
+  =>
+    _hwm
+  
+  fun ref _lwm_get(): LowWatermarkTable
+  =>
+    _lwm
+    
+  fun ref _translate_get(): TranslationTable
+  =>
+    _translate
+  
+  fun ref _origins_get(): OriginSet
+  =>
+    _origins
+
   // be update_watermark(route_id: U64, seq_id: U64)
   // =>
   //   //TODO: ack on TCP?
   //   None
+    
 
 class DataChannelConnectNotifier is TCPConnectionNotify
   let _router: DataRouter val

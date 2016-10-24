@@ -25,6 +25,22 @@ actor Step is ResilientOrigin
     _seq_id = 0
     _incoming_envelope = MsgEnvelope(this,0, None, 0, 0)
 
+  fun ref _hwm_get(): HighWatermarkTable
+  =>
+    _hwm
+  
+  fun ref _lwm_get(): LowWatermarkTable
+  =>
+    _lwm
+    
+  fun ref _translate_get(): TranslationTable
+  =>
+    _translate
+  
+  fun ref _origins_get(): OriginSet
+  =>
+    _origins
+  
   fun _send_watermark()
   =>
     // for origin in _all_origins.values do
@@ -91,29 +107,8 @@ actor Step is ResilientOrigin
   Process a high watermark received from a downstream step.
   TODO: receive watermark, flush buffers and send another watermark
   """
-  // translate downstream seq_id to origin's seq_id
-  let origin_seq_id = _translate.outToIn(seq_id)
-  // update low watermark for this route_id
-  _lwm.update(route_id, seq_id)
-  // report low watermark to upstream origins
-  for origin in _origins.values() do
-    //   origin.update_watermark(_lwm.low_watermark())
-    None
-  end
-
+  _update_watermark(route_id, seq_id)
   
-  fun ref _bookkeeping(incoming_envelope: MsgEnvelope box, seq_id: U64)
-  =>
-    """
-    Process envelopes and keep track of things
-    """
-    // keep track of messages we've received from upstream
-    _hwm.update((incoming_envelope.origin , incoming_envelope.route_id),
-      incoming_envelope.seq_id)
-    // keep track of mapping between incoming / outgoing seq_id
-    _translate.update(incoming_envelope.seq_id, seq_id)
-    // keep track of origins
-    _origins.set(incoming_envelope.origin)
     
 interface StepBuilder
   fun id(): U128

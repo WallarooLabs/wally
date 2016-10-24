@@ -5,6 +5,43 @@ trait Origin
   fun tag hash(): U64 =>
     (digestof this).hash()
 
+  fun ref _hwm_get(): HighWatermarkTable
+  fun ref _lwm_get(): LowWatermarkTable
+  fun ref _translate_get(): TranslationTable
+  fun ref _origins_get(): OriginSet
+    
+  fun ref _bookkeeping(incoming_envelope: MsgEnvelope box, seq_id: U64)
+  =>
+    """
+    Process envelopes and keep track of things
+    """
+    // keep track of messages we've received from upstream
+    _hwm_get().update((incoming_envelope.origin , incoming_envelope.route_id),
+      incoming_envelope.seq_id)
+    // keep track of mapping between incoming / outgoing seq_id
+    _translate_get().update(incoming_envelope.seq_id, seq_id)
+    // keep track of origins
+    _origins_get().set(incoming_envelope.origin)
+
+  fun ref _update_watermark(route_id: U64, seq_id: U64)
+  =>
+  """
+  Process a high watermark received from a downstream step.
+  TODO: receive watermark, flush buffers and send another watermark
+  """
+  // translate downstream seq_id to origin's seq_id
+  let origin_seq_id = _translate_get().outToIn(seq_id)
+  // update low watermark for this route_id
+  _lwm_get().update(route_id, seq_id)
+  // report low watermark to all upstream origins
+  for origin in _origins_get().values() do
+    //   origin.update_watermark(_lwm.low_watermark())
+    None
+  end
+
+
+
+    
 type OriginSet is HashSet[Origin tag, HashIs[Origin tag]] 
     
 class MsgEnvelope
