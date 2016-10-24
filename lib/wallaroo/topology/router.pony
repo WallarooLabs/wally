@@ -29,10 +29,7 @@ class DirectRouter is Router
                         origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None), seq_id: U64,
                         incoming_envelope: MsgEnvelope box): Bool
   =>
-    let outgoing_envelope = recover val
-      MsgEnvelope(origin, msg_uid, frac_ids, seq_id, _id)
-    end
-    _target.run[D](metric_name, source_ts, data, outgoing_envelope)
+    _target.run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, seq_id, _id)
     false
 
   fun route_id(): U64 => _id

@@ -154,8 +154,6 @@ class ForwardMsg[D: Any val] is DeliveryMsg
   fun metric_name(): String => _metric_name
 
   fun deliver(target_step: Step tag): Bool =>//data_receiver: DataReceiver) =>
-    //start: just to get this to compile
-    let envelope = recover val MsgEnvelope(target_step, U64(0), None, U64(0), U64(0)) end
-    //end: just-to-get-this-to-compile
-    target_step.run[D](_metric_name, _source_ts, _data, envelope)
+    //TODO: get envelope values
+    target_step.run[D](_metric_name, _source_ts, _data, target_step, 0, None, 0, 0)
     false

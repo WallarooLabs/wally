@@ -16,12 +16,14 @@ actor Step is ResilientOrigin
   var _router: Router val = EmptyRouter
   let _metrics_reporter: MetricsReporter 
   var _seq_id: U64
+  let _incoming_envelope: MsgEnvelope ref
   
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso) =>
     _runner = consume runner
     _runner.set_buffer_target(this)
     _metrics_reporter = consume metrics_reporter
     _seq_id = 0
+    _incoming_envelope = MsgEnvelope(this,0, None, 0, 0)
 
   fun _send_watermark()
   =>
@@ -33,27 +35,39 @@ actor Step is ResilientOrigin
   be update_router(router: Router val) => _router = router
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope val)
+    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None),
+    seq_id: U64, route_id: U64)
   =>
     _seq_id = _seq_id + 1
+    _incoming_envelope.origin = origin
+    _incoming_envelope.msg_uid = msg_uid
+    _incoming_envelope.frac_ids = frac_ids
+    _incoming_envelope.seq_id = seq_id
+    _incoming_envelope.route_id = route_id
     let is_finished = _runner.run[D](metric_name, source_ts, data,
-      this, incoming_envelope.msg_uid, incoming_envelope.frac_ids, _seq_id, incoming_envelope, _router)
+      this, msg_uid, frac_ids, _seq_id, _incoming_envelope, _router)
     if is_finished then
       ifdef "resilience" then
-        _bookkeeping(incoming_envelope, _seq_id)
+        _bookkeeping(_incoming_envelope, _seq_id)
         // if Sink then _send_watermark()
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
     
   be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope val)
+    origin: Origin tag, msg_uid: U64, frac_ids: (Array[U64] val | None),
+    seq_id: U64, route_id: U64)
   =>
     _seq_id = _seq_id + 1
+    _incoming_envelope.origin = origin
+    _incoming_envelope.msg_uid = msg_uid
+    _incoming_envelope.frac_ids = frac_ids
+    _incoming_envelope.seq_id = seq_id
+    _incoming_envelope.route_id = route_id
     let is_finished = _runner.recovery_run[D](metric_name, source_ts, data,
-      this, incoming_envelope.msg_uid, incoming_envelope.frac_ids, _seq_id, incoming_envelope, _router)
+      this, msg_uid, frac_ids, _seq_id, _incoming_envelope, _router)
     if is_finished then
-      _bookkeeping(incoming_envelope, _seq_id)
+      _bookkeeping(_incoming_envelope, _seq_id)
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
     
