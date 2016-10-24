@@ -25,7 +25,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(None, 0, None, 0, 0)
   var _outgoing_seq_id: U64 = 0
 
-  new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val, 
+  new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
     metrics_reporter: MetricsReporter iso)
   =>
@@ -52,16 +52,16 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       let ingest_ts = Time.nanos()
       let computation_start = Time.nanos()
 
-      let is_finished = 
+      let is_finished =
         try
           _outgoing_seq_id = _outgoing_seq_id + 1
 
           // TODO: Update this when we figure out exactly how we want to
           // handle message envelopes
-          _outgoing_envelope.update(None, _guid_gen.u128(), None, 
+          _outgoing_envelope.update(None, _guid_gen.u128(), None,
             _outgoing_seq_id, 0)
           let decoded = _handler.decode(consume data)
-          _runner.run[In](_pipeline_name, ingest_ts, decoded, 
+          _runner.run[In](_pipeline_name, ingest_ts, decoded,
             _incoming_envelope, _outgoing_envelope, conn, _router)
         else
           // TODO: we need to provide a good error handling route for crap
@@ -78,6 +78,17 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
 
       conn.expect(_header_size)
       _header = true
+
+      ifdef linux then
+        _msg_count = _msg_count + 1
+        if ((_msg_count % 25) == 0) then
+          false
+        else
+          true
+        end
+      else
+        false
+      end
     end
 
   fun ref accepted(conn: TCPSource ref) =>
