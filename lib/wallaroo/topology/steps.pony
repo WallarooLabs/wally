@@ -46,6 +46,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   // TODO: CREDITFLOW- Bug. Credits should be ISize.
   let _consumers: MapIs[CreditFlowConsumer, USize] = _consumers.create()
   var _request_more_credits_at: USize = 0
+   // CreditFlow Consumer
+  var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
+  // TODO: CREDITFLOW- Should this be ISize in case we wrap around?
+  let _max_distributable_credits: USize = 500_000
+  var _distributable_credits: USize = _max_distributable_credits
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
     consumers: Array[CreditFlowConsumer] val,
@@ -186,7 +191,10 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
         // relationship we have with a given consumer.
         // The old `Producer` class from `backpressure-jr` branch
         // would serve that general role with updates
-        _request_more_credits_at = USize(0).max(credits_available - (credits_available >> 2))
+        // The logic here could also result, in low credit situations with
+        // more than 1 credit request outstanding at a time.
+        // Example. go from 0 to 8. request at 6, request again at 0.
+        _request_more_credits_at = credits_available - (credits_available >> 2)
       else
         _request_credits(from)
       end
@@ -212,10 +220,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
         lambda(x1: USize, x2: USize): USize => x1 - x2 end)
       if credits_available == 0 then
         _request_credits(c)
-      end
-      // TODO: this breaks if num != (0 | 1)
-       if credits_available == _request_more_credits_at then
-        _request_credits(c)
+      else
+        // TODO: this breaks if num != (0 | 1)
+        if credits_available == _request_more_credits_at then
+          _request_credits(c)
+        end
       end
     end
 
@@ -238,15 +247,79 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   // CREDIT FLOW CONSUMER
   // TODO: CREDIT FLOW - Add implementation
   be register_producer(producer: CreditFlowProducer) =>
-    None
+    ifdef debug then
+      try
+        Assert(not _upstreams.contains(producer),
+          "Producer attempted registered with step more than once")
+      else
+        // TODO: CREDITFLOW - What is our error response here?
+        return
+      end
+    end
+
+    _upstreams.push(producer)
 
   be unregister_producer(producer: CreditFlowProducer,
     credits_returned: USize)
   =>
-    None
+    ifdef debug then
+      try
+        Assert(_upstreams.contains(producer),
+          "Producer attempted to unregistered with step " +
+          "it isn't registered with")
+      else
+        // TODO: CREDITFLOW - What is our error response here?
+        return
+      end
+    end
+
+    try
+      let i = _upstreams.find(producer)
+      _upstreams.delete(i)
+      _recoup_credits(credits_returned)
+    end
+
+  fun ref _recoup_credits(recoup: USize) =>
+    _distributable_credits = _distributable_credits + recoup
 
   be credit_request(from: CreditFlowProducer) =>
-    None
+    """
+    Receive a credit request from a producer. For speed purposes, we assume
+    the producer is already registered with us.
+    """
+    ifdef debug then
+      try
+        Assert(_upstreams.contains(from),
+          "Credit request from unregistered producer")
+      else
+        // TODO: CREDITFLOW - What is our error response here?
+        return
+      end
+    end
+
+    // TODO: CREDITFLOW - this is a very naive strategy
+    // Could quite possibly deadlock. Would need to look into that more.
+    let lccl = _lowest_consumer_credit_level()
+    let desired_give_out = _distributable_credits / _upstreams.size()
+    let give_out: USize = if lccl > desired_give_out then
+      desired_give_out
+    else
+      lccl
+    end
+
+    from.receive_credits(give_out, this)
+    _distributable_credits = _distributable_credits - give_out
+
+  fun _lowest_consumer_credit_level(): USize =>
+    var lowest: USize = 0
+
+    for (consumer, credits) in _consumers.pairs() do
+      if credits < lowest then
+        lowest = credits
+      end
+    end
+
+    lowest
 
 // TODO: If this sticks around after boundary work, it will have to become
 // an ResilientOrigin to compile, but that seems weird so we need to

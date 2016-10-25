@@ -114,7 +114,10 @@ actor TCPSource is CreditFlowProducer
         // relationship we have with a given consumer.
         // The old `Producer` class from `backpressure-jr` branch
         // would serve that general role with updates
-        _request_more_credits_at = USize(0).max(credits_available - (credits_available >> 2))
+        // The logic here could also result, in low credit situations with
+        // more than 1 credit request outstanding at a time.
+        // Example. go from 0 to 8. request at 6, request again at 0.
+        _request_more_credits_at = credits_available - (credits_available >> 2)
       else
         _request_credits(from)
       end
@@ -142,10 +145,11 @@ actor TCPSource is CreditFlowProducer
       if credits_available == 0 then
         _mute()
         _request_credits(c)
-      end
-      // TODO: this breaks if num != (0 | 1)
-       if credits_available == _request_more_credits_at then
-        _request_credits(c)
+      else
+        // TODO: this breaks if num != (0 | 1)
+        if credits_available == _request_more_credits_at then
+          _request_credits(c)
+        end
       end
     end
 
