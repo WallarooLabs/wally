@@ -178,6 +178,8 @@ actor PartitionProxy is CreditFlowProducer
   be update_router(router: Router val) =>
     _router = router
 
+  // TODO: If this lives on, then producer/consumer work needs
+  // to be integrated here
   be receive_credits(credits: USize, from: CreditFlowConsumer) => None
   fun ref credits_used(c: CreditFlowConsumer, num: USize = 1) => None
 
