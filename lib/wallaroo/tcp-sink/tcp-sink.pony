@@ -16,11 +16,21 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 // TODO: Fix this placeholder
 class val TrackingInfo
 
-actor EmptySink is RunnableStep
+actor EmptySink is CreditFlowConsumerStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: (Origin tag | None), msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64) 
-  => 
+    origin: (Origin tag | None), msg_uid: U128,
+    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+  =>
+    None
+
+  be register_producer(producer: CreditFlowProducer) =>
+    None
+  be unregister_producer(producer: CreditFlowProducer,
+    credits_returned: USize)
+  =>
+    None
+
+  be credit_request(from: CreditFlowProducer) =>
     None
 
 class TCPSinkBuilder
@@ -30,7 +40,7 @@ class TCPSinkBuilder
     _encoder_wrapper = encoder_wrapper
 
   fun apply(reporter: MetricsReporter iso, host: String, service: String):
-    TCPSink 
+    TCPSink
   =>
     TCPSink(_encoder_wrapper, consume reporter, host, service)
 
@@ -92,8 +102,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
   var _read_len: USize = 0
   var _shutdown: Bool = false
 
-  new create(encoder_wrapper: EncoderWrapper val, 
-    metrics_reporter: MetricsReporter iso, host: String, service: String, 
+  new create(encoder_wrapper: EncoderWrapper val,
+    metrics_reporter: MetricsReporter iso, host: String, service: String,
     from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -113,7 +123,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: (Origin tag | None), msg_uid: U128, 
+    origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
   =>
     try
@@ -299,7 +309,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
     end
 
   // TODO: Fix this when we get a real message envelope
-  fun ref _writev(data: ByteSeqIter, tracking_info: TrackingInfo val = 
+  fun ref _writev(data: ByteSeqIter, tracking_info: TrackingInfo val =
     TrackingInfo) =>
     """
     Write a sequence of sequences of bytes.

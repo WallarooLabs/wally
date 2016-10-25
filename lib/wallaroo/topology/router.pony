@@ -16,23 +16,30 @@ interface RouterBuilder
 class EmptyRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool 
+    producer: (CreditFlowProducer ref | None)): Bool
   =>
     true
 
 class DirectRouter
-  let _target: RunnableStep tag
+  let _target: CreditFlowConsumerStep tag
 
-  new val create(target: RunnableStep tag) =>
+  new val create(target: CreditFlowConsumerStep tag) =>
     _target = target
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool 
+    producer: (CreditFlowProducer ref | None)): Bool
   =>
-    // TODO: Use producer here
-    
-    _target.run[D](metric_name, source_ts, data, 
+
+    ifdef "use_backpressure" then
+      // TODO: remove match after None is gone as a producer option
+      match producer
+      | let p: CreditFlowProducer ref =>
+        p.credit_used(_target, 1)
+      end
+    end
+
+    _target.run[D](metric_name, source_ts, data,
       outgoing_envelope.origin,
       outgoing_envelope.msg_uid,
       outgoing_envelope.frac_ids,
@@ -47,14 +54,14 @@ class DirectRouter
 class DataRouter
   let _routes: Map[U128, Step tag] val
 
-  new val create(routes: Map[U128, Step tag] val = 
-    recover Map[U128, Step tag] end) 
+  new val create(routes: Map[U128, Step tag] val =
+    recover Map[U128, Step tag] end)
   =>
     _routes = routes
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool 
+    producer: (CreditFlowProducer ref | None)): Bool
   =>
     try
       match data
@@ -71,7 +78,7 @@ class DataRouter
     end
 
   // fun routes(): Array[CreditFlowConsumer tag] val =>
-  //   let rs: Array[CreditFlowConsumer tag] trn = 
+  //   let rs: Array[CreditFlowConsumer tag] trn =
   //     recover Array[CreditFlowConsumer tag] end
 
   //   for (k, v) in _routes.pairs() do
@@ -81,9 +88,9 @@ class DataRouter
   //   consume rs
 
 trait PartitionRouter is Router
-  fun local_map(): Map[U128, Step] val  
+  fun local_map(): Map[U128, Step] val
 
-class LocalPartitionRouter[In: Any val, 
+class LocalPartitionRouter[In: Any val,
   Key: (Hashable val & Equatable[Key] val)] is PartitionRouter
   let _local_map: Map[U128, Step] val
   let _step_ids: Map[Key, U128] val
@@ -101,20 +108,28 @@ class LocalPartitionRouter[In: Any val,
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool 
+    producer: (CreditFlowProducer ref | None)): Bool
   =>
     match data
     | let input: In =>
       let key = _partition_function(input)
       try
-        match _routes(key)  
+        match _routes(key)
         | let s: Step =>
-          s.run[In](metric_name, source_ts, input, 
+          ifdef "use_backpressure" then
+            // TODO: remove match after None is gone as a producer option
+            match producer
+            | let p: CreditFlowProducer ref =>
+              p.credit_used(s, 1)
+            end
+          end
+
+          s.run[In](metric_name, source_ts, input,
             outgoing_envelope.origin,
             outgoing_envelope.msg_uid,
             outgoing_envelope.frac_ids,
             outgoing_envelope.seq_id,
-            // TODO: Generate correct route id 
+            // TODO: Generate correct route id
             0)
           false
         | let p: PartitionProxy =>
@@ -125,7 +140,7 @@ class LocalPartitionRouter[In: Any val,
               outgoing_envelope.msg_uid,
               outgoing_envelope.frac_ids,
               outgoing_envelope.seq_id,
-              // TODO: Generate correct route id 
+              // TODO: Generate correct route id
               0)
             false
           else
@@ -148,7 +163,7 @@ class TCPRouter
   let _tcp_writer: TCPWriter
 
   new val create(target: (TCPConnection | Array[TCPConnection] val)) =>
-    _tcp_writer = 
+    _tcp_writer =
       match target
       | let c: TCPConnection =>
         SingleTCPWriter(c)
@@ -160,7 +175,7 @@ class TCPRouter
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool 
+    producer: (CreditFlowProducer ref | None)): Bool
   =>
     match data
     | let d: Array[ByteSeq] val =>
@@ -187,7 +202,7 @@ class SingleTCPWriter
   new create(conn: TCPConnection) =>
     _conn = conn
 
-  fun apply(d: Array[ByteSeq] val) => 
+  fun apply(d: Array[ByteSeq] val) =>
     _conn.writev(d)
 
   fun dispose() => _conn.dispose()
