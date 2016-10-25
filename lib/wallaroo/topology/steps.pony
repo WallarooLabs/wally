@@ -141,7 +141,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   be receive_credits(credits: USize, from: CreditFlowConsumer) =>
     None
 
-  fun ref credit_used(c: CreditFlowConsumer, num: USize = 1) =>
+  fun ref credits_used(c: CreditFlowConsumer, num: USize = 1) =>
     None
 
   be register_producer(producer: CreditFlowProducer) =>
@@ -179,7 +179,7 @@ actor PartitionProxy is CreditFlowProducer
     _router = router
 
   be receive_credits(credits: USize, from: CreditFlowConsumer) => None
-  fun ref credit_used(c: CreditFlowConsumer, num: USize = 1) => None
+  fun ref credits_used(c: CreditFlowConsumer, num: USize = 1) => None
 
   be forward[D: Any val](metric_name: String, source_ts: U64, data: D,
     target_step_id: U128, from_step_id: U128, msg_uid: U128,

@@ -35,7 +35,7 @@ class DirectRouter
       // TODO: remove match after None is gone as a producer option
       match producer
       | let p: CreditFlowProducer ref =>
-        p.credit_used(_target, 1)
+        p.credits_used(_target, 1)
       end
     end
 
@@ -120,7 +120,7 @@ class LocalPartitionRouter[In: Any val,
             // TODO: remove match after None is gone as a producer option
             match producer
             | let p: CreditFlowProducer ref =>
-              p.credit_used(s, 1)
+              p.credits_used(s, 1)
             end
           end
 

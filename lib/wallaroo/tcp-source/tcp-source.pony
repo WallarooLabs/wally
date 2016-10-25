@@ -112,7 +112,7 @@ actor TCPSource is CreditFlowProducer
     end
 
 
-  fun ref credit_used(c: CreditFlowConsumer, num: USize = 1) =>
+  fun ref credits_used(c: CreditFlowConsumer, num: USize = 1) =>
     //@printf[None]("credits used: %d\n".cstring(), num)
 
     ifdef debug then
