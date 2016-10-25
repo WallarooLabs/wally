@@ -1,7 +1,8 @@
 use "assert"
 use "collections"
 use "net"
-use "../backpressure"
+use "wallaroo/backpressure"
+use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -18,8 +19,7 @@ actor TCPSource is CreditFlowProducer
   """
   // Credit Flow
   // TODO: CREDITFLOW- Bug. Credits should be ISize.
-  let _consumers: MapIs[CreditFlowConsumer, USize] = _consumers.create()
-  var _request_more_credits_at: USize = 0
+  let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
 
   // TCP
   let _listen: TCPSourceListener
@@ -40,6 +40,7 @@ actor TCPSource is CreditFlowProducer
 
   var _muted: Bool
 
+  // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     consumers: Array[CreditFlowConsumer] val, fd: U32, init_size: USize = 64,
     max_size: USize = 16384)
@@ -67,33 +68,32 @@ actor TCPSource is CreditFlowProducer
     _notify.accepted(this)
 
     ifdef "use_backpressure" then
-      for c in consumers.values() do
-        _consumers(c) = 0
-      end
-      _register_with_consumers()
+      // TODO: CREDITFLOW - this should call `routes` on the _notify's router
+      // which means we need to expose that router or rather the routes
+      None
 
-      // TODO: this should be in a post create initialize
-      for c in consumers.values() do
-        _request_credits(c)
+      // TODO: CREDITFLOW - this should be in a post create initialize
+      for r in _routes.values() do
+        r.initialize()
       end
     end
 
   be dispose() =>
      """
     - Close the connection gracefully.
-    - Unregister with our consumers
+    - Dispose of our routes
     """
     close()
-
+    for r in _routes.values() do
+      r.dispose()
+    end
 
   //
   // CREDIT FLOW
-  be receive_credits(credits: USize, from: CreditFlowConsumer) =>
-    //@printf[None]("received credits: %d\n".cstring(), credits)
-
+  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
     ifdef debug then
       try
-        Assert(_consumers.contains(from),
+        Assert(_routes.contains(from),
         "Source received credits from consumer it isn't registered with.")
       else
         _hard_close()
@@ -102,71 +102,19 @@ actor TCPSource is CreditFlowProducer
     end
 
     try
-      if credits > 0 then
-        let credits_available = _consumers.upsert(from, credits,
-          lambda(x1: USize, x2: USize): USize => x1 + x2 end)
-        if (credits_available - credits) == 0 then
-          _unmute()
-        end
-        // TODO: CREDITFLOW. This is a bug.
-        // If we have more than 1 consumer, they will step on each
-        // other. We need a class to hold info about each
-        // relationship we have with a given consumer.
-        // The old `Producer` class from `backpressure-jr` branch
-        // would serve that general role with updates
-        // The logic here could also result, in low credit situations with
-        // more than 1 credit request outstanding at a time.
-        // Example. go from 0 to 8. request at 6, request again at 0.
-        _request_more_credits_at = credits_available - (credits_available >> 2)
-      else
-        _request_credits(from)
-      end
+      let route = _routes(from)
+      // TODO: CREDITFLOW- uncomment me
+      //route.receive_credits(credits)
     end
 
-
-  fun ref credits_used(c: CreditFlowConsumer, num: USize = 1) =>
-    //@printf[None]("credits used: %d\n".cstring(), num)
-
-    ifdef debug then
-      try
-        Assert(_consumers.contains(c),
-        "Source used credits going to consumer it isn't registered with.")
-        Assert(num <= _consumers(c),
-        "Source got usage notification for more than the available credits")
-      else
-        _hard_close()
-        return
-      end
-    end
-
+  // TODO: CREDITFLOW - None is a placeholder
+  // Implement real logic
+  fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
     try
-      let credits_available = _consumers.upsert(c, num,
-        lambda(x1: USize, x2: USize): USize => x1 - x2 end)
-      if credits_available == 0 then
-        _mute()
-        _request_credits(c)
-      else
-        // TODO: this breaks if num != (0 | 1)
-        if credits_available == _request_more_credits_at then
-          _request_credits(c)
-        end
-      end
+      _routes(c)
+    else
+      None
     end
-
-  fun ref _register_with_consumers() =>
-    for consumer in _consumers.keys() do
-      consumer.register_producer(this)
-    end
-
-  fun ref _unregister_with_consumers() =>
-    @printf[None]("unregistering\n".cstring())
-    for (consumer, credits) in _consumers.pairs() do
-      consumer.unregister_producer(this, credits)
-    end
-
-  fun ref _request_credits(from: CreditFlowConsumer) =>
-    //@printf[None]("Requesting credits\n".cstring())
-    from.credit_request(this)
 
   //
   // TCP
@@ -244,7 +192,6 @@ actor TCPSource is CreditFlowProducer
     else
       _close()
     end
-    _unregister_with_consumers()
 
   fun ref _close() =>
     _closed = true
@@ -392,3 +339,23 @@ actor TCPSource is CreditFlowProducer
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
     _read_buf_size()
+
+primitive TCPSourceRouteCallbackHandler is RouteCallbackHandler
+  fun shutdown(producer: CreditFlowProducer ref) =>
+    match producer
+    | let p: TCPSource ref =>
+      p._hard_close()
+    end
+
+  fun credits_replenished(producer: CreditFlowProducer ref) =>
+    match producer
+    | let p: TCPSource ref =>
+      p._unmute()
+    end
+
+  fun credits_exhausted(producer: CreditFlowProducer ref) =>
+    match producer
+    | let p: TCPSource ref =>
+      p._mute()
+    end
+

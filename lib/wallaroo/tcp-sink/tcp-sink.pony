@@ -25,8 +25,9 @@ actor EmptySink is CreditFlowConsumerStep
 
   be register_producer(producer: CreditFlowProducer) =>
     None
+
   be unregister_producer(producer: CreditFlowProducer,
-    credits_returned: USize)
+    credits_returned: ISize)
   =>
     None
 
@@ -81,8 +82,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
   // CreditFlow
   var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
   // TODO: CREDITFLOW- Should this be ISize in case we wrap around?
-  let _max_distributable_credits: USize = 500_000
-  var _distributable_credits: USize = _max_distributable_credits
+  let _max_distributable_credits: ISize = 500_000
+  var _distributable_credits: ISize = _max_distributable_credits
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -159,7 +160,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
     """
     close()
 
-  fun ref _unit_finished(number_finished: USize, last_sent: TrackingInfo val) =>
+  fun ref _unit_finished(number_finished: ISize, last_sent:
+    TrackingInfo val)
+  =>
     """
     Handles book keeping related to resilience and backpressure. Called when
     a collection of sends is completed. When backpressure hasn't been applied,
@@ -185,7 +188,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
     _upstreams.push(producer)
 
   be unregister_producer(producer: CreditFlowProducer,
-    credits_returned: USize)
+    credits_returned: ISize)
   =>
     ifdef debug then
       try
@@ -232,8 +235,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
       end
     end
 
-    let give_out: USize =  if _can_send() then
-      (_distributable_credits / _upstreams.size())
+    let give_out =  if _can_send() then
+      (_distributable_credits / _upstreams.size().isize())
     else
       0
     end
@@ -241,7 +244,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
 
-  fun ref _recoup_credits(recoup: USize) =>
+  fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
 
   //
@@ -494,7 +497,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
     writeable. On an error, dispose of the connection.
     """
     var final_pending_sent: (TrackingInfo val | None) = None
-    var num_sent: USize = 0
+    var num_sent: ISize = 0
 
     while _writeable and (_pending.size() > 0) do
       try

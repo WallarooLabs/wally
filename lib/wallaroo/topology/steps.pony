@@ -44,13 +44,13 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
 
   // Credit Flow Producer
   // TODO: CREDITFLOW- Bug. Credits should be ISize.
-  let _consumers: MapIs[CreditFlowConsumer, USize] = _consumers.create()
-  var _request_more_credits_at: USize = 0
+  let _consumers: MapIs[CreditFlowConsumer, ISize] = _consumers.create()
+  var _request_more_credits_at: ISize = 0
    // CreditFlow Consumer
   var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
   // TODO: CREDITFLOW- Should this be ISize in case we wrap around?
-  let _max_distributable_credits: USize = 500_000
-  var _distributable_credits: USize = _max_distributable_credits
+  let _max_distributable_credits: ISize = 500_000
+  var _distributable_credits: ISize = _max_distributable_credits
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
     consumers: Array[CreditFlowConsumer] val,
@@ -66,6 +66,8 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     _router = router
 
     ifdef "use_backpressure" then
+    // TODO: CREDITFLOW - this should call `routes` on the router to
+    // get consumers
       for c in consumers.values() do
         _consumers(c) = 0
       end
@@ -168,7 +170,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
 
   //////////////
   // CREDIT FLOW PRODUCER
-  be receive_credits(credits: USize, from: CreditFlowConsumer) =>
+  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
     //@printf[None]("received credits: %d\n".cstring(), credits)
 
     ifdef debug then
@@ -184,7 +186,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     try
       if credits > 0 then
         let credits_available = _consumers.upsert(from, credits,
-          lambda(x1: USize, x2: USize): USize => x1 + x2 end)
+          lambda(x1: ISize, x2: ISize): ISize => x1 + x2 end)
         // TODO: CREDITFLOW. This is a bug.
         // If we have more than 1 consumer, they will step on each
         // other. We need a class to hold info about each
@@ -200,7 +202,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
       end
     end
 
-  fun ref credits_used(c: CreditFlowConsumer, num: USize = 1) =>
+  fun ref credits_used(c: CreditFlowConsumer, num: ISize = 1) =>
     //@printf[None]("credits used: %d\n".cstring(), num)
 
     ifdef debug then
@@ -217,7 +219,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
 
     try
       let credits_available = _consumers.upsert(c, num,
-        lambda(x1: USize, x2: USize): USize => x1 - x2 end)
+        lambda(x1: ISize, x2: ISize): ISize => x1 - x2 end)
       if credits_available == 0 then
         _request_credits(c)
       else
@@ -243,6 +245,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     //@printf[None]("Requesting credits\n".cstring())
     from.credit_request(this)
 
+  // TODO: CREDITFLOW - None is a placeholder
+  // Implement real logic
+  fun route_to(c: CreditFlowConsumerStep): (Route | None) =>
+    None
+
   //////////////
   // CREDIT FLOW CONSUMER
   // TODO: CREDIT FLOW - Add implementation
@@ -260,7 +267,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     _upstreams.push(producer)
 
   be unregister_producer(producer: CreditFlowProducer,
-    credits_returned: USize)
+    credits_returned: ISize)
   =>
     ifdef debug then
       try
@@ -279,7 +286,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
       _recoup_credits(credits_returned)
     end
 
-  fun ref _recoup_credits(recoup: USize) =>
+  fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
 
   be credit_request(from: CreditFlowProducer) =>
@@ -300,8 +307,8 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     // TODO: CREDITFLOW - this is a very naive strategy
     // Could quite possibly deadlock. Would need to look into that more.
     let lccl = _lowest_consumer_credit_level()
-    let desired_give_out = _distributable_credits / _upstreams.size()
-    let give_out: USize = if lccl > desired_give_out then
+    let desired_give_out = _distributable_credits / _upstreams.size().isize()
+    let give_out = if lccl > desired_give_out then
       desired_give_out
     else
       lccl
@@ -310,8 +317,8 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
 
-  fun _lowest_consumer_credit_level(): USize =>
-    var lowest: USize = 0
+  fun _lowest_consumer_credit_level(): ISize =>
+    var lowest: ISize = 0
 
     for (consumer, credits) in _consumers.pairs() do
       if credits < lowest then
@@ -346,8 +353,9 @@ actor PartitionProxy is CreditFlowProducer
 
   // TODO: If this lives on, then producer/consumer work needs
   // to be integrated here
-  be receive_credits(credits: USize, from: CreditFlowConsumer) => None
-  fun ref credits_used(c: CreditFlowConsumer, num: USize = 1) => None
+  be receive_credits(credits: ISize, from: CreditFlowConsumer) => None
+  fun ref credits_used(c: CreditFlowConsumer, num: ISize = 1) => None
+  fun route_to(c: CreditFlowConsumerStep): (Route | None) => None
 
   be forward[D: Any val](metric_name: String, source_ts: U64, data: D,
     target_step_id: U128, from_step_id: U128, msg_uid: U128,

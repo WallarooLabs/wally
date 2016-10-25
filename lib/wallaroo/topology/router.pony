@@ -30,14 +30,9 @@ class DirectRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
-
-    ifdef "use_backpressure" then
-      // TODO: remove match after None is gone as a producer option
-      match producer
-      | let p: CreditFlowProducer ref =>
-        p.credits_used(_target, 1)
-      end
-    end
+    // TODO- CreditFlow
+    // Lookup route from producer
+    // Call run on the route we got from the producer
 
     _target.run[D](metric_name, source_ts, data,
       outgoing_envelope.origin,
@@ -116,13 +111,9 @@ class LocalPartitionRouter[In: Any val,
       try
         match _routes(key)
         | let s: Step =>
-          ifdef "use_backpressure" then
-            // TODO: remove match after None is gone as a producer option
-            match producer
-            | let p: CreditFlowProducer ref =>
-              p.credits_used(s, 1)
-            end
-          end
+          // TODO- CreditFlow
+          // Lookup route from producer
+          // Call run on the route we got from the producer
 
           s.run[In](metric_name, source_ts, input,
             outgoing_envelope.origin,
