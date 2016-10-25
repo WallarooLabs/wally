@@ -48,16 +48,18 @@ class Route
   fun ref initialize() =>
     _request_credits()
 
+  fun credits(): ISize => _credits_available
+
   fun ref dispose() =>
     """
     Return unused credits to downstream consumer
     """
     _consumer.unregister_producer(_step, _credits_available)
 
-  fun ref receive_credits(credits: ISize) =>
+  fun ref receive_credits(number: ISize) =>
      ifdef debug then
       try
-        Assert(credits >= 0,
+        Assert(number > 0,
         "Producer received credits negative credits")
       else
         _callback.shutdown(_step)
@@ -66,10 +68,10 @@ class Route
     end
 
     _request_outstanding = false
-    _credits_available = _credits_available + credits
+    _credits_available = _credits_available + number
 
     if _credits_available > 0 then
-      if (_credits_available - credits) == 0 then
+      if (_credits_available - number) == 0 then
         _callback.credits_replenished(_step)
       end
 

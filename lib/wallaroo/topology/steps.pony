@@ -43,9 +43,8 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
 
   // Credit Flow Producer
-  // TODO: CREDITFLOW- Bug. Credits should be ISize.
-  let _consumers: MapIs[CreditFlowConsumer, ISize] = _consumers.create()
-  var _request_more_credits_at: ISize = 0
+  let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
+
    // CreditFlow Consumer
   var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
   // TODO: CREDITFLOW- Should this be ISize in case we wrap around?
@@ -66,16 +65,13 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     _router = router
 
     ifdef "use_backpressure" then
-    // TODO: CREDITFLOW - this should call `routes` on the router to
-    // get consumers
-      for c in consumers.values() do
-        _consumers(c) = 0
-      end
-      _register_with_consumers()
+      // TODO: CREDITFLOW - this should call `routes` on all routers
+      // and setup our Routers
+      None
 
-      // TODO: this should be in a post create initialize
-      for c in consumers.values() do
-        _request_credits(c)
+      // TODO: CREDITFLOW - this should be in a post create initialize
+      for r in _routes.values() do
+        r.initialize()
       end
     end
 
@@ -171,11 +167,9 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   //////////////
   // CREDIT FLOW PRODUCER
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-    //@printf[None]("received credits: %d\n".cstring(), credits)
-
     ifdef debug then
       try
-        Assert(_consumers.contains(from),
+        Assert(_routes.contains(from),
         "Step received credits from consumer it isn't registered with.")
       else
         // TODO: CREDITFLOW - What is our error response here?
@@ -184,71 +178,16 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     end
 
     try
-      if credits > 0 then
-        let credits_available = _consumers.upsert(from, credits,
-          lambda(x1: ISize, x2: ISize): ISize => x1 + x2 end)
-        // TODO: CREDITFLOW. This is a bug.
-        // If we have more than 1 consumer, they will step on each
-        // other. We need a class to hold info about each
-        // relationship we have with a given consumer.
-        // The old `Producer` class from `backpressure-jr` branch
-        // would serve that general role with updates
-        // The logic here could also result, in low credit situations with
-        // more than 1 credit request outstanding at a time.
-        // Example. go from 0 to 8. request at 6, request again at 0.
-        _request_more_credits_at = credits_available - (credits_available >> 2)
-      else
-        _request_credits(from)
-      end
+      let route = _routes(from)
+      route.receive_credits(credits)
     end
 
-  fun ref credits_used(c: CreditFlowConsumer, num: ISize = 1) =>
-    //@printf[None]("credits used: %d\n".cstring(), num)
-
-    ifdef debug then
-      try
-        Assert(_consumers.contains(c),
-        "Source used credits going to consumer it isn't registered with.")
-        Assert(num <= _consumers(c),
-        "Source got usage notification for more than the available credits")
-      else
-        // TODO: CREDITFLOW - What is our error response here?
-        return
-      end
-    end
-
+  fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
     try
-      let credits_available = _consumers.upsert(c, num,
-        lambda(x1: ISize, x2: ISize): ISize => x1 - x2 end)
-      if credits_available == 0 then
-        _request_credits(c)
-      else
-        // TODO: this breaks if num != (0 | 1)
-        if credits_available == _request_more_credits_at then
-          _request_credits(c)
-        end
-      end
+      _routes(c)
+    else
+      None
     end
-
-  fun ref _register_with_consumers() =>
-    for consumer in _consumers.keys() do
-      consumer.register_producer(this)
-    end
-
-  fun ref _unregister_with_consumers() =>
-    @printf[None]("unregistering\n".cstring())
-    for (consumer, credits) in _consumers.pairs() do
-      consumer.unregister_producer(this, credits)
-    end
-
-  fun ref _request_credits(from: CreditFlowConsumer) =>
-    //@printf[None]("Requesting credits\n".cstring())
-    from.credit_request(this)
-
-  // TODO: CREDITFLOW - None is a placeholder
-  // Implement real logic
-  fun route_to(c: CreditFlowConsumerStep): (Route | None) =>
-    None
 
   //////////////
   // CREDIT FLOW CONSUMER
@@ -306,7 +245,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
 
     // TODO: CREDITFLOW - this is a very naive strategy
     // Could quite possibly deadlock. Would need to look into that more.
-    let lccl = _lowest_consumer_credit_level()
+    let lccl = _lowest_route_credit_level()
     let desired_give_out = _distributable_credits / _upstreams.size().isize()
     let give_out = if lccl > desired_give_out then
       desired_give_out
@@ -317,12 +256,12 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
 
-  fun _lowest_consumer_credit_level(): ISize =>
+  fun _lowest_route_credit_level(): ISize =>
     var lowest: ISize = 0
 
-    for (consumer, credits) in _consumers.pairs() do
-      if credits < lowest then
-        lowest = credits
+    for route in _routes.values() do
+      if route.credits() < lowest then
+        lowest = route.credits()
       end
     end
 
@@ -473,3 +412,15 @@ class PartitionedPreStateStepBuilder
     _pre_state_subpartition.build(worker_name, _runner_builder,
       state_addresses, metrics_conn, auth, connections, alfred,
       state_comp_router)
+
+primitive StepRouteCallbackHandler is RouteCallbackHandler
+  fun shutdown(producer: CreditFlowProducer ref) =>
+    // TODO: CREDITFLOW - What is our error handling?
+    None
+
+  fun credits_replenished(producer: CreditFlowProducer ref) =>
+    None
+
+  fun credits_exhausted(producer: CreditFlowProducer ref) =>
+    None
+

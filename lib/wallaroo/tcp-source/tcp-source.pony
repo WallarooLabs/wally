@@ -103,12 +103,9 @@ actor TCPSource is CreditFlowProducer
 
     try
       let route = _routes(from)
-      // TODO: CREDITFLOW- uncomment me
-      //route.receive_credits(credits)
+      route.receive_credits(credits)
     end
 
-  // TODO: CREDITFLOW - None is a placeholder
-  // Implement real logic
   fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
     try
       _routes(c)
