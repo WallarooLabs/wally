@@ -374,7 +374,7 @@ Buffer& Buffer::operator>> (string& param_)
   newStrData[sz]='\0';
   readData(newStrData, sz);
 
-  param_.copy(newStrData, sz);
+  param_.assign(newStrData, sz);
   delete[] newStrData;
   return *this;
 }
