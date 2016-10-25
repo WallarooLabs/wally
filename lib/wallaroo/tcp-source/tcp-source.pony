@@ -65,14 +65,16 @@ actor TCPSource is CreditFlowProducer
 
     _notify.accepted(this)
 
-    for c in consumers.values() do
-      _consumers(c) = 0
-    end
-    _register_with_consumers()
+    ifdef "use_backpressure" then
+      for c in consumers.values() do
+        _consumers(c) = 0
+      end
+      _register_with_consumers()
 
-    // TODO: this should be in a post create initialize
-    for c in consumers.values() do
-      _request_credits(c)
+      // TODO: this should be in a post create initialize
+      for c in consumers.values() do
+        _request_credits(c)
+      end
     end
 
   be dispose() =>
@@ -105,6 +107,12 @@ actor TCPSource is CreditFlowProducer
         if (credits_available - credits) == 0 then
           _unmute()
         end
+        // TODO: CREDITFLOW. This is a bug.
+        // If we have more than 1 consumer, they will step on each
+        // other. We need a class to hold info about each
+        // relationship we have with a given consumer.
+        // The old `Producer` class from `backpressure-jr` branch
+        // would serve that general role with updates
         _request_more_credits_at = USize(0).max(credits_available - (credits_available >> 2))
       else
         _request_credits(from)

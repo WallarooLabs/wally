@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "wallaroo/backpressure"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -25,12 +26,12 @@ interface PartitionFindable
 interface PartitionFinder
   fun find[D: Any val](data: D): Router val
 
-class StatelessPartitionFinder[In: Any val, Key: (Hashable val & Equatable[Key] val)] 
+class StatelessPartitionFinder[In: Any val, Key: (Hashable val & Equatable[Key] val)]
   let _partition_function: PartitionFunction[In, Key] val
   let _partitions: Map[Key, Router val] = Map[Key, Router val]
 
   new val create(pf: PartitionFunction[In, Key] val, keys: Array[Key] val,
-    router_builder: RouterBuilder val) 
+    router_builder: RouterBuilder val)
   =>
     _partition_function = pf
     for key in keys.values() do
@@ -49,12 +50,12 @@ class StatelessPartitionFinder[In: Any val, Key: (Hashable val & Equatable[Key] 
       EmptyRouter
     end
 
-class StatePartitionFinder[In: Any val, Key: (Hashable val & Equatable[Key] val)] 
+class StatePartitionFinder[In: Any val, Key: (Hashable val & Equatable[Key] val)]
   let _partition_function: PartitionFunction[In, Key] val
   let _partitions: Map[Key, Router val] = Map[Key, Router val]
 
   new val create(pf: PartitionFunction[In, Key] val, keys: Array[Key] val,
-    router_builder: RouterBuilder val) 
+    router_builder: RouterBuilder val)
   =>
     _partition_function = pf
     for key in keys.values() do
@@ -125,7 +126,7 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
   StateSubpartition
   let _keys: Array[Key] val
   let _runner_builder: RunnerBuilder val
- 
+
   new val create(keys: Array[Key] val, runner_builder: RunnerBuilder val) =>
     _keys = keys
     _runner_builder = runner_builder
@@ -134,21 +135,22 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
     let m: Map[Key, Step] trn = recover Map[Key, Step] end
     for key in _keys.values() do
       let reporter = MetricsReporter("shared state", metrics_conn)
-      m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred), 
-        consume reporter)
+      // TODO: CREDITFLOW- Needs real list of consumers
+      m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
+        consume reporter, recover Array[CreditFlowConsumer] end)
     end
     KeyedStateAddresses[Key](consume m)
 
 // class PartitionRouterBuilder
 //   fun build(state_addresses: StateAddresses val, metrics_conn: TCPConnection,
-//     state_comp_router: Router val = EmptyRouter): Router val 
+//     state_comp_router: Router val = EmptyRouter): Router val
 
 
 trait PreStateSubpartition
   fun build(worker_name: String, runner_builder: RunnerBuilder val,
-    state_addresses: StateAddresses val, metrics_conn: TCPConnection, 
+    state_addresses: StateAddresses val, metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
-    state_comp_router: Router val = EmptyRouter): PartitionRouter val 
+    state_comp_router: Router val = EmptyRouter): PartitionRouter val
 
 class KeyedPreStateSubpartition[PIn: Any val,
   Key: (Hashable val & Equatable[Key] val)] is PreStateSubpartition
@@ -157,42 +159,42 @@ class KeyedPreStateSubpartition[PIn: Any val,
   let _partition_function: PartitionFunction[PIn, Key] val
   let _pipeline_name: String
 
-  new val create(partition_addresses': KeyedPartitionAddresses[Key] val, 
+  new val create(partition_addresses': KeyedPartitionAddresses[Key] val,
     id_map': Map[Key, U128] val,
     partition_function': PartitionFunction[PIn, Key] val,
-    pipeline_name': String) 
+    pipeline_name': String)
   =>
     _partition_addresses = partition_addresses'
     _id_map = id_map'
     _partition_function = partition_function'
     _pipeline_name = pipeline_name'
 
-  fun build(worker_name: String, 
+  fun build(worker_name: String,
     runner_builder: RunnerBuilder val,
     state_addresses: StateAddresses val, metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
-    state_comp_router: Router val = EmptyRouter): 
+    state_comp_router: Router val = EmptyRouter):
     LocalPartitionRouter[PIn, Key] val
   =>
     // map from worker name to partition proxy
-    let partition_proxies_trn: Map[String, PartitionProxy] trn = 
+    let partition_proxies_trn: Map[String, PartitionProxy] trn =
       recover Map[String, PartitionProxy] end
 
     for (k, proxy_address) in _partition_addresses.pairs() do
       // create partition proxies
-      if (not partition_proxies_trn.contains(proxy_address.worker)) and 
+      if (not partition_proxies_trn.contains(proxy_address.worker)) and
         (proxy_address.worker != worker_name) then
         @printf[I32](("Adding partition proxy to " + proxy_address.worker + "for " + _pipeline_name + " pipeline\n").cstring())
         partition_proxies_trn(proxy_address.worker) = PartitionProxy(
           proxy_address.worker, MetricsReporter(_pipeline_name, metrics_conn),
           auth)
-      end 
+      end
     end
     let partition_proxies: Map[String, PartitionProxy] val =
       consume partition_proxies_trn
     connections.register_partition_proxies(partition_proxies)
 
-    let routes: Map[Key, (Step | PartitionProxy)] trn = 
+    let routes: Map[Key, (Step | PartitionProxy)] trn =
       recover Map[Key, (Step | PartitionProxy)] end
 
     let m: Map[U128, Step] trn = recover Map[U128, Step] end
@@ -208,10 +210,12 @@ class KeyedPreStateSubpartition[PIn: Any val,
           match state_step
           | let s: Step =>
             // Create prestate step for this key
+            // TODO: CREDITFLOW- Needs real list of consumers
             let next_step = Step(runner_builder(
                 MetricsReporter(_pipeline_name, metrics_conn)
-                where alfred = alfred, router = state_comp_router), 
-              MetricsReporter(_pipeline_name, metrics_conn), 
+                where alfred = alfred, router = state_comp_router),
+              MetricsReporter(_pipeline_name, metrics_conn),
+              recover Array[CreditFlowConsumer] end,
               DirectRouter(s))
             m(id) = next_step
             routes(key) = next_step

@@ -45,7 +45,10 @@ class EgressBuilder
     | let p: ProxyAddress val =>
       @printf[I32](("Creating Proxy to " + p.worker + "\n").cstring())
       let proxy = Proxy(worker_name, p.step_id, reporter.clone(), auth)
-      let proxy_step = Step(consume proxy, consume reporter)
+
+      // TODO: CREDITFLOW- Needs real list of consumers
+      let proxy_step = Step(consume proxy, consume reporter,
+        recover Array[CreditFlowConsumer] end)
       if proxies.contains(worker_name) then
         proxies(p.worker).push(proxy_step)
       else
@@ -261,6 +264,7 @@ actor LocalTopologyInitializer
             let listen_auth = TCPListenAuth(_auth)
             try
               @printf[I32](("----Creating source for " + pipeline.name() + " pipeline with " + sd.runner_builder().name() + "----\n").cstring())
+              // TODO: CreditFlow. Needs real list of consumers
               TCPSourceListener(sd.builder()(sd.runner_builder(),
                 latest_router, _metrics_conn),
                 recover Array[CreditFlowConsumer] end,

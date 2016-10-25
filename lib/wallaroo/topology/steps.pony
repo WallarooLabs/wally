@@ -1,3 +1,4 @@
+use "assert"
 use "buffered"
 use "time"
 use "net"
@@ -35,8 +36,14 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   let _incoming_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
 
+   // Credit Flow Producer
+  let _consumers: MapIs[CreditFlowConsumer, USize] = _consumers.create()
+  var _request_more_credits_at: USize = 0
+
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
-    router: Router val = EmptyRouter) =>
+    consumers: Array[CreditFlowConsumer] val,
+    router: Router val = EmptyRouter)
+  =>
     _runner = consume runner
     match _runner
     | let elb: EventLogBufferable =>
@@ -45,6 +52,18 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     _metrics_reporter = consume metrics_reporter
     _seq_id = 0
     _router = router
+
+    ifdef "use_backpressure" then
+      for c in consumers.values() do
+        _consumers(c) = 0
+      end
+      _register_with_consumers()
+
+      // TODO: this should be in a post create initialize
+      for c in consumers.values() do
+        _request_credits(c)
+      end
+    end
 
   be update_router(router: Router val) => _router = router
 
@@ -136,14 +155,81 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     end
 
   //////////////
-  // CREDIT FLOW
-  // TODO: Add implementation
+  // CREDIT FLOW PRODUCER
   be receive_credits(credits: USize, from: CreditFlowConsumer) =>
-    None
+    //@printf[None]("received credits: %d\n".cstring(), credits)
+
+    ifdef debug then
+      try
+        Assert(_consumers.contains(from),
+        "Step received credits from consumer it isn't registered with.")
+      else
+        // TODO: CREDITFLOW - What is our error response here?
+        return
+      end
+    end
+
+    try
+      if credits > 0 then
+        let credits_available = _consumers.upsert(from, credits,
+          lambda(x1: USize, x2: USize): USize => x1 + x2 end)
+        // TODO: CREDITFLOW. This is a bug.
+        // If we have more than 1 consumer, they will step on each
+        // other. We need a class to hold info about each
+        // relationship we have with a given consumer.
+        // The old `Producer` class from `backpressure-jr` branch
+        // would serve that general role with updates
+        _request_more_credits_at = USize(0).max(credits_available - (credits_available >> 2))
+      else
+        _request_credits(from)
+      end
+    end
 
   fun ref credits_used(c: CreditFlowConsumer, num: USize = 1) =>
-    None
+    //@printf[None]("credits used: %d\n".cstring(), num)
 
+    ifdef debug then
+      try
+        Assert(_consumers.contains(c),
+        "Source used credits going to consumer it isn't registered with.")
+        Assert(num <= _consumers(c),
+        "Source got usage notification for more than the available credits")
+      else
+        // TODO: CREDITFLOW - What is our error response here?
+        return
+      end
+    end
+
+    try
+      let credits_available = _consumers.upsert(c, num,
+        lambda(x1: USize, x2: USize): USize => x1 - x2 end)
+      if credits_available == 0 then
+        _request_credits(c)
+      end
+      // TODO: this breaks if num != (0 | 1)
+       if credits_available == _request_more_credits_at then
+        _request_credits(c)
+      end
+    end
+
+  fun ref _register_with_consumers() =>
+    for consumer in _consumers.keys() do
+      consumer.register_producer(this)
+    end
+
+  fun ref _unregister_with_consumers() =>
+    @printf[None]("unregistering\n".cstring())
+    for (consumer, credits) in _consumers.pairs() do
+      consumer.unregister_producer(this, credits)
+    end
+
+  fun ref _request_credits(from: CreditFlowConsumer) =>
+    //@printf[None]("Requesting credits\n".cstring())
+    from.credit_request(this)
+
+  //////////////
+  // CREDIT FLOW CONSUMER
+  // TODO: CREDIT FLOW - Add implementation
   be register_producer(producer: CreditFlowProducer) =>
     None
 
@@ -259,8 +345,10 @@ class StepBuilder
   =>
     let runner = _runner_builder(MetricsReporter(pipeline_name,
       metrics_conn) where alfred = alfred, router = router)
+    // TODO: CREDITFLOW- Needs real list of consumers
     let step = Step(consume runner,
-      MetricsReporter(pipeline_name, metrics_conn), router)
+      MetricsReporter(pipeline_name, metrics_conn),
+      recover Array[CreditFlowConsumer] end, router)
     step.update_router(next)
     step
 
@@ -285,7 +373,9 @@ class PartitionedPreStateStepBuilder
     pipeline_name: String, alfred: Alfred, router: Router val = EmptyRouter):
       Step tag
   =>
-    Step(RouterRunner, MetricsReporter(pipeline_name, metrics_conn))
+    // TODO: CREDITFLOW- Needs real list of consumers
+    Step(RouterRunner, MetricsReporter(pipeline_name, metrics_conn),
+      recover Array[CreditFlowConsumer] end)
 
   fun build_partition(worker_name: String, state_addresses: StateAddresses val,
     metrics_conn: TCPConnection, auth: AmbientAuth, connections: Connections,
