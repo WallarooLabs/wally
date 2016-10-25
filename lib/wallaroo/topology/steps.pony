@@ -25,6 +25,12 @@ trait RunnableStep
 type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer)
 
 actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
+  """
+  # Step
+
+  ## Future work
+  * Switch to requesting credits via promise
+  """
   let _runner: Runner
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
