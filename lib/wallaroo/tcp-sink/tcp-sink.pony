@@ -80,6 +80,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
 
   // CreditFlow
   var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
+  // TODO: CREDITFLOW- Should this be ISize in case we wrap around?
   let _max_distributable_credits: USize = 500_000
   var _distributable_credits: USize = _max_distributable_credits
 

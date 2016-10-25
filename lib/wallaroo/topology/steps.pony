@@ -36,7 +36,8 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   let _incoming_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
 
-   // Credit Flow Producer
+  // Credit Flow Producer
+  // TODO: CREDITFLOW- Bug. Credits should be ISize.
   let _consumers: MapIs[CreditFlowConsumer, USize] = _consumers.create()
   var _request_more_credits_at: USize = 0
 
