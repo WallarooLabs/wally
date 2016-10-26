@@ -120,13 +120,13 @@ actor LocalTopologyInitializer
   let _auth: AmbientAuth
   let _connections: Connections
   let _metrics_conn: TCPConnection
-  let alfred : Alfred tag
+  let _alfred : Alfred tag
   let _is_initializer: Bool
   var _topology: (LocalTopology val | None) = None
 
   new create(worker_name: String, env: Env, auth: AmbientAuth,
     connections: Connections, metrics_conn: TCPConnection,
-    is_initializer: Bool, alfred': Alfred tag)
+    is_initializer: Bool, alfred: Alfred tag)
   =>
     _worker_name = worker_name
     _env = env
@@ -134,7 +134,7 @@ actor LocalTopologyInitializer
     _connections = connections
     _metrics_conn = metrics_conn
     _is_initializer = is_initializer
-    alfred = alfred'
+    _alfred = alfred
 
   be update_topology(t: LocalTopology val) =>
     _topology = t
@@ -168,7 +168,7 @@ actor LocalTopologyInitializer
 
           // If need be, create shared state for this pipeline and add to our
           // map
-          pipeline.update_state_map(state_map, _metrics_conn, alfred)
+          pipeline.update_state_map(state_map, _metrics_conn, _alfred)
 
           // We'll need to register our proxies later over Connections
           let proxies: Map[String, Array[Step tag]] = proxies.create()
@@ -201,7 +201,7 @@ actor LocalTopologyInitializer
                 @printf[I32](("----Spinning up partition for " + p_builder.name() + "----\n").cstring())
                 let partition_router: PartitionRouter val =
                   p_builder.build_partition(_worker_name, state_addresses,
-                    _metrics_conn, _auth, _connections, alfred, latest_router)
+                    _metrics_conn, _auth, _connections, _alfred, latest_router)
                 for (id, s) in partition_router.local_map().pairs() do
                   routes(id) = s
                 end
@@ -216,7 +216,7 @@ actor LocalTopologyInitializer
               if builder.is_stateful() then
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn,
-                  pipeline.name(), alfred)
+                  pipeline.name(), _alfred)
                 let state_step_router = DirectRouter(state_step)
                 routes(builder.id()) = state_step
 
@@ -229,7 +229,7 @@ actor LocalTopologyInitializer
                   | let b: StepBuilder val =>
                     @printf[I32](("----Spinning up " + b.name() + "----\n").cstring())
                     let next_step = b(state_step_router, _metrics_conn,
-                      pipeline.name(), alfred, latest_router)
+                      pipeline.name(), _alfred, latest_router)
                     latest_router = DirectRouter(next_step)
                     routes(b.id()) = next_step
                   else
@@ -244,7 +244,7 @@ actor LocalTopologyInitializer
               else
                 @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
                 let next_step = builder(latest_router, _metrics_conn,
-                  pipeline.name(), alfred)
+                  pipeline.name(), _alfred)
                 latest_router = DirectRouter(next_step)
                 routes(builder.id()) = next_step
                 initializer_idx = initializer_idx - 1
@@ -264,7 +264,7 @@ actor LocalTopologyInitializer
             try
               @printf[I32](("----Creating source for " + pipeline.name() + " pipeline with " + sd.runner_builder().name() + "----\n").cstring())
               TCPSourceListener(sd.builder()(sd.runner_builder(),
-                latest_router, _metrics_conn, alfred),
+                latest_router, _metrics_conn), _alfred,
                 sd.address()(0), sd.address()(1))
             else
               @printf[I32]("Ill-formed source address\n".cstring())

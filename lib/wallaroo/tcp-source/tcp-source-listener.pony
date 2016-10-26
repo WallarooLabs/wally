@@ -1,4 +1,5 @@
 use "../backpressure"
+use "wallaroo/resilience"
 
 actor TCPSourceListener
   """
@@ -14,7 +15,7 @@ actor TCPSourceListener
   var _init_size: USize
   var _max_size: USize
 
-  new create(source_builder: SourceBuilder val,
+  new create(source_builder: SourceBuilder val, alfred: Alfred tag,
     host: String = "", service: String = "0",
     limit: USize = 0,
     init_size: USize = 64, max_size: USize = 16384)
@@ -22,7 +23,7 @@ actor TCPSourceListener
     """
     Listens for both IPv4 and IPv6 connections.
     """
-    _notify = SourceListenerNotify(source_builder)
+    _notify = SourceListenerNotify(source_builder, alfred)
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.null_terminated().cstring(), service.null_terminated().cstring())
     _limit = limit

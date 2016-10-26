@@ -54,8 +54,10 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
   =>
     let result = _state_comp(_input, sc_repo, state)
 
+    // It matters that the None check comes first, since Out could be
+    // type None if you always filter/end processing there
     match result
-    | (None, _) => (true, result._2)
+    | (None, _) => (true, result._2) // This must come first
     | (let output: Out, _) =>
       let is_finished = _router.route[Out](metric_name, source_ts, output, 
         incoming_envelope, outgoing_envelope, producer)

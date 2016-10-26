@@ -5,7 +5,7 @@ use "wallaroo/resilience"
 
 interface SourceBuilder
   fun name(): String
-  fun apply(): TCPSourceNotify iso^
+  fun apply(alfred: Alfred tag): TCPSourceNotify iso^
 
 class _SourceBuilder[In: Any val]
   let _name: String
@@ -26,15 +26,15 @@ class _SourceBuilder[In: Any val]
 
   fun name(): String => _name
 
-  fun apply(): TCPSourceNotify iso^ =>
+  fun apply(alfred: Alfred tag): TCPSourceNotify iso^ =>
     let reporter = MetricsReporter(_name, _metrics_conn)
 
     FramedSourceNotify[In](_name, _handler, _runner_builder, _router, 
-      consume reporter)
+      consume reporter, alfred)
 
 interface SourceBuilderBuilder
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
-    metrics_conn: TCPConnection, alfred: Alfred tag): SourceBuilder val 
+    metrics_conn: TCPConnection): SourceBuilder val 
 
 class TypedSourceBuilderBuilder[In: Any val]
   let _name: String
@@ -45,10 +45,9 @@ class TypedSourceBuilderBuilder[In: Any val]
     _handler = handler
 
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
-    metrics_conn: TCPConnection, alfred: Alfred tag): SourceBuilder val 
+    metrics_conn: TCPConnection): SourceBuilder val 
   =>
-    _SourceBuilder[In](_name, runner_builder, _handler, router, metrics_conn,
-      alfred)
+    _SourceBuilder[In](_name, runner_builder, _handler, router, metrics_conn)
   
 interface TCPSourceListenerNotify
   """
@@ -74,15 +73,17 @@ interface TCPSourceListenerNotify
 
 class SourceListenerNotify is TCPSourceListenerNotify
   let _source_builder: SourceBuilder val
+  let _alfred: Alfred tag
 
-  new iso create(builder: SourceBuilder val) =>
+  new iso create(builder: SourceBuilder val, alfred: Alfred tag) =>
     _source_builder = builder
+    _alfred = alfred
 
   fun ref listening(listen: TCPSourceListener ref) =>
     @printf[I32]((_source_builder.name() + " source is listening\n").cstring())
 
   fun ref connected(listen: TCPSourceListener ref): TCPSourceNotify iso^ =>
-    _source_builder()
+    _source_builder(_alfred)
 
   // TODO: implement listening and especially not_listening
 
