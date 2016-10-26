@@ -3,23 +3,35 @@ use "files"
 use "collections"
 
 trait Backend
-  fun ref writev(log: Array[ByteSeq] val)
   //fun read(from: U64, to: U64): Array[Array[U8] val] val
   fun ref flush()
   fun ref start()
+  fun ref write_entry(buffer_id: U128, entry: (U128, (Array[U64] val | None), U64,
+    Array[ByteSeq] val))
 
 class DummyBackend is Backend
   new iso create() => None
-  fun ref writev(log: Array[ByteSeq] val) => None
   fun ref flush() => None
   fun ref start() => None
+  fun ref write_entry(buffer_id: U128, entry: (U128, (Array[U64] val | None), U64,
+    Array[ByteSeq] val)) => None
 
 class FileBackend is Backend
+  //a record looks like this:
+  // - buffer id
+  // - uid
+  // - size of fractional id list
+  // - fractional id list (may be empty)
+  // - statechange id
+  // - payload
+
   let _file: File iso
   let _filepath: FilePath
   let _alfred: Alfred tag
+  let _writer: Writer iso
 
   new iso create(filepath: FilePath, alfred: Alfred) =>
+    _writer = recover iso Writer end
     _filepath = filepath
     _file = recover iso File(filepath) end
     _alfred = alfred
@@ -34,14 +46,6 @@ class FileBackend is Backend
         var size = _file.size()
         //start iterating until we reach start
         while _file.position() < size do
-          //a record looks like this:
-          // - buffer id
-          // - uid
-          // - size of fractional id list
-          // - fractional id list (may be empty)
-          // - statechange id
-          // - sequence id
-          // - payload
           let buffer_id = r.u128_be()
           let uid = r.u128_be()
           let fractional_size = r.u64_be()
@@ -59,8 +63,6 @@ class FileBackend is Backend
             end
           end
           let statechange_id = r.u64_be()
-          //do we need this?
-          //let seq_id = r.u64_be()
           let payload_length = r.u64_be()
           let payload_single = recover val _file.read(payload_length.usize()) end
           let payload = recover val
@@ -79,8 +81,34 @@ class FileBackend is Backend
       //start writing a new one
     end
 
-  fun ref writev(log: Array[ByteSeq] val) =>
-    _file.writev(log)
+  fun ref write_entry(buffer_id: U128, entry: (U128, (Array[U64] val | None), U64,
+    Array[ByteSeq] val))
+  =>
+    (let uid:U128, let frac_ids: (Array[U64] val | None),
+     let statechange_id: U64, let payload: Array[ByteSeq] val)
+    = entry
+    _writer.u128_be(buffer_id)
+    _writer.u128_be(uid)
+    match frac_ids
+    | let ids: Array[U64] val =>
+      let s = ids.size()
+      _writer.u64_be(s.u64())
+      for j in Range(0,s) do
+        try
+          _writer.u64_be(ids(j))
+        else
+          @printf[I32]("fractional id %d on message %d disappeared!".cstring(),
+            j, uid)
+        end
+      end
+    else
+      //we have no frac_ids
+      _writer.u64_be(0)
+    end
+    _writer.u64_be(statechange_id)
+    _writer.u64_be(payload.size().u64())
+    _writer.writev(payload)
+    _file.writev(recover val _writer.done() end)
 
   fun ref flush() =>
     _file.sync()
@@ -89,12 +117,11 @@ class FileBackend is Backend
 actor Alfred
     let _log_buffers: Map[U128, EventLogBuffer tag] = 
       _log_buffers.create()
-    // TODO: Why are these things isos? 
+    // TODO: Why are these things isos? Because Alfred is the only thing that
+    // should ever be using them, so we can't pass them anywhere.
     let _backend: Backend iso
-    let _writer: Writer iso
 
     new create(env: Env, filename: (String val | None) = None) =>
-      _writer = recover iso Writer end
       _backend = 
       recover iso
         match filename
@@ -130,42 +157,16 @@ actor Alfred
       logbuffer.set_id(id)
 
     be log(buffer_id: U128, log_entries: Array[LogEntry val] iso, low_watermark: U64) =>
-    //TODO: move this serialisation to the file backend
-      try
-        for i in Range(0,log_entries.size()) do
-          //a record looks like this:
-          // - buffer id
-          // - uid
-          // - size of fractional id list
-          // - fractional id list (may be empty)
-          // - statechange id
-          // - sequence id
-          // - payload
-          (let uid:U128, let frac_ids: (Array[U64] val | None),
-           let statechange_id: U64, let payload: Array[ByteSeq] val)
-          = log_entries(i)
-          _writer.u128_be(buffer_id)
-          _writer.u128_be(uid)
-          match frac_ids
-          | let ids: Array[U64] val =>
-            let s = ids.size()
-            _writer.u64_be(s.u64())
-            for j in Range(0,s) do
-              _writer.u64_be(ids(j))
-            end
-          else
-            //we have no frac_ids
-            _writer.u64_be(0)
-          end
-          _writer.u64_be(statechange_id)
-          //do we need this?
-          //_writer.u64_be(seq_id)
-          _writer.u64_be(payload.size().u64())
-          _writer.writev(payload)
-          _backend.writev(recover val _writer.done() end)
+      for i in Range(0,log_entries.size()) do
+        try
+          _backend.write_entry(buffer_id,log_entries(i))
+        else
+          @printf[I32]("unable to find log entry %d for buffer id %d - it seems to have disappeared!".cstring(), i, buffer_id)
         end
-        _backend.flush()
+      end
+      _backend.flush()
+      try
         _log_buffers(buffer_id).log_flushed(low_watermark)
       else
-        @printf[I32]("unrecoverable error while trying to write event log".cstring())
+        @printf[I32]("buffer %d disappeared!!".cstring(), buffer_id)
       end
