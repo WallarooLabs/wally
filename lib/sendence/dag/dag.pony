@@ -64,3 +64,10 @@ class DagNode[V: Any val]
     if not outs.contains(output) then
       outs.push(output)
     end
+
+  fun ins: Iterator[this->DagNode[V]] => ins.values()
+  fun outs: Iterator[this->DagNode[V]] => outs.values()
+
+  fun is_source(): Bool => ins.size() == 0
+  fun is_sink(): Bool => outs.size() == 0
+

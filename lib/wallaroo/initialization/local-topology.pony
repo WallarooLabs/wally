@@ -2,6 +2,7 @@ use "net"
 use "collections"
 use "sendence/dag"
 use "sendence/guid"
+use "sendence/queue"
 use "sendence/messages"
 use "wallaroo/backpressure"
 use "wallaroo/messages"
@@ -85,16 +86,67 @@ actor LocalTopologyInitializer
         let routes: Map[U128, Step tag] trn =
           recover Map[U128, Step tag] end
 
-        // Keep track of which source address we're using
-        var source_addr_idx: USize = 0
-
-        @printf[I32](("\nInitializing " + t.name() + " application:\n\n").cstring())
+        @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
 
         // Create shared state for this topology
         t.update_state_map(state_map, _metrics_conn, _alfred)
 
         // We'll need to register our proxies later over Connections
         let proxies: Map[String, Array[Step tag]] = proxies.create()
+
+
+        /////////
+        // Initialize based on DAG
+        //
+        // Assumptions:
+        //   I. Acylic graph
+        //   II. No splits (only joins), ignoring partitions
+        //   III. No direct chains of different partitions
+        /////////
+
+        let frontier = Queue[DagNode[StepInitializer val] val]
+
+        let built = Map[U128, ...StepLike...]
+
+        /////////
+        // 1. Find graph sinks and add to frontier queue. 
+        //    We'll work our way backwards.
+        for node in t.graph().nodes() do
+          if node.is_sink() then frontier.enqueue(node) end
+        end
+
+        /////////
+        // 2. Loop: Check next frontier item for if all outgoing steps have 
+        //          been created
+        //       if no, send to back of frontier queue.
+        //       if yes, add ins to frontier queue, then build the step 
+        //       (connecting it to its out step, which has already been built)
+
+        // If there are no cycles, this will terminate
+        while frontier.size() > 0 do
+          let next = frontier.dequeue()
+          var ready = true
+          for out in next.outs() do
+            if not built.contains(out.id) then ready = false end
+          end
+          if ready then
+            // ins can't be repeats here because there are no splits
+            for in_node in next.ins() do
+              frontier.enqueue(in_node)
+            end
+            let builder = next.value
+
+            // ...match kind of initializer and go from there...
+
+            built(builder.id()) = ...steplike...
+          else
+            frontier.enqueue(next)
+          end
+        end
+
+
+
+
 
         // // Create our sink or Proxy using this pipeline's egress builder
         // let sink_reporter = MetricsReporter(pipeline.name(), _metrics_conn)
