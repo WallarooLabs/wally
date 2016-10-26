@@ -10,7 +10,6 @@ trait tag CreditFlowConsumer
 
 trait tag CreditFlowProducer
   be receive_credits(credits: ISize, from: CreditFlowConsumer)
-  // TODO: CREDITFLOW - None is a placeholder
   fun ref route_to(c: CreditFlowConsumerStep): (Route | None)
 
 type CreditFlowProducerConsumer is (CreditFlowProducer & CreditFlowConsumer)

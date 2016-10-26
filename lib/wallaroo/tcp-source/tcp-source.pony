@@ -18,7 +18,6 @@ actor TCPSource is CreditFlowProducer
   * Switch to requesting credits via promise
   """
   // Credit Flow
-  // TODO: CREDITFLOW- Bug. Credits should be ISize.
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
 
   // TCP

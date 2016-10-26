@@ -47,7 +47,6 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
 
    // CreditFlow Consumer
   var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
-  // TODO: CREDITFLOW- Should this be ISize in case we wrap around?
   let _max_distributable_credits: ISize = 500_000
   var _distributable_credits: ISize = _max_distributable_credits
 
@@ -191,7 +190,6 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
 
   //////////////
   // CREDIT FLOW CONSUMER
-  // TODO: CREDIT FLOW - Add implementation
   be register_producer(producer: CreditFlowProducer) =>
     ifdef debug then
       try
