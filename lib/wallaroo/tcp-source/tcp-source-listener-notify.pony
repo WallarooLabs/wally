@@ -1,13 +1,14 @@
 use "net"
 use "wallaroo/metrics"
 use "wallaroo/topology"
+use "wallaroo/resilience"
 
 interface SourceBuilder
   fun apply(): TCPSourceNotify iso^
 
 interface SourceBuilderBuilder
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
-    metrics_conn: TCPConnection): SourceBuilder val 
+    metrics_conn: TCPConnection, alfred: Alfred tag): SourceBuilder val 
 
 class TypedSourceBuilderBuilder[In: Any val]
   let _name: String
@@ -18,16 +19,16 @@ class TypedSourceBuilderBuilder[In: Any val]
     _handler = handler
 
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
-    metrics_conn: TCPConnection): SourceBuilder val 
+    metrics_conn: TCPConnection, alfred: Alfred tag): SourceBuilder val 
   =>
     recover
-      lambda()(runner_builder, router, metrics_conn, _name, _handler):
+      lambda()(runner_builder, router, metrics_conn, _name, _handler, alfred):
         TCPSourceNotify iso^ 
       =>
         let reporter = MetricsReporter(_name, metrics_conn)
 
         FramedSourceNotify[In](_name, _handler, runner_builder, router, 
-          consume reporter)
+          consume reporter, alfred)
       end
     end
   

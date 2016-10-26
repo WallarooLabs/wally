@@ -54,7 +54,7 @@ actor Main
               SymbolDataBuilder, "symbol-data", symbol_data_partition)
             .to_sink(OrderResultEncoder, recover [0] end)     
       end
-      Startup(env, application)
+      Startup(env, application, "/tmp/market-spread.evlog")
     else
       env.out.print("Couldn't build topology")
     end

@@ -28,9 +28,9 @@ class EmptyRunner
 
 interface RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, 
+    alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None,
-    alfred: (Alfred tag | None) = None): Runner iso^
+    router: (Router val | None) = None): Runner iso^
 
   fun name(): String
   fun is_stateful(): Bool
@@ -46,9 +46,9 @@ trait ReplayableRunner
 
 primitive RouterRunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, 
+    alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None,
-    alfred: (Alfred tag | None) = None): Runner iso^
+    router: (Router val | None) = None): Runner iso^
   => 
     RouterRunner
 
@@ -63,9 +63,9 @@ class RunnerSequenceBuilder
     _runner_builders = bs
 
   fun apply(metrics_reporter: MetricsReporter iso, 
+    alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None,
-    alfred: (Alfred tag | None) = None): Runner iso^
+    router: (Router val | None) = None): Runner iso^
   =>
     var remaining: USize = _runner_builders.size()
     var latest_runner: Runner iso = RouterRunner
@@ -78,8 +78,8 @@ class RunnerSequenceBuilder
         end
       match next_builder
       | let rb: RunnerBuilder val =>
-        latest_runner = rb(metrics_reporter.clone(), consume latest_runner,
-          router)
+        latest_runner = rb(metrics_reporter.clone(), alfred,
+          consume latest_runner, router)
       end
       remaining = remaining - 1
     end
@@ -106,9 +106,9 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
     _id = id'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
+    alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None,
-    alfred: (Alfred tag | None) = None): Runner iso^
+    router: (Router val | None) = None): Runner iso^
   =>
     match (consume next_runner)
     | let r: Runner iso =>
@@ -131,9 +131,9 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
     _state_comp = state_comp
 
   fun apply(metrics_reporter: MetricsReporter iso, 
+    alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None,
-    alfred: (Alfred tag | None) = None): Runner iso^
+    router: (Router val | None) = None): Runner iso^
   =>
     match router
     | let r: Router val =>
@@ -160,21 +160,15 @@ class StateRunnerBuilder[State: Any #read]
     _state_change_builders = state_change_builders
 
   fun apply(metrics_reporter: MetricsReporter iso, 
+    alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None,
-    alfred: (Alfred tag | None) = None): Runner iso^
+    router: (Router val | None) = None): Runner iso^
   =>
-    match alfred
-    | let a: Alfred tag =>
-      let sr = StateRunner[State](_state_builder, consume metrics_reporter, a)
-      for scb in _state_change_builders.values() do
-        sr.register_state_change(scb)
-      end
-      sr
-    else
-      @printf[I32]("StateRunner didn't get Alfred!\n".cstring())
-      EmptyRunner
+    let sr = StateRunner[State](_state_builder, consume metrics_reporter, alfred)
+    for scb in _state_change_builders.values() do
+      sr.register_state_change(scb)
     end
+    sr
 
   fun name(): String => _state_builder.name()
   fun is_stateful(): Bool => true
@@ -204,9 +198,9 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
     _partition = partition'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
+    alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None,
-    alfred: (Alfred tag | None) = None): Runner iso^
+    router: (Router val | None) = None): Runner iso^
   =>
     match router
     | let r: Router val =>

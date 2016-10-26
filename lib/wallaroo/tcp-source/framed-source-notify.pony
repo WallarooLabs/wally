@@ -3,6 +3,7 @@ use "sendence/guid"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
+use "wallaroo/resilience"
 
 interface FramedSourceHandler[In: Any val]
   fun header_length(): USize
@@ -27,13 +28,13 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
 
   new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
-    metrics_reporter: MetricsReporter iso)
+    metrics_reporter: MetricsReporter iso, alfred: Alfred tag)
   =>
     _pipeline_name = pipeline_name
     // TODO: Figure out how to name sources
     _source_name = pipeline_name + " source"
     _handler = handler
-    _runner = runner_builder(metrics_reporter.clone())
+    _runner = runner_builder(metrics_reporter.clone(), alfred)
     _router = router
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()

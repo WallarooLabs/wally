@@ -7,6 +7,7 @@ use "files"
 use "wallaroo/initialization"
 use "wallaroo/network"
 use "wallaroo/topology"
+use "wallaroo/resilience"
 
 interface AppStarter
   fun apply(env: Env, data_addr: Array[String] val,
@@ -17,7 +18,7 @@ interface AppStarter
     initializer: (WorkerInitializer | None)) ? 
 
 actor Startup
-  new create(env: Env, app_runner: (AppStarter val | Application val)) =>
+  new create(env: Env, app_runner: (AppStarter val | Application val), event_log_file: (String val | None)) =>
     var m_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
     var c_arg: (Array[String] | None) = None
@@ -30,6 +31,7 @@ actor Startup
     var worker_count: USize = 1
     var is_initializer = false
     var worker_initializer: (WorkerInitializer | None) = None
+    let alfred = Alfred(env, event_log_file)
     var worker_name = ""
     try
       var options = Options(env.args)
@@ -119,12 +121,12 @@ actor Startup
         d_host, d_service, ph_host, ph_service, is_initializer)
 
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
-        env, auth, connections, metrics_conn, is_initializer)
+        env, auth, connections, metrics_conn, is_initializer, alfred)
 
       if is_initializer then
         env.out.print("Running as Initializer...")
         let application_initializer = ApplicationInitializer(
-          local_topology_initializer, input_addrs, o_addr)
+          local_topology_initializer, input_addrs, o_addr, alfred)
 
         worker_initializer = WorkerInitializer(auth, worker_count, connections,
           application_initializer, d_addr, metrics_conn)
@@ -133,7 +135,7 @@ actor Startup
 
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(worker_name, env, auth, connections, 
-          is_initializer, worker_initializer, local_topology_initializer)
+          is_initializer, worker_initializer, local_topology_initializer, alfred)
 
       if is_initializer then
         connections.register_listener(

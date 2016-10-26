@@ -5,23 +5,26 @@ use "sendence/messages"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
+use "wallaroo/resilience"
 
 actor ApplicationInitializer
   let _guid_gen: GuidGenerator = GuidGenerator
   let _local_topology_initializer: LocalTopologyInitializer
   let _input_addrs: Array[Array[String]] val
   let _output_addr: Array[String] val
+  let _alfred: Alfred tag
 
   var _application_starter: (ApplicationStarter val | None) = None
   var _application: (Application val | None) = None
 
   new create(local_topology_initializer: LocalTopologyInitializer,
     input_addrs: Array[Array[String]] val,
-    output_addr: Array[String] val)
+    output_addr: Array[String] val, alfred: Alfred tag)
   =>
     _local_topology_initializer = local_topology_initializer
     _input_addrs = input_addrs
     _output_addr = output_addr
+    _alfred = alfred
 
   be update_application(a: (ApplicationStarter val | Application val)) =>
     match a
@@ -39,7 +42,7 @@ actor ApplicationInitializer
     | let a: Application val =>
       @printf[I32]("Automating...\n".cstring())
       _automate_initialization(a, worker_initializer, worker_count,
-        worker_names)
+        worker_names, _alfred)
     else
       match _application_starter
       | let a: ApplicationStarter val =>
@@ -56,7 +59,7 @@ actor ApplicationInitializer
 
   fun ref _automate_initialization(application: Application val,
     worker_initializer: WorkerInitializer, worker_count: USize,
-    worker_names: Array[String] val)
+    worker_names: Array[String] val, alfred: Alfred tag)
   =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("^^^^^^Initializing Topologies for Workers^^^^^^^\n\n".cstring())
@@ -129,7 +132,8 @@ actor ApplicationInitializer
           if r_builder.is_stateful() then
             if latest_runner_builders.size() > 0 then
               let seq_builder = RunnerSequenceBuilder(
-                latest_runner_builders = recover Array[RunnerBuilder val] end)
+                latest_runner_builders = recover Array[RunnerBuilder val] end
+                )
               runner_builders.push(seq_builder)
             end
             runner_builders.push(r_builder)

@@ -6,6 +6,7 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
+use "wallaroo/resilience"
 
 class Application
   let _name: String
@@ -49,8 +50,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _state_builders.create()
   let _is_coalesced: Bool
 
-  new create(n: String, d: FramedSourceHandler[In] val, coalescing: Bool) 
-  =>
+  new create(n: String, d: FramedSourceHandler[In] val, coalescing: Bool) =>
     _decoder = d
     _runner_builders = Array[RunnerBuilder val]
     _name = n

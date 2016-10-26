@@ -122,12 +122,13 @@ actor LocalTopologyInitializer
   let _auth: AmbientAuth
   let _connections: Connections
   let _metrics_conn: TCPConnection
+  let alfred : Alfred tag
   let _is_initializer: Bool
   var _topology: (LocalTopology val | None) = None
 
   new create(worker_name: String, env: Env, auth: AmbientAuth,
     connections: Connections, metrics_conn: TCPConnection,
-    is_initializer: Bool)
+    is_initializer: Bool, alfred': Alfred tag)
   =>
     _worker_name = worker_name
     _env = env
@@ -135,6 +136,7 @@ actor LocalTopologyInitializer
     _connections = connections
     _metrics_conn = metrics_conn
     _is_initializer = is_initializer
+    alfred = alfred'
 
   be update_topology(t: LocalTopology val) =>
     _topology = t
@@ -143,7 +145,6 @@ actor LocalTopologyInitializer
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("|^|^|^Initializing Local Topology^|^|^|\n\n".cstring())
     try
-      let alfred = Alfred(_env)
 
       match _topology
       | let t: LocalTopology val =>
@@ -266,7 +267,7 @@ actor LocalTopologyInitializer
               @printf[I32](("----Creating source for " + pipeline.name() + " pipeline with " + sd.runner_builder().name() + "----\n").cstring())
               // TODO: CreditFlow. Needs real list of consumers
               TCPSourceListener(sd.builder()(sd.runner_builder(),
-                latest_router, _metrics_conn),
+                latest_router, _metrics_conn, alfred),
                 recover Array[CreditFlowConsumer] end,
                 sd.address()(0), sd.address()(1))
             else

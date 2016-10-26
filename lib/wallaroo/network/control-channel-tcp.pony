@@ -5,6 +5,7 @@ use "sendence/bytes"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/topology"
+use "wallaroo/resilience"
 
 class ControlChannelListenNotifier is TCPListenNotify
   let _env: Env
@@ -16,11 +17,12 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _initializer: (WorkerInitializer | None)
   let _local_topology_initializer: LocalTopologyInitializer
   let _connections: Connections
+  let _alfred: Alfred tag
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     initializer: (WorkerInitializer | None) = None,
-    local_topology_initializer: LocalTopologyInitializer)
+    local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag)
   =>
     _env = env
     _auth = auth
@@ -29,6 +31,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _initializer = initializer
     _local_topology_initializer = local_topology_initializer
     _connections = connections
+    _alfred = alfred
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -50,7 +53,7 @@ class ControlChannelListenNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _env, _auth, _connections, 
-      _initializer, _local_topology_initializer)
+      _initializer, _local_topology_initializer, _alfred)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
   let _env: Env
@@ -59,11 +62,12 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _connections: Connections
   let _initializer: (WorkerInitializer | None)
   let _local_topology_initializer: LocalTopologyInitializer
+  let _alfred: Alfred tag
   var _header: Bool = true
 
   new iso create(name: String, env: Env, auth: AmbientAuth, 
     connections: Connections, initializer: (WorkerInitializer | None),
-    local_topology_initializer: LocalTopologyInitializer) 
+    local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag) 
   =>
     _env = env
     _auth = auth
@@ -71,6 +75,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _connections = connections
     _initializer = initializer
     _local_topology_initializer = local_topology_initializer
+    _alfred = alfred
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
