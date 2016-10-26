@@ -15,6 +15,9 @@ use "wallaroo/resilience"
 //   be run[D: Any val](metric_name: String, source_ts: U64, data: D)
 //   be dispose()
 
+// TODO: CREDITFLOW- Every runnable step is also a credit flow consumer
+// Really this should probably be another method on CreditFlowConsumer
+// At which point CreditFlowConsumerStep goes away as well
 trait tag RunnableStep
   // TODO: Fix the Origin None once we know how to look up Proxy
   // for messages crossing boundary
