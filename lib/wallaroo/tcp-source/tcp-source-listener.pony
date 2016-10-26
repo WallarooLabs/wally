@@ -25,7 +25,7 @@ actor TCPSourceListener
     """
     _notify = SourceListenerNotify(source_builder, alfred)
     _event = @pony_os_listen_tcp[AsioEventID](this,
-      host.null_terminated().cstring(), service.null_terminated().cstring())
+      host.cstring(), service.cstring())
     _limit = limit
 
     _init_size = init_size

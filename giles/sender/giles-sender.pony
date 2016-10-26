@@ -135,7 +135,7 @@ actor Main
                 paths.push(FilePath(env.root as AmbientAuth, str))
               end
               if binary_fmt then
-                MultiFileBinaryDataSource(consume paths, 
+                MultiFileBinaryDataSource(consume paths,
                   should_repeat, msg_size)
               else
                 MultiFileDataSource(consume paths, should_repeat)
@@ -174,8 +174,11 @@ class ToBuffyNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     _coordinator.to_buffy_socket(sock, Ready)
 
-  fun ref throttled(sock: TCPConnection ref, value: Bool) =>
-    _coordinator.pause_sending(value)
+  fun ref throttled(sock: TCPConnection ref) =>
+    _coordinator.pause_sending(true)
+
+  fun ref unthrottled(sock: TCPConnection ref) =>
+    _coordinator.pause_sending(false)
 
 class ToDagonNotify is TCPConnectionNotify
   let _coordinator: WithDagonCoordinator

@@ -1,3 +1,7 @@
+actor Main
+  new create(env: Env) => None
+
+/*
 use "collections"
 use "net"
 use "options"
@@ -19,11 +23,11 @@ actor Main
 
 primitive ComplexStarter
   fun apply(env: Env, initializer_data_addr: Array[String],
-    input_addrs: Array[Array[String]] val, 
-    output_addr: Array[String], metrics_conn: TCPConnection, 
+    input_addrs: Array[Array[String]] val,
+    output_addr: Array[String], metrics_conn: TCPConnection,
     expected: USize, init_path: String, worker_count: USize,
     is_initializer: Bool, worker_name: String, connections: Connections,
-    initializer: (Initializer | None)) ? 
+    initializer: (Initializer | None)) ?
   =>
     // Complex numbers app
     // Complex number -> Scale by 3 -> Get conjugate -> Scale by 5
@@ -60,20 +64,20 @@ primitive ComplexStarter
       scale_step.update_router(sink_router)
       let scale_step_router = DirectRouter(scale_step)
 
-      let complex_source_builder: {(): Source[Complex val] iso^} val = 
-        recover 
-          lambda()(metrics_conn, scale_step_router): Source[Complex val] iso^ 
+      let complex_source_builder: {(): Source[Complex val] iso^} val =
+        recover
+          lambda()(metrics_conn, scale_step_router): Source[Complex val] iso^
           =>
             let complex_reporter = MetricsReporter("complex-numbers",
               metrics_conn)
             let conjugate_runner = ComputationRunner[Complex val, Complex val](
               Conjugate, RouterRunner, complex_reporter.clone())
-            let conjugate_step = Step(consume conjugate_runner, 
+            let conjugate_step = Step(consume conjugate_runner,
               complex_reporter.clone())
             conjugate_step.update_router(scale_step_router)
-            let conjugate_router = DirectRouter(conjugate_step) 
+            let conjugate_router = DirectRouter(conjugate_step)
 
-            Source[Complex val]("Complex Numbers", ComplexSourceDecoder, 
+            Source[Complex val]("Complex Numbers", ComplexSourceDecoder,
               RouterRunnerBuilder, conjugate_router, consume complex_reporter)
           end
         end
@@ -87,8 +91,8 @@ primitive ComplexStarter
           source_addr(0),
           source_addr(1))
       )
-      
-      let topology_ready_msg = 
+
+      let topology_ready_msg =
         ExternalMsgEncoder.topology_ready("initializer")
       connections.send_phone_home(topology_ready_msg)
       @printf[I32]("Sent TopologyReady\n".cstring())
@@ -96,7 +100,7 @@ primitive ComplexStarter
       @printf[I32](("I'm " + worker_name + ", the Initializer!\n").cstring())
 
       let data_notifier: TCPListenNotify iso =
-        DataChannelListenNotifier(worker_name, env, auth, connections, 
+        DataChannelListenNotifier(worker_name, env, auth, connections,
           is_initializer)
 
       let d_host = initializer_data_addr(0)
@@ -106,8 +110,8 @@ primitive ComplexStarter
       )
 
       let sendable_output_addr: Array[String] trn = recover Array[String] end
-      sendable_output_addr.push(output_addr(0)) 
-      sendable_output_addr.push(output_addr(1)) 
+      sendable_output_addr.push(output_addr(0))
+      sendable_output_addr.push(output_addr(1))
 
       // determine layout
       let topology_starter = ComplexTopologyStarter(
@@ -142,10 +146,10 @@ class ComplexTopologyStarter is TopologyStarter
 
     let local_topologies =
       if workers.size() == 1 then
-        create_local_topologies_for_2(pipeline_name, conjugate_step_id, 
+        create_local_topologies_for_2(pipeline_name, conjugate_step_id,
           scale_step_id, workers)
-      elseif workers.size() == 2 then 
-        create_local_topologies_for_3(pipeline_name, conjugate_step_id, 
+      elseif workers.size() == 2 then
+        create_local_topologies_for_3(pipeline_name, conjugate_step_id,
           scale_step_id, workers)
       else
         @printf[I32]("Complex app only works with 1-3 workers!\n".cstring())
@@ -165,14 +169,14 @@ class ComplexTopologyStarter is TopologyStarter
 
     initializer.register_proxy(worker2, proxy_step)
 
-    let complex_source_builder: {(): Source[Complex val] iso^} val = 
-      recover 
-        lambda()(proxy_step, _metrics_conn): Source[Complex val] iso^ 
+    let complex_source_builder: {(): Source[Complex val] iso^} val =
+      recover
+        lambda()(proxy_step, _metrics_conn): Source[Complex val] iso^
         =>
           let complex_reporter = MetricsReporter("complex-numbers",
             _metrics_conn)
-          let proxy_router = DirectRouter(proxy_step) 
-          Source[Complex val]("Complex Numbers", ComplexSourceDecoder, 
+          let proxy_router = DirectRouter(proxy_step)
+          Source[Complex val]("Complex Numbers", ComplexSourceDecoder,
             RouterRunnerBuilder, proxy_router, consume complex_reporter)
         end
       end
@@ -185,18 +189,18 @@ class ComplexTopologyStarter is TopologyStarter
     TCPListener(listen_auth,
       SourceListenerNotify(complex_source_builder, jr_metrics, expected),
       source_addr(0),
-      source_addr(1)) 
+      source_addr(1))
 
-    @printf[I32]("Finished running startup code!\n".cstring())   
+    @printf[I32]("Finished running startup code!\n".cstring())
 
-  fun create_local_topologies_for_2(pipeline_name: String, 
-    conjugate_step_id: U128, scale_step_id: U128, workers: Array[String] box): 
+  fun create_local_topologies_for_2(pipeline_name: String,
+    conjugate_step_id: U128, scale_step_id: U128, workers: Array[String] box):
     Array[LocalTopology val] val ?
   =>
-    let worker2 = workers(0) 
+    let worker2 = workers(0)
 
     // Worker 1 (self)
-    let worker_1_builders: Array[StepBuilder val] trn = 
+    let worker_1_builders: Array[StepBuilder val] trn =
       recover Array[StepBuilder val] end
 
     // Worker 2
@@ -225,11 +229,11 @@ class ComplexTopologyStarter is TopologyStarter
       RunnerSequenceBuilder(consume scale_runner_builders), scale_step_id)
 
 
-    let worker_2_builders: Array[StepBuilder val] trn = 
+    let worker_2_builders: Array[StepBuilder val] trn =
       recover Array[StepBuilder val] end
 
-    worker_2_builders.push(conjugate_step_builder) 
-    worker_2_builders.push(scale_step_builder) 
+    worker_2_builders.push(conjugate_step_builder)
+    worker_2_builders.push(scale_step_builder)
 
     let sink_runner_builder = EncoderSinkRunnerBuilder[Complex val](
       pipeline_name, ComplexEncoder)
@@ -239,29 +243,29 @@ class ComplexTopologyStarter is TopologyStarter
     let worker_2_pipelines: Array[LocalPipeline val] trn = recover
       Array[LocalPipeline val] end
 
-    worker_2_pipelines.push(LocalPipeline(pipeline_name, 
+    worker_2_pipelines.push(LocalPipeline(pipeline_name,
       consume worker_2_builders, egress_builder))
 
-    let worker_2_topology = LocalTopology("complex numbers", 
+    let worker_2_topology = LocalTopology("complex numbers",
       consume worker_2_pipelines)
 
-    let local_topologies: Array[LocalTopology val] trn = 
+    let local_topologies: Array[LocalTopology val] trn =
       recover Array[LocalTopology val] end
     local_topologies.push(worker_2_topology)
 
     consume local_topologies
 
-  fun create_local_topologies_for_3(pipeline_name: String, 
-    conjugate_step_id: U128, scale_step_id: U128, workers: Array[String] box): 
+  fun create_local_topologies_for_3(pipeline_name: String,
+    conjugate_step_id: U128, scale_step_id: U128, workers: Array[String] box):
     Array[LocalTopology val] val ?
   =>
     let guid_gen = GuidGenerator
 
-    let worker2 = workers(0) 
-    let worker3 = workers(1) 
+    let worker2 = workers(0)
+    let worker3 = workers(1)
 
     // Worker 1 (self)
-    let worker_1_builders: Array[StepBuilder val] trn = 
+    let worker_1_builders: Array[StepBuilder val] trn =
       recover Array[StepBuilder val] end
 
     // Worker 2
@@ -278,10 +282,10 @@ class ComplexTopologyStarter is TopologyStarter
       conjugate_step_id)
 
 
-    let worker_2_builders: Array[StepBuilder val] trn = 
+    let worker_2_builders: Array[StepBuilder val] trn =
       recover Array[StepBuilder val] end
 
-    worker_2_builders.push(conjugate_step_builder) 
+    worker_2_builders.push(conjugate_step_builder)
 
     // Worker 3
     let scale_builder = lambda(): Computation[Complex val, Complex val] val => Scale end
@@ -295,7 +299,7 @@ class ComplexTopologyStarter is TopologyStarter
     let scale_step_builder = StatelessStepBuilder(
       RunnerSequenceBuilder(consume scale_runner_builders), scale_step_id)
 
-    let worker_3_builders: Array[StepBuilder val] trn = 
+    let worker_3_builders: Array[StepBuilder val] trn =
       recover Array[StepBuilder val] end
 
     worker_3_builders.push(scale_step_builder)
@@ -304,13 +308,13 @@ class ComplexTopologyStarter is TopologyStarter
     let sink_runner_builder = EncoderSinkRunnerBuilder[Complex val](
       pipeline_name, ComplexEncoder)
 
-    let worker_3_egress_builder = EgressBuilder(_output_addr, 
+    let worker_3_egress_builder = EgressBuilder(_output_addr,
       sink_runner_builder)
 
     let worker_3_pipelines: Array[LocalPipeline val] trn = recover
       Array[LocalPipeline val] end
 
-    worker_3_pipelines.push(LocalPipeline(pipeline_name, 
+    worker_3_pipelines.push(LocalPipeline(pipeline_name,
       consume worker_3_builders, worker_3_egress_builder))
 
 
@@ -321,7 +325,7 @@ class ComplexTopologyStarter is TopologyStarter
     let worker_2_pipelines: Array[LocalPipeline val] trn = recover
       Array[LocalPipeline val] end
 
-    worker_2_pipelines.push(LocalPipeline(pipeline_name, 
+    worker_2_pipelines.push(LocalPipeline(pipeline_name,
       consume worker_2_builders, worker_2_egress_builder))
 
 
@@ -329,10 +333,10 @@ class ComplexTopologyStarter is TopologyStarter
 
     let worker_3_topology = LocalTopology(pipeline_name, consume worker_3_pipelines)
 
-    let local_topologies: Array[LocalTopology val] trn = 
+    let local_topologies: Array[LocalTopology val] trn =
       recover Array[LocalTopology val] end
     local_topologies.push(worker_2_topology)
     local_topologies.push(worker_3_topology)
 
-    consume local_topologies 
-
+    consume local_topologies
+*/

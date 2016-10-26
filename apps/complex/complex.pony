@@ -1,3 +1,4 @@
+/*
 """
 Setting up a complex app run (in order):
 1) reports sink:
@@ -58,7 +59,7 @@ class Complex
 
   fun plus(c: Complex val): Complex val =>
     Complex(_real + c._real, _imaginary + c._imaginary)
- 
+
   fun minus(c: Complex val): Complex val =>
     Complex(_real - c._real, _imaginary - c._imaginary)
 
@@ -70,8 +71,7 @@ class Complex
   fun conjugate(): Complex val =>
     Complex(_real, -_imaginary)
 
-  fun string(fmt: FormatSettings[FormatDefault, PrefixDefault] 
-    = FormatSettingsDefault): String iso^
+  fun string(): String iso^
   =>
     ("C(" + _real.string() + ", " + _imaginary.string() + ")").clone()
 
@@ -102,7 +102,7 @@ primitive ComplexDecoder is FramedSourceHandler[Complex val]
   fun payload_length(data: Array[U8] iso): USize ? =>
     Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
-  fun decode(data: Array[U8] val): Complex val ? => 
+  fun decode(data: Array[U8] val): Complex val ? =>
     let real = Bytes.to_u32(data(0), data(1), data(2), data(3))
     let imaginary = Bytes.to_u32(data(4), data(5), data(6), data(7))
     Complex(real.i32(), imaginary.i32())
@@ -118,7 +118,7 @@ primitive ComplexEncoder
     wb.done()
 
 class Counter
-  var _count: USize = 0 
+  var _count: USize = 0
   var _reals: I32 = 0
 
   fun ref apply(c: Complex val): Complex val =>
@@ -138,3 +138,4 @@ primitive UpdateCounter
   fun name(): String => "UpdateCounter"
   fun apply(c: Complex val, s: Counter): Complex val =>
     s(c)
+*/

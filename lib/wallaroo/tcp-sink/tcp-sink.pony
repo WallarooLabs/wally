@@ -118,8 +118,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
     _max_size = max_size
     _notify = EmptyNotify
     _connect_count = @pony_os_connect_tcp[U32](this,
-      host.null_terminated().cstring(), service.null_terminated().cstring(),
-      from.null_terminated().cstring())
+      host.cstring(), service.cstring(),
+      from.cstring())
     _notify_connecting()
 
   // open question: how do we reconnect if our external system goes away?
@@ -337,7 +337,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
         try
           // Send as much data as possible.
           var len =
-            @pony_os_send[USize](_event, data.cstring(), data.size()) ?
+            @pony_os_send[USize](_event, data.cpointer(), data.size()) ?
 
           if len < data.size() then
             // Send any remaining data later. Apply back pressure.
@@ -438,7 +438,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
           // Read as much data as possible.
           let len = @pony_os_recv[USize](
             _event,
-            _read_buf.cstring().usize() + _read_len,
+            _read_buf.cpointer().usize() + _read_len,
             _read_buf.size() - _read_len) ?
 
           match len
@@ -505,7 +505,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
 
         // Write as much data as possible.
         let len = @pony_os_send[USize](_event,
-          data.cstring().usize() + offset, data.size() - offset) ?
+          data.cpointer().usize() + offset, data.size() - offset) ?
 
         if (len + offset) < data.size() then
           // Send remaining data later.

@@ -57,7 +57,7 @@ class PassProcessor
 
   fun ref apply(d: Array[U8] val) =>
     _target.write(_msg_size)
-    _target.write(d)      
+    _target.write(d)
 
 class SinkProcessor
   let _target: TCPConnection
@@ -65,7 +65,7 @@ class SinkProcessor
   let _auth: AmbientAuth
   let _msg_size: Array[U8] val = Bytes.from_u32(U32(8))
 
-  new create(target: TCPConnection, metrics_reporter: MetricsReporter, 
+  new create(target: TCPConnection, metrics_reporter: MetricsReporter,
     auth: AmbientAuth) =>
     _target = target
     _reporter = metrics_reporter
@@ -74,7 +74,7 @@ class SinkProcessor
 
   fun ref apply(d: Array[U8] val) ? =>
     _target.write(_msg_size)
-    _target.write(d) 
+    _target.write(d)
     let ts = Bytes.to_u64(d(0), d(1), d(2), d(3), d(4), d(5), d(6), d(7))
     _reporter.pipeline_metric("Multi-Passthrough", ts)
 
@@ -84,7 +84,7 @@ class UniqueProcessor
   let _auth: AmbientAuth
   let _msg_size: Array[U8] val = Bytes.from_u32(U32(8))
 
-  new create(target: TCPConnection, metrics_reporter: MetricsReporter, 
+  new create(target: TCPConnection, metrics_reporter: MetricsReporter,
     auth: AmbientAuth) =>
     _target = target
     _reporter = metrics_reporter
@@ -95,7 +95,7 @@ class UniqueProcessor
     let ts = Time.nanos()
     let bytes = Bytes.from_u64(ts)
     _target.write(_msg_size)
-    _target.write(consume bytes) 
+    _target.write(consume bytes)
     _reporter.pipeline_metric("Multi-Passthrough", ts)
 
 class IncomingNotify is TCPConnectionNotify
@@ -110,12 +110,12 @@ class IncomingNotify is TCPConnectionNotify
   var _msg_count: USize = 0
 
   new iso create(auth: AmbientAuth, target: TCPConnection, expected: USize,
-    is_source: Bool, is_sink: Bool, is_unique_worker: Bool, 
-    metrics_conn: TCPConnection, no_delay: Bool) 
+    is_source: Bool, is_sink: Bool, is_unique_worker: Bool,
+    metrics_conn: TCPConnection, no_delay: Bool)
   =>
     let metrics_reporter = MetricsReporter("multi-passthrough", metrics_conn)
 
-    _processor = 
+    _processor =
       if is_source then
         SourceProcessor(target, auth)
       elseif is_sink then
@@ -168,7 +168,7 @@ class OutNotify is TCPConnectionNotify
     _no_delay = no_delay
 
   fun ref connected(conn: TCPConnection ref) =>
-    conn.set_nodelay(_no_delay)  
+    conn.set_nodelay(_no_delay)
     @printf[None](("outgoing connected to " + _name + "\n").cstring())
 
 ///
@@ -206,7 +206,7 @@ actor Main
         | ("source", None) => is_source = true
         | ("sink", None) => is_sink = true
         | ("unique", None) => is_unique_worker = true
-        | ("nagle-switch", None) => 
+        | ("nagle-switch", None) =>
           no_delay = true
           env.out.print("Turning Nagle off!")
         end
@@ -254,8 +254,8 @@ class ListenerNotify is TCPListenNotify
   let _no_delay: Bool
 
   new iso create(auth: AmbientAuth, fp: TCPConnection, expected: USize,
-    is_source: Bool, is_sink: Bool, is_unique_worker: Bool, 
-    metrics_conn: TCPConnection, no_delay: Bool) 
+    is_source: Bool, is_sink: Bool, is_unique_worker: Bool,
+    metrics_conn: TCPConnection, no_delay: Bool)
   =>
     _fp = fp
     _expected = expected
@@ -267,7 +267,7 @@ class ListenerNotify is TCPListenNotify
     _no_delay = no_delay
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    IncomingNotify(_auth, _fp, _expected, _is_source, _is_sink, 
+    IncomingNotify(_auth, _fp, _expected, _is_source, _is_sink,
       _is_unique_worker, _metrics_conn, _no_delay)
 
 
@@ -284,7 +284,7 @@ class Complex
 
   fun plus(c: Complex val): Complex val =>
     Complex(_real + c._real, _imaginary + c._imaginary)
- 
+
   fun minus(c: Complex val): Complex val =>
     Complex(_real - c._real, _imaginary - c._imaginary)
 
@@ -294,13 +294,11 @@ class Complex
   fun conjugate(): Complex val =>
     Complex(_real, -_imaginary)
 
-  fun string(fmt: FormatSettings[FormatDefault, PrefixDefault] 
-    = FormatSettingsDefault): String iso^
-  =>
+  fun string(): String iso^ =>
     ("C(" + _real.string() + ", " + _imaginary.string() + ")").clone()
 
-primitive ComplexSourceParser 
-  fun apply(data: Array[U8] val): Complex val ? => 
+primitive ComplexSourceParser
+  fun apply(data: Array[U8] val): Complex val ? =>
     let real = Bytes.to_u32(data(0), data(1), data(2), data(3))
     let imaginary = Bytes.to_u32(data(4), data(5), data(6), data(7))
     Complex(real.i32(), imaginary.i32())
@@ -315,8 +313,8 @@ primitive ComplexEncoder
     wb.done()
 
 primitive MsgEncoder
-  fun _encode(msg: ForwardMsg val, auth: AmbientAuth, 
-    wb: Writer = Writer): Array[ByteSeq] val ? 
+  fun _encode(msg: ForwardMsg val, auth: AmbientAuth,
+    wb: Writer = Writer): Array[ByteSeq] val ?
   =>
     let serialised: Array[U8] val =
       Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))

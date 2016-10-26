@@ -63,6 +63,7 @@ trait ByteLengthEncoder
     """
 
 actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
+  let _auth: ProcessMonitorAuth
   let _config: ExternalProcessConfig val
   let _codec: ExternalProcessCodec[In, Out] val
   let _length_encoder: ByteLengthEncoder val
@@ -72,13 +73,15 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
   var _process_monitor: (ProcessMonitor | None) = None
   var _completed: Bool = false
 
-  new create(config: ExternalProcessConfig val,
+  new create(auth: ProcessMonitorAuth,
+    config: ExternalProcessConfig val,
     codec: ExternalProcessCodec[In, Out] val,
     length_encoder: ByteLengthEncoder val) =>
+    _auth = auth
     _config = config
     _codec = codec
     _length_encoder = length_encoder
-    _process_monitor = _start_process(config, length_encoder)
+    _process_monitor = _start_process(auth, config, length_encoder)
 
   be add_step_reporter(sr: MetricsReporter iso) =>
     _step_reporter = consume sr
@@ -137,7 +140,7 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
       _output.send[Out](ext_msg.id(), ext_msg.source_ts(),
         ext_msg.last_ingress_ts(), ext_msg.data())
       match _step_reporter
-      | let sr: MetricsReporter ref => 
+      | let sr: MetricsReporter ref =>
         let end_time: U64 = Epoch.milliseconds()
         sr.report(ext_msg.sent_to_external_ts(), end_time)
       end
@@ -157,10 +160,13 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
       @printf[I32](error_msg.cstring())
     end
 
-  fun tag _start_process(config: ExternalProcessConfig val,
-    length_encoder: ByteLengthEncoder val): (ProcessMonitor | None) =>
+  fun tag _start_process(auth: ProcessMonitorAuth,
+    config: ExternalProcessConfig val,
+    length_encoder: ByteLengthEncoder val): (ProcessMonitor | None)
+  =>
     let notifier: ProcessNotify iso = ExternalProcessNotifier[In, Out](this, length_encoder)
-    ProcessMonitor(consume notifier,
+    ProcessMonitor(auth,
+      consume notifier,
       config.path,
       config.args,
       config.environment_variables)
@@ -170,7 +176,7 @@ actor ExternalProcessStep[In: Any val, Out: Any val] is ThroughStep[In, Out]
     match _process_monitor
     | None =>
       _log("Attempting to restart external process")
-      _process_monitor = _start_process(_config, _length_encoder)
+      _process_monitor = _start_process(_auth, _config, _length_encoder)
       // TODO: how do we know when external process is ready to respond to msgs
       // Should we add some kind of handshaking (ping/pong)?
     end
@@ -255,12 +261,8 @@ class ExternalProcessNotifier[In: Any val, Out: Any val] is ProcessNotify
     match err
     | ExecveError   => _log("ProcessError: ExecveError")
     | PipeError     => _log("ProcessError: PipeError")
-    | Dup2Error     => _log("ProcessError: Dup2Error")
     | ForkError     => _log("ProcessError: ForkError")
-    | FcntlError    => _log("ProcessError: FcntlError")
     | WaitpidError  => _log("ProcessError: WaitpidError")
-    | CloseError    => _log("ProcessError: CloseError")
-    | ReadError     => _log("ProcessError: ReadError")
     | WriteError    => _log("ProcessError: WriteError")
     | KillError     => _log("ProcessError: KillError")
     | Unsupported   => _log("ProcessError: Unsupported")

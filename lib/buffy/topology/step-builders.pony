@@ -4,10 +4,11 @@ use "buffy/topology/external"
 use "net"
 use "buffy/metrics"
 use "time"
+use "process"
 
 trait BasicStepBuilder
   fun apply(): BasicStep tag
-  fun shared_state_step_builder(): BasicSharedStateStepBuilder val 
+  fun shared_state_step_builder(): BasicSharedStateStepBuilder val
     => EmptySharedStateStepBuilder
   fun name(): String
 
@@ -35,11 +36,11 @@ class EmptySinkBuilder is SinkBuilder
   new val create(pipeline_name: String) =>
     _pipeline_name = pipeline_name
 
-  fun apply(conns: Array[TCPConnection] iso, 
-    metrics_collector: (MetricsCollector | None)): BasicStep tag 
+  fun apply(conns: Array[TCPConnection] iso,
+    metrics_collector: (MetricsCollector | None)): BasicStep tag
   =>
     EmptySink(metrics_collector, _pipeline_name)
- 
+
   fun name(): String => "Empty Sink"
 
 trait BasicOutputStepBuilder[Out: Any val] is BasicStepBuilder
@@ -103,11 +104,11 @@ class StateLocalStepBuilder[In: Any val, Out: Any val, State: Any #read]
 
   fun name(): String => _name
 
-class ComputationStepsBuilder[In: Any val, Out: Any val] 
+class ComputationStepsBuilder[In: Any val, Out: Any val]
   let _first_step: BasicOutputComputationStep
   var _last_step: BasicOutputComputationStep
 
-  new iso create(f: BasicOutputComputationStepBuilder val) => 
+  new iso create(f: BasicOutputComputationStepBuilder val) =>
     let first = f()
     _first_step = first
     _last_step = first
@@ -117,7 +118,7 @@ class ComputationStepsBuilder[In: Any val, Out: Any val]
     _last_step.add_local_output(next_step)
     _last_step = next_step
 
-  fun ref apply(): ComputationSteps[In, Out] => 
+  fun ref apply(): ComputationSteps[In, Out] =>
     ComputationSteps[In, Out](_first_step, _last_step)
 
 class CoalesceStepBuilder[In: Any val, Out: Any val]
@@ -128,8 +129,8 @@ class CoalesceStepBuilder[In: Any val, Out: Any val]
   var _name: String = ""
 
   new val create(cs: Array[BasicOutputComputationStepBuilder val] iso,
-    s_id: (U64 | None) = None, 
-    sssb: BasicSharedStateStepBuilder val = EmptySharedStateStepBuilder) 
+    s_id: (U64 | None) = None,
+    sssb: BasicSharedStateStepBuilder val = EmptySharedStateStepBuilder)
   =>
     _comp_step_builders = consume cs
     for builder in _comp_step_builders.values() do
@@ -145,7 +146,7 @@ class CoalesceStepBuilder[In: Any val, Out: Any val]
   fun apply(): BasicStep tag =>
     try
       let first_step_builder = _comp_step_builders(0)
-      let c_steps_builder: ComputationStepsBuilder[In, Out] iso = 
+      let c_steps_builder: ComputationStepsBuilder[In, Out] iso =
         ComputationStepsBuilder[In, Out](first_step_builder)
       for (idx, builder) in _comp_step_builders.pairs() do
         if idx > 0 then
@@ -161,7 +162,7 @@ class CoalesceStepBuilder[In: Any val, Out: Any val]
   fun local(): BasicOutputLocalStep =>
     try
       let first_step_builder = _comp_step_builders(0)
-      let c_steps_builder: ComputationStepsBuilder[In, Out] iso = 
+      let c_steps_builder: ComputationStepsBuilder[In, Out] iso =
         ComputationStepsBuilder[In, Out](first_step_builder)
       for (idx, builder) in _comp_step_builders.pairs() do
         if idx > 0 then
@@ -185,7 +186,7 @@ class CoalesceStepBuilder[In: Any val, Out: Any val]
 //   let _comp_step_builders: Array[BasicOutputComputationStepBuilder val] val
 //   let _state_comp: StateComputation[In, Out, State] val
 //   let _name: String
-//   let _state_id: U64 
+//   let _state_id: U64
 
 //   new val create(cs: Array[BasicOutputComputationStepBuilder val] iso,
 //     state_comp: StateComputation[In, Out, State] val, s_id: U64) =>
@@ -199,7 +200,7 @@ class CoalesceStepBuilder[In: Any val, Out: Any val]
 //   fun apply(): BasicStep tag =>
 //     try
 //       let first_step_builder = _comp_step_builders(0)
-//       let c_steps_builder: ComputationStepsBuilder[In, Out] iso = 
+//       let c_steps_builder: ComputationStepsBuilder[In, Out] iso =
 //         ComputationStepsBuilder[In, Out](first_step_builder)
 //       for (idx, builder) in _comp_step_builders.pairs() do
 //         if idx > 0 then
@@ -207,7 +208,7 @@ class CoalesceStepBuilder[In: Any val, Out: Any val]
 //         end
 //       end
 
-//       CoalesceStateStep[In, Out](consume c_steps_builder, _state_comp, 
+//       CoalesceStateStep[In, Out](consume c_steps_builder, _state_comp,
 //         _state_id)
 //     else
 //       EmptyStep
@@ -216,7 +217,7 @@ class CoalesceStepBuilder[In: Any val, Out: Any val]
 //   fun local(): BasicOutputLocalStep =>
 //     try
 //       let first_step_builder = _comp_step_builders(0)
-//       let c_steps_builder: ComputationStepsBuilder[In, Out] iso = 
+//       let c_steps_builder: ComputationStepsBuilder[In, Out] iso =
 //         ComputationStepsBuilder[In, Out](first_step_builder)
 //       for (idx, builder) in _comp_step_builders.pairs() do
 //         if idx > 0 then
@@ -398,11 +399,11 @@ primitive EmptySharedStateStepBuilder is BasicSharedStateStepBuilder
 class ExternalConnectionBuilder[In: Any val] is SinkBuilder
   let _array_stringify: ArrayStringify[In] val
   let _pipeline_name: String
-  let _initial_msgs: Array[Array[ByteSeq] val] val 
+  let _initial_msgs: Array[Array[ByteSeq] val] val
 
-  new val create(array_stringify: ArrayStringify[In] val, 
-    pipeline_name: String, initial_msgs: Array[Array[ByteSeq] val] val 
-      = recover Array[Array[ByteSeq] val] end) 
+  new val create(array_stringify: ArrayStringify[In] val,
+    pipeline_name: String, initial_msgs: Array[Array[ByteSeq] val] val
+      = recover Array[Array[ByteSeq] val] end)
   =>
     _array_stringify = array_stringify
     _pipeline_name = pipeline_name
@@ -411,7 +412,7 @@ class ExternalConnectionBuilder[In: Any val] is SinkBuilder
   fun apply(conns: Array[TCPConnection] iso, metrics_collector:
     (MetricsCollector | None))
     : BasicStep tag =>
-    ExternalConnection[In](_array_stringify, consume conns, metrics_collector, 
+    ExternalConnection[In](_array_stringify, consume conns, metrics_collector,
       _pipeline_name, _initial_msgs)
 
   fun name(): String => _pipeline_name + " Sink"
@@ -420,7 +421,7 @@ class CollectorSinkStepBuilder[In: Any val, Diff: Any #read] is SinkBuilder
   let _array_byteseqify: ArrayByteSeqify[Diff] val
   let _pipeline_name: String
   let _collector_builder: {(): SinkCollector[In, Diff]} val
-  let _initial_msgs: Array[Array[ByteSeq] val] val 
+  let _initial_msgs: Array[Array[ByteSeq] val] val
 
   new val create(collector_builder: {(): SinkCollector[In, Diff]} val,
     array_byteseqify: ArrayByteSeqify[Diff] val,
@@ -442,18 +443,20 @@ class CollectorSinkStepBuilder[In: Any val, Diff: Any #read] is SinkBuilder
 
 class ExternalProcessStepBuilder[In: Any val, Out: Any val]
   is ThroughStepBuilder[In, Out]
+  let _auth: ProcessMonitorAuth
   let _config: ExternalProcessConfig val
   let _codec: ExternalProcessCodec[In, Out] val
   let _length_encoder: ByteLengthEncoder val
   let _name: String val
 
   new val create(builder: ExternalProcessBuilder[In, Out] val) =>
+    _auth = builder.auth()
     _config = builder.config()
     _codec = builder.codec()
     _length_encoder = builder.length_encoder()
     _name = builder.name()
 
   fun apply(): BasicStep tag =>
-    ExternalProcessStep[In, Out](_config, _codec, _length_encoder)
+    ExternalProcessStep[In, Out](_auth, _config, _codec, _length_encoder)
 
   fun name(): String => _name

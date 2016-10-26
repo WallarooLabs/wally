@@ -3,7 +3,7 @@ use ".."
 actor Main
   new create(env: Env) =>
     VerifierCLI[WordcountSentMessage val, WordcountReceivedMessage val]
-      .run(env, "Word Count", WordcountResultMapper, WordcountSentParser, 
+      .run(env, "Word Count", WordcountResultMapper, WordcountSentParser,
         WordcountReceivedParser)
 
 class WordcountSentMessage
@@ -14,7 +14,7 @@ class WordcountSentMessage
     ts = ts'
     text = text'
 
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+  fun string(): String iso^ =>
     ("(" + ts.string() + ", " + text + ")").clone()
 
 class WordcountReceivedMessage
@@ -27,11 +27,11 @@ class WordcountReceivedMessage
     word = word'
     count = count'
 
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+  fun string(): String iso^ =>
     ("(" + ts.string() + ", " + word + ": " + count.string() + ")").clone()
 
 class WordcountSentParser is SentParser[WordcountSentMessage val]
-  let _messages: Array[WordcountSentMessage val] = 
+  let _messages: Array[WordcountSentMessage val] =
     Array[WordcountSentMessage val]
 
   fun fn(): USize => 2
@@ -60,21 +60,21 @@ class WordcountReceivedParser is ReceivedParser[WordcountReceivedMessage val]
 class WordcountResultMapper is ResultMapper[WordcountSentMessage val,
   WordcountReceivedMessage val]
 
-  fun sent_transform(sent: Array[WordcountSentMessage val]): 
+  fun sent_transform(sent: Array[WordcountSentMessage val]):
     CanonicalForm =>
-    var wc = WordCounter 
+    var wc = WordCounter
 
     for m in sent.values() do
       wc.update_from_string(m.text)
     end
     wc
 
-  fun received_transform(received: Array[WordcountReceivedMessage val]): 
+  fun received_transform(received: Array[WordcountReceivedMessage val]):
     CanonicalForm =>
-    var wc = WordCounter 
+    var wc = WordCounter
 
     for m in received.values() do
-      try 
+      try
         if wc(m.word) < m.count then
           wc(m.word) = m.count
         end

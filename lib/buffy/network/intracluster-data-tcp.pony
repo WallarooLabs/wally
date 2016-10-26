@@ -146,7 +146,7 @@ class IntraclusterDataSenderConnectNotify is TCPConnectionNotify
   let _target_name: String
   let _coordinator: Coordinator
 
-  new iso create(env: Env, auth: AmbientAuth, name: String, 
+  new iso create(env: Env, auth: AmbientAuth, name: String,
     target_name: String, coordinator: Coordinator)
   =>
     _env = env
