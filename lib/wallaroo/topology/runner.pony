@@ -290,7 +290,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
-    @printf[I32]("prestate runner received!\n".cstring())
+    // @printf[I32]("prestate runner received!\n".cstring())
     let computation_start = Time.nanos()
     let is_finished = 
       match data
@@ -367,7 +367,7 @@ class StateRunner[State: Any #read] is Runner
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
-    @printf[I32]("state runner received!\n".cstring())
+    // @printf[I32]("state runner received!\n".cstring())
     match input
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
