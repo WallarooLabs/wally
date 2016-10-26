@@ -1,4 +1,3 @@
-/*
 """
 Setting up a complex app run (in order):
 1) reports sink:
@@ -21,7 +20,7 @@ giles/sender/sender -b 127.0.0.1:7010 -m 10000000 -s 300 -i 2_500_000 -f apps/co
 
 use "buffered"
 use "sendence/bytes"
-use "wallaroo"
+use "wallaroo/"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
 
@@ -30,7 +29,7 @@ actor Main
     try
       let application = recover val
         Application("Complex Numbers App")
-          .new_pipeline[Complex val, Complex val]("Complex Numbers", ComplexDecoder)// where coalescing = false)
+          .new_pipeline[Complex val, Complex val]("Complex Numbers", ComplexDecoder)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Conjugate end)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
@@ -41,7 +40,7 @@ actor Main
             => Conjugate end)
           .to_sink(ComplexEncoder, recover [0] end)
       end
-      Startup(env, application)//, 1)
+      Startup(env, application, None)//, 1)
     else
       env.out.print("Couldn't build topology")
     end
@@ -59,7 +58,7 @@ class Complex
 
   fun plus(c: Complex val): Complex val =>
     Complex(_real + c._real, _imaginary + c._imaginary)
-
+ 
   fun minus(c: Complex val): Complex val =>
     Complex(_real - c._real, _imaginary - c._imaginary)
 
@@ -99,10 +98,11 @@ class Scale is Computation[Complex val, Complex val]
 primitive ComplexDecoder is FramedSourceHandler[Complex val]
   fun header_length(): USize =>
     4
+
   fun payload_length(data: Array[U8] iso): USize ? =>
     Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
-  fun decode(data: Array[U8] val): Complex val ? =>
+  fun decode(data: Array[U8] val): Complex val ? => 
     let real = Bytes.to_u32(data(0), data(1), data(2), data(3))
     let imaginary = Bytes.to_u32(data(4), data(5), data(6), data(7))
     Complex(real.i32(), imaginary.i32())
@@ -118,7 +118,7 @@ primitive ComplexEncoder
     wb.done()
 
 class Counter
-  var _count: USize = 0
+  var _count: USize = 0 
   var _reals: I32 = 0
 
   fun ref apply(c: Complex val): Complex val =>
@@ -136,6 +136,11 @@ primitive CounterBuilder
 
 primitive UpdateCounter
   fun name(): String => "UpdateCounter"
-  fun apply(c: Complex val, s: Counter): Complex val =>
-    s(c)
-*/
+  fun apply(c: Complex val, sc_repo: StateChangeRepository[Counter], 
+    state: Counter): (Complex val, None) 
+  =>
+    (state(c), None)
+
+  fun state_change_builders(): Array[StateChangeBuilder[Counter] val] val =>
+    recover Array[StateChangeBuilder[Counter] val] end
+
