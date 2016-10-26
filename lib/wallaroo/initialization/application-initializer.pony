@@ -340,8 +340,8 @@ actor ApplicationInitializer
           // If this worker has no steps (is_empty), then create a
           // placeholder sink
           if cur.is_empty then
-            let egress_builder = EgressBuilder(_output_addr, pipeline_id
-              pipeline.sink_builder())
+            let egress_builder = EgressBuilder(pipeline.name(), 
+              _guid_gen.u128(), _output_addr, pipeline.sink_builder())
             let local_pipeline = LocalPipeline(pipeline.name(),
               cur.step_initializers, egress_builder, source_data,
               pipeline.state_builders())
@@ -358,8 +358,8 @@ actor ApplicationInitializer
               // If the next worker in order has no steps, then we need a
               // sink on this worker
               if next_w.is_empty then
-                let egress_builder = EgressBuilder(_output_addr, pipeline_id
-                  pipeline.sink_builder())
+                let egress_builder = EgressBuilder(pipeline.name(), 
+                  _guid_gen.u128(), _output_addr, pipeline.sink_builder())
                 let local_pipeline = LocalPipeline(pipeline.name(),
                   cur.step_initializers, egress_builder, source_data,
                   pipeline.state_builders())
@@ -374,7 +374,8 @@ actor ApplicationInitializer
               else
                 let proxy_address = ProxyAddress(next_w.worker_name,
                   next_w.boundary_step_id)
-                let egress_builder = EgressBuilder(proxy_address)
+                let egress_builder = EgressBuilder(pipeline.name(),
+                  _guid_gen.u128(), proxy_address)
                 let local_pipeline = LocalPipeline(pipeline.name(),
                   cur.step_initializers, egress_builder, source_data,
                   pipeline.state_builders())
@@ -388,8 +389,8 @@ actor ApplicationInitializer
             // If the match fails, then this is the last worker in order and
             // we need a sink on it
             else
-              let egress_builder = EgressBuilder(_output_addr, pipeline_id
-                pipeline.sink_builder())
+              let egress_builder = EgressBuilder(pipeline.name(), 
+                _guid_gen.u128(), _output_addr, pipeline.sink_builder())
               let local_pipeline = LocalPipeline(pipeline.name(),
                 cur.step_initializers, egress_builder, source_data,
                 pipeline.state_builders())

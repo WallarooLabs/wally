@@ -1,3 +1,12 @@
+use "collections"
+use "net"
+use "wallaroo/backpressure"
+use "wallaroo/metrics"
+use "wallaroo/network"
+use "wallaroo/resilience"
+use "wallaroo/tcp-source"
+use "wallaroo/tcp-sink"
+
 type StepInitializer is (StepBuilder | PartitionedPreStateStepBuilder | EgressBuilder)
 
 class StepBuilder
@@ -90,7 +99,7 @@ class EgressBuilder
   fun apply(worker_name: String, reporter: MetricsReporter iso, 
     auth: AmbientAuth,
     proxies: Map[String, Array[Step tag]] = Map[String, Array[Step tag]]): 
-    RunnableStep tag ?
+    CreditFlowConsumerStep tag ?
   =>    
     match _addr
     | let a: Array[String] val =>
