@@ -11,55 +11,6 @@ use "wallaroo/topology"
 use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
 
-
-class EgressBuilder
-  let _addr: (Array[String] val | ProxyAddress val)
-  let _sink_builder: (TCPSinkBuilder val | None)
-
-  new val create(addr: (Array[String] val | ProxyAddress val),
-    sink_builder: (TCPSinkBuilder val | None) = None)
-  =>
-    _addr = addr
-    _sink_builder = sink_builder
-
-  fun apply(worker_name: String, reporter: MetricsReporter iso,
-    auth: AmbientAuth,
-    proxies: Map[String, Array[Step tag]] = Map[String, Array[Step tag]]):
-    CreditFlowConsumerStep tag ?
-  =>
-    match _addr
-    | let a: Array[String] val =>
-      try
-        match _sink_builder
-        | let tsb: TCPSinkBuilder val =>
-          @printf[I32](("Connecting to sink at " + a(0) + ":" + a(1) + "\n").cstring())
-
-          tsb(reporter.clone(), a(0), a(1))
-        else
-          EmptySink
-        end
-      else
-        @printf[I32]("Error connecting to sink.\n".cstring())
-        error
-      end
-    | let p: ProxyAddress val =>
-      @printf[I32](("Creating Proxy to " + p.worker + "\n").cstring())
-      let proxy = Proxy(worker_name, p.step_id, reporter.clone(), auth)
-
-      let proxy_step = Step(consume proxy, consume reporter)
-      if proxies.contains(worker_name) then
-        proxies(p.worker).push(proxy_step)
-      else
-        proxies(p.worker) = Array[Step tag]
-        proxies(p.worker).push(proxy_step)
-      end
-      proxy_step
-    else
-      // The match is exhaustive, so this can't happen
-      @printf[I32]("Exhaustive match failed somehow\n".cstring())
-      error
-    end
-
 class LocalPipeline
   let _name: String
   let _initializers: Array[StepInitializer val] val

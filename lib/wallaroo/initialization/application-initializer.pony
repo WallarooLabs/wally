@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "sendence/dag"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo"

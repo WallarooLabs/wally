@@ -17,6 +17,9 @@ class Dag[V: Any #alias]
   fun nodes(): Iterator[this->DagNode[V]] =>
     _nodes.values()
 
+  fun edges(): Iterator[(this->DagNode[V], this->DagNode[V])] =>
+    _edges.values()
+
   fun ref add_edge(from_id: U128, to_id: U128) ? =>
     let from = _nodes(from_id)
     let to = _nodes(to_id)
