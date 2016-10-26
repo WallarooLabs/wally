@@ -9,16 +9,10 @@ use "wallaroo/network"
 use "wallaroo/topology"
 use "wallaroo/resilience"
 
-interface AppStarter
-  fun apply(env: Env, data_addr: Array[String] val,
-    input_addrs: Array[Array[String]] val, 
-    output_addr: Array[String] val, metrics_conn: TCPConnection, 
-    expected: USize, init_path: String, worker_count: USize,
-    is_initializer: Bool, worker_name: String, connections: Connections,
-    initializer: (WorkerInitializer | None)) ? 
-
 actor Startup
-  new create(env: Env, app_runner: (AppStarter val | Application val), event_log_file: (String val | None)) =>
+  new create(env: Env, application: Application val, 
+    event_log_file: (String val | None)) 
+  =>
     var m_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
     var c_arg: (Array[String] | None) = None
@@ -147,17 +141,11 @@ actor Startup
         )
       end
 
-      match app_runner
-      | let application: Application val =>
-        match worker_initializer 
-        | let w: WorkerInitializer =>
-          w.start(application)
-        end
-      | let starter: AppStarter val =>
-        starter(env, d_addr, input_addrs, o_addr, metrics_conn, expected,
-          init_path, worker_count, is_initializer, worker_name, connections, 
-          worker_initializer)
+      match worker_initializer 
+      | let w: WorkerInitializer =>
+        w.start(application)
       end
+
     else
       StartupHelp(env)
     end

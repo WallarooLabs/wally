@@ -14,7 +14,6 @@ actor ApplicationInitializer
   let _output_addr: Array[String] val
   let _alfred: Alfred tag
 
-  var _application_starter: (ApplicationStarter val | None) = None
   var _application: (Application val | None) = None
 
   new create(local_topology_initializer: LocalTopologyInitializer,
@@ -26,36 +25,23 @@ actor ApplicationInitializer
     _output_addr = output_addr
     _alfred = alfred
 
-  be update_application(a: (ApplicationStarter val | Application val)) =>
-    match a
-    | let s: ApplicationStarter val =>
-      _application_starter = s
-    | let app: Application val =>
-      _application = app
-    end
+  be update_application(app: Application val) =>
+    _application = app
 
   be initialize(worker_initializer: WorkerInitializer, worker_count: USize,
     worker_names: Array[String] val)
   =>
-    @printf[I32]("Initializing application\n".cstring())
     match _application
     | let a: Application val =>
-      @printf[I32]("Automating...\n".cstring())
-      _automate_initialization(a, worker_initializer, worker_count,
+      @printf[I32]("Initializing application\n".cstring())
+      _automate_initialization(a, worker_initializer, worker_count, 
         worker_names, _alfred)
     else
-      match _application_starter
-      | let a: ApplicationStarter val =>
-        @printf[I32]("Using user-defined ApplicationStarter...\n".cstring())
-        try
-          a(worker_initializer, worker_names, _input_addrs, worker_count)
-        else
-          @printf[I32]("Error running ApplicationStarter.\n".cstring())
-        end
-      else
-        @printf[I32]("No application or application starter!\n".cstring())
-      end
+      @printf[I32]("No application provided!\n".cstring())
     end
+
+  be topology_ready() =>
+    @printf[I32]("Application has successfully initialized.\n".cstring())
 
   fun ref _automate_initialization(application: Application val,
     worker_initializer: WorkerInitializer, worker_count: USize,

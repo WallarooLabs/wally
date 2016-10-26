@@ -36,14 +36,13 @@ actor WorkerInitializer
     _metrics_conn = metrics_conn
     _application_initializer = application_initializer
 
-  be start(a: (ApplicationStarter val | Application val)) =>
+  be start(a: Application val) =>
     _application_initializer.update_application(a)
 
     if _expected == 1 then
       _application_initializer.initialize(this, _expected, 
         recover Array[String] end)     
     end
-
 
   be identify_control_address(worker: String, host: String, service: String) =>
     if _control_addrs.contains(worker) then
@@ -96,6 +95,8 @@ actor WorkerInitializer
       _ready_workers.set(worker_name)
       _initialized = _initialized + 1
       if _initialized == (_expected - 1) then
+        _application_initializer.topology_ready()
+
         let topology_ready_msg = 
           ExternalMsgEncoder.topology_ready("initializer")
         _connections.send_phone_home(topology_ready_msg)
@@ -134,7 +135,3 @@ actor WorkerInitializer
     map("control") = consume control_map
     map("data") = consume data_map
     consume map
-
-trait ApplicationStarter
-  fun apply(initializer: WorkerInitializer, workers: Array[String] box,
-    input_addrs: Array[Array[String]] val, expected: USize) ?
