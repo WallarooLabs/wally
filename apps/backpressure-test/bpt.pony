@@ -10,6 +10,8 @@ class MySourceBuilder is SourceBuilder
     _handler = handler
     _runner = runner
 
+  fun name(): String => "test"
+
   fun ref apply(listen: TCPSourceListener ref): TCPSourceNotify iso^ =>
     FramedSourceNotify(_handler, _runner)
 

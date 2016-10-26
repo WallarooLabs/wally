@@ -11,24 +11,34 @@ use "wallaroo/resilience"
 class Application
   let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
+  // Map from source id to filename
+  let init_files: Map[USize, String] = init_files.create()
 
   new create(name': String) =>
     _name = name'
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
-    pipeline_name: String, decoder: FramedSourceHandler[In] val, 
-    coalescing: Bool = true): PipelineBuilder[In, Out, In]
+    pipeline_name: String, decoder: FramedSourceHandler[In] val,
+    init_filename: String = "", coalescing: Bool = true): 
+      PipelineBuilder[In, Out, In]
   =>
-    let pipeline = Pipeline[In, Out](pipeline_name, decoder, coalescing)
+    let pipeline_id = pipelines.size()
+    if init_filename != "" then add_init_file(pipeline_id, init_filename) end
+    let pipeline = Pipeline[In, Out](pipeline_id, pipeline_name, decoder, 
+      coalescing)
     PipelineBuilder[In, Out, In](this, pipeline)
 
   fun ref add_pipeline(p: BasicPipeline) =>
     pipelines.push(p)
 
+  fun ref add_init_file(source_id: USize, filename: String) =>
+    init_files(source_id) = filename
+
   fun name(): String => _name
 
 trait BasicPipeline
   fun name(): String
+  fun source_id(): USize
   fun source_builder(): SourceBuilderBuilder val
   fun sink_builder(): (TCPSinkBuilder val | None)
   fun sink_target_ids(): Array[U64] val
@@ -39,6 +49,7 @@ trait BasicPipeline
   fun size(): USize
 
 class Pipeline[In: Any val, Out: Any val] is BasicPipeline
+  let _pipeline_id: USize
   let _name: String
   let _decoder: FramedSourceHandler[In] val
   let _runner_builders: Array[RunnerBuilder val]
@@ -50,7 +61,10 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _state_builders.create()
   let _is_coalesced: Bool
 
-  new create(n: String, d: FramedSourceHandler[In] val, coalescing: Bool) =>
+  new create(p_id: USize, n: String, d: FramedSourceHandler[In] val, 
+    coalescing: Bool) 
+  =>
+    _pipeline_id = p_id
     _decoder = d
     _runner_builders = Array[RunnerBuilder val]
     _name = n
@@ -67,6 +81,8 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   =>
     _sink_builder = sink_builder'
     _sink_target_ids = sink_ids
+
+  fun source_id(): USize => _pipeline_id
 
   fun source_builder(): SourceBuilderBuilder val => _source_builder
 

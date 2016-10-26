@@ -119,7 +119,7 @@ actor Startup
 
       if is_initializer then
         env.out.print("Running as Initializer...")
-        let application_initializer = ApplicationInitializer(
+        let application_initializer = ApplicationInitializer(auth,
           local_topology_initializer, input_addrs, o_addr, alfred)
 
         worker_initializer = WorkerInitializer(auth, worker_count, connections,

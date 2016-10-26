@@ -37,10 +37,13 @@ actor Main
       let symbol_data_partition = Partition[Symboly val, String](
         SymbolPartitionFunction, LegalSymbols.symbols)
 
+      let init_nbbo_filename = "../../demos/marketspread/initial-nbbo-fixish.msg"
+
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler)
+            "Nbbo", FixNbboFrameHandler 
+              where init_filename = init_nbbo_filename)
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition)

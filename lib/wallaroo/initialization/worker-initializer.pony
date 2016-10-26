@@ -94,7 +94,7 @@ actor WorkerInitializer
     if not _ready_workers.contains(worker_name) then
       _ready_workers.set(worker_name)
       _initialized = _initialized + 1
-      if _initialized == (_expected - 1) then
+      if _initialized == _expected then
         _application_initializer.topology_ready()
 
         let topology_ready_msg = 

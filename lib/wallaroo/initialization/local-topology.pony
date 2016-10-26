@@ -139,7 +139,7 @@ actor LocalTopologyInitializer
   be update_topology(t: LocalTopology val) =>
     _topology = t
 
-  be initialize() =>
+  be initialize(worker_initializer: (WorkerInitializer | None) = None) =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("|^|^|^Initializing Local Topology^|^|^|\n\n".cstring())
     try
@@ -288,19 +288,28 @@ actor LocalTopologyInitializer
           )
         end
 
-        // Inform the initializer that we're done initializing our local
-        // topology
-        let topology_ready_msg =
-          try
-            ChannelMsgEncoder.topology_ready(_worker_name, _auth)
+        if _is_initializer then
+          match worker_initializer
+          | let wi: WorkerInitializer =>
+            wi.topology_ready("initializer")
           else
-            @printf[I32]("ChannelMsgEncoder failed\n".cstring())
-            error
+            @printf[I32]("Need WorkerInitializer to inform that topology is ready\n".cstring())
           end
-        _connections.send_control("initializer", topology_ready_msg)
+        else
+          // Inform the initializer that we're done initializing our local
+          // topology
+          let topology_ready_msg = 
+            try
+              ChannelMsgEncoder.topology_ready(_worker_name, _auth)
+            else
+              @printf[I32]("ChannelMsgEncoder failed\n".cstring())
+              error
+            end
+          _connections.send_control("initializer", topology_ready_msg)
 
-        let ready_msg = ExternalMsgEncoder.ready(_worker_name)
-        _connections.send_phone_home(ready_msg)
+          let ready_msg = ExternalMsgEncoder.ready(_worker_name)
+          _connections.send_phone_home(ready_msg)
+        end
 
         @printf[I32]("Local topology initialized\n".cstring())
       else

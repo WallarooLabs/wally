@@ -8,6 +8,7 @@ use "wallaroo/topology"
 use "wallaroo/resilience"
 
 actor ApplicationInitializer
+  let _auth: AmbientAuth
   let _guid_gen: GuidGenerator = GuidGenerator
   let _local_topology_initializer: LocalTopologyInitializer
   let _input_addrs: Array[Array[String]] val
@@ -16,10 +17,12 @@ actor ApplicationInitializer
 
   var _application: (Application val | None) = None
 
-  new create(local_topology_initializer: LocalTopologyInitializer,
-    input_addrs: Array[Array[String]] val,
-    output_addr: Array[String] val, alfred: Alfred tag)
+  new create(auth: AmbientAuth,
+    local_topology_initializer: LocalTopologyInitializer,
+    input_addrs: Array[Array[String]] val, 
+    output_addr: Array[String] val, alfred: Alfred tag) 
   =>
+    _auth = auth
     _local_topology_initializer = local_topology_initializer
     _input_addrs = input_addrs
     _output_addr = output_addr
@@ -42,6 +45,17 @@ actor ApplicationInitializer
 
   be topology_ready() =>
     @printf[I32]("Application has successfully initialized.\n".cstring())
+
+    match _application
+    | let app: Application val =>
+      for i in Range(0, _input_addrs.size()) do
+        try
+          let filename = app.init_files(i)
+          let file = InitFile(filename, _auth)
+          file.read_into(_input_addrs(i))
+        end
+      end
+    end
 
   fun ref _automate_initialization(application: Application val,
     worker_initializer: WorkerInitializer, worker_count: USize,
@@ -415,7 +429,7 @@ actor ApplicationInitializer
         // to the list we'll use to distribute to the other workers
         if w == "initializer" then
           _local_topology_initializer.update_topology(local_topology)
-          _local_topology_initializer.initialize()
+          _local_topology_initializer.initialize(worker_initializer) 
         else
           other_local_topologies.push(local_topology)
         end
