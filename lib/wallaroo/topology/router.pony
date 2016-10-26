@@ -33,9 +33,12 @@ class DirectRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
-    // TODO- CreditFlow
+    // TODO: CreditFlow
     // Lookup route from producer
     // Call run on the route we got from the producer
+
+    let r = producer.route_to(_target)
+    r.run[D]()
 
     _target.run[D](metric_name, source_ts, data,
       outgoing_envelope.origin,
