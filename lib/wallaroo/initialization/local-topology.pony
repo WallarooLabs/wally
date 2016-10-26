@@ -264,7 +264,7 @@ actor LocalTopologyInitializer
             try
               @printf[I32](("----Creating source for " + pipeline.name() + " pipeline with " + sd.runner_builder().name() + "----\n").cstring())
               TCPSourceListener(sd.builder()(sd.runner_builder(),
-                latest_router, _metrics_conn, alred),
+                latest_router, _metrics_conn, alfred),
                 sd.address()(0), sd.address()(1))
             else
               @printf[I32]("Ill-formed source address\n".cstring())
