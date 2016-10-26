@@ -135,9 +135,8 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
     let m: Map[Key, Step] trn = recover Map[Key, Step] end
     for key in _keys.values() do
       let reporter = MetricsReporter("shared state", metrics_conn)
-      // TODO: CREDITFLOW- Needs real list of consumers
       m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
-        consume reporter, recover Array[CreditFlowConsumer] end)
+        consume reporter)
     end
     KeyedStateAddresses[Key](consume m)
 
@@ -210,12 +209,10 @@ class KeyedPreStateSubpartition[PIn: Any val,
           match state_step
           | let s: Step =>
             // Create prestate step for this key
-            // TODO: CREDITFLOW- Needs real list of consumers
             let next_step = Step(runner_builder(
                 MetricsReporter(_pipeline_name, metrics_conn)
                 where alfred = alfred, router = state_comp_router),
               MetricsReporter(_pipeline_name, metrics_conn),
-              recover Array[CreditFlowConsumer] end,
               DirectRouter(s))
             m(id) = next_step
             routes(key) = next_step

@@ -15,7 +15,7 @@ trait tag CreditFlowProducer
 
 type CreditFlowProducerConsumer is (CreditFlowProducer & CreditFlowConsumer)
 
-trait RouteCallbackHandler
+trait val RouteCallbackHandler
   fun shutdown(p: CreditFlowProducer ref)
   fun credits_replenished(p: CreditFlowProducer ref)
   fun credits_exhausted(p: CreditFlowProducer ref)

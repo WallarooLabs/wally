@@ -15,7 +15,7 @@ use "wallaroo/resilience"
 //   be run[D: Any val](metric_name: String, source_ts: U64, data: D)
 //   be dispose()
 
-trait RunnableStep
+trait tag RunnableStep
   // TODO: Fix the Origin None once we know how to look up Proxy
   // for messages crossing boundary
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -52,7 +52,6 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   var _distributable_credits: ISize = _max_distributable_credits
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
-    consumers: Array[CreditFlowConsumer] val,
     router: Router val = EmptyRouter)
   =>
     _runner = consume runner
@@ -65,9 +64,10 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
     _router = router
 
     ifdef "use_backpressure" then
-      // TODO: CREDITFLOW - this should call `routes` on all routers
-      // and setup our Routers
-      None
+      for consumer in _router.routes().values() do
+        _routes(consumer) =
+          Route(this, consumer, StepRouteCallbackHandler)
+      end
 
       // TODO: CREDITFLOW - this should be in a post create initialize
       for r in _routes.values() do
@@ -372,10 +372,8 @@ class StepBuilder
   =>
     let runner = _runner_builder(MetricsReporter(pipeline_name,
       metrics_conn) where alfred = alfred, router = router)
-    // TODO: CREDITFLOW- Needs real list of consumers
     let step = Step(consume runner,
-      MetricsReporter(pipeline_name, metrics_conn),
-      recover Array[CreditFlowConsumer] end, router)
+      MetricsReporter(pipeline_name, metrics_conn), router)
     step.update_router(next)
     step
 
@@ -400,9 +398,7 @@ class PartitionedPreStateStepBuilder
     pipeline_name: String, alfred: Alfred, router: Router val = EmptyRouter):
       Step tag
   =>
-    // TODO: CREDITFLOW- Needs real list of consumers
-    Step(RouterRunner, MetricsReporter(pipeline_name, metrics_conn),
-      recover Array[CreditFlowConsumer] end)
+    Step(RouterRunner, MetricsReporter(pipeline_name, metrics_conn))
 
   fun build_partition(worker_name: String, state_addresses: StateAddresses val,
     metrics_conn: TCPConnection, auth: AmbientAuth, connections: Connections,

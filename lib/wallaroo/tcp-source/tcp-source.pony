@@ -42,8 +42,7 @@ actor TCPSource is CreditFlowProducer
 
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
-    consumers: Array[CreditFlowConsumer] val, fd: U32, init_size: USize = 64,
-    max_size: USize = 16384)
+    fd: U32, init_size: USize = 64, max_size: USize = 16384)
   =>
     """
     A new connection accepted on a server.
@@ -68,9 +67,10 @@ actor TCPSource is CreditFlowProducer
     _notify.accepted(this)
 
     ifdef "use_backpressure" then
-      // TODO: CREDITFLOW - this should call `routes` on the _notify's router
-      // which means we need to expose that router or rather the routes
-      None
+      for consumer in _notify.routes().values() do
+        _routes(consumer) =
+          Route(this, consumer, TCPSourceRouteCallbackHandler)
+      end
 
       // TODO: CREDITFLOW - this should be in a post create initialize
       for r in _routes.values() do

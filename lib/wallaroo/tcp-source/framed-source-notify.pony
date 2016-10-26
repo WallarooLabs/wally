@@ -1,5 +1,6 @@
 use "time"
 use "sendence/guid"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -38,6 +39,9 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     _router = router
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
+
+  fun routes(): Array[CreditFlowConsumerStep] val =>
+    _router.routes()
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then

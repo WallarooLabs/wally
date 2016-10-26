@@ -1,4 +1,13 @@
+use "wallaroo/topology"
+
 interface TCPSourceNotify
+  // TODO: CREDITFLOW - this is weird that its here
+  // It exists so that a TCPSource can get its routes
+  // on startup. It probably makes more sense to make this
+  // available via the source builder that Listener gets
+  // and it can then make routes available
+  fun ref routes(): Array[CreditFlowConsumerStep] val
+
   fun ref accepted(conn: TCPSource ref) =>
     """
     Called when a TCPSource is accepted by a TCPSourceListener.

@@ -6,7 +6,6 @@ actor TCPSourceListener
   """
 
   let _notify: TCPSourceListenerNotify
-  let _consumers: Array[CreditFlowConsumer] val
   var _fd: U32
   var _event: AsioEventID = AsioEvent.none()
   let _limit: USize
@@ -16,7 +15,6 @@ actor TCPSourceListener
   var _max_size: USize
 
   new create(source_builder: SourceBuilder val,
-    consumers: Array[CreditFlowConsumer] val,
     host: String = "", service: String = "0",
     limit: USize = 0,
     init_size: USize = 64, max_size: USize = 16384)
@@ -25,7 +23,6 @@ actor TCPSourceListener
     Listens for both IPv4 and IPv6 connections.
     """
     _notify = SourceListenerNotify(source_builder)
-    _consumers = consumers
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.null_terminated().cstring(), service.null_terminated().cstring())
     _limit = limit
@@ -91,8 +88,8 @@ actor TCPSourceListener
     Spawn a new connection.
     """
     try
-      TCPSource._accept(this, _notify.connected(this), _consumers, ns,
-        _init_size, _max_size)
+      TCPSource._accept(this, _notify.connected(this), ns, _init_size,
+        _max_size)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)

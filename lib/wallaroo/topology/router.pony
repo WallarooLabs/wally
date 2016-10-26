@@ -8,7 +8,7 @@ interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
-  // fun routes(): Array[CreditFlowConsumer tag] val
+  fun routes(): Array[CreditFlowConsumerStep] val
 
 interface RouterBuilder
   fun apply(): Router val
@@ -19,6 +19,9 @@ class EmptyRouter
     producer: (CreditFlowProducer ref | None)): Bool
   =>
     true
+
+  fun routes(): Array[CreditFlowConsumerStep] val =>
+    recover val Array[CreditFlowConsumerStep] end
 
 class DirectRouter
   let _target: CreditFlowConsumerStep tag
@@ -43,16 +46,16 @@ class DirectRouter
       0)
     false
 
-  // fun routes(): Array[CreditFlowConsumer tag] val =>
-  //   recover [_target] end
+  fun routes(): Array[CreditFlowConsumerStep] val =>
+    recover val [_target] end
 
 class DataRouter
-  let _routes: Map[U128, Step tag] val
+  let _data_routes: Map[U128, Step tag] val
 
-  new val create(routes: Map[U128, Step tag] val =
+  new val create(data_routes: Map[U128, Step tag] val =
     recover Map[U128, Step tag] end)
   =>
-    _routes = routes
+    _data_routes = data_routes
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
@@ -63,7 +66,7 @@ class DataRouter
       | let delivery_msg: DeliveryMsg val =>
         let target_id = delivery_msg.target_id()
         //TODO: create and deliver envelope
-        delivery_msg.deliver(_routes(target_id))
+        delivery_msg.deliver(_data_routes(target_id))
         false
       else
         true
@@ -71,6 +74,10 @@ class DataRouter
     else
       true
     end
+
+  fun routes(): Array[CreditFlowConsumerStep] val =>
+    // TODO: CREDITFLOW - real implmentation?
+    recover val Array[CreditFlowConsumerStep] end
 
   // fun routes(): Array[CreditFlowConsumer tag] val =>
   //   let rs: Array[CreditFlowConsumer tag] trn =
@@ -89,16 +96,17 @@ class LocalPartitionRouter[In: Any val,
   Key: (Hashable val & Equatable[Key] val)] is PartitionRouter
   let _local_map: Map[U128, Step] val
   let _step_ids: Map[Key, U128] val
-  let _routes: Map[Key, (Step | PartitionProxy)] val
+  let _partition_routes: Map[Key, (Step | PartitionProxy)] val
   let _partition_function: PartitionFunction[In, Key] val
 
   new val create(local_map': Map[U128, Step] val,
-    s_ids: Map[Key, U128] val, routes: Map[Key, (Step | PartitionProxy)] val,
+    s_ids: Map[Key, U128] val,
+    partition_routes: Map[Key, (Step | PartitionProxy)] val,
     partition_function: PartitionFunction[In, Key] val)
   =>
     _local_map = local_map'
     _step_ids = s_ids
-    _routes = routes
+    _partition_routes = partition_routes
     _partition_function = partition_function
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -109,7 +117,7 @@ class LocalPartitionRouter[In: Any val,
     | let input: In =>
       let key = _partition_function(input)
       try
-        match _routes(key)
+        match _partition_routes(key)
         | let s: Step =>
           // TODO- CreditFlow
           // Lookup route from producer
@@ -148,6 +156,10 @@ class LocalPartitionRouter[In: Any val,
       true
     end
 
+  fun routes(): Array[CreditFlowConsumerStep] val =>
+    // TODO: CREDITFLOW - real implmentation
+    recover val Array[CreditFlowConsumerStep] end
+
   fun local_map(): Map[U128, Step] val => _local_map
 
 class TCPRouter
@@ -178,6 +190,10 @@ class TCPRouter
     _tcp_writer(d)
 
   fun dispose() => _tcp_writer.dispose()
+
+  fun routes(): Array[CreditFlowConsumerStep] val =>
+    // TODO: CREDITFLOW - real implmentation?
+    recover val Array[CreditFlowConsumerStep] end
 
 interface TCPWriter
   fun apply(d: Array[ByteSeq] val)
