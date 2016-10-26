@@ -2,7 +2,7 @@
 set fail -o -e
 
 TMPDIR=/tmp/market-spread-jr-run/
-SCREEN_SESSION_NAME="RUNNING_MARKET_SPREAD_JR"
+SCREEN_SESSION_NAME="RUNNING_MARKET_SPREAD"
 
 if [ -z "$MESSAGES" ]; then
   MESSAGES=150000000
@@ -12,25 +12,30 @@ if [ -z "$DOWNLOAD" ]; then
   DOWNLOAD=1
 fi  
 
+if [ -z "$BUILD" ]; then
+  BUILD=1
+fi  
+
 mkdir -p $TMPDIR/metrics_reporter_ui
 mkdir -p $TMPDIR/market_spread_reports_ui
 if [ "$DOWNLOAD"  == "1" ]; then
   wget -N https://s3.amazonaws.com/sendence-dev/wallaroo/ui-bins/market_spread_reports_ui.tar.gz -O $TMPDIR/market_spread_reports_ui.tar.gz
   wget -N https://s3.amazonaws.com/sendence-dev/wallaroo/ui-bins/metrics_reporter_ui.tar.gz -O $TMPDIR/metrics_reporter_ui.tar.gz
+  tar zxf $TMPDIR/market_spread_reports_ui.tar.gz -C $TMPDIR/market_spread_reports_ui
+  tar zxf $TMPDIR/metrics_reporter_ui.tar.gz -C $TMPDIR/metrics_reporter_ui
 fi  
 
-tar zxf $TMPDIR/market_spread_reports_ui.tar.gz -C $TMPDIR/market_spread_reports_ui
-tar zxf $TMPDIR/metrics_reporter_ui.tar.gz -C $TMPDIR/metrics_reporter_ui
-
-make build-apps-market-spread-jr
+if [ "$BUILD"  == "1" ]; then
+  make build-apps-market-spread
+fi  
 make build-giles-sender
 
-pushd $TMPDIR/metrics_reporter_ui
+pushd $TMPDIR/metrics_reporter_ui > /dev/null
 until [ exec 6<>/dev/tcp/127.0.0.1/4000 ]; do
   bin/metrics_reporter_ui start
   sleep 5
 done
-cd $TMPDIR/market_spread_reports_ui
+cd $TMPDIR/market_spread_reports_ui > /dev/null
 until [ exec 6<>/dev/tcp/127.0.0.1/4001 ]; do
   bin/market_spread_reports_ui start
   sleep 5
