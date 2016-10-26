@@ -19,7 +19,7 @@ class MarketSpreadReceivedMessage
     symbol = symbol'
     is_rejected = is_rejected'
 
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^ =>
+  fun string(): String iso^ =>
     ("(" + ts.string() + ", " + symbol + ": " + is_rejected.string() + ")")
       .clone()
 
@@ -55,7 +55,7 @@ class MarketSpreadSentParser is SentParser[FixOrderMessage val]
   fun ref sent_messages(): Array[FixOrderMessage val] =>
     _messages
 
-class MarketSpreadReceivedParser is 
+class MarketSpreadReceivedParser is
   ReceivedParser[MarketSpreadReceivedMessage val]
 
   let _messages: Array[MarketSpreadReceivedMessage val] =
@@ -71,13 +71,13 @@ class MarketSpreadReceivedParser is
   fun ref received_messages(): Array[MarketSpreadReceivedMessage val] =>
     _messages
 
-class MarketSpreadResultMapper is StatefulResultMapper[FixOrderMessage val, 
+class MarketSpreadResultMapper is StatefulResultMapper[FixOrderMessage val,
   MarketSpreadReceivedMessage val, FixNbboMessage val, MarketData]
 
-  fun init_transform(init: Array[FixNbboMessage val]): 
+  fun init_transform(init: Array[FixNbboMessage val]):
     MarketData =>
     let state = MarketData
-    
+
     for m in init.values() do
       let mid = (m.bid_px() + m.offer_px()) / 2
       if ((m.offer_px() - m.bid_px()) >= 0.05) or
@@ -85,21 +85,21 @@ class MarketSpreadResultMapper is StatefulResultMapper[FixOrderMessage val,
         state(m.symbol()) = true
       else
         state(m.symbol()) = false
-      end      
+      end
     end
     state
 
-  fun sent_transform(sent: Array[FixOrderMessage val], state: MarketData): 
+  fun sent_transform(sent: Array[FixOrderMessage val], state: MarketData):
     CanonicalForm =>
     let tr = TradeResults
-    
+
     for m in sent.values() do
       let symbol = m.symbol()
       tr(symbol) = state.is_rejected(symbol)
     end
     tr
 
-  fun received_transform(received: Array[MarketSpreadReceivedMessage val]): 
+  fun received_transform(received: Array[MarketSpreadReceivedMessage val]):
     CanonicalForm =>
     let tr = TradeResults
 
@@ -118,14 +118,14 @@ class TradeResults is CanonicalForm
   fun compare(that: CanonicalForm): (MatchStatus val, String) =>
     match that
     | let tr: TradeResults =>
-      if results.size() != tr.results.size() then 
+      if results.size() != tr.results.size() then
         return (ResultsDoNotMatch, "Trade results sizes do not match up")
       end
       for (symbol, is_rejected) in results.pairs() do
         try
           if is_rejected != tr(symbol) then
-            let msg = "Expected " + symbol + " rejection to be " 
-              + is_rejected.string() + " but it was " 
+            let msg = "Expected " + symbol + " rejection to be "
+              + is_rejected.string() + " but it was "
               + (not is_rejected).string()
             return (ResultsDoNotMatch, msg)
           end

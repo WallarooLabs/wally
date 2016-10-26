@@ -13,7 +13,8 @@ class SpikeConfig
 
 primitive SpikeWrapper
   fun apply(letter: TCPConnectionNotify iso, config: SpikeConfig val)
-    : TCPConnectionNotify iso^ =>
+    : TCPConnectionNotify iso^
+  =>
     var notify: TCPConnectionNotify iso = consume letter
     if config.delay then
       notify = DelayReceived(consume notify)

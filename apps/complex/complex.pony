@@ -39,7 +39,7 @@ class Complex
 
   fun plus(c: Complex val): Complex val =>
     Complex(_real + c._real, _imaginary + c._imaginary)
- 
+
   fun minus(c: Complex val): Complex val =>
     Complex(_real - c._real, _imaginary - c._imaginary)
 
@@ -51,8 +51,7 @@ class Complex
   fun conjugate(): Complex val =>
     Complex(_real, -_imaginary)
 
-  fun string(fmt: FormatSettings[FormatDefault, PrefixDefault] 
-    = FormatSettingsDefault): String iso^
+  fun string(): String iso^
   =>
     ("C(" + _real.string() + ", " + _imaginary.string() + ")").clone()
 
@@ -70,8 +69,8 @@ class val Scale is Computation[Complex val, Complex val]
 
   fun name(): String => "Scale by 5"
 
-class ComplexSourceDecoder 
-  fun apply(data: Array[U8] val): Complex val ? => 
+class ComplexSourceDecoder
+  fun apply(data: Array[U8] val): Complex val ? =>
     let real = Bytes.to_u32(data(0), data(1), data(2), data(3))
     let imaginary = Bytes.to_u32(data(4), data(5), data(6), data(7))
     Complex(real.i32(), imaginary.i32())

@@ -1,4 +1,4 @@
 interface Message
-  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^
+  fun string(): String iso^
 
 
