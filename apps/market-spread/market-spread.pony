@@ -37,13 +37,13 @@ actor Main
       let symbol_data_partition = Partition[Symboly val, String](
         SymbolPartitionFunction, LegalSymbols.symbols)
 
-      let init_nbbo_filename = "../../demos/marketspread/initial-nbbo-fixish.msg"
+      let init_file = InitFile("../../demos/marketspread/initial-nbbo-fixish.msg", 46)
 
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo", FixNbboFrameHandler 
-              where init_filename = init_nbbo_filename)
+              where init_file = init_file)
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition)
@@ -199,24 +199,9 @@ primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
     match FixishMsgDecoder(data)
     | let m: FixNbboMessage val => m
     else
+      // @printf[I32]("Could not get FixNbbo from incoming data\n".cstring())
       error
     end
-
-// class SymbolRouter is Router[(FixNbboMessage val | FixOrderMessage val),
-//   Step tag]
-//   let _routes: Map[String, Step tag] val
-
-//   new iso create(routes: Map[String, Step tag] val) =>
-//     _routes = routes
-
-//   fun route(input: (FixNbboMessage val | FixOrderMessage val)): 
-//     (Step tag | None) 
-//   =>
-//     if _routes.contains(input.symbol()) then
-//       try
-//         _routes(input.symbol())
-//       end
-//     end
 
 primitive SymbolPartitionFunction
   fun apply(input: Symboly val): String 

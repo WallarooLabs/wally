@@ -97,7 +97,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     end
 
   fun ref accepted(conn: TCPSource ref) =>
-    @printf[I32]("accepted\n".cstring())
+    @printf[I32]((_source_name + ": accepted a connection\n").cstring())
     conn.expect(_header_size)
 
   // TODO: implement connect_failed

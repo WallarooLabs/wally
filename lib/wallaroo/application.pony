@@ -7,23 +7,27 @@ use "wallaroo/network"
 use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
 use "wallaroo/resilience"
+use "wallaroo/topology"
 
 class Application
   let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
   // Map from source id to filename
-  let init_files: Map[USize, String] = init_files.create()
+  let init_files: Map[USize, InitFile val] = init_files.create()
 
   new create(name': String) =>
     _name = name'
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
     pipeline_name: String, decoder: FramedSourceHandler[In] val,
-    init_filename: String = "", coalescing: Bool = true): 
+    init_file: (InitFile val | None) = None, coalescing: Bool = true): 
       PipelineBuilder[In, Out, In]
   =>
     let pipeline_id = pipelines.size()
-    if init_filename != "" then add_init_file(pipeline_id, init_filename) end
+    match init_file
+    | let f: InitFile val =>
+      add_init_file(pipeline_id, f)
+    end
     let pipeline = Pipeline[In, Out](pipeline_id, pipeline_name, decoder, 
       coalescing)
     PipelineBuilder[In, Out, In](this, pipeline)
@@ -31,8 +35,8 @@ class Application
   fun ref add_pipeline(p: BasicPipeline) =>
     pipelines.push(p)
 
-  fun ref add_init_file(source_id: USize, filename: String) =>
-    init_files(source_id) = filename
+  fun ref add_init_file(source_id: USize, init_file: InitFile val) =>
+    init_files(source_id) = init_file
 
   fun name(): String => _name
 

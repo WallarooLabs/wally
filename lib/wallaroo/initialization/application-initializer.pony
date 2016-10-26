@@ -2,6 +2,7 @@ use "collections"
 use "net"
 use "sendence/guid"
 use "sendence/messages"
+use "wallaroo"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -50,8 +51,8 @@ actor ApplicationInitializer
     | let app: Application val =>
       for i in Range(0, _input_addrs.size()) do
         try
-          let filename = app.init_files(i)
-          let file = InitFile(filename, _auth)
+          let init_file = app.init_files(i)
+          let file = InitFileReader(init_file, _auth)
           file.read_into(_input_addrs(i))
         end
       end
