@@ -1,7 +1,7 @@
 use "collections"
 use "../guid"
 
-class Dag[V: Any #alias]
+class Dag[V: Any val]
   let _guid_gen: GuidGenerator = GuidGenerator
   let _nodes: Map[U128, DagNode[V]] = _nodes.create()
   let _edges: Array[(DagNode[V], DagNode[V])] = _edges.create()
@@ -33,7 +33,19 @@ class Dag[V: Any #alias]
       to.add_input(from)      
     end    
 
-class DagNode[V: Any #alias]
+  fun is_empty(): Bool => _nodes.size() == 0
+
+  fun clone(): Dag[V] val ? =>
+    let c: Dag[V] trn = recover Dag[V] end 
+    for (id, node) in _nodes.pairs() do
+      c.add_node(node.value, node.id)
+    end
+    for edge in _edges.values() do
+      c.add_edge(edge._1.id, edge._2.id)
+    end 
+    consume c
+
+class DagNode[V: Any val]
   let id: U128
   let ins: Array[DagNode[V]] = ins.create()
   let outs: Array[DagNode[V]] = outs.create()

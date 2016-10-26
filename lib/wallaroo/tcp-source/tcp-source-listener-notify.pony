@@ -33,6 +33,7 @@ class _SourceBuilder[In: Any val]
       consume reporter, alfred)
 
 interface SourceBuilderBuilder
+  fun name(): String
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
     metrics_conn: TCPConnection): SourceBuilder val 
 
@@ -43,6 +44,8 @@ class TypedSourceBuilderBuilder[In: Any val]
   new val create(name': String, handler: FramedSourceHandler[In] val) =>
     _name = name'
     _handler = handler
+
+  fun name(): String => _name
 
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
     metrics_conn: TCPConnection): SourceBuilder val 

@@ -7,7 +7,8 @@ use "wallaroo/resilience"
 use "wallaroo/tcp-source"
 use "wallaroo/tcp-sink"
 
-type StepInitializer is (StepBuilder | PartitionedPreStateStepBuilder | EgressBuilder)
+type StepInitializer is (StepBuilder | PartitionedPreStateStepBuilder | 
+  SourceData | EgressBuilder)
 
 class StepBuilder
   let _runner_builder: RunnerBuilder val
@@ -68,6 +69,32 @@ class PartitionedPreStateStepBuilder
     _pre_state_subpartition.build(worker_name, _runner_builder, 
       state_addresses, metrics_conn, auth, connections, alfred,
       state_comp_router)
+
+
+class SourceData
+  let _id: U128
+  let _name: String
+  let _builder: SourceBuilderBuilder val
+  let _runner_builder: RunnerBuilder val
+  let _address: Array[String] val
+
+  new val create(id': U128, b: SourceBuilderBuilder val, r: RunnerBuilder val, 
+    a: Array[String] val) 
+  =>
+    _id = id'
+    _name = "| " + b.name() + " source | " + r.name() + "|"
+    _builder = b
+    _runner_builder = r
+    _address = a
+
+  fun builder(): SourceBuilderBuilder val => _builder
+  fun runner_builder(): RunnerBuilder val => _runner_builder
+  fun address(): Array[String] val => _address
+
+  fun name(): String => _name
+  fun id(): U128 => _id
+  fun is_stateful(): Bool => false
+  fun is_partitioned(): Bool => false
 
 class EgressBuilder
   let _name: String

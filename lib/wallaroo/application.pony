@@ -12,6 +12,9 @@ use "wallaroo/topology"
 class Application
   let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
+  // _state_builders maps from state_name to StateSubpartition
+  let _state_builders: Map[String, StateSubpartition val] = 
+    _state_builders.create()
   // Map from source id to filename
   let init_files: Map[USize, InitFile val] = init_files.create()
 
@@ -38,6 +41,21 @@ class Application
   fun ref add_init_file(source_id: USize, init_file: InitFile val) =>
     init_files(source_id) = init_file
 
+  fun ref add_state_builder(state_name: String, 
+    state_partition: StateSubpartition val) 
+  =>
+    _state_builders(state_name) = state_partition
+
+  fun state_builder(state_name: String): StateSubpartition val ? =>
+    _state_builders(state_name)
+  fun state_builders(): Map[String, StateSubpartition val] val => 
+    let builders: Map[String, StateSubpartition val] trn =
+      recover Map[String, StateSubpartition val] end
+    for (k, v) in _state_builders.pairs() do
+      builders(k) = v
+    end
+    consume builders
+
   fun name(): String => _name
 
 trait BasicPipeline
@@ -46,8 +64,6 @@ trait BasicPipeline
   fun source_builder(): SourceBuilderBuilder val
   fun sink_builder(): (TCPSinkBuilder val | None)
   fun sink_target_ids(): Array[U64] val
-  fun state_builder(state_name: String): StateSubpartition val ?
-  fun state_builders(): Map[String, StateSubpartition val] val
   fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder val ?
   fun size(): USize
@@ -60,9 +76,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
   let _source_builder: SourceBuilderBuilder val
   var _sink_builder: (TCPSinkBuilder val | None) = None
-  // _state_builders maps from state_name to StateSubpartition
-  let _state_builders: Map[String, StateSubpartition val] = 
-    _state_builders.create()
   let _is_coalesced: Bool
 
   new create(p_id: USize, n: String, d: FramedSourceHandler[In] val, 
@@ -93,22 +106,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun sink_builder(): (TCPSinkBuilder val | None) => _sink_builder
 
   fun sink_target_ids(): Array[U64] val => _sink_target_ids
-
-  fun ref add_state_builder(state_name: String, 
-    state_partition: StateSubpartition val) 
-  =>
-    _state_builders(state_name) = state_partition
-
-  fun state_builder(state_name: String): StateSubpartition val ? =>
-    _state_builders(state_name)
-
-  fun state_builders(): Map[String, StateSubpartition val] val =>
-    let builders: Map[String, StateSubpartition val] trn =
-      recover Map[String, StateSubpartition val] end
-    for (k, v) in _state_builders.pairs() do
-      builders(k) = v
-    end
-    consume builders
 
   fun is_coalesced(): Bool => _is_coalesced
 
@@ -167,7 +164,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let state_partition = KeyedStateSubpartition[Key](partition.keys(),
       StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders()))
 
-    _p.add_state_builder(state_name, state_partition)
+    _a.add_state_builder(state_name, state_partition)
 
     PipelineBuilder[In, Out, Next](_a, _p)
 

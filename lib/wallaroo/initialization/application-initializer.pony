@@ -78,13 +78,13 @@ actor ApplicationInitializer
       // Map from step_id to worker name
       let steps: Map[U128, String] = steps.create()
       // Map from worker name to array of local pipelines
-      let local_pipelines: Map[String, Array[LocalPipeline val]] =
-        local_pipelines.create()
+      let local_graphs: Map[String, Dag[StepInitializer val]] =
+        local_graphs.create()
 
       // Initialize values for local pipelines
-      local_pipelines("initializer") = Array[LocalPipeline val]
+      local_graphs("initializer") = Dag[StepInitializer val]
       for name in worker_names.values() do
-        local_pipelines(name) = Array[LocalPipeline val]
+        local_graphs(name) = Dag[StepInitializer val]
       end
 
       @printf[I32](("Found " + application.pipelines.size().string()  + " pipelines in application\n").cstring())
@@ -331,77 +331,77 @@ actor ApplicationInitializer
           let source_data =
             if i == 0 then
               @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on " + cur.worker_name + "\n").cstring())
-              SourceData(pipeline.source_builder(),
+              SourceData(_guid_gen.u128(), pipeline.source_builder(),
                 source_seq_builder, source_addr)
             else
               None
             end
 
-          // If this worker has no steps (is_empty), then create a
-          // placeholder sink
-          if cur.is_empty then
-            let egress_builder = EgressBuilder(pipeline.name(), 
-              _guid_gen.u128(), _output_addr, pipeline.sink_builder())
-            let local_pipeline = LocalPipeline(pipeline.name(),
-              cur.step_initializers, egress_builder, source_data,
-              pipeline.state_builders())
-            try
-              local_pipelines(cur.worker_name).push(local_pipeline)
-            else
-              @printf[I32]("No pipeline list found!\n".cstring())
-              error
-            end
-          // If this worker has steps, then we need either a Proxy or a sink
-          else
-            match next_worker_data
-            | let next_w: WorkerTopologyData val =>
-              // If the next worker in order has no steps, then we need a
-              // sink on this worker
-              if next_w.is_empty then
-                let egress_builder = EgressBuilder(pipeline.name(), 
-                  _guid_gen.u128(), _output_addr, pipeline.sink_builder())
-                let local_pipeline = LocalPipeline(pipeline.name(),
-                  cur.step_initializers, egress_builder, source_data,
-                  pipeline.state_builders())
-                try
-                  local_pipelines(cur.worker_name).push(local_pipeline)
-                else
-                  @printf[I32]("No pipeline list found!\n".cstring())
-                  error
-                end
-              // If the next worker has steps (continues the pipeline), then
-              // we need a Proxy to it on this worker
-              else
-                let proxy_address = ProxyAddress(next_w.worker_name,
-                  next_w.boundary_step_id)
-                let egress_builder = EgressBuilder(pipeline.name(),
-                  _guid_gen.u128(), proxy_address)
-                let local_pipeline = LocalPipeline(pipeline.name(),
-                  cur.step_initializers, egress_builder, source_data,
-                  pipeline.state_builders())
-                try
-                  local_pipelines(cur.worker_name).push(local_pipeline)
-                else
-                  @printf[I32]("No pipeline list found!\n".cstring())
-                  error
-                end
-              end
-            // If the match fails, then this is the last worker in order and
-            // we need a sink on it
-            else
-              let egress_builder = EgressBuilder(pipeline.name(), 
-                _guid_gen.u128(), _output_addr, pipeline.sink_builder())
-              let local_pipeline = LocalPipeline(pipeline.name(),
-                cur.step_initializers, egress_builder, source_data,
-                pipeline.state_builders())
-              try
-                local_pipelines(cur.worker_name).push(local_pipeline)
-              else
-                @printf[I32]("No pipeline list found!\n".cstring())
-                error
-              end
-            end
-          end
+          // // If this worker has no steps (is_empty), then create a
+          // // placeholder sink
+          // if cur.is_empty then
+          //   let egress_builder = EgressBuilder(pipeline.name(), 
+          //     _guid_gen.u128(), _output_addr, pipeline.sink_builder())
+          //   let local_pipeline = LocalPipeline(pipeline.name(),
+          //     cur.step_initializers, egress_builder, source_data,
+          //     pipeline.state_builders())
+          //   try
+          //     local_pipelines(cur.worker_name).push(local_pipeline)
+          //   else
+          //     @printf[I32]("No pipeline list found!\n".cstring())
+          //     error
+          //   end
+          // // If this worker has steps, then we need either a Proxy or a sink
+          // else
+          //   match next_worker_data
+          //   | let next_w: WorkerTopologyData val =>
+          //     // If the next worker in order has no steps, then we need a
+          //     // sink on this worker
+          //     if next_w.is_empty then
+          //       let egress_builder = EgressBuilder(pipeline.name(), 
+          //         _guid_gen.u128(), _output_addr, pipeline.sink_builder())
+          //       let local_pipeline = LocalPipeline(pipeline.name(),
+          //         cur.step_initializers, egress_builder, source_data,
+          //         pipeline.state_builders())
+          //       try
+          //         local_pipelines(cur.worker_name).push(local_pipeline)
+          //       else
+          //         @printf[I32]("No pipeline list found!\n".cstring())
+          //         error
+          //       end
+          //     // If the next worker has steps (continues the pipeline), then
+          //     // we need a Proxy to it on this worker
+          //     else
+          //       let proxy_address = ProxyAddress(next_w.worker_name,
+          //         next_w.boundary_step_id)
+          //       let egress_builder = EgressBuilder(pipeline.name(),
+          //         _guid_gen.u128(), proxy_address)
+          //       let local_pipeline = LocalPipeline(pipeline.name(),
+          //         cur.step_initializers, egress_builder, source_data,
+          //         pipeline.state_builders())
+          //       try
+          //         local_pipelines(cur.worker_name).push(local_pipeline)
+          //       else
+          //         @printf[I32]("No pipeline list found!\n".cstring())
+          //         error
+          //       end
+          //     end
+          //   // If the match fails, then this is the last worker in order and
+          //   // we need a sink on it
+          //   else
+          //     let egress_builder = EgressBuilder(pipeline.name(), 
+          //       _guid_gen.u128(), _output_addr, pipeline.sink_builder())
+          //     let local_pipeline = LocalPipeline(pipeline.name(),
+          //       cur.step_initializers, egress_builder, source_data,
+          //       pipeline.state_builders())
+          //     try
+          //       local_pipelines(cur.worker_name).push(local_pipeline)
+          //     else
+          //       @printf[I32]("No pipeline list found!\n".cstring())
+          //       error
+          //     end
+          //   end
+          // end
         end
 
         // Reset the WorkerTopologyData array for the next pipeline since
@@ -418,14 +418,10 @@ actor ApplicationInitializer
         recover Array[LocalTopology val] end
 
       // For each worker, generate a LocalTopology
-      // from all of its LocalPipelines
-      for (w, ps) in local_pipelines.pairs() do
-        let pvals: Array[LocalPipeline val] trn =
-          recover Array[LocalPipeline val] end
-        for p in ps.values() do
-          pvals.push(p)
-        end
-        let local_topology = LocalTopology(application.name(), consume pvals)
+      // from all of its LocalGraphs
+      for (w, g) in local_graphs.pairs() do
+        let local_topology = LocalTopology(application.name(), g.clone(),
+          application.state_builders())
 
         // If this is the initializer's (i.e. our) turn, then
         // immediately (asynchronously) begin initializing it. If not, add it
