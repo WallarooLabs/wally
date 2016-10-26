@@ -151,11 +151,13 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
 class StateRunnerBuilder[State: Any #read]
   let _state_builder: StateBuilder[State] val
   let _name: String
+  let _state_change_builders: Array[StateChangeBuilder[State] val] val
 
   new val create(state_builder: StateBuilder[State] val, 
-    name': String) =>
+    name': String, state_change_builders: Array[StateChangeBuilder[State] val] val) =>
     _state_builder = state_builder
     _name = name'
+    _state_change_builders = state_change_builders
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     next_runner: (Runner iso | None) = None,
@@ -164,7 +166,11 @@ class StateRunnerBuilder[State: Any #read]
   =>
     match alfred
     | let a: Alfred tag =>
-      StateRunner[State](_state_builder, consume metrics_reporter, a)
+      let sr = StateRunner[State](_state_builder, consume metrics_reporter, a)
+      for scb in _state_change_builders.values() do
+        sr.register_state_change(scb)
+      end
+      sr
     else
       @printf[I32]("StateRunner didn't get Alfred!\n".cstring())
       EmptyRunner
@@ -340,7 +346,7 @@ class StateRunner[State: Any #read] is Runner
         DeactivatedEventLogBuffer
       end
 
-  fun ref register_state_change(scb: StateChangeBuilder[State] ref) : U64 =>
+  fun ref register_state_change(scb: StateChangeBuilder[State] val) : U64 =>
     _state_change_repository.make_and_register(scb)
 
   fun ref set_buffer_target(target: ResilientOrigin tag) =>
@@ -377,7 +383,7 @@ class StateRunner[State: Any #read] is Runner
       let state_change = result._2
 
       match state_change
-      | let sc: StateChange[State] val =>
+      | let sc: StateChange[State] ref =>
         ifdef "resilience" then
           let payload = sc.to_log_entry(_wb)
           //TODO: deal with fractional message ids here

@@ -120,7 +120,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp)
     _p.add_runner_builder(next_builder)
-    let state_builder = StateRunnerBuilder[State](s_initializer, state_name)
+    let state_builder = StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders())
     _p.add_runner_builder(state_builder)
     PipelineBuilder[In, Out, Next](_a, _p)
 
@@ -145,7 +145,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_runner_builder(next_builder)
 
     let state_partition = KeyedStateSubpartition[Key](partition.keys(),
-      StateRunnerBuilder[State](s_initializer, state_name))
+      StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders()))
 
     _p.add_state_builder(state_name, state_partition)
 

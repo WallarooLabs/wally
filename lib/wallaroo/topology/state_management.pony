@@ -27,7 +27,7 @@ class StateChangeRepository[State: Any #read]
     _state_changes = Array[StateChange[State] ref]
     _named_lookup = Map[String val, U64]
 
-  fun ref make_and_register(scb: StateChangeBuilder[State]): U64 =>
+  fun ref make_and_register(scb: StateChangeBuilder[State] val): U64 =>
     let idx = _state_changes.size().u64()
     let sc = scb(idx)
     _named_lookup.update(sc.name(),idx)

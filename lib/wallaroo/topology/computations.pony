@@ -14,21 +14,24 @@ interface StateComputation[In: Any val, Out: Any val, State: Any #read] is Basic
   // if there is no value to forward) and a StateChange if there was one (or
   // None to indicate no state change). 
   fun apply(input: In, sc_repo: StateChangeRepository[State], state: State):
-    ((Out | None), (StateChange[State] val | None))
+    ((Out | None), (StateChange[State] ref | None))
 
   fun name(): String
+
+  fun state_change_builders(): Array[StateChangeBuilder[State] val] val
 
 trait StateProcessor[State: Any #read] is BasicComputation
   fun name(): String
   // Return a tuple containing a Bool indicating whether the message was 
   // finished processing here and the state change (or None if there was
   // no state change).
-  // TODO: StateChange should be a reusable ref
+  // TODO: solve the situation where Out is None and we
+  // still want the message passed along
   fun apply(state: State, sc_repo: StateChangeRepository[State],
     metric_name: String, source_ts: U64,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): 
-      (Bool, (StateChange[State] val | None))
+      (Bool, (StateChange[State] ref | None))
   fun find_partition(finder: PartitionFinder val): Router val
 
 class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
@@ -47,7 +50,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     metric_name: String, source_ts: U64, 
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): 
-      (Bool, (StateChange[State] val | None))
+      (Bool, (StateChange[State] ref | None))
   =>
     let result = _state_comp(_input, sc_repo, state)
 
