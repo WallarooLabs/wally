@@ -82,6 +82,9 @@ class SourceListenerNotify is TCPSourceListenerNotify
   fun ref listening(listen: TCPSourceListener ref) =>
     @printf[I32]((_source_builder.name() + " source is listening\n").cstring())
 
+  fun ref listening(listen: TCPSourceListener ref) =>
+    @printf[I32]((_source_builder.name() + " source is listening\n").cstring())
+
   fun ref connected(listen: TCPSourceListener ref): TCPSourceNotify iso^ =>
     _source_builder(_alfred)
 
