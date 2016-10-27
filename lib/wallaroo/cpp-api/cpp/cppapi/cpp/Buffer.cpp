@@ -116,7 +116,7 @@ bool Buffer::writeData (const void* data_, const int size_, const bool networkOr
 
 #if defined(_LITTLE_ENDIAN)
 #if !defined(NDEBUG)
-  Logger::getLogger()->debug("{}:LE:{}, sz:{}", __PRETTY_FUNCTION__, __LINE__, size_);
+  Logger::getLogger()->trace("{}:LE:{}, sz:{}", __PRETTY_FUNCTION__, __LINE__, size_);
 #endif
   if (networkOrder_)
   {
@@ -135,7 +135,7 @@ bool Buffer::writeData (const void* data_, const int size_, const bool networkOr
   }
 #elif(_BIG_ENDIAN)
 #if !defined(NDEBUG)
-  Logger::getLogger()->debug("{}:BE:{}, sz:{}",__PRETTY_FUNCTION__, __LINE__ , size_);
+  Logger::getLogger()->trace("{}:BE:{}, sz:{}",__PRETTY_FUNCTION__, __LINE__ , size_);
 #endif
   while (count--)
   *(_write++) = *(place++);
@@ -166,7 +166,7 @@ bool Buffer::readData (void* data_, const int size_, const bool networkOrder_)
 
 #if defined(_LITTLE_ENDIAN)
 #if !defined(NDEBUG)
-  Logger::getLogger()->debug("{}:LE:{}, sz:{}", __PRETTY_FUNCTION__, __LINE__, size_);
+  Logger::getLogger()->trace("{}:LE:{}, sz:{}", __PRETTY_FUNCTION__, __LINE__, size_);
 #endif
   if (networkOrder_)
   {
@@ -185,7 +185,7 @@ bool Buffer::readData (void* data_, const int size_, const bool networkOrder_)
   }
 #elif(_BIG_ENDIAN)
 #if !defined(NDEBUG)
-  Logger::getLogger()->debug("{}:BE:{}, sz:{}",__PRETTY_FUNCTION__, __LINE__, size_);
+  Logger::getLogger()->trace("{}:BE:{}, sz:{}",__PRETTY_FUNCTION__, __LINE__, size_);
 #endif
   while (count--)
   *(place++) = *(_read++);
