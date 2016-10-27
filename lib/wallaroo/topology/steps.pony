@@ -347,3 +347,14 @@ actor PartitionProxy is CreditFlowProducer
     // | let sender: DataSender =>
     //   sender.dispose()
     end
+
+primitive StepRouteCallbackHandler is RouteCallbackHandler
+  fun shutdown(producer: CreditFlowProducer ref) =>
+    // TODO: CREDITFLOW - What is our error handling?
+    None
+
+  fun credits_replenished(producer: CreditFlowProducer ref) =>
+    None
+
+  fun credits_exhausted(producer: CreditFlowProducer ref) =>
+    None
