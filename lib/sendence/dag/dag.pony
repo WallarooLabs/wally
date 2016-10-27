@@ -2,12 +2,11 @@ use "collections"
 use "../guid"
 
 class Dag[V: Any val]
-  let _guid_gen: GuidGenerator = GuidGenerator
   let _nodes: Map[U128, DagNode[V]] = _nodes.create()
   let _edges: Array[(DagNode[V], DagNode[V])] = _edges.create()
 
   fun ref add_node(value: V, id': U128 = 0): U128 =>
-    let id = if id' == 0 then _guid_gen.u128() else id' end 
+    let id = if id' == 0 then _gen_guid() else id' end 
     _nodes(id) = DagNode[V](value, id)
     id
 
@@ -57,6 +56,11 @@ class Dag[V: Any val]
     end
     s
 
+  // Apparently Random can't be serialized, so we can't hold a GuidGenerator
+  // as a field
+  fun _gen_guid(): U128 =>
+    GuidGenerator.u128()
+ 
 class DagNode[V: Any val]
   let id: U128
   let _ins: Array[DagNode[V]] = _ins.create()

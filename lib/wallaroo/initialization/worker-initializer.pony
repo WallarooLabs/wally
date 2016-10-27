@@ -82,6 +82,7 @@ actor WorkerInitializer
     if _worker_names.size() != ts.size() then
       @printf[I32]("We need one local topology for each worker\n".cstring())
     else
+      @printf[I32]("Distributing local topologies to workers\n".cstring())
       for (idx, worker) in _worker_names.pairs() do
         try
           let spin_up_msg = ChannelMsgEncoder.spin_up_local_topology(ts(idx), 
@@ -89,6 +90,7 @@ actor WorkerInitializer
           _connections.send_control(worker, spin_up_msg)
         end
       end
+      @printf[I32]("Finished distributing\n".cstring())
     end
 
   be topology_ready(worker_name: String) =>
