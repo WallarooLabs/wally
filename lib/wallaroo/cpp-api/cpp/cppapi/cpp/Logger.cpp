@@ -27,7 +27,7 @@ Logger::Logger ()
 {
 #if defined(CONSOLE)
   try { 
-    _logger = spdlog::stdout_logger_mt("console");
+    _logger = spdlog::stdout_color_mt("console");
   }
   catch(std::exception& e_)
   {
