@@ -131,7 +131,7 @@ actor LocalTopologyInitializer
         //       if yes, add ins to frontier queue, then build the step 
         //       (connecting it to its out step, which has already been built)
 
-        // If there are no cycles, this will terminate
+        // If there are no cycles (I), this will terminate
         while frontier.size() > 0 do
           let next_node = frontier.dequeue()
 
@@ -143,7 +143,7 @@ actor LocalTopologyInitializer
 
           // We are only ready to build a node if all of its outputs
           // have been built (though currently, because there are no
-          // splits, there will only be at most one output per node)
+          // splits (II), there will only be at most one output per node)
           var ready = true
           for out in next_node.outs() do
             if not built.contains(out.id) then ready = false end
@@ -158,8 +158,7 @@ actor LocalTopologyInitializer
 
               if not builder.is_stateful() then
                 @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
-                // Currently there are no splits, so we know that a node has
-                // only one output in the graph. We also know this is not
+                // Currently there are no splits (II), so we know that a node // has only one output in the graph. We also know this is not
                 // a sink or proxy, so there is exactly one output.
                 let out_id: U128 = _get_output_node_id(next_node)
 
@@ -231,7 +230,6 @@ actor LocalTopologyInitializer
                         EmptyRouter
                       end
 
-                    // TODO: How do we identify state_comp target id?
                     let pre_state_step = b(state_step_router, _metrics_conn,
                       _alfred, state_comp_target)
                     data_routes(b.id()) = pre_state_step                    
@@ -274,19 +272,18 @@ actor LocalTopologyInitializer
                     EmptyRouter
                   end
 
-                // TODO: How do we identify state_comp target id?
                 let partition_router: PartitionRouter val =
                   p_builder.build_partition(_worker_name, state_addresses,
                     _metrics_conn, _auth, _connections, _alfred, 
                     state_comp_target)
                 
-                // Create a data route to each pre state step in the 
+                // Create a data route to each pre-state step in the 
                 // partition located on this worker
                 for (id, s) in partition_router.local_map().pairs() do
                   data_routes(id) = s
                 end
                 // Add the partition router to our built list for nodes
-                // that connect to this node via an edge and to prove
+                // that connect to this node via an in edge and to prove
                 // we've handled it
                 built(next_id) = partition_router
               else
@@ -312,7 +309,7 @@ actor LocalTopologyInitializer
               let next_id = source_data.id()
               let pipeline_name = source_data.pipeline_name()
 
-              // Currently there are no splits, so we know that a node has
+              // Currently there are no splits (II), so we know that a node has
               // only one output in the graph. We also know this is not
               // a sink or proxy, so there is exactly one output.
               let out_id: U128 = _get_output_node_id(next_node)
@@ -339,7 +336,7 @@ actor LocalTopologyInitializer
                 @printf[I32]("Ill-formed source address\n".cstring())
               end
 
-              // Nothing connects to a source as an output locally,
+              // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one
               built(next_id) = EmptyRouter
             end
@@ -407,7 +404,7 @@ actor LocalTopologyInitializer
     end
 
   fun _get_output_node_id(node: DagNode[StepInitializer val] val): U128 ? =>
-    // Currently there are no splits, so we know that a node has
+    // Currently there are no splits (II), so we know that a node has
     // only one output in the graph. 
 
     // Make sure this is not a sink or proxy node. 

@@ -87,7 +87,7 @@ actor ApplicationInitializer
 
       @printf[I32](("Found " + application.pipelines.size().string()  + " pipelines in application\n").cstring())
 
-      // Break each pipeline into LocalPipelines to distribute to workers
+      // Break each pipeline into LocalGraphs to distribute to workers
       for pipeline in application.pipelines.values() do
         if not pipeline.is_coalesced() then
           @printf[I32](("Coalescing is off for " + pipeline.name() + " pipeline\n").cstring())
@@ -190,7 +190,7 @@ actor ApplicationInitializer
           error
         end
 
-        // The last (node_id, StepInitializer val) pair we created
+        // The last (node_id, StepInitializer val) pair we created.
         // Gets set to None when we cross to the next worker since it
         // doesn't need to know its immediate cross-worker predecessor.
         var last_initializer: ((U128, StepInitializer val) | None) = 
@@ -209,8 +209,14 @@ actor ApplicationInitializer
 
         @printf[I32](("Each worker gets roughly " + per_worker.string() + " steps\n").cstring())
 
+        // Each worker gets a boundary value. Let's say initializer gets 2
+        // steps, worker2 2 steps, and worker3 3 steps. Then the boundaries
+        // array will look like: [2, 4, 7]
         let boundaries: Array[USize] = boundaries.create()
-        // Since we put the source on the first worker, start at -1
+        // Since we put the source on the first worker, start at -1 to
+        // indicate that it gets one less step than everyone else (all things 
+        // being equal). per_worker must be at least 1, so the first worker's
+        // boundary will be at least 0. 
         var count: ISize = -1
         for i in Range(0, worker_count) do
           count = count + per_worker.isize()
@@ -242,7 +248,7 @@ actor ApplicationInitializer
 
         // For each worker, use its boundary value to determine which
         // runner_builders to use to create StepInitializers that will be
-        // added to its LocalTopology
+        // added to its local graph
         while boundaries_idx < boundaries.size() do
           let boundary = 
             try
@@ -289,13 +295,12 @@ actor ApplicationInitializer
                   error
                 end
 
-              // Stateful steps have to be handled differently since pre state
+              // Stateful steps have to be handled differently since pre-state
               // steps must be on the same workers as their corresponding
               // state steps
               if next_runner_builder.is_stateful() then
                 // If this is partitioned state and we haven't handled this
-                // shared state before, handle it.  Otherwise, just handle the
-                // prestate.
+                // shared state before, handle it. 
                 var state_name = ""
                 match next_runner_builder
                 | let pb: PartitionBuilder val =>
@@ -312,8 +317,8 @@ actor ApplicationInitializer
                 | let pb: PartitionBuilder val =>
                   @printf[I32](("Preparing to spin up partitioned state on " + worker + "\n").cstring())
 
-                  // Determine whether the target step will be a step or a 
-                  // sink/proxy
+                  // Determine whether the state computation target step will 
+                  // be a step or a sink/proxy
                   let pre_state_target_id =
                     try
                       runner_builders(runner_builder_idx + 1).id()
@@ -346,8 +351,9 @@ actor ApplicationInitializer
                   let pre_state_id = next_runner_builder.id()
 
                   // Determine whether the target step will be a step or a 
-                  // sink/proxy, hopping forward 2 because the next one
-                  // should be our state step
+                  // sink/proxy, hopping forward 2 because the immediate
+                  // successor should be our state step with non-partitioned
+                  // state
                   let pre_state_target_id =
                     try
                       runner_builders(runner_builder_idx + 2).id()
@@ -431,7 +437,8 @@ actor ApplicationInitializer
           // First, check if there is going to be a step across the boundary
           if runner_builder_idx < runner_builders.size() then
             ///////
-            // We need a Proxy
+            // We need a Proxy since there are more steps to go in this
+            // pipeline
             match next_worker
             | let w: String =>
               let proxy_address = 
@@ -462,7 +469,8 @@ actor ApplicationInitializer
             end
           else
             ///////
-            // We need a Sink
+            // We need a Sink since there are no more steps to go in this
+            // pipeline
             let egress_builder = EgressBuilder(pipeline.name(), 
               egress_id, _output_addr, pipeline.sink_builder())
 
