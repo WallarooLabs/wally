@@ -58,7 +58,6 @@ actor Connections
 
   be send_control(worker: String, data: Array[ByteSeq] val) =>
     try
-      @printf[I32](("!!Sending control message to " + worker + "!!\n").cstring())
       _control_conns(worker).writev(data)
       @printf[I32](("Sent control message to " + worker + "\n").cstring())
     else

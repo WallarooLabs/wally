@@ -115,9 +115,13 @@ actor LocalTopologyInitializer
 
         /////////
         // 1. Find graph sinks and add to frontier queue. 
-        //    We'll work our way backwards.
+        //    We'll work our way backwards. 
+        @printf[I32]("Adding sink nodes to frontier\n".cstring())
         for node in graph.nodes() do
-          if node.is_sink() then frontier.enqueue(node) end
+          if node.is_sink() then 
+            @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
+            frontier.enqueue(node) 
+          end
         end
 
         /////////
@@ -202,6 +206,15 @@ actor LocalTopologyInitializer
 
                     let pre_state_router = DirectRouter(pre_state_step)
                     built(b.id()) = pre_state_router
+
+                    // Add ins to this prestate node to the frontier
+                    for in_in_node in in_node.ins() do
+                      if not built.contains(in_in_node.id) then
+                        frontier.enqueue(in_in_node)
+                      end
+                    end
+
+                    @printf[I32](("Finished handling " + in_node.value.name() + " node\n").cstring())
                   else
                     @printf[I32]("State steps should only have prestate predecessors!\n".cstring())
                     error
@@ -285,6 +298,8 @@ actor LocalTopologyInitializer
               // so this just marks that we've built this one
               built(next_id) = EmptyRouter
             end
+
+            @printf[I32](("Finished handling " + next_node.value.name() + " node\n").cstring())
           else
             frontier.enqueue(next_node)
           end

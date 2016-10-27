@@ -47,12 +47,27 @@ class Dag[V: Any val]
   fun string(): String =>
     var s = ""
     for (id, node) in _nodes.pairs() do
-      s = s + id.u16().string() + " | "
+      let name = 
+        match node.value
+        | let n: Named val => "\"" + n.name() + "\""
+        else
+          id.u16().string()
+        end
+
+      s = s + name + " :: "
       var outputs = ""
       for out in node.outs() do
-        outputs = outputs + out.id.u16().string() + "  "
+        let out_name = 
+          match out.value
+          | let n: Named val => "\"" + n.name() + "\""
+          else
+            id.u16().string()
+          end
+
+        outputs = outputs + out_name + "  "
       end
-      s = s + outputs + "\n"
+      if outputs == "" then outputs = "<>" end
+      s = s + outputs + "\n\n"
     end
     s
 
@@ -92,3 +107,5 @@ class DagNode[V: Any val]
   fun is_source(): Bool => _ins.size() == 0
   fun is_sink(): Bool => _outs.size() == 0
 
+interface Named
+  fun name(): String

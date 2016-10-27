@@ -369,16 +369,13 @@ actor ApplicationInitializer
 
                   try
                     local_graphs(worker).add_node(next_initializer, next_id)
-                    match last_initializer
-                    | (let last_id: U128, let step_init: StepInitializer val) =>
-                      local_graphs(worker).add_edge(last_id, next_id)
-                    end
+                    local_graphs(worker).add_edge(pre_state_id, next_id)
                   else
                     @printf[I32](("No graph for worker " + worker + "\n").cstring())
                     error
                   end
 
-                  last_initializer = (next_id, next_initializer) 
+                  last_initializer = None
                   steps(next_id) = worker
                 end
               else
