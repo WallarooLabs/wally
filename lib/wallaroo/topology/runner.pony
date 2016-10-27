@@ -58,9 +58,16 @@ primitive RouterRunnerBuilder
 
 class RunnerSequenceBuilder
   let _runner_builders: Array[RunnerBuilder val] val
+  let _id: U128
 
   new val create(bs: Array[RunnerBuilder val] val) =>
     _runner_builders = bs
+    _id = 
+      try
+        bs(0).id()
+      else
+        GuidGenerator.u128()
+      end
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -93,7 +100,7 @@ class RunnerSequenceBuilder
     n + "|"
 
   fun is_stateful(): Bool => false
-  fun id(): U128 => 0
+  fun id(): U128 => _id
 
 class ComputationRunnerBuilder[In: Any val, Out: Any val]
   let _comp_builder: ComputationBuilder[In, Out] val
@@ -103,7 +110,7 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
     id': U128 = 0) 
   =>
     _comp_builder = comp_builder
-    _id = id'
+    _id = if id' == 0 then GuidGenerator.u128() else id' end
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -125,10 +132,12 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
 
 class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
   let _state_comp: StateComputation[In, Out, State] val
+  let _id: U128
 
   new val create(state_comp: StateComputation[In, Out, State] val) 
   =>
     _state_comp = state_comp
+    _id = GuidGenerator.u128()
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -146,18 +155,20 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
 
   fun name(): String => _state_comp.name()
   fun is_stateful(): Bool => true
-  fun id(): U128 => 0
+  fun id(): U128 => _id
 
 class StateRunnerBuilder[State: Any #read]
   let _state_builder: StateBuilder[State] val
   let _name: String
   let _state_change_builders: Array[StateChangeBuilder[State] val] val
+  let _id: U128
 
   new val create(state_builder: StateBuilder[State] val, 
     name': String, state_change_builders: Array[StateChangeBuilder[State] val] val) =>
     _state_builder = state_builder
     _name = name'
     _state_change_builders = state_change_builders
+    _id = GuidGenerator.u128()
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -172,7 +183,7 @@ class StateRunnerBuilder[State: Any #read]
 
   fun name(): String => _state_builder.name()
   fun is_stateful(): Bool => true
-  fun id(): U128 => 0
+  fun id(): U128 => _id
 
 trait PartitionBuilder
   fun pre_state_subpartition(worker: String): PreStateSubpartition val

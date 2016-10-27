@@ -70,18 +70,16 @@ actor ApplicationInitializer
       let state_partition_map: Map[String, PartitionAddresses val] trn =
         recover Map[String, PartitionAddresses val] end
 
-      // The worker-specific summaries
-      var worker_topology_data = Array[WorkerTopologyData val]
-
       var pipeline_id: USize = 0
 
       // Map from step_id to worker name
       let steps: Map[U128, String] = steps.create()
-      // Map from worker name to array of local pipelines
-      let local_graphs: Map[String, Dag[StepInitializer val]] =
-        local_graphs.create()
 
-      // Initialize values for local pipelines
+      // We use these graphs to build the local graphs for each worker
+      let local_graphs: Map[String, Dag[StepInitializer val] trn] trn =  
+        recover Map[String, Dag[StepInitializer val] trn] end
+
+      // Initialize values for local graphs
       local_graphs("initializer") = Dag[StepInitializer val]
       for name in worker_names.values() do
         local_graphs(name) = Dag[StepInitializer val]
@@ -115,6 +113,7 @@ actor ApplicationInitializer
         end
 
         @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline.size().string() + " uncoalesced runner builders\n").cstring())
+
 
         //////////
         // Coalesce runner builders if we can
@@ -167,6 +166,26 @@ actor ApplicationInitializer
           runner_builders.push(seq_builder)
         end
 
+        // Create Source Initializer and add it to the graph for the
+        // initializer worker.
+        let source_node_id = _guid_gen.u128()
+        let source_seq_builder = RunnerSequenceBuilder(
+            source_runner_builders = recover Array[RunnerBuilder val] end) 
+        let source_initializer = SourceData(source_node_id, 
+          pipeline.source_builder(), source_seq_builder, source_addr)
+
+        @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
+
+        local_graphs("initializer").add_node(source_initializer, 
+          source_node_id)
+
+        // The last (node_id, StepInitializer val) pair we created
+        // Gets set to None when we cross to the next worker since it
+        // doesn't need to know its immediate cross-worker predecessor.
+        var last_initializer: ((U128, StepInitializer val) | None) = 
+          (source_node_id, source_initializer)
+
+
         // Determine which steps go on which workers using boundary indices
         // Each worker gets a near-equal share of the total computations
         // in this naive algorithm
@@ -180,16 +199,26 @@ actor ApplicationInitializer
         @printf[I32](("Each worker gets roughly " + per_worker.string() + " steps\n").cstring())
 
         let boundaries: Array[USize] = boundaries.create()
-        var count: USize = 0
+        // Since we put the source on the first worker, start at -1
+        var count: ISize = -1
         for i in Range(0, worker_count) do
-          count = count + per_worker
+          count = count + per_worker.isize()
+
+          // We don't want to cross a boundary to get to the worker
+          // that is the "anchor" for the partition, so instead we
+          // make sure it gets put on the same worker
+          match runner_builders((count + 1).usize()) 
+          | let pb: PartitionBuilder val =>
+            count = count + 1
+          end
+
           if (i == (worker_count - 1)) and
-            (count < runner_builders.size()) then
+            (count < runner_builders.size().isize()) then
             // Make sure we cover all steps by forcing the rest on the
             // last worker if need be
             boundaries.push(runner_builders.size())
           else
-            boundaries.push(count)
+            boundaries.push(count.usize())
           end
         end
 
@@ -223,10 +252,6 @@ actor ApplicationInitializer
               None
             end
 
-          // We'll use this to create the LocalTopology for this worker
-          let step_initializers: Array[StepInitializer val] trn =
-            recover Array[StepInitializer val] end
-
           // Make sure there are still runner_builders left in the pipeline.
           if runner_builder_idx < runner_builders.size() then
             var cur_step_id = _guid_gen.u128()
@@ -249,164 +274,126 @@ actor ApplicationInitializer
                 | let pb: PartitionBuilder val =>
                   state_name = pb.state_name()
                   if not state_partition_map.contains(state_name) then
-                    state_partition_map(state_name) = pb.partition_addresses(worker)
+                    state_partition_map(state_name) = 
+                      pb.partition_addresses(worker)
                   end
                 end
 
                 // Create the prestate initializer, and if this is not
-                // partitioned state, then the state initializer as well
-                let next_initializer: StepInitializer val =
-                  match next_runner_builder
-                  | let pb: PartitionBuilder val =>
-                    @printf[I32](("Preparing to spin up partitioned state on " + worker + "\n").cstring())
-                    PartitionedPreStateStepBuilder(
-                      pb.pre_state_subpartition(worker), next_runner_builder,
-                      state_name)
-                  else
-                    @printf[I32](("Preparing to spin up non-partitioned state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
-                    step_initializers.push(StepBuilder(next_runner_builder,
-                      next_runner_builder.id(),
-                      next_runner_builder.is_stateful()))
-                    steps(next_runner_builder.id()) = worker
+                // partitioned state, then the state initializer as well.
+                match next_runner_builder
+                | let pb: PartitionBuilder val =>
+                  @printf[I32](("Preparing to spin up partitioned state on " + worker + "\n").cstring())
+                  let next_initializer = PartitionedPreStateStepBuilder(
+                    pb.pre_state_subpartition(worker), next_runner_builder,
+                    state_name)
+                  let next_id = next_initializer.id()
 
-                    runner_builder_idx = runner_builder_idx + 1
-
-                    next_runner_builder = runner_builders(runner_builder_idx)
-
-                    @printf[I32](("Preparing to spin up non-partitioned state for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
-
-                    StepBuilder(next_runner_builder, next_runner_builder.id(),
-                      next_runner_builder.is_stateful())
+                  local_graphs(worker).add_node(next_initializer, next_id)
+                  match last_initializer
+                  | (let last_id: U128, let step_init: StepInitializer val) =>
+                    local_graphs(worker).add_edge(last_id, next_id)
                   end
 
-                step_initializers.push(next_initializer)
-                steps(next_runner_builder.id()) = worker
+                  last_initializer = (next_id, next_initializer) 
+                  steps(next_id) = worker
+                else
+                  @printf[I32](("Preparing to spin up non-partitioned state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
+                  let pre_state_id = next_runner_builder.id()
+                  let pre_state_init = StepBuilder(next_runner_builder,
+                    pre_state_id, next_runner_builder.is_stateful())
 
-                cur_step_id = _guid_gen.u128()
+                  local_graphs(worker).add_node(pre_state_init, pre_state_id)
+                  match last_initializer
+                  | (let last_id: U128, let step_init: StepInitializer val) 
+                  =>
+                    local_graphs(worker).add_edge(last_id, pre_state_id)
+                  end
+                  
+                  steps(next_runner_builder.id()) = worker
+
+                  runner_builder_idx = runner_builder_idx + 1
+
+                  next_runner_builder = runner_builders(runner_builder_idx)
+
+                  @printf[I32](("Preparing to spin up non-partitioned state for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
+
+                  let next_initializer = StepBuilder(next_runner_builder, 
+                    next_runner_builder.id(),
+                    next_runner_builder.is_stateful())
+                  let next_id = next_initializer.id()
+
+                  local_graphs(worker).add_node(next_initializer, next_id)
+                  match last_initializer
+                  | (let last_id: U128, let step_init: StepInitializer val) =>
+                    local_graphs(worker).add_edge(last_id, next_id)
+                  end
+
+                  last_initializer = (next_id, next_initializer) 
+                  steps(next_id) = worker
+                end
               else
                 @printf[I32](("Preparing to spin up " + next_runner_builder.name() + " on " + worker + "\n").cstring())
-                let step_builder = StepBuilder(next_runner_builder,
-                  cur_step_id)
-                step_initializers.push(step_builder)
-                steps(cur_step_id) = worker
+                let next_id = next_runner_builder.id()
+                let next_initializer = StepBuilder(next_runner_builder,
+                  next_id)
 
-                cur_step_id = _guid_gen.u128()
+                local_graphs(worker).add_node(next_initializer, next_id)
+                match last_initializer
+                | (let last_id: U128, let step_init: StepInitializer val) =>
+                  local_graphs(worker).add_edge(last_id, next_id)
+                end
+
+                steps(next_id) = worker
               end
 
               runner_builder_idx = runner_builder_idx + 1
             end
           end
 
-          // Having prepared all the step initializers for this worker,
-          // summarize this data in a WorkerTopologyData object
-          try
-            // This id is for the Step that will receive data via a
-            // Proxy
-            let boundary_step_id = step_initializers(0).id()
+          // Create the EgressBuilder for this worker and add to its graph.
+          // First, check if there is going to be a step across the boundary
+          if runner_builder_idx < runner_builders.size() then
+            ///////
+            // We need a Proxy
+            match next_worker
+            | let w: String =>
+              let proxy_address = ProxyAddress(w,
+                runner_builders(runner_builder_idx).id())
+              let egress_id = _guid_gen.u128()
+              let egress_builder = EgressBuilder(pipeline.name(),
+                egress_id, proxy_address)
 
-            let topology_data = WorkerTopologyData(worker, boundary_step_id,
-              consume step_initializers)
-            worker_topology_data.push(topology_data)
-          end
-
-          boundaries_idx = boundaries_idx + 1
-        end
-
-        // Set up the EgressBuilders and LocalPipelines for reach worker
-        // for our current pipeline
-        for i in Range(0, worker_topology_data.size()) do
-          let cur =
-            try
-              worker_topology_data(i)
+              local_graphs(worker).add_node(egress_builder, egress_id)
+              match last_initializer
+              | (let last_id: U128, let step_init: StepInitializer val) =>
+                local_graphs(worker).add_edge(last_id, egress_id)
+              end
             else
-              @printf[I32]("No worker topology data found!\n".cstring())
+              // Something went wrong, since if there are more runner builders
+              // there should be more workers
+              @printf[I32]("Not all runner builders were assigned to a worker\n".cstring())
               error
             end
-          let next_worker_data: (WorkerTopologyData val | None) =
-            try worker_topology_data(i + 1) else None end
+          else
+            ///////
+            // We need a Sink
+            let egress_id = _guid_gen.u128()
+            let egress_builder = EgressBuilder(pipeline.name(), 
+              egress_id, _output_addr, pipeline.sink_builder())
 
-          let source_seq_builder = RunnerSequenceBuilder(
-            source_runner_builders = recover Array[RunnerBuilder val] end)
-
-          let source_data =
-            if i == 0 then
-              @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on " + cur.worker_name + "\n").cstring())
-              SourceData(_guid_gen.u128(), pipeline.source_builder(),
-                source_seq_builder, source_addr)
-            else
-              None
+            local_graphs(worker).add_node(egress_builder, egress_id)
+            match last_initializer
+            | (let last_id: U128, let step_init: StepInitializer val) =>
+              local_graphs(worker).add_edge(last_id, egress_id)
             end
+          end
 
-          // // If this worker has no steps (is_empty), then create a
-          // // placeholder sink
-          // if cur.is_empty then
-          //   let egress_builder = EgressBuilder(pipeline.name(), 
-          //     _guid_gen.u128(), _output_addr, pipeline.sink_builder())
-          //   let local_pipeline = LocalPipeline(pipeline.name(),
-          //     cur.step_initializers, egress_builder, source_data,
-          //     pipeline.state_builders())
-          //   try
-          //     local_pipelines(cur.worker_name).push(local_pipeline)
-          //   else
-          //     @printf[I32]("No pipeline list found!\n".cstring())
-          //     error
-          //   end
-          // // If this worker has steps, then we need either a Proxy or a sink
-          // else
-          //   match next_worker_data
-          //   | let next_w: WorkerTopologyData val =>
-          //     // If the next worker in order has no steps, then we need a
-          //     // sink on this worker
-          //     if next_w.is_empty then
-          //       let egress_builder = EgressBuilder(pipeline.name(), 
-          //         _guid_gen.u128(), _output_addr, pipeline.sink_builder())
-          //       let local_pipeline = LocalPipeline(pipeline.name(),
-          //         cur.step_initializers, egress_builder, source_data,
-          //         pipeline.state_builders())
-          //       try
-          //         local_pipelines(cur.worker_name).push(local_pipeline)
-          //       else
-          //         @printf[I32]("No pipeline list found!\n".cstring())
-          //         error
-          //       end
-          //     // If the next worker has steps (continues the pipeline), then
-          //     // we need a Proxy to it on this worker
-          //     else
-          //       let proxy_address = ProxyAddress(next_w.worker_name,
-          //         next_w.boundary_step_id)
-          //       let egress_builder = EgressBuilder(pipeline.name(),
-          //         _guid_gen.u128(), proxy_address)
-          //       let local_pipeline = LocalPipeline(pipeline.name(),
-          //         cur.step_initializers, egress_builder, source_data,
-          //         pipeline.state_builders())
-          //       try
-          //         local_pipelines(cur.worker_name).push(local_pipeline)
-          //       else
-          //         @printf[I32]("No pipeline list found!\n".cstring())
-          //         error
-          //       end
-          //     end
-          //   // If the match fails, then this is the last worker in order and
-          //   // we need a sink on it
-          //   else
-          //     let egress_builder = EgressBuilder(pipeline.name(), 
-          //       _guid_gen.u128(), _output_addr, pipeline.sink_builder())
-          //     let local_pipeline = LocalPipeline(pipeline.name(),
-          //       cur.step_initializers, egress_builder, source_data,
-          //       pipeline.state_builders())
-          //     try
-          //       local_pipelines(cur.worker_name).push(local_pipeline)
-          //     else
-          //       @printf[I32]("No pipeline list found!\n".cstring())
-          //       error
-          //     end
-          //   end
-          // end
+          // Reset the last initializer since we're moving to the next worker
+          last_initializer = None
+          // Move to next worker's boundary value
+          boundaries_idx = boundaries_idx + 1
         end
-
-        // Reset the WorkerTopologyData array for the next pipeline since
-        // we've used it for this one already
-        worker_topology_data = Array[WorkerTopologyData val]
 
         // Prepare to initialize the next pipeline
         pipeline_id = pipeline_id + 1
@@ -447,15 +434,3 @@ actor ApplicationInitializer
     else
       @printf[I32]("Error initializating application!\n".cstring())
     end
-
-class WorkerTopologyData
-  let worker_name: String
-  let boundary_step_id: U128
-  let step_initializers: Array[StepInitializer val] val
-  let is_empty: Bool
-
-  new val create(n: String, id: U128, si: Array[StepInitializer val] val) =>
-    worker_name = n
-    boundary_step_id = id
-    step_initializers = si
-    is_empty = (step_initializers.size() == 0)

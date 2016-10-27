@@ -42,6 +42,7 @@ class PartitionedPreStateStepBuilder
   let _pre_state_subpartition: PreStateSubpartition val
   let _runner_builder: RunnerBuilder val
   let _state_name: String
+  let _id: U128
 
   new val create(sub: PreStateSubpartition val, r: RunnerBuilder val, 
     state_name': String) 
@@ -49,10 +50,11 @@ class PartitionedPreStateStepBuilder
     _pre_state_subpartition = sub
     _runner_builder = r
     _state_name = state_name'
+    _id = _runner_builder.id()
 
   fun name(): String => _runner_builder.name() + " partition"
   fun state_name(): String => _state_name
-  fun id(): U128 => 0
+  fun id(): U128 => _id
   fun is_stateful(): Bool => true
   fun is_partitioned(): Bool => true
   fun apply(next: Router val, metrics_conn: TCPConnection,
@@ -69,7 +71,6 @@ class PartitionedPreStateStepBuilder
     _pre_state_subpartition.build(worker_name, _runner_builder, 
       state_addresses, metrics_conn, auth, connections, alfred,
       state_comp_router)
-
 
 class SourceData
   let _id: U128
