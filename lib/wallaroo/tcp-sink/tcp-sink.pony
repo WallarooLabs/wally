@@ -23,6 +23,8 @@ actor EmptySink is CreditFlowConsumerStep
   =>
     None
 
+  be initialize() => None
+
   be register_producer(producer: CreditFlowProducer) =>
     None
 
@@ -45,7 +47,7 @@ class TCPSinkBuilder
   =>
     TCPSink(_encoder_wrapper, consume reporter, host, service)
 
-actor TCPSink is (CreditFlowConsumer & RunnableStep)
+actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   """
   # TCPSink
 
@@ -121,6 +123,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep)
       host.cstring(), service.cstring(),
       from.cstring())
     _notify_connecting()
+
+  be initialize() => None
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,

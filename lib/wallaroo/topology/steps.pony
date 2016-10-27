@@ -25,9 +25,12 @@ trait tag RunnableStep
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
 
-type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer)
+interface Initializable
+  be initialize()
 
-actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
+type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer & Initializable tag)
+
+actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Initializable)
   """
   # Step
 
@@ -70,11 +73,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
         _routes(consumer) =
           Route(this, consumer, StepRouteCallbackHandler)
       end
+    end
 
-      // TODO: CREDITFLOW - this should be in a post create initialize
-      for r in _routes.values() do
-        r.initialize()
-      end
+  be initialize() =>
+    for r in _routes.values() do
+      r.initialize()
     end
 
   be update_router(router: Router val) => _router = router
@@ -271,7 +274,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
 // TODO: If this sticks around after boundary work, it will have to become
 // an ResilientOrigin to compile, but that seems weird so we need to
 // rethink it
-actor PartitionProxy is CreditFlowProducer
+actor PartitionProxy is (CreditFlowProducer & Initializable)
   let _worker_name: String
   var _router: (Router val | None) = None
   let _metrics_reporter: MetricsReporter
@@ -287,6 +290,8 @@ actor PartitionProxy is CreditFlowProducer
     _worker_name = worker_name
     _metrics_reporter = consume metrics_reporter
     _auth = auth
+
+  be initialize() => None
 
   be update_router(router: Router val) =>
     _router = router

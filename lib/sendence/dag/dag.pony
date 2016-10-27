@@ -64,7 +64,7 @@ class Dag[V: Any val]
     consume c
 
   fun string(): String =>
-    var s = ""
+    var s = "GRAPH:\n"
     for (id, node) in _nodes.pairs() do
       let name = 
         match node.value
@@ -73,7 +73,7 @@ class Dag[V: Any val]
           id.u16().string()
         end
 
-      s = s + name + " :: "
+      s = s + name + " --> "
       var outputs = ""
       for out in node.outs() do
         let out_name = 

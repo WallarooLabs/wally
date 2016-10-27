@@ -99,6 +99,10 @@ actor LocalTopologyInitializer
         // We'll need to register our proxies later over Connections
         let proxies: Map[String, Array[Step tag]] = proxies.create()
 
+        // Keep track of everything we need to call initialize() on when
+        // we're done
+        let initializables: Array[Initializable tag] = initializables.create()
+
 
         /////////
         // Initialize based on DAG
@@ -172,6 +176,7 @@ actor LocalTopologyInitializer
 
                 let next_step = builder(out_router, _metrics_conn, _alfred)
                 data_routes(next_id) = next_step
+                initializables.push(next_step)
 
                 let next_router = DirectRouter(next_step)
                 built(next_id) = next_router
@@ -204,6 +209,7 @@ actor LocalTopologyInitializer
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn, _alfred)
                 data_routes(next_id) = state_step
+                initializables.push(state_step)
 
                 let state_step_router = DirectRouter(state_step)
                 built(next_id) = state_step_router
@@ -233,6 +239,7 @@ actor LocalTopologyInitializer
                     let pre_state_step = b(state_step_router, _metrics_conn,
                       _alfred, state_comp_target)
                     data_routes(b.id()) = pre_state_step                    
+                    initializables.push(pre_state_step)
 
                     let pre_state_router = DirectRouter(pre_state_step)
                     built(b.id()) = pre_state_router
@@ -281,6 +288,7 @@ actor LocalTopologyInitializer
                 // partition located on this worker
                 for (id, s) in partition_router.local_map().pairs() do
                   data_routes(id) = s
+                  initializables.push(s)
                 end
                 // Add the partition router to our built list for nodes
                 // that connect to this node via an in edge and to prove
@@ -301,6 +309,8 @@ actor LocalTopologyInitializer
               // registration later
               let sink = egress_builder(_worker_name,
                 consume sink_reporter, _auth, proxies)
+
+              initializables.push(sink)
 
               let sink_router = DirectRouter(sink)
 
@@ -323,6 +333,9 @@ actor LocalTopologyInitializer
 
               let source_reporter = MetricsReporter(pipeline_name, 
                 _metrics_conn)
+
+              // TODO: How do we add an Initializable to our list for 
+              // the Source?
 
               let listen_auth = TCPListenAuth(_auth)
               try
@@ -390,6 +403,11 @@ actor LocalTopologyInitializer
 
           let ready_msg = ExternalMsgEncoder.ready(_worker_name)
           _connections.send_phone_home(ready_msg)
+        end
+
+        // Initialize all our initializables to get backpressure started
+        for i in initializables.values() do
+          i.initialize()
         end
 
         @printf[I32]("Local topology initialized\n".cstring())

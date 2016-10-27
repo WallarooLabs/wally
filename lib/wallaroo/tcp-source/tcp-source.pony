@@ -10,7 +10,7 @@ use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is CreditFlowProducer
+actor TCPSource is (CreditFlowProducer & Initializable)
   """
   # TCPSource
 
@@ -70,11 +70,11 @@ actor TCPSource is CreditFlowProducer
         _routes(consumer) =
           Route(this, consumer, TCPSourceRouteCallbackHandler)
       end
+    end
 
-      // TODO: CREDITFLOW - this should be in a post create initialize
-      for r in _routes.values() do
-        r.initialize()
-      end
+  be initialize() =>
+    for r in _routes.values() do
+      r.initialize()
     end
 
   be dispose() =>
