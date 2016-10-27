@@ -271,6 +271,9 @@ actor ApplicationInitializer
               None
             end
 
+          // Set up egress id for this worker for this pipeline
+          let egress_id = _guid_gen.u128()
+
           // Make sure there are still runner_builders left in the pipeline.
           if runner_builder_idx < runner_builders.size() then
             var cur_step_id = _guid_gen.u128()
@@ -308,10 +311,20 @@ actor ApplicationInitializer
                 match next_runner_builder
                 | let pb: PartitionBuilder val =>
                   @printf[I32](("Preparing to spin up partitioned state on " + worker + "\n").cstring())
+
+                  // Determine whether the target step will be a step or a 
+                  // sink/proxy
+                  let pre_state_target_id =
+                    try
+                      runner_builders(runner_builder_idx + 1).id()
+                    else
+                      egress_id
+                    end
+
                   let next_initializer = PartitionedPreStateStepBuilder(
                     pipeline.name(),
                     pb.pre_state_subpartition(worker), next_runner_builder,
-                    state_name)
+                    state_name, pre_state_target_id)
                   let next_id = next_initializer.id()
 
                   try
@@ -331,9 +344,20 @@ actor ApplicationInitializer
                 else
                   @printf[I32](("Preparing to spin up non-partitioned state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
                   let pre_state_id = next_runner_builder.id()
+
+                  // Determine whether the target step will be a step or a 
+                  // sink/proxy, hopping forward 2 because the next one
+                  // should be our state step
+                  let pre_state_target_id =
+                    try
+                      runner_builders(runner_builder_idx + 2).id()
+                    else
+                      egress_id
+                    end
+
                   let pre_state_init = StepBuilder(pipeline.name(),
                     next_runner_builder, pre_state_id, 
-                    next_runner_builder.is_stateful())
+                    next_runner_builder.is_stateful(), pre_state_target_id)
 
                   try
                     local_graphs(worker).add_node(pre_state_init, pre_state_id)
@@ -346,7 +370,6 @@ actor ApplicationInitializer
                     @printf[I32](("No graph for worker " + worker + "\n").cstring())
                     error
                   end
-
                   
                   steps(next_runner_builder.id()) = worker
 
@@ -418,7 +441,6 @@ actor ApplicationInitializer
                   @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
                   error
                 end
-              let egress_id = _guid_gen.u128()
               let egress_builder = EgressBuilder(pipeline.name(),
                 egress_id, proxy_address)
 
@@ -441,7 +463,6 @@ actor ApplicationInitializer
           else
             ///////
             // We need a Sink
-            let egress_id = _guid_gen.u128()
             let egress_builder = EgressBuilder(pipeline.name(), 
               egress_id, _output_addr, pipeline.sink_builder())
 

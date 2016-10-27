@@ -14,19 +14,22 @@ class StepBuilder
   let _pipeline_name: String
   let _runner_builder: RunnerBuilder val
   let _id: U128
+  let _pre_state_target_id: (U128 | None)
   let _is_stateful: Bool
 
   new val create(pipeline_name': String, r: RunnerBuilder val, id': U128,
-    is_stateful': Bool = false) 
+    is_stateful': Bool = false, pre_state_target_id': (U128 | None) = None) 
   =>    
     _pipeline_name = pipeline_name'
     _runner_builder = r
     _id = id'
     _is_stateful = is_stateful'
+    _pre_state_target_id = pre_state_target_id'
 
   fun name(): String => _runner_builder.name()
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
+  fun pre_state_target_id(): (U128 | None) => _pre_state_target_id
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
 
@@ -46,20 +49,23 @@ class PartitionedPreStateStepBuilder
   let _runner_builder: RunnerBuilder val
   let _state_name: String
   let _id: U128
+  let _pre_state_target_id: U128
 
   new val create(pipeline_name': String, sub: PreStateSubpartition val, 
-    r: RunnerBuilder val, state_name': String) 
+    r: RunnerBuilder val, state_name': String, pre_state_target_id': U128) 
   =>
     _pipeline_name = pipeline_name'
     _pre_state_subpartition = sub
     _runner_builder = r
     _state_name = state_name'
     _id = _runner_builder.id()
+    _pre_state_target_id = pre_state_target_id'
 
   fun name(): String => _runner_builder.name() + " partition"
   fun pipeline_name(): String => _pipeline_name
   fun state_name(): String => _state_name
   fun id(): U128 => _id
+  fun pre_state_target_id(): U128 => _pre_state_target_id
   fun is_stateful(): Bool => true
   fun is_partitioned(): Bool => true
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
@@ -83,9 +89,10 @@ class SourceData
   let _builder: SourceBuilderBuilder val
   let _runner_builder: RunnerBuilder val
   let _address: Array[String] val
+  let _pre_state_target_id: (U128 | None)
 
   new val create(id': U128, b: SourceBuilderBuilder val, r: RunnerBuilder val, 
-    a: Array[String] val) 
+    a: Array[String] val, pre_state_target_id': (U128 | None) = None) 
   =>
     _id = id'
     _pipeline_name = b.name()
@@ -93,6 +100,7 @@ class SourceData
     _builder = b
     _runner_builder = r
     _address = a
+    _pre_state_target_id = pre_state_target_id'
 
   fun builder(): SourceBuilderBuilder val => _builder
   fun runner_builder(): RunnerBuilder val => _runner_builder
@@ -101,6 +109,7 @@ class SourceData
   fun name(): String => _name
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
+  fun pre_state_target_id(): (U128 | None) => _pre_state_target_id
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
 
@@ -131,6 +140,7 @@ class EgressBuilder
   fun name(): String => _name
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
+  fun pre_state_target_id(): (U128 | None) => None
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
 

@@ -149,11 +149,6 @@ actor LocalTopologyInitializer
             if not built.contains(out.id) then ready = false end
           end
           if ready then
-            for in_node in next_node.ins() do
-              if not built.contains(in_node.id) then
-                frontier.enqueue(in_node)
-              end
-            end
             let next_initializer: StepInitializer val = next_node.value
 
             // ...match kind of initializer and go from there...
@@ -184,6 +179,29 @@ actor LocalTopologyInitializer
               else
                 // Our step is stateful and non-partitioned, so we need to 
                 // build both a state step and a prestate step
+           
+                // First, we must check that all state computation targets
+                // have been built.  If they haven't, then we send this node
+                // to the back of the frontier queue (it will eventually
+                // be processed because of no splits (II))
+                var targets_ready = true
+                for in_node in next_node.ins() do
+                  match in_node.value.pre_state_target_id()
+                  | let id: U128 =>
+                    try
+                      built(id)
+                    else
+                      targets_ready = false
+                    end
+                  end
+                end
+
+                if not targets_ready then
+                  frontier.enqueue(next_node)
+                  continue
+                end
+                
+
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn, _alfred)
                 data_routes(next_id) = state_step
@@ -199,9 +217,23 @@ actor LocalTopologyInitializer
                   match in_node.value
                   | let b: StepBuilder val =>
                     @printf[I32](("----Spinning up " + b.name() + "----\n").cstring())
+
+                    let state_comp_target = 
+                      match b.pre_state_target_id()
+                      | let id: U128 =>
+                        try
+                          built(id)
+                        else
+                          @printf[I32]("Prestate comp target not built! We should have already caught this\n".cstring())
+                          error
+                        end
+                      else
+                        EmptyRouter
+                      end
+
                     // TODO: How do we identify state_comp target id?
                     let pre_state_step = b(state_step_router, _metrics_conn,
-                      _alfred, EmptyRouter)//...latest_router...)
+                      _alfred, state_comp_target)
                     data_routes(b.id()) = pre_state_step                    
 
                     let pre_state_router = DirectRouter(pre_state_step)
@@ -229,11 +261,24 @@ actor LocalTopologyInitializer
 
                 @printf[I32](("----Spinning up partition for " + p_builder.name() + "----\n").cstring())
 
+                let state_comp_target = 
+                  match p_builder.pre_state_target_id()
+                  | let id: U128 =>
+                    try
+                      built(id)
+                    else
+                      @printf[I32]("Prestate comp target not built!\n".cstring())
+                      error
+                    end
+                  else
+                    EmptyRouter
+                  end
+
                 // TODO: How do we identify state_comp target id?
                 let partition_router: PartitionRouter val =
                   p_builder.build_partition(_worker_name, state_addresses,
                     _metrics_conn, _auth, _connections, _alfred, 
-                    EmptyRouter)//..latest_router...)
+                    state_comp_target)
                 
                 // Create a data route to each pre state step in the 
                 // partition located on this worker
@@ -297,6 +342,14 @@ actor LocalTopologyInitializer
               // Nothing connects to a source as an output locally,
               // so this just marks that we've built this one
               built(next_id) = EmptyRouter
+            end
+
+            // Add all the nodes with incoming edges to next_node to the
+            // frontier
+            for in_node in next_node.ins() do
+              if not built.contains(in_node.id) then
+                frontier.enqueue(in_node)
+              end
             end
 
             @printf[I32](("Finished handling " + next_node.value.name() + " node\n").cstring())
