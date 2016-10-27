@@ -41,7 +41,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   let _origins: OriginSet = OriginSet(10)
   var _router: Router val
   let _metrics_reporter: MetricsReporter
-  var _seq_id: U64
+  var _outgoing_seq_id: U64
   let _incoming_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
 
@@ -62,7 +62,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
       elb.set_buffer_target(this)
     end
     _metrics_reporter = consume metrics_reporter
-    _seq_id = 0
+    _outgoing_seq_id = 0
     _router = router
 
     ifdef "use_backpressure" then
@@ -83,16 +83,16 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   // for messages crossing boundary
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
-    _seq_id = _seq_id + 1
-    _incoming_envelope.update(origin, msg_uid, frac_ids, seq_id, route_id)
-    _outgoing_envelope.update(this, msg_uid, frac_ids, _seq_id)
+    _outgoing_seq_id = _outgoing_seq_id + 1
+    _incoming_envelope.update(origin, msg_uid, frac_ids, incoming_seq_id, route_id)
+    _outgoing_envelope.update(this, msg_uid, frac_ids, _outgoing_seq_id)
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       _incoming_envelope, _outgoing_envelope, this, _router)
     if is_finished then
       ifdef "resilience" then
-        _bookkeeping(_incoming_envelope, _seq_id)
+        _bookkeeping(_incoming_envelope, _outgoing_envelope)
         // if Sink then _send_watermark()
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
@@ -105,17 +105,17 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   // for messages crossing boundary
   be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
-    _seq_id = _seq_id + 1
-    _incoming_envelope.update(origin, msg_uid, frac_ids, seq_id, route_id)
-    _outgoing_envelope.update(this, msg_uid, frac_ids, _seq_id)
+    _outgoing_seq_id = _outgoing_seq_id + 1
+    _incoming_envelope.update(origin, msg_uid, frac_ids, incoming_seq_id, route_id)
+    _outgoing_envelope.update(this, msg_uid, frac_ids, _outgoing_seq_id)
     // TODO: Reconsider how recovery_run works.  Used to call recovery_run()
     // on runner, but now runners don't implement that method.
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       _incoming_envelope, _outgoing_envelope, this, _router)
     if is_finished then
-      _bookkeeping(_incoming_envelope, _seq_id)
+      _bookkeeping(_incoming_envelope, _outgoing_envelope)
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
 
