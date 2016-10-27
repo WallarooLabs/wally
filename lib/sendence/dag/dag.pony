@@ -23,11 +23,11 @@ class Dag[V: Any val]
   fun ref add_edge(from_id: U128, to_id: U128) ? =>
     let from = _nodes(from_id)
     let to = _nodes(to_id)
-    if from.ins.contains(to) then
+    if from.has_input_from(to) then
       @printf[I32]("Cycles are not allowed!\n".cstring())
       error
     end
-    if not from.outs.contains(to) then
+    if not from.has_output_from(to) then
       _edges.push((from, to))
       from.add_output(to)      
       to.add_input(from)      
@@ -45,10 +45,22 @@ class Dag[V: Any val]
     end 
     consume c
 
+  fun string(): String =>
+    var s = ""
+    for (id, node) in _nodes.pairs() do
+      s = s + id.u16().string() + " | "
+      var outputs = ""
+      for out in node.outs() do
+        outputs = outputs + out.id.u16().string() + "  "
+      end
+      s = s + outputs + "\n"
+    end
+    s
+
 class DagNode[V: Any val]
   let id: U128
-  let ins: Array[DagNode[V]] = ins.create()
-  let outs: Array[DagNode[V]] = outs.create()
+  let _ins: Array[DagNode[V]] = _ins.create()
+  let _outs: Array[DagNode[V]] = _outs.create()
   let value: V
 
   new create(v: V, id': U128) =>
@@ -56,18 +68,23 @@ class DagNode[V: Any val]
     id = id'
 
   fun ref add_input(input: DagNode[V]) =>
-    if not ins.contains(input) then
-      ins.push(input)
+    if not _ins.contains(input) then
+      _ins.push(input)
     end
 
   fun ref add_output(output: DagNode[V]) =>
-    if not outs.contains(output) then
-      outs.push(output)
+    if not _outs.contains(output) then
+      _outs.push(output)
     end
 
-  fun ins: Iterator[this->DagNode[V]] => ins.values()
-  fun outs: Iterator[this->DagNode[V]] => outs.values()
+  fun has_input_from(node: DagNode[V]): Bool =>
+    _ins.contains(node)
+  fun has_output_from(node: DagNode[V]): Bool =>
+    _outs.contains(node)
 
-  fun is_source(): Bool => ins.size() == 0
-  fun is_sink(): Bool => outs.size() == 0
+  fun ins(): Iterator[this->DagNode[V]] => _ins.values()
+  fun outs(): Iterator[this->DagNode[V]] => _outs.values()
+
+  fun is_source(): Bool => _ins.size() == 0
+  fun is_sink(): Bool => _outs.size() == 0
 

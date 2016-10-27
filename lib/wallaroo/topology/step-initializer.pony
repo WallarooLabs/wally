@@ -30,14 +30,13 @@ class StepBuilder
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
 
-  fun apply(next: Router val, metrics_conn: TCPConnection,
-    pipeline_name: String, alfred: Alfred, router: Router val = EmptyRouter): 
-      Step tag 
+  fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
+    router: Router val = EmptyRouter): Step tag 
   =>
-    let runner = _runner_builder(MetricsReporter(pipeline_name, 
+    let runner = _runner_builder(MetricsReporter(_pipeline_name, 
       metrics_conn) where alfred = alfred, router = router)
     let step = Step(consume runner, 
-      MetricsReporter(pipeline_name, metrics_conn), router)
+      MetricsReporter(_pipeline_name, metrics_conn), router)
     step.update_router(next)
     step
 
@@ -51,6 +50,7 @@ class PartitionedPreStateStepBuilder
   new val create(pipeline_name': String, sub: PreStateSubpartition val, 
     r: RunnerBuilder val, state_name': String) 
   =>
+    _pipeline_name = pipeline_name'
     _pre_state_subpartition = sub
     _runner_builder = r
     _state_name = state_name'
@@ -62,11 +62,10 @@ class PartitionedPreStateStepBuilder
   fun id(): U128 => _id
   fun is_stateful(): Bool => true
   fun is_partitioned(): Bool => true
-  fun apply(next: Router val, metrics_conn: TCPConnection,
-    pipeline_name: String, alfred: Alfred, router: Router val = EmptyRouter): 
-      Step tag 
+  fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
+    router: Router val = EmptyRouter): Step tag 
   =>
-    Step(RouterRunner, MetricsReporter(pipeline_name, metrics_conn))
+    Step(RouterRunner, MetricsReporter(_pipeline_name, metrics_conn))
 
   fun build_partition(worker_name: String, state_addresses: StateAddresses val,
     metrics_conn: TCPConnection, auth: AmbientAuth, connections: Connections, 
@@ -79,7 +78,7 @@ class PartitionedPreStateStepBuilder
 
 class SourceData
   let _id: U128
-  let _pipeline_name: U128
+  let _pipeline_name: String
   let _name: String
   let _builder: SourceBuilderBuilder val
   let _runner_builder: RunnerBuilder val
@@ -112,11 +111,11 @@ class EgressBuilder
   let _addr: (Array[String] val | ProxyAddress val)
   let _sink_builder: (TCPSinkBuilder val | None)
 
-  new val create(pipeline_name: String, id': U128,
+  new val create(pipeline_name': String, id': U128,
     addr: (Array[String] val | ProxyAddress val), 
     sink_builder: (TCPSinkBuilder val | None) = None)
   =>
-    _pipeline_name = pipeline_name
+    _pipeline_name = pipeline_name'
     _name = 
       match addr
       | let pa: ProxyAddress val =>

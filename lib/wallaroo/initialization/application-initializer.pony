@@ -129,7 +129,13 @@ actor ApplicationInitializer
           recover Array[RunnerBuilder val] end
 
         for i in Range(0, pipeline.size()) do
-          let r_builder = pipeline(i)
+          let r_builder = 
+            try
+              pipeline(i)
+            else
+              @printf[I32](" couldn't find pipeline for index\n".cstring())
+              error
+            end
           if r_builder.is_stateful() then
             if latest_runner_builders.size() > 0 then
               let seq_builder = RunnerSequenceBuilder(
@@ -176,8 +182,13 @@ actor ApplicationInitializer
 
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
 
-        local_graphs("initializer").add_node(source_initializer, 
-          source_node_id)
+        try
+          local_graphs("initializer").add_node(source_initializer, 
+            source_node_id)
+        else
+          @printf[I32]("problem adding node to initializer graph\n".cstring())
+          error
+        end
 
         // The last (node_id, StepInitializer val) pair we created
         // Gets set to None when we cross to the next worker since it
@@ -207,9 +218,11 @@ actor ApplicationInitializer
           // We don't want to cross a boundary to get to the worker
           // that is the "anchor" for the partition, so instead we
           // make sure it gets put on the same worker
-          match runner_builders((count + 1).usize()) 
-          | let pb: PartitionBuilder val =>
-            count = count + 1
+          try
+            match runner_builders((count + 1).usize()) 
+            | let pb: PartitionBuilder val =>
+              count = count + 1
+            end
           end
 
           if (i == (worker_count - 1)) and
@@ -231,7 +244,13 @@ actor ApplicationInitializer
         // runner_builders to use to create StepInitializers that will be
         // added to its LocalTopology
         while boundaries_idx < boundaries.size() do
-          let boundary = boundaries(boundaries_idx)
+          let boundary = 
+            try
+              boundaries(boundaries_idx)
+            else
+              @printf[I32](("No boundary found for boundaries_idx " + boundaries_idx.string() + "\n").cstring())
+              error
+            end
 
           let worker =
             if boundaries_idx == 0 then
@@ -260,7 +279,12 @@ actor ApplicationInitializer
             // stepinitializers from the pipeline
             while runner_builder_idx < boundary do
               var next_runner_builder: RunnerBuilder val =
-                runner_builders(runner_builder_idx)
+                try
+                  runner_builders(runner_builder_idx)
+                else
+                  @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
+                  error
+                end
 
               // Stateful steps have to be handled differently since pre state
               // steps must be on the same workers as their corresponding
@@ -285,14 +309,21 @@ actor ApplicationInitializer
                 | let pb: PartitionBuilder val =>
                   @printf[I32](("Preparing to spin up partitioned state on " + worker + "\n").cstring())
                   let next_initializer = PartitionedPreStateStepBuilder(
+                    pipeline.name(),
                     pb.pre_state_subpartition(worker), next_runner_builder,
                     state_name)
                   let next_id = next_initializer.id()
 
-                  local_graphs(worker).add_node(next_initializer, next_id)
-                  match last_initializer
-                  | (let last_id: U128, let step_init: StepInitializer val) =>
-                    local_graphs(worker).add_edge(last_id, next_id)
+                  try
+                    local_graphs(worker).add_node(next_initializer, next_id)
+                    match last_initializer
+                    | (let last_id: U128, let step_init: StepInitializer val) 
+                    =>
+                      local_graphs(worker).add_edge(last_id, next_id)
+                    end
+                  else
+                    @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                    error
                   end
 
                   last_initializer = (next_id, next_initializer) 
@@ -300,33 +331,51 @@ actor ApplicationInitializer
                 else
                   @printf[I32](("Preparing to spin up non-partitioned state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
                   let pre_state_id = next_runner_builder.id()
-                  let pre_state_init = StepBuilder(next_runner_builder,
-                    pre_state_id, next_runner_builder.is_stateful())
+                  let pre_state_init = StepBuilder(pipeline.name(),
+                    next_runner_builder, pre_state_id, 
+                    next_runner_builder.is_stateful())
 
-                  local_graphs(worker).add_node(pre_state_init, pre_state_id)
-                  match last_initializer
-                  | (let last_id: U128, let step_init: StepInitializer val) 
-                  =>
-                    local_graphs(worker).add_edge(last_id, pre_state_id)
+                  try
+                    local_graphs(worker).add_node(pre_state_init, pre_state_id)
+                    match last_initializer
+                    | (let last_id: U128, let step_init: StepInitializer val) 
+                    =>
+                      local_graphs(worker).add_edge(last_id, pre_state_id)
+                    end
+                  else
+                    @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                    error
                   end
+
                   
                   steps(next_runner_builder.id()) = worker
 
                   runner_builder_idx = runner_builder_idx + 1
 
-                  next_runner_builder = runner_builders(runner_builder_idx)
+                  next_runner_builder = 
+                    try
+                      runner_builders(runner_builder_idx)
+                    else
+                      @printf[I32](("No runner builder for idx " + runner_builder_idx.string() + "\n").cstring())
+                      error
+                    end
 
                   @printf[I32](("Preparing to spin up non-partitioned state for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
 
-                  let next_initializer = StepBuilder(next_runner_builder, 
-                    next_runner_builder.id(),
+                  let next_initializer = StepBuilder(pipeline.name(),
+                    next_runner_builder, next_runner_builder.id(),
                     next_runner_builder.is_stateful())
                   let next_id = next_initializer.id()
 
-                  local_graphs(worker).add_node(next_initializer, next_id)
-                  match last_initializer
-                  | (let last_id: U128, let step_init: StepInitializer val) =>
-                    local_graphs(worker).add_edge(last_id, next_id)
+                  try
+                    local_graphs(worker).add_node(next_initializer, next_id)
+                    match last_initializer
+                    | (let last_id: U128, let step_init: StepInitializer val) =>
+                      local_graphs(worker).add_edge(last_id, next_id)
+                    end
+                  else
+                    @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                    error
                   end
 
                   last_initializer = (next_id, next_initializer) 
@@ -335,13 +384,20 @@ actor ApplicationInitializer
               else
                 @printf[I32](("Preparing to spin up " + next_runner_builder.name() + " on " + worker + "\n").cstring())
                 let next_id = next_runner_builder.id()
-                let next_initializer = StepBuilder(next_runner_builder,
-                  next_id)
+                let next_initializer = StepBuilder(pipeline.name(),
+                  next_runner_builder, next_id)
 
-                local_graphs(worker).add_node(next_initializer, next_id)
-                match last_initializer
-                | (let last_id: U128, let step_init: StepInitializer val) =>
-                  local_graphs(worker).add_edge(last_id, next_id)
+                try
+                  local_graphs(worker).add_node(next_initializer, next_id)
+                  match last_initializer
+                  | (let last_id: U128, let step_init: StepInitializer val) =>
+                    local_graphs(worker).add_edge(last_id, next_id)
+                  end
+                  
+                  last_initializer = (next_id, next_initializer) 
+                else
+                  @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                  error
                 end
 
                 steps(next_id) = worker
@@ -358,16 +414,26 @@ actor ApplicationInitializer
             // We need a Proxy
             match next_worker
             | let w: String =>
-              let proxy_address = ProxyAddress(w,
-                runner_builders(runner_builder_idx).id())
+              let proxy_address = 
+                try
+                  ProxyAddress(w, runner_builders(runner_builder_idx).id())
+                else
+                  @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
+                  error
+                end
               let egress_id = _guid_gen.u128()
               let egress_builder = EgressBuilder(pipeline.name(),
                 egress_id, proxy_address)
 
-              local_graphs(worker).add_node(egress_builder, egress_id)
-              match last_initializer
-              | (let last_id: U128, let step_init: StepInitializer val) =>
-                local_graphs(worker).add_edge(last_id, egress_id)
+              try
+                local_graphs(worker).add_node(egress_builder, egress_id)
+                match last_initializer
+                | (let last_id: U128, let step_init: StepInitializer val) =>
+                  local_graphs(worker).add_edge(last_id, egress_id)
+                end
+              else
+                @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                error
               end
             else
               // Something went wrong, since if there are more runner builders
@@ -382,10 +448,15 @@ actor ApplicationInitializer
             let egress_builder = EgressBuilder(pipeline.name(), 
               egress_id, _output_addr, pipeline.sink_builder())
 
-            local_graphs(worker).add_node(egress_builder, egress_id)
-            match last_initializer
-            | (let last_id: U128, let step_init: StepInitializer val) =>
-              local_graphs(worker).add_edge(last_id, egress_id)
+            try
+              local_graphs(worker).add_node(egress_builder, egress_id)
+              match last_initializer
+              | (let last_id: U128, let step_init: StepInitializer val) =>
+                local_graphs(worker).add_edge(last_id, egress_id)
+              end
+            else
+              @printf[I32](("No graph for worker " + worker + "\n").cstring())
+              error
             end
           end
 
@@ -407,8 +478,14 @@ actor ApplicationInitializer
       // For each worker, generate a LocalTopology
       // from all of its LocalGraphs
       for (w, g) in local_graphs.pairs() do
-        let local_topology = LocalTopology(application.name(), g.clone(),
-          application.state_builders())
+        let local_topology = 
+          try
+            LocalTopology(application.name(), g.clone(),
+              application.state_builders())
+          else
+            @printf[I32]("Problem cloning graph\n".cstring())
+            error
+          end
 
         // If this is the initializer's (i.e. our) turn, then
         // immediately (asynchronously) begin initializing it. If not, add it

@@ -80,6 +80,9 @@ actor LocalTopologyInitializer
 
         let graph = t.graph()
 
+        @printf[I32]("Creating graph:\n".cstring())
+        @printf[I32]((graph.string() + "\n").cstring())
+
         // Make sure we only create shared state once and reuse it
         let state_map: Map[String, StateAddresses val] = state_map.create()
 
@@ -147,7 +150,7 @@ actor LocalTopologyInitializer
                 frontier.enqueue(in_node)
               end
             end
-            let next_initializer: StepInitializer = next.value
+            let next_initializer: StepInitializer val = next_node.value
 
             // ...match kind of initializer and go from there...
             match next_initializer
@@ -163,14 +166,13 @@ actor LocalTopologyInitializer
 
                 let out_router = 
                   try
-                    built(out.id)
+                    built(out_id)
                   else
                     @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
                     error 
                   end
 
-                let next_step = builder(out_router, _metrics_conn,
-                  builder.pipeline_name(), _alfred)
+                let next_step = builder(out_router, _metrics_conn, _alfred)
                 data_routes(next_id) = next_step
 
                 let next_router = DirectRouter(next_step)
@@ -179,8 +181,7 @@ actor LocalTopologyInitializer
                 // Our step is stateful and non-partitioned, so we need to 
                 // build both a state step and a prestate step
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
-                let state_step = builder(EmptyRouter, _metrics_conn,
-                  builder.pipeline_name(), _alfred)
+                let state_step = builder(EmptyRouter, _metrics_conn, _alfred)
                 data_routes(next_id) = state_step
 
                 let state_step_router = DirectRouter(state_step)
@@ -196,7 +197,7 @@ actor LocalTopologyInitializer
                     @printf[I32](("----Spinning up " + b.name() + "----\n").cstring())
                     // TODO: How do we identify state_comp target id?
                     let pre_state_step = b(state_step_router, _metrics_conn,
-                      b.pipeline_name(), _alfred, ...latest_router...)
+                      _alfred, EmptyRouter)//...latest_router...)
                     data_routes(b.id()) = pre_state_step                    
 
                     let pre_state_router = DirectRouter(pre_state_step)
@@ -219,7 +220,7 @@ actor LocalTopologyInitializer
                 let partition_router: PartitionRouter val =
                   p_builder.build_partition(_worker_name, state_addresses,
                     _metrics_conn, _auth, _connections, _alfred, 
-                    ...latest_router...)
+                    EmptyRouter)//..latest_router...)
                 
                 // Create a data route to each pre state step in the 
                 // partition located on this worker
@@ -234,8 +235,6 @@ actor LocalTopologyInitializer
                 _env.err.print("Missing state step for " + p_builder.state_name() + "!")
                 error
               end
-
-              built(next_id) = 
             | let egress_builder: EgressBuilder val =>
               let next_id = egress_builder.id()
 
@@ -261,7 +260,7 @@ actor LocalTopologyInitializer
               let out_id: U128 = _get_output_node_id(next_node)
               let out_router = 
                 try
-                  built(out.id)
+                  built(out_id)
                 else
                   @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
                   error 
@@ -287,7 +286,7 @@ actor LocalTopologyInitializer
               built(next_id) = EmptyRouter
             end
           else
-            frontier.enqueue(next)
+            frontier.enqueue(next_node)
           end
         end
 
@@ -299,7 +298,7 @@ actor LocalTopologyInitializer
         if not _is_initializer then
           let data_notifier: TCPListenNotify iso =
             DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
-              _is_initializer, DataRouter(consume routes))
+              _is_initializer, DataRouter(consume data_routes))
           _connections.register_listener(
             TCPListener(_auth, consume data_notifier)
           )
@@ -352,8 +351,8 @@ actor LocalTopologyInitializer
 
     // Since this is not a sink or proxy, there should be exactly one 
     // output.
-    let out_id: U128 = 0
-    for out in next_node.outs() do
+    var out_id: U128 = 0
+    for out in node.outs() do
       out_id = out.id
     end
     if out_id == 0 then
