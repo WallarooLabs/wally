@@ -11,18 +11,21 @@ type StepInitializer is (StepBuilder | PartitionedPreStateStepBuilder |
   SourceData | EgressBuilder)
 
 class StepBuilder
+  let _pipeline_name: String
   let _runner_builder: RunnerBuilder val
   let _id: U128
   let _is_stateful: Bool
 
-  new val create(r: RunnerBuilder val, id': U128,
+  new val create(pipeline_name': String, r: RunnerBuilder val, id': U128,
     is_stateful': Bool = false) 
   =>    
+    _pipeline_name = pipeline_name'
     _runner_builder = r
     _id = id'
     _is_stateful = is_stateful'
 
   fun name(): String => _runner_builder.name()
+  fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
@@ -39,13 +42,14 @@ class StepBuilder
     step
 
 class PartitionedPreStateStepBuilder
+  let _pipeline_name: String
   let _pre_state_subpartition: PreStateSubpartition val
   let _runner_builder: RunnerBuilder val
   let _state_name: String
   let _id: U128
 
-  new val create(sub: PreStateSubpartition val, r: RunnerBuilder val, 
-    state_name': String) 
+  new val create(pipeline_name': String, sub: PreStateSubpartition val, 
+    r: RunnerBuilder val, state_name': String) 
   =>
     _pre_state_subpartition = sub
     _runner_builder = r
@@ -53,6 +57,7 @@ class PartitionedPreStateStepBuilder
     _id = _runner_builder.id()
 
   fun name(): String => _runner_builder.name() + " partition"
+  fun pipeline_name(): String => _pipeline_name
   fun state_name(): String => _state_name
   fun id(): U128 => _id
   fun is_stateful(): Bool => true
@@ -74,6 +79,7 @@ class PartitionedPreStateStepBuilder
 
 class SourceData
   let _id: U128
+  let _pipeline_name: U128
   let _name: String
   let _builder: SourceBuilderBuilder val
   let _runner_builder: RunnerBuilder val
@@ -83,7 +89,8 @@ class SourceData
     a: Array[String] val) 
   =>
     _id = id'
-    _name = "| " + b.name() + " source | " + r.name() + "|"
+    _pipeline_name = b.name()
+    _name = "| " + _pipeline_name + " source | " + r.name() + "|"
     _builder = b
     _runner_builder = r
     _address = a
@@ -93,12 +100,14 @@ class SourceData
   fun address(): Array[String] val => _address
 
   fun name(): String => _name
+  fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
 
 class EgressBuilder
   let _name: String
+  let _pipeline_name: String
   let _id: U128
   let _addr: (Array[String] val | ProxyAddress val)
   let _sink_builder: (TCPSinkBuilder val | None)
@@ -107,12 +116,13 @@ class EgressBuilder
     addr: (Array[String] val | ProxyAddress val), 
     sink_builder: (TCPSinkBuilder val | None) = None)
   =>
+    _pipeline_name = pipeline_name
     _name = 
       match addr
       | let pa: ProxyAddress val =>
         "Proxy to " + pa.worker
       else
-        pipeline_name + " sink"
+        _pipeline_name + " sink"
       end
 
     _id = id'
@@ -120,6 +130,7 @@ class EgressBuilder
     _sink_builder = sink_builder
 
   fun name(): String => _name
+  fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false

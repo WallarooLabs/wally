@@ -78,12 +78,14 @@ actor LocalTopologyInitializer
           @printf[I32]("----This worker has no steps----\n".cstring())
         end
 
+        let graph = t.graph()
+
         // Make sure we only create shared state once and reuse it
         let state_map: Map[String, StateAddresses val] = state_map.create()
 
         // Keep track of all Steps by id so we can create a DataRouter
         // for the data channel boundary
-        let routes: Map[U128, Step tag] trn =
+        let data_routes: Map[U128, Step tag] trn =
           recover Map[U128, Step tag] end
 
         @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
@@ -106,12 +108,12 @@ actor LocalTopologyInitializer
 
         let frontier = Queue[DagNode[StepInitializer val] val]
 
-        let built = Map[U128, ...StepLike...]
+        let built = Map[U128, Router val]
 
         /////////
         // 1. Find graph sinks and add to frontier queue. 
         //    We'll work our way backwards.
-        for node in t.graph().nodes() do
+        for node in graph.nodes() do
           if node.is_sink() then frontier.enqueue(node) end
         end
 
@@ -124,133 +126,172 @@ actor LocalTopologyInitializer
 
         // If there are no cycles, this will terminate
         while frontier.size() > 0 do
-          let next = frontier.dequeue()
+          let next_node = frontier.dequeue()
+
+          if built.contains(next_node.id) then
+            // We've already handled this node (probably because it's 
+            // pre-state)
+            continue
+          end
+
+          // We are only ready to build a node if all of its outputs
+          // have been built (though currently, because there are no
+          // splits, there will only be at most one output per node)
           var ready = true
-          for out in next.outs() do
+          for out in next_node.outs() do
             if not built.contains(out.id) then ready = false end
           end
           if ready then
-            // ins can't be repeats here because there are no splits
-            for in_node in next.ins() do
-              frontier.enqueue(in_node)
+            for in_node in next_node.ins() do
+              if not built.contains(in_node.id) then
+                frontier.enqueue(in_node)
+              end
             end
-            let builder = next.value
+            let next_initializer: StepInitializer = next.value
 
             // ...match kind of initializer and go from there...
+            match next_initializer
+            | let builder: StepBuilder val =>              
+              let next_id = builder.id()
 
-            built(builder.id()) = ...steplike...
+              if not builder.is_stateful() then
+                @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
+                // Currently there are no splits, so we know that a node has
+                // only one output in the graph. We also know this is not
+                // a sink or proxy, so there is exactly one output.
+                let out_id: U128 = _get_output_node_id(next_node)
+
+                let out_router = 
+                  try
+                    built(out.id)
+                  else
+                    @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
+                    error 
+                  end
+
+                let next_step = builder(out_router, _metrics_conn,
+                  builder.pipeline_name(), _alfred)
+                data_routes(next_id) = next_step
+
+                let next_router = DirectRouter(next_step)
+                built(next_id) = next_router
+              else
+                // Our step is stateful and non-partitioned, so we need to 
+                // build both a state step and a prestate step
+                @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
+                let state_step = builder(EmptyRouter, _metrics_conn,
+                  builder.pipeline_name(), _alfred)
+                data_routes(next_id) = state_step
+
+                let state_step_router = DirectRouter(state_step)
+                built(next_id) = state_step_router
+
+                // Before a non-partitioned state builder, we should
+                // always have one or more non-partitioned pre-state builders.
+                // The only inputs coming into a state builder should be
+                // prestate builder, so we're going to build them all
+                for in_node in next_node.ins() do
+                  match in_node.value
+                  | let b: StepBuilder val =>
+                    @printf[I32](("----Spinning up " + b.name() + "----\n").cstring())
+                    // TODO: How do we identify state_comp target id?
+                    let pre_state_step = b(state_step_router, _metrics_conn,
+                      b.pipeline_name(), _alfred, ...latest_router...)
+                    data_routes(b.id()) = pre_state_step                    
+
+                    let pre_state_router = DirectRouter(pre_state_step)
+                    built(b.id()) = pre_state_router
+                  else
+                    @printf[I32]("State steps should only have prestate predecessors!\n".cstring())
+                    error
+                  end
+                end
+              end
+            | let p_builder: PartitionedPreStateStepBuilder val =>
+              let next_id = p_builder.id()
+
+              try
+                let state_addresses = state_map(p_builder.state_name())
+
+                @printf[I32](("----Spinning up partition for " + p_builder.name() + "----\n").cstring())
+
+                // TODO: How do we identify state_comp target id?
+                let partition_router: PartitionRouter val =
+                  p_builder.build_partition(_worker_name, state_addresses,
+                    _metrics_conn, _auth, _connections, _alfred, 
+                    ...latest_router...)
+                
+                // Create a data route to each pre state step in the 
+                // partition located on this worker
+                for (id, s) in partition_router.local_map().pairs() do
+                  data_routes(id) = s
+                end
+                // Add the partition router to our built list for nodes
+                // that connect to this node via an edge and to prove
+                // we've handled it
+                built(next_id) = partition_router
+              else
+                _env.err.print("Missing state step for " + p_builder.state_name() + "!")
+                error
+              end
+
+              built(next_id) = 
+            | let egress_builder: EgressBuilder val =>
+              let next_id = egress_builder.id()
+
+              let sink_reporter = MetricsReporter(
+                egress_builder.pipeline_name(), _metrics_conn)
+
+              // Create a sink or Proxy. If this is a Proxy, the 
+              // egress builder will add it to our proxies map for
+              // registration later
+              let sink = egress_builder(_worker_name,
+                consume sink_reporter, _auth, proxies)
+
+              let sink_router = DirectRouter(sink)
+
+              built(next_id) = sink_router
+            | let source_data: SourceData val =>
+              let next_id = source_data.id()
+              let pipeline_name = source_data.pipeline_name()
+
+              // Currently there are no splits, so we know that a node has
+              // only one output in the graph. We also know this is not
+              // a sink or proxy, so there is exactly one output.
+              let out_id: U128 = _get_output_node_id(next_node)
+              let out_router = 
+                try
+                  built(out.id)
+                else
+                  @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
+                  error 
+                end
+
+              let source_reporter = MetricsReporter(pipeline_name, 
+                _metrics_conn)
+
+              let listen_auth = TCPListenAuth(_auth)
+              try
+                @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
+                TCPSourceListener(
+                  source_data.builder()(source_data.runner_builder(), out_router, _metrics_conn), 
+                  _alfred, 
+                  source_data.address()(0), 
+                  source_data.address()(1))
+              else
+                @printf[I32]("Ill-formed source address\n".cstring())
+              end
+
+              // Nothing connects to a source as an output locally,
+              // so this just marks that we've built this one
+              built(next_id) = EmptyRouter
+            end
           else
             frontier.enqueue(next)
           end
         end
 
-
-
-
-
-        // // Create our sink or Proxy using this pipeline's egress builder
-        // let sink_reporter = MetricsReporter(pipeline.name(), _metrics_conn)
-
-        // // let sink = pipeline.egress_builder()(_worker_name,
-        // //   consume sink_reporter, _auth, proxies)
-
-        // // For each step initializer in this pipeline, build the step
-        // // working backwards so we can plug later steps into earlier ones
-        // let initializers = pipeline.initializers()
-        // var initializer_idx = initializers.size()
-        // var latest_router: Router val = DirectRouter(sink)
-        // while initializer_idx > 0 do
-        //   var initializer =
-        //     try
-        //       initializers((initializer_idx - 1).usize())
-        //     else
-        //       @printf[I32]("Initializers is empty when we expected one\n".cstring())
-        //       error
-        //     end
-
-        //   match initializer
-        //   | let p_builder: PartitionedPreStateStepBuilder val =>
-        //     try
-        //       let state_addresses = state_map(p_builder.state_name())
-
-        //       @printf[I32](("----Spinning up partition for " + p_builder.name() + "----\n").cstring())
-        //       let partition_router: PartitionRouter val =
-        //         p_builder.build_partition(_worker_name, state_addresses,
-        //           _metrics_conn, _auth, _connections, _alfred, latest_router)
-        //       for (id, s) in partition_router.local_map().pairs() do
-        //         routes(id) = s
-        //       end
-        //       latest_router = partition_router
-
-        //       initializer_idx = initializer_idx - 1
-        //     else
-        //       _env.err.print("Missing state step for " + p_builder.state_name() + "!")
-        //       error
-        //     end
-        //   | let builder: StepBuilder val =>
-        //     if builder.is_stateful() then
-        //       @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
-        //       let state_step = builder(EmptyRouter, _metrics_conn,
-        //         pipeline.name(), _alfred)
-        //       let state_step_router = DirectRouter(state_step)
-        //       routes(builder.id()) = state_step
-
-        //       initializer_idx = initializer_idx - 1
-
-        //       // Before a non-partitioned state builder, we should
-        //       // always have a non-partition pre-state builder
-        //       try
-        //         match initializers((initializer_idx - 1).usize())
-        //         | let b: StepBuilder val =>
-        //           @printf[I32](("----Spinning up " + b.name() + "----\n").cstring())
-        //           let next_step = b(state_step_router, _metrics_conn,
-        //             pipeline.name(), _alfred, latest_router)
-        //           latest_router = DirectRouter(next_step)
-        //           routes(b.id()) = next_step
-        //         else
-        //           @printf[I32]("Expected a StepBuilder\n".cstring())
-        //           error
-        //         end
-        //       else
-        //         @printf[I32]("Expected a pre state StepBuilder\n".cstring())
-        //         error
-        //       end
-        //       initializer_idx = initializer_idx - 1
-        //     else
-        //       @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
-        //       let next_step = builder(latest_router, _metrics_conn,
-        //         pipeline.name(), _alfred)
-        //       latest_router = DirectRouter(next_step)
-        //       routes(builder.id()) = next_step
-        //       initializer_idx = initializer_idx - 1
-        //     end
-        //   end
-
-        // end
-
-        // // Create source if there is source data specified for this worker's
-        // // portion of the pipeline
-        // match pipeline.source_data()
-        // | let sd: SourceData val =>
-        //   let source_reporter = MetricsReporter(pipeline.name(),
-        //     _metrics_conn)
-
-        //   let listen_auth = TCPListenAuth(_auth)
-        //   try
-        //     @printf[I32](("----Creating source for " + pipeline.name() + " pipeline with " + sd.runner_builder().name() + "----\n").cstring())
-        //     TCPSourceListener(sd.builder()(sd.runner_builder(),
-        //       latest_router, _metrics_conn), _alfred,
-        //       sd.address()(0), sd.address()(1))
-        //   else
-        //     @printf[I32]("Ill-formed source address\n".cstring())
-        //   end
-        // else
-        //   @printf[I32]("No source data\n".cstring())
-        // end
-
         _register_proxies(proxies)
-
-
 
 
         // If this is not the initializer worker, then create the data channel
@@ -297,6 +338,29 @@ actor LocalTopologyInitializer
     else
       _env.err.print("Error initializing local topology")
     end
+
+  fun _get_output_node_id(node: DagNode[StepInitializer val] val): U128 ? =>
+    // Currently there are no splits, so we know that a node has
+    // only one output in the graph. 
+
+    // Make sure this is not a sink or proxy node. 
+    match node.value
+    | let eb: EgressBuilder val =>
+      @printf[I32]("Sinks and Proxies have no output nodes in the local graph!\n".cstring())
+      error 
+    end
+
+    // Since this is not a sink or proxy, there should be exactly one 
+    // output.
+    let out_id: U128 = 0
+    for out in next_node.outs() do
+      out_id = out.id
+    end
+    if out_id == 0 then
+      @printf[I32]("Invariant was violated: non-sink node had no output node.\n".cstring())
+      error
+    end
+    out_id
 
   // Connections knows how to plug proxies into other workers via TCP
   fun _register_proxies(proxies: Map[String, Array[Step tag]]) =>
