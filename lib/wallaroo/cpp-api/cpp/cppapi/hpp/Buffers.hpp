@@ -78,6 +78,7 @@ class ManagedBuffer : public Buffer
 {
 public:
     ManagedBuffer (int sz_);
+    ManagedBuffer (char* buff_, int sz_);
     ManagedBuffer (const ManagedBuffer& buff_);
     virtual ~ManagedBuffer ();
 

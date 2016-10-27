@@ -43,6 +43,14 @@ ManagedBuffer::ManagedBuffer (int sz_) : Buffer()
 
 
 
+
+ManagedBuffer::ManagedBuffer (char* buff_, int sz_) : Buffer(buff_, sz_)
+{
+
+}
+
+
+
 ManagedBuffer::ManagedBuffer (const ManagedBuffer& buff_)
 {
   Logger::getLogger()->error("ManagedBuffer (const ManagedBuffer& cpy_) --> not defined yet");
