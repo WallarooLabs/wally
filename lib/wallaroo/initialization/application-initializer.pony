@@ -4,6 +4,7 @@ use "sendence/dag"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -178,7 +179,8 @@ actor ApplicationInitializer
         let source_seq_builder = RunnerSequenceBuilder(
             source_runner_builders = recover Array[RunnerBuilder val] end) 
         let source_initializer = SourceData(source_node_id, 
-          pipeline.source_builder(), source_seq_builder, source_addr)
+          pipeline.source_builder(), source_seq_builder, 
+          pipeline.source_route_builder(), source_addr)
 
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
 

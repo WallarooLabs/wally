@@ -33,21 +33,23 @@ class DirectRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
-    // TODO: CreditFlow
-    // Lookup route from producer
-    // Call run on the route we got from the producer
-
-    //let r = producer.route_to(_target)
-    //r.run[D]()
-
-    _target.run[D](metric_name, source_ts, data,
-      outgoing_envelope.origin,
-      outgoing_envelope.msg_uid,
-      outgoing_envelope.frac_ids,
-      outgoing_envelope.seq_id,
-      // TODO: Figure out how to determine route id
-      0)
-    false
+    // TODO: Remove that producer can be None
+    match producer
+    | let cfp: CreditFlowProducer ref =>
+      let might_be_route = cfp.route_to(_target)
+      match might_be_route
+      | let r: Route =>
+        r.run[D](metric_name, source_ts, data,
+          outgoing_envelope.msg_uid,
+          outgoing_envelope.frac_ids)
+        false
+      else
+        // TODO: What do we do if we get None?
+        true
+      end
+    else
+      true
+    end
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
     recover val [_target] end
@@ -122,18 +124,24 @@ class LocalPartitionRouter[In: Any val,
       try
         match _partition_routes(key)
         | let s: Step =>
-          // TODO- CreditFlow
-          // Lookup route from producer
-          // Call run on the route we got from the producer
 
-          s.run[In](metric_name, source_ts, input,
-            outgoing_envelope.origin,
-            outgoing_envelope.msg_uid,
-            outgoing_envelope.frac_ids,
-            outgoing_envelope.seq_id,
-            // TODO: Generate correct route id
-            0)
-          false
+          // TODO: Remove that producer can be None
+          match producer
+          | let cfp: CreditFlowProducer ref =>
+            let might_be_route = cfp.route_to(s)
+            match might_be_route
+            | let r: Route =>
+              r.run[D](metric_name, source_ts, data,
+                outgoing_envelope.msg_uid,
+                outgoing_envelope.frac_ids)
+              false
+            else
+              // TODO: What do we do if we get None?
+              true
+            end
+          else
+            true
+          end    
         | let p: PartitionProxy =>
           try
             p.forward[In](metric_name, source_ts, input, _step_ids(key),
@@ -160,8 +168,18 @@ class LocalPartitionRouter[In: Any val,
     end
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
-    // TODO: CREDITFLOW - real implmentation
-    recover val Array[CreditFlowConsumerStep] end
+    // TODO: CREDITFLOW we need to handle proxies once we have boundary actors
+    let cs: Array[CreditFlowConsumerStep] trn =>
+      recover Array[CreditFlowConsumerStep] end
+
+    for s in _partition_routes.values() do
+      match s
+      | let step: Step =>
+        cs.push(step)
+      end
+    end
+
+    consume cs
 
   fun local_map(): Map[U128, Step] val => _local_map
 

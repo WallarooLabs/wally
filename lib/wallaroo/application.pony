@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "sendence/guid"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -62,6 +63,7 @@ trait BasicPipeline
   fun name(): String
   fun source_id(): USize
   fun source_builder(): SourceBuilderBuilder val
+  fun source_route_builder(): RouteBuilder val
   fun sink_builder(): (TCPSinkBuilder val | None)
   fun sink_target_ids(): Array[U64] val
   fun is_coalesced(): Bool
@@ -75,6 +77,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _runner_builders: Array[RunnerBuilder val]
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
   let _source_builder: SourceBuilderBuilder val
+  let _source_route_builder: RouteBuilder val
   var _sink_builder: (TCPSinkBuilder val | None) = None
   let _is_coalesced: Bool
 
@@ -86,6 +89,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _runner_builders = Array[RunnerBuilder val]
     _name = n
     _source_builder = TypedSourceBuilderBuilder[In](_name, _decoder)
+    _source_route_builder = TypedRouteBuilder[In]
     _is_coalesced = coalescing
 
   fun ref add_runner_builder(p: RunnerBuilder val) =>
@@ -102,6 +106,8 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun source_id(): USize => _pipeline_id
 
   fun source_builder(): SourceBuilderBuilder val => _source_builder
+
+  fun source_route_builder(): RouteBuilder val => _source_route_builder
 
   fun sink_builder(): (TCPSinkBuilder val | None) => _sink_builder
 
@@ -125,7 +131,8 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     comp_builder: ComputationBuilder[Last, Next] val,
     id: U128 = 0)
       : PipelineBuilder[In, Out, Next] =>
-    let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder)
+    let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder,
+      TypedRouteBuilder[Next])
     _p.add_runner_builder(next_builder)
     PipelineBuilder[In, Out, Next](_a, _p)
 
@@ -135,7 +142,8 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     state_name: String) 
       : PipelineBuilder[In, Out, Next] =>
 
-    let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp)
+    let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp,
+      TypedRouteBuilder[Next])
     _p.add_runner_builder(next_builder)
     let state_builder = StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders())
     _p.add_runner_builder(state_builder)
@@ -158,7 +166,8 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     end
 
     let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, PIn, State,
-      Key](_p.name(), state_name, s_comp, consume step_id_map, partition)
+      Key](_p.name(), state_name, s_comp, consume step_id_map, partition,
+        TypedRouteBuilder[Next])
     _p.add_runner_builder(next_builder)
 
     let state_partition = KeyedStateSubpartition[Key](partition.keys(),

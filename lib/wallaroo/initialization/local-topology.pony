@@ -341,7 +341,10 @@ actor LocalTopologyInitializer
               try
                 @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
                 TCPSourceListener(
-                  source_data.builder()(source_data.runner_builder(), out_router, _metrics_conn), 
+                  source_data.builder()(source_data.runner_builder(), 
+                    out_router, _metrics_conn),
+                  out_router,
+                  source_data.route_builder(),
                   _alfred, 
                   source_data.address()(0), 
                   source_data.address()(1))

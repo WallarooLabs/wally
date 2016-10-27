@@ -39,7 +39,8 @@ class StepBuilder
     let runner = _runner_builder(MetricsReporter(_pipeline_name, 
       metrics_conn) where alfred = alfred, router = router)
     let step = Step(consume runner, 
-      MetricsReporter(_pipeline_name, metrics_conn), router)
+      MetricsReporter(_pipeline_name, metrics_conn), 
+      _runner_builder.route_builder(), router)
     step.update_router(next)
     step
 
@@ -71,7 +72,8 @@ class PartitionedPreStateStepBuilder
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
     router: Router val = EmptyRouter): Step tag 
   =>
-    Step(RouterRunner, MetricsReporter(_pipeline_name, metrics_conn))
+    Step(RouterRunner, MetricsReporter(_pipeline_name, metrics_conn), 
+      _runner_builder.route_builder())
 
   fun build_partition(worker_name: String, state_addresses: StateAddresses val,
     metrics_conn: TCPConnection, auth: AmbientAuth, connections: Connections, 
@@ -88,10 +90,12 @@ class SourceData
   let _name: String
   let _builder: SourceBuilderBuilder val
   let _runner_builder: RunnerBuilder val
+  let _route_builder: RouteBuilder val
   let _address: Array[String] val
   let _pre_state_target_id: (U128 | None)
 
-  new val create(id': U128, b: SourceBuilderBuilder val, r: RunnerBuilder val, 
+  new val create(id': U128, b: SourceBuilderBuilder val, r: RunnerBuilder val,
+    default_source_route_builder: RouteBuilder val,
     a: Array[String] val, pre_state_target_id': (U128 | None) = None) 
   =>
     _id = id'
@@ -99,11 +103,19 @@ class SourceData
     _name = "| " + _pipeline_name + " source | " + r.name() + "|"
     _builder = b
     _runner_builder = r
+    _route_builder = 
+      match _runner_builder.route_builder()
+      | let e: EmptyRouteBuilder val =>
+        default_source_route_builder
+      else
+        _runner_builder.route_builder()
+      end
     _address = a
     _pre_state_target_id = pre_state_target_id'
 
   fun builder(): SourceBuilderBuilder val => _builder
   fun runner_builder(): RunnerBuilder val => _runner_builder
+  fun route_builder(): RouteBuilder val => _route_builder
   fun address(): Array[String] val => _address
 
   fun name(): String => _name
@@ -167,7 +179,7 @@ class EgressBuilder
     | let p: ProxyAddress val =>
       @printf[I32](("Creating Proxy to " + p.worker + "\n").cstring())
       let proxy = Proxy(worker_name, p.step_id, reporter.clone(), auth)
-      let proxy_step = Step(consume proxy, consume reporter)
+      let proxy_step = Step(consume proxy, consume reporter, EmptyRouteBuilder)
       if proxies.contains(worker_name) then
         proxies(p.worker).push(proxy_step)
       else
