@@ -197,11 +197,14 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   let _state_comp: StateComputation[In, Out, State] val
   let _step_id_map: Map[Key, U128] val
   let _partition: Partition[PIn, Key] val
+  let _id: U128
 
   new val create(pipeline_name: String, state_name': String,
     state_comp: StateComputation[In, Out, State] val,
-    step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val) 
+    step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val,
+    id': U128 = 0) 
   =>
+    _id = if id' == 0 then GuidGenerator.u128() else id' end
     _state_name = state_name'
     _pipeline_name = pipeline_name
     _state_comp = state_comp
@@ -225,7 +228,7 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   fun name(): String => _state_comp.name()
   fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
-  fun id(): U128 => 0
+  fun id(): U128 => _id
   fun step_id_map(): Map[Key, U128] val => _step_id_map
   
   fun pre_state_subpartition(worker: String): PreStateSubpartition val =>

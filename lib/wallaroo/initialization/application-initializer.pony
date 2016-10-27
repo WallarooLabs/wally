@@ -335,7 +335,7 @@ actor ApplicationInitializer
                       local_graphs(worker).add_edge(last_id, next_id)
                     end
                   else
-                    @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                    @printf[I32](("Possibly no graph for worker " + worker + " when trying to spin up partitioned state\n").cstring())
                     error
                   end
 

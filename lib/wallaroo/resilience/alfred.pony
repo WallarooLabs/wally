@@ -168,5 +168,5 @@ actor Alfred
       try
         _log_buffers(buffer_id).log_flushed(low_watermark)
       else
-        @printf[I32]("buffer %d disappeared!!".cstring(), buffer_id)
+        @printf[I32]("buffer %d disappeared!".cstring(), buffer_id)
       end

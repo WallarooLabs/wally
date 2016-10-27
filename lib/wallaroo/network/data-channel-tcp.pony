@@ -100,7 +100,6 @@ class DataChannelConnectNotifier is TCPConnectionNotify
     else
       match ChannelMsgDecoder(consume data, _auth)
       | let d: DeliveryMsg val =>
-        @printf[I32]("Received delivery msg!!\n".cstring())
         //TODO: read envelope from data
         //TODO: manage values for outgoing envelope at router?
         _incoming_envelope.update(_origin, 0, None, 0, 0)

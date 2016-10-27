@@ -20,17 +20,36 @@ class Dag[V: Any val]
     _edges.values()
 
   fun ref add_edge(from_id: U128, to_id: U128) ? =>
-    let from = _nodes(from_id)
-    let to = _nodes(to_id)
-    if from.has_input_from(to) then
-      @printf[I32]("Cycles are not allowed!\n".cstring())
+    try
+      let from =
+        try
+          _nodes(from_id)
+        else
+          @printf[I32]("There is no node for from_id\n".cstring())
+          error
+        end
+      let to =
+        try
+          _nodes(to_id)
+        else
+          @printf[I32]("There is no node for to_id\n".cstring())
+          error
+        end        
+        
+      // Obviously this only catches simple cycles
+      if from.has_input_from(to) then
+        @printf[I32]("Cycles are not allowed!\n".cstring())
+        error
+      end
+      if not from.has_output_from(to) then
+        _edges.push((from, to))
+        from.add_output(to)      
+        to.add_input(from)      
+      end    
+    else
+      @printf[I32]("Failed to add edge to graph\n".cstring())
       error
     end
-    if not from.has_output_from(to) then
-      _edges.push((from, to))
-      from.add_output(to)      
-      to.add_input(from)      
-    end    
 
   fun is_empty(): Bool => _nodes.size() == 0
 
