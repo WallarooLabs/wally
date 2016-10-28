@@ -55,6 +55,8 @@ public:
     virtual Buffer& operator<< (const short param_);
     virtual Buffer& operator<< (const unsigned int param_);
     virtual Buffer& operator<< (const int param_);
+    virtual Buffer& operator<< (const unsigned long param_);
+    virtual Buffer& operator<< (const long param_);
     virtual Buffer& operator<< (const double param_);
     virtual Buffer& operator<< (const string& str_);
 
@@ -64,6 +66,8 @@ public:
     virtual Buffer& operator>> (short& param_);
     virtual Buffer& operator>> (unsigned int& param_);
     virtual Buffer& operator>> (int& param_);
+    virtual Buffer& operator>> (unsigned long& param_);
+    virtual Buffer& operator>> (long& param_);
     virtual Buffer& operator>> (double& param_);
     virtual Buffer& operator>> (string& param_);
 };

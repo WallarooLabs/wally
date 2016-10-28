@@ -262,6 +262,27 @@ Buffer& Buffer::operator<< (const int param_)
 
 
 
+//------------------------------------------------
+Buffer& Buffer::operator<< (const unsigned long param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+Buffer& Buffer::operator<< (const long param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
 
 //------------------------------------------------
 Buffer& Buffer::operator<< (const double param_)
@@ -344,6 +365,28 @@ Buffer& Buffer::operator>> (unsigned int& param_)
 
 //------------------------------------------------
 Buffer& Buffer::operator>> (int& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+Buffer& Buffer::operator>> (unsigned long& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+Buffer& Buffer::operator>> (long& param_)
 {
   readData(&param_, sizeof(param_));
   return *this;
