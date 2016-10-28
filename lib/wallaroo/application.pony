@@ -129,8 +129,8 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
   fun ref to[Next: Any val](
     comp_builder: ComputationBuilder[Last, Next] val,
-    id: U128 = 0)
-      : PipelineBuilder[In, Out, Next] =>
+    id: U128 = 0): PipelineBuilder[In, Out, Next] 
+  =>
     let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder,
       TypedRouteBuilder[Next])
     _p.add_runner_builder(next_builder)
@@ -139,10 +139,10 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   fun ref to_stateful[Next: Any val, State: Any #read](
     s_comp: StateComputation[Last, Next, State] val,
     s_initializer: StateBuilder[State] val,
-    state_name: String) 
-      : PipelineBuilder[In, Out, Next] =>
-
+    state_name: String): PipelineBuilder[In, Out, Next] 
+  =>
     let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp,
+      TypedRouteBuilder[StateProcessor[State] val],
       TypedRouteBuilder[Next])
     _p.add_runner_builder(next_builder)
     let state_builder = StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders())
@@ -167,6 +167,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, PIn, State,
       Key](_p.name(), state_name, s_comp, consume step_id_map, partition,
+        TypedRouteBuilder[StateProcessor[State] val],
         TypedRouteBuilder[Next])
     _p.add_runner_builder(next_builder)
 

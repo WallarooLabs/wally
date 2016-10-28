@@ -48,6 +48,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   var _outgoing_seq_id: U64
   let _incoming_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
+  var _initialized: Bool = false
 
   // Credit Flow Producer
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
@@ -79,7 +80,18 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     for r in _routes.values() do
       r.initialize()
     end
- 
+
+    _initialized = true
+
+  be register_routes(router: Router val, route_builder: RouteBuilder val) =>
+    for consumer in router.routes().values() do
+      let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
+      _routes(consumer) = next_route
+      if _initialized then
+        next_route.initialize()
+      end
+    end
+
   // TODO: This needs to dispose of the old routes and replace with new routes
   be update_router(router: Router val) => _router = router
 

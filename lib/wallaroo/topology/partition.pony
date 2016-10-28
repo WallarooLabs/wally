@@ -100,6 +100,7 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
 
 interface StateAddresses
   fun apply(key: Any val): (Step | None)
+  fun register_routes(router: Router val, route_builder: RouteBuilder val)
 
 class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
   let _addresses: Map[Key, Step] val
@@ -117,6 +118,11 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
       end
     else
       None
+    end
+
+  fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
+    for step in _addresses.values() do
+      step.register_routes(router, route_builder)
     end
 
 trait StateSubpartition

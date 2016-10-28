@@ -331,7 +331,8 @@ actor ApplicationInitializer
                   let next_initializer = PartitionedPreStateStepBuilder(
                     pipeline.name(),
                     pb.pre_state_subpartition(worker), next_runner_builder,
-                    state_name, pre_state_target_id)
+                    state_name, pre_state_target_id,
+                    next_runner_builder.forward_route_builder())
                   let next_id = next_initializer.id()
 
                   try
@@ -365,7 +366,8 @@ actor ApplicationInitializer
 
                   let pre_state_init = StepBuilder(pipeline.name(),
                     next_runner_builder, pre_state_id, 
-                    next_runner_builder.is_stateful(), pre_state_target_id)
+                    next_runner_builder.is_stateful(), pre_state_target_id,
+                    next_runner_builder.forward_route_builder())
 
                   try
                     local_graphs(worker).add_node(pre_state_init, pre_state_id)

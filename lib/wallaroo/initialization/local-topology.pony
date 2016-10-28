@@ -233,8 +233,14 @@ actor LocalTopologyInitializer
                           error
                         end
                       else
+                        @printf[I32]("This shouldn't happen!!\n".cstring())
                         EmptyRouter
                       end
+
+                    match state_comp_target
+                    | let e: EmptyRouter val =>
+                      @printf[I32]("!!How did this happen?\n".cstring())
+                    end
 
                     let pre_state_step = b(state_step_router, _metrics_conn,
                       _alfred, state_comp_target)
@@ -243,6 +249,9 @@ actor LocalTopologyInitializer
 
                     let pre_state_router = DirectRouter(pre_state_step)
                     built(b.id()) = pre_state_router
+
+                    state_step.register_routes(state_comp_target, 
+                      b.forward_route_builder())
 
                     // Add ins to this prestate node to the frontier
                     for in_in_node in in_node.ins() do
@@ -278,6 +287,9 @@ actor LocalTopologyInitializer
                   else
                     EmptyRouter
                   end
+
+                state_addresses.register_routes(state_comp_target,
+                   p_builder.forward_route_builder())
 
                 let partition_router: PartitionRouter val =
                   p_builder.build_partition(_worker_name, state_addresses,

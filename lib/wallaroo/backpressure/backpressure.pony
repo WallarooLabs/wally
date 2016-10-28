@@ -75,12 +75,6 @@ class TypedRoute[In: Any val] is Route
     _consumer = consumer
     _callback = handler
     _consumer.register_producer(_step)
-    _credits_available = 
-      ifdef "use_backpressure" then
-        0
-      else
-        100000000000
-      end
 
   fun ref initialize() =>
     ifdef "use_backpressure" then
@@ -142,34 +136,43 @@ class TypedRoute[In: Any val] is Route
   =>
     match data
     | let input: In =>
-      if _credits_available > 0 then
-        let above_request_point =
-          _credits_available >= _request_more_credits_after
+      @printf[I32]("Successful route match\n".cstring())
+      ifdef "use_backpressure" then
+        if _credits_available > 0 then
+          let above_request_point =
+            _credits_available >= _request_more_credits_after
 
-        if _queue.size() > 0 then
-          _add_to_queue(metric_name, source_ts, input, msg_uid, frac_ids)
-          _flush_queue()
-        else
-          _send_message_on_route(metric_name, source_ts, input, msg_uid, 
-            frac_ids)
-        end
+          if _queue.size() > 0 then
+            _add_to_queue(metric_name, source_ts, input, msg_uid, frac_ids)
+            _flush_queue()
+          else
+            _send_message_on_route(metric_name, source_ts, input, msg_uid, 
+              frac_ids)
+          end
 
-        if _credits_available == 0 then
-          _callback.credits_exhausted(_step)
-          _request_credits()
-        else
-          if above_request_point then
-            if _credits_available < _request_more_credits_after then
-              // we started above the request size and finished below,
-              // request credits
-              _request_credits()
+          if _credits_available == 0 then
+            _callback.credits_exhausted(_step)
+            _request_credits()
+          else
+            if above_request_point then
+              if _credits_available < _request_more_credits_after then
+                // we started above the request size and finished below,
+                // request credits
+                _request_credits()
+              end
             end
           end
+        else
+          _add_to_queue(metric_name, source_ts, input, msg_uid, frac_ids)
+          _request_credits()
         end
       else
-        _add_to_queue(metric_name, source_ts, input, msg_uid, frac_ids)
-        _request_credits()
+        _send_message_on_route(metric_name, source_ts, input, msg_uid, 
+          frac_ids)
+        @printf[I32]("Sent\n".cstring())
       end
+    else
+      @printf[I32]("In route, match failed\n".cstring())
     end
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64,
