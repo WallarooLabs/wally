@@ -106,7 +106,7 @@ actor LocalTopologyInitializer
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("|^|^|^Initializing Local Topology^|^|^|\n\n".cstring())
     try
-      if (_worker_count > 0) and (_outgoing_boundaries.size() == 0) then
+      if (_worker_count > 1) and (_outgoing_boundaries.size() == 0) then
         @printf[I32]("Outgoing boundaries not set up!\n".cstring())
         error
       end
