@@ -7,17 +7,20 @@ interface EventLogBufferable
 trait ResilientOrigin is Origin
   be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
   be replay_finished()
+  be log_flushed(low_watermark: U64, messages_flushed: U64)
+  be start_without_replay()
 
 type LogEntry is (U128, (Array[U64] val | None), U64, Array[ByteSeq] val)
 
 trait EventLogBuffer
-   be queue(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
-   be flush(watermark: U64)
-   be set_id(id: U128)
-   be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
-   be set_target(target: ResilientOrigin tag)
-   be log_flushed(low_watermark: U64)
-   be replay_finished()
+  be queue(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
+  be flush(watermark: U64)
+  be set_id(id: U128)
+  be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
+  be set_target(target: ResilientOrigin tag)
+  be log_flushed(low_watermark: U64, messages_flushed: U64)
+  be replay_finished()
+  be start_without_replay()
 
 actor DeactivatedEventLogBuffer is EventLogBuffer
   new create() => None
@@ -26,8 +29,9 @@ actor DeactivatedEventLogBuffer is EventLogBuffer
   be set_id(id: U128) => None
   be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) => None
   be set_target(target: ResilientOrigin tag) => None
-  be log_flushed(low_watermark: U64) => None
+  be log_flushed(low_watermark: U64, messages_flushed: U64) => None
   be replay_finished() => None
+  be start_without_replay() => None
 
 actor StandardEventLogBuffer is EventLogBuffer
   let _alfred: Alfred
@@ -62,22 +66,27 @@ actor StandardEventLogBuffer is EventLogBuffer
       let out_buf: Array[LogEntry val] iso = recover iso Array[LogEntry val] end 
       let new_buf: Array[LogEntry val] = Array[LogEntry val]
       
-      // TODO: Do not compare against UID
-      // for entry in _buf.values() do
-      //   if entry._1 <= low_watermark then
-      //       out_buf.push(entry)
-      //   else
-      //       new_buf.push(entry)
-      //   end
-      // end
+      // TODO: fractional uids
+      for entry in _buf.values() do
+        if entry._1 <= low_watermark.u128() then
+          out_buf.push(entry)
+        else
+          new_buf.push(entry)
+        end
+      end
       _alfred.log(id, consume out_buf, low_watermark)
       _buf = new_buf
+    else
+      @printf[I32]("flushing an uninitialised buffer has no effect".cstring())
     end
 
-  be log_flushed(low_watermark: U64) =>
-    //TODO-Markus: update watermark tables wherever that may be, and send a watermark
-    //upstream
-    None
+  be log_flushed(low_watermark: U64, messages_flushed: U64) =>
+    match _target
+    | let t: ResilientOrigin tag => t.log_flushed(low_watermark, messages_flushed)
+    else
+      //TODO: explode
+      @printf[I32]("FATAL: received log_flushed with None target".cstring())
+    end
 
   be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) =>
     match _target
@@ -90,6 +99,14 @@ actor StandardEventLogBuffer is EventLogBuffer
   be replay_finished() =>
     match _target
     | let t: ResilientOrigin tag => t.replay_finished()
+    else
+      //TODO: explode
+      @printf[I32]("FATAL: trying to terminate replay log to a None target".cstring())
+    end
+
+  be start_without_replay() =>
+    match _target
+    | let t: ResilientOrigin tag => t.start_without_replay()
     else
       //TODO: explode
       @printf[I32]("FATAL: trying to terminate replay log to a None target".cstring())

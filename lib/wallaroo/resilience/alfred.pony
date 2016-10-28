@@ -10,7 +10,7 @@ trait Backend
     Array[ByteSeq] val))
 
 class DummyBackend is Backend
-  new iso create() => None
+  new create() => None
   fun ref flush() => None
   fun ref start() => None
   fun ref write_entry(buffer_id: U128, entry: (U128, (Array[U64] val | None), U64,
@@ -29,15 +29,17 @@ class FileBackend is Backend
   let _filepath: FilePath
   let _alfred: Alfred tag
   let _writer: Writer iso
+  var _replay_on_start: Bool
 
-  new iso create(filepath: FilePath, alfred: Alfred) =>
+  new create(filepath: FilePath, alfred: Alfred) =>
     _writer = recover iso Writer end
     _filepath = filepath
+    _replay_on_start = _filepath.exists()
     _file = recover iso File(filepath) end
     _alfred = alfred
 
   fun ref start() =>
-    if _filepath.exists() then
+    if _replay_on_start then
       //replay log to Alfred
       try
         let r = Reader
@@ -46,11 +48,13 @@ class FileBackend is Backend
         var size = _file.size()
         //start iterating until we reach start
         while _file.position() < size do
+          r.append(_file.read(40))
           let buffer_id = r.u128_be()
           let uid = r.u128_be()
           let fractional_size = r.u64_be()
           let frac_ids = recover val
             if fractional_size > 0 then
+              r.append(_file.read(fractional_size.usize() * 8))
               let l = Array[U64]
               for i in Range(0,fractional_size.usize()) do
                 l.push(r.u64_be())
@@ -62,6 +66,7 @@ class FileBackend is Backend
               None
             end
           end
+          r.append(_file.read(16))
           let statechange_id = r.u64_be()
           let payload_length = r.u64_be()
           let payload_single = recover val _file.read(payload_length.usize()) end
@@ -77,8 +82,8 @@ class FileBackend is Backend
       else
         @printf[I32]("Cannot recover state from eventlog\n".cstring())
       end
-    //else
-      //start writing a new one
+    else
+      _alfred.start_without_replay()
     end
 
   fun ref write_entry(buffer_id: U128, entry: (U128, (Array[U64] val | None), U64,
@@ -106,20 +111,24 @@ class FileBackend is Backend
       _writer.u64_be(0)
     end
     _writer.u64_be(statechange_id)
-    _writer.u64_be(payload.size().u64())
+    var payload_size: USize = 0
+    for p in payload.values() do
+      payload_size = payload_size + p.size()
+    end
+    _writer.u64_be(payload_size.u64())
     _writer.writev(payload)
     _file.writev(recover val _writer.done() end)
 
   fun ref flush() =>
-    _file.sync()
-    
+    _file.flush()
+ 
 
 actor Alfred
     let _log_buffers: Map[U128, EventLogBuffer tag] = 
       _log_buffers.create()
     // TODO: Why are these things isos? Because Alfred is the only thing that
     // should ever be using them, so we can't pass them anywhere.
-    let _backend: Backend iso
+    let _backend: Backend ref
 
     new create(env: Env, filename: (String val | None) = None) =>
       _backend = 
@@ -135,12 +144,20 @@ actor Alfred
           DummyBackend
         end
       end
-      //_backend.start(this)
+
+    be start() =>
+      _backend.start()
 
     be replay_finished() =>
       //signal all buffers that event log replay is finished
       for b in _log_buffers.values() do
         b.replay_finished()
+      end
+
+    be start_without_replay() =>
+      //signal all buffers that there is no event log replay
+      for b in _log_buffers.values() do
+        b.start_without_replay()
       end
 
     be replay_log_entry(buffer_id: U128, uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) =>
@@ -157,7 +174,8 @@ actor Alfred
       logbuffer.set_id(id)
 
     be log(buffer_id: U128, log_entries: Array[LogEntry val] iso, low_watermark: U64) =>
-      for i in Range(0,log_entries.size()) do
+      let write_count = log_entries.size()
+      for i in Range(0, write_count) do
         try
           _backend.write_entry(buffer_id,log_entries(i))
         else
@@ -166,7 +184,7 @@ actor Alfred
       end
       _backend.flush()
       try
-        _log_buffers(buffer_id).log_flushed(low_watermark)
+        _log_buffers(buffer_id).log_flushed(low_watermark, write_count.u64())
       else
         @printf[I32]("buffer %d disappeared!!".cstring(), buffer_id)
       end
