@@ -18,11 +18,9 @@ class EmptyRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
-    @printf[I32]("Got state step empty router!\n".cstring())
     true
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
-    @printf[I32]("Hi I'm EmptyRouter routes\n".cstring())
     recover val Array[CreditFlowConsumerStep] end
 
 class DirectRouter
@@ -35,31 +33,25 @@ class DirectRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
-    @printf[I32]("Router recvd\n".cstring())
     // TODO: Remove that producer can be None
     match producer
     | let cfp: CreditFlowProducer ref =>
-      @printf[I32]("Matched producer\n".cstring())
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
-        @printf[I32]("Matched route\n".cstring())
         r.run[D](metric_name, source_ts, data,
           outgoing_envelope.msg_uid,
           outgoing_envelope.frac_ids)
         false
       else
         // TODO: What do we do if we get None?
-        @printf[I32]("There is no route for this target\n".cstring())
         true
       end
     else
-      @printf[I32]("No producer\n".cstring())
       true
     end
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
-    @printf[I32]("!!Hi I'm routes\n".cstring())
     recover val [_target] end
 
 class DataRouter

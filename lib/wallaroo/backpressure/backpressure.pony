@@ -136,7 +136,6 @@ class TypedRoute[In: Any val] is Route
   =>
     match data
     | let input: In =>
-      @printf[I32]("Successful route match\n".cstring())
       ifdef "use_backpressure" then
         if _credits_available > 0 then
           let above_request_point =
@@ -169,10 +168,7 @@ class TypedRoute[In: Any val] is Route
       else
         _send_message_on_route(metric_name, source_ts, input, msg_uid, 
           frac_ids)
-        @printf[I32]("Sent\n".cstring())
       end
-    else
-      @printf[I32]("In route, match failed\n".cstring())
     end
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64,
