@@ -115,20 +115,16 @@ class DataRouter
   =>
     _data_routes = data_routes
 
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool
+  // fun route(metric_name: String, source_ts: U64, d_msg: DeliveryMsg val,
+  //   incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
+  //   producer: (CreditFlowProducer ref | None)): Bool
+  fun route(d_msg: DeliveryMsg val)
   =>
     try
-      match data
-      | let delivery_msg: DeliveryMsg val =>
-        let target_id = delivery_msg.target_id()
-        //TODO: create and deliver envelope
-        delivery_msg.deliver(_data_routes(target_id))
-        false
-      else
-        true
-      end
+      let target_id = d_msg.target_id()
+      //TODO: create and deliver envelope
+      d_msg.deliver(_data_routes(target_id))
+      false
     else
       true
     end

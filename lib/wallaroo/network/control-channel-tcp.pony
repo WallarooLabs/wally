@@ -127,6 +127,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         | let wi: WorkerInitializer =>
           wi.connections_ready(m.worker_name)
         end
+      | let m: CreateDataReceivers val =>
+        _local_topology_initializer.create_data_receivers(m.workers)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")
       else

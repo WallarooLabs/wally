@@ -20,6 +20,7 @@ actor WorkerInitializer
   let _connections_ready_workers: Set[String] = Set[String]
   let _ready_workers: Set[String] = Set[String]
   var _control_identified: USize = 1
+  var _data_receivers: USize = 1
   var _data_identified: USize = 1
   var _interconnected: USize = 1
   var _initialized: USize = 0
@@ -56,12 +57,10 @@ actor WorkerInitializer
       _worker_names.push(worker)
       _control_addrs(worker) = (host, service)
       _control_identified = _control_identified + 1
-      if (_control_identified == _expected) and 
-        (_data_identified == _expected) 
-      then
+      if _control_identified == _expected then
         @printf[I32]("All worker channels identified\n".cstring())
     
-        _create_interconnections()
+        _create_data_receivers()
       end
     end
 
@@ -71,9 +70,7 @@ actor WorkerInitializer
     else  
       _data_addrs(worker) = (host, service)
       _data_identified = _data_identified + 1
-      if (_control_identified == _expected) and 
-        (_data_identified == _expected) 
-      then
+      if _data_identified == _expected then
         @printf[I32]("All worker channels identified\n".cstring())
 
         _create_interconnections()
@@ -125,6 +122,28 @@ actor WorkerInitializer
 
   // be register_proxy(worker: String, proxy: Step tag) =>
   //   _connections.register_proxy(worker, proxy)
+
+  fun _create_data_receivers() =>
+    let ws: Array[String] trn = recover Array[String] end
+
+    ws.push("initializer")
+    for w in _worker_names.values() do 
+      ws.push(w)
+    end
+
+    let workers: Array[String] val = consume ws
+
+    try
+      let create_data_receivers_msg = ChannelMsgEncoder.create_data_receivers(
+        workers, _auth)
+      for key in _control_addrs.keys() do
+        _connections.send_control(key, create_data_receivers_msg)
+      end 
+
+      _local_topology_initializer.create_data_receivers(workers)
+    else
+      @printf[I32]("Failed to create message to create data receivers\n".cstring())
+    end
 
   fun _create_interconnections() =>
     let addresses = _generate_addresses_map()

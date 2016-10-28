@@ -17,6 +17,8 @@ actor Connections
   let _data_conns: Map[String, OutgoingBoundary] = _data_conns.create()
   var _phone_home: (TCPConnection | None) = None
   let _metrics_conn: TCPConnection
+  let _init_d_host: String
+  let _init_d_service: String
   // let _proxies: Map[String, Array[Step tag]] = _proxies.create()
   // let _partition_proxies: Map[String, Array[PartitionProxy tag]] = 
   //   _partition_proxies.create()
@@ -32,6 +34,8 @@ actor Connections
     _auth = auth
     _is_initializer = is_initializer
     _metrics_conn = metrics_conn
+    _init_d_host = d_host
+    _init_d_service = d_service
 
     if not _is_initializer then
       create_control_connection("initializer", c_host, c_service)
@@ -57,11 +61,14 @@ actor Connections
   be register_listener(listener: TCPListener) =>
     _listeners.push(listener)
     
-  // be add_control_connection(worker: String, conn: TCPConnection) =>
-  //   _control_conns(worker) = conn
-
-  // be add_data_connection(worker: String, conn: TCPConnection) =>
-  //   _data_conns(worker) = conn
+  be create_initializer_data_channel(
+    data_receivers: Map[String, DataReceiver] val) 
+  =>
+    let data_notifier: TCPListenNotify iso =
+      DataChannelListenNotifier(_worker_name, _env, _auth, this,
+        _is_initializer, data_receivers)
+    register_listener(TCPListener(_auth, consume data_notifier,
+      _init_d_host, _init_d_service))
 
   be send_control(worker: String, data: Array[ByteSeq] val) =>
     try

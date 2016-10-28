@@ -57,6 +57,7 @@ actor LocalTopologyInitializer
   var _outgoing_boundaries: Map[String, OutgoingBoundary] val = 
     recover Map[String, OutgoingBoundary] end
   var _topology: (LocalTopology val | None) = None
+  let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
 
   new create(worker_name: String, worker_count: USize, env: Env, 
     auth: AmbientAuth, connections: Connections, metrics_conn: TCPConnection,
@@ -71,22 +72,35 @@ actor LocalTopologyInitializer
     _is_initializer = is_initializer
     _alfred = alfred
 
-    // If this is not the initializer worker, then create the data channel
-    // incoming boundary
-    if not _is_initializer then
-      let data_notifier: TCPListenNotify iso =
-        DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
-          _is_initializer, DataRouter(recover Map[U128, Step tag] end))
-      _connections.register_listener(
-        TCPListener(_auth, consume data_notifier)
-      )
-    end    
-
   be update_topology(t: LocalTopology val) =>
     _topology = t
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     _outgoing_boundaries = bs
+
+  be create_data_receivers(ws: Array[String] val) =>
+    let drs: Map[String, DataReceiver] trn = 
+      recover Map[String, DataReceiver] end
+
+    for w in ws.values() do
+      if w != _worker_name then
+        let data_receiver = DataReceiver(_connections)
+        drs(w) = data_receiver
+        _data_receivers(w) = data_receiver
+      end
+    end
+
+    let data_receivers: Map[String, DataReceiver] val = consume drs 
+
+    if not _is_initializer then
+      let data_notifier: TCPListenNotify iso =
+        DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
+          _is_initializer, data_receivers)
+      _connections.register_listener(
+        TCPListener(_auth, consume data_notifier))
+    else
+      _connections.create_initializer_data_channel(data_receivers)
+    end
 
   be initialize(worker_initializer: (WorkerInitializer | None) = None) =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
@@ -258,14 +272,8 @@ actor LocalTopologyInitializer
                           error
                         end
                       else
-                        @printf[I32]("This shouldn't happen!!\n".cstring())
                         EmptyRouter
                       end
-
-                    match state_comp_target
-                    | let e: EmptyRouter val =>
-                      @printf[I32]("!!How did this happen?\n".cstring())
-                    end
 
                     let pre_state_step = b(state_step_router, _metrics_conn,
                       _alfred, state_comp_target)
@@ -418,10 +426,10 @@ actor LocalTopologyInitializer
           end
         end
 
-        // _register_proxies(proxies)
-
         let data_router = DataRouter(consume data_routes)
-
+        for receiver in _data_receivers.values() do
+          receiver.update_router(data_router)
+        end
 
         if _is_initializer then
           match worker_initializer

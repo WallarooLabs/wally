@@ -496,6 +496,14 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       _read_buf.undefined(_next_size)
     end
 
+  fun local_address(): IPAddress =>
+    """
+    Return the local IP address.
+    """
+    let ip = recover IPAddress end
+    @pony_os_sockname[Bool](_fd, ip)
+    ip
+
 interface _OutgoingBoundaryNotify
   fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
     """
@@ -570,3 +578,12 @@ interface _OutgoingBoundaryNotify
     None
 
 class EmptyBoundaryNotify is _OutgoingBoundaryNotify
+  fun ref connected(conn: OutgoingBoundary ref) =>
+  """
+  Called when we have successfully connected to the server.
+  """
+  None
+  // try
+  //   @printf[I32](("!!Connected from outgoing boundary at " + conn.local_address().name(None, true)._2 + "\n").cstring())
+  // end
+

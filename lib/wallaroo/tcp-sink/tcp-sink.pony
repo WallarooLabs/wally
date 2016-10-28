@@ -553,6 +553,14 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       _read_buf.undefined(_next_size)
     end
 
+  fun local_address(): IPAddress =>
+    """
+    Return the local IP address.
+    """
+    let ip = recover IPAddress end
+    @pony_os_sockname[Bool](_fd, ip)
+    ip
+
 interface _TCPSinkNotify
   fun ref connecting(conn: TCPSink ref, count: U32) =>
     """
@@ -627,3 +635,11 @@ interface _TCPSinkNotify
     None
 
 class EmptyNotify is _TCPSinkNotify
+  fun ref connected(conn: TCPSink ref) =>
+  """
+  Called when we have successfully connected to the server.
+  """
+  None
+  // try
+  //   @printf[I32](("!!Conn3ected from tcp sink at " + conn.local_address().name(None, true)._2 + "\n").cstring())
+  // end
