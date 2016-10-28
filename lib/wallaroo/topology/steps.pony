@@ -43,10 +43,12 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _translate: TranslationTable = TranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
   var _router: Router val
+  let _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
   var _outgoing_seq_id: U64
   let _incoming_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
+  var _initialized: Bool = false
 
   // Credit Flow Producer
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
@@ -57,7 +59,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   var _distributable_credits: ISize = _max_distributable_credits
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
-    router: Router val = EmptyRouter)
+    route_builder: RouteBuilder val, router: Router val = EmptyRouter)
   =>
     _runner = consume runner
     match _runner
@@ -67,19 +69,30 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     _metrics_reporter = consume metrics_reporter
     _outgoing_seq_id = 0
     _router = router
-
-    ifdef "use_backpressure" then
-      for consumer in _router.routes().values() do
-        _routes(consumer) =
-          Route(this, consumer, StepRouteCallbackHandler)
-      end
-    end
+    _route_builder = route_builder
 
   be initialize() =>
+    for consumer in _router.routes().values() do
+      _routes(consumer) =
+        _route_builder(this, consumer, StepRouteCallbackHandler)
+    end
+
     for r in _routes.values() do
       r.initialize()
     end
 
+    _initialized = true
+
+  be register_routes(router: Router val, route_builder: RouteBuilder val) =>
+    for consumer in router.routes().values() do
+      let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
+      _routes(consumer) = next_route
+      if _initialized then
+        next_route.initialize()
+      end
+    end
+
+  // TODO: This needs to dispose of the old routes and replace with new routes
   be update_router(router: Router val) => _router = router
 
   // TODO: Fix the Origin None once we know how to look up Proxy

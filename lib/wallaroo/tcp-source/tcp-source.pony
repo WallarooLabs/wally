@@ -41,6 +41,7 @@ actor TCPSource is (CreditFlowProducer & Initializable)
 
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
+    routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
     fd: U32, init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -65,17 +66,16 @@ actor TCPSource is (CreditFlowProducer & Initializable)
 
     _notify.accepted(this)
 
-    ifdef "use_backpressure" then
-      for consumer in _notify.routes().values() do
-        _routes(consumer) =
-          Route(this, consumer, TCPSourceRouteCallbackHandler)
-      end
+    for consumer in routes.values() do
+      _routes(consumer) =
+        route_builder(this, consumer, TCPSourceRouteCallbackHandler)
     end
 
-  be initialize() =>
     for r in _routes.values() do
       r.initialize()
     end
+
+  be initialize() => None
 
   be dispose() =>
      """

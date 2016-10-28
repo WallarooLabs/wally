@@ -4,6 +4,7 @@ use "sendence/dag"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -178,7 +179,8 @@ actor ApplicationInitializer
         let source_seq_builder = RunnerSequenceBuilder(
             source_runner_builders = recover Array[RunnerBuilder val] end) 
         let source_initializer = SourceData(source_node_id, 
-          pipeline.source_builder(), source_seq_builder, source_addr)
+          pipeline.source_builder(), source_seq_builder, 
+          pipeline.source_route_builder(), source_addr)
 
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
 
@@ -329,7 +331,8 @@ actor ApplicationInitializer
                   let next_initializer = PartitionedPreStateStepBuilder(
                     pipeline.name(),
                     pb.pre_state_subpartition(worker), next_runner_builder,
-                    state_name, pre_state_target_id)
+                    state_name, pre_state_target_id,
+                    next_runner_builder.forward_route_builder())
                   let next_id = next_initializer.id()
 
                   try
@@ -363,7 +366,8 @@ actor ApplicationInitializer
 
                   let pre_state_init = StepBuilder(pipeline.name(),
                     next_runner_builder, pre_state_id, 
-                    next_runner_builder.is_stateful(), pre_state_target_id)
+                    next_runner_builder.is_stateful(), pre_state_target_id,
+                    next_runner_builder.forward_route_builder())
 
                   try
                     local_graphs(worker).add_node(pre_state_init, pre_state_id)
