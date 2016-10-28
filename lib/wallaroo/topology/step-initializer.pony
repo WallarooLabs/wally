@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "wallaroo/backpressure"
+use "wallaroo/boundary"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
@@ -166,10 +167,12 @@ class EgressBuilder
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
+  fun target_address(): (Array[String] val | ProxyAddress val) => _addr
+
   fun apply(worker_name: String, reporter: MetricsReporter iso, 
     auth: AmbientAuth,
-    proxies: Map[String, Array[Step tag]] = Map[String, Array[Step tag]]): 
-    CreditFlowConsumerStep tag ?
+    proxies: Map[String, OutgoingBoundary] val = 
+      recover Map[String, OutgoingBoundary] end): CreditFlowConsumerStep tag ?
   =>    
     match _addr
     | let a: Array[String] val =>
@@ -187,16 +190,12 @@ class EgressBuilder
         error
       end
     | let p: ProxyAddress val =>
-      @printf[I32](("Creating Proxy to " + p.worker + "\n").cstring())
-      let proxy = Proxy(worker_name, p.step_id, reporter.clone(), auth)
-      let proxy_step = Step(consume proxy, consume reporter, EmptyRouteBuilder)
-      if proxies.contains(worker_name) then
-        proxies(p.worker).push(proxy_step)
+      try
+        proxies(p.worker)
       else
-        proxies(p.worker) = Array[Step tag]
-        proxies(p.worker).push(proxy_step)
+        @printf[I32](("Couldn't find proxy for " + p.worker + ".\n").cstring())
+        error
       end
-      proxy_step
     else
       // The match is exhaustive, so this can't happen
       @printf[I32]("Exhaustive match failed somehow\n".cstring())

@@ -14,12 +14,14 @@ actor WorkerInitializer
   let _expected: USize
   let _connections: Connections
   let _application_initializer: ApplicationInitializer
+  let _local_topology_initializer: LocalTopologyInitializer
   let _initializer_data_addr: Array[String] val
   let _metrics_conn: TCPConnection
+  let _connections_ready_workers: Set[String] = Set[String]
   let _ready_workers: Set[String] = Set[String]
   var _control_identified: USize = 1
   var _data_identified: USize = 1
-  // var interconnected: USize = 0
+  var _interconnected: USize = 1
   var _initialized: USize = 0
 
   let _worker_names: Array[String] = Array[String]
@@ -28,6 +30,7 @@ actor WorkerInitializer
 
   new create(auth: AmbientAuth, workers: USize, connections: Connections,
     application_initializer: ApplicationInitializer, 
+    local_topology_initializer: LocalTopologyInitializer,
     data_addr: Array[String] val, metrics_conn: TCPConnection) 
   =>
     _auth = auth
@@ -36,6 +39,7 @@ actor WorkerInitializer
     _initializer_data_addr = data_addr
     _metrics_conn = metrics_conn
     _application_initializer = application_initializer
+    _local_topology_initializer = local_topology_initializer
 
   be start(a: Application val) =>
     _application_initializer.update_application(a)
@@ -52,16 +56,12 @@ actor WorkerInitializer
       _worker_names.push(worker)
       _control_addrs(worker) = (host, service)
       _control_identified = _control_identified + 1
-      if _control_identified == _expected then
-        @printf[I32]("All worker control channels identified\n".cstring())
-
-        let names: Array[String] trn = recover Array[String] end
-        for name in _worker_names.values() do
-          names.push(name)
-        end
-
-        _application_initializer.initialize(this, _expected, 
-          consume names)      
+      if (_control_identified == _expected) and 
+        (_data_identified == _expected) 
+      then
+        @printf[I32]("All worker channels identified\n".cstring())
+    
+        _create_interconnections()
       end
     end
 
@@ -71,8 +71,10 @@ actor WorkerInitializer
     else  
       _data_addrs(worker) = (host, service)
       _data_identified = _data_identified + 1
-      if _data_identified == _expected then
-        @printf[I32]("All worker data channels identified\n".cstring())
+      if (_control_identified == _expected) and 
+        (_data_identified == _expected) 
+      then
+        @printf[I32]("All worker channels identified\n".cstring())
 
         _create_interconnections()
       end
@@ -93,6 +95,21 @@ actor WorkerInitializer
       @printf[I32]("Finished distributing\n".cstring())
     end
 
+ be connections_ready(worker_name: String) =>
+    if not _connections_ready_workers.contains(worker_name) then
+      _connections_ready_workers.set(worker_name)
+      _interconnected = _interconnected + 1
+      if _interconnected == _expected then
+        let names: Array[String] trn = recover Array[String] end
+        for name in _worker_names.values() do
+          names.push(name)
+        end
+
+        _application_initializer.initialize(this, _expected, 
+          consume names)    
+      end
+    end
+
   be topology_ready(worker_name: String) =>
     if not _ready_workers.contains(worker_name) then
       _ready_workers.set(worker_name)
@@ -106,8 +123,8 @@ actor WorkerInitializer
       end
     end
 
-  be register_proxy(worker: String, proxy: Step tag) =>
-    _connections.register_proxy(worker, proxy)
+  // be register_proxy(worker: String, proxy: Step tag) =>
+  //   _connections.register_proxy(worker, proxy)
 
   fun _create_interconnections() =>
     let addresses = _generate_addresses_map()
@@ -116,6 +133,8 @@ actor WorkerInitializer
       for key in _control_addrs.keys() do
         _connections.send_control(key, message)
       end
+
+      _connections.update_boundaries(_local_topology_initializer)
     else
       @printf[I32]("Initializer: Error initializing interconnections\n".cstring())
     end

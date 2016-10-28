@@ -53,9 +53,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _shutdown: Bool = false
   let _queue: Queue[Array[ByteSeq] val] = _queue.create()
 
-  new create(//encoder_wrapper: EncoderWrapper val,
-    metrics_reporter: MetricsReporter iso, host: String, service: String,
-    from: String = "", init_size: USize = 64, max_size: USize = 16384)
+  new create(metrics_reporter: MetricsReporter iso, host: String, 
+    service: String, from: String = "", init_size: USize = 64, 
+    max_size: USize = 16384)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
@@ -90,10 +90,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       // _queue.enqueue(data)
 
       _writev(data)
-
-      // TODO: Should happen when tracking info comes back from writev as
-      // being done.
-      // _metrics_reporter.pipeline_metric(metric_name, source_ts)
     // end
 
   be update_router(router: Router val) =>

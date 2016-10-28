@@ -120,7 +120,13 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           i.topology_ready(m.worker_name)
         end
       | let m: CreateConnectionsMsg val =>
-        _connections.create_connections(m.addresses)
+        _connections.create_connections(m.addresses, 
+          _local_topology_initializer)
+      | let m: ConnectionsReadyMsg val =>
+        match _initializer
+        | let wi: WorkerInitializer =>
+          wi.connections_ready(m.worker_name)
+        end
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")
       else

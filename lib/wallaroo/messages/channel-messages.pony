@@ -60,6 +60,11 @@ primitive ChannelMsgEncoder
   =>
     _encode(CreateConnectionsMsg(addresses), auth)
 
+  fun connections_ready(worker_name: String, auth: AmbientAuth): 
+    Array[ByteSeq] val ? 
+  =>
+    _encode(ConnectionsReadyMsg(worker_name), auth)
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg val =>
     try
@@ -126,6 +131,12 @@ class CreateConnectionsMsg is ChannelMsg
   new val create(addrs: Map[String, Map[String, (String, String)]] val) =>
     addresses = addrs
 
+class ConnectionsReadyMsg is ChannelMsg
+  let worker_name: String
+
+  new val create(name: String) =>
+    worker_name = name
+    
 trait DeliveryMsg is ChannelMsg
   fun target_id(): U128
   fun ack_id(): U64
