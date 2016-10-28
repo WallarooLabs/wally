@@ -334,10 +334,8 @@ actor PartitionProxy is (CreditFlowProducer & Initializable)
         // the thing normally responsible for creating the outgoing
         // envelope arguments
         let forward_msg = ChannelMsgEncoder.data_channel[D](target_step_id,
-          0, _worker_name, source_ts, data, metric_name, _auth,
-          return_proxy_address, msg_uid, frac_ids, seq_id,
-          // TODO: Generate correct route id
-          0)
+          _worker_name, source_ts, data, metric_name, _auth,
+          return_proxy_address, msg_uid, frac_ids, seq_id)
 
         match _router
         | let r: Router val =>

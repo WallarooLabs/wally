@@ -488,13 +488,11 @@ class Proxy is Runner
         // the thing normally responsible for creating the outgoing 
         // envelope arguments
         let forward_msg = ChannelMsgEncoder.data_channel[In](_target_step_id, 
-          0, _worker_name, source_ts, input, metric_name, _auth,
+          _worker_name, source_ts, input, metric_name, _auth,
           return_proxy_address,
           outgoing_envelope.msg_uid,
           outgoing_envelope.frac_ids,
-          outgoing_envelope.seq_id,
-          // TODO: Generate correct route id 
-          0)
+          outgoing_envelope.seq_id)
         r.route[Array[ByteSeq] val](metric_name, source_ts, forward_msg, 
           incoming_envelope, outgoing_envelope, producer)
         false

@@ -54,6 +54,59 @@ class DirectRouter
   fun routes(): Array[CreditFlowConsumerStep] val =>
     recover val [_target] end
 
+class ProxyRouter
+  let _worker_name: String
+  let _target: CreditFlowConsumerStep tag
+  let _target_proxy_address: ProxyAddress val
+  let _auth: AmbientAuth
+
+  new val create(worker_name: String, target: CreditFlowConsumerStep tag, 
+    target_proxy_address: ProxyAddress val, auth: AmbientAuth)
+  =>
+    _worker_name = worker_name
+    _target = target
+    _target_proxy_address = target_proxy_address
+    _auth = auth
+
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
+    producer: (CreditFlowProducer ref | None)): Bool
+  =>
+    // TODO: Remove that producer can be None
+    match producer
+    | let cfp: CreditFlowProducer ref =>
+      let might_be_route = cfp.route_to(_target)
+      match might_be_route
+      | let r: Route =>
+        try
+          let forward_msg = ChannelMsgEncoder.data_channel[D](
+            _target_proxy_address.step_id,
+            _worker_name, source_ts, data, metric_name, _auth,
+            _target_proxy_address, 
+            outgoing_envelope.msg_uid,
+            outgoing_envelope.frac_ids,
+            outgoing_envelope.seq_id)
+
+          r.forward(metric_name, source_ts, forward_msg,
+            outgoing_envelope.msg_uid,
+            outgoing_envelope.frac_ids,
+            _target_proxy_address)
+          false
+        else
+          @printf[I32]("Failed to build forward message\n".cstring())
+          true
+        end
+      else
+        // TODO: What do we do if we get None?
+        true
+      end
+    else
+      true
+    end
+
+  fun routes(): Array[CreditFlowConsumerStep] val =>
+    recover val [_target] end
+
 class DataRouter
   let _data_routes: Map[U128, Step tag] val
 
