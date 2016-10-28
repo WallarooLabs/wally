@@ -33,10 +33,14 @@ trait Origin
   Process a high watermark received from a downstream step.
   TODO: receive watermark, flush buffers and send another watermark
   """
-  // translate downstream seq_id to origin's seq_id
-  let origin_seq_id = _translate_get().outToIn(seq_id)
-  // update low watermark for this route_id
-  _lwm_get().update(route_id, seq_id)
+  try
+    // translate downstream seq_id to origin's seq_id
+    let origin_seq_id = _translate_get().outToIn(seq_id)
+    // update low watermark for this route_id
+    _lwm_get().update(route_id, origin_seq_id)
+  else
+    @printf[I32]("Error finding value in TranslationTable\n".cstring())
+  end
   // report low watermark to all upstream origins
   for origin in _origins_get().values() do
     //   origin.update_watermark(_lwm.low_watermark())
@@ -160,6 +164,10 @@ class TranslationTable
   vice versa.
   Create a new entry every time we send a message downstream.
   Remove old entries every time we receive a new low watermark.
+
+  TODO: Extend this to support splits.
+        _inToOut: Map[U64, Set[U64]]
+        _outToIn: Map[U64, U64]
   """
   let _inToOut: Map[U64, U64]
   let _outToIn: Map[U64, U64]
@@ -178,7 +186,7 @@ class TranslationTable
       @printf[I32]("Error inserting into translation tables\n".cstring())      
     end
 
-  fun outToIn(out_seq_id: U64): U64
+  fun outToIn(out_seq_id: U64): U64 ?
   =>
     """
     Return the incoming seq_id for a given outgoing seq_id.
@@ -186,11 +194,11 @@ class TranslationTable
     try
       _outToIn(out_seq_id)
     else
-      @printf[I32]("Error in outToIn\n".cstring())
-      0
+      @printf[I32]("Error in outToIn: %ld\n".cstring(), out_seq_id)
+      error
     end
 
-  fun inToOut(in_seq_id: U64): U64
+  fun inToOut(in_seq_id: U64): U64 ?
   =>
     """
     Return the outgoing seq_id for a given incoming seq_id.
@@ -198,8 +206,8 @@ class TranslationTable
     try
       _inToOut(in_seq_id)
     else
-      @printf[I32]("Error in inToOut\n".cstring())
-      0
+      @printf[I32]("Error in inToOut: %ld\n".cstring(), in_seq_id)
+      error
     end
 
   fun ref remove(out_seq_id: U64)
