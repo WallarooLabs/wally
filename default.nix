@@ -4,8 +4,8 @@ let
             ( _nixpkgs.fetchFromGitHub
               { owner = "Sendence";
                 repo = "nixpkgs";
-                rev = "ece059b8cde8ee7c01973a68ca566393cf90651f";
-                sha256 = "0wrdvzlhhiga1wg5xxx0jcv1zwl9c9dzqmcsvdqn6i495ivkhfg6";
+                rev = "a42d05c50c09817f838d8630b35bb611962d6f7d";
+                sha256 = "13n58ynrk24x9hdwwwmn0qk3qidlhrp8ch5r7q2lpd3zzd42fhza";
               }
             ) { });
 in
@@ -36,7 +36,7 @@ in
   with pkgs;
   with beamPackages;
 
-  let ponyc-lto = ponyc.override { lto = true; };
+  let ponyc-lto = ponyc.override { lto = true; llvm = llvm_38; };
       sendence-ponyc = stdenv.lib.overrideDerivation ponyc-lto (oldAttrs: rec {
       name = "sendence-ponyc-${version}";
       version = "sendence-13.4.1";
@@ -107,24 +107,35 @@ in
 
       installPhase = ''
         mkdir -p $out/bin
-        ln -s /usr/local/bin/docker $out/bin/docker
-        ln -s /sbin/ifconfig $out/bin/ifconfig
-        ln -s /usr/bin/getconf $out/bin/getconf
-        ln -s /usr/local/bin/VBoxManage $out/bin/VBoxManage
 
-        myDockerVersion=$($out/bin/docker --version | head -n 1 | sed -e 's/Docker version //' | sed -e 's/, build.*//')
+        if [ -e /usr/local/bin/docker ]; then
+          ln -s /usr/local/bin/docker $out/bin/docker
+          myDockerVersion=$($out/bin/docker --version | head -n 1 | sed -e 's/Docker version //' | sed -e 's/, build.*//')
 
-#        if [ "$dockerVersion" != "$myDockerVersion" ]; then
-#          echo "docker version ($myDockerVersion) not correct. Please install $dockerVersion!"
-#          exit 1
-#        fi
+#          if [ "$dockerVersion" != "$myDockerVersion" ]; then
+#            echo "docker version ($myDockerVersion) not correct. Please install $dockerVersion!"
+#            exit 1
+#          fi
+        fi
 
-        myVboxVersion="$($out/bin/VBoxManage --version)"
+        if [ -e /sbin/ifconfig ]; then
+          ln -s /sbin/ifconfig $out/bin/ifconfig
+        fi
 
-#        if [ "$vboxVersion" != "$myVboxVersion" ]; then
-#          echo "VirtualBox version ($myVboxVersion) not correct. Please install $vboxVersion!"
-#          exit 1
-#        fi
+        if [ -e /usr/bin/getconf ]; then
+          ln -s /usr/bin/getconf $out/bin/getconf
+        fi
+
+        if [ -e /usr/local/bin/VBoxManage ]; then
+          ln -s /usr/local/bin/VBoxManage $out/bin/VBoxManage
+          myVboxVersion="$($out/bin/VBoxManage --version)"
+
+#          if [ "$vboxVersion" != "$myVboxVersion" ]; then
+#            echo "VirtualBox version ($myVboxVersion) not correct. Please install $vboxVersion!"
+#            exit 1
+#          fi
+        fi
+
       '';
 
     };
