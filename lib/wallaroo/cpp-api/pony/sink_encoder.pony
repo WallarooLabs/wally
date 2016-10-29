@@ -1,6 +1,5 @@
 use "buffered"
 use "wallaroo/messages"
-// use "wallaroo/topology"
 
 use @w_sink_encoder_get_size[USize](sink_encoder: SinkEncoderP,
   data: DataP tag)
@@ -23,7 +22,7 @@ class CPPSinkEncoder is SinkEncoder[CPPData val]
         let bytes = Array[U8].undefined(size)
         if size > 0 then
           @w_sink_encoder_encode(_sink_encoder.obj(), data.obj(),
-            bytes.cstring(), size)
+            bytes.cpointer(), size)
         end
         bytes
       end]

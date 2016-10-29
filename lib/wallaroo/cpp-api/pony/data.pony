@@ -6,7 +6,7 @@ type DataP is ManagedObjectP
 
 primitive CPPDataDeserialize
   fun apply(bytes: Array[U8] val): CPPData =>
-    CPPData(CPPManagedObject(@w_data_deserialize(bytes.cstring(), bytes.size())))
+    CPPData(CPPManagedObject(@w_data_deserialize(bytes.cpointer(), bytes.size())))
 
 class CPPData
   let _data: CPPManagedObject
@@ -18,7 +18,7 @@ class CPPData
     let size = @w_data_serialize_get_size(obj())
     let bytes = recover val
       let b = Array[U8].undefined(size)
-      @w_data_serialize(obj(), b.cstring(), size)
+      @w_data_serialize(obj(), b.cpointer(), size)
       b
     end
     bytes
