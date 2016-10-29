@@ -35,6 +35,8 @@ interface RunnerBuilder
   fun name(): String
   fun is_stateful(): Bool
   fun id(): U128
+  fun route_builder(): RouteBuilder val
+  fun forward_route_builder(): RouteBuilder val
 
 trait ReplayableRunner
   // TODO: Remove Origin None option once we fix identifying origin Proxy when
@@ -43,24 +45,23 @@ trait ReplayableRunner
     origin: (Origin tag | None))
   fun ref replay_finished()
 
-
-primitive RouterRunnerBuilder
-  fun apply(metrics_reporter: MetricsReporter iso, 
-    alfred: Alfred tag,
-    next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None): Runner iso^
-  => 
-    RouterRunner
-
-  fun name(): String => "router"
-  fun is_stateful(): Bool => false
-  fun id(): U128 => 0
-
 class RunnerSequenceBuilder
   let _runner_builders: Array[RunnerBuilder val] val
+  let _id: U128
+  var _forward_route_builder: RouteBuilder val = EmptyRouteBuilder
 
   new val create(bs: Array[RunnerBuilder val] val) =>
     _runner_builders = bs
+    _id = 
+      try
+        bs(0).id()
+      else
+        GuidGenerator.u128()
+      end
+    try
+      _forward_route_builder = 
+        _runner_builders(_runner_builders.size() - 1).forward_route_builder()
+    end
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -93,17 +94,26 @@ class RunnerSequenceBuilder
     n + "|"
 
   fun is_stateful(): Bool => false
-  fun id(): U128 => 0
+  fun id(): U128 => _id
+  fun route_builder(): RouteBuilder val => 
+    try
+      _runner_builders(_runner_builders.size() - 1).route_builder()
+    else
+      EmptyRouteBuilder
+    end
+  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
 
 class ComputationRunnerBuilder[In: Any val, Out: Any val]
   let _comp_builder: ComputationBuilder[In, Out] val
   let _id: U128
+  let _route_builder: RouteBuilder val
 
   new val create(comp_builder: ComputationBuilder[In, Out] val,
-    id': U128 = 0) 
+    route_builder': RouteBuilder val, id': U128 = 0) 
   =>
     _comp_builder = comp_builder
-    _id = id'
+    _route_builder = route_builder'
+    _id = if id' == 0 then GuidGenerator.u128() else id' end
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -122,13 +132,23 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
   fun name(): String => _comp_builder().name()
   fun is_stateful(): Bool => false
   fun id(): U128 => _id
+  fun route_builder(): RouteBuilder val => _route_builder
+  fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
 class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
   let _state_comp: StateComputation[In, Out, State] val
+  let _route_builder: RouteBuilder val
+  let _forward_route_builder: RouteBuilder val
+  let _id: U128
 
-  new val create(state_comp: StateComputation[In, Out, State] val) 
+  new val create(state_comp: StateComputation[In, Out, State] val,
+    route_builder': RouteBuilder val, 
+    forward_route_builder': RouteBuilder val) 
   =>
     _state_comp = state_comp
+    _route_builder = route_builder'
+    _id = GuidGenerator.u128()
+    _forward_route_builder = forward_route_builder'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -146,18 +166,24 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
 
   fun name(): String => _state_comp.name()
   fun is_stateful(): Bool => true
-  fun id(): U128 => 0
+  fun id(): U128 => _id
+  fun route_builder(): RouteBuilder val => _route_builder
+  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
 
 class StateRunnerBuilder[State: Any #read]
   let _state_builder: StateBuilder[State] val
   let _name: String
   let _state_change_builders: Array[StateChangeBuilder[State] val] val
+  let _id: U128
 
   new val create(state_builder: StateBuilder[State] val, 
-    name': String, state_change_builders: Array[StateChangeBuilder[State] val] val) =>
+    name': String, 
+    state_change_builders: Array[StateChangeBuilder[State] val] val) 
+  =>
     _state_builder = state_builder
     _name = name'
     _state_change_builders = state_change_builders
+    _id = GuidGenerator.u128()
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -172,7 +198,9 @@ class StateRunnerBuilder[State: Any #read]
 
   fun name(): String => _state_builder.name()
   fun is_stateful(): Bool => true
-  fun id(): U128 => 0
+  fun id(): U128 => _id
+  fun route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
 trait PartitionBuilder
   fun pre_state_subpartition(worker: String): PreStateSubpartition val
@@ -186,16 +214,24 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   let _state_comp: StateComputation[In, Out, State] val
   let _step_id_map: Map[Key, U128] val
   let _partition: Partition[PIn, Key] val
+  let _route_builder: RouteBuilder val
+  let _forward_route_builder: RouteBuilder val
+  let _id: U128
 
   new val create(pipeline_name: String, state_name': String,
     state_comp: StateComputation[In, Out, State] val,
-    step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val) 
+    step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val,
+    route_builder': RouteBuilder val, 
+    forward_route_builder': RouteBuilder val, id': U128 = 0) 
   =>
+    _id = if id' == 0 then GuidGenerator.u128() else id' end
     _state_name = state_name'
     _pipeline_name = pipeline_name
     _state_comp = state_comp
     _step_id_map = step_id_map'
     _partition = partition'
+    _route_builder = route_builder'
+    _forward_route_builder = forward_route_builder'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -214,8 +250,10 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   fun name(): String => _state_comp.name()
   fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
-  fun id(): U128 => 0
+  fun id(): U128 => _id
   fun step_id_map(): Map[Key, U128] val => _step_id_map
+  fun route_builder(): RouteBuilder val => _route_builder
+  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
   
   fun pre_state_subpartition(worker: String): PreStateSubpartition val =>
     KeyedPreStateSubpartition[PIn, Key](partition_addresses(worker),
@@ -290,7 +328,6 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
-    // @printf[I32]("prestate runner received!\n".cstring())
     let computation_start = Time.nanos()
     let is_finished = 
       match data
@@ -451,13 +488,11 @@ class Proxy is Runner
         // the thing normally responsible for creating the outgoing 
         // envelope arguments
         let forward_msg = ChannelMsgEncoder.data_channel[In](_target_step_id, 
-          0, _worker_name, source_ts, input, metric_name, _auth,
+          _worker_name, source_ts, input, metric_name, _auth,
           return_proxy_address,
           outgoing_envelope.msg_uid,
           outgoing_envelope.frac_ids,
-          outgoing_envelope.seq_id,
-          // TODO: Generate correct route id 
-          0)
+          outgoing_envelope.seq_id)
         r.route[Array[ByteSeq] val](metric_name, source_ts, forward_msg, 
           incoming_envelope, outgoing_envelope, producer)
         false

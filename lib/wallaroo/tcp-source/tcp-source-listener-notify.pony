@@ -33,6 +33,7 @@ class _SourceBuilder[In: Any val]
       consume reporter, alfred)
 
 interface SourceBuilderBuilder
+  fun name(): String
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
     metrics_conn: TCPConnection): SourceBuilder val 
 
@@ -43,6 +44,8 @@ class TypedSourceBuilderBuilder[In: Any val]
   new val create(name': String, handler: FramedSourceHandler[In] val) =>
     _name = name'
     _handler = handler
+
+  fun name(): String => _name
 
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
     metrics_conn: TCPConnection): SourceBuilder val 
@@ -78,6 +81,9 @@ class SourceListenerNotify is TCPSourceListenerNotify
   new iso create(builder: SourceBuilder val, alfred: Alfred tag) =>
     _source_builder = builder
     _alfred = alfred
+
+  fun ref listening(listen: TCPSourceListener ref) =>
+    @printf[I32]((_source_builder.name() + " source is listening\n").cstring())
 
   fun ref listening(listen: TCPSourceListener ref) =>
     @printf[I32]((_source_builder.name() + " source is listening\n").cstring())

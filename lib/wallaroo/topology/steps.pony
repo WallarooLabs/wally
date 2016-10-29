@@ -25,9 +25,12 @@ trait tag RunnableStep
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
 
-type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer)
+interface Initializable
+  be initialize()
 
-actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
+type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer & Initializable tag)
+
+actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Initializable)
   """
   # Step
 
@@ -40,10 +43,12 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   let _translate: TranslationTable = TranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
   var _router: Router val
+  let _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
-  var _seq_id: U64
+  var _outgoing_seq_id: U64
   let _incoming_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
+  var _initialized: Bool = false
 
   // Credit Flow Producer
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
@@ -54,7 +59,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   var _distributable_credits: ISize = _max_distributable_credits
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
-    router: Router val = EmptyRouter)
+    route_builder: RouteBuilder val, router: Router val = EmptyRouter)
   =>
     _runner = consume runner
     match _runner
@@ -62,37 +67,48 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
       elb.set_buffer_target(this)
     end
     _metrics_reporter = consume metrics_reporter
-    _seq_id = 0
+    _outgoing_seq_id = 0
     _router = router
+    _route_builder = route_builder
 
-    ifdef "use_backpressure" then
-      for consumer in _router.routes().values() do
-        _routes(consumer) =
-          Route(this, consumer, StepRouteCallbackHandler)
-      end
+  be initialize() =>
+    for consumer in _router.routes().values() do
+      _routes(consumer) =
+        _route_builder(this, consumer, StepRouteCallbackHandler)
+    end
 
-      // TODO: CREDITFLOW - this should be in a post create initialize
-      for r in _routes.values() do
-        r.initialize()
+    for r in _routes.values() do
+      r.initialize()
+    end
+
+    _initialized = true
+
+  be register_routes(router: Router val, route_builder: RouteBuilder val) =>
+    for consumer in router.routes().values() do
+      let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
+      _routes(consumer) = next_route
+      if _initialized then
+        next_route.initialize()
       end
     end
 
+  // TODO: This needs to dispose of the old routes and replace with new routes
   be update_router(router: Router val) => _router = router
 
   // TODO: Fix the Origin None once we know how to look up Proxy
   // for messages crossing boundary
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
-    _seq_id = _seq_id + 1
-    _incoming_envelope.update(origin, msg_uid, frac_ids, seq_id, route_id)
-    _outgoing_envelope.update(this, msg_uid, frac_ids, _seq_id)
+    _outgoing_seq_id = _outgoing_seq_id + 1
+    _incoming_envelope.update(origin, msg_uid, frac_ids, incoming_seq_id, route_id)
+    _outgoing_envelope.update(this, msg_uid, frac_ids, _outgoing_seq_id)
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       _incoming_envelope, _outgoing_envelope, this, _router)
     if is_finished then
       ifdef "resilience" then
-        _bookkeeping(_incoming_envelope, _seq_id)
+        _bookkeeping(_incoming_envelope, _outgoing_envelope)
         // if Sink then _send_watermark()
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
@@ -105,17 +121,17 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
   // for messages crossing boundary
   be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
-    _seq_id = _seq_id + 1
-    _incoming_envelope.update(origin, msg_uid, frac_ids, seq_id, route_id)
-    _outgoing_envelope.update(this, msg_uid, frac_ids, _seq_id)
+    _outgoing_seq_id = _outgoing_seq_id + 1
+    _incoming_envelope.update(origin, msg_uid, frac_ids, incoming_seq_id, route_id)
+    _outgoing_envelope.update(this, msg_uid, frac_ids, _outgoing_seq_id)
     // TODO: Reconsider how recovery_run works.  Used to call recovery_run()
     // on runner, but now runners don't implement that method.
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       _incoming_envelope, _outgoing_envelope, this, _router)
     if is_finished then
-      _bookkeeping(_incoming_envelope, _seq_id)
+      _bookkeeping(_incoming_envelope, _outgoing_envelope)
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
 
@@ -282,7 +298,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer)
 // TODO: If this sticks around after boundary work, it will have to become
 // an ResilientOrigin to compile, but that seems weird so we need to
 // rethink it
-actor PartitionProxy is CreditFlowProducer
+actor PartitionProxy is (CreditFlowProducer & Initializable)
   let _worker_name: String
   var _router: (Router val | None) = None
   let _metrics_reporter: MetricsReporter
@@ -298,6 +314,8 @@ actor PartitionProxy is CreditFlowProducer
     _worker_name = worker_name
     _metrics_reporter = consume metrics_reporter
     _auth = auth
+
+  be initialize() => None
 
   be update_router(router: Router val) =>
     _router = router
@@ -327,10 +345,8 @@ actor PartitionProxy is CreditFlowProducer
         // the thing normally responsible for creating the outgoing
         // envelope arguments
         let forward_msg = ChannelMsgEncoder.data_channel[D](target_step_id,
-          0, _worker_name, source_ts, data, metric_name, _auth,
-          return_proxy_address, msg_uid, frac_ids, seq_id,
-          // TODO: Generate correct route id
-          0)
+          _worker_name, source_ts, data, metric_name, _auth,
+          return_proxy_address, msg_uid, frac_ids, seq_id)
 
         match _router
         | let r: Router val =>
@@ -359,68 +375,6 @@ actor PartitionProxy is CreditFlowProducer
     //   sender.dispose()
     end
 
-type StepInitializer is (StepBuilder | PartitionedPreStateStepBuilder)
-
-class StepBuilder
-  let _runner_builder: RunnerBuilder val
-  let _id: U128
-  let _is_stateful: Bool
-
-  new val create(r: RunnerBuilder val, id': U128,
-    is_stateful': Bool = false)
-  =>
-    _runner_builder = r
-    _id = id'
-    _is_stateful = is_stateful'
-
-  fun name(): String => _runner_builder.name()
-  fun id(): U128 => _id
-  fun is_stateful(): Bool => _is_stateful
-  fun is_partitioned(): Bool => false
-
-  fun apply(next: Router val, metrics_conn: TCPConnection,
-    pipeline_name: String, alfred: Alfred, router: Router val = EmptyRouter):
-      Step tag
-  =>
-    let runner = _runner_builder(MetricsReporter(pipeline_name,
-      metrics_conn) where alfred = alfred, router = router)
-    let step = Step(consume runner,
-      MetricsReporter(pipeline_name, metrics_conn), router)
-    step.update_router(next)
-    step
-
-class PartitionedPreStateStepBuilder
-  let _pre_state_subpartition: PreStateSubpartition val
-  let _runner_builder: RunnerBuilder val
-  let _state_name: String
-
-  new val create(sub: PreStateSubpartition val, r: RunnerBuilder val,
-    state_name': String)
-  =>
-    _pre_state_subpartition = sub
-    _runner_builder = r
-    _state_name = state_name'
-
-  fun name(): String => _runner_builder.name() + " partition"
-  fun state_name(): String => _state_name
-  fun id(): U128 => 0
-  fun is_stateful(): Bool => true
-  fun is_partitioned(): Bool => true
-  fun apply(next: Router val, metrics_conn: TCPConnection,
-    pipeline_name: String, alfred: Alfred, router: Router val = EmptyRouter):
-      Step tag
-  =>
-    Step(RouterRunner, MetricsReporter(pipeline_name, metrics_conn))
-
-  fun build_partition(worker_name: String, state_addresses: StateAddresses val,
-    metrics_conn: TCPConnection, auth: AmbientAuth, connections: Connections,
-    alfred: Alfred, state_comp_router: Router val = EmptyRouter):
-      PartitionRouter val
-  =>
-    _pre_state_subpartition.build(worker_name, _runner_builder,
-      state_addresses, metrics_conn, auth, connections, alfred,
-      state_comp_router)
-
 primitive StepRouteCallbackHandler is RouteCallbackHandler
   fun shutdown(producer: CreditFlowProducer ref) =>
     // TODO: CREDITFLOW - What is our error handling?
@@ -431,4 +385,3 @@ primitive StepRouteCallbackHandler is RouteCallbackHandler
 
   fun credits_exhausted(producer: CreditFlowProducer ref) =>
     None
-

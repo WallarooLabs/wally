@@ -34,6 +34,8 @@ actor Main
             => Conjugate end)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Scale(5) end)
+          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
+            => Scale(10) end)
           .to_stateful[Complex val, Counter](UpdateCounter,
             CounterBuilder, "counter-builder")
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
@@ -90,7 +92,7 @@ class Scale is Computation[Complex val, Complex val]
     _name = "Scale by " + _scalar.string()
 
   fun apply(input: Complex val): Complex val =>
-    @printf[I32]("Scale\n".cstring())
+    @printf[I32]((_name + "\n").cstring())
     input * _scalar
 
   fun name(): String => _name
@@ -139,6 +141,7 @@ primitive UpdateCounter
   fun apply(c: Complex val, sc_repo: StateChangeRepository[Counter], 
     state: Counter): (Complex val, None) 
   =>
+    @printf[I32]("UpdateCounter\n".cstring())
     (state(c), None)
 
   fun state_change_builders(): Array[StateChangeBuilder[Counter] val] val =>

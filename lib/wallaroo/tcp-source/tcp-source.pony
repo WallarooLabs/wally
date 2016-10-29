@@ -10,7 +10,7 @@ use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is CreditFlowProducer
+actor TCPSource is (CreditFlowProducer & Initializable)
   """
   # TCPSource
 
@@ -37,10 +37,11 @@ actor TCPSource is CreditFlowProducer
   var _read_len: USize = 0
   var _shutdown: Bool = false
 
-  var _muted: Bool
+  var _muted: Bool = false
 
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
+    routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
     fd: U32, init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -56,26 +57,18 @@ actor TCPSource is CreditFlowProducer
     _next_size = init_size
     _max_size = max_size
 
-    _muted =
-      ifdef "use_backpressure" then
-        true
-      else
-        false
-      end
-
     _notify.accepted(this)
 
-    ifdef "use_backpressure" then
-      for consumer in _notify.routes().values() do
-        _routes(consumer) =
-          Route(this, consumer, TCPSourceRouteCallbackHandler)
-      end
-
-      // TODO: CREDITFLOW - this should be in a post create initialize
-      for r in _routes.values() do
-        r.initialize()
-      end
+    for consumer in routes.values() do
+      _routes(consumer) =
+        route_builder(this, consumer, TCPSourceRouteCallbackHandler)
     end
+
+    for r in _routes.values() do
+      r.initialize()
+    end
+
+  be initialize() => None
 
   be dispose() =>
      """

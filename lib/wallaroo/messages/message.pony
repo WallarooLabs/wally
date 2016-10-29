@@ -10,21 +10,23 @@ trait Origin
   fun ref _translate_get(): TranslationTable
   fun ref _origins_get(): OriginSet
     
-  fun ref _bookkeeping(incoming_envelope: MsgEnvelope box, seq_id: U64)
+  fun ref _bookkeeping(incoming_envelope: MsgEnvelope box,
+    outgoing_envelope: MsgEnvelope box)
   =>
     """
     Process envelopes and keep track of things
     """
-    // keep track of messages we've received from upstream
-    _hwm_get().update((incoming_envelope.origin, incoming_envelope.route_id),
-      incoming_envelope.seq_id)
-    // keep track of mapping between incoming / outgoing seq_id
-    _translate_get().update(incoming_envelope.seq_id, seq_id)
-    // keep track of origins
-    // TODO: Figure out how to get this to work with our temporary None
-    // value possibility
-    // _origins_get().set(incoming_envelope.origin)
-
+    match incoming_envelope.origin
+    | let origin: Origin tag =>
+      // keep track of messages we've sent downstream
+      _hwm_get().update((origin, outgoing_envelope.route_id),
+        outgoing_envelope.seq_id)
+      // keep track of mapping between incoming / outgoing seq_id
+      _translate_get().update(outgoing_envelope.seq_id, incoming_envelope.seq_id)
+      // keep track of origins
+      _origins_get().set(origin)
+    end
+    
   fun ref _update_watermark(route_id: U64, seq_id: U64)
   =>
   """
@@ -79,7 +81,8 @@ class MsgEnvelope
     else
       recover val MsgEnvelope(origin, msg_uid, frac_ids, seq_id, route_id) end
     end
-    
+
+
 primitive HashTuple
   fun hash(t: (U64, U64)): U64 =>
     cantorPair(t)
@@ -91,25 +94,20 @@ primitive HashTuple
     (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
 
     
-// TODO: Get rid of None once we fix handling Proxy lookup when sending
-// across boundaries (to identify origin)
-type OriginRoutePair is ((Origin tag | None), U64)
+type OriginRoutePair is (Origin tag, U64)
 
 
-// TODO: Get this to work
 primitive HashOriginRoute
   fun hash(t: OriginRoutePair): U64
   =>
-    // cantorPair((t._1.hash(), t._2.hash()))
-    0 // TODO: delete this line
+    cantorPair((t._1.hash(), t._2.hash()))
 
   fun eq(t1: OriginRoutePair, t2: OriginRoutePair): Bool
   =>
-    false // TODO: delete this line
-    // hash(t1) == hash(t2)
+    hash(t1) == hash(t2)
 
-  // fun cantorPair(t: (U64, U64)): U64 =>
-    // (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
+  fun cantorPair(t: (U64, U64)): U64 =>
+    (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
     
 
 class HighWatermarkTable

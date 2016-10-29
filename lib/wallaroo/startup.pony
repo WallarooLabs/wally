@@ -112,10 +112,11 @@ actor Startup
         end
 
       let connections = Connections(worker_name, env, auth, c_host, c_service, 
-        d_host, d_service, ph_host, ph_service, is_initializer)
+        d_host, d_service, ph_host, ph_service, metrics_conn, is_initializer)
 
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
-        env, auth, connections, metrics_conn, is_initializer, alfred)
+        worker_count, env, auth, connections, metrics_conn, is_initializer, 
+        alfred)
 
       if is_initializer then
         env.out.print("Running as Initializer...")
@@ -123,7 +124,8 @@ actor Startup
           local_topology_initializer, input_addrs, o_addr, alfred)
 
         worker_initializer = WorkerInitializer(auth, worker_count, connections,
-          application_initializer, d_addr, metrics_conn)
+          application_initializer, local_topology_initializer, d_addr, 
+          metrics_conn)
         worker_name = "initializer"
       end
 
