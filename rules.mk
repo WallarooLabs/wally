@@ -541,6 +541,26 @@ print-%:
 	$(QUIET)echo '  flavor = $(flavor $*)'
 	$(QUIET)echo '   value = $(value  $*)'
 
+setup-nix: ## set up nix environment
+	$(QUIET)$(if $(wildcard ~/.nix-profile/bin/nix-shell),,$(abs_buffy_dir)/scratch/misc/install-nix)
+	$(QUIET). ~/.nix-profile/etc/profile.d/nix.sh \
+          && nix-shell --option extra-binary-caches \
+             https://s3.amazonaws.com/sendence-dev/nix-cache/ \
+             --command "echo 'Success!'"
+	$(QUIET)echo ''
+	$(QUIET)echo ''
+	$(QUIET)echo 'Nix successfully setup!'
+	$(QUIET)echo ''
+	$(QUIET)echo 'Please log out and log back into your shell to set up nix environment variables.'
+	$(QUIET)echo 'Or run: ". ~/.nix-profile/etc/profile.d/nix.sh"'
+	$(QUIET)echo ''
+	$(QUIET)echo 'You can start an interactive nix shell (similar to virtualenv) by running the'
+	$(QUIET)echo 'following from the buffy root directory:'
+	$(QUIET)echo '  nix-shell'
+	$(QUIET)echo ''
+	$(QUIET)echo 'For an environment with only commnds installed via nix run:'
+	$(QUIET)echo '  nix-shell --pure'
+	$(QUIET)echo ''
 
 dagon-test: ## Run dagon tests
 
