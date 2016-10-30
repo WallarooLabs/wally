@@ -39,20 +39,27 @@ namespace wallaroo
 {
 
 
-RawBuffer::RawBuffer () : Buffer()
+BufferReader::BufferReader () : Buffer()
 {
 }
 
 
 //------------------------------------------------
-RawBuffer::RawBuffer (char* str_, int sz_) : Buffer(str_,sz_)
+BufferReader::BufferReader (char* str_, int sz_) : Buffer()
 {
+  _body = str_;
+  _bodySize = sz_;
+
+
+  _read = _body;
+  _write = _body + sz_;
+
 }
 
 
 
 
-RawBuffer::RawBuffer (const RawBuffer& rhs_) : Buffer(rhs_)
+BufferReader::BufferReader (const BufferReader& rhs_) : Buffer()
 {
   Logger::getLogger()->error("RawBuffer (const RawBuffer &cpy_) --> not defined yet");
 }
@@ -62,7 +69,7 @@ RawBuffer::RawBuffer (const RawBuffer& rhs_) : Buffer(rhs_)
 
 
 //------------------------------------------------
-RawBuffer::~RawBuffer ()
+BufferReader::~BufferReader ()
 {
   _body = nullptr;
   _read = nullptr;
@@ -70,5 +77,122 @@ RawBuffer::~RawBuffer ()
   _bodySize = 0;
 }
 
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (bool& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (char& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (unsigned short& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (short& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (unsigned int& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (int& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (unsigned long& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (long& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (double& param_)
+{
+  readData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (string& param_)
+{
+  short sz;
+  readData(&sz, sizeof(short));
+
+  char* newStrData = new char[sz + 1];
+  newStrData[sz] = '\0';
+  readData(newStrData, sz);
+
+  param_.assign(newStrData, sz);
+  delete[] newStrData;
+  return *this;
+}
 
 }

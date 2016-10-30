@@ -42,34 +42,9 @@ protected:
 
 protected:
     Buffer ();
-    Buffer (char* body_, int bodySz_);
 
 public:
     virtual ~Buffer () = 0;
-
-
-public:
-    virtual Buffer& operator<< (const bool param_);
-    virtual Buffer& operator<< (const char param_);
-    virtual Buffer& operator<< (const unsigned short param_);
-    virtual Buffer& operator<< (const short param_);
-    virtual Buffer& operator<< (const unsigned int param_);
-    virtual Buffer& operator<< (const int param_);
-    virtual Buffer& operator<< (const unsigned long param_);
-    virtual Buffer& operator<< (const long param_);
-    virtual Buffer& operator<< (const double param_);
-    virtual Buffer& operator<< (const string& str_);
-
-    virtual Buffer& operator>> (bool& param_);
-    virtual Buffer& operator>> (char& param_);
-    virtual Buffer& operator>> (unsigned short& param_);
-    virtual Buffer& operator>> (short& param_);
-    virtual Buffer& operator>> (unsigned int& param_);
-    virtual Buffer& operator>> (int& param_);
-    virtual Buffer& operator>> (unsigned long& param_);
-    virtual Buffer& operator>> (long& param_);
-    virtual Buffer& operator>> (double& param_);
-    virtual Buffer& operator>> (string& param_);
 };
 
 
@@ -78,13 +53,16 @@ public:
 //--------------------------------------------------------------------
 //
 //--------------------------------------------------------------------
-class ManagedBuffer : public Buffer
+class BufferWriter : public Buffer
 {
+private:
+    bool _internallyAllocatedBuffer;
+
 public:
-    ManagedBuffer (int sz_);
-    ManagedBuffer (char* buff_, int sz_);
-    ManagedBuffer (const ManagedBuffer& buff_);
-    virtual ~ManagedBuffer ();
+    BufferWriter (int sz_);
+    BufferWriter (char* buff_, int sz_);
+    BufferWriter (const BufferWriter& buff_);
+    virtual ~BufferWriter ();
 
 public:
     char* extractPointer ()
@@ -97,6 +75,18 @@ public:
       return holder;
     }
 
+
+public:
+    virtual BufferWriter& operator<< (const bool param_);
+    virtual BufferWriter& operator<< (const char param_);
+    virtual BufferWriter& operator<< (const unsigned short param_);
+    virtual BufferWriter& operator<< (const short param_);
+    virtual BufferWriter& operator<< (const unsigned int param_);
+    virtual BufferWriter& operator<< (const int param_);
+    virtual BufferWriter& operator<< (const unsigned long param_);
+    virtual BufferWriter& operator<< (const long param_);
+    virtual BufferWriter& operator<< (const double param_);
+    virtual BufferWriter& operator<< (const string& str_);
 };
 
 
@@ -106,13 +96,25 @@ public:
 //--------------------------------------------------------------------
 //
 //--------------------------------------------------------------------
-class RawBuffer : public Buffer
+class BufferReader : public Buffer
 {
 public:
-    RawBuffer();
-    RawBuffer (char* str_, int sz_);
-    RawBuffer (const RawBuffer& rhs_);
-    virtual ~RawBuffer ();
+    BufferReader();
+    BufferReader (char* str_, int sz_);
+    BufferReader (const BufferReader& rhs_);
+    virtual ~BufferReader ();
+
+public:
+    virtual BufferReader& operator>> (bool& param_);
+    virtual BufferReader& operator>> (char& param_);
+    virtual BufferReader& operator>> (unsigned short& param_);
+    virtual BufferReader& operator>> (short& param_);
+    virtual BufferReader& operator>> (unsigned int& param_);
+    virtual BufferReader& operator>> (int& param_);
+    virtual BufferReader& operator>> (unsigned long& param_);
+    virtual BufferReader& operator>> (long& param_);
+    virtual BufferReader& operator>> (double& param_);
+    virtual BufferReader& operator>> (string& param_);
 };
 }
 

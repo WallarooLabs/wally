@@ -35,7 +35,9 @@ namespace wallaroo
 
 
 
-ManagedBuffer::ManagedBuffer (int sz_) : Buffer()
+
+//------------------------------------------------
+BufferWriter::BufferWriter (int sz_) : Buffer(), _internallyAllocatedBuffer(true)
 {
   _bodySize = sz_;
   setBody(_bodySize);
@@ -44,24 +46,35 @@ ManagedBuffer::ManagedBuffer (int sz_) : Buffer()
 
 
 
-ManagedBuffer::ManagedBuffer (char* buff_, int sz_) : Buffer(buff_, sz_)
-{
 
+//------------------------------------------------
+BufferWriter::BufferWriter (char* buff_, int sz_) : Buffer(), _internallyAllocatedBuffer(false)
+{
+  _body = buff_;
+  _bodySize = sz_;
+
+  _read = _body + sz_;
+  _write = _body;// + sz_;
 }
 
 
 
-ManagedBuffer::ManagedBuffer (const ManagedBuffer& buff_)
+
+
+//------------------------------------------------
+BufferWriter::BufferWriter (const BufferWriter& buff_)
 {
-  Logger::getLogger()->error("ManagedBuffer (const ManagedBuffer& cpy_) --> not defined yet");
+  Logger::getLogger()->error("BufferWriter (const ManagedBuffer& cpy_) --> not defined yet");
 }
 
 
 
 
-ManagedBuffer::~ManagedBuffer ()
+
+//------------------------------------------------
+BufferWriter::~BufferWriter ()
 {
-  if (_body != nullptr)
+  if (_body != nullptr && _internallyAllocatedBuffer)
   {
     delete[] _body;
   }
@@ -72,5 +85,117 @@ ManagedBuffer::~ManagedBuffer ()
   _write = nullptr;
   _bodySize = 0;
 }
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<< (const bool param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<< (const char param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<< (const unsigned short param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<< (const short param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<< (const unsigned int param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<< (const int param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<< (const unsigned long param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<< (const long param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<< (const double param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<< (const string& str_)
+{
+  short sz = (short) str_.size();
+  writeData(&sz, sizeof(short));
+  writeData(str_.c_str(), sz);
+  return *this;
+}
+
 
 }
