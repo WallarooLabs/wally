@@ -28,21 +28,21 @@ class CPPComputation is Computation[CPPData val, CPPData val]
   fun name(): String =>
     _name
 
-class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState val]
-  let _computation: CPPManagedObject val
-  let _name: String
+// class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState val]
+//   let _computation: CPPManagedObject val
+//   let _name: String
 
-  new create(computation: CPPManagedObject val) =>
-    _computation = computation
-    _name = recover String.from_cstring(@w_state_computation_get_name(_computation.obj())) end
+//   new create(computation: CPPManagedObject val) =>
+//     _computation = computation
+//     _name = recover String.from_cstring(@w_state_computation_get_name(_computation.obj())) end
 
-  fun apply(input: CPPData val, state: CPPState val): (CPPData val | None) =>
-    match @w_state_computation_compute(_computation.obj(), input.obj(), state.obj())
-    | let result: DataP if (not result.is_null()) =>
-      recover CPPData(CPPManagedObject(result)) end
-    else
-      None
-    end
+//   fun apply(input: CPPData val, state: CPPState val): (CPPData val | None) =>
+//     match @w_state_computation_compute(_computation.obj(), input.obj(), state.obj())
+//     | let result: DataP if (not result.is_null()) =>
+//       recover CPPData(CPPManagedObject(result)) end
+//     else
+//       None
+//     end
 
-  fun name(): String =>
-    _name
+//   fun name(): String =>
+//     _name

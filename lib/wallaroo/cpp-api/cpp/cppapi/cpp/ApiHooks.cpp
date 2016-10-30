@@ -63,17 +63,30 @@ extern void w_data_serialize(wallaroo::Data* data_, char* bytes_, size_t sz_)
 }
 
 extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
-  wallaroo::Data *data_) {
+  wallaroo::Data *data_)
+{
   return sink_encoder->get_size(data_);
 }
 
 extern void w_sink_encoder_encode(wallaroo::SinkEncoder *sink_encoder,
-  wallaroo::Data *data_, char *bytes) {
+  wallaroo::Data *data_, char *bytes)
+{
   sink_encoder->encode(data_, bytes);
 }
 
+extern size_t w_source_decoder_header_length(wallaroo::SourceDecoder *source_decoder)
+{
+  return source_decoder->header_length();
+}
+
+extern size_t w_source_decoder_payload_length(wallaroo::SourceDecoder *source_decoder, char *bytes)
+{
+  return source_decoder->payload_length(bytes);
+}
+
 extern wallaroo::Data *w_source_decoder_decode(wallaroo::SourceDecoder *source_decoder,
-  char *bytes, size_t sz_) {
+  char *bytes, size_t sz_)
+{
   return source_decoder->decode(bytes, sz_);
 }
 
