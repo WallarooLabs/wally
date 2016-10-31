@@ -15,6 +15,10 @@ actor DataReceiver
   // let _timers: Timers = Timers
   // let _incoming_envelope: MsgEnvelope ref = MsgEnvelope(None, 0, None, 0, 0)
   // let _outgoing_envelope: MsgEnvelope ref = MsgEnvelope(None, 0, None, 0, 0)
+  // let _alfred: Alfred
+
+  //TODO: request upstream replays when instructed to from Alfred
+  //TODO: signal to Alfred an end of upstream replay
 
   new create(connections: Connections) =>
     _connections = connections

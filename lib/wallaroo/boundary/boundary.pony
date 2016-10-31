@@ -53,6 +53,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _shutdown: Bool = false
   let _queue: Queue[Array[ByteSeq] val] = _queue.create()
 
+  //RESILIENCE
+  //should become circular buffer
+  //let _replay_queue: Queue[Array[ByteSeq] val] = _replay_queue.create()
+
+  //TODO: deal with incoming replay request from downstream boundary
+
   new create(metrics_reporter: MetricsReporter iso, host: String, 
     service: String, from: String = "", init_size: USize = 64, 
     max_size: USize = 16384)
@@ -88,7 +94,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   =>
     // try
       // _queue.enqueue(data)
-
+    
+      //TODO: push to _replay_queue
       _writev(data)
     // end
 
