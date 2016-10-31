@@ -40,7 +40,8 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _runner: Runner
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _translate: TranslationTable = TranslationTable(10)
+  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
+  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
   var _router: Router val
   let _route_builder: RouteBuilder val
@@ -141,8 +142,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   fun ref _lwm_get(): LowWatermarkTable =>
     _lwm
 
-  fun ref _translate_get(): TranslationTable =>
-    _translate
+  fun ref _seq_translate_get(): SeqTranslationTable =>
+    _seq_translate
+
+  fun ref _route_translate_get(): RouteTranslationTable =>
+    _route_translate
 
   fun ref _origins_get(): OriginSet =>
     _origins

@@ -9,7 +9,7 @@ actor Main is TestList
     test(_TestOriginSet)
     test(_TestHashOriginRoute)
     test(_TestHighWatermarkTable)
-    test(_TestTranslationTable)
+    test(_TestSeqTranslationTable)
     test(_TestBookkeeping)
     test(_TestUpdateWatermark)
 
@@ -17,7 +17,8 @@ actor Main is TestList
 class _TestOrigin is Origin 
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _translate: TranslationTable = TranslationTable(10)
+  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
+  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
 
   fun ref _hwm_get(): HighWatermarkTable =>
@@ -26,8 +27,11 @@ class _TestOrigin is Origin
   fun ref _lwm_get(): LowWatermarkTable =>
     _lwm
     
-  fun ref _translate_get(): TranslationTable =>
-    _translate
+  fun ref _seq_translate_get(): SeqTranslationTable =>
+    _seq_translate
+
+  fun ref _route_translate_get(): RouteTranslationTable =>
+    _route_translate
   
   fun ref _origins_get(): OriginSet =>
     _origins
@@ -80,25 +84,25 @@ class iso _TestHighWatermarkTable is UnitTest
     end
 
     
-class iso _TestTranslationTable is UnitTest
+class iso _TestSeqTranslationTable is UnitTest
   fun name(): String =>
     "messages/TranslationTable"
 
   fun apply(h: TestHelper) =>
-    let translate: TranslationTable = TranslationTable(10)    
+    let seq_translate: SeqTranslationTable = SeqTranslationTable(10)    
     let origin: Origin = _TestOrigin
     let incoming_seq_id: U64 = U64(1)
     let outgoing_seq_id: U64 = U64(2)
 
-    translate.update(incoming_seq_id, outgoing_seq_id)
+    seq_translate.update(incoming_seq_id, outgoing_seq_id)
     try
-      let outToIn = translate.outToIn(outgoing_seq_id)
+      let outToIn = seq_translate.outToIn(outgoing_seq_id)
       h.assert_true(outToIn == incoming_seq_id)
     else
       h.fail("TranslationTable lookup failed!")
     end
     try
-      let inToOut = translate.inToOut(incoming_seq_id)
+      let inToOut = seq_translate.inToOut(incoming_seq_id)
       h.assert_true(inToOut == outgoing_seq_id)
     else
       h.fail("TranslationTable lookup failed!")
@@ -136,16 +140,16 @@ class iso _TestBookkeeping is UnitTest
     end
     // check TranslationTable
     try
-      let outToIn = origin_B._translate_get().outToIn(outgoing_seq_id)
+      let outToIn = origin_B._seq_translate_get().outToIn(outgoing_seq_id)
       h.assert_true(incoming_seq_id == outToIn)
     else
-      h.fail("TranslationTable.outToIn failed!")
+      h.fail("SeqTranslationTable.outToIn failed!")
     end
     try
-      let inToOut = origin_B._translate_get().inToOut(incoming_seq_id)
+      let inToOut = origin_B._seq_translate_get().inToOut(incoming_seq_id)
       h.assert_true(outgoing_seq_id == inToOut)
     else
-      h.fail("TranslationTable.inToOut failed!")
+      h.fail("SeqTranslationTable.inToOut failed!")
     end
 
 class iso _TestUpdateWatermark is UnitTest

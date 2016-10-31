@@ -7,7 +7,8 @@ trait Origin
 
   fun ref _hwm_get(): HighWatermarkTable
   fun ref _lwm_get(): LowWatermarkTable
-  fun ref _translate_get(): TranslationTable
+  fun ref _seq_translate_get(): SeqTranslationTable
+  fun ref _route_translate_get(): RouteTranslationTable
   fun ref _origins_get(): OriginSet
     
   fun ref _bookkeeping(incoming_envelope: MsgEnvelope box,
@@ -22,31 +23,46 @@ trait Origin
       _hwm_get().update((origin, outgoing_envelope.route_id),
         outgoing_envelope.seq_id)
       // keep track of mapping between incoming / outgoing seq_id
-      _translate_get().update(incoming_envelope.seq_id,
+      _seq_translate_get().update(incoming_envelope.seq_id,
         outgoing_envelope.seq_id )
+      // keep track of mapping between incoming / outgoing route_id
+      _route_translate_get().update(incoming_envelope.route_id,
+        outgoing_envelope.route_id)
       // keep track of origins
       _origins_get().set(origin)
     end
     
-  fun ref _update_watermark(route_id: U64, seq_id: U64)
+  fun ref _update_watermark(route_id: U64, downstream_seq_id: U64)
   =>
   """
   Process a high watermark received from a downstream step.
   TODO: receive watermark, flush buffers and send another watermark
   """
+  // update low watermark for this route_id
+  _lwm_get().update(route_id, downstream_seq_id)
+
+  // calculate which messages can be ACKed
   try
-    // translate downstream seq_id to origin's seq_id
-    let origin_seq_id = _translate_get().outToIn(seq_id)
-    // update low watermark for this route_id
-    _lwm_get().update(route_id, origin_seq_id)
+    let low_watermark = _lwm_get().low_watermark()
+    for origin in _origins_get().values() do
+      let highest_outgoing_seq_id = _hwm_get().apply((origin, route_id))
+      if low_watermark > highest_outgoing_seq_id then
+        // translate downstream seq_id to upstream seq_id
+        let upstream_seq_id = _seq_translate_get().outToIn(downstream_seq_id)
+        // translate downstream route_id to upstream route_id
+        let upstream_route_id = _route_translate_get().outToIn(route_id)
+        // send new watermark upstream
+        // origin.update_watermark(upstream_route_id, upstream_seq_id)
+      end
+    end
   else
     @printf[I32]("Error finding value in TranslationTable\n".cstring())
   end
-  // report low watermark to all upstream origins
-  for origin in _origins_get().values() do
-    //   origin.update_watermark(_lwm.low_watermark())
-    None
-  end
+
+  // truncate our buffers using new low watermark
+  
+  // call Alfred with new low watermark
+
 
     
 type OriginSet is HashSet[Origin tag, HashIs[Origin tag]] 
@@ -159,10 +175,10 @@ class HighWatermarkTable
     end
 
 
-class TranslationTable
+class SeqTranslationTable
   """
-  We need to be able to go from an incoming seq_id to an outgoing seq_id and
-  vice versa.
+  We need to be able to translate from an incoming seq_id to an 
+  outgoing seq_id and vice versa.
   Create a new entry every time we send a message downstream.
   Remove old entries every time we receive a new low watermark.
 
@@ -184,7 +200,7 @@ class TranslationTable
       _inToOut.insert(in_seq_id, out_seq_id)
       _outToIn.insert(out_seq_id, in_seq_id)
     else
-      @printf[I32]("Error inserting into translation tables\n".cstring())      
+      @printf[I32]("Error inserting into SeqTranslationTable\n".cstring())      
     end
 
   fun outToIn(out_seq_id: U64): U64 ?
@@ -217,9 +233,71 @@ class TranslationTable
       _inToOut.remove(_outToIn(out_seq_id))
       _outToIn.remove(out_seq_id)
     else
-      @printf[I32]("Error removing key from TranslationTable\n".cstring())
+      @printf[I32]("Error removing key from SeqTranslationTable\n".cstring())
     end
 
+class RouteTranslationTable
+  """
+  We need to be able to translate from an incoming route_id to an 
+  outgoing route_id and vice versa.
+  Create a new entry every time we send a message downstream.
+  Remove old entries every time we receive a new low watermark.
+
+  TODO: Extend this to support splits.
+        _inToOut: Map[U64, Set[U64]]
+        _outToIn: Map[U64, U64]
+  """
+  let _inToOut: Map[U64, U64]
+  let _outToIn: Map[U64, U64]
+
+  new create(size: USize)
+  =>
+    _inToOut = Map[U64, U64](size)
+    _outToIn = Map[U64, U64](size)
+      
+  fun ref update(in_route_id: U64, out_route_id: U64)
+  =>
+    try
+      _inToOut.insert(in_route_id, out_route_id)
+      _outToIn.insert(out_route_id, in_route_id)
+    else
+      @printf[I32]("Error inserting into RouteTranslationTable\n".cstring())      
+    end
+
+  fun outToIn(out_route_id: U64): U64 ?
+  =>
+    """
+    Return the incoming route_id for a given outgoing route_id.
+    """
+    try
+      _outToIn(out_route_id)
+    else
+      @printf[I32]("Error in outToIn: %ld\n".cstring(), out_route_id)
+      error
+    end
+
+  fun inToOut(in_route_id: U64): U64 ?
+  =>
+    """
+    Return the outgoing route_id for a given incoming route_id.
+    """
+    try
+      _inToOut(in_route_id)
+    else
+      @printf[I32]("Error in inToOut: %ld\n".cstring(), in_route_id)
+      error
+    end
+
+  fun ref remove(out_route_id: U64)
+  =>
+    try
+      _inToOut.remove(_outToIn(out_route_id))
+      _outToIn.remove(out_route_id)
+    else
+      @printf[I32]("Error removing key from RouteTranslationTable\n".cstring())
+    end
+
+    
 class LowWatermarkTable
   """
   Keep track of low watermark values per route as reported by downstream 
