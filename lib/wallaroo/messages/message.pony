@@ -22,7 +22,8 @@ trait Origin
       _hwm_get().update((origin, outgoing_envelope.route_id),
         outgoing_envelope.seq_id)
       // keep track of mapping between incoming / outgoing seq_id
-      _translate_get().update(outgoing_envelope.seq_id, incoming_envelope.seq_id)
+      _translate_get().update(incoming_envelope.seq_id,
+        outgoing_envelope.seq_id )
       // keep track of origins
       _origins_get().set(origin)
     end
