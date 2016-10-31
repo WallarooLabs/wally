@@ -147,6 +147,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   fun ref _origins_get(): OriginSet =>
     _origins
 
+  be log_flushed(low_watermark: U64, messages_flushed: U64) =>
+    //TODO-Markus: update watermark tables wherever that may be, and send a watermark
+    //upstream
+    None
+
   be update_watermark(route_id: U64, seq_id: U64)
   =>
     """
@@ -169,6 +174,12 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     end
 
   be replay_finished() =>
+    match _runner
+    | let r: ReplayableRunner =>
+      r.replay_finished()
+    end
+
+  be start_without_replay() =>
     match _runner
     | let r: ReplayableRunner =>
       r.replay_finished()
@@ -334,10 +345,8 @@ actor PartitionProxy is (CreditFlowProducer & Initializable)
         // the thing normally responsible for creating the outgoing
         // envelope arguments
         let forward_msg = ChannelMsgEncoder.data_channel[D](target_step_id,
-          0, _worker_name, source_ts, data, metric_name, _auth,
-          return_proxy_address, msg_uid, frac_ids, seq_id,
-          // TODO: Generate correct route id
-          0)
+          _worker_name, source_ts, data, metric_name, _auth,
+          return_proxy_address, msg_uid, frac_ids, seq_id)
 
         match _router
         | let r: Router val =>

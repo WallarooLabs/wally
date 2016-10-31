@@ -197,7 +197,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
     end
     let partition_proxies: Map[String, PartitionProxy] val =
       consume partition_proxies_trn
-    connections.register_partition_proxies(partition_proxies)
+    // connections.register_partition_proxies(partition_proxies)
 
     let routes: Map[Key, (Step | PartitionProxy)] trn =
       recover Map[Key, (Step | PartitionProxy)] end
