@@ -50,6 +50,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _incoming_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   var _initialized: Bool = false
+  let _deduplication_list: Array[MsgEnvelope box] = _deduplication_list.create()
 
   // Credit Flow Producer
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
@@ -120,6 +121,37 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
 
   // TODO: Fix the Origin None once we know how to look up Proxy
   // for messages crossing boundary
+
+  fun _is_duplicate(envelope: MsgEnvelope box): Bool =>
+    for e in _deduplication_list.values() do
+      //TODO: Bloom filter maybe?
+      if e.msg_uid == envelope.msg_uid then
+        match (e.frac_ids, envelope.frac_ids)
+        | (let efa: Array[U64] val, let efb: Array[U64] val) => 
+          if efa.size() == efb.size() then
+            var found = true
+            for i in Range(0,efa.size()) do
+              try
+                if efa(i) != efb(i) then
+                  found = false
+                  break
+                end
+              else
+                found = false
+                break
+              end
+            end
+            if found then
+              return true
+            end
+          end
+        | (None,None) => return true
+        end
+      end
+    end
+    false
+
+
   be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
@@ -127,13 +159,14 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     _outgoing_seq_id = _outgoing_seq_id + 1
     _incoming_envelope.update(origin, msg_uid, frac_ids, incoming_seq_id, route_id)
     _outgoing_envelope.update(this, msg_uid, frac_ids, _outgoing_seq_id)
-    // TODO: Reconsider how recovery_run works.  Used to call recovery_run()
-    // on runner, but now runners don't implement that method.
-    let is_finished = _runner.run[D](metric_name, source_ts, data,
-      _incoming_envelope, _outgoing_envelope, this, _router)
-    if is_finished then
-      _bookkeeping(_incoming_envelope, _outgoing_envelope)
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
+    if not _is_duplicate(_incoming_envelope) then
+      _deduplication_list.push(_incoming_envelope)
+      let is_finished = _runner.run[D](metric_name, source_ts, data,
+        _incoming_envelope, _outgoing_envelope, this, _router)
+      if is_finished then
+        _bookkeeping(_incoming_envelope, _outgoing_envelope)
+        _metrics_reporter.pipeline_metric(metric_name, source_ts)
+      end
     end
 
   fun ref _hwm_get(): HighWatermarkTable =>
@@ -172,9 +205,14 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
 
   be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
   =>
-    match _runner
-    | let r: ReplayableRunner =>
-      r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
+    if not _is_duplicate(_incoming_envelope) then
+      _deduplication_list.push(_incoming_envelope)
+      match _runner
+      | let r: ReplayableRunner =>
+        r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
+      else
+        @printf[I32]("trying to replay a message to a non-replayable runner!".cstring())
+      end
     end
 
   be replay_finished() =>
@@ -182,12 +220,14 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     | let r: ReplayableRunner =>
       r.replay_finished()
     end
+    _deduplication_list.clear()
 
   be start_without_replay() =>
     match _runner
     | let r: ReplayableRunner =>
       r.replay_finished()
     end
+    _deduplication_list.clear()
 
   be dispose() =>
     match _router
