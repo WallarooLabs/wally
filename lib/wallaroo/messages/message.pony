@@ -5,11 +5,11 @@ trait Origin
   fun tag hash(): U64 =>
     (digestof this).hash()
 
-  fun ref _hwm_get(): HighWatermarkTable
-  fun ref _lwm_get(): LowWatermarkTable
-  fun ref _seq_translate_get(): SeqTranslationTable
-  fun ref _route_translate_get(): RouteTranslationTable
-  fun ref _origins_get(): OriginSet
+  fun ref hwm_get(): HighWatermarkTable
+  fun ref lwm_get(): LowWatermarkTable
+  fun ref seq_translate_get(): SeqTranslationTable
+  fun ref route_translate_get(): RouteTranslationTable
+  fun ref origins_get(): OriginSet
     
   fun ref _bookkeeping(incoming_envelope: MsgEnvelope box,
     outgoing_envelope: MsgEnvelope box)
@@ -20,51 +20,47 @@ trait Origin
     match incoming_envelope.origin
     | let origin: Origin tag =>
       // keep track of messages we've sent downstream
-      _hwm_get().update((origin, outgoing_envelope.route_id),
+      hwm_get().update((origin, outgoing_envelope.route_id),
         outgoing_envelope.seq_id)
       // keep track of mapping between incoming / outgoing seq_id
-      _seq_translate_get().update(incoming_envelope.seq_id,
+      seq_translate_get().update(incoming_envelope.seq_id,
         outgoing_envelope.seq_id )
       // keep track of mapping between incoming / outgoing route_id
-      _route_translate_get().update(incoming_envelope.route_id,
+      route_translate_get().update(incoming_envelope.route_id,
         outgoing_envelope.route_id)
       // keep track of origins
-      _origins_get().set(origin)
+      origins_get().set(origin)
     end
     
-  fun ref _update_watermark(route_id: U64, downstream_seq_id: U64)
+  be update_watermark(route_id: U64, downstream_seq_id: U64)
   =>
   """
   Process a high watermark received from a downstream step.
-  TODO: receive watermark, flush buffers and send another watermark
+  TODO: truncate replay buffers using new low watermark
+  TODO: call Alfred with new low watermark
   """
   // update low watermark for this route_id
-  _lwm_get().update(route_id, downstream_seq_id)
+  lwm_get().update(route_id, downstream_seq_id)
 
   // calculate which messages can be ACKed
   try
-    let low_watermark = _lwm_get().low_watermark()
-    for origin in _origins_get().values() do
-      let highest_outgoing_seq_id = _hwm_get().apply((origin, route_id))
+    let low_watermark = lwm_get().low_watermark()
+    for origin in origins_get().values() do
+      let highest_outgoing_seq_id = hwm_get().apply((origin, route_id))
       if low_watermark > highest_outgoing_seq_id then
         // translate downstream seq_id to upstream seq_id
-        let upstream_seq_id = _seq_translate_get().outToIn(downstream_seq_id)
+        let upstream_seq_id = seq_translate_get().outToIn(downstream_seq_id)
         // translate downstream route_id to upstream route_id
-        let upstream_route_id = _route_translate_get().outToIn(route_id)
+        let upstream_route_id = route_translate_get().outToIn(route_id)
         // send new watermark upstream
-        // origin.update_watermark(upstream_route_id, upstream_seq_id)
+        origin.update_watermark(upstream_route_id, upstream_seq_id)
       end
     end
   else
     @printf[I32]("Error finding value in TranslationTable\n".cstring())
   end
 
-  // truncate our buffers using new low watermark
   
-  // call Alfred with new low watermark
-
-
-    
 type OriginSet is HashSet[Origin tag, HashIs[Origin tag]] 
     
 class MsgEnvelope
