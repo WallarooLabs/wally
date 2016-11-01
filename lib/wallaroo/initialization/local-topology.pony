@@ -113,6 +113,8 @@ actor LocalTopologyInitializer
 
       match _topology
       | let t: LocalTopology val =>
+        // TODO: Write LocalTopology (t) to disk
+
         if t.is_empty() then
           @printf[I32]("----This worker has no steps----\n".cstring())
         end
