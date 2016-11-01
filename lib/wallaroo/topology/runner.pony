@@ -415,7 +415,8 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
           //TODO: deal with creating fractional message ids here
           match _id
           | let buffer_id: U128 =>
-            _alfred.queue_log_entry(buffer_id, incoming_envelope.msg_uid, None, sc.id(), payload)
+            _alfred.queue_log_entry(buffer_id, incoming_envelope.msg_uid, None,
+              sc.id(), outgoing_envelope.seq_id, payload)
           else
             @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
           end

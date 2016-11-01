@@ -2,20 +2,19 @@ use "buffered"
 use "files"
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/messages"
 
 trait Backend
   //fun read(from: U64, to: U64): Array[Array[U8] val] val
   fun ref flush()
   fun ref start()
-  fun ref write_entry(buffer_id: U128, entry: (U128, (Array[U64] val | None), U64,
-    Array[ByteSeq] val))
+  fun ref write_entry(buffer_id: U128, entry: LogEntry)
 
 class DummyBackend is Backend
   new create() => None
   fun ref flush() => None
   fun ref start() => None
-  fun ref write_entry(buffer_id: U128, entry: (U128, (Array[U64] val | None), U64,
-    Array[ByteSeq] val)) => None
+  fun ref write_entry(buffer_id: U128, entry: LogEntry) => None
 
 class FileBackend is Backend
   //a record looks like this:
@@ -87,11 +86,10 @@ class FileBackend is Backend
       _alfred.start_without_replay()
     end
 
-  fun ref write_entry(buffer_id: U128, entry: (U128, (Array[U64] val | None), U64,
-    Array[ByteSeq] val))
+  fun ref write_entry(buffer_id: U128, entry: LogEntry)
   =>
     (let uid:U128, let frac_ids: (Array[U64] val | None),
-     let statechange_id: U64, let payload: Array[ByteSeq] val)
+     let statechange_id: U64, let seq_id: U64, let payload: Array[ByteSeq] val)
     = entry
     _writer.u128_be(buffer_id)
     _writer.u128_be(uid)
@@ -196,17 +194,20 @@ actor Alfred
       origin.set_id(id)
 
     be queue_log_entry(buffer_id: U128, uid: U128,
-      frac_ids: (Array[U64] val | None), statechange_id: U64,
+      frac_ids: (Array[U64] val | None), statechange_id: U64, seq_id: U64,
       payload: Array[ByteSeq] val)
     =>
       try
-        _log_buffers(buffer_id).queue(uid, frac_ids, statechange_id, payload)
+        _log_buffers(buffer_id).queue(uid, frac_ids, statechange_id, seq_id, payload)
       else
         @printf[I32]("Trying to log to non-existent buffer no %d!".cstring(),
           buffer_id)
       end
 
-    be write_log(buffer_id: U128, log_entries: Array[LogEntry val] iso, low_watermark: U64) =>
+    be write_log(buffer_id: U128, log_entries: Array[LogEntry val] iso,
+      low_watermark:U64, origin: Origin tag, upstream_route_id: U64,
+      upstream_seq_id: U64)
+    =>
       let write_count = log_entries.size()
       for i in Range(0, write_count) do
         try
@@ -217,7 +218,20 @@ actor Alfred
       end
       _backend.flush()
       try
-        _origins(buffer_id).log_flushed(low_watermark, write_count.u64())
+        _origins(buffer_id).log_flushed(low_watermark, write_count.u64(),
+          origin, upstream_route_id, upstream_seq_id)
       else
         @printf[I32]("buffer %d disappeared!".cstring(), buffer_id)
+      end
+
+    be flush_buffer(buffer_id: U128, low_watermark:U64,
+      origin: Origin tag, upstream_route_id: U64,
+      upstream_seq_id: U64)
+    =>
+      try
+        _log_buffers(buffer_id).flush(low_watermark, origin, upstream_route_id,
+          upstream_seq_id)
+      else
+        @printf[I32]("Trying to flush non-existent buffer no %d!".cstring(),
+          buffer_id)
       end

@@ -191,10 +191,14 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   fun ref origins_get(): OriginSet =>
     _origins
 
-  be log_flushed(low_watermark: U64, messages_flushed: U64) =>
-    //TODO-Markus: update watermark tables wherever that may be, and send a watermark
-    //upstream
-    None
+  fun ref _flush(low_watermark: U64, origin: Origin tag,
+    upstream_route_id: U64 , upstream_seq_id: U64) =>
+    match _id
+    | let id: U128 => _alfred.flush_buffer(id, low_watermark, origin,
+      upstream_route_id, upstream_seq_id)
+    else
+      @printf[I32]("Tried to flush a non-existing buffer!".cstring())
+    end
 
   be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
   =>

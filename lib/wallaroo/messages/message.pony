@@ -10,7 +10,14 @@ trait Origin
   fun ref seq_translate_get(): SeqTranslationTable
   fun ref route_translate_get(): RouteTranslationTable
   fun ref origins_get(): OriginSet
+
+  fun ref _flush(low_watermark: U64, origin: Origin tag,
+    upstream_route_id: U64 , upstream_seq_id: U64)
     
+  be log_flushed(low_watermark: U64, messages_flushed: U64, origin: Origin tag,
+    upstream_route_id: U64 , upstream_seq_id: U64) =>
+    origin.update_watermark(upstream_route_id, upstream_seq_id)
+
   fun ref _bookkeeping(incoming_envelope: MsgEnvelope box,
     outgoing_envelope: MsgEnvelope box)
   =>
@@ -48,15 +55,11 @@ trait Origin
     for origin in origins_get().values() do
       let highest_outgoing_seq_id = hwm_get().apply((origin, route_id))
       if low_watermark > highest_outgoing_seq_id then
-        // translate downstream seq_id to upstream seq_id
-        let upstream_seq_id = seq_translate_get().outToIn(downstream_seq_id)
         // translate downstream route_id to upstream route_id
         let upstream_route_id = route_translate_get().outToIn(route_id)
-        // flush event logs
-        // TODO: Alan add flushing
-        // flush(low_watermark, origin)
-        // send new watermark upstream (TODO: move this to log_flushed)
-        origin.update_watermark(upstream_route_id, upstream_seq_id)
+        // translate downstream seq_id to upstream seq_id
+        let upstream_seq_id = seq_translate_get().outToIn(downstream_seq_id)
+        _flush(low_watermark, origin, upstream_route_id, upstream_seq_id)
       end
     end
   else

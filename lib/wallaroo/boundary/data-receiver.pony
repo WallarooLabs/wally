@@ -30,6 +30,10 @@ actor DataReceiver is Origin
   be upstream_replay_finished() =>
     _alfred.upstream_replay_finished(this)
 
+  fun ref _flush(low_watermark: U64, origin: Origin tag,
+    upstream_route_id: U64 , upstream_seq_id: U64) =>
+    """This is not a real Origin, so it doesn't write any State"""
+    None
 
   fun ref hwm_get(): HighWatermarkTable => _hwm
   fun ref lwm_get(): LowWatermarkTable => _lwm
