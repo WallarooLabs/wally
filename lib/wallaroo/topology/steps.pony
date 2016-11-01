@@ -51,6 +51,8 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   var _initialized: Bool = false
   let _deduplication_list: Array[MsgEnvelope box] = _deduplication_list.create()
+  let _alfred: Alfred
+  var _id: (U128 | None)
 
   // Credit Flow Producer
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
@@ -61,17 +63,23 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   var _distributable_credits: ISize = _max_distributable_credits
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
-    route_builder: RouteBuilder val, router: Router val = EmptyRouter)
+    route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter)
   =>
     _runner = consume runner
-    match _runner
-    | let elb: EventLogBufferable =>
-      elb.set_buffer_target(this)
-    end
     _metrics_reporter = consume metrics_reporter
     _outgoing_seq_id = 0
     _router = router
     _route_builder = route_builder
+    _alfred = alfred
+    _alfred.register_origin(this)
+    _id = None
+
+  be set_id(id: U128) =>
+    _id = id
+    match _runner
+    | let sr: ReplayableRunner =>
+      sr.set_id(id)
+    end
 
   be initialize() =>
     for consumer in _router.routes().values() do

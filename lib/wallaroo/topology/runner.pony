@@ -26,6 +26,14 @@ class EmptyRunner
   => 
     true
 
+trait ReplayableRunner
+  // TODO: Remove Origin None option once we fix identifying origin Proxy when
+  // messages cross boundary
+  fun ref replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val, 
+    origin: (Origin tag | None))
+  fun ref replay_finished()
+  fun ref set_id(id: U128)
+
 interface RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -37,13 +45,6 @@ interface RunnerBuilder
   fun id(): U128
   fun route_builder(): RouteBuilder val
   fun forward_route_builder(): RouteBuilder val
-
-trait ReplayableRunner
-  // TODO: Remove Origin None option once we fix identifying origin Proxy when
-  // messages cross boundary
-  fun ref replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val, 
-    origin: (Origin tag | None))
-  fun ref replay_finished()
 
 class RunnerSequenceBuilder
   let _runner_builders: Array[RunnerBuilder val] val
@@ -354,34 +355,28 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
 
     is_finished
 
-class StateRunner[State: Any #read] is Runner
+class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   let _state: State
   let _metrics_reporter: MetricsReporter
   let _state_change_repository: StateChangeRepository[State] ref
-  let _event_log_buffer: EventLogBuffer tag
   let _alfred: Alfred
-  let _wb : Writer = Writer
-  let _rb : Reader = Reader
+  let _wb: Writer = Writer
+  let _rb: Reader = Reader
+  var _id: (U128 | None)
 
   new iso create(state_builder: {(): State} val, 
-      metrics_reporter: MetricsReporter iso, alfred: Alfred) 
+      metrics_reporter: MetricsReporter iso, alfred: Alfred)
   =>
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
     _state_change_repository = StateChangeRepository[State]
     _alfred = alfred
-    _event_log_buffer =
-      ifdef "resilience" then
-        StandardEventLogBuffer(alfred)
-      else
-        DeactivatedEventLogBuffer
-      end
+    _id = None
+
+  fun ref set_id(id: U128) => _id = id
 
   fun ref register_state_change(scb: StateChangeBuilder[State] val) : U64 =>
     _state_change_repository.make_and_register(scb)
-
-  fun ref set_buffer_target(target: ResilientOrigin tag) =>
-    _event_log_buffer.set_target(target)
 
   fun ref replay_log_entry(msg_uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val, 
     origin: (Origin tag | None))
@@ -417,9 +412,13 @@ class StateRunner[State: Any #read] is Runner
       | let sc: StateChange[State] ref =>
         ifdef "resilience" then
           let payload = sc.to_log_entry(_wb)
-          //TODO: deal with fractional message ids here
-          _event_log_buffer.queue(incoming_envelope.msg_uid, None, sc.id(),
-            payload)
+          //TODO: deal with creating fractional message ids here
+          match _id
+          | let buffer_id: U128 =>
+            _alfred.queue_log_entry(buffer_id, incoming_envelope.msg_uid, None, sc.id(), payload)
+          else
+            @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
+          end
         end
         sc.apply(_state)
         let computation_end = Time.nanos()

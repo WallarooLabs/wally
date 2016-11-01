@@ -45,7 +45,7 @@ class StepBuilder
       metrics_conn) where alfred = alfred, router = router)
     let step = Step(consume runner, 
       MetricsReporter(_pipeline_name, metrics_conn), 
-      _runner_builder.route_builder(), router)
+      _runner_builder.route_builder(), alfred, router)
     step.update_router(next)
     step
 
@@ -82,7 +82,7 @@ class PartitionedPreStateStepBuilder
     router: Router val = EmptyRouter): Step tag 
   =>
     Step(RouterRunner, MetricsReporter(_pipeline_name, metrics_conn), 
-      _runner_builder.route_builder())
+      _runner_builder.route_builder(), alfred)
 
   fun build_partition(worker_name: String, state_addresses: StateAddresses val,
     metrics_conn: TCPConnection, auth: AmbientAuth, connections: Connections, 

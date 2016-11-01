@@ -125,10 +125,8 @@ class FileBackend is Backend
  
 
 actor Alfred
-    let _log_buffers: Map[U128, EventLogBuffer tag] = 
-      _log_buffers.create()
-    // TODO: Why are these things isos? Because Alfred is the only thing that
-    // should ever be using them, so we can't pass them anywhere.
+    let _origins: Map[U128, ResilientOrigin tag] = _origins.create()
+    let _log_buffers: Map[U128, EventLogBuffer ref] = _log_buffers.create()
     let _backend: Backend ref
     let _incoming_boundaries: Array[DataReceiver tag] ref =
       _incoming_boundaries.create(1)
@@ -168,30 +166,47 @@ actor Alfred
       //TODO: if all boundary markers are true, we have truly finished replaying
 
     be replay_finished() =>
-      for b in _log_buffers.values() do
+      for b in _origins.values() do
         b.replay_finished()
       end
 
     be start_without_replay() =>
       //signal all buffers that there is no event log replay
-      for b in _log_buffers.values() do
+      for b in _origins.values() do
         b.start_without_replay()
       end
 
     be replay_log_entry(buffer_id: U128, uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) =>
       try
-        _log_buffers(buffer_id).replay_log_entry(uid, frac_ids, statechange_id, payload)
+        _origins(buffer_id).replay_log_entry(uid, frac_ids, statechange_id, payload)
       else
         //TODO: explode here
         @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
       end
 
-    be register_log_buffer(logbuffer: EventLogBuffer tag) =>
-      let id = _log_buffers.size().u128()
-      _log_buffers(id) = logbuffer
-      logbuffer.set_id(id)
+    be register_origin(origin: ResilientOrigin tag) =>
+      let id = _origins.size().u128()
+      _origins(id) = origin 
+      _log_buffers(id) =
+        ifdef "resilience" then
+          StandardEventLogBuffer(this,id)
+        else
+          DeactivatedEventLogBuffer
+        end
+      origin.set_id(id)
 
-    be log(buffer_id: U128, log_entries: Array[LogEntry val] iso, low_watermark: U64) =>
+    be queue_log_entry(buffer_id: U128, uid: U128,
+      frac_ids: (Array[U64] val | None), statechange_id: U64,
+      payload: Array[ByteSeq] val)
+    =>
+      try
+        _log_buffers(buffer_id).queue(uid, frac_ids, statechange_id, payload)
+      else
+        @printf[I32]("Trying to log to non-existent buffer no %d!".cstring(),
+          buffer_id)
+      end
+
+    be write_log(buffer_id: U128, log_entries: Array[LogEntry val] iso, low_watermark: U64) =>
       let write_count = log_entries.size()
       for i in Range(0, write_count) do
         try
@@ -202,7 +217,7 @@ actor Alfred
       end
       _backend.flush()
       try
-        _log_buffers(buffer_id).log_flushed(low_watermark, write_count.u64())
+        _origins(buffer_id).log_flushed(low_watermark, write_count.u64())
       else
         @printf[I32]("buffer %d disappeared!".cstring(), buffer_id)
       end

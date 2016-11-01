@@ -142,7 +142,7 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
     for key in _keys.values() do
       let reporter = MetricsReporter("shared state", metrics_conn)
       m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
-        consume reporter, _runner_builder.route_builder())
+        consume reporter, _runner_builder.route_builder(), alfred)
     end
     KeyedStateAddresses[Key](consume m)
 
@@ -219,7 +219,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
                 MetricsReporter(_pipeline_name, metrics_conn)
                 where alfred = alfred, router = state_comp_router),
               MetricsReporter(_pipeline_name, metrics_conn),
-              runner_builder.route_builder(),
+              runner_builder.route_builder(), alfred,
               DirectRouter(s))
             m(id) = next_step
             routes(key) = next_step
