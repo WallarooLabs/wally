@@ -111,6 +111,9 @@ actor LocalTopologyInitializer
         error
       end
 
+      // TODO: Check if we are recovering (have a saved LocalTopology)
+      // and if so read and load it
+
       match _topology
       | let t: LocalTopology val =>
         // TODO: Write LocalTopology (t) to disk
