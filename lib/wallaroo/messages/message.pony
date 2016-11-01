@@ -52,7 +52,10 @@ trait Origin
         let upstream_seq_id = seq_translate_get().outToIn(downstream_seq_id)
         // translate downstream route_id to upstream route_id
         let upstream_route_id = route_translate_get().outToIn(route_id)
-        // send new watermark upstream
+        // flush event logs
+        // TODO: Alan add flushing
+        // flush(low_watermark, origin)
+        // send new watermark upstream (TODO: move this to log_flushed)
         origin.update_watermark(upstream_route_id, upstream_seq_id)
       end
     end

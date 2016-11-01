@@ -31,11 +31,11 @@ actor DataReceiver is Origin
     _alfred.upstream_replay_finished(this)
 
 
-  fun ref _hwm_get(): HighWatermarkTable => _hwm
-  fun ref _lwm_get(): LowWatermarkTable => _lwm
-  fun ref _origins_get(): OriginSet => _origins
-  fun ref _seq_translate_get(): SeqTranslationTable => _seq_translate
-  fun ref _route_translate_get(): RouteTranslationTable => _route_translate
+  fun ref hwm_get(): HighWatermarkTable => _hwm
+  fun ref lwm_get(): LowWatermarkTable => _lwm
+  fun ref origins_get(): OriginSet => _origins
+  fun ref seq_translate_get(): SeqTranslationTable => _seq_translate
+  fun ref route_translate_get(): RouteTranslationTable => _route_translate
 
   new create(connections: Connections, alfred: Alfred) =>
     _connections = connections
