@@ -59,7 +59,6 @@ class DataChannelConnectNotifier is TCPConnectionNotify
     _receivers = receivers    
     _env = env
     _auth = auth
-    // _origin = DataOrigin
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
