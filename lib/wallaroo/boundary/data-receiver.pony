@@ -1,27 +1,46 @@
 use "collections"
 use "net"
-use "wallaroo/messages"
+use "time"
 use "wallaroo/network"
 use "wallaroo/topology"
-use "time"
+use "wallaroo/resilience"
+use "wallaroo/messages"
 
-actor DataReceiver
+actor DataReceiver is Origin
   var _sender_name: String = ""
   let _connections: Connections
   var _router: DataRouter val = DataRouter(recover Map[U128, Step tag] end)
   var _last_id_seen: U64 = 0
   var _connected: Bool = false
   var _reconnecting: Bool = false
+  //TODO: why 10?
+  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
+  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
+  let _origins: OriginSet = OriginSet(10)
+  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
+  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
+  let _alfred: Alfred
+
   // let _timers: Timers = Timers
-  // let _incoming_envelope: MsgEnvelope ref = MsgEnvelope(None, 0, None, 0, 0)
-  // let _outgoing_envelope: MsgEnvelope ref = MsgEnvelope(None, 0, None, 0, 0)
-  // let _alfred: Alfred
+  be request_replay() =>
+    //TODO: request upstream replays
+    None
 
-  //TODO: request upstream replays when instructed to from Alfred
-  //TODO: signal to Alfred an end of upstream replay
+  //TODO: this should be triggered by a special message
+  be upstream_replay_finished() =>
+    _alfred.upstream_replay_finished(this)
 
-  new create(connections: Connections) =>
+
+  fun ref _hwm_get(): HighWatermarkTable => _hwm
+  fun ref _lwm_get(): LowWatermarkTable => _lwm
+  fun ref _origins_get(): OriginSet => _origins
+  fun ref _seq_translate_get(): SeqTranslationTable => _seq_translate
+  fun ref _route_translate_get(): RouteTranslationTable => _route_translate
+
+  new create(connections: Connections, alfred: Alfred) =>
     _connections = connections
+    _alfred = alfred
+    _alfred.register_incoming_boundary(this)
     // let t = Timer(_Ack(this), 1_000_000_000, 1_000_000_000)
     // _timers(consume t)
 
@@ -33,14 +52,9 @@ actor DataReceiver
 
   be received(d: DeliveryMsg val)
   =>  
-    //TODO: read envelope from data
-    //TODO: manage values for outgoing envelope at router?
-    // _incoming_envelope.update(None, 0, None, 0, 0)
-    // _outgoing_envelope.update(None, 0, None, 0, 0)
-
     if d.seq_id() > _last_id_seen then
       _last_id_seen = d.seq_id()
-      _router.route(d)
+      _router.route(d, this)
       // match _router.route(target_step_id)
       // | let s: Step tag =>
       //   s.run[D](metric_name, source_ts, msg_data)

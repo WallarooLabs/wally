@@ -96,6 +96,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       // _queue.enqueue(data)
     
       //TODO: push to _replay_queue
+      //TODO: make and send envelope
       _writev(data)
     // end
 

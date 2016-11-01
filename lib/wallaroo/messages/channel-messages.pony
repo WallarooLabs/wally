@@ -149,13 +149,19 @@ class CreateDataReceivers is ChannelMsg
   new val create(ws: Array[String] val) =>
     workers = ws
     
+class ReplayCompleteMsg is ChannelMsg
+  let _from_worker_name: String
+  fun from_name(): String => _from_worker_name
+  new val create(from: String) =>
+    _from_worker_name = from
+
 trait DeliveryMsg is ChannelMsg
   fun target_id(): U128
   fun seq_id(): U64
   fun source_ts(): U64
   fun metric_name(): String
   fun from_name(): String
-  fun deliver(target_step: Step tag): Bool
+  fun deliver(target_step: Step tag, origin: Origin tag): Bool
 
 class ForwardMsg[D: Any val] is DeliveryMsg
   let _target_id: U128
@@ -188,10 +194,7 @@ class ForwardMsg[D: Any val] is DeliveryMsg
   fun source_ts(): U64 => _source_ts
   fun metric_name(): String => _metric_name
 
-  fun deliver(target_step: Step tag): Bool =>
-    // TODO: We need to give the step a reference to the incoming boundary
-    // actor for this message (passed in to this method), and then replace 
-    // None below
-    target_step.run[D](_metric_name, _source_ts, _data, None, _msg_uid, 
+  fun deliver(target_step: Step tag, origin: Origin tag): Bool =>
+    target_step.run[D](_metric_name, _source_ts, _data, origin, _msg_uid, 
       _frac_ids, _seq_id, 0)
     false  

@@ -1,6 +1,7 @@
 use "buffered"
 use "files"
 use "collections"
+use "wallaroo/boundary"
 
 trait Backend
   //fun read(from: U64, to: U64): Array[Array[U8] val] val
@@ -78,7 +79,7 @@ class FileBackend is Backend
           _alfred.replay_log_entry(buffer_id, uid, frac_ids, statechange_id, payload)
         end
         _file.seek_end(0)
-        _alfred.replay_finished()
+        _alfred.log_replay_finished()
       else
         @printf[I32]("Cannot recover state from eventlog\n".cstring())
       end
@@ -129,6 +130,10 @@ actor Alfred
     // TODO: Why are these things isos? Because Alfred is the only thing that
     // should ever be using them, so we can't pass them anywhere.
     let _backend: Backend ref
+    let _incoming_boundaries: Array[DataReceiver tag] ref =
+      _incoming_boundaries.create(1)
+    let _replay_complete_markers: Map[U64, Bool] =
+      _replay_complete_markers.create()
 
     new create(env: Env, filename: (String val | None) = None) =>
       _backend = 
@@ -148,8 +153,21 @@ actor Alfred
     be start() =>
       _backend.start()
 
-    be replay_finished() =>
+    be register_incoming_boundary(boundary: DataReceiver tag) =>
+      _incoming_boundaries.push(boundary)
+
+    be log_replay_finished() =>
       //signal all buffers that event log replay is finished
+      for boundary in _incoming_boundaries.values() do
+        boundary.request_replay()
+        _replay_complete_markers.update((digestof boundary).hash(),false)
+      end
+
+    be upstream_replay_finished(boundary: DataReceiver tag) =>
+      _replay_complete_markers.update((digestof boundary).hash(), true)
+      //TODO: if all boundary markers are true, we have truly finished replaying
+
+    be replay_finished() =>
       for b in _log_buffers.values() do
         b.replay_finished()
       end

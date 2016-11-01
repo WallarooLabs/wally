@@ -104,6 +104,12 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
+      | let c: ReplayCompleteMsg val =>
+        try
+          _receivers(c.from_name()).upstream_replay_finished()
+        else
+          @printf[I32]("Missing DataReceiver!\n".cstring())
+        end
       | let m: SpinUpLocalTopologyMsg val =>
         _env.out.print("Received spin up local topology message!")
       | let m: UnknownChannelMsg val =>

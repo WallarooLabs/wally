@@ -84,7 +84,7 @@ actor LocalTopologyInitializer
 
     for w in ws.values() do
       if w != _worker_name then
-        let data_receiver = DataReceiver(_connections)
+        let data_receiver = DataReceiver(_connections, _alfred)
         drs(w) = data_receiver
         _data_receivers(w) = data_receiver
       end
