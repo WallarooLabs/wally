@@ -41,6 +41,12 @@ set(HEADER_FILES
 	hpp/ApiHooks.hpp
 	hpp/ApiObject.hpp
 	hpp/WallarooVersion.hpp
+        hpp/ApiUser.hpp
+        hpp/Computation.hpp
+        hpp/State.hpp
+        hpp/StateChange.hpp
+        hpp/StateChangeRepository.hpp
+        hpp/StateChangeBuilder.hpp
 )
 
 

@@ -31,13 +31,21 @@
 #include "ManagedObject.hpp"
 #include "SinkEncoder.hpp"
 #include "SourceDecoder.hpp"
+#include "State.hpp"
+#include "StateChange.hpp"
+#include "StateChangeRepository.hpp"
+#include "StateChangeBuilder.hpp"
 
 extern "C" {
 extern wallaroo::Data *w_computation_compute(wallaroo::Computation *computation_, wallaroo::Data *data_);
 extern char *w_computation_get_name(wallaroo::Computation *computation);
 
-extern wallaroo::Data *w_state_computation_compute(wallaroo::StateComputation *state_computation_, wallaroo::Data *data_, wallaroo::State *state_);
+extern wallaroo::Data *w_state_computation_compute(wallaroo::StateComputation *state_computation_, wallaroo::Data *data_,
+                                                   wallaroo::StateChangeRepository *state_change_repo_,
+                                                   wallaroo::State *state_);
 extern char *w_state_computation_get_name(wallaroo::StateComputation *state_computation_);
+extern size_t w_state_computation_get_number_of_state_change_builders(wallaroo::StateComputation *state_computaton_);
+extern wallaroo::StateChangeBuilder *w_state_computation_get_state_change_builder(wallaroo::StateComputation *state_computation_, uint64_t idx_);
 
 extern size_t w_data_serialize_get_size(wallaroo::Data* data_);
 extern void w_data_serialize(wallaroo::Data* data_, char* bytes_, size_t sz_);
@@ -51,6 +59,15 @@ extern void w_sink_encoder_encode(wallaroo::SinkEncoder *sink_encoder,
 extern size_t w_source_decoder_header_length(wallaroo::SourceDecoder *source_decoder);
 extern size_t w_source_decoder_payload_length(wallaroo::SourceDecoder *source_decoder, char *bytes);
 extern wallaroo::Data *w_source_decoder_decode(wallaroo::SourceDecoder *source_decoder, char *bytes, size_t sz_);
+
+extern char *w_state_change_get_name(wallaroo::StateChange *state_change_);
+extern uint64_t w_state_change_get_id(wallaroo::StateChange *state_change_);
+extern void w_state_change_apply(wallaroo::StateChange *state_change_, wallaroo::State *state_);
+extern size_t w_state_change_get_log_entry_size(wallaroo::StateChange *state_change_);
+extern void w_state_change_to_log_entry(wallaroo::StateChange *state_change_, char *bytes_);
+extern size_t w_state_change_get_log_entry_size_header_size(wallaroo::StateChange *state_change_);
+extern size_t w_state_change_read_log_entry_size_header(wallaroo::StateChange *state_change_, char *bytes_);
+extern bool w_state_change_read_log_entry(wallaroo::StateChange *state_change_, char *bytes_);
 
 extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_);
 }
