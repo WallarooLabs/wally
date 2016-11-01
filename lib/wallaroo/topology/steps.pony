@@ -111,7 +111,6 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     if is_finished then
       ifdef "resilience" then
         _bookkeeping(_incoming_envelope, _outgoing_envelope)
-        // if Sink then _send_watermark()
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
@@ -169,38 +168,24 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
       end
     end
 
-  fun ref _hwm_get(): HighWatermarkTable =>
+  fun ref hwm_get(): HighWatermarkTable =>
     _hwm
 
-  fun ref _lwm_get(): LowWatermarkTable =>
+  fun ref lwm_get(): LowWatermarkTable =>
     _lwm
 
-  fun ref _seq_translate_get(): SeqTranslationTable =>
+  fun ref seq_translate_get(): SeqTranslationTable =>
     _seq_translate
 
-  fun ref _route_translate_get(): RouteTranslationTable =>
+  fun ref route_translate_get(): RouteTranslationTable =>
     _route_translate
 
-  fun ref _origins_get(): OriginSet =>
+  fun ref origins_get(): OriginSet =>
     _origins
 
   be log_flushed(low_watermark: U64, messages_flushed: U64) =>
     //TODO-Markus: update watermark tables wherever that may be, and send a watermark
     //upstream
-    None
-
-  be update_watermark(route_id: U64, seq_id: U64)
-  =>
-    """
-    Process a high watermark received from a downstream step.
-    TODO: receive watermark, flush buffers and send another watermark
-    """
-    _update_watermark(route_id, seq_id)
-
-  fun _send_watermark() =>
-    // for origin in _all_origins.values do
-    //   origin.update_watermark(route_id, seq_id)
-    // end
     None
 
   be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)

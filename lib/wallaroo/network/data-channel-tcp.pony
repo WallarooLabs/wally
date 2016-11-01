@@ -46,38 +46,11 @@ class DataChannelListenNotifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     DataChannelConnectNotifier(_receivers, _env, _auth)
 
-class DataOrigin is Origin
-  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
-  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
-  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
-  let _origins: OriginSet = OriginSet(10)
-
-  fun ref _hwm_get(): HighWatermarkTable =>
-    _hwm
-  
-  fun ref _lwm_get(): LowWatermarkTable =>
-    _lwm
-    
-  fun ref _seq_translate_get(): SeqTranslationTable =>
-    _seq_translate
-
-  fun ref _route_translate_get(): RouteTranslationTable =>
-    _route_translate
-  
-  fun ref _origins_get(): OriginSet =>
-    _origins
-
-  // be update_watermark(route_id: U64, seq_id: U64)
-  // =>
-  //   //TODO: ack on TCP?
-  //   None
     
 class DataChannelConnectNotifier is TCPConnectionNotify
   let _receivers: Map[String, DataReceiver] val
   let _env: Env
   let _auth: AmbientAuth
-  let _origin: DataOrigin tag 
   var _header: Bool = true
 
   new iso create(receivers: Map[String, DataReceiver] val,
@@ -86,7 +59,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
     _receivers = receivers    
     _env = env
     _auth = auth
-    _origin = DataOrigin
+    // _origin = DataOrigin
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
