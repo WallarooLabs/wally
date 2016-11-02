@@ -49,7 +49,7 @@ trait Route
   fun ref receive_credits(number: ISize)
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     msg_uid: U128, frac_ids: (Array[U64] val | None))
-  fun ref forward(delivery_msg: DeliveryMsg val)
+  fun ref forward(delivery_msg: ReplayableDeliveryMsg val)
 
 class EmptyRoute is Route
   fun ref initialize() => None
@@ -62,7 +62,7 @@ class EmptyRoute is Route
   => 
     None
 
-  fun ref forward(delivery_msg: DeliveryMsg val) =>
+  fun ref forward(delivery_msg: ReplayableDeliveryMsg val) =>
     None
 
 
@@ -180,7 +180,7 @@ class TypedRoute[In: Any val] is Route
       end
     end
 
-  fun ref forward(delivery_msg: DeliveryMsg val) =>
+  fun ref forward(delivery_msg: ReplayableDeliveryMsg val) =>
     @printf[I32]("Forward should never be called on a TypedRoute\n".cstring())
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64,
@@ -227,7 +227,7 @@ class BoundaryRoute is Route
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
   var _seq_id: U64 = 0
-  embed _queue: Queue[DeliveryMsg val] = _queue.create()
+  embed _queue: Queue[ReplayableDeliveryMsg val] = _queue.create()
 
   new create(step: CreditFlowProducer ref, consumer: OutgoingBoundary,
     handler: RouteCallbackHandler)
@@ -293,7 +293,7 @@ class BoundaryRoute is Route
   =>
     @printf[I32]("Run should never be called on a BoundaryRoute\n".cstring())
 
-  fun ref forward(delivery_msg: DeliveryMsg val) =>
+  fun ref forward(delivery_msg: ReplayableDeliveryMsg val) =>
     ifdef "use_backpressure" then
       if _credits_available > 0 then
         let above_request_point =
@@ -326,7 +326,7 @@ class BoundaryRoute is Route
       _send_message_on_route(delivery_msg)
     end
 
-  fun ref _send_message_on_route(delivery_msg: DeliveryMsg val)
+  fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val)
   =>
     _consumer.forward(delivery_msg)
 
@@ -335,7 +335,7 @@ class BoundaryRoute is Route
   fun ref _next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
 
-  fun ref _add_to_queue(delivery_msg: DeliveryMsg val) =>
+  fun ref _add_to_queue(delivery_msg: ReplayableDeliveryMsg val) =>
     try
       _queue.enqueue(delivery_msg)
     end

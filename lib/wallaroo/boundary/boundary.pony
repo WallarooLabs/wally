@@ -118,8 +118,14 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   =>
     @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
 
+  be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+    origin: (Origin tag | None), msg_uid: U128,
+    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
+  =>
+    @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
+
   // open question: how do we reconnect if our external system goes away?
-  be forward(delivery_msg: DeliveryMsg val)
+  be forward(delivery_msg: ReplayableDeliveryMsg val)
   =>
     try
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg, 
@@ -145,8 +151,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   be replay_msgs() =>
     for msg in _queue.values() do
-      _writev(msg)
+      try
+        _writev(ChannelMsgEncoder.replay(msg, _auth))
+      end
     end
+    _writev(ChannelMsgEncoder.replay_complete(_worker_name, _auth))
 
   be update_router(router: Router val) =>
     """

@@ -86,6 +86,13 @@ actor DataReceiver is Origin
       //   s.run[D](metric_name, source_ts, msg_data)
     end
 
+  be replay_received(r: ReplayableDeliveryMsg val, seq_id: U64)
+  =>  
+    if seq_id > _last_id_seen then
+      _last_id_seen = seq_id
+      _router.replay_route(r, this, seq_id)
+    end
+
 //  be ack() => _ack()
 //
 //  fun ref _ack() =>

@@ -88,6 +88,16 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         end
       | let aw: AckWatermarkMsg val =>
         _connections.ack_watermark_to_boundary(aw.sender_name, aw.seq_id)
+      | let r: ReplayMsg val =>
+        try
+          let data_msg = r.data_msg(_auth)
+          let delivery_msg = data_msg.delivery_msg
+
+          _receivers(delivery_msg.sender_name())
+            .replay_received(delivery_msg, data_msg.seq_id)              
+        else
+          @printf[I32]("Missing DataReceiver!\n".cstring())
+        end
       | let c: ReplayCompleteMsg val =>
         try
           _receivers(c.sender_name()).upstream_replay_finished()

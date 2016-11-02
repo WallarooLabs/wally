@@ -20,7 +20,7 @@ primitive ChannelMsgEncoder
     end
     wb.done()
 
-  fun data_channel(delivery_msg: DeliveryMsg val,
+  fun data_channel(delivery_msg: ReplayableDeliveryMsg val,
     seq_id: U64, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(DataMsg(delivery_msg, seq_id), auth)
@@ -94,6 +94,11 @@ primitive ChannelMsgEncoder
     auth: AmbientAuth): Array[ByteSeq] val ? 
   =>
     _encode(AckWatermarkMsg(sender_name, sender_step_id, seq_id), auth)
+
+  fun replay(delivery_bytes: Array[ByteSeq] val, auth: AmbientAuth): 
+    Array[ByteSeq] val ? 
+  =>
+    _encode(ReplayMsg(delivery_bytes), auth)
 
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg val =>
@@ -199,11 +204,37 @@ class AckWatermarkMsg is ChannelMsg
   
 class DataMsg is ChannelMsg
   let seq_id: U64
-  let delivery_msg: DeliveryMsg val
+  let delivery_msg: ReplayableDeliveryMsg val
 
-  new val create(msg: DeliveryMsg val, seq_id': U64) =>
+  new val create(msg: ReplayableDeliveryMsg val, seq_id': U64) =>
     seq_id = seq_id'
     delivery_msg = msg
+
+class ReplayMsg is ChannelMsg
+  let data_bytes: Array[ByteSeq] val
+
+  new val create(db: Array[ByteSeq] val) =>
+    data_bytes = db
+
+  fun data_msg(auth: AmbientAuth): DataMsg val ? =>
+    var size: USize = 0
+    for bytes in data_bytes.values() do
+      size = size + bytes.size()
+    end
+
+    let buffer: Array[U8] trn = recover Array[U8](size) end
+    for bytes in data_bytes.values() do
+      buffer.append(bytes)
+    end
+
+    match ChannelMsgDecoder(consume buffer, auth)
+    | let r: DataMsg val =>
+      r
+    else
+      @printf[I32]("Trouble reconstituting replayed data msg\n".cstring())
+      error
+    end
+
 
 trait DeliveryMsg is ChannelMsg
   fun target_id(): U128
@@ -211,7 +242,11 @@ trait DeliveryMsg is ChannelMsg
   fun deliver(target_step: RunnableStep tag, origin: Origin tag,
     seq_id: U64): Bool
 
-class ForwardMsg[D: Any val] is DeliveryMsg
+trait ReplayableDeliveryMsg is DeliveryMsg
+  fun replay_deliver(target_step: RunnableStep tag, origin: Origin tag,
+    seq_id: U64): Bool
+
+class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _target_id: U128
   let _sender_name: String
   let _source_ts: U64
@@ -242,6 +277,13 @@ class ForwardMsg[D: Any val] is DeliveryMsg
   =>
     target_step.run[D](_metric_name, _source_ts, _data, origin, _msg_uid, 
       _frac_ids, seq_id, 0)
+    false  
+
+  fun replay_deliver(target_step: RunnableStep tag, origin: Origin tag,
+    seq_id: U64): Bool
+  =>
+    target_step.recovery_run[D](_metric_name, _source_ts, _data, origin, 
+      _msg_uid, _frac_ids, seq_id, 0)
     false  
 
 class RequestReplayMsg is DeliveryMsg

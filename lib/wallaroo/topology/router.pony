@@ -109,12 +109,23 @@ class DataRouter
   // fun route(metric_name: String, source_ts: U64, d_msg: DeliveryMsg val,
   //   incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
   //   producer: (CreditFlowProducer ref | None)): Bool
-  fun route(d_msg: DeliveryMsg val, origin: Origin tag, seq_id: U64)
-  =>
+  fun route(d_msg: DeliveryMsg val, origin: Origin tag, seq_id: U64) =>
     try
       let target_id = d_msg.target_id()
       //TODO: create and deliver envelope
       d_msg.deliver(_data_routes(target_id), origin, seq_id)
+      false
+    else
+      true
+    end
+
+  fun replay_route(r_msg: ReplayableDeliveryMsg val, origin: Origin tag,
+    seq_id: U64)
+  =>
+    try
+      let target_id = r_msg.target_id()
+      //TODO: create and deliver envelope
+      r_msg.replay_deliver(_data_routes(target_id), origin, seq_id)
       false
     else
       true

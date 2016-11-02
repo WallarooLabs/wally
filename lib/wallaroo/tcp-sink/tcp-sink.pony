@@ -23,6 +23,12 @@ actor EmptySink is CreditFlowConsumerStep
   =>
     None
 
+  be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+    origin: (Origin tag | None), msg_uid: U128,
+    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
+  =>
+    None
+
   be initialize() => None
 
   be register_producer(producer: CreditFlowProducer) =>
@@ -148,6 +154,14 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
       return
     end
+
+  be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+    origin: (Origin tag | None), msg_uid: U128,
+    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
+  =>
+    //TODO: What do we do here?
+    run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, 
+      incoming_seq_id, route_id)
 
   be update_router(router: Router val) =>
     """
