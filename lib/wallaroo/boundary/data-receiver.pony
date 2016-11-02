@@ -38,6 +38,14 @@ actor DataReceiver is Origin
     _sender_step_id = sender_step_id
     @printf[I32](("DataReceiver got DataConnectMsg from " + _sender_name + "\n").cstring())
 
+  be update_watermark(route_id: U64, seq_id: U64) =>
+    try
+      let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name, _sender_step_id, seq_id, _auth)
+      _connections.send_data(_sender_name, ack_msg)
+    else
+      @printf[I32]("Error creating ack watermark message\n".cstring())
+    end
+
   be request_replay() =>
     try
       let request_msg = ChannelMsgEncoder.request_replay(_worker_name,
@@ -47,7 +55,6 @@ actor DataReceiver is Origin
       @printf[I32]("Error creating request replay message\n".cstring())
     end
 
-  //TODO: this should be triggered by ReplayCompleteMsg
   be upstream_replay_finished() =>
     _alfred.upstream_replay_finished(this)
 

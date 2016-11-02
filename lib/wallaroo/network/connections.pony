@@ -157,6 +157,20 @@ actor Connections
       end
     end
 
+  be ack_watermark_to_boundary(receiver_name: String, seq_id: U64) =>
+    try
+      _data_conns(receiver_name).ack(seq_id)
+    else
+      @printf[I32](("No outgoing boundary to worker " + receiver_name + "\n").cstring())
+    end
+
+  be request_replay(receiver_name: String) =>
+    try
+      _data_conns(receiver_name).replay_msgs()
+    else
+      @printf[I32](("No outgoing boundary to worker " + receiver_name + "\n").cstring())
+    end
+
     // try
     //   for proxy in _proxies(target_name).values() do
     //     proxy.update_router(TCPRouter(data_conn))

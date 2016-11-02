@@ -90,6 +90,11 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReplayCompleteMsg(sender_name), auth)
 
+  fun ack_watermark(sender_name: String, sender_step_id: U128, seq_id: U64, 
+    auth: AmbientAuth): Array[ByteSeq] val ? 
+  =>
+    _encode(AckWatermarkMsg(sender_name, sender_step_id, seq_id), auth)
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg val =>
     try
@@ -181,6 +186,16 @@ class ReplayCompleteMsg is ChannelMsg
     _sender_name = from
 
   fun sender_name(): String => _sender_name
+
+class AckWatermarkMsg is ChannelMsg
+  let sender_name: String
+  let sender_step_id: U128
+  let seq_id: U64
+
+  new val create(sender_name': String, sender_step_id': U128, seq_id': U64) =>
+    sender_name = sender_name'
+    sender_step_id = sender_step_id'
+    seq_id = seq_id'
   
 class DataMsg is ChannelMsg
   let seq_id: U64
@@ -229,15 +244,6 @@ class ForwardMsg[D: Any val] is DeliveryMsg
       _frac_ids, seq_id, 0)
     false  
 
-<<<<<<< HEAD
-//WOT WE UANT:
-//class ReplayMsg[D: Any val] is ForwardMsg
-//
-//  fun deliver(target_step: Step tag, origin: Origin tag): Bool =>
-//    target_step.replay_run[D](_metric_name, _source_ts, _data, origin, _msg_uid, 
-//      _frac_ids, _seq_id, 0)
-//    false  
-=======
 class RequestReplayMsg is DeliveryMsg
   let _sender_name: String
   let _target_id: U128
@@ -259,6 +265,3 @@ class RequestReplayMsg is DeliveryMsg
       @printf[I32]("RequestReplayMsg was not directed to an OutgoingBoundary!\n".cstring())
     end
     false
-
-
->>>>>>> 53527d1... Initial work on boundary ackings protocols/algo

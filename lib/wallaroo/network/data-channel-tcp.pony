@@ -44,19 +44,21 @@ class DataChannelListenNotifier is TCPListenNotify
     end
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelConnectNotifier(_receivers, _env, _auth)
+    DataChannelConnectNotifier(_receivers, _connections, _env, _auth)
 
     
 class DataChannelConnectNotifier is TCPConnectionNotify
   let _receivers: Map[String, DataReceiver] val
+  let _connections: Connections
   let _env: Env
   let _auth: AmbientAuth
   var _header: Bool = true
 
   new iso create(receivers: Map[String, DataReceiver] val,
-    env: Env, auth: AmbientAuth) 
+    connections: Connections, env: Env, auth: AmbientAuth) 
   =>
-    _receivers = receivers    
+    _receivers = receivers
+    _connections = connections  
     _env = env
     _auth = auth
 
@@ -84,6 +86,8 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
+      | let aw: AckWatermarkMsg val =>
+        _connections.ack_watermark_to_boundary(aw.sender_name, aw.seq_id)
       | let c: ReplayCompleteMsg val =>
         try
           _receivers(c.sender_name()).upstream_replay_finished()
