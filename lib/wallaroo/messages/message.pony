@@ -39,15 +39,14 @@ trait Origin
       origins_get().set(origin)
     end
     
-  be update_watermark(route_id: U64, downstream_seq_id: U64)
-  =>
+  be update_watermark(route_id: U64, seq_id: U64) =>
   """
   Process a high watermark received from a downstream step.
   TODO: truncate replay buffers using new low watermark
   TODO: call Alfred with new low watermark
   """
   // update low watermark for this route_id
-  lwm_get().update(route_id, downstream_seq_id)
+  lwm_get().update(route_id, seq_id)
 
   // calculate which messages can be ACKed
   try
@@ -58,7 +57,7 @@ trait Origin
         // translate downstream route_id to upstream route_id
         let upstream_route_id = route_translate_get().outToIn(route_id)
         // translate downstream seq_id to upstream seq_id
-        let upstream_seq_id = seq_translate_get().outToIn(downstream_seq_id)
+        let upstream_seq_id = seq_translate_get().outToIn(seq_id)
         _flush(low_watermark, origin, upstream_route_id, upstream_seq_id)
       end
     end

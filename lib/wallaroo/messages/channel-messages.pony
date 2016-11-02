@@ -198,3 +198,11 @@ class ForwardMsg[D: Any val] is DeliveryMsg
     target_step.run[D](_metric_name, _source_ts, _data, origin, _msg_uid, 
       _frac_ids, _seq_id, 0)
     false  
+
+//WOT WE UANT:
+//class ReplayMsg[D: Any val] is ForwardMsg
+//
+//  fun deliver(target_step: Step tag, origin: Origin tag): Bool =>
+//    target_step.replay_run[D](_metric_name, _source_ts, _data, origin, _msg_uid, 
+//      _frac_ids, _seq_id, 0)
+//    false  

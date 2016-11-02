@@ -62,24 +62,20 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _max_distributable_credits: ISize = 500_000
   var _distributable_credits: ISize = _max_distributable_credits
 
-  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
+  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, id: U128,
     route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter)
   =>
     _runner = consume runner
+    match _runner
+    | let r: ReplayableRunner => r.set_origin_id(id)
+    end
     _metrics_reporter = consume metrics_reporter
     _outgoing_seq_id = 0
     _router = router
     _route_builder = route_builder
     _alfred = alfred
-    _alfred.register_origin(this)
-    _id = None
-
-  be set_id(id: U128) =>
+    _alfred.register_origin(this, id)
     _id = id
-    match _runner
-    | let sr: ReplayableRunner =>
-      sr.set_id(id)
-    end
 
   be initialize() =>
     for consumer in _router.routes().values() do
@@ -159,7 +155,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     false
 
 
-  be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
@@ -200,7 +196,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
       @printf[I32]("Tried to flush a non-existing buffer!".cstring())
     end
 
-  be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
+  be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val)
   =>
     if not _is_duplicate(_incoming_envelope) then
       _deduplication_list.push(_incoming_envelope)
@@ -213,17 +209,9 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     end
 
   be replay_finished() =>
-    match _runner
-    | let r: ReplayableRunner =>
-      r.replay_finished()
-    end
     _deduplication_list.clear()
 
   be start_without_replay() =>
-    match _runner
-    | let r: ReplayableRunner =>
-      r.replay_finished()
-    end
     _deduplication_list.clear()
 
   be dispose() =>

@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "sendence/guid"
 use "wallaroo/backpressure"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
@@ -139,10 +140,11 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
 
   fun build(metrics_conn: TCPConnection, alfred: Alfred): StateAddresses val =>
     let m: Map[Key, Step] trn = recover Map[Key, Step] end
+    let guid_gen = GuidGenerator
     for key in _keys.values() do
       let reporter = MetricsReporter("shared state", metrics_conn)
       m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
-        consume reporter, _runner_builder.route_builder(), alfred)
+        consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
     end
     KeyedStateAddresses[Key](consume m)
 
@@ -218,7 +220,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
             let next_step = Step(runner_builder(
                 MetricsReporter(_pipeline_name, metrics_conn)
                 where alfred = alfred, router = state_comp_router),
-              MetricsReporter(_pipeline_name, metrics_conn),
+              MetricsReporter(_pipeline_name, metrics_conn), id,
               runner_builder.route_builder(), alfred,
               DirectRouter(s))
             m(id) = next_step

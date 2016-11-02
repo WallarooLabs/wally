@@ -18,21 +18,10 @@ interface Runner
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None), router: (Router val | None) = None): Bool
 
-// TODO: This only exists to get StateRunner to compile because of ALFRED
-class EmptyRunner
-  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None), router: (Router val | None) = None): Bool 
-  => 
-    true
-
 trait ReplayableRunner
-  // TODO: Remove Origin None option once we fix identifying origin Proxy when
-  // messages cross boundary
-  fun ref replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val, 
-    origin: (Origin tag | None))
-  fun ref replay_finished()
-  fun ref set_id(id: U128)
+  fun ref replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val, 
+    origin: Origin tag)
+  fun ref set_origin_id(id: U128)
 
 interface RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, 
@@ -373,20 +362,17 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     _alfred = alfred
     _id = None
 
-  fun ref set_id(id: U128) => _id = id
+  fun ref set_origin_id(id: U128) => _id = id
 
   fun ref register_state_change(scb: StateChangeBuilder[State] val) : U64 =>
     _state_change_repository.make_and_register(scb)
 
-  fun ref replay_log_entry(msg_uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val, 
+  fun ref replay_log_entry(msg_uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val, 
     origin: (Origin tag | None))
   =>
-    let me = recover val MsgEnvelope(origin, msg_uid, frac_ids,0,0) end
     try
       let sc = _state_change_repository(statechange_id)
-      for e in payload.values() do
-        _rb.append(e as Array[U8] val)
-      end
+      _rb.append(payload as Array[U8] val)
       try
         sc.read_log_entry(_rb)
         sc.apply(_state)
@@ -411,12 +397,14 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
       match state_change
       | let sc: StateChange[State] ref =>
         ifdef "resilience" then
-          let payload = sc.to_log_entry(_wb)
+          sc.write_log_entry(_wb)
+          //TODO: batching? race between queueing and watermark?
+          let payload = _wb.done()
           //TODO: deal with creating fractional message ids here
           match _id
           | let buffer_id: U128 =>
             _alfred.queue_log_entry(buffer_id, incoming_envelope.msg_uid, None,
-              sc.id(), outgoing_envelope.seq_id, payload)
+              sc.id(), outgoing_envelope.seq_id, consume payload)
           else
             @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
           end
@@ -436,9 +424,6 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
       @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
       true
     end
-
-  fun ref replay_finished() =>
-    None
 
   fun rotate_log() =>
     //we need to be able to conflate all the current logs to a checkpoint and

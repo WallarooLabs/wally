@@ -5,7 +5,6 @@ use "wallaroo/boundary"
 use "wallaroo/messages"
 
 trait Backend
-  //fun read(from: U64, to: U64): Array[Array[U8] val] val
   fun ref flush()
   fun ref start()
   fun ref write_entry(buffer_id: U128, entry: LogEntry)
@@ -46,7 +45,7 @@ class FileBackend is Backend
         //seek beginning of file
         _file.seek_start(0)
         var size = _file.size()
-        //start iterating until we reach start
+        //start iterating until we reach original EOF
         while _file.position() < size do
           r.append(_file.read(40))
           let buffer_id = r.u128_be()
@@ -66,15 +65,11 @@ class FileBackend is Backend
               None
             end
           end
-          r.append(_file.read(16))
+          r.append(_file.read(16)) //TODO: use sizeof-type things?
           let statechange_id = r.u64_be()
           let payload_length = r.u64_be()
-          let payload_single = recover val _file.read(payload_length.usize()) end
-          let payload = recover val
-            let p = Array[ByteSeq]
-            p.push(payload_single)
-            p
-          end
+          let payload = recover val _file.read(payload_length.usize()) end
+          //origin_id!
           _alfred.replay_log_entry(buffer_id, uid, frac_ids, statechange_id, payload)
         end
         _file.seek_end(0)
@@ -155,15 +150,16 @@ actor Alfred
     be log_replay_finished() =>
       //signal all buffers that event log replay is finished
       for boundary in _incoming_boundaries.values() do
+        _replay_complete_markers.update((digestof boundary),false)
         boundary.request_replay()
-        _replay_complete_markers.update((digestof boundary).hash(),false)
       end
 
     be upstream_replay_finished(boundary: DataReceiver tag) =>
-      _replay_complete_markers.update((digestof boundary).hash(), true)
+      _replay_complete_markers.update((digestof boundary), true)
       //TODO: if all boundary markers are true, we have truly finished replaying
+      // replay_finished
 
-    be replay_finished() =>
+    fun _replay_finished() =>
       for b in _origins.values() do
         b.replay_finished()
       end
@@ -174,7 +170,7 @@ actor Alfred
         b.start_without_replay()
       end
 
-    be replay_log_entry(buffer_id: U128, uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val) =>
+    be replay_log_entry(buffer_id: U128, uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val) =>
       try
         _origins(buffer_id).replay_log_entry(uid, frac_ids, statechange_id, payload)
       else
@@ -182,8 +178,7 @@ actor Alfred
         @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
       end
 
-    be register_origin(origin: ResilientOrigin tag) =>
-      let id = _origins.size().u128()
+    be register_origin(origin: ResilientOrigin tag, id: U128) =>
       _origins(id) = origin 
       _log_buffers(id) =
         ifdef "resilience" then
@@ -191,7 +186,6 @@ actor Alfred
         else
           DeactivatedEventLogBuffer
         end
-      origin.set_id(id)
 
     be queue_log_entry(buffer_id: U128, uid: U128,
       frac_ids: (Array[U64] val | None), statechange_id: U64, seq_id: U64,
