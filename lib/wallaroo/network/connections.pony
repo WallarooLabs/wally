@@ -78,6 +78,14 @@ actor Connections
       @printf[I32](("No control connection for worker " + worker + "\n").cstring())
     end
 
+  be send_data(worker: String, data: Array[ByteSeq] val) =>
+    try
+      _data_conns(worker).writev(data)
+      // @printf[I32](("Sent protocol message over outgoing boundary to " + worker + "\n").cstring())
+    else
+      @printf[I32](("No outgoing boundary to worker " + worker + "\n").cstring())
+    end
+
   be send_phone_home(msg: Array[ByteSeq] val) =>
     match _phone_home
     | let tcp: TCPConnection =>
@@ -135,9 +143,19 @@ actor Connections
   be create_data_connection(target_name: String, host: String, 
     service: String) 
   =>
-    let outgoing_boundary = OutgoingBoundary(
-      MetricsReporter(_worker_name, _metrics_conn), host, service)
+    let outgoing_boundary = OutgoingBoundary(_auth,
+      _worker_name, MetricsReporter(_worker_name, _metrics_conn), 
+      host, service)
     _data_conns(target_name) = outgoing_boundary
+
+  be update_boundary_ids(boundary_ids: Map[String, U128] val) =>
+    for (worker, boundary) in _data_conns.pairs() do
+      try
+        boundary.register_step_id(boundary_ids(worker))
+      else
+        @printf[I32](("Could not register step id for boundary to " + worker + "\n").cstring())
+      end
+    end
 
     // try
     //   for proxy in _proxies(target_name).values() do

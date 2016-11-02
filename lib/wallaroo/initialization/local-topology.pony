@@ -20,13 +20,16 @@ class LocalTopology
   let _graph: Dag[StepInitializer val] val
   // _state_builders maps from state_name to StateSubpartition
   let _state_builders: Map[String, StateSubpartition val] val
+  let _proxy_ids: Map[String, U128] val
 
   new val create(name': String, graph': Dag[StepInitializer val] val,
-    state_builders': Map[String, StateSubpartition val] val)
+    state_builders': Map[String, StateSubpartition val] val,
+    proxy_ids': Map[String, U128] val)
   =>
     _app_name = name'
     _graph = graph'
     _state_builders = state_builders'
+    _proxy_ids = proxy_ids'
 
   fun update_state_map(state_map: Map[String, StateAddresses val],
     metrics_conn: TCPConnection, alfred: Alfred)
@@ -44,6 +47,8 @@ class LocalTopology
 
   fun is_empty(): Bool =>
     _graph.is_empty()
+
+  fun proxy_ids(): Map[String, U128] val => _proxy_ids
 
 actor LocalTopologyInitializer
   let _worker_name: String
@@ -84,7 +89,8 @@ actor LocalTopologyInitializer
 
     for w in ws.values() do
       if w != _worker_name then
-        let data_receiver = DataReceiver(_connections, _alfred)
+        let data_receiver = DataReceiver(_auth, _worker_name, w, _connections, 
+          _alfred)
         drs(w) = data_receiver
         _data_receivers(w) = data_receiver
       end
@@ -130,10 +136,10 @@ actor LocalTopologyInitializer
         // Make sure we only create shared state once and reuse it
         let state_map: Map[String, StateAddresses val] = state_map.create()
 
-        // Keep track of all Steps by id so we can create a DataRouter
-        // for the data channel boundary
-        let data_routes: Map[U128, Step tag] trn =
-          recover Map[U128, Step tag] end
+        // Keep track of all CreditFLowConsumerSteps by id so we can create a 
+        // DataRouter for the data channel boundary
+        let data_routes: Map[U128, CreditFlowConsumerStep tag] trn =
+          recover Map[U128, CreditFlowConsumerStep tag] end
 
         @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
 
@@ -146,6 +152,9 @@ actor LocalTopologyInitializer
         // Keep track of everything we need to call initialize() on when
         // we're done
         let initializables: Array[Initializable tag] = initializables.create()
+
+        // Update the step ids for all OutgoingBoundaries
+        _connections.update_boundary_ids(t.proxy_ids())
 
 
         /////////
@@ -374,6 +383,7 @@ actor LocalTopologyInitializer
                   DirectRouter(sink)
                 end
 
+              data_routes(next_id) = sink
               built(next_id) = sink_router
             | let source_data: SourceData val =>
               let next_id = source_data.id()

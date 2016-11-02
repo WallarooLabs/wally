@@ -7,9 +7,13 @@ use "wallaroo/resilience"
 use "wallaroo/messages"
 
 actor DataReceiver is Origin
-  var _sender_name: String = ""
+  let _auth: AmbientAuth  
+  let _worker_name: String
+  var _sender_name: String
+  var _sender_step_id: U128 = 0
   let _connections: Connections
-  var _router: DataRouter val = DataRouter(recover Map[U128, Step tag] end)
+  var _router: DataRouter val = 
+    DataRouter(recover Map[U128, CreditFlowConsumerStep tag] end)
   var _last_id_seen: U64 = 0
   var _connected: Bool = false
   var _reconnecting: Bool = false
@@ -20,12 +24,28 @@ actor DataReceiver is Origin
   let _route_translate: RouteTranslationTable = RouteTranslationTable(1)
   let _alfred: Alfred
 
-  // let _timers: Timers = Timers
+  new create(auth: AmbientAuth, worker_name: String, sender_name: String, 
+    connections: Connections, alfred: Alfred) 
+  =>
+    _auth = auth
+    _worker_name = worker_name
+    _sender_name = sender_name
+    _connections = connections
+    _alfred = alfred
+    _alfred.register_incoming_boundary(this)
+
+  be data_connect(sender_step_id: U128) =>
+    _sender_step_id = sender_step_id
+    @printf[I32](("DataReceiver got DataConnectMsg from " + _sender_name + "\n").cstring())
+
   be request_replay() =>
-    //TODO: request upstream replay
-    //let request_msg = ChannelMsgEncoder...
-    //_connections.send_data(_sender_name, request_msg) 
-    None
+    try
+      let request_msg = ChannelMsgEncoder.request_replay(_worker_name,
+        _sender_step_id, _auth)
+      _connections.send_data(_sender_name, request_msg)
+    else
+      @printf[I32]("Error creating request replay message\n".cstring())
+    end
 
   //TODO: this should be triggered by ReplayCompleteMsg
   be upstream_replay_finished() =>
@@ -46,24 +66,14 @@ actor DataReceiver is Origin
   fun ref seq_translate_get(): SeqTranslationTable => _seq_translate
   fun ref route_translate_get(): RouteTranslationTable => _route_translate
 
-  new create(connections: Connections, alfred: Alfred) =>
-    _connections = connections
-    _alfred = alfred
-    _alfred.register_incoming_boundary(this)
-    // let t = Timer(_Ack(this), 1_000_000_000, 1_000_000_000)
-    // _timers(consume t)
-
   be update_router(router: DataRouter val) =>
     _router = router
 
-  be register_sender_name(name: String) =>
-    _sender_name = name
-
-  be received(d: DeliveryMsg val)
+  be received(d: DeliveryMsg val, seq_id: U64)
   =>  
-    if d.seq_id() > _last_id_seen then
-      _last_id_seen = d.seq_id()
-      _router.route(d, this)
+    if seq_id > _last_id_seen then
+      _last_id_seen = seq_id
+      _router.route(d, this, seq_id)
       // match _router.route(target_step_id)
       // | let s: Step tag =>
       //   s.run[D](metric_name, source_ts, msg_data)

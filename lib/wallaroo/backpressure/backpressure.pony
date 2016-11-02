@@ -1,5 +1,6 @@
 use "assert"
 use "sendence/guid"
+use "sendence/queue"
 use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/topology"
@@ -48,9 +49,7 @@ trait Route
   fun ref receive_credits(number: ISize)
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     msg_uid: U128, frac_ids: (Array[U64] val | None))
-  fun ref forward(metric_name: String, source_ts: U64,
-    data: Array[ByteSeq] val, msg_uid: U128, frac_ids: (Array[U64] val | None),
-    target_proxy_address: ProxyAddress val) 
+  fun ref forward(delivery_msg: DeliveryMsg val)
 
 class EmptyRoute is Route
   fun ref initialize() => None
@@ -63,10 +62,7 @@ class EmptyRoute is Route
   => 
     None
 
-  fun ref forward(metric_name: String, source_ts: U64,
-    data: Array[ByteSeq] val, msg_uid: U128, frac_ids: (Array[U64] val | None),
-    target_proxy_address: ProxyAddress val) 
-  =>
+  fun ref forward(delivery_msg: DeliveryMsg val) =>
     None
 
 
@@ -184,10 +180,7 @@ class TypedRoute[In: Any val] is Route
       end
     end
 
-  fun ref forward(metric_name: String, source_ts: U64,
-    data: Array[ByteSeq] val, msg_uid: U128, frac_ids: (Array[U64] val | None),
-    target_proxy_address: ProxyAddress val) 
-  =>
+  fun ref forward(delivery_msg: DeliveryMsg val) =>
     @printf[I32]("Forward should never be called on a TypedRoute\n".cstring())
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64,
@@ -234,8 +227,7 @@ class BoundaryRoute is Route
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
   var _seq_id: U64 = 0
-  embed _queue: Array[(String, U64, Array[ByteSeq] val, U128, 
-    (Array[U64] val | None), ProxyAddress val)] = _queue.create()
+  embed _queue: Queue[DeliveryMsg val] = _queue.create()
 
   new create(step: CreditFlowProducer ref, consumer: OutgoingBoundary,
     handler: RouteCallbackHandler)
@@ -301,22 +293,17 @@ class BoundaryRoute is Route
   =>
     @printf[I32]("Run should never be called on a BoundaryRoute\n".cstring())
 
-  fun ref forward(metric_name: String, source_ts: U64,
-    input: Array[ByteSeq] val, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), target_proxy_address: ProxyAddress val)
-  =>
+  fun ref forward(delivery_msg: DeliveryMsg val) =>
     ifdef "use_backpressure" then
       if _credits_available > 0 then
         let above_request_point =
           _credits_available >= _request_more_credits_after
 
         if _queue.size() > 0 then
-          _add_to_queue(metric_name, source_ts, input, msg_uid, frac_ids,
-            target_proxy_address)
+          _add_to_queue(delivery_msg)
           _flush_queue()
         else
-          _send_message_on_route(metric_name, source_ts, input, msg_uid, 
-            frac_ids, target_proxy_address)
+          _send_message_on_route(delivery_msg)
         end
 
         if _credits_available == 0 then
@@ -332,47 +319,31 @@ class BoundaryRoute is Route
           end
         end
       else
-        _add_to_queue(metric_name, source_ts, input, msg_uid, frac_ids,
-          target_proxy_address)
+        _add_to_queue(delivery_msg)
         _request_credits()
       end       
     else
-      _send_message_on_route(metric_name, source_ts, input, msg_uid, 
-        frac_ids, target_proxy_address)
+      _send_message_on_route(delivery_msg)
     end
 
-  fun ref _send_message_on_route(metric_name: String, source_ts: U64,
-    input: Array[ByteSeq] val, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), target_proxy_address: ProxyAddress val)
+  fun ref _send_message_on_route(delivery_msg: DeliveryMsg val)
   =>
-    _consumer.forward(metric_name,
-      source_ts,
-      input,  
-      // TODO: This should be _step but we need to fix type since it has
-      // to implement Origin tag
-      None,
-      msg_uid,
-      frac_ids,
-      _next_sequence_id(),
-      _route_id,
-      target_proxy_address)
-     
-      _credits_available = _credits_available - 1
+    _consumer.forward(delivery_msg)
+
+    _credits_available = _credits_available - 1
 
   fun ref _next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
 
-  fun ref _add_to_queue(metric_name: String, source_ts: U64,
-    input: Array[ByteSeq] val, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), target_proxy_address: ProxyAddress val)
-  =>
-    _queue.push((metric_name, source_ts, input, msg_uid, frac_ids,
-      target_proxy_address))
+  fun ref _add_to_queue(delivery_msg: DeliveryMsg val) =>
+    try
+      _queue.enqueue(delivery_msg)
+    end
 
   fun ref _flush_queue() =>
     while ((_credits_available > 0) and (_queue.size() > 0)) do
       try
-        let d =_queue.shift()
-        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6)
+        let d =_queue.dequeue()
+        _send_message_on_route(d)
       end
     end

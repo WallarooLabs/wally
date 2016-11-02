@@ -86,6 +86,10 @@ actor ApplicationInitializer
         local_graphs(name) = Dag[StepInitializer val]
       end
 
+      // Keep track of proxy ids per worker
+      let proxy_ids: Map[String, Map[String, U128]] = proxy_ids.create()
+
+
       @printf[I32](("Found " + application.pipelines.size().string()  + " pipelines in application\n").cstring())
 
       // Break each pipeline into LocalGraphs to distribute to workers
@@ -248,6 +252,9 @@ actor ApplicationInitializer
         // Keep track of which worker's boundary we're using
         var boundaries_idx: USize = 0
 
+        ///////////
+        // WORKERS 
+
         // For each worker, use its boundary value to determine which
         // runner_builders to use to create StepInitializers that will be
         // added to its local graph
@@ -279,8 +286,20 @@ actor ApplicationInitializer
               None
             end
 
-          // Set up egress id for this worker for this pipeline
-          let egress_id = _guid_gen.u128()
+          let local_proxy_ids = Map[String, U128] 
+          proxy_ids(worker) = local_proxy_ids          
+          if worker != "initializer" then
+            local_proxy_ids("initializer") = _guid_gen.u128()
+          end
+          for w in worker_names.values() do
+            if worker != w then
+              local_proxy_ids(w) = _guid_gen.u128()
+            end
+          end
+
+          // Set up sink id for this worker for this pipeline (in case there's
+          // a sink on it)
+          let sink_id = _guid_gen.u128()
 
           // Make sure there are still runner_builders left in the pipeline.
           if runner_builder_idx < runner_builders.size() then
@@ -325,7 +344,7 @@ actor ApplicationInitializer
                     try
                       runner_builders(runner_builder_idx + 1).id()
                     else
-                      egress_id
+                      sink_id
                     end
 
                   let next_initializer = PartitionedPreStateStepBuilder(
@@ -361,7 +380,7 @@ actor ApplicationInitializer
                     try
                       runner_builders(runner_builder_idx + 2).id()
                     else
-                      egress_id
+                      sink_id
                     end
 
                   let pre_state_init = StepBuilder(pipeline.name(),
@@ -445,6 +464,8 @@ actor ApplicationInitializer
             // pipeline
             match next_worker
             | let w: String =>
+              let egress_id = local_proxy_ids(w)
+
               let proxy_address = 
                 try
                   ProxyAddress(w, runner_builders(runner_builder_idx).id())
@@ -456,6 +477,9 @@ actor ApplicationInitializer
                 egress_id, proxy_address)
 
               try
+                // If we've already created a node for this proxy, it
+                // will simply be overwritten (which effectively means
+                // there is one node per OutgoingBoundary)
                 local_graphs(worker).add_node(egress_builder, egress_id)
                 match last_initializer
                 | (let last_id: U128, let step_init: StepInitializer val) =>
@@ -476,13 +500,13 @@ actor ApplicationInitializer
             // We need a Sink since there are no more steps to go in this
             // pipeline
             let egress_builder = EgressBuilder(pipeline.name(), 
-              egress_id, _output_addr, pipeline.sink_builder())
+              sink_id, _output_addr, pipeline.sink_builder())
 
             try
-              local_graphs(worker).add_node(egress_builder, egress_id)
+              local_graphs(worker).add_node(egress_builder, sink_id)
               match last_initializer
               | (let last_id: U128, let step_init: StepInitializer val) =>
-                local_graphs(worker).add_edge(last_id, egress_id)
+                local_graphs(worker).add_edge(last_id, sink_id)
               end
             else
               @printf[I32](("No graph for worker " + worker + "\n").cstring())
@@ -508,10 +532,15 @@ actor ApplicationInitializer
       // For each worker, generate a LocalTopology
       // from all of its LocalGraphs
       for (w, g) in local_graphs.pairs() do
+        let p_ids: Map[String, U128] trn = recover Map[String, U128] end
+        for (target, p_id) in proxy_ids(w).pairs() do
+          p_ids(target) = p_id
+        end
+
         let local_topology = 
           try
             LocalTopology(application.name(), g.clone(),
-              application.state_builders())
+              application.state_builders(), consume p_ids)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error

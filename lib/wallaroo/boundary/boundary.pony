@@ -17,10 +17,12 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
 class OutgoingBoundaryBuilder
-  fun apply(reporter: MetricsReporter iso, host: String, service: String):
-    OutgoingBoundary
+  fun apply(auth: AmbientAuth, worker_name: String,  
+    reporter: MetricsReporter iso, host: String, service: String): 
+      OutgoingBoundary
   =>
-    OutgoingBoundary(consume reporter, host, service)
+    OutgoingBoundary(auth, worker_name, consume reporter, host,
+      service)
 
 actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   // Steplike
@@ -51,7 +53,17 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
+
+  // Connection, Acking and Replay
+  let _auth: AmbientAuth
+  let _worker_name: String
+  var _step_id: U128 = 0
+  let _host: String
+  let _service: String
+  let _from: String
   let _queue: Queue[Array[ByteSeq] val] = _queue.create()
+  var _lowest_queue_id: U64 = 0
+  var _seq_id: U64 = 0
 
   //RESILIENCE
   //should become circular buffer
@@ -59,26 +71,46 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   //TODO: deal with incoming replay request from downstream boundary
 
-  new create(metrics_reporter: MetricsReporter iso, host: String, 
-    service: String, from: String = "", init_size: USize = 64, 
-    max_size: USize = 16384)
+  new create(auth: AmbientAuth, worker_name: String,
+    metrics_reporter: MetricsReporter iso, host: String, service: String, 
+    from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
     // _encoder = encoder_wrapper
+    _auth = auth
+    _worker_name = worker_name
+    _host = host
+    _service = service
+    _from = from
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _notify = EmptyBoundaryNotify
     _connect_count = @pony_os_connect_tcp[U32](this,
-      host.cstring(), service.cstring(),
+      _host.cstring(), _service.cstring(),
       from.cstring())
     _notify_connecting()
 
-  be initialize() => None
+  be initialize() =>
+    try
+      if _step_id == 0 then
+        @printf[I32]("Never registered step id for OutgoingBoundary!\n".cstring())
+        error
+      end
+
+      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id, 
+        _auth)
+      writev(connect_msg)
+    else
+      @printf[I32]("Failed to create DataConnectMsg\n".cstring())
+    end
+
+  be register_step_id(step_id: U128) =>
+    _step_id = step_id
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
@@ -87,18 +119,34 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
 
   // open question: how do we reconnect if our external system goes away?
-  be forward(metric_name: String, source_ts: U64, data: Array[ByteSeq] val,
-    origin: (Origin tag | None), msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64,
-    target_proxy_address: ProxyAddress val)
+  be forward(delivery_msg: DeliveryMsg val)
   =>
-    // try
-      // _queue.enqueue(data)
-    
-      //TODO: push to _replay_queue
-      //TODO: make and send envelope
-      _writev(data)
-    // end
+    try
+      let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg, 
+        _seq_id, _auth)
+      _queue.enqueue(outgoing_msg)
+
+      _writev(outgoing_msg)
+
+      _seq_id = _seq_id + 1
+    end
+
+  be writev(data: Array[ByteSeq] val) =>
+    _writev(data)
+
+  be ack(seq_id: U64) =>
+    if seq_id > _lowest_queue_id then
+      let flush_count = seq_id - _lowest_queue_id
+      for i in Range(0, flush_count.usize()) do
+        try _queue.dequeue() end
+        _lowest_queue_id = _lowest_queue_id + 1
+      end
+    end
+
+  be replay_msgs() =>
+    for msg in _queue.values() do
+      _writev(msg)
+    end
 
   be update_router(router: Router val) =>
     """

@@ -78,24 +78,15 @@ class ProxyRouter
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
-        try
-          let forward_msg = ChannelMsgEncoder.data_channel[D](
-            _target_proxy_address.step_id,
-            _worker_name, source_ts, data, metric_name, _auth,
-            _target_proxy_address, 
-            outgoing_envelope.msg_uid,
-            outgoing_envelope.frac_ids,
-            outgoing_envelope.seq_id)
+        let delivery_msg = ForwardMsg[D](
+          _target_proxy_address.step_id,
+          _worker_name, source_ts, data, metric_name,
+          _target_proxy_address, 
+          outgoing_envelope.msg_uid,
+          outgoing_envelope.frac_ids)
 
-          r.forward(metric_name, source_ts, forward_msg,
-            outgoing_envelope.msg_uid,
-            outgoing_envelope.frac_ids,
-            _target_proxy_address)
-          false
-        else
-          @printf[I32]("Failed to build forward message\n".cstring())
-          true
-        end
+        r.forward(delivery_msg)
+        false
       else
         // TODO: What do we do if we get None?
         true
@@ -108,22 +99,22 @@ class ProxyRouter
     recover val [_target] end
 
 class DataRouter
-  let _data_routes: Map[U128, Step tag] val
+  let _data_routes: Map[U128, CreditFlowConsumerStep tag] val
 
-  new val create(data_routes: Map[U128, Step tag] val =
-    recover Map[U128, Step tag] end)
+  new val create(data_routes: Map[U128, CreditFlowConsumerStep tag] val =
+    recover Map[U128, CreditFlowConsumerStep tag] end)
   =>
     _data_routes = data_routes
 
   // fun route(metric_name: String, source_ts: U64, d_msg: DeliveryMsg val,
   //   incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
   //   producer: (CreditFlowProducer ref | None)): Bool
-  fun route(d_msg: DeliveryMsg val, origin: Origin tag)
+  fun route(d_msg: DeliveryMsg val, origin: Origin tag, seq_id: U64)
   =>
     try
       let target_id = d_msg.target_id()
       //TODO: create and deliver envelope
-      d_msg.deliver(_data_routes(target_id), origin)
+      d_msg.deliver(_data_routes(target_id), origin, seq_id)
       false
     else
       true

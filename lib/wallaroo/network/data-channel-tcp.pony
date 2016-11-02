@@ -70,15 +70,23 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       end
     else
       match ChannelMsgDecoder(consume data, _auth)
-      | let d: DeliveryMsg val =>
+      | let data_msg: DataMsg val =>
+        let seq_id = data_msg.seq_id
         try
-          _receivers(d.from_name()).received(d)
+          _receivers(data_msg.delivery_msg.sender_name()).received(data_msg.delivery_msg,
+            seq_id)
+        else
+          @printf[I32]("Missing DataReceiver!\n".cstring())
+        end
+      | let dc: DataConnectMsg val =>
+        try
+          _receivers(dc.sender_name).data_connect(dc.sender_step_id)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
       | let c: ReplayCompleteMsg val =>
         try
-          _receivers(c.from_name()).upstream_replay_finished()
+          _receivers(c.sender_name()).upstream_replay_finished()
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
