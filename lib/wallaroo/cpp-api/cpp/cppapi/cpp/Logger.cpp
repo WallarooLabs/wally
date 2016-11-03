@@ -34,7 +34,8 @@ Logger::Logger ()
     _logger = spdlog::get("console");
   }
 #else
-  _logger = spdlog::basic_logger_mt("basic_logger", "debug_cppapi.log");
+  spdlog::set_async_mode(8192);
+  _logger = spdlog::basic_logger_mt("basic_logger", "/apps/dev/arizona/data/wallaroo/logs/debug_cppapi.log");
 #endif
   _logger->set_level(spdlog::level::info);
 }
