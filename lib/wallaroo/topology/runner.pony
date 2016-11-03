@@ -269,14 +269,16 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
     match workers
     | let w: String =>
       for key in _partition.keys().values() do
-        m(key) = ProxyAddress(w, GuidGenerator.u128())
+        try
+          m(key) = ProxyAddress(w, _step_id_map(key))
+        end
       end
     | let ws: Array[String] val =>
       let w_count = ws.size()
       var idx: USize = 0
       for key in _partition.keys().values() do
         try
-          m(key) = ProxyAddress(ws(idx), GuidGenerator.u128())
+          m(key) = ProxyAddress(ws(idx), _step_id_map(key))
         end
         idx = (idx + 1) % w_count
       end
