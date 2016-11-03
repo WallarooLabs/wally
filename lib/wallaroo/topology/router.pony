@@ -95,6 +95,12 @@ class ProxyRouter
       true
     end
 
+  fun copy_with_new_target_id(target_id: U128): ProxyRouter val =>
+    ProxyRouter(_worker_name, 
+      _target, 
+      ProxyAddress(_target_proxy_address.worker, target_id), 
+      _auth)
+
   fun routes(): Array[CreditFlowConsumerStep] val =>
     recover val [_target] end
 

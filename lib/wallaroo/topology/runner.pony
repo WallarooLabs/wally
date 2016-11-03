@@ -193,9 +193,14 @@ class StateRunnerBuilder[State: Any #read]
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
 trait PartitionBuilder
-  fun pre_state_subpartition(worker: String): PreStateSubpartition val
-  fun partition_addresses(worker: String): PartitionAddresses val
+  // These two methods need to be deterministic at the moment since they
+  // are called at different times
+  fun pre_state_subpartition(workers: (String | Array[String] val)):
+    PreStateSubpartition val
+  fun partition_addresses(workers: (String | Array[String] val)):
+    PartitionAddresses val
   fun state_name(): String
+  fun is_multi(): Bool
 
 class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val, 
   PIn: Any val, State: Any #read, Key: (Hashable val & Equatable[Key])] is PartitionBuilder
@@ -207,12 +212,14 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   let _route_builder: RouteBuilder val
   let _forward_route_builder: RouteBuilder val
   let _id: U128
+  let _multi_worker: Bool
 
   new val create(pipeline_name: String, state_name': String,
     state_comp: StateComputation[In, Out, State] val,
     step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val,
     route_builder': RouteBuilder val, 
-    forward_route_builder': RouteBuilder val, id': U128 = 0) 
+    forward_route_builder': RouteBuilder val, id': U128 = 0,
+    multi_worker: Bool = false) 
   =>
     _id = if id' == 0 then GuidGenerator.u128() else id' end
     _state_name = state_name'
@@ -222,6 +229,7 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
     _partition = partition'
     _route_builder = route_builder'
     _forward_route_builder = forward_route_builder'
+    _multi_worker = multi_worker
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -244,17 +252,36 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   fun step_id_map(): Map[Key, U128] val => _step_id_map
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  
-  fun pre_state_subpartition(worker: String): PreStateSubpartition val =>
-    KeyedPreStateSubpartition[PIn, Key](partition_addresses(worker),
+  fun is_multi(): Bool => _multi_worker
+
+  fun pre_state_subpartition(workers: (String | Array[String] val)): 
+    PreStateSubpartition val 
+  =>
+    KeyedPreStateSubpartition[PIn, Key](partition_addresses(workers),
       _step_id_map, _partition.function(), _pipeline_name)
 
-  fun partition_addresses(worker: String): KeyedPartitionAddresses[Key] val =>
+  fun partition_addresses(workers: (String | Array[String] val)): 
+    KeyedPartitionAddresses[Key] val 
+  =>
     let m: Map[Key, ProxyAddress val] trn = 
       recover Map[Key, ProxyAddress val] end
-    for key in _partition.keys().values() do
-      m(key) = ProxyAddress(worker, GuidGenerator.u128())
+
+    match workers
+    | let w: String =>
+      for key in _partition.keys().values() do
+        m(key) = ProxyAddress(w, GuidGenerator.u128())
+      end
+    | let ws: Array[String] val =>
+      let w_count = ws.size()
+      var idx: USize = 0
+      for key in _partition.keys().values() do
+        try
+          m(key) = ProxyAddress(ws(idx), GuidGenerator.u128())
+        end
+        idx = (idx + 1) % w_count
+      end
     end
+
     KeyedPartitionAddresses[Key](consume m)
 
 class ComputationRunner[In: Any val, Out: Any val]

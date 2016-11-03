@@ -134,7 +134,9 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
   let _keys: Array[Key] val
   let _runner_builder: RunnerBuilder val
 
-  new val create(keys: Array[Key] val, runner_builder: RunnerBuilder val) =>
+  new val create(keys: Array[Key] val, runner_builder: RunnerBuilder val,
+     multi_worker: Bool = false) 
+  =>
     _keys = keys
     _runner_builder = runner_builder
 
@@ -169,7 +171,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
   new val create(partition_addresses': KeyedPartitionAddresses[Key] val,
     id_map': Map[Key, U128] val,
     partition_function': PartitionFunction[PIn, Key] val,
-    pipeline_name': String)
+    pipeline_name': String, multi_worker: Bool = false)
   =>
     _partition_addresses = partition_addresses'
     _id_map = id_map'

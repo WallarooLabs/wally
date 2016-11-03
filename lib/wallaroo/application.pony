@@ -155,7 +155,8 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       s_comp: StateComputation[Last, Next, State] val,
       s_initializer: StateBuilder[State] val,
       state_name: String, 
-      partition: Partition[PIn, Key] val
+      partition: Partition[PIn, Key] val,
+      multi_worker: Bool = false
     ): PipelineBuilder[In, Out, Next] 
   =>
     let guid_gen = GuidGenerator
@@ -168,11 +169,13 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, PIn, State,
       Key](_p.name(), state_name, s_comp, consume step_id_map, partition,
         TypedRouteBuilder[StateProcessor[State] val],
-        TypedRouteBuilder[Next])
+        TypedRouteBuilder[Next]
+        where multi_worker = multi_worker)
     _p.add_runner_builder(next_builder)
 
     let state_partition = KeyedStateSubpartition[Key](partition.keys(),
-      StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders()))
+      StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders()) 
+        where multi_worker = multi_worker)
 
     _a.add_state_builder(state_name, state_partition)
 

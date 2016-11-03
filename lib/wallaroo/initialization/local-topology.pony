@@ -363,11 +363,14 @@ actor LocalTopologyInitializer
               let sink_reporter = MetricsReporter(
                 egress_builder.pipeline_name(), _metrics_conn)
 
-              // Create a sink or OutgoingBoundary proxy. 
+              // Create a sink or OutgoingBoundary proxy. If the latter,
+              // egress_builder finds it from _outgoing_boundaries
               let sink = egress_builder(_worker_name,
                 consume sink_reporter, _auth, _outgoing_boundaries)
 
-              initializables.push(sink)
+              if not initializables.contains(sink) then
+                initializables.push(sink)
+              end
 
               let sink_router = 
                 match sink

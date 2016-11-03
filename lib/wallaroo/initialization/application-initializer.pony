@@ -320,23 +320,26 @@ actor ApplicationInitializer
               // steps must be on the same workers as their corresponding
               // state steps
               if next_runner_builder.is_stateful() then
-                // If this is partitioned state and we haven't handled this
-                // shared state before, handle it. 
-                var state_name = ""
-                match next_runner_builder
-                | let pb: PartitionBuilder val =>
-                  state_name = pb.state_name()
-                  if not state_partition_map.contains(state_name) then
-                    state_partition_map(state_name) = 
-                      pb.partition_addresses(worker)
-                  end
-                end
-
                 // Create the prestate initializer, and if this is not
                 // partitioned state, then the state initializer as well.
                 match next_runner_builder
                 | let pb: PartitionBuilder val =>
                   @printf[I32](("Preparing to spin up partitioned state on " + worker + "\n").cstring())
+
+                  // Determine which workers will be involved in this partition
+                  let workers = 
+                    if pb.is_multi() then
+                      worker_names
+                    else
+                      worker
+                    end
+
+                  // Handle the shared state
+                  let state_name = pb.state_name()
+                  if not state_partition_map.contains(state_name) then
+                    state_partition_map(state_name) = 
+                      pb.partition_addresses(workers)
+                  end
 
                   // Determine whether the state computation target step will 
                   // be a step or a sink/proxy
@@ -349,7 +352,7 @@ actor ApplicationInitializer
 
                   let next_initializer = PartitionedPreStateStepBuilder(
                     pipeline.name(),
-                    pb.pre_state_subpartition(worker), next_runner_builder,
+                    pb.pre_state_subpartition(workers), next_runner_builder,
                     state_name, pre_state_target_id,
                     next_runner_builder.forward_route_builder())
                   let next_id = next_initializer.id()
@@ -464,15 +467,16 @@ actor ApplicationInitializer
             // pipeline
             match next_worker
             | let w: String =>
-              let egress_id = local_proxy_ids(w)
-
-              let proxy_address = 
+              let egress_id = 
                 try
-                  ProxyAddress(w, runner_builders(runner_builder_idx).id())
+                  runner_builders(runner_builder_idx).id()
                 else
                   @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
                   error
                 end
+
+              let proxy_address = ProxyAddress(w, egress_id)
+                
               let egress_builder = EgressBuilder(pipeline.name(),
                 egress_id, proxy_address)
 
