@@ -58,7 +58,7 @@ actor LocalTopologyInitializer
   let _connections: Connections
   let _metrics_conn: TCPConnection
   let _alfred : Alfred tag
-  let _is_initializer: Bool
+  var _is_initializer: Bool
   var _outgoing_boundaries: Map[String, OutgoingBoundary] val = 
     recover Map[String, OutgoingBoundary] end
   var _topology: (LocalTopology val | None) = None
@@ -456,6 +456,8 @@ actor LocalTopologyInitializer
           else
             @printf[I32]("Need WorkerInitializer to inform that topology is ready\n".cstring())
           end
+
+          _is_initializer = false
         else
           // Inform the initializer that we're done initializing our local
           // topology
