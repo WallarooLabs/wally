@@ -46,7 +46,7 @@ extern wallaroo::Data *w_computation_compute(wallaroo::Computation *computation_
   return computation_->compute(data_);
 }
 
-extern char *w_computation_get_name(wallaroo::Computation *computation_)
+extern const char *w_computation_get_name(wallaroo::Computation *computation_)
 {
   return computation_->name();
 }
@@ -61,7 +61,7 @@ extern void *w_state_computation_compute(wallaroo::StateComputation *state_compu
   return state_computation_->compute(data_, state_change_repo_, state_change_repository_helper_, state_, none_);
 }
 
-extern char *w_state_computation_get_name(wallaroo::StateComputation *state_computation_)
+extern const char *w_state_computation_get_name(wallaroo::StateComputation *state_computation_)
 {
   return state_computation_->name();
 }
@@ -114,7 +114,7 @@ extern wallaroo::Data *w_source_decoder_decode(wallaroo::SourceDecoder *source_d
   return source_decoder->decode(bytes, sz_);
 }
 
-extern char *w_state_change_get_name(wallaroo::StateChange *state_change_)
+extern const char *w_state_change_get_name(wallaroo::StateChange *state_change_)
 {
   return state_change_->name();
 }

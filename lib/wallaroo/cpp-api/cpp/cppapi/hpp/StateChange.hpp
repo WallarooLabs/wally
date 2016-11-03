@@ -8,7 +8,7 @@ namespace wallaroo
 class StateChange: public ManagedObject
 {
 public:
-  virtual char *name() = 0;
+  virtual const char *name() = 0;
   virtual uint64_t id() = 0;
   virtual void apply(State *state_) = 0;
   virtual size_t get_log_entry_size() = 0;

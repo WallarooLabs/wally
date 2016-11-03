@@ -38,14 +38,14 @@
 
 extern "C" {
 extern wallaroo::Data *w_computation_compute(wallaroo::Computation *computation_, wallaroo::Data *data_);
-extern char *w_computation_get_name(wallaroo::Computation *computation);
+extern const char *w_computation_get_name(wallaroo::Computation *computation);
 
 extern void *w_state_computation_compute(wallaroo::StateComputation *state_computation_, wallaroo::Data *data_,
                                          wallaroo::StateChangeRepository *state_change_repo_,
                                          void *state_change_repository_helper_,
                                          wallaroo::State *state_,
                                          void *none_);
-extern char *w_state_computation_get_name(wallaroo::StateComputation *state_computation_);
+extern const char *w_state_computation_get_name(wallaroo::StateComputation *state_computation_);
 extern size_t w_state_computation_get_number_of_state_change_builders(wallaroo::StateComputation *state_computaton_);
 extern wallaroo::StateChangeBuilder *w_state_computation_get_state_change_builder(wallaroo::StateComputation *state_computation_, uint64_t idx_);
 
@@ -62,7 +62,7 @@ extern size_t w_source_decoder_header_length(wallaroo::SourceDecoder *source_dec
 extern size_t w_source_decoder_payload_length(wallaroo::SourceDecoder *source_decoder, char *bytes);
 extern wallaroo::Data *w_source_decoder_decode(wallaroo::SourceDecoder *source_decoder, char *bytes, size_t sz_);
 
-extern char *w_state_change_get_name(wallaroo::StateChange *state_change_);
+extern const char *w_state_change_get_name(wallaroo::StateChange *state_change_);
 extern uint64_t w_state_change_get_id(wallaroo::StateChange *state_change_);
 extern void w_state_change_apply(wallaroo::StateChange *state_change_, wallaroo::State *state_);
 extern size_t w_state_change_get_log_entry_size(wallaroo::StateChange *state_change_);
