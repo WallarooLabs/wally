@@ -140,6 +140,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let encoded = _encoder.encode[D](data, _wb)
       _writev(encoded)
+      // TODO: We are finished with the message and can update watermarks
+
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
       _metrics_reporter.pipeline_metric(metric_name, source_ts)

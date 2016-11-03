@@ -63,10 +63,6 @@ actor DataReceiver is Origin
     """This is not a real Origin, so it doesn't write any State"""
     None
 
-  be update_watermark(route_id: U64, seq_id: U64) =>
-    //TODO: send watermark via TCP
-    None
-
   fun ref hwm_get(): HighWatermarkTable => _hwm
   fun ref lwm_get(): LowWatermarkTable => _lwm
   fun ref origins_get(): OriginSet => _origins

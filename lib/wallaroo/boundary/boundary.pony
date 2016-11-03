@@ -65,12 +65,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _lowest_queue_id: U64 = 0
   var _seq_id: U64 = 0
 
-  //RESILIENCE
-  //should become circular buffer
-  //let _replay_queue: Queue[Array[ByteSeq] val] = _replay_queue.create()
-
-  //TODO: deal with incoming replay request from downstream boundary
-
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String, 
     from: String = "", init_size: USize = 64, max_size: USize = 16384)
@@ -124,7 +118,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   =>
     @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
 
-  // open question: how do we reconnect if our external system goes away?
+  // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: ReplayableDeliveryMsg val)
   =>
     try
