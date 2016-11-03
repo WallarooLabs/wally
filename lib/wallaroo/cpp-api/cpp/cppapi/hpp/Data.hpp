@@ -41,5 +41,11 @@ public:
     virtual size_t serialize_get_size () = 0;
 };
 
+class EncodableData: public Data
+{
+public:
+  virtual void encode(char *bytes) = 0;
+};
+
 }
 #endif //__DATA_HPP__

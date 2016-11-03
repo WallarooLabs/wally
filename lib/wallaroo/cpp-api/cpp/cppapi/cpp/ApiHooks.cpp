@@ -34,6 +34,11 @@
 
 extern "C"
 {
+// These functions are generated when building the Wallaroo application.
+void* pony_CPPStateChangeRepositoryHelper_lookup_by_name(void* self, void* sc_repo, const char* name_p);
+void* pony_CPPStateChangeRepositoryHelper_get_state_change_object(void *state_change_repository_helper_, void* state_change_);
+void* pony_CPPStateChangeRepositoryHelper_get_stateful_computation_return(void *state_change_repository_helper_, void* data_, void* state_change_);
+
 //------------------------------------------------------------------------
 //
 extern wallaroo::Data *w_computation_compute(wallaroo::Computation *computation_, wallaroo::Data *data_)
@@ -46,12 +51,14 @@ extern char *w_computation_get_name(wallaroo::Computation *computation_)
   return computation_->name();
 }
 
-extern wallaroo::Data *w_state_computation_compute(wallaroo::StateComputation *state_computation_,
-                                                   wallaroo::Data *data_,
-                                                   wallaroo::StateChangeRepository *state_change_repo_,
-                                                   wallaroo::State *state_)
+extern void *w_state_computation_compute(wallaroo::StateComputation *state_computation_,
+                                         wallaroo::Data *data_,
+                                         wallaroo::StateChangeRepository *state_change_repo_,
+                                         void *state_change_repository_helper_,
+                                         wallaroo::State *state_,
+                                         void *none_)
 {
-  return state_computation_->compute(data_, state_change_repo_, state_);
+  return state_computation_->compute(data_, state_change_repo_, state_change_repository_helper_, state_, none_);
 }
 
 extern char *w_state_computation_get_name(wallaroo::StateComputation *state_computation_)
@@ -86,7 +93,7 @@ extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
 }
 
 extern void w_sink_encoder_encode(wallaroo::SinkEncoder *sink_encoder,
-  wallaroo::Data *data_, char *bytes)
+  wallaroo::EncodableData *data_, char *bytes)
 {
   sink_encoder->encode(data_, bytes);
 }
@@ -105,11 +112,6 @@ extern wallaroo::Data *w_source_decoder_decode(wallaroo::SourceDecoder *source_d
   char *bytes, size_t sz_)
 {
   return source_decoder->decode(bytes, sz_);
-}
-
-extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_)
-{
-  delete obj_;
 }
 
 extern char *w_state_change_get_name(wallaroo::StateChange *state_change_)
@@ -150,6 +152,30 @@ extern size_t w_state_change_read_log_entry_size_header(wallaroo::StateChange *s
 extern bool w_state_change_read_log_entry(wallaroo::StateChange *state_change_, char *bytes_)
 {
   return state_change_->read_log_entry(bytes_);
+}
+
+extern wallaroo::StateChange *w_state_change_builder_build(wallaroo::StateChangeBuilder *state_change_builder_, uint64_t id_){
+  return state_change_builder_->build(id_);
+}
+
+extern void *w_state_change_repository_lookup_by_name(void *state_change_repository_helper_, void *state_change_repository_, const char *name_)
+{
+  return (void *)pony_CPPStateChangeRepositoryHelper_lookup_by_name(state_change_repository_helper_, state_change_repository_, name_);
+}
+
+extern wallaroo::StateChange *w_state_change_get_state_change_object(void *state_change_repository_helper_, void *state_change_)
+{
+  return (wallaroo::StateChange *)pony_CPPStateChangeRepositoryHelper_get_state_change_object(state_change_repository_helper_, state_change_);
+}
+
+void *w_stateful_computation_get_return(void *state_change_repository_helper_, wallaroo::Data* data_, void *state_change_)
+{
+  return pony_CPPStateChangeRepositoryHelper_get_stateful_computation_return(state_change_repository_helper_, data_, state_change_);
+}
+  
+extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_)
+{
+  delete obj_;
 }
 
 }

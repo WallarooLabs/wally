@@ -52,3 +52,6 @@ class CPPStateChange is StateChange[CPPState]
     if @w_state_change_read_log_entry(_state_change.obj(), bytes.cpointer()) == false then
       error
     end
+
+  fun obj(): StateChangeP =>
+    _state_change.obj()

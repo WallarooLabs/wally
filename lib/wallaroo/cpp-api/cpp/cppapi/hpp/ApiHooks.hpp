@@ -40,9 +40,11 @@ extern "C" {
 extern wallaroo::Data *w_computation_compute(wallaroo::Computation *computation_, wallaroo::Data *data_);
 extern char *w_computation_get_name(wallaroo::Computation *computation);
 
-extern wallaroo::Data *w_state_computation_compute(wallaroo::StateComputation *state_computation_, wallaroo::Data *data_,
-                                                   wallaroo::StateChangeRepository *state_change_repo_,
-                                                   wallaroo::State *state_);
+extern void *w_state_computation_compute(wallaroo::StateComputation *state_computation_, wallaroo::Data *data_,
+                                         wallaroo::StateChangeRepository *state_change_repo_,
+                                         void *state_change_repository_helper_,
+                                         wallaroo::State *state_,
+                                         void *none_);
 extern char *w_state_computation_get_name(wallaroo::StateComputation *state_computation_);
 extern size_t w_state_computation_get_number_of_state_change_builders(wallaroo::StateComputation *state_computaton_);
 extern wallaroo::StateChangeBuilder *w_state_computation_get_state_change_builder(wallaroo::StateComputation *state_computation_, uint64_t idx_);
@@ -54,7 +56,7 @@ extern wallaroo::Data* w_data_deserialize (char* bytes_, size_t sz_);
 extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
   wallaroo::Data *data_);
 extern void w_sink_encoder_encode(wallaroo::SinkEncoder *sink_encoder,
-  wallaroo::Data *data_, char *bytes);
+  wallaroo::EncodableData *data_, char *bytes);
 
 extern size_t w_source_decoder_header_length(wallaroo::SourceDecoder *source_decoder);
 extern size_t w_source_decoder_payload_length(wallaroo::SourceDecoder *source_decoder, char *bytes);
@@ -68,6 +70,12 @@ extern void w_state_change_to_log_entry(wallaroo::StateChange *state_change_, ch
 extern size_t w_state_change_get_log_entry_size_header_size(wallaroo::StateChange *state_change_);
 extern size_t w_state_change_read_log_entry_size_header(wallaroo::StateChange *state_change_, char *bytes_);
 extern bool w_state_change_read_log_entry(wallaroo::StateChange *state_change_, char *bytes_);
+
+extern wallaroo::StateChange *w_state_change_builder_build(wallaroo::StateChangeBuilder *state_change_builder_, uint64_t id_);
+
+extern void *w_state_change_repository_lookup_by_name(void *state_change_repository_helper_, void *state_change_repository_, const char *name_);
+extern wallaroo::StateChange *w_state_change_get_state_change_object(void *state_change_repository_helper_, void *state_change_);
+extern void *w_stateful_computation_get_return(void *state_change_repository_helper_, wallaroo::Data* data_, void *state_change_);
 
 extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_);
 }

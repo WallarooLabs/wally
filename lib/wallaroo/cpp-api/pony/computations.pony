@@ -4,8 +4,8 @@ use "wallaroo/topology"
 use @w_computation_compute[DataP](computation: ComputationP, input: DataP)
 use @w_computation_get_name[Pointer[U8]](computation: ComputationP)
 
-use @w_state_computation_compute[StateComputationReturn](state_computation: StateComputationP,
-  input: DataP,sc_repo: StateChangeRepository[CPPState], state: StateP, n: None)
+use @w_state_computation_compute[((CPPData val | None), (CPPStateChange | None))](state_computation: StateComputationP,
+  input: DataP, sc_repo: StateChangeRepository[CPPState], sc_repo_helper: CPPStateChangeRepositoryHelper, state: StateP, n: None)
 use @w_state_computation_get_name[Pointer[U8]](state_computation: StateComputationP)
 use @w_state_computation_get_number_of_state_change_builders[USize](state_computaton: StateComputationP)
 use @w_state_computation_get_state_change_builder[StateChangeBuilderP](state_computation: StateComputationP, idx: USize)
@@ -49,21 +49,7 @@ class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState
   fun apply(input: CPPData val, sc_repo: StateChangeRepository[CPPState], state: CPPState):
     ((CPPData val | None), (CPPStateChange | None))
   =>
-    let ret = @w_state_computation_compute(_computation.obj(), input.obj(), sc_repo, state.obj(), None)
-    let rd = ret.data
-    let ret_data: (CPPData val | None) = if ret.has_data then
-      recover val CPPData(CPPManagedObject(rd)) end
-    else
-      None
-    end
-
-    let ret_state_change = if ret.has_state_change then
-      ret.state_change
-    else
-      None
-    end
-
-    (ret_data, ret_state_change)
+    @w_state_computation_compute(_computation.obj(), input.obj(), sc_repo, CPPStateChangeRepositoryHelper, state.obj(), None)
 
   fun name(): String =>
     _name

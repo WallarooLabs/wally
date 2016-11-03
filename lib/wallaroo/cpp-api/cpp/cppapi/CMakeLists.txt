@@ -68,19 +68,15 @@ include_directories("${PROJECT_SOURCE_DIR}/cppapi/hpp")
 include_directories("hpp")
 
 # add_executable(testapi ${SOURCE_FILES} cpp/tester.cpp)
-add_library(wallaroo SHARED ${SOURCE_FILES})
 add_library(wallaroo-static STATIC ${SOURCE_FILES})
 set_target_properties(wallaroo-static PROPERTIES OUTPUT_NAME "wallaroo")
 set_target_properties(wallaroo-static PROPERTIES PREFIX "lib")
-
-target_include_directories(wallaroo PUBLIC ${PROJECT_SOURCE_DIR}/cppapi/hpp)
 
 include (InstallRequiredSystemLibraries)
 set (CPACK_PACKAGE_VERSION_MAJOR "${WallarooCppApi_VERSION_MAJOR}")
 set (CPACK_PACKAGE_VERSION_MINOR "${WallarooCppApi_VERSION_MINOR}")
 
 include (CPack)
-install(TARGETS wallaroo EXPORT ${PROJECT_NAME} DESTINATION lib/${PROJECT_NAME})
 install(TARGETS wallaroo-static EXPORT ${PROJECT_NAME} ARCHIVE DESTINATION lib/${PROJECT_NAME})
 
 #
