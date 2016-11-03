@@ -23,7 +23,7 @@ actor EmptySink is CreditFlowConsumerStep
   =>
     None
 
-  be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
@@ -155,7 +155,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       return
     end
 
-  be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>

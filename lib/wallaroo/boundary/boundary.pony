@@ -118,7 +118,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   =>
     @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
 
-  be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
@@ -155,7 +155,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         _writev(ChannelMsgEncoder.replay(msg, _auth))
       end
     end
-    _writev(ChannelMsgEncoder.replay_complete(_worker_name, _auth))
+    try
+      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _auth))
+    end
 
   be update_router(router: Router val) =>
     """

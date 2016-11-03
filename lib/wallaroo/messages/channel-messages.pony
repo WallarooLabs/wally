@@ -282,7 +282,7 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun replay_deliver(target_step: RunnableStep tag, origin: Origin tag,
     seq_id: U64): Bool
   =>
-    target_step.recovery_run[D](_metric_name, _source_ts, _data, origin, 
+    target_step.replay_run[D](_metric_name, _source_ts, _data, origin, 
       _msg_uid, _frac_ids, seq_id, 0)
     false  
 
