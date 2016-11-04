@@ -119,11 +119,11 @@ class DataChannelConnectNotifier is TCPConnectionNotify
     false
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print("accepted")
+    _env.out.print("accepted data channel connection")
     conn.expect(4)
 
   fun ref connected(sock: TCPConnection ref) =>
-    _env.out.print("incoming connected")
+    _env.out.print("incoming connected on data channel")
 
 // class DataSenderConnectNotifier is TCPConnectionNotify
 //   let _env: Env
