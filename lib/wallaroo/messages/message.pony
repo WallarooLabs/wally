@@ -42,8 +42,8 @@ trait Origin
   be update_watermark(route_id: U64, seq_id: U64) =>
   """
   Process a high watermark received from a downstream step.
-  TODO: truncate replay buffers using new low watermark
-  TODO: call Alfred with new low watermark
+  TODO: Cleanup entries in hwm, seq_translate and route_translate
+        once we've ACKed them upstream
   """
   // update low watermark for this route_id
   lwm_get().update(route_id, seq_id)
