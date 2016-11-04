@@ -68,6 +68,7 @@ actor Main
 primitive Identity[In: Any val]
   fun name(): String => "identity"
   fun apply(r: In): In =>
+    @printf[I32]("Identity!!\n".cstring())
     r
 
 primitive IdentityBuilder[In: Any val]
@@ -107,6 +108,7 @@ class SymbolDataStateChange is StateChange[SymbolData]
     _last_offer = last_offer
 
   fun apply(state: SymbolData ref) =>
+    @printf[I32]("State change!!\n".cstring())
     state.last_bid = _last_bid
     state.last_offer = _last_offer
     state.should_reject_trades = _should_reject_trades
@@ -162,6 +164,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     sc_repo: StateChangeRepository[SymbolData], 
     state: SymbolData): ((OrderResult val | None), None)
   =>
+    @printf[I32]("!!CheckOrder\n".cstring())
     if state.should_reject_trades then
       @printf[I32]("Rejecting an order\n".cstring())
       let res = OrderResult(msg, state.last_bid, state.last_offer,

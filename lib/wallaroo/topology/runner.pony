@@ -18,6 +18,8 @@ interface Runner
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None), router: (Router val | None) = None): Bool
 
+  fun name(): String
+
 trait ReplayableRunner
   fun ref replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val, 
     origin: Origin tag)
@@ -327,6 +329,8 @@ class ComputationRunner[In: Any val, Out: Any val]
       computation_start, computation_end)
     is_finished
 
+  fun name(): String => _computation.name()
+
 class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _metrics_reporter: MetricsReporter
   let _output_router: Router val
@@ -372,6 +376,8 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
       computation_end)
 
     is_finished
+
+  fun name(): String => _name
 
 class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   let _state: State
@@ -459,6 +465,8 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     //rotate
     None
 
+  fun name(): String => "State runner"
+
 class iso RouterRunner
   fun ref run[In: Any val](metric_name: String val, source_ts: U64, input: In,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
@@ -472,3 +480,6 @@ class iso RouterRunner
     else
       true
     end
+
+  fun name(): String => "Router runner"
+
