@@ -86,8 +86,8 @@ actor Startup
 
       let d_addr_ref = d_arg as Array[String]
       let d_addr_trn: Array[String] trn = recover Array[String] end
-      d_addr_trn.push(o_addr_ref(0))
-      d_addr_trn.push(o_addr_ref(1))
+      d_addr_trn.push(d_addr_ref(0))
+      d_addr_trn.push(d_addr_ref(1))
       let d_addr: Array[String] val = consume d_addr_trn
 
       let d_host = d_addr(0)
