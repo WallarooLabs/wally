@@ -118,10 +118,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       _incoming_envelope, _outgoing_envelope, this, _router)
     if is_finished then
+      _metrics_reporter.pipeline_metric(metric_name, source_ts)
+    else
       ifdef "resilience" then
         _bookkeeping(_incoming_envelope, _outgoing_envelope)
       end
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
 
   ///////////
@@ -171,8 +172,9 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
       let is_finished = _runner.run[D](metric_name, source_ts, data,
         _incoming_envelope, _outgoing_envelope, this, _router)
       if is_finished then
-        _bookkeeping(_incoming_envelope, _outgoing_envelope)
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
+      else
+        _bookkeeping(_incoming_envelope, _outgoing_envelope)
       end
     end
 
