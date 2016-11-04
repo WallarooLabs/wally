@@ -140,8 +140,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let encoded = _encoder.encode[D](data, _wb)
       _writev(encoded)
-      // TODO: We are finished with the message and can update watermarks
-
+      
+      // We are finished with the message and can update watermarks
+      // Note: We are ACKing messages as fast as they come in.
+      // TODO: Queue the ACKs and use a timer to send watermarks upstream
+      //       periodically.
+      ifdef "resilience" then
+        match origin
+        | let origin': Origin tag => origin'.update_watermark(route_id, seq_id)
+        end
+      end
+      
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
