@@ -15,6 +15,7 @@ received.txt
 readable.txt
 metrics-report.txt
 .drone.sec.yml
+test.t
 
 # partial compilation files
 *.o
