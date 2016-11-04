@@ -91,12 +91,14 @@ class PartitionedPreStateStepBuilder
 
   fun build_partition(worker_name: String, state_addresses: StateAddresses val,
     metrics_conn: TCPConnection, auth: AmbientAuth, connections: Connections, 
-    alfred: Alfred, state_comp_router: Router val = EmptyRouter): 
+    alfred: Alfred, 
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    state_comp_router: Router val = EmptyRouter): 
       PartitionRouter val 
   =>
     _pre_state_subpartition.build(_app_name, worker_name, _runner_builder, 
       state_addresses, metrics_conn, auth, connections, alfred,
-      state_comp_router)
+      outgoing_boundaries, state_comp_router)
 
 class SourceData
   let _id: U128

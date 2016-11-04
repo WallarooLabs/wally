@@ -342,7 +342,7 @@ actor LocalTopologyInitializer
                 let partition_router: PartitionRouter val =
                   p_builder.build_partition(_worker_name, state_addresses,
                     _metrics_conn, _auth, _connections, _alfred, 
-                    state_comp_target)
+                    _outgoing_boundaries, state_comp_target)
                 
                 // Create a data route to each pre-state step in the 
                 // partition located on this worker
@@ -477,7 +477,7 @@ actor LocalTopologyInitializer
 
         // Initialize all our initializables to get backpressure started
         for i in initializables.values() do
-          i.initialize()
+          i.initialize(_outgoing_boundaries)
         end
 
         @printf[I32]("Local topology initialized\n".cstring())

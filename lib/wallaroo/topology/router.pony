@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "wallaroo/backpressure"
+use "wallaroo/boundary"
 use "wallaroo/messages"
 
 // TODO: Eliminate producer None when we can
@@ -159,12 +160,12 @@ class LocalPartitionRouter[In: Any val,
   Key: (Hashable val & Equatable[Key] val)] is PartitionRouter
   let _local_map: Map[U128, Step] val
   let _step_ids: Map[Key, U128] val
-  let _partition_routes: Map[Key, (Step | PartitionProxy)] val
+  let _partition_routes: Map[Key, (Step | ProxyRouter val)] val
   let _partition_function: PartitionFunction[In, Key] val
 
   new val create(local_map': Map[U128, Step] val,
     s_ids: Map[Key, U128] val,
-    partition_routes: Map[Key, (Step | PartitionProxy)] val,
+    partition_routes: Map[Key, (Step | ProxyRouter val)] val,
     partition_function: PartitionFunction[In, Key] val)
   =>
     _local_map = local_map'
@@ -182,7 +183,6 @@ class LocalPartitionRouter[In: Any val,
       try
         match _partition_routes(key)
         | let s: Step =>
-
           // TODO: Remove that producer can be None
           match producer
           | let cfp: CreditFlowProducer ref =>
@@ -201,22 +201,12 @@ class LocalPartitionRouter[In: Any val,
           else
             true
           end    
-        | let p: PartitionProxy =>
-          try
-            p.forward[In](metric_name, source_ts, input, _step_ids(key),
-              // TODO: We need to receive a from_step_id and pass it here
-              0,
-              outgoing_envelope.msg_uid,
-              outgoing_envelope.frac_ids,
-              outgoing_envelope.seq_id,
-              // TODO: Generate correct route id
-              0)
-            false
-          else
-            @printf[I32]("Missing step ID for partition key\n".cstring())
-            true
-          end
+        | let p: ProxyRouter val =>
+          p.route[In](metric_name, source_ts, input, incoming_envelope,
+            outgoing_envelope, producer)
+          false
         else
+          // This can't happen because the match is exhaustive
           true
         end
       else

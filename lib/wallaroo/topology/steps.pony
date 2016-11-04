@@ -5,6 +5,7 @@ use "net"
 use "collections"
 use "sendence/epoch"
 use "wallaroo/backpressure"
+use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -31,7 +32,7 @@ trait tag RunnableStep
 
 
 interface Initializable
-  be initialize()
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val)
 
 type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer & Initializable tag)
 
@@ -82,10 +83,15 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     _alfred.register_origin(this, id)
     _id = id
 
-  be initialize() =>
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) =>
     for consumer in _router.routes().values() do
       _routes(consumer) =
         _route_builder(this, consumer, StepRouteCallbackHandler)
+    end
+
+    for (worker, boundary) in outgoing_boundaries.pairs() do
+      _routes(boundary) = 
+        _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
     for r in _routes.values() do
@@ -329,86 +335,6 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     end
 
     lowest
-
-// TODO: If this sticks around after boundary work, it will have to become
-// an ResilientOrigin to compile, but that seems weird so we need to
-// rethink it
-actor PartitionProxy is (CreditFlowProducer & Initializable)
-  let _worker_name: String
-  var _router: (Router val | None) = None
-  let _metrics_reporter: MetricsReporter
-  let _auth: AmbientAuth
-  var _seq_id: U64 = 0
-  // TODO: This None will break when we no use None as origin possibility
-  let _incoming_envelope: MsgEnvelope = MsgEnvelope(None, 0, None, 0, 0)
-  let _outgoing_envelope: MsgEnvelope = MsgEnvelope(None, 0, None, 0, 0)
-
-  new create(worker_name: String, metrics_reporter: MetricsReporter iso,
-    auth: AmbientAuth)
-  =>
-    _worker_name = worker_name
-    _metrics_reporter = consume metrics_reporter
-    _auth = auth
-
-  be initialize() => None
-
-  be update_router(router: Router val) =>
-    _router = router
-
-  // TODO: If this lives on, then producer/consumer work needs
-  // to be integrated here
-  be receive_credits(credits: ISize, from: CreditFlowConsumer) => None
-  fun ref credits_used(c: CreditFlowConsumer, num: ISize = 1) => None
-  fun route_to(c: CreditFlowConsumerStep): (Route | None) => None
-
-  be forward[D: Any val](metric_name: String, source_ts: U64, data: D,
-    target_step_id: U128, from_step_id: U128, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64,
-    route_id: U64)
-  =>
-    _seq_id = _seq_id + 1
-
-    // TODO: This None will break when we no use None as origin possibility
-    _incoming_envelope.update(None, msg_uid, frac_ids, seq_id, route_id)
-    _outgoing_envelope.update(None, msg_uid, frac_ids, _seq_id)
-
-    let is_finished =
-      try
-        let return_proxy_address = ProxyAddress(_worker_name, from_step_id)
-
-        // TODO: This forward_msg should be created in a router, which is
-        // the thing normally responsible for creating the outgoing
-        // envelope arguments
-        let forward_msg = ChannelMsgEncoder.delivery[D](target_step_id,
-          _worker_name, source_ts, data, metric_name, _auth,
-          return_proxy_address, msg_uid, frac_ids)
-
-        match _router
-        | let r: Router val =>
-          r.route[Array[ByteSeq] val](metric_name, source_ts,
-            forward_msg, _incoming_envelope, _outgoing_envelope,
-            this)
-          false
-        else
-          @printf[I32]("PartitionProxy has no router\n".cstring())
-          true
-        end
-      else
-        @printf[I32]("Problem encoding forwarded message\n".cstring())
-        true
-      end
-
-    if is_finished then
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
-    end
-
-  be dispose() =>
-    match _router
-    | let r: TCPRouter val =>
-      r.dispose()
-    // | let sender: DataSender =>
-    //   sender.dispose()
-    end
 
 primitive StepRouteCallbackHandler is RouteCallbackHandler
   fun shutdown(producer: CreditFlowProducer ref) =>

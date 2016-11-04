@@ -20,9 +20,6 @@ actor Connections
   let _metrics_conn: TCPConnection
   let _init_d_host: String
   let _init_d_service: String
-  // let _proxies: Map[String, Array[Step tag]] = _proxies.create()
-  // let _partition_proxies: Map[String, Array[PartitionProxy tag]] = 
-  //   _partition_proxies.create()
   let _listeners: Array[TCPListener] = Array[TCPListener]
 
   new create(app_name: String, worker_name: String, env: Env, 
@@ -173,38 +170,6 @@ actor Connections
       @printf[I32](("No outgoing boundary to worker " + receiver_name + "\n").cstring())
     end
 
-    // try
-    //   for proxy in _proxies(target_name).values() do
-    //     proxy.update_router(TCPRouter(data_conn))
-    //   end
-    // end
-
-  // be register_proxy(worker: String, proxy: Step tag) =>
-  //   try
-  //     if _proxies.contains(worker) then
-  //       _proxies(worker).push(proxy)
-  //     else
-  //       _proxies(worker) = Array[Step tag]
-  //       _proxies(worker).push(proxy)
-  //     end
-  //   end
-
-  // be register_partition_proxies(proxies: Map[String, PartitionProxy] val) =>
-  //   for (worker, proxy) in proxies.pairs() do
-  //     try
-  //       if _partition_proxies.contains(worker) then
-  //         _partition_proxies(worker).push(proxy)
-  //         let tcp_router = TCPRouter(_data_conns(worker))
-  //         proxy.update_router(tcp_router)
-  //       else
-  //         _partition_proxies(worker) = Array[PartitionProxy tag]
-  //         _partition_proxies(worker).push(proxy)
-  //         let tcp_router = TCPRouter(_data_conns(worker))
-  //         proxy.update_router(tcp_router)
-  //       end
-  //     end
-  //   end
-
   be shutdown() =>
     for listener in _listeners.values() do
       listener.dispose()
@@ -213,16 +178,7 @@ actor Connections
     for (key, conn) in _control_conns.pairs() do
       conn.dispose()
     end
-    // for (name, proxies) in _proxies.pairs() do
-    //   for proxy in proxies.values() do
-    //     proxy.dispose()
-    //   end
-    // end
-    // for (name, proxies) in _partition_proxies.pairs() do
-    //   for proxy in proxies.values() do
-    //     proxy.dispose()
-    //   end
-    // end
+
     // for (key, receiver) in _data_connection_receivers.pairs() do
     //   receiver.dispose()
     // end

@@ -89,7 +89,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       from.cstring())
     _notify_connecting()
 
-  be initialize() =>
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) =>
     try
       if _step_id == 0 then
         @printf[I32]("Never registered step id for OutgoingBoundary!\n".cstring())

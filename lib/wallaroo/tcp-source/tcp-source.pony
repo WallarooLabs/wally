@@ -2,6 +2,7 @@ use "assert"
 use "collections"
 use "net"
 use "wallaroo/backpressure"
+use "wallaroo/boundary"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -68,7 +69,7 @@ actor TCPSource is (CreditFlowProducer & Initializable)
       r.initialize()
     end
 
-  be initialize() => None
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) => None
 
   be dispose() =>
      """

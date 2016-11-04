@@ -2,6 +2,7 @@ use "collections"
 use "net"
 use "sendence/guid"
 use "wallaroo/backpressure"
+use "wallaroo/boundary"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -163,6 +164,7 @@ trait PreStateSubpartition
     runner_builder: RunnerBuilder val,
     state_addresses: StateAddresses val, metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
     state_comp_router: Router val = EmptyRouter): PartitionRouter val
 
 class KeyedPreStateSubpartition[PIn: Any val,
@@ -175,7 +177,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
   new val create(partition_addresses': KeyedPartitionAddresses[Key] val,
     id_map': Map[Key, U128] val,
     partition_function': PartitionFunction[PIn, Key] val,
-    pipeline_name': String, multi_worker: Bool = false)
+    pipeline_name': String)
   =>
     _partition_addresses = partition_addresses'
     _id_map = id_map'
@@ -186,29 +188,12 @@ class KeyedPreStateSubpartition[PIn: Any val,
     runner_builder: RunnerBuilder val,
     state_addresses: StateAddresses val, metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
     state_comp_router: Router val = EmptyRouter):
     LocalPartitionRouter[PIn, Key] val
   =>
-    // map from worker name to partition proxy
-    let partition_proxies_trn: Map[String, PartitionProxy] trn =
-      recover Map[String, PartitionProxy] end
-
-    for (k, proxy_address) in _partition_addresses.pairs() do
-      // create partition proxies
-      if (not partition_proxies_trn.contains(proxy_address.worker)) and
-        (proxy_address.worker != worker_name) then
-        @printf[I32](("Adding partition proxy to " + proxy_address.worker + "for " + _pipeline_name + " pipeline\n").cstring())
-        partition_proxies_trn(proxy_address.worker) = PartitionProxy(
-          proxy_address.worker, MetricsReporter(app_name, metrics_conn),
-          auth)
-      end
-    end
-    let partition_proxies: Map[String, PartitionProxy] val =
-      consume partition_proxies_trn
-    // connections.register_partition_proxies(partition_proxies)
-
-    let routes: Map[Key, (Step | PartitionProxy)] trn =
-      recover Map[Key, (Step | PartitionProxy)] end
+    let routes: Map[Key, (Step | ProxyRouter val)] trn =
+      recover Map[Key, (Step | ProxyRouter val)] end
 
     let m: Map[U128, Step] trn = recover Map[U128, Step] end
 
@@ -237,9 +222,11 @@ class KeyedPreStateSubpartition[PIn: Any val,
           end
         else
           try
-            routes(key) = partition_proxies(pa.worker)
+            let boundary = outgoing_boundaries(pa.worker)
+            routes(key) = ProxyRouter(worker_name, boundary,
+              pa, auth)
           else
-            @printf[I32](("Missing PartitionProxy for " + pa.worker + "!\n").cstring())
+            @printf[I32](("Missing proxy for " + pa.worker + "!\n").cstring())
           end
         end
       else
