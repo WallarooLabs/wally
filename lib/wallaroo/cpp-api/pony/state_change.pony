@@ -29,7 +29,7 @@ class CPPStateChange is StateChange[CPPState]
   fun apply(state: CPPState) =>
     @w_state_change_apply(_state_change.obj(), state.obj())
 
-  fun to_log_entry(out_writer: Writer): Array[ByteSeq] val =>
+  fun write_log_entry(out_writer: Writer) =>
     let sz = @w_state_change_get_log_entry_size(_state_change.obj())
     let bytes: Array[U8] val = recover
       let b = Array[U8](sz)
@@ -37,7 +37,6 @@ class CPPStateChange is StateChange[CPPState]
       b
     end
     out_writer.write(consume bytes)
-    out_writer.done()
 
   fun read_log_entry(in_reader: Reader) ? =>
     let header_size = @w_state_change_get_log_entry_size_header_size(_state_change.obj())
