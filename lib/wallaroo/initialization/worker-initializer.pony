@@ -21,7 +21,7 @@ actor WorkerInitializer
   let _ready_workers: Set[String] = Set[String]
   var _control_identified: USize = 1
   var _data_receivers: USize = 1
-  var _data_identified: USize = 1
+  var _data_identified: USize = 0
   var _interconnected: USize = 1
   var _initialized: USize = 0
 
@@ -112,6 +112,7 @@ actor WorkerInitializer
       _ready_workers.set(worker_name)
       _initialized = _initialized + 1
       if _initialized == _expected then
+        @printf[I32]("All workers reporting Topology ready!\n".cstring())
         _application_initializer.topology_ready()
 
         let topology_ready_msg = 
@@ -140,7 +141,7 @@ actor WorkerInitializer
         _connections.send_control(key, create_data_receivers_msg)
       end 
 
-      _local_topology_initializer.create_data_receivers(workers)
+      _local_topology_initializer.create_data_receivers(workers, this)
     else
       @printf[I32]("Failed to create message to create data receivers\n".cstring())
     end

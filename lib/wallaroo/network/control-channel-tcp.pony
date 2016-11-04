@@ -102,7 +102,6 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           _connections.create_control_connection(m.worker_name, host, m.service)
         end
       | let m: IdentifyDataPortMsg val =>
-        _env.out.print("Got data message!")
         try
           (let host, _) = conn.remote_address().name()
           match _initializer

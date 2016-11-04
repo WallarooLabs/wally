@@ -40,8 +40,6 @@ actor Connections
 
     if not _is_initializer then
       create_control_connection("initializer", c_host, c_service)
-      @printf[I32](("---!!CREATING DATA to initializer at " + d_service + "\n").cstring())
-      create_data_connection("initializer", d_host, d_service)
     end
 
     if (ph_host != "") and (ph_service != "") then
@@ -64,13 +62,17 @@ actor Connections
     _listeners.push(listener)
     
   be create_initializer_data_channel(
-    data_receivers: Map[String, DataReceiver] val) 
+    data_receivers: Map[String, DataReceiver] val,
+    worker_initializer: WorkerInitializer) 
   =>
     let data_notifier: TCPListenNotify iso =
       DataChannelListenNotifier(_worker_name, _env, _auth, this,
         _is_initializer, data_receivers)
     register_listener(TCPListener(_auth, consume data_notifier,
       _init_d_host, _init_d_service))
+
+    worker_initializer.identify_data_address("initializer", _init_d_host,
+      _init_d_service)
 
   be send_control(worker: String, data: Array[ByteSeq] val) =>
     try
@@ -111,6 +113,11 @@ actor Connections
     local_topology_initializer: LocalTopologyInitializer) 
   =>
     try
+      // if not _is_initializer then
+      //   @printf[I32](("---!!CREATING DATA to initializer at " + _init_d_service + "\n").cstring())
+      //   create_data_connection("initializer", _init_d_host, _init_d_service)
+      // end
+
       let control_addrs = addresses("control")
       let data_addrs = addresses("data")
       for (target, address) in control_addrs.pairs() do
@@ -118,8 +125,10 @@ actor Connections
       end
 
       for (target, address) in data_addrs.pairs() do
-        @printf[I32](("---!!CREATING DATA CONN to " + address._2 + "\n").cstring())
-        create_data_connection(target, address._1, address._2)
+        if target != _worker_name then
+          @printf[I32](("---!!CREATING DATA CONN to " + address._2 + "\n").cstring())
+          create_data_connection(target, address._1, address._2)
+        end
       end
 
       update_boundaries(local_topology_initializer)

@@ -84,7 +84,8 @@ actor LocalTopologyInitializer
   be update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     _outgoing_boundaries = bs
 
-  be create_data_receivers(ws: Array[String] val) =>
+  be create_data_receivers(ws: Array[String] val,
+    worker_initializer: (WorkerInitializer | None) = None) =>
     let drs: Map[String, DataReceiver] trn = 
       recover Map[String, DataReceiver] end
 
@@ -106,7 +107,10 @@ actor LocalTopologyInitializer
       _connections.register_listener(
         TCPListener(_auth, consume data_notifier))
     else
-      _connections.create_initializer_data_channel(data_receivers)
+      match worker_initializer
+      | let wi: WorkerInitializer =>
+        _connections.create_initializer_data_channel(data_receivers, wi)
+      end
     end
 
   be initialize(worker_initializer: (WorkerInitializer | None) = None) =>
