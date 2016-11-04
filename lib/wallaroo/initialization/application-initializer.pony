@@ -327,9 +327,16 @@ actor ApplicationInitializer
                   @printf[I32](("Preparing to spin up partitioned state on " + worker + "\n").cstring())
 
                   // Determine which workers will be involved in this partition
-                  let workers = 
+                  let partition_workers: (String | Array[String] val) = 
                     if pb.is_multi() then
-                      worker_names
+                      @printf[I32]("Multiworker Partition\n".cstring())
+                      let w_names: Array[String] trn = 
+                        recover Array[String] end
+                      w_names.push("initializer")
+                      for w in worker_names.values() do
+                        w_names.push(w)
+                      end
+                      consume w_names
                     else
                       worker
                     end
@@ -338,7 +345,7 @@ actor ApplicationInitializer
                   let state_name = pb.state_name()
                   if not state_partition_map.contains(state_name) then
                     state_partition_map(state_name) = 
-                      pb.partition_addresses(workers)
+                      pb.partition_addresses(partition_workers)
                   end
 
                   // Determine whether the state computation target step will 
@@ -347,18 +354,53 @@ actor ApplicationInitializer
                     try
                       runner_builders(runner_builder_idx + 1).id()
                     else
+                      // We need a sink on every worker involved in the 
+                      // partition
+                      let egress_builder = EgressBuilder(pipeline.name(), 
+                        sink_id, _output_addr, pipeline.sink_builder())
+
+                      match partition_workers
+                      | let w: String =>
+                        try
+                          local_graphs(w).add_node(egress_builder, sink_id)
+                        else
+                          @printf[I32](("No graph for worker " + w + "\n").cstring())
+                          error
+                        end
+                      | let ws: Array[String] val =>
+                        local_graphs("initializer").add_node(egress_builder, 
+                          sink_id)
+                        for w in ws.values() do
+                          try
+                            local_graphs(w).add_node(egress_builder, sink_id)
+                          else
+                            @printf[I32](("No graph for worker " + w + "\n").cstring())
+                            error
+                          end
+                        end
+                      end
+
                       sink_id
                     end
 
                   let next_initializer = PartitionedPreStateStepBuilder(
                     application.name(), pipeline.name(),
-                    pb.pre_state_subpartition(workers), next_runner_builder,
-                    state_name, pre_state_target_id,
+                    pb.pre_state_subpartition(partition_workers), 
+                    next_runner_builder, state_name, pre_state_target_id,
                     next_runner_builder.forward_route_builder())
                   let next_id = next_initializer.id()
 
                   try
-                    local_graphs(worker).add_node(next_initializer, next_id)
+                    match partition_workers
+                    | let w: String =>                    
+                      local_graphs(w).add_node(next_initializer, next_id)
+                    | let ws: Array[String] val =>
+                      local_graphs("initializer").add_node(next_initializer, next_id)
+                      for w in ws.values() do
+                        local_graphs(w).add_node(next_initializer, next_id)
+                      end
+                    end
+
                     match last_initializer
                     | (let last_id: U128, let step_init: StepInitializer val) 
                     =>

@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "sendence/guid"
 use "sendence/messages"
 use "wallaroo/boundary"
 use "wallaroo/initialization"
@@ -21,6 +22,7 @@ actor Connections
   let _init_d_host: String
   let _init_d_service: String
   let _listeners: Array[TCPListener] = Array[TCPListener]
+  let _guid_gen: GuidGenerator = GuidGenerator
 
   new create(app_name: String, worker_name: String, env: Env, 
     auth: AmbientAuth, c_host: String, c_service: String, d_host: String, 
@@ -145,6 +147,7 @@ actor Connections
     let outgoing_boundary = OutgoingBoundary(_auth,
       _worker_name, MetricsReporter(_app_name, _metrics_conn), 
       host, service)
+    outgoing_boundary.register_step_id(_guid_gen.u128())
     _data_conns(target_name) = outgoing_boundary
 
   be update_boundary_ids(boundary_ids: Map[String, U128] val) =>

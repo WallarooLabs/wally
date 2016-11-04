@@ -44,17 +44,20 @@ actor Main
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo", FixNbboFrameHandler 
               where init_file = init_file)
+            .to[FixNbboMessage val](IdentityBuilder[FixNbboMessage val])
+            .to[FixNbboMessage val](IdentityBuilder[FixNbboMessage val])
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
-               symbol_data_partition)
+               symbol_data_partition where multi_worker = true)
             .done()
           .new_pipeline[FixOrderMessage val, OrderResult val](
             "Orders", FixOrderFrameHandler)
-            // .to[FixOrderMessage val](IdentityBuilder)
-            // .to[FixOrderMessage val](IdentityBuilder)
+            .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
+            .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
             .to_state_partition[Symboly val, String, 
               (OrderResult val | None), SymbolData](CheckOrder, 
-              SymbolDataBuilder, "symbol-data", symbol_data_partition)
+              SymbolDataBuilder, "symbol-data", symbol_data_partition
+              where multi_worker = true)
             .to_sink(OrderResultEncoder, recover [0] end)     
       end
       Startup(env, application, "/tmp/market-spread.evlog")
@@ -62,16 +65,16 @@ actor Main
       env.out.print("Couldn't build topology")
     end
 
-primitive Identity
+primitive Identity[In: Any val]
   fun name(): String => "identity"
-  fun apply(r: FixOrderMessage val): FixOrderMessage val =>
-    @printf[I32]("Identity\n".cstring())
+  fun apply(r: In): In =>
     r
 
-primitive IdentityBuilder
-  fun apply(): Computation[FixOrderMessage val, FixOrderMessage val] val =>
-    Identity
+primitive IdentityBuilder[In: Any val]
+  fun apply(): Computation[In, In] val =>
+    Identity[In]
  
+
 interface Symboly
   fun symbol(): String
 

@@ -154,11 +154,6 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
     end
     KeyedStateAddresses[Key](consume m)
 
-// class PartitionRouterBuilder
-//   fun build(state_addresses: StateAddresses val, metrics_conn: TCPConnection,
-//     state_comp_router: Router val = EmptyRouter): Router val
-
-
 trait PreStateSubpartition
   fun build(app_name: String, worker_name: String, 
     runner_builder: RunnerBuilder val,

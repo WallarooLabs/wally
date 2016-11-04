@@ -114,9 +114,6 @@ class DataRouter
   =>
     _data_routes = data_routes
 
-  // fun route(metric_name: String, source_ts: U64, d_msg: DeliveryMsg val,
-  //   incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-  //   producer: (CreditFlowProducer ref | None)): Bool
   fun route(d_msg: DeliveryMsg val, origin: Origin tag, seq_id: U64) =>
     try
       let target_id = d_msg.target_id()
