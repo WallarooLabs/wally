@@ -351,7 +351,7 @@ actor ApplicationInitializer
                     end
 
                   let next_initializer = PartitionedPreStateStepBuilder(
-                    pipeline.name(),
+                    application.name(), pipeline.name(),
                     pb.pre_state_subpartition(workers), next_runner_builder,
                     state_name, pre_state_target_id,
                     next_runner_builder.forward_route_builder())
@@ -386,7 +386,8 @@ actor ApplicationInitializer
                       sink_id
                     end
 
-                  let pre_state_init = StepBuilder(pipeline.name(),
+                  let pre_state_init = StepBuilder(application.name(),
+                    pipeline.name(),
                     next_runner_builder, pre_state_id, 
                     next_runner_builder.is_stateful(), pre_state_target_id,
                     next_runner_builder.forward_route_builder())
@@ -417,7 +418,8 @@ actor ApplicationInitializer
 
                   @printf[I32](("Preparing to spin up non-partitioned state for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
 
-                  let next_initializer = StepBuilder(pipeline.name(),
+                  let next_initializer = StepBuilder(application.name(),
+                    pipeline.name(),
                     next_runner_builder, next_runner_builder.id(),
                     next_runner_builder.is_stateful())
                   let next_id = next_initializer.id()
@@ -436,8 +438,8 @@ actor ApplicationInitializer
               else
                 @printf[I32](("Preparing to spin up " + next_runner_builder.name() + " on " + worker + "\n").cstring())
                 let next_id = next_runner_builder.id()
-                let next_initializer = StepBuilder(pipeline.name(),
-                  next_runner_builder, next_id)
+                let next_initializer = StepBuilder(application.name(),
+                  pipeline.name(), next_runner_builder, next_id)
 
                 try
                   local_graphs(worker).add_node(next_initializer, next_id)

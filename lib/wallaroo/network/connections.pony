@@ -9,6 +9,7 @@ use "wallaroo/tcp-source"
 use "wallaroo/topology"
 
 actor Connections
+  let _app_name: String
   let _worker_name: String
   let _env: Env
   let _auth: AmbientAuth
@@ -24,11 +25,12 @@ actor Connections
   //   _partition_proxies.create()
   let _listeners: Array[TCPListener] = Array[TCPListener]
 
-  new create(worker_name: String, env: Env, auth: AmbientAuth,
-    c_host: String, c_service: String, d_host: String, d_service: String, 
-    ph_host: String, ph_service: String, metrics_conn: TCPConnection,
-    is_initializer: Bool) 
+  new create(app_name: String, worker_name: String, env: Env, 
+    auth: AmbientAuth, c_host: String, c_service: String, d_host: String, 
+    d_service: String, ph_host: String, ph_service: String, 
+    metrics_conn: TCPConnection, is_initializer: Bool) 
   =>
+    _app_name = app_name
     _worker_name = worker_name
     _env = env
     _auth = auth
@@ -144,7 +146,7 @@ actor Connections
     service: String) 
   =>
     let outgoing_boundary = OutgoingBoundary(_auth,
-      _worker_name, MetricsReporter(_worker_name, _metrics_conn), 
+      _worker_name, MetricsReporter(_app_name, _metrics_conn), 
       host, service)
     _data_conns(target_name) = outgoing_boundary
 

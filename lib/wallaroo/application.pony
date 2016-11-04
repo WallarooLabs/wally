@@ -32,8 +32,8 @@ class Application
     | let f: InitFile val =>
       add_init_file(pipeline_id, f)
     end
-    let pipeline = Pipeline[In, Out](pipeline_id, pipeline_name, decoder, 
-      coalescing)
+    let pipeline = Pipeline[In, Out](_name, pipeline_id, pipeline_name, 
+      decoder, coalescing)
     PipelineBuilder[In, Out, In](this, pipeline)
 
   fun ref add_pipeline(p: BasicPipeline) =>
@@ -81,14 +81,14 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _sink_builder: (TCPSinkBuilder val | None) = None
   let _is_coalesced: Bool
 
-  new create(p_id: USize, n: String, d: FramedSourceHandler[In] val, 
-    coalescing: Bool) 
+  new create(app_name: String, p_id: USize, n: String, 
+    d: FramedSourceHandler[In] val, coalescing: Bool) 
   =>
     _pipeline_id = p_id
     _decoder = d
     _runner_builders = Array[RunnerBuilder val]
     _name = n
-    _source_builder = TypedSourceBuilderBuilder[In](_name, _decoder)
+    _source_builder = TypedSourceBuilderBuilder[In](app_name, _name, _decoder)
     _source_route_builder = TypedRouteBuilder[In]
     _is_coalesced = coalescing
 

@@ -127,24 +127,27 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
     end
 
 trait StateSubpartition
-  fun build(metrics_conn: TCPConnection, alfred: Alfred): StateAddresses val
+  fun build(app_name: String, metrics_conn: TCPConnection, alfred: Alfred): 
+    StateAddresses val
 
 class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
   StateSubpartition
   let _keys: Array[Key] val
   let _runner_builder: RunnerBuilder val
 
-  new val create(keys: Array[Key] val, runner_builder: RunnerBuilder val,
-     multi_worker: Bool = false) 
+  new val create(keys: Array[Key] val, 
+    runner_builder: RunnerBuilder val, multi_worker: Bool = false) 
   =>
     _keys = keys
     _runner_builder = runner_builder
 
-  fun build(metrics_conn: TCPConnection, alfred: Alfred): StateAddresses val =>
+  fun build(app_name: String, metrics_conn: TCPConnection, alfred: Alfred): 
+    StateAddresses val 
+  =>
     let m: Map[Key, Step] trn = recover Map[Key, Step] end
     let guid_gen = GuidGenerator
     for key in _keys.values() do
-      let reporter = MetricsReporter("shared state", metrics_conn)
+      let reporter = MetricsReporter(app_name, metrics_conn)
       m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
         consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
     end
@@ -156,7 +159,8 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
 
 
 trait PreStateSubpartition
-  fun build(worker_name: String, runner_builder: RunnerBuilder val,
+  fun build(app_name: String, worker_name: String, 
+    runner_builder: RunnerBuilder val,
     state_addresses: StateAddresses val, metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     state_comp_router: Router val = EmptyRouter): PartitionRouter val
@@ -178,7 +182,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
     _partition_function = partition_function'
     _pipeline_name = pipeline_name'
 
-  fun build(worker_name: String,
+  fun build(app_name: String, worker_name: String,
     runner_builder: RunnerBuilder val,
     state_addresses: StateAddresses val, metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
@@ -195,7 +199,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
         (proxy_address.worker != worker_name) then
         @printf[I32](("Adding partition proxy to " + proxy_address.worker + "for " + _pipeline_name + " pipeline\n").cstring())
         partition_proxies_trn(proxy_address.worker) = PartitionProxy(
-          proxy_address.worker, MetricsReporter(_pipeline_name, metrics_conn),
+          proxy_address.worker, MetricsReporter(app_name, metrics_conn),
           auth)
       end
     end
@@ -220,9 +224,9 @@ class KeyedPreStateSubpartition[PIn: Any val,
           | let s: Step =>
             // Create prestate step for this key
             let next_step = Step(runner_builder(
-                MetricsReporter(_pipeline_name, metrics_conn)
+                MetricsReporter(app_name, metrics_conn)
                 where alfred = alfred, router = state_comp_router),
-              MetricsReporter(_pipeline_name, metrics_conn), id,
+              MetricsReporter(app_name, metrics_conn), id,
               runner_builder.route_builder(), alfred,
               DirectRouter(s))
             m(id) = next_step

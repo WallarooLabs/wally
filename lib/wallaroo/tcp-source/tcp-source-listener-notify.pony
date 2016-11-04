@@ -8,16 +8,19 @@ interface SourceBuilder
   fun apply(alfred: Alfred tag): TCPSourceNotify iso^
 
 class _SourceBuilder[In: Any val]
+  let _app_name: String
   let _name: String
   let _runner_builder: RunnerBuilder val
   let _handler: FramedSourceHandler[In] val
   let _router: Router val
   let _metrics_conn: TCPConnection  
 
-  new val create(name': String, runner_builder: RunnerBuilder val, 
+  new val create(app_name: String, name': String, 
+    runner_builder: RunnerBuilder val, 
     handler: FramedSourceHandler[In] val,
     router: Router val, metrics_conn: TCPConnection) 
   =>
+    _app_name = app_name
     _name = name'
     _runner_builder = runner_builder
     _handler = handler
@@ -27,7 +30,7 @@ class _SourceBuilder[In: Any val]
   fun name(): String => _name
 
   fun apply(alfred: Alfred tag): TCPSourceNotify iso^ =>
-    let reporter = MetricsReporter(_name, _metrics_conn)
+    let reporter = MetricsReporter(_app_name, _metrics_conn)
 
     FramedSourceNotify[In](_name, _handler, _runner_builder, _router, 
       consume reporter, alfred)
@@ -38,10 +41,14 @@ interface SourceBuilderBuilder
     metrics_conn: TCPConnection): SourceBuilder val 
 
 class TypedSourceBuilderBuilder[In: Any val]
+  let _app_name: String
   let _name: String
   let _handler: FramedSourceHandler[In] val
 
-  new val create(name': String, handler: FramedSourceHandler[In] val) =>
+  new val create(app_name: String, name': String, 
+    handler: FramedSourceHandler[In] val) 
+  =>
+    _app_name = app_name
     _name = name'
     _handler = handler
 
@@ -50,7 +57,8 @@ class TypedSourceBuilderBuilder[In: Any val]
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
     metrics_conn: TCPConnection): SourceBuilder val 
   =>
-    _SourceBuilder[In](_name, runner_builder, _handler, router, metrics_conn)
+    _SourceBuilder[In](_app_name, _name, runner_builder, _handler, router,
+      metrics_conn)
   
 interface TCPSourceListenerNotify
   """

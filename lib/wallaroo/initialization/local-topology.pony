@@ -37,7 +37,8 @@ class LocalTopology
     for (state_name, subpartition) in _state_builders.pairs() do
       if not state_map.contains(state_name) then
         @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
-        state_map(state_name) = subpartition.build(metrics_conn, alfred)
+        state_map(state_name) = subpartition.build(_app_name, metrics_conn, 
+          alfred)
       end
     end
 
@@ -360,8 +361,8 @@ actor LocalTopologyInitializer
             | let egress_builder: EgressBuilder val =>
               let next_id = egress_builder.id()
 
-              let sink_reporter = MetricsReporter(
-                egress_builder.pipeline_name(), _metrics_conn)
+              let sink_reporter = MetricsReporter(t.name(), 
+                _metrics_conn)
 
               // Create a sink or OutgoingBoundary proxy. If the latter,
               // egress_builder finds it from _outgoing_boundaries
@@ -404,7 +405,7 @@ actor LocalTopologyInitializer
                   error 
                 end
 
-              let source_reporter = MetricsReporter(pipeline_name, 
+              let source_reporter = MetricsReporter(t.name(), 
                 _metrics_conn)
 
               // TODO: How do we add an Initializable to our list for 

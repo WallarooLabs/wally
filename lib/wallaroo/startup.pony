@@ -117,8 +117,9 @@ actor Startup
           ("", "")
         end
 
-      let connections = Connections(worker_name, env, auth, c_host, c_service, 
-        d_host, d_service, ph_host, ph_service, metrics_conn, is_initializer)
+      let connections = Connections(application.name(), worker_name, env, auth,
+        c_host, c_service, d_host, d_service, ph_host, ph_service, 
+        metrics_conn, is_initializer)
 
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
         worker_count, env, auth, connections, metrics_conn, is_initializer, 
