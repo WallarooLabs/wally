@@ -5,15 +5,14 @@ trait StateChange[State: Any #read]
   fun name(): String val
   fun id(): U64
   fun apply(state: State)
-  fun to_log_entry(out_writer: Writer): Array[ByteSeq] val
+  fun write_log_entry(out_writer: Writer)
   fun ref read_log_entry(in_reader: Reader) ?
 
 class EmptyStateChange[State: Any #read] is StateChange[State]
   fun name(): String val => ""
   fun id(): U64 => 0
   fun apply(state: State) => None
-  fun to_log_entry(out_writer: Writer): Array[ByteSeq] val => 
-    recover Array[ByteSeq] end
+  fun write_log_entry(out_writer: Writer) => None
   fun ref read_log_entry(in_reader: Reader) => None
 
 trait StateChangeBuilder[State: Any #read]

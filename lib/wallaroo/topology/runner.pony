@@ -18,13 +18,10 @@ interface Runner
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None), router: (Router val | None) = None): Bool
 
-// TODO: This only exists to get StateRunner to compile because of ALFRED
-class EmptyRunner
-  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None), router: (Router val | None) = None): Bool 
-  => 
-    true
+trait ReplayableRunner
+  fun ref replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val, 
+    origin: Origin tag)
+  fun ref set_origin_id(id: U128)
 
 interface RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, 
@@ -35,30 +32,13 @@ interface RunnerBuilder
   fun name(): String
   fun is_stateful(): Bool
   fun id(): U128
-
-trait ReplayableRunner
-  // TODO: Remove Origin None option once we fix identifying origin Proxy when
-  // messages cross boundary
-  fun ref replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val, 
-    origin: (Origin tag | None))
-  fun ref replay_finished()
-
-
-primitive RouterRunnerBuilder
-  fun apply(metrics_reporter: MetricsReporter iso, 
-    alfred: Alfred tag,
-    next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None): Runner iso^
-  => 
-    RouterRunner
-
-  fun name(): String => "router"
-  fun is_stateful(): Bool => false
-  fun id(): U128 => 0
+  fun route_builder(): RouteBuilder val
+  fun forward_route_builder(): RouteBuilder val
 
 class RunnerSequenceBuilder
   let _runner_builders: Array[RunnerBuilder val] val
   let _id: U128
+  var _forward_route_builder: RouteBuilder val = EmptyRouteBuilder
 
   new val create(bs: Array[RunnerBuilder val] val) =>
     _runner_builders = bs
@@ -68,6 +48,10 @@ class RunnerSequenceBuilder
       else
         GuidGenerator.u128()
       end
+    try
+      _forward_route_builder = 
+        _runner_builders(_runner_builders.size() - 1).forward_route_builder()
+    end
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -101,15 +85,24 @@ class RunnerSequenceBuilder
 
   fun is_stateful(): Bool => false
   fun id(): U128 => _id
+  fun route_builder(): RouteBuilder val => 
+    try
+      _runner_builders(_runner_builders.size() - 1).route_builder()
+    else
+      EmptyRouteBuilder
+    end
+  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
 
 class ComputationRunnerBuilder[In: Any val, Out: Any val]
   let _comp_builder: ComputationBuilder[In, Out] val
   let _id: U128
+  let _route_builder: RouteBuilder val
 
   new val create(comp_builder: ComputationBuilder[In, Out] val,
-    id': U128 = 0) 
+    route_builder': RouteBuilder val, id': U128 = 0) 
   =>
     _comp_builder = comp_builder
+    _route_builder = route_builder'
     _id = if id' == 0 then GuidGenerator.u128() else id' end
 
   fun apply(metrics_reporter: MetricsReporter iso, 
@@ -129,15 +122,23 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
   fun name(): String => _comp_builder().name()
   fun is_stateful(): Bool => false
   fun id(): U128 => _id
+  fun route_builder(): RouteBuilder val => _route_builder
+  fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
 class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
   let _state_comp: StateComputation[In, Out, State] val
+  let _route_builder: RouteBuilder val
+  let _forward_route_builder: RouteBuilder val
   let _id: U128
 
-  new val create(state_comp: StateComputation[In, Out, State] val) 
+  new val create(state_comp: StateComputation[In, Out, State] val,
+    route_builder': RouteBuilder val, 
+    forward_route_builder': RouteBuilder val) 
   =>
     _state_comp = state_comp
+    _route_builder = route_builder'
     _id = GuidGenerator.u128()
+    _forward_route_builder = forward_route_builder'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -156,6 +157,8 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
   fun name(): String => _state_comp.name()
   fun is_stateful(): Bool => true
   fun id(): U128 => _id
+  fun route_builder(): RouteBuilder val => _route_builder
+  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
 
 class StateRunnerBuilder[State: Any #read]
   let _state_builder: StateBuilder[State] val
@@ -164,7 +167,9 @@ class StateRunnerBuilder[State: Any #read]
   let _id: U128
 
   new val create(state_builder: StateBuilder[State] val, 
-    name': String, state_change_builders: Array[StateChangeBuilder[State] val] val) =>
+    name': String, 
+    state_change_builders: Array[StateChangeBuilder[State] val] val) 
+  =>
     _state_builder = state_builder
     _name = name'
     _state_change_builders = state_change_builders
@@ -184,11 +189,18 @@ class StateRunnerBuilder[State: Any #read]
   fun name(): String => _state_builder.name()
   fun is_stateful(): Bool => true
   fun id(): U128 => _id
+  fun route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
 trait PartitionBuilder
-  fun pre_state_subpartition(worker: String): PreStateSubpartition val
-  fun partition_addresses(worker: String): PartitionAddresses val
+  // These two methods need to be deterministic at the moment since they
+  // are called at different times
+  fun pre_state_subpartition(workers: (String | Array[String] val)):
+    PreStateSubpartition val
+  fun partition_addresses(workers: (String | Array[String] val)):
+    PartitionAddresses val
   fun state_name(): String
+  fun is_multi(): Bool
 
 class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val, 
   PIn: Any val, State: Any #read, Key: (Hashable val & Equatable[Key])] is PartitionBuilder
@@ -197,12 +209,17 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   let _state_comp: StateComputation[In, Out, State] val
   let _step_id_map: Map[Key, U128] val
   let _partition: Partition[PIn, Key] val
+  let _route_builder: RouteBuilder val
+  let _forward_route_builder: RouteBuilder val
   let _id: U128
+  let _multi_worker: Bool
 
   new val create(pipeline_name: String, state_name': String,
     state_comp: StateComputation[In, Out, State] val,
     step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val,
-    id': U128 = 0) 
+    route_builder': RouteBuilder val, 
+    forward_route_builder': RouteBuilder val, id': U128 = 0,
+    multi_worker: Bool = false) 
   =>
     _id = if id' == 0 then GuidGenerator.u128() else id' end
     _state_name = state_name'
@@ -210,6 +227,9 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
     _state_comp = state_comp
     _step_id_map = step_id_map'
     _partition = partition'
+    _route_builder = route_builder'
+    _forward_route_builder = forward_route_builder'
+    _multi_worker = multi_worker
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -230,17 +250,40 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   fun is_stateful(): Bool => true
   fun id(): U128 => _id
   fun step_id_map(): Map[Key, U128] val => _step_id_map
-  
-  fun pre_state_subpartition(worker: String): PreStateSubpartition val =>
-    KeyedPreStateSubpartition[PIn, Key](partition_addresses(worker),
+  fun route_builder(): RouteBuilder val => _route_builder
+  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
+  fun is_multi(): Bool => _multi_worker
+
+  fun pre_state_subpartition(workers: (String | Array[String] val)): 
+    PreStateSubpartition val 
+  =>
+    KeyedPreStateSubpartition[PIn, Key](partition_addresses(workers),
       _step_id_map, _partition.function(), _pipeline_name)
 
-  fun partition_addresses(worker: String): KeyedPartitionAddresses[Key] val =>
+  fun partition_addresses(workers: (String | Array[String] val)): 
+    KeyedPartitionAddresses[Key] val 
+  =>
     let m: Map[Key, ProxyAddress val] trn = 
       recover Map[Key, ProxyAddress val] end
-    for key in _partition.keys().values() do
-      m(key) = ProxyAddress(worker, GuidGenerator.u128())
+
+    match workers
+    | let w: String =>
+      for key in _partition.keys().values() do
+        try
+          m(key) = ProxyAddress(w, _step_id_map(key))
+        end
+      end
+    | let ws: Array[String] val =>
+      let w_count = ws.size()
+      var idx: USize = 0
+      for key in _partition.keys().values() do
+        try
+          m(key) = ProxyAddress(ws(idx), _step_id_map(key))
+        end
+        idx = (idx + 1) % w_count
+      end
     end
+
     KeyedPartitionAddresses[Key](consume m)
 
 class ComputationRunner[In: Any val, Out: Any val]
@@ -304,7 +347,6 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
-    // @printf[I32]("prestate runner received!\n".cstring())
     let computation_start = Time.nanos()
     let is_finished = 
       match data
@@ -331,44 +373,35 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
 
     is_finished
 
-class StateRunner[State: Any #read] is Runner
+class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   let _state: State
   let _metrics_reporter: MetricsReporter
   let _state_change_repository: StateChangeRepository[State] ref
-  let _event_log_buffer: EventLogBuffer tag
   let _alfred: Alfred
-  let _wb : Writer = Writer
-  let _rb : Reader = Reader
+  let _wb: Writer = Writer
+  let _rb: Reader = Reader
+  var _id: (U128 | None)
 
   new iso create(state_builder: {(): State} val, 
-      metrics_reporter: MetricsReporter iso, alfred: Alfred) 
+      metrics_reporter: MetricsReporter iso, alfred: Alfred)
   =>
     _state = state_builder()
     _metrics_reporter = consume metrics_reporter
     _state_change_repository = StateChangeRepository[State]
     _alfred = alfred
-    _event_log_buffer =
-      ifdef "resilience" then
-        StandardEventLogBuffer(alfred)
-      else
-        DeactivatedEventLogBuffer
-      end
+    _id = None
+
+  fun ref set_origin_id(id: U128) => _id = id
 
   fun ref register_state_change(scb: StateChangeBuilder[State] val) : U64 =>
     _state_change_repository.make_and_register(scb)
 
-  fun ref set_buffer_target(target: ResilientOrigin tag) =>
-    _event_log_buffer.set_target(target)
-
-  fun ref replay_log_entry(msg_uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val, 
+  fun ref replay_log_entry(msg_uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val, 
     origin: (Origin tag | None))
   =>
-    let me = recover val MsgEnvelope(origin, msg_uid, frac_ids,0,0) end
     try
       let sc = _state_change_repository(statechange_id)
-      for e in payload.values() do
-        _rb.append(e as Array[U8] val)
-      end
+      _rb.append(payload as Array[U8] val)
       try
         sc.read_log_entry(_rb)
         sc.apply(_state)
@@ -393,10 +426,17 @@ class StateRunner[State: Any #read] is Runner
       match state_change
       | let sc: StateChange[State] ref =>
         ifdef "resilience" then
-          let payload = sc.to_log_entry(_wb)
-          //TODO: deal with fractional message ids here
-          _event_log_buffer.queue(incoming_envelope.msg_uid, None, sc.id(),
-            payload)
+          sc.write_log_entry(_wb)
+          //TODO: batching? race between queueing and watermark?
+          let payload = _wb.done()
+          //TODO: deal with creating fractional message ids here
+          match _id
+          | let buffer_id: U128 =>
+            _alfred.queue_log_entry(buffer_id, incoming_envelope.msg_uid, None,
+              sc.id(), outgoing_envelope.seq_id, consume payload)
+          else
+            @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
+          end
         end
         sc.apply(_state)
         let computation_end = Time.nanos()
@@ -414,9 +454,6 @@ class StateRunner[State: Any #read] is Runner
       true
     end
 
-  fun ref replay_finished() =>
-    None
-
   fun rotate_log() =>
     //we need to be able to conflate all the current logs to a checkpoint and
     //rotate
@@ -432,53 +469,6 @@ class iso RouterRunner
       r.route[In](metric_name, source_ts, input, incoming_envelope,
         outgoing_envelope, producer)
       false
-    else
-      true
-    end
-
-class Proxy is Runner
-  let _worker_name: String
-  let _target_step_id: U128
-  let _metrics_reporter: MetricsReporter
-  let _auth: AmbientAuth
-
-  new iso create(worker_name: String, target_step_id: U128, 
-    metrics_reporter: MetricsReporter iso, auth: AmbientAuth) 
-  =>
-    _worker_name = worker_name
-    _target_step_id = target_step_id
-    _metrics_reporter = consume metrics_reporter
-    _auth = auth
-
-  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
-  =>
-    match router
-    | let r: Router val =>
-      try
-        // TODO: Once from_step_id is part of the message envelopes, use
-        // the from_step_id from the sending Step
-        let return_proxy_address = ProxyAddress(_worker_name, 0)
-
-        // TODO: This forward_msg should be created in a router, which is
-        // the thing normally responsible for creating the outgoing 
-        // envelope arguments
-        let forward_msg = ChannelMsgEncoder.data_channel[In](_target_step_id, 
-          0, _worker_name, source_ts, input, metric_name, _auth,
-          return_proxy_address,
-          outgoing_envelope.msg_uid,
-          outgoing_envelope.frac_ids,
-          outgoing_envelope.seq_id,
-          // TODO: Generate correct route id 
-          0)
-        r.route[Array[ByteSeq] val](metric_name, source_ts, forward_msg, 
-          incoming_envelope, outgoing_envelope, producer)
-        false
-      else
-        @printf[I32]("Problem encoding forwarded message\n".cstring())
-        true
-      end
     else
       true
     end

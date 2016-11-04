@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "sendence/guid"
 use "wallaroo/backpressure"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
@@ -100,6 +101,7 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
 
 interface StateAddresses
   fun apply(key: Any val): (Step | None)
+  fun register_routes(router: Router val, route_builder: RouteBuilder val)
 
 class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
   let _addresses: Map[Key, Step] val
@@ -119,6 +121,11 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
       None
     end
 
+  fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
+    for step in _addresses.values() do
+      step.register_routes(router, route_builder)
+    end
+
 trait StateSubpartition
   fun build(metrics_conn: TCPConnection, alfred: Alfred): StateAddresses val
 
@@ -127,16 +134,19 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
   let _keys: Array[Key] val
   let _runner_builder: RunnerBuilder val
 
-  new val create(keys: Array[Key] val, runner_builder: RunnerBuilder val) =>
+  new val create(keys: Array[Key] val, runner_builder: RunnerBuilder val,
+     multi_worker: Bool = false) 
+  =>
     _keys = keys
     _runner_builder = runner_builder
 
   fun build(metrics_conn: TCPConnection, alfred: Alfred): StateAddresses val =>
     let m: Map[Key, Step] trn = recover Map[Key, Step] end
+    let guid_gen = GuidGenerator
     for key in _keys.values() do
       let reporter = MetricsReporter("shared state", metrics_conn)
       m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
-        consume reporter)
+        consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
     end
     KeyedStateAddresses[Key](consume m)
 
@@ -161,7 +171,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
   new val create(partition_addresses': KeyedPartitionAddresses[Key] val,
     id_map': Map[Key, U128] val,
     partition_function': PartitionFunction[PIn, Key] val,
-    pipeline_name': String)
+    pipeline_name': String, multi_worker: Bool = false)
   =>
     _partition_addresses = partition_addresses'
     _id_map = id_map'
@@ -191,7 +201,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
     end
     let partition_proxies: Map[String, PartitionProxy] val =
       consume partition_proxies_trn
-    connections.register_partition_proxies(partition_proxies)
+    // connections.register_partition_proxies(partition_proxies)
 
     let routes: Map[Key, (Step | PartitionProxy)] trn =
       recover Map[Key, (Step | PartitionProxy)] end
@@ -212,7 +222,8 @@ class KeyedPreStateSubpartition[PIn: Any val,
             let next_step = Step(runner_builder(
                 MetricsReporter(_pipeline_name, metrics_conn)
                 where alfred = alfred, router = state_comp_router),
-              MetricsReporter(_pipeline_name, metrics_conn),
+              MetricsReporter(_pipeline_name, metrics_conn), id,
+              runner_builder.route_builder(), alfred,
               DirectRouter(s))
             m(id) = next_step
             routes(key) = next_step

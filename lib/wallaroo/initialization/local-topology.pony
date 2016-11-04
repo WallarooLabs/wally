@@ -1,10 +1,12 @@
 use "net"
 use "collections"
+use "promises"
 use "sendence/dag"
 use "sendence/guid"
 use "sendence/queue"
 use "sendence/messages"
 use "wallaroo/backpressure"
+use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -18,13 +20,16 @@ class LocalTopology
   let _graph: Dag[StepInitializer val] val
   // _state_builders maps from state_name to StateSubpartition
   let _state_builders: Map[String, StateSubpartition val] val
+  let _proxy_ids: Map[String, U128] val
 
   new val create(name': String, graph': Dag[StepInitializer val] val,
-    state_builders': Map[String, StateSubpartition val] val)
+    state_builders': Map[String, StateSubpartition val] val,
+    proxy_ids': Map[String, U128] val)
   =>
     _app_name = name'
     _graph = graph'
     _state_builders = state_builders'
+    _proxy_ids = proxy_ids'
 
   fun update_state_map(state_map: Map[String, StateAddresses val],
     metrics_conn: TCPConnection, alfred: Alfred)
@@ -43,21 +48,28 @@ class LocalTopology
   fun is_empty(): Bool =>
     _graph.is_empty()
 
+  fun proxy_ids(): Map[String, U128] val => _proxy_ids
+
 actor LocalTopologyInitializer
   let _worker_name: String
+  let _worker_count: USize
   let _env: Env
   let _auth: AmbientAuth
   let _connections: Connections
   let _metrics_conn: TCPConnection
   let _alfred : Alfred tag
-  let _is_initializer: Bool
+  var _is_initializer: Bool
+  var _outgoing_boundaries: Map[String, OutgoingBoundary] val = 
+    recover Map[String, OutgoingBoundary] end
   var _topology: (LocalTopology val | None) = None
+  let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
 
-  new create(worker_name: String, env: Env, auth: AmbientAuth,
-    connections: Connections, metrics_conn: TCPConnection,
+  new create(worker_name: String, worker_count: USize, env: Env, 
+    auth: AmbientAuth, connections: Connections, metrics_conn: TCPConnection,
     is_initializer: Bool, alfred: Alfred tag)
   =>
     _worker_name = worker_name
+    _worker_count = worker_count
     _env = env
     _auth = auth
     _connections = connections
@@ -68,12 +80,50 @@ actor LocalTopologyInitializer
   be update_topology(t: LocalTopology val) =>
     _topology = t
 
+  be update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
+    _outgoing_boundaries = bs
+
+  be create_data_receivers(ws: Array[String] val) =>
+    let drs: Map[String, DataReceiver] trn = 
+      recover Map[String, DataReceiver] end
+
+    for w in ws.values() do
+      if w != _worker_name then
+        let data_receiver = DataReceiver(_auth, _worker_name, w, _connections, 
+          _alfred)
+        drs(w) = data_receiver
+        _data_receivers(w) = data_receiver
+      end
+    end
+
+    let data_receivers: Map[String, DataReceiver] val = consume drs 
+
+    if not _is_initializer then
+      let data_notifier: TCPListenNotify iso =
+        DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
+          _is_initializer, data_receivers)
+      _connections.register_listener(
+        TCPListener(_auth, consume data_notifier))
+    else
+      _connections.create_initializer_data_channel(data_receivers)
+    end
+
   be initialize(worker_initializer: (WorkerInitializer | None) = None) =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("|^|^|^Initializing Local Topology^|^|^|\n\n".cstring())
     try
+      if (_worker_count > 1) and (_outgoing_boundaries.size() == 0) then
+        @printf[I32]("Outgoing boundaries not set up!\n".cstring())
+        error
+      end
+
+      // TODO: Check if we are recovering (have a saved LocalTopology)
+      // and if so read and load it
+
       match _topology
       | let t: LocalTopology val =>
+        // TODO: Write LocalTopology (t) to disk
+
         if t.is_empty() then
           @printf[I32]("----This worker has no steps----\n".cstring())
         end
@@ -86,22 +136,25 @@ actor LocalTopologyInitializer
         // Make sure we only create shared state once and reuse it
         let state_map: Map[String, StateAddresses val] = state_map.create()
 
-        // Keep track of all Steps by id so we can create a DataRouter
-        // for the data channel boundary
-        let data_routes: Map[U128, Step tag] trn =
-          recover Map[U128, Step tag] end
+        // Keep track of all CreditFLowConsumerSteps by id so we can create a 
+        // DataRouter for the data channel boundary
+        let data_routes: Map[U128, CreditFlowConsumerStep tag] trn =
+          recover Map[U128, CreditFlowConsumerStep tag] end
 
         @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
 
         // Create shared state for this topology
         t.update_state_map(state_map, _metrics_conn, _alfred)
 
-        // We'll need to register our proxies later over Connections
-        let proxies: Map[String, Array[Step tag]] = proxies.create()
+        // // We'll need to register our proxies later over Connections
+        // let proxies: Map[String, Array[Step tag]] = proxies.create()
 
         // Keep track of everything we need to call initialize() on when
         // we're done
         let initializables: Array[Initializable tag] = initializables.create()
+
+        // Update the step ids for all OutgoingBoundaries
+        _connections.update_boundary_ids(t.proxy_ids())
 
 
         /////////
@@ -244,6 +297,9 @@ actor LocalTopologyInitializer
                     let pre_state_router = DirectRouter(pre_state_step)
                     built(b.id()) = pre_state_router
 
+                    state_step.register_routes(state_comp_target, 
+                      b.forward_route_builder())
+
                     // Add ins to this prestate node to the frontier
                     for in_in_node in in_node.ins() do
                       if not built.contains(in_in_node.id) then
@@ -279,6 +335,9 @@ actor LocalTopologyInitializer
                     EmptyRouter
                   end
 
+                state_addresses.register_routes(state_comp_target,
+                   p_builder.forward_route_builder())
+
                 let partition_router: PartitionRouter val =
                   p_builder.build_partition(_worker_name, state_addresses,
                     _metrics_conn, _auth, _connections, _alfred, 
@@ -304,16 +363,30 @@ actor LocalTopologyInitializer
               let sink_reporter = MetricsReporter(
                 egress_builder.pipeline_name(), _metrics_conn)
 
-              // Create a sink or Proxy. If this is a Proxy, the 
-              // egress builder will add it to our proxies map for
-              // registration later
+              // Create a sink or OutgoingBoundary proxy. If the latter,
+              // egress_builder finds it from _outgoing_boundaries
               let sink = egress_builder(_worker_name,
-                consume sink_reporter, _auth, proxies)
+                consume sink_reporter, _auth, _outgoing_boundaries)
 
-              initializables.push(sink)
+              if not initializables.contains(sink) then
+                initializables.push(sink)
+              end
 
-              let sink_router = DirectRouter(sink)
+              let sink_router = 
+                match sink
+                | let ob: OutgoingBoundary =>
+                  match egress_builder.target_address()
+                  | let pa: ProxyAddress val =>
+                    ProxyRouter(_worker_name, ob, pa, _auth)
+                  else
+                    @printf[I32]("No ProxyAddress for proxy!\n".cstring())
+                    error
+                  end
+                else
+                  DirectRouter(sink)
+                end
 
+              data_routes(next_id) = sink
               built(next_id) = sink_router
             | let source_data: SourceData val =>
               let next_id = source_data.id()
@@ -341,7 +414,10 @@ actor LocalTopologyInitializer
               try
                 @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
                 TCPSourceListener(
-                  source_data.builder()(source_data.runner_builder(), out_router, _metrics_conn), 
+                  source_data.builder()(source_data.runner_builder(), 
+                    out_router, _metrics_conn),
+                  out_router,
+                  source_data.route_builder(),
                   _alfred, 
                   source_data.address()(0), 
                   source_data.address()(1))
@@ -368,18 +444,9 @@ actor LocalTopologyInitializer
           end
         end
 
-        _register_proxies(proxies)
-
-
-        // If this is not the initializer worker, then create the data channel
-        // incoming boundary
-        if not _is_initializer then
-          let data_notifier: TCPListenNotify iso =
-            DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
-              _is_initializer, DataRouter(consume data_routes))
-          _connections.register_listener(
-            TCPListener(_auth, consume data_notifier)
-          )
+        let data_router = DataRouter(consume data_routes)
+        for receiver in _data_receivers.values() do
+          receiver.update_router(data_router)
         end
 
         if _is_initializer then
@@ -389,6 +456,8 @@ actor LocalTopologyInitializer
           else
             @printf[I32]("Need WorkerInitializer to inform that topology is ready\n".cstring())
           end
+
+          _is_initializer = false
         else
           // Inform the initializer that we're done initializing our local
           // topology
@@ -445,9 +514,9 @@ actor LocalTopologyInitializer
     out_id
 
   // Connections knows how to plug proxies into other workers via TCP
-  fun _register_proxies(proxies: Map[String, Array[Step tag]]) =>
-    for (worker, ps) in proxies.pairs() do
-      for proxy in ps.values() do
-        _connections.register_proxy(worker, proxy)
-      end
-    end
+  // fun _register_proxies(proxies: Map[String, Array[Step tag]]) =>
+  //   for (worker, ps) in proxies.pairs() do
+  //     for proxy in ps.values() do
+  //       _connections.register_proxy(worker, proxy)
+  //     end
+  //   end

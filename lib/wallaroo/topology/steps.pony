@@ -24,6 +24,11 @@ trait tag RunnableStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+  
+  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+    origin: (Origin tag | None), msg_uid: U128,
+    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
+
 
 interface Initializable
   be initialize()
@@ -40,13 +45,19 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _runner: Runner
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _translate: TranslationTable = TranslationTable(10)
+  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
+  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
   var _router: Router val
+  let _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
   var _outgoing_seq_id: U64
   let _incoming_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
+  var _initialized: Bool = false
+  let _deduplication_list: Array[MsgEnvelope box] = _deduplication_list.create()
+  let _alfred: Alfred
+  var _id: (U128 | None)
 
   // Credit Flow Producer
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
@@ -56,30 +67,43 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _max_distributable_credits: ISize = 500_000
   var _distributable_credits: ISize = _max_distributable_credits
 
-  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
-    router: Router val = EmptyRouter)
+  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, id: U128,
+    route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter)
   =>
     _runner = consume runner
     match _runner
-    | let elb: EventLogBufferable =>
-      elb.set_buffer_target(this)
+    | let r: ReplayableRunner => r.set_origin_id(id)
     end
     _metrics_reporter = consume metrics_reporter
     _outgoing_seq_id = 0
     _router = router
-
-    ifdef "use_backpressure" then
-      for consumer in _router.routes().values() do
-        _routes(consumer) =
-          Route(this, consumer, StepRouteCallbackHandler)
-      end
-    end
+    _route_builder = route_builder
+    _alfred = alfred
+    _alfred.register_origin(this, id)
+    _id = id
 
   be initialize() =>
+    for consumer in _router.routes().values() do
+      _routes(consumer) =
+        _route_builder(this, consumer, StepRouteCallbackHandler)
+    end
+
     for r in _routes.values() do
       r.initialize()
     end
 
+    _initialized = true
+
+  be register_routes(router: Router val, route_builder: RouteBuilder val) =>
+    for consumer in router.routes().values() do
+      let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
+      _routes(consumer) = next_route
+      if _initialized then
+        next_route.initialize()
+      end
+    end
+
+  // TODO: This needs to dispose of the old routes and replace with new routes
   be update_router(router: Router val) => _router = router
 
   // TODO: Fix the Origin None once we know how to look up Proxy
@@ -96,7 +120,6 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     if is_finished then
       ifdef "resilience" then
         _bookkeeping(_incoming_envelope, _outgoing_envelope)
-        // if Sink then _send_watermark()
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
@@ -106,60 +129,94 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
 
   // TODO: Fix the Origin None once we know how to look up Proxy
   // for messages crossing boundary
-  be recovery_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+
+  fun _is_duplicate(envelope: MsgEnvelope box): Bool =>
+    for e in _deduplication_list.values() do
+      //TODO: Bloom filter maybe?
+      if e.msg_uid == envelope.msg_uid then
+        match (e.frac_ids, envelope.frac_ids)
+        | (let efa: Array[U64] val, let efb: Array[U64] val) => 
+          if efa.size() == efb.size() then
+            var found = true
+            for i in Range(0,efa.size()) do
+              try
+                if efa(i) != efb(i) then
+                  found = false
+                  break
+                end
+              else
+                found = false
+                break
+              end
+            end
+            if found then
+              return true
+            end
+          end
+        | (None,None) => return true
+        end
+      end
+    end
+    false
+
+  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
     _outgoing_seq_id = _outgoing_seq_id + 1
     _incoming_envelope.update(origin, msg_uid, frac_ids, incoming_seq_id, route_id)
     _outgoing_envelope.update(this, msg_uid, frac_ids, _outgoing_seq_id)
-    // TODO: Reconsider how recovery_run works.  Used to call recovery_run()
-    // on runner, but now runners don't implement that method.
-    let is_finished = _runner.run[D](metric_name, source_ts, data,
-      _incoming_envelope, _outgoing_envelope, this, _router)
-    if is_finished then
-      _bookkeeping(_incoming_envelope, _outgoing_envelope)
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
+    if not _is_duplicate(_incoming_envelope) then
+      _deduplication_list.push(_incoming_envelope)
+      let is_finished = _runner.run[D](metric_name, source_ts, data,
+        _incoming_envelope, _outgoing_envelope, this, _router)
+      if is_finished then
+        _bookkeeping(_incoming_envelope, _outgoing_envelope)
+        _metrics_reporter.pipeline_metric(metric_name, source_ts)
+      end
     end
 
-  fun ref _hwm_get(): HighWatermarkTable =>
+  fun ref hwm_get(): HighWatermarkTable =>
     _hwm
 
-  fun ref _lwm_get(): LowWatermarkTable =>
+  fun ref lwm_get(): LowWatermarkTable =>
     _lwm
 
-  fun ref _translate_get(): TranslationTable =>
-    _translate
+  fun ref seq_translate_get(): SeqTranslationTable =>
+    _seq_translate
 
-  fun ref _origins_get(): OriginSet =>
+  fun ref route_translate_get(): RouteTranslationTable =>
+    _route_translate
+
+  fun ref origins_get(): OriginSet =>
     _origins
 
-  be update_watermark(route_id: U64, seq_id: U64)
-  =>
-    """
-    Process a high watermark received from a downstream step.
-    TODO: receive watermark, flush buffers and send another watermark
-    """
-    _update_watermark(route_id, seq_id)
+  fun ref _flush(low_watermark: U64, origin: Origin tag,
+    upstream_route_id: U64 , upstream_seq_id: U64) =>
+    match _id
+    | let id: U128 => _alfred.flush_buffer(id, low_watermark, origin,
+      upstream_route_id, upstream_seq_id)
+    else
+      @printf[I32]("Tried to flush a non-existing buffer!".cstring())
+    end
 
-  fun _send_watermark() =>
-    // for origin in _all_origins.values do
-    //   origin.update_watermark(route_id, seq_id)
-    // end
-    None
-
-  be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: Array[ByteSeq] val)
+  be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val)
   =>
-    match _runner
-    | let r: ReplayableRunner =>
-      r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
+    if not _is_duplicate(_incoming_envelope) then
+      _deduplication_list.push(_incoming_envelope)
+      match _runner
+      | let r: ReplayableRunner =>
+        r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
+      else
+        @printf[I32]("trying to replay a message to a non-replayable runner!".cstring())
+      end
     end
 
   be replay_finished() =>
-    match _runner
-    | let r: ReplayableRunner =>
-      r.replay_finished()
-    end
+    _deduplication_list.clear()
+
+  be start_without_replay() =>
+    _deduplication_list.clear()
 
   be dispose() =>
     match _router
@@ -320,11 +377,9 @@ actor PartitionProxy is (CreditFlowProducer & Initializable)
         // TODO: This forward_msg should be created in a router, which is
         // the thing normally responsible for creating the outgoing
         // envelope arguments
-        let forward_msg = ChannelMsgEncoder.data_channel[D](target_step_id,
-          0, _worker_name, source_ts, data, metric_name, _auth,
-          return_proxy_address, msg_uid, frac_ids, seq_id,
-          // TODO: Generate correct route id
-          0)
+        let forward_msg = ChannelMsgEncoder.delivery[D](target_step_id,
+          _worker_name, source_ts, data, metric_name, _auth,
+          return_proxy_address, msg_uid, frac_ids)
 
         match _router
         | let r: Router val =>

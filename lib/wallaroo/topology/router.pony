@@ -33,47 +33,107 @@ class DirectRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
-    // TODO: CreditFlow
-    // Lookup route from producer
-    // Call run on the route we got from the producer
-
-    //let r = producer.route_to(_target)
-    //r.run[D]()
-
-    _target.run[D](metric_name, source_ts, data,
-      outgoing_envelope.origin,
-      outgoing_envelope.msg_uid,
-      outgoing_envelope.frac_ids,
-      outgoing_envelope.seq_id,
-      // TODO: Figure out how to determine route id
-      0)
-    false
+    // TODO: Remove that producer can be None
+    match producer
+    | let cfp: CreditFlowProducer ref =>
+      let might_be_route = cfp.route_to(_target)
+      match might_be_route
+      | let r: Route =>
+        r.run[D](metric_name, source_ts, data,
+          outgoing_envelope.origin,
+          outgoing_envelope.msg_uid,
+          outgoing_envelope.frac_ids)
+        false
+      else
+        // TODO: What do we do if we get None?
+        true
+      end
+    else
+      true
+    end
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
     recover val [_target] end
 
-class DataRouter
-  let _data_routes: Map[U128, Step tag] val
+class ProxyRouter
+  let _worker_name: String
+  let _target: CreditFlowConsumerStep tag
+  let _target_proxy_address: ProxyAddress val
+  let _auth: AmbientAuth
 
-  new val create(data_routes: Map[U128, Step tag] val =
-    recover Map[U128, Step tag] end)
+  new val create(worker_name: String, target: CreditFlowConsumerStep tag, 
+    target_proxy_address: ProxyAddress val, auth: AmbientAuth)
   =>
-    _data_routes = data_routes
+    _worker_name = worker_name
+    _target = target
+    _target_proxy_address = target_proxy_address
+    _auth = auth
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
-    try
-      match data
-      | let delivery_msg: DeliveryMsg val =>
-        let target_id = delivery_msg.target_id()
-        //TODO: create and deliver envelope
-        delivery_msg.deliver(_data_routes(target_id))
+    // TODO: Remove that producer can be None
+    match producer
+    | let cfp: CreditFlowProducer ref =>
+      let might_be_route = cfp.route_to(_target)
+      match might_be_route
+      | let r: Route =>
+        let delivery_msg = ForwardMsg[D](
+          _target_proxy_address.step_id,
+          _worker_name, source_ts, data, metric_name,
+          _target_proxy_address, 
+          outgoing_envelope.msg_uid,
+          outgoing_envelope.frac_ids)
+
+        r.forward(delivery_msg)
         false
       else
+        // TODO: What do we do if we get None?
         true
       end
+    else
+      true
+    end
+
+  fun copy_with_new_target_id(target_id: U128): ProxyRouter val =>
+    ProxyRouter(_worker_name, 
+      _target, 
+      ProxyAddress(_target_proxy_address.worker, target_id), 
+      _auth)
+
+  fun routes(): Array[CreditFlowConsumerStep] val =>
+    recover val [_target] end
+
+class DataRouter
+  let _data_routes: Map[U128, CreditFlowConsumerStep tag] val
+
+  new val create(data_routes: Map[U128, CreditFlowConsumerStep tag] val =
+    recover Map[U128, CreditFlowConsumerStep tag] end)
+  =>
+    _data_routes = data_routes
+
+  // fun route(metric_name: String, source_ts: U64, d_msg: DeliveryMsg val,
+  //   incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
+  //   producer: (CreditFlowProducer ref | None)): Bool
+  fun route(d_msg: DeliveryMsg val, origin: Origin tag, seq_id: U64) =>
+    try
+      let target_id = d_msg.target_id()
+      //TODO: create and deliver envelope
+      d_msg.deliver(_data_routes(target_id), origin, seq_id)
+      false
+    else
+      true
+    end
+
+  fun replay_route(r_msg: ReplayableDeliveryMsg val, origin: Origin tag,
+    seq_id: U64)
+  =>
+    try
+      let target_id = r_msg.target_id()
+      //TODO: create and deliver envelope
+      r_msg.replay_deliver(_data_routes(target_id), origin, seq_id)
+      false
     else
       true
     end
@@ -122,18 +182,25 @@ class LocalPartitionRouter[In: Any val,
       try
         match _partition_routes(key)
         | let s: Step =>
-          // TODO- CreditFlow
-          // Lookup route from producer
-          // Call run on the route we got from the producer
 
-          s.run[In](metric_name, source_ts, input,
-            outgoing_envelope.origin,
-            outgoing_envelope.msg_uid,
-            outgoing_envelope.frac_ids,
-            outgoing_envelope.seq_id,
-            // TODO: Generate correct route id
-            0)
-          false
+          // TODO: Remove that producer can be None
+          match producer
+          | let cfp: CreditFlowProducer ref =>
+            let might_be_route = cfp.route_to(s)
+            match might_be_route
+            | let r: Route =>
+              r.run[D](metric_name, source_ts, data,
+                outgoing_envelope.origin,
+                outgoing_envelope.msg_uid,
+                outgoing_envelope.frac_ids)
+              false
+            else
+              // TODO: What do we do if we get None?
+              true
+            end
+          else
+            true
+          end    
         | let p: PartitionProxy =>
           try
             p.forward[In](metric_name, source_ts, input, _step_ids(key),
@@ -160,8 +227,18 @@ class LocalPartitionRouter[In: Any val,
     end
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
-    // TODO: CREDITFLOW - real implmentation
-    recover val Array[CreditFlowConsumerStep] end
+    // TODO: CREDITFLOW we need to handle proxies once we have boundary actors
+    let cs: Array[CreditFlowConsumerStep] trn =
+      recover Array[CreditFlowConsumerStep] end
+
+    for s in _partition_routes.values() do
+      match s
+      | let step: Step =>
+        cs.push(step)
+      end
+    end
+
+    consume cs
 
   fun local_map(): Map[U128, Step] val => _local_map
 

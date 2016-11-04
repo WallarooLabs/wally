@@ -3,10 +3,10 @@ use "time"
 use "buffered"
 use "collections"
 use "sendence/bytes"
+use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
-
 
 class DataChannelListenNotifier is TCPListenNotify
   let _name: String
@@ -15,20 +15,20 @@ class DataChannelListenNotifier is TCPListenNotify
   let _is_initializer: Bool
   var _host: String = ""
   var _service: String = ""
-  let _router: DataRouter val
   let _connections: Connections
+  let _receivers: Map[String, DataReceiver] val
 
   new iso create(name: String, env: Env, auth: AmbientAuth, 
-    connections: Connections, is_initializer: Bool, routes: DataRouter val = 
-    DataRouter)
+    connections: Connections, is_initializer: Bool, 
+    receivers: Map[String, DataReceiver] val)
   =>
     _name = name
     _env = env
     _auth = auth
     _is_initializer = is_initializer
-    _router = routes
     _connections = connections
-    
+    _receivers = receivers    
+
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
@@ -44,50 +44,23 @@ class DataChannelListenNotifier is TCPListenNotify
     end
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelConnectNotifier(_router, _env, _auth)
+    DataChannelConnectNotifier(_receivers, _connections, _env, _auth)
 
-class DataOrigin is Origin
-  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
-  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _translate: TranslationTable = TranslationTable(10)
-  let _origins: OriginSet = OriginSet(10)
-  fun ref _hwm_get(): HighWatermarkTable
-  =>
-    _hwm
-  
-  fun ref _lwm_get(): LowWatermarkTable
-  =>
-    _lwm
-    
-  fun ref _translate_get(): TranslationTable
-  =>
-    _translate
-  
-  fun ref _origins_get(): OriginSet
-  =>
-    _origins
-
-  // be update_watermark(route_id: U64, seq_id: U64)
-  // =>
-  //   //TODO: ack on TCP?
-  //   None
     
 class DataChannelConnectNotifier is TCPConnectionNotify
-  let _router: DataRouter val
+  let _receivers: Map[String, DataReceiver] val
+  let _connections: Connections
   let _env: Env
   let _auth: AmbientAuth
-  let _origin: DataOrigin tag 
   var _header: Bool = true
-  // TODO: The None for Origin will break when we fix identiyfing Proxy origin
-  // over a boundary
-  let _incoming_envelope: MsgEnvelope ref = MsgEnvelope(None, 0, None, 0, 0)
-  let _outgoing_envelope: MsgEnvelope ref = MsgEnvelope(None, 0, None, 0, 0)
 
-  new iso create(routes: DataRouter val, env: Env, auth: AmbientAuth) =>
-    _router = routes
+  new iso create(receivers: Map[String, DataReceiver] val,
+    connections: Connections, env: Env, auth: AmbientAuth) 
+  =>
+    _receivers = receivers
+    _connections = connections  
     _env = env
     _auth = auth
-    _origin = DataOrigin
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -99,13 +72,38 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       end
     else
       match ChannelMsgDecoder(consume data, _auth)
-      | let d: DeliveryMsg val =>
-        //TODO: read envelope from data
-        //TODO: manage values for outgoing envelope at router?
-        _incoming_envelope.update(_origin, 0, None, 0, 0)
-        _outgoing_envelope.update(None, 0, None, 0, 0)
-        _router.route[DeliveryMsg val](d.metric_name(), d.source_ts(), d,
-          _incoming_envelope, _outgoing_envelope, None)
+      | let data_msg: DataMsg val =>
+        let seq_id = data_msg.seq_id
+        try
+          _receivers(data_msg.delivery_msg.sender_name()).received(data_msg.delivery_msg,
+            seq_id)
+        else
+          @printf[I32]("Missing DataReceiver!\n".cstring())
+        end
+      | let dc: DataConnectMsg val =>
+        try
+          _receivers(dc.sender_name).data_connect(dc.sender_step_id)
+        else
+          @printf[I32]("Missing DataReceiver!\n".cstring())
+        end
+      | let aw: AckWatermarkMsg val =>
+        _connections.ack_watermark_to_boundary(aw.sender_name, aw.seq_id)
+      | let r: ReplayMsg val =>
+        try
+          let data_msg = r.data_msg(_auth)
+          let delivery_msg = data_msg.delivery_msg
+
+          _receivers(delivery_msg.sender_name())
+            .replay_received(delivery_msg, data_msg.seq_id)              
+        else
+          @printf[I32]("Missing DataReceiver!\n".cstring())
+        end
+      | let c: ReplayCompleteMsg val =>
+        try
+          _receivers(c.sender_name()).upstream_replay_finished()
+        else
+          @printf[I32]("Missing DataReceiver!\n".cstring())
+        end
       | let m: SpinUpLocalTopologyMsg val =>
         _env.out.print("Received spin up local topology message!")
       | let m: UnknownChannelMsg val =>
@@ -126,16 +124,16 @@ class DataChannelConnectNotifier is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     _env.out.print("incoming connected")
 
-class DataSenderConnectNotifier is TCPConnectionNotify
-  let _env: Env
+// class DataSenderConnectNotifier is TCPConnectionNotify
+//   let _env: Env
 
-  new iso create(env: Env)
-  =>
-    _env = env
+//   new iso create(env: Env)
+//   =>
+//     _env = env
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
-    _env.out.print("Data sender channel received data.")
-    true
+//   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+//     _env.out.print("Data sender channel received data.")
+//     true
 
   // fun ref closed(conn: TCPConnection ref) =>
   //   _coordinator.reconnect_data(_target_name)

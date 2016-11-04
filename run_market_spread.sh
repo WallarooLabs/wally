@@ -1,7 +1,7 @@
 #!/bin/bash
 set fail -o -e
 
-TMPDIR=/tmp/market-spread-jr-run/
+TMPDIR=/tmp/market-spread-run/
 SCREEN_SESSION_NAME="RUNNING_MARKET_SPREAD"
 
 if [ -z "$MESSAGES" ]; then
@@ -21,9 +21,9 @@ mkdir -p $TMPDIR/market_spread_reports_ui
 if [ "$DOWNLOAD"  == "1" ]; then
   wget -N https://s3.amazonaws.com/sendence-dev/wallaroo/ui-bins/market_spread_reports_ui.tar.gz -O $TMPDIR/market_spread_reports_ui.tar.gz
   wget -N https://s3.amazonaws.com/sendence-dev/wallaroo/ui-bins/metrics_reporter_ui.tar.gz -O $TMPDIR/metrics_reporter_ui.tar.gz
-  tar zxf $TMPDIR/market_spread_reports_ui.tar.gz -C $TMPDIR/market_spread_reports_ui
-  tar zxf $TMPDIR/metrics_reporter_ui.tar.gz -C $TMPDIR/metrics_reporter_ui
 fi  
+tar zxf $TMPDIR/market_spread_reports_ui.tar.gz -C $TMPDIR/market_spread_reports_ui
+tar zxf $TMPDIR/metrics_reporter_ui.tar.gz -C $TMPDIR/metrics_reporter_ui
 
 if [ "$BUILD"  == "1" ]; then
   make build-apps-market-spread
@@ -44,7 +44,7 @@ popd
 
 screen -dmS $SCREEN_SESSION_NAME
 
-screen -S $SCREEN_SESSION_NAME -p 0 -X stuff "apps/market-spread-jr/market-spread-jr -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e $MESSAGES -n node-name
+screen -S $SCREEN_SESSION_NAME -p 0 -X stuff "apps/market-spread/market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e $MESSAGES -n node-name
 "
 
 sleep 5

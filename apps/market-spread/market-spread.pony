@@ -108,18 +108,15 @@ class SymbolDataStateChange is StateChange[SymbolData]
     state.last_offer = _last_offer
     state.should_reject_trades = _should_reject_trades
 
-  fun to_log_entry(out_writer: Writer) : Array[ByteSeq] val =>
+  fun write_log_entry(out_writer: Writer) =>
     out_writer.f64_be(_last_bid)
     out_writer.f64_be(_last_offer)
-    // TODO: Add .bool() method to Writer
-    // out_writer.bool(_should_reject_trades)
-    out_writer.done()
+    out_writer.bool(_should_reject_trades)
 
   fun ref read_log_entry(in_reader: Reader) ? =>
     _last_bid = in_reader.f64_be()
     _last_offer = in_reader.f64_be()
-    // TODO: Add .bool() method to Reader
-    // _should_reject_trades = in_reader.bool()
+    _should_reject_trades = in_reader.bool()
 
 class SymbolDataStateChangeBuilder is StateChangeBuilder[SymbolData]
   fun apply(id: U64): StateChange[SymbolData] =>

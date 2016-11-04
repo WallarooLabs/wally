@@ -2,9 +2,11 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "sendence/queue"
 use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/tcp-sink"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -13,77 +15,18 @@ use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-// TODO: Fix this placeholder
-class val TrackingInfo
 
-actor EmptySink is CreditFlowConsumerStep
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: (Origin tag | None), msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+class OutgoingBoundaryBuilder
+  fun apply(auth: AmbientAuth, worker_name: String,  
+    reporter: MetricsReporter iso, host: String, service: String): 
+      OutgoingBoundary
   =>
-    None
+    OutgoingBoundary(auth, worker_name, consume reporter, host,
+      service)
 
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: (Origin tag | None), msg_uid: U128,
-    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
-  =>
-    None
-
-  be initialize() => None
-
-  be register_producer(producer: CreditFlowProducer) =>
-    None
-
-  be unregister_producer(producer: CreditFlowProducer,
-    credits_returned: ISize)
-  =>
-    None
-
-  be credit_request(from: CreditFlowProducer) =>
-    None
-
-class TCPSinkBuilder
-  let _encoder_wrapper: EncoderWrapper val
-
-  new val create(encoder_wrapper: EncoderWrapper val) =>
-    _encoder_wrapper = encoder_wrapper
-
-  fun apply(reporter: MetricsReporter iso, host: String, service: String):
-    TCPSink
-  =>
-    TCPSink(_encoder_wrapper, consume reporter, host, service)
-
-actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
-  """
-  # TCPSink
-
-  `TCPSink` replaces the Pony standard library class `TCPConnection`
-  within Wallaroo for outgoing connections to external systems. While
-  `TCPConnection` offers a number of excellent features it doesn't
-  account for our needs around resilience and backpressure.
-
-  `TCPSink` incorporates basic send/recv functionality from `TCPConnection` as
-  well as supporting our CreditFlow backpressure system and working with
-  our upstream backup/message acknowledgement system.
-
-  ## Backpressure
-
-  ...
-
-  ## Resilience and message tracking
-
-  ...
-
-  ## Possible future work
-
-  - Much better algo for determining how many credits to hand out per producer
-  - At the moment we treat sending over TCP as done. In the future we can and should support ack of the data being handled from the other side.
-  - Handle reconnecting after being disconnected from the downstream
-  - Optional in sink deduplication (this woud involve storing what we sent and
-    was acknowleged.)
-  """
+actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   // Steplike
-  let _encoder: EncoderWrapper val
+  // let _encoder: EncoderWrapper val
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
 
@@ -93,7 +36,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _distributable_credits: ISize = _max_distributable_credits
 
   // TCP
-  var _notify: _TCPSinkNotify
+  var _notify: _OutgoingBoundaryNotify
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
@@ -111,72 +54,108 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _read_len: USize = 0
   var _shutdown: Bool = false
 
-  new create(encoder_wrapper: EncoderWrapper val,
-    metrics_reporter: MetricsReporter iso, host: String, service: String,
+  // Connection, Acking and Replay
+  let _auth: AmbientAuth
+  let _worker_name: String
+  var _step_id: U128 = 0
+  let _host: String
+  let _service: String
+  let _from: String
+  let _queue: Queue[Array[ByteSeq] val] = _queue.create()
+  var _lowest_queue_id: U64 = 0
+  var _seq_id: U64 = 0
+
+  new create(auth: AmbientAuth, worker_name: String,
+    metrics_reporter: MetricsReporter iso, host: String, service: String, 
     from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    _encoder = encoder_wrapper
+    // _encoder = encoder_wrapper
+    _auth = auth
+    _worker_name = worker_name
+    _host = host
+    _service = service
+    _from = from
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
-    _notify = EmptyNotify
+    _notify = EmptyBoundaryNotify
     _connect_count = @pony_os_connect_tcp[U32](this,
-      host.cstring(), service.cstring(),
+      _host.cstring(), _service.cstring(),
       from.cstring())
     _notify_connecting()
 
-  be initialize() => None
+  be initialize() =>
+    try
+      if _step_id == 0 then
+        @printf[I32]("Never registered step id for OutgoingBoundary!\n".cstring())
+        error
+      end
 
-  // open question: how do we reconnect if our external system goes away?
+      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id, 
+        _auth)
+      writev(connect_msg)
+    else
+      @printf[I32]("Failed to create DataConnectMsg\n".cstring())
+    end
+
+  be register_step_id(step_id: U128) =>
+    _step_id = step_id
+
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
   =>
-    try
-      let encoded = _encoder.encode[D](data, _wb)
-      _writev(encoded)
-      
-      // We are finished with the message and can update watermarks
-      // Note: We are ACKing messages as fast as they come in.
-      // TODO: Queue the ACKs and use a timer to send watermarks upstream
-      //       periodically.
-      ifdef "resilience" then
-        match origin
-        | let origin': Origin tag => origin'.update_watermark(route_id, seq_id)
-        end
-      end
-      
-      // TODO: Should happen when tracking info comes back from writev as
-      // being done.
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
-    else
-      ifdef debug then
-        try
-          Assert(false, "Encoder sink received unrecognized input type.")
-        else
-          _hard_close()
-          return
-        end
-      end
-      return
-    end
+    @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: (Origin tag | None), msg_uid: U128,
     frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
-    //TODO: What do we do here?
-    run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, 
-      incoming_seq_id, route_id)
+    @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
+
+  // TODO: open question: how do we reconnect if our external system goes away?
+  be forward(delivery_msg: ReplayableDeliveryMsg val)
+  =>
+    try
+      let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg, 
+        _seq_id, _auth)
+      _queue.enqueue(outgoing_msg)
+
+      _writev(outgoing_msg)
+
+      _seq_id = _seq_id + 1
+    end
+
+  be writev(data: Array[ByteSeq] val) =>
+    _writev(data)
+
+  be ack(seq_id: U64) =>
+    if seq_id > _lowest_queue_id then
+      let flush_count = seq_id - _lowest_queue_id
+      for i in Range(0, flush_count.usize()) do
+        try _queue.dequeue() end
+        _lowest_queue_id = _lowest_queue_id + 1
+      end
+    end
+
+  be replay_msgs() =>
+    for msg in _queue.values() do
+      try
+        _writev(ChannelMsgEncoder.replay(msg, _auth))
+      end
+    end
+    try
+      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _auth))
+    end
 
   be update_router(router: Router val) =>
     """
-    No-op: TCPSink has no router
+    No-op: OutgoingBoundary has no router
     """
     None
 
@@ -586,8 +565,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     @pony_os_sockname[Bool](_fd, ip)
     ip
 
-interface _TCPSinkNotify
-  fun ref connecting(conn: TCPSink ref, count: U32) =>
+interface _OutgoingBoundaryNotify
+  fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
     """
     Called if name resolution succeeded for a TCPConnection and we are now
     waiting for a connection to the server to succeed. The count is the number
@@ -596,20 +575,20 @@ interface _TCPSinkNotify
     """
     None
 
-  fun ref connected(conn: TCPSink ref) =>
+  fun ref connected(conn: OutgoingBoundary ref) =>
     """
     Called when we have successfully connected to the server.
     """
     None
 
-  fun ref connect_failed(conn: TCPSink ref) =>
+  fun ref connect_failed(conn: OutgoingBoundary ref) =>
     """
     Called when we have failed to connect to all possible addresses for the
     server. At this point, the connection will never be established.
     """
     None
 
-  fun ref sentv(conn: TCPSink ref, data: ByteSeqIter): ByteSeqIter =>
+  fun ref sentv(conn: OutgoingBoundary ref, data: ByteSeqIter): ByteSeqIter =>
     """
     Called when multiple chunks of data are sent to the connection in a single
     call. This gives the notifier an opportunity to modify the sent data chunks
@@ -618,7 +597,7 @@ interface _TCPSinkNotify
     """
     data
 
-  fun ref received(conn: TCPSink ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: OutgoingBoundary ref, data: Array[U8] iso): Bool =>
     """
     Called when new data is received on the connection. Return true if you
     want to continue receiving messages without yielding until you read
@@ -627,7 +606,7 @@ interface _TCPSinkNotify
     """
     true
 
-  fun ref expect(conn: TCPSink ref, qty: USize): USize =>
+  fun ref expect(conn: OutgoingBoundary ref, qty: USize): USize =>
     """
     Called when the connection has been told to expect a certain quantity of
     bytes. This allows nested notifiers to change the expected quantity, which
@@ -635,13 +614,13 @@ interface _TCPSinkNotify
     """
     qty
 
-  fun ref closed(conn: TCPSink ref) =>
+  fun ref closed(conn: OutgoingBoundary ref) =>
     """
     Called when the connection is closed.
     """
     None
 
-  fun ref throttled(conn: TCPSink ref) =>
+  fun ref throttled(conn: OutgoingBoundary ref) =>
     """
     Called when the connection starts experiencing TCP backpressure. You should
     respond to this by pausing additional calls to `write` and `writev` until
@@ -651,7 +630,7 @@ interface _TCPSinkNotify
     """
     None
 
-  fun ref unthrottled(conn: TCPSink ref) =>
+  fun ref unthrottled(conn: OutgoingBoundary ref) =>
     """
     Called when the connection stops experiencing TCP backpressure. Upon
     receiving this notification, you should feel free to start making calls to
@@ -659,12 +638,13 @@ interface _TCPSinkNotify
     """
     None
 
-class EmptyNotify is _TCPSinkNotify
-  fun ref connected(conn: TCPSink ref) =>
+class EmptyBoundaryNotify is _OutgoingBoundaryNotify
+  fun ref connected(conn: OutgoingBoundary ref) =>
   """
   Called when we have successfully connected to the server.
   """
   None
   // try
-  //   @printf[I32](("!!Conn3ected from tcp sink at " + conn.local_address().name(None, true)._2 + "\n").cstring())
+  //   @printf[I32](("!!Connected from outgoing boundary at " + conn.local_address().name(None, true)._2 + "\n").cstring())
   // end
+

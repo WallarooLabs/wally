@@ -4,6 +4,7 @@ use "sendence/dag"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -84,6 +85,10 @@ actor ApplicationInitializer
       for name in worker_names.values() do
         local_graphs(name) = Dag[StepInitializer val]
       end
+
+      // Keep track of proxy ids per worker
+      let proxy_ids: Map[String, Map[String, U128]] = proxy_ids.create()
+
 
       @printf[I32](("Found " + application.pipelines.size().string()  + " pipelines in application\n").cstring())
 
@@ -178,7 +183,8 @@ actor ApplicationInitializer
         let source_seq_builder = RunnerSequenceBuilder(
             source_runner_builders = recover Array[RunnerBuilder val] end) 
         let source_initializer = SourceData(source_node_id, 
-          pipeline.source_builder(), source_seq_builder, source_addr)
+          pipeline.source_builder(), source_seq_builder, 
+          pipeline.source_route_builder(), source_addr)
 
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
 
@@ -246,6 +252,9 @@ actor ApplicationInitializer
         // Keep track of which worker's boundary we're using
         var boundaries_idx: USize = 0
 
+        ///////////
+        // WORKERS 
+
         // For each worker, use its boundary value to determine which
         // runner_builders to use to create StepInitializers that will be
         // added to its local graph
@@ -277,8 +286,20 @@ actor ApplicationInitializer
               None
             end
 
-          // Set up egress id for this worker for this pipeline
-          let egress_id = _guid_gen.u128()
+          let local_proxy_ids = Map[String, U128] 
+          proxy_ids(worker) = local_proxy_ids          
+          if worker != "initializer" then
+            local_proxy_ids("initializer") = _guid_gen.u128()
+          end
+          for w in worker_names.values() do
+            if worker != w then
+              local_proxy_ids(w) = _guid_gen.u128()
+            end
+          end
+
+          // Set up sink id for this worker for this pipeline (in case there's
+          // a sink on it)
+          let sink_id = _guid_gen.u128()
 
           // Make sure there are still runner_builders left in the pipeline.
           if runner_builder_idx < runner_builders.size() then
@@ -299,23 +320,26 @@ actor ApplicationInitializer
               // steps must be on the same workers as their corresponding
               // state steps
               if next_runner_builder.is_stateful() then
-                // If this is partitioned state and we haven't handled this
-                // shared state before, handle it. 
-                var state_name = ""
-                match next_runner_builder
-                | let pb: PartitionBuilder val =>
-                  state_name = pb.state_name()
-                  if not state_partition_map.contains(state_name) then
-                    state_partition_map(state_name) = 
-                      pb.partition_addresses(worker)
-                  end
-                end
-
                 // Create the prestate initializer, and if this is not
                 // partitioned state, then the state initializer as well.
                 match next_runner_builder
                 | let pb: PartitionBuilder val =>
                   @printf[I32](("Preparing to spin up partitioned state on " + worker + "\n").cstring())
+
+                  // Determine which workers will be involved in this partition
+                  let workers = 
+                    if pb.is_multi() then
+                      worker_names
+                    else
+                      worker
+                    end
+
+                  // Handle the shared state
+                  let state_name = pb.state_name()
+                  if not state_partition_map.contains(state_name) then
+                    state_partition_map(state_name) = 
+                      pb.partition_addresses(workers)
+                  end
 
                   // Determine whether the state computation target step will 
                   // be a step or a sink/proxy
@@ -323,13 +347,14 @@ actor ApplicationInitializer
                     try
                       runner_builders(runner_builder_idx + 1).id()
                     else
-                      egress_id
+                      sink_id
                     end
 
                   let next_initializer = PartitionedPreStateStepBuilder(
                     pipeline.name(),
-                    pb.pre_state_subpartition(worker), next_runner_builder,
-                    state_name, pre_state_target_id)
+                    pb.pre_state_subpartition(workers), next_runner_builder,
+                    state_name, pre_state_target_id,
+                    next_runner_builder.forward_route_builder())
                   let next_id = next_initializer.id()
 
                   try
@@ -358,12 +383,13 @@ actor ApplicationInitializer
                     try
                       runner_builders(runner_builder_idx + 2).id()
                     else
-                      egress_id
+                      sink_id
                     end
 
                   let pre_state_init = StepBuilder(pipeline.name(),
                     next_runner_builder, pre_state_id, 
-                    next_runner_builder.is_stateful(), pre_state_target_id)
+                    next_runner_builder.is_stateful(), pre_state_target_id,
+                    next_runner_builder.forward_route_builder())
 
                   try
                     local_graphs(worker).add_node(pre_state_init, pre_state_id)
@@ -441,17 +467,23 @@ actor ApplicationInitializer
             // pipeline
             match next_worker
             | let w: String =>
-              let proxy_address = 
+              let egress_id = 
                 try
-                  ProxyAddress(w, runner_builders(runner_builder_idx).id())
+                  runner_builders(runner_builder_idx).id()
                 else
                   @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
                   error
                 end
+
+              let proxy_address = ProxyAddress(w, egress_id)
+                
               let egress_builder = EgressBuilder(pipeline.name(),
                 egress_id, proxy_address)
 
               try
+                // If we've already created a node for this proxy, it
+                // will simply be overwritten (which effectively means
+                // there is one node per OutgoingBoundary)
                 local_graphs(worker).add_node(egress_builder, egress_id)
                 match last_initializer
                 | (let last_id: U128, let step_init: StepInitializer val) =>
@@ -472,13 +504,13 @@ actor ApplicationInitializer
             // We need a Sink since there are no more steps to go in this
             // pipeline
             let egress_builder = EgressBuilder(pipeline.name(), 
-              egress_id, _output_addr, pipeline.sink_builder())
+              sink_id, _output_addr, pipeline.sink_builder())
 
             try
-              local_graphs(worker).add_node(egress_builder, egress_id)
+              local_graphs(worker).add_node(egress_builder, sink_id)
               match last_initializer
               | (let last_id: U128, let step_init: StepInitializer val) =>
-                local_graphs(worker).add_edge(last_id, egress_id)
+                local_graphs(worker).add_edge(last_id, sink_id)
               end
             else
               @printf[I32](("No graph for worker " + worker + "\n").cstring())
@@ -504,10 +536,15 @@ actor ApplicationInitializer
       // For each worker, generate a LocalTopology
       // from all of its LocalGraphs
       for (w, g) in local_graphs.pairs() do
+        let p_ids: Map[String, U128] trn = recover Map[String, U128] end
+        for (target, p_id) in proxy_ids(w).pairs() do
+          p_ids(target) = p_id
+        end
+
         let local_topology = 
           try
             LocalTopology(application.name(), g.clone(),
-              application.state_builders())
+              application.state_builders(), consume p_ids)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error
