@@ -4,6 +4,7 @@ use "options"
 use "time"
 use "buffered"
 use "files"
+use "sendence/hub"
 use "wallaroo/initialization"
 use "wallaroo/network"
 use "wallaroo/topology"
@@ -102,6 +103,11 @@ actor Startup
           OutNotify("metrics"),
           m_addr(0),
           m_addr(1))
+
+      let connect_msg = HubProtocol.connect()
+      let metrics_join_msg = HubProtocol.join("metrics:" + application.name()) 
+      metrics_conn.writev(connect_msg)
+      metrics_conn.writev(metrics_join_msg)
 
       (let ph_host, let ph_service) = 
         match p_arg
