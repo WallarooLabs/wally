@@ -59,6 +59,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     match result
     | (None, _) => (true, result._2) // This must come first
     | (let output: Out, _) =>
+      @printf[I32]("Routing a message\n".cstring())
       let is_finished = _router.route[Out](metric_name, source_ts, output, 
         incoming_envelope, outgoing_envelope, producer)
       (is_finished, result._2)

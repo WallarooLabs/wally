@@ -411,7 +411,7 @@ actor ApplicationInitializer
                     error
                   end
 
-                  last_initializer = (next_id, next_initializer) 
+                  last_initializer = None//(next_id, next_initializer) 
                   steps(next_id) = worker
                 else
                   @printf[I32](("Preparing to spin up non-partitioned state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())

@@ -42,8 +42,8 @@ actor Main
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler 
-              where init_file = init_file)
+            "Nbbo", FixNbboFrameHandler)
+              // where init_file = init_file)
             .to[FixNbboMessage val](IdentityBuilder[FixNbboMessage val])
             .to[FixNbboMessage val](IdentityBuilder[FixNbboMessage val])
             .to_state_partition[Symboly val, String, None,
@@ -132,6 +132,7 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
     sc_repo: StateChangeRepository[SymbolData], 
     state: SymbolData): (None, StateChange[SymbolData] ref)
   =>
+    @printf[I32]("!!Update NBBO\n".cstring())
     let state_change: SymbolDataStateChange ref =
       try
         sc_repo.lookup_by_name("SymbolDataStateChange") as SymbolDataStateChange
@@ -162,10 +163,12 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     state: SymbolData): ((OrderResult val | None), None)
   =>
     if state.should_reject_trades then
+      @printf[I32]("Rejecting an order\n".cstring())
       let res = OrderResult(msg, state.last_bid, state.last_offer,
         Epoch.nanoseconds())
       (res, None)
     else
+      @printf[I32]("Accepting an order\n".cstring())
       (None, None)
     end
   

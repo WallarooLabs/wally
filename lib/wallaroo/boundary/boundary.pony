@@ -122,6 +122,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   be forward(delivery_msg: ReplayableDeliveryMsg val)
   =>
     try
+      @printf[I32]("!!Writing over boundary!\n".cstring())
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg, 
         _seq_id, _auth)
       _queue.enqueue(outgoing_msg)

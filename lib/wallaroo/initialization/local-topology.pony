@@ -167,6 +167,9 @@ actor LocalTopologyInitializer
         //   III. No direct chains of different partitions
         /////////
 
+        // TODO: Change this to a Stack for depth-first search so we have
+        // more control over the order things are initialized in (i.e. from
+        // one sink back before another sink begins)
         let frontier = Queue[DagNode[StepInitializer val] val]
 
         let built = Map[U128, Router val]
@@ -175,11 +178,23 @@ actor LocalTopologyInitializer
         // 1. Find graph sinks and add to frontier queue. 
         //    We'll work our way backwards. 
         @printf[I32]("Adding sink nodes to frontier\n".cstring())
+
+        // Hold partitions until the end because we need to build state
+        // comp targets first
+        let partitions = Array[DagNode[StepInitializer val] val]
         for node in graph.nodes() do
           if node.is_sink() then 
             @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
-            frontier.enqueue(node) 
+            match node.value
+            | let p: PartitionedPreStateStepBuilder val =>
+              partitions.push(node)
+            else
+              frontier.enqueue(node) 
+            end
           end
+        end
+        for node in partitions.values() do
+          frontier.enqueue(node) 
         end
 
         /////////

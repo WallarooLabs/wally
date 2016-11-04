@@ -139,6 +139,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
   =>
     try
+      @printf[I32]("!!Sending out over sink!\n".cstring())
       let encoded = _encoder.encode[D](data, _wb)
       _writev(encoded)
       
