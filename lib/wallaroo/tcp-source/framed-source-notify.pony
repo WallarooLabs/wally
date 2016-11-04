@@ -54,6 +54,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       end
       true
     else
+      @printf[I32]("--!!SOURCE Received!!--\n".cstring())
       let ingest_ts = Time.nanos()
       let computation_start = Time.nanos()
 

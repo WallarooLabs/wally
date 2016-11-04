@@ -19,6 +19,7 @@ class EmptyRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
+    @printf[I32]("!!Routing died at EmptyRouter\n".cstring())
     true
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
@@ -34,6 +35,7 @@ class DirectRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
+    @printf[I32]("!!Got to DirectRouter, but is there a Route?\n".cstring())
     // TODO: Remove that producer can be None
     match producer
     | let cfp: CreditFlowProducer ref =>
@@ -175,8 +177,10 @@ class LocalPartitionRouter[In: Any val,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
+    @printf[I32]("!!Got to PartitionRouter, but now what?\n".cstring())
     match data
     | let input: In =>
+      @printf[I32]("!!PartitionRouter, input matched but route?\n".cstring())
       let key = _partition_function(input)
       try
         match _partition_routes(key)
@@ -206,10 +210,11 @@ class LocalPartitionRouter[In: Any val,
             outgoing_envelope, producer)
           false
         else
-          // This can't happen because the match is exhaustive
           true
         end
       else
+        // There is no entry for this key!
+        @printf[I32]("!!No entry for this key!\n".cstring())
         true
       end
     else

@@ -109,6 +109,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           | let i: WorkerInitializer =>
             i.identify_data_address(m.worker_name, host, m.service)
           end
+          @printf[I32](("---!!CREATING DATA to " + m.service + "\n").cstring())
           _connections.create_data_connection(m.worker_name, host, m.service)
         end
       | let m: SpinUpLocalTopologyMsg val =>

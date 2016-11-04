@@ -40,6 +40,7 @@ actor Connections
 
     if not _is_initializer then
       create_control_connection("initializer", c_host, c_service)
+      @printf[I32](("---!!CREATING DATA to initializer at " + d_service + "\n").cstring())
       create_data_connection("initializer", d_host, d_service)
     end
 
@@ -117,6 +118,7 @@ actor Connections
       end
 
       for (target, address) in data_addrs.pairs() do
+        @printf[I32](("---!!CREATING DATA CONN to " + address._2 + "\n").cstring())
         create_data_connection(target, address._1, address._2)
       end
 
