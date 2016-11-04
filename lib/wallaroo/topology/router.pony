@@ -40,6 +40,7 @@ class DirectRouter
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
+        @printf[I32]("!!Routing to a step via DirectRouter\n".cstring())
         r.run[D](metric_name, source_ts, data,
           outgoing_envelope.origin,
           outgoing_envelope.msg_uid,
@@ -186,6 +187,7 @@ class LocalPartitionRouter[In: Any val,
             let might_be_route = cfp.route_to(s)
             match might_be_route
             | let r: Route =>
+              @printf[I32]("!!Routing to a step via PartitionRouter\n".cstring())
               r.run[D](metric_name, source_ts, data,
                 outgoing_envelope.origin,
                 outgoing_envelope.msg_uid,
@@ -199,6 +201,7 @@ class LocalPartitionRouter[In: Any val,
             true
           end    
         | let p: ProxyRouter val =>
+          @printf[I32]("!!Routing to a proxy via PartitionRouter\n".cstring())
           p.route[In](metric_name, source_ts, input, incoming_envelope,
             outgoing_envelope, producer)
           false
