@@ -15,7 +15,16 @@ trait Origin
     upstream_route_id: U64 , upstream_seq_id: U64)
     
   be log_flushed(low_watermark: U64, messages_flushed: U64, origin: Origin tag,
-    upstream_route_id: U64 , upstream_seq_id: U64) =>
+    upstream_route_id: U64 , upstream_seq_id: U64)
+  =>
+    """
+    We will be called back here once the eventlogs have been flushed for a
+    particular origin. We can now send the low watermark upstream to this
+    origin.
+
+    TODO: Cleanup entries in hwm, seq_translate and route_translate
+          once we've ACKed them upstream
+    """
     origin.update_watermark(upstream_route_id, upstream_seq_id)
 
   fun ref _bookkeeping(incoming_envelope: MsgEnvelope box,
@@ -42,8 +51,6 @@ trait Origin
   be update_watermark(route_id: U64, seq_id: U64) =>
   """
   Process a high watermark received from a downstream step.
-  TODO: Cleanup entries in hwm, seq_translate and route_translate
-        once we've ACKed them upstream
   """
   // update low watermark for this route_id
   lwm_get().update(route_id, seq_id)
