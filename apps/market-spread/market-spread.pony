@@ -42,18 +42,14 @@ actor Main
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler)
-              // where init_file = init_file)
-            // .to[FixNbboMessage val](IdentityBuilder[FixNbboMessage val])
-            // .to[FixNbboMessage val](IdentityBuilder[FixNbboMessage val])
+            "Nbbo", FixNbboFrameHandler
+              where init_file = init_file)
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
             .done()
           .new_pipeline[FixOrderMessage val, OrderResult val](
             "Orders", FixOrderFrameHandler)
-            // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
-            // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
             .to_state_partition[Symboly val, String, 
               (OrderResult val | None), SymbolData](CheckOrder, 
               SymbolDataBuilder, "symbol-data", symbol_data_partition
@@ -68,7 +64,7 @@ actor Main
 primitive Identity[In: Any val]
   fun name(): String => "identity"
   fun apply(r: In): In =>
-    @printf[I32]("Identity!!\n".cstring())
+    // @printf[I32]("Identity!!\n".cstring())
     r
 
 primitive IdentityBuilder[In: Any val]
@@ -108,7 +104,7 @@ class SymbolDataStateChange is StateChange[SymbolData]
     _last_offer = last_offer
 
   fun apply(state: SymbolData ref) =>
-    @printf[I32]("State change!!\n".cstring())
+    // @printf[I32]("State change!!\n".cstring())
     state.last_bid = _last_bid
     state.last_offer = _last_offer
     state.should_reject_trades = _should_reject_trades
@@ -134,7 +130,7 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
     sc_repo: StateChangeRepository[SymbolData], 
     state: SymbolData): (None, StateChange[SymbolData] ref)
   =>
-    @printf[I32]("!!Update NBBO\n".cstring())
+    // @printf[I32]("!!Update NBBO\n".cstring())
     let state_change: SymbolDataStateChange ref =
       try
         sc_repo.lookup_by_name("SymbolDataStateChange") as SymbolDataStateChange
@@ -164,14 +160,12 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     sc_repo: StateChangeRepository[SymbolData], 
     state: SymbolData): ((OrderResult val | None), None)
   =>
-    @printf[I32]("!!CheckOrder\n".cstring())
+    // @printf[I32]("!!CheckOrder\n".cstring())
     if state.should_reject_trades then
-      @printf[I32]("Rejecting an order\n".cstring())
       let res = OrderResult(msg, state.last_bid, state.last_offer,
         Epoch.nanoseconds())
       (res, None)
     else
-      @printf[I32]("Accepting an order\n".cstring())
       (None, None)
     end
   

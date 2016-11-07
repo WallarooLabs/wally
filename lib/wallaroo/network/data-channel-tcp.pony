@@ -71,7 +71,6 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         _header = false
       end
     else
-      @printf[I32]("!!Got msg on datachannel\n".cstring())
       match ChannelMsgDecoder(consume data, _auth)
       | let data_msg: DataMsg val =>
         let seq_id = data_msg.seq_id

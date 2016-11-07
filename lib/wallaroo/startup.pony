@@ -92,7 +92,6 @@ actor Startup
 
       let d_host = d_addr(0)
       let d_service = d_addr(1)
-      @printf[I32](("!!!!Dservice at " + d_service + "\n").cstring())
 
       if worker_name == "" then
         env.out.print("You must specify a worker name via --worker-name/-n.")

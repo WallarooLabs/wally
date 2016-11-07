@@ -147,10 +147,8 @@ class TypedRoute[In: Any val] is Route
     origin: (Origin tag | None), msg_uid: U128, 
     frac_ids: (Array[U64] val | None))
   =>
-    @printf[I32]("!!Received at TypedRoute (correct?)\n".cstring())
     match data
     | let input: In =>
-      @printf[I32]("!!Received at TypedRoute (correct!)\n".cstring())
       ifdef "use_backpressure" then
         if _credits_available > 0 then
           let above_request_point =
@@ -195,7 +193,6 @@ class TypedRoute[In: Any val] is Route
     input: In, origin: (Origin tag | None), msg_uid: U128, 
     frac_ids: (Array[U64] val | None))
   =>
-    @printf[I32]("!!Sent from TypedRoute\n".cstring())
     _consumer.run[In](metric_name,
       source_ts,
       input,  
@@ -304,7 +301,6 @@ class BoundaryRoute is Route
     @printf[I32]("Run should never be called on a BoundaryRoute\n".cstring())
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val) =>
-    @printf[I32]("!!Received at BoundaryRoute\n".cstring())
     ifdef "use_backpressure" then
       if _credits_available > 0 then
         let above_request_point =
@@ -339,7 +335,6 @@ class BoundaryRoute is Route
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val)
   =>
-    @printf[I32]("!!Forwarded from BoundaryRoute\n".cstring())
     _consumer.forward(delivery_msg)
 
     _credits_available = _credits_available - 1

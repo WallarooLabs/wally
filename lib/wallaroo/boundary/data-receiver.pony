@@ -74,9 +74,7 @@ actor DataReceiver is Origin
 
   be received(d: DeliveryMsg val, seq_id: U64)
   =>  
-    @printf[I32]("!!Got msg at DataReceiver\n".cstring())
     if seq_id >= _last_id_seen then
-      @printf[I32]("!!Routing msg from DataReceiver\n".cstring())
       _last_id_seen = seq_id
       _router.route(d, this, seq_id)
       // match _router.route(target_step_id)
