@@ -141,13 +141,38 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     s_initializer: StateBuilder[State] val,
     state_name: String): PipelineBuilder[In, Out, Next] 
   =>
-    let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp,
-      TypedRouteBuilder[StateProcessor[State] val],
-      TypedRouteBuilder[Next])
+    let guid_gen = GuidGenerator
+    let single_step_partition = Partition[Last, U8](
+      SingleStepPartitionFunction[Last], recover [0] end)
+    let step_id_map: Map[U8, U128] trn = recover Map[U8, U128] end
+
+    step_id_map(0) = guid_gen.u128()
+
+    let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, Last, 
+      State, U8](_p.name(), state_name, s_comp, consume step_id_map, 
+        single_step_partition,
+        TypedRouteBuilder[StateProcessor[State] val],
+        TypedRouteBuilder[Next]
+        where multi_worker = false)
     _p.add_runner_builder(next_builder)
-    let state_builder = StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders())
-    _p.add_runner_builder(state_builder)
+
+    let state_partition = KeyedStateSubpartition[U8](
+      single_step_partition.keys(),
+      StateRunnerBuilder[State](s_initializer, state_name, 
+        s_comp.state_change_builders()) 
+      where multi_worker = false)
+
+    _a.add_state_builder(state_name, state_partition)
+
     PipelineBuilder[In, Out, Next](_a, _p)
+
+    // let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp,
+    //   TypedRouteBuilder[StateProcessor[State] val],
+    //   TypedRouteBuilder[Next])
+    // _p.add_runner_builder(next_builder)
+    // let state_builder = StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders())
+    // _p.add_runner_builder(state_builder)
+    // PipelineBuilder[In, Out, Next](_a, _p)
 
   fun ref to_state_partition[PIn: Any val,
     Key: (Hashable val & Equatable[Key]), Next: Any val = PIn, 

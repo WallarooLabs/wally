@@ -32,7 +32,6 @@ trait StateProcessor[State: Any #read] is BasicComputation
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): 
       (Bool, (StateChange[State] ref | None))
-  fun find_partition(finder: PartitionFinder val): Router val
 
 class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
   is StateProcessor[State]
@@ -67,9 +66,6 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     end
 
   fun name(): String => _state_comp.name()
-
-  fun find_partition(finder: PartitionFinder val): Router val =>
-    finder.find[In](_input)
 
 interface BasicComputationBuilder
   fun apply(): BasicComputation val

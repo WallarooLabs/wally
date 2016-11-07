@@ -341,6 +341,7 @@ actor ApplicationInitializer
                       end
                       consume w_names
                     else
+                      @printf[I32]("!! NOT IS MULTI\n".cstring())
                       worker
                     end
 

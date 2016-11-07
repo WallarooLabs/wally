@@ -118,6 +118,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     origin: Origin tag, msg_uid: U128,
     frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
+    @printf[I32]("!!RECVD at Step\n".cstring())
     _outgoing_seq_id = _outgoing_seq_id + 1
     _incoming_envelope.update(origin, msg_uid, frac_ids, incoming_seq_id, route_id)
     _outgoing_envelope.update(this, msg_uid, frac_ids, _outgoing_seq_id)

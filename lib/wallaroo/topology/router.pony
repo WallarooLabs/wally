@@ -117,6 +117,7 @@ class DataRouter
   fun route(d_msg: DeliveryMsg val, origin: Origin tag, seq_id: U64) =>
     try
       let target_id = d_msg.target_id()
+      @printf[I32](("!!TARGETING " + target_id.string() + "\n").cstring())
       //TODO: create and deliver envelope
       d_msg.deliver(_data_routes(target_id), origin, seq_id)
       false
