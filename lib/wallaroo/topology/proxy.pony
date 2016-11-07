@@ -6,3 +6,5 @@ class ProxyAddress
     worker = w
     step_id = s_id
 
+  fun string(): String =>
+    "[[" + worker + ": " + step_id.string() + "]]" 

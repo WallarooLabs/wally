@@ -438,6 +438,7 @@ actor LocalTopologyInitializer
                     out_router, _metrics_conn),
                   out_router,
                   source_data.route_builder(),
+                  _outgoing_boundaries,
                   _alfred, 
                   source_data.address()(0), 
                   source_data.address()(1))

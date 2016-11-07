@@ -77,12 +77,16 @@ class ProxyRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
+    @printf[I32](("!!PR: Trying to route to " + _target_proxy_address.string() + "\n").cstring())
+
     // TODO: Remove that producer can be None
     match producer
     | let cfp: CreditFlowProducer ref =>
+      @printf[I32]("!!PR: Matched CreditFlowProducer\n".cstring())
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
+        @printf[I32]("!!PR: Matched Route\n".cstring())
         let delivery_msg = ForwardMsg[D](
           _target_proxy_address.step_id,
           _worker_name, source_ts, data, metric_name,
@@ -94,9 +98,11 @@ class ProxyRouter
         false
       else
         // TODO: What do we do if we get None?
+        @printf[I32]("!!PR: FAILED to match Route\n".cstring())
         true
       end
     else
+      @printf[I32]("!!PR: FAILED to match CreditFlowProducer \n".cstring())
       true
     end
 

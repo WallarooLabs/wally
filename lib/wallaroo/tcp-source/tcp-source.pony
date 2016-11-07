@@ -20,6 +20,8 @@ actor TCPSource is (CreditFlowProducer & Initializable)
   """
   // Credit Flow
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
+  let _route_builder: RouteBuilder val
+  let _outgoing_boundaries: Map[String, OutgoingBoundary] val
 
   // TCP
   let _listen: TCPSourceListener
@@ -43,6 +45,7 @@ actor TCPSource is (CreditFlowProducer & Initializable)
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,    
     fd: U32, init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -58,18 +61,27 @@ actor TCPSource is (CreditFlowProducer & Initializable)
     _next_size = init_size
     _max_size = max_size
 
+    _route_builder = route_builder
+    _outgoing_boundaries = outgoing_boundaries
+
     _notify.accepted(this)
 
     for consumer in routes.values() do
       _routes(consumer) =
-        route_builder(this, consumer, TCPSourceRouteCallbackHandler)
+        _route_builder(this, consumer, TCPSourceRouteCallbackHandler)
+    end
+
+    for (worker, boundary) in _outgoing_boundaries.pairs() do
+      _routes(boundary) = 
+        _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
     for r in _routes.values() do
       r.initialize()
     end
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) => None
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) => 
+    None
 
   be dispose() =>
      """
