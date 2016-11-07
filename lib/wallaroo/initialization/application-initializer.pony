@@ -142,6 +142,7 @@ actor ApplicationInitializer
               error
             end
           if r_builder.is_stateful() then
+            @printf[I32]("--!!STATEFUL!!\n".cstring())
             if latest_runner_builders.size() > 0 then
               let seq_builder = RunnerSequenceBuilder(
                 latest_runner_builders = recover Array[RunnerBuilder val] end
@@ -151,18 +152,20 @@ actor ApplicationInitializer
             runner_builders.push(r_builder)
             handled_source_runners = true
           elseif not pipeline.is_coalesced() then
+            @printf[I32]("--!!NOT COALESCING!!\n".cstring())
             if handled_source_runners then
               runner_builders.push(r_builder)
             else
               source_runner_builders.push(r_builder)
               handled_source_runners = true
             end
-          // If the developer specified an id, then this needs to be on
+          // TODO: If the developer specified an id, then this needs to be on
           // a separate step to be accessed by multiple pipelines
-          elseif r_builder.id() != 0 then
-            runner_builders.push(r_builder)
-            handled_source_runners = true
+          // elseif ??? then
+          //   runner_builders.push(r_builder)
+          //   handled_source_runners = true
           else
+            @printf[I32]("--!!COALESCING!!\n".cstring())
             if handled_source_runners then
               latest_runner_builders.push(r_builder)
             else

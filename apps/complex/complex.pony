@@ -29,7 +29,7 @@ actor Main
     try
       let application = recover val
         Application("Complex Numbers App")
-          .new_pipeline[Complex val, Complex val]("Complex Numbers", ComplexDecoder)
+          .new_pipeline[Complex val, Complex val]("Complex Numbers", ComplexDecoder where coalescing = false)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Conjugate end)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
