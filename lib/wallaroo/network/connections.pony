@@ -113,11 +113,6 @@ actor Connections
     local_topology_initializer: LocalTopologyInitializer) 
   =>
     try
-      // if not _is_initializer then
-      //   @printf[I32](("---!!CREATING DATA to initializer at " + _init_d_service + "\n").cstring())
-      //   create_data_connection("initializer", _init_d_host, _init_d_service)
-      // end
-
       let control_addrs = addresses("control")
       let data_addrs = addresses("data")
       for (target, address) in control_addrs.pairs() do
@@ -126,7 +121,6 @@ actor Connections
 
       for (target, address) in data_addrs.pairs() do
         if target != _worker_name then
-          @printf[I32](("---!!CREATING DATA CONN to " + address._2 + "\n").cstring())
           create_data_connection(target, address._1, address._2)
         end
       end

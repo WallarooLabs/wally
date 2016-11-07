@@ -139,7 +139,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
   =>
     try
-      @printf[I32]("!!Sending out over sink!\n".cstring())
       let encoded = _encoder.encode[D](data, _wb)
       _writev(encoded)
       
@@ -667,6 +666,3 @@ class EmptyNotify is _TCPSinkNotify
   Called when we have successfully connected to the server.
   """
   None
-  // try
-  //   @printf[I32](("!!Conn3ected from tcp sink at " + conn.local_address().name(None, true)._2 + "\n").cstring())
-  // end

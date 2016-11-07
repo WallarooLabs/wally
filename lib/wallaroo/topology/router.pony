@@ -19,7 +19,6 @@ class EmptyRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
-    @printf[I32]("!!Routing died at EmptyRouter\n".cstring())
     true
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
@@ -35,14 +34,12 @@ class DirectRouter
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
-    @printf[I32]("!!Got to DirectRouter, but is there a Route?\n".cstring())
     // TODO: Remove that producer can be None
     match producer
     | let cfp: CreditFlowProducer ref =>
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
-        @printf[I32]("!!Routing to a step via DirectRouter\n".cstring())
         r.run[D](metric_name, source_ts, data,
           outgoing_envelope.origin,
           outgoing_envelope.msg_uid,
@@ -177,10 +174,8 @@ class LocalPartitionRouter[In: Any val,
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None)): Bool
   =>
-    @printf[I32]("!!Got to PartitionRouter, but now what?\n".cstring())
     match data
     | let input: In =>
-      @printf[I32]("!!PartitionRouter, input matched but route?\n".cstring())
       let key = _partition_function(input)
       try
         match _partition_routes(key)
@@ -191,7 +186,6 @@ class LocalPartitionRouter[In: Any val,
             let might_be_route = cfp.route_to(s)
             match might_be_route
             | let r: Route =>
-              @printf[I32]("!!Routing to a step via PartitionRouter\n".cstring())
               r.run[D](metric_name, source_ts, data,
                 outgoing_envelope.origin,
                 outgoing_envelope.msg_uid,
@@ -205,7 +199,6 @@ class LocalPartitionRouter[In: Any val,
             true
           end    
         | let p: ProxyRouter val =>
-          @printf[I32]("!!Routing to a proxy via PartitionRouter\n".cstring())
           p.route[In](metric_name, source_ts, input, incoming_envelope,
             outgoing_envelope, producer)
           false
@@ -214,7 +207,6 @@ class LocalPartitionRouter[In: Any val,
         end
       else
         // There is no entry for this key!
-        @printf[I32]("!!No entry for this key!\n".cstring())
         true
       end
     else
