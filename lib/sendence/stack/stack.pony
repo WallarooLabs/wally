@@ -1,3 +1,5 @@
+// A very simple stack implementation that exists to make local topology
+// initialization in Wallaroo simpler 
 class Stack[V: Any #alias]
   var _size: USize = 0
   let _array: Array[V] = Array[V]

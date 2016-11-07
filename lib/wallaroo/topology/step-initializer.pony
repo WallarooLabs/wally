@@ -174,7 +174,8 @@ class EgressBuilder
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
-  fun target_address(): (Array[String] val | ProxyAddress val) => _addr
+  fun target_address(): (Array[String] val | ProxyAddress val | 
+    PartitionAddresses val) => _addr
 
   fun apply(worker_name: String, reporter: MetricsReporter iso, 
     auth: AmbientAuth,

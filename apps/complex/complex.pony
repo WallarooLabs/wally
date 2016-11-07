@@ -34,10 +34,10 @@ actor Main
             => Conjugate end)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Scale(5) end)
-          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
-            => Scale(10) end)
           .to_stateful[Complex val, Counter](UpdateCounter,
             CounterBuilder, "counter-builder")
+          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
+            => Scale(10) end)
           .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
             => Conjugate end)
           .to_sink(ComplexEncoder, recover [0] end)

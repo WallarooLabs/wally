@@ -350,8 +350,6 @@ actor LocalTopologyInitializer
               let state_comp_target = 
                 match p_builder.pre_state_target_id()
                 | let id: U128 =>
-                  @printf[I32](("!!TARGETING " + id.string() + " from state comp\n").cstring())
-
                   try
                     built(id)
                   else
@@ -373,7 +371,6 @@ actor LocalTopologyInitializer
               // Create a data route to each pre-state step in the 
               // partition located on this worker
               for (id, s) in partition_router.local_map().pairs() do
-                @printf[I32](("!!ADDING to DataRouter: " + id.string() + "\n").cstring())
                 data_routes(id) = s
                 initializables.push(s)
               end
@@ -459,13 +456,11 @@ actor LocalTopologyInitializer
             // frontier
             for in_node in next_node.ins() do
               if not built.contains(in_node.id) then
-                @printf[I32](("!!ADDING " + in_node.id.string() + " to frontier\n").cstring())
                 frontier.push(in_node)
               end
             end
 
             @printf[I32](("Finished handling " + next_node.value.name() + " node\n").cstring())
-            @printf[I32](("!!Which was id " + next_node.id.string() + "\n").cstring())
           else
             frontier.push(next_node)
           end

@@ -141,6 +141,9 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     s_initializer: StateBuilder[State] val,
     state_name: String): PipelineBuilder[In, Out, Next] 
   =>
+    // TODO: This is a shortcut. Non-partitioned state is being treated as a
+    // special case of partitioned state with one partition. This works but is
+    // a bit confusing when reading the code.
     let guid_gen = GuidGenerator
     let single_step_partition = Partition[Last, U8](
       SingleStepPartitionFunction[Last], recover [0] end)

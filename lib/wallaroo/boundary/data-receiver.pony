@@ -74,7 +74,6 @@ actor DataReceiver is Origin
 
   be received(d: DeliveryMsg val, seq_id: U64)
   =>  
-    @printf[I32]("!!RECVD at DataReceiver\n".cstring())
     if seq_id >= _last_id_seen then
       _last_id_seen = seq_id
       _router.route(d, this, seq_id)

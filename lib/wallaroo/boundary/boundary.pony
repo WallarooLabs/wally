@@ -644,7 +644,3 @@ class EmptyBoundaryNotify is _OutgoingBoundaryNotify
   Called when we have successfully connected to the server.
   """
   None
-  // try
-  //   @printf[I32](("!!Connected from outgoing boundary at " + conn.local_address().name(None, true)._2 + "\n").cstring())
-  // end
-

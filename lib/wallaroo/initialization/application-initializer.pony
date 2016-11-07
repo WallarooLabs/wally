@@ -142,7 +142,6 @@ actor ApplicationInitializer
               error
             end
           if r_builder.is_stateful() then
-            @printf[I32]("--!!STATEFUL!!\n".cstring())
             if latest_runner_builders.size() > 0 then
               let seq_builder = RunnerSequenceBuilder(
                 latest_runner_builders = recover Array[RunnerBuilder val] end
@@ -152,7 +151,6 @@ actor ApplicationInitializer
             runner_builders.push(r_builder)
             handled_source_runners = true
           elseif not pipeline.is_coalesced() then
-            @printf[I32]("--!!NOT COALESCING!!\n".cstring())
             if handled_source_runners then
               runner_builders.push(r_builder)
             else
@@ -165,7 +163,6 @@ actor ApplicationInitializer
           //   runner_builders.push(r_builder)
           //   handled_source_runners = true
           else
-            @printf[I32]("--!!COALESCING!!\n".cstring())
             if handled_source_runners then
               latest_runner_builders.push(r_builder)
             else
@@ -226,27 +223,32 @@ actor ApplicationInitializer
         // indicate that it gets one less step than everyone else (all things 
         // being equal). per_worker must be at least 1, so the first worker's
         // boundary will be at least 0. 
-        var count: ISize = -1
+        var count: USize = 0
         for i in Range(0, worker_count) do
-          count = count + per_worker.isize()
+          count = count + per_worker
 
           // We don't want to cross a boundary to get to the worker
           // that is the "anchor" for the partition, so instead we
           // make sure it gets put on the same worker
           try
-            match runner_builders((count + 1).usize()) 
+            match runner_builders(count) 
             | let pb: PartitionBuilder val =>
               count = count + 1
             end
           end
 
           if (i == (worker_count - 1)) and
-            (count < runner_builders.size().isize()) then
+            (count < runner_builders.size()) then
             // Make sure we cover all steps by forcing the rest on the
             // last worker if need be
             boundaries.push(runner_builders.size())
           else
-            boundaries.push(count.usize())
+            let b = if count < runner_builders.size() then 
+              count 
+            else
+              runner_builders.size() 
+            end
+            boundaries.push(b)
           end
         end
 
@@ -341,7 +343,6 @@ actor ApplicationInitializer
                       end
                       consume w_names
                     else
-                      @printf[I32]("!! NOT IS MULTI\n".cstring())
                       worker
                     end
 
@@ -515,31 +516,46 @@ actor ApplicationInitializer
             // pipeline
             match next_worker
             | let w: String =>
-              let egress_id = 
+              let next_runner_builder = 
                 try
-                  runner_builders(runner_builder_idx).id()
+                  runner_builders(runner_builder_idx)
                 else
                   @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
                   error
                 end
 
-              let proxy_address = ProxyAddress(w, egress_id)
-                
-              let egress_builder = EgressBuilder(pipeline.name(),
-                egress_id, proxy_address)
-
-              try
-                // If we've already created a node for this proxy, it
-                // will simply be overwritten (which effectively means
-                // there is one node per OutgoingBoundary)
-                local_graphs(worker).add_node(egress_builder, egress_id)
-                match last_initializer
-                | (let last_id: U128, let step_init: StepInitializer val) =>
-                  local_graphs(worker).add_edge(last_id, egress_id)
-                end
-              else
-                @printf[I32](("No graph for worker " + worker + "\n").cstring())
+              match next_runner_builder
+              | let pb: PartitionBuilder val =>
+                @printf[I32]("A PartitionBuilder should never begin the chain on a non-initializer worker!\n".cstring())
                 error
+              else
+                // Build our egress builder for the proxy
+                let egress_id = 
+                  try
+                    runner_builders(runner_builder_idx).id()
+                  else
+                    @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
+                    error
+                  end
+
+                let proxy_address = ProxyAddress(w, egress_id)
+                  
+                let egress_builder = EgressBuilder(pipeline.name(),
+                  egress_id, proxy_address)
+
+                try
+                  // If we've already created a node for this proxy, it
+                  // will simply be overwritten (which effectively means
+                  // there is one node per OutgoingBoundary)
+                  local_graphs(worker).add_node(egress_builder, egress_id)
+                  match last_initializer
+                  | (let last_id: U128, let step_init: StepInitializer val) =>
+                    local_graphs(worker).add_edge(last_id, egress_id)
+                  end
+                else
+                  @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                  error
+                end
               end
             else
               // Something went wrong, since if there are more runner builders

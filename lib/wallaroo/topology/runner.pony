@@ -267,13 +267,11 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   =>
     let m: Map[Key, ProxyAddress val] trn = 
       recover Map[Key, ProxyAddress val] end
-    @printf[I32]("!!PARTITIONADDRESSES!!\n".cstring())
 
     match workers
     | let w: String =>
       for key in _partition.keys().values() do
         try
-          @printf[I32](("!!PREPARING A KEY: " + _step_id_map(key).string() + "!!\n").cstring())
           m(key) = ProxyAddress(w, _step_id_map(key))
         end
       end
@@ -353,14 +351,12 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
     producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
   =>
-    @printf[I32]("!!Recvd at prestate runner\n".cstring())
     let computation_start = Time.nanos()
     let is_finished = 
       match data
       | let input: In =>
         match router
         | let shared_state_router: Router val =>
-          @printf[I32]("!!Router matched at prestate runner\n".cstring())
           let processor: StateProcessor[State] val = 
             StateComputationWrapper[In, Out, State](input, _state_comp, 
               _output_router)
