@@ -44,16 +44,12 @@ actor Main
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo", FixNbboFrameHandler
               where init_file = init_file)
-            .to[FixNbboMessage val](IdentityBuilder[FixNbboMessage val])
-            .to[FixNbboMessage val](IdentityBuilder[FixNbboMessage val])
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
             .done()
           .new_pipeline[FixOrderMessage val, OrderResult val](
             "Orders", FixOrderFrameHandler)
-            .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
-            .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
             .to_state_partition[Symboly val, String, 
               (OrderResult val | None), SymbolData](CheckOrder, 
               SymbolDataBuilder, "symbol-data", symbol_data_partition
