@@ -78,13 +78,13 @@ type OriginSet is HashSet[Origin tag, HashIs[Origin tag]]
 class MsgEnvelope
   // TODO: Fix the Origin None once we know how to look up Proxy
   // for messages crossing boundary  
-  var origin: (Origin tag | None)   // tag referencing upstream origin for msg
+  var origin: Origin tag   // tag referencing upstream origin for msg
   var msg_uid: U128         // Source assigned UID; universally unique
   var frac_ids: (Array[U64] val | None) // fractional msg ids
   var seq_id: U64          // assigned by immediate upstream origin
   var route_id: U64        // assigned by immediate upstream origin
 
-  new create(origin': (Origin tag | None), msg_uid': U128,
+  new create(origin': Origin tag, msg_uid': U128,
     frac_ids': (Array[U64] val | None), seq_id': U64, route_id': U64)
   =>
     origin = origin'
@@ -93,7 +93,7 @@ class MsgEnvelope
     seq_id = seq_id'
     route_id = route_id'
 
-  fun ref update(origin': (Origin tag | None), msg_uid': U128, 
+  fun ref update(origin': Origin tag, msg_uid': U128, 
     frac_ids': (Array[U64] val | None), seq_id': U64, route_id': U64 = 0) 
   =>
     origin = origin'

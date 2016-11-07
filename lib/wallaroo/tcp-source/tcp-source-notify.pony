@@ -1,4 +1,5 @@
 use "wallaroo/topology"
+use "wallaroo/messages"
 
 interface TCPSourceNotify
   // TODO: CREDITFLOW - this is weird that its here
@@ -58,5 +59,11 @@ interface TCPSourceNotify
   fun ref closed(conn: TCPSource ref) =>
     """
     Called when the connection is closed.
+    """
+    None
+
+  fun ref set_origin(origin: Origin tag) =>
+    """
+    Needed to be able to set what the origin is for incoming messages
     """
     None

@@ -23,8 +23,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _header_size: USize
   var _msg_count: USize = 0
   // TODO: This incoming envelope is junk because conceptually there is none
-  let _incoming_envelope: MsgEnvelope = MsgEnvelope(None, 0, None, 0, 0)
-  let _outgoing_envelope: MsgEnvelope = MsgEnvelope(None, 0, None, 0, 0)
+  var _envelope: (MsgEnvelope | None) = None
   var _outgoing_seq_id: U64 = 0
 
   new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val,
@@ -42,6 +41,9 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
     _router.routes()
+
+  fun ref set_origin(origin: Origin tag) =>
+    _envelope = MsgEnvelope(origin, 0, None, 0, 0)
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -63,11 +65,17 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
 
           // TODO: Update this when we figure out exactly how we want to
           // handle message envelopes
-          _outgoing_envelope.update(None, _guid_gen.u128(), None,
-            _outgoing_seq_id, 0)
-          let decoded = _handler.decode(consume data)
-          _runner.run[In](_pipeline_name, ingest_ts, decoded,
-            _incoming_envelope, _outgoing_envelope, conn, _router)
+          match _envelope
+          | let envelope: MsgEnvelope =>
+            envelope.update(envelope.origin, _guid_gen.u128(), None,
+              _outgoing_seq_id, 0)
+            let decoded = _handler.decode(consume data)
+            _runner.run[In](_pipeline_name, ingest_ts, decoded,
+              envelope, envelope, conn, _router)
+          else
+            @printf[I32]("_envelope = None".cstring())
+            true
+          end
         else
           // TODO: we need to provide a good error handling route for crap
           true

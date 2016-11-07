@@ -4,6 +4,7 @@ use "net"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/topology"
+use "wallaroo/messages"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -11,7 +12,7 @@ use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is (CreditFlowProducer & Initializable)
+actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   """
   # TCPSource
 
@@ -39,6 +40,11 @@ actor TCPSource is (CreditFlowProducer & Initializable)
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
+  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
+  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
+  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
+  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
+  let _origins: OriginSet = OriginSet(10)
 
   var _muted: Bool = false
 
@@ -53,6 +59,7 @@ actor TCPSource is (CreditFlowProducer & Initializable)
     """
     _listen = listen
     _notify = consume notify
+    _notify.set_origin(this)
     _connect_count = 0
     _fd = fd
     _event = @pony_asio_event_create(this, fd, AsioEvent.read_write(), 0, true)
@@ -79,6 +86,25 @@ actor TCPSource is (CreditFlowProducer & Initializable)
     for r in _routes.values() do
       r.initialize()
     end
+
+  fun ref hwm_get(): HighWatermarkTable =>
+    _hwm
+
+  fun ref lwm_get(): LowWatermarkTable =>
+    _lwm
+
+  fun ref seq_translate_get(): SeqTranslationTable =>
+    _seq_translate
+
+  fun ref route_translate_get(): RouteTranslationTable =>
+    _route_translate
+
+  fun ref origins_get(): OriginSet =>
+    _origins
+
+  fun ref _flush(low_watermark: U64, origin: Origin tag,
+    upstream_route_id: U64 , upstream_seq_id: U64) =>
+    None
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) => 
     None
