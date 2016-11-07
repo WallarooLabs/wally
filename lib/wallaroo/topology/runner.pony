@@ -403,7 +403,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     _state_change_repository.make_and_register(scb)
 
   fun ref replay_log_entry(msg_uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val, 
-    origin: (Origin tag | None))
+    origin: Origin tag)
   =>
     try
       let sc = _state_change_repository(statechange_id)
