@@ -147,9 +147,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       // TODO: Queue the ACKs and use a timer to send watermarks upstream
       //       periodically.
       ifdef "resilience" then
-        match origin
-        | let origin': Origin tag => origin'.update_watermark(route_id, seq_id)
-        end
+        origin.update_watermark(route_id, seq_id)
       end
       
       // TODO: Should happen when tracking info comes back from writev as

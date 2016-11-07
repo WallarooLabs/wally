@@ -33,19 +33,17 @@ trait Origin
     """
     Process envelopes and keep track of things
     """
-    match incoming_envelope.origin
-    | let origin: Origin tag =>
-      // keep track of messages we've sent downstream
-      hwm_get().update((origin, outgoing_envelope.route_id),
-        outgoing_envelope.seq_id)
-      // keep track of mapping between incoming / outgoing seq_id
-      seq_translate_get().update(incoming_envelope.seq_id,
-        outgoing_envelope.seq_id )
-      // keep track of mapping between incoming / outgoing route_id
-      route_translate_get().update(incoming_envelope.route_id,
-        outgoing_envelope.route_id)
-      // keep track of origins
-      origins_get().set(origin)
+    // keep track of messages we've sent downstream
+    hwm_get().update((incoming_envelope.origin, outgoing_envelope.route_id),
+      outgoing_envelope.seq_id)
+    // keep track of mapping between incoming / outgoing seq_id
+    seq_translate_get().update(incoming_envelope.seq_id,
+      outgoing_envelope.seq_id )
+    // keep track of mapping between incoming / outgoing route_id
+    route_translate_get().update(incoming_envelope.route_id,
+      outgoing_envelope.route_id)
+    // keep track of origins
+    origins_get().set(incoming_envelope.origin)
     end
     
   be update_watermark(route_id: U64, seq_id: U64) =>
