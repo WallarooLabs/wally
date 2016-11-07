@@ -44,7 +44,6 @@ trait Origin
       outgoing_envelope.route_id)
     // keep track of origins
     origins_get().set(incoming_envelope.origin)
-    end
     
   be update_watermark(route_id: U64, seq_id: U64) =>
   """
