@@ -70,7 +70,7 @@ git clone https://github.com/sendence/buffy.git
 
 To build Market Spread Jr:
 ```
-make arch=amd64 build-apps-market-spread-jr
+make arch=amd64 build-apps-market-spread
 ```
 
 To build Giles Sender:
@@ -81,7 +81,7 @@ make arch=amd64 build-giles-sender
 ###AWS
 to run the Market Spread Jr application you must be in it's directory:
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread-jr -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 150000000 --ponythreads 4 --ponypinasio
+sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 150000000 --ponythreads 4 --ponypinasio
 ```
 
 To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
@@ -98,7 +98,7 @@ sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/sender/send
 to run the Market Spread Jr application you must be in it's directory:
 
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread-jr -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 150000000 --ponythreads 4 --ponypinasio
+sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 150000000 --ponythreads 4 --ponypinasio
 ```
 
 To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
