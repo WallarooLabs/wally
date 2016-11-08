@@ -24,6 +24,8 @@
 #ifndef __SERIALIZABLE_HPP__
 #define __SERIALIZABLE_HPP__
 
+#include <cstddef>
+
 namespace wallaroo
 {
 class Serializable
