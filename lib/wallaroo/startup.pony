@@ -48,7 +48,7 @@ actor Startup
 
       for option in options do
         match option
-        | ("expected", let arg: I64) => expected = arg.usize()
+        | ("expected", let arg: I64) => 
           env.out.print("--expected/-e is a deprecated parameter")
         | ("metrics", let arg: String) => m_arg = arg.split(":")
         | ("in", let arg: String) => 
