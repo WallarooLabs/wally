@@ -34,15 +34,24 @@ trait Origin
     Process envelopes and keep track of things
     """
 
-    @printf[I32](
-      "bookkeeping-IN : uid: %llu\troute_id: %llu\tseq_id: %llu\n".cstring(),
-      incoming_envelope.msg_uid,
-      incoming_envelope.route_id, incoming_envelope.seq_id)
-    @printf[I32](
-      "bookkeeping-OUT: uid: %llu\troute_id: %llu\tseq_id: %llu\n".cstring(),
-      outgoing_envelope.msg_uid,
-      outgoing_envelope.route_id, outgoing_envelope.seq_id)
+    @printf[I32]((
+      "bookkeeping-IN : uid: " +
+      incoming_envelope.msg_uid.string() +
+      "\troute_id: " +
+      incoming_envelope.route_id.string() +
+      "\tseq_id: " +
+      incoming_envelope.seq_id.string() +
+      "\n").cstring())
 
+    @printf[I32]((
+      "bookkeeping-OUT : uid: " +
+      outgoing_envelope.msg_uid.string() +
+      "\troute_id: " +
+      outgoing_envelope.route_id.string() +
+      "\tseq_id: " +
+      outgoing_envelope.seq_id.string() +
+      "\n").cstring())
+      
     // keep track of messages we've sent downstream
     hwm_get().update((incoming_envelope.origin, outgoing_envelope.route_id),
       outgoing_envelope.seq_id)
@@ -60,9 +69,9 @@ trait Origin
   Process a high watermark received from a downstream step.
   """
 
-  @printf[I32]("update_watermark\troute_id: %llu\tseq_id: %llu -------\n".cstring(),
-    route_id, seq_id)
-
+  @printf[I32]((
+    "update_watermark\troute_id: " + route_id.string() +
+    "\tseq_id: " + seq_id.string() + "\n").cstring())
   
   // update low watermark for this route_id
   lwm_get().update(route_id, seq_id)
