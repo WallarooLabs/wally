@@ -21,8 +21,6 @@ actor Startup
     var p_arg: (Array[String] | None) = None
     var i_addrs_write: Array[Array[String]] trn = 
       recover Array[Array[String]] end
-    var expected: USize = 1_000_000
-    var init_path = ""
     var worker_count: USize = 1
     var is_initializer = false
     var worker_initializer: (WorkerInitializer | None) = None
@@ -51,6 +49,7 @@ actor Startup
       for option in options do
         match option
         | ("expected", let arg: I64) => expected = arg.usize()
+          env.out.print("--expected/-e is a deprecated parameter")
         | ("metrics", let arg: String) => m_arg = arg.split(":")
         | ("in", let arg: String) => 
           for addr in arg.split(",").values() do
@@ -60,7 +59,8 @@ actor Startup
         | ("control", let arg: String) => c_arg = arg.split(":")
         | ("data", let arg: String) => d_arg = arg.split(":")
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
-        | ("file", let arg: String) => init_path = arg
+        | ("file", let arg: String) => 
+          env.out.print("--file/-f is a deprecated parameter")
         | ("worker-count", let arg: I64) => 
           worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
