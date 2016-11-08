@@ -4,6 +4,7 @@
 
 #include "State.hpp"
 #include <cstdint>
+#include <cstddef>
 
 namespace wallaroo
 {
