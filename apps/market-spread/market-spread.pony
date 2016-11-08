@@ -2,14 +2,14 @@
 Market Spread App
 
 Setting up a market spread run (in order):
-1) reports sink:
-nc -l 127.0.0.1 7002 >> /dev/null
+1) reports sink (if not using Monitoring Hub):
+nc -l 127.0.0.1 5555 >> /dev/null
 
-2) metrics sink:
-nc -l 127.0.0.1 7003 >> /dev/null
+2) metrics sink (if not using Monitoring Hub):
+nc -l 127.0.0.1 5001 >> /dev/null
 
 3) market spread app:
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:7002 -m 127.0.0.1:7003 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 10000000 -n node-name --ponythreads=4 --ponynoblock
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n node-name --ponythreads=4 --ponynoblock
 
 4) orders:
 giles/sender/sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57
