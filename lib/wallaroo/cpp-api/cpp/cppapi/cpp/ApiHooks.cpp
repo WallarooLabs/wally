@@ -24,6 +24,7 @@
 #include "ApiHooks.hpp"
 #include "Computation.hpp"
 #include "Data.hpp"
+#include "Serializable.hpp"
 #include "ManagedObject.hpp"
 #include "SinkEncoder.hpp"
 #include "SourceDecoder.hpp"
@@ -76,14 +77,14 @@ extern wallaroo::StateChangeBuilder *w_state_computation_get_state_change_builde
   return state_computation_->get_state_change_builder(idx_);
 }
 
-extern size_t w_data_serialize_get_size(wallaroo::Data* data_)
+extern size_t w_serializable_serialize_get_size(wallaroo::Serializable* serializable_)
 {
-  return data_->serialize_get_size();
+  return serializable_->serialize_get_size();
 }
 
-extern void w_data_serialize(wallaroo::Data* data_, char* bytes_, size_t sz_)
+extern void w_serializable_serialize(wallaroo::Serializable* serializable_, char* bytes_, size_t sz_)
 {
-  data_->serialize(bytes_, sz_);
+  serializable_->serialize(bytes_, sz_);
 }
 
 extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
