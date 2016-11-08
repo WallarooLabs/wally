@@ -3,7 +3,7 @@ use @w_managed_object_delete[None](obj: ManagedObjectP)
 type ManagedObjectP is Pointer[U8] val
 
 class CPPManagedObject
-  let _obj: ManagedObjectP
+  var _obj: ManagedObjectP
 
   new create(obj': ManagedObjectP) =>
     _obj = obj'
@@ -13,3 +13,13 @@ class CPPManagedObject
 
   fun _final() =>
     @w_managed_object_delete(_obj)
+
+  fun _serialise_space(): USize =>
+    @w_serializable_serialize_get_size(obj())
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    @w_serializable_serialize(obj(), bytes, USize(0))
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _obj = @w_user_serializable_deserialize(bytes, USize(0))
+

@@ -39,12 +39,12 @@ struct StateComputationReturn
   embed state_change: CPPStateChange = CPPStateChange(recover CPPManagedObject(recover Pointer[U8] end) end)
 
 class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState]
-  let _computation: CPPManagedObject val
-  let _name: String
+  var _computation: CPPManagedObject val
+  // var _name: 
 
   new create(computation: CPPManagedObject val) =>
     _computation = computation
-    _name = recover String.from_cstring(@w_state_computation_get_name(_computation.obj())) end
+    // _name = recover String.from_cstring(@w_state_computation_get_name(_computation.obj())) end
 
   fun apply(input: CPPData val, sc_repo: StateChangeRepository[CPPState], state: CPPState):
     ((CPPData val | None), (CPPStateChange | None))
@@ -52,7 +52,7 @@ class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState
     @w_state_computation_compute(_computation.obj(), input.obj(), sc_repo, CPPStateChangeRepositoryHelper, state.obj(), None)
 
   fun name(): String =>
-    _name
+    recover String.from_cstring(@w_state_computation_get_name(_computation.obj())) end
 
   fun state_change_builders(): Array[StateChangeBuilder[CPPState] val] val =>
     let num_builders = @w_state_computation_get_number_of_state_change_builders(_computation.obj())
@@ -63,3 +63,13 @@ class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState
       end
       builders
     end
+
+  // fun _serialise_space(): USize =>
+  //   @w_serializable_serialize_get_size(_computation.obj())
+
+  // fun _serialise(bytes: Pointer[U8] tag) =>
+  //   @w_serializable_serialize(_computation.obj(), bytes, USize(0))
+
+  // fun ref _deserialise(bytes: Pointer[U8] tag) =>
+  //   _computation = recover CPPManagedObject(recover @w_user_serializable_deserialize(bytes, USize(0)) end) end
+  //   _name = recover String.from_cstring(@w_computation_get_name(_computation.obj())) end

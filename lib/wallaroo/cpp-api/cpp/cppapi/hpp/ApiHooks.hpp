@@ -27,6 +27,7 @@
 
 #include <cstddef>
 #include "Computation.hpp"
+#include "Serializable.hpp"
 #include "Data.hpp"
 #include "ManagedObject.hpp"
 #include "SinkEncoder.hpp"
@@ -49,9 +50,9 @@ extern const char *w_state_computation_get_name(wallaroo::StateComputation *stat
 extern size_t w_state_computation_get_number_of_state_change_builders(wallaroo::StateComputation *state_computaton_);
 extern wallaroo::StateChangeBuilder *w_state_computation_get_state_change_builder(wallaroo::StateComputation *state_computation_, uint64_t idx_);
 
-extern size_t w_data_serialize_get_size(wallaroo::Data* data_);
-extern void w_data_serialize(wallaroo::Data* data_, char* bytes_, size_t sz_);
-extern wallaroo::Data* w_data_deserialize (char* bytes_, size_t sz_);
+extern size_t w_serializable_serialize_get_size(wallaroo::Serializable* serializable_);
+extern void w_serializable_serialize(wallaroo::Serializable* serializable_, char* bytes_, size_t sz_);
+extern wallaroo::Serializable* w_serializable_deserialize (char* bytes_, size_t sz_);
 
 extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
   wallaroo::Data *data_);

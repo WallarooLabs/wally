@@ -3,19 +3,22 @@
 
 #include "ManagedObject.hpp"
 #include "Data.hpp"
+#include "Serializable.hpp"
 #include "State.hpp"
 #include "StateChange.hpp"
 #include "StateChangeRepository.hpp"
 #include "StateChangeBuilder.hpp"
 
 namespace wallaroo {
-class Computation: public ManagedObject {
+class Computation: public ManagedObject
+{
 public:
   virtual const char *name() = 0;
   virtual Data *compute(Data *input_) = 0;
 };
 
-class StateComputation: public ManagedObject {
+class StateComputation: public ManagedObject, public Serializable
+{
 public:
   virtual const char *name() = 0;
   virtual void *compute(Data *input_, StateChangeRepository *state_change_repository_, void* state_change_Respository_helper_, State *state_, void *none) = 0;
