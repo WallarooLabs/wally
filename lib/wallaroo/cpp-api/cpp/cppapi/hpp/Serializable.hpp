@@ -25,15 +25,16 @@
 #define __SERIALIZABLE_HPP__
 
 #include <cstddef>
+#include <stdlib.h>
 
 namespace wallaroo
 {
 class Serializable
 {
 public:
-    virtual void deserialize (char* bytes) = 0;
-    virtual void serialize (char* bytes, size_t nsz_) = 0;
-    virtual size_t serialize_get_size () = 0;
+  virtual void deserialize (char* bytes) {}
+  virtual void serialize (char* bytes, size_t nsz_) {}
+  virtual size_t serialize_get_size () { return 0; }
 };
 }
 #endif // __SERIALIZABLE_HPP__

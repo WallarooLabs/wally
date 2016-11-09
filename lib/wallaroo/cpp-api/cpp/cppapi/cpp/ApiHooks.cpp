@@ -88,7 +88,7 @@ extern void w_serializable_serialize(wallaroo::Serializable* serializable_, char
 }
 
 extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
-  wallaroo::Data *data_)
+  wallaroo::EncodableData *data_)
 {
   return sink_encoder->get_size(data_);
 }

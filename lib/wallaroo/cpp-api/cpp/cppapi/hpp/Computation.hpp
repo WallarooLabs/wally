@@ -3,7 +3,6 @@
 
 #include "ManagedObject.hpp"
 #include "Data.hpp"
-#include "Serializable.hpp"
 #include "State.hpp"
 #include "StateChange.hpp"
 #include "StateChangeRepository.hpp"
@@ -17,7 +16,7 @@ public:
   virtual Data *compute(Data *input_) = 0;
 };
 
-class StateComputation: public ManagedObject, public Serializable
+class StateComputation: public ManagedObject
 {
 public:
   virtual const char *name() = 0;
