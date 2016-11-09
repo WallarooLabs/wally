@@ -1,7 +1,10 @@
 #ifndef __STATECHANGE_H__
 #define __STATECHANGE_H__
 
+
 #include "State.hpp"
+#include <cstdint>
+#include <cstddef>
 
 namespace wallaroo
 {
