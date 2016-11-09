@@ -51,7 +51,8 @@ trait Route
     origin: Origin tag, msg_uid: U128, 
     frac_ids: (Array[U64] val | None), outgoing_seq_id: U64)
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val)
-
+  fun route_id(): U64
+    
 class EmptyRoute is Route
   fun ref initialize() => None
   fun credits(): ISize => 0
@@ -67,6 +68,7 @@ class EmptyRoute is Route
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val) =>
     None
 
+  fun route_id(): U64 => 0
 
 class TypedRoute[In: Any val] is Route
   """
@@ -219,6 +221,8 @@ class TypedRoute[In: Any val] is Route
       end
     end
 
+  fun route_id(): U64 => _route_id
+    
 class BoundaryRoute is Route
   """
   Relationship between a single producer and a single consumer.
@@ -337,9 +341,6 @@ class BoundaryRoute is Route
 
     _credits_available = _credits_available - 1
 
-  fun ref _next_sequence_id(): U64 =>
-    _seq_id = _seq_id + 1
-
   fun ref _add_to_queue(delivery_msg: ReplayableDeliveryMsg val) =>
     try
       _queue.enqueue(delivery_msg)
@@ -352,3 +353,6 @@ class BoundaryRoute is Route
         _send_message_on_route(d)
       end
     end
+
+  fun route_id(): U64 => _route_id
+    

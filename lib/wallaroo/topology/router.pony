@@ -45,6 +45,11 @@ class DirectRouter
           outgoing_envelope.msg_uid,
           outgoing_envelope.frac_ids,
           outgoing_envelope.seq_id)
+
+        outgoing_envelope.update(outgoing_envelope.origin,
+          outgoing_envelope.msg_uid, outgoing_envelope.frac_ids,
+          outgoing_envelope.seq_id, r.route_id())
+          
         false
       else
         // TODO: What do we do if we get None?
