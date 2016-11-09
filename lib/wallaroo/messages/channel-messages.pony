@@ -29,7 +29,7 @@ primitive ChannelMsgEncoder
     from_worker_name: String, source_ts: U64, msg_data: D,
     metric_name: String, auth: AmbientAuth,
     proxy_address: ProxyAddress val, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None)): Array[ByteSeq] val ?
+    frac_ids: None): Array[ByteSeq] val ?
   =>
     _encode(ForwardMsg[D](target_id, from_worker_name, source_ts, 
       msg_data, metric_name, proxy_address, msg_uid, frac_ids), auth)
@@ -254,11 +254,11 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _metric_name: String
   let _proxy_address: ProxyAddress val
   let _msg_uid: U128
-  let _frac_ids: (Array[U64] val | None)
+  let _frac_ids: None
 
   new val create(t_id: U128, from: String, s_ts: U64, 
     m_data: D, m_name: String, proxy_address: ProxyAddress val, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None)) 
+    frac_ids: None) 
   =>
     _target_id = t_id
     _sender_name = from

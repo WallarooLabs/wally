@@ -10,9 +10,9 @@ interface Router
     producer: (CreditFlowProducer ref | None),
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   fun routes(): Array[CreditFlowConsumerStep] val
 
@@ -24,9 +24,9 @@ class EmptyRouter
     producer: (CreditFlowProducer ref | None),
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
     true
@@ -44,9 +44,9 @@ class DirectRouter
     producer: (CreditFlowProducer ref | None),
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
     // TODO: Remove that producer can be None
@@ -88,9 +88,9 @@ class ProxyRouter
     producer: (CreditFlowProducer ref | None),
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
     // TODO: Remove that producer can be None
@@ -192,9 +192,9 @@ class LocalPartitionRouter[In: Any val,
     producer: (CreditFlowProducer ref | None),
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
     match data

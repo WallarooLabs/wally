@@ -49,7 +49,7 @@ trait Route
   fun ref receive_credits(number: ISize)
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), outgoing_seq_id: U64)
+    frac_ids: None, outgoing_seq_id: U64)
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val)
   fun route_id(): U64
     
@@ -61,7 +61,7 @@ class EmptyRoute is Route
   
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), outgoing_seq_id: U64)
+    frac_ids: None, outgoing_seq_id: U64)
   => 
     None
 
@@ -84,7 +84,7 @@ class TypedRoute[In: Any val] is Route
   var _seq_id: U64 = 0
   // (metric_name, source_ts, data, origin, msg_uid, frac_ids)
   embed _queue: Array[(String, U64, In, Origin tag, U128, 
-    (Array[U64] val | None), U64)] = _queue.create()
+    None, U64)] = _queue.create()
 
   new create(step: CreditFlowProducer ref, consumer: CreditFlowConsumerStep,
     handler: RouteCallbackHandler)
@@ -147,7 +147,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), outgoing_seq_id: U64)
+    frac_ids: None, outgoing_seq_id: U64)
   =>
     match data
     | let input: In =>
@@ -193,7 +193,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64,
     input: In, origin: Origin tag, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), outgoing_seq_id: U64)
+    frac_ids: None, outgoing_seq_id: U64)
   =>
     _consumer.run[In](metric_name,
       source_ts,
@@ -208,7 +208,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _add_to_queue(metric_name: String, source_ts: U64,
     input: In, origin: Origin tag, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), outgoind_seq_id: U64)
+    frac_ids: None, outgoind_seq_id: U64)
   =>
   _queue.push((metric_name, source_ts, input, origin, msg_uid,
     frac_ids, outgoind_seq_id))
@@ -298,7 +298,7 @@ class BoundaryRoute is Route
  
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), outgoing_seq_id: U64)
+    frac_ids: None, outgoing_seq_id: U64)
   =>
     @printf[I32]("Run should never be called on a BoundaryRoute\n".cstring())
 

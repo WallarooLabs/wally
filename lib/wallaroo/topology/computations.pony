@@ -32,9 +32,9 @@ trait StateProcessor[State: Any #read] is BasicComputation
     producer: (CreditFlowProducer ref | None),
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids': (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): (Bool, (StateChange[State] ref | None))
 
 class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
@@ -54,9 +54,9 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     producer: (CreditFlowProducer ref | None),
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): (Bool, (StateChange[State] ref | None))
   =>
     let result = _state_comp(_input, sc_repo, state)

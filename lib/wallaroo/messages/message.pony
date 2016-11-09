@@ -32,7 +32,7 @@ trait Origin
     i_origin: Origin tag, i_msg_uid: U128, 
     i_frac_ids': (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64, o_route_id: U64)
   =>
     """
@@ -104,7 +104,7 @@ type OriginSet is HashSet[Origin tag, HashIs[Origin tag]]
 //   // for messages crossing boundary  
 //   var origin: Origin tag   // tag referencing upstream origin for msg
 //   var msg_uid: U128         // Source assigned UID; universally unique
-//   var frac_ids: (Array[U64] val | None) // fractional msg ids
+//   var frac_ids: None // fractional msg ids
 //   var seq_id: U64          // assigned by immediate upstream origin
 //   var route_id: U64        // assigned by immediate upstream origin
 

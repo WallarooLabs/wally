@@ -69,8 +69,8 @@ class FileBackend is Backend
           let statechange_id = r.u64_be()
           let payload_length = r.u64_be()
           let payload = recover val _file.read(payload_length.usize()) end
-          //origin_id!
-          _alfred.replay_log_entry(buffer_id, uid, frac_ids, statechange_id, payload)
+          //origin_id! // frac_ids!
+          _alfred.replay_log_entry(buffer_id, uid, None, statechange_id, payload)
         end
         _file.seek_end(0)
         _alfred.log_replay_finished()
@@ -83,27 +83,32 @@ class FileBackend is Backend
 
   fun ref write_entry(buffer_id: U128, entry: LogEntry)
   =>
-    (let uid:U128, let frac_ids: (Array[U64] val | None),
+    (let uid:U128, let frac_ids: None,
      let statechange_id: U64, let seq_id: U64, let payload: Array[ByteSeq] val)
     = entry
     _writer.u128_be(buffer_id)
     _writer.u128_be(uid)
-    match frac_ids
-    | let ids: Array[U64] val =>
-      let s = ids.size()
-      _writer.u64_be(s.u64())
-      for j in Range(0,s) do
-        try
-          _writer.u64_be(ids(j))
-        else
-          @printf[I32]("fractional id %d on message %d disappeared!".cstring(),
-            j, uid)
-        end
-      end
-    else
-      //we have no frac_ids
-      _writer.u64_be(0)
-    end
+
+    // match frac_ids
+    // | let ids: Array[U64] val =>
+    //   let s = ids.size()
+    //   _writer.u64_be(s.u64())
+    //   for j in Range(0,s) do
+    //     try
+    //       _writer.u64_be(ids(j))
+    //     else
+    //       @printf[I32]("fractional id %d on message %d disappeared!".cstring(),
+    //         j, uid)
+    //     end
+    //   end
+    // else
+    // //we have no frac_ids
+    // _writer.u64_be(0)
+    // end
+
+    //we have no frac_ids
+    _writer.u64_be(0)
+
     _writer.u64_be(statechange_id)
     var payload_size: USize = 0
     for p in payload.values() do
@@ -170,7 +175,7 @@ actor Alfred
         b.start_without_replay()
       end
 
-    be replay_log_entry(buffer_id: U128, uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val) =>
+    be replay_log_entry(buffer_id: U128, uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val) =>
       try
         _origins(buffer_id).replay_log_entry(uid, frac_ids, statechange_id, payload)
       else
@@ -188,7 +193,7 @@ actor Alfred
         end
 
     be queue_log_entry(buffer_id: U128, uid: U128,
-      frac_ids: (Array[U64] val | None), statechange_id: U64, seq_id: U64,
+      frac_ids: None, statechange_id: U64, seq_id: U64,
       payload: Array[ByteSeq] val)
     =>
       try

@@ -18,15 +18,15 @@ interface Runner
     producer: (CreditFlowProducer ref | None), router: Router val,
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
 
   fun name(): String
 
 trait ReplayableRunner
-  fun ref replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val, 
+  fun ref replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val, 
     origin: Origin tag)
   fun ref set_origin_id(id: U128)
 
@@ -311,9 +311,9 @@ class ComputationRunner[In: Any val, Out: Any val]
     producer: (CreditFlowProducer ref | None), router: Router val,
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
     let computation_start = Time.nanos()
@@ -362,9 +362,9 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,    producer: (CreditFlowProducer ref | None), router: Router val,
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
     let computation_start = Time.nanos()
@@ -420,7 +420,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   fun ref register_state_change(scb: StateChangeBuilder[State] val) : U64 =>
     _state_change_repository.make_and_register(scb)
 
-  fun ref replay_log_entry(msg_uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val, 
+  fun ref replay_log_entry(msg_uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val, 
     origin: Origin tag)
   =>
     try
@@ -438,9 +438,9 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     producer: (CreditFlowProducer ref | None), router: Router val,
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
     // @printf[I32]("state runner received!\n".cstring())
@@ -499,9 +499,9 @@ class iso RouterRunner
     producer: (CreditFlowProducer ref | None), router: Router val,
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
     match router

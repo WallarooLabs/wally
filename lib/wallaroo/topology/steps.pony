@@ -24,11 +24,11 @@ trait tag RunnableStep
   // for messages crossing boundary
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+    frac_ids: None, seq_id: U64, route_id: U64)
   
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
+    frac_ids: None, incoming_seq_id: U64, route_id: U64)
 
 
 interface Initializable
@@ -117,7 +117,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   // for messages crossing boundary
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
+    frac_ids: None, incoming_seq_id: U64, route_id: U64)
   =>
     _outgoing_seq_id = _outgoing_seq_id + 1
     let is_finished = _runner.run[D](metric_name, source_ts, data,
@@ -146,39 +146,41 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   // for messages crossing boundary
 
   fun _is_duplicate(origin: Origin tag, msg_uid: U128, 
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64): Bool 
+    frac_ids: None, seq_id: U64, route_id: U64): Bool 
   =>
     for e in _deduplication_list.values() do
       //TODO: Bloom filter maybe?
       if e._2 == msg_uid then
-        match (e._3, frac_ids)
-        | (let efa: Array[U64] val, let efb: Array[U64] val) => 
-          if efa.size() == efb.size() then
-            var found = true
-            for i in Range(0,efa.size()) do
-              try
-                if efa(i) != efb(i) then
-                  found = false
-                  break
-                end
-              else
-                found = false
-                break
-              end
-            end
-            if found then
-              return true
-            end
-          end
-        | (None,None) => return true
-        end
+        // No frac_ids yet
+        return true
+        // match (e._3, frac_ids)
+        // | (let efa: Array[U64] val, let efb: Array[U64] val) => 
+        //   if efa.size() == efb.size() then
+        //     var found = true
+        //     for i in Range(0,efa.size()) do
+        //       try
+        //         if efa(i) != efb(i) then
+        //           found = false
+        //           break
+        //         end
+        //       else
+        //         found = false
+        //         break
+        //       end
+        //     end
+        //     if found then
+        //       return true
+        //     end
+        //   end
+        // | (None,None) => return true
+        // end
       end
     end
     false
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
+    frac_ids: None, incoming_seq_id: U64, route_id: U64)
   =>
     _outgoing_seq_id = _outgoing_seq_id + 1
     if not _is_duplicate(origin, msg_uid, frac_ids, incoming_seq_id, 
@@ -227,7 +229,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
       @printf[I32]("Tried to flush a non-existing buffer!".cstring())
     end
 
-  be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val)
+  be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val)
   =>
     // TODO: We need to handle the entire incoming envelope here
     None

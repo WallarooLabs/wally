@@ -135,7 +135,7 @@ actor TestOrigin is ResilientOrigin
     alfred.start()
     _finished = finished
 
-  be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None),
+  be replay_log_entry(uid: U128, frac_ids: None,
     statechange_id: U64, payload: Array[ByteSeq] val) =>
     h.assert_true(uid == _next_to_be_replayed)
     _next_to_be_replayed = _next_to_be_replayed + 1
