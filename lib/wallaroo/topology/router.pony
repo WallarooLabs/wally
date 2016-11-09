@@ -201,7 +201,6 @@ class LocalPartitionRouter[In: Any val,
         | let p: ProxyRouter val =>
           p.route[In](metric_name, source_ts, input, incoming_envelope,
             outgoing_envelope, producer)
-          false
         else
           true
         end

@@ -476,7 +476,6 @@ class iso RouterRunner
     | let r: Router val =>
       r.route[In](metric_name, source_ts, input, incoming_envelope,
         outgoing_envelope, producer)
-      false
     else
       true
     end
