@@ -14,9 +14,14 @@ use "wallaroo/resilience"
 // TODO: Eliminate producer None when we can
 interface Runner
   // Return a Bool indicating whether the message is finished processing
-  fun ref run[In: Any val](metric_name: String, source_ts: U64, input: In,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None), router: (Router val | None) = None): Bool
+  fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None), router: Router val,
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64): Bool
 
   fun name(): String
 
@@ -302,10 +307,14 @@ class ComputationRunner[In: Any val, Out: Any val]
     _next = consume next
     _metrics_reporter = consume metrics_reporter
 
-  fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None), router: (Router val | None)): 
-      Bool
+  fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None), router: Router val,
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64): Bool
   =>
     let computation_start = Time.nanos()
 
@@ -316,8 +325,11 @@ class ComputationRunner[In: Any val, Out: Any val]
         match result
         | None => true
         | let output: Out =>
-          _next.run[Out](metric_name, source_ts, output, 
-            incoming_envelope, outgoing_envelope, producer, router)
+          _next.run[Out](metric_name, source_ts, output, producer, router,
+            // incoming envelope
+            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+            // outgoing envelope
+            o_origin, o_msg_uid, o_frac_ids, o_seq_id)
         else
           true
         end
@@ -347,9 +359,13 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     _name = _state_comp.name()
     _prep_name = _name + " prep"
 
-  fun ref run[D: Any val](metric_name: String val, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
+  fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,    producer: (CreditFlowProducer ref | None), router: Router val,
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64): Bool
   =>
     let computation_start = Time.nanos()
     let is_finished = 
@@ -360,9 +376,11 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
           let processor: StateProcessor[State] val = 
             StateComputationWrapper[In, Out, State](input, _state_comp, 
               _output_router)
-          shared_state_router.route[StateProcessor[State] val](metric_name,
-            source_ts, processor, incoming_envelope, outgoing_envelope,
-            producer)
+          shared_state_router.route[StateProcessor[State] val](metric_name, source_ts, processor, producer,
+            // incoming envelope
+            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+            // outgoing envelope
+            o_origin, o_msg_uid, o_frac_ids, o_seq_id)
         else
           true
         end
@@ -416,16 +434,25 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
       @printf[I32]("FATAL: could not look up state_change with id %d".cstring(), statechange_id)
     end
 
-  fun ref run[In: Any val](metric_name: String val, source_ts: U64, input: In,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
+  fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None), router: Router val,
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64): Bool
   =>
     // @printf[I32]("state runner received!\n".cstring())
-    match input
+    match data
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
       let result = sp(_state, _state_change_repository, metric_name, source_ts,
-          incoming_envelope, outgoing_envelope, producer)
+        producer,
+        // incoming envelope
+        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        // outgoing envelope
+        o_origin, o_msg_uid, o_frac_ids, o_seq_id)        
       let is_finished = result._1
       let state_change = result._2
 
@@ -438,8 +465,8 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
           //TODO: deal with creating fractional message ids here
           match _id
           | let buffer_id: U128 =>
-            _alfred.queue_log_entry(buffer_id, incoming_envelope.msg_uid, None,
-              sc.id(), outgoing_envelope.seq_id, consume payload)
+            _alfred.queue_log_entry(buffer_id, i_msg_uid, None,
+              sc.id(), o_seq_id, consume payload)
           else
             @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
           end
@@ -468,14 +495,22 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   fun name(): String => "State runner"
 
 class iso RouterRunner
-  fun ref run[In: Any val](metric_name: String val, source_ts: U64, input: In,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None), router: (Router val | None)): Bool
+  fun ref run[Out: Any val](metric_name: String, source_ts: U64, output: Out,
+    producer: (CreditFlowProducer ref | None), router: Router val,
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64): Bool
   =>
     match router
     | let r: Router val =>
-      r.route[In](metric_name, source_ts, input, incoming_envelope,
-        outgoing_envelope, producer)
+      r.route[Out](metric_name, source_ts, output, producer,
+        // incoming envelope
+        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        // outgoing envelope
+        o_origin, o_msg_uid, o_frac_ids, o_seq_id)
     else
       true
     end

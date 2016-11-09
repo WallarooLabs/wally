@@ -53,10 +53,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
   var _outgoing_seq_id: U64
-  let _incoming_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
-  let _outgoing_envelope: MsgEnvelope = MsgEnvelope(this, 0, None, 0, 0)
   var _initialized: Bool = false
-  let _deduplication_list: Array[MsgEnvelope box] = _deduplication_list.create()
+  // list of envelopes
+  // (origin, msg_uid, frac_ids, seq_id, route_id)
+  let _deduplication_list: Array[(Origin tag, U128, (Array[U64] val | None),
+    U64, U64)] = _deduplication_list.create()
   let _alfred: Alfred
   var _id: (U128 | None)
 
@@ -119,15 +120,22 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
     _outgoing_seq_id = _outgoing_seq_id + 1
-    _incoming_envelope.update(origin, msg_uid, frac_ids, incoming_seq_id, route_id)
-    _outgoing_envelope.update(this, msg_uid, frac_ids, _outgoing_seq_id)
     let is_finished = _runner.run[D](metric_name, source_ts, data,
-      _incoming_envelope, _outgoing_envelope, this, _router)
+      this, _router,
+      // incoming envelope
+      origin, msg_uid, frac_ids, incoming_seq_id, route_id,
+      // outgoing envelope
+      this, msg_uid, frac_ids, _outgoing_seq_id)
     if is_finished then
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     else
       ifdef "resilience" then
-        _bookkeeping(_incoming_envelope, _outgoing_envelope)
+        _bookkeeping(      
+          // incoming envelope
+          origin, msg_uid, frac_ids, incoming_seq_id, route_id,
+          // outgoing envelope
+          // TODO: We need the real route id
+          this, msg_uid, frac_ids, _outgoing_seq_id, 0)
       end
     end
 
@@ -137,11 +145,13 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   // TODO: Fix the Origin None once we know how to look up Proxy
   // for messages crossing boundary
 
-  fun _is_duplicate(envelope: MsgEnvelope box): Bool =>
+  fun _is_duplicate(origin: Origin tag, msg_uid: U128, 
+    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64): Bool 
+  =>
     for e in _deduplication_list.values() do
       //TODO: Bloom filter maybe?
-      if e.msg_uid == envelope.msg_uid then
-        match (e.frac_ids, envelope.frac_ids)
+      if e._2 == msg_uid then
+        match (e._3, frac_ids)
         | (let efa: Array[U64] val, let efb: Array[U64] val) => 
           if efa.size() == efb.size() then
             var found = true
@@ -171,16 +181,25 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
   =>
     _outgoing_seq_id = _outgoing_seq_id + 1
-    _incoming_envelope.update(origin, msg_uid, frac_ids, incoming_seq_id, route_id)
-    _outgoing_envelope.update(this, msg_uid, frac_ids, _outgoing_seq_id)
-    if not _is_duplicate(_incoming_envelope) then
-      _deduplication_list.push(_incoming_envelope)
-      let is_finished = _runner.run[D](metric_name, source_ts, data,
-        _incoming_envelope, _outgoing_envelope, this, _router)
+    if not _is_duplicate(origin, msg_uid, frac_ids, incoming_seq_id, 
+      route_id) then
+      _deduplication_list.push((origin, msg_uid, frac_ids, incoming_seq_id, 
+        route_id))
+      let is_finished = _runner.run[D](metric_name, source_ts, data, 
+        this, _router,
+        // incoming envelope
+        origin, msg_uid, frac_ids, incoming_seq_id, route_id,
+        // outgoing envelope
+        this, msg_uid, frac_ids, _outgoing_seq_id)
       if is_finished then
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
       else
-        _bookkeeping(_incoming_envelope, _outgoing_envelope)
+        _bookkeeping(
+          // incoming envelope
+          origin, msg_uid, frac_ids, incoming_seq_id, route_id,
+          // outgoing envelope
+          // TODO: We need the real route id
+          this, msg_uid, frac_ids, _outgoing_seq_id, 0)
       end
     end
 
@@ -210,15 +229,17 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
 
   be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val)
   =>
-    if not _is_duplicate(_incoming_envelope) then
-      _deduplication_list.push(_incoming_envelope)
-      match _runner
-      | let r: ReplayableRunner =>
-        r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
-      else
-        @printf[I32]("trying to replay a message to a non-replayable runner!".cstring())
-      end
-    end
+    // TODO: We need to handle the entire incoming envelope here
+    None
+    // if not _is_duplicate(_incoming_envelope) then
+    //   _deduplication_list.push(_incoming_envelope)
+    //   match _runner
+    //   | let r: ReplayableRunner =>
+    //     r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
+    //   else
+    //     @printf[I32]("trying to replay a message to a non-replayable runner!".cstring())
+    //   end
+    // end
 
   be replay_finished() =>
     _deduplication_list.clear()
@@ -227,12 +248,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     _deduplication_list.clear()
 
   be dispose() =>
-    match _router
-    | let r: TCPRouter val =>
-      r.dispose()
+    None
+    // match _router
     // | let sender: DataSender =>
     //   sender.dispose()
-    end
+    // end
 
   //////////////
   // CREDIT FLOW PRODUCER

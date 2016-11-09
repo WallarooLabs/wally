@@ -27,8 +27,13 @@ trait Origin
     """
     origin.update_watermark(upstream_route_id, upstream_seq_id)
 
-  fun ref _bookkeeping(incoming_envelope: MsgEnvelope box,
-    outgoing_envelope: MsgEnvelope box)
+  fun ref _bookkeeping(
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids': (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64, o_route_id: U64)
   =>
     """
     Process envelopes and keep track of things
@@ -36,33 +41,30 @@ trait Origin
     ifdef "resilience-debug" then
       @printf[I32]((
         "bookkeeping-IN : uid: " +
-        incoming_envelope.msg_uid.string() +
+        i_msg_uid.string() +
         "\troute_id: " +
-        incoming_envelope.route_id.string() +
+        i_route_id.string() +
         "\tseq_id: " +
-        incoming_envelope.seq_id.string() +
+        i_seq_id.string() +
         "\n").cstring())
       @printf[I32]((
         "bookkeeping-OUT : uid: " +
-        outgoing_envelope.msg_uid.string() +
+        o_msg_uid.string() +
         "\troute_id: " +
-        outgoing_envelope.route_id.string() +
+        o_route_id.string() +
         "\tseq_id: " +
-        outgoing_envelope.seq_id.string() +
+        o_seq_id.string() +
         "\n").cstring())
     end
       
     // keep track of messages we've sent downstream
-    hwm_get().update((incoming_envelope.origin, outgoing_envelope.route_id),
-      outgoing_envelope.seq_id)
+    hwm_get().update((i_origin, o_route_id), o_seq_id)
     // keep track of mapping between incoming / outgoing seq_id
-    seq_translate_get().update(incoming_envelope.seq_id,
-      outgoing_envelope.seq_id )
+    seq_translate_get().update(i_seq_id, o_seq_id )
     // keep track of mapping between incoming / outgoing route_id
-    route_translate_get().update(incoming_envelope.route_id,
-      outgoing_envelope.route_id)
+    route_translate_get().update(i_route_id, o_route_id)
     // keep track of origins
-    origins_get().set(incoming_envelope.origin)
+    origins_get().set(i_origin)
     
   be update_watermark(route_id: U64, seq_id: U64) =>
   """
@@ -97,41 +99,41 @@ trait Origin
   
 type OriginSet is HashSet[Origin tag, HashIs[Origin tag]] 
     
-class MsgEnvelope
-  // TODO: Fix the Origin None once we know how to look up Proxy
-  // for messages crossing boundary  
-  var origin: Origin tag   // tag referencing upstream origin for msg
-  var msg_uid: U128         // Source assigned UID; universally unique
-  var frac_ids: (Array[U64] val | None) // fractional msg ids
-  var seq_id: U64          // assigned by immediate upstream origin
-  var route_id: U64        // assigned by immediate upstream origin
+// class MsgEnvelope
+//   // TODO: Fix the Origin None once we know how to look up Proxy
+//   // for messages crossing boundary  
+//   var origin: Origin tag   // tag referencing upstream origin for msg
+//   var msg_uid: U128         // Source assigned UID; universally unique
+//   var frac_ids: (Array[U64] val | None) // fractional msg ids
+//   var seq_id: U64          // assigned by immediate upstream origin
+//   var route_id: U64        // assigned by immediate upstream origin
 
-  new create(origin': Origin tag, msg_uid': U128,
-    frac_ids': (Array[U64] val | None), seq_id': U64, route_id': U64)
-  =>
-    origin = origin'
-    msg_uid = msg_uid'
-    frac_ids = frac_ids'
-    seq_id = seq_id'
-    route_id = route_id'
+//   new create(origin': Origin tag, msg_uid': U128,
+//     frac_ids': (Array[U64] val | None), seq_id': U64, route_id': U64)
+//   =>
+//     origin = origin'
+//     msg_uid = msg_uid'
+//     frac_ids = frac_ids'
+//     seq_id = seq_id'
+//     route_id = route_id'
 
-  fun ref update(origin': Origin tag, msg_uid': U128, 
-    frac_ids': (Array[U64] val | None), seq_id': U64, route_id': U64 = 0) 
-  =>
-    origin = origin'
-    msg_uid = msg_uid'
-    frac_ids = frac_ids'
-    seq_id = seq_id'
-    route_id = route_id'
+//   fun ref update(origin': Origin tag, msg_uid': U128, 
+//     frac_ids': (Array[U64] val | None), seq_id': U64, route_id': U64 = 0) 
+//   =>
+//     origin = origin'
+//     msg_uid = msg_uid'
+//     frac_ids = frac_ids'
+//     seq_id = seq_id'
+//     route_id = route_id'
 
-  fun clone(): MsgEnvelope val =>
-    match frac_ids
-    | let f_ids: Array[U64] val =>
-      recover val MsgEnvelope(origin, msg_uid, recover val f_ids.clone() end,
-        seq_id,route_id) end
-    else
-      recover val MsgEnvelope(origin, msg_uid, frac_ids, seq_id, route_id) end
-    end
+//   fun clone(): MsgEnvelope val =>
+//     match frac_ids
+//     | let f_ids: Array[U64] val =>
+//       recover val MsgEnvelope(origin, msg_uid, recover val f_ids.clone() end,
+//         seq_id,route_id) end
+//     else
+//       recover val MsgEnvelope(origin, msg_uid, frac_ids, seq_id, route_id) end
+//     end
 
 
 primitive HashTuple

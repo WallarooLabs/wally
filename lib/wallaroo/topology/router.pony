@@ -7,8 +7,13 @@ use "wallaroo/messages"
 // TODO: Eliminate producer None when we can
 interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool
+    producer: (CreditFlowProducer ref | None),
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64): Bool
   fun routes(): Array[CreditFlowConsumerStep] val
 
 interface RouterBuilder
@@ -16,8 +21,13 @@ interface RouterBuilder
 
 class EmptyRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool
+    producer: (CreditFlowProducer ref | None),
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64): Bool
   =>
     true
 
@@ -31,8 +41,13 @@ class DirectRouter
     _target = target
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool
+    producer: (CreditFlowProducer ref | None),
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64): Bool
   =>
     // TODO: Remove that producer can be None
     match producer
@@ -41,15 +56,8 @@ class DirectRouter
       match might_be_route
       | let r: Route =>
         r.run[D](metric_name, source_ts, data,
-          outgoing_envelope.origin,
-          outgoing_envelope.msg_uid,
-          outgoing_envelope.frac_ids,
-          outgoing_envelope.seq_id)
-
-        outgoing_envelope.update(outgoing_envelope.origin,
-          outgoing_envelope.msg_uid, outgoing_envelope.frac_ids,
-          outgoing_envelope.seq_id, r.route_id())
-          
+          // outgoing envelope
+          o_origin, o_msg_uid, o_frac_ids, o_seq_id)        
         false
       else
         // TODO: What do we do if we get None?
@@ -77,8 +85,13 @@ class ProxyRouter
     _auth = auth
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool
+    producer: (CreditFlowProducer ref | None),
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64): Bool
   =>
     // TODO: Remove that producer can be None
     match producer
@@ -90,8 +103,7 @@ class ProxyRouter
           _target_proxy_address.step_id,
           _worker_name, source_ts, data, metric_name,
           _target_proxy_address, 
-          outgoing_envelope.msg_uid,
-          outgoing_envelope.frac_ids)
+          o_msg_uid, o_frac_ids)
 
         r.forward(delivery_msg)
         false
@@ -177,8 +189,13 @@ class LocalPartitionRouter[In: Any val,
     _partition_function = partition_function
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool
+    producer: (CreditFlowProducer ref | None),
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: (Array[U64] val | None),
+    o_seq_id: U64): Bool
   =>
     match data
     | let input: In =>
@@ -193,10 +210,8 @@ class LocalPartitionRouter[In: Any val,
             match might_be_route
             | let r: Route =>
               r.run[D](metric_name, source_ts, data,
-                outgoing_envelope.origin,
-                outgoing_envelope.msg_uid,
-                outgoing_envelope.frac_ids,
-                outgoing_envelope.seq_id)
+                // outgoing envelope
+                o_origin, o_msg_uid, o_frac_ids, o_seq_id)
               false
             else
               // TODO: What do we do if we get None?
@@ -206,8 +221,11 @@ class LocalPartitionRouter[In: Any val,
             true
           end    
         | let p: ProxyRouter val =>
-          p.route[In](metric_name, source_ts, input, incoming_envelope,
-            outgoing_envelope, producer)
+          p.route[In](metric_name, source_ts, input, producer,
+            // incoming envelope
+            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+            // outgoing envelope
+            o_origin, o_msg_uid, o_frac_ids, o_seq_id)
         else
           true
         end
@@ -234,67 +252,3 @@ class LocalPartitionRouter[In: Any val,
     consume cs
 
   fun local_map(): Map[U128, Step] val => _local_map
-
-class TCPRouter
-  let _tcp_writer: TCPWriter
-
-  new val create(target: (TCPConnection | Array[TCPConnection] val)) =>
-    _tcp_writer =
-      match target
-      | let c: TCPConnection =>
-        SingleTCPWriter(c)
-      | let cs: Array[TCPConnection] val =>
-        MultiTCPWriter(cs)
-      else
-        EmptyTCPWriter
-      end
-
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    incoming_envelope: MsgEnvelope box, outgoing_envelope: MsgEnvelope,
-    producer: (CreditFlowProducer ref | None)): Bool
-  =>
-    match data
-    | let d: Array[ByteSeq] val =>
-      _tcp_writer(d)
-    end
-    false
-
-  fun writev(d: Array[ByteSeq] val) =>
-    _tcp_writer(d)
-
-  fun dispose() => _tcp_writer.dispose()
-
-  fun routes(): Array[CreditFlowConsumerStep] val =>
-    // TODO: CREDITFLOW - real implmentation?
-    recover val Array[CreditFlowConsumerStep] end
-
-interface TCPWriter
-  fun apply(d: Array[ByteSeq] val)
-  fun dispose()
-
-class EmptyTCPWriter
-  fun apply(d: Array[ByteSeq] val) => None
-  fun dispose() => None
-
-class SingleTCPWriter
-  let _conn: TCPConnection
-
-  new create(conn: TCPConnection) =>
-    _conn = conn
-
-  fun apply(d: Array[ByteSeq] val) =>
-    _conn.writev(d)
-
-  fun dispose() => _conn.dispose()
-
-class MultiTCPWriter
-  let _conns: Array[TCPConnection] val
-
-  new create(conns: Array[TCPConnection] val) =>
-    _conns = conns
-
-  fun apply(d: Array[ByteSeq] val) =>
-    for c in _conns.values() do c.writev(d) end
-
-  fun dispose() =>
-    for c in _conns.values() do c.dispose() end

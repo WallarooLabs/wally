@@ -22,9 +22,8 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
   var _msg_count: USize = 0
-  // TODO: This incoming envelope is junk because conceptually there is none
-  var _envelope: (MsgEnvelope | None) = None
   var _outgoing_seq_id: U64 = 0
+  var _origin: (Origin tag | None) = None
 
   new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
@@ -43,7 +42,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     _router.routes()
 
   fun ref set_origin(origin: Origin tag) =>
-    _envelope = MsgEnvelope(origin, 0, None, 0, 0)
+    _origin = origin
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -61,19 +60,18 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
 
       let is_finished =
         try
-          _outgoing_seq_id = _outgoing_seq_id + 1
-
-          // TODO: Update this when we figure out exactly how we want to
-          // handle message envelopes
-          match _envelope
-          | let envelope: MsgEnvelope =>
-            envelope.update(envelope.origin, _guid_gen.u128(), None,
-              _outgoing_seq_id, 0)
+          match _origin
+          | let o: Origin tag =>
+            _outgoing_seq_id = _outgoing_seq_id + 1
             let decoded = _handler.decode(consume data)
             _runner.run[In](_pipeline_name, ingest_ts, decoded,
-              envelope, envelope, conn, _router)
+              conn, _router,
+              // incoming envelope (of which technically there is none)
+              o, 0, None, 0, 0,
+              // outgoing envelope
+              o, 0, None, 0)
           else
-            @printf[I32]("_envelope = None".cstring())
+            @printf[I32]("FramedSourceNotify needs an Origin to pass along!\n".cstring())
             true
           end
         else
