@@ -33,6 +33,25 @@ trait Origin
     """
     Process envelopes and keep track of things
     """
+    ifdef "resilience-debug" then
+      @printf[I32]((
+        "bookkeeping-IN : uid: " +
+        incoming_envelope.msg_uid.string() +
+        "\troute_id: " +
+        incoming_envelope.route_id.string() +
+        "\tseq_id: " +
+        incoming_envelope.seq_id.string() +
+        "\n").cstring())
+      @printf[I32]((
+        "bookkeeping-OUT : uid: " +
+        outgoing_envelope.msg_uid.string() +
+        "\troute_id: " +
+        outgoing_envelope.route_id.string() +
+        "\tseq_id: " +
+        outgoing_envelope.seq_id.string() +
+        "\n").cstring())
+    end
+      
     // keep track of messages we've sent downstream
     hwm_get().update((incoming_envelope.origin, outgoing_envelope.route_id),
       outgoing_envelope.seq_id)
@@ -49,6 +68,12 @@ trait Origin
   """
   Process a high watermark received from a downstream step.
   """
+  ifdef "resilience-debug" then
+    @printf[I32]((
+      "update_watermark\troute_id: " + route_id.string() +
+      "\tseq_id: " + seq_id.string() + "\n").cstring())
+  end
+    
   // update low watermark for this route_id
   lwm_get().update(route_id, seq_id)
 
@@ -66,7 +91,7 @@ trait Origin
       end
     end
   else
-    @printf[I32]("Error finding value in TranslationTable\n".cstring())
+    @printf[I32]("Missing bookkeeping entry.\n".cstring())
   end
 
   
@@ -167,7 +192,8 @@ class HighWatermarkTable
         end
       end)
     else
-      @printf[I32]("Error upserting into HighWaterMarkTable\n".cstring())      
+      @printf[I32](
+        "HighWaterMarkTable: error upserting OriginRoutePair\n".cstring())      
     end
 
   fun apply(key: OriginRoutePair): U64 ?
@@ -175,7 +201,7 @@ class HighWatermarkTable
     try
       _hwmt(key)
     else
-      @printf[I32]("Error fetching a seq_id from HighWaterMarkTable\n".cstring())
+      @printf[I32]("HighWaterMarkTable: no entry for OriginRoutePair\n".cstring())
       error
     end
 
@@ -205,7 +231,9 @@ class SeqTranslationTable
       _inToOut.insert(in_seq_id, out_seq_id)
       _outToIn.insert(out_seq_id, in_seq_id)
     else
-      @printf[I32]("Error inserting into SeqTranslationTable\n".cstring())      
+      @printf[I32](
+        "SeqTranslationTable: error inserting %llu,%llu\n".cstring(),
+        in_seq_id, out_seq_id)      
     end
 
   fun outToIn(out_seq_id: U64): U64 ?
@@ -216,7 +244,8 @@ class SeqTranslationTable
     try
       _outToIn(out_seq_id)
     else
-      @printf[I32]("Error in outToIn: %ld\n".cstring(), out_seq_id)
+      @printf[I32]("SeqTranslationTable: no entry outToin: %llu\n".cstring(),
+        out_seq_id)
       error
     end
 
@@ -228,7 +257,8 @@ class SeqTranslationTable
     try
       _inToOut(in_seq_id)
     else
-      @printf[I32]("Error in inToOut: %ld\n".cstring(), in_seq_id)
+      @printf[I32]("SeqTranslationTable: no entry inToOut: %llu\n".cstring(),
+        in_seq_id)
       error
     end
 
@@ -238,7 +268,7 @@ class SeqTranslationTable
       _inToOut.remove(_outToIn(out_seq_id))
       _outToIn.remove(out_seq_id)
     else
-      @printf[I32]("Error removing key from SeqTranslationTable\n".cstring())
+      @printf[I32]("SeqTranslationTable: error removing %llu\n".cstring())
     end
 
 class RouteTranslationTable
@@ -266,7 +296,8 @@ class RouteTranslationTable
       _inToOut.insert(in_route_id, out_route_id)
       _outToIn.insert(out_route_id, in_route_id)
     else
-      @printf[I32]("Error inserting into RouteTranslationTable\n".cstring())      
+      @printf[I32]("RouteTranslationTable: error inserting %llu,%llu\n".cstring(),
+        in_route_id, out_route_id)      
     end
 
   fun outToIn(out_route_id: U64): U64 ?
@@ -277,7 +308,8 @@ class RouteTranslationTable
     try
       _outToIn(out_route_id)
     else
-      @printf[I32]("Error in outToIn: %ld\n".cstring(), out_route_id)
+      @printf[I32]("RouteTranslationTable: no entry outToIn: %llu\n".cstring(),
+        out_route_id)
       error
     end
 
@@ -289,7 +321,8 @@ class RouteTranslationTable
     try
       _inToOut(in_route_id)
     else
-      @printf[I32]("Error in inToOut: %ld\n".cstring(), in_route_id)
+      @printf[I32]("RouteTranslationTable: no entry inToOut: %llu\n".cstring(),
+        in_route_id)
       error
     end
 
@@ -299,7 +332,9 @@ class RouteTranslationTable
       _inToOut.remove(_outToIn(out_route_id))
       _outToIn.remove(out_route_id)
     else
-      @printf[I32]("Error removing key from RouteTranslationTable\n".cstring())
+      @printf[I32](
+        "RouteTranslationTable: error removing entry: %llu\n".cstring(),
+        out_route_id)
     end
 
     

@@ -43,7 +43,13 @@ class DirectRouter
         r.run[D](metric_name, source_ts, data,
           outgoing_envelope.origin,
           outgoing_envelope.msg_uid,
-          outgoing_envelope.frac_ids)
+          outgoing_envelope.frac_ids,
+          outgoing_envelope.seq_id)
+
+        outgoing_envelope.update(outgoing_envelope.origin,
+          outgoing_envelope.msg_uid, outgoing_envelope.frac_ids,
+          outgoing_envelope.seq_id, r.route_id())
+          
         false
       else
         // TODO: What do we do if we get None?
@@ -189,7 +195,8 @@ class LocalPartitionRouter[In: Any val,
               r.run[D](metric_name, source_ts, data,
                 outgoing_envelope.origin,
                 outgoing_envelope.msg_uid,
-                outgoing_envelope.frac_ids)
+                outgoing_envelope.frac_ids,
+                outgoing_envelope.seq_id)
               false
             else
               // TODO: What do we do if we get None?

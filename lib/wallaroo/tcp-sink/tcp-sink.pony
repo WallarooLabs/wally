@@ -147,6 +147,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       // TODO: Queue the ACKs and use a timer to send watermarks upstream
       //       periodically.
       ifdef "resilience" then
+        ifdef "resilience-debug" then
+          @printf[I32]((
+            "sink uid: " + msg_uid.string() +
+            "\troute_id: " + route_id.string() + "\tseq_id: " +
+            seq_id.string() + "\n").cstring())
+        end
         origin.update_watermark(route_id, seq_id)
       end
       
