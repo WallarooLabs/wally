@@ -27,12 +27,11 @@
 
 
 #include "Buffers.hpp"
-#include "Serializable.hpp"
 #include "ManagedObject.hpp"
 
 namespace wallaroo
 {
-class Data: public Serializable, public ManagedObject
+class Data: public ManagedObject
 {
 public:
     virtual ~Data();
@@ -41,6 +40,7 @@ public:
 class EncodableData: public Data
 {
 public:
+  virtual size_t encode_get_size() = 0;
   virtual void encode(char *bytes) = 0;
 };
 
