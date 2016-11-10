@@ -56,6 +56,8 @@ class DirectRouter
       match might_be_route
       | let r: Route =>
         r.run[D](metric_name, source_ts, data,
+          // hand down cfp so we can update route_id
+          cfp,
           // outgoing envelope
           o_origin, o_msg_uid, o_frac_ids, o_seq_id)        
         false
@@ -210,6 +212,8 @@ class LocalPartitionRouter[In: Any val,
             match might_be_route
             | let r: Route =>
               r.run[D](metric_name, source_ts, data,
+                // hand down cfp so we can update route_id
+                cfp,
                 // outgoing envelope
                 o_origin, o_msg_uid, o_frac_ids, o_seq_id)
               false

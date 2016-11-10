@@ -53,6 +53,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
   var _outgoing_seq_id: U64
+  var _outgoing_route_id: U64
   var _initialized: Bool = false
   // list of envelopes
   // (origin, msg_uid, frac_ids, seq_id, route_id)
@@ -78,6 +79,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     end
     _metrics_reporter = consume metrics_reporter
     _outgoing_seq_id = 0
+    _outgoing_route_id = 0
     _router = router
     _route_builder = route_builder
     _alfred = alfred
@@ -135,7 +137,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
           origin, msg_uid, frac_ids, incoming_seq_id, route_id,
           // outgoing envelope
           // TODO: We need the real route id
-          this, msg_uid, frac_ids, _outgoing_seq_id, 0)
+          this, msg_uid, frac_ids, _outgoing_seq_id, _outgoing_route_id)
       end
     end
 
@@ -199,12 +201,14 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
         _bookkeeping(
           // incoming envelope
           origin, msg_uid, frac_ids, incoming_seq_id, route_id,
-          // outgoing envelope
-          // TODO: We need the real route id
-          this, msg_uid, frac_ids, _outgoing_seq_id, 0)
+          // outgoing envelope; outgoing_route_id was set by Router
+          this, msg_uid, frac_ids, _outgoing_seq_id, _outgoing_route_id)
       end
     end
 
+  //////////////
+  // ORIGIN (resilience)
+    
   fun ref hwm_get(): HighWatermarkTable =>
     _hwm
 
@@ -284,6 +288,12 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
       None
     end
 
+  fun ref update_route_id(route_id: U64) =>
+    """
+    We call this from the Route once a message has been sent downstream.
+    """
+    _outgoing_route_id = route_id
+    
   //////////////
   // CREDIT FLOW CONSUMER
   be register_producer(producer: CreditFlowProducer) =>
