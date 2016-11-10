@@ -93,7 +93,7 @@ actor DataReceiver is Origin
       _router.replay_route(r, this, seq_id)
     end
 
-  be ack_latest() => _ack_lastest()
+  be ack_latest() => _ack_latest()
 
   fun ref _ack_latest() =>
     try
