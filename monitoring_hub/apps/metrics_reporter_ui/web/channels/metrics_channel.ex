@@ -22,7 +22,7 @@ defmodule MetricsReporterUI.MetricsChannel do
     store_period_throughput_msg(app_name, category, pipeline_key, throughput_msg)
     {:ok, _pid} = find_or_start_latency_bins_worker(app_name, category, pipeline_key)
     {:ok, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key)
-    {:reply, :ok, socket}
+    {:noreply, socket}
   end
 
   def handle_in("step-metrics", metrics_collection, socket) do
