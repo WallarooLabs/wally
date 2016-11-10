@@ -68,8 +68,8 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
               conn, _router,
               // incoming envelope (of which technically there is none)
               o, 0, None, 0, 0,
-              // outgoing envelope
-              o, 0, None, 0)
+              // outgoing envelope with msg_uid
+              o, _guid_gen.u128(), None, 0)
           else
             @printf[I32]("FramedSourceNotify needs an Origin to pass along!\n".cstring())
             true
