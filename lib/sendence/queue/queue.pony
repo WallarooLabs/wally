@@ -130,6 +130,13 @@ class Queue[A: Any #alias]
     _back_ptr = 0
     this
 
+  fun ref clear_n(n: USize) =>
+    if (_size > 0) and (n > 0) then
+      let to_clear = if _size < (n - 1) then (_size - 1) else n end
+      _front_ptr = (_front_ptr + to_clear) and _mod
+      _size = _size - to_clear
+    end
+
   fun contains(a: A!, pred: {(box->A!, box->A!): Bool} val =
     lambda(l: box->A!, r: box->A!): Bool => l is r end): Bool =>
     """

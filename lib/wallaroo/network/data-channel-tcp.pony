@@ -54,6 +54,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   var _header: Bool = true
   var _msg_count: USize = 0
+  let _timers: Timers = Timers
 
   new iso create(receivers: Map[String, DataReceiver] val,
     connections: Connections, env: Env, auth: AmbientAuth) 

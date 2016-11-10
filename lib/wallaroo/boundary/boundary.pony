@@ -136,11 +136,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   be ack(seq_id: U64) =>
     if seq_id > _lowest_queue_id then
-      let flush_count = seq_id - _lowest_queue_id
-      for i in Range(0, flush_count.usize()) do
-        try _queue.dequeue() end
-        _lowest_queue_id = _lowest_queue_id + 1
-      end
+      let flush_count: USize = (seq_id - _lowest_queue_id).usize()
+      _queue.clear_n(flush_count)
+      // _queue.clear()
+      _lowest_queue_id = _lowest_queue_id + flush_count.u64()
     end
 
   be replay_msgs() =>
