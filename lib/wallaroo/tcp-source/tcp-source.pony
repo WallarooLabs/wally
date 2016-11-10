@@ -40,13 +40,14 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
+  var _muted: Bool = false
+  
+  // Resilience
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
   let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
   let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
-
-  var _muted: Bool = false
 
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
