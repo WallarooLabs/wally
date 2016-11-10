@@ -82,9 +82,9 @@ class TypedRoute[In: Any val] is Route
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
   var _seq_id: U64 = 0
-  // (metric_name, source_ts, input, cfp, origin, msg_uid,
+  // (metric_name, source_ts, input, origin, msg_uid,
   // frac_ids, outgoing_seq_id)
-  embed _queue: Array[(String, U64, In, CreditFlowProducer ref, Origin tag, U128, 
+  embed _queue: Array[(String, U64, In, Origin tag, U128, 
     None, U64)] = _queue.create()
 
   new create(step: CreditFlowProducer ref, consumer: CreditFlowConsumerStep,
@@ -159,11 +159,11 @@ class TypedRoute[In: Any val] is Route
             _credits_available >= _request_more_credits_after
 
           if _queue.size() > 0 then
-            _add_to_queue(metric_name, source_ts, input, cfp, origin, msg_uid, 
+            _add_to_queue(metric_name, source_ts, input, origin, msg_uid, 
               frac_ids, outgoing_seq_id)
             _flush_queue()
           else
-            _send_message_on_route(metric_name, source_ts, input, cfp, origin, 
+            _send_message_on_route(metric_name, source_ts, input, origin, 
               msg_uid, frac_ids, outgoing_seq_id)
           end
 
@@ -180,21 +180,22 @@ class TypedRoute[In: Any val] is Route
             end
           end
         else
-          _add_to_queue(metric_name, source_ts, input, cfp, origin, msg_uid, 
+          _add_to_queue(metric_name, source_ts, input, origin, msg_uid, 
             frac_ids, outgoing_seq_id)
           _request_credits()
         end
       else
-        _send_message_on_route(metric_name, source_ts, input, cfp, origin,
+        _send_message_on_route(metric_name, source_ts, input, origin,
           msg_uid, frac_ids, outgoing_seq_id)
       end
+      // update the route_id of the outgoing envelope
+      cfp.update_route_id(_route_id)
     end
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val) =>
     @printf[I32]("Forward should never be called on a TypedRoute\n".cstring())
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64, input: In,
-    cfp: CreditFlowProducer ref,
     origin: Origin tag, msg_uid: U128, 
     frac_ids: None, outgoing_seq_id: U64)
   =>
@@ -209,22 +210,19 @@ class TypedRoute[In: Any val] is Route
      
       _credits_available = _credits_available - 1
 
-      // update the route_id of the outgoing envelope
-      cfp.update_route_id(_route_id)
 
   fun ref _add_to_queue(metric_name: String, source_ts: U64, input: In,
-    cfp: CreditFlowProducer ref,
     origin: Origin tag, msg_uid: U128, 
     frac_ids: None, outgoind_seq_id: U64)
   =>
-    _queue.push((metric_name, source_ts, input, cfp,
+    _queue.push((metric_name, source_ts, input,
       origin, msg_uid, frac_ids, outgoind_seq_id))
 
   fun ref _flush_queue() =>
     while ((_credits_available > 0) and (_queue.size() > 0)) do
       try
         let d =_queue.shift()
-        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, d._7, d._8)
+        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, d._7)
       end
     end
     
