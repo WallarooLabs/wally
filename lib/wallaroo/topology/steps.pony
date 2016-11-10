@@ -222,6 +222,9 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
 
   fun ref _flush(low_watermark: U64, origin: Origin tag,
     upstream_route_id: U64 , upstream_seq_id: U64) =>
+    ifdef "resilience-debug" then
+      @printf[I32]("flushing below: %llu\n".cstring(), low_watermark)
+    end
     match _id
     | let id: U128 => _alfred.flush_buffer(id, low_watermark, origin,
       upstream_route_id, upstream_seq_id)
