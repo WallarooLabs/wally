@@ -21,9 +21,9 @@ primitive ChannelMsgEncoder
     wb.done()
 
   fun data_channel(delivery_msg: ReplayableDeliveryMsg val,
-    seq_id: U64, auth: AmbientAuth): Array[ByteSeq] val ?
+    seq_id: U64, wb: Writer, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(DataMsg(delivery_msg, seq_id), auth)
+    _encode(DataMsg(delivery_msg, seq_id), auth, wb)
 
   fun delivery[D: Any val](target_id: U128, 
     from_worker_name: String, source_ts: U64, msg_data: D,
