@@ -45,6 +45,9 @@ class StandardEventLogBuffer is EventLogBuffer
     let out_buf: Array[LogEntry val] iso = recover iso Array[LogEntry val] end 
     let residual: Array[LogEntry val] = Array[LogEntry val]
     
+    ifdef "resilience-debug" then
+      @printf[I32]("_buf size: %llu\n".cstring(), _buf.size())
+    end
     //TODO: post-paranoia, _buf is ordered so optimise w/ ring buffer-like thing
     for entry in _buf.values() do
       if entry._4 <= low_watermark then
@@ -52,6 +55,9 @@ class StandardEventLogBuffer is EventLogBuffer
       else
         residual.push(entry)
       end
+    end
+    ifdef "resilience-debug" then
+      @printf[I32]("flush size: %llu\n".cstring(), out_buf.size())
     end
     _alfred.write_log(_origin_id, consume out_buf, low_watermark, origin,
       upstream_route_id, upstream_seq_id)
