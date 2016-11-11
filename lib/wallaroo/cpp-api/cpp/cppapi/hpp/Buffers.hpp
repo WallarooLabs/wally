@@ -87,6 +87,7 @@ public:
     virtual BufferWriter& operator<< (const long param_);
     virtual BufferWriter& operator<< (const double param_);
     virtual BufferWriter& operator<< (const string& str_);
+    virtual BufferWriter& operator<< (const char* str_);
 };
 
 
@@ -115,6 +116,8 @@ public:
     virtual BufferReader& operator>> (long& param_);
     virtual BufferReader& operator>> (double& param_);
     virtual BufferReader& operator>> (string& param_);
+    virtual BufferReader& operator>> (char* str_);
+    virtual BufferReader& operator>> (char** str_);
 };
 }
 
