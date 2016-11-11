@@ -76,6 +76,12 @@ actor ApplicationInitializer
       // Map from step_id to worker name
       let steps: Map[U128, String] = steps.create()
 
+      // TODO: Replace this when POC default target strategy is updated
+      // Map from worker name to default target
+      let default_targets: 
+        Map[String, (Array[StepBuilder val] val | ProxyAddress val)]
+          = default_targets.create()
+
       // We use these graphs to build the local graphs for each worker
       let local_graphs: Map[String, Dag[StepInitializer val] trn] trn =  
         recover Map[String, Dag[StepInitializer val] trn] end
@@ -392,7 +398,8 @@ actor ApplicationInitializer
                     application.name(), pipeline.name(),
                     pb.pre_state_subpartition(partition_workers), 
                     next_runner_builder, state_name, pre_state_target_id,
-                    next_runner_builder.forward_route_builder())
+                    next_runner_builder.forward_route_builder(),
+                    pb.default_target_name())
                   let next_id = next_initializer.id()
 
                   try
@@ -418,6 +425,74 @@ actor ApplicationInitializer
 
                   last_initializer = None//(next_id, next_initializer) 
                   steps(next_id) = worker
+
+                  // TODO: Replace this default strategy with a better one 
+                  // after POC
+                  if pb.default_target_name() != "" then
+                    match application.default_target
+                    | let default_target: Array[RunnerBuilder val] val =>
+                      @printf[I32](("Preparing to spin up default target state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
+
+                      // The target will always be the sink (a stipulation of
+                      // the temporary POC strategy)
+                      let default_pre_state_target_id = sink_id
+
+                      let pre_state_runner_builder = 
+                        try 
+                          default_target(0)
+                        else
+                          @printf[I32]("Default target had no prestate value!\n".cstring())
+                          error
+                        end
+
+                      let state_runner_builder = 
+                        try 
+                          default_target(1)
+                        else
+                          @printf[I32]("Default target had no state value!\n".cstring())
+                          error
+                        end
+
+                      let pre_state_id = pre_state_runner_builder.id()
+                      let state_id = state_runner_builder.id()
+
+                      let pre_state_builder = StepBuilder(application.name(),
+                        pipeline.name(),
+                        pre_state_runner_builder, pre_state_id, 
+                        pre_state_runner_builder.is_stateful(), 
+                        default_pre_state_target_id,
+                        pre_state_runner_builder.forward_route_builder())
+
+                      @printf[I32](("Preparing to spin up default target state for " + state_runner_builder.name() + " on " + worker + "\n").cstring())
+
+                      let state_builder = StepBuilder(application.name(),
+                        pipeline.name(),
+                        state_runner_builder, next_runner_builder.id(),
+                        true)
+ 
+                      // Add prestate to defaults
+                      // Add state to defaults
+
+                      steps(pre_state_id) = worker
+                      steps(state_id) = worker
+
+                      let next_default_targets: Array[StepBuilder val] trn = 
+                        recover Array[StepBuilder val] end
+
+                      next_default_targets.push(pre_state_builder)
+                      next_default_targets.push(state_builder)
+
+                      default_targets(worker) = consume next_default_targets
+
+                      // Create ProxyAddresses for the other workers
+                      let proxy_address = ProxyAddress(worker, 
+                        default_pre_state_target_id)
+
+                      for w in worker_names.values() do
+                        default_targets(w) = proxy_address
+                      end
+                    end
+                  end
                 else
                   @printf[I32](("Preparing to spin up non-partitioned state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
                   let pre_state_id = next_runner_builder.id()
@@ -608,7 +683,9 @@ actor ApplicationInitializer
         let local_topology = 
           try
             LocalTopology(application.name(), g.clone(),
-              application.state_builders(), consume p_ids)
+              application.state_builders(), consume p_ids,
+              default_targets(w), application.default_target_name,
+              application.default_target_id)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error

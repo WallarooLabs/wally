@@ -209,6 +209,7 @@ trait PartitionBuilder
     PartitionAddresses val
   fun state_name(): String
   fun is_multi(): Bool
+  fun default_target_name(): String
 
 class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val, 
   PIn: Any val, State: Any #read, Key: (Hashable val & Equatable[Key])] is PartitionBuilder
@@ -221,13 +222,14 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   let _forward_route_builder: RouteBuilder val
   let _id: U128
   let _multi_worker: Bool
+  let _default_target_name: String
 
   new val create(pipeline_name: String, state_name': String,
     state_comp: StateComputation[In, Out, State] val,
     step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val,
     route_builder': RouteBuilder val, 
     forward_route_builder': RouteBuilder val, id': U128 = 0,
-    multi_worker: Bool = false) 
+    multi_worker: Bool = false, default_target_name': String = "") 
   =>
     _id = if id' == 0 then GuidGenerator.u128() else id' end
     _state_name = state_name'
@@ -238,6 +240,7 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
     _route_builder = route_builder'
     _forward_route_builder = forward_route_builder'
     _multi_worker = multi_worker
+    _default_target_name = default_target_name'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -261,6 +264,7 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
   fun is_multi(): Bool => _multi_worker
+  fun default_target_name(): String => _default_target_name
 
   fun pre_state_subpartition(workers: (String | Array[String] val)): 
     PreStateSubpartition val 

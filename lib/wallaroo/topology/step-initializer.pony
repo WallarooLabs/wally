@@ -61,10 +61,12 @@ class PartitionedPreStateStepBuilder
   let _id: U128
   let _pre_state_target_id: U128
   let _forward_route_builder: RouteBuilder val
+  let _default_target_name: String
 
   new val create(app_name: String, pipeline_name': String, 
     sub: PreStateSubpartition val, r: RunnerBuilder val, state_name': String,
-    pre_state_target_id': U128, forward_route_builder': RouteBuilder val) 
+    pre_state_target_id': U128, forward_route_builder': RouteBuilder val,
+    default_target_name': String = "") 
   =>
     _app_name = app_name
     _pipeline_name = pipeline_name'
@@ -74,6 +76,7 @@ class PartitionedPreStateStepBuilder
     _id = _runner_builder.id()
     _pre_state_target_id = pre_state_target_id'
     _forward_route_builder = forward_route_builder'
+    _default_target_name = default_target_name'
 
   fun name(): String => _runner_builder.name() + " partition"
   fun pipeline_name(): String => _pipeline_name
@@ -83,6 +86,8 @@ class PartitionedPreStateStepBuilder
   fun is_stateful(): Bool => true
   fun is_partitioned(): Bool => true
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
+  fun default_target_name(): String => _default_target_name
+    
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
     router: Router val = EmptyRouter): Step tag 
   =>

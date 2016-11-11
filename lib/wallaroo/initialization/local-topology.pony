@@ -22,15 +22,26 @@ class LocalTopology
   // _state_builders maps from state_name to StateSubpartition
   let _state_builders: Map[String, StateSubpartition val] val
   let _proxy_ids: Map[String, U128] val
+  // TODO: Replace this default strategy with a better one after POC
+  let default_target: (Array[StepBuilder val] val | ProxyAddress val | None)
+  let default_target_name: String
+  let default_target_id: U128
 
   new val create(name': String, graph': Dag[StepInitializer val] val,
     state_builders': Map[String, StateSubpartition val] val,
-    proxy_ids': Map[String, U128] val)
+    proxy_ids': Map[String, U128] val,
+    default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
+      None,
+    default_target_name': String = "", default_target_id': U128 = 0)
   =>
     _app_name = name'
     _graph = graph'
     _state_builders = state_builders'
     _proxy_ids = proxy_ids'
+    // TODO: Replace this default strategy with a better one after POC
+    default_target = default_target'
+    default_target_name = default_target_name'
+    default_target_id = default_target_id'
 
   fun update_state_map(state_map: Map[String, StateAddresses val],
     metrics_conn: TCPConnection, alfred: Alfred)
@@ -162,6 +173,50 @@ actor LocalTopologyInitializer
         // Update the step ids for all OutgoingBoundaries
         _connections.update_boundary_ids(t.proxy_ids())
 
+        // Keep track of the steps we've built
+        let built = Map[U128, Router val]
+
+
+        // TODO: Replace this when we move past the temporary POC based default
+        // target strategy
+        var default_target_id: U128 = t.default_target_id
+        var default_target_state_step_id: U128 = 0
+        var default_target_node: (DagNode[StepInitializer val] val | None) = 
+          None
+        var default_target_state_step: (Step | None) = None
+        match t.default_target
+        | let targets: Array[StepBuilder val] val =>
+          let pre_state_builder = 
+            try
+              targets(0)
+            else
+              @printf[I32]("No StepInitializer for prestate default target\n".cstring())
+              error
+            end
+
+          default_target_node = recover DagNode[StepInitializer val](
+            pre_state_builder, pre_state_builder.id()) end
+
+          let state_builder = 
+            try
+              targets(1)
+            else
+              @printf[I32]("No StepInitializer for state default target\n".cstring())
+              error
+            end
+          default_target_state_step_id = state_builder.id()
+
+          let state_step = state_builder(EmptyRouter, _metrics_conn,
+            _alfred)
+          default_target_state_step = state_step
+          built(default_target_state_step_id) = DirectRouter(state_step)
+        | let proxy_target: ProxyAddress val =>
+          let proxy_router = ProxyRouter(_worker_name, 
+            _outgoing_boundaries(proxy_target.worker), proxy_target,
+            _auth)
+          built(default_target_id) = proxy_router
+        end
+
 
         /////////
         // Initialize based on DAG
@@ -177,7 +232,6 @@ actor LocalTopologyInitializer
         // one sink back before another sink begins)
         let frontier = Stack[DagNode[StepInitializer val] val]
 
-        let built = Map[U128, Router val]
 
         /////////
         // 1. Find graph sinks and add to frontier queue. 
@@ -198,6 +252,13 @@ actor LocalTopologyInitializer
             end
           end
         end
+
+        // TODO: Change this when we move past POC default target strategy
+        match default_target_node
+        | let n: DagNode[StepInitializer val] val =>
+          frontier.push(n)
+        end
+
         for node in non_partitions.values() do
           frontier.push(node) 
         end
@@ -244,7 +305,8 @@ actor LocalTopologyInitializer
                 @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
                 // Currently there are no splits (II), so we know that a node // has only one output in the graph. We also know this is not
                 // a sink or proxy, so there is exactly one output.
-                let out_id: U128 = _get_output_node_id(next_node)
+                let out_id: U128 = _get_output_node_id(next_node, 
+                  default_target_id, default_target_state_step_id)
 
                 let out_router = 
                   try
@@ -416,7 +478,8 @@ actor LocalTopologyInitializer
               // Currently there are no splits (II), so we know that a node has
               // only one output in the graph. We also know this is not
               // a sink or proxy, so there is exactly one output.
-              let out_id: U128 = _get_output_node_id(next_node)
+              let out_id: U128 = _get_output_node_id(next_node,
+                default_target_id, default_target_state_step_id)
               let out_router = 
                 try
                   built(out_id)
@@ -512,7 +575,14 @@ actor LocalTopologyInitializer
       _env.err.print("Error initializing local topology")
     end
 
-  fun _get_output_node_id(node: DagNode[StepInitializer val] val): U128 ? =>
+  fun _get_output_node_id(node: DagNode[StepInitializer val] val,
+    default_target_id: U128, default_target_state_step_id: U128): U128 ? 
+  =>
+    // TODO: Replace this once we move past POC default target strategy
+    if node.id == default_target_id then
+      return default_target_state_step_id
+    end
+
     // Currently there are no splits (II), so we know that a node has
     // only one output in the graph. 
 

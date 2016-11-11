@@ -179,16 +179,19 @@ class LocalPartitionRouter[In: Any val,
   let _step_ids: Map[Key, U128] val
   let _partition_routes: Map[Key, (Step | ProxyRouter val)] val
   let _partition_function: PartitionFunction[In, Key] val
+  let _default_router: (Router val | None)
 
   new val create(local_map': Map[U128, Step] val,
     s_ids: Map[Key, U128] val,
     partition_routes: Map[Key, (Step | ProxyRouter val)] val,
-    partition_function: PartitionFunction[In, Key] val)
+    partition_function: PartitionFunction[In, Key] val,
+    default_router: (Router val | None) = None)
   =>
     _local_map = local_map'
     _step_ids = s_ids
     _partition_routes = partition_routes
     _partition_function = partition_function
+    _default_router = default_router
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: (CreditFlowProducer ref | None),
@@ -235,7 +238,17 @@ class LocalPartitionRouter[In: Any val,
         end
       else
         // There is no entry for this key!
-        true
+        // If there's a default, use that
+        match _default_router
+        | let r: Router val =>
+          r.route[In](metric_name, source_ts, input, producer,
+            // incoming envelope
+            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+            // outgoing envelope
+            o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+        else
+          true
+        end
       end
     else
       true
