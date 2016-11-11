@@ -129,6 +129,12 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
       // outgoing envelope
       this, msg_uid, frac_ids, _outgoing_seq_id)
     if is_finished then
+      //TODO: be more efficient (batching?)
+      //this makes sure we never skip watermarks because everything is always
+      //finished
+      _bookkeeping(origin, msg_uid, frac_ids, incoming_seq_id, route_id,
+                   this, msg_uid, frac_ids, _outgoing_seq_id, 0)
+      update_watermark(0, _outgoing_seq_id)
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     else
       ifdef "resilience" then
