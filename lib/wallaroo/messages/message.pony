@@ -84,7 +84,8 @@ trait Origin
     let low_watermark = lwm_get().low_watermark()
     for origin in origins_get().values() do
       let highest_outgoing_seq_id = hwm_get().apply((origin, route_id))
-      if low_watermark > highest_outgoing_seq_id then
+      
+      if low_watermark < highest_outgoing_seq_id then
         // translate downstream route_id to upstream route_id
         let upstream_route_id = route_translate_get().outToIn(route_id)
         // translate downstream seq_id to upstream seq_id
@@ -115,12 +116,10 @@ type OriginRoutePair is (Origin tag, U64)
 
 
 primitive HashOriginRoute
-  fun hash(t: OriginRoutePair): U64
-  =>
+  fun hash(t: OriginRoutePair): U64 =>
     cantorPair((t._1.hash(), t._2.hash()))
 
-  fun eq(t1: OriginRoutePair, t2: OriginRoutePair): Bool
-  =>
+  fun eq(t1: OriginRoutePair, t2: OriginRoutePair): Bool =>
     hash(t1) == hash(t2)
 
   fun cantorPair(t: (U64, U64)): U64 =>
@@ -139,12 +138,10 @@ class HighWatermarkTable
   """
   let _hwmt: HashMap[OriginRoutePair, U64, HashOriginRoute]
   
-  new create(size: USize)
-  =>
+  new create(size: USize) =>
     _hwmt = HashMap[OriginRoutePair, U64, HashOriginRoute](size)
      
-  fun ref update(key: OriginRoutePair, seq_id: U64)
-  =>
+  fun ref update(key: OriginRoutePair, seq_id: U64) =>
   """
   Keep track of the highest seq_id per route per origin.
   """  
@@ -162,8 +159,7 @@ class HighWatermarkTable
         "HighWaterMarkTable: error upserting OriginRoutePair\n".cstring())      
     end
 
-  fun apply(key: OriginRoutePair): U64 ?
-  =>
+  fun apply(key: OriginRoutePair): U64 ? =>
     try
       _hwmt(key)
     else
@@ -186,13 +182,11 @@ class SeqTranslationTable
   let _inToOut: Map[U64, U64]
   let _outToIn: Map[U64, U64]
 
-  new create(size: USize)
-  =>
+  new create(size: USize) =>
     _inToOut = Map[U64, U64](size)
     _outToIn = Map[U64, U64](size)
       
-  fun ref update(in_seq_id: U64, out_seq_id: U64)
-  =>
+  fun ref update(in_seq_id: U64, out_seq_id: U64) =>
     try
       _inToOut.insert(in_seq_id, out_seq_id)
       _outToIn.insert(out_seq_id, in_seq_id)
@@ -202,8 +196,7 @@ class SeqTranslationTable
         in_seq_id, out_seq_id)      
     end
 
-  fun outToIn(out_seq_id: U64): U64 ?
-  =>
+  fun outToIn(out_seq_id: U64): U64 ? =>
     """
     Return the incoming seq_id for a given outgoing seq_id.
     """
@@ -215,8 +208,7 @@ class SeqTranslationTable
       error
     end
 
-  fun inToOut(in_seq_id: U64): U64 ?
-  =>
+  fun inToOut(in_seq_id: U64): U64 ? =>
     """
     Return the outgoing seq_id for a given incoming seq_id.
     """
@@ -228,8 +220,7 @@ class SeqTranslationTable
       error
     end
 
-  fun ref remove(out_seq_id: U64)
-  =>
+  fun ref remove(out_seq_id: U64) =>
     try
       _inToOut.remove(_outToIn(out_seq_id))
       _outToIn.remove(out_seq_id)
@@ -251,13 +242,11 @@ class RouteTranslationTable
   let _inToOut: Map[U64, U64]
   let _outToIn: Map[U64, U64]
 
-  new create(size: USize)
-  =>
+  new create(size: USize) =>
     _inToOut = Map[U64, U64](size)
     _outToIn = Map[U64, U64](size)
       
-  fun ref update(in_route_id: U64, out_route_id: U64)
-  =>
+  fun ref update(in_route_id: U64, out_route_id: U64) =>
     try
       _inToOut.insert(in_route_id, out_route_id)
       _outToIn.insert(out_route_id, in_route_id)
@@ -266,8 +255,7 @@ class RouteTranslationTable
         in_route_id, out_route_id)      
     end
 
-  fun outToIn(out_route_id: U64): U64 ?
-  =>
+  fun outToIn(out_route_id: U64): U64 ? =>
     """
     Return the incoming route_id for a given outgoing route_id.
     """
@@ -279,8 +267,7 @@ class RouteTranslationTable
       error
     end
 
-  fun inToOut(in_route_id: U64): U64 ?
-  =>
+  fun inToOut(in_route_id: U64): U64 ? =>
     """
     Return the outgoing route_id for a given incoming route_id.
     """
@@ -292,8 +279,7 @@ class RouteTranslationTable
       error
     end
 
-  fun ref remove(out_route_id: U64)
-  =>
+  fun ref remove(out_route_id: U64) =>
     try
       _inToOut.remove(_outToIn(out_route_id))
       _outToIn.remove(out_route_id)
@@ -312,18 +298,15 @@ class LowWatermarkTable
   let _lwmt: Map[U64, U64]
   var _low_watermark: U64
   
-  new create(size: USize)
-  =>
+  new create(size: USize) =>
     _lwmt = Map[U64, U64](size)
     _low_watermark = U64(0)
     
-  fun ref update(route_id: U64, seq_id: U64)
-  =>
+  fun ref update(route_id: U64, seq_id: U64) =>
     _lwmt(route_id) = seq_id
     _new_low_watermark(seq_id)
 
-  fun ref _new_low_watermark(seq_id: U64)
-  =>
+  fun ref _new_low_watermark(seq_id: U64) =>
     var min = seq_id
     for value in _lwmt.values() do
       if value < min then
@@ -331,9 +314,10 @@ class LowWatermarkTable
       end
     end
     _low_watermark = min
+    @printf[I32]("_low_watermark: %llu\n".cstring(), _low_watermark)
+
     
-  fun apply(route_id: U64): U64 ?
-  =>
+  fun apply(route_id: U64): U64 ? =>
     try
       _lwmt(route_id)
     else
@@ -341,8 +325,7 @@ class LowWatermarkTable
       error
     end
 
-  fun ref remove(route_id: U64)
-  =>
+  fun ref remove(route_id: U64) =>
     try
       _lwmt.remove(route_id)
     else
