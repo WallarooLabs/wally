@@ -5,9 +5,17 @@ If you have not followed the setup instructions in the orchestration/terraform [
 ##Configuring Cluster:
 
 Once set up, an AWS cluster can be started with the following command:
+
+For SINGLE WORKER run (16 vCPU):
 ```
 make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=16 num_followers=0 force_instance=c4.4xlarge spot_bid_factor=100 ansible_system_cpus=0,8 ansible_isolcpus=false
 ```
+
+For MULTI WORKER run (36 vCPU):
+```
+make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=36 num_followers=0 force_instance=c4.8xlarge spot_bid_factor=100 ansible_system_cpus=0,18 ansible_isolcpus=false no_spot=true
+```
+
 
 A packet cluster with this command:
 ```
@@ -110,7 +118,7 @@ to run the Market Spread application you must be in it's directory.
 
 ####SINGLE WORKER market spread:
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -e 150000000 --ponythreads 4 --ponypinasio --ponynoblock
+sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
 ```
 
 To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
