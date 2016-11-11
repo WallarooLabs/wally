@@ -23,28 +23,21 @@ actor Main is TestList
     test(_TestEventLog)
 
 
-class _TestOrigin is Origin 
+actor _TestOrigin is Origin 
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _translate: TranslationTable = TranslationTable(10)
+  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
+  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
 
-  fun ref _hwm_get(): HighWatermarkTable
-  =>
-    _hwm
-  
-  fun ref _lwm_get(): LowWatermarkTable
-  =>
-    _lwm
-    
-  fun ref _translate_get(): TranslationTable
-  =>
-    _translate
-  
-  fun ref _origins_get(): OriginSet
-  =>
-    _origins
-
+  fun ref hwm_get(): HighWatermarkTable => _hwm 
+  fun ref lwm_get(): LowWatermarkTable => _lwm 
+  fun ref seq_translate_get(): SeqTranslationTable => _seq_translate 
+  fun ref route_translate_get(): RouteTranslationTable => _route_translate 
+  fun ref origins_get(): OriginSet => _origins 
+  fun ref _flush(low_watermark: U64, origin: Origin tag,
+    upstream_route_id: U64 , upstream_seq_id: U64) =>
+    None
 
 class iso _TestOriginSet is UnitTest
   fun name(): String =>
@@ -52,7 +45,7 @@ class iso _TestOriginSet is UnitTest
 
   fun apply(h: TestHelper) =>
     let set = OriginSet(1)
-    let o1: Origin = _TestOrigin
+    let o1: Origin tag = _TestOrigin
     set.set(o1)
     h.assert_true(set.contains(o1))
 
@@ -61,7 +54,7 @@ class iso _TestHashOriginRoute is UnitTest
     "messages/HashOriginRoute"
 
   fun apply(h: TestHelper) =>
-    let origin: Origin = _TestOrigin
+    let origin: Origin tag = _TestOrigin
     let route: U64 = U64(1)
     let pair: OriginRoutePair = (origin, route)
     let hash1: U64 = HashOriginRoute.hash(pair)
@@ -76,7 +69,7 @@ class iso _TestHighWatermarkTable is UnitTest
 
   fun apply(h: TestHelper) =>
     let hwm: HighWatermarkTable = HighWatermarkTable(10)
-    let origin: Origin = _TestOrigin
+    let origin: Origin tag = _TestOrigin
     let route: U64 = U64(1)
     let pair: OriginRoutePair = (origin, route)
     let seq_id: U64 = U64(100)
@@ -114,7 +107,8 @@ actor TestOrigin is ResilientOrigin
   let message_count: U64
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _translate: TranslationTable = TranslationTable(10)
+  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
+  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
   let sc: TestStateChange = TestStateChange(42)
   let state: TestState = TestState
@@ -130,21 +124,19 @@ actor TestOrigin is ResilientOrigin
     h = h'
     message_count = message_count'
     alfred = Alfred(h.env,"/tmp/test_event_log.evlog")
-    buffer = StandardEventLogBuffer(alfred)
-    buffer.set_target(this)
+    buffer = StandardEventLogBuffer(alfred,0)
+    alfred.register_origin(this,0)
     alfred.start()
     _finished = finished
 
-  be replay_log_entry(uid: U128, frac_ids: None,
-    statechange_id: U64, payload: Array[ByteSeq] val) =>
+  be replay_log_entry(uid: U128, frac_ids: (Array[U64] val | None),
+    statechange_id: U64, payload: ByteSeq val) =>
     h.assert_true(uid == _next_to_be_replayed)
     _next_to_be_replayed = _next_to_be_replayed + 1
-    for e in payload.values() do
-      try
-        _reader.append(e as Array[U8] val)
-      else
-        @printf[I32]("the world is broken\n".cstring())
-      end
+    try
+      _reader.append(payload as Array[U8] val)
+    else
+      @printf[I32]("the world is broken\n".cstring())
     end
     sc.read_log_entry(_reader)
     sc.apply(state)
@@ -152,27 +144,35 @@ actor TestOrigin is ResilientOrigin
   be replay_finished() =>
     h.assert_true(state.sum == _target_sum)
 
+  fun ref _flush(low_watermark: U64, origin: Origin tag,
+    upstream_route_id: U64 , upstream_seq_id: U64) =>
+    None
+
   be start_without_replay() =>
     let ts = TestState
     for i in Range(0, message_count.usize()) do
       _target_sum = _target_sum + i.u64()
       sc.value = i.u64()
-      buffer.queue(i.u128(), None, sc.id(), sc.to_log_entry(_writer))
+      sc.write_log_entry(_writer)
+      alfred.queue_log_entry(0, i.u128(), None, sc.id(), i.u64(), _writer.done())
     end
-    buffer.flush(message_count)
+    alfred.flush_buffer(0, message_count, this, 0, 0)
 
-  be log_flushed(low_watermark: U64, messages_flushed: U64) =>
+  be log_flushed(low_watermark: U64, messages_flushed: U64, origin: Origin tag,
+    upstream_route_id: U64 , upstream_seq_id: U64)
+  =>
     h.assert_true(low_watermark == message_count)
     h.assert_true(messages_flushed == message_count)
     let alfred2 = Alfred(h.env,"/tmp/test_event_log.evlog")
-    let buffer2 = StandardEventLogBuffer(alfred2)
-    buffer2.set_target(this)
+    let buffer2 = StandardEventLogBuffer(alfred2,0)
+    alfred2.register_origin(this,0)
     alfred2.start()
     
-  fun ref _hwm_get(): HighWatermarkTable => _hwm
-  fun ref _lwm_get(): LowWatermarkTable => _lwm
-  fun ref _translate_get(): TranslationTable => _translate
-  fun ref _origins_get(): OriginSet => _origins
+  fun ref hwm_get(): HighWatermarkTable => _hwm
+  fun ref lwm_get(): LowWatermarkTable => _lwm
+  fun ref seq_translate_get(): SeqTranslationTable => _seq_translate 
+  fun ref route_translate_get(): RouteTranslationTable => _route_translate 
+  fun ref origins_get(): OriginSet => _origins
 
 class TestState
   var sum: U64 = 0
@@ -186,9 +186,8 @@ class TestStateChange is StateChange[TestState]
   fun id(): U64 => _id
   fun apply(state: TestState) => state.sum = state.sum + value
 
-  fun to_log_entry(out_writer: Writer): Array[ByteSeq] val => 
+  fun write_log_entry(out_writer: Writer) => 
     out_writer.u64_be(value)
-    out_writer.done()
 
   fun ref read_log_entry(in_reader: Reader) =>
     try
