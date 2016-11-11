@@ -136,6 +136,10 @@ ifeq ($(shell uname -s),Linux)
   docker_user_arg := -u `id -u`
   extra_awk_arg := \\
   host_ip_src = $(shell ifconfig `route -n | grep '^0.0.0.0' | awk '{print $$8}'` | egrep -o 'inet addr:[^ ]+' | awk -F: '{print $$2}')
+  system_cpus := $(shell sudo cset set -l -r | grep '/system' | awk '{print $$2}')
+  ifneq (,$(system_cpus))
+    docker_cpu_arg := --cpuset-cpus $(system_cpus)
+  endif
 else
   host_ip_src = $(shell ifconfig `route -n get 0.0.0.0 2>/dev/null | awk '/interface: / {print $$2}'` | egrep -o 'inet [^ ]+' | awk '{print $$2}')
 endif
@@ -174,7 +178,7 @@ ifneq ($(arch),native)
   ifneq ($(in_docker),true)
     quote = '
     ponyc_docker_args = docker run --rm -i $(docker_user_arg) -v \
-        $(abs_buffy_dir):$(abs_buffy_dir) \
+        $(abs_buffy_dir):$(abs_buffy_dir) $(docker_cpu_arg) \
         -v $(HOME)/.gitconfig:/.gitconfig \
         -v $(HOME)/.gitconfig:/root/.gitconfig \
         -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
@@ -183,7 +187,7 @@ ifneq ($(arch),native)
         $(ponyc_runner):$(ponyc_tag) -c $(quote)
 
     monhub_docker_args = docker run --rm -i -v \
-        $(abs_buffy_dir):$(abs_buffy_dir) \
+        $(abs_buffy_dir):$(abs_buffy_dir) $(docker_cpu_arg) \
         -v $(HOME)/.gitconfig:/.gitconfig \
         -v $(HOME)/.gitconfig:/root/.gitconfig \
         -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \

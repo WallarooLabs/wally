@@ -245,8 +245,11 @@ if cheapest_instance['Spot']:
         , cheapest_instance['Price'], cheapest_instance['AvailabilityZone'])
 
 else:
+  az_output = ""
+  if args.availability_zone:
+    az_output = "ci_az={0}#availability_zone={0}#".format(args.availability_zone)
   # output makefile fragment for make to eval if not spot instance
-  print (pg_output + \
+  print (pg_output + az_output + \
         "ci_inst_type={0}#ci_args=-var leader_instance_type={0} -var " + \
         "follower_instance_type={0}").format(cheapest_instance['InstanceType'])
 
