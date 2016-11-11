@@ -88,6 +88,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
       r.initialize()
     end
 
+  //////////////
+  // ORIGIN (resilience)
   fun ref hwm_get(): HighWatermarkTable =>
     _hwm
 
@@ -145,6 +147,9 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
       None
     end
 
+  fun ref update_route_id(route_id: U64) =>
+    None // only used in Route to update the outgoing route_id for a message
+    
   //
   // TCP
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>

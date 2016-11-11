@@ -99,42 +99,6 @@ trait Origin
   
 type OriginSet is HashSet[Origin tag, HashIs[Origin tag]] 
     
-// class MsgEnvelope
-//   // TODO: Fix the Origin None once we know how to look up Proxy
-//   // for messages crossing boundary  
-//   var origin: Origin tag   // tag referencing upstream origin for msg
-//   var msg_uid: U128         // Source assigned UID; universally unique
-//   var frac_ids: None // fractional msg ids
-//   var seq_id: U64          // assigned by immediate upstream origin
-//   var route_id: U64        // assigned by immediate upstream origin
-
-//   new create(origin': Origin tag, msg_uid': U128,
-//     frac_ids': (Array[U64] val | None), seq_id': U64, route_id': U64)
-//   =>
-//     origin = origin'
-//     msg_uid = msg_uid'
-//     frac_ids = frac_ids'
-//     seq_id = seq_id'
-//     route_id = route_id'
-
-//   fun ref update(origin': Origin tag, msg_uid': U128, 
-//     frac_ids': (Array[U64] val | None), seq_id': U64, route_id': U64 = 0) 
-//   =>
-//     origin = origin'
-//     msg_uid = msg_uid'
-//     frac_ids = frac_ids'
-//     seq_id = seq_id'
-//     route_id = route_id'
-
-//   fun clone(): MsgEnvelope val =>
-//     match frac_ids
-//     | let f_ids: Array[U64] val =>
-//       recover val MsgEnvelope(origin, msg_uid, recover val f_ids.clone() end,
-//         seq_id,route_id) end
-//     else
-//       recover val MsgEnvelope(origin, msg_uid, frac_ids, seq_id, route_id) end
-//     end
-
 
 primitive HashTuple
   fun hash(t: (U64, U64)): U64 =>
