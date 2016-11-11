@@ -23,9 +23,11 @@
 #ifndef __MANAGED_OBJECT_HPP__
 #define __MANAGED_OBJECT_HPP__
 
+#include "Serializable.hpp"
+
 namespace wallaroo
 {
-class ManagedObject
+class ManagedObject: public Serializable
 {
 public:
   virtual ~ManagedObject();

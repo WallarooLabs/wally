@@ -55,7 +55,7 @@ extern void w_serializable_serialize(wallaroo::Serializable* serializable_, char
 extern wallaroo::Serializable* w_serializable_deserialize (char* bytes_, size_t sz_);
 
 extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
-  wallaroo::Data *data_);
+  wallaroo::EncodableData *data_);
 extern void w_sink_encoder_encode(wallaroo::SinkEncoder *sink_encoder,
   wallaroo::EncodableData *data_, char *bytes);
 
