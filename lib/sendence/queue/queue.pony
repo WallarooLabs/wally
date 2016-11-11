@@ -22,7 +22,7 @@ class Queue[A: Any #alias]
     """
     Create a queue of elements from the supplied array.
     """
-    let n = 
+    let n =
       if len >= els.size() then
         len.max(2).next_pow2()
       else
@@ -86,7 +86,7 @@ class Queue[A: Any #alias]
 
       if _back_ptr == _data.size() then
         _data.push(consume a)
-        _back_ptr = _data.size() 
+        _back_ptr = _data.size()
       elseif _front_ptr > _back_ptr then
         for i in Range(0, _back_ptr) do
           _data.push(_data(i))
@@ -128,6 +128,7 @@ class Queue[A: Any #alias]
     _size = 0
     _front_ptr = 0
     _back_ptr = 0
+    _data.clear()
     this
 
   fun ref clear_n(n: USize) =>
@@ -135,6 +136,7 @@ class Queue[A: Any #alias]
       let to_clear = if _size < (n - 1) then (_size - 1) else n end
       _front_ptr = (_front_ptr + to_clear) and _mod
       _size = _size - to_clear
+      _data.remove(0, to_clear)
     end
 
   fun contains(a: A!, pred: {(box->A!, box->A!): Bool} val =
@@ -196,7 +198,7 @@ class QueueValues[A, B: Array[A] #read] is Iterator[B->A]
     _front = _initial_front
     _last_front = _front
     this
-    
+
 class QueuePairs[A, B: Array[A] #read] is Iterator[(USize, B->A)]
   let _data: B
   var _front: USize
@@ -227,4 +229,4 @@ class QueuePairs[A, B: Array[A] #read] is Iterator[(USize, B->A)]
         _front + (_data.size() - _initial_front)
       end
     (relative_idx, _data(_front = (_front + 1) % _data.size()))
-        
+
