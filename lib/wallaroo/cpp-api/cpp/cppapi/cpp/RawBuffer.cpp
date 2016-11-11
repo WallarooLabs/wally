@@ -61,7 +61,7 @@ BufferReader::BufferReader (char* str_, int sz_) : Buffer()
 
 BufferReader::BufferReader (const BufferReader& rhs_) : Buffer()
 {
-  Logger::getLogger()->error("RawBuffer (const RawBuffer &cpy_) --> not defined yet");
+  Logger::getLogger()->error("RawBuffer (const RawBuffer &cpy_) -->{}", "not defined yet");
 }
 
 
@@ -195,4 +195,41 @@ BufferReader& BufferReader::operator>> (string& param_)
   return *this;
 }
 
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (char* param_)
+{
+  short sz;
+  readData(&sz, sizeof(short));
+
+  char* newStrData = new char[sz + 1];
+  newStrData[sz] = '\0';
+  readData(newStrData, sz);
+
+  std::strncpy(newStrData, param_, sz);
+  delete[] newStrData;
+  return *this;
+}
+
+
+
+
+
+
+
+//------------------------------------------------
+BufferReader& BufferReader::operator>> (char** param_)
+{
+  short sz;
+  readData(&sz, sizeof(short));
+
+  char* newStrData = new char[sz + 1];
+  newStrData[sz] = '\0';
+  readData(newStrData, sz);
+  (*param_) = newStrData;
+  return *this;
+}
 }
