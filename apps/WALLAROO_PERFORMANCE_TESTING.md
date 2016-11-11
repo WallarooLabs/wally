@@ -71,7 +71,7 @@ docker run -d -u root --cpuset-cpus 0,8 --privileged \
 docker.sendence.com:5043/wallaroo-market-spread-reports-ui:latest
 ```
 
-#### For 32 vCPU cluster:
+#### For 36 vCPU cluster:
 
 To run the Metrics UI:
 ```
