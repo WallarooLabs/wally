@@ -218,7 +218,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       = recover Array[Array[ByteSeq] val] end): Application ? 
   =>
     let sink_builder: TCPSinkBuilder val = 
-      TCPSinkBuilder(TypedEncoderWrapper[Out](encoder))
+      TCPSinkBuilder(TypedEncoderWrapper[Out](encoder), initial_msgs)
     _p.update_sink(sink_builder, sink_ids)
       //, initial_msgs), sink_ids)
     _a.add_pipeline(_p as BasicPipeline)

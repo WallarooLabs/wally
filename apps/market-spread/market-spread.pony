@@ -39,6 +39,15 @@ actor Main
 
       let init_file = InitFile("../../demos/marketspread/initial-nbbo-fixish.msg", 46)
 
+      let initial_report_msgs_trn: Array[Array[ByteSeq] val] trn = 
+        recover Array[Array[ByteSeq] val] end
+      let connect_msg = HubProtocol.connect()
+      let join_msg = HubProtocol.join("reports:market-spread")
+      initial_report_msgs_trn.push(connect_msg)
+      initial_report_msgs_trn.push(join_msg)
+      let initial_report_msgs: Array[Array[ByteSeq] val] val = 
+        consume initial_report_msgs_trn
+
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixNbboMessage val, None](
@@ -54,7 +63,8 @@ actor Main
               (OrderResult val | None), SymbolData](CheckOrder, 
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
-            .to_sink(OrderResultEncoder, recover [0] end)     
+            .to_sink(OrderResultEncoder, recover [0] end,
+              initial_report_msgs)     
       end
       Startup(env, application, "/tmp/market-spread.evlog")
     else

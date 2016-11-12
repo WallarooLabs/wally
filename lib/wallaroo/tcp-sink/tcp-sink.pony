@@ -45,14 +45,19 @@ actor EmptySink is CreditFlowConsumerStep
 
 class TCPSinkBuilder
   let _encoder_wrapper: EncoderWrapper val
+  let _initial_msgs: Array[Array[ByteSeq] val] val
 
-  new val create(encoder_wrapper: EncoderWrapper val) =>
+  new val create(encoder_wrapper: EncoderWrapper val, 
+    initial_msgs: Array[Array[ByteSeq] val] val) 
+  =>
     _encoder_wrapper = encoder_wrapper
+    _initial_msgs = initial_msgs
 
   fun apply(reporter: MetricsReporter iso, host: String, service: String):
     TCPSink
   =>
-    TCPSink(_encoder_wrapper, consume reporter, host, service)
+    TCPSink(_encoder_wrapper, consume reporter, host, service,
+      _initial_msgs)
 
 actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   """
@@ -111,9 +116,11 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
+  let _initial_msgs: Array[Array[ByteSeq] val] val
 
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
+    initial_msgs: Array[Array[ByteSeq] val] val, 
     from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -126,6 +133,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _next_size = init_size
     _max_size = max_size
     _notify = EmptyNotify
+    _initial_msgs = initial_msgs
     _connect_count = @pony_os_connect_tcp[U32](this,
       host.cstring(), service.cstring(),
       from.cstring())
@@ -303,6 +311,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
             _notify.connected(this)
 
+            for msg in _initial_msgs.values() do
+              _writev(msg)
+            end
             _pending_writes()
           else
             // The connection failed, unsubscribe the event and close.
