@@ -25,7 +25,7 @@ trait tag RunnableStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, seq_id: U64, route_id: U64)
-  
+
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, incoming_seq_id: U64, route_id: U64)
@@ -93,7 +93,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     end
 
     for (worker, boundary) in outgoing_boundaries.pairs() do
-      _routes(boundary) = 
+      _routes(boundary) =
         _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
@@ -132,13 +132,15 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
       //TODO: be more efficient (batching?)
       //this makes sure we never skip watermarks because everything is always
       //finished
-      _bookkeeping(origin, msg_uid, frac_ids, incoming_seq_id, route_id,
-                   this, msg_uid, frac_ids, _outgoing_seq_id, 0)
-      update_watermark(0, _outgoing_seq_id)
+      ifdef "resilience" then
+        _bookkeeping(origin, msg_uid, frac_ids, incoming_seq_id, route_id,
+          this, msg_uid, frac_ids, _outgoing_seq_id, 0)
+        update_watermark(0, _outgoing_seq_id)
+      end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     else
       ifdef "resilience" then
-        _bookkeeping(      
+        _bookkeeping(
           // incoming envelope
           origin, msg_uid, frac_ids, incoming_seq_id, route_id,
           // outgoing envelope
@@ -153,8 +155,8 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   // TODO: Fix the Origin None once we know how to look up Proxy
   // for messages crossing boundary
 
-  fun _is_duplicate(origin: Origin tag, msg_uid: U128, 
-    frac_ids: None, seq_id: U64, route_id: U64): Bool 
+  fun _is_duplicate(origin: Origin tag, msg_uid: U128,
+    frac_ids: None, seq_id: U64, route_id: U64): Bool
   =>
     for e in _deduplication_list.values() do
       //TODO: Bloom filter maybe?
@@ -162,7 +164,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
         // No frac_ids yet
         return true
         // match (e._3, frac_ids)
-        // | (let efa: Array[U64] val, let efb: Array[U64] val) => 
+        // | (let efa: Array[U64] val, let efb: Array[U64] val) =>
         //   if efa.size() == efb.size() then
         //     var found = true
         //     for i in Range(0,efa.size()) do
@@ -191,11 +193,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     frac_ids: None, incoming_seq_id: U64, route_id: U64)
   =>
     _outgoing_seq_id = _outgoing_seq_id + 1
-    if not _is_duplicate(origin, msg_uid, frac_ids, incoming_seq_id, 
+    if not _is_duplicate(origin, msg_uid, frac_ids, incoming_seq_id,
       route_id) then
-      _deduplication_list.push((origin, msg_uid, frac_ids, incoming_seq_id, 
+      _deduplication_list.push((origin, msg_uid, frac_ids, incoming_seq_id,
         route_id))
-      let is_finished = _runner.run[D](metric_name, source_ts, data, 
+      let is_finished = _runner.run[D](metric_name, source_ts, data,
         this, _router,
         // incoming envelope
         origin, msg_uid, frac_ids, incoming_seq_id, route_id,
@@ -214,7 +216,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
 
   //////////////
   // ORIGIN (resilience)
-    
+
   fun ref hwm_get(): HighWatermarkTable =>
     _hwm
 
@@ -299,7 +301,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     We call this from the Route once a message has been sent downstream.
     """
     _outgoing_route_id = route_id
-    
+
   //////////////
   // CREDIT FLOW CONSUMER
   be register_producer(producer: CreditFlowProducer) =>
