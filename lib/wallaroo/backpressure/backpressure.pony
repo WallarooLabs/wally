@@ -186,7 +186,6 @@ class TypedRoute[In: Any val] is Route
           _request_credits()
         end
       else
-        @printf[I32]("!!Sending on Route\n".cstring())
         _send_message_on_route(metric_name, source_ts, input, origin,
           msg_uid, frac_ids, outgoing_seq_id)
       end
@@ -200,16 +199,7 @@ class TypedRoute[In: Any val] is Route
   fun ref _send_message_on_route(metric_name: String, source_ts: U64, input: In,
     origin: Origin tag, msg_uid: U128, 
     frac_ids: None, outgoing_seq_id: U64)
-  =>
-    @printf[I32]("!!Sent on Route\n".cstring())
-    //!!
-    match _consumer
-    | let sink: TCPSink =>
-      @printf[I32]("--++--!! We have a route to a sink\n".cstring())
-    else
-      @printf[I32]("------!! We have a route to a NON-sink\n".cstring())
-    end
-    
+  =>  
     _consumer.run[In](metric_name,
       source_ts,
       input,  

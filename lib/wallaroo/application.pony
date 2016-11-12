@@ -60,7 +60,8 @@ class Application
       TypedRouteBuilder[Out])
     builders.push(pre_state_builder)
 
-    let state_builder' = StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders())
+    let state_builder' = StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders(),
+      TypedRouteBuilder[Out])
     builders.push(state_builder')
 
     default_target = consume builders

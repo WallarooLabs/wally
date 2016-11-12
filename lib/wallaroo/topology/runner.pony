@@ -172,15 +172,18 @@ class StateRunnerBuilder[State: Any #read]
   let _state_builder: StateBuilder[State] val
   let _name: String
   let _state_change_builders: Array[StateChangeBuilder[State] val] val
+  let _route_builder: RouteBuilder val
   let _id: U128
 
   new val create(state_builder: StateBuilder[State] val, 
     name': String, 
-    state_change_builders: Array[StateChangeBuilder[State] val] val) 
+    state_change_builders: Array[StateChangeBuilder[State] val] val,
+    route_builder': RouteBuilder val = EmptyRouteBuilder) 
   =>
     _state_builder = state_builder
     _name = name'
     _state_change_builders = state_change_builders
+    _route_builder = route_builder'
     _id = GuidGenerator.u128()
 
   fun apply(metrics_reporter: MetricsReporter iso, 
@@ -197,7 +200,7 @@ class StateRunnerBuilder[State: Any #read]
   fun name(): String => _state_builder.name()
   fun is_stateful(): Bool => true
   fun id(): U128 => _id
-  fun route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
 trait PartitionBuilder

@@ -22,7 +22,6 @@ actor EmptySink is CreditFlowConsumerStep
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, seq_id: U64, route_id: U64)
   =>
-    @printf[I32]("!!Recvd at EMPTY SINK!\n".cstring())
     None
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -31,7 +30,10 @@ actor EmptySink is CreditFlowConsumerStep
   =>
     None
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) => None
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val) 
+  => 
+    None
 
   be register_producer(producer: CreditFlowProducer) =>
     None
@@ -140,14 +142,16 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       from.cstring())
     _notify_connecting()
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) => None
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val) 
+  => 
+    None
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, seq_id: U64, route_id: U64)
   =>
-    @printf[I32]("!!Recvd at SINK!\n".cstring())
     try
       let encoded = _encoder.encode[D](data, _wb)
       _writev(encoded)

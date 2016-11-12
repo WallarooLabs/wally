@@ -42,13 +42,14 @@ class StepBuilder
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
 
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
-    router: Router val = EmptyRouter): Step tag 
+    router: Router val = EmptyRouter, 
+    default_target: (Step | None) = None): Step tag 
   =>
     let runner = _runner_builder(MetricsReporter(_app_name, 
       metrics_conn) where alfred = alfred, router = router)
     let step = Step(consume runner, 
       MetricsReporter(_app_name, metrics_conn), _id,
-      _runner_builder.route_builder(), alfred, router)
+      _runner_builder.route_builder(), alfred, router, default_target)
     step.update_router(next)
     step
 
@@ -197,8 +198,6 @@ class EgressBuilder
 
           tsb(reporter.clone(), a(0), a(1))
         else
-          @printf[I32]("--------!!!! WE DON'T HAVE AN ADDRESS FOR SINK!!\n".cstring())
-          @printf[I32](("--------!!Sink addr is size " + a.size().string() + "\n").cstring())
           EmptySink
         end
       else

@@ -10,6 +10,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
+use "wallaroo/tcp-sink"
 
 // trait RunnableStep
 //   be update_router(router: Router val)
@@ -32,7 +33,8 @@ trait tag RunnableStep
 
 
 interface Initializable
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val)
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val)
 
 type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer & Initializable tag)
 
@@ -50,8 +52,9 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
   var _router: Router val
-  let _route_builder: RouteBuilder val
+  var _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
+  let _default_target: (Step | None)
   var _outgoing_seq_id: U64
   var _outgoing_route_id: U64
   var _initialized: Bool = false
@@ -71,7 +74,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   var _distributable_credits: ISize = _max_distributable_credits
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, id: U128,
-    route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter)
+    route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter, default_target: (Step | None) = None)
   =>
     _runner = consume runner
     match _runner
@@ -85,8 +88,11 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     _alfred = alfred
     _alfred.register_origin(this, id)
     _id = id
+    _default_target = default_target
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) =>
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val) 
+  =>
     for consumer in _router.routes().values() do
       _routes(consumer) =
         _route_builder(this, consumer, StepRouteCallbackHandler)
@@ -97,11 +103,23 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
         _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
+    match _default_target
+    | let r: CreditFlowConsumerStep =>
+      _routes(r) = _route_builder(this, r, StepRouteCallbackHandler)
+    end
+
+    for sink in tcp_sinks.values() do
+      _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
+    end
+
     for r in _routes.values() do
       r.initialize()
     end
 
     _initialized = true
+
+  be update_route_builder(route_builder: RouteBuilder val) =>
+    _route_builder = route_builder
 
   be register_routes(router: Router val, route_builder: RouteBuilder val) =>
     for consumer in router.routes().values() do
@@ -121,7 +139,6 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, incoming_seq_id: U64, route_id: U64)
   =>
-    @printf[I32]("!!Recvd at Step!!\n".cstring())
     _outgoing_seq_id = _outgoing_seq_id + 1
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       this, _router,

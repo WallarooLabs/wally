@@ -430,6 +430,7 @@ actor ApplicationInitializer
                   // TODO: Replace this default strategy with a better one 
                   // after POC
                   if pb.default_target_name() != "" then
+                    @printf[I32]("-----We have a real default target name\n".cstring())
                     match application.default_target
                     | let default_target: Array[RunnerBuilder val] val =>
                       @printf[I32](("Preparing to spin up default target state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
@@ -460,7 +461,7 @@ actor ApplicationInitializer
                       let pre_state_builder = StepBuilder(application.name(),
                         pipeline.name(),
                         pre_state_runner_builder, pre_state_id, 
-                        pre_state_runner_builder.is_stateful(), 
+                        false, 
                         default_pre_state_target_id,
                         pre_state_runner_builder.forward_route_builder())
 
@@ -468,8 +469,10 @@ actor ApplicationInitializer
 
                       let state_builder = StepBuilder(application.name(),
                         pipeline.name(),
-                        state_runner_builder, next_runner_builder.id(),
-                        true)
+                        state_runner_builder, state_id,
+                        true 
+                        where forward_route_builder' = 
+                          state_runner_builder.route_builder())
  
                       // Add prestate to defaults
                       // Add state to defaults
@@ -483,15 +486,18 @@ actor ApplicationInitializer
                       next_default_targets.push(pre_state_builder)
                       next_default_targets.push(state_builder)
 
+                      @printf[I32](("Adding default target for " + worker + "\n").cstring())
                       default_targets(worker) = consume next_default_targets
 
                       // Create ProxyAddresses for the other workers
                       let proxy_address = ProxyAddress(worker, 
-                        default_pre_state_target_id)
+                        pre_state_id)
 
                       for w in worker_names.values() do
                         default_targets(w) = proxy_address
                       end
+                    else
+                      @printf[I32]("----But no default target!\n".cstring())
                     end
                   end
                 else

@@ -30,7 +30,8 @@ actor Main
           .new_pipeline[String, Result val]("Default Test",
             DefaultTestFrameHandler)
             .to_state_partition[String, String, Result val, NormalState](UpdateState, NormalStateBuilder, "normal-state",
-              symbol_data_partition where multi_worker = true)
+              symbol_data_partition where multi_worker = true,
+              default_target_name = "default")
             .to_sink(ResultEncoder, recover [0] end)                 
           .partition_default_target[String, Result val, DefaultState](
             "Default Test", "default", UpdateDefaultState, 
@@ -93,7 +94,7 @@ primitive UpdateState is StateComputation[String, Result val, NormalState]
     sc_repo: StateChangeRepository[NormalState], 
     state: NormalState): (Result val, StateChange[NormalState] ref)
   =>
-    @printf[I32]("!!Update Normal State\n".cstring())
+    // @printf[I32]("!!Update Normal State\n".cstring())
     let state_change: NormalStateChange ref =
       try
         sc_repo.lookup_by_name("NormalStateChange") as NormalStateChange
@@ -172,7 +173,7 @@ primitive UpdateDefaultState is StateComputation[String, Result val,
     sc_repo: StateChangeRepository[DefaultState], 
     state: DefaultState): (Result val, StateChange[DefaultState] ref)
   =>
-    @printf[I32]("!!Update Default State\n".cstring())
+    // @printf[I32]("!!Update Default State\n".cstring())
     let state_change: DefaultStateChange ref =
       try
         sc_repo.lookup_by_name("DefaultStateChange") as DefaultStateChange

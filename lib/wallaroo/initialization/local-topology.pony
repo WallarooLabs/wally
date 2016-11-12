@@ -170,6 +170,8 @@ actor LocalTopologyInitializer
         // we're done
         let initializables: Array[Initializable tag] = initializables.create()
 
+        let tcp_sinks_trn: Array[TCPSink] trn = recover Array[TCPSink] end
+
         // Update the step ids for all OutgoingBoundaries
         _connections.update_boundary_ids(t.proxy_ids())
 
@@ -179,6 +181,7 @@ actor LocalTopologyInitializer
 
         // TODO: Replace this when we move past the temporary POC based default
         // target strategy
+        var default_target: (Step | None) = None
         var default_target_id: U128 = t.default_target_id
         var default_target_state_step_id: U128 = 0
         var default_target_node: (DagNode[StepInitializer val] val | None) = 
@@ -186,6 +189,7 @@ actor LocalTopologyInitializer
         var default_target_state_step: (Step | None) = None
         match t.default_target
         | let targets: Array[StepBuilder val] val =>
+          @printf[I32]("A default target exists!\n".cstring())
           let pre_state_builder = 
             try
               targets(0)
@@ -208,6 +212,10 @@ actor LocalTopologyInitializer
 
           let state_step = state_builder(EmptyRouter, _metrics_conn,
             _alfred)
+          state_step.update_route_builder(state_builder.forward_route_builder())
+
+          initializables.push(state_step)
+
           default_target_state_step = state_step
           built(default_target_state_step_id) = DirectRouter(state_step)
         | let proxy_target: ProxyAddress val =>
@@ -243,9 +251,9 @@ actor LocalTopologyInitializer
         let non_partitions = Array[DagNode[StepInitializer val] val]
         for node in graph.nodes() do
           if node.is_sink() then 
-            @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
             match node.value
             | let p: PartitionedPreStateStepBuilder val =>
+              @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
               frontier.push(node)
             else
               non_partitions.push(node)
@@ -256,10 +264,12 @@ actor LocalTopologyInitializer
         // TODO: Change this when we move past POC default target strategy
         match default_target_node
         | let n: DagNode[StepInitializer val] val =>
+          @printf[I32](("Adding default target " + n.value.name() + " to frontier\n").cstring())
           frontier.push(n)
         end
 
         for node in non_partitions.values() do
+          @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
           frontier.push(node) 
         end
 
@@ -277,6 +287,7 @@ actor LocalTopologyInitializer
           if built.contains(next_node.id) then
             // We've already handled this node (probably because it's 
             // pre-state)
+            @printf[I32](("We've already handled " + next_node.value.name() + " with id " + next_node.id.string() + " so we're not handling it again\n").cstring())
             continue
           end
 
@@ -294,12 +305,14 @@ actor LocalTopologyInitializer
           //   end
           // end
           if ready then
+            @printf[I32](("Handling " + next_node.value.name() + " node\n").cstring())
             let next_initializer: StepInitializer val = next_node.value
 
             // ...match kind of initializer and go from there...
             match next_initializer
             | let builder: StepBuilder val =>              
               let next_id = builder.id()
+              @printf[I32](("Handling id " + next_id.string() + "\n").cstring())
 
               if not builder.is_stateful() then
                 @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
@@ -316,12 +329,36 @@ actor LocalTopologyInitializer
                     error 
                   end
 
-                let next_step = builder(out_router, _metrics_conn, _alfred)
+                // If this is a default target, it might have a state comp 
+                // target.
+                let state_comp_target_router = 
+                  match builder.pre_state_target_id() 
+                  | let id: U128 =>
+                    try
+                      built(id)
+                    else
+                      EmptyRouter
+                    end
+                  else
+                    EmptyRouter
+                  end
+
+                // Check if this is a default target.  If so, route it
+                // to the appropriate default state step.
+                let next_step = builder(out_router, _metrics_conn, _alfred, 
+                  state_comp_target_router)
+
                 data_routes(next_id) = next_step
                 initializables.push(next_step)
 
                 let next_router = DirectRouter(next_step)
                 built(next_id) = next_router
+
+                // If this is our default target, then keep a reference
+                // to it
+                if next_id == default_target_id then
+                  default_target = next_step
+                end
               else
                 // Our step is stateful and non-partitioned, so we need to 
                 // build both a state step and a prestate step
@@ -345,8 +382,7 @@ actor LocalTopologyInitializer
                 if not targets_ready then
                   frontier.push(next_node)
                   continue
-                end
-                
+                end              
 
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn, _alfred)
@@ -375,6 +411,7 @@ actor LocalTopologyInitializer
                           error
                         end
                       else
+                        @printf[I32]("There is no prestate comp target. Using an EmptyRouter\n".cstring())
                         EmptyRouter
                       end
 
@@ -463,6 +500,11 @@ actor LocalTopologyInitializer
                 let sink = egress_builder(_worker_name,
                   consume sink_reporter, _auth, _outgoing_boundaries)
 
+                match sink
+                | let tcp: TCPSink =>
+                  tcp_sinks_trn.push(tcp)
+                end
+
                 if not initializables.contains(sink) then
                   initializables.push(sink)
                 end
@@ -516,7 +558,7 @@ actor LocalTopologyInitializer
                   out_router,
                   source_data.route_builder(),
                   _outgoing_boundaries,
-                  _alfred, 
+                  _alfred, default_target,
                   source_data.address()(0), 
                   source_data.address()(1))
               else
@@ -573,8 +615,9 @@ actor LocalTopologyInitializer
         end
 
         // Initialize all our initializables to get backpressure started
+        let tcp_sinks: Array[TCPSink] val = consume tcp_sinks_trn
         for i in initializables.values() do
-          i.initialize(_outgoing_boundaries)
+          i.initialize(_outgoing_boundaries, tcp_sinks)
         end
 
         @printf[I32]("Local topology initialized\n".cstring())
@@ -593,6 +636,7 @@ actor LocalTopologyInitializer
   =>
     // TODO: Replace this once we move past POC default target strategy
     if node.id == default_target_id then
+      @printf[I32]("Building default target step\n".cstring())
       return default_target_state_step_id
     end
 
