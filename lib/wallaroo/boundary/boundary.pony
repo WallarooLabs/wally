@@ -17,8 +17,8 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
 class OutgoingBoundaryBuilder
-  fun apply(auth: AmbientAuth, worker_name: String,  
-    reporter: MetricsReporter iso, host: String, service: String): 
+  fun apply(auth: AmbientAuth, worker_name: String,
+    reporter: MetricsReporter iso, host: String, service: String):
       OutgoingBoundary
   =>
     OutgoingBoundary(auth, worker_name, consume reporter, host,
@@ -61,12 +61,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   let _host: String
   let _service: String
   let _from: String
-  let _queue: Queue[Array[ByteSeq] val] = _queue.create()
+  let _queue: Queue[Array[ByteSeq] val] = _queue.create(500_000)
   var _lowest_queue_id: U64 = 0
   var _seq_id: U64 = 0
 
   new create(auth: AmbientAuth, worker_name: String,
-    metrics_reporter: MetricsReporter iso, host: String, service: String, 
+    metrics_reporter: MetricsReporter iso, host: String, service: String,
     from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -96,7 +96,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         error
       end
 
-      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id, 
+      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
         _auth)
       writev(connect_msg)
     else
@@ -122,7 +122,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   be forward(delivery_msg: ReplayableDeliveryMsg val)
   =>
     try
-      let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg, 
+      let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         _seq_id, _wb, _auth)
       _queue.enqueue(outgoing_msg)
 
