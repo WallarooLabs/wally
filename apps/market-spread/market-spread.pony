@@ -51,7 +51,7 @@ actor Main
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler,
+            "Nbbo", FixNbboFrameHandler
               where init_file = init_file)
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
