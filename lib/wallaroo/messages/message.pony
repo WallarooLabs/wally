@@ -13,7 +13,7 @@ trait Origin
 
   fun ref _flush(low_watermark: U64, origin: Origin tag,
     upstream_route_id: U64 , upstream_seq_id: U64)
-    
+
   be log_flushed(low_watermark: U64, messages_flushed: U64, origin: Origin tag,
     upstream_route_id: U64 , upstream_seq_id: U64)
   =>
@@ -29,7 +29,7 @@ trait Origin
 
   fun ref _bookkeeping(
     // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
+    i_origin: Origin tag, i_msg_uid: U128,
     i_frac_ids': (Array[U64] val | None), i_seq_id: U64, i_route_id: U64,
     // outgoing envelope
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
@@ -56,7 +56,7 @@ trait Origin
         o_seq_id.string() +
         "\n").cstring())
     end
-      
+
     // keep track of messages we've sent downstream
     hwm_get().update((i_origin, o_route_id), o_seq_id)
     // keep track of mapping between incoming / outgoing seq_id
@@ -65,7 +65,7 @@ trait Origin
     route_translate_get().update(i_route_id, o_route_id)
     // keep track of origins
     origins_get().set(i_origin)
-    
+
   be update_watermark(route_id: U64, seq_id: U64) =>
   """
   Process a high watermark received from a downstream step.
@@ -75,7 +75,7 @@ trait Origin
       "update_watermark\troute_id: " + route_id.string() +
       "\tseq_id: " + seq_id.string() + "\n").cstring())
   end
-    
+
   // update low watermark for this route_id
   lwm_get().update(route_id, seq_id)
 
@@ -84,7 +84,7 @@ trait Origin
     let low_watermark = lwm_get().low_watermark()
     for origin in origins_get().values() do
       let highest_outgoing_seq_id = hwm_get().apply((origin, route_id))
-      
+
       if low_watermark < highest_outgoing_seq_id then
         // translate downstream route_id to upstream route_id
         let upstream_route_id = route_translate_get().outToIn(route_id)
@@ -97,9 +97,9 @@ trait Origin
     @printf[I32]("Missing bookkeeping entry.\n".cstring())
   end
 
-  
-type OriginSet is HashSet[Origin tag, HashIs[Origin tag]] 
-    
+
+type OriginSet is HashSet[Origin tag, HashIs[Origin tag]]
+
 
 primitive HashTuple
   fun hash(t: (U64, U64)): U64 =>
@@ -109,9 +109,9 @@ primitive HashTuple
     cantorPair(t1) == cantorPair(t2)
 
   fun cantorPair(t: (U64, U64)): U64 =>
-    (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
+    (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2
 
-    
+
 type OriginRoutePair is (Origin tag, U64)
 
 
@@ -123,8 +123,8 @@ primitive HashOriginRoute
     hash(t1) == hash(t2)
 
   fun cantorPair(t: (U64, U64)): U64 =>
-    (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2    
-    
+    (((t._1 + t._2) * (t._1 + t._2 + 1)) / 2 )+ t._2
+
 
 class HighWatermarkTable
   """
@@ -137,14 +137,14 @@ class HighWatermarkTable
         of this table is static.
   """
   let _hwmt: HashMap[OriginRoutePair, U64, HashOriginRoute]
-  
+
   new create(size: USize) =>
     _hwmt = HashMap[OriginRoutePair, U64, HashOriginRoute](size)
-     
+
   fun ref update(key: OriginRoutePair, seq_id: U64) =>
   """
   Keep track of the highest seq_id per route per origin.
-  """  
+  """
     try
       _hwmt.upsert(key, seq_id, lambda(x: U64, y: U64): U64
       =>
@@ -156,7 +156,7 @@ class HighWatermarkTable
       end)
     else
       @printf[I32](
-        "HighWaterMarkTable: error upserting OriginRoutePair\n".cstring())      
+        "HighWaterMarkTable: error upserting OriginRoutePair\n".cstring())
     end
 
   fun apply(key: OriginRoutePair): U64 ? =>
@@ -170,7 +170,7 @@ class HighWatermarkTable
 
 class SeqTranslationTable
   """
-  We need to be able to translate from an incoming seq_id to an 
+  We need to be able to translate from an incoming seq_id to an
   outgoing seq_id and vice versa.
   Create a new entry every time we send a message downstream.
   Remove old entries every time we receive a new low watermark.
@@ -185,7 +185,7 @@ class SeqTranslationTable
   new create(size: USize) =>
     _inToOut = Map[U64, U64](size)
     _outToIn = Map[U64, U64](size)
-      
+
   fun ref update(in_seq_id: U64, out_seq_id: U64) =>
     try
       _inToOut.insert(in_seq_id, out_seq_id)
@@ -193,7 +193,7 @@ class SeqTranslationTable
     else
       @printf[I32](
         "SeqTranslationTable: error inserting %llu,%llu\n".cstring(),
-        in_seq_id, out_seq_id)      
+        in_seq_id, out_seq_id)
     end
 
   fun outToIn(out_seq_id: U64): U64 ? =>
@@ -230,7 +230,7 @@ class SeqTranslationTable
 
 class RouteTranslationTable
   """
-  We need to be able to translate from an incoming route_id to an 
+  We need to be able to translate from an incoming route_id to an
   outgoing route_id and vice versa.
   Create a new entry every time we send a message downstream.
   Remove old entries every time we receive a new low watermark.
@@ -245,14 +245,14 @@ class RouteTranslationTable
   new create(size: USize) =>
     _inToOut = Map[U64, U64](size)
     _outToIn = Map[U64, U64](size)
-      
+
   fun ref update(in_route_id: U64, out_route_id: U64) =>
     try
       _inToOut.insert(in_route_id, out_route_id)
       _outToIn.insert(out_route_id, in_route_id)
     else
       @printf[I32]("RouteTranslationTable: error inserting %llu,%llu\n".cstring(),
-        in_route_id, out_route_id)      
+        in_route_id, out_route_id)
     end
 
   fun outToIn(out_route_id: U64): U64 ? =>
@@ -289,19 +289,19 @@ class RouteTranslationTable
         out_route_id)
     end
 
-    
+
 class LowWatermarkTable
   """
-  Keep track of low watermark values per route as reported by downstream 
+  Keep track of low watermark values per route as reported by downstream
   steps.
   """
   let _lwmt: Map[U64, U64]
   var _low_watermark: U64
-  
+
   new create(size: USize) =>
     _lwmt = Map[U64, U64](size)
     _low_watermark = U64(0)
-    
+
   fun ref update(route_id: U64, seq_id: U64) =>
     _lwmt(route_id) = seq_id
     _new_low_watermark(seq_id)
@@ -314,9 +314,9 @@ class LowWatermarkTable
       end
     end
     _low_watermark = min
-    @printf[I32]("_low_watermark: %llu\n".cstring(), _low_watermark)
+    //@printf[I32]("_low_watermark: %llu\n".cstring(), _low_watermark)
 
-    
+
   fun apply(route_id: U64): U64 ? =>
     try
       _lwmt(route_id)
@@ -337,4 +337,4 @@ class LowWatermarkTable
     _low_watermark
 
 
-  
+
