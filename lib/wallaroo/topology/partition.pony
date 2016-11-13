@@ -220,6 +220,7 @@ primitive PartitionFileReader
           error
         end
       end
+      file.dispose()
     else
       @printf[I32]("ERROR: Problem reading partition file. Each line must have a key string and, optionally, a weight (separated by a comma)\n".cstring())
     end
