@@ -8,16 +8,21 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
 
+type WeightedKey[Key: (Hashable val & Equatable[Key])] is
+  (Key, USize)
+
 class Partition[In: Any val, Key: (Hashable val & Equatable[Key])]
   let _function: PartitionFunction[In, Key] val
-  let _keys: Array[Key] val
+  let _keys: (Array[WeightedKey[Key]] val | Array[Key] val)
 
-  new val create(f: PartitionFunction[In, Key] val, ks: Array[Key] val) =>
+  new val create(f: PartitionFunction[In, Key] val, 
+    ks: (Array[WeightedKey[Key]] val | Array[Key] val)) 
+  =>
     _function = f
     _keys = ks
 
   fun function(): PartitionFunction[In, Key] val => _function
-  fun keys(): Array[Key] val => _keys
+  fun keys(): (Array[WeightedKey[Key]] val | Array[Key] val) => _keys
 
 interface PartitionFunction[In: Any val, Key: (Hashable val & Equatable[Key] val)]
   fun apply(input: In): Key
@@ -82,10 +87,10 @@ trait StateSubpartition
 
 class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
   StateSubpartition
-  let _keys: Array[Key] val
+  let _keys: (Array[WeightedKey[Key]] val | Array[Key] val)
   let _runner_builder: RunnerBuilder val
 
-  new val create(keys: Array[Key] val, 
+  new val create(keys: (Array[WeightedKey[Key]] val | Array[Key] val),
     runner_builder: RunnerBuilder val, multi_worker: Bool = false) 
   =>
     _keys = keys
@@ -96,11 +101,23 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
   =>
     let m: Map[Key, Step] trn = recover Map[Key, Step] end
     let guid_gen = GuidGenerator
-    for key in _keys.values() do
-      let reporter = MetricsReporter(app_name, metrics_conn)
-      m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
-        consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
+
+    match _keys
+    | let wks: Array[WeightedKey[Key]] val =>
+      for wkey in wks.values() do
+        let reporter = MetricsReporter(app_name, metrics_conn)
+        m(wkey._1) = Step(_runner_builder(reporter.clone() 
+            where alfred = alfred),
+          consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
+      end
+    | let ks: Array[Key] val =>
+      for key in ks.values() do
+        let reporter = MetricsReporter(app_name, metrics_conn)
+        m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
+          consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
+      end
     end
+
     KeyedStateAddresses[Key](consume m)
 
 trait PreStateSubpartition
