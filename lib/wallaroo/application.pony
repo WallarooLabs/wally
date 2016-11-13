@@ -190,8 +190,15 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let guid_gen = GuidGenerator
     let step_id_map: Map[Key, U128] trn = recover Map[Key, U128] end
 
-    for key in partition.keys().values() do
-      step_id_map(key) = guid_gen.u128()
+    match partition.keys()
+    | let wks: Array[WeightedKey[Key]] val =>
+      for wkey in wks.values() do
+        step_id_map(wkey._1) = guid_gen.u128()
+      end
+    | let ks: Array[Key] val =>
+      for key in ks.values() do
+        step_id_map(key) = guid_gen.u128()
+      end
     end
 
     let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, PIn, State,

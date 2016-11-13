@@ -1,4 +1,5 @@
 use "collections"
+use "files"
 use "net"
 use "sendence/guid"
 use "wallaroo/backpressure"
@@ -8,16 +9,21 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
 
+type WeightedKey[Key: (Hashable val & Equatable[Key])] is
+  (Key, USize)
+
 class Partition[In: Any val, Key: (Hashable val & Equatable[Key])]
   let _function: PartitionFunction[In, Key] val
-  let _keys: Array[Key] val
+  let _keys: (Array[WeightedKey[Key]] val | Array[Key] val)
 
-  new val create(f: PartitionFunction[In, Key] val, ks: Array[Key] val) =>
+  new val create(f: PartitionFunction[In, Key] val, 
+    ks: (Array[WeightedKey[Key]] val | Array[Key] val)) 
+  =>
     _function = f
     _keys = ks
 
   fun function(): PartitionFunction[In, Key] val => _function
-  fun keys(): Array[Key] val => _keys
+  fun keys(): (Array[WeightedKey[Key]] val | Array[Key] val) => _keys
 
 interface PartitionFunction[In: Any val, Key: (Hashable val & Equatable[Key] val)]
   fun apply(input: In): Key
@@ -82,10 +88,10 @@ trait StateSubpartition
 
 class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
   StateSubpartition
-  let _keys: Array[Key] val
+  let _keys: (Array[WeightedKey[Key]] val | Array[Key] val)
   let _runner_builder: RunnerBuilder val
 
-  new val create(keys: Array[Key] val, 
+  new val create(keys: (Array[WeightedKey[Key]] val | Array[Key] val),
     runner_builder: RunnerBuilder val, multi_worker: Bool = false) 
   =>
     _keys = keys
@@ -96,11 +102,23 @@ class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
   =>
     let m: Map[Key, Step] trn = recover Map[Key, Step] end
     let guid_gen = GuidGenerator
-    for key in _keys.values() do
-      let reporter = MetricsReporter(app_name, metrics_conn)
-      m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
-        consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
+
+    match _keys
+    | let wks: Array[WeightedKey[Key]] val =>
+      for wkey in wks.values() do
+        let reporter = MetricsReporter(app_name, metrics_conn)
+        m(wkey._1) = Step(_runner_builder(reporter.clone() 
+            where alfred = alfred),
+          consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
+      end
+    | let ks: Array[Key] val =>
+      for key in ks.values() do
+        let reporter = MetricsReporter(app_name, metrics_conn)
+        m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
+          consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
+      end
     end
+
     KeyedStateAddresses[Key](consume m)
 
 trait PreStateSubpartition
@@ -182,3 +200,36 @@ class KeyedPreStateSubpartition[PIn: Any val,
 
     LocalPartitionRouter[PIn, Key](consume m, _id_map, consume routes,
       _partition_function)
+
+primitive PartitionFileReader
+  fun apply(filename: String, auth: AmbientAuth): 
+    Array[WeightedKey[String]] val 
+  =>
+    let keys: Array[WeightedKey[String]] trn = 
+      recover Array[WeightedKey[String]] end
+
+    try
+      let file = File(FilePath(auth, filename))
+      for line in file.lines() do
+        let els = line.split(",")
+        match els.size()
+        | 0 => None
+        | 1 => keys.push((els(0), 1))
+        | 2 => keys.push((els(0), els(1).usize()))
+        else
+          error
+        end
+      end
+      file.dispose()
+    else
+      @printf[I32]("ERROR: Problem reading partition file. Each line must have a key string and, optionally, a weight (separated by a comma)\n".cstring())
+    end
+
+    consume keys
+
+
+
+
+
+
+

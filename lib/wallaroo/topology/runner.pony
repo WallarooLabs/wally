@@ -4,6 +4,7 @@ use "time"
 use "net"
 use "sendence/epoch"
 use "sendence/guid"
+use "sendence/weighted"
 use "wallaroo/backpressure"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
@@ -275,19 +276,47 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
 
     match workers
     | let w: String =>
-      for key in _partition.keys().values() do
-        try
-          m(key) = ProxyAddress(w, _step_id_map(key))
+      // With one worker, all the keys go on that worker
+      match _partition.keys()
+      | let wks: Array[WeightedKey[Key]] val =>
+        for wkey in wks.values() do
+          try
+            m(wkey._1) = ProxyAddress(w, _step_id_map(wkey._1))
+          end
+        end
+      | let ks: Array[Key] val =>
+        for key in ks.values() do
+          try
+            m(key) = ProxyAddress(w, _step_id_map(key))
+          end
         end
       end
     | let ws: Array[String] val =>
+      // With multiple workers, we need to determine our distribution of keys
       let w_count = ws.size()
       var idx: USize = 0
-      for key in _partition.keys().values() do
+
+      match _partition.keys()
+      | let wks: Array[WeightedKey[Key]] val =>
+        // Using weighted keys, we need to create a distribution that
+        // balances the weight across workers
         try
-          m(key) = ProxyAddress(ws(idx), _step_id_map(key))
+          let buckets = Weighted[Key](wks, ws.size())
+          for worker_idx in Range(0, buckets.size()) do
+            for key in buckets(worker_idx).values() do
+              m(key) = ProxyAddress(ws(worker_idx), _step_id_map(key))
+            end
+          end
+        end 
+      | let ks: Array[Key] val =>
+        // With unweighted keys, we simply distribute the keys equally across
+        // the workers
+        for key in ks.values() do
+          try
+            m(key) = ProxyAddress(ws(idx), _step_id_map(key))
+          end
+          idx = (idx + 1) % w_count
         end
-        idx = (idx + 1) % w_count
       end
     end
 
