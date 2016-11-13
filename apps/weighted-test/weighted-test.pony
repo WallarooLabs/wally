@@ -23,7 +23,7 @@ actor Main
   new create(env: Env) =>
     try
       let symbol_data_partition = Partition[String, String](
-        StringPartitionFunction, Symbols.symbols)
+        StringPartitionFunction, PartitionFileReader("partition.txt",        env.root as AmbientAuth))
 
       let application = recover val
         Application("Complex Numbers App")
@@ -155,18 +155,18 @@ primitive ResultEncoder
     HubProtocol.payload("default-test", "reports:default-test", 
       consume payload, wb)
 
-class Symbols
-  let symbols: Array[WeightedKey[String]] val
+// class Symbols
+//   let symbols: Array[WeightedKey[String]] val
 
-  new create() =>
-    symbols = recover [
-("a", 110),
-("b", 40),
-("c", 5),
-("d", 735),
-("e", 45),
-("f", 260),
-("g", 410),
-("h", 915),
-("i", 480)
-] end
+//   new create() =>
+//     symbols = recover [
+// ("a", 110),
+// ("b", 40),
+// ("c", 5),
+// ("d", 735),
+// ("e", 45),
+// ("f", 260),
+// ("g", 410),
+// ("h", 915),
+// ("i", 480)
+// ] end

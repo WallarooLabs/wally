@@ -1,4 +1,5 @@
 use "collections"
+use "files"
 use "net"
 use "sendence/guid"
 use "wallaroo/backpressure"
@@ -199,3 +200,35 @@ class KeyedPreStateSubpartition[PIn: Any val,
 
     LocalPartitionRouter[PIn, Key](consume m, _id_map, consume routes,
       _partition_function)
+
+primitive PartitionFileReader
+  fun apply(filename: String, auth: AmbientAuth): 
+    Array[WeightedKey[String]] val 
+  =>
+    let keys: Array[WeightedKey[String]] trn = 
+      recover Array[WeightedKey[String]] end
+
+    try
+      let file = File(FilePath(auth, filename))
+      for line in file.lines() do
+        let els = line.split(",")
+        match els.size()
+        | 0 => None
+        | 1 => keys.push((els(0), 1))
+        | 2 => keys.push((els(0), els(1).usize()))
+        else
+          error
+        end
+      end
+    else
+      @printf[I32]("ERROR: Problem reading partition file. Each line must have a key string and, optionally, a weight (separated by a comma)\n".cstring())
+    end
+
+    consume keys
+
+
+
+
+
+
+
