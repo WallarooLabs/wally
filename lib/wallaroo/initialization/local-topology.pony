@@ -425,10 +425,22 @@ actor LocalTopologyInitializer
               state_addresses.register_routes(state_comp_target,
                  p_builder.forward_route_builder())
 
+              // Check for default router
+              let default_router = 
+                try
+                  if default_target_id != 0 then
+                    built(default_target_id)
+                  else
+                    None
+                  end
+                else
+                  None
+                end
+
               let partition_router: PartitionRouter val =
                 p_builder.build_partition(_worker_name, state_addresses,
                   _metrics_conn, _auth, _connections, _alfred, 
-                  _outgoing_boundaries, state_comp_target)
+                  _outgoing_boundaries, state_comp_target, default_router)
               
               // Create a data route to each pre-state step in the 
               // partition located on this worker
@@ -442,35 +454,36 @@ actor LocalTopologyInitializer
               built(next_id) = partition_router
             | let egress_builder: EgressBuilder val =>
               let next_id = egress_builder.id()
+              if not built.contains(next_id) then
+                let sink_reporter = MetricsReporter(t.name(), 
+                  _metrics_conn)
 
-              let sink_reporter = MetricsReporter(t.name(), 
-                _metrics_conn)
+                // Create a sink or OutgoingBoundary proxy. If the latter,
+                // egress_builder finds it from _outgoing_boundaries
+                let sink = egress_builder(_worker_name,
+                  consume sink_reporter, _auth, _outgoing_boundaries)
 
-              // Create a sink or OutgoingBoundary proxy. If the latter,
-              // egress_builder finds it from _outgoing_boundaries
-              let sink = egress_builder(_worker_name,
-                consume sink_reporter, _auth, _outgoing_boundaries)
-
-              if not initializables.contains(sink) then
-                initializables.push(sink)
-              end
-
-              let sink_router = 
-                match sink
-                | let ob: OutgoingBoundary =>
-                  match egress_builder.target_address()
-                  | let pa: ProxyAddress val =>
-                    ProxyRouter(_worker_name, ob, pa, _auth)
-                  else
-                    @printf[I32]("No ProxyAddress for proxy!\n".cstring())
-                    error
-                  end
-                else
-                  DirectRouter(sink)
+                if not initializables.contains(sink) then
+                  initializables.push(sink)
                 end
 
-              data_routes(next_id) = sink
-              built(next_id) = sink_router
+                let sink_router = 
+                  match sink
+                  | let ob: OutgoingBoundary =>
+                    match egress_builder.target_address()
+                    | let pa: ProxyAddress val =>
+                      ProxyRouter(_worker_name, ob, pa, _auth)
+                    else
+                      @printf[I32]("No ProxyAddress for proxy!\n".cstring())
+                      error
+                    end
+                  else
+                    DirectRouter(sink)
+                  end
+
+                data_routes(next_id) = sink
+                built(next_id) = sink_router
+              end
             | let source_data: SourceData val =>
               let next_id = source_data.id()
               let pipeline_name = source_data.pipeline_name()

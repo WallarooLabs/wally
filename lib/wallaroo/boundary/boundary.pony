@@ -121,6 +121,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: ReplayableDeliveryMsg val)
   =>
+    // @printf[I32]("!!HOW DID I GET HERE?\n".cstring())
     try
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         _seq_id, _wb, _auth)

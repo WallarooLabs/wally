@@ -114,14 +114,15 @@ actor ApplicationInitializer
         end
         let source_addr: Array[String] val = consume source_addr_trn
 
-        let sink_addr: Array[String] trn = recover Array[String] end
+        let sink_addr_trn: Array[String] trn = recover Array[String] end
         try
-          sink_addr.push(_output_addr(0))
-          sink_addr.push(_output_addr(1))
+          sink_addr_trn.push(_output_addr(0))
+          sink_addr_trn.push(_output_addr(1))
         else
           @printf[I32]("No output address!\n".cstring())
           error
         end
+        let sink_addr: Array[String] val = consume sink_addr_trn
 
         @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline.size().string() + " uncoalesced runner builders\n").cstring())
 
@@ -368,7 +369,7 @@ actor ApplicationInitializer
                       // We need a sink on every worker involved in the 
                       // partition
                       let egress_builder = EgressBuilder(pipeline.name(), 
-                        sink_id, _output_addr, pipeline.sink_builder())
+                        sink_id, sink_addr, pipeline.sink_builder())
 
                       match partition_workers
                       | let w: String =>
@@ -643,7 +644,7 @@ actor ApplicationInitializer
             // We need a Sink since there are no more steps to go in this
             // pipeline
             let egress_builder = EgressBuilder(pipeline.name(), 
-              sink_id, _output_addr, pipeline.sink_builder())
+              sink_id, sink_addr, pipeline.sink_builder())
 
             try
               local_graphs(worker).add_node(egress_builder, sink_id)
@@ -680,11 +681,19 @@ actor ApplicationInitializer
           p_ids(target) = p_id
         end
 
+        let default_target = 
+          try
+            default_targets(w)
+          else
+            @printf[I32](("No default target specified for " + w + "\n").cstring())
+            None
+          end
+
         let local_topology = 
           try
             LocalTopology(application.name(), g.clone(),
               application.state_builders(), consume p_ids,
-              default_targets(w), application.default_target_name,
+              default_target, application.default_target_name,
               application.default_target_id)
           else
             @printf[I32]("Problem cloning graph\n".cstring())

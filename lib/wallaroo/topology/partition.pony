@@ -127,7 +127,8 @@ trait PreStateSubpartition
     state_addresses: StateAddresses val, metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    state_comp_router: Router val = EmptyRouter): PartitionRouter val
+    state_comp_router: Router val = EmptyRouter,
+    default_router: (Router val | None) = None): PartitionRouter val
 
 class KeyedPreStateSubpartition[PIn: Any val,
   Key: (Hashable val & Equatable[Key] val)] is PreStateSubpartition
@@ -151,7 +152,8 @@ class KeyedPreStateSubpartition[PIn: Any val,
     state_addresses: StateAddresses val, metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    state_comp_router: Router val = EmptyRouter):
+    state_comp_router: Router val = EmptyRouter,
+    default_router: (Router val | None) = None):
     LocalPartitionRouter[PIn, Key] val
   =>
     let routes: Map[Key, (Step | ProxyRouter val)] trn =
@@ -199,7 +201,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
     @printf[I32](("Spinning up " + partition_count.string() + " prestate partitions for " + _pipeline_name + " pipeline\n").cstring())
 
     LocalPartitionRouter[PIn, Key](consume m, _id_map, consume routes,
-      _partition_function)
+      _partition_function, default_router)
 
 primitive PartitionFileReader
   fun apply(filename: String, auth: AmbientAuth): 
@@ -226,10 +228,3 @@ primitive PartitionFileReader
     end
 
     consume keys
-
-
-
-
-
-
-

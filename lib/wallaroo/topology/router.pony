@@ -206,14 +206,22 @@ class LocalPartitionRouter[In: Any val,
     | let input: In =>
       let key = _partition_function(input)
       try
+        // !!
+        match key
+        | let s: Stringable =>
+          @printf[I32](("!!KEY: " + s.string() + "\n").cstring())
+        end
+
         match _partition_routes(key)
         | let s: Step =>
           // TODO: Remove that producer can be None
           match producer
           | let cfp: CreditFlowProducer ref =>
+            @printf[I32]("!!Matched cfp!\n".cstring())
             let might_be_route = cfp.route_to(s)
             match might_be_route
             | let r: Route =>
+              @printf[I32]("!!Matched Route!\n".cstring())
               r.run[D](metric_name, source_ts, data,
                 // hand down cfp so we can update route_id
                 cfp,
@@ -225,6 +233,7 @@ class LocalPartitionRouter[In: Any val,
               true
             end
           else
+            @printf[I32]("!!FAILED TO MATCH CFP\n".cstring())
             true
           end    
         | let p: ProxyRouter val =>
@@ -234,6 +243,7 @@ class LocalPartitionRouter[In: Any val,
             // outgoing envelope
             o_origin, o_msg_uid, o_frac_ids, o_seq_id)
         else
+          // No step or proxyrouter
           true
         end
       else
@@ -241,12 +251,14 @@ class LocalPartitionRouter[In: Any val,
         // If there's a default, use that
         match _default_router
         | let r: Router val =>
+          @printf[I32]("--!!Default Routing!!\n".cstring())
           r.route[In](metric_name, source_ts, input, producer,
             // incoming envelope
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
             // outgoing envelope
             o_origin, o_msg_uid, o_frac_ids, o_seq_id)
         else
+          @printf[I32]("--!!No Default Router!!\n".cstring())
           true
         end
       end

@@ -22,6 +22,7 @@ actor EmptySink is CreditFlowConsumerStep
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, seq_id: U64, route_id: U64)
   =>
+    @printf[I32]("!!Recvd at EMPTY SINK!\n".cstring())
     None
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -146,6 +147,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, seq_id: U64, route_id: U64)
   =>
+    @printf[I32]("!!Recvd at SINK!\n".cstring())
     try
       let encoded = _encoder.encode[D](data, _wb)
       _writev(encoded)

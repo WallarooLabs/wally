@@ -98,12 +98,13 @@ class PartitionedPreStateStepBuilder
     metrics_conn: TCPConnection, auth: AmbientAuth, connections: Connections, 
     alfred: Alfred, 
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    state_comp_router: Router val = EmptyRouter): 
+    state_comp_router: Router val = EmptyRouter,
+    default_router: (Router val | None) = None): 
       PartitionRouter val 
   =>
     _pre_state_subpartition.build(_app_name, worker_name, _runner_builder, 
       state_addresses, metrics_conn, auth, connections, alfred,
-      outgoing_boundaries, state_comp_router)
+      outgoing_boundaries, state_comp_router, default_router)
 
 class SourceData
   let _id: U128
@@ -196,6 +197,8 @@ class EgressBuilder
 
           tsb(reporter.clone(), a(0), a(1))
         else
+          @printf[I32]("--------!!!! WE DON'T HAVE AN ADDRESS FOR SINK!!\n".cstring())
+          @printf[I32](("--------!!Sink addr is size " + a.size().string() + "\n").cstring())
           EmptySink
         end
       else

@@ -55,6 +55,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       end
       true
     else
+      @printf[I32]("!! RECVD at SOURCE\n".cstring())
       let ingest_ts = Time.nanos()
       let computation_start = Time.nanos()
 
@@ -64,6 +65,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
           | let o: Origin tag =>
             _outgoing_seq_id = _outgoing_seq_id + 1
             let decoded = _handler.decode(consume data)
+            @printf[I32]("!! Decoded at SOURCE\n".cstring())
             _runner.run[In](_pipeline_name, ingest_ts, decoded,
               conn, _router,
               // incoming envelope (of which technically there is none)
