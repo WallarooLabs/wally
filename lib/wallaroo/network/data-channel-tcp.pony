@@ -3,7 +3,7 @@ use "time"
 use "buffered"
 use "collections"
 use "sendence/bytes"
-use "sendence/epoch"
+use "sendence/wall-clock"
 use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -81,7 +81,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       end
       true
     else
-      let ingest_ts = Epoch.nanoseconds() // because we received this from another worker
+      let ingest_ts = WallClock.nanoseconds() // because we received this from another worker
       let my_latest_ts = Time.nanos()
 
       ifdef "trace" then

@@ -4,7 +4,7 @@ use "net"
 use "time"
 use "buffered"
 use "sendence/hub"
-use "sendence/epoch"
+use "sendence/wall-clock"
 
 type MetricsCategory is
   (ComputationCategory | StartToEndCategory | NodeIngressEgressCategory)
@@ -42,11 +42,11 @@ class _MetricsReporter
     _category = category
     _period = period
     _output_to = output_to
-    let now = Epoch.nanoseconds()
+    let now = WallClock.nanoseconds()
     _period_ends_at = _next_period_endtime(now, period)
 
   fun ref report(duration: U64) =>
-    let now = Epoch.nanoseconds()
+    let now = WallClock.nanoseconds()
 
     if now > _period_ends_at then
       let h = _histogram = Histogram
@@ -128,7 +128,7 @@ class MetricsReporter
         reporter
       end
 
-    metrics.report(Epoch.nanoseconds() - source_ts) // might be across workers
+    metrics.report(WallClock.nanoseconds() - source_ts) // might be across workers
 
   fun clone(): MetricsReporter iso^ =>
     MetricsReporter(_app_name, _metrics_conn, _worker_name)

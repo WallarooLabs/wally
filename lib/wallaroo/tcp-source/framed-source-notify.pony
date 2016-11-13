@@ -1,12 +1,12 @@
 use "time"
 use "sendence/guid"
+use "sendence/wall-clock"
 use "wallaroo/backpressure"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 use "wallaroo/resilience"
-use "sendence/epoch"
 
 
 interface FramedSourceHandler[In: Any val]
@@ -60,7 +60,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       end
       true
     else
-      let ingest_ts = Epoch.nanoseconds() // might send across workers
+      let ingest_ts = WallClock.nanoseconds() // might send across workers
       let lastest_ts = Time.nanos()
 
       ifdef "trace" then

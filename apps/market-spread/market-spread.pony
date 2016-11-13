@@ -50,7 +50,7 @@ use "sendence/bytes"
 use "sendence/fix"
 use "sendence/new-fix"
 use "sendence/hub"
-use "sendence/epoch"
+use "sendence/wall-clock"
 use "wallaroo"
 use "wallaroo/metrics"
 use "wallaroo/tcp-source"
@@ -234,7 +234,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     // @printf[I32]("!!CheckOrder\n".cstring())
     if state.should_reject_trades then
       let res = OrderResult(msg, state.last_bid, state.last_offer,
-        Epoch.nanoseconds())
+        Time.nanos())
       (res, None)
     else
       (None, None)

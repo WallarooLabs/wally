@@ -5,7 +5,7 @@ use "net"
 use "time"
 use "sendence/guid"
 use "sendence/queue"
-use "sendence/epoch"
+use "sendence/wall-clock"
 use "wallaroo/backpressure"
 use "wallaroo/fail"
 use "wallaroo/invariant"
@@ -177,7 +177,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       end
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
-        seq_id, _wb, _auth, Epoch.nanoseconds(),
+        seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)
       //_queue.enqueue(outgoing_msg)
 
