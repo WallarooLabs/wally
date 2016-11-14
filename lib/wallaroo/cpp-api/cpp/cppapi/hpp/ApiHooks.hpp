@@ -79,8 +79,8 @@ extern wallaroo::StateChange *w_state_change_get_state_change_object(void *state
 extern void *w_stateful_computation_get_return(void *state_change_repository_helper_, wallaroo::Data* data_, void *state_change_);
 
 extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_);
-extern uint64_t w_managed_object_hash(wallaroo::ManagedObject const *obj_);
-extern uint64_t w_managed_object_partition_index(wallaroo::ManagedObject const *obj_);
+extern uint64_t w_hashable_hash(wallaroo::Hashable const *obj_);
+extern uint64_t w_hashable_partition_index(wallaroo::Hashable const *obj_);
 
 }
 
