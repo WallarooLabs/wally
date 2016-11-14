@@ -387,7 +387,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     _distributable_credits = _distributable_credits - give_out
 
   fun _lowest_route_credit_level(): ISize =>
-    var lowest: ISize = 0
+    var lowest: ISize = ISize.max_value()
 
     for route in _routes.values() do
       if route.credits() < lowest then
@@ -397,13 +397,13 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
 
     lowest
 
-primitive StepRouteCallbackHandler is RouteCallbackHandler
+class StepRouteCallbackHandler is RouteCallbackHandler
   fun shutdown(producer: CreditFlowProducer ref) =>
     // TODO: CREDITFLOW - What is our error handling?
     None
 
-  fun credits_replenished(producer: CreditFlowProducer ref) =>
+  fun ref credits_replenished(producer: CreditFlowProducer ref) =>
     None
 
-  fun credits_exhausted(producer: CreditFlowProducer ref) =>
+  fun ref credits_exhausted(producer: CreditFlowProducer ref) =>
     None

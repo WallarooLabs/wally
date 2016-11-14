@@ -18,10 +18,10 @@ trait tag CreditFlowProducer // TODO: find better name now the we have route_id
     
 type CreditFlowProducerConsumer is (CreditFlowProducer & CreditFlowConsumer)
 
-trait val RouteCallbackHandler
+trait RouteCallbackHandler
   fun shutdown(p: CreditFlowProducer ref)
-  fun credits_replenished(p: CreditFlowProducer ref)
-  fun credits_exhausted(p: CreditFlowProducer ref)
+  fun ref credits_replenished(p: CreditFlowProducer ref)
+  fun ref credits_exhausted(p: CreditFlowProducer ref)
 
 trait RouteBuilder
   fun apply(step: CreditFlowProducer ref, consumer: CreditFlowConsumerStep,

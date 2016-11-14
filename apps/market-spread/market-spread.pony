@@ -247,7 +247,7 @@ class OrderResult
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
-    // @printf[I32]((r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
+    // @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
     //Header (size == 55 bytes)
     let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
     wb.u32_be(msgs_size.u32())
