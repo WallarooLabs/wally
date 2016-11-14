@@ -19,22 +19,10 @@
  *
  * Copyright (c) 2016 Sendence LLC All rights reserved.
  */
-
-
-#ifndef __SERIALIZABLE_HPP__
-#define __SERIALIZABLE_HPP__
-
-#include <cstddef>
 #include "Hashable.hpp"
 
 namespace wallaroo
 {
-class Serializable: public Hashable
-{
-public:
-  virtual void deserialize (char* bytes) {}
-  virtual void serialize (char* bytes, size_t nsz_) {}
-  virtual size_t serialize_get_size () { return 0; }
-};
+uint64_t Hashable::hash() const { return (uint64_t) this; };
+uint64_t Hashable::partition_index() const { return 0; };
 }
-#endif // __SERIALIZABLE_HPP__

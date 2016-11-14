@@ -32,8 +32,6 @@ class ManagedObject: public Serializable
 {
 public:
   virtual ~ManagedObject();
-  virtual uint64_t hash() const;
-  virtual uint64_t partition_index() const;
 };
 }
 

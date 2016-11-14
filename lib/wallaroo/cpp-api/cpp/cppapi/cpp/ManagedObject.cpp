@@ -24,6 +24,4 @@
 namespace wallaroo
 {
 ManagedObject::~ManagedObject() {}
-uint64_t ManagedObject::hash() const { return (uint64_t) this; };
-uint64_t ManagedObject::partition_index() const { return 0; };
 }
