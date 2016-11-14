@@ -121,9 +121,10 @@ actor Startup
         c_host, c_service, d_host, d_service, ph_host, ph_service, 
         metrics_conn, is_initializer)
 
+      let local_topology_file = "/tmp/" + worker_name + ".local-topology"
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
         worker_count, env, auth, connections, metrics_conn, is_initializer, 
-        alfred)
+        alfred, local_topology_file)
 
       if is_initializer then
         env.out.print("Running as Initializer...")
