@@ -36,17 +36,21 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}")
 message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
 set(HEADER_FILES
-	hpp/Logger.hpp
-	hpp/Buffers.hpp
 	hpp/ApiHooks.hpp
-	hpp/ApiObject.hpp
-	hpp/WallarooVersion.hpp
-        hpp/ApiUser.hpp
+	hpp/Buffers.hpp
         hpp/Computation.hpp
-        hpp/State.hpp
-        hpp/StateChange.hpp
-        hpp/StateChangeRepository.hpp
-        hpp/StateChangeBuilder.hpp
+	hpp/Data.hpp
+	hpp/Logger.hpp
+	hpp/ManagedObject.hpp
+	hpp/Serializable.hpp
+	hpp/SinkEncoder.hpp
+	hpp/SourceDecoder.hpp
+	hpp/StateChangeBuilder.hpp
+	hpp/StateChange.hpp
+	hpp/StateChangeRepository.hpp
+	hpp/State.hpp
+	hpp/UserHooks.hpp
+	hpp/WallarooVersion.hpp
 )
 
 
@@ -68,10 +72,13 @@ message("Inside sibdir, include dir: ${PROJECT_SOURCE_DIR}/cppapi/hpp")
 include_directories("${PROJECT_SOURCE_DIR}/cppapi/hpp")
 include_directories("hpp")
 
-# add_executable(testapi ${SOURCE_FILES} cpp/tester.cpp)
 add_library(wallaroo-static STATIC ${SOURCE_FILES})
 set_target_properties(wallaroo-static PROPERTIES OUTPUT_NAME "wallaroo")
 set_target_properties(wallaroo-static PROPERTIES PREFIX "lib")
+
+add_library(wallaroo-shared SHARED ${SOURCE_FILES})
+set_target_properties(wallaroo-shared PROPERTIES OUTPUT_NAME "wallaroo")
+set_target_properties(wallaroo-shared PROPERTIES PREFIX "lib")
 
 include (InstallRequiredSystemLibraries)
 set (CPACK_PACKAGE_VERSION_MAJOR "${WallarooCppApi_VERSION_MAJOR}")
