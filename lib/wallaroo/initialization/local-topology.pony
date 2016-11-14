@@ -1,6 +1,9 @@
 use "net"
 use "collections"
 use "promises"
+use "serialise"
+use "files"
+use "buffered"
 use "sendence/dag"
 use "sendence/guid"
 use "sendence/queue"
@@ -76,10 +79,11 @@ actor LocalTopologyInitializer
     recover Map[String, OutgoingBoundary] end
   var _topology: (LocalTopology val | None) = None
   let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
+  let _local_topology_file: String
 
   new create(worker_name: String, worker_count: USize, env: Env, 
     auth: AmbientAuth, connections: Connections, metrics_conn: TCPConnection,
-    is_initializer: Bool, alfred: Alfred tag)
+    is_initializer: Bool, alfred: Alfred tag, local_topology_file: String)
   =>
     _worker_name = worker_name
     _worker_count = worker_count
@@ -89,6 +93,7 @@ actor LocalTopologyInitializer
     _metrics_conn = metrics_conn
     _is_initializer = is_initializer
     _alfred = alfred
+    _local_topology_file = local_topology_file
 
   be update_topology(t: LocalTopology val) =>
     _topology = t
@@ -133,13 +138,45 @@ actor LocalTopologyInitializer
         @printf[I32]("Outgoing boundaries not set up!\n".cstring())
         error
       end
-
-      // TODO: Check if we are recovering (have a saved LocalTopology)
-      // and if so read and load it
+      
+      ifdef "resilience" then
+        try
+          let local_topology_file = FilePath(_auth, _local_topology_file)
+          if local_topology_file.exists() then
+            //we are recovering an existing worker topology
+            let data = recover val
+              let file = File(local_topology_file)
+              file.read(file.size())
+            end
+            match Serialised.input(InputSerialisedAuth(_auth), data)(
+              DeserialiseAuth(_auth))
+            | let t: LocalTopology val => 
+              _topology = t
+            else
+              @printf[I32]("error restoring previous topology!".cstring())
+            end
+          end
+        else
+          @printf[I32]("error restoring previous topology!".cstring())
+        end
+      end
 
       match _topology
       | let t: LocalTopology val =>
-        // TODO: Write LocalTopology (t) to disk
+        ifdef "resilience" then
+          try
+            let local_topology_file = FilePath(_auth, _local_topology_file)
+            let file = File(local_topology_file)
+            let wb = Writer
+            let serialised_topology: Array[U8] val =
+              Serialised(SerialiseAuth(_auth), _topology).output(
+                OutputSerialisedAuth(_auth))
+            wb.write(serialised_topology)
+            file.writev(recover val wb.done() end)
+          else
+            @printf[I32]("error saving topology!".cstring())
+          end
+        end
 
         if t.is_empty() then
           @printf[I32]("----This worker has no steps----\n".cstring())
