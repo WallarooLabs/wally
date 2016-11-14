@@ -78,9 +78,22 @@ primitive AccumulatorStateBuilder
     Debug("Building state")
     CPPState(CPPManagedObject(@get_state()))
 
+primitive SimplePartitionFunction
+  fun apply(input: CPPData val): U64
+  =>
+    input.partition_index()
+
+class LegalSymbols
+  let symbols: Array[U64] val
+
+  new create() =>
+    symbols = recover [0] end
+
 actor Main
   new create(env: Env) =>
     try
+      let cpp_data_partition = Partition[CPPData val, U64](
+        SimplePartitionFunction, LegalSymbols.symbols)
       let application = recover val
         Application("Passthrough Topology")
           .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end
@@ -88,12 +101,13 @@ actor Main
           // .to_stateful[CPPData val, CPPState](
           //   StateComputationFactory(),
           //   AccumulatorStateBuilder, "accumulator-builder")
-          // .to_stateful[CPPData val, CPPState](
-          //   DummyComputationFactory(),
-          //   AccumulatorStateBuilder, "accumulator-builder")
+          .to_state_partition[CPPData val, U64, CPPData val, CPPState](
+            DummyComputationFactory(),
+            AccumulatorStateBuilder, "accumulator-builder", cpp_data_partition)
           .to[CPPData val](ComputationFactory0)
           .to[CPPData val](ComputationFactory1)
           .to[CPPData val](ComputationFactory2)
+          //.to_state_partition[CPPData val](ComputationFactory1)
           .to_sink(recover CPPSinkEncoder(recover CPPManagedObject(@get_sink_encoder()) end) end, recover [0] end)
       end
       Startup(env, application, None)
