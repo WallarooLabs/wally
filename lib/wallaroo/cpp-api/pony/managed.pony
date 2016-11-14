@@ -1,6 +1,6 @@
 use @w_managed_object_delete[None](obj: ManagedObjectP)
-use @w_managed_object_hash[U64](obj: ManagedObjectP)
-use @w_managed_object_partition_index[U64](obj: ManagedObjectP)
+use @w_hashable_hash[U64](obj: ManagedObjectP)
+use @w_hashable_partition_index[U64](obj: ManagedObjectP)
 
 type ManagedObjectP is Pointer[U8] val
 
