@@ -14,6 +14,13 @@ actor Startup
   new create(env: Env, application: Application val, 
     event_log_file: (String val | None)) 
   =>
+    ifdef "use_backpressure" then
+      env.out.print("**BACKPRESSURE is active**")
+    end
+    ifdef "resilience" then
+      env.out.print("**RESILIENCE is active**")
+    end
+
     var m_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
     var c_arg: (Array[String] | None) = None
