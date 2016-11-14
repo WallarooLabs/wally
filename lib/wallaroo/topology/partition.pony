@@ -179,6 +179,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
               runner_builder.route_builder(), alfred,
               DirectRouter(s))
             m(id) = next_step
+
             routes(key) = next_step
             partition_count = partition_count + 1
           else
@@ -187,6 +188,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
         else
           try
             let boundary = outgoing_boundaries(pa.worker)
+
             routes(key) = ProxyRouter(worker_name, boundary,
               pa, auth)
           else

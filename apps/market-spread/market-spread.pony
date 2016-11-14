@@ -272,7 +272,27 @@ class LegalSymbols
   let symbols: Array[String] val
 
   new create() =>
-    symbols = recover      
+    let padded: Array[String] trn = recover Array[String] end
+    for symbol in RawSymbols().values() do 
+      padded.push(RawSymbols.pad_symbol(symbol))
+    end
+    symbols = consume padded
+
+primitive RawSymbols
+  fun pad_symbol(s: String): String =>
+    if s.size() == 4 then
+      s
+    else
+      let diff = 4 - s.size()
+      var padded = s
+      for i in Range(0, diff) do
+        padded = " " + padded
+      end
+      padded
+    end   
+
+  fun apply(): Array[String] val =>
+    recover      
       [
 "AA",
 "BAC",
