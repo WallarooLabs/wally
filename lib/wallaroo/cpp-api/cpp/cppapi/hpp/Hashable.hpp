@@ -21,20 +21,18 @@
  */
 
 
-#ifndef __SERIALIZABLE_HPP__
-#define __SERIALIZABLE_HPP__
+#ifndef __HASHABLE_HPP__
+#define __HASHABLE_HPP__
 
-#include <cstddef>
-#include "Hashable.hpp"
+#include <cstdint>
 
 namespace wallaroo
 {
-class Serializable: public Hashable
+class Hashable
 {
 public:
-  virtual void deserialize (char* bytes) {}
-  virtual void serialize (char* bytes, size_t nsz_) {}
-  virtual size_t serialize_get_size () { return 0; }
+  virtual uint64_t hash() const;
+  virtual uint64_t partition_index() const;
 };
 }
-#endif // __SERIALIZABLE_HPP__
+#endif // __HASHABLE_HPP__
