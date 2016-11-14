@@ -163,7 +163,6 @@ actor LocalTopologyInitializer
 
       match _topology
       | let t: LocalTopology val =>
-        // TODO: Write LocalTopology (t) to disk
         ifdef "resilience" then
           try
             let local_topology_file = FilePath(_auth, _local_topology_file)
