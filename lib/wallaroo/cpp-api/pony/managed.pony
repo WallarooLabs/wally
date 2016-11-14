@@ -23,3 +23,13 @@ class CPPManagedObject
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
     _obj = @w_user_serializable_deserialize(bytes, USize(0))
 
+  //TODO: Pass-through to cpp with a helper
+  fun hash(): U64 =>
+    _obj.usize().u64()
+
+  fun eq(other: CPPManagedObject): Bool =>
+    _obj.hash() == other.hash()
+
+  //TODO: Pass-through to cpp with a helper
+  fun partition_index(): U64 =>
+    0
