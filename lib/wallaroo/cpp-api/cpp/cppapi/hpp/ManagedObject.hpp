@@ -23,6 +23,7 @@
 #ifndef __MANAGED_OBJECT_HPP__
 #define __MANAGED_OBJECT_HPP__
 
+#include <cstdint>
 #include "Serializable.hpp"
 
 namespace wallaroo
@@ -31,6 +32,8 @@ class ManagedObject: public Serializable
 {
 public:
   virtual ~ManagedObject();
+  virtual uint64_t hash() const;
+  virtual uint64_t partition_index() const;
 };
 }
 
