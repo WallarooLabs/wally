@@ -179,4 +179,14 @@ extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_)
   delete obj_;
 }
 
+extern uint64_t w_managed_object_hash(wallaroo::ManagedObject const *obj_)
+{
+  return obj_->hash();
+}
+
+extern uint64_t w_managed_object_partition_index(wallaroo::ManagedObject const *obj_)
+{
+  return obj_->partition_index();
+}
+
 }
