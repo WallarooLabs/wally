@@ -239,7 +239,8 @@ class BoundaryRoute is Route
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
   var _seq_id: U64 = 0
-  embed _queue: Queue[ReplayableDeliveryMsg val] = _queue.create()
+  embed _queue: Queue[ReplayableDeliveryMsg val] = 
+    Queue[ReplayableDeliveryMsg val](500_000)
 
   new create(step: CreditFlowProducer ref, consumer: OutgoingBoundary,
     handler: RouteCallbackHandler)
