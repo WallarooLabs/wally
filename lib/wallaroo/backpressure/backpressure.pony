@@ -85,8 +85,7 @@ class TypedRoute[In: Any val] is Route
   var _seq_id: U64 = 0
   // (metric_name, source_ts, input, origin, msg_uid,
   // frac_ids, outgoing_seq_id)
-  let _queue: Array[(String, U64, In, Origin tag, U128, None, U64)] = 
-    Array[(String, U64, In, Origin tag, U128, None, U64)](500_000) 
+  let _queue: Array[(String, U64, In, Origin tag, U128, None, U64)]
 
   new create(step: CreditFlowProducer ref, consumer: CreditFlowConsumerStep,
     handler: RouteCallbackHandler)
@@ -95,6 +94,12 @@ class TypedRoute[In: Any val] is Route
     _consumer = consumer
     _callback = handler
     _consumer.register_producer(_step)
+    let q_size: USize = ifdef "use_backpressure" then
+        500_000
+      else
+        0
+      end
+    _queue = Array[(String, U64, In, Origin tag, U128, None, U64)](q_size)
 
   fun ref initialize() =>
     None
@@ -239,8 +244,7 @@ class BoundaryRoute is Route
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
   var _seq_id: U64 = 0
-  let _queue: Queue[ReplayableDeliveryMsg val] = 
-    Queue[ReplayableDeliveryMsg val](500_000)
+  let _queue: Queue[ReplayableDeliveryMsg val]
 
   new create(step: CreditFlowProducer ref, consumer: OutgoingBoundary,
     handler: RouteCallbackHandler)
@@ -249,6 +253,12 @@ class BoundaryRoute is Route
     _consumer = consumer
     _callback = handler
     _consumer.register_producer(_step)
+    let q_size: USize = ifdef "use_backpressure" then
+        500_000
+      else
+        0
+      end
+    _queue = Queue[ReplayableDeliveryMsg val](q_size)
 
   fun ref initialize() =>
     None
