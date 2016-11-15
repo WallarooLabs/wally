@@ -5,7 +5,8 @@ use "wallaroo/resilience"
 
 interface SourceBuilder
   fun name(): String
-  fun apply(alfred: Alfred tag): TCPSourceNotify iso^
+  fun apply(alfred: Alfred tag, target_router: Router val): 
+    TCPSourceNotify iso^
 
 class _SourceBuilder[In: Any val]
   let _app_name: String
@@ -29,11 +30,13 @@ class _SourceBuilder[In: Any val]
 
   fun name(): String => _name
 
-  fun apply(alfred: Alfred tag): TCPSourceNotify iso^ =>
+  fun apply(alfred: Alfred tag, target_router: Router val): 
+    TCPSourceNotify iso^ 
+  =>
     let reporter = MetricsReporter(_app_name, _metrics_conn)
 
     FramedSourceNotify[In](_name, _handler, _runner_builder, _router, 
-      consume reporter, alfred)
+      consume reporter, alfred, target_router)
 
 interface SourceBuilderBuilder
   fun name(): String
@@ -85,10 +88,13 @@ interface TCPSourceListenerNotify
 class SourceListenerNotify is TCPSourceListenerNotify
   let _source_builder: SourceBuilder val
   let _alfred: Alfred tag
+  let _target_router: Router val
 
-  new iso create(builder: SourceBuilder val, alfred: Alfred tag) =>
+  new iso create(builder: SourceBuilder val, alfred: Alfred tag,
+    target_router: Router val) =>
     _source_builder = builder
     _alfred = alfred
+    _target_router = target_router
 
   fun ref listening(listen: TCPSourceListener ref) =>
     @printf[I32]((_source_builder.name() + " source is listening\n").cstring())
@@ -97,7 +103,7 @@ class SourceListenerNotify is TCPSourceListenerNotify
     @printf[I32]((_source_builder.name() + " source is listening\n").cstring())
 
   fun ref connected(listen: TCPSourceListener ref): TCPSourceNotify iso^ =>
-    _source_builder(_alfred)
+    _source_builder(_alfred, _target_router)
 
   // TODO: implement listening and especially not_listening
 

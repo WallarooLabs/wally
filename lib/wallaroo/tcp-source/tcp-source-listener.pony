@@ -27,13 +27,14 @@ actor TCPSourceListener
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
+    target_router: Router val = EmptyRouter, 
     host: String = "", service: String = "0", limit: USize = 0, 
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
     Listens for both IPv4 and IPv6 connections.
     """
-    _notify = SourceListenerNotify(source_builder, alfred)
+    _notify = SourceListenerNotify(source_builder, alfred, target_router)
     _router = router
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
