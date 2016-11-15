@@ -34,4 +34,4 @@ class CPPManagedObject
 
   fun partition_index(): U64 =>
     @w_hashable_partition_index(_obj)
-    0
+    
