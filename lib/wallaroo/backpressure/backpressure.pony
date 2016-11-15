@@ -85,7 +85,7 @@ class TypedRoute[In: Any val] is Route
   var _seq_id: U64 = 0
   // (metric_name, source_ts, input, origin, msg_uid,
   // frac_ids, outgoing_seq_id)
-  embed _queue: Array[(String, U64, In, Origin tag, U128, None, U64)] = 
+  let _queue: Array[(String, U64, In, Origin tag, U128, None, U64)] = 
     Array[(String, U64, In, Origin tag, U128, None, U64)](500_000) 
 
   new create(step: CreditFlowProducer ref, consumer: CreditFlowConsumerStep,
@@ -239,7 +239,7 @@ class BoundaryRoute is Route
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
   var _seq_id: U64 = 0
-  embed _queue: Queue[ReplayableDeliveryMsg val] = 
+  let _queue: Queue[ReplayableDeliveryMsg val] = 
     Queue[ReplayableDeliveryMsg val](500_000)
 
   new create(step: CreditFlowProducer ref, consumer: OutgoingBoundary,
