@@ -25,28 +25,31 @@ interface Runner
     o_seq_id: U64): Bool
 
   fun name(): String
+  fun state_name(): String
 
 trait ReplayableRunner
   fun ref replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val, 
     origin: Origin tag)
   fun ref set_origin_id(id: U128)
 
-interface RunnerBuilder
+trait RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None): Runner iso^
 
   fun name(): String
+  fun state_name(): String => ""
   fun is_stateful(): Bool
   fun id(): U128
   fun route_builder(): RouteBuilder val
   fun forward_route_builder(): RouteBuilder val
 
-class RunnerSequenceBuilder
+class RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder val] val
   let _id: U128
   var _forward_route_builder: RouteBuilder val = EmptyRouteBuilder
+  var _state_name: String = ""
 
   new val create(bs: Array[RunnerBuilder val] val) =>
     _runner_builders = bs
@@ -59,6 +62,10 @@ class RunnerSequenceBuilder
     try
       _forward_route_builder = 
         _runner_builders(_runner_builders.size() - 1).forward_route_builder()
+    end
+    try
+      _state_name =
+        _runner_builders(_runner_builders.size() - 1).state_name()
     end
 
   fun apply(metrics_reporter: MetricsReporter iso, 
@@ -91,6 +98,7 @@ class RunnerSequenceBuilder
     end
     n + "|"
 
+  fun state_name(): String => _state_name
   fun is_stateful(): Bool => false
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => 
@@ -101,7 +109,7 @@ class RunnerSequenceBuilder
     end
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
 
-class ComputationRunnerBuilder[In: Any val, Out: Any val]
+class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   let _comp_builder: ComputationBuilder[In, Out] val
   let _id: U128
   let _route_builder: RouteBuilder val
@@ -128,22 +136,27 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val]
     end
 
   fun name(): String => _comp_builder().name()
+  fun state_name(): String => ""
   fun is_stateful(): Bool => false
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
-class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
+class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read] is
+  RunnerBuilder
   let _state_comp: StateComputation[In, Out, State] val
+  let _state_name: String
   let _route_builder: RouteBuilder val
   let _forward_route_builder: RouteBuilder val
   let _id: U128
 
   new val create(state_comp: StateComputation[In, Out, State] val,
+    state_name': String,
     route_builder': RouteBuilder val, 
     forward_route_builder': RouteBuilder val) 
   =>
     _state_comp = state_comp
+    _state_name = state_name'
     _route_builder = route_builder'
     _id = GuidGenerator.u128()
     _forward_route_builder = forward_route_builder'
@@ -155,33 +168,35 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read]
   =>
     match router
     | let r: Router val =>
-      PreStateRunner[In, Out, State](_state_comp, r, consume metrics_reporter)
+      PreStateRunner[In, Out, State](_state_comp, _state_name, r, 
+        consume metrics_reporter)
     else
       @printf[I32]("PreStateRunner should take a Router on build!\n".cstring())
-      PreStateRunner[In, Out, State](_state_comp, EmptyRouter, 
+      PreStateRunner[In, Out, State](_state_comp, _state_name, EmptyRouter, 
         consume metrics_reporter)
     end
 
   fun name(): String => _state_comp.name()
+  fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
 
-class StateRunnerBuilder[State: Any #read]
+class StateRunnerBuilder[State: Any #read] is RunnerBuilder
   let _state_builder: StateBuilder[State] val
-  let _name: String
+  let _state_name: String
   let _state_change_builders: Array[StateChangeBuilder[State] val] val
   let _route_builder: RouteBuilder val
   let _id: U128
 
   new val create(state_builder: StateBuilder[State] val, 
-    name': String, 
+    state_name': String, 
     state_change_builders: Array[StateChangeBuilder[State] val] val,
     route_builder': RouteBuilder val = EmptyRouteBuilder) 
   =>
     _state_builder = state_builder
-    _name = name'
+    _state_name = state_name'
     _state_change_builders = state_change_builders
     _route_builder = route_builder'
     _id = GuidGenerator.u128()
@@ -198,6 +213,7 @@ class StateRunnerBuilder[State: Any #read]
     sr
 
   fun name(): String => _state_builder.name()
+  fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => _route_builder
@@ -215,7 +231,8 @@ trait PartitionBuilder
   fun default_target_name(): String
 
 class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val, 
-  PIn: Any val, State: Any #read, Key: (Hashable val & Equatable[Key])] is PartitionBuilder
+  PIn: Any val, State: Any #read, Key: (Hashable val & Equatable[Key])] is  
+    (PartitionBuilder & RunnerBuilder)
   let _pipeline_name: String
   let _state_name: String
   let _state_comp: StateComputation[In, Out, State] val
@@ -252,10 +269,11 @@ class PartitionedPreStateRunnerBuilder[In: Any val, Out: Any val,
   =>
     match router
     | let r: Router val =>
-      PreStateRunner[In, Out, State](_state_comp, r, consume metrics_reporter)
+      PreStateRunner[In, Out, State](_state_comp, _state_name, r, 
+        consume metrics_reporter)
     else
       @printf[I32]("PreStateRunner should take a Router on build!\n".cstring())
-      PreStateRunner[In, Out, State](_state_comp, EmptyRouter, 
+      PreStateRunner[In, Out, State](_state_comp, _state_name, EmptyRouter, 
         consume metrics_reporter)
     end
 
@@ -378,6 +396,7 @@ class ComputationRunner[In: Any val, Out: Any val]
     is_finished
 
   fun name(): String => _computation.name()
+  fun state_name(): String => ""
 
 class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _metrics_reporter: MetricsReporter
@@ -385,15 +404,18 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _state_comp: StateComputation[In, Out, State] val
   let _name: String
   let _prep_name: String
+  let _state_name: String
 
   new iso create(state_comp: StateComputation[In, Out, State] val,
-    router: Router val, metrics_reporter: MetricsReporter iso) 
+    state_name': String, router: Router val, 
+    metrics_reporter: MetricsReporter iso) 
   =>
     _metrics_reporter = consume metrics_reporter
     _output_router = router
     _state_comp = state_comp
     _name = _state_comp.name()
     _prep_name = _name + " prep"
+    _state_name = state_name'
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,    producer: (CreditFlowProducer ref | None), router: Router val,
     // incoming envelope
@@ -432,6 +454,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     is_finished
 
   fun name(): String => _name
+  fun state_name(): String => _state_name
 
 class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   let _state: State
@@ -529,6 +552,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     None
 
   fun name(): String => "State runner"
+  fun state_name(): String => ""
 
 class iso RouterRunner
   fun ref run[Out: Any val](metric_name: String, source_ts: U64, output: Out,
@@ -552,4 +576,5 @@ class iso RouterRunner
     end
 
   fun name(): String => "Router runner"
+  fun state_name(): String => ""
 

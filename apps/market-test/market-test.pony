@@ -197,7 +197,7 @@ actor Main
         String](state_addresses, SymbolPartitionFunction)
 
       let nbbo_runner_builder = PreStateRunnerBuilder[FixNbboMessage val, None,
-        SymbolData](UpdateNbbo,
+        SymbolData](UpdateNbbo, "symbol-data",
           TypedRouteBuilder[StateProcessor[SymbolData] val],
           TypedRouteBuilder[None])
 
@@ -223,7 +223,7 @@ actor Main
       let orders_partition_router = StateAddressesRouter[FixOrderMessage val, 
         String](state_addresses, SymbolPartitionFunction)
 
-      let orders_runner_builder = PreStateRunnerBuilder[FixOrderMessage val, OrderResult val, SymbolData](CheckOrder,
+      let orders_runner_builder = PreStateRunnerBuilder[FixOrderMessage val, OrderResult val, SymbolData](CheckOrder, "symbol-data",
           TypedRouteBuilder[StateProcessor[SymbolData] val],
           TypedRouteBuilder[OrderResult val]) 
 

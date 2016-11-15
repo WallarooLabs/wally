@@ -14,6 +14,7 @@ type StepInitializer is (StepBuilder | PartitionedPreStateStepBuilder |
 class StepBuilder
   let _app_name: String
   let _pipeline_name: String
+  let _state_name: String
   let _runner_builder: RunnerBuilder val
   let _id: U128
   let _pre_state_target_id: (U128 | None)
@@ -28,12 +29,14 @@ class StepBuilder
     _app_name = app_name
     _pipeline_name = pipeline_name'
     _runner_builder = r
+    _state_name = _runner_builder.state_name()
     _id = id'
     _is_stateful = is_stateful'
     _pre_state_target_id = pre_state_target_id'
     _forward_route_builder = forward_route_builder'
 
   fun name(): String => _runner_builder.name()
+  fun state_name(): String => _state_name
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
   fun pre_state_target_id(): (U128 | None) => _pre_state_target_id
@@ -111,6 +114,7 @@ class SourceData
   let _id: U128
   let _pipeline_name: String
   let _name: String
+  let _state_name: String
   let _builder: SourceBuilderBuilder val
   let _runner_builder: RunnerBuilder val
   let _route_builder: RouteBuilder val
@@ -126,6 +130,7 @@ class SourceData
     _name = "| " + _pipeline_name + " source | " + r.name() + "|"
     _builder = b
     _runner_builder = r
+    _state_name = _runner_builder.state_name()
     _route_builder = 
       match _runner_builder.route_builder()
       | let e: EmptyRouteBuilder val =>
@@ -142,6 +147,7 @@ class SourceData
   fun address(): Array[String] val => _address
 
   fun name(): String => _name
+  fun state_name(): String => _state_name
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
   fun pre_state_target_id(): (U128 | None) => _pre_state_target_id
@@ -174,6 +180,7 @@ class EgressBuilder
     _sink_builder = sink_builder
 
   fun name(): String => _name
+  fun state_name(): String => ""
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
   fun pre_state_target_id(): (U128 | None) => None

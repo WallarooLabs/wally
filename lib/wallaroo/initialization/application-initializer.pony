@@ -149,14 +149,16 @@ actor ApplicationInitializer
               error
             end
           if r_builder.is_stateful() then
-            if latest_runner_builders.size() > 0 then
+            if handled_source_runners then
+              latest_runner_builders.push(r_builder)
               let seq_builder = RunnerSequenceBuilder(
                 latest_runner_builders = recover Array[RunnerBuilder val] end
                 )
               runner_builders.push(seq_builder)
+            else
+              source_runner_builders.push(r_builder)
+              handled_source_runners = true
             end
-            runner_builders.push(r_builder)
-            handled_source_runners = true
           elseif not pipeline.is_coalesced() then
             if handled_source_runners then
               runner_builders.push(r_builder)

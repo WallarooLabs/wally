@@ -56,6 +56,7 @@ class Application
       recover Array[RunnerBuilder val] end
 
     let pre_state_builder = PreStateRunnerBuilder[In, Out, State](s_comp,
+      state_name,
       TypedRouteBuilder[StateProcessor[State] val],
       TypedRouteBuilder[Out])
     builders.push(pre_state_builder)
@@ -184,12 +185,17 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     step_id_map(0) = guid_gen.u128()
 
-    let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, Last, 
-      State, U8](_p.name(), state_name, s_comp, consume step_id_map, 
-        single_step_partition,
-        TypedRouteBuilder[StateProcessor[State] val],
-        TypedRouteBuilder[Next]
-        where multi_worker = false)
+
+    let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp,
+      state_name, TypedRouteBuilder[StateProcessor[State] val],
+      TypedRouteBuilder[Next])
+
+    // let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, Last, 
+    //   State, U8](_p.name(), state_name, s_comp, consume step_id_map, 
+    //     single_step_partition,
+    //     TypedRouteBuilder[StateProcessor[State] val],
+    //     TypedRouteBuilder[Next]
+    //     where multi_worker = false)
     _p.add_runner_builder(next_builder)
 
     let state_partition = KeyedStateSubpartition[U8](
@@ -203,6 +209,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     PipelineBuilder[In, Out, Next](_a, _p)
 
     // let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp,
+    //   state_name,
     //   TypedRouteBuilder[StateProcessor[State] val],
     //   TypedRouteBuilder[Next])
     // _p.add_runner_builder(next_builder)
@@ -235,12 +242,10 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       end
     end
 
-    let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, PIn, State,
-      Key](_p.name(), state_name, s_comp, consume step_id_map, partition,
-        TypedRouteBuilder[StateProcessor[State] val],
-        TypedRouteBuilder[Next]
-        where multi_worker = multi_worker, default_target_name' = 
-        default_target_name)
+    let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp,
+      state_name, TypedRouteBuilder[StateProcessor[State] val],
+      TypedRouteBuilder[Next])
+
     _p.add_runner_builder(next_builder)
 
     let state_partition = KeyedStateSubpartition[Key](partition.keys(),
