@@ -36,7 +36,19 @@ in
   with pkgs;
   with beamPackages;
 
-  let ponyc-lto = ponyc.override { lto = true; llvm = llvm_38; };
+### compilers available ###
+#        gcc49
+#        gcc5
+#        gcc6
+#        clang_37
+#        clang_38
+#        clang_39
+### llvm versions available ###
+#        llvm_37
+#        llvm_38
+#        llvm_39
+#
+  let ponyc-lto = ponyc.override { lto = true; llvm = llvm_38; /* cc = clang39; */ };
       sendence-ponyc = stdenv.lib.overrideDerivation ponyc-lto (oldAttrs: rec {
       name = "sendence-ponyc-${version}";
       version = "sendence-13.4.1";
