@@ -5,6 +5,11 @@
 #include "State.hpp"
 #include <cstdint>
 #include <cstddef>
+#include <string>
+using std::string;
+
+
+
 
 namespace wallaroo
 {
