@@ -96,14 +96,14 @@ docker run -d -u root --cpuset-cpus 0,18 --privileged \
 docker.sendence.com:5043/wallaroo-market-spread-reports-ui:latest
 ```
 
-###Running Market Spread Jr
+###Running Market Spread
 
 You'll need to clone the repo:
 ```
 git clone https://github.com/sendence/buffy.git
 ```
 
-To build Market Spread Jr:
+To build Market Spread:
 ```
 make arch=amd64 build-apps-market-spread
 ```
@@ -117,6 +117,8 @@ make arch=amd64 build-giles-sender
 to run the Market Spread application you must be in it's directory.
 
 ####SINGLE WORKER market spread:
+
+#####350 Symbols:
 ```
 sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
 ```
@@ -149,9 +151,42 @@ To run the Orders Sender:
 sudo cset proc -s user -e numactl -- -C 10,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 50000000 -s 300 -i 5_000_000 -f ~/buffy/demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
 ```
 
+#####R3K Symbols:
+```
+sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
+```
+
+To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+```
+sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/r3k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+```
+
+To run the Orders Sender:
+```
+sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 50000000 -s 300 -i 5_000_000 -f ~/buffy/demos/marketspread/r3k-orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
+```
+
+
+####2 WORKER market spread (in order)
+```
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 -d 127.0.0.1:12501 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -w 2 -t
+
+sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 -d 127.0.0.1:12501 --ponythreads 4 --ponypinasio --ponynoblock -w 2 -n worker2
+```
+
+To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+```
+sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+```
+
+To run the Orders Sender:
+```
+sudo cset proc -s user -e numactl -- -C 10,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 50000000 -s 300 -i 5_000_000 -f ~/buffy/demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
+```
+
 ###Packet
 
-to run the Market Spread Jr application you must be in it's directory:
+to run the Market Spread application you must be in it's directory:
 
 ```
 sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -e 150000000 --ponythreads 4 --ponypinasio
