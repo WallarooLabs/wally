@@ -9,17 +9,20 @@ nc -l 127.0.0.1 5555 >> /dev/null
 nc -l 127.0.0.1 5001 >> /dev/null
 
 3a) market spread app (1 worker):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n node-name --ponythreads=4 --ponynoblock
+./market-test -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n node-name --ponythreads=4 --ponynoblock
 
 3b) market spread app (2 workers):
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n node-name --ponythreads=4 --ponynoblock -t -w 2
+./market-test -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n node-name --ponythreads=4 --ponynoblock -t -w 2
 
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n worker2 --ponythreads=4 --ponynoblock -w 2
+./market-test -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n worker2 --ponythreads=4 --ponynoblock -w 2
 
-4) orders:
+4) initial nbbo data:
+giles/sender/sender -b 127.0.0.1:7000 -m 1000 -s 300 -i 2_500_000 -f demos/marketspread/initial-nbbo-fixish.msg --ponythreads=1 -y -g 46 -w
+
+5) orders:
 giles/sender/sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
 
-5) nbbo:
+6) nbbo:
 giles/sender/sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 """
 use "collections"
@@ -172,6 +175,8 @@ actor Main
         o_addr(1), 
         initial_report_msgs)
 
+      let sink_router = DirectRouter(sink)
+
 
       // STATE PARTITION
 
@@ -185,25 +190,27 @@ actor Main
       let state_addresses = state_subpartition.build("Market Spread App",
         metrics_conn, alfred)
 
-      let state_partition_router = StateAddressesRouter[Symboly val, String](
-        state_addresses, SymbolPartitionFunction)
 
       // NBBO SOURCE
+
+      let nbbo_partition_router = StateAddressesRouter[FixNbboMessage val,
+        String](state_addresses, SymbolPartitionFunction)
 
       let nbbo_runner_builder = PreStateRunnerBuilder[FixNbboMessage val, None,
         SymbolData](UpdateNbbo,
           TypedRouteBuilder[StateProcessor[SymbolData] val],
           TypedRouteBuilder[None])
 
-      let nbbo_route_builder = TypedRouteBuilder[UpdateNbbo val]
+      let nbbo_route_builder = 
+        TypedRouteBuilder[StateProcessor[SymbolData] val]
 
       let nbbo_s_s_builder = TypedSourceBuilderBuilder[FixNbboMessage val](
         "Market Spread App", "NBBO Source", FixNbboFrameHandler)
 
       TCPSourceListener(
         nbbo_s_s_builder(nbbo_runner_builder, 
-          state_partition_router, metrics_conn),
-        state_partition_router,
+          nbbo_partition_router, metrics_conn),
+        nbbo_partition_router,
         nbbo_route_builder,
         recover Map[String, OutgoingBoundary] end,
         alfred, None, EmptyRouter,
@@ -213,24 +220,32 @@ actor Main
 
       // ORDERS SOURCE
 
+      let orders_partition_router = StateAddressesRouter[FixOrderMessage val, 
+        String](state_addresses, SymbolPartitionFunction)
+
       let orders_runner_builder = PreStateRunnerBuilder[FixOrderMessage val, OrderResult val, SymbolData](CheckOrder,
           TypedRouteBuilder[StateProcessor[SymbolData] val],
           TypedRouteBuilder[OrderResult val]) 
 
-      let orders_route_builder = TypedRouteBuilder[CheckOrder val]
+      let orders_route_builder = 
+        TypedRouteBuilder[StateProcessor[SymbolData] val]
 
       let orders_s_s_builder = TypedSourceBuilderBuilder[FixOrderMessage val](
         "Market Spread App", "Orders Source", FixOrderFrameHandler)
 
       TCPSourceListener(
         orders_s_s_builder(orders_runner_builder, 
-          state_partition_router, metrics_conn),
-        state_partition_router,
+          orders_partition_router, metrics_conn),
+        orders_partition_router,
         orders_route_builder,
         recover Map[String, OutgoingBoundary] end,
-        alfred, None, DirectRouter(sink),
+        alfred, None, sink_router,
         input_addrs(1)(0), 
         input_addrs(1)(1))
+
+      // Register leftover routes
+
+      state_addresses.register_routes(sink_router, TypedRouteBuilder[OrderResult val])
     end
 
 
@@ -455,7 +470,7 @@ class OrderResult
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
-    // @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
+    @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
     //Header (size == 55 bytes)
     let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
     wb.u32_be(msgs_size.u32())

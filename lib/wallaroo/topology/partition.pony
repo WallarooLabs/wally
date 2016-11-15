@@ -95,6 +95,11 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
 
     consume ss
 
+  fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
+    for s in _addresses.values() do
+      s.register_routes(router, route_builder)
+    end
+
 trait StateSubpartition
   fun build(app_name: String, metrics_conn: TCPConnection, alfred: Alfred): 
     StateAddresses val
