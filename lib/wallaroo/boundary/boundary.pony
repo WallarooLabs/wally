@@ -17,8 +17,8 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
 class OutgoingBoundaryBuilder
-  fun apply(auth: AmbientAuth, worker_name: String,  
-    reporter: MetricsReporter iso, host: String, service: String): 
+  fun apply(auth: AmbientAuth, worker_name: String,
+    reporter: MetricsReporter iso, host: String, service: String):
       OutgoingBoundary
   =>
     OutgoingBoundary(auth, worker_name, consume reporter, host,
@@ -61,12 +61,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   let _host: String
   let _service: String
   let _from: String
-  let _queue: Queue[Array[ByteSeq] val] = _queue.create()
+  let _queue: Queue[Array[ByteSeq] val] = _queue.create(500_000)
   var _lowest_queue_id: U64 = 0
   var _seq_id: U64 = 0
 
   new create(auth: AmbientAuth, worker_name: String,
-    metrics_reporter: MetricsReporter iso, host: String, service: String, 
+    metrics_reporter: MetricsReporter iso, host: String, service: String,
     from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -89,14 +89,16 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       from.cstring())
     _notify_connecting()
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) =>
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val) 
+  =>
     try
       if _step_id == 0 then
         @printf[I32]("Never registered step id for OutgoingBoundary!\n".cstring())
         error
       end
 
-      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id, 
+      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
         _auth)
       writev(connect_msg)
     else
@@ -108,13 +110,13 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+    frac_ids: None, seq_id: U64, route_id: U64)
   =>
     @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
+    frac_ids: None, incoming_seq_id: U64, route_id: U64)
   =>
     @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
 
@@ -122,8 +124,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   be forward(delivery_msg: ReplayableDeliveryMsg val)
   =>
     try
-      let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg, 
-        _seq_id, _auth)
+      let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
+        _seq_id, _wb, _auth)
       _queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
@@ -136,11 +138,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   be ack(seq_id: U64) =>
     if seq_id > _lowest_queue_id then
-      let flush_count = seq_id - _lowest_queue_id
-      for i in Range(0, flush_count.usize()) do
-        try _queue.dequeue() end
-        _lowest_queue_id = _lowest_queue_id + 1
-      end
+      let flush_count: USize = (seq_id - _lowest_queue_id).usize()
+      _queue.clear_n(flush_count)
+      // _queue.clear()
+      _lowest_queue_id = _lowest_queue_id + flush_count.u64()
     end
 
   be replay_msgs() =>

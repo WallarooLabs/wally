@@ -18,6 +18,10 @@ class Application
     _state_builders.create()
   // Map from source id to filename
   let init_files: Map[USize, InitFile val] = init_files.create()
+  // TODO: Replace this default strategy with a better one after POC
+  var default_target: (Array[RunnerBuilder val] val | None) = None
+  var default_target_name: String = ""
+  var default_target_id: U128 = 0
 
   new create(name': String) =>
     _name = name'
@@ -35,6 +39,35 @@ class Application
     let pipeline = Pipeline[In, Out](_name, pipeline_id, pipeline_name, 
       decoder, coalescing)
     PipelineBuilder[In, Out, In](this, pipeline)
+
+  // TODO: Replace this with a better approach.  This is a shortcut to get
+  // the POC working and handle unknown bucket in the partition.
+  fun ref partition_default_target[In: Any val, Out: Any val, 
+    State: Any #read](
+    pipeline_name: String,
+    target_name: String,
+    s_comp: StateComputation[In, Out, State] val,
+    s_initializer: StateBuilder[State] val,
+    state_name: String): Application
+  =>
+    default_target_name = target_name
+
+    let builders: Array[RunnerBuilder val] trn = 
+      recover Array[RunnerBuilder val] end
+
+    let pre_state_builder = PreStateRunnerBuilder[In, Out, State](s_comp,
+      TypedRouteBuilder[StateProcessor[State] val],
+      TypedRouteBuilder[Out])
+    builders.push(pre_state_builder)
+
+    let state_builder' = StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders(),
+      TypedRouteBuilder[Out])
+    builders.push(state_builder')
+
+    default_target = consume builders
+    default_target_id = pre_state_builder.id()
+
+    this
 
   fun ref add_pipeline(p: BasicPipeline) =>
     pipelines.push(p)
@@ -184,21 +217,30 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       s_initializer: StateBuilder[State] val,
       state_name: String, 
       partition: Partition[PIn, Key] val,
-      multi_worker: Bool = false
+      multi_worker: Bool = false,
+      default_target_name: String = ""
     ): PipelineBuilder[In, Out, Next] 
   =>
     let guid_gen = GuidGenerator
     let step_id_map: Map[Key, U128] trn = recover Map[Key, U128] end
 
-    for key in partition.keys().values() do
-      step_id_map(key) = guid_gen.u128()
+    match partition.keys()
+    | let wks: Array[WeightedKey[Key]] val =>
+      for wkey in wks.values() do
+        step_id_map(wkey._1) = guid_gen.u128()
+      end
+    | let ks: Array[Key] val =>
+      for key in ks.values() do
+        step_id_map(key) = guid_gen.u128()
+      end
     end
 
     let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, PIn, State,
       Key](_p.name(), state_name, s_comp, consume step_id_map, partition,
         TypedRouteBuilder[StateProcessor[State] val],
         TypedRouteBuilder[Next]
-        where multi_worker = multi_worker)
+        where multi_worker = multi_worker, default_target_name' = 
+        default_target_name)
     _p.add_runner_builder(next_builder)
 
     let state_partition = KeyedStateSubpartition[Key](partition.keys(),
@@ -218,7 +260,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       = recover Array[Array[ByteSeq] val] end): Application ? 
   =>
     let sink_builder: TCPSinkBuilder val = 
-      TCPSinkBuilder(TypedEncoderWrapper[Out](encoder))
+      TCPSinkBuilder(TypedEncoderWrapper[Out](encoder), initial_msgs)
     _p.update_sink(sink_builder, sink_ids)
       //, initial_msgs), sink_ids)
     _a.add_pipeline(_p as BasicPipeline)

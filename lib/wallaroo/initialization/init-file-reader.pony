@@ -34,7 +34,9 @@ class InitFileReader
       _file.dispose()
 
       @printf[I32](("Read initialization messages from " + _filename + "\n").cstring())
-      conn.dispose()
+      // TODO: Calling this here makes reading in messages non-deterministic.
+      // Disposal must be handled later and elsewhere.
+      // conn.dispose()
     else
       @printf[I32]("Incorrect address for init file\n".cstring())
     end

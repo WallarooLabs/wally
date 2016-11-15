@@ -7,13 +7,13 @@ use "wallaroo/messages"
 trait Backend
   fun ref flush()
   fun ref start()
-  fun ref write_entry(buffer_id: U128, entry: LogEntry)
+  fun ref write_entry(origin_id: U128, entry: LogEntry)
 
 class DummyBackend is Backend
   new create() => None
   fun ref flush() => None
   fun ref start() => None
-  fun ref write_entry(buffer_id: U128, entry: LogEntry) => None
+  fun ref write_entry(origin_id: U128, entry: LogEntry) => None
 
 class FileBackend is Backend
   //a record looks like this:
@@ -48,7 +48,7 @@ class FileBackend is Backend
         //start iterating until we reach original EOF
         while _file.position() < size do
           r.append(_file.read(40))
-          let buffer_id = r.u128_be()
+          let origin_id = r.u128_be()
           let uid = r.u128_be()
           let fractional_size = r.u64_be()
           let frac_ids = recover val
@@ -69,8 +69,7 @@ class FileBackend is Backend
           let statechange_id = r.u64_be()
           let payload_length = r.u64_be()
           let payload = recover val _file.read(payload_length.usize()) end
-          //origin_id!
-          _alfred.replay_log_entry(buffer_id, uid, frac_ids, statechange_id, payload)
+          _alfred.replay_log_entry(origin_id, uid, None, statechange_id, payload)
         end
         _file.seek_end(0)
         _alfred.log_replay_finished()
@@ -81,29 +80,34 @@ class FileBackend is Backend
       _alfred.start_without_replay()
     end
 
-  fun ref write_entry(buffer_id: U128, entry: LogEntry)
+  fun ref write_entry(origin_id: U128, entry: LogEntry)
   =>
-    (let uid:U128, let frac_ids: (Array[U64] val | None),
+    (let uid:U128, let frac_ids: None,
      let statechange_id: U64, let seq_id: U64, let payload: Array[ByteSeq] val)
     = entry
-    _writer.u128_be(buffer_id)
+    _writer.u128_be(origin_id)
     _writer.u128_be(uid)
-    match frac_ids
-    | let ids: Array[U64] val =>
-      let s = ids.size()
-      _writer.u64_be(s.u64())
-      for j in Range(0,s) do
-        try
-          _writer.u64_be(ids(j))
-        else
-          @printf[I32]("fractional id %d on message %d disappeared!".cstring(),
-            j, uid)
-        end
-      end
-    else
-      //we have no frac_ids
-      _writer.u64_be(0)
-    end
+
+    // match frac_ids
+    // | let ids: Array[U64] val =>
+    //   let s = ids.size()
+    //   _writer.u64_be(s.u64())
+    //   for j in Range(0,s) do
+    //     try
+    //       _writer.u64_be(ids(j))
+    //     else
+    //       @printf[I32]("fractional id %d on message %d disappeared!".cstring(),
+    //         j, uid)
+    //     end
+    //   end
+    // else
+    // //we have no frac_ids
+    // _writer.u64_be(0)
+    // end
+
+    //we have no frac_ids
+    _writer.u64_be(0)
+
     _writer.u64_be(statechange_id)
     var payload_size: USize = 0
     for p in payload.values() do
@@ -170,9 +174,9 @@ actor Alfred
         b.start_without_replay()
       end
 
-    be replay_log_entry(buffer_id: U128, uid: U128, frac_ids: (Array[U64] val | None), statechange_id: U64, payload: ByteSeq val) =>
+    be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val) =>
       try
-        _origins(buffer_id).replay_log_entry(uid, frac_ids, statechange_id, payload)
+        _origins(origin_id).replay_log_entry(uid, frac_ids, statechange_id, payload)
       else
         //TODO: explode here
         @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
@@ -187,45 +191,45 @@ actor Alfred
           DeactivatedEventLogBuffer
         end
 
-    be queue_log_entry(buffer_id: U128, uid: U128,
-      frac_ids: (Array[U64] val | None), statechange_id: U64, seq_id: U64,
+    be queue_log_entry(origin_id: U128, uid: U128,
+      frac_ids: None, statechange_id: U64, seq_id: U64,
       payload: Array[ByteSeq] val)
     =>
       try
-        _log_buffers(buffer_id).queue(uid, frac_ids, statechange_id, seq_id, payload)
+        _log_buffers(origin_id).queue(uid, frac_ids, statechange_id, seq_id, payload)
       else
         @printf[I32]("Trying to log to non-existent buffer no %d!".cstring(),
-          buffer_id)
+          origin_id)
       end
 
-    be write_log(buffer_id: U128, log_entries: Array[LogEntry val] iso,
+    be write_log(origin_id: U128, log_entries: Array[LogEntry val] iso,
       low_watermark:U64, origin: Origin tag, upstream_route_id: U64,
       upstream_seq_id: U64)
     =>
       let write_count = log_entries.size()
       for i in Range(0, write_count) do
         try
-          _backend.write_entry(buffer_id,log_entries(i))
+          _backend.write_entry(origin_id,log_entries(i))
         else
-          @printf[I32]("unable to find log entry %d for buffer id %d - it seems to have disappeared!".cstring(), i, buffer_id)
+          @printf[I32]("unable to find log entry %d for buffer id %d - it seems to have disappeared!".cstring(), i, origin_id)
         end
       end
       _backend.flush()
       try
-        _origins(buffer_id).log_flushed(low_watermark, write_count.u64(),
+        _origins(origin_id).log_flushed(low_watermark, write_count.u64(),
           origin, upstream_route_id, upstream_seq_id)
       else
-        @printf[I32]("buffer %d disappeared!".cstring(), buffer_id)
+        @printf[I32]("buffer %d disappeared!".cstring(), origin_id)
       end
 
-    be flush_buffer(buffer_id: U128, low_watermark:U64,
+    be flush_buffer(origin_id: U128, low_watermark:U64,
       origin: Origin tag, upstream_route_id: U64,
       upstream_seq_id: U64)
     =>
       try
-        _log_buffers(buffer_id).flush(low_watermark, origin, upstream_route_id,
+        _log_buffers(origin_id).flush(low_watermark, origin, upstream_route_id,
           upstream_seq_id)
       else
         @printf[I32]("Trying to flush non-existent buffer no %d!".cstring(),
-          buffer_id)
+          origin_id)
       end

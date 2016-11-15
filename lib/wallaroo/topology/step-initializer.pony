@@ -42,13 +42,14 @@ class StepBuilder
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
 
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
-    router: Router val = EmptyRouter): Step tag 
+    router: Router val = EmptyRouter, 
+    default_target: (Step | None) = None): Step tag 
   =>
     let runner = _runner_builder(MetricsReporter(_app_name, 
       metrics_conn) where alfred = alfred, router = router)
     let step = Step(consume runner, 
       MetricsReporter(_app_name, metrics_conn), _id,
-      _runner_builder.route_builder(), alfred, router)
+      _runner_builder.route_builder(), alfred, router, default_target)
     step.update_router(next)
     step
 
@@ -61,10 +62,12 @@ class PartitionedPreStateStepBuilder
   let _id: U128
   let _pre_state_target_id: U128
   let _forward_route_builder: RouteBuilder val
+  let _default_target_name: String
 
   new val create(app_name: String, pipeline_name': String, 
     sub: PreStateSubpartition val, r: RunnerBuilder val, state_name': String,
-    pre_state_target_id': U128, forward_route_builder': RouteBuilder val) 
+    pre_state_target_id': U128, forward_route_builder': RouteBuilder val,
+    default_target_name': String = "") 
   =>
     _app_name = app_name
     _pipeline_name = pipeline_name'
@@ -74,6 +77,7 @@ class PartitionedPreStateStepBuilder
     _id = _runner_builder.id()
     _pre_state_target_id = pre_state_target_id'
     _forward_route_builder = forward_route_builder'
+    _default_target_name = default_target_name'
 
   fun name(): String => _runner_builder.name() + " partition"
   fun pipeline_name(): String => _pipeline_name
@@ -83,6 +87,8 @@ class PartitionedPreStateStepBuilder
   fun is_stateful(): Bool => true
   fun is_partitioned(): Bool => true
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
+  fun default_target_name(): String => _default_target_name
+    
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
     router: Router val = EmptyRouter): Step tag 
   =>
@@ -93,12 +99,13 @@ class PartitionedPreStateStepBuilder
     metrics_conn: TCPConnection, auth: AmbientAuth, connections: Connections, 
     alfred: Alfred, 
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    state_comp_router: Router val = EmptyRouter): 
+    state_comp_router: Router val = EmptyRouter,
+    default_router: (Router val | None) = None): 
       PartitionRouter val 
   =>
     _pre_state_subpartition.build(_app_name, worker_name, _runner_builder, 
       state_addresses, metrics_conn, auth, connections, alfred,
-      outgoing_boundaries, state_comp_router)
+      outgoing_boundaries, state_comp_router, default_router)
 
 class SourceData
   let _id: U128

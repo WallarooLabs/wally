@@ -26,6 +26,7 @@ resource "aws_placement_group" "default" {
 }
 
 resource "aws_autoscaling_group" "leaders" {
+  name = "${var.cluster_name}_leader-asg"
   vpc_zone_identifier = [ "${coalesce(var.aws_subnet_id, data.terraform_remote_state.vpc.SUBNET_1_ID)}" ]
   max_size = "${var.leader_max_nodes}"
   min_size = "${var.leader_min_nodes}"
@@ -69,6 +70,7 @@ resource "aws_autoscaling_group" "leaders" {
 }
 
 resource "aws_autoscaling_group" "followers" {
+  name = "${var.cluster_name}_follower-asg"
   vpc_zone_identifier = [ "${coalesce(var.aws_subnet_id, data.terraform_remote_state.vpc.SUBNET_1_ID)}" ]
   max_size = "${var.follower_max_nodes}"
   min_size = "${var.follower_min_nodes}"
@@ -113,7 +115,7 @@ resource "aws_autoscaling_group" "followers" {
 
 
 resource "aws_launch_configuration" "follower_launch_config" {
-  name_prefix = "follower-launch-config-"
+  name = "${var.cluster_name}_follower-launch-config"
   image_id = "${lookup(var.instance_amis, var.aws_region)}"
   instance_type = "${var.follower_instance_type}"
   spot_price = "${var.follower_spot_price}"
@@ -168,7 +170,7 @@ resource "aws_launch_configuration" "follower_launch_config" {
 }
 
 resource "aws_launch_configuration" "leader_launch_config" {
-  name_prefix = "leader-launch-config-"
+  name = "${var.cluster_name}_leader-launch-config"
   image_id = "${lookup(var.instance_amis, var.aws_region)}"
   instance_type = "${var.leader_instance_type}"
   spot_price = "${var.leader_spot_price}"

@@ -13,14 +13,14 @@ defmodule MarketSpreadReportsUI.ReportsChannel do
     {:ok, updated_rejected_order_msgs} = RejectedOrdersStore.store_rejected_order_msgs([rejected_order_msg])
     data = %{rejected_orders: updated_rejected_order_msgs}
     broadcast! socket, "rejected-order-msgs", data
-    {:reply, :ok, socket}
+    {:noreply, socket}
   end
 
   def handle_in("client-order-summaries", client_order_summary_msgs, socket) do
     {:ok, updated_client_order_summary_msgs} = ClientOrderSummaryStore.store_client_order_summary_msgs(client_order_summary_msgs)
     data = %{client_order_summary_msgs: updated_client_order_summary_msgs}
     broadcast! socket, "client-order-summary-msgs", data
-    {:reply, :ok, socket}
+    {:noreply, socket}
   end
 
   def handle_info(:after_join, socket) do

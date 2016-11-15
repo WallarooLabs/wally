@@ -136,6 +136,10 @@ ifeq ($(shell uname -s),Linux)
   docker_user_arg := -u `id -u`
   extra_awk_arg := \\
   host_ip_src = $(shell ifconfig `route -n | grep '^0.0.0.0' | awk '{print $$8}'` | egrep -o 'inet addr:[^ ]+' | awk -F: '{print $$2}')
+  system_cpus := $(shell sudo cset set -l -r | grep '/system' | awk '{print $$2}')
+  ifneq (,$(system_cpus))
+    docker_cpu_arg := --cpuset-cpus $(system_cpus)
+  endif
 else
   host_ip_src = $(shell ifconfig `route -n get 0.0.0.0 2>/dev/null | awk '/interface: / {print $$2}'` | egrep -o 'inet [^ ]+' | awk '{print $$2}')
 endif
@@ -174,7 +178,7 @@ ifneq ($(arch),native)
   ifneq ($(in_docker),true)
     quote = '
     ponyc_docker_args = docker run --rm -i $(docker_user_arg) -v \
-        $(abs_buffy_dir):$(abs_buffy_dir) \
+        $(abs_buffy_dir):$(abs_buffy_dir) $(docker_cpu_arg) \
         -v $(HOME)/.gitconfig:/.gitconfig \
         -v $(HOME)/.gitconfig:/root/.gitconfig \
         -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
@@ -183,7 +187,7 @@ ifneq ($(arch),native)
         $(ponyc_runner):$(ponyc_tag) -c $(quote)
 
     monhub_docker_args = docker run --rm -i -v \
-        $(abs_buffy_dir):$(abs_buffy_dir) \
+        $(abs_buffy_dir):$(abs_buffy_dir) $(docker_cpu_arg) \
         -v $(HOME)/.gitconfig:/.gitconfig \
         -v $(HOME)/.gitconfig:/root/.gitconfig \
         -v $(HOME)/.git-credential-cache:/root/.git-credential-cache \
@@ -198,10 +202,10 @@ define PONYC
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable fetch \
     $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
-    $(debug_arg) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
+    $(debug_arg) $(PONYCFLAGS) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && echo "$@:" | tr '\n' ' ' > $(notdir $(abspath $(1:%/=%))).d
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
-    $(debug_arg) . --pass import --files $(if $(filter \
+    $(debug_arg) $(PONYCFLAGS) . --pass import --files $(if $(filter \
     $(ponyc_docker_args),docker),$(quote)) 2>/dev/null | grep -o "$(abs_buffy_dir).*.pony" \
     | awk 'BEGIN { a="" } {a=a$$1":\n"; printf "%s ",$$1} END {print "\n"a}' \
     >> $(notdir $(abspath $(1:%/=%))).d

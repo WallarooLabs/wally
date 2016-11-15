@@ -20,17 +20,20 @@ class val TrackingInfo
 actor EmptySink is CreditFlowConsumerStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+    frac_ids: None, seq_id: U64, route_id: U64)
   =>
     None
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
+    frac_ids: None, incoming_seq_id: U64, route_id: U64)
   =>
     None
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) => None
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val) 
+  => 
+    None
 
   be register_producer(producer: CreditFlowProducer) =>
     None
@@ -45,14 +48,19 @@ actor EmptySink is CreditFlowConsumerStep
 
 class TCPSinkBuilder
   let _encoder_wrapper: EncoderWrapper val
+  let _initial_msgs: Array[Array[ByteSeq] val] val
 
-  new val create(encoder_wrapper: EncoderWrapper val) =>
+  new val create(encoder_wrapper: EncoderWrapper val, 
+    initial_msgs: Array[Array[ByteSeq] val] val) 
+  =>
     _encoder_wrapper = encoder_wrapper
+    _initial_msgs = initial_msgs
 
   fun apply(reporter: MetricsReporter iso, host: String, service: String):
     TCPSink
   =>
-    TCPSink(_encoder_wrapper, consume reporter, host, service)
+    TCPSink(_encoder_wrapper, consume reporter, host, service,
+      _initial_msgs)
 
 actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   """
@@ -90,7 +98,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   // CreditFlow
   var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
-  let _max_distributable_credits: ISize = 500_000
+  let _max_distributable_credits: ISize = 175_000_000
   var _distributable_credits: ISize = _max_distributable_credits
 
   // TCP
@@ -111,9 +119,11 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
+  let _initial_msgs: Array[Array[ByteSeq] val] val
 
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
+    initial_msgs: Array[Array[ByteSeq] val] val, 
     from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -126,17 +136,21 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _next_size = init_size
     _max_size = max_size
     _notify = EmptyNotify
+    _initial_msgs = initial_msgs
     _connect_count = @pony_os_connect_tcp[U32](this,
       host.cstring(), service.cstring(),
       from.cstring())
     _notify_connecting()
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) => None
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val) 
+  => 
+    None
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), seq_id: U64, route_id: U64)
+    frac_ids: None, seq_id: U64, route_id: U64)
   =>
     try
       let encoded = _encoder.encode[D](data, _wb)
@@ -147,6 +161,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       // TODO: Queue the ACKs and use a timer to send watermarks upstream
       //       periodically.
       ifdef "resilience" then
+        ifdef "resilience-debug" then
+          @printf[I32]((
+            "sink uid: " + msg_uid.string() +
+            "\troute_id: " + route_id.string() + "\tseq_id: " +
+            seq_id.string() + "\n").cstring())
+        end
         origin.update_watermark(route_id, seq_id)
       end
       
@@ -167,7 +187,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Origin tag, msg_uid: U128,
-    frac_ids: (Array[U64] val | None), incoming_seq_id: U64, route_id: U64)
+    frac_ids: None, incoming_seq_id: U64, route_id: U64)
   =>
     //TODO: What do we do here?
     run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, 
@@ -297,6 +317,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
             _notify.connected(this)
 
+            for msg in _initial_msgs.values() do
+              _writev(msg)
+            end
             _pending_writes()
           else
             // The connection failed, unsubscribe the event and close.

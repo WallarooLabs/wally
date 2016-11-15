@@ -23,6 +23,7 @@ actor DataReceiver is Origin
   let _seq_translate: SeqTranslationTable = SeqTranslationTable(1)
   let _route_translate: RouteTranslationTable = RouteTranslationTable(1)
   let _alfred: Alfred
+  let _timers: Timers = Timers
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String, 
     connections: Connections, alfred: Alfred) 
@@ -33,6 +34,12 @@ actor DataReceiver is Origin
     _connections = connections
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
+    ifdef "resilience" then
+      None
+    else
+      let t = Timer(_Ack(this), 1_000_000_000, 1_000_000_000)
+      _timers(consume t)
+    end
 
   be data_connect(sender_step_id: U128) =>
     _sender_step_id = sender_step_id
@@ -77,9 +84,6 @@ actor DataReceiver is Origin
     if seq_id >= _last_id_seen then
       _last_id_seen = seq_id
       _router.route(d, this, seq_id)
-      // match _router.route(target_step_id)
-      // | let s: Step tag =>
-      //   s.run[D](metric_name, source_ts, msg_data)
     end
 
   be replay_received(r: ReplayableDeliveryMsg val, seq_id: U64)
@@ -89,11 +93,23 @@ actor DataReceiver is Origin
       _router.replay_route(r, this, seq_id)
     end
 
-//  be ack() => _ack()
-//
-//  fun ref _ack() =>
-//    None
-//    // _connections.ack_msg_id(_sender_name, _last_id_seen)
+  be ack_latest() => _ack_latest()
+
+  fun ref _ack_latest() =>
+    try
+      if _last_id_seen > 0 then
+        let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name, 
+          _sender_step_id, _last_id_seen, _auth)
+        _connections.send_data(_sender_name, ack_msg)
+      end
+    else
+      @printf[I32]("Error creating ack watermark message\n".cstring())
+    end
+
+ be dispose() => 
+   _timers.dispose()
+
+
 //
 //  be open_connection() =>
 //    if _connected == true then
@@ -117,17 +133,13 @@ actor DataReceiver is Origin
 //
 //  // fun ref _connect_ack() =>
 //  //   _connections.ack_connect_msg_id(_sender_name, _last_id_seen)
-//
-//  be dispose() => 
-//    None
-//    // _timers.dispose()
-//
-//class _Ack is TimerNotify
-//  let _receiver: DataReceiver
-//
-//  new iso create(receiver: DataReceiver) =>
-//    _receiver = receiver
-//
-//  fun ref apply(timer: Timer, count: U64): Bool =>
-//    _receiver.ack()
-//    true
+
+class _Ack is TimerNotify
+ let _receiver: DataReceiver
+
+ new iso create(receiver: DataReceiver) =>
+   _receiver = receiver
+
+ fun ref apply(timer: Timer, count: U64): Bool =>
+   _receiver.ack_latest()
+   true

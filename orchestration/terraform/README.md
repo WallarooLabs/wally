@@ -58,8 +58,8 @@ Software needed:
 * wc
 * head
 * tail
-* terraform (need version `0.6.*`)
-* Installing ansible (need version `ansible-2.1.1.0`): `pip install ansible`
+* terraform (need version `0.7.4`). Get the exact version here: https://releases.hashicorp.com/terraform/
+* Installing ansible (need version `ansible-2.1.1.0`): `pip install 'ansible==2.1.1.0' --force-reinstall`
 * Installing boto: `pip install boto`
 * Installing packet: `pip install packet-python`
 

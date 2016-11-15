@@ -76,6 +76,12 @@ actor ApplicationInitializer
       // Map from step_id to worker name
       let steps: Map[U128, String] = steps.create()
 
+      // TODO: Replace this when POC default target strategy is updated
+      // Map from worker name to default target
+      let default_targets: 
+        Map[String, (Array[StepBuilder val] val | ProxyAddress val)]
+          = default_targets.create()
+
       // We use these graphs to build the local graphs for each worker
       let local_graphs: Map[String, Dag[StepInitializer val] trn] trn =  
         recover Map[String, Dag[StepInitializer val] trn] end
@@ -108,14 +114,15 @@ actor ApplicationInitializer
         end
         let source_addr: Array[String] val = consume source_addr_trn
 
-        let sink_addr: Array[String] trn = recover Array[String] end
+        let sink_addr_trn: Array[String] trn = recover Array[String] end
         try
-          sink_addr.push(_output_addr(0))
-          sink_addr.push(_output_addr(1))
+          sink_addr_trn.push(_output_addr(0))
+          sink_addr_trn.push(_output_addr(1))
         else
           @printf[I32]("No output address!\n".cstring())
           error
         end
+        let sink_addr: Array[String] val = consume sink_addr_trn
 
         @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline.size().string() + " uncoalesced runner builders\n").cstring())
 
@@ -362,7 +369,7 @@ actor ApplicationInitializer
                       // We need a sink on every worker involved in the 
                       // partition
                       let egress_builder = EgressBuilder(pipeline.name(), 
-                        sink_id, _output_addr, pipeline.sink_builder())
+                        sink_id, sink_addr, pipeline.sink_builder())
 
                       match partition_workers
                       | let w: String =>
@@ -392,7 +399,8 @@ actor ApplicationInitializer
                     application.name(), pipeline.name(),
                     pb.pre_state_subpartition(partition_workers), 
                     next_runner_builder, state_name, pre_state_target_id,
-                    next_runner_builder.forward_route_builder())
+                    next_runner_builder.forward_route_builder(),
+                    pb.default_target_name())
                   let next_id = next_initializer.id()
 
                   try
@@ -418,6 +426,80 @@ actor ApplicationInitializer
 
                   last_initializer = None//(next_id, next_initializer) 
                   steps(next_id) = worker
+
+                  // TODO: Replace this default strategy with a better one 
+                  // after POC
+                  if pb.default_target_name() != "" then
+                    @printf[I32]("-----We have a real default target name\n".cstring())
+                    match application.default_target
+                    | let default_target: Array[RunnerBuilder val] val =>
+                      @printf[I32](("Preparing to spin up default target state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
+
+                      // The target will always be the sink (a stipulation of
+                      // the temporary POC strategy)
+                      let default_pre_state_target_id = sink_id
+
+                      let pre_state_runner_builder = 
+                        try 
+                          default_target(0)
+                        else
+                          @printf[I32]("Default target had no prestate value!\n".cstring())
+                          error
+                        end
+
+                      let state_runner_builder = 
+                        try 
+                          default_target(1)
+                        else
+                          @printf[I32]("Default target had no state value!\n".cstring())
+                          error
+                        end
+
+                      let pre_state_id = pre_state_runner_builder.id()
+                      let state_id = state_runner_builder.id()
+
+                      let pre_state_builder = StepBuilder(application.name(),
+                        pipeline.name(),
+                        pre_state_runner_builder, pre_state_id, 
+                        false, 
+                        default_pre_state_target_id,
+                        pre_state_runner_builder.forward_route_builder())
+
+                      @printf[I32](("Preparing to spin up default target state for " + state_runner_builder.name() + " on " + worker + "\n").cstring())
+
+                      let state_builder = StepBuilder(application.name(),
+                        pipeline.name(),
+                        state_runner_builder, state_id,
+                        true 
+                        where forward_route_builder' = 
+                          state_runner_builder.route_builder())
+ 
+                      // Add prestate to defaults
+                      // Add state to defaults
+
+                      steps(pre_state_id) = worker
+                      steps(state_id) = worker
+
+                      let next_default_targets: Array[StepBuilder val] trn = 
+                        recover Array[StepBuilder val] end
+
+                      next_default_targets.push(pre_state_builder)
+                      next_default_targets.push(state_builder)
+
+                      @printf[I32](("Adding default target for " + worker + "\n").cstring())
+                      default_targets(worker) = consume next_default_targets
+
+                      // Create ProxyAddresses for the other workers
+                      let proxy_address = ProxyAddress(worker, 
+                        pre_state_id)
+
+                      for w in worker_names.values() do
+                        default_targets(w) = proxy_address
+                      end
+                    else
+                      @printf[I32]("----But no default target!\n".cstring())
+                    end
+                  end
                 else
                   @printf[I32](("Preparing to spin up non-partitioned state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
                   let pre_state_id = next_runner_builder.id()
@@ -568,7 +650,7 @@ actor ApplicationInitializer
             // We need a Sink since there are no more steps to go in this
             // pipeline
             let egress_builder = EgressBuilder(pipeline.name(), 
-              sink_id, _output_addr, pipeline.sink_builder())
+              sink_id, sink_addr, pipeline.sink_builder())
 
             try
               local_graphs(worker).add_node(egress_builder, sink_id)
@@ -605,10 +687,20 @@ actor ApplicationInitializer
           p_ids(target) = p_id
         end
 
+        let default_target = 
+          try
+            default_targets(w)
+          else
+            @printf[I32](("No default target specified for " + w + "\n").cstring())
+            None
+          end
+
         let local_topology = 
           try
             LocalTopology(application.name(), g.clone(),
-              application.state_builders(), consume p_ids)
+              application.state_builders(), consume p_ids,
+              default_target, application.default_target_name,
+              application.default_target_id)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error

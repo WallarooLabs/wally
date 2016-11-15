@@ -5,9 +5,17 @@ If you have not followed the setup instructions in the orchestration/terraform [
 ##Configuring Cluster:
 
 Once set up, an AWS cluster can be started with the following command:
+
+For SINGLE WORKER run (16 vCPU):
 ```
 make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=16 num_followers=0 force_instance=c4.4xlarge spot_bid_factor=100 ansible_system_cpus=0,8 ansible_isolcpus=false
 ```
+
+For MULTI WORKER run (36 vCPU):
+```
+make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=36 num_followers=0 force_instance=c4.8xlarge spot_bid_factor=100 ansible_system_cpus=0,18 ansible_isolcpus=false no_spot=true
+```
+
 
 A packet cluster with this command:
 ```
@@ -38,6 +46,8 @@ You need to create a docker network for the UI's with the following command:
 docker network create buffy-leader
 ```
 
+#### For 16 vCPU cluster:
+
 To run the Metrics UI:
 ```
 docker run -d -u root --cpuset-cpus 0,8 --privileged  \
@@ -61,6 +71,31 @@ docker run -d -u root --cpuset-cpus 0,8 --privileged \
 docker.sendence.com:5043/wallaroo-market-spread-reports-ui:latest
 ```
 
+#### For 36 vCPU cluster:
+
+To run the Metrics UI:
+```
+docker run -d -u root --cpuset-cpus 0,18 --privileged  \
+-v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock \
+-v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  \
+-v /tmp:/apps/metrics_reporter_ui/log  \
+-p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
+-e "BINS_TYPE=demo" -e "RELX_REPLACE_OS_VARS=true" \
+--name mui -h mui --net=buffy-leader \
+docker.sendence.com:5043/wallaroo-metrics-ui:latest
+```
+
+To run the Reports UI:
+```
+docker run -d -u root --cpuset-cpus 0,18 --privileged \
+-v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock \
+-v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  \
+-v /tmp:/apps/market_spread_reports_ui/log \
+-p 0.0.0.0:4001:4001 -p 0.0.0.0:5555:5555 \
+--name aui -h aui --net=buffy-leader \
+docker.sendence.com:5043/wallaroo-market-spread-reports-ui:latest
+```
+
 ###Running Market Spread Jr
 
 You'll need to clone the repo:
@@ -70,7 +105,7 @@ git clone https://github.com/sendence/buffy.git
 
 To build Market Spread Jr:
 ```
-make arch=amd64 build-apps-market-spread-jr
+make arch=amd64 build-apps-market-spread
 ```
 
 To build Giles Sender:
@@ -79,18 +114,39 @@ make arch=amd64 build-giles-sender
 ```
 
 ###AWS
-to run the Market Spread Jr application you must be in it's directory:
+to run the Market Spread application you must be in it's directory.
+
+####SINGLE WORKER market spread:
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread-jr -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 150000000 --ponythreads 4 --ponypinasio
+sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
 ```
 
 To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
 ```
-sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio```
+sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+```
 
 To run the Orders Sender:
 ```
-sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 50000000 -s 300 -i 5_000_000 -f ~/buffy/demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio
+sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 50000000 -s 300 -i 5_000_000 -f ~/buffy/demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
+```
+
+
+####2 WORKER market spread (in order)
+```
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 -d 127.0.0.1:12501 --ponythreads 4 --ponypinasio --ponynoblock -w 2 -t
+
+sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 -d 127.0.0.1:12501 --ponythreads 4 --ponypinasio --ponynoblock -w 2 -n worker2
+```
+
+To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
+```
+sudo cset proc -s user -e numactl -- -C 9,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+```
+
+To run the Orders Sender:
+```
+sudo cset proc -s user -e numactl -- -C 10,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 50000000 -s 300 -i 5_000_000 -f ~/buffy/demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
 ```
 
 ###Packet
@@ -98,17 +154,17 @@ sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/sender/send
 to run the Market Spread Jr application you must be in it's directory:
 
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread-jr -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 150000000 --ponythreads 4 --ponypinasio
+sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -e 150000000 --ponythreads 4 --ponypinasio
 ```
 
 To run the NBBO Sender: (must be started before Orders so that the initial NBBO can be set)
 
 ```
-sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio
+sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 100000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
 ```
 
 To run the Orders Sender:
 
 ```
-sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 50000000 -s 300 -i 5_000_000 -f ~/buffy/demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio
+sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 50000000 -s 300 -i 5_000_000 -f ~/buffy/demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w —ponynoblock
 ```

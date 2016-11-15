@@ -13,6 +13,7 @@ actor TCPSourceListener
   let _router: Router val
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _default_target: (Step | None)
   var _fd: U32
   var _event: AsioEventID = AsioEvent.none()
   let _limit: USize
@@ -24,9 +25,10 @@ actor TCPSourceListener
   new create(source_builder: SourceBuilder val, router: Router val,
     route_builder: RouteBuilder val, 
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    alfred: Alfred tag, host: String = "", 
-    service: String = "0", limit: USize = 0, init_size: USize = 64, 
-    max_size: USize = 16384)
+    alfred: Alfred tag,
+    default_target: (Step | None) = None,
+    host: String = "", service: String = "0", limit: USize = 0, 
+    init_size: USize = 64, max_size: USize = 16384)
   =>
     """
     Listens for both IPv4 and IPv6 connections.
@@ -38,6 +40,7 @@ actor TCPSourceListener
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.cstring(), service.cstring())
     _limit = limit
+    _default_target = default_target
 
     _init_size = init_size
     _max_size = max_size
@@ -101,7 +104,8 @@ actor TCPSourceListener
     """
     try
       TCPSource._accept(this, _notify.connected(this), _router.routes(), 
-        _route_builder, _outgoing_boundaries, ns, _init_size, _max_size)
+        _route_builder, _outgoing_boundaries, ns, _default_target, _init_size, 
+        _max_size)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)

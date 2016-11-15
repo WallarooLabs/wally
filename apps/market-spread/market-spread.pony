@@ -2,20 +2,25 @@
 Market Spread App
 
 Setting up a market spread run (in order):
-1) reports sink:
-nc -l 127.0.0.1 7002 >> /dev/null
+1) reports sink (if not using Monitoring Hub):
+nc -l 127.0.0.1 5555 >> /dev/null
 
-2) metrics sink:
-nc -l 127.0.0.1 7003 >> /dev/null
+2) metrics sink (if not using Monitoring Hub):
+nc -l 127.0.0.1 5001 >> /dev/null
 
-3) market spread app:
-./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:7002 -m 127.0.0.1:7003 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -f ../../demos/marketspread/initial-nbbo-fixish.msg -e 10000000 -n node-name --ponythreads=4
+3a) market spread app (1 worker):
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n node-name --ponythreads=4 --ponynoblock
+
+3b) market spread app (2 workers):
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n node-name --ponythreads=4 --ponynoblock -t -w 2
+
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n worker2 --ponythreads=4 --ponynoblock -w 2
 
 4) orders:
-giles/sender/sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57
+giles/sender/sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
 
 5) nbbo:
-giles/sender/sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46
+giles/sender/sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 """
 use "collections"
 use "net"
@@ -39,6 +44,15 @@ actor Main
 
       let init_file = InitFile("../../demos/marketspread/initial-nbbo-fixish.msg", 46)
 
+      let initial_report_msgs_trn: Array[Array[ByteSeq] val] trn = 
+        recover Array[Array[ByteSeq] val] end
+      let connect_msg = HubProtocol.connect()
+      let join_msg = HubProtocol.join("reports:market-spread")
+      initial_report_msgs_trn.push(connect_msg)
+      initial_report_msgs_trn.push(join_msg)
+      let initial_report_msgs: Array[Array[ByteSeq] val] val = 
+        consume initial_report_msgs_trn
+
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixNbboMessage val, None](
@@ -54,7 +68,8 @@ actor Main
               (OrderResult val | None), SymbolData](CheckOrder, 
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
-            .to_sink(OrderResultEncoder, recover [0] end)     
+            .to_sink(OrderResultEncoder, recover [0] end,
+              initial_report_msgs)     
       end
       Startup(env, application, "/tmp/market-spread.evlog")
     else
@@ -237,7 +252,7 @@ class OrderResult
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
-    @printf[I32]((r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
+    // @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
     //Header (size == 55 bytes)
     let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
     wb.u32_be(msgs_size.u32())
@@ -262,7 +277,27 @@ class LegalSymbols
   let symbols: Array[String] val
 
   new create() =>
-    symbols = recover      
+    let padded: Array[String] trn = recover Array[String] end
+    for symbol in RawSymbols().values() do 
+      padded.push(RawSymbols.pad_symbol(symbol))
+    end
+    symbols = consume padded
+
+primitive RawSymbols
+  fun pad_symbol(s: String): String =>
+    if s.size() == 4 then
+      s
+    else
+      let diff = 4 - s.size()
+      var padded = s
+      for i in Range(0, diff) do
+        padded = " " + padded
+      end
+      padded
+    end   
+
+  fun apply(): Array[String] val =>
+    recover      
       [
 "AA",
 "BAC",

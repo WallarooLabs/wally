@@ -5,6 +5,7 @@ use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/topology"
 use "wallaroo/messages"
+use "wallaroo/tcp-sink"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -40,19 +41,21 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
+  var _muted: Bool = false
+  
+  // Resilience
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
   let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
   let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
 
-  var _muted: Bool = false
-
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,    
-    fd: U32, init_size: USize = 64, max_size: USize = 16384)
+    outgoing_boundaries: Map[String, OutgoingBoundary] val, 
+    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,   
+    init_size: USize = 64, max_size: USize = 16384)
   =>
     """
     A new connection accepted on a server.
@@ -83,10 +86,17 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
         _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
+    match default_target
+    | let r: CreditFlowConsumerStep =>
+      _routes(r) = _route_builder(this, r, StepRouteCallbackHandler)
+    end
+
     for r in _routes.values() do
       r.initialize()
     end
 
+  //////////////
+  // ORIGIN (resilience)
   fun ref hwm_get(): HighWatermarkTable =>
     _hwm
 
@@ -106,7 +116,9 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     upstream_route_id: U64 , upstream_seq_id: U64) =>
     None
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val) => 
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val) 
+  => 
     None
 
   be dispose() =>
@@ -144,6 +156,9 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
       None
     end
 
+  fun ref update_route_id(route_id: U64) =>
+    None // only used in Route to update the outgoing route_id for a message
+    
   //
   // TCP
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
@@ -368,22 +383,38 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     _expect = _notify.expect(this, qty)
     _read_buf_size()
 
-primitive TCPSourceRouteCallbackHandler is RouteCallbackHandler
+class TCPSourceRouteCallbackHandler is RouteCallbackHandler
+  var _muted: ISize = 0
+
   fun shutdown(producer: CreditFlowProducer ref) =>
     match producer
     | let p: TCPSource ref =>
       p._hard_close()
     end
 
-  fun credits_replenished(producer: CreditFlowProducer ref) =>
+  fun ref credits_replenished(producer: CreditFlowProducer ref) =>
+    ifdef debug then
+      try
+        Assert(_muted > 0, 
+          "credits_replenished() should only be called when the calling " + 
+          "Route was already muted.")
+      else
+        shutdown(producer)
+        return
+      end
+    end
     match producer
     | let p: TCPSource ref =>
-      p._unmute()
+      _muted = _muted - 1
+      if (_muted == 0) then
+        p._unmute()
+      end
     end
 
-  fun credits_exhausted(producer: CreditFlowProducer ref) =>
+  fun ref credits_exhausted(producer: CreditFlowProducer ref) =>
     match producer
     | let p: TCPSource ref =>
+      _muted = _muted + 1
       p._mute()
     end
 

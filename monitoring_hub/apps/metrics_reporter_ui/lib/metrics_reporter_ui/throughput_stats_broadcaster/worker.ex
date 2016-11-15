@@ -25,9 +25,9 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
     %{log_name: log_name, interval_key: interval_key, msg_log_name: msg_log_name,
       app_name: _app_name, category: category, pipeline_key: pipeline_key, 
       stats_interval: stats_interval} = state
-      :timer.sleep(1000)
     time_now = :os.system_time(:seconds)
     start_time = time_now - stats_interval
+    :timer.sleep(1000)
     case get_throughput_msgs(log_name, start_time) do
       [] ->
         :ok
@@ -54,6 +54,7 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
   defp get_throughput_msgs(log_name, start_time) do
     :ok = MessageLog.Supervisor.lookup_or_create log_name
     throughput_msgs = MessageLog.get_logs(log_name, [start_time: start_time])
+    throughput_msgs_without_partial = List.delete_at(throughput_msgs, -1)
   end
 
   defp create_throughput_stats_msg(throughput_stats, pipeline_key, time_now) do

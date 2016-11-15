@@ -53,6 +53,8 @@ class DataChannelConnectNotifier is TCPConnectionNotify
   let _env: Env
   let _auth: AmbientAuth
   var _header: Bool = true
+  var _msg_count: USize = 0
+  let _timers: Timers = Timers
 
   new iso create(receivers: Map[String, DataReceiver] val,
     connections: Connections, env: Env, auth: AmbientAuth) 
@@ -70,6 +72,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       end
+      true
     else
       match ChannelMsgDecoder(consume data, _auth)
       | let data_msg: DataMsg val =>
@@ -114,8 +117,18 @@ class DataChannelConnectNotifier is TCPConnectionNotify
 
       conn.expect(4)
       _header = true
+
+      ifdef linux then
+        _msg_count = _msg_count + 1
+        if ((_msg_count % 25) == 0) then
+          false
+        else
+          true
+        end
+      else
+        false
+      end
     end
-    false
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("accepted data channel connection")

@@ -14,6 +14,13 @@ actor Startup
   new create(env: Env, application: Application val, 
     event_log_file: (String val | None)) 
   =>
+    ifdef "use_backpressure" then
+      env.out.print("**BACKPRESSURE is active**")
+    end
+    ifdef "resilience" then
+      env.out.print("**RESILIENCE is active**")
+    end
+
     var m_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
     var c_arg: (Array[String] | None) = None
@@ -21,8 +28,6 @@ actor Startup
     var p_arg: (Array[String] | None) = None
     var i_addrs_write: Array[Array[String]] trn = 
       recover Array[Array[String]] end
-    var expected: USize = 1_000_000
-    var init_path = ""
     var worker_count: USize = 1
     var is_initializer = false
     var worker_initializer: (WorkerInitializer | None) = None
@@ -50,7 +55,8 @@ actor Startup
 
       for option in options do
         match option
-        | ("expected", let arg: I64) => expected = arg.usize()
+        | ("expected", let arg: I64) => 
+          env.out.print("--expected/-e is a deprecated parameter")
         | ("metrics", let arg: String) => m_arg = arg.split(":")
         | ("in", let arg: String) => 
           for addr in arg.split(",").values() do
@@ -60,7 +66,8 @@ actor Startup
         | ("control", let arg: String) => c_arg = arg.split(":")
         | ("data", let arg: String) => d_arg = arg.split(":")
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
-        | ("file", let arg: String) => init_path = arg
+        | ("file", let arg: String) => 
+          env.out.print("--file/-f is a deprecated parameter")
         | ("worker-count", let arg: I64) => 
           worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
@@ -121,9 +128,10 @@ actor Startup
         c_host, c_service, d_host, d_service, ph_host, ph_service, 
         metrics_conn, is_initializer)
 
+      let local_topology_file = "/tmp/" + worker_name + ".local-topology"
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
         worker_count, env, auth, connections, metrics_conn, is_initializer, 
-        alfred)
+        alfred, local_topology_file)
 
       if is_initializer then
         env.out.print("Running as Initializer...")
