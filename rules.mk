@@ -202,10 +202,10 @@ define PONYC
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable fetch \
     $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
-    $(debug_arg) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
+    $(debug_arg) $(PONYCFLAGS) . $(if $(filter $(ponyc_docker_args),docker),$(quote))
   $(QUIET)cd $(1) && echo "$@:" | tr '\n' ' ' > $(notdir $(abspath $(1:%/=%))).d
   $(QUIET)cd $(1) && $(ponyc_docker_args) stable env ponyc $(ponyc_arch_args) \
-    $(debug_arg) . --pass import --files $(if $(filter \
+    $(debug_arg) $(PONYCFLAGS) . --pass import --files $(if $(filter \
     $(ponyc_docker_args),docker),$(quote)) 2>/dev/null | grep -o "$(abs_buffy_dir).*.pony" \
     | awk 'BEGIN { a="" } {a=a$$1":\n"; printf "%s ",$$1} END {print "\n"a}' \
     >> $(notdir $(abspath $(1:%/=%))).d
