@@ -37,17 +37,22 @@ trait StateProcessor[State: Any #read] is BasicComputation
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): (Bool, (StateChange[State] ref | None))
 
+trait InputWrapper[In: Any val] 
+  fun input(): In
+
 class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
-  is StateProcessor[State]
+  is (StateProcessor[State] & InputWrapper[In])
   let _state_comp: StateComputation[In, Out, State] val
   let _input: In
   let _router: Router val
 
-  new val create(input: In, state_comp: StateComputation[In, Out, State] val,
+  new val create(input': In, state_comp: StateComputation[In, Out, State] val,
     router: Router val) =>
     _state_comp = state_comp
-    _input = input
+    _input = input'
     _router = router
+
+  fun input(): In => _input
 
   fun apply(state: State, sc_repo: StateChangeRepository[State],
     metric_name: String, source_ts: U64, 

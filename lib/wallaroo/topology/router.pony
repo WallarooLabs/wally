@@ -272,6 +272,7 @@ class LocalPartitionRouter[In: Any val,
 
   fun local_map(): Map[U128, Step] val => _local_map
 
+// TODO: Remove State type argument
 class StateAddressesRouter[In: Any val, 
   Key: (Hashable val & Equatable[Key] val)]
   let _state_addresses: StateAddresses val
@@ -293,8 +294,8 @@ class StateAddressesRouter[In: Any val,
     o_seq_id: U64): Bool
   =>
     match data
-    | let input: In =>
-      let key = _partition_function(input)
+    | let iw: InputWrapper[In] val =>
+      let key = _partition_function(iw.input())
       match _state_addresses(key)
       | let s: Step =>
         // TODO: Remove that producer can be None
@@ -311,19 +312,16 @@ class StateAddressesRouter[In: Any val,
             false
           else
             // TODO: What do we do if we get None?
-            @printf[I32]("!!Route not found in partition!\n".cstring())
             true
           end
         else
-          @printf[I32]("!!CreditFlowProducer not found in partition!\n".cstring())
           true
         end
       else
-        @printf[I32]("!!Key not found in partition!\n".cstring())
         true    
       end
     else
-      @printf[I32]("!!Wrong input type to partition router!!\n".cstring())
+      @printf[I32]("Wrong input type to partition router!\n".cstring())
       true
     end
 
