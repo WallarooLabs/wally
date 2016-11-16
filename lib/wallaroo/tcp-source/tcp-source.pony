@@ -11,6 +11,7 @@ use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
+use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 actor TCPSource is (CreditFlowProducer & Initializable & Origin)
@@ -68,7 +69,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     _notify.set_origin(this)
     _connect_count = 0
     _fd = fd
-    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write(), 0, true)
+    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write_oneshot(), 0, true)
     _connected = true
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
@@ -222,6 +223,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
       _try_shutdown()
     end
+    _resubscribe_event()
 
   fun ref _notify_connecting() =>
     """
@@ -327,6 +329,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
         | 0 =>
           // Would block, try again later.
           _readable = false
+          resubscribe_event()
           return
         | _next_size =>
           // Increase the read buffer size.
@@ -403,6 +406,15 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
     _read_buf_size()
+
+  fun ref _resubscribe_event() =>
+    let flags = if not _readable then
+      AsioEvent.read_oneshot()
+    else
+      return
+    end
+
+    @pony_asio_event_resubscribe(_event, flags)
 
 class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   var _muted: ISize = 0
