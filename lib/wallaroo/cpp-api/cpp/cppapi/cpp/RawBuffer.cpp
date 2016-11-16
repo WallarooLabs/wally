@@ -226,10 +226,10 @@ BufferReader& BufferReader::operator>> (char** param_)
   short sz;
   readData(&sz, sizeof(short));
 
-  char* newStrData = new char[sz + 1];
-  newStrData[sz] = '\0';
-  readData(newStrData, sz);
-  (*param_) = newStrData;
+  *param_ = new char[sz + 1];
+  readData(*param_, sz);
+  (*param_)[sz] = '\0';
+
   return *this;
 }
 }
