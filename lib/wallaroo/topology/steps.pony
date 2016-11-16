@@ -83,7 +83,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     _metrics_reporter = consume metrics_reporter
     _outgoing_seq_id = 0
     _outgoing_route_id = 0
-    _router = router
+    _router = _runner.augment_router(router)
     _route_builder = route_builder
     _alfred = alfred
     _alfred.register_origin(this, id)

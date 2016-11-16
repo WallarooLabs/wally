@@ -23,7 +23,7 @@ class LocalTopology
   let _app_name: String
   let _graph: Dag[StepInitializer val] val
   // _state_builders maps from state_name to StateSubpartition
-  let _state_builders: Map[String, StateSubpartition val] val
+  let _state_builders: Map[String, PartitionBuilder val] val
   let _proxy_ids: Map[String, U128] val
   // TODO: Replace this default strategy with a better one after POC
   let default_target: (Array[StepBuilder val] val | ProxyAddress val | None)
@@ -31,7 +31,7 @@ class LocalTopology
   let default_target_id: U128
 
   new val create(name': String, graph': Dag[StepInitializer val] val,
-    state_builders': Map[String, StateSubpartition val] val,
+    state_builders': Map[String, PartitionBuilder val] val,
     proxy_ids': Map[String, U128] val,
     default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
       None,
@@ -46,16 +46,16 @@ class LocalTopology
     default_target_name = default_target_name'
     default_target_id = default_target_id'
 
-  fun update_state_map(state_map: Map[String, StateAddresses val],
-    metrics_conn: TCPConnection, alfred: Alfred)
-  =>
-    for (state_name, subpartition) in _state_builders.pairs() do
-      if not state_map.contains(state_name) then
-        @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
-        state_map(state_name) = subpartition.build(_app_name, metrics_conn, 
-          alfred)
-      end
-    end
+  // fun update_state_map(state_map: Map[String, StateAddresses val],
+  //   metrics_conn: TCPConnection, alfred: Alfred)
+  // =>
+  //   for (state_name, subpartition) in _state_builders.pairs() do
+  //     if not state_map.contains(state_name) then
+  //       @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
+  //       state_map(state_name) = subpartition.build(_app_name, metrics_conn, 
+  //         alfred)
+  //     end
+  //   end
 
   fun graph(): Dag[StepInitializer val] val => _graph
 
@@ -187,8 +187,8 @@ actor LocalTopologyInitializer
         @printf[I32]("Creating graph:\n".cstring())
         @printf[I32]((graph.string() + "\n").cstring())
 
-        // Make sure we only create shared state once and reuse it
-        let state_map: Map[String, StateAddresses val] = state_map.create()
+        // // Make sure we only create shared state once and reuse it
+        // let state_map: Map[String, StateAddresses val] = state_map.create()
 
         // Keep track of all CreditFLowConsumerSteps by id so we can create a 
         // DataRouter for the data channel boundary
@@ -197,8 +197,8 @@ actor LocalTopologyInitializer
 
         @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
 
-        // Create shared state for this topology
-        t.update_state_map(state_map, _metrics_conn, _alfred)
+        // // Create shared state for this topology
+        // t.update_state_map(state_map, _metrics_conn, _alfred)
 
         // // We'll need to register our proxies later over Connections
         // let proxies: Map[String, Array[Step tag]] = proxies.create()
@@ -289,7 +289,7 @@ actor LocalTopologyInitializer
         for node in graph.nodes() do
           if node.is_sink() then 
             match node.value
-            | let p: PartitionedPreStateStepBuilder val =>
+            | let p: PartitionedStateStepBuilder val =>
               @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
               frontier.push(node)
             else
@@ -481,9 +481,9 @@ actor LocalTopologyInitializer
                   end
                 end
               end
-            | let p_builder: PartitionedPreStateStepBuilder val =>
+            | let p_builder: PartitionedStateStepBuilder val =>
               let next_id = p_builder.id()
-              let state_addresses = state_map(p_builder.state_name())
+              // let state_addresses = state_map(p_builder.state_name())
 
               @printf[I32](("----Spinning up partition for " + p_builder.name() + "----\n").cstring())
 
@@ -500,8 +500,8 @@ actor LocalTopologyInitializer
                   EmptyRouter
                 end
 
-              state_addresses.register_routes(state_comp_target,
-                 p_builder.forward_route_builder())
+              // state_addresses.register_routes(state_comp_target,
+              //    p_builder.forward_route_builder())
 
               // Check for default router
               let default_router = 
@@ -516,7 +516,7 @@ actor LocalTopologyInitializer
                 end
 
               let partition_router: PartitionRouter val =
-                p_builder.build_partition(_worker_name, state_addresses,
+                p_builder.build_partition(_worker_name, 
                   _metrics_conn, _auth, _connections, _alfred, 
                   _outgoing_boundaries, state_comp_target, default_router)
               

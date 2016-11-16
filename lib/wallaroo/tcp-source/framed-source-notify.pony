@@ -36,7 +36,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     _handler = handler
     _runner = runner_builder(metrics_reporter.clone(), alfred 
       where router = target_router)
-    _router = router
+    _router = _runner.augment_router(router)
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
 

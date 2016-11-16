@@ -14,7 +14,7 @@ class Application
   let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
   // _state_builders maps from state_name to StateSubpartition
-  let _state_builders: Map[String, StateSubpartition val] = 
+  let _state_builders: Map[String, PartitionBuilder val] = 
     _state_builders.create()
   // Map from source id to filename
   let init_files: Map[USize, InitFile val] = init_files.create()
@@ -77,15 +77,15 @@ class Application
     init_files(source_id) = init_file
 
   fun ref add_state_builder(state_name: String, 
-    state_partition: StateSubpartition val) 
+    state_partition: PartitionBuilder val) 
   =>
     _state_builders(state_name) = state_partition
 
-  fun state_builder(state_name: String): StateSubpartition val ? =>
+  fun state_builder(state_name: String): PartitionBuilder val ? =>
     _state_builders(state_name)
-  fun state_builders(): Map[String, StateSubpartition val] val => 
-    let builders: Map[String, StateSubpartition val] trn =
-      recover Map[String, StateSubpartition val] end
+  fun state_builders(): Map[String, PartitionBuilder val] val => 
+    let builders: Map[String, PartitionBuilder val] trn =
+      recover Map[String, PartitionBuilder val] end
     for (k, v) in _state_builders.pairs() do
       builders(k) = v
     end
@@ -190,32 +190,25 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       state_name, TypedRouteBuilder[StateProcessor[State] val],
       TypedRouteBuilder[Next])
 
-    // let next_builder = PartitionedPreStateRunnerBuilder[Last, Next, Last, 
-    //   State, U8](_p.name(), state_name, s_comp, consume step_id_map, 
-    //     single_step_partition,
-    //     TypedRouteBuilder[StateProcessor[State] val],
-    //     TypedRouteBuilder[Next]
-    //     where multi_worker = false)
     _p.add_runner_builder(next_builder)
 
-    let state_partition = KeyedStateSubpartition[U8](
-      single_step_partition.keys(),
-      StateRunnerBuilder[State](s_initializer, state_name, 
-        s_comp.state_change_builders()) 
-      where multi_worker = false)
+    let state_builder = PartitionedStateRunnerBuilder[Last, State,
+      U8](_p.name(), state_name, consume step_id_map, 
+        single_step_partition,
+        StateRunnerBuilder[State](s_initializer, state_name, 
+          s_comp.state_change_builders()),
+        TypedRouteBuilder[StateProcessor[State] val],
+        TypedRouteBuilder[Next])
 
-    _a.add_state_builder(state_name, state_partition)
+    // let state_partition = KeyedStateSubpartition[U8, Key](
+    //   single_step_partition.keys(),
+    //   StateRunnerBuilder[State](s_initializer, state_name, 
+    //     s_comp.state_change_builders()) 
+    //   where multi_worker = false)
+
+    _a.add_state_builder(state_name, state_builder)
 
     PipelineBuilder[In, Out, Next](_a, _p)
-
-    // let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp,
-    //   state_name,
-    //   TypedRouteBuilder[StateProcessor[State] val],
-    //   TypedRouteBuilder[Next])
-    // _p.add_runner_builder(next_builder)
-    // let state_builder = StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders())
-    // _p.add_runner_builder(state_builder)
-    // PipelineBuilder[In, Out, Next](_a, _p)
 
   fun ref to_state_partition[PIn: Any val,
     Key: (Hashable val & Equatable[Key]), Next: Any val = PIn, 
@@ -248,11 +241,20 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     _p.add_runner_builder(next_builder)
 
-    let state_partition = KeyedStateSubpartition[Key](partition.keys(),
-      StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders()) 
-        where multi_worker = multi_worker)
+    let state_builder = PartitionedStateRunnerBuilder[PIn, State,
+      Key](_p.name(), state_name, consume step_id_map, partition,
+        StateRunnerBuilder[State](s_initializer, state_name, 
+          s_comp.state_change_builders()),
+        TypedRouteBuilder[StateProcessor[State] val],
+        TypedRouteBuilder[Next]
+        where multi_worker = multi_worker, default_target_name' = 
+        default_target_name)
 
-    _a.add_state_builder(state_name, state_partition)
+    // let state_partition = KeyedStateSubpartition[Key](partition.keys(),
+    //   StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders()) 
+    //     where multi_worker = multi_worker)
+
+    _a.add_state_builder(state_name, state_builder)
 
     PipelineBuilder[In, Out, Next](_a, _p)
 

@@ -204,8 +204,8 @@ class LocalPartitionRouter[In: Any val,
     o_seq_id: U64): Bool
   =>
     match data
-    | let input: In =>
-      let key = _partition_function(input)
+    | let iw: InputWrapper[In] val =>
+      let key = _partition_function(iw.input())
       try
         match _partition_routes(key)
         | let s: Step =>
@@ -229,7 +229,7 @@ class LocalPartitionRouter[In: Any val,
             true
           end    
         | let p: ProxyRouter val =>
-          p.route[In](metric_name, source_ts, input, producer,
+          p.route[D](metric_name, source_ts, data, producer,
             // incoming envelope
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
             // outgoing envelope
@@ -243,7 +243,7 @@ class LocalPartitionRouter[In: Any val,
         // If there's a default, use that
         match _default_router
         | let r: Router val =>
-          r.route[In](metric_name, source_ts, input, producer,
+          r.route[In](metric_name, source_ts, iw.input(), producer,
             // incoming envelope
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
             // outgoing envelope
@@ -272,7 +272,8 @@ class LocalPartitionRouter[In: Any val,
 
   fun local_map(): Map[U128, Step] val => _local_map
 
-// TODO: Remove State type argument
+// TODO: Remove this by updating market-test once single prestate work
+// is finished
 class StateAddressesRouter[In: Any val, 
   Key: (Hashable val & Equatable[Key] val)]
   let _state_addresses: StateAddresses val
@@ -317,6 +318,12 @@ class StateAddressesRouter[In: Any val,
         else
           true
         end
+      | let p: ProxyRouter val =>
+        p.route[D](metric_name, source_ts, data, producer,
+          // incoming envelope
+          i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+          // outgoing envelope
+          o_origin, o_msg_uid, o_frac_ids, o_seq_id)
       else
         true    
       end

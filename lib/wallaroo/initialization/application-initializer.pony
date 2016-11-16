@@ -397,9 +397,9 @@ actor ApplicationInitializer
                       sink_id
                     end
 
-                  let next_initializer = PartitionedPreStateStepBuilder(
+                  let next_initializer = PartitionedStateStepBuilder(
                     application.name(), pipeline.name(),
-                    pb.pre_state_subpartition(partition_workers), 
+                    pb.state_subpartition(partition_workers), 
                     next_runner_builder, state_name, pre_state_target_id,
                     next_runner_builder.forward_route_builder(),
                     pb.default_target_name())

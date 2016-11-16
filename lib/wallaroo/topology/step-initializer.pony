@@ -8,7 +8,7 @@ use "wallaroo/resilience"
 use "wallaroo/tcp-source"
 use "wallaroo/tcp-sink"
 
-type StepInitializer is (StepBuilder | PartitionedPreStateStepBuilder | 
+type StepInitializer is (StepBuilder | PartitionedStateStepBuilder | 
   SourceData | EgressBuilder)
 
 class StepBuilder
@@ -56,10 +56,10 @@ class StepBuilder
     step.update_router(next)
     step
 
-class PartitionedPreStateStepBuilder
+class PartitionedStateStepBuilder
   let _app_name: String
   let _pipeline_name: String
-  let _pre_state_subpartition: PreStateSubpartition val
+  let _state_subpartition: StateSubpartition val
   let _runner_builder: RunnerBuilder val
   let _state_name: String
   let _id: U128
@@ -68,13 +68,13 @@ class PartitionedPreStateStepBuilder
   let _default_target_name: String
 
   new val create(app_name: String, pipeline_name': String, 
-    sub: PreStateSubpartition val, r: RunnerBuilder val, state_name': String,
+    sub: StateSubpartition val, r: RunnerBuilder val, state_name': String,
     pre_state_target_id': U128, forward_route_builder': RouteBuilder val,
     default_target_name': String = "") 
   =>
     _app_name = app_name
     _pipeline_name = pipeline_name'
-    _pre_state_subpartition = sub
+    _state_subpartition = sub
     _runner_builder = r
     _state_name = state_name'
     _id = _runner_builder.id()
@@ -98,16 +98,16 @@ class PartitionedPreStateStepBuilder
     Step(RouterRunner, MetricsReporter(_app_name, metrics_conn), _id,
       _runner_builder.route_builder(), alfred)
 
-  fun build_partition(worker_name: String, state_addresses: StateAddresses val,
-    metrics_conn: TCPConnection, auth: AmbientAuth, connections: Connections, 
+  fun build_partition(worker_name: String, metrics_conn: TCPConnection, 
+    auth: AmbientAuth, connections: Connections, 
     alfred: Alfred, 
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     state_comp_router: Router val = EmptyRouter,
     default_router: (Router val | None) = None): 
       PartitionRouter val 
   =>
-    _pre_state_subpartition.build(_app_name, worker_name, _runner_builder, 
-      state_addresses, metrics_conn, auth, connections, alfred,
+    _state_subpartition.build(_app_name, worker_name, _runner_builder, 
+      metrics_conn, auth, connections, alfred,
       outgoing_boundaries, state_comp_router, default_router)
 
 class SourceData
