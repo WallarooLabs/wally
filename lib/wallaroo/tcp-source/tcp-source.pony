@@ -74,6 +74,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
 
+    //TODO: either only accept when we are done recovering or don't start
+    //listening until we are done recovering
     _notify.accepted(this)
 
     for consumer in routes.values() do
