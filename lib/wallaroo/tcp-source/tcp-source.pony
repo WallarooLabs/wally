@@ -203,7 +203,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
       end
     else
       if AsioEvent.readable(flags) then
-        if not _readable  then
+        if _readable  then
           @printf[None]("Got readable while readable\n".cstring())
           _mute()
         end
