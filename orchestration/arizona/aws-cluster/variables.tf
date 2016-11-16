@@ -88,10 +88,8 @@ variable "follower_spot_price" {
   default = ""
 }
 
-variable "instance_amis" {
+variable "instance_ami" {
   description = "AMI for all instances."
-  default = {
-    us-east-1 = "ami-0ecd9e19"
-  }
+  default = "ami-0ecd9e19"
 }
 
