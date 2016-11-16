@@ -51,7 +51,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   let _origins: OriginSet = OriginSet(10)
 
   // BUG TRACKING
-  let _read_agains: USize = 0
+  var _read_agains: USize = 0
 
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
