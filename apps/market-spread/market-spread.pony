@@ -8,8 +8,13 @@ nc -l 127.0.0.1 5555 >> /dev/null
 2) metrics sink (if not using Monitoring Hub):
 nc -l 127.0.0.1 5001 >> /dev/null
 
-3) market spread app:
+3a) market spread app (1 worker):
 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n node-name --ponythreads=4 --ponynoblock
+
+3b) market spread app (2 workers):
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n node-name --ponythreads=4 --ponynoblock -t -w 2
+
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n worker2 --ponythreads=4 --ponynoblock -w 2
 
 4) orders:
 giles/sender/sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
@@ -247,7 +252,7 @@ class OrderResult
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
-    // @printf[I32]((r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
+    // @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
     //Header (size == 55 bytes)
     let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
     wb.u32_be(msgs_size.u32())
@@ -272,7 +277,27 @@ class LegalSymbols
   let symbols: Array[String] val
 
   new create() =>
-    symbols = recover      
+    let padded: Array[String] trn = recover Array[String] end
+    for symbol in RawSymbols().values() do 
+      padded.push(RawSymbols.pad_symbol(symbol))
+    end
+    symbols = consume padded
+
+primitive RawSymbols
+  fun pad_symbol(s: String): String =>
+    if s.size() == 4 then
+      s
+    else
+      let diff = 4 - s.size()
+      var padded = s
+      for i in Range(0, diff) do
+        padded = " " + padded
+      end
+      padded
+    end   
+
+  fun apply(): Array[String] val =>
+    recover      
       [
 "AA",
 "BAC",

@@ -15,13 +15,13 @@ trait tag CreditFlowProducer // TODO: find better name now the we have route_id
   be receive_credits(credits: ISize, from: CreditFlowConsumer)
   fun ref route_to(c: CreditFlowConsumerStep): (Route | None)
   fun ref update_route_id(route_id: U64)
-    
+
 type CreditFlowProducerConsumer is (CreditFlowProducer & CreditFlowConsumer)
 
-trait val RouteCallbackHandler
+trait RouteCallbackHandler
   fun shutdown(p: CreditFlowProducer ref)
-  fun credits_replenished(p: CreditFlowProducer ref)
-  fun credits_exhausted(p: CreditFlowProducer ref)
+  fun ref credits_replenished(p: CreditFlowProducer ref)
+  fun ref credits_exhausted(p: CreditFlowProducer ref)
 
 trait RouteBuilder
   fun apply(step: CreditFlowProducer ref, consumer: CreditFlowConsumerStep,
@@ -29,10 +29,10 @@ trait RouteBuilder
 
 primitive TypedRouteBuilder[In: Any val] is RouteBuilder
   fun apply(step: CreditFlowProducer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler): Route 
+    handler: RouteCallbackHandler): Route
   =>
     match consumer
-    | let boundary: OutgoingBoundary => 
+    | let boundary: OutgoingBoundary =>
       BoundaryRoute(step, boundary, handler)
     else
       TypedRoute[In](step, consumer, handler)
@@ -42,7 +42,7 @@ primitive EmptyRouteBuilder is RouteBuilder
   fun apply(step: CreditFlowProducer ref, consumer: CreditFlowConsumerStep,
     handler: RouteCallbackHandler): Route
   =>
-    EmptyRoute  
+    EmptyRoute
 
 trait Route
   fun ref initialize()
@@ -51,21 +51,21 @@ trait Route
   fun ref receive_credits(number: ISize)
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: CreditFlowProducer ref,
-    origin: Origin tag, msg_uid: U128, 
+    origin: Origin tag, msg_uid: U128,
     frac_ids: None, outgoing_seq_id: U64)
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val)
-    
+
 class EmptyRoute is Route
   fun ref initialize() => None
   fun credits(): ISize => 0
   fun ref dispose() => None
   fun ref receive_credits(number: ISize) => None
-  
+
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
-    cfp: CreditFlowProducer ref,    
-    origin: Origin tag, msg_uid: U128, 
+    cfp: CreditFlowProducer ref,
+    origin: Origin tag, msg_uid: U128,
     frac_ids: None, outgoing_seq_id: U64)
-  => 
+  =>
     None
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val) =>
@@ -85,8 +85,7 @@ class TypedRoute[In: Any val] is Route
   var _seq_id: U64 = 0
   // (metric_name, source_ts, input, origin, msg_uid,
   // frac_ids, outgoing_seq_id)
-  embed _queue: Array[(String, U64, In, Origin tag, U128, 
-    None, U64)] = _queue.create()
+  let _queue: Array[(String, U64, In, Origin tag, U128, None, U64)]
 
   new create(step: CreditFlowProducer ref, consumer: CreditFlowConsumerStep,
     handler: RouteCallbackHandler)
@@ -95,6 +94,13 @@ class TypedRoute[In: Any val] is Route
     _consumer = consumer
     _callback = handler
     _consumer.register_producer(_step)
+
+    let q_size: USize = ifdef "use_backpressure" then
+      500_000
+    else
+      0
+    end
+    _queue = Array[(String, U64, In, Origin tag, U128, None, U64)](q_size)
 
   fun ref initialize() =>
     None
@@ -148,8 +154,8 @@ class TypedRoute[In: Any val] is Route
     end
 
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
-    cfp: CreditFlowProducer ref,    
-    origin: Origin tag, msg_uid: U128, 
+    cfp: CreditFlowProducer ref,
+    origin: Origin tag, msg_uid: U128,
     frac_ids: None, outgoing_seq_id: U64)
   =>
     match data
@@ -160,11 +166,11 @@ class TypedRoute[In: Any val] is Route
             _credits_available >= _request_more_credits_after
 
           if _queue.size() > 0 then
-            _add_to_queue(metric_name, source_ts, input, origin, msg_uid, 
+            _add_to_queue(metric_name, source_ts, input, origin, msg_uid,
               frac_ids, outgoing_seq_id)
             _flush_queue()
           else
-            _send_message_on_route(metric_name, source_ts, input, origin, 
+            _send_message_on_route(metric_name, source_ts, input, origin,
               msg_uid, frac_ids, outgoing_seq_id)
           end
 
@@ -181,7 +187,7 @@ class TypedRoute[In: Any val] is Route
             end
           end
         else
-          _add_to_queue(metric_name, source_ts, input, origin, msg_uid, 
+          _add_to_queue(metric_name, source_ts, input, origin, msg_uid,
             frac_ids, outgoing_seq_id)
           _request_credits()
         end
@@ -197,23 +203,23 @@ class TypedRoute[In: Any val] is Route
     @printf[I32]("Forward should never be called on a TypedRoute\n".cstring())
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64, input: In,
-    origin: Origin tag, msg_uid: U128, 
+    origin: Origin tag, msg_uid: U128,
     frac_ids: None, outgoing_seq_id: U64)
-  =>  
+  =>
     _consumer.run[In](metric_name,
       source_ts,
-      input,  
+      input,
       origin,
       msg_uid,
       frac_ids,
       outgoing_seq_id,
       _route_id)
-     
+
     _credits_available = _credits_available - 1
 
 
   fun ref _add_to_queue(metric_name: String, source_ts: U64, input: In,
-    origin: Origin tag, msg_uid: U128, 
+    origin: Origin tag, msg_uid: U128,
     frac_ids: None, outgoind_seq_id: U64)
   =>
     _queue.push((metric_name, source_ts, input,
@@ -226,7 +232,7 @@ class TypedRoute[In: Any val] is Route
         _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, d._7)
       end
     end
-    
+
 class BoundaryRoute is Route
   """
   Relationship between a single producer and a single consumer.
@@ -239,7 +245,7 @@ class BoundaryRoute is Route
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
   var _seq_id: U64 = 0
-  embed _queue: Queue[ReplayableDeliveryMsg val] = _queue.create()
+  let _queue: Queue[ReplayableDeliveryMsg val]
 
   new create(step: CreditFlowProducer ref, consumer: OutgoingBoundary,
     handler: RouteCallbackHandler)
@@ -248,6 +254,13 @@ class BoundaryRoute is Route
     _consumer = consumer
     _callback = handler
     _consumer.register_producer(_step)
+
+    let q_size: USize = ifdef "use_backpressure" then
+      500_000
+    else
+      0
+    end
+    _queue = Queue[ReplayableDeliveryMsg val](q_size)
 
   fun ref initialize() =>
     None
@@ -299,10 +312,10 @@ class BoundaryRoute is Route
       _consumer.credit_request(_step)
       _request_outstanding = true
     end
- 
+
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: CreditFlowProducer ref,
-    origin: Origin tag, msg_uid: U128, 
+    origin: Origin tag, msg_uid: U128,
     frac_ids: None, outgoing_seq_id: U64)
   =>
     @printf[I32]("Run should never be called on a BoundaryRoute\n".cstring())
@@ -335,7 +348,7 @@ class BoundaryRoute is Route
       else
         _add_to_queue(delivery_msg)
         _request_credits()
-      end       
+      end
     else
       _send_message_on_route(delivery_msg)
     end
@@ -359,4 +372,4 @@ class BoundaryRoute is Route
       end
     end
 
-    
+

@@ -385,22 +385,38 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     _expect = _notify.expect(this, qty)
     _read_buf_size()
 
-primitive TCPSourceRouteCallbackHandler is RouteCallbackHandler
+class TCPSourceRouteCallbackHandler is RouteCallbackHandler
+  var _muted: ISize = 0
+
   fun shutdown(producer: CreditFlowProducer ref) =>
     match producer
     | let p: TCPSource ref =>
       p._hard_close()
     end
 
-  fun credits_replenished(producer: CreditFlowProducer ref) =>
+  fun ref credits_replenished(producer: CreditFlowProducer ref) =>
+    ifdef debug then
+      try
+        Assert(_muted > 0, 
+          "credits_replenished() should only be called when the calling " + 
+          "Route was already muted.")
+      else
+        shutdown(producer)
+        return
+      end
+    end
     match producer
     | let p: TCPSource ref =>
-      p._unmute()
+      _muted = _muted - 1
+      if (_muted == 0) then
+        p._unmute()
+      end
     end
 
-  fun credits_exhausted(producer: CreditFlowProducer ref) =>
+  fun ref credits_exhausted(producer: CreditFlowProducer ref) =>
     match producer
     | let p: TCPSource ref =>
+      _muted = _muted + 1
       p._mute()
     end
 
