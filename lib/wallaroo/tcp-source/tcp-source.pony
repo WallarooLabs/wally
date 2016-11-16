@@ -409,7 +409,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
   fun ref _resubscribe_event() =>
     let flags = if not _readable then
-      AsioEvent.read_oneshot()
+      AsioEvent.read() or AsioEvent.oneshot()
     else
       return
     end
