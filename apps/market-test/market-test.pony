@@ -49,13 +49,13 @@ use "wallaroo/tcp-source"
 use "wallaroo/topology"
 
 actor Main
-  new create(env: Env) => 
+  new create(env: Env) =>
     var m_arg: (Array[String] | None) = None
     var o_arg: (Array[String] | None) = None
     var c_arg: (Array[String] | None) = None
     var d_arg: (Array[String] | None) = None
     var p_arg: (Array[String] | None) = None
-    var i_addrs_write: Array[Array[String]] trn = 
+    var i_addrs_write: Array[Array[String]] trn =
       recover Array[Array[String]] end
     var worker_count: USize = 1
     var is_initializer = false
@@ -84,10 +84,10 @@ actor Main
 
       for option in options do
         match option
-        | ("expected", let arg: I64) => 
+        | ("expected", let arg: I64) =>
           env.out.print("--expected/-e is a deprecated parameter")
         | ("metrics", let arg: String) => m_arg = arg.split(":")
-        | ("in", let arg: String) => 
+        | ("in", let arg: String) =>
           for addr in arg.split(",").values() do
             i_addrs_write.push(addr.split(":"))
           end
@@ -95,9 +95,9 @@ actor Main
         | ("control", let arg: String) => c_arg = arg.split(":")
         | ("data", let arg: String) => d_arg = arg.split(":")
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
-        | ("file", let arg: String) => 
+        | ("file", let arg: String) =>
           env.out.print("--file/-f is a deprecated parameter")
-        | ("worker-count", let arg: I64) => 
+        | ("worker-count", let arg: I64) =>
           worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
         | ("name", let arg: String) => worker_name = arg
@@ -141,13 +141,13 @@ actor Main
           m_addr(1))
 
       let connect_msg = HubProtocol.connect()
-      let metrics_join_msg = HubProtocol.join("metrics:Market Spread App") 
+      let metrics_join_msg = HubProtocol.join("metrics:Market Spread App")
       metrics_conn.writev(connect_msg)
       metrics_conn.writev(metrics_join_msg)
 
-      (let ph_host, let ph_service) = 
+      (let ph_host, let ph_service) =
         match p_arg
-        | let addr: Array[String] => 
+        | let addr: Array[String] =>
           (addr(0), addr(1))
         else
           ("", "")
@@ -158,21 +158,21 @@ actor Main
       let encoder_wrapper = TypedEncoderWrapper[OrderResult val](
         OrderResultEncoder)
 
-      let sink_reporter = MetricsReporter("Market Spread App", 
+      let sink_reporter = MetricsReporter("Market Spread App",
         metrics_conn)
 
-      let initial_report_msgs_trn: Array[Array[ByteSeq] val] trn = 
+      let initial_report_msgs_trn: Array[Array[ByteSeq] val] trn =
         recover Array[Array[ByteSeq] val] end
       let report_connect_msg = HubProtocol.connect()
       let join_msg = HubProtocol.join("reports:market-spread")
       initial_report_msgs_trn.push(report_connect_msg)
       initial_report_msgs_trn.push(join_msg)
-      let initial_report_msgs: Array[Array[ByteSeq] val] val = 
+      let initial_report_msgs: Array[Array[ByteSeq] val] val =
         consume initial_report_msgs_trn
 
-      let sink = TCPSink(encoder_wrapper, consume sink_reporter, 
-        o_addr(0), 
-        o_addr(1), 
+      let sink = TCPSink(encoder_wrapper, consume sink_reporter,
+        o_addr(0),
+        o_addr(1),
         initial_report_msgs)
 
       let sink_router = DirectRouter(sink)
@@ -181,10 +181,10 @@ actor Main
       // STATE PARTITION
 
       let state_runner_builder = StateRunnerBuilder[SymbolData](
-        SymbolDataBuilder, "Symbol Data", UpdateNbbo.state_change_builders()) 
+        SymbolDataBuilder, "Symbol Data", UpdateNbbo.state_change_builders())
 
       let state_subpartition = KeyedStateSubpartition[String](
-        LegalSymbols.symbols, state_runner_builder 
+        LegalSymbols.symbols, state_runner_builder
         where multi_worker = false)
 
       let state_addresses = state_subpartition.build("Market Spread App",
@@ -201,46 +201,46 @@ actor Main
           TypedRouteBuilder[StateProcessor[SymbolData] val],
           TypedRouteBuilder[None])
 
-      let nbbo_route_builder = 
+      let nbbo_route_builder =
         TypedRouteBuilder[StateProcessor[SymbolData] val]
 
       let nbbo_s_s_builder = TypedSourceBuilderBuilder[FixNbboMessage val](
         "Market Spread App", "NBBO Source", FixNbboFrameHandler)
 
       TCPSourceListener(
-        nbbo_s_s_builder(nbbo_runner_builder, 
+        nbbo_s_s_builder(nbbo_runner_builder,
           nbbo_partition_router, metrics_conn),
         nbbo_partition_router,
         nbbo_route_builder,
         recover Map[String, OutgoingBoundary] end,
         alfred, None, EmptyRouter,
-        input_addrs(0)(0), 
+        input_addrs(0)(0),
         input_addrs(0)(1))
 
 
       // ORDERS SOURCE
 
-      let orders_partition_router = StateAddressesRouter[FixOrderMessage val, 
+      let orders_partition_router = StateAddressesRouter[FixOrderMessage val,
         String](state_addresses, SymbolPartitionFunction)
 
       let orders_runner_builder = PreStateRunnerBuilder[FixOrderMessage val, OrderResult val, SymbolData](CheckOrder,
           TypedRouteBuilder[StateProcessor[SymbolData] val],
-          TypedRouteBuilder[OrderResult val]) 
+          TypedRouteBuilder[OrderResult val])
 
-      let orders_route_builder = 
+      let orders_route_builder =
         TypedRouteBuilder[StateProcessor[SymbolData] val]
 
       let orders_s_s_builder = TypedSourceBuilderBuilder[FixOrderMessage val](
         "Market Spread App", "Orders Source", FixOrderFrameHandler)
 
       TCPSourceListener(
-        orders_s_s_builder(orders_runner_builder, 
+        orders_s_s_builder(orders_runner_builder,
           orders_partition_router, metrics_conn),
         orders_partition_router,
         orders_route_builder,
         recover Map[String, OutgoingBoundary] end,
         alfred, None, sink_router,
-        input_addrs(1)(0), 
+        input_addrs(1)(0),
         input_addrs(1)(1))
 
       // Register leftover routes
@@ -255,12 +255,12 @@ actor Main
 
 
       // let connections = Connections(application.name(), worker_name, env, auth,
-      //   c_host, c_service, d_host, d_service, ph_host, ph_service, 
+      //   c_host, c_service, d_host, d_service, ph_host, ph_service,
       //   metrics_conn, is_initializer)
 
       // let local_topology_file = "/tmp/" + worker_name + ".local-topology"
-      // let local_topology_initializer = LocalTopologyInitializer(worker_name, 
-      //   worker_count, env, auth, connections, metrics_conn, is_initializer, 
+      // let local_topology_initializer = LocalTopologyInitializer(worker_name,
+      //   worker_count, env, auth, connections, metrics_conn, is_initializer,
       //   alfred, local_topology_file)
 
       // if is_initializer then
@@ -269,26 +269,26 @@ actor Main
       //     local_topology_initializer, input_addrs, o_addr, alfred)
 
       //   worker_initializer = WorkerInitializer(auth, worker_count, connections,
-      //     application_initializer, local_topology_initializer, d_addr, 
+      //     application_initializer, local_topology_initializer, d_addr,
       //     metrics_conn)
       //   worker_name = "initializer"
       // end
 
       // let control_notifier: TCPListenNotify iso =
-      //   ControlChannelListenNotifier(worker_name, env, auth, connections, 
+      //   ControlChannelListenNotifier(worker_name, env, auth, connections,
       //     is_initializer, worker_initializer, local_topology_initializer, alfred)
 
       // if is_initializer then
       //   connections.register_listener(
-      //     TCPListener(auth, consume control_notifier, c_host, c_service) 
+      //     TCPListener(auth, consume control_notifier, c_host, c_service)
       //   )
       // else
       //   connections.register_listener(
-      //     TCPListener(auth, consume control_notifier) 
+      //     TCPListener(auth, consume control_notifier)
       //   )
       // end
 
-      // match worker_initializer 
+      // match worker_initializer
       // | let w: WorkerInitializer =>
       //   w.start(application)
       // end
@@ -303,7 +303,7 @@ primitive Identity[In: Any val]
 primitive IdentityBuilder[In: Any val]
   fun apply(): Computation[In, In] val =>
     Identity[In]
- 
+
 
 interface Symboly
   fun symbol(): String
@@ -326,7 +326,7 @@ class SymbolDataStateChange is StateChange[SymbolData]
 
   fun name(): String => _name
   fun id(): U64 => _id
-  
+
   new create(id': U64, name': String) =>
     _id = id'
     _name = name'
@@ -359,8 +359,8 @@ class SymbolDataStateChangeBuilder is StateChangeBuilder[SymbolData]
 primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
   fun name(): String => "Update NBBO"
 
-  fun apply(msg: FixNbboMessage val, 
-    sc_repo: StateChangeRepository[SymbolData], 
+  fun apply(msg: FixNbboMessage val,
+    sc_repo: StateChangeRepository[SymbolData],
     state: SymbolData): (None, StateChange[SymbolData] ref)
   =>
     // @printf[I32]("!!Update NBBO\n".cstring())
@@ -385,12 +385,12 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
       scbs.push(recover val SymbolDataStateChangeBuilder end)
     end
 
-class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val, 
+class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
   SymbolData]
   fun name(): String => "Check Order against NBBO"
 
-  fun apply(msg: FixOrderMessage val, 
-    sc_repo: StateChangeRepository[SymbolData], 
+  fun apply(msg: FixOrderMessage val,
+    sc_repo: StateChangeRepository[SymbolData],
     state: SymbolData): ((OrderResult val | None), None)
   =>
     // @printf[I32]("!!CheckOrder\n".cstring())
@@ -401,7 +401,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     else
       (None, None)
     end
-  
+
   fun state_change_builders(): Array[StateChangeBuilder[SymbolData] val] val =>
     recover val
       Array[StateChangeBuilder[SymbolData] val]
@@ -437,7 +437,7 @@ primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
     end
 
 primitive SymbolPartitionFunction
-  fun apply(input: Symboly val): String 
+  fun apply(input: Symboly val): String
   =>
     input.symbol()
 
@@ -470,7 +470,7 @@ class OrderResult
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
-    @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
+    //@printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
     //Header (size == 55 bytes)
     let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
     wb.u32_be(msgs_size.u32())
@@ -488,7 +488,7 @@ primitive OrderResultEncoder
     wb.f64_be(r.offer)
     wb.u64_be(r.timestamp)
     let payload = wb.done()
-    HubProtocol.payload("rejected-orders", "reports:market-spread", 
+    HubProtocol.payload("rejected-orders", "reports:market-spread",
       consume payload, wb)
 
 class LegalSymbols
@@ -496,7 +496,7 @@ class LegalSymbols
 
   new create() =>
     let padded: Array[String] trn = recover Array[String] end
-    for symbol in RawSymbols().values() do 
+    for symbol in RawSymbols().values() do
       padded.push(RawSymbols.pad_symbol(symbol))
     end
     symbols = consume padded
@@ -512,10 +512,10 @@ primitive RawSymbols
         padded = " " + padded
       end
       padded
-    end   
+    end
 
   fun apply(): Array[String] val =>
-    recover      
+    recover
       [
 "AA",
 "BAC",
