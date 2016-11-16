@@ -51,9 +51,6 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
 
-  // BUG TRACKING
-  var _read_agains: USize = 0
-
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
@@ -69,7 +66,13 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     _notify.set_origin(this)
     _connect_count = 0
     _fd = fd
-    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write_oneshot(), 0, true)
+    ifdef linux then
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write_oneshot(), 0, true)
+    else
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write(), 0, true)
+    end
     _connected = true
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
@@ -204,14 +207,6 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
       end
     else
       if AsioEvent.readable(flags) then
-        if _readable  then
-          @printf[None]("Got readable while readable\n".cstring())
-          _mute()
-        end
-        if _read_agains > 0 then
-          @printf[None]("got readable and _read_agains is more than 0. Doubling up\n".cstring())
-          _mute()
-        end
         _readable = true
         _pending_reads()
       end
@@ -314,12 +309,11 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
       while _readable and not _shutdown_peer do
         if _muted then
-          @printf[None]("Attempt to read while muted\n".cstring())
-          //_read_again()
           return
         end
 
         // Read as much data as possible.
+        _read_buf_size()
         let len = @pony_os_recv[USize](
           _event,
           _read_buf.cpointer().usize() + _read_len,
@@ -344,21 +338,20 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
           _read_len = 0
 
           let carry_on = _notify.received(this, consume data)
-          _read_buf_size()
-          if not carry_on then
-            _read_agains = _read_agains + 1
-            _read_again()
-            return
+          ifdef osx then
+            if not carry_on then
+              _read_again()
+              return
+            end
+
+            sum = sum + len
+
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
+            end
           end
-        end
-
-        sum = sum + len
-
-        if sum >= _max_size then
-          // If we've read _max_size, yield and read again later.
-          _read_agains = _read_agains + 1
-          _read_again()
-          return
         end
       end
     else
@@ -371,12 +364,6 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     """
     Resume reading.
     """
-    if _read_agains > 1 then
-      @printf[None]("Too many read again calls. BUG!!!!!".cstring())
-      _mute()
-    end
-
-    _read_agains = _read_agains - 1
 
     _pending_reads()
 
@@ -391,12 +378,11 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     end
 
   fun ref _mute() =>
-    @printf[None]("Muting\n".cstring())
     _muted = true
 
   fun ref _unmute() =>
-    @printf[None]("Unmuting\n".cstring())
     _muted = false
+    _pending_reads()
 
   fun ref expect(qty: USize = 0) =>
     """
@@ -408,13 +394,15 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     _read_buf_size()
 
   fun ref _resubscribe_event() =>
-    let flags = if not _readable then
-      AsioEvent.read() or AsioEvent.oneshot()
-    else
-      return
-    end
+    ifdef linux
+      let flags = if not _readable then
+        AsioEvent.read() or AsioEvent.oneshot()
+      else
+        return
+      end
 
-    @pony_asio_event_resubscribe(_event, flags)
+      @pony_asio_event_resubscribe(_event, flags)
+    end
 
 class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   var _muted: ISize = 0

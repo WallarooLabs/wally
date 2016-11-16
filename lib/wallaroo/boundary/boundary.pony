@@ -90,7 +90,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _notify_connecting()
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
+    tcp_sinks: Array[TCPSink] val)
   =>
     try
       if _step_id == 0 then
