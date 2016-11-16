@@ -394,7 +394,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     _read_buf_size()
 
   fun ref _resubscribe_event() =>
-    ifdef linux
+    ifdef linux then
       let flags = if not _readable then
         AsioEvent.read() or AsioEvent.oneshot()
       else
