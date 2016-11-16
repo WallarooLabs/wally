@@ -42,7 +42,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   var _read_len: USize = 0
   var _shutdown: Bool = false
   var _muted: Bool = false
-  
+
   // Resilience
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
@@ -50,11 +50,14 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
 
+  // BUG TRACKING
+  let _read_agains: USize = 0
+
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val, 
-    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,   
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -82,7 +85,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     end
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
-      _routes(boundary) = 
+      _routes(boundary) =
         _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
@@ -117,8 +120,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     None
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
-  => 
+    tcp_sinks: Array[TCPSink] val)
+  =>
     None
 
   be dispose() =>
@@ -158,7 +161,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
   fun ref update_route_id(route_id: U64) =>
     None // only used in Route to update the outgoing route_id for a message
-    
+
   //
   // TCP
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
@@ -200,6 +203,14 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
       end
     else
       if AsioEvent.readable(flags) then
+        if not _readable  then
+          @printf[None]("Got readable while readable\n".cstring())
+          _mute()
+        end
+        if _read_agains > 0 then
+          @printf[None]("got readable and _read_agains is more than 0. Doubling up\n".cstring())
+          _mute()
+        end
         _readable = true
         _pending_reads()
       end
@@ -301,7 +312,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
       while _readable and not _shutdown_peer do
         if _muted then
-          _read_again()
+          @printf[None]("Attempt to read while muted\n".cstring())
+          //_read_again()
           return
         end
 
@@ -331,6 +343,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
           let carry_on = _notify.received(this, consume data)
           _read_buf_size()
           if not carry_on then
+            _read_agains = _read_agains + 1
             _read_again()
             return
           end
@@ -340,6 +353,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
         if sum >= _max_size then
           // If we've read _max_size, yield and read again later.
+          _read_agains = _read_agains + 1
           _read_again()
           return
         end
@@ -354,6 +368,13 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     """
     Resume reading.
     """
+    if _read_agains > 1 then
+      @printf[None]("Too many read again calls. BUG!!!!!".cstring())
+      _mute()
+    end
+
+    _read_agains = _read_agains - 1
+
     _pending_reads()
 
   fun ref _read_buf_size() =>
@@ -395,8 +416,8 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   fun ref credits_replenished(producer: CreditFlowProducer ref) =>
     ifdef debug then
       try
-        Assert(_muted > 0, 
-          "credits_replenished() should only be called when the calling " + 
+        Assert(_muted > 0,
+          "credits_replenished() should only be called when the calling " +
           "Route was already muted.")
       else
         shutdown(producer)
