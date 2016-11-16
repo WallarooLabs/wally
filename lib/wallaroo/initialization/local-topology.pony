@@ -21,23 +21,26 @@ use "wallaroo/tcp-source"
 
 class LocalTopology
   let _app_name: String
+  let _worker_name: String
   let _graph: Dag[StepInitializer val] val
   // _state_builders maps from state_name to StateSubpartition
-  let _state_builders: Map[String, PartitionBuilder val] val
+  let _state_builders: Map[String, StateSubpartition val] val
   let _proxy_ids: Map[String, U128] val
   // TODO: Replace this default strategy with a better one after POC
   let default_target: (Array[StepBuilder val] val | ProxyAddress val | None)
   let default_target_name: String
   let default_target_id: U128
 
-  new val create(name': String, graph': Dag[StepInitializer val] val,
-    state_builders': Map[String, PartitionBuilder val] val,
+  new val create(name': String, worker_name: String,
+    graph': Dag[StepInitializer val] val,
+    state_builders': Map[String, StateSubpartition val] val,
     proxy_ids': Map[String, U128] val,
     default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
       None,
     default_target_name': String = "", default_target_id': U128 = 0)
   =>
     _app_name = name'
+    _worker_name = worker_name
     _graph = graph'
     _state_builders = state_builders'
     _proxy_ids = proxy_ids'
@@ -46,16 +49,18 @@ class LocalTopology
     default_target_name = default_target_name'
     default_target_id = default_target_id'
 
-  // fun update_state_map(state_map: Map[String, StateAddresses val],
-  //   metrics_conn: TCPConnection, alfred: Alfred)
-  // =>
-  //   for (state_name, subpartition) in _state_builders.pairs() do
-  //     if not state_map.contains(state_name) then
-  //       @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
-  //       state_map(state_name) = subpartition.build(_app_name, metrics_conn, 
-  //         alfred)
-  //     end
-  //   end
+  fun update_state_map(state_map: Map[String, PartitionRouter val],
+    metrics_conn: TCPConnection, alfred: Alfred,
+    connections: Connections, auth: AmbientAuth,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val)
+  =>
+    for (state_name, subpartition) in _state_builders.pairs() do
+      if not state_map.contains(state_name) then
+        @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
+        state_map(state_name) = subpartition.build(_app_name, _worker_name,
+           metrics_conn, auth, connections, alfred, outgoing_boundaries)
+      end
+    end
 
   fun graph(): Dag[StepInitializer val] val => _graph
 
@@ -187,8 +192,8 @@ actor LocalTopologyInitializer
         @printf[I32]("Creating graph:\n".cstring())
         @printf[I32]((graph.string() + "\n").cstring())
 
-        // // Make sure we only create shared state once and reuse it
-        // let state_map: Map[String, StateAddresses val] = state_map.create()
+        // Make sure we only create shared state once and reuse it
+        let state_map: Map[String, PartitionRouter val] = state_map.create()
 
         // Keep track of all CreditFLowConsumerSteps by id so we can create a 
         // DataRouter for the data channel boundary
@@ -197,11 +202,9 @@ actor LocalTopologyInitializer
 
         @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
 
-        // // Create shared state for this topology
-        // t.update_state_map(state_map, _metrics_conn, _alfred)
-
-        // // We'll need to register our proxies later over Connections
-        // let proxies: Map[String, Array[Step tag]] = proxies.create()
+        // Create shared state for this topology
+        t.update_state_map(state_map, _metrics_conn, _alfred, _connections,
+          _auth, _outgoing_boundaries)
 
         // Keep track of everything we need to call initialize() on when
         // we're done
@@ -364,7 +367,7 @@ actor LocalTopologyInitializer
 
                 let out_router = 
                   try
-                    built(out_id)
+                    builder.augment_router(built(out_id))
                   else
                     @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
                     error 
@@ -571,17 +574,30 @@ actor LocalTopologyInitializer
               let next_id = source_data.id()
               let pipeline_name = source_data.pipeline_name()
 
-              // Currently there are no splits (II), so we know that a node has
-              // only one output in the graph. We also know this is not
-              // a sink or proxy, so there is exactly one output.
-              let out_id: U128 = _get_output_node_id(next_node,
-                default_target_id, default_target_state_step_id)
               let out_router = 
-                try
-                  built(out_id)
+                if source_data.state_name() == "" then
+                  // Currently there are no splits (II), so we know that a node has
+                  // only one output in the graph. We also know this is not
+                  // a sink or proxy, so there is exactly one output.
+                  let out_id: U128 = _get_output_node_id(next_node,
+                    default_target_id, default_target_state_step_id)
+                  try
+                    built(out_id)
+                  else
+                    @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
+                    error 
+                  end
                 else
-                  @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
-                  error 
+                  // Source has a prestate runner on it, so we have no 
+                  // direct target. We need a partition router.
+                  try
+                    @printf[I32]("!!Augmenting router for state\n".cstring())
+                    source_data.augment_router(
+                      state_map(source_data.state_name()))
+                  else
+                    @printf[I32]("State doesn't exist for state computation.\n".cstring())
+                    error 
+                  end
                 end
 
               let source_reporter = MetricsReporter(t.name(), 

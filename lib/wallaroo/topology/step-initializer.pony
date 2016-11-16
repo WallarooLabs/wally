@@ -43,6 +43,8 @@ class StepBuilder
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
+  fun augment_router(r: Router val): Router val =>
+    _runner_builder.augment_router(r)
 
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
     router: Router val = EmptyRouter, 
@@ -91,6 +93,7 @@ class PartitionedStateStepBuilder
   fun is_partitioned(): Bool => true
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
   fun default_target_name(): String => _default_target_name
+  fun augment_router(r: Router val): Router val => r
     
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
     router: Router val = EmptyRouter): Step tag 
@@ -106,9 +109,9 @@ class PartitionedStateStepBuilder
     default_router: (Router val | None) = None): 
       PartitionRouter val 
   =>
-    _state_subpartition.build(_app_name, worker_name, _runner_builder, 
+    _state_subpartition.build(_app_name, worker_name,
       metrics_conn, auth, connections, alfred,
-      outgoing_boundaries, state_comp_router, default_router)
+      outgoing_boundaries, default_router)
 
 class SourceData
   let _id: U128
@@ -154,6 +157,8 @@ class SourceData
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun augment_router(r: Router val): Router val =>
+    _runner_builder.augment_router(r)
 
 class EgressBuilder
   let _name: String
@@ -187,6 +192,7 @@ class EgressBuilder
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun augment_router(r: Router val): Router val => r
 
   fun target_address(): (Array[String] val | ProxyAddress val | 
     PartitionAddresses val) => _addr

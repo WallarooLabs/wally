@@ -196,10 +196,9 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
 
 trait StateSubpartition
   fun build(app_name: String, worker_name: String, 
-    runner_builder: RunnerBuilder val, metrics_conn: TCPConnection,
+    metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    state_comp_router: Router val = EmptyRouter,
     default_router: (Router val | None) = None): PartitionRouter val
 
 class KeyedStateSubpartition[PIn: Any val,
@@ -208,9 +207,10 @@ class KeyedStateSubpartition[PIn: Any val,
   let _id_map: Map[Key, U128] val
   let _partition_function: PartitionFunction[PIn, Key] val
   let _pipeline_name: String
+  let _runner_builder: RunnerBuilder val
 
   new val create(partition_addresses': KeyedPartitionAddresses[Key] val,
-    id_map': Map[Key, U128] val,
+    id_map': Map[Key, U128] val, runner_builder: RunnerBuilder val,
     partition_function': PartitionFunction[PIn, Key] val,
     pipeline_name': String)
   =>
@@ -218,12 +218,12 @@ class KeyedStateSubpartition[PIn: Any val,
     _id_map = id_map'
     _partition_function = partition_function'
     _pipeline_name = pipeline_name'
+    _runner_builder = runner_builder
 
   fun build(app_name: String, worker_name: String,
-    runner_builder: RunnerBuilder val, metrics_conn: TCPConnection,
+    metrics_conn: TCPConnection, 
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    state_comp_router: Router val = EmptyRouter,
     default_router: (Router val | None) = None):
     LocalPartitionRouter[PIn, Key] val
   =>
@@ -242,9 +242,9 @@ class KeyedStateSubpartition[PIn: Any val,
       | let pa: ProxyAddress val =>
         if pa.worker == worker_name then
           let reporter = MetricsReporter(app_name, metrics_conn)
-          let next_state_step = Step(runner_builder(reporter.clone() 
+          let next_state_step = Step(_runner_builder(reporter.clone() 
               where alfred = alfred),
-            consume reporter, guid_gen.u128(), runner_builder.route_builder(),
+            consume reporter, guid_gen.u128(), _runner_builder.route_builder(),
               alfred)
 
           m(id) = next_state_step

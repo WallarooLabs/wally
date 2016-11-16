@@ -67,6 +67,11 @@ actor ApplicationInitializer
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("^^^^^^Initializing Topologies for Workers^^^^^^^\n\n".cstring())
     try
+      let all_workers_trn: Array[String] trn = recover Array[String] end
+      all_workers_trn.push("initializer")
+      for w in worker_names.values() do all_workers_trn.push(w) end
+      let all_workers: Array[String] val = consume all_workers_trn
+
       // Keep track of shared state so that it's only created once
       let state_partition_map: Map[String, PartitionAddresses val] trn =
         recover Map[String, PartitionAddresses val] end
@@ -91,6 +96,15 @@ actor ApplicationInitializer
       for name in worker_names.values() do
         local_graphs(name) = Dag[StepInitializer val]
       end
+
+      // Create StateSubpartitions
+      let ssb_trn: Map[String, StateSubpartition val] trn = 
+        recover Map[String, StateSubpartition val] end
+      for (s_name, p_builder) in application.state_builders().pairs() do
+        ssb_trn(s_name) = p_builder.state_subpartition(all_workers)
+      end
+      let state_subpartitions: Map[String, StateSubpartition val] val = 
+        consume ssb_trn
 
       // Keep track of proxy ids per worker
       let proxy_ids: Map[String, Map[String, U128]] = proxy_ids.create()
@@ -208,8 +222,14 @@ actor ApplicationInitializer
         // The last (node_id, StepInitializer val) pair we created.
         // Gets set to None when we cross to the next worker since it
         // doesn't need to know its immediate cross-worker predecessor.
+        // If the source has a prestate runner on it, then we set this
+        // to None since it won't send directly to anything.
         var last_initializer: ((U128, StepInitializer val) | None) = 
-          (source_node_id, source_initializer)
+          if source_seq_builder.state_name() == "" then
+            (source_node_id, source_initializer)
+          else
+            None
+          end
 
 
         // Determine which steps go on which workers using boundary indices
@@ -699,8 +719,8 @@ actor ApplicationInitializer
 
         let local_topology = 
           try
-            LocalTopology(application.name(), g.clone(),
-              application.state_builders(), consume p_ids,
+            LocalTopology(application.name(), w, g.clone(),
+              state_subpartitions, consume p_ids,
               default_target, application.default_target_name,
               application.default_target_id)
           else

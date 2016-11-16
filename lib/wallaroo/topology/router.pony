@@ -5,6 +5,10 @@ use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/tcp-sink"
 
+//!!
+use "sendence/fix"
+use "sendence/new-fix"
+
 // TODO: Eliminate producer None when we can
 interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -30,6 +34,7 @@ class EmptyRouter
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
+    @printf[I32]("!!EmptyRouter RECVD\n".cstring())
     true
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
@@ -174,8 +179,17 @@ class DataRouter
 trait PartitionRouter is Router
   fun local_map(): Map[U128, Step] val
 
+trait AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)] is
+  PartitionRouter
+  fun clone_and_augment[NewIn: Any val](
+    new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter val
+
+//!!
+interface Sy
+  fun symbol(): String
+
 class LocalPartitionRouter[In: Any val,
-  Key: (Hashable val & Equatable[Key] val)] is PartitionRouter
+  Key: (Hashable val & Equatable[Key] val)] is AugmentablePartitionRouter[Key]
   let _local_map: Map[U128, Step] val
   let _step_ids: Map[Key, U128] val
   let _partition_routes: Map[Key, (Step | ProxyRouter val)] val
@@ -204,57 +218,71 @@ class LocalPartitionRouter[In: Any val,
     o_seq_id: U64): Bool
   =>
     match data
-    | let iw: InputWrapper[In] val =>
-      let key = _partition_function(iw.input())
-      try
-        match _partition_routes(key)
-        | let s: Step =>
-          // TODO: Remove that producer can be None
-          match producer
-          | let cfp: CreditFlowProducer ref =>
-            let might_be_route = cfp.route_to(s)
-            match might_be_route
-            | let r: Route =>
-              r.run[D](metric_name, source_ts, data,
-                // hand down cfp so we can update route_id
-                cfp,
-                // outgoing envelope
-                o_origin, o_msg_uid, o_frac_ids, o_seq_id)
-              false
+    // TODO: Using an untyped input wrapper that returns an Any val might
+    // cause perf slowdowns and should be reevaluated.
+    | let iw: InputWrapper val =>
+      match iw.input()
+      | let input: In =>
+        let key = _partition_function(input)
+        try
+          match _partition_routes(key)
+          | let s: Step =>
+            // TODO: Remove that producer can be None
+            match producer
+            | let cfp: CreditFlowProducer ref =>
+              let might_be_route = cfp.route_to(s)
+              match might_be_route
+              | let r: Route =>
+                r.run[D](metric_name, source_ts, data,
+                  // hand down cfp so we can update route_id
+                  cfp,
+                  // outgoing envelope
+                  o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+                false
+              else
+                // TODO: What do we do if we get None?
+                true
+              end
             else
-              // TODO: What do we do if we get None?
               true
-            end
+            end    
+          | let p: ProxyRouter val =>
+            p.route[D](metric_name, source_ts, data, producer,
+              // incoming envelope
+              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+              // outgoing envelope
+              o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+          else
+            // No step or proxyrouter
+            true
+          end
+        else
+          // There is no entry for this key!
+          // If there's a default, use that
+          match _default_router
+          | let r: Router val =>
+            r.route[In](metric_name, source_ts, input, producer,
+              // incoming envelope
+              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+              // outgoing envelope
+              o_origin, o_msg_uid, o_frac_ids, o_seq_id)
           else
             true
-          end    
-        | let p: ProxyRouter val =>
-          p.route[D](metric_name, source_ts, data, producer,
-            // incoming envelope
-            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-            // outgoing envelope
-            o_origin, o_msg_uid, o_frac_ids, o_seq_id)
-        else
-          // No step or proxyrouter
-          true
+          end
         end
       else
-        // There is no entry for this key!
-        // If there's a default, use that
-        match _default_router
-        | let r: Router val =>
-          r.route[In](metric_name, source_ts, iw.input(), producer,
-            // incoming envelope
-            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-            // outgoing envelope
-            o_origin, o_msg_uid, o_frac_ids, o_seq_id)
-        else
-          true
-        end
+        // InputWrapper doesn't wrap In
+        true
       end
     else
       true
     end
+
+  fun clone_and_augment[NewIn: Any val](
+    new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter val
+  =>
+    LocalPartitionRouter[NewIn, Key](_local_map, _step_ids, _partition_routes, 
+      new_p_function)
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
     // TODO: CREDITFLOW we need to handle proxies once we have boundary actors
@@ -272,65 +300,65 @@ class LocalPartitionRouter[In: Any val,
 
   fun local_map(): Map[U128, Step] val => _local_map
 
-// TODO: Remove this by updating market-test once single prestate work
-// is finished
-class StateAddressesRouter[In: Any val, 
-  Key: (Hashable val & Equatable[Key] val)]
-  let _state_addresses: StateAddresses val
-  let _partition_function: PartitionFunction[In, Key] val
+// // TODO: Remove this by updating market-test once single prestate work
+// // is finished
+// class StateAddressesRouter[In: Any val, 
+//   Key: (Hashable val & Equatable[Key] val)]
+//   let _state_addresses: StateAddresses val
+//   let _partition_function: PartitionFunction[In, Key] val
   
-  new val create(state_addresses: StateAddresses val,
-    partition_function: PartitionFunction[In, Key] val) 
-  =>
-    _state_addresses = state_addresses
-    _partition_function = partition_function
+//   new val create(state_addresses: StateAddresses val,
+//     partition_function: PartitionFunction[In, Key] val) 
+//   =>
+//     _state_addresses = state_addresses
+//     _partition_function = partition_function
     
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
-  =>
-    match data
-    | let iw: InputWrapper[In] val =>
-      let key = _partition_function(iw.input())
-      match _state_addresses(key)
-      | let s: Step =>
-        // TODO: Remove that producer can be None
-        match producer
-        | let cfp: CreditFlowProducer ref =>
-          let might_be_route = cfp.route_to(s)
-          match might_be_route
-          | let r: Route =>
-            r.run[D](metric_name, source_ts, data,
-              // hand down cfp so we can update route_id
-              cfp,
-              // outgoing envelope
-              o_origin, o_msg_uid, o_frac_ids, o_seq_id)
-            false
-          else
-            // TODO: What do we do if we get None?
-            true
-          end
-        else
-          true
-        end
-      | let p: ProxyRouter val =>
-        p.route[D](metric_name, source_ts, data, producer,
-          // incoming envelope
-          i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-          // outgoing envelope
-          o_origin, o_msg_uid, o_frac_ids, o_seq_id)
-      else
-        true    
-      end
-    else
-      @printf[I32]("Wrong input type to partition router!\n".cstring())
-      true
-    end
+//   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+//     producer: (CreditFlowProducer ref | None),
+//     // incoming envelope
+//     i_origin: Origin tag, i_msg_uid: U128, 
+//     i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
+//     // outgoing envelope
+//     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
+//     o_seq_id: U64): Bool
+//   =>
+//     match data
+//     | let iw: InputWrapper val =>
+//       let key = _partition_function(iw.input())
+//       match _state_addresses(key)
+//       | let s: Step =>
+//         // TODO: Remove that producer can be None
+//         match producer
+//         | let cfp: CreditFlowProducer ref =>
+//           let might_be_route = cfp.route_to(s)
+//           match might_be_route
+//           | let r: Route =>
+//             r.run[D](metric_name, source_ts, data,
+//               // hand down cfp so we can update route_id
+//               cfp,
+//               // outgoing envelope
+//               o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+//             false
+//           else
+//             // TODO: What do we do if we get None?
+//             true
+//           end
+//         else
+//           true
+//         end
+//       | let p: ProxyRouter val =>
+//         p.route[D](metric_name, source_ts, data, producer,
+//           // incoming envelope
+//           i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+//           // outgoing envelope
+//           o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+//       else
+//         true    
+//       end
+//     else
+//       @printf[I32]("Wrong input type to partition router!\n".cstring())
+//       true
+//     end
 
-  fun routes(): Array[CreditFlowConsumerStep] val =>
-    _state_addresses.steps()
+//   fun routes(): Array[CreditFlowConsumerStep] val =>
+//     _state_addresses.steps()

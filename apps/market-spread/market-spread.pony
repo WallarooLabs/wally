@@ -56,14 +56,19 @@ actor Main
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler
-              where init_file = init_file)
+            //!!
+            "Nbbo", FixNbboFrameHandler)
+              // where init_file = init_file)
+            .to[FixNbboMessage val](IdentityBuilder[FixNbboMessage val])
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
             .done()
           .new_pipeline[FixOrderMessage val, OrderResult val](
-            "Orders", FixOrderFrameHandler)
+            //!! coalescing
+            "Orders", FixOrderFrameHandler where coalescing = false)
+            // TODO: Why does NBBO work with this but not Orders?
+            .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
             .to_state_partition[Symboly val, String, 
               (OrderResult val | None), SymbolData](CheckOrder, 
               SymbolDataBuilder, "symbol-data", symbol_data_partition
@@ -145,7 +150,7 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
     sc_repo: StateChangeRepository[SymbolData], 
     state: SymbolData): (None, StateChange[SymbolData] ref)
   =>
-    // @printf[I32]("!!Update NBBO\n".cstring())
+    @printf[I32]("!!Update NBBO\n".cstring())
     let state_change: SymbolDataStateChange ref =
       try
         sc_repo.lookup_by_name("SymbolDataStateChange") as SymbolDataStateChange
@@ -175,7 +180,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     sc_repo: StateChangeRepository[SymbolData], 
     state: SymbolData): ((OrderResult val | None), None)
   =>
-    // @printf[I32]("!!CheckOrder\n".cstring())
+    @printf[I32]("!!CheckOrder\n".cstring())
     if state.should_reject_trades then
       let res = OrderResult(msg, state.last_bid, state.last_offer,
         Epoch.nanoseconds())
@@ -252,7 +257,7 @@ class OrderResult
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
-    // @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
+    @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
     //Header (size == 55 bytes)
     let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
     wb.u32_be(msgs_size.u32())

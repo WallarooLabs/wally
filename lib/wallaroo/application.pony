@@ -55,8 +55,8 @@ class Application
     let builders: Array[RunnerBuilder val] trn = 
       recover Array[RunnerBuilder val] end
 
-    let pre_state_builder = PreStateRunnerBuilder[In, Out, State](s_comp,
-      state_name,
+    let pre_state_builder = PreStateRunnerBuilder[In, Out, In, U8, State](
+      s_comp, state_name, SingleStepPartitionFunction[In],
       TypedRouteBuilder[StateProcessor[State] val],
       TypedRouteBuilder[Out])
     builders.push(pre_state_builder)
@@ -186,8 +186,9 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     step_id_map(0) = guid_gen.u128()
 
 
-    let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp,
-      state_name, TypedRouteBuilder[StateProcessor[State] val],
+    let next_builder = PreStateRunnerBuilder[Last, Next, Last, U8, State](
+      s_comp, state_name, SingleStepPartitionFunction[Last],
+      TypedRouteBuilder[StateProcessor[State] val],
       TypedRouteBuilder[Next])
 
     _p.add_runner_builder(next_builder)
@@ -235,8 +236,9 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       end
     end
 
-    let next_builder = PreStateRunnerBuilder[Last, Next, State](s_comp,
-      state_name, TypedRouteBuilder[StateProcessor[State] val],
+    let next_builder = PreStateRunnerBuilder[Last, Next, PIn, Key, State](
+      s_comp, state_name, partition.function(), 
+      TypedRouteBuilder[StateProcessor[State] val],
       TypedRouteBuilder[Next])
 
     _p.add_runner_builder(next_builder)

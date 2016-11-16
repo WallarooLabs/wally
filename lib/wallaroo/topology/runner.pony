@@ -45,6 +45,7 @@ trait RunnerBuilder
   fun id(): U128
   fun route_builder(): RouteBuilder val
   fun forward_route_builder(): RouteBuilder val
+  fun augment_router(r: Router val): Router val => r
 
 class RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder val] val
@@ -109,6 +110,12 @@ class RunnerSequenceBuilder is RunnerBuilder
       EmptyRouteBuilder
     end
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
+  fun augment_router(r: Router val): Router val =>
+    try
+      _runner_builders(_runner_builders.size() - 1).augment_router(r)
+    else
+      r
+    end
 
 class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   let _comp_builder: ComputationBuilder[In, Out] val
@@ -143,22 +150,26 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
-class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read] is
-  RunnerBuilder
+class PreStateRunnerBuilder[In: Any val, Out: Any val, 
+  PIn: Any val, Key: (Hashable val & Equatable[Key] val), State: Any #read] is 
+    RunnerBuilder
   let _state_comp: StateComputation[In, Out, State] val
   let _state_name: String
   let _route_builder: RouteBuilder val
+  let _partition_function: PartitionFunction[PIn, Key] val
   let _forward_route_builder: RouteBuilder val
   let _id: U128
 
   new val create(state_comp: StateComputation[In, Out, State] val,
     state_name': String,
+    partition_function': PartitionFunction[PIn, Key] val,
     route_builder': RouteBuilder val, 
     forward_route_builder': RouteBuilder val) 
   =>
     _state_comp = state_comp
     _state_name = state_name'
     _route_builder = route_builder'
+    _partition_function = partition_function'
     _id = GuidGenerator.u128()
     _forward_route_builder = forward_route_builder'
 
@@ -183,6 +194,15 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val, State: Any #read] is
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
+  fun augment_router(r: Router val): Router val =>
+    match r
+    | let p: AugmentablePartitionRouter[Key] val =>
+      let r2 = p.clone_and_augment[PIn](_partition_function)
+      @printf[I32]("---!!Cloned!!\n".cstring())
+      r2
+    else
+      r
+    end
 
 class StateRunnerBuilder[State: Any #read] is RunnerBuilder
   let _state_builder: StateBuilder[State] val
@@ -294,7 +314,8 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
     StateSubpartition val 
   =>
     KeyedStateSubpartition[PIn, Key](partition_addresses(workers),
-      _step_id_map, _partition.function(), _pipeline_name)
+      _step_id_map, _state_runner_builder, _partition.function(), 
+      _pipeline_name)
 
   fun partition_addresses(workers: (String | Array[String] val)): 
     KeyedPartitionAddresses[Key] val 

@@ -139,6 +139,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, incoming_seq_id: U64, route_id: U64)
   =>
+    // @printf[I32]("!!STEP RECVD\n".cstring())
     _outgoing_seq_id = _outgoing_seq_id + 1
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       this, _router,
