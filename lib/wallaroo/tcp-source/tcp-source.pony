@@ -329,7 +329,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
         | 0 =>
           // Would block, try again later.
           _readable = false
-          resubscribe_event()
+          _resubscribe_event()
           return
         | _next_size =>
           // Increase the read buffer size.
