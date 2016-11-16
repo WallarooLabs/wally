@@ -160,8 +160,19 @@ actor Alfred
 
     be upstream_replay_finished(boundary: DataReceiver tag) =>
       _replay_complete_markers.update((digestof boundary), true)
-      //TODO: if all boundary markers are true, we have truly finished replaying
-      // replay_finished
+      var finished = true
+      for b in _incoming_boundaries.values() do
+        try
+          if not _replay_complete_markers((digestof b)) then
+            finished = false
+          end
+        else
+          @printf[I32]("A boundary just disappeared!".cstring())
+        end
+      end
+      if finished then
+        _replay_finished()
+      end
 
     fun _replay_finished() =>
       for b in _origins.values() do
