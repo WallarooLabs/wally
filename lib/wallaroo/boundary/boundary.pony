@@ -13,6 +13,7 @@ use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
+use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
@@ -306,10 +307,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
       if AsioEvent.readable(flags) then
         _readable = true
-
-        if _pending_reads() then
-          _read_again()
-        end
+        _pending_reads()
       end
 
       if AsioEvent.disposable(flags) then
@@ -319,6 +317,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
       _try_shutdown()
     end
+    _resubscribe_event()
 
   // TODO: Fix this when we get a real message envelope
   fun ref _writev(data: ByteSeqIter, tracking_info: TrackingInfo val =
@@ -434,61 +433,59 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
     _notify.closed(this)
 
-  fun ref _pending_reads(): Bool =>
-    """
-    Read while data is available, guessing the next packet length as we go. If
-    we read 4 kb of data, send ourself a resume message and stop reading, to
-    avoid starving other actors.
-    """
-      try
-        var sum: USize = 0
+  // TODO: switch to using single sys call "expect"
+  fun ref _pending_reads() =>
+    try
+      var sum: USize = 0
 
-        while _readable and not _shutdown_peer do
-          // Read as much data as possible.
-          let len = @pony_os_recv[USize](
-            _event,
-            _read_buf.cpointer().usize() + _read_len,
-            _read_buf.size() - _read_len) ?
+      while _readable and not _shutdown_peer do
+        // Read as much data as possible.
+        _read_buf_size()
+        let len = @pony_os_recv[USize](
+          _event,
+          _read_buf.cpointer().usize() + _read_len,
+          _read_buf.size() - _read_len) ?
 
-          match len
-          | 0 =>
-            // Would block, try again later.
-            _readable = false
-            return false
-          | _next_size =>
-            // Increase the read buffer size.
-            _next_size = _max_size.min(_next_size * 2)
-          end
+        match len
+        | 0 =>
+          // Would block, try again later.
+          _readable = false
+          _resubscribe_event()
+          return
+        | _next_size =>
+          // Increase the read buffer size.
+          _next_size = _max_size.min(_next_size * 2)
+        end
 
-          _read_len = _read_len + len
+        _read_len = _read_len + len
 
-          if _read_len >= _expect then
-            let data = _read_buf = recover Array[U8] end
-            data.truncate(_read_len)
-            _read_len = 0
+        if _read_len >= _expect then
+          let data = _read_buf = recover Array[U8] end
+          data.truncate(_read_len)
+          _read_len = 0
 
-            if not _notify.received(this, consume data) then
-              _read_buf_size()
-              return true
-            else
-              _read_buf_size()
+          let carry_on = _notify.received(this, consume data)
+          ifdef osx then
+            if not carry_on then
+              _read_again()
+              return
+            end
+
+            sum = sum + len
+
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
             end
           end
-
-          sum = sum + len
-
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            return true
-          end
         end
-      else
-        // The socket has been closed from the other side.
-        _shutdown_peer = true
-        close()
       end
-
-      false
+    else
+      // The socket has been closed from the other side.
+      _shutdown_peer = true
+      close()
+    end
 
   be _read_again() =>
     """
@@ -565,6 +562,21 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     let ip = recover IPAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
+
+  fun ref _resubscribe_event() =>
+    ifdef linux then
+      let flags = if not _readable and not _writeable then
+        AsioEvent.read_write_oneshot()
+      elseif not _readable then
+        AsioEvent.read() or AsioEvent.oneshot()
+      elseif not _writeable then
+        AsioEvent.write() or AsioEvent.oneshot()
+      else
+        return
+      end
+
+      @pony_asio_event_resubscribe(_event, flags)
+    end
 
 interface _OutgoingBoundaryNotify
   fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>

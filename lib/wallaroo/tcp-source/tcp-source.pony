@@ -298,6 +298,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
     _listen._conn_closed()
 
+  // TODO: switch to using single sys call "expect"
   fun ref _pending_reads() =>
     """
     Unless this connection is currently muted, read while data is available,

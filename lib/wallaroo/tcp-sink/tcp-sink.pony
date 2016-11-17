@@ -3,7 +3,7 @@ use "buffered"
 use "collections"
 use "net"
 use "wallaroo/backpressure"
-use "wallaroo/boundary" 
+use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -12,6 +12,7 @@ use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
+use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 // TODO: Fix this placeholder
@@ -31,8 +32,8 @@ actor EmptySink is CreditFlowConsumerStep
     None
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
-  => 
+    tcp_sinks: Array[TCPSink] val)
+  =>
     None
 
   be register_producer(producer: CreditFlowProducer) =>
@@ -50,8 +51,8 @@ class TCPSinkBuilder
   let _encoder_wrapper: EncoderWrapper val
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
-  new val create(encoder_wrapper: EncoderWrapper val, 
-    initial_msgs: Array[Array[ByteSeq] val] val) 
+  new val create(encoder_wrapper: EncoderWrapper val,
+    initial_msgs: Array[Array[ByteSeq] val] val)
   =>
     _encoder_wrapper = encoder_wrapper
     _initial_msgs = initial_msgs
@@ -123,7 +124,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
-    initial_msgs: Array[Array[ByteSeq] val] val, 
+    initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -143,8 +144,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _notify_connecting()
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
-  => 
+    tcp_sinks: Array[TCPSink] val)
+  =>
     None
 
   // open question: how do we reconnect if our external system goes away?
@@ -155,7 +156,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let encoded = _encoder.encode[D](data, _wb)
       _writev(encoded)
-      
+
       // We are finished with the message and can update watermarks
       // Note: We are ACKing messages as fast as they come in.
       // TODO: Queue the ACKs and use a timer to send watermarks upstream
@@ -169,7 +170,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
         end
         origin.update_watermark(route_id, seq_id)
       end
-      
+
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
@@ -190,7 +191,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     frac_ids: None, incoming_seq_id: U64, route_id: U64)
   =>
     //TODO: What do we do here?
-    run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, 
+    run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids,
       incoming_seq_id, route_id)
 
   be update_router(router: Router val) =>
@@ -348,10 +349,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
       if AsioEvent.readable(flags) then
         _readable = true
-
-        if _pending_reads() then
-          _read_again()
-        end
+        _pending_reads()
       end
 
       if AsioEvent.disposable(flags) then
@@ -361,6 +359,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
       _try_shutdown()
     end
+    _resubscribe_event()
 
   // TODO: Fix this when we get a real message envelope
   fun ref _writev(data: ByteSeqIter, tracking_info: TrackingInfo val =
@@ -476,7 +475,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
     _notify.closed(this)
 
-  fun ref _pending_reads(): Bool =>
+  // TODO: support new "expect" with single system call
+  fun ref _pending_reads() =>
     """
     Read while data is available, guessing the next packet length as we go. If
     we read 4 kb of data, send ourself a resume message and stop reading, to
@@ -487,6 +487,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
         while _readable and not _shutdown_peer do
           // Read as much data as possible.
+          _read_buf_size()
           let len = @pony_os_recv[USize](
             _event,
             _read_buf.cpointer().usize() + _read_len,
@@ -496,7 +497,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           | 0 =>
             // Would block, try again later.
             _readable = false
-            return false
+            _resubscribe_event()
+            return
           | _next_size =>
             // Increase the read buffer size.
             _next_size = _max_size.min(_next_size * 2)
@@ -509,19 +511,21 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
             data.truncate(_read_len)
             _read_len = 0
 
-            if not _notify.received(this, consume data) then
-              _read_buf_size()
-              return true
-            else
-              _read_buf_size()
+            let carry_on = _notify.received(this, consume data)
+            ifdef osx then
+              if not carry_on then
+                _read_again()
+                return
+              end
+
+              sum = sum + len
+
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                _read_again()
+                return
+              end
             end
-          end
-
-          sum = sum + len
-
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            return true
           end
         end
       else
@@ -531,12 +535,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
 
       false
-
-  be _read_again() =>
-    """
-    Resume reading.
-    """
-    _pending_reads()
 
   fun _can_send(): Bool =>
     _connected and not _closed and _writeable
@@ -607,6 +605,28 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     let ip = recover IPAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
+
+  be _read_again() =>
+    """
+    Resume reading.
+    """
+
+    _pending_reads()
+
+  fun ref _resubscribe_event() =>
+    ifdef linux then
+      let flags = if not _readable and not _writeable then
+        AsioEvent.read_write_oneshot()
+      elseif not _readable then
+        AsioEvent.read() or AsioEvent.oneshot()
+      elseif not _writeable then
+        AsioEvent.write() or AsioEvent.oneshot()
+      else
+        return
+      end
+
+      @pony_asio_event_resubscribe(_event, flags)
+    end
 
 interface _TCPSinkNotify
   fun ref connecting(conn: TCPSink ref, count: U32) =>
