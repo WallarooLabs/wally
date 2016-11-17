@@ -23,6 +23,7 @@ actor Main
       var l_arg: (Array[String] | None) = None
       var n_arg: (String | None) = None
       var e_arg: (USize | None) = None
+      var o_arg = "recevied-metrics.txt"
 
       try
         var options = Options(env.args)
@@ -31,12 +32,14 @@ actor Main
           .add("phone-home", "d", StringArgument)
           .add("name", "n", StringArgument)
           .add("listen", "l", StringArgument)
+          .add("output-file", "o", StringArgument)
 
         for option in options do
           match option
           | ("name", let arg: String) => n_arg = arg
           | ("phone-home", let arg: String) => p_arg = arg.split(":")
           | ("listen", let arg: String) => l_arg = arg.split(":")
+          | ("output-file", let arg: String) => o_arg = arg
           | let err: ParseError =>
             err.report(env.err)
             required_args_are_present = false
@@ -73,7 +76,7 @@ actor Main
         if required_args_are_present then
           let listener_addr = l_arg as Array[String]
 
-          let store = Store(env.root as AmbientAuth)
+          let store = Store(env.root as AmbientAuth, o_arg)
           let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           SignalHandler(TermHandler(coordinator), Sig.term())
@@ -335,10 +338,10 @@ actor Store
   let _received_file: (File | None)
   var _count: USize = 0
 
-  new create(auth: AmbientAuth) =>
+  new create(auth: AmbientAuth, output_file_path: String) =>
     _received_file =
       try
-        let f = File(FilePath(auth, "received-metrics.txt"))
+        let f = File(FilePath(auth, output_file_path))
         f.set_length(0)
         f
       else
