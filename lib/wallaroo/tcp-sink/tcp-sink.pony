@@ -116,6 +116,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _writeable: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   embed _pending: List[(ByteSeq, USize, TrackingInfo val)] = _pending.create()
+  embed _pending_tracking: List[(USize, TrackingInfo val)] = _pending_tracking.create()
+  embed _pending_writev: Array[USize] = _pending_writev.create()
+  var _pending_writev_total: USize = 0
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
   var _read_len: USize = 0
@@ -321,7 +324,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
             for msg in _initial_msgs.values() do
               _writev(msg)
             end
-            _pending_writes()
+            ifdef linux then
+              if _pending_writes() then
+                //sent all data; release backpressure
+                _release_backpressure()
+              end
+            end
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -344,7 +352,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
         _writeable = true
-        _pending_writes()
+        ifdef linux then
+          if _pending_writes() then
+            //sent all data; release backpressure
+            _release_backpressure()
+          end
+        end
       end
 
       if AsioEvent.readable(flags) then
@@ -370,9 +383,15 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     if _connected and not _closed then
       _in_sent = true
 
+      var data_size: USize = 0
       for bytes in _notify.sentv(this, data).values() do
-        _write_final(bytes, tracking_info)
+        _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+        _pending_writev_total = _pending_writev_total + bytes.size()
+        data_size = data_size + bytes.size()
       end
+
+      _pending_tracking.push((data_size, tracking_info))
+      _pending_writes()
 
       _in_sent = false
     end
@@ -383,27 +402,10 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     everything was written. On an error, close the connection. This is for
     data that has already been transformed by the notifier.
     """
-      if _writeable then
-        try
-          // Send as much data as possible.
-          var len =
-            @pony_os_send[USize](_event, data.cpointer(), data.size()) ?
-
-          if len < data.size() then
-            // Send any remaining data later. Apply back pressure.
-            _pending.push((data, len, tracking_info))
-            _apply_backpressure()
-          else
-            _unit_finished(1, tracking_info)
-          end
-        else
-          // Non-graceful shutdown on error.
-          _hard_close()
-        end
-      else
-        // Send later, when the socket is available for writing.
-        _pending.push((data, 0, tracking_info))
-     end
+    _pending_writev.push(data.cpointer().usize()).push(data.size())
+    _pending_writev_total = _pending_writev_total + data.size()
+    _pending_tracking.push((data.size(), tracking_info))
+    _pending_writes()
 
   fun ref _notify_connecting() =>
     """
@@ -539,46 +541,113 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   fun _can_send(): Bool =>
     _connected and not _closed and _writeable
 
-  fun ref _pending_writes() =>
+  fun ref _pending_writes(): Bool =>
     """
     Send pending data. If any data can't be sent, keep it and mark as not
-    writeable. On an error, dispose of the connection.
+    writeable. On an error, dispose of the connection. Returns whether
+    it sent all pending data or not.
     """
-    var final_pending_sent: (TrackingInfo val | None) = None
-    var num_sent: ISize = 0
-
-    while _writeable and (_pending.size() > 0) do
+    var num_to_send: USize = 0
+    var bytes_to_send: USize = 0
+    var bytes_sent: USize = 0
+    while _writeable and (_pending_writev.size() > 0) do
       try
-        let node = _pending.head()
-        (let data, let offset, let tracking_info) = node()
+        //determine number of bytes and buffers to send
+        if (_pending_writev.size()/2) < @pony_os_writev_max[I32]().usize() then
+          num_to_send = _pending_writev.size()/2
+          bytes_to_send = _pending_writev_total
+        else
+          //have more buffers than a single writev can handle
+          //iterate over buffers being sent to add up total
+          num_to_send = _pending_writev.size()/2
+          bytes_to_send = 0
+          for d in Range[USize](1, num_to_send*2, 2) do
+            bytes_to_send = bytes_to_send + _pending_writev(d)
+          end
+        end
 
         // Write as much data as possible.
-        let len = @pony_os_send[USize](_event,
-          data.cpointer().usize() + offset, data.size() - offset) ?
+        var len = @pony_os_writev[USize](_event,
+          _pending_writev.cpointer(), (_pending_writev.size()/2).min(@pony_os_writev_max[I32]().usize())) ?
 
-        if (len + offset) < data.size() then
-          // Send remaining data later.
-          node() = (data, offset + len, tracking_info)
-          _writeable = false
-        else
-          // This chunk has been fully sent.
-          _pending.shift()
-          final_pending_sent = tracking_info
-          num_sent = num_sent + 1
-          if _pending.size() == 0 then
-            // Remove back pressure.
-            _release_backpressure()
+        // keep track of how many bytes we sent
+        bytes_sent = bytes_sent + len
+
+        if len < bytes_to_send then
+          while len > 0 do
+            let iov_p = _pending_writev(0)
+            let iov_s = _pending_writev(1)
+            if iov_s <= len then
+              len = len - iov_s
+              _pending_writev.shift()
+              _pending_writev.shift()
+              _pending_writev_total = _pending_writev_total - iov_s
+            else
+              _pending_writev.update(0, iov_p+len)
+              _pending_writev.update(1, iov_s-len)
+              _pending_writev_total = _pending_writev_total - len
+              _apply_backpressure()
+            end
           end
+
+          // do trackinginfo finished stuff
+          _tracking_info_finished(bytes_sent)
+
+          //didn't send all data
+          return false
+        else
+          // sent all data we requested in this batch
+          _pending_writev.remove(0, num_to_send*2)
+          _pending_writev_total = _pending_writev_total - bytes_to_send
         end
       else
         // Non-graceful shutdown on error.
         _hard_close()
+
+        // do trackinginfo finished stuff
+        _tracking_info_finished(bytes_sent)
+
+        //didn't send all data
+        return false
       end
     end
 
-    match final_pending_sent
-    | let sent: TrackingInfo val =>
-      _unit_finished(num_sent, sent)
+    // do trackinginfo finished stuff
+    _tracking_info_finished(bytes_sent)
+
+    //sent all data
+    true
+
+
+  fun ref _tracking_info_finished(num_bytes_sent: USize) =>
+    """
+    Call _unit_finished with # of sent messages and last TrackingInfo
+    """
+    var num_sent: ISize = 0
+    var final_pending_sent: (TrackingInfo val | None) = None
+    var bytes_sent = num_bytes_sent
+
+    try
+      while bytes_sent > 0 do
+        let node = _pending_tracking.head()
+        (let bytes, let tracking_info) = node()
+        if bytes <= bytes_sent then
+          num_sent = num_sent + 1
+          bytes_sent = bytes_sent - bytes
+          final_pending_sent = tracking_info
+          _pending_tracking.shift()
+        else
+          let bytes_remaining = bytes - bytes_sent
+          bytes_sent = 0
+          // update remaining for this message
+          node() = (bytes_remaining, tracking_info)
+        end
+      end
+
+      match final_pending_sent
+      | let sent: TrackingInfo val =>
+        _unit_finished(num_sent, sent)
+      end
     end
 
   fun ref _apply_backpressure() =>
