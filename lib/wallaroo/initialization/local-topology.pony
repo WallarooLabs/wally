@@ -8,7 +8,6 @@ use "sendence/dag"
 use "sendence/guid"
 use "sendence/queue"
 use "sendence/messages"
-use "sendence/stack"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/messages"
@@ -278,7 +277,7 @@ actor LocalTopologyInitializer
         // TODO: Change this to a Stack for depth-first search so we have
         // more control over the order things are initialized in (i.e. from
         // one sink back before another sink begins)
-        let frontier = Stack[DagNode[StepInitializer val] val]
+        let frontier = Array[DagNode[StepInitializer val] val]
 
 
         /////////
@@ -290,14 +289,11 @@ actor LocalTopologyInitializer
         // comp targets first
         let non_partitions = Array[DagNode[StepInitializer val] val]
         for node in graph.nodes() do
-          if node.is_sink() then 
-            match node.value
-            | let p: PartitionedStateStepBuilder val =>
-              @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
-              frontier.push(node)
-            else
-              non_partitions.push(node)
-            end
+          if node.is_sink() and node.value.is_prestate() then 
+            @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
+            frontier.push(node)
+          else  
+            non_partitions.push(node)
           end
         end
 
@@ -342,12 +338,15 @@ actor LocalTopologyInitializer
           for out in next_node.outs() do
             if not built.contains(out.id) then ready = false end
           end
-          // match next_node.value
-          // | let p: PartitionedPreStateStepBuilder val =>
-          //   if not built.contains(p.pre_state_target_id()) then
-          //     ready = false
-          //   end
-          // end
+          match next_node.value
+          | let s_builder: StepBuilder val =>
+            match s_builder.pre_state_target_id()
+            | let psid: U128 =>
+              if not built.contains(psid) then
+                ready = false
+              end
+            end
+          end
           if ready then
             @printf[I32](("Handling " + next_node.value.name() + " node\n").cstring())
             let next_initializer: StepInitializer val = next_node.value
@@ -373,17 +372,23 @@ actor LocalTopologyInitializer
                     error 
                   end
 
-                // If this is a default target, it might have a state comp 
-                // target.
+                // If this is prestate or a default target, it might have a 
+                // state comp target.
                 let state_comp_target_router = 
                   match builder.pre_state_target_id() 
                   | let id: U128 =>
                     try
                       built(id)
                     else
+                      if builder.is_prestate() then
+                        @printf[I32]("!!Pre state target not built!\n".cstring())
+                      end
                       EmptyRouter
                     end
                   else
+                    if builder.is_prestate() then
+                      @printf[I32]("!!Why doesn't pre state have a target. Is this NBBO?\n".cstring())
+                    end
                     EmptyRouter
                   end
 
@@ -424,7 +429,7 @@ actor LocalTopologyInitializer
                 end
 
                 if not targets_ready then
-                  frontier.push(next_node)
+                  frontier.unshift(next_node)
                   continue
                 end              
 
@@ -484,55 +489,56 @@ actor LocalTopologyInitializer
                   end
                 end
               end
-            | let p_builder: PartitionedStateStepBuilder val =>
-              let next_id = p_builder.id()
-              // let state_addresses = state_map(p_builder.state_name())
+              //!! TODO: Remove this if possible
+            // | let p_builder: PartitionedStateStepBuilder val =>
+            //   let next_id = p_builder.id()
+            //   // let state_addresses = state_map(p_builder.state_name())
 
-              @printf[I32](("----Spinning up partition for " + p_builder.name() + "----\n").cstring())
+            //   @printf[I32](("----Spinning up partition for " + p_builder.name() + "----\n").cstring())
 
-              let state_comp_target = 
-                match p_builder.pre_state_target_id()
-                | let id: U128 =>
-                  try
-                    built(id)
-                  else
-                    @printf[I32]("Prestate comp target not built! Did you try to string two state steps in a row (that can't be done)?\n".cstring())
-                    error
-                  end
-                else
-                  EmptyRouter
-                end
+            //   let state_comp_target = 
+            //     match p_builder.pre_state_target_id()
+            //     | let id: U128 =>
+            //       try
+            //         built(id)
+            //       else
+            //         @printf[I32]("Prestate comp target not built! Did you try to string two state steps in a row (that can't be done)?\n".cstring())
+            //         error
+            //       end
+            //     else
+            //       EmptyRouter
+            //     end
 
-              // state_addresses.register_routes(state_comp_target,
-              //    p_builder.forward_route_builder())
+            //   // state_addresses.register_routes(state_comp_target,
+            //   //    p_builder.forward_route_builder())
 
-              // Check for default router
-              let default_router = 
-                try
-                  if default_target_id != 0 then
-                    built(default_target_id)
-                  else
-                    None
-                  end
-                else
-                  None
-                end
+            //   // Check for default router
+            //   let default_router = 
+            //     try
+            //       if default_target_id != 0 then
+            //         built(default_target_id)
+            //       else
+            //         None
+            //       end
+            //     else
+            //       None
+            //     end
 
-              let partition_router: PartitionRouter val =
-                p_builder.build_partition(_worker_name, 
-                  _metrics_conn, _auth, _connections, _alfred, 
-                  _outgoing_boundaries, state_comp_target, default_router)
+            //   let partition_router: PartitionRouter val =
+            //     p_builder.build_partition(_worker_name, 
+            //       _metrics_conn, _auth, _connections, _alfred, 
+            //       _outgoing_boundaries, state_comp_target, default_router)
               
-              // Create a data route to each pre-state step in the 
-              // partition located on this worker
-              for (id, s) in partition_router.local_map().pairs() do
-                data_routes(id) = s
-                initializables.push(s)
-              end
-              // Add the partition router to our built list for nodes
-              // that connect to this node via an in edge and to prove
-              // we've handled it
-              built(next_id) = partition_router
+            //   // Create a data route to each pre-state step in the 
+            //   // partition located on this worker
+            //   for (id, s) in partition_router.local_map().pairs() do
+            //     data_routes(id) = s
+            //     initializables.push(s)
+            //   end
+            //   // Add the partition router to our built list for nodes
+            //   // that connect to this node via an in edge and to prove
+            //   // we've handled it
+            //   built(next_id) = partition_router
             | let egress_builder: EgressBuilder val =>
               let next_id = egress_builder.id()
               if not built.contains(next_id) then
@@ -639,7 +645,7 @@ actor LocalTopologyInitializer
 
             @printf[I32](("Finished handling " + next_node.value.name() + " node\n").cstring())
           else
-            frontier.push(next_node)
+            frontier.unshift(next_node)
           end
         end
         _alfred.local_topology_ready(consume tcpsl_builders)

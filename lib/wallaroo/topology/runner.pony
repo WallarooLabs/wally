@@ -41,7 +41,9 @@ trait RunnerBuilder
 
   fun name(): String
   fun state_name(): String => ""
+  fun is_prestate(): Bool => false
   fun is_stateful(): Bool
+  fun is_multi(): Bool => false
   fun id(): U128
   fun route_builder(): RouteBuilder val
   fun forward_route_builder(): RouteBuilder val
@@ -101,7 +103,19 @@ class RunnerSequenceBuilder is RunnerBuilder
     n + "|"
 
   fun state_name(): String => _state_name
+  fun is_prestate(): Bool => 
+    try
+      _runner_builders(_runner_builders.size() - 1).is_prestate()
+    else
+      false
+    end
   fun is_stateful(): Bool => false
+  fun is_multi(): Bool => 
+    try
+      _runner_builders(_runner_builders.size() - 1).is_multi()
+    else
+      false
+    end
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => 
     try
@@ -159,18 +173,21 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
   let _partition_function: PartitionFunction[PIn, Key] val
   let _forward_route_builder: RouteBuilder val
   let _id: U128
+  let _is_multi: Bool
 
   new val create(state_comp: StateComputation[In, Out, State] val,
     state_name': String,
     partition_function': PartitionFunction[PIn, Key] val,
     route_builder': RouteBuilder val, 
-    forward_route_builder': RouteBuilder val) 
+    forward_route_builder': RouteBuilder val,
+    multi_worker: Bool = false) 
   =>
     _state_comp = state_comp
     _state_name = state_name'
     _route_builder = route_builder'
     _partition_function = partition_function'
     _id = GuidGenerator.u128()
+    _is_multi = multi_worker
     _forward_route_builder = forward_route_builder'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
@@ -191,6 +208,7 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
   fun name(): String => _state_comp.name()
   fun state_name(): String => _state_name
   fun is_stateful(): Bool => true
+  fun is_multi(): Bool => _is_multi
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
@@ -481,6 +499,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
 
   fun name(): String => _name
   fun state_name(): String => _state_name
+  fun is_pre_state(): Bool => true
   fun augment_router(router: Router val): Router val => router
 
 class StateRunner[State: Any #read] is (Runner & ReplayableRunner)

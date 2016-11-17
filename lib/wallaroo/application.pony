@@ -239,7 +239,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let next_builder = PreStateRunnerBuilder[Last, Next, PIn, Key, State](
       s_comp, state_name, partition.function(), 
       TypedRouteBuilder[StateProcessor[State] val],
-      TypedRouteBuilder[Next])
+      TypedRouteBuilder[Next] where multi_worker = multi_worker)
 
     _p.add_runner_builder(next_builder)
 
