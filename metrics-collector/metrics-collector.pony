@@ -374,7 +374,7 @@ class ThroughputStats
       if throughput > 10000 then
         (throughput / 1000.0).u64().string()
       else
-        (throughput / 1000.0).precision2().string()
+        throughput.string()
       end
     formatted_throughput.clone().append("k").clone()
 
