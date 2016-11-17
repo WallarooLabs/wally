@@ -317,6 +317,10 @@ actor LocalTopologyInitializer
         //       if yes, add ins to frontier queue, then build the step 
         //       (connecting it to its out step, which has already been built)
 
+        //accumulation of all TCPSourceListenerBuilders for Alfred, so that it
+        //can make them when it's ready
+        let tcpsl_builders: Array[TCPSourceListenerBuilder val] iso =
+          recover iso Array[TCPSourceListenerBuilder val] end
         // If there are no cycles (I), this will terminate
         while frontier.size() > 0 do
           let next_node = frontier.pop()
@@ -589,15 +593,17 @@ actor LocalTopologyInitializer
               let listen_auth = TCPListenAuth(_auth)
               try
                 @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
-                TCPSourceListener(
-                  source_data.builder()(source_data.runner_builder(), 
-                    out_router, _metrics_conn),
-                  out_router,
-                  source_data.route_builder(),
-                  _outgoing_boundaries,
-                  _alfred, default_target,
-                  source_data.address()(0), 
-                  source_data.address()(1))
+                tcpsl_builders.push( recover val
+                  TCPSourceListenerBuilder(
+                    source_data.builder()(source_data.runner_builder(), 
+                      out_router, _metrics_conn),
+                    out_router,
+                    source_data.route_builder(),
+                    _outgoing_boundaries,
+                    _alfred, default_target,
+                    source_data.address()(0), 
+                    source_data.address()(1))
+                end )
               else
                 @printf[I32]("Ill-formed source address\n".cstring())
               end
@@ -620,6 +626,7 @@ actor LocalTopologyInitializer
             frontier.push(next_node)
           end
         end
+        _alfred.local_topology_ready(consume tcpsl_builders)
 
         let data_router = DataRouter(consume data_routes)
         for receiver in _data_receivers.values() do

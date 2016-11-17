@@ -3,6 +3,7 @@ use "files"
 use "collections"
 use "wallaroo/boundary"
 use "wallaroo/messages"
+use "wallaroo/tcp-source"
 
 trait Backend
   fun ref flush()
@@ -129,24 +130,38 @@ actor Alfred
       _incoming_boundaries.create(1)
     let _replay_complete_markers: Map[U64, Bool] =
       _replay_complete_markers.create()
+    var _tcpsl_builders: Array[TCPSourceListenerBuilder val] val
 
     new create(env: Env, filename: (String val | None) = None) =>
       _backend = 
       recover iso
-        match filename
-        | let f: String val =>
-          try 
-            FileBackend(FilePath(env.root as AmbientAuth, f), this)
+        ifdef "resilience" then
+          match filename
+          | let f: String val =>
+            try 
+              FileBackend(FilePath(env.root as AmbientAuth, f), this)
+            else
+              @printf[I32]("couldn't open event log".cstring())
+              DummyBackend
+            end
           else
+            @printf[I32]("warning: no event file will be written, despite resilience being enabled".cstring())
             DummyBackend
           end
         else
           DummyBackend
         end
       end
+      _tcpsl_builders = recover val Array[TCPSourceListenerBuilder val] end
 
-    be start() =>
-      _backend.start()
+    be local_topology_ready(tcpsl_builders: Array[TCPSourceListenerBuilder val] val) =>
+      _tcpsl_builders = tcpsl_builders
+      ifdef "resilience" then
+        _backend.start()
+      else
+        _resume_normal_processing()
+      end
+        
 
     be register_incoming_boundary(boundary: DataReceiver tag) =>
       _incoming_boundaries.push(boundary)
@@ -178,11 +193,18 @@ actor Alfred
       for b in _origins.values() do
         b.replay_finished()
       end
+      _resume_normal_processing()
 
     be start_without_replay() =>
       //signal all buffers that there is no event log replay
       for b in _origins.values() do
         b.start_without_replay()
+      end
+      _resume_normal_processing()
+
+    be _resume_normal_processing() =>
+      for tslb in _tcpsl_builders.values() do
+        tslb()
       end
 
     be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val) =>
