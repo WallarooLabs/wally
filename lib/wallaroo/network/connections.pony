@@ -71,7 +71,7 @@ actor Connections
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     register_listener(TCPListener(_auth, consume data_notifier,
-      _init_d_host, _init_d_service, "", 1_048_576, 1_048_576))
+      _init_d_host, _init_d_service, 0, 1_048_576, 1_048_576))
 
     worker_initializer.identify_data_address("initializer", _init_d_host,
       _init_d_service)
