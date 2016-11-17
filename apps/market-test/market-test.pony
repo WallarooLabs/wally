@@ -55,6 +55,7 @@ actor Main
     var c_arg: (Array[String] | None) = None
     var d_arg: (Array[String] | None) = None
     var p_arg: (Array[String] | None) = None
+    var s_arg: (String | None) = None
     var i_addrs_write: Array[Array[String]] trn =
       recover Array[Array[String]] end
     var worker_count: USize = 1
@@ -75,6 +76,7 @@ actor Main
         .add("data", "d", StringArgument)
         .add("phone-home", "p", StringArgument)
         .add("file", "f", StringArgument)
+        .add("symbols-file", "s", StringArgument)
         // worker count includes the initial "leader" since there is no
         // persisting leader
         .add("worker-count", "w", I64Argument)
@@ -101,6 +103,7 @@ actor Main
           worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
         | ("name", let arg: String) => worker_name = arg
+        | ("symbols-file", let arg: String) => s_arg = arg
         end
       end
 
@@ -132,6 +135,12 @@ actor Main
       if worker_name == "" then
         env.out.print("You must specify a worker name via --worker-name/-n.")
         error
+      end
+
+      if s_arg is None then
+        env.out.print("Using Default Symbols in LegalSymbols")
+      else
+        env.out.print("Sourcing Symbols from file: " + s_arg.string())
       end
 
       let connect_auth = TCPConnectAuth(auth)
@@ -183,9 +192,15 @@ actor Main
       let state_runner_builder = StateRunnerBuilder[SymbolData](
         SymbolDataBuilder, "Symbol Data", UpdateNbbo.state_change_builders())
 
-      let state_subpartition = KeyedStateSubpartition[String](
-        LegalSymbols.symbols, state_runner_builder
-        where multi_worker = false)
+      let state_subpartition = if s_arg is None then
+        KeyedStateSubpartition[String](
+          LegalSymbols.symbols, state_runner_builder
+          where multi_worker = false)
+      else
+        KeyedStateSubpartition[String](
+          PartitionFileReader(s_arg as String, env.root as AmbientAuth),
+          state_runner_builder where multi_worker = false)
+      end
 
       let state_addresses = state_subpartition.build("Market Spread App",
         metrics_conn, alfred)
