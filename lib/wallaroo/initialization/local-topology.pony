@@ -493,7 +493,7 @@ actor LocalTopologyInitializer
                   try
                     built(id)
                   else
-                    @printf[I32]("Prestate comp target not built!\n".cstring())
+                    @printf[I32]("Prestate comp target not built! Did you try to string two state steps in a row (that can't be done)?\n".cstring())
                     error
                   end
                 else
