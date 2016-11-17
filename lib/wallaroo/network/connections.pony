@@ -24,10 +24,10 @@ actor Connections
   let _listeners: Array[TCPListener] = Array[TCPListener]
   let _guid_gen: GuidGenerator = GuidGenerator
 
-  new create(app_name: String, worker_name: String, env: Env, 
-    auth: AmbientAuth, c_host: String, c_service: String, d_host: String, 
-    d_service: String, ph_host: String, ph_service: String, 
-    metrics_conn: TCPConnection, is_initializer: Bool) 
+  new create(app_name: String, worker_name: String, env: Env,
+    auth: AmbientAuth, c_host: String, c_service: String, d_host: String,
+    d_service: String, ph_host: String, ph_service: String,
+    metrics_conn: TCPConnection, is_initializer: Bool)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -50,7 +50,7 @@ actor Connections
         let ready_msg = ExternalMsgEncoder.ready(_worker_name)
         phone_home.writev(ready_msg)
       end
-      _env.out.print("Set up phone home connection on " + ph_host 
+      _env.out.print("Set up phone home connection on " + ph_host
         + ":" + ph_service)
     end
 
@@ -60,16 +60,18 @@ actor Connections
 
   be register_listener(listener: TCPListener) =>
     _listeners.push(listener)
-    
+
   be create_initializer_data_channel(
     data_receivers: Map[String, DataReceiver] val,
-    worker_initializer: WorkerInitializer) 
+    worker_initializer: WorkerInitializer)
   =>
     let data_notifier: TCPListenNotify iso =
       DataChannelListenNotifier(_worker_name, _env, _auth, this,
         _is_initializer, data_receivers)
+    // TODO: we need to get the init and max sizes from OS max
+    // buffer size
     register_listener(TCPListener(_auth, consume data_notifier,
-      _init_d_host, _init_d_service))
+      _init_d_host, _init_d_service, "", 1_048_576, 1_048_576))
 
     worker_initializer.identify_data_address("initializer", _init_d_host,
       _init_d_service)
@@ -99,7 +101,7 @@ actor Connections
     end
 
   be update_boundaries(local_topology_initializer: LocalTopologyInitializer) =>
-    let out_bs: Map[String, OutgoingBoundary] trn = 
+    let out_bs: Map[String, OutgoingBoundary] trn =
       recover Map[String, OutgoingBoundary] end
 
     for (target, boundary) in _data_conns.pairs() do
@@ -110,7 +112,7 @@ actor Connections
 
   be create_connections(
     addresses: Map[String, Map[String, (String, String)]] val,
-    local_topology_initializer: LocalTopologyInitializer) 
+    local_topology_initializer: LocalTopologyInitializer)
   =>
     try
       let control_addrs = addresses("control")
@@ -135,22 +137,22 @@ actor Connections
       _env.out.print(_worker_name + ": Interconnections with other workers created.")
     else
       _env.out.print("Problem creating interconnections with other workers")
-    end 
+    end
 
-  be create_control_connection(target_name: String, host: String, 
-    service: String) 
+  be create_control_connection(target_name: String, host: String,
+    service: String)
   =>
     let control_notifier: TCPConnectionNotify iso =
       ControlSenderConnectNotifier(_env)
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
-    _control_conns(target_name) = control_conn    
+    _control_conns(target_name) = control_conn
 
-  be create_data_connection(target_name: String, host: String, 
-    service: String) 
+  be create_data_connection(target_name: String, host: String,
+    service: String)
   =>
     let outgoing_boundary = OutgoingBoundary(_auth,
-      _worker_name, MetricsReporter(_app_name, _metrics_conn), 
+      _worker_name, MetricsReporter(_app_name, _metrics_conn),
       host, service)
     outgoing_boundary.register_step_id(_guid_gen.u128())
     _data_conns(target_name) = outgoing_boundary
@@ -197,6 +199,6 @@ actor Connections
       phc.dispose()
     end
 
-    _env.out.print("Connections: Finished shutdown procedure.")    
+    _env.out.print("Connections: Finished shutdown procedure.")
 
 

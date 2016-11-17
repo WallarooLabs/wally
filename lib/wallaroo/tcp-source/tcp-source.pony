@@ -74,9 +74,17 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
         AsioEvent.read_write(), 0, true)
     end
     _connected = true
+    /*
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
+    */
+
+    // TODO: replace with value of OS buffer size from socketopt.
+    // This value is stupid large
+    _read_buf = recover Array[U8].undefined(1_048_576) end
+    _next_size = 1_048_576
+    _max_size = 1_048_576
 
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
