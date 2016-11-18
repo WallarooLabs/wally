@@ -49,7 +49,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _closed: Bool = false
   var _writeable: Bool = false
   var _event: AsioEventID = AsioEvent.none()
-  embed _pending: List[(ByteSeq, USize, TrackingInfo val)] = _pending.create()
   embed _pending_tracking: List[(USize, TrackingInfo val)] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -398,7 +397,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     if
       not _shutdown and
       (_connect_count == 0) and
-      (_pending.size() == 0)
+      (_pending_writev_total == 0)
     then
       _shutdown = true
 
@@ -428,7 +427,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
     // Unsubscribe immediately and drop all pending writes.
     @pony_asio_event_unsubscribe(_event)
-    _pending.clear()
+    _pending_tracking.clear()
+    _pending_writev.clear()
+    _pending_writev_total = 0
     _readable = false
     _writeable = false
 
