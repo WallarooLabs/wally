@@ -22,6 +22,7 @@ class LocalTopology
   let _app_name: String
   let _worker_name: String
   let _graph: Dag[StepInitializer val] val
+  let _step_map: Map[U128, (ProxyAddress val | U128)] val 
   // _state_builders maps from state_name to StateSubpartition
   let _state_builders: Map[String, StateSubpartition val] val
   let _proxy_ids: Map[String, U128] val
@@ -32,6 +33,7 @@ class LocalTopology
 
   new val create(name': String, worker_name: String,
     graph': Dag[StepInitializer val] val,
+    step_map': Map[U128, (ProxyAddress val | U128)] val,
     state_builders': Map[String, StateSubpartition val] val,
     proxy_ids': Map[String, U128] val,
     default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
@@ -41,6 +43,7 @@ class LocalTopology
     _app_name = name'
     _worker_name = worker_name
     _graph = graph'
+    _step_map = step_map'
     _state_builders = state_builders'
     _proxy_ids = proxy_ids'
     // TODO: Replace this default strategy with a better one after POC
@@ -62,6 +65,8 @@ class LocalTopology
     end
 
   fun graph(): Dag[StepInitializer val] val => _graph
+
+  fun step_map(): Map[U128, (ProxyAddress val | U128)] val => _step_map
 
   fun name(): String => _app_name
 

@@ -72,6 +72,14 @@ actor ApplicationInitializer
       for w in worker_names.values() do all_workers_trn.push(w) end
       let all_workers: Array[String] val = consume all_workers_trn
 
+      // Keep track of all steps in the cluster and their proxy addresses.
+      // This includes sinks but not sources, since we never send a message
+      // directly to a source. For a sink, we don't keep a proxy address but
+      // a step id (U128), since every worker will have its own instance of
+      // that sink.
+      let step_map: Map[U128, (ProxyAddress val | U128)] trn = 
+        recover Map[U128, (ProxyAddress val | U128)] end
+
       // Keep track of shared state so that it's only created once
       let state_partition_map: Map[String, PartitionAddresses val] trn =
         recover Map[String, PartitionAddresses val] end
@@ -118,11 +126,14 @@ actor ApplicationInitializer
           @printf[I32](("Coalescing is off for " + pipeline.name() + " pipeline\n").cstring())
         end
 
-        // This is the sink id for the sink for this pipeline on the
-        // initializer worker, if there is one.
-        // ASSUMPTION: There is only at most one sink per worker per 
-          // pipeline.
-        var sink_id = _guid_gen.u128()
+        // This is the sink id for the sink for this pipeline, which
+        // will have an instance on each worker.
+        // ASSUMPTION: There is only at most one sink per pipeline.
+        let sink_id = _guid_gen.u128()
+
+        // Since every worker will have an instance of this sink, we record
+        // the step id and not the proxy address in our step map.
+        step_map(sink_id) = sink_id
 
         let source_addr_trn: Array[String] trn = recover Array[String] end
         try
@@ -391,18 +402,6 @@ actor ApplicationInitializer
               local_proxy_ids(w) = _guid_gen.u128()
             end
           end
-
-          // Set up sink id for this worker for this pipeline (in case there's
-          // a sink on it). If this worker is the initializer, we already
-          // have an id. 
-          // ASSUMPTION: There is only at most one sink per worker per 
-          // pipeline.
-          sink_id = 
-            if worker == "initializer" then
-              sink_id
-            else
-              _guid_gen.u128()
-            end
 
           // Make sure there are still runner_builders left in the pipeline.
           if runner_builder_idx < runner_builders.size() then
@@ -705,6 +704,7 @@ actor ApplicationInitializer
                 let next_initializer = StepBuilder(application.name(),
                   pipeline.name(), next_runner_builder, next_id where
                   pre_state_target_id' = pre_state_target_id)
+                step_map(next_id) = ProxyAddress(worker, next_id)
                 try
                   local_graphs(worker).add_node(next_initializer, next_id)
                   match last_initializer
@@ -726,6 +726,7 @@ actor ApplicationInitializer
                 let next_id = next_runner_builder.id()
                 let next_initializer = StepBuilder(application.name(),
                   pipeline.name(), next_runner_builder, next_id)
+                step_map(next_id) = ProxyAddress(worker, next_id)
 
                 try
                   local_graphs(worker).add_node(next_initializer, next_id)
@@ -831,6 +832,9 @@ actor ApplicationInitializer
         pipeline_id = pipeline_id + 1
       end
 
+      let sendable_step_map: Map[U128, (ProxyAddress val | U128)] val = 
+        consume step_map
+
       // Keep track of LocalTopologies that we need to send to other
       // (non-initializer) workers
       let other_local_topologies: Array[LocalTopology val] trn =
@@ -855,7 +859,7 @@ actor ApplicationInitializer
         let local_topology = 
           try
             LocalTopology(application.name(), w, g.clone(),
-              state_subpartitions, consume p_ids,
+              sendable_step_map, state_subpartitions, consume p_ids,
               default_target, application.default_target_name,
               application.default_target_id)
           else

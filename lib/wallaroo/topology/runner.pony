@@ -476,10 +476,12 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
       | let input: In =>
         match router
         | let shared_state_router: Router val =>
-          let processor: StateProcessor[State] val = 
+          let processor: StateComputationWrapper[In, Out, State] val = 
             StateComputationWrapper[In, Out, State](input, _state_comp, 
               _output_router)
-          shared_state_router.route[StateProcessor[State] val](metric_name, source_ts, processor, producer,
+          shared_state_router.route[
+            StateComputationWrapper[In, Out, State] val](
+            metric_name, source_ts, processor, producer,
             // incoming envelope
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
             // outgoing envelope

@@ -111,12 +111,31 @@ class ProxyRouter
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
+    @printf[I32]("!!ProxyRouter!\n".cstring())
     // TODO: Remove that producer can be None
     match producer
     | let cfp: CreditFlowProducer ref =>
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
+        @printf[I32]("!!ProxyRouter found Route!\n".cstring()) 
+        
+        //!!
+        match data
+        | let f: FixOrderMessage val =>
+          @printf[I32]("!!FixOrder!\n".cstring())
+        | let iw: InputWrapper val =>
+          @printf[I32]("!!InputWrapper...\n".cstring())
+          match iw.input()
+          | let f: FixOrderMessage val =>
+            @printf[I32]("!!...containing FixOrder!\n".cstring())
+          else
+            @printf[I32]("!!...NOT containing FixOrder!\n".cstring())
+          end
+        else
+          @printf[I32]("!!NOT FixOrder!\n".cstring())
+        end
+
         let delivery_msg = ForwardMsg[D](
           _target_proxy_address.step_id,
           _worker_name, source_ts, data, metric_name,
@@ -142,19 +161,133 @@ class ProxyRouter
   fun routes(): Array[CreditFlowConsumerStep] val =>
     recover val [_target] end
 
+trait OmniRouter
+  fun route_with_target_id[D: Any val](target_id: U128,
+    metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None),
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
+    o_seq_id: U64): Bool
+
+class EmptyOmniRouter is OmniRouter
+  fun route_with_target_id[D: Any val](target_id: U128,
+    metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None),
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
+    o_seq_id: U64): Bool 
+  =>
+    @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n".cstring())
+    true
+
+class StepIdRouter is OmniRouter
+  let _worker_name: String
+  let _data_routes: Map[U128, CreditFlowConsumerStep tag] val
+  let _step_map: Map[U128, (ProxyAddress val | U128)] val 
+  let _outgoing_boundaries: Map[String, OutgoingBoundary] val  
+
+  new val create(worker_name: String,
+    data_routes: Map[U128, CreditFlowConsumerStep tag] val =
+      recover Map[U128, CreditFlowConsumerStep tag] end,
+    step_map: Map[U128, (ProxyAddress val | U128)] val,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val)
+  =>
+    _worker_name = worker_name
+    _data_routes = data_routes
+    _step_map = step_map
+    _outgoing_boundaries = outgoing_boundaries
+
+  fun route_with_target_id[D: Any val](target_id: U128,
+    metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None),
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
+    o_seq_id: U64): Bool
+  =>
+    // TODO: Remove that producer can be None
+    match producer
+    | let cfp: CreditFlowProducer ref =>
+      try
+        // Try as though this target_id step exists on this worker
+        let target = _data_routes(target_id)
+
+        let might_be_route = cfp.route_to(target)
+        match might_be_route
+        | let r: Route =>
+          r.run[D](metric_name, source_ts, data,
+            // hand down cfp so we can update route_id
+            cfp,
+            // outgoing envelope
+            o_origin, o_msg_uid, o_frac_ids, o_seq_id)        
+          false
+        else
+          // No route for this target
+          true
+        end
+      else
+        // This target_id step exists on another worker
+        try
+          match _step_map(target_id)
+          | let pa: ProxyAddress val =>
+            try
+              // Try as though we have a reference to the right boundary
+              let boundary = _outgoing_boundaries(pa.worker)
+              let might_be_route = cfp.route_to(boundary)
+              match might_be_route
+              | let r: Route =>
+                let delivery_msg = ForwardMsg[D](
+                  pa.step_id, _worker_name, source_ts, data, metric_name,
+                  pa, o_msg_uid, o_frac_ids)
+
+                r.forward(delivery_msg)
+                false
+              else
+                // We don't have a route to this boundary
+                true
+              end
+            else
+              // We don't have a reference to the right outgoing boundary
+              true
+            end
+          | let sink_id: U128 =>
+            @printf[I32](("We should have built a sink on this worker for id " + sink_id.string() + " but it seems we didn't!\n").cstring())
+            true
+          else
+            @printf[I32]("DataRouter did not have an entry for provided target id\n".cstring())
+            true
+          end 
+        else
+          // Apparently this target_id does not refer to a valid step id
+          true
+        end
+      end
+    else
+      // We don't have a valid CFP
+      true
+    end
+
 class DataRouter
   let _data_routes: Map[U128, CreditFlowConsumerStep tag] val
 
   new val create(data_routes: Map[U128, CreditFlowConsumerStep tag] val =
-    recover Map[U128, CreditFlowConsumerStep tag] end)
+      recover Map[U128, CreditFlowConsumerStep tag] end)
   =>
     _data_routes = data_routes
 
   fun route(d_msg: DeliveryMsg val, origin: Origin tag, seq_id: U64) =>
+    let target_id = d_msg.target_id()
     try
-      let target_id = d_msg.target_id()
-      //TODO: create and deliver envelope
-      d_msg.deliver(_data_routes(target_id), origin, seq_id)
+      let target = _data_routes(target_id)
+      d_msg.deliver(target, origin, seq_id)
       false
     else
       true

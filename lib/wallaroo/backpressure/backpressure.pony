@@ -355,6 +355,7 @@ class BoundaryRoute is Route
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val)
   =>
+    @printf[I32]("!!BoudnaryRoute sending\n".cstring())
     _consumer.forward(delivery_msg)
 
     _credits_available = _credits_available - 1
