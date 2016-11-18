@@ -509,7 +509,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     var num_to_send: USize = 0
     var bytes_to_send: USize = 0
     var bytes_sent: USize = 0
-    while _writeable and (_pending_writev.size() > 0) do
+    while _writeable and (_pending_writev_total > 0) do
       try
         //determine number of bytes and buffers to send
         if (_pending_writev.size()/2) < @pony_os_writev_max[I32]().usize() then
@@ -546,36 +546,33 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
               _pending_writev.update(1, iov_s-len)
               _pending_writev_total = _pending_writev_total - len
               _apply_backpressure()
+              len = 0
             end
           end
-
-          // do trackinginfo finished stuff
-          _tracking_info_finished(bytes_sent)
-
-          //didn't send all data
-          return false
         else
           // sent all data we requested in this batch
-          _pending_writev.remove(0, num_to_send*2)
           _pending_writev_total = _pending_writev_total - bytes_to_send
+          if _pending_writev_total == 0 then
+            _pending_writev.clear()
+//            @printf[I32]("Clearing writev buffer...\n".cstring())
+
+            // do trackinginfo finished stuff
+            _tracking_info_finished(bytes_sent)
+            return true
+          else
+            _pending_writev.remove(0, num_to_send*2)
+          end
         end
       else
         // Non-graceful shutdown on error.
         _hard_close()
-
-        // do trackinginfo finished stuff
-        _tracking_info_finished(bytes_sent)
-
-        //didn't send all data
-        return false
       end
     end
 
     // do trackinginfo finished stuff
     _tracking_info_finished(bytes_sent)
 
-    //sent all data
-    true
+    false
 
 
   fun ref _tracking_info_finished(num_bytes_sent: USize) =>
