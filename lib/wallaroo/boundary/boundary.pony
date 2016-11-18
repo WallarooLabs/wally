@@ -506,19 +506,21 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     writeable. On an error, dispose of the connection. Returns whether
     it sent all pending data or not.
     """
+    // TODO: Make writev_batch_size user configurable
+    let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
     var num_to_send: USize = 0
     var bytes_to_send: USize = 0
     var bytes_sent: USize = 0
     while _writeable and (_pending_writev_total > 0) do
       try
         //determine number of bytes and buffers to send
-        if (_pending_writev.size()/2) < @pony_os_writev_max[I32]().usize() then
+        if (_pending_writev.size()/2) < writev_batch_size then
           num_to_send = _pending_writev.size()/2
           bytes_to_send = _pending_writev_total
         else
           //have more buffers than a single writev can handle
           //iterate over buffers being sent to add up total
-          num_to_send = _pending_writev.size()/2
+          num_to_send = writev_batch_size
           bytes_to_send = 0
           for d in Range[USize](1, num_to_send*2, 2) do
             bytes_to_send = bytes_to_send + _pending_writev(d)
@@ -527,7 +529,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
         // Write as much data as possible.
         var len = @pony_os_writev[USize](_event,
-          _pending_writev.cpointer(), (_pending_writev.size()/2).min(@pony_os_writev_max[I32]().usize())) ?
+          _pending_writev.cpointer(), num_to_send) ?
 
         // keep track of how many bytes we sent
         bytes_sent = bytes_sent + len
