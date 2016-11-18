@@ -29,12 +29,10 @@ sleep 2
 nc -l 5555 > /dev/null &
 
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 1000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w $NO_BLOCK &
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 1000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/initial-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w $NO_BLOCK
 
 cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 100000000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w $NO_BLOCK &
-
-sleep 2
 
 cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 16,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 50000000000 -s 300 -i 5_000_000 -f ~/buffy/demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 --ponypinasio -w $NO_BLOCK &
