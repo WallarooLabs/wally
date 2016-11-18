@@ -5,6 +5,7 @@ use "files"
 use "collections"
 use "sendence/hub"
 use "sendence/epoch"
+use "format"
 
 actor Main
   new create(env: Env) =>
@@ -370,11 +371,20 @@ class ThroughputStats
       max_throughput_by_period.f64() / _trunc_period.f64()
 
   fun format_throughput(throughput: F64): String iso^ =>
+    let divided_throughput = throughput / 1000.0
     let formatted_throughput =
-      if throughput > 10000 then
-        (throughput / 1000.0).u64().string()
+      if divided_throughput >= 10.0 then
+        divided_throughput.u64().string()
+      elseif divided_throughput >= 1.0 then
+        Format.float[F64](where x = divided_throughput, prec = 3)
+      elseif divided_throughput >= 0.1 then
+        Format.float[F64](where x = divided_throughput, prec = 2)
+      elseif divided_throughput >= 0.01 then
+        Format.float[F64](where x = divided_throughput, prec = 1)
+      elseif throughput == 0.0 then
+        return "0".clone()
       else
-        throughput.string()
+        return "Under 100".clone()
       end
     formatted_throughput.clone().append("k").clone()
 
