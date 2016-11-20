@@ -9,10 +9,12 @@ let
               }
             ) { });
 in
-{  use_pinned ? true }:
+{  use_pinned ? true, ponyc ? "sendence-14.0.5", compiler ? "clang_38", llvm ? "llvm_38", use_lto ? true, run_ponyc_tests ? true }:
 
 let
   pkgs = if use_pinned then _pinned_nixpkgs else _nixpkgs;
+  compiler_to_use = builtins.getAttr compiler pkgs;
+  llvm_to_use = builtins.getAttr llvm pkgs;
   requiredVersion = "1.11.4";
   x = if ! builtins ? nixVersion || builtins.compareVersions requiredVersion builtins.nixVersion != 0 then
     abort "This version of Nixpkgs requires Nix == ${requiredVersion}, your version is ${builtins.nixVersion} please upgrade or downgrade!"
@@ -47,17 +49,24 @@ in
 #        llvm_37
 #        llvm_38
 #        llvm_39
-#
-  let ponyc-lto = ponyc.override { lto = true; llvm = llvm_38; /* cc = clang39; */ };
+
+  let ponyc-lto = pkgs.ponyc.override { lto = use_lto; llvm = llvm_to_use; cc = compiler_to_use; };
       sendence-ponyc = stdenv.lib.overrideDerivation ponyc-lto (oldAttrs: rec {
-      name = "sendence-ponyc-${version}";
-      version = "sendence-13.4.1";
-      src  = latestGit {
-               owner  = "sendence";
-               repo   = "ponyc";
-               rev    = version;
-             };
+      name = "sendence-ponyc" + (if builtins.typeOf ponyc == "string" then "-" + ponyc else "");
+
+      src = if builtins.typeOf ponyc == "path" then ponyc else
+                latestGit {
+                    owner  = "sendence";
+                    repo   = "ponyc";
+                    rev    = ponyc;
+                };
+
       patches = [ ];
+
+      doCheck = run_ponyc_tests;
+
+      checkTarget = "test";
+
     });
       hex-13 = stdenv.lib.overrideDerivation beamPackages.hex (oldAttrs: rec {
         version = "v0.13.2";
@@ -166,6 +175,8 @@ in
       '';
 
       buildInputs = [
+        compiler_to_use
+        llvm_to_use
         sendence-ponyc
         pony-stable-frozen
         file

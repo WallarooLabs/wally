@@ -1,6 +1,6 @@
-{  use_pinned ? true }:
+{  use_pinned ? true, ponyc ? "sendence-14.0.5", compiler ? "clang_38", llvm ? "llvm_38", use_lto ? true, run_ponyc_tests ? true }:
 
-let buffy = import ./default.nix { use_pinned = use_pinned; };
+let buffy = import ./default.nix { use_pinned = use_pinned; ponyc = ponyc; compiler = compiler; llvm = llvm; use_lto = use_lto; run_ponyc_tests = run_ponyc_tests; };
 in
   with buffy;
   with buffy.pkgs;
