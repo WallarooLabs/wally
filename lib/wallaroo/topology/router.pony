@@ -184,10 +184,6 @@ trait AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)] is
   fun clone_and_augment[NewIn: Any val](
     new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter val
 
-//!!
-interface Sy
-  fun symbol(): String
-
 class LocalPartitionRouter[In: Any val,
   Key: (Hashable val & Equatable[Key] val)] is AugmentablePartitionRouter[Key]
   let _local_map: Map[U128, Step] val

@@ -205,9 +205,49 @@ actor ApplicationInitializer
         let source_node_id = _guid_gen.u128()
         let source_seq_builder = RunnerSequenceBuilder(
             source_runner_builders = recover Array[RunnerBuilder val] end) 
+
+        // If the source contains a prestate runner, then we might need
+        // a pre state target id, None if not
+        let pre_state_target_id =
+          if source_seq_builder.is_prestate() then
+            try
+              runner_builders(runner_builder_idx + 1).id()
+            else
+              // We need a sink on every worker involved in the 
+              // partition
+              let egress_builder = EgressBuilder(pipeline.name(), 
+                sink_id, sink_addr, pipeline.sink_builder())
+
+              match partition_workers
+              | let w: String =>
+                try
+                  local_graphs(w).add_node(egress_builder, sink_id)
+                else
+                  @printf[I32](("No graph for worker " + w + "\n").cstring())
+                  error
+                end
+              | let ws: Array[String] val =>
+                local_graphs("initializer").add_node(egress_builder, 
+                  sink_id)
+                for w in ws.values() do
+                  try
+                    local_graphs(w).add_node(egress_builder, sink_id)
+                  else
+                    @printf[I32](("No graph for worker " + w + "\n").cstring())
+                    error
+                  end
+                end
+              end
+
+              sink_id
+            end
+          else
+            None
+          end
+
         let source_initializer = SourceData(source_node_id, 
           pipeline.source_builder(), source_seq_builder, 
-          pipeline.source_route_builder(), source_addr)
+          pipeline.source_route_builder(), source_addr, pre_state_target_id)
 
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
 

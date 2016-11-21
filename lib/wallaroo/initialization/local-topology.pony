@@ -580,6 +580,50 @@ actor LocalTopologyInitializer
               let next_id = source_data.id()
               let pipeline_name = source_data.pipeline_name()
 
+
+              if source_data.is_prestate() then
+                @printf[I32]("!!Found PRESTATE\n".cstring())
+                match source_data.pre_state_target_id()
+                | let id: U128 =>
+                  @printf[I32]("!!PRESTATE has target\n".cstring())
+                  try
+                    built(id)
+                    @printf[I32]("!!PRESTATE has target built\n".cstring())
+                  else
+                    @printf[I32]("!!PRESTATE has no target built!\n".cstring())
+                  end
+                else
+                  @printf[I32]("!!PRESTATE has no target\n".cstring())
+                end
+              else
+                @printf[I32]("!!Source has NO PRESTATE\n".cstring())
+              end
+
+              @printf[I32](("!!Source data state name: " + source_data.state_name() + "\n").cstring())
+
+              let state_comp_target_router = 
+                if source_data.is_prestate() then
+                  match source_data.pre_state_target_id()
+                  | let id: U128 =>
+                    try
+                      // !!
+                      let r = built(id)
+                      @printf[I32]("!!WE FOUND PRESTATE TARGET!\n".cstring())
+                      r
+                    else
+                      @printf[I32]("Prestate comp target not built! We should have already caught this\n".cstring())
+                      error
+                    end
+                  else
+                    @printf[I32]("There is no prestate comp target. Using an EmptyRouter\n".cstring())
+                    EmptyRouter
+                  end
+                else
+                  EmptyRouter
+                end
+
+
+
               let out_router = 
                 if source_data.state_name() == "" then
                   // Currently there are no splits (II), so we know that a node has
@@ -622,7 +666,7 @@ actor LocalTopologyInitializer
                     out_router,
                     source_data.route_builder(),
                     _outgoing_boundaries,
-                    _alfred, default_target, EmptyRouter,
+                    _alfred, default_target, state_comp_target_router,
                     source_data.address()(0), 
                     source_data.address()(1))
                 end )

@@ -207,6 +207,7 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
 
   fun name(): String => _state_comp.name()
   fun state_name(): String => _state_name
+  fun is_prestate(): Bool => true
   fun is_stateful(): Bool => true
   fun is_multi(): Bool => _is_multi
   fun id(): U128 => _id
