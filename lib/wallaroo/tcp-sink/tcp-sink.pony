@@ -32,7 +32,7 @@ actor EmptySink is CreditFlowConsumerStep
     None
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
   => 
     None
 
@@ -144,7 +144,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _notify_connecting()
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
   => 
     None
 

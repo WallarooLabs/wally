@@ -284,12 +284,18 @@ class DataRouter
     _data_routes = data_routes
 
   fun route(d_msg: DeliveryMsg val, origin: Origin tag, seq_id: U64) =>
+    @printf[I32]("!! DataRouter\n".cstring())
     let target_id = d_msg.target_id()
     try
       let target = _data_routes(target_id)
+      @printf[I32]("!! DataRouter succeeded\n".cstring())
       d_msg.deliver(target, origin, seq_id)
       false
     else
+      @printf[I32]("!! DataRouter failed\n".cstring())
+      ifdef debug then
+        @printf[I32]("DataRouter failed to find route\n".cstring())
+      end
       true
     end
 

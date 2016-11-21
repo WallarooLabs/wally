@@ -126,7 +126,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     None
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
   => 
     None
 

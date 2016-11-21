@@ -17,6 +17,7 @@ interface Runner
   // Return a Bool indicating whether the message is finished processing
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: (CreditFlowProducer ref | None), router: Router val,
+    omni_router: OmniRouter val,
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
     i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
@@ -37,7 +38,8 @@ trait RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None): Runner iso^
+    router: (Router val | None) = None,
+    target_id: (U128 | None) = None): Runner iso^
 
   fun name(): String
   fun state_name(): String => ""
@@ -75,7 +77,8 @@ class RunnerSequenceBuilder is RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None): Runner iso^
+    router: (Router val | None) = None,
+    target_id: (U128 | None) = None): Runner iso^
   =>
     var remaining: USize = _runner_builders.size()
     var latest_runner: Runner iso = RouterRunner
@@ -146,7 +149,8 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None): Runner iso^
+    router: (Router val | None) = None,
+    target_id: (U128 | None) = None): Runner iso^
   =>
     match (consume next_runner)
     | let r: Runner iso =>
@@ -193,15 +197,16 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None): Runner iso^
+    router: (Router val | None) = None,
+    target_id: (U128 | None) = None): Runner iso^
   =>
-    match router
-    | let r: Router val =>
-      PreStateRunner[In, Out, State](_state_comp, _state_name, r, 
+    match target_id
+    | let t_id: U128 =>
+      PreStateRunner[In, Out, State](_state_comp, _state_name, t_id, 
         consume metrics_reporter)
     else
-      @printf[I32]("PreStateRunner should take a Router on build!\n".cstring())
-      PreStateRunner[In, Out, State](_state_comp, _state_name, EmptyRouter, 
+      @printf[I32]("PreStateRunner should take a target_id on build!\n".cstring())
+      PreStateRunner[In, Out, State](_state_comp, _state_name, 0, 
         consume metrics_reporter)
     end
 
@@ -244,7 +249,8 @@ class StateRunnerBuilder[State: Any #read] is RunnerBuilder
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None): Runner iso^
+    router: (Router val | None) = None,
+    target_id: (U128 | None) = None): Runner iso^
   =>
     let sr = StateRunner[State](_state_builder, consume metrics_reporter, alfred)
     for scb in _state_change_builders.values() do
@@ -304,7 +310,8 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
-    router: (Router val | None) = None): Runner iso^
+    router: (Router val | None) = None,
+    target_id: (U128 | None) = None): Runner iso^
   =>
     _state_runner_builder(consume metrics_reporter, alfred, 
       consume next_runner, router)
@@ -406,6 +413,7 @@ class ComputationRunner[In: Any val, Out: Any val]
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: (CreditFlowProducer ref | None), router: Router val,
+    omni_router: OmniRouter val,
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
     i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
@@ -423,6 +431,7 @@ class ComputationRunner[In: Any val, Out: Any val]
         | None => true
         | let output: Out =>
           _next.run[Out](metric_name, source_ts, output, producer, router,
+            omni_router,
             // incoming envelope
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
             // outgoing envelope
@@ -445,24 +454,25 @@ class ComputationRunner[In: Any val, Out: Any val]
 
 class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _metrics_reporter: MetricsReporter
-  let _output_router: Router val
+  let _target_id: U128
   let _state_comp: StateComputation[In, Out, State] val
   let _name: String
   let _prep_name: String
   let _state_name: String
 
   new iso create(state_comp: StateComputation[In, Out, State] val,
-    state_name': String, router: Router val, 
+    state_name': String, target_id: U128, 
     metrics_reporter: MetricsReporter iso) 
   =>
     _metrics_reporter = consume metrics_reporter
-    _output_router = router
+    _target_id = target_id
     _state_comp = state_comp
     _name = _state_comp.name()
     _prep_name = _name + " prep"
     _state_name = state_name'
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,    producer: (CreditFlowProducer ref | None), router: Router val,
+    omni_router: OmniRouter val,
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
     i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
@@ -478,7 +488,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
         | let shared_state_router: Router val =>
           let processor: StateComputationWrapper[In, Out, State] val = 
             StateComputationWrapper[In, Out, State](input, _state_comp, 
-              _output_router)
+              _target_id)
           shared_state_router.route[
             StateComputationWrapper[In, Out, State] val](
             metric_name, source_ts, processor, producer,
@@ -544,6 +554,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: (CreditFlowProducer ref | None), router: Router val,
+    omni_router: OmniRouter val,
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
     i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
@@ -555,8 +566,8 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     match data
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
-      let result = sp(_state, _state_change_repository, metric_name, source_ts,
-        producer,
+      let result = sp(_state, _state_change_repository, omni_router, 
+        metric_name, source_ts, producer,
         // incoming envelope
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
         // outgoing envelope
@@ -607,6 +618,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
 class iso RouterRunner
   fun ref run[Out: Any val](metric_name: String, source_ts: U64, output: Out,
     producer: (CreditFlowProducer ref | None), router: Router val,
+    omni_router: OmniRouter val,
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
     i_frac_ids: None, i_seq_id: U64, i_route_id: U64,

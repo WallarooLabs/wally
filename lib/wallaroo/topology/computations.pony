@@ -28,7 +28,7 @@ trait StateProcessor[State: Any #read] is BasicComputation
   // TODO: solve the situation where Out is None and we
   // still want the message passed along
   fun apply(state: State, sc_repo: StateChangeRepository[State],
-    metric_name: String, source_ts: U64,
+    omni_router: OmniRouter val, metric_name: String, source_ts: U64,
     producer: (CreditFlowProducer ref | None),
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
@@ -44,18 +44,18 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
   is (StateProcessor[State] & InputWrapper)
   let _state_comp: StateComputation[In, Out, State] val
   let _input: In
-  let _router: Router val
+  let _target_id: U128
 
   new val create(input': In, state_comp: StateComputation[In, Out, State] val,
-    router: Router val) =>
+    target_id: U128) =>
     _state_comp = state_comp
     _input = input'
-    _router = router
+    _target_id = target_id
 
   fun input(): Any val => _input
 
   fun apply(state: State, sc_repo: StateChangeRepository[State],
-    metric_name: String, source_ts: U64, 
+    omni_router: OmniRouter val, metric_name: String, source_ts: U64,
     producer: (CreditFlowProducer ref | None),
     // incoming envelope
     i_origin: Origin tag, i_msg_uid: U128, 
@@ -71,8 +71,8 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     match result
     | (None, _) => (true, result._2) // This must come first
     | (let output: Out, _) =>
-      let is_finished = _router.route[Out](metric_name, source_ts, output, 
-        producer,
+      let is_finished = omni_router.route_with_target_id[Out](_target_id, 
+        metric_name, source_ts, output, producer,
         // incoming envelope
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
         // outgoing envelope

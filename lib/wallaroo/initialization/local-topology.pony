@@ -54,13 +54,15 @@ class LocalTopology
   fun update_state_map(state_map: Map[String, PartitionRouter val],
     metrics_conn: TCPConnection, alfred: Alfred,
     connections: Connections, auth: AmbientAuth,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val)
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    data_routes: Map[U128, CreditFlowConsumerStep tag])
   =>
     for (state_name, subpartition) in _state_builders.pairs() do
       if not state_map.contains(state_name) then
         @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
         state_map(state_name) = subpartition.build(_app_name, _worker_name,
-           metrics_conn, auth, connections, alfred, outgoing_boundaries)
+           metrics_conn, auth, connections, alfred, outgoing_boundaries,
+           data_routes)
       end
     end
 
@@ -199,10 +201,7 @@ actor LocalTopologyInitializer
         // Make sure we only create shared state once and reuse it
         let state_map: Map[String, PartitionRouter val] = state_map.create()
 
-        // Keep track of all CreditFLowConsumerSteps by id so we can create a 
-        // DataRouter for the data channel boundary
-        let data_routes: Map[U128, CreditFlowConsumerStep tag] trn =
-          recover Map[U128, CreditFlowConsumerStep tag] end
+
 
         // Keep track of everything we need to call initialize() on when
         // we're done
@@ -210,18 +209,37 @@ actor LocalTopologyInitializer
 
         @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
 
+        let data_routes_ref = Map[U128, CreditFlowConsumerStep tag]
+
         // Create shared state for this topology
-        t.update_state_map(state_map, _metrics_conn, _alfred, _connections,
-          _auth, _outgoing_boundaries)
+        t.update_state_map(state_map, _metrics_conn, _alfred, 
+          _connections, _auth, _outgoing_boundaries, data_routes_ref)
+        
+        // Keep track of all CreditFLowConsumerSteps by id so we can create a 
+        // DataRouter for the data channel boundary
+        var data_routes: Map[U128, CreditFlowConsumerStep tag] trn =
+          recover Map[U128, CreditFlowConsumerStep tag] end
+        for (id, r) in data_routes_ref.pairs() do
+          data_routes(id) = r
+        end
 
         let tcp_sinks_trn: Array[TCPSink] trn = recover Array[TCPSink] end
 
         // Update the step ids for all OutgoingBoundaries
         _connections.update_boundary_ids(t.proxy_ids())
 
-        // Keep track of the steps we've built
-        let built = Map[U128, Router val]
+        // Keep track of routers to the steps we've built
+        let built_routers = Map[U128, Router val]
 
+        // Keep track of steps we've built that we'll use for the OmniRouter.
+        // Unlike data_routes, these will not include state steps, which will // never be direct targets of state computations.
+        let built_stateless_steps: Map[U128, CreditFlowConsumerStep] trn = 
+          recover Map[U128, CreditFlowConsumerStep] end
+
+        // Keep track of built state steps so we can register routes on them
+        // for state computation targets
+        // let built_state_steps: Map[U128, CreditFlowConsumerStep] = 
+        //   built_state_steps.create()
 
         // TODO: Replace this when we move past the temporary POC based default
         // target strategy
@@ -261,12 +279,13 @@ actor LocalTopologyInitializer
           initializables.push(state_step)
 
           default_target_state_step = state_step
-          built(default_target_state_step_id) = DirectRouter(state_step)
+          // built_state_steps(default_target_state_step_id) = state_step
+          built_routers(default_target_state_step_id) = DirectRouter(state_step)
         | let proxy_target: ProxyAddress val =>
           let proxy_router = ProxyRouter(_worker_name, 
             _outgoing_boundaries(proxy_target.worker), proxy_target,
             _auth)
-          built(default_target_id) = proxy_router
+          built_routers(default_target_id) = proxy_router
         end
 
 
@@ -329,7 +348,7 @@ actor LocalTopologyInitializer
         while frontier.size() > 0 do
           let next_node = frontier.pop()
 
-          if built.contains(next_node.id) then
+          if built_routers.contains(next_node.id) then
             // We've already handled this node (probably because it's 
             // pre-state)
             @printf[I32](("We've already handled " + next_node.value.name() + " with id " + next_node.id.string() + " so we're not handling it again\n").cstring())
@@ -341,13 +360,13 @@ actor LocalTopologyInitializer
           // splits (II), there will only be at most one output per node)
           var ready = true
           for out in next_node.outs() do
-            if not built.contains(out.id) then ready = false end
+            if not built_routers.contains(out.id) then ready = false end
           end
           match next_node.value
           | let s_builder: StepBuilder val =>
             match s_builder.pre_state_target_id()
             | let psid: U128 =>
-              if not built.contains(psid) then
+              if not built_routers.contains(psid) then
                 ready = false
               end
             end
@@ -371,7 +390,7 @@ actor LocalTopologyInitializer
 
                 let out_router = 
                   try
-                    builder.augment_router(built(out_id))
+                    builder.augment_router(built_routers(out_id))
                   else
                     @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
                     error 
@@ -383,7 +402,7 @@ actor LocalTopologyInitializer
                   match builder.pre_state_target_id() 
                   | let id: U128 =>
                     try
-                      let pre_state_target_router = built(id)
+                      let pre_state_target_router = built_routers(id)
                       match pre_state_target_router
                       | let pr: PartitionRouter val =>
                         pr.register_routes(pre_state_target_router,
@@ -411,8 +430,9 @@ actor LocalTopologyInitializer
                 data_routes(next_id) = next_step
                 initializables.push(next_step)
 
+                built_stateless_steps(next_id) = next_step
                 let next_router = DirectRouter(next_step)
-                built(next_id) = next_router
+                built_routers(next_id) = next_router
 
                 // If this is our default target, then keep a reference
                 // to it
@@ -432,7 +452,7 @@ actor LocalTopologyInitializer
                   match in_node.value.pre_state_target_id()
                   | let id: U128 =>
                     try
-                      built(id)
+                      built_routers(id)
                     else
                       targets_ready = false
                     end
@@ -447,10 +467,11 @@ actor LocalTopologyInitializer
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn, _alfred)
                 data_routes(next_id) = state_step
+                // built_state_steps(next_id) = state_step
                 initializables.push(state_step)
 
                 let state_step_router = DirectRouter(state_step)
-                built(next_id) = state_step_router
+                built_routers(next_id) = state_step_router
 
                 // Before a non-partitioned state builder, we should
                 // always have one or more non-partitioned pre-state builders.
@@ -465,7 +486,7 @@ actor LocalTopologyInitializer
                       match b.pre_state_target_id()
                       | let id: U128 =>
                         try
-                          built(id)
+                          built_routers(id)
                         else
                           @printf[I32]("Prestate comp target not built! We should have already caught this\n".cstring())
                           error
@@ -480,15 +501,16 @@ actor LocalTopologyInitializer
                     data_routes(b.id()) = pre_state_step                    
                     initializables.push(pre_state_step)
 
+                    built_stateless_steps(b.id()) = pre_state_step
                     let pre_state_router = DirectRouter(pre_state_step)
-                    built(b.id()) = pre_state_router
+                    built_routers(b.id()) = pre_state_router
 
                     state_step.register_routes(state_comp_target, 
                       b.forward_route_builder())
 
                     // Add ins to this prestate node to the frontier
                     for in_in_node in in_node.ins() do
-                      if not built.contains(in_in_node.id) then
+                      if not built_routers.contains(in_in_node.id) then
                         frontier.push(in_in_node)
                       end
                     end
@@ -511,7 +533,7 @@ actor LocalTopologyInitializer
             //     match p_builder.pre_state_target_id()
             //     | let id: U128 =>
             //       try
-            //         built(id)
+            //         built_routers(id)
             //       else
             //         @printf[I32]("Prestate comp target not built! Did you try to string two state steps in a row (that can't be done)?\n".cstring())
             //         error
@@ -527,7 +549,7 @@ actor LocalTopologyInitializer
             //   let default_router = 
             //     try
             //       if default_target_id != 0 then
-            //         built(default_target_id)
+            //         built_routers(default_target_id)
             //       else
             //         None
             //       end
@@ -549,10 +571,10 @@ actor LocalTopologyInitializer
             //   // Add the partition router to our built list for nodes
             //   // that connect to this node via an in edge and to prove
             //   // we've handled it
-            //   built(next_id) = partition_router
+            //   built_routers(next_id) = partition_router
             | let egress_builder: EgressBuilder val =>
               let next_id = egress_builder.id()
-              if not built.contains(next_id) then
+              if not built_routers.contains(next_id) then
                 let sink_reporter = MetricsReporter(t.name(), 
                   _metrics_conn)
 
@@ -584,8 +606,9 @@ actor LocalTopologyInitializer
                     DirectRouter(sink)
                   end
 
+                built_stateless_steps(next_id) = sink
                 data_routes(next_id) = sink
-                built(next_id) = sink_router
+                built_routers(next_id) = sink_router
               end
             | let source_data: SourceData val =>
               let next_id = source_data.id()
@@ -599,7 +622,7 @@ actor LocalTopologyInitializer
                   | let id: U128 =>
                     try
                       // !!
-                      let r = built(id)
+                      let r = built_routers(id)
                       @printf[I32]("!!WE FOUND PRESTATE TARGET!\n".cstring())
                       r
                     else
@@ -632,7 +655,7 @@ actor LocalTopologyInitializer
                   let out_id: U128 = _get_output_node_id(next_node,
                     default_target_id, default_target_state_step_id)
                   try
-                    built(out_id)
+                    built_routers(out_id)
                   else
                     @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
                     error 
@@ -691,13 +714,13 @@ actor LocalTopologyInitializer
 
               // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one
-              built(next_id) = EmptyRouter
+              built_routers(next_id) = EmptyRouter
             end
 
             // Add all the nodes with incoming edges to next_node to the
             // frontier
             for in_node in next_node.ins() do
-              if not built.contains(in_node.id) then
+              if not built_routers.contains(in_node.id) then
                 frontier.push(in_node)
               end
             end
@@ -739,10 +762,13 @@ actor LocalTopologyInitializer
           _connections.send_phone_home(ready_msg)
         end
 
+        let omni_router = StepIdRouter(_worker_name,
+          consume built_stateless_steps, t.step_map(), _outgoing_boundaries)
+
         // Initialize all our initializables to get backpressure started
         let tcp_sinks: Array[TCPSink] val = consume tcp_sinks_trn
         for i in initializables.values() do
-          i.initialize(_outgoing_boundaries, tcp_sinks)
+          i.initialize(_outgoing_boundaries, tcp_sinks, omni_router)
         end
 
         @printf[I32]("Local topology initialized\n".cstring())

@@ -49,13 +49,16 @@ class StepBuilder
 
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
     router: Router val = EmptyRouter, 
+    omni_router: OmniRouter val = EmptyOmniRouter,
     default_target: (Step | None) = None): Step tag 
   =>
     let runner = _runner_builder(MetricsReporter(_app_name, 
-      metrics_conn) where alfred = alfred, router = router)
+      metrics_conn) where alfred = alfred, router = router, 
+      target_id = pre_state_target_id())
     let step = Step(consume runner, 
       MetricsReporter(_app_name, metrics_conn), _id,
-      _runner_builder.route_builder(), alfred, router, default_target)
+      _runner_builder.route_builder(), alfred, router, default_target,
+      omni_router)
     step.update_router(next)
     step
 

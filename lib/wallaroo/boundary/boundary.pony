@@ -92,7 +92,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + service + "\n").cstring())
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
   =>
     try
       if _step_id == 0 then

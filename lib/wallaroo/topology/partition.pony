@@ -199,6 +199,7 @@ trait StateSubpartition
     metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    data_routes: Map[U128, CreditFlowConsumerStep tag],
     default_router: (Router val | None) = None): PartitionRouter val
 
 class KeyedStateSubpartition[PIn: Any val,
@@ -224,6 +225,7 @@ class KeyedStateSubpartition[PIn: Any val,
     metrics_conn: TCPConnection, 
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    data_routes: Map[U128, CreditFlowConsumerStep tag],
     default_router: (Router val | None) = None):
     LocalPartitionRouter[PIn, Key] val
   =>
@@ -247,6 +249,7 @@ class KeyedStateSubpartition[PIn: Any val,
             consume reporter, guid_gen.u128(), _runner_builder.route_builder(),
               alfred)
 
+          data_routes(id) = next_state_step
           m(id) = next_state_step
           routes(key) = next_state_step
           partition_count = partition_count + 1

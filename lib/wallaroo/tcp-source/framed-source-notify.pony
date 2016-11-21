@@ -19,6 +19,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _handler: FramedSourceHandler[In] val
   let _runner: Runner
   let _router: Router val
+  let _omni_router: OmniRouter val = EmptyOmniRouter
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
   var _msg_count: USize = 0
@@ -67,7 +68,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
             _outgoing_seq_id = _outgoing_seq_id + 1
             let decoded = _handler.decode(consume data)
             _runner.run[In](_pipeline_name, ingest_ts, decoded,
-              conn, _router,
+              conn, _router, _omni_router,
               // incoming envelope (of which technically there is none)
               o, 0, None, 0, 0,
               // outgoing envelope with msg_uid

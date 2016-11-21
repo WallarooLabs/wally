@@ -34,7 +34,7 @@ trait tag RunnableStep
 
 interface Initializable
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val)
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
 
 type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer & Initializable tag)
 
@@ -52,6 +52,8 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
   var _router: Router val
+  // For use if this is a state step, otherwise EmptyOmniRouter
+  var _omni_router: OmniRouter val
   var _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
   let _default_target: (Step | None)
@@ -74,7 +76,8 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   var _distributable_credits: ISize = _max_distributable_credits
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, id: U128,
-    route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter, default_target: (Step | None) = None)
+    route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter, default_target: (Step | None) = None,
+    omni_router: OmniRouter val = EmptyOmniRouter)
   =>
     _runner = consume runner
     match _runner
@@ -84,6 +87,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     _outgoing_seq_id = 0
     _outgoing_route_id = 0
     _router = _runner.augment_router(router)
+    _omni_router = omni_router
     _route_builder = route_builder
     _alfred = alfred
     _alfred.register_origin(this, id)
@@ -91,7 +95,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     _default_target = default_target
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
   =>
     for consumer in _router.routes().values() do
       _routes(consumer) =
@@ -133,6 +137,9 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   // TODO: This needs to dispose of the old routes and replace with new routes
   be update_router(router: Router val) => _router = router
 
+  be update_omni_router(omni_router: OmniRouter val) => 
+    _omni_router = omni_router
+
   // TODO: Fix the Origin None once we know how to look up Proxy
   // for messages crossing boundary
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -142,7 +149,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     // @printf[I32]("!!STEP RECVD\n".cstring())
     _outgoing_seq_id = _outgoing_seq_id + 1
     let is_finished = _runner.run[D](metric_name, source_ts, data,
-      this, _router,
+      this, _router, _omni_router,
       // incoming envelope
       origin, msg_uid, frac_ids, incoming_seq_id, route_id,
       // outgoing envelope
@@ -217,7 +224,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
       _deduplication_list.push((origin, msg_uid, frac_ids, incoming_seq_id,
         route_id))
       let is_finished = _runner.run[D](metric_name, source_ts, data,
-        this, _router,
+        this, _router, _omni_router,
         // incoming envelope
         origin, msg_uid, frac_ids, incoming_seq_id, route_id,
         // outgoing envelope
