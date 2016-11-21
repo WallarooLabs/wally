@@ -56,8 +56,9 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
   fun pairs(): Iterator[(Key, ProxyAddress val)] => _addresses.pairs()
 
 interface StateAddresses
-  fun apply(key: Any val): (Step | None)
+  fun apply(key: Any val): (Step tag | None)
   fun register_routes(router: Router val, route_builder: RouteBuilder val)
+  fun steps(): Array[CreditFlowConsumerStep] val
 
 class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
   let _addresses: Map[Key, Step] val
@@ -80,6 +81,23 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
   fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
     for step in _addresses.values() do
       step.register_routes(router, route_builder)
+    end
+
+  fun steps(): Array[CreditFlowConsumerStep] val =>
+    let ss: Array[CreditFlowConsumerStep] trn =
+      recover Array[CreditFlowConsumerStep] end
+
+    for s in _addresses.values() do
+      try
+        ss.push(s as CreditFlowConsumerStep)
+      end
+    end
+
+    consume ss
+
+  fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
+    for s in _addresses.values() do
+      s.register_routes(router, route_builder)
     end
 
 trait StateSubpartition

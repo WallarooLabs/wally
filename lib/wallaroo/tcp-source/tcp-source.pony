@@ -1,4 +1,5 @@
 use "assert"
+use "buffered"
 use "collections"
 use "net"
 use "wallaroo/backpressure"
@@ -11,6 +12,7 @@ use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
+use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 actor TCPSource is (CreditFlowProducer & Initializable & Origin)
@@ -42,7 +44,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   var _read_len: USize = 0
   var _shutdown: Bool = false
   var _muted: Bool = false
-  
+  var _expect_read_buf: Reader = Reader
+
   // Resilience
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
@@ -53,8 +56,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val, 
-    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,   
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -65,11 +68,25 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     _notify.set_origin(this)
     _connect_count = 0
     _fd = fd
-    _event = @pony_asio_event_create(this, fd, AsioEvent.read_write(), 0, true)
+    ifdef linux then
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write_oneshot(), 0, true)
+    else
+      _event = @pony_asio_event_create(this, fd,
+        AsioEvent.read_write(), 0, true)
+    end
     _connected = true
+    /*
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
+    */
+
+    // TODO: replace with value of OS buffer size from socketopt.
+    // This value is stupid large
+    _read_buf = recover Array[U8].undefined(1_048_576) end
+    _next_size = 1_048_576
+    _max_size = 1_048_576
 
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
@@ -84,7 +101,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     end
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
-      _routes(boundary) = 
+      _routes(boundary) =
         _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
@@ -119,8 +136,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     None
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
-  => 
+    tcp_sinks: Array[TCPSink] val)
+  =>
     None
 
   be dispose() =>
@@ -160,7 +177,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
   fun ref update_route_id(route_id: U64) =>
     None // only used in Route to update the outgoing route_id for a message
-    
+
   //
   // TCP
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
@@ -213,6 +230,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
       _try_shutdown()
     end
+    _resubscribe_event()
 
   fun ref _notify_connecting() =>
     """
@@ -303,11 +321,38 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
       while _readable and not _shutdown_peer do
         if _muted then
-          _read_again()
           return
         end
 
+        while (_expect_read_buf.size() > 0) and
+          (_expect_read_buf.size() >= _expect)
+        do
+          let block_size = if _expect != 0 then
+            _expect
+          else
+            _expect_read_buf.size()
+          end
+
+          let out = _expect_read_buf.block(block_size)
+          let carry_on = _notify.received(this, consume out)
+          ifdef osx then
+            if not carry_on then
+              _read_again()
+              return
+            end
+
+            sum = sum + block_size
+
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
+            end
+          end
+        end
+
         // Read as much data as possible.
+        _read_buf_size()
         let len = @pony_os_recv[USize](
           _event,
           _read_buf.cpointer().usize() + _read_len,
@@ -317,6 +362,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
         | 0 =>
           // Would block, try again later.
           _readable = false
+          _resubscribe_event()
           return
         | _next_size =>
           // Increase the read buffer size.
@@ -330,20 +376,51 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
           data.truncate(_read_len)
           _read_len = 0
 
-          let carry_on = _notify.received(this, consume data)
-          _read_buf_size()
-          if not carry_on then
-            _read_again()
-            return
+          _expect_read_buf.append(consume data)
+
+          while (_expect_read_buf.size() > 0) and
+            (_expect_read_buf.size() >= _expect)
+          do
+            let out = _expect_read_buf.block(_expect)
+            let osize = _expect
+
+            let carry_on = _notify.received(this, consume out)
+            ifdef osx then
+              if not carry_on then
+                _read_again()
+                return
+              end
+
+              sum = sum + osize
+
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                _read_again()
+                return
+              end
+            end
           end
-        end
+        else
+          let data = _read_buf = recover Array[U8] end
+          data.truncate(_read_len)
+          let dsize = _read_len
+          _read_len = 0
 
-        sum = sum + len
+          let carry_on = _notify.received(this, consume data)
+          ifdef osx then
+            if not carry_on then
+              _read_again()
+              return
+            end
 
-        if sum >= _max_size then
-          // If we've read _max_size, yield and read again later.
-          _read_again()
-          return
+            sum = sum + dsize
+
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
+            end
+          end
         end
       end
     else
@@ -356,25 +433,21 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     """
     Resume reading.
     """
+
     _pending_reads()
 
   fun ref _read_buf_size() =>
     """
     Resize the read buffer.
     """
-    if _expect != 0 then
-      _read_buf.undefined(_expect)
-    else
-      _read_buf.undefined(_next_size)
-    end
+    _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
-    @printf[None]("Muting\n".cstring())
     _muted = true
 
   fun ref _unmute() =>
-    @printf[None]("Unmuting\n".cstring())
     _muted = false
+    _pending_reads()
 
   fun ref expect(qty: USize = 0) =>
     """
@@ -383,7 +456,17 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     """
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
-    _read_buf_size()
+
+  fun ref _resubscribe_event() =>
+    ifdef linux then
+      let flags = if not _readable then
+        AsioEvent.read() or AsioEvent.oneshot()
+      else
+        return
+      end
+
+      @pony_asio_event_resubscribe(_event, flags)
+    end
 
 class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   var _muted: ISize = 0
@@ -397,8 +480,8 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   fun ref credits_replenished(producer: CreditFlowProducer ref) =>
     ifdef debug then
       try
-        Assert(_muted > 0, 
-          "credits_replenished() should only be called when the calling " + 
+        Assert(_muted > 0,
+          "credits_replenished() should only be called when the calling " +
           "Route was already muted.")
       else
         shutdown(producer)
