@@ -159,7 +159,8 @@ class SourceData
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun forward_route_builder(): RouteBuilder val => 
+    _runner_builder.forward_route_builder()
   fun augment_router(r: Router val): Router val =>
     _runner_builder.augment_router(r)
 

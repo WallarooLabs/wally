@@ -2,6 +2,7 @@ use "collections"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/resilience"
+use "wallaroo/tcp-sink"
 use "wallaroo/topology"
 
 class TCPSourceListenerBuilder
@@ -9,6 +10,7 @@ class TCPSourceListenerBuilder
   let _router: Router val
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _tcp_sinks: Array[TCPSink] val
   let _alfred: Alfred
   let _default_target: (Step | None)
   let _target_router: Router val
@@ -18,9 +20,10 @@ class TCPSourceListenerBuilder
   let _init_size: USize
   let _max_size: USize
 
-  new create(source_builder: SourceBuilder val, router: Router val,
+  new val create(source_builder: SourceBuilder val, router: Router val,
     route_builder: RouteBuilder val, 
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
     target_router: Router val = EmptyRouter, 
@@ -31,8 +34,10 @@ class TCPSourceListenerBuilder
     _router = router
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
+    _tcp_sinks = tcp_sinks
     _alfred = alfred
     _default_target = default_target
+    _target_router = target_router
     _host = host
     _service = service
     _limit = limit
@@ -41,8 +46,8 @@ class TCPSourceListenerBuilder
 
   fun apply(): TCPSourceListener =>
     TCPSourceListener(_source_builder, _router, _route_builder, 
-      _outgoing_boundaries, _alfred, _default_target, _target_router, _host, 
-      _service, _limit, _init_size, _max_size) 
+      _outgoing_boundaries, _tcp_sinks, _alfred, _default_target, 
+      _target_router, _host, _service, _limit, _init_size, _max_size) 
 
 actor TCPSourceListener
   """
@@ -53,6 +58,7 @@ actor TCPSourceListener
   let _router: Router val
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _tcp_sinks: Array[TCPSink] val
   let _default_target: (Step | None)
   var _fd: U32
   var _event: AsioEventID = AsioEvent.none()
@@ -65,6 +71,7 @@ actor TCPSourceListener
   new create(source_builder: SourceBuilder val, router: Router val,
     route_builder: RouteBuilder val, 
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
     target_router: Router val = EmptyRouter, 
@@ -78,6 +85,7 @@ actor TCPSourceListener
     _router = router
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
+    _tcp_sinks = tcp_sinks
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.cstring(), service.cstring())
     _limit = limit
@@ -145,8 +153,8 @@ actor TCPSourceListener
     """
     try
       TCPSource._accept(this, _notify.connected(this), _router.routes(), 
-        _route_builder, _outgoing_boundaries, ns, _default_target, _init_size, 
-        _max_size)
+        _route_builder, _outgoing_boundaries, _tcp_sinks, ns, _default_target, 
+        _init_size, _max_size)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)

@@ -55,12 +55,14 @@ class DirectRouter
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
+    @printf[I32]("!!DirectRouter\n".cstring())
     // TODO: Remove that producer can be None
     match producer
     | let cfp: CreditFlowProducer ref =>
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
+        @printf[I32]("!!Route\n".cstring())        
         r.run[D](metric_name, source_ts, data,
           // hand down cfp so we can update route_id
           cfp,
@@ -77,6 +79,14 @@ class DirectRouter
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
     recover val [_target] end
+
+  fun has_sink(): Bool => 
+    match _target
+    | let tcp: TCPSink =>
+      true
+    else
+      false
+    end
 
 class ProxyRouter
   let _worker_name: String
@@ -178,6 +188,7 @@ class DataRouter
 
 trait PartitionRouter is Router
   fun local_map(): Map[U128, Step] val
+  fun register_routes(router: Router val, route_builder: RouteBuilder val) 
 
 trait AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)] is
   PartitionRouter
@@ -279,6 +290,32 @@ class LocalPartitionRouter[In: Any val,
   =>
     LocalPartitionRouter[NewIn, Key](_local_map, _step_ids, _partition_routes, 
       new_p_function)
+
+  fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
+    //!!
+    match router
+    | let d: DirectRouter val =>
+      if d.has_sink() then
+        @printf[I32]("-----!! SINK ROUTER registering\n".cstring())
+      else
+        @printf[I32]("-----!! NON SINK ROUTER registering\n".cstring())
+      end
+    end
+    //!!
+    match route_builder
+    | let d: EmptyRouteBuilder val =>
+        @printf[I32]("-----!! EMPTY ROUTE BUILDER\n".cstring())
+    else
+      @printf[I32]("-----!! REAL ROUTE BUILDER\n".cstring())
+    end
+
+
+    for r in _partition_routes.values() do
+      match r
+      | let step: Step =>
+        step.register_routes(router, route_builder)
+      end
+    end
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
     // TODO: CREDITFLOW we need to handle proxies once we have boundary actors

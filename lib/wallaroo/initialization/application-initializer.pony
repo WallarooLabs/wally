@@ -118,6 +118,12 @@ actor ApplicationInitializer
           @printf[I32](("Coalescing is off for " + pipeline.name() + " pipeline\n").cstring())
         end
 
+        // This is the sink id for the sink for this pipeline on the
+        // initializer worker, if there is one.
+        // ASSUMPTION: There is only at most one sink per worker per 
+          // pipeline.
+        var sink_id = _guid_gen.u128()
+
         let source_addr_trn: Array[String] trn = recover Array[String] end
         try
           source_addr_trn.push(_input_addrs(pipeline_id)(0))
@@ -206,19 +212,31 @@ actor ApplicationInitializer
         let source_seq_builder = RunnerSequenceBuilder(
             source_runner_builders = recover Array[RunnerBuilder val] end) 
 
+        let source_partition_workers: (String | Array[String] val | None) = 
+          if source_seq_builder.is_prestate() then
+            if source_seq_builder.is_multi() then
+              @printf[I32]("Multiworker Partition\n".cstring())
+              all_workers
+            else
+              "initializer"
+            end
+          else
+            None
+          end
+
         // If the source contains a prestate runner, then we might need
         // a pre state target id, None if not
-        let pre_state_target_id =
+        let source_pre_state_target_id =
           if source_seq_builder.is_prestate() then
             try
-              runner_builders(runner_builder_idx + 1).id()
+              runner_builders(0).id()
             else
               // We need a sink on every worker involved in the 
               // partition
               let egress_builder = EgressBuilder(pipeline.name(), 
                 sink_id, sink_addr, pipeline.sink_builder())
 
-              match partition_workers
+              match source_partition_workers
               | let w: String =>
                 try
                   local_graphs(w).add_node(egress_builder, sink_id)
@@ -237,6 +255,8 @@ actor ApplicationInitializer
                     error
                   end
                 end
+              // source_partition_workers shouldn't be None since we showed
+              // that source_seq_builders.is_prestate() is true
               end
 
               sink_id
@@ -247,7 +267,8 @@ actor ApplicationInitializer
 
         let source_initializer = SourceData(source_node_id, 
           pipeline.source_builder(), source_seq_builder, 
-          pipeline.source_route_builder(), source_addr, pre_state_target_id)
+          pipeline.source_route_builder(), source_addr, 
+          source_pre_state_target_id)
 
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
 
@@ -372,8 +393,16 @@ actor ApplicationInitializer
           end
 
           // Set up sink id for this worker for this pipeline (in case there's
-          // a sink on it)
-          let sink_id = _guid_gen.u128()
+          // a sink on it). If this worker is the initializer, we already
+          // have an id. 
+          // ASSUMPTION: There is only at most one sink per worker per 
+          // pipeline.
+          sink_id = 
+            if worker == "initializer" then
+              sink_id
+            else
+              _guid_gen.u128()
+            end
 
           // Make sure there are still runner_builders left in the pipeline.
           if runner_builder_idx < runner_builders.size() then

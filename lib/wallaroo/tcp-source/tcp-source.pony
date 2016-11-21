@@ -24,6 +24,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _tcp_sinks: Array[TCPSink] val
 
   // TCP
   let _listen: TCPSourceListener
@@ -54,6 +55,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val, 
+    tcp_sinks: Array[TCPSink] val,
     fd: U32, default_target: (CreditFlowConsumerStep | None) = None,   
     init_size: USize = 64, max_size: USize = 16384)
   =>
@@ -73,6 +75,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
+    _tcp_sinks = tcp_sinks
 
     //TODO: either only accept when we are done recovering or don't start
     //listening until we are done recovering
@@ -86,6 +89,10 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     for (worker, boundary) in _outgoing_boundaries.pairs() do
       _routes(boundary) = 
         _route_builder(this, boundary, StepRouteCallbackHandler)
+    end
+
+    for sink in tcp_sinks.values() do
+      _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
     end
 
     match default_target

@@ -159,6 +159,7 @@ class TypedRoute[In: Any val] is Route
   =>
     match data
     | let input: In =>
+      @printf[I32]("!!Matched input type on Route\n".cstring())        
       ifdef "use_backpressure" then
         if _credits_available > 0 then
           let above_request_point =
@@ -205,6 +206,7 @@ class TypedRoute[In: Any val] is Route
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, outgoing_seq_id: U64)
   =>
+    @printf[I32]("!!Sending on Route\n".cstring())        
     _consumer.run[In](metric_name,
       source_ts,
       input,

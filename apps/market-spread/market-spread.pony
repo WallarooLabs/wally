@@ -180,7 +180,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     sc_repo: StateChangeRepository[SymbolData], 
     state: SymbolData): ((OrderResult val | None), None)
   =>
-    @printf[I32]("!!CheckOrder\n".cstring())
+    // @printf[I32]("!!CheckOrder\n".cstring())
     if state.should_reject_trades then
       let res = OrderResult(msg, state.last_bid, state.last_offer,
         Epoch.nanoseconds())

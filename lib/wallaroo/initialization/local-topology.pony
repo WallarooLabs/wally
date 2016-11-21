@@ -199,15 +199,15 @@ actor LocalTopologyInitializer
         let data_routes: Map[U128, CreditFlowConsumerStep tag] trn =
           recover Map[U128, CreditFlowConsumerStep tag] end
 
+        // Keep track of everything we need to call initialize() on when
+        // we're done
+        let initializables: Array[Initializable tag] = initializables.create()
+
         @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
 
         // Create shared state for this topology
         t.update_state_map(state_map, _metrics_conn, _alfred, _connections,
           _auth, _outgoing_boundaries)
-
-        // Keep track of everything we need to call initialize() on when
-        // we're done
-        let initializables: Array[Initializable tag] = initializables.create()
 
         let tcp_sinks_trn: Array[TCPSink] trn = recover Array[TCPSink] end
 
@@ -378,7 +378,13 @@ actor LocalTopologyInitializer
                   match builder.pre_state_target_id() 
                   | let id: U128 =>
                     try
-                      built(id)
+                      let pre_state_target_router = built(id)
+                      match pre_state_target_router
+                      | let pr: PartitionRouter val =>
+                        pr.register_routes(pre_state_target_router,
+                          builder.forward_route_builder())
+                      end
+                      pre_state_target_router
                     else
                       if builder.is_prestate() then
                         @printf[I32]("!!Pre state target not built!\n".cstring())
@@ -580,25 +586,6 @@ actor LocalTopologyInitializer
               let next_id = source_data.id()
               let pipeline_name = source_data.pipeline_name()
 
-
-              if source_data.is_prestate() then
-                @printf[I32]("!!Found PRESTATE\n".cstring())
-                match source_data.pre_state_target_id()
-                | let id: U128 =>
-                  @printf[I32]("!!PRESTATE has target\n".cstring())
-                  try
-                    built(id)
-                    @printf[I32]("!!PRESTATE has target built\n".cstring())
-                  else
-                    @printf[I32]("!!PRESTATE has no target built!\n".cstring())
-                  end
-                else
-                  @printf[I32]("!!PRESTATE has no target\n".cstring())
-                end
-              else
-                @printf[I32]("!!Source has NO PRESTATE\n".cstring())
-              end
-
               @printf[I32](("!!Source data state name: " + source_data.state_name() + "\n").cstring())
 
               let state_comp_target_router = 
@@ -622,7 +609,15 @@ actor LocalTopologyInitializer
                   EmptyRouter
                 end
 
-
+              //!!
+              match state_comp_target_router
+              | let d: DirectRouter val =>
+                if d.has_sink() then
+                  @printf[I32]("-----!! SINK ROUTER for target\n".cstring())
+                else
+                  @printf[I32]("-----!! NON SINK ROUTER for target\n".cstring())
+                end
+              end
 
               let out_router = 
                 if source_data.state_name() == "" then
@@ -639,9 +634,14 @@ actor LocalTopologyInitializer
                   end
                 else
                   // Source has a prestate runner on it, so we have no 
-                  // direct target. We need a partition router.
+                  // direct target. We need a partition router. And we
+                  // need to register a route to our state comp target on those
+                  // state steps.
                   try
-                    @printf[I32]("!!Augmenting router for state\n".cstring())
+                    let state_router = state_map(source_data.state_name())
+                    state_router.register_routes(state_comp_target_router,
+                      source_data.forward_route_builder())
+                    @printf[I32]("!!JUST REGISTERD\n".cstring())
                     source_data.augment_router(
                       state_map(source_data.state_name()))
                   else
@@ -656,20 +656,30 @@ actor LocalTopologyInitializer
               // TODO: How do we add an Initializable to our list for 
               // the Source?
 
+              // Get all the sinks so far, which should include any sinks
+              // prestate on this source might target
+              let sinks_for_source_trn: Array[TCPSink] trn = 
+                recover Array[TCPSink] end
+              for sink in tcp_sinks_trn.values() do
+                sinks_for_source_trn.push(sink)
+              end
+              let sinks_for_source: Array[TCPSink] val =  
+                consume sinks_for_source_trn
+
               let listen_auth = TCPListenAuth(_auth)
               try
                 @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
-                tcpsl_builders.push( recover val
+                tcpsl_builders.push(
                   TCPSourceListenerBuilder(
                     source_data.builder()(source_data.runner_builder(), 
                       out_router, _metrics_conn),
                     out_router,
                     source_data.route_builder(),
-                    _outgoing_boundaries,
+                    _outgoing_boundaries, sinks_for_source,
                     _alfred, default_target, state_comp_target_router,
                     source_data.address()(0), 
                     source_data.address()(1))
-                end )
+                )
               else
                 @printf[I32]("Ill-formed source address\n".cstring())
               end
