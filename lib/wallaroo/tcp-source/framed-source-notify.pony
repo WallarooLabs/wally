@@ -27,13 +27,15 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
 
   new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
-    metrics_reporter: MetricsReporter iso, alfred: Alfred tag)
+    metrics_reporter: MetricsReporter iso, alfred: Alfred tag,
+    target_router: Router val)
   =>
     _pipeline_name = pipeline_name
     // TODO: Figure out how to name sources
     _source_name = pipeline_name + " source"
     _handler = handler
-    _runner = runner_builder(metrics_reporter.clone(), alfred)
+    _runner = runner_builder(metrics_reporter.clone(), alfred 
+      where router = target_router)
     _router = router
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()

@@ -600,7 +600,7 @@ actor LocalTopologyInitializer
                     out_router,
                     source_data.route_builder(),
                     _outgoing_boundaries,
-                    _alfred, default_target,
+                    _alfred, default_target, EmptyRouter,
                     source_data.address()(0), 
                     source_data.address()(1))
                 end )
