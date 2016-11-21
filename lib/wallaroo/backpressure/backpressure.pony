@@ -101,13 +101,6 @@ class TypedRoute[In: Any val] is Route
       end
     _queue = Array[(String, U64, In, Origin tag, U128, None, U64)](q_size)
 
-    let q_size: USize = ifdef "use_backpressure" then
-      500_000
-    else
-      0
-    end
-    _queue = Array[(String, U64, In, Origin tag, U128, None, U64)](q_size)
-
   fun ref initialize() =>
     None
 
