@@ -11,6 +11,7 @@ class TCPSourceListenerBuilder
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _alfred: Alfred
   let _default_target: (Step | None)
+  let _target_router: Router val
   let _host: String
   let _service: String
   let _limit: USize
@@ -22,6 +23,7 @@ class TCPSourceListenerBuilder
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
+    target_router: Router val,
     host: String = "", service: String = "0", limit: USize = 0, 
     init_size: USize = 64, max_size: USize = 16384)
   =>
@@ -31,6 +33,7 @@ class TCPSourceListenerBuilder
     _outgoing_boundaries = outgoing_boundaries
     _alfred = alfred
     _default_target = default_target
+    _target_router = target_router
     _host = host
     _service = service
     _limit = limit
@@ -40,7 +43,8 @@ class TCPSourceListenerBuilder
   fun apply(): TCPSourceListener =>
     TCPSourceListener(
       _source_builder, _router, _route_builder, _outgoing_boundaries,
-      _alfred, _default_target, _host, _service, _limit, _init_size, _max_size
+      _alfred, _default_target, _target_router, _host, _service, _limit,
+      _init_size, _max_size
     ) 
 
 actor TCPSourceListener
