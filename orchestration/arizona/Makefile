@@ -14,6 +14,8 @@ ansible_parallelism ?= default## Number of machines to process in parallel for A
 num_leaders ?= ## Number of leader nodes (1 by default)
 num_followers ?= ## Number of follower nodes (2 by default)
 ansible_ptpd_experimental ?= false## Whether to use experimental PTPd or not
+arizona_node_type ?= execution## Type of arizona node to launch. Options are: 'execution', 'development', 'build'
+ansible_system_cpus ?= ## Number of cpus to dedicate for system processes (the rest are isolated for user processes)
 
 inventory_script := ec2.py
 ansible_user := ec2-user
@@ -82,6 +84,12 @@ ifneq (,$(filter $(provider),packet))
   all_instances := 'tag_arizona:&tag_Cluster_$(cluster_name):&$(region)'
 endif
 
+# set arguments for ansible system_cpus variable
+ifeq ($(ansible_system_cpus),)
+  ansible_sys_cpus_arg :=
+else
+  ansible_sys_cpus_arg := system_cpus=$(ansible_system_cpus)
+endif
 
 # set arguments for ansible parallelism
 ifeq ($(ansible_parallelism),default)
@@ -219,6 +227,17 @@ ifneq (,$(findstring -var follower_spot_price=,$(terraform_args)))
   endif
 endif
 
+ifdef arizona_node_type
+  ifeq (,$(filter $(arizona_node_type),execution development build))
+    $(error Unknown arizona_node_type option "$(arizona_node_type). \
+      Valid options are 'execution', 'development', and 'build'")
+  endif
+endif
+
+arizona_execution_instance_ami := ami-0ecd9e19
+arizona_development_instance_ami := ami-3592c222
+arizona_build_instance_ami := ami-b57929a2
+
 cluster_full_pem := $(shell echo $(cluster_pem))
 
 .PHONY: all init-terrform plan apply terraform-plan\
@@ -235,6 +254,7 @@ terraform-plan: # actual terraform plan command
 	cd $(provider)-cluster && terraform plan -var $(provider)_key_name=$(region) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
           $(provider)_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
+          -var instance_ami=$(arizona_$(arizona_node_type)_instance_ami) \
           $(num_leaders_arg) $(num_followers_arg) $(packet_vars)
 	@echo "\033[36m==> Successfully ran terraform plan for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'!\033[0m"
@@ -245,6 +265,7 @@ terraform-apply: # actual terraform apply command
 	cd $(provider)-cluster && terraform apply -var $(provider)_key_name=$(region) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
           $(provider)_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
+          -var instance_ami=$(arizona_$(arizona_node_type)_instance_ami) \
           $(num_leaders_arg) $(num_followers_arg) $(packet_vars)
 	@echo "\033[36m==> Successfully ran terraform apply for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'!\033[0m"
@@ -255,6 +276,7 @@ terraform-destroy: # actual terraform destroy command
 	cd $(provider)-cluster && terraform destroy -force -var $(provider)_key_name=$(region) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
           $(provider)_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
+          -var instance_ami=$(arizona_$(arizona_node_type)_instance_ami) \
           $(num_leaders_arg) $(num_followers_arg) $(packet_vars)
 	@echo "\033[36m==> Successfully ran terraform destroy for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'!\033[0m"
@@ -285,7 +307,7 @@ configure: check-cluster-name ## Configure nodes using ansible
           ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
           $(provider)_region=$(region) ptpd_experimental=$(ansible_ptpd_experimental)\
-          " -u $(ansible_user) \
+          $(ansible_sys_cpus_arg)" -u $(ansible_user) \
           ../ansible/playbooks/arizona.yml
 	@echo "\033[36m==> Successfully ran ansible playbook for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'!\033[0m"

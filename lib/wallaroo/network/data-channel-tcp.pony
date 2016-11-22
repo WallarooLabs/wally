@@ -18,8 +18,8 @@ class DataChannelListenNotifier is TCPListenNotify
   let _connections: Connections
   let _receivers: Map[String, DataReceiver] val
 
-  new iso create(name: String, env: Env, auth: AmbientAuth, 
-    connections: Connections, is_initializer: Bool, 
+  new iso create(name: String, env: Env, auth: AmbientAuth,
+    connections: Connections, is_initializer: Bool,
     receivers: Map[String, DataReceiver] val)
   =>
     _name = name
@@ -27,7 +27,7 @@ class DataChannelListenNotifier is TCPListenNotify
     _auth = auth
     _is_initializer = is_initializer
     _connections = connections
-    _receivers = receivers    
+    _receivers = receivers
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -46,21 +46,20 @@ class DataChannelListenNotifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     DataChannelConnectNotifier(_receivers, _connections, _env, _auth)
 
-    
+
 class DataChannelConnectNotifier is TCPConnectionNotify
   let _receivers: Map[String, DataReceiver] val
   let _connections: Connections
   let _env: Env
   let _auth: AmbientAuth
   var _header: Bool = true
-  var _msg_count: USize = 0
   let _timers: Timers = Timers
 
   new iso create(receivers: Map[String, DataReceiver] val,
-    connections: Connections, env: Env, auth: AmbientAuth) 
+    connections: Connections, env: Env, auth: AmbientAuth)
   =>
     _receivers = receivers
-    _connections = connections  
+    _connections = connections
     _env = env
     _auth = auth
 
@@ -97,7 +96,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
           let delivery_msg = data_msg.delivery_msg
 
           _receivers(delivery_msg.sender_name())
-            .replay_received(delivery_msg, data_msg.seq_id)              
+            .replay_received(delivery_msg, data_msg.seq_id)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
@@ -119,12 +118,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       _header = true
 
       ifdef linux then
-        _msg_count = _msg_count + 1
-        if ((_msg_count % 25) == 0) then
-          false
-        else
-          true
-        end
+        true
       else
         false
       end

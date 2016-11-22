@@ -45,7 +45,7 @@ resource "aws_instance" "leaders" {
     create_before_destroy = true
   }
 
-  ami = "${lookup(var.instance_amis, var.aws_region)}"
+  ami = "${var.instance_ami}"
   instance_type = "${var.leader_instance_type}"
   iam_instance_profile = "${var.aws_iam_role}"
   monitoring = "${var.aws_detailed_monitoring}"
@@ -80,7 +80,7 @@ resource "aws_instance" "followers" {
     create_before_destroy = true
   }
 
-  ami = "${lookup(var.instance_amis, var.aws_region)}"
+  ami = "${var.instance_ami}"
   instance_type = "${var.follower_instance_type}"
   iam_instance_profile = "${var.aws_iam_role}"
   monitoring = "${var.aws_detailed_monitoring}"

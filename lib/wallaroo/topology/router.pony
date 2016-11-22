@@ -271,3 +271,59 @@ class LocalPartitionRouter[In: Any val,
     consume cs
 
   fun local_map(): Map[U128, Step] val => _local_map
+
+// TODO: Remove State type argument
+class StateAddressesRouter[In: Any val, 
+  Key: (Hashable val & Equatable[Key] val)]
+  let _state_addresses: StateAddresses val
+  let _partition_function: PartitionFunction[In, Key] val
+  
+  new val create(state_addresses: StateAddresses val,
+    partition_function: PartitionFunction[In, Key] val) 
+  =>
+    _state_addresses = state_addresses
+    _partition_function = partition_function
+    
+  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: (CreditFlowProducer ref | None),
+    // incoming envelope
+    i_origin: Origin tag, i_msg_uid: U128, 
+    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
+    // outgoing envelope
+    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
+    o_seq_id: U64): Bool
+  =>
+    match data
+    | let iw: InputWrapper[In] val =>
+      let key = _partition_function(iw.input())
+      match _state_addresses(key)
+      | let s: Step =>
+        // TODO: Remove that producer can be None
+        match producer
+        | let cfp: CreditFlowProducer ref =>
+          let might_be_route = cfp.route_to(s)
+          match might_be_route
+          | let r: Route =>
+            r.run[D](metric_name, source_ts, data,
+              // hand down cfp so we can update route_id
+              cfp,
+              // outgoing envelope
+              o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+            false
+          else
+            // TODO: What do we do if we get None?
+            true
+          end
+        else
+          true
+        end
+      else
+        true    
+      end
+    else
+      @printf[I32]("Wrong input type to partition router!\n".cstring())
+      true
+    end
+
+  fun routes(): Array[CreditFlowConsumerStep] val =>
+    _state_addresses.steps()

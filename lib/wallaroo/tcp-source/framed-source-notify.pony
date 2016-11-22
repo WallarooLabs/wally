@@ -21,19 +21,20 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _router: Router val
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
-  var _msg_count: USize = 0
   var _outgoing_seq_id: U64 = 0
   var _origin: (Origin tag | None) = None
 
   new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
-    metrics_reporter: MetricsReporter iso, alfred: Alfred tag)
+    metrics_reporter: MetricsReporter iso, alfred: Alfred tag,
+    target_router: Router val)
   =>
     _pipeline_name = pipeline_name
     // TODO: Figure out how to name sources
     _source_name = pipeline_name + " source"
     _handler = handler
-    _runner = runner_builder(metrics_reporter.clone(), alfred)
+    _runner = runner_builder(metrics_reporter.clone(), alfred
+      where router = target_router)
     _router = router
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
@@ -91,12 +92,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       _header = true
 
       ifdef linux then
-        _msg_count = _msg_count + 1
-        if ((_msg_count % 25) == 0) then
-          false
-        else
-          true
-        end
+        true
       else
         false
       end

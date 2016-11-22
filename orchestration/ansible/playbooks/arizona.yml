@@ -50,6 +50,21 @@
       state: present
       tags:
         Name: "{{ cluster_name }}:{{ ansible_hostname }}"
+  - name: Check if cset is installed
+    stat: path=/usr/bin/cset
+    register: cset
+  - name: install cset utility
+    yum:
+      name: https://s3.amazonaws.com/sendence-dev/installers/cset/cpuset-1.5.6-2.2.x86_64.rpm
+      state: present
+    when: not cset.stat.exists
+    become: yes
+  - name: apply kernel tweaks
+    script: roles/common/files/kerneltweaks_arizona.sh > /kerneltweaks.out
+    become: yes
+  - name: create cpu shield
+    script: roles/common/files/create_cpu_shield.sh {{ system_cpus if system_cpus is defined else "" }} > /create_cpu_shield.out
+    become: yes
 
 # Configure and deploy leader servers.
 - hosts: arizona-leaders
