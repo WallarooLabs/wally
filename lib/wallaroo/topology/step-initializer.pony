@@ -34,10 +34,6 @@ class StepBuilder
     _is_stateful = is_stateful'
     _pre_state_target_id = pre_state_target_id'
     _forward_route_builder = forward_route_builder'
-    match pre_state_target_id'
-    | let tid: U128 =>
-      @printf[I32]("!!StepBuilder create() got tid: %llu".cstring(), tid)
-    end
 
   fun name(): String => _runner_builder.name()
   fun state_name(): String => _state_name
@@ -56,7 +52,6 @@ class StepBuilder
     omni_router: OmniRouter val = EmptyOmniRouter,
     default_target: (Step | None) = None): Step tag 
   =>
-    @printf[I32]("!!Calling runnerbuilder from stepinitializer\n".cstring())
     let runner = _runner_builder(MetricsReporter(_app_name, 
       metrics_conn) where alfred = alfred, router = router, 
       pre_state_target_id' = pre_state_target_id())

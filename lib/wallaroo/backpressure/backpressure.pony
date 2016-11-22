@@ -66,7 +66,6 @@ class EmptyRoute is Route
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, outgoing_seq_id: U64)
   =>
-    @printf[I32]("!!EMPTY-ROUTE!!\n".cstring())
     None
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val) =>
@@ -158,10 +157,8 @@ class TypedRoute[In: Any val] is Route
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, outgoing_seq_id: U64)
   =>
-    @printf[I32]("!!ROUTE: Received at Route\n".cstring())
     match data
     | let input: In =>
-      @printf[I32]("!!ROUTE: Matched input type on Route\n".cstring())        
       ifdef "use_backpressure" then
         if _credits_available > 0 then
           let above_request_point =
@@ -208,7 +205,6 @@ class TypedRoute[In: Any val] is Route
     origin: Origin tag, msg_uid: U128,
     frac_ids: None, outgoing_seq_id: U64)
   =>
-    @printf[I32]("!!Sending on Route\n".cstring())        
     _consumer.run[In](metric_name,
       source_ts,
       input,
@@ -357,7 +353,6 @@ class BoundaryRoute is Route
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val)
   =>
-    @printf[I32]("!!BoudnaryRoute sending\n".cstring())
     _consumer.forward(delivery_msg)
 
     _credits_available = _credits_available - 1

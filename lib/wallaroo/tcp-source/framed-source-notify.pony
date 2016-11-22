@@ -35,18 +35,8 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     // TODO: Figure out how to name sources
     _source_name = pipeline_name + " source"
     _handler = handler
-    _runner =
-      match pre_state_target_id
-      | let id: U128 =>
-        @printf[I32]("!!FrameSource create() got tid: %llu\n".cstring(), id)
-        runner_builder(metrics_reporter.clone(), alfred, None, 
-          target_router, id)
-      else
-        @printf[I32]("!!FrameSource create() got tid NONE\n".cstring())
-        RouterRunner
-      end
-    // _runner = runner_builder(metrics_reporter.clone(), alfred 
-      // where router = target_router, target_id = pre_state_target_id)
+    _runner = runner_builder(metrics_reporter.clone(), alfred, None, 
+      target_router, pre_state_target_id)
     _router = _runner.clone_router_and_set_input_type(router)
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()

@@ -373,7 +373,6 @@ actor LocalTopologyInitializer
           | let s_builder: StepBuilder val =>
             match s_builder.pre_state_target_id()
             | let psid: U128 =>
-              @printf[I32]("!!Prestate target id: %llu".cstring(), psid)
               if not built_routers.contains(psid) then
                 ready = false
               end
@@ -409,7 +408,6 @@ actor LocalTopologyInitializer
                 let state_comp_target_router = 
                   match builder.pre_state_target_id() 
                   | let id: U128 =>
-                    @printf[I32]("!!Prestate target id: %llu".cstring(), id)
                     try
                       let pre_state_target_router = built_routers(id)
                       // match pre_state_target_router
@@ -419,15 +417,9 @@ actor LocalTopologyInitializer
                       // end
                       pre_state_target_router
                     else
-                      if builder.is_prestate() then
-                        @printf[I32]("!!Pre state target not built!\n".cstring())
-                      end
                       EmptyRouter
                     end
                   else
-                    if builder.is_prestate() then
-                      @printf[I32]("!!Why doesn't pre state have a target. Is this NBBO?\n".cstring())
-                    end
                     EmptyRouter
                   end
 
@@ -460,7 +452,6 @@ actor LocalTopologyInitializer
                 for in_node in next_node.ins() do
                   match in_node.value.pre_state_target_id()
                   | let id: U128 =>
-                    @printf[I32]("!!Prestate target id: %llu".cstring(), id)
                     try
                       built_routers(id)
                     else
@@ -495,8 +486,6 @@ actor LocalTopologyInitializer
                     let state_comp_target = 
                       match b.pre_state_target_id()
                       | let id: U128 =>
-                        @printf[I32]("!!Prestate target id: %llu".cstring(), 
-                          id)
                         try
                           built_routers(id)
                         else
@@ -627,18 +616,12 @@ actor LocalTopologyInitializer
               let next_id = source_data.id()
               let pipeline_name = source_data.pipeline_name()
 
-              @printf[I32](("!!Source data state name: " + source_data.state_name() + "\n").cstring())
-
               let state_comp_target_router = 
                 if source_data.is_prestate() then
                   match source_data.pre_state_target_id()
                   | let id: U128 =>
-                    @printf[I32]("!!Prestate target: %llu\n".cstring(), id)
                     try
-                      // !!
-                      let r = built_routers(id)
-                      @printf[I32]("!!WE FOUND PRESTATE TARGET!\n".cstring())
-                      r
+                      built_routers(id)
                     else
                       @printf[I32]("Prestate comp target not built! We should have already caught this\n".cstring())
                       error
@@ -648,19 +631,8 @@ actor LocalTopologyInitializer
                     EmptyRouter
                   end
                 else
-                  @printf[I32]("!!Source is not prestate. EMPTYROUTER\n".cstring())
                   EmptyRouter
                 end
-
-              //!!
-              match state_comp_target_router
-              | let d: DirectRouter val =>
-                if d.has_sink() then
-                  @printf[I32]("-----!! SINK ROUTER for target\n".cstring())
-                else
-                  @printf[I32]("-----!! NON SINK ROUTER for target\n".cstring())
-                end
-              end
 
               let out_router = 
                 if source_data.state_name() == "" then
@@ -681,18 +653,6 @@ actor LocalTopologyInitializer
                   // need to register a route to our state comp target on those
                   // state steps.
                   try
-                    // let state_router = state_map(source_data.state_name())
-                    // state_router.register_routes(state_comp_target_router,
-                    //   source_data.forward_route_builder())
-                    // //!!
-                    // match source_data.forward_route_builder()
-                    // | let e: EmptyRouteBuilder val =>
-                    //   @printf[I32]("!!FAIL: Source data has EmptyRouteBuilder\n".cstring())
-                    // else
-                    //   @printf[I32]("!!SUCCESS: Source data has real forward RouteBuilder\n".cstring())
-                    // end
-
-                    // @printf[I32]("!!JUST REGISTERD\n".cstring())
                     source_data.clone_router_and_set_input_type(
                       state_map(source_data.state_name()))
                   else

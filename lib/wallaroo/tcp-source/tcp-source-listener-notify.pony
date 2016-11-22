@@ -30,12 +30,6 @@ class _SourceBuilder[In: Any val]
     _router = router
     _metrics_conn = metrics_conn
     _pre_state_target_id = pre_state_target_id
-    match pre_state_target_id
-    | let id: U128 =>
-      @printf[I32]("!!SourceBuilder create() got tid: %llu\n".cstring(), id)
-    else
-      @printf[I32]("!!SourceBuilder create() got tid NONE\n".cstring())
-    end
 
   fun name(): String => _name
 

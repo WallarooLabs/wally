@@ -11,22 +11,18 @@ primitive ChannelMsgEncoder
   fun _encode(msg: ChannelMsg val, auth: AmbientAuth, 
     wb: Writer = Writer): Array[ByteSeq] val ? 
   =>
-    @printf[I32]("!!Serialising".cstring())
     let serialised: Array[U8] val =
       Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
-    @printf[I32]("!!Serialised".cstring())
     let size = serialised.size()
     if size > 0 then
       wb.u32_be(size.u32())
       wb.write(serialised)
     end
-    @printf[I32]("!!wb.done()".cstring())
     wb.done()
 
   fun data_channel(delivery_msg: ReplayableDeliveryMsg val,
     seq_id: U64, wb: Writer, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    @printf[I32]("!!Inside datachannel method".cstring())
     _encode(DataMsg(delivery_msg, seq_id), auth, wb)
 
   fun delivery[D: Any val](target_id: U128, 

@@ -280,9 +280,6 @@ actor ApplicationInitializer
             None
           end
 
-        @printf[I32]("!!Source prestate target id: %llu".cstring(), 
-          source_pre_state_target_id)
-
         if source_seq_builder.is_prestate() then
           let psd = PreStateData(source_seq_builder,
             source_pre_state_target_id)
@@ -712,8 +709,6 @@ actor ApplicationInitializer
 
                     sink_id
                   end
-                @printf[I32]("!!Init: Prestate target id: %llu".cstring(), 
-                  pre_state_target_id)
 
                 @printf[I32](("Preparing to spin up prestate step " + next_runner_builder.name() + " on " + worker + "\n").cstring())
 

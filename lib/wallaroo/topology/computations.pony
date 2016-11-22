@@ -51,8 +51,6 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     _state_comp = state_comp
     _input = input'
     _target_id = target_id
-    @printf[I32]("!!StateCompWrapper create() got tid: %llu\n".cstring(), 
-      target_id)
 
   fun input(): Any val => _input
 

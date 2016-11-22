@@ -55,7 +55,7 @@ class RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder val] val
   let _id: U128
   var _forward_route_builder: RouteBuilder val
-  var _state_name: String = ""
+  var _state_name: String
 
   new val create(bs: Array[RunnerBuilder val] val) =>
     _runner_builders = bs
@@ -67,18 +67,17 @@ class RunnerSequenceBuilder is RunnerBuilder
       end
     _forward_route_builder = 
       try
-        //!!
-        let frb = _runner_builders(_runner_builders.size() - 1).forward_route_builder()
-        @printf[I32]("!!Setting up RunnerSequenceBuilder FORWARD ROUTER...\n".cstring())
-        frb
+        _runner_builders(_runner_builders.size() - 1).forward_route_builder()
       else
         EmptyRouteBuilder
       end
 
-    try
-      _state_name =
+    _state_name =
+      try
         _runner_builders(_runner_builders.size() - 1).state_name()
-    end
+      else
+        ""
+      end
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -206,11 +205,8 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = 10): Runner iso^
   =>
-    @printf[I32](("!!PreStateRunnerBuilder target_id: " + pre_state_target_id'.string() + "\n").cstring())
     match pre_state_target_id'
     | let t_id: U128 =>
-      @printf[I32]("!!PreStateRunnerBuilder apply got tid: %llu".cstring(),
-        t_id)
       PreStateRunner[In, Out, State](_state_comp, _state_name, t_id, 
         consume metrics_reporter)
     else
@@ -230,9 +226,7 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
   fun clone_router_and_set_input_type(r: Router val): Router val =>
     match r
     | let p: AugmentablePartitionRouter[Key] val =>
-      let r2 = p.clone_and_set_input_type[PIn](_partition_function)
-      @printf[I32]("---!!Cloned!!\n".cstring())
-      r2
+      p.clone_and_set_input_type[PIn](_partition_function)
     else
       r
     end
@@ -479,7 +473,6 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     _name = _state_comp.name()
     _prep_name = _name + " prep"
     _state_name = state_name'
-    @printf[I32]("!!PrestateRUnner create() got tid: %llu".cstring(), target_id)
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,    producer: (CreditFlowProducer ref | None), router: Router val,
     omni_router: OmniRouter val,

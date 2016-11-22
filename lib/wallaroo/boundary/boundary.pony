@@ -125,7 +125,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: ReplayableDeliveryMsg val)
   =>
-    @printf[I32]("!!Boundary!\n".cstring())
     try
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         _seq_id, _wb, _auth)
@@ -134,8 +133,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       _writev(outgoing_msg)
 
       _seq_id = _seq_id + 1
-    else
-      @printf[I32]("!!Error preparing datamsg!\n".cstring())
     end
 
   be writev(data: Array[ByteSeq] val) =>

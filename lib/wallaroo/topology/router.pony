@@ -5,10 +5,6 @@ use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/tcp-sink"
 
-//!!
-use "sendence/fix"
-use "sendence/new-fix"
-
 // TODO: Eliminate producer None when we can
 interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -34,7 +30,6 @@ class EmptyRouter
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
-    @printf[I32]("!!EmptyRouter RECVD\n".cstring())
     true
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
@@ -55,14 +50,12 @@ class DirectRouter
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
-    @printf[I32]("!!DirectRouter\n".cstring())
     // TODO: Remove that producer can be None
     match producer
     | let cfp: CreditFlowProducer ref =>
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
-        @printf[I32]("!!Route\n".cstring())        
         r.run[D](metric_name, source_ts, data,
           // hand down cfp so we can update route_id
           cfp,
@@ -111,31 +104,12 @@ class ProxyRouter
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
-    @printf[I32]("!!ProxyRouter!\n".cstring())
     // TODO: Remove that producer can be None
     match producer
     | let cfp: CreditFlowProducer ref =>
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
-        @printf[I32]("!!ProxyRouter found Route!\n".cstring()) 
-        
-        //!!
-        match data
-        | let f: FixOrderMessage val =>
-          @printf[I32]("!!FixOrder!\n".cstring())
-        | let iw: InputWrapper val =>
-          @printf[I32]("!!InputWrapper...\n".cstring())
-          match iw.input()
-          | let f: FixOrderMessage val =>
-            @printf[I32]("!!...containing FixOrder!\n".cstring())
-          else
-            @printf[I32]("!!...NOT containing FixOrder!\n".cstring())
-          end
-        else
-          @printf[I32]("!!NOT FixOrder!\n".cstring())
-        end
-
         let delivery_msg = ForwardMsg[D](
           _target_proxy_address.step_id,
           _worker_name, source_ts, data, metric_name,
@@ -212,21 +186,16 @@ class StepIdRouter is OmniRouter
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
-    @printf[I32](("!!OmniRouter, routing id " + target_id.string() + "\n").cstring())
     // TODO: Remove that producer can be None
     match producer
     | let cfp: CreditFlowProducer ref =>
-      @printf[I32]("!!OmniRouter: CFP\n".cstring())
       try
         // Try as though this target_id step exists on this worker
         let target = _data_routes(target_id)
 
-        @printf[I32]("!!OmniRouter: Target is on this worker\n".cstring())
-
         let might_be_route = cfp.route_to(target)
         match might_be_route
         | let r: Route =>
-          @printf[I32]("!!OmniRouter: Route\n".cstring())
           r.run[D](metric_name, source_ts, data,
             // hand down cfp so we can update route_id
             cfp,
@@ -235,12 +204,10 @@ class StepIdRouter is OmniRouter
           false
         else
           // No route for this target
-          @printf[I32]("!!OmniRouter: No route for this target\n".cstring())
           true
         end
       else
         // This target_id step exists on another worker
-        @printf[I32]("!!OmniRouter: Target is NOT on this worker\n".cstring())
         try
           match _step_map(target_id)
           | let pa: ProxyAddress val =>
@@ -265,14 +232,11 @@ class StepIdRouter is OmniRouter
               true
             end
           | let sink_id: U128 =>
-            @printf[I32](("We should have built a sink on this worker for id " + sink_id.string() + " but it seems we didn't!\n").cstring())
             true
           else
-            @printf[I32]("DataRouter did not have an entry for provided target id\n".cstring())
             true
           end 
         else
-          @printf[I32]("!!OmniRouter: Actually we don't have a record of that step id\n".cstring())
           // Apparently this target_id does not refer to a valid step id
           true
         end
@@ -291,15 +255,12 @@ class DataRouter
     _data_routes = data_routes
 
   fun route(d_msg: DeliveryMsg val, origin: Origin tag, seq_id: U64) =>
-    @printf[I32]("!! DataRouter\n".cstring())
     let target_id = d_msg.target_id()
     try
       let target = _data_routes(target_id)
-      @printf[I32]("!! DataRouter succeeded\n".cstring())
       d_msg.deliver(target, origin, seq_id)
       false
     else
-      @printf[I32]("!! DataRouter failed\n".cstring())
       ifdef debug then
         @printf[I32]("DataRouter failed to find route\n".cstring())
       end
@@ -438,24 +399,6 @@ class LocalPartitionRouter[In: Any val,
       new_p_function)
 
   fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
-    //!!
-    match router
-    | let d: DirectRouter val =>
-      if d.has_sink() then
-        @printf[I32]("-----!! SINK ROUTER registering\n".cstring())
-      else
-        @printf[I32]("-----!! NON SINK ROUTER registering\n".cstring())
-      end
-    end
-    //!!
-    match route_builder
-    | let d: EmptyRouteBuilder val =>
-        @printf[I32]("-----!! EMPTY ROUTE BUILDER\n".cstring())
-    else
-      @printf[I32]("-----!! REAL ROUTE BUILDER\n".cstring())
-    end
-
-
     for r in _partition_routes.values() do
       match r
       | let step: Step =>
