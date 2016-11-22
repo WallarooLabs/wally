@@ -22,7 +22,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
   var _outgoing_seq_id: U64 = 0
-  var _origin: (Origin tag | None) = None
+  var _origin: (Origin | None) = None
 
   new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
@@ -42,7 +42,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   fun routes(): Array[CreditFlowConsumerStep] val =>
     _router.routes()
 
-  fun ref set_origin(origin: Origin tag) =>
+  fun ref set_origin(origin: Origin) =>
     _origin = origin
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
@@ -62,15 +62,12 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       let is_finished =
         try
           match _origin
-          | let o: Origin tag =>
+          | let o: Origin =>
             _outgoing_seq_id = _outgoing_seq_id + 1
             let decoded = _handler.decode(consume data)
             _runner.run[In](_pipeline_name, ingest_ts, decoded,
               conn, _router,
-              // incoming envelope (of which technically there is none)
-              o, 0, None, 0, 0,
-              // outgoing envelope with msg_uid
-              o, _guid_gen.u128(), None, 0)
+              o,  _guid_gen.u128(), None, 0, 0)
           else
             @printf[I32]("FramedSourceNotify needs an Origin to pass along!\n".cstring())
             true

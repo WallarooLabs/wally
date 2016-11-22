@@ -5,7 +5,6 @@ use "net"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/topology"
-use "wallaroo/messages"
 use "wallaroo/tcp-sink"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -46,12 +45,11 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   var _muted: Bool = false
   var _expect_read_buf: Reader = Reader
 
-  // Resilience
-  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
-  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
-  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
-  let _origins: OriginSet = OriginSet(10)
+  // Origin (Resilience)
+  var _flushing: Bool = false
+  let _watermarks: Watermarks = _watermarks.create()
+  let _hwmt: HighWatermarkTable = _hwmt.create()
+  var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
@@ -116,23 +114,20 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
   //////////////
   // ORIGIN (resilience)
-  fun ref hwm_get(): HighWatermarkTable =>
-    _hwm
+  fun ref flushing(): Bool =>
+    _flushing
 
-  fun ref lwm_get(): LowWatermarkTable =>
-    _lwm
+  fun ref not_flushing() =>
+    _flushing = false
 
-  fun ref seq_translate_get(): SeqTranslationTable =>
-    _seq_translate
+  fun ref watermarks(): Watermarks =>
+    _watermarks
 
-  fun ref route_translate_get(): RouteTranslationTable =>
-    _route_translate
+  fun ref hwmt(): HighWatermarkTable =>
+    _hwmt
 
-  fun ref origins_get(): OriginSet =>
-    _origins
-
-  fun ref _flush(low_watermark: U64, origin: Origin tag,
-    upstream_route_id: U64 , upstream_seq_id: U64) =>
+  fun ref _flush(low_watermark: U64, origin: Origin,
+    upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
     None
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
@@ -175,8 +170,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
       None
     end
 
-  fun ref update_route_id(route_id: U64) =>
-    None // only used in Route to update the outgoing route_id for a message
+  fun ref next_sequence_id(): U64 =>
+    _seq_id = _seq_id + 1
 
   //
   // TCP

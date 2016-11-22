@@ -1,5 +1,4 @@
 use "buffered"
-use "wallaroo/messages"
 use "wallaroo/backpressure"
 
 trait BasicComputation
@@ -29,13 +28,10 @@ trait StateProcessor[State: Any #read] is BasicComputation
   // still want the message passed along
   fun apply(state: State, sc_repo: StateChangeRepository[State],
     metric_name: String, source_ts: U64,
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): (Bool, (StateChange[State] ref | None))
+    producer: Producer ref,
+    i_origin: Origin, i_msg_uid: U128, 
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: SeqId):
+      (Bool, (StateChange[State] ref | None))
 
 trait InputWrapper[In: Any val] 
   fun input(): In
@@ -56,13 +52,10 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
 
   fun apply(state: State, sc_repo: StateChangeRepository[State],
     metric_name: String, source_ts: U64, 
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): (Bool, (StateChange[State] ref | None))
+    producer: Producer ref,
+    i_origin: Origin, i_msg_uid: U128, 
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId):
+      (Bool, (StateChange[State] ref | None))
   =>
     let result = _state_comp(_input, sc_repo, state)
 
@@ -74,9 +67,8 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
       let is_finished = _router.route[Out](metric_name, source_ts, output, 
         producer,
         // incoming envelope
-        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-        // outgoing envelope
-        o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
+
       (is_finished, result._2)
     else
       (true, result._2)

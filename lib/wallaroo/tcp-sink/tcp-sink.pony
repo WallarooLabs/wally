@@ -15,19 +15,19 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-// TODO: Fix this placeholder
-class val TrackingInfo
+type Envelope is (Origin, U128, None, SeqId, RouteId)
+
 
 actor EmptySink is CreditFlowConsumerStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, seq_id: U64, route_id: U64)
+    origin: Origin, msg_uid: U128,
+    frac_ids: None, seq_id: SeqId, route_id: RouteId)
   =>
     None
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: U64, route_id: U64)
+    origin: Origin, msg_uid: U128,
+    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
   =>
     None
 
@@ -63,7 +63,7 @@ class TCPSinkBuilder
     TCPSink(_encoder_wrapper, consume reporter, host, service,
       _initial_msgs)
 
-actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
+actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
   """
   # TCPSink
 
@@ -116,14 +116,22 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _writeable: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
-  embed _pending_tracking: List[(USize, TrackingInfo val)] = _pending_tracking.create()
+  embed _pending_tracking: List[(USize, Envelope)] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
+
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
   let _initial_msgs: Array[Array[ByteSeq] val] val
+
+  // Origin (Resilience)
+  var _flushing: Bool = false
+  let _watermarks: Watermarks = _watermarks.create()
+  let _hwmt: HighWatermarkTable = _hwmt.create()
+  var _outgoing_seq_id: U64
+  let _outgoing_route_id: U64 = 0 // there's only one route
 
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -134,6 +142,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
+    // Resilience
+    _outgoing_seq_id = 0
+    //
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
@@ -153,26 +164,16 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, seq_id: U64, route_id: U64)
+    i_origin: Origin, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     try
+      _outgoing_seq_id = _outgoing_seq_id + 1
       let encoded = _encoder.encode[D](data, _wb)
-      _writev(encoded)
 
-      // We are finished with the message and can update watermarks
-      // Note: We are ACKing messages as fast as they come in.
-      // TODO: Queue the ACKs and use a timer to send watermarks upstream
-      //       periodically.
-      ifdef "resilience" then
-        ifdef "resilience-debug" then
-          @printf[I32]((
-            "sink uid: " + msg_uid.string() +
-            "\troute_id: " + route_id.string() + "\tseq_id: " +
-            seq_id.string() + "\n").cstring())
-        end
-        origin.update_watermark(route_id, seq_id)
-      end
+      let envelope = (i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
+
+      _writev(encoded, envelope)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
@@ -190,12 +191,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: U64, route_id: U64)
+    i_origin: Origin, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    //TODO: What do we do here?
-    run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids,
-      incoming_seq_id, route_id)
+    //TODO: deduplication like in the Step
+    run[D](metric_name, source_ts, data, i_origin, msg_uid, i_frac_ids,
+      i_seq_id, i_route_id)
 
   be update_router(router: Router val) =>
     """
@@ -211,8 +212,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     close()
 
-  fun ref _unit_finished(number_finished: ISize, last_sent:
-    TrackingInfo val)
+  fun ref _unit_finished(number_finished: ISize,
+    envelope: (Envelope | None))
   =>
     """
     Handles book keeping related to resilience and backpressure. Called when
@@ -222,6 +223,33 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     attempting to catch up on sending pending data.
     """
     _recoup_credits(number_finished)
+
+    ifdef "resilience" then
+      match envelope
+      | let sent: Envelope =>
+        (let i_origin, let msg_uid, let i_frac_ids,
+          let i_seq_id, let i_route_id) = sent
+
+        ifdef debug then
+          @printf[I32]((
+            "tcp-sink:\ni_origin: " +
+            i_origin.hash().string() +
+            "\tmsg_uid: " +
+            msg_uid.string() +
+            "\ti_seq_id: " +
+            i_seq_id.string() +
+            "\ti_route_id: " +
+            i_route_id.string() +
+            "\n\n").cstring())
+        end
+
+        // We are finished with the message and can update watermarks
+        // Note: We are ACKing messages as fast as they come in.
+        // TODO: Queue the ACKs and use a timer to send watermarks upstream
+        //       periodically.
+        i_origin.update_watermark(i_route_id, i_seq_id)
+      end
+    end
 
   //
   // CREDIT FLOW
@@ -321,8 +349,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
             _notify.connected(this)
 
+
             for msg in _initial_msgs.values() do
-              _writev(msg)
+              _writev(msg, None)
             end
             ifdef not windows then
               if _pending_writes() then
@@ -375,8 +404,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _resubscribe_event()
 
   // TODO: Fix this when we get a real message envelope
-  fun ref _writev(data: ByteSeqIter, tracking_info: TrackingInfo val =
-    TrackingInfo) =>
+  fun ref _writev(data: ByteSeqIter, envelope: (Envelope | None))
+  =>
     """
     Write a sequence of sequences of bytes.
     """
@@ -391,13 +420,18 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
         data_size = data_size + bytes.size()
       end
 
-      _pending_tracking.push((data_size, tracking_info))
+      match envelope
+      | let e: Envelope =>
+        // only track if there is an envelope to track
+        _pending_tracking.push((data_size, e))
+      end
+
       _pending_writes()
 
       _in_sent = false
     end
 
-  fun ref _write_final(data: ByteSeq, tracking_info: TrackingInfo val) =>
+  fun ref _write_final(data: ByteSeq, envelope: (Envelope | None)) =>
     """
     Write as much as possible to the socket. Set _writeable to false if not
     everything was written. On an error, close the connection. This is for
@@ -405,7 +439,11 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     _pending_writev.push(data.cpointer().usize()).push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
-    _pending_tracking.push((data.size(), tracking_info))
+    match envelope
+    | let e: Envelope =>
+      // only track if there is an envelope to track
+      _pending_tracking.push((data.size(), e))
+    end
     _pending.push((data, 0))
     _pending_writes()
 
@@ -605,8 +643,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
             _pending_writev.clear()
             _pending.clear()
 
-            // do trackinginfo finished stuff
-            _tracking_info_finished(bytes_sent)
+            // do envelope finished stuff
+            _envelope_finished(bytes_sent)
             return true
           else
            for d in Range[USize](0, num_to_send, 1) do
@@ -614,6 +652,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
              _pending_writev.shift()
              _pending.shift()
            end
+
           end
         end
       else
@@ -622,39 +661,39 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    // do trackinginfo finished stuff
-    _tracking_info_finished(bytes_sent)
+    // do envelope finished stuff
+    _envelope_finished(bytes_sent)
 
     false
 
 
-  fun ref _tracking_info_finished(num_bytes_sent: USize) =>
+  fun ref _envelope_finished(num_bytes_sent: USize) =>
     """
-    Call _unit_finished with # of sent messages and last TrackingInfo
+    Call _unit_finished with # of sent messages and last Envelope
     """
     var num_sent: ISize = 0
-    var final_pending_sent: (TrackingInfo val | None) = None
+    var final_pending_sent: (Envelope | None) = None
     var bytes_sent = num_bytes_sent
 
     try
       while bytes_sent > 0 do
         let node = _pending_tracking.head()
-        (let bytes, let tracking_info) = node()
+        (let bytes, let envelope) = node()
         if bytes <= bytes_sent then
           num_sent = num_sent + 1
           bytes_sent = bytes_sent - bytes
-          final_pending_sent = tracking_info
+          final_pending_sent = envelope
           _pending_tracking.shift()
         else
           let bytes_remaining = bytes - bytes_sent
           bytes_sent = 0
           // update remaining for this message
-          node() = (bytes_remaining, tracking_info)
+          node() = (bytes_remaining, envelope)
         end
       end
 
       match final_pending_sent
-      | let sent: TrackingInfo val =>
+      | let sent: Envelope =>
         _unit_finished(num_sent, sent)
       end
     end
@@ -705,6 +744,27 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
       @pony_asio_event_resubscribe(_event, flags)
     end
+
+  //////////////
+  // ORIGIN (resilience)
+  fun ref flushing(): Bool =>
+    _flushing
+
+  fun ref not_flushing() =>
+    _flushing = false
+
+  fun ref watermarks(): Watermarks =>
+    _watermarks
+
+  fun ref hwmt(): HighWatermarkTable =>
+    _hwmt
+
+  fun ref _flush(low_watermark: U64, origin: Origin,
+    upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
+    """
+    No-op: TCPSink has no resilient state
+    """
+    None
 
 interface _TCPSinkNotify
   fun ref connecting(conn: TCPSink ref, count: U32) =>

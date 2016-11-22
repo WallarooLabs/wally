@@ -1,9 +1,9 @@
 use "buffered"
 use "files"
 use "collections"
+use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/messages"
-use "wallaroo/tcp-source"
 
 trait Backend
   fun ref flush()
@@ -123,45 +123,31 @@ class FileBackend is Backend
  
 
 actor Alfred
-    let _origins: Map[U128, ResilientOrigin tag] = _origins.create()
+    let _origins: Map[U128, (Resilient & Origin)] = _origins.create()
     let _log_buffers: Map[U128, EventLogBuffer ref] = _log_buffers.create()
     let _backend: Backend ref
     let _incoming_boundaries: Array[DataReceiver tag] ref =
       _incoming_boundaries.create(1)
     let _replay_complete_markers: Map[U64, Bool] =
       _replay_complete_markers.create()
-    var _tcpsl_builders: Array[TCPSourceListenerBuilder val] val
 
     new create(env: Env, filename: (String val | None) = None) =>
       _backend = 
       recover iso
-        ifdef "resilience" then
-          match filename
-          | let f: String val =>
-            try 
-              FileBackend(FilePath(env.root as AmbientAuth, f), this)
-            else
-              @printf[I32]("couldn't open event log".cstring())
-              DummyBackend
-            end
+        match filename
+        | let f: String val =>
+          try 
+            FileBackend(FilePath(env.root as AmbientAuth, f), this)
           else
-            @printf[I32]("warning: no event file will be written, despite resilience being enabled".cstring())
             DummyBackend
           end
         else
           DummyBackend
         end
       end
-      _tcpsl_builders = recover val Array[TCPSourceListenerBuilder val] end
 
-    be local_topology_ready(tcpsl_builders: Array[TCPSourceListenerBuilder val] val) =>
-      _tcpsl_builders = tcpsl_builders
-      ifdef "resilience" then
-        _backend.start()
-      else
-        _resume_normal_processing()
-      end
-        
+    be start() =>
+      _backend.start()
 
     be register_incoming_boundary(boundary: DataReceiver tag) =>
       _incoming_boundaries.push(boundary)
@@ -193,18 +179,11 @@ actor Alfred
       for b in _origins.values() do
         b.replay_finished()
       end
-      _resume_normal_processing()
 
     be start_without_replay() =>
       //signal all buffers that there is no event log replay
       for b in _origins.values() do
         b.start_without_replay()
-      end
-      _resume_normal_processing()
-
-    be _resume_normal_processing() =>
-      for tslb in _tcpsl_builders.values() do
-        tslb()
       end
 
     be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val) =>
@@ -215,7 +194,7 @@ actor Alfred
         @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
       end
 
-    be register_origin(origin: ResilientOrigin tag, id: U128) =>
+    be register_origin(origin: (Resilient & Origin), id: U128) =>
       _origins(id) = origin 
       _log_buffers(id) =
         ifdef "resilience" then
@@ -236,8 +215,8 @@ actor Alfred
       end
 
     be write_log(origin_id: U128, log_entries: Array[LogEntry val] iso,
-      low_watermark:U64, origin: Origin tag, upstream_route_id: U64,
-      upstream_seq_id: U64)
+      low_watermark:U64, origin: Origin, upstream_route_id: RouteId,
+      upstream_seq_id: SeqId)
     =>
       let write_count = log_entries.size()
       for i in Range(0, write_count) do
@@ -249,16 +228,21 @@ actor Alfred
       end
       _backend.flush()
       try
-        _origins(origin_id).log_flushed(low_watermark, write_count.u64(),
+        _origins(origin_id).log_flushed(low_watermark,
           origin, upstream_route_id, upstream_seq_id)
       else
         @printf[I32]("buffer %d disappeared!".cstring(), origin_id)
       end
 
     be flush_buffer(origin_id: U128, low_watermark:U64,
-      origin: Origin tag, upstream_route_id: U64,
-      upstream_seq_id: U64)
+      origin: Origin, upstream_route_id: RouteId,
+      upstream_seq_id: SeqId)
     =>
+      ifdef debug then
+        @printf[I32](("flush_buffer for id: " +
+          origin_id.string() + "\n\n").cstring())
+      end
+        
       try
         _log_buffers(origin_id).flush(low_watermark, origin, upstream_route_id,
           upstream_seq_id)

@@ -1,10 +1,12 @@
 use "collections"
 use "net"
 use "time"
-use "wallaroo/network"
-use "wallaroo/topology"
-use "wallaroo/resilience"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
+use "wallaroo/network"
+use "wallaroo/resilience"
+use "wallaroo/topology"
+
 
 actor DataReceiver is Origin
   let _auth: AmbientAuth  
@@ -17,14 +19,13 @@ actor DataReceiver is Origin
   var _last_id_seen: U64 = 0
   var _connected: Bool = false
   var _reconnecting: Bool = false
-  let _hwm: HighWatermarkTable = HighWatermarkTable(1)
-  let _lwm: LowWatermarkTable = LowWatermarkTable(1)
-  let _origins: OriginSet = OriginSet(1)
-  let _seq_translate: SeqTranslationTable = SeqTranslationTable(1)
-  let _route_translate: RouteTranslationTable = RouteTranslationTable(1)
   let _alfred: Alfred
   let _timers: Timers = Timers
-
+  // Origin (Resilience)
+  var _flushing: Bool = false
+  let _watermarks: Watermarks = _watermarks.create()
+  let _hwmt: HighWatermarkTable = _hwmt.create()
+  
   new create(auth: AmbientAuth, worker_name: String, sender_name: String, 
     connections: Connections, alfred: Alfred) 
   =>
@@ -43,7 +44,6 @@ actor DataReceiver is Origin
 
   be data_connect(sender_step_id: U128) =>
     _sender_step_id = sender_step_id
-    @printf[I32](("DataReceiver got DataConnectMsg from " + _sender_name + "\n").cstring())
 
   be update_watermark(route_id: U64, seq_id: U64) =>
     try
@@ -65,16 +65,24 @@ actor DataReceiver is Origin
   be upstream_replay_finished() =>
     _alfred.upstream_replay_finished(this)
 
-  fun ref _flush(low_watermark: U64, origin: Origin tag,
-    upstream_route_id: U64 , upstream_seq_id: U64) =>
+  fun ref _flush(low_watermark: U64, origin: Origin,
+    upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
     """This is not a real Origin, so it doesn't write any State"""
     None
 
-  fun ref hwm_get(): HighWatermarkTable => _hwm
-  fun ref lwm_get(): LowWatermarkTable => _lwm
-  fun ref origins_get(): OriginSet => _origins
-  fun ref seq_translate_get(): SeqTranslationTable => _seq_translate
-  fun ref route_translate_get(): RouteTranslationTable => _route_translate
+  //////////////
+  // ORIGIN (resilience)
+  fun ref flushing(): Bool =>
+    _flushing
+
+  fun ref not_flushing() =>
+    _flushing = false
+    
+  fun ref watermarks(): Watermarks =>
+    _watermarks
+    
+  fun ref hwmt(): HighWatermarkTable =>
+    _hwmt
 
   be update_router(router: DataRouter val) =>
     _router = router

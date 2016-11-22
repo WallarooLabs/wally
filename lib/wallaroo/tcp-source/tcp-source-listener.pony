@@ -4,49 +4,6 @@ use "wallaroo/boundary"
 use "wallaroo/resilience"
 use "wallaroo/topology"
 
-class TCPSourceListenerBuilder
-  let _source_builder: SourceBuilder val
-  let _router: Router val
-  let _route_builder: RouteBuilder val
-  let _outgoing_boundaries: Map[String, OutgoingBoundary] val
-  let _alfred: Alfred
-  let _default_target: (Step | None)
-  let _target_router: Router val
-  let _host: String
-  let _service: String
-  let _limit: USize
-  let _init_size: USize
-  let _max_size: USize
-
-  new create(source_builder: SourceBuilder val, router: Router val,
-    route_builder: RouteBuilder val, 
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    alfred: Alfred tag,
-    default_target: (Step | None) = None,
-    target_router: Router val,
-    host: String = "", service: String = "0", limit: USize = 0, 
-    init_size: USize = 64, max_size: USize = 16384)
-  =>
-    _source_builder = source_builder
-    _router = router
-    _route_builder = route_builder
-    _outgoing_boundaries = outgoing_boundaries
-    _alfred = alfred
-    _default_target = default_target
-    _target_router = target_router
-    _host = host
-    _service = service
-    _limit = limit
-    _init_size = init_size
-    _max_size = max_size
-
-  fun apply(): TCPSourceListener =>
-    TCPSourceListener(
-      _source_builder, _router, _route_builder, _outgoing_boundaries,
-      _alfred, _default_target, _target_router, _host, _service, _limit,
-      _init_size, _max_size
-    ) 
-
 actor TCPSourceListener
   """
   # TCPSourceListener
@@ -66,12 +23,12 @@ actor TCPSourceListener
   var _max_size: USize
 
   new create(source_builder: SourceBuilder val, router: Router val,
-    route_builder: RouteBuilder val, 
+    route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
-    target_router: Router val = EmptyRouter, 
-    host: String = "", service: String = "0", limit: USize = 0, 
+    target_router: Router val = EmptyRouter,
+    host: String = "", service: String = "0", limit: USize = 0,
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -147,8 +104,8 @@ actor TCPSourceListener
     Spawn a new connection.
     """
     try
-      TCPSource._accept(this, _notify.connected(this), _router.routes(), 
-        _route_builder, _outgoing_boundaries, ns, _default_target, _init_size, 
+      TCPSource._accept(this, _notify.connected(this), _router.routes(),
+        _route_builder, _outgoing_boundaries, ns, _default_target, _init_size,
         _max_size)
       _count = _count + 1
     else

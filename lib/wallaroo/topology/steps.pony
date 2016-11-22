@@ -4,9 +4,9 @@ use "time"
 use "net"
 use "collections"
 use "sendence/epoch"
+use "sendence/guid"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
-use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
@@ -24,12 +24,12 @@ trait tag RunnableStep
   // TODO: Fix the Origin None once we know how to look up Proxy
   // for messages crossing boundary
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, seq_id: U64, route_id: U64)
+    origin: Origin, msg_uid: U128,
+    frac_ids: None, seq_id: SeqId, route_id: RouteId)
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: U64, route_id: U64)
+    origin: Origin, msg_uid: U128,
+    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
 
 
 interface Initializable
@@ -38,7 +38,8 @@ interface Initializable
 
 type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer & Initializable tag)
 
-actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Initializable)
+actor Step is (RunnableStep & Resilient & Producer &
+  Consumer & Initializable)
   """
   # Step
 
@@ -46,25 +47,21 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   * Switch to requesting credits via promise
   """
   let _runner: Runner
-  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
-  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
-  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
-  let _origins: OriginSet = OriginSet(10)
   var _router: Router val
   var _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
   let _default_target: (Step | None)
-  var _outgoing_seq_id: U64
-  var _outgoing_route_id: U64
   var _initialized: Bool = false
   // list of envelopes
   // (origin, msg_uid, frac_ids, seq_id, route_id)
-  let _deduplication_list: Array[(Origin tag, U128, (Array[U64] val | None),
-    U64, U64)] = _deduplication_list.create()
+  let _deduplication_list: Array[(Origin, U128, (Array[U64] val | None),
+    SeqId, RouteId)] = _deduplication_list.create()
   let _alfred: Alfred
-  var _id: (U128 | None)
+  var _id: U128
+  var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
+  let _filter_route_id: RouteId = GuidGenerator.u64()
+  
   // Credit Flow Producer
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
 
@@ -73,16 +70,20 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   let _max_distributable_credits: ISize = 500_000
   var _distributable_credits: ISize = _max_distributable_credits
 
+  // Origin (Resilience)
+  var _flushing: Bool = false
+  let _watermarks: Watermarks = _watermarks.create()
+  let _hwmt: HighWatermarkTable = _hwmt.create()
+
+  
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, id: U128,
     route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter, default_target: (Step | None) = None)
   =>
     _runner = consume runner
     match _runner
-    | let r: ReplayableRunner => r.set_origin_id(id)
+    | let r: ReplayableRunner => r.set_step_id(id)
     end
     _metrics_reporter = consume metrics_reporter
-    _outgoing_seq_id = 0
-    _outgoing_route_id = 0
     _router = router
     _route_builder = route_builder
     _alfred = alfred
@@ -133,48 +134,33 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
   // TODO: This needs to dispose of the old routes and replace with new routes
   be update_router(router: Router val) => _router = router
 
-  // TODO: Fix the Origin None once we know how to look up Proxy
-  // for messages crossing boundary
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: U64, route_id: U64)
+    i_origin: Origin, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    _outgoing_seq_id = _outgoing_seq_id + 1
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       this, _router,
-      // incoming envelope
-      origin, msg_uid, frac_ids, incoming_seq_id, route_id,
-      // outgoing envelope
-      this, msg_uid, frac_ids, _outgoing_seq_id)
+      i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
     if is_finished then
       //TODO: be more efficient (batching?)
       //this makes sure we never skip watermarks because everything is always
       //finished
       ifdef "resilience" then
-        _bookkeeping(origin, msg_uid, frac_ids, incoming_seq_id, route_id,
-          this, msg_uid, frac_ids, _outgoing_seq_id, 0)
-        update_watermark(0, _outgoing_seq_id)
+        let sid: SeqId = next_sequence_id()
+        _bookkeeping(_filter_route_id, sid, i_origin, i_route_id,
+          i_seq_id, msg_uid)
+        _update_watermark(_filter_route_id, sid)
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
-    else
-      ifdef "resilience" then
-        _bookkeeping(
-          // incoming envelope
-          origin, msg_uid, frac_ids, incoming_seq_id, route_id,
-          // outgoing envelope
-          // TODO: We need the real route id
-          this, msg_uid, frac_ids, _outgoing_seq_id, _outgoing_route_id)
-      end
     end
 
+  fun ref next_sequence_id(): U64 =>
+    _seq_id = _seq_id + 1
+    
   ///////////
   // RECOVERY
-
-  // TODO: Fix the Origin None once we know how to look up Proxy
-  // for messages crossing boundary
-
-  fun _is_duplicate(origin: Origin tag, msg_uid: U128,
-    frac_ids: None, seq_id: U64, route_id: U64): Bool
+  fun _is_duplicate(origin: Origin, msg_uid: U128,
+    frac_ids: None, seq_id: SeqId, route_id: RouteId): Bool
   =>
     for e in _deduplication_list.values() do
       //TODO: Bloom filter maybe?
@@ -207,57 +193,55 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     false
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: U64, route_id: U64)
+    i_origin: Origin, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    _outgoing_seq_id = _outgoing_seq_id + 1
-    if not _is_duplicate(origin, msg_uid, frac_ids, incoming_seq_id,
-      route_id) then
-      _deduplication_list.push((origin, msg_uid, frac_ids, incoming_seq_id,
-        route_id))
+    if not _is_duplicate(i_origin, msg_uid, i_frac_ids, i_seq_id,
+      i_route_id) then
+      _deduplication_list.push((i_origin, msg_uid, i_frac_ids, i_seq_id,
+        i_route_id))
       let is_finished = _runner.run[D](metric_name, source_ts, data,
         this, _router,
-        // incoming envelope
-        origin, msg_uid, frac_ids, incoming_seq_id, route_id,
-        // outgoing envelope
-        this, msg_uid, frac_ids, _outgoing_seq_id)
+        i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
+        
       if is_finished then
+        //TODO: be more efficient (batching?)
+        ifdef "resilience" then
+          @printf[I32]("Calling _update_watermark() during replay \n\n".cstring())
+          let sid: SeqId = next_sequence_id()
+          _bookkeeping(_filter_route_id, sid, i_origin, i_route_id,
+            i_seq_id, msg_uid)
+          _update_watermark(_filter_route_id, sid)
+        end
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
-      else
-        _bookkeeping(
-          // incoming envelope
-          origin, msg_uid, frac_ids, incoming_seq_id, route_id,
-          // outgoing envelope; outgoing_route_id was set by Router
-          this, msg_uid, frac_ids, _outgoing_seq_id, _outgoing_route_id)
       end
     end
 
   //////////////
   // ORIGIN (resilience)
+  fun ref flushing(): Bool =>
+    _flushing
 
-  fun ref hwm_get(): HighWatermarkTable =>
-    _hwm
+  fun ref not_flushing() =>
+    _flushing = false
+    
+  fun ref watermarks(): Watermarks =>
+    _watermarks
+    
+  fun ref hwmt(): HighWatermarkTable =>
+    _hwmt
 
-  fun ref lwm_get(): LowWatermarkTable =>
-    _lwm
-
-  fun ref seq_translate_get(): SeqTranslationTable =>
-    _seq_translate
-
-  fun ref route_translate_get(): RouteTranslationTable =>
-    _route_translate
-
-  fun ref origins_get(): OriginSet =>
-    _origins
-
-  fun ref _flush(low_watermark: U64, origin: Origin tag,
-    upstream_route_id: U64 , upstream_seq_id: U64) =>
-    ifdef "resilience-debug" then
-      @printf[I32]("flushing below: %llu\n".cstring(), low_watermark)
+  fun ref _flush(low_watermark: SeqId, origin: Origin,
+    upstream_route_id: RouteId , upstream_seq_id: SeqId)
+  =>
+    ifdef debug then
+      @printf[I32]("flushing below: %llu\n".cstring(), upstream_seq_id)
     end
     match _id
-    | let id: U128 => _alfred.flush_buffer(id, low_watermark, origin,
-      upstream_route_id, upstream_seq_id)
+    | let id: U128 =>
+      _flushing = true
+      _alfred.flush_buffer(id, low_watermark, origin, upstream_route_id,
+        upstream_seq_id)
     else
       @printf[I32]("Tried to flush a non-existing buffer!".cstring())
     end
@@ -312,13 +296,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
       _routes(c)
     else
       None
-    end
-
-  fun ref update_route_id(route_id: U64) =>
-    """
-    We call this from the Route once a message has been sent downstream.
-    """
-    _outgoing_route_id = route_id
+    end    
 
   //////////////
   // CREDIT FLOW CONSUMER
