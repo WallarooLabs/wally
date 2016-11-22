@@ -260,13 +260,6 @@ class BoundaryRoute is Route
       end
     _queue = Queue[ReplayableDeliveryMsg val](q_size)
 
-    let q_size: USize = ifdef "use_backpressure" then
-      500_000
-    else
-      0
-    end
-    _queue = Queue[ReplayableDeliveryMsg val](q_size)
-
   fun ref initialize() =>
     None
 
