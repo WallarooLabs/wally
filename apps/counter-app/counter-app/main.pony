@@ -98,16 +98,16 @@ actor Main
         Application("Passthrough Topology")
           .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end
             where coalescing = false)
-          // .to_stateful[CPPData val, CPPState](
-          //   StateComputationFactory(),
-          //   AccumulatorStateBuilder, "accumulator-builder")
-          .to_state_partition[CPPData val, U64, CPPData val, CPPState](
-            DummyComputationFactory(),
-            AccumulatorStateBuilder, "accumulator-builder", cpp_data_partition)
+          // .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end)
           .to[CPPData val](ComputationFactory0)
           .to[CPPData val](ComputationFactory1)
           .to[CPPData val](ComputationFactory2)
-          //.to_state_partition[CPPData val](ComputationFactory1)
+          .to_stateful[CPPData val, CPPState](
+            StateComputationFactory(),
+            AccumulatorStateBuilder, "accumulator-builder")
+          // .to_stateful[CPPData val, CPPState](
+          //   DummyComputationFactory(),
+          //   AccumulatorStateBuilder, "accumulator-builder")
           .to_sink(recover CPPSinkEncoder(recover CPPManagedObject(@get_sink_encoder()) end) end, recover [0] end)
       end
       Startup(env, application, None)

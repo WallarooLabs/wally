@@ -8,6 +8,7 @@
 #include "WallarooCppApi/SourceDecoder.hpp"
 #include "WallarooCppApi/SinkEncoder.hpp"
 #include <vector>
+#include <iostream>
 
 class Numbers: public wallaroo::EncodableData
 {
@@ -94,6 +95,9 @@ class CounterAddBuilder: public wallaroo::StateChangeBuilder
 {
 public:
   virtual wallaroo::StateChange *build(uint64_t idx_);
+  virtual void deserialize (char* bytes);
+  virtual void serialize (char* bytes, size_t nsz_);
+  virtual size_t serialize_get_size ();
 };
 
 class SimpleComputation: public wallaroo::Computation

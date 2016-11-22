@@ -64,6 +64,10 @@ extern "C"
     {
       return new CounterSinkEncoder();
     }
+    case 5:
+    {
+      return new CounterAddBuilder();
+    }
     }
     return nullptr;
   }
@@ -301,7 +305,7 @@ size_t CounterAdd::get_log_entry_size_header_size()
 
 bool CounterAdd::read_log_entry(char *bytes_)
 {
-  int _value = ((int)(bytes_[0]) << 24) +
+  _value = ((int)(bytes_[0]) << 24) +
     ((int)(bytes_[1]) << 16) +
     ((int)(bytes_[2]) << 8) +
     (int)(bytes_[3]);
@@ -317,6 +321,19 @@ void CounterAdd::set_value(int value_)
 wallaroo::StateChange *CounterAddBuilder::build(uint64_t idx_)
 {
   return new CounterAdd(idx_);
+}
+
+void CounterAddBuilder::deserialize (char* bytes)
+{
+}
+
+void CounterAddBuilder::serialize (char* bytes, size_t nsz_) {
+  bytes[0] = 0;
+  bytes[1] = 5;
+}
+
+size_t CounterAddBuilder::serialize_get_size () {
+  return 2;
 }
 
 const char *SimpleComputation::name()
@@ -352,7 +369,8 @@ void *CounterComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeR
 
   counter_add->set_value(sum);
 
-  return w_stateful_computation_get_return(state_change_repository_helper_, total, state_change_handle);
+  // return w_stateful_computation_get_return(state_change_repository_helper_, total, state_change_handle);
+  return w_stateful_computation_get_return(state_change_repository_helper_, total, none);
 }
 
 size_t CounterComputation::get_number_of_state_change_builders()
