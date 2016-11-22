@@ -190,7 +190,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     ifdef debug then
       try
         Assert(not _upstreams.contains(producer),
-          "Producer attempted registered with sink more than once")
+          "Producer attempted registered with boundary more than once")
       else
         _hard_close()
         return
@@ -350,7 +350,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         _pending_writev_total = _pending_writev_total + bytes.size()
         data_size = data_size + bytes.size()
       end
- 
+
       _pending_tracking.push((data_size, tracking_info))
       _pending_writes()
 
