@@ -4,7 +4,12 @@
 
 #include "Logger.hpp"
 #include <exception>
+#include <iostream>
+#include <string>
+#include <cstdlib>
+
 using std::exception;
+using std::string;
 
 
 
@@ -18,15 +23,13 @@ Logger* Logger::_instance = nullptr;
 
 
 
-
-
-
 //------------------------------------------------
 
-Logger::Logger ()
+Logger::Logger()
 {
 #if defined(CONSOLE)
-  try { 
+  try
+  {
     _logger = spdlog::stdout_color_mt("console");
   }
   catch(std::exception& e_)
@@ -36,9 +39,27 @@ Logger::Logger ()
 #else
   int q_size = 8192;
   spdlog::set_async_mode(q_size, spdlog::async_overflow_policy::block_retry,
-                         nullptr,
-                         std::chrono::seconds(2));
-  _logger = spdlog::basic_logger_mt("basic_logger", "/apps/dev/arizona/data/wallaroo/logs/debug_cppapi.log");
+      nullptr,
+      std::chrono::seconds(2));
+
+  string path;
+  const char* strPath = std::getenv("WALLAROO_LOGPATH");
+  if (strPath == nullptr )
+  {
+    path = "/apps/dev/arizona/data/wallaroo/logs";
+  }
+  else
+  {
+    path = strPath;
+  }
+
+
+  //
+  //
+  //
+  string fqn = path + "/wallaroo.log";
+  std::cout << "wallaroo log:" << fqn << std::endl;
+  _logger = spdlog::basic_logger_mt("basic_logger", fqn.c_str());
 #endif
   _logger->set_level(spdlog::level::info);
 }
@@ -47,7 +68,7 @@ Logger::Logger ()
 
 
 //------------------------------------------------
-Logger::~Logger ()
+Logger::~Logger()
 {
   //delete _logger;
 }
@@ -57,7 +78,7 @@ Logger::~Logger ()
 
 //------------------------------------------------
 // yeah - this should be trhead safe but... eh...
-Logger* Logger::getInstnace ()
+Logger* Logger::getInstnace()
 {
   if (nullptr == _instance)
   {
@@ -71,7 +92,7 @@ Logger* Logger::getInstnace ()
 
 
 //------------------------------------------------
-std::shared_ptr <spdlog::logger> Logger::getLogger ()
+std::shared_ptr<spdlog::logger> Logger::getLogger()
 {
   return getInstnace()->_logger;
 }
