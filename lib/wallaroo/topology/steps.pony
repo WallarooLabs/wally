@@ -86,7 +86,7 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
     _metrics_reporter = consume metrics_reporter
     _outgoing_seq_id = 0
     _outgoing_route_id = 0
-    _router = _runner.augment_router(router)
+    _router = _runner.clone_router_and_set_input_type(router)
     _omni_router = omni_router
     _route_builder = route_builder
     _alfred = alfred
@@ -112,13 +112,15 @@ actor Step is (RunnableStep & ResilientOrigin & CreditFlowProducerConsumer & Ini
       _routes(r) = _route_builder(this, r, StepRouteCallbackHandler)
     end
 
-    for sink in tcp_sinks.values() do
-      _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
-    end
+    // for sink in tcp_sinks.values() do
+    //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
+    // end
 
     for r in _routes.values() do
       r.initialize()
     end
+
+    _omni_router = omni_router
 
     _initialized = true
 

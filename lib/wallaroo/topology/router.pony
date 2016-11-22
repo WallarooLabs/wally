@@ -193,8 +193,7 @@ class StepIdRouter is OmniRouter
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val  
 
   new val create(worker_name: String,
-    data_routes: Map[U128, CreditFlowConsumerStep tag] val =
-      recover Map[U128, CreditFlowConsumerStep tag] end,
+    data_routes: Map[U128, CreditFlowConsumerStep tag] val,
     step_map: Map[U128, (ProxyAddress val | U128)] val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val)
   =>
@@ -213,16 +212,21 @@ class StepIdRouter is OmniRouter
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
+    @printf[I32](("!!OmniRouter, routing id " + target_id.string() + "\n").cstring())
     // TODO: Remove that producer can be None
     match producer
     | let cfp: CreditFlowProducer ref =>
+      @printf[I32]("!!OmniRouter: CFP\n".cstring())
       try
         // Try as though this target_id step exists on this worker
         let target = _data_routes(target_id)
 
+        @printf[I32]("!!OmniRouter: Target is on this worker\n".cstring())
+
         let might_be_route = cfp.route_to(target)
         match might_be_route
         | let r: Route =>
+          @printf[I32]("!!OmniRouter: Route\n".cstring())
           r.run[D](metric_name, source_ts, data,
             // hand down cfp so we can update route_id
             cfp,
@@ -231,10 +235,12 @@ class StepIdRouter is OmniRouter
           false
         else
           // No route for this target
+          @printf[I32]("!!OmniRouter: No route for this target\n".cstring())
           true
         end
       else
         // This target_id step exists on another worker
+        @printf[I32]("!!OmniRouter: Target is NOT on this worker\n".cstring())
         try
           match _step_map(target_id)
           | let pa: ProxyAddress val =>
@@ -266,6 +272,7 @@ class StepIdRouter is OmniRouter
             true
           end 
         else
+          @printf[I32]("!!OmniRouter: Actually we don't have a record of that step id\n".cstring())
           // Apparently this target_id does not refer to a valid step id
           true
         end
@@ -331,7 +338,7 @@ trait PartitionRouter is Router
 
 trait AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)] is
   PartitionRouter
-  fun clone_and_augment[NewIn: Any val](
+  fun clone_and_set_input_type[NewIn: Any val](
     new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter val
 
 class LocalPartitionRouter[In: Any val,
@@ -424,7 +431,7 @@ class LocalPartitionRouter[In: Any val,
       true
     end
 
-  fun clone_and_augment[NewIn: Any val](
+  fun clone_and_set_input_type[NewIn: Any val](
     new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter val
   =>
     LocalPartitionRouter[NewIn, Key](_local_map, _step_ids, _partition_routes, 

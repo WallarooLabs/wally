@@ -25,6 +25,7 @@ class LocalTopology
   let _step_map: Map[U128, (ProxyAddress val | U128)] val 
   // _state_builders maps from state_name to StateSubpartition
   let _state_builders: Map[String, StateSubpartition val] val
+  let _pre_state_data: Array[PreStateData val] val
   let _proxy_ids: Map[String, U128] val
   // TODO: Replace this default strategy with a better one after POC
   let default_target: (Array[StepBuilder val] val | ProxyAddress val | None)
@@ -35,6 +36,7 @@ class LocalTopology
     graph': Dag[StepInitializer val] val,
     step_map': Map[U128, (ProxyAddress val | U128)] val,
     state_builders': Map[String, StateSubpartition val] val,
+    pre_state_data': Array[PreStateData val] val,
     proxy_ids': Map[String, U128] val,
     default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
       None,
@@ -45,6 +47,7 @@ class LocalTopology
     _graph = graph'
     _step_map = step_map'
     _state_builders = state_builders'
+    _pre_state_data = pre_state_data'
     _proxy_ids = proxy_ids'
     // TODO: Replace this default strategy with a better one after POC
     default_target = default_target'
@@ -55,6 +58,7 @@ class LocalTopology
     metrics_conn: TCPConnection, alfred: Alfred,
     connections: Connections, auth: AmbientAuth,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    initializables: Array[Initializable tag],
     data_routes: Map[U128, CreditFlowConsumerStep tag])
   =>
     for (state_name, subpartition) in _state_builders.pairs() do
@@ -62,11 +66,13 @@ class LocalTopology
         @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
         state_map(state_name) = subpartition.build(_app_name, _worker_name,
            metrics_conn, auth, connections, alfred, outgoing_boundaries,
-           data_routes)
+           initializables, data_routes)
       end
     end
 
   fun graph(): Dag[StepInitializer val] val => _graph
+
+  fun pre_state_data(): Array[PreStateData val] val => _pre_state_data
 
   fun step_map(): Map[U128, (ProxyAddress val | U128)] val => _step_map
 
@@ -213,7 +219,8 @@ actor LocalTopologyInitializer
 
         // Create shared state for this topology
         t.update_state_map(state_map, _metrics_conn, _alfred, 
-          _connections, _auth, _outgoing_boundaries, data_routes_ref)
+          _connections, _auth, _outgoing_boundaries, initializables,
+          data_routes_ref)
         
         // Keep track of all CreditFLowConsumerSteps by id so we can create a 
         // DataRouter for the data channel boundary
@@ -366,6 +373,7 @@ actor LocalTopologyInitializer
           | let s_builder: StepBuilder val =>
             match s_builder.pre_state_target_id()
             | let psid: U128 =>
+              @printf[I32]("!!Prestate target id: %llu".cstring(), psid)
               if not built_routers.contains(psid) then
                 ready = false
               end
@@ -390,7 +398,7 @@ actor LocalTopologyInitializer
 
                 let out_router = 
                   try
-                    builder.augment_router(built_routers(out_id))
+                    builder.clone_router_and_set_input_type(built_routers(out_id))
                   else
                     @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
                     error 
@@ -401,13 +409,14 @@ actor LocalTopologyInitializer
                 let state_comp_target_router = 
                   match builder.pre_state_target_id() 
                   | let id: U128 =>
+                    @printf[I32]("!!Prestate target id: %llu".cstring(), id)
                     try
                       let pre_state_target_router = built_routers(id)
-                      match pre_state_target_router
-                      | let pr: PartitionRouter val =>
-                        pr.register_routes(pre_state_target_router,
-                          builder.forward_route_builder())
-                      end
+                      // match pre_state_target_router
+                      // | let pr: PartitionRouter val =>
+                      //   pr.register_routes(pre_state_target_router,
+                      //     builder.forward_route_builder())
+                      // end
                       pre_state_target_router
                     else
                       if builder.is_prestate() then
@@ -451,6 +460,7 @@ actor LocalTopologyInitializer
                 for in_node in next_node.ins() do
                   match in_node.value.pre_state_target_id()
                   | let id: U128 =>
+                    @printf[I32]("!!Prestate target id: %llu".cstring(), id)
                     try
                       built_routers(id)
                     else
@@ -485,6 +495,8 @@ actor LocalTopologyInitializer
                     let state_comp_target = 
                       match b.pre_state_target_id()
                       | let id: U128 =>
+                        @printf[I32]("!!Prestate target id: %llu".cstring(), 
+                          id)
                         try
                           built_routers(id)
                         else
@@ -606,6 +618,7 @@ actor LocalTopologyInitializer
                     DirectRouter(sink)
                   end
 
+                @printf[I32](("!!Sink id: " + next_id.string() + "\n").cstring())
                 built_stateless_steps(next_id) = sink
                 data_routes(next_id) = sink
                 built_routers(next_id) = sink_router
@@ -620,6 +633,7 @@ actor LocalTopologyInitializer
                 if source_data.is_prestate() then
                   match source_data.pre_state_target_id()
                   | let id: U128 =>
+                    @printf[I32]("!!Prestate target: %llu\n".cstring(), id)
                     try
                       // !!
                       let r = built_routers(id)
@@ -634,6 +648,7 @@ actor LocalTopologyInitializer
                     EmptyRouter
                   end
                 else
+                  @printf[I32]("!!Source is not prestate. EMPTYROUTER\n".cstring())
                   EmptyRouter
                 end
 
@@ -666,11 +681,19 @@ actor LocalTopologyInitializer
                   // need to register a route to our state comp target on those
                   // state steps.
                   try
-                    let state_router = state_map(source_data.state_name())
-                    state_router.register_routes(state_comp_target_router,
-                      source_data.forward_route_builder())
-                    @printf[I32]("!!JUST REGISTERD\n".cstring())
-                    source_data.augment_router(
+                    // let state_router = state_map(source_data.state_name())
+                    // state_router.register_routes(state_comp_target_router,
+                    //   source_data.forward_route_builder())
+                    // //!!
+                    // match source_data.forward_route_builder()
+                    // | let e: EmptyRouteBuilder val =>
+                    //   @printf[I32]("!!FAIL: Source data has EmptyRouteBuilder\n".cstring())
+                    // else
+                    //   @printf[I32]("!!SUCCESS: Source data has real forward RouteBuilder\n".cstring())
+                    // end
+
+                    // @printf[I32]("!!JUST REGISTERD\n".cstring())
+                    source_data.clone_router_and_set_input_type(
                       state_map(source_data.state_name()))
                   else
                     @printf[I32]("State doesn't exist for state computation.\n".cstring())
@@ -700,7 +723,8 @@ actor LocalTopologyInitializer
                 tcpsl_builders.push(
                   TCPSourceListenerBuilder(
                     source_data.builder()(source_data.runner_builder(), 
-                      out_router, _metrics_conn),
+                      out_router, _metrics_conn, 
+                      source_data.pre_state_target_id()),
                     out_router,
                     source_data.route_builder(),
                     _outgoing_boundaries, sinks_for_source,
@@ -736,6 +760,31 @@ actor LocalTopologyInitializer
         for receiver in _data_receivers.values() do
           receiver.update_router(data_router)
         end
+
+        /////
+        // Register pre state target routes on corresponding state steps
+        for psd in t.pre_state_data().values() do
+          match psd.target_id()
+          | let tid: U128 =>
+            let partition_router = 
+              try
+                psd.clone_router_and_set_input_type(state_map(psd.state_name()))
+              else
+                @printf[I32]("PartitionRouter was not built for expected state partition.\n".cstring())
+                error 
+              end
+            let target_router = built_routers(tid)
+            match partition_router
+            | let pr: PartitionRouter val =>
+              pr.register_routes(target_router, psd.forward_route_builder())
+              @printf[I32](("Registered routes on state steps for " + psd.pre_state_name() + "\n").cstring())
+            else
+              @printf[I32](("Expected PartitionRouter but found something else!\n").cstring())
+              error
+            end
+          end
+        end
+        /////
 
         if _is_initializer then
           match worker_initializer

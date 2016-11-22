@@ -27,7 +27,7 @@ interface Runner
 
   fun name(): String
   fun state_name(): String
-  fun augment_router(router: Router val): Router val
+  fun clone_router_and_set_input_type(router: Router val): Router val
 
 trait ReplayableRunner
   fun ref replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val, 
@@ -39,7 +39,7 @@ trait RunnerBuilder
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
-    target_id: (U128 | None) = None): Runner iso^
+    pre_state_target_id': (U128 | None) = None): Runner iso^
 
   fun name(): String
   fun state_name(): String => ""
@@ -49,12 +49,12 @@ trait RunnerBuilder
   fun id(): U128
   fun route_builder(): RouteBuilder val
   fun forward_route_builder(): RouteBuilder val
-  fun augment_router(r: Router val): Router val => r
+  fun clone_router_and_set_input_type(r: Router val): Router val => r
 
 class RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder val] val
   let _id: U128
-  var _forward_route_builder: RouteBuilder val = EmptyRouteBuilder
+  var _forward_route_builder: RouteBuilder val
   var _state_name: String = ""
 
   new val create(bs: Array[RunnerBuilder val] val) =>
@@ -65,10 +65,16 @@ class RunnerSequenceBuilder is RunnerBuilder
       else
         GuidGenerator.u128()
       end
-    try
-      _forward_route_builder = 
-        _runner_builders(_runner_builders.size() - 1).forward_route_builder()
-    end
+    _forward_route_builder = 
+      try
+        //!!
+        let frb = _runner_builders(_runner_builders.size() - 1).forward_route_builder()
+        @printf[I32]("!!Setting up RunnerSequenceBuilder FORWARD ROUTER...\n".cstring())
+        frb
+      else
+        EmptyRouteBuilder
+      end
+
     try
       _state_name =
         _runner_builders(_runner_builders.size() - 1).state_name()
@@ -78,7 +84,7 @@ class RunnerSequenceBuilder is RunnerBuilder
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
-    target_id: (U128 | None) = None): Runner iso^
+    pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
     var remaining: USize = _runner_builders.size()
     var latest_runner: Runner iso = RouterRunner
@@ -92,7 +98,7 @@ class RunnerSequenceBuilder is RunnerBuilder
       match next_builder
       | let rb: RunnerBuilder val =>
         latest_runner = rb(metrics_reporter.clone(), alfred,
-          consume latest_runner, router)
+          consume latest_runner, router, pre_state_target_id')
       end
       remaining = remaining - 1
     end
@@ -127,9 +133,9 @@ class RunnerSequenceBuilder is RunnerBuilder
       EmptyRouteBuilder
     end
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  fun augment_router(r: Router val): Router val =>
+  fun clone_router_and_set_input_type(r: Router val): Router val =>
     try
-      _runner_builders(_runner_builders.size() - 1).augment_router(r)
+      _runner_builders(_runner_builders.size() - 1).clone_router_and_set_input_type(r)
     else
       r
     end
@@ -150,7 +156,7 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
-    target_id: (U128 | None) = None): Runner iso^
+    pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
     match (consume next_runner)
     | let r: Runner iso =>
@@ -198,10 +204,13 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
-    target_id: (U128 | None) = None): Runner iso^
+    pre_state_target_id': (U128 | None) = 10): Runner iso^
   =>
-    match target_id
+    @printf[I32](("!!PreStateRunnerBuilder target_id: " + pre_state_target_id'.string() + "\n").cstring())
+    match pre_state_target_id'
     | let t_id: U128 =>
+      @printf[I32]("!!PreStateRunnerBuilder apply got tid: %llu".cstring(),
+        t_id)
       PreStateRunner[In, Out, State](_state_comp, _state_name, t_id, 
         consume metrics_reporter)
     else
@@ -218,10 +227,10 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  fun augment_router(r: Router val): Router val =>
+  fun clone_router_and_set_input_type(r: Router val): Router val =>
     match r
     | let p: AugmentablePartitionRouter[Key] val =>
-      let r2 = p.clone_and_augment[PIn](_partition_function)
+      let r2 = p.clone_and_set_input_type[PIn](_partition_function)
       @printf[I32]("---!!Cloned!!\n".cstring())
       r2
     else
@@ -250,7 +259,7 @@ class StateRunnerBuilder[State: Any #read] is RunnerBuilder
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
-    target_id: (U128 | None) = None): Runner iso^
+    pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
     let sr = StateRunner[State](_state_builder, consume metrics_reporter, alfred)
     for scb in _state_change_builders.values() do
@@ -311,7 +320,7 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
-    target_id: (U128 | None) = None): Runner iso^
+    pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
     _state_runner_builder(consume metrics_reporter, alfred, 
       consume next_runner, router)
@@ -449,8 +458,8 @@ class ComputationRunner[In: Any val, Out: Any val]
 
   fun name(): String => _computation.name()
   fun state_name(): String => ""
-  fun augment_router(router: Router val): Router val => 
-    _next.augment_router(router)
+  fun clone_router_and_set_input_type(router: Router val): Router val => 
+    _next.clone_router_and_set_input_type(router)
 
 class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _metrics_reporter: MetricsReporter
@@ -470,6 +479,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     _name = _state_comp.name()
     _prep_name = _name + " prep"
     _state_name = state_name'
+    @printf[I32]("!!PrestateRUnner create() got tid: %llu".cstring(), target_id)
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,    producer: (CreditFlowProducer ref | None), router: Router val,
     omni_router: OmniRouter val,
@@ -513,7 +523,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   fun name(): String => _name
   fun state_name(): String => _state_name
   fun is_pre_state(): Bool => true
-  fun augment_router(router: Router val): Router val => router
+  fun clone_router_and_set_input_type(router: Router val): Router val => router
 
 class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   let _state: State
@@ -613,7 +623,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
 
   fun name(): String => "State runner"
   fun state_name(): String => ""
-  fun augment_router(router: Router val): Router val => router
+  fun clone_router_and_set_input_type(router: Router val): Router val => router
 
 class iso RouterRunner
   fun ref run[Out: Any val](metric_name: String, source_ts: U64, output: Out,
@@ -639,5 +649,5 @@ class iso RouterRunner
 
   fun name(): String => "Router runner"
   fun state_name(): String => ""
-  fun augment_router(router: Router val): Router val => router
+  fun clone_router_and_set_input_type(router: Router val): Router val => router
 

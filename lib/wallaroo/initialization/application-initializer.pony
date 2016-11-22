@@ -84,6 +84,10 @@ actor ApplicationInitializer
       let state_partition_map: Map[String, PartitionAddresses val] trn =
         recover Map[String, PartitionAddresses val] end
 
+      // Keep track of all prestate data so we can register routes 
+      let pre_state_data: Array[PreStateData val] trn =
+        recover Array[PreStateData val] end
+
       var pipeline_id: USize = 0
 
       // Map from step_id to worker name
@@ -275,6 +279,15 @@ actor ApplicationInitializer
           else
             None
           end
+
+        @printf[I32]("!!Source prestate target id: %llu".cstring(), 
+          source_pre_state_target_id)
+
+        if source_seq_builder.is_prestate() then
+          let psd = PreStateData(source_seq_builder,
+            source_pre_state_target_id)
+          pre_state_data.push(psd)
+        end
 
         let source_initializer = SourceData(source_node_id, 
           pipeline.source_builder(), source_seq_builder, 
@@ -699,7 +712,15 @@ actor ApplicationInitializer
 
                     sink_id
                   end
-                @printf[I32](("Preparing to spin up " + next_runner_builder.name() + " on " + worker + "\n").cstring())
+                @printf[I32]("!!Init: Prestate target id: %llu".cstring(), 
+                  pre_state_target_id)
+
+                @printf[I32](("Preparing to spin up prestate step " + next_runner_builder.name() + " on " + worker + "\n").cstring())
+
+                let psd = PreStateData(next_runner_builder,
+                  pre_state_target_id)
+                pre_state_data.push(psd)
+
                 let next_id = next_runner_builder.id()
                 let next_initializer = StepBuilder(application.name(),
                   pipeline.name(), next_runner_builder, next_id where
@@ -835,6 +856,9 @@ actor ApplicationInitializer
       let sendable_step_map: Map[U128, (ProxyAddress val | U128)] val = 
         consume step_map
 
+      let sendable_pre_state_data: Array[PreStateData val] val =
+        consume pre_state_data
+
       // Keep track of LocalTopologies that we need to send to other
       // (non-initializer) workers
       let other_local_topologies: Array[LocalTopology val] trn =
@@ -859,8 +883,8 @@ actor ApplicationInitializer
         let local_topology = 
           try
             LocalTopology(application.name(), w, g.clone(),
-              sendable_step_map, state_subpartitions, consume p_ids,
-              default_target, application.default_target_name,
+              sendable_step_map, state_subpartitions, sendable_pre_state_data,
+              consume p_ids, default_target, application.default_target_name,
               application.default_target_id)
           else
             @printf[I32]("Problem cloning graph\n".cstring())

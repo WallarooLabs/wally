@@ -15,11 +15,13 @@ class _SourceBuilder[In: Any val]
   let _handler: FramedSourceHandler[In] val
   let _router: Router val
   let _metrics_conn: TCPConnection  
+  let _pre_state_target_id: (U128 | None)
 
   new val create(app_name: String, name': String, 
     runner_builder: RunnerBuilder val, 
     handler: FramedSourceHandler[In] val,
-    router: Router val, metrics_conn: TCPConnection) 
+    router: Router val, metrics_conn: TCPConnection,
+    pre_state_target_id: (U128 | None) = None) 
   =>
     _app_name = app_name
     _name = name'
@@ -27,21 +29,29 @@ class _SourceBuilder[In: Any val]
     _handler = handler
     _router = router
     _metrics_conn = metrics_conn
+    _pre_state_target_id = pre_state_target_id
+    match pre_state_target_id
+    | let id: U128 =>
+      @printf[I32]("!!SourceBuilder create() got tid: %llu\n".cstring(), id)
+    else
+      @printf[I32]("!!SourceBuilder create() got tid NONE\n".cstring())
+    end
 
   fun name(): String => _name
 
   fun apply(alfred: Alfred tag, target_router: Router val): 
-    TCPSourceNotify iso^ 
+    TCPSourceNotify iso^
   =>
     let reporter = MetricsReporter(_app_name, _metrics_conn)
 
     FramedSourceNotify[In](_name, _handler, _runner_builder, _router, 
-      consume reporter, alfred, target_router)
+      consume reporter, alfred, target_router, _pre_state_target_id)
 
 interface SourceBuilderBuilder
   fun name(): String
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
-    metrics_conn: TCPConnection): SourceBuilder val 
+    metrics_conn: TCPConnection, pre_state_target_id: (U128 | None) = None):
+      SourceBuilder val 
 
 class TypedSourceBuilderBuilder[In: Any val]
   let _app_name: String
@@ -58,10 +68,11 @@ class TypedSourceBuilderBuilder[In: Any val]
   fun name(): String => _name
 
   fun apply(runner_builder: RunnerBuilder val, router: Router val, 
-    metrics_conn: TCPConnection): SourceBuilder val 
+    metrics_conn: TCPConnection, pre_state_target_id: (U128 | None) = None):
+      SourceBuilder val 
   =>
     _SourceBuilder[In](_app_name, _name, runner_builder, _handler, router,
-      metrics_conn)
+      metrics_conn, pre_state_target_id)
   
 interface TCPSourceListenerNotify
   """

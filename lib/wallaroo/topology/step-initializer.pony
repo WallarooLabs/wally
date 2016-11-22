@@ -34,6 +34,10 @@ class StepBuilder
     _is_stateful = is_stateful'
     _pre_state_target_id = pre_state_target_id'
     _forward_route_builder = forward_route_builder'
+    match pre_state_target_id'
+    | let tid: U128 =>
+      @printf[I32]("!!StepBuilder create() got tid: %llu".cstring(), tid)
+    end
 
   fun name(): String => _runner_builder.name()
   fun state_name(): String => _state_name
@@ -44,17 +48,18 @@ class StepBuilder
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  fun augment_router(r: Router val): Router val =>
-    _runner_builder.augment_router(r)
+  fun clone_router_and_set_input_type(r: Router val): Router val =>
+    _runner_builder.clone_router_and_set_input_type(r)
 
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
     router: Router val = EmptyRouter, 
     omni_router: OmniRouter val = EmptyOmniRouter,
     default_target: (Step | None) = None): Step tag 
   =>
+    @printf[I32]("!!Calling runnerbuilder from stepinitializer\n".cstring())
     let runner = _runner_builder(MetricsReporter(_app_name, 
       metrics_conn) where alfred = alfred, router = router, 
-      target_id = pre_state_target_id())
+      pre_state_target_id' = pre_state_target_id())
     let step = Step(consume runner, 
       MetricsReporter(_app_name, metrics_conn), _id,
       _runner_builder.route_builder(), alfred, router, default_target,
@@ -98,7 +103,7 @@ class StepBuilder
 //   fun is_partitioned(): Bool => true
 //   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
 //   fun default_target_name(): String => _default_target_name
-//   fun augment_router(r: Router val): Router val => r
+//   fun clone_router_and_set_input_type(r: Router val): Router val => r
     
 //   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
 //     router: Router val = EmptyRouter): Step tag 
@@ -164,8 +169,8 @@ class SourceData
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => 
     _runner_builder.forward_route_builder()
-  fun augment_router(r: Router val): Router val =>
-    _runner_builder.augment_router(r)
+  fun clone_router_and_set_input_type(r: Router val): Router val =>
+    _runner_builder.clone_router_and_set_input_type(r)
 
 class EgressBuilder
   let _name: String
@@ -200,7 +205,7 @@ class EgressBuilder
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
-  fun augment_router(r: Router val): Router val => r
+  fun clone_router_and_set_input_type(r: Router val): Router val => r
 
   fun target_address(): (Array[String] val | ProxyAddress val | 
     PartitionAddresses val) => _addr
@@ -237,3 +242,25 @@ class EgressBuilder
       @printf[I32]("Exhaustive match failed somehow\n".cstring())
       error
     end 
+
+class PreStateData
+  let _state_name: String
+  let _pre_state_name: String
+  let _runner_builder: RunnerBuilder val
+  let _target_id: (U128 | None)
+  let _forward_route_builder: RouteBuilder val
+
+  new val create(runner_builder: RunnerBuilder val, t_id: (U128 | None)) =>
+    _runner_builder = runner_builder
+    _state_name = runner_builder.state_name()
+    _pre_state_name = runner_builder.name()
+    _target_id = t_id
+    _forward_route_builder = runner_builder.forward_route_builder()
+
+  fun state_name(): String => _state_name
+  fun pre_state_name(): String => _pre_state_name
+  fun target_id(): (U128 | None) => _target_id
+  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
+  fun clone_router_and_set_input_type(r: Router val): Router val =>
+    _runner_builder.clone_router_and_set_input_type(r)
+
