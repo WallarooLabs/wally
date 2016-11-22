@@ -115,6 +115,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _closed: Bool = false
   var _writeable: Bool = false
   var _event: AsioEventID = AsioEvent.none()
+  embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_tracking: List[(USize, TrackingInfo val)] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
@@ -323,7 +324,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
             for msg in _initial_msgs.values() do
               _writev(msg)
             end
-            ifdef linux then
+            ifdef not windows then
               if _pending_writes() then
                 //sent all data; release backpressure
                 _release_backpressure()
@@ -351,7 +352,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
         _writeable = true
-        ifdef linux then
+        ifdef not windows then
           if _pending_writes() then
             //sent all data; release backpressure
             _release_backpressure()
@@ -386,6 +387,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       for bytes in _notify.sentv(this, data).values() do
         _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
         _pending_writev_total = _pending_writev_total + bytes.size()
+        _pending.push((bytes, 0))
         data_size = data_size + bytes.size()
       end
 
@@ -404,6 +406,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _pending_writev.push(data.cpointer().usize()).push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
     _pending_tracking.push((data.size(), tracking_info))
+    _pending.push((data, 0))
     _pending_writes()
 
   fun ref _notify_connecting() =>
@@ -469,6 +472,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     @pony_asio_event_unsubscribe(_event)
     _pending_tracking.clear()
     _pending_writev.clear()
+    _pending.clear()
     _pending_writev_total = 0
     _readable = false
     _writeable = false
@@ -584,6 +588,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
               len = len - iov_s
               _pending_writev.shift()
               _pending_writev.shift()
+              _pending.shift()
               _pending_writev_total = _pending_writev_total - iov_s
             else
               _pending_writev.update(0, iov_p+len)
@@ -598,13 +603,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           _pending_writev_total = _pending_writev_total - bytes_to_send
           if _pending_writev_total == 0 then
             _pending_writev.clear()
-//            @printf[I32]("Clearing writev buffer...\n".cstring())
+            _pending.clear()
 
             // do trackinginfo finished stuff
             _tracking_info_finished(bytes_sent)
             return true
           else
-            _pending_writev.remove(0, num_to_send*2)
+           for d in Range[USize](0, num_to_send, 1) do
+             _pending_writev.shift()
+             _pending_writev.shift()
+             _pending.shift()
+           end
           end
         end
       else
