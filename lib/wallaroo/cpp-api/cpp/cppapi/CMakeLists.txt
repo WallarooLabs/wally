@@ -76,10 +76,6 @@ add_library(wallaroo-static STATIC ${SOURCE_FILES})
 set_target_properties(wallaroo-static PROPERTIES OUTPUT_NAME "wallaroo")
 set_target_properties(wallaroo-static PROPERTIES PREFIX "lib")
 
-add_library(wallaroo-shared SHARED ${SOURCE_FILES})
-set_target_properties(wallaroo-shared PROPERTIES OUTPUT_NAME "wallaroo")
-set_target_properties(wallaroo-shared PROPERTIES PREFIX "lib")
-
 include (InstallRequiredSystemLibraries)
 set (CPACK_PACKAGE_VERSION_MAJOR "${WallarooCppApi_VERSION_MAJOR}")
 set (CPACK_PACKAGE_VERSION_MINOR "${WallarooCppApi_VERSION_MINOR}")
