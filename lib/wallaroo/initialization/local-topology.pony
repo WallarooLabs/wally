@@ -249,7 +249,8 @@ actor LocalTopologyInitializer
         //   built_state_steps.create()
 
         // TODO: Replace this when we move past the temporary POC based default
-        // target strategy
+        // target strategy. There can currently only be one default target
+        // per topology.
         var default_target: (Step | None) = None
         var default_target_id: U128 = t.default_target_id
         var default_target_state_step_id: U128 = 0
@@ -388,12 +389,52 @@ actor LocalTopologyInitializer
               let next_id = builder.id()
               @printf[I32](("Handling id " + next_id.string() + "\n").cstring())
 
-              if not builder.is_stateful() then
+              ///////////////////
+              // PRESTATE BUILDER
+              if builder.is_prestate() then              
+                @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
+ 
+                let partition_router = 
+                  try
+                    builder.clone_router_and_set_input_type(
+                      state_map(builder.state_name()))
+                  else
+                    @printf[I32](("No partition router found for " + builder.state_name() + "\n").cstring())
+                    error
+                  end
+
+                let state_comp_target_router = 
+                  match builder.pre_state_target_id() 
+                  | let id: U128 =>
+                    try
+                      built_routers(id)
+                    else
+                      @printf[I32]("No router found to prestate target step\n".cstring())
+                      error
+                    end
+                  else
+                    // This prestate has no computation target
+                    EmptyRouter
+                  end
+
+                let next_step = builder(partition_router, _metrics_conn, 
+                  _alfred, state_comp_target_router)
+
+                data_routes(next_id) = next_step
+                initializables.push(next_step)
+
+                built_stateless_steps(next_id) = next_step
+                let next_router = DirectRouter(next_step)
+                built_routers(next_id) = next_router
+              //////////////////////////////////
+              // STATELESS, NON-PRESTATE BUILDER
+              elseif not builder.is_stateful() then
                 @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
                 // Currently there are no splits (II), so we know that a node // has only one output in the graph. We also know this is not
                 // a sink or proxy, so there is exactly one output.
-                let out_id: U128 = _get_output_node_id(next_node, 
-                  default_target_id, default_target_state_step_id)
+                let out_id: U128 = 
+                    _get_output_node_id(next_node, 
+                      default_target_id, default_target_state_step_id)
 
                 let out_router = 
                   try
@@ -403,30 +444,9 @@ actor LocalTopologyInitializer
                     error 
                   end
 
-                // If this is prestate or a default target, it might have a 
-                // state comp target.
-                let state_comp_target_router = 
-                  match builder.pre_state_target_id() 
-                  | let id: U128 =>
-                    try
-                      let pre_state_target_router = built_routers(id)
-                      // match pre_state_target_router
-                      // | let pr: PartitionRouter val =>
-                      //   pr.register_routes(pre_state_target_router,
-                      //     builder.forward_route_builder())
-                      // end
-                      pre_state_target_router
-                    else
-                      EmptyRouter
-                    end
-                  else
-                    EmptyRouter
-                  end
-
                 // Check if this is a default target.  If so, route it
                 // to the appropriate default state step.
-                let next_step = builder(out_router, _metrics_conn, _alfred, 
-                  state_comp_target_router)
+                let next_step = builder(out_router, _metrics_conn, _alfred)
 
                 data_routes(next_id) = next_step
                 initializables.push(next_step)
@@ -440,6 +460,8 @@ actor LocalTopologyInitializer
                 if next_id == default_target_id then
                   default_target = next_step
                 end
+              ////////////////////////////////
+              // NON-PARTITIONED STATE BUILDER
               else
                 // Our step is stateful and non-partitioned, so we need to 
                 // build both a state step and a prestate step
@@ -607,7 +629,6 @@ actor LocalTopologyInitializer
                     DirectRouter(sink)
                   end
 
-                @printf[I32](("!!Sink id: " + next_id.string() + "\n").cstring())
                 built_stateless_steps(next_id) = sink
                 data_routes(next_id) = sink
                 built_routers(next_id) = sink_router

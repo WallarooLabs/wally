@@ -68,7 +68,7 @@ actor Main
             //!! coalescing
             "Orders", FixOrderFrameHandler where coalescing = false)
             // TODO: Why does NBBO work with this but not Orders?
-            // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
+            .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
             .to_state_partition[Symboly val, String, 
               (OrderResult val | None), SymbolData](CheckOrder, 
               SymbolDataBuilder, "symbol-data", symbol_data_partition
