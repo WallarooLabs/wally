@@ -1,7 +1,7 @@
+use "assert"
 use "collections"
 use "time"
 use "wallaroo/topology"
-use "assert"
 use "sendence/guid"
 
 type SeqId is U64
@@ -25,6 +25,7 @@ trait tag Origin
   fun ref not_flushing()
   fun ref watermarks(): Watermarks
   fun ref hwmt(): HighWatermarkTable
+  fun ref _watermarks_counter(): U64
 
   fun ref _flush(low_watermark: SeqId, origin: Origin,
     upstream_route_id: RouteId , upstream_seq_id: SeqId)
@@ -71,8 +72,6 @@ trait tag Origin
     hwmt().update(o_seq_id, (i_origin, i_route_id, i_seq_id))
     watermarks().add_sent(o_route_id, o_seq_id)
 
-  be send_batched_watermarks() => None
-
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
   """
   Process a high watermark received from a downstream step.
@@ -80,30 +79,32 @@ trait tag Origin
     _update_watermark(route_id, seq_id)
 
   fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    ifdef "resilience" then
-      ifdef "trace" then
-        @printf[I32]((
-        "update_watermark: " +
-        "route_id: " + route_id.string() +
-        "\tseq_id: " + seq_id.string() + "\n\n").cstring())
-      end
+    ifdef "trace" then
+      @printf[I32]((
+      "update_watermark: " +
+      "route_id: " + route_id.string() +
+      "\tseq_id: " + seq_id.string() + "\n\n").cstring())
     end
 
-    // ifdef debug then
-      // try
-      //   Assert(hwmt().contains(seq_id),
-      //     "Invariant violated: hwmt().contains(seq_id)")
-      // else
-      //   //TODO: how do we bail out here?
-      //   None
-      // end
-    // end
+    ifdef debug then
+      /*
+      try
+        Assert(hwmt().contains(seq_id),
+          "Invariant violated: hwmt().contains(seq_id)")
+       else
+        //TODO: how do we bail out here?
+        None
+      end*/
+    end
 
     try
       (let i_origin, let i_route_id, let i_seq_id) =
         hwmt().get_and_remove(seq_id)
       watermarks().add_high_watermark(route_id, seq_id)
-      _run_ack(i_origin, i_route_id, i_seq_id)
+
+      if ((_watermarks_counter() % 1000) == 0) then
+        _run_ack(i_origin, i_route_id, i_seq_id)
+      end
     else
       //TODO: how do we bail out here?
       None
@@ -116,6 +117,7 @@ trait tag Origin
         @printf[I32]("_run_ack: we're not flushing yet. Flushing now.\n\n".cstring())
       end
 
+      @printf[None]("Running ack\n".cstring())
       let lowest_watermark = watermarks().low_watermark_for(i_origin)
       _flush(lowest_watermark, i_origin, i_route_id , i_seq_id)
     end
@@ -124,56 +126,6 @@ trait tag Origin
 type OriginRouteSeqId is (Origin, RouteId, SeqId)
 
 type RouteLastWatermark is Map[RouteId, SeqId]
-
-class _WMQSend is TimerNotify
-  let _parent: Origin
-
-  new iso create(parent: Origin) =>
-    _parent = parent
-
-  fun ref apply(timer: Timer, count: U64): Bool =>
-    _parent.send_batched_watermarks()
-    true
-
-class WaterMarkBatcher
-  let _origin_queues: HashMap[Origin, RouteLastWatermark, HashOrigin] = _origin_queues.create()
-  let _timers: Timers = Timers
-  let _parent: Origin
-
-  new create(parent: Origin, interval: U64 = 1_000_000_000) =>
-    _parent = parent
-    let t = Timer(_WMQSend(_parent), interval, interval)
-    _timers(consume t)
-
-  fun ref queue(origin: Origin tag, route_id: RouteId, seq_id: SeqId) =>
-    let last = 
-      try
-        _origin_queues(origin)(route_id) 
-      else
-        0
-      end
-    if seq_id > last then
-      try
-        if not _origin_queues.contains(origin) then
-          _origin_queues.update(origin, RouteLastWatermark)
-        end
-        _origin_queues(origin).update(route_id,seq_id)
-      else
-        @printf[I32]("couldn't queue watermark\n".cstring())
-      end
-    end
-
-  fun ref send() =>
-    try
-      for origin in _origin_queues.keys() do
-        for route_id in _origin_queues(origin).keys() do
-          (let k, let seq_id) = _origin_queues(origin).remove(route_id)
-          origin.update_watermark(route_id, seq_id)
-        end
-      end
-    else
-      @printf[I32]("failed to send batched watermarks!".cstring())
-    end
 
 class HighWatermarkTable
   let id: U64 = GuidGenerator.u64()

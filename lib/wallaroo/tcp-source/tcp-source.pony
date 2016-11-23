@@ -50,6 +50,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   let _watermarks: Watermarks = _watermarks.create()
   let _hwmt: HighWatermarkTable = _hwmt.create()
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
+  var _wmcounter: U64 = 0
 
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
@@ -130,6 +131,9 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
     None
 
+  fun ref _watermarks_counter(): U64 =>
+    _wmcounter = _wmcounter + 1
+
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val)
   =>
@@ -144,8 +148,6 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     for r in _routes.values() do
       r.dispose()
     end
-
-  be send_batched_watermarks() => None //TODO: add watermark batching
 
   //
   // CREDIT FLOW

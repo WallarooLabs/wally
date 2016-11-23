@@ -9,12 +9,12 @@ use "wallaroo/topology"
 
 
 actor DataReceiver is Origin
-  let _auth: AmbientAuth  
+  let _auth: AmbientAuth
   let _worker_name: String
   var _sender_name: String
   var _sender_step_id: U128 = 0
   let _connections: Connections
-  var _router: DataRouter val = 
+  var _router: DataRouter val =
     DataRouter(recover Map[U128, CreditFlowConsumerStep tag] end)
   var _last_id_seen: U64 = 0
   var _connected: Bool = false
@@ -25,9 +25,10 @@ actor DataReceiver is Origin
   var _flushing: Bool = false
   let _watermarks: Watermarks = _watermarks.create()
   let _hwmt: HighWatermarkTable = _hwmt.create()
-  
-  new create(auth: AmbientAuth, worker_name: String, sender_name: String, 
-    connections: Connections, alfred: Alfred) 
+  var _wmcounter: U64 = 0
+
+  new create(auth: AmbientAuth, worker_name: String, sender_name: String,
+    connections: Connections, alfred: Alfred)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -41,8 +42,6 @@ actor DataReceiver is Origin
       let t = Timer(_Ack(this), 1_000_000_000, 1_000_000_000)
       _timers(consume t)
     end
-
-  be send_batched_watermarks() => None //TODO: add watermark batching
 
   be data_connect(sender_step_id: U128) =>
     _sender_step_id = sender_step_id
@@ -79,25 +78,28 @@ actor DataReceiver is Origin
 
   fun ref not_flushing() =>
     _flushing = false
-    
+
   fun ref watermarks(): Watermarks =>
     _watermarks
-    
+
   fun ref hwmt(): HighWatermarkTable =>
     _hwmt
+
+  fun ref _watermarks_counter(): U64 =>
+    _wmcounter = _wmcounter + 1
 
   be update_router(router: DataRouter val) =>
     _router = router
 
   be received(d: DeliveryMsg val, seq_id: U64)
-  =>  
+  =>
     if seq_id >= _last_id_seen then
       _last_id_seen = seq_id
       _router.route(d, this, seq_id)
     end
 
   be replay_received(r: ReplayableDeliveryMsg val, seq_id: U64)
-  =>  
+  =>
     if seq_id >= _last_id_seen then
       _last_id_seen = seq_id
       _router.replay_route(r, this, seq_id)
@@ -108,7 +110,7 @@ actor DataReceiver is Origin
   fun ref _ack_latest() =>
     try
       if _last_id_seen > 0 then
-        let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name, 
+        let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, _last_id_seen, _auth)
         _connections.send_data(_sender_name, ack_msg)
       end
@@ -116,7 +118,7 @@ actor DataReceiver is Origin
       @printf[I32]("Error creating ack watermark message\n".cstring())
     end
 
- be dispose() => 
+ be dispose() =>
    _timers.dispose()
 
 

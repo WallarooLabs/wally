@@ -63,7 +63,7 @@ class TCPSinkBuilder
     TCPSink(_encoder_wrapper, consume reporter, host, service,
       _initial_msgs)
 
-actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
+actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   """
   # TCPSink
 
@@ -132,7 +132,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
   let _hwmt: HighWatermarkTable = _hwmt.create()
   var _outgoing_seq_id: U64
   let _outgoing_route_id: U64 = 0 // there's only one route
-  let _watermark_batcher: WaterMarkBatcher
 
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -147,7 +146,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
     _outgoing_seq_id = 0
     //
     _encoder = encoder_wrapper
-    _watermark_batcher = WaterMarkBatcher(this)
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
@@ -250,13 +248,10 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
         end
 
         // We are finished with the message and can update watermarks (batched)
-        //i_origin.update_watermark(i_route_id, i_seq_id)
-        _watermark_batcher.queue(i_origin, i_route_id, i_seq_id)
+        i_origin.update_watermark(i_route_id, i_seq_id)
+        //_watermark_batcher.queue(i_origin, i_route_id, i_seq_id)
       end
     end
-
-  be send_batched_watermarks() =>
-    _watermark_batcher.send()
 
   //
   // CREDIT FLOW
@@ -678,30 +673,32 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
     """
     Call _unit_finished with # of sent messages and last Envelope
     """
-    var num_sent: ISize = 0
-    var final_pending_sent: (Envelope | None) = None
-    var bytes_sent = num_bytes_sent
+    ifdef "backpressure" or "resilience" then
+      var num_sent: ISize = 0
+      var final_pending_sent: (Envelope | None) = None
+      var bytes_sent = num_bytes_sent
 
-    try
-      while bytes_sent > 0 do
-        let node = _pending_tracking.head()
-        (let bytes, let envelope) = node()
-        if bytes <= bytes_sent then
-          num_sent = num_sent + 1
-          bytes_sent = bytes_sent - bytes
-          final_pending_sent = envelope
-          _pending_tracking.shift()
-        else
-          let bytes_remaining = bytes - bytes_sent
-          bytes_sent = 0
-          // update remaining for this message
-          node() = (bytes_remaining, envelope)
+      try
+        while bytes_sent > 0 do
+          let node = _pending_tracking.head()
+          (let bytes, let envelope) = node()
+          if bytes <= bytes_sent then
+            num_sent = num_sent + 1
+            bytes_sent = bytes_sent - bytes
+            final_pending_sent = envelope
+            _pending_tracking.shift()
+          else
+            let bytes_remaining = bytes - bytes_sent
+            bytes_sent = 0
+            // update remaining for this message
+            node() = (bytes_remaining, envelope)
+          end
         end
-      end
 
-      match final_pending_sent
-      | let sent: Envelope =>
-        _unit_finished(num_sent, sent)
+        match final_pending_sent
+        | let sent: Envelope =>
+          _unit_finished(num_sent, sent)
+        end
       end
     end
 
@@ -751,27 +748,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
 
       @pony_asio_event_resubscribe(_event, flags)
     end
-
-  //////////////
-  // ORIGIN (resilience)
-  fun ref flushing(): Bool =>
-    _flushing
-
-  fun ref not_flushing() =>
-    _flushing = false
-
-  fun ref watermarks(): Watermarks =>
-    _watermarks
-
-  fun ref hwmt(): HighWatermarkTable =>
-    _hwmt
-
-  fun ref _flush(low_watermark: U64, origin: Origin,
-    upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
-    """
-    No-op: TCPSink has no resilient state
-    """
-    None
 
 interface _TCPSinkNotify
   fun ref connecting(conn: TCPSink ref, count: U32) =>

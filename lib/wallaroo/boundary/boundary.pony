@@ -76,7 +76,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   let _watermarks: Watermarks = _watermarks.create()
   let _hwmt: HighWatermarkTable = _hwmt.create()
   let _route_id: RouteId = GuidGenerator.u64()
-  be send_batched_watermarks() => None //TODO: add watermark batching
+  var _wmcounter: U64 = 0
 
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -694,6 +694,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     No-op: OutgoingBoundary has no resilient state
     """
     None
+
+  fun ref _watermarks_counter(): U64 =>
+    _wmcounter = _wmcounter + 1
 
 interface _OutgoingBoundaryNotify
   fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>

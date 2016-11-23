@@ -74,7 +74,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _flushing: Bool = false
   let _watermarks: Watermarks = _watermarks.create()
   let _hwmt: HighWatermarkTable = _hwmt.create()
-
+  var _wmcounter: U64 = 0
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, id: U128,
     route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter, default_target: (Step | None) = None)
@@ -234,9 +234,6 @@ actor Step is (RunnableStep & Resilient & Producer &
   fun ref _flush(low_watermark: SeqId, origin: Origin,
     upstream_route_id: RouteId , upstream_seq_id: SeqId)
   =>
-    // SEAN: XXX
-    None
-    /*
     ifdef "trace" then
       @printf[I32]("flushing below: %llu\n".cstring(), upstream_seq_id)
     end
@@ -248,7 +245,9 @@ actor Step is (RunnableStep & Resilient & Producer &
     else
       @printf[I32]("Tried to flush a non-existing buffer!".cstring())
     end
-    */
+
+  fun ref _watermarks_counter(): U64 =>
+    _wmcounter = _wmcounter + 1
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val)
   =>

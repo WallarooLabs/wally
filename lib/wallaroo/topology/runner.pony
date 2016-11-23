@@ -471,8 +471,6 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
 
       match state_change
       | let sc: StateChange[State] ref =>
-        // SEAN: XXX
-        /*
         ifdef "resilience" then
           sc.write_log_entry(_wb)
           //TODO: batching? race between queueing and watermark?
@@ -487,7 +485,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
             @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
           end
         end
-        */
+
         sc.apply(_state)
         let computation_end = Time.nanos()
         _metrics_reporter.step_metric(sp.name(), computation_start,
