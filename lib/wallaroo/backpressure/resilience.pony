@@ -164,7 +164,6 @@ class WaterMarkBatcher
     end
 
   fun send() =>
-    @printf[I32]("sending from WatermarkBatcher\n".cstring())
     try
       for origin in _origin_queues.keys() do
         for route_id in _origin_queues(origin).keys() do
