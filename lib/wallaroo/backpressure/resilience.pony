@@ -163,11 +163,11 @@ class WaterMarkBatcher
       end
     end
 
-  fun send() =>
+  fun ref send() =>
     try
       for origin in _origin_queues.keys() do
         for route_id in _origin_queues(origin).keys() do
-          let seq_id = _origin_queues(origin)(route_id)
+          (let k, let seq_id) = _origin_queues(origin).remove(route_id)
           origin.update_watermark(route_id, seq_id)
         end
       end
