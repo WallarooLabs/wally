@@ -215,18 +215,17 @@ actor LocalTopologyInitializer
         // Make sure we only create shared state once and reuse it
         let state_map: Map[String, Router val] = state_map.create()
 
-
-
         // Keep track of everything we need to call initialize() on when
         // we're done
         let initializables: Array[Initializable tag] = initializables.create()
 
         @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
 
-        // For passing into partition builders
+        // For passing into partition builders so they can add state steps
+        // to our data routes
         let data_routes_ref = Map[U128, CreditFlowConsumerStep tag]
        
-        // Keep track of all CreditFLowConsumerSteps by id so we can create a 
+        // Keep track of all CreditFlowConsumerSteps by id so we can create a 
         // DataRouter for the data channel boundary
         var data_routes: Map[U128, CreditFlowConsumerStep tag] trn =
           recover Map[U128, CreditFlowConsumerStep tag] end
@@ -240,18 +239,17 @@ actor LocalTopologyInitializer
         let built_routers = Map[U128, Router val]
 
         // Keep track of steps we've built that we'll use for the OmniRouter.
-        // Unlike data_routes, these will not include state steps, which will // never be direct targets of state computations.
+        // Unlike data_routes, these will not include state steps, which will // never be direct targets for state computation outputs.
         let built_stateless_steps: Map[U128, CreditFlowConsumerStep] trn = 
           recover Map[U128, CreditFlowConsumerStep] end
 
-        // Keep track of built state steps so we can register routes on them
-        // for state computation targets
-        // let built_state_steps: Map[U128, CreditFlowConsumerStep] = 
-        //   built_state_steps.create()
+        // Accumulate all TCPSourceListenerBuilders so we can build them
+        // once Alfred signals we're ready
+        let tcpsl_builders: Array[TCPSourceListenerBuilder val] iso =
+          recover iso Array[TCPSourceListenerBuilder val] end
 
         // TODO: Replace this when we move past the temporary POC based default
-        // target strategy. There can currently only be one default target
-        // per topology.
+        // target strategy. There can currently only be one partition default // target per topology.
         var default_step_initializer: (StepInitializer val | None) = None
         var default_in_route_builder: (RouteBuilder val | None) = None
         var default_target: (Step | None) = None
@@ -298,11 +296,6 @@ actor LocalTopologyInitializer
           built_routers(default_target_id) = proxy_router
         end
 
-        // Create shared state for this topology
-        // t.update_state_map(state_map, _metrics_conn, _alfred, 
-        //   _connections, _auth, _outgoing_boundaries, initializables,
-        //   data_routes_ref, default_router)
-
         /////////
         // Initialize based on DAG
         //
@@ -312,11 +305,7 @@ actor LocalTopologyInitializer
         //   III. No direct chains of different partitions
         /////////
 
-        // TODO: Change this to a Stack for depth-first search so we have
-        // more control over the order things are initialized in (i.e. from
-        // one sink back before another sink begins)
         let frontier = Array[DagNode[StepInitializer val] val]
-
 
         /////////
         // 1. Find graph sinks and add to frontier queue. 
@@ -324,7 +313,8 @@ actor LocalTopologyInitializer
         @printf[I32]("Adding sink nodes to frontier\n".cstring())
 
         // Hold non_partitions until the end because we need to build state
-        // comp targets first
+        // comp targets first. (Holding to the end means processing first,
+        // since we're pushing onto a stack)
         let non_partitions = Array[DagNode[StepInitializer val] val]
         for node in graph.nodes() do
           if node.is_sink() and node.value.is_prestate() then 
@@ -335,13 +325,6 @@ actor LocalTopologyInitializer
           end
         end
 
-        // // TODO: Change this when we move past POC default target strategy
-        // match default_target_node
-        // | let n: DagNode[StepInitializer val] val =>
-        //   @printf[I32](("Adding default target " + n.value.name() + " to frontier\n").cstring())
-        //   frontier.push(n)
-        // end
-
         for node in non_partitions.values() do
           @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
           frontier.push(node) 
@@ -350,14 +333,9 @@ actor LocalTopologyInitializer
         /////////
         // 2. Loop: Check next frontier item for if all outgoing steps have 
         //          been created
-        //       if no, send to back of frontier queue.
-        //       if yes, add ins to frontier queue, then build the step 
+        //       if no, send to bottom of frontier stack.
+        //       if yes, add ins to frontier stack, then build the step 
         //       (connecting it to its out step, which has already been built)
-
-        //accumulation of all TCPSourceListenerBuilders for Alfred, so that it
-        //can make them when it's ready
-        let tcpsl_builders: Array[TCPSourceListenerBuilder val] iso =
-          recover iso Array[TCPSourceListenerBuilder val] end
         // If there are no cycles (I), this will terminate
         while frontier.size() > 0 do
           let next_node = frontier.pop()
@@ -365,6 +343,7 @@ actor LocalTopologyInitializer
           if built_routers.contains(next_node.id) then
             // We've already handled this node (probably because it's 
             // pre-state)
+            // TODO: I don't think this should ever happen.
             @printf[I32](("We've already handled " + next_node.value.name() + " with id " + next_node.id.string() + " so we're not handling it again\n").cstring())
             continue
           end
@@ -391,13 +370,16 @@ actor LocalTopologyInitializer
 
             // ...match kind of initializer and go from there...
             match next_initializer
-            | let builder: StepBuilder val =>              
+            | let builder: StepBuilder val => 
+            ///////////////
+            // STEP BUILDER
+            ///////////////       
               let next_id = builder.id()
               @printf[I32](("Handling id " + next_id.string() + "\n").cstring())
 
+              if builder.is_prestate() then              
               ///////////////////
               // PRESTATE BUILDER
-              if builder.is_prestate() then              
                 @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
  
                 // TODO: Change this when we implement post-POC default 
@@ -471,9 +453,9 @@ actor LocalTopologyInitializer
                 built_stateless_steps(next_id) = next_step
                 let next_router = DirectRouter(next_step)
                 built_routers(next_id) = next_router
+              elseif not builder.is_stateful() then
               //////////////////////////////////
               // STATELESS, NON-PRESTATE BUILDER
-              elseif not builder.is_stateful() then
                 @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
                 // Currently there are no splits (II), so we know that a node // has only one output in the graph. We also know this is not
                 // a sink or proxy, so there is exactly one output.
@@ -505,9 +487,9 @@ actor LocalTopologyInitializer
                 if next_id == default_target_id then
                   default_target = next_step
                 end
+              else
               ////////////////////////////////
               // NON-PARTITIONED STATE BUILDER
-              else
                 // Our step is stateful and non-partitioned, so we need to 
                 // build both a state step and a prestate step
            
@@ -535,7 +517,6 @@ actor LocalTopologyInitializer
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn, _alfred)
                 data_routes(next_id) = state_step
-                // built_state_steps(next_id) = state_step
                 initializables.push(state_step)
 
                 let state_step_router = DirectRouter(state_step)
@@ -591,6 +572,9 @@ actor LocalTopologyInitializer
                 end
               end
             | let egress_builder: EgressBuilder val =>
+            ////////////////////////////////////
+            // EGRESS BUILDER (Sink or Boundary)
+            ////////////////////////////////////
               let next_id = egress_builder.id()
               if not built_routers.contains(next_id) then
                 let sink_reporter = MetricsReporter(t.name(), 
@@ -629,6 +613,9 @@ actor LocalTopologyInitializer
                 built_routers(next_id) = sink_router
               end
             | let source_data: SourceData val =>
+            /////////////////
+            // SOURCE DATA
+            /////////////////            
               let next_id = source_data.id()
               let pipeline_name = source_data.pipeline_name()
 

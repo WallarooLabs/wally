@@ -200,12 +200,6 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
         TypedRouteBuilder[StateProcessor[State] val],
         TypedRouteBuilder[Next])
 
-    // let state_partition = KeyedStateSubpartition[U8, Key](
-    //   single_step_partition.keys(),
-    //   StateRunnerBuilder[State](s_initializer, state_name, 
-    //     s_comp.state_change_builders()) 
-    //   where multi_worker = false)
-
     _a.add_state_builder(state_name, state_builder)
 
     PipelineBuilder[In, Out, Next](_a, _p)
@@ -252,10 +246,6 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
         where multi_worker = multi_worker, default_state_name' = 
         default_state_name)
 
-    // let state_partition = KeyedStateSubpartition[Key](partition.keys(),
-    //   StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders()) 
-    //     where multi_worker = multi_worker)
-
     _a.add_state_builder(state_name, state_builder)
 
     PipelineBuilder[In, Out, Next](_a, _p)
@@ -271,6 +261,5 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let sink_builder: TCPSinkBuilder val = 
       TCPSinkBuilder(TypedEncoderWrapper[Out](encoder), initial_msgs)
     _p.update_sink(sink_builder, sink_ids)
-      //, initial_msgs), sink_ids)
     _a.add_pipeline(_p as BasicPipeline)
     _a

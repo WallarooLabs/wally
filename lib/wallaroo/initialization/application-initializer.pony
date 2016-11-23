@@ -88,6 +88,7 @@ actor ApplicationInitializer
       let pre_state_data: Array[PreStateData val] trn =
         recover Array[PreStateData val] end
 
+      // This will be incremented as we move through pipelines
       var pipeline_id: USize = 0
 
       // Map from step_id to worker name
@@ -124,7 +125,7 @@ actor ApplicationInitializer
 
       @printf[I32](("Found " + application.pipelines.size().string()  + " pipelines in application\n").cstring())
 
-      // Break each pipeline into LocalGraphs to distribute to workers
+      // Add stepbuilders for each pipeline into LocalGraphs to distribute to // workers
       for pipeline in application.pipelines.values() do
         if not pipeline.is_coalesced() then
           @printf[I32](("Coalescing is off for " + pipeline.name() + " pipeline\n").cstring())
@@ -344,8 +345,8 @@ actor ApplicationInitializer
 
         @printf[I32](("Each worker gets roughly " + per_worker.string() + " steps\n").cstring())
 
-        // Each worker gets a boundary value. Let's say initializer gets 2
-        // steps, worker2 2 steps, and worker3 3 steps. Then the boundaries
+        // Each worker gets a boundary value. Let's say "initializer" gets 2
+        // steps, "worker2" 2 steps, and "worker3" 3 steps. Then the boundaries
         // array will look like: [2, 4, 7]
         let boundaries: Array[USize] = boundaries.create()
         // Since we put the source on the first worker, start at -1 to
@@ -446,9 +447,9 @@ actor ApplicationInitializer
                   error
                 end
 
+              if next_runner_builder.is_prestate() then
               //////////////////////////
               // PRESTATE RUNNER BUILDER
-              if next_runner_builder.is_prestate() then
                 // Determine which workers will be involved in this partition
                 let partition_workers: (String | Array[String] val) = 
                   if next_runner_builder.is_multi() then
@@ -504,6 +505,11 @@ actor ApplicationInitializer
                     @printf[I32]("Failed to find state builder for prestate.\n".cstring())
                     error
                   end
+
+                // TODO: Update this approach when we create post-POC default
+                // strategy.
+                // ASSUMPTION: There is only one partititon default target
+                // per application.
                 if state_builder.default_state_name() != "" then
                   pipeline_default_state_name = 
                     state_builder.default_state_name()
@@ -531,9 +537,9 @@ actor ApplicationInitializer
                 end
 
                 steps(next_id) = worker
+              else
               //////////////////////////////
               // NON-PRESTATE RUNNER BUILDER
-              else
                 @printf[I32](("Preparing to spin up " + next_runner_builder.name() + " on " + worker + "\n").cstring())
                 let next_id = next_runner_builder.id()
                 let next_initializer = StepBuilder(application.name(),
@@ -558,14 +564,15 @@ actor ApplicationInitializer
 
               runner_builder_idx = runner_builder_idx + 1
             end
+            // We've reached the end of this worker's runner builders for this // pipeline
           end
 
           // Create the EgressBuilder for this worker and add to its graph.
           // First, check if there is going to be a step across the boundary
           if runner_builder_idx < runner_builders.size() then
-            ///////
-            // We need a Proxy since there are more steps to go in this
-            // pipeline
+          ///////
+          // We need a Proxy since there are more steps to go in this
+          // pipeline
             match next_worker
             | let w: String =>
               let next_runner_builder = 
@@ -616,9 +623,9 @@ actor ApplicationInitializer
               error
             end
           else
-            ///////
-            // We need a Sink since there are no more steps to go in this
-            // pipeline
+          ///////
+          // We need a Sink since there are no more steps to go in this
+          // pipeline
             let egress_builder = EgressBuilder(pipeline.name(), 
               sink_id, sink_addr, pipeline.sink_builder())
 
@@ -638,6 +645,7 @@ actor ApplicationInitializer
           last_initializer = None
           // Move to next worker's boundary value
           boundaries_idx = boundaries_idx + 1
+          // Finished with this worker for this pipeline
         end
 
         ////////////////////////////////////////////////////////////////
@@ -695,9 +703,6 @@ actor ApplicationInitializer
               where forward_route_builder' = 
                 state_runner_builder.route_builder())
 
-            // Add prestate to defaults
-            // Add state to defaults
-
             steps(pre_state_id) = pipeline_default_target_worker
             steps(state_id) = pipeline_default_target_worker
 
@@ -733,12 +738,11 @@ actor ApplicationInitializer
         consume pre_state_data
 
       // Keep track of LocalTopologies that we need to send to other
-      // (non-initializer) workers
+      // (non-"initializer") workers
       let other_local_topologies: Array[LocalTopology val] trn =
         recover Array[LocalTopology val] end
 
-      // For each worker, generate a LocalTopology
-      // from all of its LocalGraphs
+      // For each worker, generate a LocalTopology from its LocalGraph
       for (w, g) in local_graphs.pairs() do
         let p_ids: Map[String, U128] trn = recover Map[String, U128] end
         for (target, p_id) in proxy_ids(w).pairs() do
@@ -764,7 +768,7 @@ actor ApplicationInitializer
             error
           end
 
-        // If this is the initializer's (i.e. our) turn, then
+        // If this is the "initializer"'s (i.e. our) turn, then
         // immediately (asynchronously) begin initializing it. If not, add it
         // to the list we'll use to distribute to the other workers
         if w == "initializer" then
