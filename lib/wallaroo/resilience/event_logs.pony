@@ -37,16 +37,14 @@ class StandardEventLogBuffer is EventLogBuffer
 
   fun ref queue(uid: U128, frac_ids: None,
     statechange_id: U64, seq_id: U64, payload: Array[ByteSeq] val) =>
-    //TODO: prevent a memory leak by not pushing to _buf
-    ifdef "resilience" then
-      _buf.push((uid, frac_ids, statechange_id, seq_id, payload))
-    end
+
+    _buf.push((uid, frac_ids, statechange_id, seq_id, payload))
 
   fun ref flush(low_watermark: U64, origin: Origin,
     upstream_route_id: RouteId, upstream_seq_id: SeqId) =>
-    let out_buf: Array[LogEntry val] iso = recover iso Array[LogEntry val] end 
+    let out_buf: Array[LogEntry val] iso = recover iso Array[LogEntry val] end
     let residual: Array[LogEntry val] = Array[LogEntry val]
-    
+
     ifdef debug then
       @printf[I32](("_buf size: " + _buf.size().string() +
       " _origin_id: " + _origin_id.string() + "\n\n").cstring())
