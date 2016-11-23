@@ -105,6 +105,12 @@ actor LocalTopologyInitializer
   var _topology: (LocalTopology val | None) = None
   let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
   let _local_topology_file: String
+  var _topology_initialized: Bool = false
+
+  // Accumulate all TCPSourceListenerBuilders so we can build them
+  // once Alfred signals we're ready
+  let tcpsl_builders: Array[TCPSourceListenerBuilder val] =
+    recover iso Array[TCPSourceListenerBuilder val] end
 
   new create(worker_name: String, worker_count: USize, env: Env,
     auth: AmbientAuth, connections: Connections, metrics_conn: TCPConnection,
@@ -242,11 +248,6 @@ actor LocalTopologyInitializer
         // Unlike data_routes, these will not include state steps, which will // never be direct targets for state computation outputs.
         let built_stateless_steps: Map[U128, CreditFlowConsumerStep] trn = 
           recover Map[U128, CreditFlowConsumerStep] end
-
-        // Accumulate all TCPSourceListenerBuilders so we can build them
-        // once Alfred signals we're ready
-        let tcpsl_builders: Array[TCPSourceListenerBuilder val] iso =
-          recover iso Array[TCPSourceListenerBuilder val] end
 
         // TODO: Replace this when we move past the temporary POC based default
         // target strategy. There can currently only be one partition default // target per topology.
@@ -848,6 +849,10 @@ actor LocalTopologyInitializer
         end
 
         @printf[I32]("Local topology initialized\n".cstring())
+        _topology_initialized = true
+
+        // TODO: Notify Alfred to start reading data. This should be called by // Alfred after it's done.
+        spin_up_source_listeners()
       else
         @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end
@@ -856,6 +861,15 @@ actor LocalTopologyInitializer
       @printf[I32]("---------------------------------------------------------\n".cstring())
     else
       _env.err.print("Error initializing local topology")
+    end
+
+  be spin_up_source_listeners() =>
+    if not _topology_initialized then
+      @printf[I32]("ERROR: Tried to spin up source listeners before topology was initialized!\n".cstring())
+    else
+      for builder in tcpsl_builders.values() do
+        builder()
+      end
     end
 
   fun _get_output_node_id(node: DagNode[StepInitializer val] val,

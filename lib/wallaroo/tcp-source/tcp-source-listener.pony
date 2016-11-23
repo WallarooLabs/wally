@@ -102,6 +102,7 @@ actor TCPSourceListener
     _max_size = max_size
     _fd = @pony_asio_event_fd(_event)
     _notify_listening()
+    @printf[I32]((source_builder.name() + " source listening on " + host + ":" + service + "\n").cstring())
 
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
