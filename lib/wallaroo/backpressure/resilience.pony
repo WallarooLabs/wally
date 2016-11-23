@@ -86,16 +86,17 @@ trait tag Origin
       "\tseq_id: " + seq_id.string() + "\n\n").cstring())
     end
 
+    /*
     ifdef debug then
-      /*
       try
         Assert(hwmt().contains(seq_id),
           "Invariant violated: hwmt().contains(seq_id)")
        else
         //TODO: how do we bail out here?
         None
-      end*/
+      end
     end
+    */
 
     try
       (let i_origin, let i_route_id, let i_seq_id) =
@@ -174,6 +175,7 @@ class Watermarks
     var not_fully_acked = false
     var low = try _low_watermarks(origin)
     else
+      @printf[None]("We shouldnt keep seeing this\n".cstring())
       U64.max_value()
     end
     var high: U64 = 0
