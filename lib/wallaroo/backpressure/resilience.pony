@@ -19,12 +19,12 @@ primitive HashOrigin
 trait tag Origin
   fun tag hash(): U64 =>
     (digestof this).hash()
-        
+
   fun ref flushing(): Bool
   fun ref not_flushing()
   fun ref watermarks(): Watermarks
   fun ref hwmt(): HighWatermarkTable
-    
+
   fun ref _flush(low_watermark: SeqId, origin: Origin,
     upstream_route_id: RouteId , upstream_seq_id: SeqId)
 
@@ -41,7 +41,7 @@ trait tag Origin
     watermarks().update_low_watermark(i_origin, low_watermark)
     // send low watermark upstream
     i_origin.update_watermark(i_route_id, i_seq_id)
-    
+
   fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId, i_origin: Origin,
     i_route_id: RouteId, i_seq_id: SeqId, msg_uid: U128)
   =>
@@ -49,7 +49,7 @@ trait tag Origin
     Process envelopes and keep track of things
     """
     ifdef "resilience" then //TODO: fix other "resilience-debug" entries
-      ifdef debug then 
+      ifdef debug then
         @printf[I32]((
         "bookkeeping envelope:\no_route_id: " +
         o_route_id.string() +
@@ -75,7 +75,7 @@ trait tag Origin
   Process a high watermark received from a downstream step.
   """
     _update_watermark(route_id, seq_id)
-  
+
   fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
     ifdef "resilience" then
       ifdef debug then
@@ -95,28 +95,29 @@ trait tag Origin
       //   None
       // end
     // end
-    
+
     try
-      (let i_origin, let i_route_id, let i_seq_id) = hwmt()(seq_id)
+      (let i_origin, let i_route_id, let i_seq_id) =
+        hwmt().get_and_remove(seq_id)
       watermarks().add_high_watermark(route_id, seq_id)
       _run_ack(i_origin, i_route_id, i_seq_id)
     else
       //TODO: how do we bail out here?
-      None      
+      None
     end
-    
+
   fun ref _run_ack(i_origin: Origin, i_route_id: RouteId, i_seq_id: SeqId) ? =>
     if not flushing() then
 
       ifdef debug then
         @printf[I32]("_run_ack: we're not flushing yet. Flushing now.\n\n".cstring())
       end
-    
+
       let lowest_watermark = watermarks().low_watermark_for(i_origin)
       _flush(lowest_watermark, i_origin, i_route_id , i_seq_id)
     end
 
-    
+
 type OriginRouteSeqId is (Origin, RouteId, SeqId)
 
 
@@ -128,7 +129,7 @@ class HighWatermarkTable
   =>
     _hwmt(o_seq_id) = tuple
 
-  fun apply(o_seq_id: SeqId): OriginRouteSeqId ? =>
+  fun ref get_and_remove(o_seq_id: SeqId): OriginRouteSeqId ? =>
     ifdef debug then
       try
         Assert(_hwmt.contains(o_seq_id),
@@ -140,7 +141,8 @@ class HighWatermarkTable
     end
 
     try
-      _hwmt(o_seq_id)
+      (let k, let v) = _hwmt.remove(o_seq_id)
+      v
     else
       //TODO: bail out, we failed.
       //This can only happen if we never registered a tuple
@@ -161,7 +163,7 @@ class Watermarks
   let _route_trackers: Map[RouteId, RouteTracker] = _route_trackers.create()
   let _low_watermarks: HashMap[Origin, U64, HashOrigin] = _low_watermarks.create()
   //TODO: use MapIs
-    
+
   fun low_watermark_for(origin: Origin): U64 =>
     var not_fully_acked = false
     var low = try _low_watermarks(origin)
@@ -186,7 +188,7 @@ class Watermarks
     else
       high
     end
-    
+
   fun ref add_high_watermark(o_route_id: RouteId, o_seq_id: SeqId) =>
     let route_tracker = try
       _route_trackers(o_route_id)
@@ -197,7 +199,7 @@ class Watermarks
         o_route_id.string() + " on id: " + id.string() + "\n\n").cstring())
       None
     end
-    
+
     ifdef debug then
       try
         @printf[I32](("add_high_watermark: o_route_id: " +
@@ -215,7 +217,7 @@ class Watermarks
     end
 
     match route_tracker
-    | let rt: RouteTracker => rt.highest_acked = o_seq_id    
+    | let rt: RouteTracker => rt.highest_acked = o_seq_id
     else
       //TODO: how do we bail out here?
       None
@@ -240,15 +242,15 @@ class Watermarks
         None
       end
 
-    route_tracker.highest_sent = o_seq_id    
-    
+    route_tracker.highest_sent = o_seq_id
+
   fun ref update_low_watermark(i_origin: Origin, low_watermark: SeqId) =>
     _low_watermarks(i_origin) = low_watermark
 
   fun ref create_route_tracker(): RouteTracker =>
     RouteTracker.create()
 
-    
+
 primitive HashTuple
   fun hash(t: (U64, U64)): U64 =>
     cantorPair(t)
