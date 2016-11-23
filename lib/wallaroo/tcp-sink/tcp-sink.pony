@@ -132,6 +132,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
   let _hwmt: HighWatermarkTable = _hwmt.create()
   var _outgoing_seq_id: U64
   let _outgoing_route_id: U64 = 0 // there's only one route
+  let _watermark_batcher: WaterMarkBatcher
 
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -146,6 +147,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
     _outgoing_seq_id = 0
     //
     _encoder = encoder_wrapper
+    _watermark_batcher = WaterMarkBatcher(this)
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
@@ -194,7 +196,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
     i_origin: Origin, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    //TODO: deduplication like in the Step
+    //TODO: deduplication like in the Step <- this is pointless if the Sink
+    //doesn't have state, because on recovery we won't have a list of "seen
+    //messages", which we would normally get from the eventlog.
     run[D](metric_name, source_ts, data, i_origin, msg_uid, i_frac_ids,
       i_seq_id, i_route_id)
 
@@ -243,13 +247,14 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
             "\n\n").cstring())
         end
 
-        // We are finished with the message and can update watermarks
-        // Note: We are ACKing messages as fast as they come in.
-        // TODO: Queue the ACKs and use a timer to send watermarks upstream
-        //       periodically.
-        i_origin.update_watermark(i_route_id, i_seq_id)
+        // We are finished with the message and can update watermarks (batched)
+        //i_origin.update_watermark(i_route_id, i_seq_id)
+        _watermark_batcher.queue(i_origin, i_route_id, i_seq_id)
       end
     end
+
+  be send_batched_watermarks() =>
+    _watermark_batcher.send()
 
   //
   // CREDIT FLOW

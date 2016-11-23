@@ -145,6 +145,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
       r.dispose()
     end
 
+  be send_batched_watermarks() => None //TODO: add watermark batching
+
   //
   // CREDIT FLOW
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>

@@ -1,4 +1,5 @@
 use "collections"
+use "time"
 use "wallaroo/topology"
 use "assert"
 use "sendence/guid"
@@ -70,6 +71,8 @@ trait tag Origin
     hwmt().update(o_seq_id, (i_origin, i_route_id, i_seq_id))
     watermarks().add_sent(o_route_id, o_seq_id)
 
+  be send_batched_watermarks() => None
+
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
   """
   Process a high watermark received from a downstream step.
@@ -120,6 +123,58 @@ trait tag Origin
 
 type OriginRouteSeqId is (Origin, RouteId, SeqId)
 
+type RouteLastWatermark is Map[RouteId, SeqId]
+
+class _WMQSend is TimerNotify
+  let _parent: Origin
+
+  new iso create(parent: Origin) =>
+    _parent = parent
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _parent.send_batched_watermarks()
+    true
+
+class WaterMarkBatcher
+  let _origin_queues: HashMap[Origin, RouteLastWatermark, HashOrigin] = _origin_queues.create()
+  let _timers: Timers = Timers
+  let _parent: Origin
+
+  new create(parent: Origin, interval: U64 = 1_000_000_000) =>
+    _parent = parent
+    let t = Timer(_WMQSend(_parent), interval, interval)
+    _timers(consume t)
+
+  fun ref queue(origin: Origin tag, route_id: RouteId, seq_id: SeqId) =>
+    let last = 
+      try
+        _origin_queues(origin)(route_id) 
+      else
+        0
+      end
+    if seq_id > last then
+      try
+        if not _origin_queues.contains(origin) then
+          _origin_queues.add(origin, RouteLastWatermark)
+          _origin_queues(origin).update(route_id,last)
+        end
+      else
+        @printf[I32]("couldn't queue watermark\n".cstring())
+      end
+    end
+
+  fun send() =>
+    @printf[I32]("sending from WatermarkBatcher\n".cstring())
+    try
+      for origin in _origin_queues.keys() do
+        for route_id in _origin_queues(origin).keys() do
+          let seq_id = _origin_queues(origin)(route_id)
+          origin.update_watermark(route_id, seq_id)
+        end
+      end
+    else
+      @printf[I32]("failed to send batched watermarks!".cstring())
+    end
 
 class HighWatermarkTable
   let id: U64 = GuidGenerator.u64()

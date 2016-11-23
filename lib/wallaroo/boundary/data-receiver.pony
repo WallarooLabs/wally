@@ -42,6 +42,8 @@ actor DataReceiver is Origin
       _timers(consume t)
     end
 
+  be send_batched_watermarks() => None //TODO: add watermark batching
+
   be data_connect(sender_step_id: U128) =>
     _sender_step_id = sender_step_id
 

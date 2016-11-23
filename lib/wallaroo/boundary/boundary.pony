@@ -76,6 +76,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   let _watermarks: Watermarks = _watermarks.create()
   let _hwmt: HighWatermarkTable = _hwmt.create()
   let _route_id: RouteId = GuidGenerator.u64()
+  be send_batched_watermarks() => None //TODO: add watermark batching
 
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
