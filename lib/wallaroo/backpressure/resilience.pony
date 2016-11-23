@@ -118,7 +118,6 @@ trait tag Origin
         @printf[I32]("_run_ack: we're not flushing yet. Flushing now.\n\n".cstring())
       end
 
-      @printf[None]("Running ack\n".cstring())
       let lowest_watermark = watermarks().low_watermark_for(i_origin)
       _flush(lowest_watermark, i_origin, i_route_id , i_seq_id)
     end
@@ -175,7 +174,6 @@ class Watermarks
     var not_fully_acked = false
     var low = try _low_watermarks(origin)
     else
-      @printf[None]("We shouldnt keep seeing this\n".cstring())
       U64.max_value()
     end
     var high: U64 = 0
