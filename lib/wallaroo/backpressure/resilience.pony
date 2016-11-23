@@ -155,9 +155,9 @@ class WaterMarkBatcher
     if seq_id > last then
       try
         if not _origin_queues.contains(origin) then
-          _origin_queues.add(origin, RouteLastWatermark)
-          _origin_queues(origin).update(route_id,last)
+          _origin_queues.update(origin, RouteLastWatermark)
         end
+        _origin_queues(origin).update(route_id,seq_id)
       else
         @printf[I32]("couldn't queue watermark\n".cstring())
       end
