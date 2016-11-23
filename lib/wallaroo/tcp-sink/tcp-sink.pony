@@ -226,7 +226,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
-    _recoup_credits(number_finished)
+    ifdef "backpressure" then
+      _recoup_credits(number_finished)
+    end
 
     ifdef "resilience" then
       match envelope

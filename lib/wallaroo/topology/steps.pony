@@ -61,7 +61,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
   let _filter_route_id: RouteId = GuidGenerator.u64()
-  
+
   // Credit Flow Producer
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
 
@@ -75,7 +75,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   let _watermarks: Watermarks = _watermarks.create()
   let _hwmt: HighWatermarkTable = _hwmt.create()
 
-  
+
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, id: U128,
     route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter, default_target: (Step | None) = None)
   =>
@@ -92,7 +92,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     _default_target = default_target
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val) 
+    tcp_sinks: Array[TCPSink] val)
   =>
     for consumer in _router.routes().values() do
       _routes(consumer) =
@@ -156,7 +156,7 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   fun ref next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
-    
+
   ///////////
   // RECOVERY
   fun _is_duplicate(origin: Origin, msg_uid: U128,
@@ -203,7 +203,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       let is_finished = _runner.run[D](metric_name, source_ts, data,
         this, _router,
         i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
-        
+
       if is_finished then
         //TODO: be more efficient (batching?)
         ifdef "resilience" then
@@ -224,16 +224,19 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   fun ref not_flushing() =>
     _flushing = false
-    
+
   fun ref watermarks(): Watermarks =>
     _watermarks
-    
+
   fun ref hwmt(): HighWatermarkTable =>
     _hwmt
 
   fun ref _flush(low_watermark: SeqId, origin: Origin,
     upstream_route_id: RouteId , upstream_seq_id: SeqId)
   =>
+    // SEAN: XXX
+    None
+    /*
     ifdef debug then
       @printf[I32]("flushing below: %llu\n".cstring(), upstream_seq_id)
     end
@@ -245,6 +248,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     else
       @printf[I32]("Tried to flush a non-existing buffer!".cstring())
     end
+    */
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val)
   =>
@@ -296,7 +300,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       _routes(c)
     else
       None
-    end    
+    end
 
   //////////////
   // CREDIT FLOW CONSUMER
