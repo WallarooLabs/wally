@@ -387,6 +387,9 @@ class LocalPartitionRouter[In: Any val,
           // If there's a default, use that
           match _default_router
           | let r: Router val =>
+            ifdef "trace" then
+              @printf[I32]("PartitionRouter sending to default step as there was no entry for key\n".cstring())
+            end
             r.route[In](metric_name, source_ts, input, producer,
               i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
           else
