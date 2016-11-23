@@ -138,13 +138,36 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   fun ref hwmt(): HighWatermarkTable =>
     _hwmt
 
+  fun ref _watermarks_counter(): U64 =>
+    _wmcounter = _wmcounter + 1
+
+  // Override these for TCPSource as we are currently
+  // not resilient.
+
   fun ref _flush(low_watermark: U64, origin: Origin,
     upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
     None
 
-  fun ref _watermarks_counter(): U64 =>
-    _wmcounter = _wmcounter + 1
+  be log_flushed(low_watermark: SeqId, i_origin: Origin,
+    i_route_id: RouteId, i_seq_id: SeqId)
+  =>
+    None
 
+  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId, i_origin: Origin,
+    i_route_id: RouteId, i_seq_id: SeqId, msg_uid: U128)
+  =>
+    None
+
+  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
+    None
+
+  fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
+    None
+
+  fun ref _run_ack(i_origin: Origin, i_route_id: RouteId, i_seq_id: SeqId) =>
+    None
+
+  // Our actor
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
   => 
