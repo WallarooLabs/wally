@@ -46,8 +46,8 @@ Logger::Logger()
   const char* strPath = std::getenv("WALLAROO_LOGPATH");
   if (strPath == nullptr )
   {
-    path = "/apps/dev/arizona/data/wallaroo/logs";
-    std::cerr << "WALLAROO_LOGPATH NOT SET! Defaultin to:" << path << std::endl;
+    path = "/tmp";
+    std::cerr << "WALLAROO_LOGPATH NOT SET! Defaulting to:" << path << std::endl;
   }
   else
   {
