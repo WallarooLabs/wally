@@ -472,9 +472,10 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
       match state_change
       | let sc: StateChange[State] ref =>
         ifdef "resilience" then
-          sc.write_log_entry(_wb)
+          let wb: Writer = Writer //TODO: this is terrible for performance!!
+          sc.write_log_entry(wb)
           //TODO: batching? race between queueing and watermark?
-          let payload = _wb.done()
+          let payload = wb.done()
           //TODO: deal with creating fractional message ids here
           match _id
           | let buffer_id: U128 =>
