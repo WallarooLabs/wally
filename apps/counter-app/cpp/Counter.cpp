@@ -8,6 +8,16 @@
 
 extern "C"
 {
+  extern CounterPartitionKey* get_partition_key(size_t idx)
+  {
+    return new CounterPartitionKey(idx);
+  }
+
+  extern CounterPartitionFunction* get_partition_function(size_t idx)
+  {
+    return new CounterPartitionFunction();
+  }
+
   extern CounterSourceDecoder* get_source_decoder()
   {
     return new CounterSourceDecoder();
@@ -67,6 +77,12 @@ extern "C"
     case 5:
     {
       return new CounterAddBuilder();
+    }
+    case 6:
+    {
+      CounterPartitionKey *cpk = new CounterPartitionKey(0);
+      cpk->deserialize(bytes_ + 2);
+      return cpk;
     }
     }
     return nullptr;
@@ -369,8 +385,7 @@ void *CounterComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeR
 
   counter_add->set_value(sum);
 
-  // return w_stateful_computation_get_return(state_change_repository_helper_, total, state_change_handle);
-  return w_stateful_computation_get_return(state_change_repository_helper_, total, none);
+  return w_stateful_computation_get_return(state_change_repository_helper_, total, state_change_handle);
 }
 
 size_t CounterComputation::get_number_of_state_change_builders()
@@ -403,4 +418,51 @@ size_t DummyComputation::get_number_of_state_change_builders(){
 wallaroo::StateChangeBuilder *DummyComputation::get_state_change_builder(size_t idx_)
 {
   return nullptr;
+}
+
+CounterPartitionKey::CounterPartitionKey(size_t value_): _value(value_)
+{
+}
+
+uint64_t CounterPartitionKey::hash()
+{
+  return (uint64_t)get_value();
+}
+
+bool CounterPartitionKey::eq(wallaroo::Key *other_)
+{
+  return get_value() == ((CounterPartitionKey *)other_)->get_value();
+}
+
+size_t CounterPartitionKey::get_value()
+{
+  return _value;
+}
+
+void CounterPartitionKey::deserialize(char *bytes_)
+{
+  _value = ((size_t)(bytes_[0]) << 24) +
+    ((size_t)(bytes_[1]) << 16) +
+    ((size_t)(bytes_[2]) << 8) +
+    (size_t)(bytes_[3]);
+}
+
+void CounterPartitionKey::serialize(char* bytes_, size_t nsz_)
+{
+  bytes_[0] = 0x00;
+  bytes_[1] = 0x06;
+  bytes_[2] = (_value >> 24) & 0xFF;
+  bytes_[3] = (_value >> 16) & 0xFF;
+  bytes_[4] = (_value >> 8) & 0xFF;
+  bytes_[5] = _value & 0xFF;
+}
+
+void serialize(char *bytes, size_t nsz_)
+{
+}
+
+wallaroo::Key *CounterPartitionFunction::partition(wallaroo::Data *data)
+{
+  Numbers *numbers = (Numbers *)data;
+  return new CounterPartitionKey((numbers->get_numbers().size()) % 2);
 }

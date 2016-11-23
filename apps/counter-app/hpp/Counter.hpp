@@ -2,6 +2,8 @@
 #define __COUNTER_HPP__
 
 #include "WallarooCppApi/Data.hpp"
+#include "WallarooCppApi/Key.hpp"
+#include "WallarooCppApi/PartitionFunction.hpp"
 #include "WallarooCppApi/State.hpp"
 #include "WallarooCppApi/StateChange.hpp"
 #include "WallarooCppApi/Computation.hpp"
@@ -39,7 +41,7 @@ public:
   virtual void deserialize (char* bytes);
   virtual void serialize (char* bytes, size_t nsz_);
   virtual size_t serialize_get_size () { return 6; }
-  virtual size_t encode_get_size() { return 6; }
+  virtual size_t encode_get_size() { return 4; }
   virtual void encode(char *bytes);
   virtual ~Total() {};
 };
@@ -129,6 +131,29 @@ public:
   virtual void deserialize (char* bytes) {};
   virtual void serialize (char* bytes, size_t nsz_) { bytes[0] = 0; bytes[1] = 1; }
   virtual size_t serialize_get_size () { return 2; }
+};
+
+class CounterPartitionKey: public wallaroo::Key
+{
+private:
+  size_t _value;
+public:
+  CounterPartitionKey(size_t value_);
+  virtual ~CounterPartitionKey() {}
+  virtual uint64_t hash();
+  virtual bool eq(wallaroo::Key *other_);
+  size_t get_value();
+  virtual void deserialize (char* bytes_);
+  virtual void serialize (char* bytes_, size_t nsz_);
+  virtual size_t serialize_get_size () { return 6; }
+};
+
+class CounterPartitionFunction: public wallaroo::PartitionFunction
+{
+public:
+  CounterPartitionFunction() {}
+  virtual ~CounterPartitionFunction() {}
+  virtual wallaroo::Key *partition(wallaroo::Data *data_);
 };
 
 #endif

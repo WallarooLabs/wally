@@ -40,6 +40,7 @@ set(HEADER_FILES
 	hpp/Buffers.hpp
         hpp/Computation.hpp
 	hpp/Data.hpp
+      	hpp/Key.hpp
 	hpp/Logger.hpp
 	hpp/ManagedObject.hpp
 	hpp/Serializable.hpp
