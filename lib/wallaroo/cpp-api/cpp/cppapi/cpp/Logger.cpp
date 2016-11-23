@@ -47,6 +47,7 @@ Logger::Logger()
   if (strPath == nullptr )
   {
     path = "/apps/dev/arizona/data/wallaroo/logs";
+    std::cerr << "WALLAROO_LOGPATH NOT SET! Defaultin to:" << path << std::endl;
   }
   else
   {
