@@ -56,7 +56,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val, 
     tcp_sinks: Array[TCPSink] val,
-    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,   
+    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,  
+    forward_route_builder: (RouteBuilder val | None) = None, 
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -97,7 +98,10 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
     match default_target
     | let r: CreditFlowConsumerStep =>
-      _routes(r) = _route_builder(this, r, StepRouteCallbackHandler)
+      match forward_route_builder
+      | let frb: RouteBuilder val =>
+        _routes(r) = frb(this, r, StepRouteCallbackHandler)
+      end
     end
 
     for r in _routes.values() do

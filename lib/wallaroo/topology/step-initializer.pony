@@ -37,6 +37,13 @@ class StepBuilder
 
   fun name(): String => _runner_builder.name()
   fun state_name(): String => _state_name
+  fun default_state_name(): String => 
+    match _runner_builder
+    | let ds: DefaultStateable val => 
+      if ds.default_state_name() != "" then ds.default_state_name() else "" end
+    else
+      ""
+    end
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
   fun pre_state_target_id(): (U128 | None) => _pre_state_target_id
@@ -44,8 +51,12 @@ class StepBuilder
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  fun clone_router_and_set_input_type(r: Router val): Router val =>
-    _runner_builder.clone_router_and_set_input_type(r)
+  fun in_route_builder(): (RouteBuilder val | None) => 
+    _runner_builder.in_route_builder()
+  fun clone_router_and_set_input_type(r: Router val,
+    default_r: (Router val | None) = None): Router val 
+  =>
+    _runner_builder.clone_router_and_set_input_type(r, default_r)
 
   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
     router: Router val = EmptyRouter, 
@@ -61,62 +72,6 @@ class StepBuilder
       omni_router)
     step.update_router(next)
     step
-
-// !! TODO: Remove this is possible
-// class PartitionedStateStepBuilder
-//   let _app_name: String
-//   let _pipeline_name: String
-//   let _state_subpartition: StateSubpartition val
-//   let _runner_builder: RunnerBuilder val
-//   let _state_name: String
-//   let _id: U128
-//   let _pre_state_target_id: U128
-//   let _forward_route_builder: RouteBuilder val
-//   let _default_target_name: String
-
-//   new val create(app_name: String, pipeline_name': String, 
-//     sub: StateSubpartition val, r: RunnerBuilder val, state_name': String,
-//     pre_state_target_id': U128, forward_route_builder': RouteBuilder val,
-//     default_target_name': String = "") 
-//   =>
-//     _app_name = app_name
-//     _pipeline_name = pipeline_name'
-//     _state_subpartition = sub
-//     _runner_builder = r
-//     _state_name = state_name'
-//     _id = _runner_builder.id()
-//     _pre_state_target_id = pre_state_target_id'
-//     _forward_route_builder = forward_route_builder'
-//     _default_target_name = default_target_name'
-
-//   fun name(): String => _runner_builder.name() + " partition"
-//   fun pipeline_name(): String => _pipeline_name
-//   fun state_name(): String => _state_name
-//   fun id(): U128 => _id
-//   fun pre_state_target_id(): U128 => _pre_state_target_id
-//   fun is_stateful(): Bool => true
-//   fun is_partitioned(): Bool => true
-//   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-//   fun default_target_name(): String => _default_target_name
-//   fun clone_router_and_set_input_type(r: Router val): Router val => r
-    
-//   fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
-//     router: Router val = EmptyRouter): Step tag 
-//   =>
-//     Step(RouterRunner, MetricsReporter(_app_name, metrics_conn), _id,
-//       _runner_builder.route_builder(), alfred)
-
-//   fun build_partition(worker_name: String, metrics_conn: TCPConnection, 
-//     auth: AmbientAuth, connections: Connections, 
-//     alfred: Alfred, 
-//     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-//     state_comp_router: Router val = EmptyRouter,
-//     default_router: (Router val | None) = None): 
-//       PartitionRouter val 
-//   =>
-//     _state_subpartition.build(_app_name, worker_name,
-//       metrics_conn, auth, connections, alfred,
-//       outgoing_boundaries, default_router)
 
 class SourceData
   let _id: U128
@@ -156,6 +111,13 @@ class SourceData
 
   fun name(): String => _name
   fun state_name(): String => _state_name
+  fun default_state_name(): String => 
+    match _runner_builder
+    | let ds: DefaultStateable val => 
+      if ds.default_state_name() != "" then ds.default_state_name() else "" end
+    else
+      ""
+    end
   fun pipeline_name(): String => _pipeline_name
   fun id(): U128 => _id
   fun pre_state_target_id(): (U128 | None) => _pre_state_target_id
@@ -164,8 +126,10 @@ class SourceData
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => 
     _runner_builder.forward_route_builder()
-  fun clone_router_and_set_input_type(r: Router val): Router val =>
-    _runner_builder.clone_router_and_set_input_type(r)
+  fun clone_router_and_set_input_type(r: Router val,
+    default_r: (Router val | None) = None): Router val 
+  =>
+    _runner_builder.clone_router_and_set_input_type(r, default_r)
 
 class EgressBuilder
   let _name: String
@@ -200,7 +164,8 @@ class EgressBuilder
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
-  fun clone_router_and_set_input_type(r: Router val): Router val => r
+  fun clone_router_and_set_input_type(r: Router val,
+    dr: (Router val | None) = None): Router val => r
 
   fun target_address(): (Array[String] val | ProxyAddress val | 
     PartitionAddresses val) => _addr
@@ -244,13 +209,16 @@ class PreStateData
   let _runner_builder: RunnerBuilder val
   let _target_id: (U128 | None)
   let _forward_route_builder: RouteBuilder val
+  let _is_default_target: Bool
 
-  new val create(runner_builder: RunnerBuilder val, t_id: (U128 | None)) =>
+  new val create(runner_builder: RunnerBuilder val, t_id: (U128 | None),
+    is_default_target': Bool = false) =>
     _runner_builder = runner_builder
     _state_name = runner_builder.state_name()
     _pre_state_name = runner_builder.name()
     _target_id = t_id
     _forward_route_builder = runner_builder.forward_route_builder()
+    _is_default_target = is_default_target'
 
   fun state_name(): String => _state_name
   fun pre_state_name(): String => _pre_state_name
@@ -258,4 +226,5 @@ class PreStateData
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
   fun clone_router_and_set_input_type(r: Router val): Router val =>
     _runner_builder.clone_router_and_set_input_type(r)
+  fun is_default_target(): Bool => _is_default_target
 

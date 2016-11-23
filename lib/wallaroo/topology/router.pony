@@ -300,7 +300,8 @@ trait PartitionRouter is Router
 trait AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)] is
   PartitionRouter
   fun clone_and_set_input_type[NewIn: Any val](
-    new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter val
+    new_p_function: PartitionFunction[NewIn, Key] val,
+    new_default_router: (Router val | None) = None): PartitionRouter val
 
 class LocalPartitionRouter[In: Any val,
   Key: (Hashable val & Equatable[Key] val)] is AugmentablePartitionRouter[Key]
@@ -393,10 +394,17 @@ class LocalPartitionRouter[In: Any val,
     end
 
   fun clone_and_set_input_type[NewIn: Any val](
-    new_p_function: PartitionFunction[NewIn, Key] val): PartitionRouter val
+    new_p_function: PartitionFunction[NewIn, Key] val,
+    new_d_router: (Router val | None) = None): PartitionRouter val
   =>
-    LocalPartitionRouter[NewIn, Key](_local_map, _step_ids, _partition_routes, 
-      new_p_function)
+    match new_d_router
+    | let dr: Router val =>
+      LocalPartitionRouter[NewIn, Key](_local_map, _step_ids, 
+        _partition_routes, new_p_function, dr)
+    else
+      LocalPartitionRouter[NewIn, Key](_local_map, _step_ids, 
+        _partition_routes, new_p_function, _default_router)
+    end
 
   fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
     for r in _partition_routes.values() do

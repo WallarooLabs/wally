@@ -27,7 +27,8 @@ interface Runner
 
   fun name(): String
   fun state_name(): String
-  fun clone_router_and_set_input_type(router: Router val): Router val
+  fun clone_router_and_set_input_type(r: Router val,
+    default_r: (Router val | None) = None): Router val 
 
 trait ReplayableRunner
   fun ref replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val, 
@@ -49,12 +50,17 @@ trait RunnerBuilder
   fun id(): U128
   fun route_builder(): RouteBuilder val
   fun forward_route_builder(): RouteBuilder val
-  fun clone_router_and_set_input_type(r: Router val): Router val => r
+  fun in_route_builder(): (RouteBuilder val | None) => None
+  fun clone_router_and_set_input_type(r: Router val,
+    default_r: (Router val | None) = None): Router val 
+  =>
+    r
 
 class RunnerSequenceBuilder is RunnerBuilder
   let _runner_builders: Array[RunnerBuilder val] val
   let _id: U128
   var _forward_route_builder: RouteBuilder val
+  var _in_route_builder: (RouteBuilder val | None)
   var _state_name: String
 
   new val create(bs: Array[RunnerBuilder val] val) =>
@@ -70,6 +76,13 @@ class RunnerSequenceBuilder is RunnerBuilder
         _runner_builders(_runner_builders.size() - 1).forward_route_builder()
       else
         EmptyRouteBuilder
+      end
+
+    _in_route_builder = 
+      try
+        _runner_builders(_runner_builders.size() - 1).in_route_builder()
+      else
+        None
       end
 
     _state_name =
@@ -111,6 +124,17 @@ class RunnerSequenceBuilder is RunnerBuilder
     n + "|"
 
   fun state_name(): String => _state_name
+  fun default_state_name(): String => 
+    try
+      match _runner_builders(_runner_builders.size() - 1)
+      | let ds: DefaultStateable val =>
+        ds.default_state_name()
+      else
+        ""
+      end
+    else
+      ""
+    end
   fun is_prestate(): Bool => 
     try
       _runner_builders(_runner_builders.size() - 1).is_prestate()
@@ -132,9 +156,12 @@ class RunnerSequenceBuilder is RunnerBuilder
       EmptyRouteBuilder
     end
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  fun clone_router_and_set_input_type(r: Router val): Router val =>
+  fun in_route_builder(): (RouteBuilder val | None) => _in_route_builder
+  fun clone_router_and_set_input_type(r: Router val,
+    default_r: (Router val | None) = None): Router val 
+  =>
     try
-      _runner_builders(_runner_builders.size() - 1).clone_router_and_set_input_type(r)
+      _runner_builders(_runner_builders.size() - 1).clone_router_and_set_input_type(r, default_r)
     else
       r
     end
@@ -173,14 +200,19 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
 
+interface DefaultStateable
+  fun default_state_name(): String
+
 class PreStateRunnerBuilder[In: Any val, Out: Any val, 
   PIn: Any val, Key: (Hashable val & Equatable[Key] val), State: Any #read] is 
     RunnerBuilder
   let _state_comp: StateComputation[In, Out, State] val
   let _state_name: String
+  let _default_state_name: String
   let _route_builder: RouteBuilder val
   let _partition_function: PartitionFunction[PIn, Key] val
   let _forward_route_builder: RouteBuilder val
+  let _in_route_builder: (RouteBuilder val | None)
   let _id: U128
   let _is_multi: Bool
 
@@ -189,21 +221,25 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
     partition_function': PartitionFunction[PIn, Key] val,
     route_builder': RouteBuilder val, 
     forward_route_builder': RouteBuilder val,
+    in_route_builder': (RouteBuilder val | None) = None,
+    default_state_name': String = "",
     multi_worker: Bool = false) 
   =>
     _state_comp = state_comp
     _state_name = state_name'
+    _default_state_name = default_state_name'
     _route_builder = route_builder'
     _partition_function = partition_function'
     _id = GuidGenerator.u128()
     _is_multi = multi_worker
     _forward_route_builder = forward_route_builder'
+    _in_route_builder = in_route_builder'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
-    pre_state_target_id': (U128 | None) = 10): Runner iso^
+    pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
     match pre_state_target_id'
     | let t_id: U128 =>
@@ -217,16 +253,21 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
 
   fun name(): String => _state_comp.name()
   fun state_name(): String => _state_name
+  fun default_state_name(): String => _default_state_name
   fun is_prestate(): Bool => true
   fun is_stateful(): Bool => true
   fun is_multi(): Bool => _is_multi
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  fun clone_router_and_set_input_type(r: Router val): Router val =>
+  fun in_route_builder(): (RouteBuilder val | None) => 
+    _in_route_builder
+  fun clone_router_and_set_input_type(r: Router val,
+    default_r: (Router val | None) = None): Router val 
+  =>
     match r
     | let p: AugmentablePartitionRouter[Key] val =>
-      p.clone_and_set_input_type[PIn](_partition_function)
+      p.clone_and_set_input_type[PIn](_partition_function, default_r)
     else
       r
     end
@@ -277,7 +318,7 @@ trait PartitionBuilder
     PartitionAddresses val
   fun state_name(): String
   fun is_multi(): Bool
-  fun default_target_name(): String
+  fun default_state_name(): String
 
 class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read, 
   Key: (Hashable val & Equatable[Key])] is (PartitionBuilder & RunnerBuilder)
@@ -290,14 +331,14 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
   let _forward_route_builder: RouteBuilder val
   let _id: U128
   let _multi_worker: Bool
-  let _default_target_name: String
+  let _default_state_name: String
 
   new val create(pipeline_name: String, state_name': String,
     step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val,
     state_runner_builder: StateRunnerBuilder[State] val,
     route_builder': RouteBuilder val, 
     forward_route_builder': RouteBuilder val, id': U128 = 0,
-    multi_worker: Bool = false, default_target_name': String = "") 
+    multi_worker: Bool = false, default_state_name': String = "") 
   =>
     _id = if id' == 0 then GuidGenerator.u128() else id' end
     _state_name = state_name'
@@ -308,7 +349,7 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
     _route_builder = route_builder'
     _forward_route_builder = forward_route_builder'
     _multi_worker = multi_worker
-    _default_target_name = default_target_name'
+    _default_state_name = default_state_name'
 
   fun apply(metrics_reporter: MetricsReporter iso, 
     alfred: Alfred tag,
@@ -337,7 +378,7 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
   fun is_multi(): Bool => _multi_worker
-  fun default_target_name(): String => _default_target_name
+  fun default_state_name(): String => _default_state_name
 
   fun state_subpartition(workers: (String | Array[String] val)): 
     StateSubpartition val 
@@ -452,8 +493,10 @@ class ComputationRunner[In: Any val, Out: Any val]
 
   fun name(): String => _computation.name()
   fun state_name(): String => ""
-  fun clone_router_and_set_input_type(router: Router val): Router val => 
-    _next.clone_router_and_set_input_type(router)
+  fun clone_router_and_set_input_type(r: Router val,
+    default_r: (Router val | None) = None): Router val 
+  =>
+    _next.clone_router_and_set_input_type(r)
 
 class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _metrics_reporter: MetricsReporter
@@ -516,7 +559,10 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   fun name(): String => _name
   fun state_name(): String => _state_name
   fun is_pre_state(): Bool => true
-  fun clone_router_and_set_input_type(router: Router val): Router val => router
+  fun clone_router_and_set_input_type(r: Router val,
+    default_r: (Router val | None) = None): Router val 
+  =>
+    r
 
 class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   let _state: State
@@ -565,7 +611,6 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
     o_seq_id: U64): Bool
   =>
-    // @printf[I32]("state runner received!\n".cstring())
     match data
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
@@ -616,7 +661,10 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
 
   fun name(): String => "State runner"
   fun state_name(): String => ""
-  fun clone_router_and_set_input_type(router: Router val): Router val => router
+  fun clone_router_and_set_input_type(r: Router val,
+    default_r: (Router val | None) = None): Router val 
+  =>
+    r
 
 class iso RouterRunner
   fun ref run[Out: Any val](metric_name: String, source_ts: U64, output: Out,
@@ -642,5 +690,8 @@ class iso RouterRunner
 
   fun name(): String => "Router runner"
   fun state_name(): String => ""
-  fun clone_router_and_set_input_type(router: Router val): Router val => router
+  fun clone_router_and_set_input_type(r: Router val,
+    default_r: (Router val | None) = None): Router val 
+  =>
+    r
 

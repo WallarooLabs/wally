@@ -31,11 +31,11 @@ actor Main
             DefaultTestFrameHandler)
             .to_state_partition[String, String, Result val, NormalState](UpdateState, NormalStateBuilder, "normal-state",
               symbol_data_partition where multi_worker = true,
-              default_target_name = "default")
+              default_state_name = "default-state")
             .to_sink(ResultEncoder, recover [0] end)                 
           .partition_default_target[String, Result val, DefaultState](
-            "Default Test", "default", UpdateDefaultState, 
-            DefaultStateBuilder, "default-state")
+            "Default Test", "default-state", UpdateDefaultState, 
+            DefaultStateBuilder)
 
       end
       Startup(env, application, None)//, 1)
@@ -105,7 +105,10 @@ primitive UpdateState is StateComputation[String, Result val, NormalState]
     let new_count = state.count + 1
     state_change.update(new_count, msg)
 
-    (Result(new_count, msg), state_change)
+   let res = Result(new_count, msg) 
+   // @printf[I32](("N>>>>R: [" + res.count.string() + " | " + res.defaulted_string + " | " + res.letter_count.string() + " |\n").cstring())
+
+    (res, state_change)
 
   fun state_change_builders(): 
     Array[StateChangeBuilder[NormalState] val] val 
@@ -186,7 +189,10 @@ primitive UpdateDefaultState is StateComputation[String, Result val,
     let new_letter_count = state.letter_count + msg.size().u64()
     state_change.update(new_count, last_string, new_letter_count)
 
-    (Result(new_count, last_string, new_letter_count), state_change)
+    let res = Result(new_count, last_string, new_letter_count) 
+    // @printf[I32](("D>>>>R: [" + res.count.string() + " | " + res.defaulted_string + " | " + res.letter_count.string() + " |\n").cstring())
+
+    (res, state_change)
 
   fun state_change_builders(): 
     Array[StateChangeBuilder[DefaultState] val] val 

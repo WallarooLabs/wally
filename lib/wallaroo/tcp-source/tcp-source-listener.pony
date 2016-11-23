@@ -9,6 +9,7 @@ class TCPSourceListenerBuilder
   let _source_builder: SourceBuilder val
   let _router: Router val
   let _route_builder: RouteBuilder val
+  let _default_in_route_builder: (RouteBuilder val | None)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _tcp_sinks: Array[TCPSink] val
   let _alfred: Alfred
@@ -26,6 +27,7 @@ class TCPSourceListenerBuilder
     tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
+    default_in_route_builder: (RouteBuilder val | None) = None, 
     target_router: Router val = EmptyRouter, 
     host: String = "", service: String = "0", limit: USize = 0, 
     init_size: USize = 64, max_size: USize = 16384)
@@ -33,6 +35,7 @@ class TCPSourceListenerBuilder
     _source_builder = source_builder
     _router = router
     _route_builder = route_builder
+    _default_in_route_builder = default_in_route_builder
     _outgoing_boundaries = outgoing_boundaries
     _tcp_sinks = tcp_sinks
     _alfred = alfred
@@ -47,7 +50,8 @@ class TCPSourceListenerBuilder
   fun apply(): TCPSourceListener =>
     TCPSourceListener(_source_builder, _router, _route_builder, 
       _outgoing_boundaries, _tcp_sinks, _alfred, _default_target, 
-      _target_router, _host, _service, _limit, _init_size, _max_size) 
+      _default_in_route_builder, _target_router, _host, _service, _limit, 
+      _init_size, _max_size) 
 
 actor TCPSourceListener
   """
@@ -57,6 +61,7 @@ actor TCPSourceListener
   let _notify: TCPSourceListenerNotify
   let _router: Router val
   let _route_builder: RouteBuilder val
+  let _default_in_route_builder: (RouteBuilder val | None)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _tcp_sinks: Array[TCPSink] val
   let _default_target: (Step | None)
@@ -74,6 +79,7 @@ actor TCPSourceListener
     tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
+    default_in_route_builder: (RouteBuilder val | None) = None, 
     target_router: Router val = EmptyRouter, 
     host: String = "", service: String = "0", limit: USize = 0, 
     init_size: USize = 64, max_size: USize = 16384)
@@ -84,6 +90,7 @@ actor TCPSourceListener
     _notify = SourceListenerNotify(source_builder, alfred, target_router)
     _router = router
     _route_builder = route_builder
+    _default_in_route_builder = default_in_route_builder
     _outgoing_boundaries = outgoing_boundaries
     _tcp_sinks = tcp_sinks
     _event = @pony_os_listen_tcp[AsioEventID](this,
@@ -154,7 +161,7 @@ actor TCPSourceListener
     try
       TCPSource._accept(this, _notify.connected(this), _router.routes(), 
         _route_builder, _outgoing_boundaries, _tcp_sinks, ns, _default_target, 
-        _init_size, _max_size)
+        _default_in_route_builder, _init_size, _max_size)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)

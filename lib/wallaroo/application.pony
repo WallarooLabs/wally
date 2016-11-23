@@ -20,7 +20,7 @@ class Application
   let init_files: Map[USize, InitFile val] = init_files.create()
   // TODO: Replace this default strategy with a better one after POC
   var default_target: (Array[RunnerBuilder val] val | None) = None
-  var default_target_name: String = ""
+  var default_state_name: String = ""
   var default_target_id: U128 = 0
 
   new create(name': String) =>
@@ -45,23 +45,22 @@ class Application
   fun ref partition_default_target[In: Any val, Out: Any val, 
     State: Any #read](
     pipeline_name: String,
-    target_name: String,
+    default_name: String,
     s_comp: StateComputation[In, Out, State] val,
-    s_initializer: StateBuilder[State] val,
-    state_name: String): Application
+    s_initializer: StateBuilder[State] val): Application
   =>
-    default_target_name = target_name
+    default_state_name = default_name
 
     let builders: Array[RunnerBuilder val] trn = 
       recover Array[RunnerBuilder val] end
 
     let pre_state_builder = PreStateRunnerBuilder[In, Out, In, U8, State](
-      s_comp, state_name, SingleStepPartitionFunction[In],
+      s_comp, default_name, SingleStepPartitionFunction[In],
       TypedRouteBuilder[StateProcessor[State] val],
-      TypedRouteBuilder[Out])
+      TypedRouteBuilder[Out], TypedRouteBuilder[In])
     builders.push(pre_state_builder)
 
-    let state_builder' = StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders(),
+    let state_builder' = StateRunnerBuilder[State](s_initializer, default_name, s_comp.state_change_builders(),
       TypedRouteBuilder[Out])
     builders.push(state_builder')
 
@@ -219,7 +218,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       state_name: String, 
       partition: Partition[PIn, Key] val,
       multi_worker: Bool = false,
-      default_target_name: String = ""
+      default_state_name: String = ""
     ): PipelineBuilder[In, Out, Next] 
   =>
     let guid_gen = GuidGenerator
@@ -239,7 +238,8 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let next_builder = PreStateRunnerBuilder[Last, Next, PIn, Key, State](
       s_comp, state_name, partition.function(), 
       TypedRouteBuilder[StateProcessor[State] val],
-      TypedRouteBuilder[Next] where multi_worker = multi_worker)
+      TypedRouteBuilder[Next] where multi_worker = multi_worker,
+      default_state_name' = default_state_name)
 
     _p.add_runner_builder(next_builder)
 
@@ -249,8 +249,8 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
           s_comp.state_change_builders()),
         TypedRouteBuilder[StateProcessor[State] val],
         TypedRouteBuilder[Next]
-        where multi_worker = multi_worker, default_target_name' = 
-        default_target_name)
+        where multi_worker = multi_worker, default_state_name' = 
+        default_state_name)
 
     // let state_partition = KeyedStateSubpartition[Key](partition.keys(),
     //   StateRunnerBuilder[State](s_initializer, state_name, s_comp.state_change_builders()) 

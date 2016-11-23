@@ -139,6 +139,12 @@ actor ApplicationInitializer
         // the step id and not the proxy address in our step map.
         step_map(sink_id) = sink_id
 
+        // TODO: Replace this when we have a better post-POC default strategy.
+        // This is set if we need a default target in this pipeline.
+        // Currently there can only be one default target per topology.
+        var pipeline_default_state_name = ""
+        var pipeline_default_target_worker = ""
+
         let source_addr_trn: Array[String] trn = recover Array[String] end
         try
           source_addr_trn.push(_input_addrs(pipeline_id)(0))
@@ -284,6 +290,18 @@ actor ApplicationInitializer
           let psd = PreStateData(source_seq_builder,
             source_pre_state_target_id)
           pre_state_data.push(psd)
+
+          let state_builder = 
+            try
+              application.state_builder(psd.state_name())
+            else
+              @printf[I32]("Failed to find state builder for prestate.\n".cstring())
+              error
+            end
+          if state_builder.default_state_name() != "" then
+            pipeline_default_state_name = state_builder.default_state_name()
+            pipeline_default_target_worker = "initializer"
+          end
         end
 
         let source_initializer = SourceData(source_node_id, 
@@ -428,245 +446,8 @@ actor ApplicationInitializer
                   error
                 end
 
-              //!! TODO: Take what we need from the commented out code below
-
-              // Stateful steps have to be handled differently since pre-state
-              // steps must be on the same workers as their corresponding
-              // state steps
-              // if next_runner_builder.is_stateful() then
-              //   // Create the prestate initializer, and if this is not
-              //   // partitioned state, then the state initializer as well.
-              //   match next_runner_builder
-              //   | let pb: PartitionBuilder val =>
-              //     @printf[I32](("Preparing to spin up partitioned state on " + worker + "\n").cstring())
-
-              //     // Determine which workers will be involved in this partition
-              //     let partition_workers: (String | Array[String] val) = 
-              //       if pb.is_multi() then
-              //         @printf[I32]("Multiworker Partition\n".cstring())
-              //         let w_names: Array[String] trn = 
-              //           recover Array[String] end
-              //         w_names.push("initializer")
-              //         for w in worker_names.values() do
-              //           w_names.push(w)
-              //         end
-              //         consume w_names
-              //       else
-              //         worker
-              //       end
-
-              //     // Handle the shared state
-              //     let state_name = pb.state_name()
-              //     if not state_partition_map.contains(state_name) then
-              //       state_partition_map(state_name) = 
-              //         pb.partition_addresses(partition_workers)
-              //     end
-
-              //     // Determine whether the state computation target step will 
-              //     // be a step or a sink/proxy
-                  // let pre_state_target_id =
-                  //   try
-                  //     runner_builders(runner_builder_idx + 1).id()
-                  //   else
-                  //     // We need a sink on every worker involved in the 
-                  //     // partition
-                  //     let egress_builder = EgressBuilder(pipeline.name(), 
-                  //       sink_id, sink_addr, pipeline.sink_builder())
-
-                  //     match partition_workers
-                  //     | let w: String =>
-                  //       try
-                  //         local_graphs(w).add_node(egress_builder, sink_id)
-                  //       else
-                  //         @printf[I32](("No graph for worker " + w + "\n").cstring())
-                  //         error
-                  //       end
-                  //     | let ws: Array[String] val =>
-                  //       local_graphs("initializer").add_node(egress_builder, 
-                  //         sink_id)
-                  //       for w in ws.values() do
-                  //         try
-                  //           local_graphs(w).add_node(egress_builder, sink_id)
-                  //         else
-                  //           @printf[I32](("No graph for worker " + w + "\n").cstring())
-                  //           error
-                  //         end
-                  //       end
-                  //     end
-
-                  //     sink_id
-                  //   end
-
-              //     let next_initializer = PartitionedStateStepBuilder(
-              //       application.name(), pipeline.name(),
-              //       pb.state_subpartition(partition_workers), 
-              //       next_runner_builder, state_name, pre_state_target_id,
-              //       next_runner_builder.forward_route_builder(),
-              //       pb.default_target_name())
-              //     let next_id = next_initializer.id()
-
-              //     try
-              //       match partition_workers
-              //       | let w: String =>                    
-              //         local_graphs(w).add_node(next_initializer, next_id)
-              //       | let ws: Array[String] val =>
-              //         local_graphs("initializer").add_node(next_initializer, next_id)
-              //         for w in ws.values() do
-              //           local_graphs(w).add_node(next_initializer, next_id)
-              //         end
-              //       end
-
-              //       match last_initializer
-              //       | (let last_id: U128, let step_init: StepInitializer val) 
-              //       =>
-              //         local_graphs(worker).add_edge(last_id, next_id)
-              //       end
-              //     else
-              //       @printf[I32](("Possibly no graph for worker " + worker + " when trying to spin up partitioned state\n").cstring())
-              //       error
-              //     end
-
-              //     last_initializer = None//(next_id, next_initializer) 
-              //     steps(next_id) = worker
-
-              //     // TODO: Replace this default strategy with a better one 
-              //     // after POC
-              //     if pb.default_target_name() != "" then
-              //       @printf[I32]("-----We have a real default target name\n".cstring())
-              //       match application.default_target
-              //       | let default_target: Array[RunnerBuilder val] val =>
-              //         @printf[I32](("Preparing to spin up default target state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
-
-              //         // The target will always be the sink (a stipulation of
-              //         // the temporary POC strategy)
-              //         let default_pre_state_target_id = sink_id
-
-              //         let pre_state_runner_builder = 
-              //           try 
-              //             default_target(0)
-              //           else
-              //             @printf[I32]("Default target had no prestate value!\n".cstring())
-              //             error
-              //           end
-
-              //         let state_runner_builder = 
-              //           try 
-              //             default_target(1)
-              //           else
-              //             @printf[I32]("Default target had no state value!\n".cstring())
-              //             error
-              //           end
-
-              //         let pre_state_id = pre_state_runner_builder.id()
-              //         let state_id = state_runner_builder.id()
-
-              //         let pre_state_builder = StepBuilder(application.name(),
-              //           pipeline.name(),
-              //           pre_state_runner_builder, pre_state_id, 
-              //           false, 
-              //           default_pre_state_target_id,
-              //           pre_state_runner_builder.forward_route_builder())
-
-              //         @printf[I32](("Preparing to spin up default target state for " + state_runner_builder.name() + " on " + worker + "\n").cstring())
-
-              //         let state_builder = StepBuilder(application.name(),
-              //           pipeline.name(),
-              //           state_runner_builder, state_id,
-              //           true 
-              //           where forward_route_builder' = 
-              //             state_runner_builder.route_builder())
- 
-              //         // Add prestate to defaults
-              //         // Add state to defaults
-
-              //         steps(pre_state_id) = worker
-              //         steps(state_id) = worker
-
-              //         let next_default_targets: Array[StepBuilder val] trn = 
-              //           recover Array[StepBuilder val] end
-
-              //         next_default_targets.push(pre_state_builder)
-              //         next_default_targets.push(state_builder)
-
-              //         @printf[I32](("Adding default target for " + worker + "\n").cstring())
-              //         default_targets(worker) = consume next_default_targets
-
-              //         // Create ProxyAddresses for the other workers
-              //         let proxy_address = ProxyAddress(worker, 
-              //           pre_state_id)
-
-              //         for w in worker_names.values() do
-              //           default_targets(w) = proxy_address
-              //         end
-              //       else
-              //         @printf[I32]("----But no default target!\n".cstring())
-              //       end
-              //     end
-              //!!
-                // else
-                //   @printf[I32](("Preparing to spin up non-partitioned state computation for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
-                //   let pre_state_id = next_runner_builder.id()
-
-                //   // Determine whether the target step will be a step or a 
-                //   // sink/proxy, hopping forward 2 because the immediate
-                //   // successor should be our state step with non-partitioned
-                //   // state
-                //   let pre_state_target_id =
-                //     try
-                //       runner_builders(runner_builder_idx + 2).id()
-                //     else
-                //       sink_id
-                //     end
-
-                //   let pre_state_init = StepBuilder(application.name(),
-                //     pipeline.name(),
-                //     next_runner_builder, pre_state_id, 
-                //     next_runner_builder.is_stateful(), pre_state_target_id,
-                //     next_runner_builder.forward_route_builder())
-
-                //   try
-                //     local_graphs(worker).add_node(pre_state_init, pre_state_id)
-                //     match last_initializer
-                //     | (let last_id: U128, let step_init: StepInitializer val) 
-                //     =>
-                //       local_graphs(worker).add_edge(last_id, pre_state_id)
-                //     end
-                //   else
-                //     @printf[I32](("No graph for worker " + worker + "\n").cstring())
-                //     error
-                //   end
-                  
-                //   steps(next_runner_builder.id()) = worker
-
-                //   runner_builder_idx = runner_builder_idx + 1
-
-                //   next_runner_builder = 
-                //     try
-                //       runner_builders(runner_builder_idx)
-                //     else
-                //       @printf[I32](("No runner builder for idx " + runner_builder_idx.string() + "\n").cstring())
-                //       error
-                //     end
-
-                //   @printf[I32](("Preparing to spin up non-partitioned state for " + next_runner_builder.name() + " on " + worker + "\n").cstring())
-
-                //   let next_initializer = StepBuilder(application.name(),
-                //     pipeline.name(),
-                //     next_runner_builder, next_runner_builder.id(),
-                //     next_runner_builder.is_stateful())
-                //   let next_id = next_initializer.id()
-
-                //   try
-                //     local_graphs(worker).add_node(next_initializer, next_id)
-                //     local_graphs(worker).add_edge(pre_state_id, next_id)
-                //   else
-                //     @printf[I32](("No graph for worker " + worker + "\n").cstring())
-                //     error
-                //   end
-
-                //   last_initializer = None
-                //   steps(next_id) = worker
-                // end
+              //////////////////////////
+              // PRESTATE RUNNER BUILDER
               if next_runner_builder.is_prestate() then
                 // Determine which workers will be involved in this partition
                 let partition_workers: (String | Array[String] val) = 
@@ -716,6 +497,19 @@ actor ApplicationInitializer
                   pre_state_target_id)
                 pre_state_data.push(psd)
 
+                let state_builder = 
+                  try
+                    application.state_builder(psd.state_name())
+                  else
+                    @printf[I32]("Failed to find state builder for prestate.\n".cstring())
+                    error
+                  end
+                if state_builder.default_state_name() != "" then
+                  pipeline_default_state_name = 
+                    state_builder.default_state_name()
+                  pipeline_default_target_worker = "worker"
+                end
+
                 let next_id = next_runner_builder.id()
                 let next_initializer = StepBuilder(application.name(),
                   pipeline.name(), next_runner_builder, next_id where
@@ -737,6 +531,8 @@ actor ApplicationInitializer
                 end
 
                 steps(next_id) = worker
+              //////////////////////////////
+              // NON-PRESTATE RUNNER BUILDER
               else
                 @printf[I32](("Preparing to spin up " + next_runner_builder.name() + " on " + worker + "\n").cstring())
                 let next_id = next_runner_builder.id()
@@ -844,6 +640,88 @@ actor ApplicationInitializer
           boundaries_idx = boundaries_idx + 1
         end
 
+        ////////////////////////////////////////////////////////////////
+        // HANDLE PARTITION DEFAULT STEP IF ONE EXISTS FOR THIS PIPELINE
+        ////////
+        // TODO: Replace this default strategy with a better one 
+        // after POC
+        if pipeline_default_state_name != "" then
+          @printf[I32]("-----We have a real default target name\n".cstring())
+          match application.default_target
+          | let default_target: Array[RunnerBuilder val] val =>
+            @printf[I32](("Preparing to spin up default target state on " + pipeline_default_target_worker + "\n").cstring())
+
+            // The target will always be the sink (a stipulation of
+            // the temporary POC strategy)
+            let default_pre_state_target_id = sink_id
+
+            let pre_state_runner_builder = 
+              try 
+                default_target(0)
+              else
+                @printf[I32]("Default target had no prestate value!\n".cstring())
+                error
+              end
+
+            let state_runner_builder = 
+              try 
+                default_target(1)
+              else
+                @printf[I32]("Default target had no state value!\n".cstring())
+                error
+              end
+
+            let pre_state_id = pre_state_runner_builder.id()
+            let state_id = state_runner_builder.id()
+
+            // Add default prestate to PreStateData
+            let psd = PreStateData(pre_state_runner_builder,
+              default_pre_state_target_id, true)
+            pre_state_data.push(psd)
+
+            let pre_state_builder = StepBuilder(application.name(),
+              pipeline.name(),
+              pre_state_runner_builder, pre_state_id, 
+              false, 
+              default_pre_state_target_id,
+              pre_state_runner_builder.forward_route_builder())
+
+            @printf[I32](("Preparing to spin up default target state for " + state_runner_builder.name() + " on " + pipeline_default_target_worker + "\n").cstring())
+
+            let state_builder = StepBuilder(application.name(),
+              pipeline.name(),
+              state_runner_builder, state_id,
+              true 
+              where forward_route_builder' = 
+                state_runner_builder.route_builder())
+
+            // Add prestate to defaults
+            // Add state to defaults
+
+            steps(pre_state_id) = pipeline_default_target_worker
+            steps(state_id) = pipeline_default_target_worker
+
+            let next_default_targets: Array[StepBuilder val] trn = 
+              recover Array[StepBuilder val] end
+
+            next_default_targets.push(pre_state_builder)
+            next_default_targets.push(state_builder)
+
+            @printf[I32](("Adding default target for " + pipeline_default_target_worker + "\n").cstring())
+            default_targets(pipeline_default_target_worker) = consume next_default_targets
+
+            // Create ProxyAddresses for the other workers
+            let proxy_address = ProxyAddress(pipeline_default_target_worker, 
+              pre_state_id)
+
+            for w in worker_names.values() do
+              default_targets(w) = proxy_address
+            end
+          else
+            @printf[I32]("----But no default target!\n".cstring())
+          end
+        end        
+
         // Prepare to initialize the next pipeline
         pipeline_id = pipeline_id + 1
       end
@@ -879,7 +757,7 @@ actor ApplicationInitializer
           try
             LocalTopology(application.name(), w, g.clone(),
               sendable_step_map, state_subpartitions, sendable_pre_state_data,
-              consume p_ids, default_target, application.default_target_name,
+              consume p_ids, default_target, application.default_state_name,
               application.default_target_id)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
