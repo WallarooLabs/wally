@@ -56,13 +56,6 @@ actor Main
 
       let application = recover val
         Application("Market Spread App")
-          .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler
-              where init_file = init_file)
-            .to_state_partition[Symboly val, String, None,
-               SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
-               symbol_data_partition where multi_worker = true)
-            .done()
           .new_pipeline[FixOrderMessage val, OrderResult val](
             "Orders", FixOrderFrameHandler)
             .to_state_partition[Symboly val, String, 
@@ -71,6 +64,13 @@ actor Main
               where multi_worker = true)
             .to_sink(OrderResultEncoder, recover [0] end,
               initial_report_msgs)     
+          .new_pipeline[FixNbboMessage val, None](
+            "Nbbo", FixNbboFrameHandler
+              where init_file = init_file)
+            .to_state_partition[Symboly val, String, None,
+               SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
+               symbol_data_partition where multi_worker = true)
+            .done()
       end
       Startup(env, application, "/tmp/market-spread.evlog")
     else
