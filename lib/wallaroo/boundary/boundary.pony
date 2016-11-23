@@ -163,7 +163,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       // _queue.clear()
       _lowest_queue_id = _lowest_queue_id + flush_count.u64()
 
-      ifdef debug then
+      ifdef "trace" then
         @printf[I32](
           "Got ack callback from downstream worker --------\n\n".cstring())
       end

@@ -50,7 +50,7 @@ trait tag Origin
     Process envelopes and keep track of things
     """
     ifdef "resilience" then //TODO: fix other "resilience-debug" entries
-      ifdef debug then
+      ifdef "trace" then
         @printf[I32]((
         "bookkeeping envelope:\no_route_id: " +
         o_route_id.string() +
@@ -81,7 +81,7 @@ trait tag Origin
 
   fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
     ifdef "resilience" then
-      ifdef debug then
+      ifdef "trace" then
         @printf[I32]((
         "update_watermark: " +
         "route_id: " + route_id.string() +
@@ -112,7 +112,7 @@ trait tag Origin
   fun ref _run_ack(i_origin: Origin, i_route_id: RouteId, i_seq_id: SeqId) ? =>
     if not flushing() then
 
-      ifdef debug then
+      ifdef "trace" then
         @printf[I32]("_run_ack: we're not flushing yet. Flushing now.\n\n".cstring())
       end
 
@@ -256,8 +256,10 @@ class Watermarks
 
     ifdef debug then
       try
-        @printf[I32](("add_high_watermark: o_route_id: " +
+        ifdef "trace" then
+          @printf[I32](("add_high_watermark: o_route_id: " +
           o_route_id.string() + "\n\n").cstring())
+        end
         Assert(route_tracker isnt None,
           "Invariant violated: route_tracker isn't None")
         match route_tracker

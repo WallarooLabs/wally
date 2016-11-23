@@ -237,7 +237,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     // SEAN: XXX
     None
     /*
-    ifdef debug then
+    ifdef "trace" then
       @printf[I32]("flushing below: %llu\n".cstring(), upstream_seq_id)
     end
     match _id

@@ -236,7 +236,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable & Origin)
         (let i_origin, let msg_uid, let i_frac_ids,
           let i_seq_id, let i_route_id) = sent
 
-        ifdef debug then
+        ifdef "trace" then
           @printf[I32]((
             "tcp-sink:\ni_origin: " +
             i_origin.hash().string() +

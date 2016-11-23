@@ -45,7 +45,7 @@ class StandardEventLogBuffer is EventLogBuffer
     let out_buf: Array[LogEntry val] iso = recover iso Array[LogEntry val] end
     let residual: Array[LogEntry val] = Array[LogEntry val]
 
-    ifdef debug then
+    ifdef "trace" then
       @printf[I32](("_buf size: " + _buf.size().string() +
       " _origin_id: " + _origin_id.string() + "\n\n").cstring())
     end
@@ -57,7 +57,7 @@ class StandardEventLogBuffer is EventLogBuffer
         residual.push(entry)
       end
     end
-    ifdef debug then
+    ifdef "trace" then
       @printf[I32]("flush size: %llu\n".cstring(), out_buf.size())
     end
     _alfred.write_log(_origin_id, consume out_buf, low_watermark, origin,

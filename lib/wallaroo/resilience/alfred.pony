@@ -238,7 +238,7 @@ actor Alfred
       origin: Origin, upstream_route_id: RouteId,
       upstream_seq_id: SeqId)
     =>
-      ifdef debug then
+      ifdef "trace" then
         @printf[I32](("flush_buffer for id: " +
           origin_id.string() + "\n\n").cstring())
       end

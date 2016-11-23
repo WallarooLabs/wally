@@ -219,7 +219,7 @@ class LocalPartitionRouter[In: Any val,
         end
       else
         // There is no entry for this key!
-        ifdef debug then
+        ifdef "trace" then
           @printf[I32](("LocalPartitionRouter.route: No entry for this" +
             "key...\n\n").cstring())
         end
