@@ -73,6 +73,9 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       end
       true
     else
+      ifdef "trace" then
+        @printf[I32]("Rcvd msg on data channel\n".cstring())
+      end
       match ChannelMsgDecoder(consume data, _auth)
       | let data_msg: DataMsg val =>
         let seq_id = data_msg.seq_id

@@ -23,6 +23,9 @@ actor EmptySink is CreditFlowConsumerStep
     origin: Origin, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId)
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at EmptySink\n".cstring())
+    end
     None
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -167,6 +170,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     i_origin: Origin, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at TCPSink\n".cstring())
+    end
     try
       _outgoing_seq_id = _outgoing_seq_id + 1
       let encoded = _encoder.encode[D](data, _wb)

@@ -57,6 +57,9 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       end
       true
     else
+      ifdef "trace" then
+        @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
+      end
       let ingest_ts = Time.nanos()
       let computation_start = Time.nanos()
 
@@ -74,6 +77,9 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
                 end
                 error 
               end
+            ifdef "trace" then
+              @printf[I32](("Msg decoded at " + _pipeline_name + " source\n").cstring())
+            end
             _runner.run[In](_pipeline_name, ingest_ts, decoded,
               conn, _router, _omni_router,
               o,  _guid_gen.u128(), None, 0, 0)

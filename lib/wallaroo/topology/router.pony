@@ -38,12 +38,18 @@ class DirectRouter
     i_origin: Origin, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at DirectRouter\n".cstring())
+    end
     // TODO: Remove that producer can be None
     match producer
     | let cfp: Producer ref =>
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
+        ifdef "trace" then
+          @printf[I32]("DirectRouter found Route\n".cstring())
+        end
         r.run[D](metric_name, source_ts, data,
           // hand down cfp so we can call _next_sequence_id()
           cfp,
@@ -88,12 +94,18 @@ class ProxyRouter
     i_origin: Origin, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at ProxyRouter\n".cstring())
+    end
     // TODO: Remove that producer can be None
     match producer
     | let cfp: Producer ref =>
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
+        ifdef "trace" then
+          @printf[I32]("DirectRouter found Route\n".cstring())
+        end
         let delivery_msg = ForwardMsg[D](
           _target_proxy_address.step_id,
           _worker_name, source_ts, data, metric_name,
@@ -160,6 +172,9 @@ class StepIdRouter is OmniRouter
     i_origin: Origin, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at OmniRouter\n".cstring())
+    end
     // TODO: Remove that producer can be None
     match producer
     | let cfp: Producer ref =>
@@ -170,6 +185,9 @@ class StepIdRouter is OmniRouter
         let might_be_route = cfp.route_to(target)
         match might_be_route
         | let r: Route =>
+          ifdef "trace" then
+            @printf[I32]("OmniRouter found Route to Step\n".cstring())
+          end
           r.run[D](metric_name, source_ts, data,
             // hand down cfp so we can update route_id
             cfp,
@@ -192,6 +210,9 @@ class StepIdRouter is OmniRouter
               let might_be_route = cfp.route_to(boundary)
               match might_be_route
               | let r: Route =>
+                ifdef "trace" then
+                  @printf[I32]("OmniRouter found Route to OutgoingBoundary\n".cstring())
+                end
                 let delivery_msg = ForwardMsg[D](pa.step_id,
                   _worker_name, source_ts, data, metric_name,
                   pa, msg_uid, i_frac_ids)
@@ -201,10 +222,16 @@ class StepIdRouter is OmniRouter
                 false
               else
                 // We don't have a route to this boundary
+                ifdef debug then
+                  @printf[I32]("OmniRouter had no Route\n".cstring())
+                end
                 true
               end
             else
               // We don't have a reference to the right outgoing boundary
+              ifdef debug then
+                @printf[I32]("OmniRouter has no reference to OutgoingBoundary\n".cstring())
+              end
               true
             end
           | let sink_id: U128 =>
@@ -214,6 +241,9 @@ class StepIdRouter is OmniRouter
           end 
         else
           // Apparently this target_id does not refer to a valid step id
+          ifdef debug then
+            @printf[I32]("OmniRouter: target id does not refer to valid step id\n".cstring())
+          end
           true
         end
       end
@@ -231,9 +261,15 @@ class DataRouter
     _data_routes = data_routes
 
   fun route(d_msg: DeliveryMsg val, origin: Origin, seq_id: SeqId) =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at DataRouter\n".cstring())
+    end
     let target_id = d_msg.target_id()
     try
       let target = _data_routes(target_id)
+      ifdef "trace" then
+        @printf[I32]("DataRouter found Step\n".cstring())
+      end
       d_msg.deliver(target, origin, seq_id)
       false
     else
@@ -304,6 +340,9 @@ class LocalPartitionRouter[In: Any val,
     i_origin: Origin, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at PartitionRouter\n".cstring())
+    end
     match data
     // TODO: Using an untyped input wrapper that returns an Any val might
     // cause perf slowdowns and should be reevaluated.
@@ -320,6 +359,9 @@ class LocalPartitionRouter[In: Any val,
               let might_be_route = cfp.route_to(s)
               match might_be_route
               | let r: Route =>
+                ifdef "trace" then
+                  @printf[I32]("PartitionRouter found Route\n".cstring())
+                end
                 r.run[D](metric_name, source_ts, data,
                   // hand down cfp so we can update route_id
                   cfp,
@@ -342,21 +384,24 @@ class LocalPartitionRouter[In: Any val,
           end
         else
           // There is no entry for this key!
-          ifdef "trace" then
-            @printf[I32](("LocalPartitionRouter.route: No entry for this" +
-              "key...\n\n").cstring())
-          end
           // If there's a default, use that
           match _default_router
           | let r: Router val =>
             r.route[In](metric_name, source_ts, input, producer,
               i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
           else
+            ifdef debug then
+              @printf[I32](("LocalPartitionRouter.route: No entry for this" +
+                "key and no default\n\n").cstring())
+            end
             true
           end
         end
       else
         // InputWrapper doesn't wrap In
+        ifdef debug then
+          @printf[I32]("LocalPartitionRouter.route: InputWrapper doesn't contain data of type In\n".cstring())
+        end
         true
       end
     else

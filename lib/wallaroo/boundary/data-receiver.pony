@@ -93,6 +93,9 @@ actor DataReceiver is Origin
 
   be received(d: DeliveryMsg val, seq_id: U64)
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
+    end
     if seq_id >= _last_id_seen then
       _last_id_seen = seq_id
       _router.route(d, this, seq_id)

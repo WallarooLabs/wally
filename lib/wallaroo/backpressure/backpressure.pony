@@ -171,6 +171,9 @@ class TypedRoute[In: Any val] is Route
     origin: Origin, msg_uid: U128,
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at Route\n".cstring())
+    end
     match data
     | let input: In =>
       ifdef "use_backpressure" then
@@ -207,6 +210,10 @@ class TypedRoute[In: Any val] is Route
       else
         _send_message_on_route(metric_name, source_ts, input, cfp, origin,
           msg_uid, frac_ids, i_seq_id, i_route_id)
+      end
+    else
+      ifdef debug then
+        @printf[I32]("Route received input of wrong type\n".cstring())
       end
     end
 
@@ -352,6 +359,9 @@ class BoundaryRoute is Route
     i_origin: Origin, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId)
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at BoundaryRoute\n".cstring())
+    end
     ifdef "use_backpressure" then
       if _credits_available > 0 then
         let above_request_point =

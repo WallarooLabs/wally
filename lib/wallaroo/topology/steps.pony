@@ -147,6 +147,9 @@ actor Step is (RunnableStep & Resilient & Producer &
     i_origin: Origin, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
+    ifdef "trace" then
+      @printf[I32](("Rcvd msg at " + _runner.name() + " step\n").cstring())
+    end
     let is_finished = _runner.run[D](metric_name, source_ts, data,
       this, _router, _omni_router,
       i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
