@@ -40,6 +40,8 @@ use "wallaroo/tcp-source"
 use "wallaroo/cpp-api/pony"
 use "debug"
 
+use @get_partition_key[KeyP](idx: USize)
+use @get_partition_function[PartitionFunctionP]()
 use @get_source_decoder[SourceDecoderP]()
 use @get_sink_encoder[SinkEncoderP]()
 use @get_computation[ComputationP]()
@@ -83,28 +85,36 @@ primitive SimplePartitionFunction
   =>
     input.partition_index()
 
-class LegalSymbols
-  let symbols: Array[U64] val
-
-  new create() =>
-    symbols = recover [0] end
-
 actor Main
   new create(env: Env) =>
     try
-      let cpp_data_partition = Partition[CPPData val, U64](
-        SimplePartitionFunction, LegalSymbols.symbols)
+      let partition_function = recover val CPPPartitionFunction(recover CPPManagedObject(@get_partition_function()) end) end
+      let partition_keys: Array[CPPKey val] val = recover [as CPPKey val:
+        recover CPPKey(recover CPPManagedObject(@get_partition_key(0)) end) end,
+        recover CPPKey(recover CPPManagedObject(@get_partition_key(1)) end) end
+        ] end
+      let data_partition = Partition[CPPData val, CPPKey val](
+        partition_function, partition_keys)
       let application = recover val
         Application("Passthrough Topology")
           .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end
             where coalescing = false)
           // .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end)
-          .to[CPPData val](ComputationFactory0)
-          .to[CPPData val](ComputationFactory1)
-          .to[CPPData val](ComputationFactory2)
-          .to_stateful[CPPData val, CPPState](
+          .to_state_partition[CPPData val, CPPKey val, CPPData val, CPPState](
             StateComputationFactory(),
-            AccumulatorStateBuilder, "accumulator-builder")
+            AccumulatorStateBuilder, "accumulator-builder", data_partition where multi_worker = true)
+          //
+          // MULTIWORKER
+          //
+          // .to[CPPData val](ComputationFactory0)
+          // .to[CPPData val](ComputationFactory1)
+          // .to[CPPData val](ComputationFactory2)
+          // .to_stateful[CPPData val, CPPState](
+          //   StateComputationFactory(),
+          //   AccumulatorStateBuilder, "accumulator-builder")
+          //
+          // DUMMY COMPUTATION
+          // 
           // .to_stateful[CPPData val, CPPState](
           //   DummyComputationFactory(),
           //   AccumulatorStateBuilder, "accumulator-builder")

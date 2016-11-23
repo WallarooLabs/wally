@@ -29,6 +29,8 @@
 #include "Computation.hpp"
 #include "Serializable.hpp"
 #include "Data.hpp"
+#include "Key.hpp"
+#include "PartitionFunction.hpp"
 #include "ManagedObject.hpp"
 #include "SinkEncoder.hpp"
 #include "SourceDecoder.hpp"
@@ -78,10 +80,15 @@ extern void *w_state_change_repository_lookup_by_name(void *state_change_reposit
 extern wallaroo::StateChange *w_state_change_get_state_change_object(void *state_change_repository_helper_, void *state_change_);
 extern void *w_stateful_computation_get_return(void *state_change_repository_helper_, wallaroo::Data* data_, void *state_change_);
 
-extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_);
 extern uint64_t w_hashable_hash(wallaroo::Hashable const *obj_);
 extern uint64_t w_hashable_partition_index(wallaroo::Hashable const *obj_);
 
+extern uint64_t w_key_hash(wallaroo::Key *key_);
+extern bool w_key_eq(wallaroo::Key *key_, wallaroo::Key *other_);
+
+extern wallaroo::Key *w_partition_function_parition(wallaroo::PartitionFunction *partition_function_, wallaroo::Data *data_);
+
+extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_);
 }
 
 #endif //WALLAROOCPPAPI_APIHOOKS_HPP
