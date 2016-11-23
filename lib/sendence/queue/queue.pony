@@ -140,7 +140,7 @@ class Queue[A: Any #alias]
     end
 
   fun contains(a: A!, pred: {(box->A!, box->A!): Bool} val =
-    lambda(l: box->A!, r: box->A!): Bool => l is r end): Bool =>
+    {(l: box->A!, r: box->A!): Bool => l is r}): Bool =>
     """
     Returns true if the queue contains `value`, false otherwise.
     """
