@@ -65,7 +65,15 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
           match _origin
           | let o: Origin =>
             _outgoing_seq_id = _outgoing_seq_id + 1
-            let decoded = _handler.decode(consume data)
+            let decoded = 
+              try
+                _handler.decode(consume data)
+              else
+                ifdef debug then
+                  @printf[I32]("Error decoding message at source\n".cstring())
+                end
+                error 
+              end
             _runner.run[In](_pipeline_name, ingest_ts, decoded,
               conn, _router, _omni_router,
               o,  _guid_gen.u128(), None, 0, 0)

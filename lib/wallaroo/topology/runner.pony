@@ -545,6 +545,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
 class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   let _state: State
   let _metrics_reporter: MetricsReporter
+  //TODO: this needs to be per-computation, rather than per-runner
   let _state_change_repository: StateChangeRepository[State] ref
   let _alfred: Alfred
   let _wb: Writer = Writer

@@ -17,10 +17,10 @@ nc -l 127.0.0.1 5001 >> /dev/null
 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
 
 4) orders:
-giles/sender/sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
+giles/sender/sender -b 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
 
 5) nbbo:
-giles/sender/sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
+giles/sender/sender -b 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 """
 use "assert"
 use "collections"
@@ -56,14 +56,6 @@ actor Main
 
       let application = recover val
         Application("Market Spread App")
-          .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler
-              where init_file = init_file)
-            // .to[FixNbboMessage val](IdentityBuilder[FixNbboMessage val])
-            .to_state_partition[Symboly val, String, None,
-               SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
-               symbol_data_partition where multi_worker = true)
-            .done()
           .new_pipeline[FixOrderMessage val, OrderResult val](
             "Orders", FixOrderFrameHandler)
             // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
@@ -73,6 +65,13 @@ actor Main
               where multi_worker = true)
             .to_sink(OrderResultEncoder, recover [0] end,
               initial_report_msgs)     
+          .new_pipeline[FixNbboMessage val, None](
+            "Nbbo", FixNbboFrameHandler
+              where init_file = init_file)
+            .to_state_partition[Symboly val, String, None,
+               SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
+               symbol_data_partition where multi_worker = true)
+            .done()
       end
       Startup(env, application, "/tmp/market-spread.evlog")
     else
