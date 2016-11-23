@@ -52,3 +52,6 @@ class StateChangeRepository[State: Any #read]
 
   fun size() : USize =>
     _state_changes.size()
+
+  fun contains(name: String): Bool =>
+    _named_lookup.contains(name)
