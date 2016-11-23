@@ -100,13 +100,13 @@ actor LocalTopologyInitializer
   let _metrics_conn: TCPConnection
   let _alfred : Alfred tag
   var _is_initializer: Bool
-  var _outgoing_boundaries: Map[String, OutgoingBoundary] val = 
+  var _outgoing_boundaries: Map[String, OutgoingBoundary] val =
     recover Map[String, OutgoingBoundary] end
   var _topology: (LocalTopology val | None) = None
   let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
   let _local_topology_file: String
 
-  new create(worker_name: String, worker_count: USize, env: Env, 
+  new create(worker_name: String, worker_count: USize, env: Env,
     auth: AmbientAuth, connections: Connections, metrics_conn: TCPConnection,
     is_initializer: Bool, alfred: Alfred tag, local_topology_file: String)
   =>
@@ -128,19 +128,19 @@ actor LocalTopologyInitializer
 
   be create_data_receivers(ws: Array[String] val,
     worker_initializer: (WorkerInitializer | None) = None) =>
-    let drs: Map[String, DataReceiver] trn = 
+    let drs: Map[String, DataReceiver] trn =
       recover Map[String, DataReceiver] end
 
     for w in ws.values() do
       if w != _worker_name then
-        let data_receiver = DataReceiver(_auth, _worker_name, w, _connections, 
+        let data_receiver = DataReceiver(_auth, _worker_name, w, _connections,
           _alfred)
         drs(w) = data_receiver
         _data_receivers(w) = data_receiver
       end
     end
 
-    let data_receivers: Map[String, DataReceiver] val = consume drs 
+    let data_receivers: Map[String, DataReceiver] val = consume drs
 
     if not _is_initializer then
       let data_notifier: TCPListenNotify iso =
@@ -163,7 +163,7 @@ actor LocalTopologyInitializer
         @printf[I32]("Outgoing boundaries not set up!\n".cstring())
         error
       end
-      
+
       ifdef "resilience" then
         try
           let local_topology_file = FilePath(_auth, _local_topology_file)
@@ -175,7 +175,7 @@ actor LocalTopologyInitializer
             end
             match Serialised.input(InputSerialisedAuth(_auth), data)(
               DeserialiseAuth(_auth))
-            | let t: LocalTopology val => 
+            | let t: LocalTopology val =>
               _topology = t
             else
               @printf[I32]("error restoring previous topology!".cstring())
@@ -270,7 +270,7 @@ actor LocalTopologyInitializer
           default_step_initializer = pre_state_initializer
           default_in_route_builder = pre_state_initializer.in_route_builder()
 
-          let state_builder = 
+          let state_builder =
             try
               targets(1)
             else
@@ -290,7 +290,7 @@ actor LocalTopologyInitializer
           built_routers(default_target_state_step_id) = state_step_router
           state_map(t.default_state_name) = state_step_router
         | let proxy_target: ProxyAddress val =>
-          let proxy_router = ProxyRouter(_worker_name, 
+          let proxy_router = ProxyRouter(_worker_name,
             _outgoing_boundaries(proxy_target.worker), proxy_target,
             _auth)
           built_routers(default_target_id) = proxy_router
@@ -308,8 +308,8 @@ actor LocalTopologyInitializer
         let frontier = Array[DagNode[StepInitializer val] val]
 
         /////////
-        // 1. Find graph sinks and add to frontier queue. 
-        //    We'll work our way backwards. 
+        // 1. Find graph sinks and add to frontier queue.
+        //    We'll work our way backwards.
         @printf[I32]("Adding sink nodes to frontier\n".cstring())
 
         // Hold non_partitions until the end because we need to build state
@@ -327,11 +327,11 @@ actor LocalTopologyInitializer
 
         for node in non_partitions.values() do
           @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
-          frontier.push(node) 
+          frontier.push(node)
         end
 
         /////////
-        // 2. Loop: Check next frontier item for if all outgoing steps have 
+        // 2. Loop: Check next frontier item for if all outgoing steps have
         //          been created
         //       if no, send to bottom of frontier stack.
         //       if yes, add ins to frontier stack, then build the step 
@@ -492,7 +492,7 @@ actor LocalTopologyInitializer
               // NON-PARTITIONED STATE BUILDER
                 // Our step is stateful and non-partitioned, so we need to 
                 // build both a state step and a prestate step
-           
+
                 // First, we must check that all state computation targets
                 // have been built.  If they haven't, then we send this node
                 // to the back of the frontier queue (it will eventually
@@ -512,7 +512,7 @@ actor LocalTopologyInitializer
                 if not targets_ready then
                   frontier.unshift(next_node)
                   continue
-                end              
+                end
 
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn, _alfred)
@@ -531,7 +531,7 @@ actor LocalTopologyInitializer
                   | let b: StepBuilder val =>
                     @printf[I32](("----Spinning up " + b.name() + "----\n").cstring())
 
-                    let state_comp_target = 
+                    let state_comp_target =
                       match b.pre_state_target_id()
                       | let id: U128 =>
                         try
@@ -547,14 +547,14 @@ actor LocalTopologyInitializer
 
                     let pre_state_step = b(state_step_router, _metrics_conn,
                       _alfred, state_comp_target)
-                    data_routes(b.id()) = pre_state_step                    
+                    data_routes(b.id()) = pre_state_step
                     initializables.push(pre_state_step)
 
                     built_stateless_steps(b.id()) = pre_state_step
                     let pre_state_router = DirectRouter(pre_state_step)
                     built_routers(b.id()) = pre_state_router
 
-                    state_step.register_routes(state_comp_target, 
+                    state_step.register_routes(state_comp_target,
                       b.forward_route_builder())
 
                     // Add ins to this prestate node to the frontier
@@ -577,7 +577,7 @@ actor LocalTopologyInitializer
             ////////////////////////////////////
               let next_id = egress_builder.id()
               if not built_routers.contains(next_id) then
-                let sink_reporter = MetricsReporter(t.name(), 
+                let sink_reporter = MetricsReporter(t.name(),
                   _metrics_conn)
 
                 // Create a sink or OutgoingBoundary proxy. If the latter,
@@ -594,7 +594,7 @@ actor LocalTopologyInitializer
                   initializables.push(sink)
                 end
 
-                let sink_router = 
+                let sink_router =
                   match sink
                   | let ob: OutgoingBoundary =>
                     match egress_builder.target_address()
@@ -702,7 +702,7 @@ actor LocalTopologyInitializer
                   end
                 end
 
-              let source_reporter = MetricsReporter(t.name(), 
+              let source_reporter = MetricsReporter(t.name(),
                 _metrics_conn)
 
               // Get all the sinks so far, which should include any sinks
@@ -714,7 +714,6 @@ actor LocalTopologyInitializer
               end
               let sinks_for_source: Array[TCPSink] val =  
                 consume sinks_for_source_trn
-
 
               let listen_auth = TCPListenAuth(_auth)
               try
@@ -754,7 +753,6 @@ actor LocalTopologyInitializer
             frontier.unshift(next_node)
           end
         end
-        _alfred.local_topology_ready(consume tcpsl_builders)
 
         /////
         // Register pre state target routes on corresponding state steps
@@ -827,7 +825,7 @@ actor LocalTopologyInitializer
         else
           // Inform the initializer that we're done initializing our local
           // topology
-          let topology_ready_msg = 
+          let topology_ready_msg =
             try
               ChannelMsgEncoder.topology_ready(_worker_name, _auth)
             else
@@ -861,7 +859,7 @@ actor LocalTopologyInitializer
     end
 
   fun _get_output_node_id(node: DagNode[StepInitializer val] val,
-    default_target_id: U128, default_target_state_step_id: U128): U128 ? 
+    default_target_id: U128, default_target_state_step_id: U128): U128 ?
   =>
     // TODO: Replace this once we move past POC default target strategy
     if node.id == default_target_id then
@@ -870,16 +868,16 @@ actor LocalTopologyInitializer
     end
 
     // Currently there are no splits (II), so we know that a node has
-    // only one output in the graph. 
+    // only one output in the graph.
 
-    // Make sure this is not a sink or proxy node. 
+    // Make sure this is not a sink or proxy node.
     match node.value
     | let eb: EgressBuilder val =>
       @printf[I32]("Sinks and Proxies have no output nodes in the local graph!\n".cstring())
-      error 
+      error
     end
 
-    // Since this is not a sink or proxy, there should be exactly one 
+    // Since this is not a sink or proxy, there should be exactly one
     // output.
     var out_id: U128 = 0
     for out in node.outs() do

@@ -1,5 +1,6 @@
-use "wallaroo/topology"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
+use "wallaroo/topology"
 
 interface TCPSourceNotify
   // TODO: CREDITFLOW - this is weird that its here
@@ -62,7 +63,7 @@ interface TCPSourceNotify
     """
     None
 
-  fun ref set_origin(origin: Origin tag) =>
+  fun ref set_origin(origin: Origin) =>
     """
     Needed to be able to set what the origin is for incoming messages
     """

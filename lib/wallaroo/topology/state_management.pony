@@ -1,3 +1,4 @@
+use "assert"
 use "collections"
 use "buffered"
 
@@ -37,7 +38,20 @@ class StateChangeRepository[State: Any #read]
     _state_changes(index.usize())
 
   fun ref lookup_by_name(name: String): StateChange[State] ref ? =>
+    ifdef debug then
+      try
+        Assert(_named_lookup.contains(name),
+        "Invariant violated: _named_lookup.contains(name) for name: " + name)
+      else
+        //TODO: how do we bail out here?
+        None
+      end
+    end
+
     _state_changes(_named_lookup(name).usize())
 
   fun size() : USize =>
     _state_changes.size()
+
+  fun contains(name: String): Bool =>
+    _named_lookup.contains(name)

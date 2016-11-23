@@ -74,7 +74,7 @@ actor TCPSourceListener
   var _max_size: USize
 
   new create(source_builder: SourceBuilder val, router: Router val,
-    route_builder: RouteBuilder val, 
+    route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,

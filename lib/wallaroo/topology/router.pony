@@ -8,13 +8,9 @@ use "wallaroo/tcp-sink"
 // TODO: Eliminate producer None when we can
 interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+    producer: Producer ref,
+    i_origin: Origin, i_msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   fun routes(): Array[CreditFlowConsumerStep] val
 
 interface RouterBuilder
@@ -22,13 +18,9 @@ interface RouterBuilder
 
 class EmptyRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+    producer: Producer ref,
+    i_origin: Origin, i_msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     true
 
@@ -42,25 +34,21 @@ class DirectRouter
     _target = target
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+    producer: Producer ref,
+    i_origin: Origin, i_msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     // TODO: Remove that producer can be None
     match producer
-    | let cfp: CreditFlowProducer ref =>
+    | let cfp: Producer ref =>
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
         r.run[D](metric_name, source_ts, data,
-          // hand down cfp so we can update route_id
+          // hand down cfp so we can call _next_sequence_id()
           cfp,
-          // outgoing envelope
-          o_origin, o_msg_uid, o_frac_ids, o_seq_id)        
+          // incoming envelope
+          i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
         false
       else
         // TODO: What do we do if we get None?
@@ -87,7 +75,7 @@ class ProxyRouter
   let _target_proxy_address: ProxyAddress val
   let _auth: AmbientAuth
 
-  new val create(worker_name: String, target: CreditFlowConsumerStep tag, 
+  new val create(worker_name: String, target: CreditFlowConsumerStep tag,
     target_proxy_address: ProxyAddress val, auth: AmbientAuth)
   =>
     _worker_name = worker_name
@@ -96,27 +84,25 @@ class ProxyRouter
     _auth = auth
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+    producer: Producer ref,
+    i_origin: Origin, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     // TODO: Remove that producer can be None
     match producer
-    | let cfp: CreditFlowProducer ref =>
+    | let cfp: Producer ref =>
       let might_be_route = cfp.route_to(_target)
       match might_be_route
       | let r: Route =>
         let delivery_msg = ForwardMsg[D](
           _target_proxy_address.step_id,
           _worker_name, source_ts, data, metric_name,
-          _target_proxy_address, 
-          o_msg_uid, o_frac_ids)
+          _target_proxy_address,
+          msg_uid, i_frac_ids)
 
-        r.forward(delivery_msg)
+        r.forward(delivery_msg, cfp, i_origin, msg_uid, i_frac_ids,
+          i_seq_id, i_route_id)
+
         false
       else
         // TODO: What do we do if we get None?
@@ -127,9 +113,9 @@ class ProxyRouter
     end
 
   fun copy_with_new_target_id(target_id: U128): ProxyRouter val =>
-    ProxyRouter(_worker_name, 
-      _target, 
-      ProxyAddress(_target_proxy_address.worker, target_id), 
+    ProxyRouter(_worker_name,
+      _target,
+      ProxyAddress(_target_proxy_address.worker, target_id),
       _auth)
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
@@ -138,24 +124,16 @@ class ProxyRouter
 trait OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+    producer: Producer ref,
+    i_origin: Origin, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
 
 class EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool 
+    producer: Producer ref,
+    i_origin: Origin, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n".cstring())
     true
@@ -178,17 +156,13 @@ class StepIdRouter is OmniRouter
 
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+    producer: Producer ref,
+    i_origin: Origin, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     // TODO: Remove that producer can be None
     match producer
-    | let cfp: CreditFlowProducer ref =>
+    | let cfp: Producer ref =>
       try
         // Try as though this target_id step exists on this worker
         let target = _data_routes(target_id)
@@ -199,8 +173,9 @@ class StepIdRouter is OmniRouter
           r.run[D](metric_name, source_ts, data,
             // hand down cfp so we can update route_id
             cfp,
-            // outgoing envelope
-            o_origin, o_msg_uid, o_frac_ids, o_seq_id)        
+            // incoming envelope
+            i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
+       
           false
         else
           // No route for this target
@@ -217,11 +192,12 @@ class StepIdRouter is OmniRouter
               let might_be_route = cfp.route_to(boundary)
               match might_be_route
               | let r: Route =>
-                let delivery_msg = ForwardMsg[D](
-                  pa.step_id, _worker_name, source_ts, data, metric_name,
-                  pa, o_msg_uid, o_frac_ids)
+                let delivery_msg = ForwardMsg[D](pa.step_id,
+                  _worker_name, source_ts, data, metric_name,
+                  pa, msg_uid, i_frac_ids)
 
-                r.forward(delivery_msg)
+                r.forward(delivery_msg, cfp, i_origin, msg_uid, i_frac_ids,
+                  i_seq_id, i_route_id)
                 false
               else
                 // We don't have a route to this boundary
@@ -254,7 +230,7 @@ class DataRouter
   =>
     _data_routes = data_routes
 
-  fun route(d_msg: DeliveryMsg val, origin: Origin tag, seq_id: U64) =>
+  fun route(d_msg: DeliveryMsg val, origin: Origin, seq_id: SeqId) =>
     let target_id = d_msg.target_id()
     try
       let target = _data_routes(target_id)
@@ -267,8 +243,8 @@ class DataRouter
       true
     end
 
-  fun replay_route(r_msg: ReplayableDeliveryMsg val, origin: Origin tag,
-    seq_id: U64)
+  fun replay_route(r_msg: ReplayableDeliveryMsg val, origin: Origin,
+    seq_id: SeqId)
   =>
     try
       let target_id = r_msg.target_id()
@@ -324,13 +300,9 @@ class LocalPartitionRouter[In: Any val,
     _default_router = default_router
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None),
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+    producer: Producer ref,
+    i_origin: Origin, i_msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     match data
     // TODO: Using an untyped input wrapper that returns an Any val might
@@ -344,15 +316,15 @@ class LocalPartitionRouter[In: Any val,
           | let s: Step =>
             // TODO: Remove that producer can be None
             match producer
-            | let cfp: CreditFlowProducer ref =>
+            | let cfp: Producer ref =>
               let might_be_route = cfp.route_to(s)
               match might_be_route
               | let r: Route =>
                 r.run[D](metric_name, source_ts, data,
                   // hand down cfp so we can update route_id
                   cfp,
-                  // outgoing envelope
-                  o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+                  // incoming envelope
+                  i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
                 false
               else
                 // TODO: What do we do if we get None?
@@ -363,24 +335,22 @@ class LocalPartitionRouter[In: Any val,
             end    
           | let p: ProxyRouter val =>
             p.route[D](metric_name, source_ts, data, producer,
-              // incoming envelope
-              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-              // outgoing envelope
-              o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
           else
             // No step or proxyrouter
             true
           end
         else
           // There is no entry for this key!
+          ifdef "trace" then
+            @printf[I32](("LocalPartitionRouter.route: No entry for this" +
+              "key...\n\n").cstring())
+          end
           // If there's a default, use that
           match _default_router
           | let r: Router val =>
             r.route[In](metric_name, source_ts, input, producer,
-              // incoming envelope
-              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-              // outgoing envelope
-              o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
           else
             true
           end
@@ -429,66 +399,3 @@ class LocalPartitionRouter[In: Any val,
     consume cs
 
   fun local_map(): Map[U128, Step] val => _local_map
-
-// // TODO: Remove this by updating market-test once single prestate work
-// // is finished
-// class StateAddressesRouter[In: Any val, 
-//   Key: (Hashable val & Equatable[Key] val)]
-//   let _state_addresses: StateAddresses val
-//   let _partition_function: PartitionFunction[In, Key] val
-  
-//   new val create(state_addresses: StateAddresses val,
-//     partition_function: PartitionFunction[In, Key] val) 
-//   =>
-//     _state_addresses = state_addresses
-//     _partition_function = partition_function
-    
-//   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
-//     producer: (CreditFlowProducer ref | None),
-//     // incoming envelope
-//     i_origin: Origin tag, i_msg_uid: U128, 
-//     i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-//     // outgoing envelope
-//     o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-//     o_seq_id: U64): Bool
-//   =>
-//     match data
-//     | let iw: InputWrapper val =>
-//       let key = _partition_function(iw.input())
-//       match _state_addresses(key)
-//       | let s: Step =>
-//         // TODO: Remove that producer can be None
-//         match producer
-//         | let cfp: CreditFlowProducer ref =>
-//           let might_be_route = cfp.route_to(s)
-//           match might_be_route
-//           | let r: Route =>
-//             r.run[D](metric_name, source_ts, data,
-//               // hand down cfp so we can update route_id
-//               cfp,
-//               // outgoing envelope
-//               o_origin, o_msg_uid, o_frac_ids, o_seq_id)
-//             false
-//           else
-//             // TODO: What do we do if we get None?
-//             true
-//           end
-//         else
-//           true
-//         end
-//       | let p: ProxyRouter val =>
-//         p.route[D](metric_name, source_ts, data, producer,
-//           // incoming envelope
-//           i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-//           // outgoing envelope
-//           o_origin, o_msg_uid, o_frac_ids, o_seq_id)
-//       else
-//         true    
-//       end
-//     else
-//       @printf[I32]("Wrong input type to partition router!\n".cstring())
-//       true
-//     end
-
-//   fun routes(): Array[CreditFlowConsumerStep] val =>
-//     _state_addresses.steps()

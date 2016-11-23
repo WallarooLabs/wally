@@ -89,7 +89,6 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
   fun steps(): Array[CreditFlowConsumerStep] val =>
     let ss: Array[CreditFlowConsumerStep] trn =
       recover Array[CreditFlowConsumerStep] end
-
     for s in _addresses.values() do
       match s
       | let cfcs: CreditFlowConsumerStep =>
@@ -98,101 +97,6 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
     end
 
     consume ss
-
-// trait StateSubpartition
-//   fun build(app_name: String, metrics_conn: TCPConnection, alfred: Alfred): 
-//     StateAddresses val
-
-// class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
-//   StateSubpartition
-//   let _keys: (Array[WeightedKey[Key]] val | Array[Key] val)
-//   let _partition_addresses: KeyedPartitionAddresses[Key] val
-//   let _id_map: Map[Key, U128] val
-//   let _runner_builder: RunnerBuilder val
-
-//   new val create(keys: (Array[WeightedKey[Key]] val | Array[Key] val),
-//     runner_builder: RunnerBuilder val, multi_worker: Bool = false) 
-//   =>
-//     _keys = keys
-//     _runner_builder = runner_builder
-
-//   fun build(app_name: String, metrics_conn: TCPConnection, alfred: Alfred): 
-//     StateAddresses val 
-//   =>
-//     let routes: Map[Key, (Step | ProxyRouter val)] trn =
-//       recover Map[Key, (Step | ProxyRouter val)] end
-
-//     let m: Map[U128, Step] trn = recover Map[U128, Step] end
-
-//     var partition_count: USize = 0
-
-//     for (key, id) in _id_map.pairs() do
-//       let proxy_address = _partition_addresses(key)
-//       match proxy_address
-//       | let pa: ProxyAddress val =>
-//         if pa.worker == worker_name then
-//           let state_step = state_addresses(key)
-//           match state_step
-//           | let s: Step =>
-//             // Create prestate step for this key
-//             let next_step = Step(runner_builder(
-//                 MetricsReporter(app_name, metrics_conn)
-//                 where alfred = alfred, router = state_comp_router),
-//               MetricsReporter(app_name, metrics_conn), id,
-//               runner_builder.route_builder(), alfred,
-//               DirectRouter(s))
-//             m(id) = next_step
-
-//             routes(key) = next_step
-//             partition_count = partition_count + 1
-//           else
-//             @printf[I32]("Subpartition: Missing state step!\n".cstring())
-//           end
-//         else
-//           try
-//             let boundary = outgoing_boundaries(pa.worker)
-
-//             routes(key) = ProxyRouter(worker_name, boundary,
-//               pa, auth)
-//           else
-//             @printf[I32](("Missing proxy for " + pa.worker + "!\n").cstring())
-//           end
-//         end
-//       else
-//         @printf[I32]("Missing proxy address!\n".cstring())
-//       end
-//     end
-
-//     KeyedStateAddresses[Key](consume routes)
-
-
-
-
-
-
-
-
-    // let m: Map[Key, (Step | ProxyRouter val)] trn = 
-    //   recover Map[Key, (Step | ProxyRouter val)] end
-    // let guid_gen = GuidGenerator
-
-    // match _keys
-    // | let wks: Array[WeightedKey[Key]] val =>
-    //   for wkey in wks.values() do
-    //     let reporter = MetricsReporter(app_name, metrics_conn)
-    //     m(wkey._1) = Step(_runner_builder(reporter.clone() 
-    //         where alfred = alfred),
-    //       consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
-    //   end
-    // | let ks: Array[Key] val =>
-    //   for key in ks.values() do
-    //     let reporter = MetricsReporter(app_name, metrics_conn)
-    //     m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
-    //       consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
-    //   end
-    // end
-
-    // KeyedStateAddresses[Key](consume m)
 
 trait StateSubpartition
   fun build(app_name: String, worker_name: String, 

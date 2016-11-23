@@ -3,7 +3,7 @@ use "buffered"
 use "collections"
 use "net"
 use "wallaroo/backpressure"
-use "wallaroo/boundary" 
+use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -12,21 +12,22 @@ use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
+use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-// TODO: Fix this placeholder
-class val TrackingInfo
+type Envelope is (Origin, U128, None, SeqId, RouteId)
+
 
 actor EmptySink is CreditFlowConsumerStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, seq_id: U64, route_id: U64)
+    origin: Origin, msg_uid: U128,
+    frac_ids: None, seq_id: SeqId, route_id: RouteId)
   =>
     None
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: U64, route_id: U64)
+    origin: Origin, msg_uid: U128,
+    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
   =>
     None
 
@@ -50,8 +51,8 @@ class TCPSinkBuilder
   let _encoder_wrapper: EncoderWrapper val
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
-  new val create(encoder_wrapper: EncoderWrapper val, 
-    initial_msgs: Array[Array[ByteSeq] val] val) 
+  new val create(encoder_wrapper: EncoderWrapper val,
+    initial_msgs: Array[Array[ByteSeq] val] val)
   =>
     _encoder_wrapper = encoder_wrapper
     _initial_msgs = initial_msgs
@@ -114,22 +115,36 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _closed: Bool = false
   var _writeable: Bool = false
   var _event: AsioEventID = AsioEvent.none()
-  embed _pending: List[(ByteSeq, USize, TrackingInfo val)] = _pending.create()
+  embed _pending: List[(ByteSeq, USize)] = _pending.create()
+  embed _pending_tracking: List[(USize, Envelope)] = _pending_tracking.create()
+  embed _pending_writev: Array[USize] = _pending_writev.create()
+  var _pending_writev_total: USize = 0
+
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
+  // Origin (Resilience)
+  var _flushing: Bool = false
+  let _watermarks: Watermarks = _watermarks.create()
+  let _hwmt: HighWatermarkTable = _hwmt.create()
+  var _outgoing_seq_id: U64
+  let _outgoing_route_id: U64 = 0 // there's only one route
+
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
-    initial_msgs: Array[Array[ByteSeq] val] val, 
+    initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
+    // Resilience
+    _outgoing_seq_id = 0
+    //
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
@@ -149,27 +164,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, seq_id: U64, route_id: U64)
+    i_origin: Origin, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     try
+      _outgoing_seq_id = _outgoing_seq_id + 1
       let encoded = _encoder.encode[D](data, _wb)
-      _writev(encoded)
-      
-      // We are finished with the message and can update watermarks
-      // Note: We are ACKing messages as fast as they come in.
-      // TODO: Queue the ACKs and use a timer to send watermarks upstream
-      //       periodically.
-      ifdef "resilience" then
-        ifdef "resilience-debug" then
-          @printf[I32]((
-            "sink uid: " + msg_uid.string() +
-            "\troute_id: " + route_id.string() + "\tseq_id: " +
-            seq_id.string() + "\n").cstring())
-        end
-        origin.update_watermark(route_id, seq_id)
-      end
-      
+
+      let envelope = (i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
+
+      _writev(encoded, envelope)
+
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
@@ -186,12 +191,14 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: U64, route_id: U64)
+    i_origin: Origin, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    //TODO: What do we do here?
-    run[D](metric_name, source_ts, data, origin, msg_uid, frac_ids, 
-      incoming_seq_id, route_id)
+    //TODO: deduplication like in the Step <- this is pointless if the Sink
+    //doesn't have state, because on recovery we won't have a list of "seen
+    //messages", which we would normally get from the eventlog.
+    run[D](metric_name, source_ts, data, i_origin, msg_uid, i_frac_ids,
+      i_seq_id, i_route_id)
 
   be update_router(router: Router val) =>
     """
@@ -207,8 +214,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     close()
 
-  fun ref _unit_finished(number_finished: ISize, last_sent:
-    TrackingInfo val)
+  fun ref _unit_finished(number_finished: ISize,
+    envelope: (Envelope | None))
   =>
     """
     Handles book keeping related to resilience and backpressure. Called when
@@ -217,7 +224,34 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
-    _recoup_credits(number_finished)
+    ifdef "backpressure" then
+      _recoup_credits(number_finished)
+    end
+
+    ifdef "resilience" then
+      match envelope
+      | let sent: Envelope =>
+        (let i_origin, let msg_uid, let i_frac_ids,
+          let i_seq_id, let i_route_id) = sent
+
+        ifdef "trace" then
+          @printf[I32]((
+            "tcp-sink:\ni_origin: " +
+            i_origin.hash().string() +
+            "\tmsg_uid: " +
+            msg_uid.string() +
+            "\ti_seq_id: " +
+            i_seq_id.string() +
+            "\ti_route_id: " +
+            i_route_id.string() +
+            "\n\n").cstring())
+        end
+
+        // We are finished with the message and can update watermarks (batched)
+        i_origin.update_watermark(i_route_id, i_seq_id)
+        //_watermark_batcher.queue(i_origin, i_route_id, i_seq_id)
+      end
+    end
 
   //
   // CREDIT FLOW
@@ -317,10 +351,16 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
             _notify.connected(this)
 
+
             for msg in _initial_msgs.values() do
-              _writev(msg)
+              _writev(msg, None)
             end
-            _pending_writes()
+            ifdef not windows then
+              if _pending_writes() then
+                //sent all data; release backpressure
+                _release_backpressure()
+              end
+            end
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -343,15 +383,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       // At this point, it's our event.
       if AsioEvent.writeable(flags) then
         _writeable = true
-        _pending_writes()
+        ifdef not windows then
+          if _pending_writes() then
+            //sent all data; release backpressure
+            _release_backpressure()
+          end
+        end
       end
 
       if AsioEvent.readable(flags) then
         _readable = true
-
-        if _pending_reads() then
-          _read_again()
-        end
+        _pending_reads()
       end
 
       if AsioEvent.disposable(flags) then
@@ -361,50 +403,51 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
       _try_shutdown()
     end
+    _resubscribe_event()
 
   // TODO: Fix this when we get a real message envelope
-  fun ref _writev(data: ByteSeqIter, tracking_info: TrackingInfo val =
-    TrackingInfo) =>
+  fun ref _writev(data: ByteSeqIter, envelope: (Envelope | None))
+  =>
     """
     Write a sequence of sequences of bytes.
     """
     if _connected and not _closed then
       _in_sent = true
 
+      var data_size: USize = 0
       for bytes in _notify.sentv(this, data).values() do
-        _write_final(bytes, tracking_info)
+        _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+        _pending_writev_total = _pending_writev_total + bytes.size()
+        _pending.push((bytes, 0))
+        data_size = data_size + bytes.size()
       end
+
+      match envelope
+      | let e: Envelope =>
+        // only track if there is an envelope to track
+        _pending_tracking.push((data_size, e))
+      end
+
+      _pending_writes()
 
       _in_sent = false
     end
 
-  fun ref _write_final(data: ByteSeq, tracking_info: TrackingInfo val) =>
+  fun ref _write_final(data: ByteSeq, envelope: (Envelope | None)) =>
     """
     Write as much as possible to the socket. Set _writeable to false if not
     everything was written. On an error, close the connection. This is for
     data that has already been transformed by the notifier.
     """
-      if _writeable then
-        try
-          // Send as much data as possible.
-          var len =
-            @pony_os_send[USize](_event, data.cpointer(), data.size()) ?
-
-          if len < data.size() then
-            // Send any remaining data later. Apply back pressure.
-            _pending.push((data, len, tracking_info))
-            _apply_backpressure()
-          else
-            _unit_finished(1, tracking_info)
-          end
-        else
-          // Non-graceful shutdown on error.
-          _hard_close()
-        end
-      else
-        // Send later, when the socket is available for writing.
-        _pending.push((data, 0, tracking_info))
-     end
+    _pending_writev.push(data.cpointer().usize()).push(data.size())
+    _pending_writev_total = _pending_writev_total + data.size()
+    match envelope
+    | let e: Envelope =>
+      // only track if there is an envelope to track
+      _pending_tracking.push((data.size(), e))
+    end
+    _pending.push((data, 0))
+    _pending_writes()
 
   fun ref _notify_connecting() =>
     """
@@ -437,7 +480,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     if
       not _shutdown and
       (_connect_count == 0) and
-      (_pending.size() == 0)
+      (_pending_writev_total == 0)
     then
       _shutdown = true
 
@@ -467,7 +510,10 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
     // Unsubscribe immediately and drop all pending writes.
     @pony_asio_event_unsubscribe(_event)
+    _pending_tracking.clear()
+    _pending_writev.clear()
     _pending.clear()
+    _pending_writev_total = 0
     _readable = false
     _writeable = false
 
@@ -476,7 +522,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
     _notify.closed(this)
 
-  fun ref _pending_reads(): Bool =>
+  // TODO: support new "expect" with single system call
+  fun ref _pending_reads() =>
     """
     Read while data is available, guessing the next packet length as we go. If
     we read 4 kb of data, send ourself a resume message and stop reading, to
@@ -487,6 +534,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
         while _readable and not _shutdown_peer do
           // Read as much data as possible.
+          _read_buf_size()
           let len = @pony_os_recv[USize](
             _event,
             _read_buf.cpointer().usize() + _read_len,
@@ -496,7 +544,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           | 0 =>
             // Would block, try again later.
             _readable = false
-            return false
+            _resubscribe_event()
+            return
           | _next_size =>
             // Increase the read buffer size.
             _next_size = _max_size.min(_next_size * 2)
@@ -509,19 +558,21 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
             data.truncate(_read_len)
             _read_len = 0
 
-            if not _notify.received(this, consume data) then
-              _read_buf_size()
-              return true
-            else
-              _read_buf_size()
+            let carry_on = _notify.received(this, consume data)
+            ifdef osx then
+              if not carry_on then
+                _read_again()
+                return
+              end
+
+              sum = sum + len
+
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                _read_again()
+                return
+              end
             end
-          end
-
-          sum = sum + len
-
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            return true
           end
         end
       else
@@ -532,44 +583,78 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
       false
 
-  be _read_again() =>
-    """
-    Resume reading.
-    """
-    _pending_reads()
-
   fun _can_send(): Bool =>
     _connected and not _closed and _writeable
 
-  fun ref _pending_writes() =>
+  fun ref _pending_writes(): Bool =>
     """
     Send pending data. If any data can't be sent, keep it and mark as not
-    writeable. On an error, dispose of the connection.
+    writeable. On an error, dispose of the connection. Returns whether
+    it sent all pending data or not.
     """
-    var final_pending_sent: (TrackingInfo val | None) = None
-    var num_sent: ISize = 0
-
-    while _writeable and (_pending.size() > 0) do
+    // TODO: Make writev_batch_size user configurable
+    let writev_batch_size: USize = @pony_os_writev_max[I32]().usize()
+    var num_to_send: USize = 0
+    var bytes_to_send: USize = 0
+    var bytes_sent: USize = 0
+    while _writeable and (_pending_writev_total > 0) do
       try
-        let node = _pending.head()
-        (let data, let offset, let tracking_info) = node()
+        //determine number of bytes and buffers to send
+        if (_pending_writev.size()/2) < writev_batch_size then
+          num_to_send = _pending_writev.size()/2
+          bytes_to_send = _pending_writev_total
+        else
+          //have more buffers than a single writev can handle
+          //iterate over buffers being sent to add up total
+          num_to_send = writev_batch_size
+          bytes_to_send = 0
+          for d in Range[USize](1, num_to_send*2, 2) do
+            bytes_to_send = bytes_to_send + _pending_writev(d)
+          end
+        end
 
         // Write as much data as possible.
-        let len = @pony_os_send[USize](_event,
-          data.cpointer().usize() + offset, data.size() - offset) ?
+        var len = @pony_os_writev[USize](_event,
+          _pending_writev.cpointer(), num_to_send) ?
 
-        if (len + offset) < data.size() then
-          // Send remaining data later.
-          node() = (data, offset + len, tracking_info)
-          _writeable = false
+        // keep track of how many bytes we sent
+        bytes_sent = bytes_sent + len
+
+        if len < bytes_to_send then
+          while len > 0 do
+            let iov_p = _pending_writev(0)
+            let iov_s = _pending_writev(1)
+            if iov_s <= len then
+              len = len - iov_s
+              _pending_writev.shift()
+              _pending_writev.shift()
+              _pending.shift()
+              _pending_writev_total = _pending_writev_total - iov_s
+            else
+              _pending_writev.update(0, iov_p+len)
+              _pending_writev.update(1, iov_s-len)
+              _pending_writev_total = _pending_writev_total - len
+              len = 0
+            end
+          end
+          _apply_backpressure()
         else
-          // This chunk has been fully sent.
-          _pending.shift()
-          final_pending_sent = tracking_info
-          num_sent = num_sent + 1
-          if _pending.size() == 0 then
-            // Remove back pressure.
-            _release_backpressure()
+          // sent all data we requested in this batch
+          _pending_writev_total = _pending_writev_total - bytes_to_send
+          if _pending_writev_total == 0 then
+            _pending_writev.clear()
+            _pending.clear()
+
+            // do envelope finished stuff
+            _envelope_finished(bytes_sent)
+            return true
+          else
+           for d in Range[USize](0, num_to_send, 1) do
+             _pending_writev.shift()
+             _pending_writev.shift()
+             _pending.shift()
+           end
+
           end
         end
       else
@@ -578,9 +663,43 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    match final_pending_sent
-    | let sent: TrackingInfo val =>
-      _unit_finished(num_sent, sent)
+    // do envelope finished stuff
+    _envelope_finished(bytes_sent)
+
+    false
+
+
+  fun ref _envelope_finished(num_bytes_sent: USize) =>
+    """
+    Call _unit_finished with # of sent messages and last Envelope
+    """
+    ifdef "backpressure" or "resilience" then
+      var num_sent: ISize = 0
+      var final_pending_sent: (Envelope | None) = None
+      var bytes_sent = num_bytes_sent
+
+      try
+        while bytes_sent > 0 do
+          let node = _pending_tracking.head()
+          (let bytes, let envelope) = node()
+          if bytes <= bytes_sent then
+            num_sent = num_sent + 1
+            bytes_sent = bytes_sent - bytes
+            final_pending_sent = envelope
+            _pending_tracking.shift()
+          else
+            let bytes_remaining = bytes - bytes_sent
+            bytes_sent = 0
+            // update remaining for this message
+            node() = (bytes_remaining, envelope)
+          end
+        end
+
+        match final_pending_sent
+        | let sent: Envelope =>
+          _unit_finished(num_sent, sent)
+        end
+      end
     end
 
   fun ref _apply_backpressure() =>
@@ -607,6 +726,28 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     let ip = recover IPAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
+
+  be _read_again() =>
+    """
+    Resume reading.
+    """
+
+    _pending_reads()
+
+  fun ref _resubscribe_event() =>
+    ifdef linux then
+      let flags = if not _readable and not _writeable then
+        AsioEvent.read_write_oneshot()
+      elseif not _readable then
+        AsioEvent.read() or AsioEvent.oneshot()
+      elseif not _writeable then
+        AsioEvent.write() or AsioEvent.oneshot()
+      else
+        return
+      end
+
+      @pony_asio_event_resubscribe(_event, flags)
+    end
 
 interface _TCPSinkNotify
   fun ref connecting(conn: TCPSink ref, count: U32) =>

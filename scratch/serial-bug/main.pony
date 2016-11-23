@@ -7,7 +7,7 @@ actor Main
   new create(env: Env) =>
     try
       let auth = env.root as AmbientAuth
-      let builder: StepBuilder val = recover lambda(): Step tag => Step end end
+      let builder: StepBuilder val = recover {(): Step tag => Step } end
       let builders: Array[StepBuilder val] val = recover [builder] end
       let t = LocalTopology(builders, 2)
       let a = Array[LocalTopology val]

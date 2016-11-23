@@ -8,7 +8,6 @@ use "sendence/weighted"
 use "wallaroo/backpressure"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
-use "wallaroo/messages"
 use "wallaroo/resilience"
 
 
@@ -16,27 +15,21 @@ use "wallaroo/resilience"
 interface Runner
   // Return a Bool indicating whether the message is finished processing
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None), router: Router val,
-    omni_router: OmniRouter val,
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
-
+    producer: Producer ref, router: Router val, omni_router: OmniRouter val,
+    i_origin: Origin, i_msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   fun name(): String
   fun state_name(): String
   fun clone_router_and_set_input_type(r: Router val,
     default_r: (Router val | None) = None): Router val 
 
 trait ReplayableRunner
-  fun ref replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val, 
-    origin: Origin tag)
-  fun ref set_origin_id(id: U128)
+  fun ref replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val,
+    origin: Origin)
+  fun ref set_step_id(id: U128)
 
 trait RunnerBuilder
-  fun apply(metrics_reporter: MetricsReporter iso, 
+  fun apply(metrics_reporter: MetricsReporter iso,
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
@@ -65,7 +58,7 @@ class RunnerSequenceBuilder is RunnerBuilder
 
   new val create(bs: Array[RunnerBuilder val] val) =>
     _runner_builders = bs
-    _id = 
+    _id =
       try
         bs(0).id()
       else
@@ -92,7 +85,7 @@ class RunnerSequenceBuilder is RunnerBuilder
         ""
       end
 
-  fun apply(metrics_reporter: MetricsReporter iso, 
+  fun apply(metrics_reporter: MetricsReporter iso,
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
@@ -101,7 +94,7 @@ class RunnerSequenceBuilder is RunnerBuilder
     var remaining: USize = _runner_builders.size()
     var latest_runner: Runner iso = RouterRunner
     while remaining > 0 do
-      let next_builder: (RunnerBuilder val | None) = 
+      let next_builder: (RunnerBuilder val | None) =
         try
           _runner_builders(remaining - 1)
         else
@@ -149,7 +142,7 @@ class RunnerSequenceBuilder is RunnerBuilder
       false
     end
   fun id(): U128 => _id
-  fun route_builder(): RouteBuilder val => 
+  fun route_builder(): RouteBuilder val =>
     try
       _runner_builders(_runner_builders.size() - 1).route_builder()
     else
@@ -172,13 +165,13 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   let _route_builder: RouteBuilder val
 
   new val create(comp_builder: ComputationBuilder[In, Out] val,
-    route_builder': RouteBuilder val, id': U128 = 0) 
+    route_builder': RouteBuilder val, id': U128 = 0)
   =>
     _comp_builder = comp_builder
     _route_builder = route_builder'
     _id = if id' == 0 then GuidGenerator.u128() else id' end
 
-  fun apply(metrics_reporter: MetricsReporter iso, 
+  fun apply(metrics_reporter: MetricsReporter iso,
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
@@ -186,11 +179,11 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   =>
     match (consume next_runner)
     | let r: Runner iso =>
-      ComputationRunner[In, Out](_comp_builder(), consume r, 
+      ComputationRunner[In, Out](_comp_builder(), consume r,
         consume metrics_reporter)
     else
-      ComputationRunner[In, Out](_comp_builder(), RouterRunner, 
-        consume metrics_reporter)      
+      ComputationRunner[In, Out](_comp_builder(), RouterRunner,
+        consume metrics_reporter)
     end
 
   fun name(): String => _comp_builder().name()
@@ -235,7 +228,7 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
     _forward_route_builder = forward_route_builder'
     _in_route_builder = in_route_builder'
 
-  fun apply(metrics_reporter: MetricsReporter iso, 
+  fun apply(metrics_reporter: MetricsReporter iso,
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
@@ -282,7 +275,7 @@ class StateRunnerBuilder[State: Any #read] is RunnerBuilder
   new val create(state_builder: StateBuilder[State] val, 
     state_name': String, 
     state_change_builders: Array[StateChangeBuilder[State] val] val,
-    route_builder': RouteBuilder val = EmptyRouteBuilder) 
+    route_builder': RouteBuilder val = EmptyRouteBuilder)
   =>
     _state_builder = state_builder
     _state_name = state_name'
@@ -290,7 +283,7 @@ class StateRunnerBuilder[State: Any #read] is RunnerBuilder
     _route_builder = route_builder'
     _id = GuidGenerator.u128()
 
-  fun apply(metrics_reporter: MetricsReporter iso, 
+  fun apply(metrics_reporter: MetricsReporter iso,
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
@@ -351,7 +344,7 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
     _multi_worker = multi_worker
     _default_state_name = default_state_name'
 
-  fun apply(metrics_reporter: MetricsReporter iso, 
+  fun apply(metrics_reporter: MetricsReporter iso,
     alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
@@ -387,10 +380,10 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
       _step_id_map, _state_runner_builder, _partition.function(), 
       _pipeline_name)
 
-  fun partition_addresses(workers: (String | Array[String] val)): 
-    KeyedPartitionAddresses[Key] val 
+  fun partition_addresses(workers: (String | Array[String] val)):
+    KeyedPartitionAddresses[Key] val
   =>
-    let m: Map[Key, ProxyAddress val] trn = 
+    let m: Map[Key, ProxyAddress val] trn =
       recover Map[Key, ProxyAddress val] end
 
     match workers
@@ -426,7 +419,7 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
               m(key) = ProxyAddress(ws(worker_idx), _step_id_map(key))
             end
           end
-        end 
+        end
       | let ks: Array[Key] val =>
         // With unweighted keys, we simply distribute the keys equally across
         // the workers
@@ -447,8 +440,8 @@ class ComputationRunner[In: Any val, Out: Any val]
   let _computation_name: String
   let _metrics_reporter: MetricsReporter
 
-  new iso create(computation: Computation[In, Out] val, 
-    next: Runner iso, metrics_reporter: MetricsReporter iso) 
+  new iso create(computation: Computation[In, Out] val,
+    next: Runner iso, metrics_reporter: MetricsReporter iso)
   =>
     _computation = computation
     _computation_name = _computation.name()
@@ -456,18 +449,13 @@ class ComputationRunner[In: Any val, Out: Any val]
     _metrics_reporter = consume metrics_reporter
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None), router: Router val,
-    omni_router: OmniRouter val,
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+    producer: Producer ref, router: Router val, omni_router: OmniRouter val,
+    i_origin: Origin, i_msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     let computation_start = Time.nanos()
 
-    let is_finished = 
+    let is_finished =
       match data
       | let input: In =>
         let result = _computation(input)
@@ -476,17 +464,14 @@ class ComputationRunner[In: Any val, Out: Any val]
         | let output: Out =>
           _next.run[Out](metric_name, source_ts, output, producer, router,
             omni_router,
-            // incoming envelope
-            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-            // outgoing envelope
-            o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
         else
           true
         end
       else
         true
       end
-    let computation_end = Time.nanos()   
+    let computation_end = Time.nanos()
     _metrics_reporter.step_metric(_computation_name,
       computation_start, computation_end)
     is_finished
@@ -517,17 +502,13 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     _prep_name = _name + " prep"
     _state_name = state_name'
 
-  fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,    producer: (CreditFlowProducer ref | None), router: Router val,
-    omni_router: OmniRouter val,
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+  fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
+    producer: Producer ref, router: Router val, omni_router: OmniRouter val,
+    i_origin: Origin, i_msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     let computation_start = Time.nanos()
-    let is_finished = 
+    let is_finished =
       match data
       | let input: In =>
         match router
@@ -538,10 +519,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
           shared_state_router.route[
             StateComputationWrapper[In, Out, State] val](
             metric_name, source_ts, processor, producer,
-            // incoming envelope
-            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-            // outgoing envelope
-            o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
         else
           true
         end
@@ -551,7 +529,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
       end
     let computation_end = Time.nanos()
 
-    _metrics_reporter.step_metric(_prep_name, computation_start, 
+    _metrics_reporter.step_metric(_prep_name, computation_start,
       computation_end)
 
     is_finished
@@ -573,7 +551,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   let _rb: Reader = Reader
   var _id: (U128 | None)
 
-  new iso create(state_builder: {(): State} val, 
+  new iso create(state_builder: {(): State} val,
       metrics_reporter: MetricsReporter iso, alfred: Alfred)
   =>
     _state = state_builder()
@@ -582,13 +560,14 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     _alfred = alfred
     _id = None
 
-  fun ref set_origin_id(id: U128) => _id = id
+  fun ref set_step_id(id: U128) =>
+    _id = id
 
   fun ref register_state_change(scb: StateChangeBuilder[State] val) : U64 =>
     _state_change_repository.make_and_register(scb)
 
-  fun ref replay_log_entry(msg_uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val, 
-    origin: Origin tag)
+  fun ref replay_log_entry(msg_uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val,
+    origin: Origin)
   =>
     try
       let sc = _state_change_repository(statechange_id)
@@ -602,24 +581,16 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     end
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: (CreditFlowProducer ref | None), router: Router val,
-    omni_router: OmniRouter val,
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+    producer: Producer ref, router: Router val, omni_router: OmniRouter val,
+    i_origin: Origin, i_msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     match data
     | let sp: StateProcessor[State] val =>
       let computation_start = Time.nanos()
-      let result = sp(_state, _state_change_repository, omni_router, 
+      let result = sp(_state, _state_change_repository, omni_router,
         metric_name, source_ts, producer,
-        // incoming envelope
-        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-        // outgoing envelope
-        o_origin, o_msg_uid, o_frac_ids, o_seq_id)        
+        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
       let is_finished = result._1
       let state_change = result._2
 
@@ -632,20 +603,22 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
           //TODO: deal with creating fractional message ids here
           match _id
           | let buffer_id: U128 =>
+
             _alfred.queue_log_entry(buffer_id, i_msg_uid, None,
-              sc.id(), o_seq_id, consume payload)
+              sc.id(), i_seq_id, consume payload) //TODO: Alan check i_seq_id is correct
           else
             @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
           end
         end
+
         sc.apply(_state)
         let computation_end = Time.nanos()
-        _metrics_reporter.step_metric(sp.name(), computation_start, 
+        _metrics_reporter.step_metric(sp.name(), computation_start,
           computation_end)
         is_finished
       else
         let computation_end = Time.nanos()
-        _metrics_reporter.step_metric(sp.name(), computation_start, 
+        _metrics_reporter.step_metric(sp.name(), computation_start,
           computation_end)
         is_finished
       end
@@ -668,22 +641,14 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
 
 class iso RouterRunner
   fun ref run[Out: Any val](metric_name: String, source_ts: U64, output: Out,
-    producer: (CreditFlowProducer ref | None), router: Router val,
-    omni_router: OmniRouter val,
-    // incoming envelope
-    i_origin: Origin tag, i_msg_uid: U128, 
-    i_frac_ids: None, i_seq_id: U64, i_route_id: U64,
-    // outgoing envelope
-    o_origin: Origin tag, o_msg_uid: U128, o_frac_ids: None,
-    o_seq_id: U64): Bool
+    producer: Producer ref, router: Router val, omni_router: OmniRouter val,
+    i_origin: Origin, i_msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     match router
     | let r: Router val =>
       r.route[Out](metric_name, source_ts, output, producer,
-        // incoming envelope
-        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-        // outgoing envelope
-        o_origin, o_msg_uid, o_frac_ids, o_seq_id)
+        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
     else
       true
     end

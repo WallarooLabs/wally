@@ -268,9 +268,9 @@ class MetricsData
     period_end: U64) ?
   =>
     throughputs_by_period.upsert(period_end, throughput,
-      lambda(prev_throughput: U64, current_throughput: U64): U64 =>
+      {(prev_throughput: U64, current_throughput: U64): U64 =>
         prev_throughput + current_throughput
-      end)
+      })
 
   fun ref calculate_throughput_min_max() =>
     for (period_end, throughput) in throughputs_by_period.pairs() do
