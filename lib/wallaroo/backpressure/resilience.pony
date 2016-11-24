@@ -103,9 +103,7 @@ trait tag Origin
         hwmt().get_and_remove(seq_id)
       watermarks().add_high_watermark(route_id, seq_id)
 
-      if ((_watermarks_counter() % 1000) == 0) then
-        _run_ack(i_origin, i_route_id, i_seq_id)
-      end
+      _run_ack(i_origin, i_route_id, i_seq_id)
     else
       //TODO: how do we bail out here?
       None
