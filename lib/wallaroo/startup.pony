@@ -12,7 +12,7 @@ use "wallaroo/resilience"
 
 actor Startup
   new create(env: Env, application: Application val, 
-    event_log_file: (String val | None)) 
+    app_name: (String val | None)) 
   =>
     ifdef "use_backpressure" then
       env.out.print("**BACKPRESSURE is active**")
@@ -31,7 +31,6 @@ actor Startup
     var worker_count: USize = 1
     var is_initializer = false
     var worker_initializer: (WorkerInitializer | None) = None
-    let alfred = Alfred(env, event_log_file)
     var worker_name = ""
     try
       var options = Options(env.args)
@@ -128,7 +127,16 @@ actor Startup
         c_host, c_service, d_host, d_service, ph_host, ph_service, 
         metrics_conn, is_initializer)
 
-      let local_topology_file = "/tmp/" + worker_name + ".local-topology"
+      let name =  match app_name
+        | let n: String => n
+        else
+          ""
+        end
+      let event_log_file = "/tmp/" + name + "-" + worker_name + ".evlog"
+      let local_topology_file = "/tmp/" + name + "-" +
+          worker_name + ".local-topology"
+        
+      let alfred = Alfred(env, event_log_file)
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
         worker_count, env, auth, connections, metrics_conn, is_initializer, 
         alfred, local_topology_file)
