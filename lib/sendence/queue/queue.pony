@@ -128,7 +128,6 @@ class Queue[A: Any #alias]
     _size = 0
     _front_ptr = 0
     _back_ptr = 0
-    _data.clear()
     this
 
   fun ref clear_n(n: USize) =>
@@ -136,7 +135,6 @@ class Queue[A: Any #alias]
       let to_clear = if _size < (n - 1) then (_size - 1) else n end
       _front_ptr = (_front_ptr + to_clear) and _mod
       _size = _size - to_clear
-      _data.remove(0, to_clear)
     end
 
   fun contains(a: A!, pred: {(box->A!, box->A!): Bool} val =
