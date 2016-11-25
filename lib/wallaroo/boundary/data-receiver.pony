@@ -111,7 +111,6 @@ actor DataReceiver is Origin
   be ack_latest() => _ack_latest()
 
   fun ref _ack_latest() =>
-    // @printf[I32]("!!Ack latest\n".cstring())
     try
       if _last_id_seen > 0 then
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
