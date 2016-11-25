@@ -9,6 +9,9 @@ class Queue[A: Any #alias]
   var _mod: USize = 0
   var _size: USize = 0
 
+  //!!
+  var _count: USize = 0
+
   new create(len: USize = 0) =>
     """
     Create a queue.
@@ -99,6 +102,13 @@ class Queue[A: Any #alias]
       end
     end
     _size = _size + 1
+
+    //!!
+    _count = _count + 1
+    if (_count % 100000) == 0 then
+      @printf[I32]("!!Enqueue. Size: %llu, space: %llu, array: %llu\n".cstring(), _size, space(), _data.size())
+    end
+
     // Assert(_data.size() <= space(), "Data size is not <= space()")
     // Assert(_size <= space(), "Size is not <= space()")
     // Assert(_size <= _data.size(), "Size is not <= data size")
@@ -108,6 +118,12 @@ class Queue[A: Any #alias]
       let a = _data(_front_ptr)
       _front_ptr = (_front_ptr + 1) and _mod
       _size = _size - 1
+
+      //!!
+      if (_count % 100000) == 0 then
+        @printf[I32]("!!Dequeue. Size: %llu, space: %llu, array: %llu\n".cstring(), _size, space(), _data.size())
+      end
+
       a
     else
       error
@@ -131,10 +147,18 @@ class Queue[A: Any #alias]
     this
 
   fun ref clear_n(n: USize) =>
+    //!!
+    // @printf[I32]("!!Clear>>. Size: %llu, space: %llu, array: %llu\n".cstring(), _size, space(), _data.size())
+    //!!
+
     if (_size > 0) and (n > 0) then
       let to_clear = if _size < (n - 1) then (_size - 1) else n end
       _front_ptr = (_front_ptr + to_clear) and _mod
       _size = _size - to_clear
+
+
+      //!!
+      // @printf[I32]("!!Cleared %llu<<. Size: %llu, space: %llu, array: %llu\n".cstring(), to_clear, _size, space(), _data.size())
     end
 
   fun contains(a: A!, pred: {(box->A!, box->A!): Bool} val =

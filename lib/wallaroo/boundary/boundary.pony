@@ -143,7 +143,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     try
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         _seq_id, _wb, _auth)
-      _queue.enqueue(outgoing_msg)
+      //!!
+      // _queue.enqueue(outgoing_msg)
 
       ifdef "resilience" then
         _bookkeeping(_route_id, _seq_id, i_origin, i_route_id,
@@ -159,10 +160,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     _writev(data)
 
   be ack(seq_id: U64) =>
+    // @printf[I32]("!!Ack at boundary, seq_id: %llu, low_id: %llu, high_sent: %llu\n".cstring(), seq_id, _lowest_queue_id, _seq_id)
     if seq_id > _lowest_queue_id then
       let flush_count: USize = (seq_id - _lowest_queue_id).usize()
+      // @printf[I32]("!!Ack at boundary, flushing count of %llu\n".cstring(), 
+        // flush_count)
       _queue.clear_n(flush_count)
-      // _queue.clear()
       _lowest_queue_id = _lowest_queue_id + flush_count.u64()
 
       ifdef "trace" then
