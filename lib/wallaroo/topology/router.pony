@@ -9,7 +9,7 @@ use "wallaroo/tcp-sink"
 interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, i_msg_uid: U128,
+    i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   fun routes(): Array[CreditFlowConsumerStep] val
 
@@ -19,7 +19,7 @@ interface RouterBuilder
 class EmptyRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, i_msg_uid: U128,
+    i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     true
@@ -35,7 +35,7 @@ class DirectRouter
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, i_msg_uid: U128,
+    i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
@@ -67,7 +67,7 @@ class DirectRouter
   fun routes(): Array[CreditFlowConsumerStep] val =>
     recover val [_target] end
 
-  fun has_sink(): Bool => 
+  fun has_sink(): Bool =>
     match _target
     | let tcp: TCPSink =>
       true
@@ -91,7 +91,7 @@ class ProxyRouter
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
@@ -137,14 +137,14 @@ trait OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
 
 class EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n".cstring())
@@ -153,8 +153,8 @@ class EmptyOmniRouter is OmniRouter
 class StepIdRouter is OmniRouter
   let _worker_name: String
   let _data_routes: Map[U128, CreditFlowConsumerStep tag] val
-  let _step_map: Map[U128, (ProxyAddress val | U128)] val 
-  let _outgoing_boundaries: Map[String, OutgoingBoundary] val  
+  let _step_map: Map[U128, (ProxyAddress val | U128)] val
+  let _outgoing_boundaries: Map[String, OutgoingBoundary] val
 
   new val create(worker_name: String,
     data_routes: Map[U128, CreditFlowConsumerStep tag] val,
@@ -169,7 +169,7 @@ class StepIdRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
@@ -193,7 +193,7 @@ class StepIdRouter is OmniRouter
             cfp,
             // incoming envelope
             i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
-       
+
           false
         else
           // No route for this target
@@ -238,7 +238,7 @@ class StepIdRouter is OmniRouter
             true
           else
             true
-          end 
+          end
         else
           // Apparently this target_id does not refer to a valid step id
           ifdef debug then
@@ -260,7 +260,7 @@ class DataRouter
   =>
     _data_routes = data_routes
 
-  fun route(d_msg: DeliveryMsg val, origin: Origin, seq_id: SeqId) =>
+  fun route(d_msg: DeliveryMsg val, origin: Producer, seq_id: SeqId) =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataRouter\n".cstring())
     end
@@ -279,7 +279,7 @@ class DataRouter
       true
     end
 
-  fun replay_route(r_msg: ReplayableDeliveryMsg val, origin: Origin,
+  fun replay_route(r_msg: ReplayableDeliveryMsg val, origin: Producer,
     seq_id: SeqId)
   =>
     try
@@ -307,7 +307,7 @@ class DataRouter
 
 trait PartitionRouter is Router
   fun local_map(): Map[U128, Step] val
-  fun register_routes(router: Router val, route_builder: RouteBuilder val) 
+  fun register_routes(router: Router val, route_builder: RouteBuilder val)
 
 trait AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)] is
   PartitionRouter
@@ -337,7 +337,7 @@ class LocalPartitionRouter[In: Any val,
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, i_msg_uid: U128,
+    i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
@@ -374,7 +374,7 @@ class LocalPartitionRouter[In: Any val,
               end
             else
               true
-            end    
+            end
           | let p: ProxyRouter val =>
             p.route[D](metric_name, source_ts, data, producer,
               i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
@@ -417,10 +417,10 @@ class LocalPartitionRouter[In: Any val,
   =>
     match new_d_router
     | let dr: Router val =>
-      LocalPartitionRouter[NewIn, Key](_local_map, _step_ids, 
+      LocalPartitionRouter[NewIn, Key](_local_map, _step_ids,
         _partition_routes, new_p_function, dr)
     else
-      LocalPartitionRouter[NewIn, Key](_local_map, _step_ids, 
+      LocalPartitionRouter[NewIn, Key](_local_map, _step_ids,
         _partition_routes, new_p_function, _default_router)
     end
 

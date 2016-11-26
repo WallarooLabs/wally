@@ -120,10 +120,10 @@ class FileBackend is Backend
 
   fun ref flush() =>
     _file.flush()
- 
+
 
 actor Alfred
-    let _origins: Map[U128, (Resilient & Origin)] = _origins.create()
+    let _origins: Map[U128, (Resilient & Producer)] = _origins.create()
     let _log_buffers: Map[U128, EventLogBuffer ref] = _log_buffers.create()
     let _backend: Backend ref
     let _incoming_boundaries: Array[DataReceiver tag] ref =
@@ -132,11 +132,11 @@ actor Alfred
       _replay_complete_markers.create()
 
     new create(env: Env, filename: (String val | None) = None) =>
-      _backend = 
+      _backend =
       recover iso
         match filename
         | let f: String val =>
-          try 
+          try
             FileBackend(FilePath(env.root as AmbientAuth, f), this)
           else
             DummyBackend
@@ -194,8 +194,8 @@ actor Alfred
         @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
       end
 
-    be register_origin(origin: (Resilient & Origin), id: U128) =>
-      _origins(id) = origin 
+    be register_origin(origin: (Resilient & Producer), id: U128) =>
+      _origins(id) = origin
       _log_buffers(id) =
         ifdef "resilience" then
           StandardEventLogBuffer(this,id)
@@ -215,8 +215,7 @@ actor Alfred
       end
 
     be write_log(origin_id: U128, log_entries: Array[LogEntry val] iso,
-      low_watermark:U64, origin: Origin, upstream_route_id: RouteId,
-      upstream_seq_id: SeqId)
+      low_watermark:U64)
     =>
       let write_count = log_entries.size()
       for i in Range(0, write_count) do
@@ -228,24 +227,19 @@ actor Alfred
       end
       _backend.flush()
       try
-        _origins(origin_id).log_flushed(low_watermark,
-          origin, upstream_route_id, upstream_seq_id)
+        _origins(origin_id).log_flushed(low_watermark)
       else
         @printf[I32]("buffer %d disappeared!".cstring(), origin_id)
       end
 
-    be flush_buffer(origin_id: U128, low_watermark:U64,
-      origin: Origin, upstream_route_id: RouteId,
-      upstream_seq_id: SeqId)
-    =>
+    be flush_buffer(origin_id: U128, low_watermark:U64) =>
       ifdef "trace" then
         @printf[I32](("flush_buffer for id: " +
           origin_id.string() + "\n\n").cstring())
       end
-        
+
       try
-        _log_buffers(origin_id).flush(low_watermark, origin, upstream_route_id,
-          upstream_seq_id)
+        _log_buffers(origin_id).flush(low_watermark)
       else
         @printf[I32]("Trying to flush non-existent buffer no %d!".cstring(),
           origin_id)

@@ -1,0 +1,151 @@
+use "collections"
+use "time"
+use "wallaroo/fail"
+use "wallaroo/invariant"
+
+class Routes
+  """
+  All the routes available
+  """
+  let _filter_route: _FilterRoute ref = recover ref _FilterRoute end
+  let _routes: Map[RouteId, _Route] = _routes.create()
+  var _flushed_watermark: U64 = 0
+  var _flushing: Bool = false
+  let _ack_batch_size: USize = 5
+  let _outgoing_to_incoming: _OutgoingToIncoming =
+    _OutgoingToIncoming(_ack_batch_size)
+
+  new create() =>
+    None
+
+  fun ref add_route(route: Route) =>
+    // This is our wedge into current routes until John
+    // and I can work out the abstractions
+    // Its used from Step
+    Invariant(not _routes.contains(route.id()))
+
+    _routes(route.id()) = _Route
+
+  fun ref add_route_id(route_id: RouteId) =>
+    // This is our wedge into current routes until John
+    // and I can work out the abstractions
+    // Its used from Boundary
+    Invariant(not _routes.contains(route_id))
+
+    _routes(route_id) = _Route
+
+  fun ref send(producer: Producer ref, o_route_id: RouteId, o_seq_id: SeqId,
+    i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
+  =>
+    Invariant(_routes.contains(o_route_id))
+
+    try
+      _routes(o_route_id).send(o_seq_id)
+      _add_incoming(producer, o_seq_id, i_origin, i_route_id, i_seq_id)
+    else
+      Fail()
+    end
+
+  fun ref filter(producer: Producer ref, o_seq_id: SeqId,
+    i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
+  =>
+    """
+    Filter out a message or otherwise have this be the end of the line
+    """
+    _filter_route.filter(o_seq_id)
+    _add_incoming(producer, o_seq_id, i_origin, i_route_id, i_seq_id)
+
+  fun ref receive_ack(route_id: RouteId, seq_id: SeqId) =>
+    Invariant(_routes.contains(route_id))
+    LazyInvariant({()(_routes, route_id, seq_id): Bool ? =>
+      _routes(route_id).highest_seq_id_sent() >= seq_id})
+
+    try
+      _routes(route_id).receive_ack(seq_id)
+    else
+      Fail()
+    end
+
+  fun ref flushed(up_to: SeqId) =>
+    Invariant(_outgoing_to_incoming.contains(up_to))
+
+    try
+      _flushing = false
+      for (o_r, id) in
+        _outgoing_to_incoming.origin_notifications(up_to).pairs()
+      do
+        o_r._1.update_watermark(o_r._2, id)
+      end
+      _outgoing_to_incoming.evict(up_to)
+      _flushed_watermark = up_to
+    else
+      Fail()
+    end
+
+  fun ref _add_incoming(producer: Producer ref, o_seq_id: SeqId,
+    i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
+  =>
+    _outgoing_to_incoming.add(o_seq_id, i_origin, i_route_id, i_seq_id)
+    _maybe_ack(producer)
+
+  fun ref _maybe_ack(producer: Producer ref) =>
+    if not _flushing and
+      ((_outgoing_to_incoming.size() % _ack_batch_size) == 0)
+    then
+      _ack(producer)
+    end
+
+  fun ref _ack(producer: Producer ref) =>
+    let proposed_watermark = propose_new_watermark()
+
+    if proposed_watermark == _flushed_watermark then
+      return
+    end
+
+    _flushing = true
+    producer._flush(proposed_watermark)
+
+  fun ref propose_new_watermark(): U64 =>
+    let proposed_watermark = _ProposeWatermark(_filter_route, _routes)
+    Invariant(proposed_watermark >= _flushed_watermark)
+    proposed_watermark
+
+// incorporate into TypedRoute
+class _Route
+  var _highest_seq_id_sent: U64 = 0
+  var _highest_seq_id_acked: U64 = 0
+  var _last_ack: U64 = Time.millis()
+
+  fun ref send(o_seq_id: SeqId) =>
+    Invariant(o_seq_id > _highest_seq_id_sent)
+
+    _highest_seq_id_sent = o_seq_id
+
+  fun ref receive_ack(seq_id: SeqId) =>
+    Invariant(seq_id <= _highest_seq_id_sent)
+
+    _last_ack = Time.millis()
+    _highest_seq_id_acked = seq_id
+
+  fun is_fully_acked(): Bool =>
+    _highest_seq_id_sent == _highest_seq_id_acked
+
+  fun highest_seq_id_acked(): U64 =>
+    _highest_seq_id_acked
+
+  fun highest_seq_id_sent(): U64 =>
+    _highest_seq_id_sent
+
+class _FilterRoute
+  var _highest_seq_id: U64 = 0
+
+  fun ref filter(o_seq_id: SeqId) =>
+    Invariant(o_seq_id > _highest_seq_id)
+
+    _highest_seq_id = o_seq_id
+
+  fun is_fully_acked(): Bool =>
+    true
+
+  fun highest_seq_id(): U64 =>
+    _highest_seq_id
