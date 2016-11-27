@@ -5,7 +5,6 @@ use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/tcp-sink"
 
-// TODO: Eliminate producer None when we can
 interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
@@ -41,28 +40,24 @@ class DirectRouter
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DirectRouter\n".cstring())
     end
-    // TODO: Remove that producer can be None
-    match producer
-    | let cfp: Producer ref =>
-      let might_be_route = cfp.route_to(_target)
-      match might_be_route
-      | let r: Route =>
-        ifdef "trace" then
-          @printf[I32]("DirectRouter found Route\n".cstring())
-        end
-        r.run[D](metric_name, source_ts, data,
-          // hand down cfp so we can call _next_sequence_id()
-          cfp,
-          // incoming envelope
-          i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
-        false
-      else
-        // TODO: What do we do if we get None?
-        true
+
+    let might_be_route = producer.route_to(_target)
+    match might_be_route
+    | let r: Route =>
+      ifdef "trace" then
+        @printf[I32]("DirectRouter found Route\n".cstring())
       end
+      r.run[D](metric_name, source_ts, data,
+        // hand down producer so we can call _next_sequence_id()
+        producer,
+        // incoming envelope
+        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
+      false
     else
+      // TODO: What do we do if we get None?
       true
     end
+
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
     recover val [_target] end
@@ -97,30 +92,25 @@ class ProxyRouter
     ifdef "trace" then
       @printf[I32]("Rcvd msg at ProxyRouter\n".cstring())
     end
-    // TODO: Remove that producer can be None
-    match producer
-    | let cfp: Producer ref =>
-      let might_be_route = cfp.route_to(_target)
-      match might_be_route
-      | let r: Route =>
-        ifdef "trace" then
-          @printf[I32]("DirectRouter found Route\n".cstring())
-        end
-        let delivery_msg = ForwardMsg[D](
-          _target_proxy_address.step_id,
-          _worker_name, source_ts, data, metric_name,
-          _target_proxy_address,
-          msg_uid, i_frac_ids)
 
-        r.forward(delivery_msg, cfp, i_origin, msg_uid, i_frac_ids,
-          i_seq_id, i_route_id)
-
-        false
-      else
-        // TODO: What do we do if we get None?
-        true
+    let might_be_route = producer.route_to(_target)
+    match might_be_route
+    | let r: Route =>
+      ifdef "trace" then
+        @printf[I32]("DirectRouter found Route\n".cstring())
       end
+      let delivery_msg = ForwardMsg[D](
+        _target_proxy_address.step_id,
+        _worker_name, source_ts, data, metric_name,
+        _target_proxy_address,
+        msg_uid, i_frac_ids)
+
+      r.forward(delivery_msg, producer, i_origin, msg_uid, i_frac_ids,
+        i_seq_id, i_route_id)
+
+      false
     else
+      // TODO: What do we do if we get None?
       true
     end
 
@@ -175,81 +165,75 @@ class StepIdRouter is OmniRouter
     ifdef "trace" then
       @printf[I32]("Rcvd msg at OmniRouter\n".cstring())
     end
-    // TODO: Remove that producer can be None
-    match producer
-    | let cfp: Producer ref =>
-      try
-        // Try as though this target_id step exists on this worker
-        let target = _data_routes(target_id)
 
-        let might_be_route = cfp.route_to(target)
-        match might_be_route
-        | let r: Route =>
-          ifdef "trace" then
-            @printf[I32]("OmniRouter found Route to Step\n".cstring())
-          end
-          r.run[D](metric_name, source_ts, data,
-            // hand down cfp so we can update route_id
-            cfp,
-            // incoming envelope
-            i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
+    try
+      // Try as though this target_id step exists on this worker
+      let target = _data_routes(target_id)
 
-          false
-        else
-          // No route for this target
-          true
+      let might_be_route = producer.route_to(target)
+      match might_be_route
+      | let r: Route =>
+        ifdef "trace" then
+          @printf[I32]("OmniRouter found Route to Step\n".cstring())
         end
-      else
-        // This target_id step exists on another worker
-        try
-          match _step_map(target_id)
-          | let pa: ProxyAddress val =>
-            try
-              // Try as though we have a reference to the right boundary
-              let boundary = _outgoing_boundaries(pa.worker)
-              let might_be_route = cfp.route_to(boundary)
-              match might_be_route
-              | let r: Route =>
-                ifdef "trace" then
-                  @printf[I32]("OmniRouter found Route to OutgoingBoundary\n".cstring())
-                end
-                let delivery_msg = ForwardMsg[D](pa.step_id,
-                  _worker_name, source_ts, data, metric_name,
-                  pa, msg_uid, i_frac_ids)
+        r.run[D](metric_name, source_ts, data,
+          // hand down producer so we can update route_id
+          producer,
+          // incoming envelope
+          i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
 
-                r.forward(delivery_msg, cfp, i_origin, msg_uid, i_frac_ids,
-                  i_seq_id, i_route_id)
-                false
-              else
-                // We don't have a route to this boundary
-                ifdef debug then
-                  @printf[I32]("OmniRouter had no Route\n".cstring())
-                end
-                true
+        false
+      else
+        // No route for this target
+        true
+      end
+    else
+      // This target_id step exists on another worker
+      try
+        match _step_map(target_id)
+        | let pa: ProxyAddress val =>
+          try
+            // Try as though we have a reference to the right boundary
+            let boundary = _outgoing_boundaries(pa.worker)
+            let might_be_route = producer.route_to(boundary)
+            match might_be_route
+            | let r: Route =>
+              ifdef "trace" then
+                @printf[I32]("OmniRouter found Route to OutgoingBoundary\n".cstring())
               end
+              let delivery_msg = ForwardMsg[D](pa.step_id,
+                _worker_name, source_ts, data, metric_name,
+                pa, msg_uid, i_frac_ids)
+
+              r.forward(delivery_msg, producer, i_origin, msg_uid, i_frac_ids,
+                i_seq_id, i_route_id)
+              false
             else
-              // We don't have a reference to the right outgoing boundary
+              // We don't have a route to this boundary
               ifdef debug then
-                @printf[I32]("OmniRouter has no reference to OutgoingBoundary\n".cstring())
+                @printf[I32]("OmniRouter had no Route\n".cstring())
               end
               true
             end
-          | let sink_id: U128 =>
-            true
           else
+            // We don't have a reference to the right outgoing boundary
+            ifdef debug then
+              @printf[I32]("OmniRouter has no reference to OutgoingBoundary\n".cstring())
+            end
             true
           end
+        | let sink_id: U128 =>
+          true
         else
-          // Apparently this target_id does not refer to a valid step id
-          ifdef debug then
-            @printf[I32]("OmniRouter: target id does not refer to valid step id\n".cstring())
-          end
           true
         end
+      else
+        // Apparently this target_id does not refer to a valid step id
+        ifdef debug then
+          @printf[I32]("OmniRouter: target id does not refer to valid step id\n".cstring())
+        end
+        true
       end
-    else
-      // We don't have a valid CFP
-      true
     end
 
 class DataRouter
@@ -353,26 +337,20 @@ class LocalPartitionRouter[In: Any val,
         try
           match _partition_routes(key)
           | let s: Step =>
-            // TODO: Remove that producer can be None
-            match producer
-            | let cfp: Producer ref =>
-              let might_be_route = cfp.route_to(s)
-              match might_be_route
-              | let r: Route =>
-                ifdef "trace" then
-                  @printf[I32]("PartitionRouter found Route\n".cstring())
-                end
-                r.run[D](metric_name, source_ts, data,
-                  // hand down cfp so we can update route_id
-                  cfp,
-                  // incoming envelope
-                  i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
-                false
-              else
-                // TODO: What do we do if we get None?
-                true
+            let might_be_route = producer.route_to(s)
+            match might_be_route
+            | let r: Route =>
+              ifdef "trace" then
+                @printf[I32]("PartitionRouter found Route\n".cstring())
               end
+              r.run[D](metric_name, source_ts, data,
+                // hand down producer so we can update route_id
+                producer,
+                // incoming envelope
+                i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
+              false
             else
+              // TODO: What do we do if we get None?
               true
             end
           | let p: ProxyRouter val =>

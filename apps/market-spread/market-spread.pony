@@ -73,7 +73,7 @@ actor Main
                symbol_data_partition where multi_worker = true)
             .done()
       end
-      Startup(env, application, "/tmp/market-spread.evlog")
+      Startup(env, application, "market-spread")
     else
       env.out.print("Couldn't build topology")
     end

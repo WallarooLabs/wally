@@ -160,7 +160,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     if seq_id > _lowest_queue_id then
       let flush_count: USize = (seq_id - _lowest_queue_id).usize()
       _queue.clear_n(flush_count)
-      // _queue.clear()
       _lowest_queue_id = _lowest_queue_id + flush_count.u64()
 
       ifdef "trace" then
