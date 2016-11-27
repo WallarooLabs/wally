@@ -153,6 +153,7 @@ class TypedRoute[In: Any val] is Route
     _step = step
     _consumer = consumer
     _callback = handler
+    // @printf[I32]("!!Route: Registering producer\n".cstring())
     _consumer.register_producer(_step)
     let q_size: USize = ifdef "use_backpressure" then
       500_000
