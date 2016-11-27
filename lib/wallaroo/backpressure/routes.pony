@@ -26,14 +26,6 @@ class Routes
 
     _routes(route.id()) = _Route
 
-  fun ref add_route_id(route_id: RouteId) =>
-    // This is our wedge into current routes until John
-    // and I can work out the abstractions
-    // Its used from Boundary
-    Invariant(not _routes.contains(route_id))
-
-    _routes(route_id) = _Route
-
   fun ref send(producer: Producer ref, o_route_id: RouteId, o_seq_id: SeqId,
     i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
   =>
