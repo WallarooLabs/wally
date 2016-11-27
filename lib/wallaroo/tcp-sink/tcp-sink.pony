@@ -300,7 +300,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     ifdef debug then
       try
         Assert(give_out >= 0,
-          "TCPSink is trying to send back negative credits")
+          "TCPSink calculated and is trying to send back negative credits")
       else
         _hard_close()
         return
