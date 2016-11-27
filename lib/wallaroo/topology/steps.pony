@@ -112,7 +112,9 @@ actor Step is (RunnableStep & Resilient & Producer &
 
     for r in _routes.values() do
       r.initialize()
-      _resilience_routes.add_route(r)
+      ifdef "resilience" then
+        _resilience_routes.add_route(r)
+      end
     end
 
     _omni_router = omni_router
