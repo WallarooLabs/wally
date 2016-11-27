@@ -4,6 +4,8 @@ use "collections"
 use "net"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -178,15 +180,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       // being done.
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     else
-      ifdef debug then
-        try
-          Assert(false, "Encoder sink received unrecognized input type.")
-        else
-          _hard_close()
-          return
-        end
-      end
-      return
+      Fail()
     end
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,

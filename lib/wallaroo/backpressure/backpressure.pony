@@ -2,6 +2,8 @@ use "assert"
 use "sendence/guid"
 use "sendence/queue"
 use "wallaroo/boundary"
+use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/tcp-sink"
 use "wallaroo/topology"
@@ -129,15 +131,7 @@ class TypedRoute[In: Any val] is Route
     _consumer.unregister_producer(_step, _credits_available)
 
   fun ref receive_credits(number: ISize) =>
-     ifdef debug then
-      try
-        Assert(number > 0,
-        "Producer received credits negative credits")
-      else
-        _callback.shutdown(_step)
-        return
-      end
-    end
+    Invariant(number > 0)
 
     _request_outstanding = false
     _credits_available = _credits_available + number
@@ -214,16 +208,15 @@ class TypedRoute[In: Any val] is Route
           msg_uid, frac_ids, i_seq_id, i_route_id)
       end
     else
-      ifdef debug then
-        @printf[I32]("Route received input of wrong type\n".cstring())
-      end
+      Fail()
     end
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId)
   =>
-    @printf[I32]("Forward should never be called on a TypedRoute\n".cstring())
+    // Forward should never be called on a TypedRoute
+    Fail()
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64, input: In,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, frac_ids: None,
@@ -310,15 +303,7 @@ class BoundaryRoute is Route
     _consumer.unregister_producer(_step, _credits_available)
 
   fun ref receive_credits(number: ISize) =>
-     ifdef debug then
-      try
-        Assert(number > 0,
-        "Producer received credits negative credits")
-      else
-        _callback.shutdown(_step)
-        return
-      end
-    end
+     Invariant(number > 0)
 
     _request_outstanding = false
     _credits_available = _credits_available + number
@@ -354,7 +339,8 @@ class BoundaryRoute is Route
     origin: Producer, msg_uid: U128,
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    @printf[I32]("Run should never be called on a BoundaryRoute\n".cstring())
+    // Run should never be called on a BoundaryRoute
+    Fail()
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,

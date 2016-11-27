@@ -4,6 +4,7 @@ use "collections"
 use "net"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/invariant"
 use "wallaroo/topology"
 use "wallaroo/tcp-sink"
 
@@ -167,15 +168,7 @@ actor TCPSource is (Initializable & Producer)
   //
   // CREDIT FLOW
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-    ifdef debug then
-      try
-        Assert(_routes.contains(from),
-        "Source received credits from consumer it isn't registered with.")
-      else
-        _hard_close()
-        return
-      end
-    end
+    Invariant(_routes.contains(from))
 
     try
       let route = _routes(from)
@@ -492,16 +485,8 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
     end
 
   fun ref credits_replenished(producer: Producer ref) =>
-    ifdef debug then
-      try
-        Assert(_muted > 0,
-          "credits_replenished() should only be called when the calling " +
-          "Route was already muted.")
-      else
-        shutdown(producer)
-        return
-      end
-    end
+    Invariant(_muted > 0)
+
     match producer
     | let p: TCPSource ref =>
       _muted = _muted - 1

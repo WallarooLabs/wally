@@ -5,6 +5,8 @@ use "net"
 use "sendence/guid"
 use "sendence/queue"
 use "wallaroo/backpressure"
+use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/tcp-sink"
@@ -108,15 +110,14 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   =>
     try
       if _step_id == 0 then
-        @printf[I32]("Never registered step id for OutgoingBoundary!\n".cstring())
-        error
+        Fail()
       end
 
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
         _auth)
       writev(connect_msg)
     else
-      @printf[I32]("Failed to create DataConnectMsg\n".cstring())
+      Fail()
     end
 
   be register_step_id(step_id: U128) =>
@@ -126,13 +127,15 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId)
   =>
-    @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
+    // Run should never be called on an OutgoingBoundary
+    Fail()
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
   =>
-    @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
+    // Should never be called on an OutgoingBoundary
+    Fail()
 
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: ReplayableDeliveryMsg val,
@@ -210,31 +213,14 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   //
   // CREDIT FLOW
   be register_producer(producer: Producer) =>
-    ifdef debug then
-      try
-        Assert(not _upstreams.contains(producer),
-          "Producer attempted registered with boundary more than once")
-      else
-        _hard_close()
-        return
-      end
-    end
+    Invariant(not _upstreams.contains(producer))
 
     _upstreams.push(producer)
 
   be unregister_producer(producer: Producer,
     credits_returned: ISize)
   =>
-    ifdef debug then
-      try
-        Assert(_upstreams.contains(producer),
-          "Producer attempted to unregistered with sink " +
-          "it isn't registered with")
-      else
-        _hard_close()
-        return
-      end
-    end
+    Invariant(_upstreams.contains(producer))
 
     try
       let i = _upstreams.find(producer)
@@ -260,15 +246,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     to stop sending. They only send when they have credits. If they run out
     and we are experiencing backpressure, they don't get any more.
     """
-    ifdef debug then
-      try
-        Assert(_upstreams.contains(from),
-          "Credit request from unregistered producer")
-      else
-        _hard_close()
-        return
-      end
-    end
+    Invariant(_upstreams.contains(from))
 
     let give_out =  if _can_send() then
       (_distributable_credits / _upstreams.size().isize())

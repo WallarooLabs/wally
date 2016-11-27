@@ -7,15 +7,11 @@ use "sendence/epoch"
 use "sendence/guid"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
 use "wallaroo/tcp-sink"
-
-// trait RunnableStep
-//   be update_router(router: Router val)
-//   be run[D: Any val](metric_name: String, source_ts: U64, data: D)
-//   be dispose()
 
 // TODO: CREDITFLOW- Every runnable step is also a credit flow consumer
 // Really this should probably be another method on CreditFlowConsumer
@@ -271,15 +267,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   //////////////
   // CREDIT FLOW PRODUCER
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-    ifdef debug then
-      try
-        Assert(_routes.contains(from),
-        "Step received credits from consumer it isn't registered with.")
-      else
-        // TODO: CREDITFLOW - What is our error response here?
-        return
-      end
-    end
+    Invariant(_routes.contains(from))
 
     try
       let route = _routes(from)
@@ -296,31 +284,14 @@ actor Step is (RunnableStep & Resilient & Producer &
   //////////////
   // CREDIT FLOW CONSUMER
   be register_producer(producer: Producer) =>
-    ifdef debug then
-      try
-        Assert(not _upstreams.contains(producer),
-          "Producer attempted registered with step more than once")
-      else
-        // TODO: CREDITFLOW - What is our error response here?
-        return
-      end
-    end
+    Invariant(not _upstreams.contains(producer))
 
     _upstreams.push(producer)
 
   be unregister_producer(producer: Producer,
     credits_returned: ISize)
   =>
-    ifdef debug then
-      try
-        Assert(_upstreams.contains(producer),
-          "Producer attempted to unregistered with step " +
-          "it isn't registered with")
-      else
-        // TODO: CREDITFLOW - What is our error response here?
-        return
-      end
-    end
+    Invariant(_upstreams.contains(producer))
 
     try
       let i = _upstreams.find(producer)
@@ -336,15 +307,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
     """
-    ifdef debug then
-      try
-        Assert(_upstreams.contains(from),
-          "Credit request from unregistered producer")
-      else
-        // TODO: CREDITFLOW - What is our error response here?
-        return
-      end
-    end
+    Invariant(_upstreams.contains(from))
 
     // TODO: CREDITFLOW - this is a very naive strategy
     // Could quite possibly deadlock. Would need to look into that more.

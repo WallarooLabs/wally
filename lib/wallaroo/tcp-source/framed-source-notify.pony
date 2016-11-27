@@ -1,6 +1,7 @@
 use "time"
 use "sendence/guid"
 use "wallaroo/backpressure"
+use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -84,12 +85,12 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
               conn, _router, _omni_router,
               o,  _guid_gen.u128(), None, 0, 0)
           else
-            @printf[I32](("FramedSourceNotify needs an Producer " +
-              "to pass along!\n").cstring())
+            // FramedSourceNotify needs an Producer to pass along
+            Fail()
             true
           end
         else
-          // TODO: we need to provide a good error handling route for crap
+          Fail()
           true
         end
 
