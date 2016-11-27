@@ -4,21 +4,39 @@ use "collections"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/messages"
+use "wallaroo/fail"
+
+//TODO: origin needs to get its own file
+trait tag Resilient
+  be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq)
+  be replay_finished()
+  be start_without_replay()
+
+//TODO: explain in comment
+type LogEntry is (Bool, U128, U128, None, U64, U64, Array[ByteSeq] val)
+
+// used to hold a receovered log entry that might need to be replayed on
+// recovery
+type ReplayEntry is (U128, U128, None, U64, U64, ByteSeq val)
 
 trait Backend
-  fun ref flush()
+  fun ref flush() ?
+  fun ref sync() ?
   fun ref start()
-  fun ref write_entry(origin_id: U128, entry: LogEntry)
+  fun ref write_entries(log_entries: Array[LogEntry val]) ?
 
 class DummyBackend is Backend
   new create() => None
   fun ref flush() => None
+  fun ref sync() => None
   fun ref start() => None
-  fun ref write_entry(origin_id: U128, entry: LogEntry) => None
+  fun ref write_entries(log_entries: Array[LogEntry val]) => None
 
 class FileBackend is Backend
   //a record looks like this:
-  // - buffer id
+  // - is_watermark boolean
+  // - origin id
+  // - seq id (low watermark record ends here)
   // - uid
   // - size of fractional id list
   // - fractional id list (may be empty)
@@ -40,98 +58,181 @@ class FileBackend is Backend
 
   fun ref start() =>
     if _replay_on_start then
+      @printf[I32]("RESILIENCE: Replaying from recovery log file.\n".cstring())
+
       //replay log to Alfred
       try
         let r = Reader
+
         //seek beginning of file
         _file.seek_start(0)
         var size = _file.size()
+
+        var num_replayed: USize = 0
+        var num_skipped: USize = 0
+
+        // array to hold recovered data temporarily until we've sent it off to
+        // be replayed
+        var replay_buffer: Array[ReplayEntry val] ref = replay_buffer.create()
+
+        let watermarks: Map[U128, U64] = watermarks.create()
+
         //start iterating until we reach original EOF
         while _file.position() < size do
-          r.append(_file.read(40))
+          r.append(_file.read(25))
+          let is_watermark = r.bool()
           let origin_id = r.u128_be()
-          let uid = r.u128_be()
-          let fractional_size = r.u64_be()
-          let frac_ids = recover val
-            if fractional_size > 0 then
-              r.append(_file.read(fractional_size.usize() * 8))
-              let l = Array[U64]
-              for i in Range(0,fractional_size.usize()) do
-                l.push(r.u64_be())
+          let seq_id = r.u64_be()
+          if is_watermark then
+            // save last watermark read from file
+            watermarks(origin_id) = seq_id
+          else
+            r.append(_file.read(24))
+            let uid = r.u128_be()
+            let fractional_size = r.u64_be()
+            let frac_ids = recover val
+              if fractional_size > 0 then
+                r.append(_file.read(fractional_size.usize() * 8))
+                let l = Array[U64]
+                for i in Range(0,fractional_size.usize()) do
+                  l.push(r.u64_be())
+                end
+                l
+              else
+                //None is faster if we have no frac_ids, which will probably be
+                //true most of the time
+                None
               end
-              l
-            else
-              //None is faster if we have no frac_ids, which will probably be
-              //true most of the time
-              None
             end
+            r.append(_file.read(16)) //TODO: use sizeof-type things?
+            let statechange_id = r.u64_be()
+            let payload_length = r.u64_be()
+            let payload = recover val _file.read(payload_length.usize()) end
+
+            // put entry into temporary recovered buffer
+            replay_buffer.push((origin_id, uid, None, statechange_id, seq_id
+                               , payload))
+
           end
-          r.append(_file.read(16)) //TODO: use sizeof-type things?
-          let statechange_id = r.u64_be()
-          let payload_length = r.u64_be()
-          let payload = recover val _file.read(payload_length.usize()) end
-          _alfred.replay_log_entry(origin_id, uid, None, statechange_id, payload)
+
+          // clear read buffer to free file data read so far
+          r.clear()
         end
+
+        // iterate through recovered buffer and replay entries at or below
+        // watermark
+        for entry in replay_buffer.values() do
+          try
+            // only replay if at or below watermark
+            if entry._5 <= watermarks(entry._1) then
+              num_replayed = num_replayed + 1
+              _alfred.replay_log_entry(entry._1, entry._2, entry._3, entry._4
+                                      , entry._6)
+            else
+              num_skipped = num_skipped + 1
+            end
+          else
+            Fail()
+          end
+        end
+
+        @printf[I32]("RESILIENCE: Replayed %d entries from recovery log file.\n".cstring(), num_replayed)
+        @printf[I32]("RESILIENCE: Skipped %d entries from recovery log file.\n".cstring(), num_skipped)
+
         _file.seek_end(0)
         _alfred.log_replay_finished()
       else
         @printf[I32]("Cannot recover state from eventlog\n".cstring())
       end
     else
+      @printf[I32]("RESILIENCE: Nothing to replay from recovery log file.\n".cstring())
       _alfred.start_without_replay()
     end
 
-  fun ref write_entry(origin_id: U128, entry: LogEntry)
+  fun ref write_entries(log_entries: Array[LogEntry val]) ?
   =>
-    (let uid:U128, let frac_ids: None,
+    for entry in log_entries.values() do
+      _encode_entry(entry)
+    end
+    if not _file.writev(recover val _writer.done() end) then
+      error
+    end
+
+  fun ref _encode_entry(entry: LogEntry)
+  =>
+    (let is_watermark: Bool, let origin_id: U128, let uid: U128, let frac_ids: None,
      let statechange_id: U64, let seq_id: U64, let payload: Array[ByteSeq] val)
     = entry
+
+    _writer.bool(is_watermark)
     _writer.u128_be(origin_id)
-    _writer.u128_be(uid)
+    _writer.u64_be(seq_id)
 
-    // match frac_ids
-    // | let ids: Array[U64] val =>
-    //   let s = ids.size()
-    //   _writer.u64_be(s.u64())
-    //   for j in Range(0,s) do
-    //     try
-    //       _writer.u64_be(ids(j))
-    //     else
-    //       @printf[I32]("fractional id %d on message %d disappeared!".cstring(),
-    //         j, uid)
-    //     end
-    //   end
-    // else
-    // //we have no frac_ids
-    // _writer.u64_be(0)
-    // end
+    if not is_watermark then
 
-    //we have no frac_ids
-    _writer.u64_be(0)
+      _writer.u128_be(uid)
 
-    _writer.u64_be(statechange_id)
-    var payload_size: USize = 0
-    for p in payload.values() do
-      payload_size = payload_size + p.size()
+      // match frac_ids
+      // | let ids: Array[U64] val =>
+      //   let s = ids.size()
+      //   _writer.u64_be(s.u64())
+      //   for j in Range(0,s) do
+      //     try
+      //       _writer.u64_be(ids(j))
+      //     else
+      //       @printf[I32]("fractional id %d on message %d disappeared!".cstring(),
+      //         j, uid)
+      //     end
+      //   end
+      // else
+      // //we have no frac_ids
+      // _writer.u64_be(0)
+      // end
+
+      //we have no frac_ids
+      _writer.u64_be(0)
+
+      _writer.u64_be(statechange_id)
+      var payload_size: USize = 0
+      for p in payload.values() do
+        payload_size = payload_size + p.size()
+      end
+      _writer.u64_be(payload_size.u64())
     end
-    _writer.u64_be(payload_size.u64())
-    _writer.writev(payload)
-    _file.writev(recover val _writer.done() end)
 
-  fun ref flush() =>
+    // write data to write buffer
+    _writer.writev(payload)
+
+  fun ref flush() ? =>
     _file.flush()
+    match _file.errno()
+    | FileOK => None
+    else
+      error
+    end
+
+  fun ref sync() ? =>
+    _file.sync()
+    match _file.errno()
+    | FileOK => None
+    else
+      error
+    end
 
 
 actor Alfred
     let _origins: Map[U128, (Resilient & Producer)] = _origins.create()
-    let _log_buffers: Map[U128, EventLogBuffer ref] = _log_buffers.create()
+    let _seq_ids: Map[U128, U64] = _seq_ids.create()
+    var _log_buffer: Array[LogEntry val] ref = _log_buffer.create()
+    let _logging_batch_size: USize
     let _backend: Backend ref
     let _incoming_boundaries: Array[DataReceiver tag] ref =
       _incoming_boundaries.create(1)
     let _replay_complete_markers: Map[U64, Bool] =
       _replay_complete_markers.create()
 
-    new create(env: Env, filename: (String val | None) = None) =>
+    new create(env: Env, filename: (String val | None) = None, logging_batch_size: USize = 1000) =>
+      _logging_batch_size = logging_batch_size
       _backend =
       recover iso
         match filename
@@ -196,40 +297,34 @@ actor Alfred
 
     be register_origin(origin: (Resilient & Producer), id: U128) =>
       _origins(id) = origin
-      _log_buffers(id) =
-        ifdef "resilience" then
-          StandardEventLogBuffer(this,id)
-        else
-          DeactivatedEventLogBuffer
-        end
 
     be queue_log_entry(origin_id: U128, uid: U128,
       frac_ids: None, statechange_id: U64, seq_id: U64,
       payload: Array[ByteSeq] val)
     =>
-      try
-        _log_buffers(origin_id).queue(uid, frac_ids, statechange_id, seq_id, payload)
+      ifdef "resilience" then
+        // update sequence id received for logging
+        _seq_ids(origin_id) = seq_id
+
+        // add to buffer
+        _log_buffer.push((false, origin_id, uid, frac_ids, statechange_id
+                         , seq_id, payload))
+
+        if _log_buffer.size() == _logging_batch_size then
+          //write buffer to disk
+          write_log()
+        end
       else
-        @printf[I32]("Trying to log to non-existent buffer no %d!".cstring(),
-          origin_id)
+        None
       end
 
-    be write_log(origin_id: U128, log_entries: Array[LogEntry val] iso,
-      low_watermark:U64)
+    fun ref write_log()
     =>
-      let write_count = log_entries.size()
-      for i in Range(0, write_count) do
-        try
-          _backend.write_entry(origin_id,log_entries(i))
-        else
-          @printf[I32]("unable to find log entry %d for buffer id %d - it seems to have disappeared!".cstring(), i, origin_id)
-        end
-      end
-      _backend.flush()
       try
-        _origins(origin_id).log_flushed(low_watermark)
+        // write buffer to disk
+        _backend.write_entries(_log_buffer = Array[LogEntry val])
       else
-        @printf[I32]("buffer %d disappeared!".cstring(), origin_id)
+        @printf[I32]("error writing log entries to disk!\n".cstring())
       end
 
     be flush_buffer(origin_id: U128, low_watermark:U64) =>
@@ -239,8 +334,19 @@ actor Alfred
       end
 
       try
-        _log_buffers(origin_id).flush(low_watermark)
+        // Add low watermark ack to buffer
+        _log_buffer.push((true, origin_id, 0, None, 0, low_watermark
+                         , recover Array[ByteSeq] end))
+
+        //write buffer to disk
+        write_log()
+
+        // flush any written data to disk
+        _backend.flush()
+
+        // sync any written data to disk
+        _backend.sync()
       else
-        @printf[I32]("Trying to flush non-existent buffer no %d!".cstring(),
-          origin_id)
+        @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
       end
+
