@@ -40,6 +40,7 @@ public:
 class EncodableData: public Data
 {
 public:
+  virtual ~EncodableData() {};
   virtual size_t encode_get_size() = 0;
   virtual void encode(char *bytes) = 0;
 };
