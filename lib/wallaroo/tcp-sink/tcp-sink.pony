@@ -291,10 +291,20 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    let give_out =  if _can_send() then
+    let give_out = if _can_send() then
       (_distributable_credits / _upstreams.size().isize())
     else
       0
+    end
+
+    ifdef debug then
+      try
+        Assert(give_out >= 0,
+          "TCPSink is trying to send back negative credits")
+      else
+        _hard_close()
+        return
+      end
     end
 
     from.receive_credits(give_out, this)
