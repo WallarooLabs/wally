@@ -160,7 +160,6 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _request_credits() =>
     if not _request_outstanding then
-      @printf[I32]("!!Requesting credits\n".cstring())
       _consumer.credit_request(_step)
       _request_outstanding = true
     end
@@ -330,13 +329,11 @@ class BoundaryRoute is Route
       _request_more_credits_after =
         _credits_available - (_credits_available >> 2)
     else
-      @printf[I32]("!!Credits received is 0 which is less than we want\n".cstring())
       _request_credits()
     end
 
   fun ref _request_credits() =>
     if not _request_outstanding then
-      @printf[I32]("!!Requesting credits\n".cstring())
       _consumer.credit_request(_step)
       _request_outstanding = true
     end

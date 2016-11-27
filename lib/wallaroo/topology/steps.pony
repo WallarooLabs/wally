@@ -167,10 +167,10 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
 
     //!
-    _count = _count + 1
-    if (_count % 10_000) == 0 then
-      @printf[I32]("!!Next 10,000 recvd at STEP\n".cstring())
-    end
+    // _count = _count + 1
+    // if (_count % 10_000) == 0 then
+    //   @printf[I32]("!!Next 10,000 recvd at STEP\n".cstring())
+    // end
 
   fun ref next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
@@ -330,16 +330,16 @@ actor Step is (RunnableStep & Resilient & Producer &
 
     // TODO: CREDITFLOW - this is a very naive strategy
     // Could quite possibly deadlock. Would need to look into that more.
-    let lccl = _lowest_route_credit_level()
+    // let lccl = _lowest_route_credit_level()
     let desired_give_out = _distributable_credits / _upstreams.size().isize()
-    let give_out = if lccl > desired_give_out then
-      desired_give_out
-    else
-      lccl
-    end
+    // let give_out = if lccl > desired_give_out then
+      // desired_give_out
+    // else
+      // lccl
+    // end
 
-    from.receive_credits(give_out, this)
-    _distributable_credits = _distributable_credits - give_out
+    from.receive_credits(desired_give_out, this)
+    _distributable_credits = _distributable_credits - desired_give_out
 
   fun _lowest_route_credit_level(): ISize =>
     var lowest: ISize = ISize.max_value()
