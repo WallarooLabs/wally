@@ -306,6 +306,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   be unregister_producer(producer: Producer,
     credits_returned: ISize)
   =>
+    @printf[I32](("!!Unregistering producer on " + _runner.name() + "\n").cstring())
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end

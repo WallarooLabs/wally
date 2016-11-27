@@ -290,6 +290,7 @@ actor TCPSource is (Initializable & Producer)
     if _connected and _shutdown and _shutdown_peer then
       _hard_close()
     else
+      @printf[I32]("!!Disposing of routes\n".cstring())
       for r in _routes.values() do
         r.dispose()
       end
@@ -318,6 +319,7 @@ actor TCPSource is (Initializable & Producer)
     _notify.closed(this)
 
     _listen._conn_closed()
+    @printf[I32]("!!Disposing of routes\n".cstring())
     for r in _routes.values() do
       r.dispose()
     end
