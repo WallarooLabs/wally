@@ -162,7 +162,7 @@ actor Startup
         )
       else
         connections.register_listener(
-          TCPListener(auth, consume control_notifier) 
+          TCPListener(auth, consume control_notifier) // chooses port each time
         )
       end
 

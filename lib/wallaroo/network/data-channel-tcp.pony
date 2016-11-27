@@ -134,6 +134,12 @@ class DataChannelConnectNotifier is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     _env.out.print("incoming connected on data channel")
 
+  fun ref closed(conn: TCPConnection ref) =>
+    _env.out.print("DataChannelConnectNotifier : server closed")
+    //TODO: Initiate reconnect to downstream node here. We need to
+    //      create a new connection in OutgoingBoundary
+    
+    
 // class DataSenderConnectNotifier is TCPConnectionNotify
 //   let _env: Env
 

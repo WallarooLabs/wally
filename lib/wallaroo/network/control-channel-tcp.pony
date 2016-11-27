@@ -146,7 +146,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _env.out.print(_name + ": connection failed!")
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print(_name + ": server closed")
+    _env.out.print("ControlChannelConnectNotifier :" + _name + ": server closed")
 
 class ControlSenderConnectNotifier is TCPConnectionNotify
   let _env: Env

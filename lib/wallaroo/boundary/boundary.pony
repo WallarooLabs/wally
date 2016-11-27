@@ -99,10 +99,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     _notify = EmptyBoundaryNotify
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
-      from.cstring())
+      _from.cstring())
     _notify_connecting()
 
-    @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + service + "\n").cstring())
+    @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
@@ -699,6 +699,26 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   fun ref _watermarks_counter(): U64 =>
     _wmcounter = _wmcounter + 1
 
+  be reconnect_to_downstream() =>
+    @printf[I32](("OutgoingBoundary: trying to reconnect to downstream: " +
+      _host + ": " + _service + "\n\n").cstring())
+    _notify = EmptyBoundaryNotify
+
+    while not _connected do
+      // this doesn't work because downstream comes back on a different port
+      // could it come back on the same port?
+      _connect_count = _try_reconnect_to_downstream()
+      //TODO: wait a while before retrying
+    end
+    
+    _notify_connecting()
+
+  fun ref _try_reconnect_to_downstream(): U32 =>
+    @pony_os_connect_tcp[U32](this,
+      _host.cstring(), _service.cstring(),
+      _from.cstring())
+
+    
 interface _OutgoingBoundaryNotify
   fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
     """
@@ -777,4 +797,9 @@ class EmptyBoundaryNotify is _OutgoingBoundaryNotify
   """
   Called when we have successfully connected to the server.
   """
-  None
+    @printf[I32]("EmptyBoundaryNotify: connected\n\n".cstring())
+    None
+
+  fun ref closed(conn: OutgoingBoundary ref) =>
+    @printf[I32]("EmptyBoundaryNotify: closed\n\n".cstring())
+    conn.reconnect_to_downstream()
