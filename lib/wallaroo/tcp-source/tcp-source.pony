@@ -156,14 +156,10 @@ actor TCPSource is (Initializable & Producer)
     None
 
   be dispose() =>
-     """
+    """
     - Close the connection gracefully.
-    - Dispose of our routes
     """
     close()
-    for r in _routes.values() do
-      r.dispose()
-    end
 
   //
   // CREDIT FLOW
@@ -293,6 +289,10 @@ actor TCPSource is (Initializable & Producer)
 
     if _connected and _shutdown and _shutdown_peer then
       _hard_close()
+    else
+      for r in _routes.values() do
+        r.dispose()
+      end
     end
 
   fun ref _hard_close() =>
@@ -318,6 +318,9 @@ actor TCPSource is (Initializable & Producer)
     _notify.closed(this)
 
     _listen._conn_closed()
+    for r in _routes.values() do
+      r.dispose()
+    end
 
   fun ref _pending_reads() =>
     """
@@ -458,9 +461,11 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
+    @printf[I32]("!!MUTE\n".cstring())
     _muted = true
 
   fun ref _unmute() =>
+    @printf[I32]("!!UNMUTE\n".cstring())
     _muted = false
     _pending_reads()
 
@@ -502,6 +507,8 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       _muted = _muted - 1
       if (_muted == 0) then
         p._unmute()
+      else
+        @printf[I32]("!!_muted != 0 which is weird\n".cstring())
       end
     end
 

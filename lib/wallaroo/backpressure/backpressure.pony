@@ -334,6 +334,7 @@ class BoundaryRoute is Route
 
   fun ref _request_credits() =>
     if not _request_outstanding then
+      @printf[I32]("!!Requesting credits\n".cstring())
       _consumer.credit_request(_step)
       _request_outstanding = true
     end
