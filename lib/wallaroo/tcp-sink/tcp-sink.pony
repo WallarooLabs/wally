@@ -281,6 +281,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     to stop sending. They only send when they have credits. If they run out
     and we are experiencing backpressure, they don't get any more.
     """
+    @printf[I32]("!!Request at Sink\n".cstring())
+
     ifdef debug then
       try
         Assert(_upstreams.contains(from),

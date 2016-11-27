@@ -508,7 +508,7 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       if (_muted == 0) then
         p._unmute()
       else
-        @printf[I32]("!!_muted != 0 which is weird\n".cstring())
+        @printf[I32](("!!_muted == " + _muted.string() + "\n").cstring())
       end
     end
 
