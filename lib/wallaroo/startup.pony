@@ -15,10 +15,13 @@ actor Startup
     app_name: (String val | None)) 
   =>
     ifdef "use_backpressure" then
-      env.out.print("**BACKPRESSURE is active**")
+      env.out.print("****BACKPRESSURE is active****")
     end
     ifdef "resilience" then
-      env.out.print("**RESILIENCE is active**")
+      env.out.print("****RESILIENCE is active****")
+    end
+    ifdef "trace" then
+      env.out.print("****TRACE is active****")
     end
 
     var m_arg: (Array[String] | None) = None
