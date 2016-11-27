@@ -70,8 +70,11 @@ actor Step is (RunnableStep & Resilient & Producer &
   // TODO: This needs to be merged with credit flow producer routes
   let _resilience_routes: Routes = Routes
 
-  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
-    id: U128, route_builder: RouteBuilder val, alfred: Alfred,
+  //!!
+  var _count: USize = 0
+
+  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, 
+    id: U128, route_builder: RouteBuilder val, alfred: Alfred, 
     router: Router val = EmptyRouter, default_target: (Step | None) = None,
     omni_router: OmniRouter val = EmptyOmniRouter)
   =>
@@ -161,6 +164,12 @@ actor Step is (RunnableStep & Resilient & Producer &
           i_origin, i_route_id, i_seq_id)
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
+    end
+
+    //!
+    _count = _count + 1
+    if (_count % 10_000) == 0 then
+      @printf[I32]("!!Next 10,000 recvd at STEP\n".cstring())
     end
 
   fun ref next_sequence_id(): U64 =>
