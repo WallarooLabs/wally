@@ -23,14 +23,16 @@ trait Backend
   fun ref flush() ?
   fun ref sync() ?
   fun ref start()
-  fun ref write_entries(log_entries: Array[LogEntry val]) ?
+  fun ref write() ?
+  fun ref encode_entry(entry: LogEntry)
 
 class DummyBackend is Backend
   new create() => None
   fun ref flush() => None
   fun ref sync() => None
   fun ref start() => None
-  fun ref write_entries(log_entries: Array[LogEntry val]) => None
+  fun ref write() => None
+  fun ref encode_entry(entry: LogEntry) => None
 
 class FileBackend is Backend
   //a record looks like this:
@@ -149,16 +151,13 @@ class FileBackend is Backend
       _alfred.start_without_replay()
     end
 
-  fun ref write_entries(log_entries: Array[LogEntry val]) ?
+  fun ref write() ?
   =>
-    for entry in log_entries.values() do
-      _encode_entry(entry)
-    end
     if not _file.writev(recover val _writer.done() end) then
       error
     end
 
-  fun ref _encode_entry(entry: LogEntry)
+  fun ref encode_entry(entry: LogEntry)
   =>
     (let is_watermark: Bool, let origin_id: U128, let uid: U128, let frac_ids: None,
      let statechange_id: U64, let seq_id: U64, let payload: Array[ByteSeq] val)
@@ -222,14 +221,13 @@ class FileBackend is Backend
 
 actor Alfred
     let _origins: Map[U128, (Resilient & Producer)] = _origins.create()
-    let _seq_ids: Map[U128, U64] = _seq_ids.create()
-    var _log_buffer: Array[LogEntry val] ref = _log_buffer.create()
     let _logging_batch_size: USize
     let _backend: Backend ref
     let _incoming_boundaries: Array[DataReceiver tag] ref =
       _incoming_boundaries.create(1)
     let _replay_complete_markers: Map[U64, Bool] =
       _replay_complete_markers.create()
+    var num_encoded: USize = 0
 
     new create(env: Env, filename: (String val | None) = None, logging_batch_size: USize = 1000) =>
       _logging_batch_size = logging_batch_size
@@ -303,14 +301,15 @@ actor Alfred
       payload: Array[ByteSeq] val)
     =>
       ifdef "resilience" then
-        // update sequence id received for logging
-        _seq_ids(origin_id) = seq_id
-
-        // add to buffer
-        _log_buffer.push((false, origin_id, uid, frac_ids, statechange_id
+        // add to backend buffer after encoding
+        // encode right away to amortize encoding cost per entry when received
+        // as opposed to when writing a batch to disk
+        _backend.encode_entry((false, origin_id, uid, frac_ids, statechange_id
                          , seq_id, payload))
 
-        if _log_buffer.size() == _logging_batch_size then
+        num_encoded = num_encoded + 1
+
+        if num_encoded == _logging_batch_size then
           //write buffer to disk
           write_log()
         end
@@ -321,10 +320,13 @@ actor Alfred
     fun ref write_log()
     =>
       try
+        num_encoded = 0
+
         // write buffer to disk
-        _backend.write_entries(_log_buffer = Array[LogEntry val])
+        _backend.write()
       else
         @printf[I32]("error writing log entries to disk!\n".cstring())
+        Fail()
       end
 
     be flush_buffer(origin_id: U128, low_watermark:U64) =>
@@ -335,8 +337,10 @@ actor Alfred
 
       try
         // Add low watermark ack to buffer
-        _log_buffer.push((true, origin_id, 0, None, 0, low_watermark
+        _backend.encode_entry((true, origin_id, 0, None, 0, low_watermark
                          , recover Array[ByteSeq] end))
+
+        num_encoded = num_encoded + 1
 
         //write buffer to disk
         write_log()
@@ -348,5 +352,6 @@ actor Alfred
         _backend.sync()
       else
         @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
+        Fail()
       end
 
