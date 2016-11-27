@@ -11,12 +11,12 @@ class Routes
   let _routes: Map[RouteId, _Route] = _routes.create()
   var _flushed_watermark: U64 = 0
   var _flushing: Bool = false
-  let _ack_batch_size: USize = 5
-  let _outgoing_to_incoming: _OutgoingToIncoming =
-    _OutgoingToIncoming(_ack_batch_size)
+  let _ack_batch_size: USize
+  let _outgoing_to_incoming: _OutgoingToIncoming
 
-  new create() =>
-    None
+  new create(ack_batch_size': USize = 10_000) =>
+    _ack_batch_size = ack_batch_size'
+    _outgoing_to_incoming = _OutgoingToIncoming(_ack_batch_size)
 
   fun ref add_route(route: Route) =>
     // This is our wedge into current routes until John

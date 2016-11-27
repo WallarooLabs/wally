@@ -13,11 +13,14 @@ class TerminusRoute
   such as "terminate this tuple once we know it has been sent by the sink".
   """
   var _highest_tracking_id_acked: U64 = 0
-  let _ack_batch_size: USize = 5
+  let _ack_batch_size: USize
   var _tracking_id: U64 = 0
-  let _tracking_id_to_incoming: _OutgoingToIncoming =
-    _OutgoingToIncoming(_ack_batch_size)
-   var _acked_watermark: U64 = 0
+  let _tracking_id_to_incoming: _OutgoingToIncoming
+  var _acked_watermark: U64 = 0
+
+  new create(ack_batch_size': USize = 10_000) =>
+    _ack_batch_size = ack_batch_size'
+    _tracking_id_to_incoming = _OutgoingToIncoming(_ack_batch_size)
 
   fun ref terminate(i_origin: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): SeqId
