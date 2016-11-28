@@ -331,7 +331,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     _recoup_credits(recoup)
 
   fun ref _recoup_credits(recoup: ISize) =>
-    @printf[I32]("!!Recouping")
+    // @printf[I32]("!!Recouping".cstring())
     _distributable_credits = _distributable_credits + recoup
     if _distributable_credits > _max_distributable_credits then
       _distributable_credits = _max_distributable_credits

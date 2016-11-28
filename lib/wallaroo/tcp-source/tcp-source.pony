@@ -2,6 +2,7 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "time"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/invariant"
@@ -27,6 +28,8 @@ actor TCPSource is (Initializable & Producer)
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _tcp_sinks: Array[TCPSink] val
+  var _credit_timer: (Timer tag | None) = None
+  let _credit_timers: Timers = Timers
 
   // TCP
   let _listen: TCPSourceListener
@@ -167,6 +170,14 @@ actor TCPSource is (Initializable & Producer)
 
   //
   // CREDIT FLOW
+  be request_credits() =>
+    ifdef "credit_trace" then
+      @printf[I32]("Source: Periodic credit request while muted\n".cstring())
+    end
+    for r in _routes.values() do
+      r.request_credits()
+    end
+
   fun ref recoup_credits(credits: ISize) => None
 
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
@@ -469,9 +480,23 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
-    _muted = true
+    try
+      let t = Timer(_RequestCredits(this), 1_000_000_000, 1_000_000_000)
+      _credit_timer = t as Timer tag
+      _credit_timers(consume t)
+      _muted = true
+    else
+      ifdef debug then
+        @printf[I32]("Failed to mute source\n".cstring())
+      end
+    end
 
   fun ref _unmute() =>
+    match _credit_timer
+    | let t: Timer tag =>
+      _credit_timers.cancel(t)
+      _credit_timer = None
+    end
     _muted = false
     _pending_reads()
 
@@ -523,3 +548,12 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       p._mute()
     end
 
+class _RequestCredits is TimerNotify
+ let _source: TCPSource
+
+ new iso create(source: TCPSource) =>
+  _source = source
+
+ fun ref apply(timer: Timer, count: U64): Bool =>
+   _source.request_credits()
+   true
