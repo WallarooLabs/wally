@@ -289,7 +289,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("Boundary: credit request and giving %llu credits out of %llu\n".cstring(), desired_give_out, _distributable_credits)
+      @printf[I32]("Boundary: credit request and giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
     end
 
     from.receive_credits(give_out, this)
