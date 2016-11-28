@@ -499,7 +499,7 @@ actor TCPSource is (Initializable & Producer)
   fun ref _mute() =>
     @printf[I32]("!!MUTE\n".cstring())
     try
-      if not _unregistered then
+      if (_credit_timer is None) and (not _unregistered) then
         let t = Timer(_RequestCredits(this), 1_000_000_000, 1_000_000_000)
         _credit_timer = t as Timer tag
         _credit_timers(consume t)
