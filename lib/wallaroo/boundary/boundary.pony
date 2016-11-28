@@ -38,7 +38,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 500_000
-  var _distributable_credits: ISize = _max_distributable_credits
+  var _distributable_credits: ISize = 200_000
   var _unacked_credits: ISize = 0
 
   // TCP
@@ -157,6 +157,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       _queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
+
+      _distributable_credits = _distributable_credits - 1
     end
 
   be writev(data: Array[ByteSeq] val) =>
@@ -167,10 +169,14 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       let flush_count: USize = (seq_id - _lowest_queue_id).usize()
       _queue.clear_n(flush_count)
       _lowest_queue_id = _lowest_queue_id + flush_count.u64()
+      _distributable_credits = _distributable_credits + flush_count.isize()
+      if _distributable_credits > _max_distributable_credits then
+        _distributable_credits = _max_distributable_credits
+      end
 
       ifdef "trace" then
         @printf[I32](
-          "Got ack callback from downstream worker --------\n\n".cstring())
+          "OutgoingBoundary: got ack from downstream worker\n".cstring())
       end
 
       ifdef "resilience" then
