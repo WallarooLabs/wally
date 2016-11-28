@@ -64,7 +64,7 @@ actor Connections
     _listeners.push(listener)
 
   be make_and_register_recoverable_listener(auth: TCPListenerAuth,
-    data_notifier: TCPListenNotify iso, recovery_addr_file: FilePath val,
+    notifier: TCPListenNotify iso, recovery_addr_file: FilePath val,
     host: String val = "", port: String val = "0")
   =>
     if recovery_addr_file.exists() then
@@ -72,13 +72,16 @@ actor Connections
         let file = File(recovery_addr_file)
         let host' = file.line()
         let port' = file.line()
-        _listeners.push(TCPListener(auth, consume data_notifier, consume host',
+        _listeners.push(TCPListener(auth, consume notifier, consume host',
           consume port'))
       else
         @printf[I32]("could not recover host and port from file (replace with Fail())\n".cstring())
       end
     else
-      _listeners.push(TCPListener(auth, consume data_notifier, host, port))
+        let file = File(recovery_addr_file)
+        file.print(host)
+        file.print(port)      
+      _listeners.push(TCPListener(auth, consume notifier, host, port))
     end
 
   be create_initializer_data_channel(
