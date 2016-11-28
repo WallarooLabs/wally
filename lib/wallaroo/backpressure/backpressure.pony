@@ -201,10 +201,6 @@ class TypedRoute[In: Any val] is Route
       Invariant(number >= 0)
     end
 
-    ifdef "credit_trace" then
-      @printf[I32]("--Route: rcvd %llu credits\n".cstring(), number)
-    end 
-
     _request_outstanding = false
     let credits_recouped = 
       if (_credits_available + number) > _max_credits then
@@ -215,6 +211,11 @@ class TypedRoute[In: Any val] is Route
     _credits_available = _credits_available + credits_recouped
     _step.recoup_credits(credits_recouped)
     _consumer.ack_credits(number, number - credits_recouped)
+
+    ifdef "credit_trace" then
+      @printf[I32]("--Route: rcvd %llu credits. Used %llu. Had %llu out of %llu\n".cstring(), number, credits_recouped, 
+        _credits_available - credits_recouped, _max_credits)
+    end 
 
     if _credits_available > 0 then
       if (_credits_available - credits_recouped) == 0 then

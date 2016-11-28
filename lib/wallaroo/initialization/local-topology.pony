@@ -822,11 +822,11 @@ actor LocalTopologyInitializer
           receiver.update_router(data_router)
         end
 
-        if _is_initializer then
-          _is_initializer = false
-        else
+        if not _is_initializer then
           // Inform the initializer that we're done initializing our local
-          // topology
+          // topology. If this is the initializer worker, we'll inform 
+          // our WorkerInitializer actor once we've spun up the source
+          // listeners.
           let topology_ready_msg =
             try
               ChannelMsgEncoder.topology_ready(_worker_name, _auth)
@@ -877,6 +877,7 @@ actor LocalTopologyInitializer
       match _worker_initializer
       | let wi: WorkerInitializer =>
         wi.topology_ready("initializer")
+        _is_initializer = false
       else
         @printf[I32]("Need WorkerInitializer to inform that topology is ready\n".cstring())
       end
