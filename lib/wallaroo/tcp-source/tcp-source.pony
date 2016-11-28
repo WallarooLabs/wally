@@ -367,6 +367,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
           end
 
           let out = _expect_read_buf.block(block_size)
+
           let carry_on = _notify.received(this, consume out)
           ifdef osx then
             if not carry_on then
@@ -414,8 +415,15 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
           while (_expect_read_buf.size() > 0) and
             (_expect_read_buf.size() >= _expect)
           do
-            let out = _expect_read_buf.block(_expect)
-            let osize = _expect
+            let block_size = if _expect != 0 then
+              _expect
+            else
+              _expect_read_buf.size()
+            end
+
+            let out = _expect_read_buf.block(block_size)
+
+            let osize = block_size
 
             let carry_on = _notify.received(this, consume out)
             ifdef osx then
@@ -439,21 +447,38 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
           let dsize = _read_len
           _read_len = 0
 
-          let carry_on = _notify.received(this, consume data)
-          ifdef osx then
-            if not carry_on then
-              _read_again()
-              return
+          _expect_read_buf.append(consume data)
+
+          while (_expect_read_buf.size() > 0) and
+            (_expect_read_buf.size() >= _expect)
+          do
+            let block_size = if _expect != 0 then
+              _expect
+            else
+              _expect_read_buf.size()
             end
 
-            sum = sum + dsize
+            let out = _expect_read_buf.block(block_size)
 
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              return
+            let osize = block_size
+
+            let carry_on = _notify.received(this, consume out)
+            ifdef osx then
+              if not carry_on then
+                _read_again()
+                return
+              end
+
+              sum = sum + osize
+
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                _read_again()
+                return
+              end
             end
           end
+
         end
       end
     else
