@@ -135,11 +135,14 @@ actor Startup
       let event_log_file = "/tmp/" + name + "-" + worker_name + ".evlog"
       let local_topology_file = "/tmp/" + name + "-" +
           worker_name + ".local-topology"
+      let data_channel_file = "/tmp/" + name + "-" + worker_name + ".tcp-data"
+      let control_channel_file = "/tmp/" + name + "-" + worker_name +
+          ".tcp-control"
         
       let alfred = Alfred(env, event_log_file)
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
         worker_count, env, auth, connections, metrics_conn, is_initializer, 
-        alfred, local_topology_file)
+        alfred, local_topology_file, data_channel_file)
 
       if is_initializer then
         env.out.print("Running as Initializer...")
@@ -152,17 +155,21 @@ actor Startup
         worker_name = "initializer"
       end
 
+      let control_channel_filepath: FilePath = FilePath(auth, control_channel_file)
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(worker_name, env, auth, connections, 
-          is_initializer, worker_initializer, local_topology_initializer, alfred)
+          is_initializer, worker_initializer, local_topology_initializer,
+          alfred, control_channel_filepath)
 
       if is_initializer then
-        connections.register_listener(
-          TCPListener(auth, consume control_notifier, c_host, c_service) 
+        connections.make_and_register_recoverable_listener(
+          auth, consume control_notifier, control_channel_filepath,
+          c_host, c_service
         )
       else
-        connections.register_listener(
-          TCPListener(auth, consume control_notifier) // chooses port each time
+        connections.make_and_register_recoverable_listener(
+          auth, consume control_notifier,
+          control_channel_filepath
         )
       end
 

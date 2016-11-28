@@ -2,6 +2,7 @@ use "net"
 use "time"
 use "buffered"
 use "collections"
+use "files"
 use "sendence/bytes"
 use "wallaroo/boundary"
 use "wallaroo/messages"
@@ -13,6 +14,7 @@ class DataChannelListenNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
   let _is_initializer: Bool
+  let _recovery_file: FilePath
   var _host: String = ""
   var _service: String = ""
   let _connections: Connections
@@ -20,7 +22,7 @@ class DataChannelListenNotifier is TCPListenNotify
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
-    receivers: Map[String, DataReceiver] val)
+    receivers: Map[String, DataReceiver] val, recovery_file: FilePath)
   =>
     _name = name
     _env = env
@@ -28,10 +30,14 @@ class DataChannelListenNotifier is TCPListenNotify
     _is_initializer = is_initializer
     _connections = connections
     _receivers = receivers
+    _recovery_file = recovery_file
 
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
+      let f = File(_recovery_file)
+      f.print(_host)
+      f.print(_service)
       _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
       if not _is_initializer then
         let message = ChannelMsgEncoder.identify_data_port(_name, _service,

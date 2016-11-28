@@ -105,6 +105,7 @@ actor LocalTopologyInitializer
   var _topology: (LocalTopology val | None) = None
   let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
   let _local_topology_file: String
+  let _data_channel_file: String
   var _topology_initialized: Bool = false
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
@@ -114,7 +115,8 @@ actor LocalTopologyInitializer
 
   new create(worker_name: String, worker_count: USize, env: Env,
     auth: AmbientAuth, connections: Connections, metrics_conn: TCPConnection,
-    is_initializer: Bool, alfred: Alfred tag, local_topology_file: String)
+    is_initializer: Bool, alfred: Alfred tag, local_topology_file: String,
+    data_channel_file: String)
   =>
     _worker_name = worker_name
     _worker_count = worker_count
@@ -125,6 +127,7 @@ actor LocalTopologyInitializer
     _is_initializer = is_initializer
     _alfred = alfred
     _local_topology_file = local_topology_file
+    _data_channel_file = data_channel_file
 
   be update_topology(t: LocalTopology val) =>
     _topology = t
@@ -148,17 +151,23 @@ actor LocalTopologyInitializer
 
     let data_receivers: Map[String, DataReceiver] val = consume drs
 
-    if not _is_initializer then
-      let data_notifier: TCPListenNotify iso =
-        DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
-          _is_initializer, data_receivers)
-      _connections.register_listener(
-        TCPListener(_auth, consume data_notifier))
-    else
-      match worker_initializer
-      | let wi: WorkerInitializer =>
-        _connections.create_initializer_data_channel(data_receivers, wi)
+    try
+      let data_channel_file = FilePath(_auth, _data_channel_file)
+      if not _is_initializer then
+        let data_notifier: TCPListenNotify iso =
+          DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
+            _is_initializer, data_receivers, data_channel_file)
+        _connections.make_and_register_recoverable_listener(
+          _auth, consume data_notifier, data_channel_file)
+      else
+        match worker_initializer
+        | let wi: WorkerInitializer =>
+          _connections.create_initializer_data_channel(data_receivers, wi,
+          data_channel_file)
+        end
       end
+    else
+      @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
 
   be initialize(worker_initializer: (WorkerInitializer | None) = None) =>

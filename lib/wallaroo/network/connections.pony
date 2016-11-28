@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "files"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo/boundary"
@@ -8,6 +9,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
+//use "wallaroo/fail"
 
 actor Connections
   let _app_name: String
@@ -61,13 +63,31 @@ actor Connections
   be register_listener(listener: TCPListener) =>
     _listeners.push(listener)
 
+  be make_and_register_recoverable_listener(auth: TCPListenerAuth,
+    data_notifier: TCPListenNotify iso, recovery_addr_file: FilePath val,
+    host: String val = "", port: String val = "0")
+  =>
+    if recovery_addr_file.exists() then
+      try
+        let file = File(recovery_addr_file)
+        let host' = file.line()
+        let port' = file.line()
+        _listeners.push(TCPListener(auth, consume data_notifier, consume host',
+          consume port'))
+      else
+        @printf[I32]("could not recover host and port from file (replace with Fail())\n".cstring())
+      end
+    else
+      _listeners.push(TCPListener(auth, consume data_notifier, host, port))
+    end
+
   be create_initializer_data_channel(
     data_receivers: Map[String, DataReceiver] val,
-    worker_initializer: WorkerInitializer)
+    worker_initializer: WorkerInitializer, data_channel_file: FilePath)
   =>
     let data_notifier: TCPListenNotify iso =
       DataChannelListenNotifier(_worker_name, _env, _auth, this,
-        _is_initializer, data_receivers)
+        _is_initializer, data_receivers, data_channel_file)
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     register_listener(TCPListener(_auth, consume data_notifier,
@@ -200,5 +220,4 @@ actor Connections
     end
 
     _env.out.print("Connections: Finished shutdown procedure.")
-
 
