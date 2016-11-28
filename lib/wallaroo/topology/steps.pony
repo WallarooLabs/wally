@@ -64,7 +64,7 @@ actor Step is (RunnableStep & Resilient & Producer &
    // CreditFlow Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 500_000
-  var _distributable_credits: ISize = _max_distributable_credits
+  var _distributable_credits: ISize = 0
 
   // Resilience routes
   // TODO: This needs to be merged with credit flow producer routes
@@ -319,7 +319,11 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
 
   fun ref _recoup_credits(recoup: ISize) =>
+    @printf[I32]("!!Recouping")
     _distributable_credits = _distributable_credits + recoup
+    if _distributable_credits > _max_distributable_credits then
+      _distributable_credits = _max_distributable_credits
+    end
 
   be credit_request(from: Producer) =>
     """
