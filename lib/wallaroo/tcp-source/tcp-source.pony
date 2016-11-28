@@ -105,9 +105,10 @@ actor TCPSource is (Initializable & Producer)
         _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
-    for sink in tcp_sinks.values() do
-      _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
-    end
+    // TODO: Remove this if possible.
+    // for sink in tcp_sinks.values() do
+    //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
+    // end
 
     match default_target
     | let r: CreditFlowConsumerStep =>

@@ -184,6 +184,10 @@ class TypedRoute[In: Any val] is Route
     ifdef debug then
       Invariant(number >= 0)
     end
+    
+    ifdef "trace" then
+      @printf[I32]("--Route: rcvd %llu credits".cstring(), number)
+    end 
 
     _request_outstanding = false
     _credits_available = _credits_available + number
@@ -210,6 +214,9 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _request_credits() =>
     if not _request_outstanding then
+      ifdef "trace" then
+        @printf[I32]("--Route: requesting credits\n".cstring())
+      end
       _consumer.credit_request(_step)
       _request_outstanding = true
     end
@@ -220,7 +227,7 @@ class TypedRoute[In: Any val] is Route
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     ifdef "trace" then
-      @printf[I32]("Rcvd msg at Route\n".cstring())
+      @printf[I32]("--Rcvd msg at Route\n".cstring())
     end
     match data
     | let input: In =>
@@ -251,6 +258,9 @@ class TypedRoute[In: Any val] is Route
             end
           end
         else
+          ifdef "trace" then
+            @printf[I32]("----No credits: added msg to Route queue\n".cstring())
+          end
           _add_to_queue(metric_name, source_ts, input, cfp, origin, msg_uid,
             frac_ids, i_seq_id, i_route_id)
           _request_credits()
@@ -284,6 +294,10 @@ class TypedRoute[In: Any val] is Route
       frac_ids,
       o_seq_id,
       _route_id)
+
+    ifdef "trace" then
+      @printf[I32]("Sent msg from Route\n".cstring())
+    end
 
     ifdef "resilience" then
       cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id, i_seq_id)
