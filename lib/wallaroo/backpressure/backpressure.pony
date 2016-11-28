@@ -518,18 +518,19 @@ class BoundaryRoute is Route
     end
 
   fun ref request_credits() =>
-    if not _request_outstanding then
-      if (Time.nanos() - _last_credit_ts) > 1_000_000_000 then
-        ifdef "credit_trace" then
-          @printf[I32]("--BoundaryRoute: requesting credits\n".cstring())
+    if (Time.nanos() - _last_credit_ts) > 1_000_000_000 then
+      if not _request_outstanding then
+          ifdef "credit_trace" then
+            @printf[I32]("--BoundaryRoute: requesting credits\n".cstring())
+          end
+          _consumer.credit_request(_step)
+          _last_credit_ts = Time.nanos()
+          _request_outstanding = true
         end
-        _consumer.credit_request(_step)
-        _last_credit_ts = Time.nanos()
-        _request_outstanding = true
-      end
-    else
-      ifdef "credit_trace" then
-        @printf[I32]("----Request already outstanding\n".cstring())
+      else
+        ifdef "credit_trace" then
+          @printf[I32]("----Request already outstanding\n".cstring())
+        end
       end
     end
 
