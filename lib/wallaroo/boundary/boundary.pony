@@ -166,23 +166,42 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
   be ack(seq_id: SeqId) =>
     if seq_id > _lowest_queue_id then
-      let flush_count: USize = (seq_id - _lowest_queue_id).usize()
-      _queue.clear_n(flush_count)
-      _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-      _distributable_credits = _distributable_credits + flush_count.isize()
-      if _distributable_credits > _max_distributable_credits then
-        _distributable_credits = _max_distributable_credits
-      end
-
       ifdef "trace" then
         @printf[I32](
           "OutgoingBoundary: got ack from downstream worker\n".cstring())
       end
 
+      let flush_count: USize = (seq_id - _lowest_queue_id).usize()
+      _queue.clear_n(flush_count)
+      _lowest_queue_id = _lowest_queue_id + flush_count.u64()
+      _distributable_credits = _distributable_credits + flush_count.isize()
+      ifdef "credit_trace" then
+        var recouped_credits = flush_count.isize()
+        if _distributable_credits > _max_distributable_credits then
+          recouped_credits = 
+            _max_distributable_credits - _distributable_credits
+          _distributable_credits = _max_distributable_credits
+          @printf[I32]("OutgoingBoundary: recouped %llu credits. Now at %llu\n".cstring(), recouped_credits,
+            _distributable_credits)
+        end
+      else
+        if _distributable_credits > _max_distributable_credits then
+          _distributable_credits = _max_distributable_credits
+        end
+      end
+
+      //TODO: Batching
+      _update_watermark(_route_id, seq_id)
+    else
+      ifdef "trace" then
+        @printf[I32](
+          "OutgoingBoundary: got repeat ack from downstream worker\n".cstring())
+      end
+
       ifdef "resilience" then
         _terminus_route.receive_ack(seq_id)
       end
-  end
+    end
 
   be replay_msgs() =>
     for msg in _queue.values() do
@@ -267,6 +286,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       (_distributable_credits / _upstreams.size().isize())
     else
       0
+    end
+
+    ifdef "credit_trace" then
+      @printf[I32]("Boundary: credit request and giving %llu credits out of %llu\n".cstring(), desired_give_out, _distributable_credits)
     end
 
     from.receive_credits(give_out, this)

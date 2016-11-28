@@ -174,6 +174,7 @@ actor Step is (RunnableStep & Resilient & Producer &
           i_origin, i_route_id, i_seq_id)
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
+      _recoup_credits(1)
     end
 
     //!
@@ -238,6 +239,7 @@ actor Step is (RunnableStep & Resilient & Producer &
           _resilience_routes.filter(this, next_sequence_id(),
             i_origin, i_route_id, i_seq_id)
         end
+        _recoup_credits(1)
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
       end
     end
@@ -359,8 +361,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     // end
 
     ifdef "credit_trace" then
-      @printf[I32]("Step: credit request and giving %llu credits\n".cstring(),
-        desired_give_out)
+      @printf[I32]("Step: credit request and giving %llu credits out of %llu\n".cstring(), desired_give_out, _distributable_credits)
     end
 
     from.receive_credits(desired_give_out, this)

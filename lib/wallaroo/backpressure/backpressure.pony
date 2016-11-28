@@ -176,10 +176,28 @@ class TypedRoute[In: Any val] is Route
     //   TypedRouteQueueDataBuilder[In], q_size)
 
   fun ref initialize(max_credits: ISize) =>
+    ifdef debug then
+      try
+        Assert(max_credits > 0,
+          "Route max credits must be greater than 0")
+      else
+        _callback.shutdown(_step)
+        return
+      end
+    end
     _max_credits = max_credits
     request_credits()
 
   fun ref update_max_credits(max_credits: ISize) =>
+    ifdef debug then
+      try
+        Assert(max_credits > 0,
+          "Route max credits must be greater than 0")
+      else
+        _callback.shutdown(_step)
+        return
+      end
+    end
     _max_credits = max_credits
 
   fun id(): U64 =>

@@ -312,8 +312,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("Sink: Credits requested. Giving %llu\n".cstring(), 
-        give_out)
+      @printf[I32]("Sink: Credits requested. Giving %llu out of %llu\n".cstring(), give_out, _distributable_credits)
     end 
 
     from.receive_credits(give_out, this)
