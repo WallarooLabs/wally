@@ -496,9 +496,11 @@ actor TCPSource is (Initializable & Producer)
 
   fun ref _mute() =>
     try
-      let t = Timer(_RequestCredits(this), 1_000_000_000, 1_000_000_000)
-      _credit_timer = t as Timer tag
-      _credit_timers(consume t)
+      if not _unregistered then
+        let t = Timer(_RequestCredits(this), 1_000_000_000, 1_000_000_000)
+        _credit_timer = t as Timer tag
+        _credit_timers(consume t)
+      end
       _muted = true
     else
       ifdef debug then
