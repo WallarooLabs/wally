@@ -214,7 +214,7 @@ class TypedRoute[In: Any val] is Route
     _consumer.ack_credits(number, number - credits_recouped)
 
     if _credits_available > 0 then
-      if (_credits_available - number) == 0 then
+      if (_credits_available - credits_recouped) == 0 then
         _callback.credits_replenished(_step)
       end
 
@@ -465,7 +465,7 @@ class BoundaryRoute is Route
     _consumer.ack_credits(number, number - credits_recouped)
 
     if _credits_available > 0 then
-      if (_credits_available - number) == 0 then
+      if (_credits_available - credits_recouped) == 0 then
         _callback.credits_replenished(_step)
       end
 
