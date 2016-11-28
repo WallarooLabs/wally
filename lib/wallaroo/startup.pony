@@ -77,7 +77,12 @@ actor Startup
         end
       end
 
-      if worker_count == 1 then is_initializer = true end
+      if worker_count == 1 then 
+        env.out.print("Single worker topology")
+        is_initializer = true 
+      else
+        env.out.print(worker_count.string() + " worker topology")
+      end
 
       if is_initializer then worker_name = "initializer" end
 

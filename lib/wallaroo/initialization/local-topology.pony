@@ -108,6 +108,7 @@ actor LocalTopologyInitializer
   var _topology: (LocalTopology val | None) = None
   let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
   let _local_topology_file: String
+  var _worker_initializer: (WorkerInitializer | None) = None
   var _topology_initialized: Bool = false
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
@@ -170,6 +171,7 @@ actor LocalTopologyInitializer
   be initialize(worker_initializer: (WorkerInitializer | None) = None) =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("|^|^|^Initializing Local Topology^|^|^|\n\n".cstring())
+    _worker_initializer = worker_initializer
     try
       if (_worker_count > 1) and (_outgoing_boundaries.size() == 0) then
         @printf[I32]("Outgoing boundaries not set up!\n".cstring())
@@ -821,13 +823,6 @@ actor LocalTopologyInitializer
         end
 
         if _is_initializer then
-          match worker_initializer
-          | let wi: WorkerInitializer =>
-            wi.topology_ready("initializer")
-          else
-            @printf[I32]("Need WorkerInitializer to inform that topology is ready\n".cstring())
-          end
-
           _is_initializer = false
         else
           // Inform the initializer that we're done initializing our local
@@ -878,16 +873,12 @@ actor LocalTopologyInitializer
       end
     end
 
-    @printf[I32]("Application has successfully initialized.\n".cstring())
-
-    match _application
-    | let app: Application val =>
-      for i in Range(0, _input_addrs.size()) do
-        try
-          let init_file = app.init_files(i)
-          let file = InitFileReader(init_file, _auth)
-          file.read_into(_input_addrs(i))
-        end
+    if _is_initializer then
+      match _worker_initializer
+      | let wi: WorkerInitializer =>
+        wi.topology_ready("initializer")
+      else
+        @printf[I32]("Need WorkerInitializer to inform that topology is ready\n".cstring())
       end
     end
 
