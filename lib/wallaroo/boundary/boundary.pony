@@ -2,6 +2,7 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "time"
 use "sendence/guid"
 use "sendence/queue"
 use "wallaroo/backpressure"
@@ -77,6 +78,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   let _hwmt: HighWatermarkTable = _hwmt.create()
   let _route_id: RouteId = GuidGenerator.u64()
   var _wmcounter: U64 = 0
+  let _timers: Timers = Timers
 
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -702,17 +704,19 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   be reconnect_to_downstream() =>
     @printf[I32](("OutgoingBoundary: trying to reconnect to downstream: " +
       _host + ": " + _service + "\n\n").cstring())
-    _notify = EmptyBoundaryNotify
 
-    while not _connected do
-      // this doesn't work because downstream comes back on a different port
-      // could it come back on the same port?
-      _connect_count = _try_reconnect_to_downstream()
-      //TODO: wait a while before retrying
+    _notify = EmptyBoundaryNotify
+    _connect_count = _try_reconnect_to_downstream()
+
+    if _connected then
+      @printf[I32]("Reconnected to downstream.".cstring())
+      _notify_connecting()
+    else
+      // start a timer and retry
+      let timer = Timer(WaitForReconnect(this), 1_000_000_000, 10_000_000_000)
+      _timers(consume timer)
     end
     
-    _notify_connecting()
-
   fun ref _try_reconnect_to_downstream(): U32 =>
     @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
@@ -803,3 +807,17 @@ class EmptyBoundaryNotify is _OutgoingBoundaryNotify
   fun ref closed(conn: OutgoingBoundary ref) =>
     @printf[I32]("EmptyBoundaryNotify: closed\n\n".cstring())
     conn.reconnect_to_downstream()
+
+
+class WaitForReconnect is TimerNotify
+  let _boundary: OutgoingBoundary
+
+  new iso create(boundary: OutgoingBoundary) =>
+    _boundary = boundary
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    @printf[I32]("Wait for downstream listener activation...\n\n".cstring())
+    _boundary.reconnect_to_downstream()
+    false
+
+    
