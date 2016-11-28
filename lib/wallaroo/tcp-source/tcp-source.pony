@@ -30,6 +30,8 @@ actor TCPSource is (Initializable & Producer)
   let _tcp_sinks: Array[TCPSink] val
   var _credit_timer: (Timer tag | None) = None
   let _credit_timers: Timers = Timers
+  // Determines if we can still process credits from consumers
+  var _unregistered: Bool = false
 
   // TCP
   let _listen: TCPSourceListener
@@ -187,9 +189,16 @@ actor TCPSource is (Initializable & Producer)
       Invariant(_routes.contains(from))
     end
 
-    try
-      let route = _routes(from)
-      route.receive_credits(credits)
+    if _unregistered then
+      ifdef "credit_trace" then
+        @printf[I32]("Unregistered source returning credits unused\n".cstring())
+      end
+      from.ack_credits(credits, credits)
+    else
+      try
+        let route = _routes(from)
+        route.receive_credits(credits)
+      end
     end
 
   fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
@@ -313,6 +322,7 @@ actor TCPSource is (Initializable & Producer)
       for r in _routes.values() do
         r.dispose()
       end
+      _unregistered = true
     end
 
   fun ref _hard_close() =>
@@ -342,6 +352,7 @@ actor TCPSource is (Initializable & Producer)
     for r in _routes.values() do
       r.dispose()
     end
+    _unregistered = true
 
   fun ref _pending_reads() =>
     """

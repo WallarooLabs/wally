@@ -316,6 +316,7 @@ primitive RawSymbols
       padded
     end   
 
+//!!
   fun apply(): Array[String] val =>
     recover      
       [
@@ -333,7 +334,8 @@ primitive RawSymbols
 "ATML",
 "YHOO",
 "F",
-"T",
+"T"] end//!!,
+/*
 "MU",
 "PFE",
 "CSCO",
@@ -670,3 +672,4 @@ primitive RawSymbols
 "IVR",
 "SLH"]
 end
+*/
