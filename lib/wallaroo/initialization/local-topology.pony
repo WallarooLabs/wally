@@ -8,6 +8,7 @@ use "sendence/dag"
 use "sendence/guid"
 use "sendence/queue"
 use "sendence/messages"
+use "wallaroo"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/messages"
@@ -92,6 +93,8 @@ class LocalTopology
   fun proxy_ids(): Map[String, U128] val => _proxy_ids
 
 actor LocalTopologyInitializer
+  let _application: Application val
+  let _input_addrs: Array[Array[String]] val
   let _worker_name: String
   let _worker_count: USize
   let _env: Env
@@ -112,10 +115,12 @@ actor LocalTopologyInitializer
   let tcpsl_builders: Array[TCPSourceListenerBuilder val] =
     recover iso Array[TCPSourceListenerBuilder val] end
 
-  new create(worker_name: String, worker_count: USize, env: Env,
-    auth: AmbientAuth, connections: Connections, metrics_conn: TCPConnection,
-    is_initializer: Bool, alfred: Alfred tag, local_topology_file: String)
+  new create(app: Application val, worker_name: String, worker_count: USize, 
+    env: Env, auth: AmbientAuth, connections: Connections, 
+    metrics_conn: TCPConnection, is_initializer: Bool, alfred: Alfred tag, 
+    input_addrs: Array[Array[String]] val, local_topology_file: String)
   =>
+    _application = app
     _worker_name = worker_name
     _worker_count = worker_count
     _env = env
@@ -124,6 +129,7 @@ actor LocalTopologyInitializer
     _metrics_conn = metrics_conn
     _is_initializer = is_initializer
     _alfred = alfred
+    _input_addrs = input_addrs
     _local_topology_file = local_topology_file
 
   be update_topology(t: LocalTopology val) =>
@@ -869,6 +875,19 @@ actor LocalTopologyInitializer
     else
       for builder in tcpsl_builders.values() do
         builder()
+      end
+    end
+
+    @printf[I32]("Application has successfully initialized.\n".cstring())
+
+    match _application
+    | let app: Application val =>
+      for i in Range(0, _input_addrs.size()) do
+        try
+          let init_file = app.init_files(i)
+          let file = InitFileReader(init_file, _auth)
+          file.read_into(_input_addrs(i))
+        end
       end
     end
 

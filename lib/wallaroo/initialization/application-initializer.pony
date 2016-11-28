@@ -49,17 +49,6 @@ actor ApplicationInitializer
   be topology_ready() =>
     @printf[I32]("Application has successfully initialized.\n".cstring())
 
-    match _application
-    | let app: Application val =>
-      for i in Range(0, _input_addrs.size()) do
-        try
-          let init_file = app.init_files(i)
-          let file = InitFileReader(init_file, _auth)
-          file.read_into(_input_addrs(i))
-        end
-      end
-    end
-
   fun ref _automate_initialization(application: Application val,
     worker_initializer: WorkerInitializer, worker_count: USize,
     worker_names: Array[String] val, alfred: Alfred tag)
