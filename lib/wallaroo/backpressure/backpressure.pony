@@ -49,6 +49,7 @@ trait Route
   fun id(): U64
   fun credits(): ISize
   fun ref dispose()
+  fun ref request_credits()
   fun ref receive_credits(number: ISize)
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
@@ -66,6 +67,7 @@ class EmptyRoute is Route
   fun id(): U64 => _route_id
   fun credits(): ISize => 0
   fun ref dispose() => None
+  fun ref request_credits() => None
   fun ref receive_credits(number: ISize) => None
 
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
@@ -155,7 +157,7 @@ class TypedRoute[In: Any val] is Route
     _callback = handler
     // @printf[I32]("!!Route: Registering producer\n".cstring())
     _consumer.register_producer(_step)
-    let q_size: USize = ifdef "use_backpressure" then
+    let q_size: USize = ifdef "backpressure" then
       500_000
     else
       0
@@ -202,17 +204,17 @@ class TypedRoute[In: Any val] is Route
 
         if _credits_available == 0 then
           _callback.credits_exhausted(_step)
-          _request_credits()
+          request_credits()
         end
       end
 
       _request_more_credits_after =
         _credits_available - (_credits_available >> 2)
     else
-      _request_credits()
+      request_credits()
     end
 
-  fun ref _request_credits() =>
+  fun ref request_credits() =>
     if not _request_outstanding then
       ifdef "credit_trace" then
         @printf[I32]("--Route: requesting credits\n".cstring())
@@ -231,7 +233,7 @@ class TypedRoute[In: Any val] is Route
     end
     match data
     | let input: In =>
-      ifdef "use_backpressure" then
+      ifdef "backpressure" then
         if _credits_available > 0 then
           let above_request_point =
             _credits_available >= _request_more_credits_after
@@ -247,13 +249,13 @@ class TypedRoute[In: Any val] is Route
 
           if _credits_available == 0 then
             _callback.credits_exhausted(_step)
-            _request_credits()
+            request_credits()
           else
             if above_request_point then
               if _credits_available < _request_more_credits_after then
                 // we started above the request size and finished below,
                 // request credits
-                _request_credits()
+                request_credits()
               end
             end
           end
@@ -263,7 +265,7 @@ class TypedRoute[In: Any val] is Route
           end
           _add_to_queue(metric_name, source_ts, input, cfp, origin, msg_uid,
             frac_ids, i_seq_id, i_route_id)
-          _request_credits()
+          request_credits()
         end
       else
         _send_message_on_route(metric_name, source_ts, input, cfp, origin,
@@ -388,7 +390,7 @@ class BoundaryRoute is Route
     _consumer = consumer
     _callback = handler
     _consumer.register_producer(_step)
-    let q_size: USize = ifdef "use_backpressure" then
+    let q_size: USize = ifdef "backpressure" then
       500_000
     else
       0
@@ -431,17 +433,17 @@ class BoundaryRoute is Route
 
         if _credits_available == 0 then
           _callback.credits_exhausted(_step)
-          _request_credits()
+          request_credits()
         end
       end
 
       _request_more_credits_after =
         _credits_available - (_credits_available >> 2)
     else
-      _request_credits()
+      request_credits()
     end
 
-  fun ref _request_credits() =>
+  fun ref request_credits() =>
     if not _request_outstanding then
       _consumer.credit_request(_step)
       _request_outstanding = true
@@ -462,7 +464,7 @@ class BoundaryRoute is Route
     ifdef "trace" then
       @printf[I32]("Rcvd msg at BoundaryRoute\n".cstring())
     end
-    ifdef "use_backpressure" then
+    ifdef "backpressure" then
       if _credits_available > 0 then
         let above_request_point =
           _credits_available >= _request_more_credits_after
@@ -487,13 +489,13 @@ class BoundaryRoute is Route
 
         if _credits_available == 0 then
           _callback.credits_exhausted(_step)
-          _request_credits()
+          request_credits()
         else
           if above_request_point then
             if _credits_available < _request_more_credits_after then
               // we started above the request size and finished below,
               // request credits
-              _request_credits()
+              request_credits()
             end
           end
         end
@@ -504,7 +506,7 @@ class BoundaryRoute is Route
           msg_uid,
           i_frac_ids,
           i_seq_id)
-        _request_credits()
+        request_credits()
       end
     else
       _send_message_on_route(delivery_msg,

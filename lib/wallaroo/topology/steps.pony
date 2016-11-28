@@ -340,8 +340,19 @@ actor Step is (RunnableStep & Resilient & Producer &
       // lccl
     // end
 
+    ifdef "credit_trace" then
+      @printf[I32]("Step: credit request and giving %llu credits".cstring(),
+        desired_give_out)
+    end
+
     from.receive_credits(desired_give_out, this)
     _distributable_credits = _distributable_credits - desired_give_out
+
+    if _distributable_credits == 0 then
+      for r in _routes.values() do
+        r.request_credits()
+      end
+    end
 
   fun _lowest_route_credit_level(): ISize =>
     var lowest: ISize = ISize.max_value()

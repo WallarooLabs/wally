@@ -219,7 +219,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
-    ifdef "use_backpressure" then
+    ifdef "backpressure" then
       _recoup_credits(number_finished)
     end
 
@@ -730,7 +730,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     Call _unit_finished with # of sent messages and last tracking_id
     """
-    ifdef "use_backpressure" or "resilience" then
+    ifdef "backpressure" or "resilience" then
       var num_sent: ISize = 0
       var final_pending_sent: (SeqId | None) = None
       var bytes_sent = num_bytes_sent
