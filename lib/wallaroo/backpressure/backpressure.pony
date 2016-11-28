@@ -193,6 +193,8 @@ class TypedRoute[In: Any val] is Route
     Return unused credits to downstream consumer
     """
     _consumer.unregister_producer(_step, _credits_available)
+    //TODO: Will this gum up the works?
+    _flush_queue()
 
   fun ref receive_credits(number: ISize) =>
     ifdef debug then
@@ -448,7 +450,9 @@ class BoundaryRoute is Route
     Return unused credits to downstream consumer
     """
     _consumer.unregister_producer(_step, _credits_available)
-
+    //TODO: Will this gum up the works?
+    _flush_queue()
+    
   fun ref receive_credits(number: ISize) =>
     ifdef debug then
       Invariant(number > 0)
