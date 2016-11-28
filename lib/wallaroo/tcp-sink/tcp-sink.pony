@@ -119,6 +119,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   embed _pending_tracking: List[(USize, SeqId)] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
+  var _muted: Bool = false
+  var _expect_read_buf: Reader = Reader
 
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
@@ -496,50 +498,94 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
     _notify.closed(this)
 
-  // TODO: support new "expect" with single system call
   fun ref _pending_reads() =>
     """
-    Read while data is available, guessing the next packet length as we go. If
-    we read 4 kb of data, send ourself a resume message and stop reading, to
-    avoid starving other actors.
+    Unless this connection is currently muted, read while data is available,
+    guessing the next packet length as we go. If we read 4 kb of data, send
+    ourself a resume message and stop reading, to avoid starving other actors.
     """
-      try
-        var sum: USize = 0
+    try
+      var sum: USize = 0
 
-        while _readable and not _shutdown_peer do
-          // Read as much data as possible.
-          _read_buf_size()
-          let len = @pony_os_recv[USize](
-            _event,
-            _read_buf.cpointer().usize() + _read_len,
-            _read_buf.size() - _read_len) ?
+      while _readable and not _shutdown_peer do
+        if _muted then
+          return
+        end
 
-          match len
-          | 0 =>
-            // Would block, try again later.
-            _readable = false
-            _resubscribe_event()
-            return
-          | _next_size =>
-            // Increase the read buffer size.
-            _next_size = _max_size.min(_next_size * 2)
+        while (_expect_read_buf.size() > 0) and
+          (_expect_read_buf.size() >= _expect)
+        do
+          let block_size = if _expect != 0 then
+            _expect
+          else
+            _expect_read_buf.size()
           end
 
-          _read_len = _read_len + len
+          let out = _expect_read_buf.block(block_size)
+          let carry_on = _notify.received(this, consume out)
+          ifdef osx then
+            if not carry_on then
+              _read_again()
+              return
+            end
 
-          if _read_len >= _expect then
-            let data = _read_buf = recover Array[U8] end
-            data.truncate(_read_len)
-            _read_len = 0
+            sum = sum + block_size
 
-            let carry_on = _notify.received(this, consume data)
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
+            end
+          end
+        end
+
+        // Read as much data as possible.
+        _read_buf_size()
+        let len = @pony_os_recv[USize](
+          _event,
+          _read_buf.cpointer().usize() + _read_len,
+          _read_buf.size() - _read_len) ?
+
+        match len
+        | 0 =>
+          // Would block, try again later.
+          _readable = false
+          _resubscribe_event()
+          return
+        | _next_size =>
+          // Increase the read buffer size.
+          _next_size = _max_size.min(_next_size * 2)
+        end
+
+         _read_len = _read_len + len
+
+        if _expect != 0 then
+          let data = _read_buf = recover Array[U8] end
+          data.truncate(_read_len)
+          _read_len = 0
+
+          _expect_read_buf.append(consume data)
+
+          while (_expect_read_buf.size() > 0) and
+            (_expect_read_buf.size() >= _expect)
+          do
+            let block_size = if _expect != 0 then
+              _expect
+            else
+              _expect_read_buf.size()
+            end
+
+            let out = _expect_read_buf.block(block_size)
+            let osize = block_size
+
+            let carry_on = _notify.received(this, consume out)
             ifdef osx then
               if not carry_on then
                 _read_again()
                 return
               end
 
-              sum = sum + len
+              sum = sum + osize
 
               if sum >= _max_size then
                 // If we've read _max_size, yield and read again later.
@@ -548,14 +594,34 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
               end
             end
           end
-        end
-      else
-        // The socket has been closed from the other side.
-        _shutdown_peer = true
-        close()
-      end
+        else
+          let data = _read_buf = recover Array[U8] end
+          data.truncate(_read_len)
+          let dsize = _read_len
+          _read_len = 0
 
-      false
+          let carry_on = _notify.received(this, consume data)
+          ifdef osx then
+            if not carry_on then
+              _read_again()
+              return
+            end
+
+            sum = sum + dsize
+
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
+            end
+          end
+        end
+      end
+    else
+      // The socket has been closed from the other side.
+      _shutdown_peer = true
+      close()
+    end
 
   fun _can_send(): Bool =>
     _connected and not _closed and _writeable
