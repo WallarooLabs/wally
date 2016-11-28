@@ -213,14 +213,18 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   //
   // CREDIT FLOW
   be register_producer(producer: Producer) =>
-    Invariant(not _upstreams.contains(producer))
+    ifdef debug then
+      Invariant(not _upstreams.contains(producer))
+    end
 
     _upstreams.push(producer)
 
   be unregister_producer(producer: Producer,
     credits_returned: ISize)
   =>
-    Invariant(_upstreams.contains(producer))
+    ifdef debug then
+      Invariant(_upstreams.contains(producer))
+    end
 
     try
       let i = _upstreams.find(producer)
@@ -246,7 +250,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     to stop sending. They only send when they have credits. If they run out
     and we are experiencing backpressure, they don't get any more.
     """
-    Invariant(_upstreams.contains(from))
+    ifdef debug then
+      Invariant(_upstreams.contains(from))
+    end
 
     let give_out =  if _can_send() then
       (_distributable_credits / _upstreams.size().isize())

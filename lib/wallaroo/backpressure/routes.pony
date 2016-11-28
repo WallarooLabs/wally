@@ -22,14 +22,18 @@ class Routes
     // This is our wedge into current routes until John
     // and I can work out the abstractions
     // Its used from Step
-    Invariant(not _routes.contains(route.id()))
+    ifdef debug then
+      Invariant(not _routes.contains(route.id()))
+    end
 
     _routes(route.id()) = _Route
 
   fun ref send(producer: Producer ref, o_route_id: RouteId, o_seq_id: SeqId,
     i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
   =>
-    Invariant(_routes.contains(o_route_id))
+    ifdef debug then
+      Invariant(_routes.contains(o_route_id))
+    end
 
     try
       _routes(o_route_id).send(o_seq_id)
@@ -48,9 +52,11 @@ class Routes
     _add_incoming(producer, o_seq_id, i_origin, i_route_id, i_seq_id)
 
   fun ref receive_ack(route_id: RouteId, seq_id: SeqId) =>
-    Invariant(_routes.contains(route_id))
-    LazyInvariant({()(_routes, route_id, seq_id): Bool ? =>
-      _routes(route_id).highest_seq_id_sent() >= seq_id})
+    ifdef debug then
+      Invariant(_routes.contains(route_id))
+      LazyInvariant({()(_routes, route_id, seq_id): Bool ? =>
+        _routes(route_id).highest_seq_id_sent() >= seq_id})
+    end
 
     try
       _routes(route_id).receive_ack(seq_id)
@@ -59,7 +65,9 @@ class Routes
     end
 
   fun ref flushed(up_to: SeqId) =>
-    Invariant(_outgoing_to_incoming.contains(up_to))
+    ifdef debug then
+      Invariant(_outgoing_to_incoming.contains(up_to))
+    end
 
     try
       _flushing = false
@@ -99,7 +107,9 @@ class Routes
 
   fun ref propose_new_watermark(): U64 =>
     let proposed_watermark = _ProposeWatermark(_filter_route, _routes)
-    Invariant(proposed_watermark >= _flushed_watermark)
+    ifdef debug then
+      Invariant(proposed_watermark >= _flushed_watermark)
+    end
     proposed_watermark
 
 // incorporate into TypedRoute
@@ -109,12 +119,16 @@ class _Route
   var _last_ack: U64 = Time.millis()
 
   fun ref send(o_seq_id: SeqId) =>
-    Invariant(o_seq_id > _highest_seq_id_sent)
+    ifdef debug then
+      Invariant(o_seq_id > _highest_seq_id_sent)
+    end
 
     _highest_seq_id_sent = o_seq_id
 
   fun ref receive_ack(seq_id: SeqId) =>
-    Invariant(seq_id <= _highest_seq_id_sent)
+    ifdef debug then
+      Invariant(seq_id <= _highest_seq_id_sent)
+    end
 
     _last_ack = Time.millis()
     _highest_seq_id_acked = seq_id
@@ -132,7 +146,9 @@ class _FilterRoute
   var _highest_seq_id: U64 = 0
 
   fun ref filter(o_seq_id: SeqId) =>
-    Invariant(o_seq_id > _highest_seq_id)
+    ifdef debug then
+      Invariant(o_seq_id > _highest_seq_id)
+    end
 
     _highest_seq_id = o_seq_id
 

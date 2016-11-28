@@ -269,7 +269,9 @@ actor Step is (RunnableStep & Resilient & Producer &
   //////////////
   // CREDIT FLOW PRODUCER
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-    Invariant(_routes.contains(from))
+    ifdef debug then
+      Invariant(_routes.contains(from))
+    end
 
     try
       let route = _routes(from)
@@ -286,14 +288,18 @@ actor Step is (RunnableStep & Resilient & Producer &
   //////////////
   // CREDIT FLOW CONSUMER
   be register_producer(producer: Producer) =>
-    Invariant(not _upstreams.contains(producer))
+    ifdef debug then
+      Invariant(not _upstreams.contains(producer))
+    end
 
     _upstreams.push(producer)
 
   be unregister_producer(producer: Producer,
     credits_returned: ISize)
   =>
-    Invariant(_upstreams.contains(producer))
+    ifdef debug then
+      Invariant(_upstreams.contains(producer))
+    end
 
     try
       let i = _upstreams.find(producer)
@@ -309,7 +315,9 @@ actor Step is (RunnableStep & Resilient & Producer &
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
     """
-    Invariant(_upstreams.contains(from))
+    ifdef debug then
+      Invariant(_upstreams.contains(from))
+    end
 
     // TODO: CREDITFLOW - this is a very naive strategy
     // Could quite possibly deadlock. Would need to look into that more.

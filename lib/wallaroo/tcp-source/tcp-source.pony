@@ -168,7 +168,9 @@ actor TCPSource is (Initializable & Producer)
   //
   // CREDIT FLOW
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-    Invariant(_routes.contains(from))
+    ifdef debug then
+      Invariant(_routes.contains(from))
+    end
 
     try
       let route = _routes(from)
@@ -485,7 +487,9 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
     end
 
   fun ref credits_replenished(producer: Producer ref) =>
-    Invariant(_muted > 0)
+    ifdef debug then
+      Invariant(_muted > 0)
+    end
 
     match producer
     | let p: TCPSource ref =>

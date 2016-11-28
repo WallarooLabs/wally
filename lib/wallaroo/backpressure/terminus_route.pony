@@ -38,7 +38,9 @@ class TerminusRoute
     """
     Acknowledgement that we are done handling a termination.
     """
-    Invariant(seq_id <= _tracking_id)
+    ifdef debug then
+      Invariant(seq_id <= _tracking_id)
+    end
 
     _highest_tracking_id_acked = seq_id
 
@@ -58,7 +60,9 @@ class TerminusRoute
 
   fun ref _ack() =>
     let up_to = _highest_tracking_id_acked
-    Invariant(_tracking_id_to_incoming.contains(up_to))
+    ifdef debug then
+      Invariant(_tracking_id_to_incoming.contains(up_to))
+    end
 
     try
       for (o_r, id) in

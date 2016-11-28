@@ -55,19 +55,24 @@ class _OutgoingToIncoming
         @printf[I32]("id: %llu o: %llu\n".cstring(),
           id, _seq_id_to_incoming(index)._1)
       end
-      LazyInvariant({
-        ()(_seq_id_to_incoming, index, id): Bool ? =>
-        _seq_id_to_incoming(index)._1 <= id})
-      LazyInvariant({
-        ()(_seq_id_to_incoming, index, id): Bool ? =>
-        _seq_id_to_incoming(index)._1 == id})
+      ifdef debug then
+        LazyInvariant({
+          ()(_seq_id_to_incoming, index, id): Bool ? =>
+          _seq_id_to_incoming(index)._1 <= id})
+        LazyInvariant({
+          ()(_seq_id_to_incoming, index, id): Bool ? =>
+          _seq_id_to_incoming(index)._1 == id})
+      end
       index
     else
       error
     end
 
   fun _origin_highs_below(index: USize): MapIs[(Producer, RouteId), U64] =>
-    Invariant(index < _seq_id_to_incoming.size())
+    ifdef debug then
+      Invariant(index < _seq_id_to_incoming.size())
+    end
+
 
     let high_by_origin_route: MapIs[(Producer, RouteId), U64] =
       MapIs[(Producer, RouteId), U64]

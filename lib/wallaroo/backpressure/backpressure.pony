@@ -131,7 +131,9 @@ class TypedRoute[In: Any val] is Route
     _consumer.unregister_producer(_step, _credits_available)
 
   fun ref receive_credits(number: ISize) =>
-    Invariant(number >= 0)
+    ifdef debug then
+      Invariant(number >= 0)
+    end
 
     _request_outstanding = false
     _credits_available = _credits_available + number
@@ -303,7 +305,9 @@ class BoundaryRoute is Route
     _consumer.unregister_producer(_step, _credits_available)
 
   fun ref receive_credits(number: ISize) =>
-     Invariant(number > 0)
+    ifdef debug then
+      Invariant(number > 0)
+    end
 
     _request_outstanding = false
     _credits_available = _credits_available + number
