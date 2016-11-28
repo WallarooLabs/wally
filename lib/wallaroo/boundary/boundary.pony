@@ -158,7 +158,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
       _writev(outgoing_msg)
 
-      _distributable_credits = _distributable_credits - 1
+      _distributable_credits = _distributable_credits + 1
     end
 
   be writev(data: Array[ByteSeq] val) =>
@@ -236,7 +236,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
-    _recoup_credits(number_finished)
+    None
+
+    // TODO: This doesn't line up with actual messages.  We need a new 
+    // strategy.
+    //_recoup_credits(number_finished)
 
   //
   // CREDIT FLOW

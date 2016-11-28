@@ -97,10 +97,6 @@ actor DataReceiver is Producer
   fun ref _ack_latest() =>
     try
       if _last_id_seen > 0 then
-        ifdef "credit_trace" then
-          @printf[I32]("Acking seq_id to upstream boundary\n".cstring())
-        end
-
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, _last_id_seen, _auth)
         _connections.send_data(_sender_name, ack_msg)
