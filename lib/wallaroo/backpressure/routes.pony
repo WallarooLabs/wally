@@ -55,7 +55,7 @@ class Routes
     ifdef debug then
       Invariant(_routes.contains(route_id))
       LazyInvariant({()(_routes, route_id, seq_id): Bool ? =>
-        _routes(route_id).highest_seq_id_sent() >= seq_id})
+          _routes(route_id).highest_seq_id_sent() >= seq_id})
     end
 
     try
