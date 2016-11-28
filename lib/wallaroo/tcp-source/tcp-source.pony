@@ -44,7 +44,7 @@ actor TCPSource is (Initializable & Producer)
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
-  var _muted: Bool = false
+  var _muted: Bool = true
   var _expect_read_buf: Reader = Reader
 
   // Origin (Resilience)
