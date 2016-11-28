@@ -72,6 +72,9 @@ actor Connections
         let file = File(recovery_addr_file)
         let host' = file.line()
         let port' = file.line()
+
+        @printf[I32]("Restarting a listener ...\n\n".cstring())
+
         _listeners.push(TCPListener(auth, consume notifier, consume host',
           consume port'))
       else

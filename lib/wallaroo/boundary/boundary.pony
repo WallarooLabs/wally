@@ -704,20 +704,26 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   be reconnect_to_downstream() =>
     @printf[I32](("OutgoingBoundary: trying to reconnect to downstream: " +
       _host + ": " + _service + "\n\n").cstring())
-
-    _notify = EmptyBoundaryNotify
-    _connect_count = _try_reconnect_to_downstream()
-
-    if _connected then
-      @printf[I32]("Reconnected to downstream.".cstring())
+    // the connection is dead. Reset everything.
+    // _connected = false
+    // _closed = true
+    // _writeable = false
+      
+    // try to reconnect to downstream data-channel
+    if not _connected then
+      _notify = EmptyBoundaryNotify
+      _connect_count = _try_reconnect_to_downstream()
       _notify_connecting()
-    else
+    end
+    
+    if not _connected then
       // start a timer and retry
       let timer = Timer(WaitForReconnect(this), 1_000_000_000, 10_000_000_000)
       _timers(consume timer)
     end
     
   fun ref _try_reconnect_to_downstream(): U32 =>
+    @printf[I32]("Reconnecting to downstream.\n".cstring())
     @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
       _from.cstring())
@@ -796,7 +802,7 @@ interface _OutgoingBoundaryNotify
     """
     None
 
-class EmptyBoundaryNotify is _OutgoingBoundaryNotify
+class EmptyBoundaryNotify is _OutgoingBoundaryNotify //TODO: rename this!
   fun ref connected(conn: OutgoingBoundary ref) =>
   """
   Called when we have successfully connected to the server.
@@ -816,7 +822,7 @@ class WaitForReconnect is TimerNotify
     _boundary = boundary
 
   fun ref apply(timer: Timer, count: U64): Bool =>
-    @printf[I32]("Wait for downstream listener activation...\n\n".cstring())
+    // @printf[I32]("Wait for downstream listener activation...\n\n".cstring())
     _boundary.reconnect_to_downstream()
     false
 

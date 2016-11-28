@@ -41,7 +41,7 @@ class DataChannelListenNotifier is TCPListenNotify
       f.sync()
       f.dispose()
       _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
-      if not _is_initializer then
+      if not (_is_initializer and _recovery_file.exists()) then
         let message = ChannelMsgEncoder.identify_data_port(_name, _service,
           _auth)
         _connections.send_control("initializer", message)

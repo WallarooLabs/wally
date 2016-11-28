@@ -31,7 +31,11 @@ class LocalTopology
   let default_target: (Array[StepBuilder val] val | ProxyAddress val | None)
   let default_state_name: String
   let default_target_id: U128
+  // resilience
+  let worker_names_filepath: FilePath
+  let worker_names: Array[String] val
 
+  
   new val create(name': String, worker_name: String,
     graph': Dag[StepInitializer val] val,
     step_map': Map[U128, (ProxyAddress val | U128)] val,
@@ -40,7 +44,9 @@ class LocalTopology
     proxy_ids': Map[String, U128] val,
     default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
       None,
-    default_state_name': String = "", default_target_id': U128 = 0)
+    default_state_name': String = "", default_target_id': U128 = 0,
+    worker_names': Array[String] val,
+    worker_names_filepath': FilePath)
   =>
     _app_name = name'
     _worker_name = worker_name
@@ -53,7 +59,12 @@ class LocalTopology
     default_target = default_target'
     default_state_name = default_state_name'
     default_target_id = default_target_id'
+    //resilience
+    worker_names = worker_names'
+    worker_names_filepath = worker_names_filepath'
 
+
+    
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
     metrics_conn: TCPConnection, alfred: Alfred,
@@ -170,6 +181,22 @@ actor LocalTopologyInitializer
       @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
 
+  fun ref _save_worker_names(worker_names_filepath: FilePath,
+    worker_names: Array[String] val)
+  =>
+    """
+    Save the list of worker names to a file.
+    """
+    let file = File(worker_names_filepath)
+    for worker_name in worker_names.values() do
+      file.print(worker_name)
+      @printf[I32](("LocalTopology._save_worker_names: " + worker_name).cstring())
+    end
+    file.sync()
+    file.dispose()
+
+    
+    
   be initialize(worker_initializer: (WorkerInitializer | None) = None) =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("|^|^|^Initializing Local Topology^|^|^|\n\n".cstring())
@@ -216,6 +243,8 @@ actor LocalTopologyInitializer
           else
             @printf[I32]("error saving topology!".cstring())
           end
+          // save list of worker names to file
+          _save_worker_names(t.worker_names_filepath, t.worker_names)
         end
 
         if t.is_empty() then

@@ -138,7 +138,8 @@ actor Startup
       let data_channel_file = "/tmp/" + name + "-" + worker_name + ".tcp-data"
       let control_channel_file = "/tmp/" + name + "-" + worker_name +
           ".tcp-control"
-        
+      let worker_names_file = "/tmp/" + name + "-" + worker_name + ".workers"
+          
       let alfred = Alfred(env, event_log_file)
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
         worker_count, env, auth, connections, metrics_conn, is_initializer, 
@@ -147,7 +148,8 @@ actor Startup
       if is_initializer then
         env.out.print("Running as Initializer...")
         let application_initializer = ApplicationInitializer(auth,
-          local_topology_initializer, input_addrs, o_addr, alfred)
+          local_topology_initializer, input_addrs, o_addr, alfred,
+          FilePath(auth, worker_names_file))
 
         worker_initializer = WorkerInitializer(auth, worker_count, connections,
           application_initializer, local_topology_initializer, d_addr, 
@@ -173,6 +175,19 @@ actor Startup
         )
       end
 
+      // If the file worker_names_file exists we need to recover the list of
+      // known workers and recreate the data receivers
+      let worker_names_filepath: FilePath = FilePath(auth, worker_names_file)
+      if worker_names_filepath.exists() then
+        let recovered_workers = _recover_worker_names(worker_names_filepath)
+        local_topology_initializer.create_data_receivers(recovered_workers,
+          worker_initializer)
+      end
+
+      // TODO: We are not recreating the control channel connection from upstream!
+      // TODO: An initializer cannot recover in this way. Make sure that we fail
+      //       immediately if an initializer tries to recover.
+      
       match worker_initializer 
       | let w: WorkerInitializer =>
         w.start(application)
@@ -181,3 +196,21 @@ actor Startup
     else
       StartupHelp(env)
     end
+
+
+  fun ref _recover_worker_names(worker_names_filepath: FilePath):
+    Array[String] val
+  =>
+    """
+    Read in a list of the names of all workers after recovery.
+    """
+    let ws: Array[String] trn = recover Array[String] end
+
+    let file = File(worker_names_filepath)
+    for worker_name in file.lines() do
+      ws.push(worker_name)
+      @printf[I32](("recover_worker_names: " + worker_name).cstring())
+    end
+
+    ws
+    
