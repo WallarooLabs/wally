@@ -14,7 +14,7 @@ actor Startup
   new create(env: Env, application: Application val, 
     app_name: (String val | None)) 
   =>
-    ifdef "use_backpressure" then
+    ifdef "backpressure" then
       env.out.print("****BACKPRESSURE is active****")
     end
     ifdef "resilience" then
