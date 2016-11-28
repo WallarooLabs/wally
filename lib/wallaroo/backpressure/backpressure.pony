@@ -184,9 +184,9 @@ class TypedRoute[In: Any val] is Route
     ifdef debug then
       Invariant(number >= 0)
     end
-    
-    ifdef "trace" then
-      @printf[I32]("--Route: rcvd %llu credits".cstring(), number)
+
+    ifdef "credit_trace" then
+      @printf[I32]("--Route: rcvd %llu credits\n".cstring(), number)
     end 
 
     _request_outstanding = false
@@ -214,7 +214,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _request_credits() =>
     if not _request_outstanding then
-      ifdef "trace" then
+      ifdef "credit_trace" then
         @printf[I32]("--Route: requesting credits\n".cstring())
       end
       _consumer.credit_request(_step)
