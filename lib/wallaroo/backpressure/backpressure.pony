@@ -1,4 +1,5 @@
 use "assert"
+use "time"
 use "sendence/guid"
 use "sendence/container-queue"
 use "sendence/queue"
@@ -142,6 +143,8 @@ class TypedRoute[In: Any val] is Route
   var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
+  var _last_credit_ts: U64 = 0 // Timestamp we last requested
+
 
   // _queue stores tuples of the form:
   // (metric_name: String, source_ts: U64, data: D,
@@ -223,11 +226,14 @@ class TypedRoute[In: Any val] is Route
 
   fun ref request_credits() =>
     if not _request_outstanding then
-      ifdef "credit_trace" then
-        @printf[I32]("--Route: requesting credits\n".cstring())
+      if (Time.nanos() - _last_credit_ts) > 1_000_000_000 then
+        ifdef "credit_trace" then
+          @printf[I32]("--Route: requesting credits\n".cstring())
+        end
+        _consumer.credit_request(_step)
+        _last_credit_ts = Time.nanos()
+        _request_outstanding = true
       end
-      _consumer.credit_request(_step)
-      _request_outstanding = true
     else
       ifdef "credit_trace" then
         @printf[I32]("----Request already outstanding\n".cstring())
