@@ -334,8 +334,7 @@ primitive RawSymbols
 "ATML",
 "YHOO",
 "F",
-"T"] end//!!,
-/*
+"T",
 "MU",
 "PFE",
 "CSCO",
@@ -672,4 +671,3 @@ primitive RawSymbols
 "IVR",
 "SLH"]
 end
-*/

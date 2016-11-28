@@ -319,13 +319,9 @@ actor TCPSource is (Initializable & Producer)
     if _connected and _shutdown and _shutdown_peer then
       _hard_close()
     else
-      @printf[I32]("!!Disposing of routes\n".cstring())
-      for r in _routes.values() do
-        r.dispose()
+      if not _unregistered then
+        _dispose_routes()
       end
-      _cancel_credit_timer()
-      _muted = true
-      _unregistered = true
     end
 
   fun ref _hard_close() =>
@@ -351,11 +347,18 @@ actor TCPSource is (Initializable & Producer)
     _notify.closed(this)
 
     _listen._conn_closed()
+    if not _unregistered then
+      _dispose_routes()
+    end
+    _unregistered = true
+
+  fun ref _dispose_routes() =>
     @printf[I32]("!!Disposing of routes\n".cstring())
     for r in _routes.values() do
       r.dispose()
     end
     _cancel_credit_timer()
+    _muted = true
     _unregistered = true
 
   fun ref _pending_reads() =>
@@ -497,7 +500,6 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
-    @printf[I32]("!!MUTE\n".cstring())
     try
       if (_credit_timer is None) and (not _unregistered) then
         let t = Timer(_RequestCredits(this), 1_000_000_000, 1_000_000_000)
@@ -512,7 +514,6 @@ actor TCPSource is (Initializable & Producer)
     end
 
   fun ref _unmute() =>
-    @printf[I32]("!!UNMUTE\n".cstring())
     _cancel_credit_timer()
     _muted = false
     _pending_reads()
@@ -520,7 +521,6 @@ actor TCPSource is (Initializable & Producer)
   fun ref _cancel_credit_timer() =>
     match _credit_timer
     | let t: Timer tag =>
-      @printf[I32]("!!! CANCEL TIMER!!!\n".cstring())
       _credit_timers.cancel(t)
       _credit_timer = None
     end
