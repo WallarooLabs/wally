@@ -119,7 +119,10 @@ actor TCPSource is (Initializable & Producer)
     end
 
     for r in _routes.values() do
-      r.initialize()
+      // TODO: What should the initial max credits per route from 
+      // a Source be?  I'm starting at max_value because that makes
+      // us dependent on how many can be distributed from downstream.
+      r.initialize(ISize.max_value())
     end
 
   //////////////
@@ -164,6 +167,8 @@ actor TCPSource is (Initializable & Producer)
 
   //
   // CREDIT FLOW
+  fun ref recoup_credits(credits: ISize) => None
+
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
     ifdef debug then
       Invariant(_routes.contains(from))

@@ -45,7 +45,8 @@ primitive EmptyRouteBuilder is RouteBuilder
     EmptyRoute
 
 trait Route
-  fun ref initialize()
+  fun ref initialize(max_credits: ISize)
+  fun ref update_max_credits(max_credits: ISize)
   fun id(): U64
   fun credits(): ISize
   fun ref dispose()
@@ -63,8 +64,9 @@ trait Route
 class EmptyRoute is Route
   let _route_id: U64 = 1 + GuidGenerator.u64() // route 0 is used for filtered messages
 
-  fun ref initialize() => None
+  fun ref initialize(max_credits: ISize) => None
   fun id(): U64 => _route_id
+  fun ref update_max_credits(max_credits: ISize) => None
   fun credits(): ISize => 0
   fun ref dispose() => None
   fun ref request_credits() => None
@@ -136,7 +138,8 @@ class TypedRoute[In: Any val] is Route
   let _step: Producer ref
   let _callback: RouteCallbackHandler
   let _consumer: CreditFlowConsumerStep
-  var _credits_available: ISize = 1
+  var _max_credits: ISize = 0 // This is updated on initialize()
+  var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
 
@@ -167,8 +170,12 @@ class TypedRoute[In: Any val] is Route
     // _queue = ContainerQueue[TypedRouteQueueTuple[In], TypedRouteQueueData[In]](
     //   TypedRouteQueueDataBuilder[In], q_size)
 
-  fun ref initialize() =>
-    None
+  fun ref initialize(max_credits: ISize) =>
+    _max_credits = max_credits
+    request_credits()
+
+  fun ref update_max_credits(max_credits: ISize) =>
+    _max_credits = max_credits
 
   fun id(): U64 =>
     _route_id
@@ -221,6 +228,10 @@ class TypedRoute[In: Any val] is Route
       end
       _consumer.credit_request(_step)
       _request_outstanding = true
+    else
+      ifdef "credit_trace" then
+        @printf[I32]("----Request already outstanding\n".cstring())
+      end
     end
 
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
@@ -373,7 +384,8 @@ class BoundaryRoute is Route
   let _step: Producer ref
   let _callback: RouteCallbackHandler
   let _consumer: OutgoingBoundary
-  var _credits_available: ISize = 1
+  var _max_credits: ISize = 0 // This is updated on initialize()
+  var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
   // Store tuples of the form
@@ -400,8 +412,12 @@ class BoundaryRoute is Route
     // _queue = ContainerQueue[BoundaryRouteQueueTuple, 
     //   BoundaryRouteQueueData](BoundaryRouteQueueDataBuilder, q_size)
 
-  fun ref initialize() =>
-    None
+  fun ref initialize(max_credits: ISize) =>
+    _max_credits = max_credits
+    request_credits()
+
+  fun ref update_max_credits(max_credits: ISize) =>
+    _max_credits = max_credits
 
   fun id(): U64 =>
     _route_id
@@ -421,7 +437,14 @@ class BoundaryRoute is Route
     end
 
     _request_outstanding = false
-    _credits_available = _credits_available + number
+    let credits_recouped = 
+      if (_credits_available + number) > _max_credits then
+        _max_credits - _credits_available
+      else
+        number
+      end
+    _credits_available = _credits_available + credits_recouped
+    _step.recoup_credits(credits_recouped)
 
     if _credits_available > 0 then
       if (_credits_available - number) == 0 then

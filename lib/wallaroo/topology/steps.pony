@@ -113,8 +113,11 @@ actor Step is (RunnableStep & Resilient & Producer &
     //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
     // end
 
+    let max_credits_per_route = 
+      _max_distributable_credits / _routes.size().isize()
+
     for r in _routes.values() do
-      r.initialize()
+      r.initialize(max_credits_per_route)
       ifdef "resilience" then
         _resilience_routes.add_route(r)
       end
@@ -132,7 +135,13 @@ actor Step is (RunnableStep & Resilient & Producer &
       let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
       _routes(consumer) = next_route
       if _initialized then
-        next_route.initialize()
+        let new_max_credits_per_route = 
+          _max_distributable_credits / _routes.size().isize()
+
+        next_route.initialize(new_max_credits_per_route)
+        for r in _routes.values() do
+          r.update_max_credits(new_max_credits_per_route)
+        end
       end
     end
 
@@ -307,7 +316,6 @@ actor Step is (RunnableStep & Resilient & Producer &
   be unregister_producer(producer: Producer,
     credits_returned: ISize)
   =>
-    // @printf[I32](("!!Unregistering producer on " + _runner.name() + "\n").cstring())
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
@@ -317,6 +325,9 @@ actor Step is (RunnableStep & Resilient & Producer &
       _upstreams.delete(i)
       _recoup_credits(credits_returned)
     end
+
+  fun ref recoup_credits(recoup: ISize) =>
+    _recoup_credits(recoup)
 
   fun ref _recoup_credits(recoup: ISize) =>
     @printf[I32]("!!Recouping")
