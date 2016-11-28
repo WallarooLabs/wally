@@ -30,16 +30,16 @@ actor Main
       let application = recover val
         Application("Complex Numbers App")
           .new_pipeline[Complex val, Complex val]("Complex Numbers", ComplexDecoder where coalescing = false)
-          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
-            => Conjugate end)
-          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
-            => Scale(5) end)
+          .to[Complex val]({(): Computation[Complex val, Complex val] iso^
+            => Conjugate })
+          .to[Complex val]({(): Computation[Complex val, Complex val] iso^
+            => Scale(5) })
           .to_stateful[Complex val, Counter](UpdateCounter,
             CounterBuilder, "counter-builder")
-          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
-            => Scale(10) end)
-          .to[Complex val](lambda(): Computation[Complex val, Complex val] iso^
-            => Conjugate end)
+          .to[Complex val]({(): Computation[Complex val, Complex val] iso^
+            => Scale(10) })
+          .to[Complex val]({(): Computation[Complex val, Complex val] iso^
+            => Conjugate })
           .to_sink(ComplexEncoder, recover [0] end)
       end
       Startup(env, application, None)//, 1)

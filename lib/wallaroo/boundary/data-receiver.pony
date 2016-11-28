@@ -1,32 +1,34 @@
 use "collections"
 use "net"
 use "time"
-use "wallaroo/network"
-use "wallaroo/topology"
-use "wallaroo/resilience"
+use "wallaroo/backpressure"
 use "wallaroo/messages"
+use "wallaroo/network"
+use "wallaroo/resilience"
+use "wallaroo/topology"
+
 
 actor DataReceiver is Origin
-  let _auth: AmbientAuth  
+  let _auth: AmbientAuth
   let _worker_name: String
   var _sender_name: String
   var _sender_step_id: U128 = 0
   let _connections: Connections
-  var _router: DataRouter val = 
+  var _router: DataRouter val =
     DataRouter(recover Map[U128, CreditFlowConsumerStep tag] end)
   var _last_id_seen: U64 = 0
   var _connected: Bool = false
   var _reconnecting: Bool = false
-  let _hwm: HighWatermarkTable = HighWatermarkTable(1)
-  let _lwm: LowWatermarkTable = LowWatermarkTable(1)
-  let _origins: OriginSet = OriginSet(1)
-  let _seq_translate: SeqTranslationTable = SeqTranslationTable(1)
-  let _route_translate: RouteTranslationTable = RouteTranslationTable(1)
   let _alfred: Alfred
   let _timers: Timers = Timers
+  // Origin (Resilience)
+  var _flushing: Bool = false
+  let _watermarks: Watermarks = _watermarks.create()
+  let _hwmt: HighWatermarkTable = _hwmt.create()
+  var _wmcounter: U64 = 0
 
-  new create(auth: AmbientAuth, worker_name: String, sender_name: String, 
-    connections: Connections, alfred: Alfred) 
+  new create(auth: AmbientAuth, worker_name: String, sender_name: String,
+    connections: Connections, alfred: Alfred)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -43,7 +45,6 @@ actor DataReceiver is Origin
 
   be data_connect(sender_step_id: U128) =>
     _sender_step_id = sender_step_id
-    @printf[I32](("DataReceiver got DataConnectMsg from " + _sender_name + "\n").cstring())
 
   be update_watermark(route_id: U64, seq_id: U64) =>
     try
@@ -65,29 +66,43 @@ actor DataReceiver is Origin
   be upstream_replay_finished() =>
     _alfred.upstream_replay_finished(this)
 
-  fun ref _flush(low_watermark: U64, origin: Origin tag,
-    upstream_route_id: U64 , upstream_seq_id: U64) =>
+  fun ref _flush(low_watermark: U64, origin: Origin,
+    upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
     """This is not a real Origin, so it doesn't write any State"""
     None
 
-  fun ref hwm_get(): HighWatermarkTable => _hwm
-  fun ref lwm_get(): LowWatermarkTable => _lwm
-  fun ref origins_get(): OriginSet => _origins
-  fun ref seq_translate_get(): SeqTranslationTable => _seq_translate
-  fun ref route_translate_get(): RouteTranslationTable => _route_translate
+  //////////////
+  // ORIGIN (resilience)
+  fun ref flushing(): Bool =>
+    _flushing
+
+  fun ref not_flushing() =>
+    _flushing = false
+
+  fun ref watermarks(): Watermarks =>
+    _watermarks
+
+  fun ref hwmt(): HighWatermarkTable =>
+    _hwmt
+
+  fun ref _watermarks_counter(): U64 =>
+    _wmcounter = _wmcounter + 1
 
   be update_router(router: DataRouter val) =>
     _router = router
 
   be received(d: DeliveryMsg val, seq_id: U64)
-  =>  
+  =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
+    end
     if seq_id >= _last_id_seen then
       _last_id_seen = seq_id
       _router.route(d, this, seq_id)
     end
 
   be replay_received(r: ReplayableDeliveryMsg val, seq_id: U64)
-  =>  
+  =>
     if seq_id >= _last_id_seen then
       _last_id_seen = seq_id
       _router.replay_route(r, this, seq_id)
@@ -98,7 +113,7 @@ actor DataReceiver is Origin
   fun ref _ack_latest() =>
     try
       if _last_id_seen > 0 then
-        let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name, 
+        let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, _last_id_seen, _auth)
         _connections.send_data(_sender_name, ack_msg)
       end
@@ -106,7 +121,7 @@ actor DataReceiver is Origin
       @printf[I32]("Error creating ack watermark message\n".cstring())
     end
 
- be dispose() => 
+ be dispose() =>
    _timers.dispose()
 
 

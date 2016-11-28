@@ -56,17 +56,17 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
   fun pairs(): Iterator[(Key, ProxyAddress val)] => _addresses.pairs()
 
 interface StateAddresses
-  fun apply(key: Any val): (Step tag | None)
+  fun apply(key: Any val): (Step tag | ProxyRouter val | None)
   fun register_routes(router: Router val, route_builder: RouteBuilder val)
   fun steps(): Array[CreditFlowConsumerStep] val
 
 class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
-  let _addresses: Map[Key, Step] val
+  let _addresses: Map[Key, (Step | ProxyRouter val)] val
 
-  new val create(a: Map[Key, Step] val) =>
+  new val create(a: Map[Key, (Step | ProxyRouter val)] val) =>
     _addresses = a
 
-  fun apply(k: Any val): (Step | None) =>
+  fun apply(k: Any val): (Step | ProxyRouter val | None) =>
     match k
     | let key: Key =>
       try
@@ -79,84 +79,44 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
     end
 
   fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
-    for step in _addresses.values() do
-      step.register_routes(router, route_builder)
+    for s in _addresses.values() do
+      match s
+      | let step: Step =>
+        step.register_routes(router, route_builder)
+      end
     end
 
   fun steps(): Array[CreditFlowConsumerStep] val =>
     let ss: Array[CreditFlowConsumerStep] trn =
       recover Array[CreditFlowConsumerStep] end
-
     for s in _addresses.values() do
-      try
-        ss.push(s as CreditFlowConsumerStep)
+      match s
+      | let cfcs: CreditFlowConsumerStep =>
+        ss.push(cfcs)
       end
     end
 
     consume ss
 
-  fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
-    for s in _addresses.values() do
-      s.register_routes(router, route_builder)
-    end
-
 trait StateSubpartition
-  fun build(app_name: String, metrics_conn: TCPConnection, alfred: Alfred): 
-    StateAddresses val
-
-class KeyedStateSubpartition[Key: (Hashable val & Equatable[Key] val)] is
-  StateSubpartition
-  let _keys: (Array[WeightedKey[Key]] val | Array[Key] val)
-  let _runner_builder: RunnerBuilder val
-
-  new val create(keys: (Array[WeightedKey[Key]] val | Array[Key] val),
-    runner_builder: RunnerBuilder val, multi_worker: Bool = false) 
-  =>
-    _keys = keys
-    _runner_builder = runner_builder
-
-  fun build(app_name: String, metrics_conn: TCPConnection, alfred: Alfred): 
-    StateAddresses val 
-  =>
-    let m: Map[Key, Step] trn = recover Map[Key, Step] end
-    let guid_gen = GuidGenerator
-
-    match _keys
-    | let wks: Array[WeightedKey[Key]] val =>
-      for wkey in wks.values() do
-        let reporter = MetricsReporter(app_name, metrics_conn)
-        m(wkey._1) = Step(_runner_builder(reporter.clone() 
-            where alfred = alfred),
-          consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
-      end
-    | let ks: Array[Key] val =>
-      for key in ks.values() do
-        let reporter = MetricsReporter(app_name, metrics_conn)
-        m(key) = Step(_runner_builder(reporter.clone() where alfred = alfred),
-          consume reporter, guid_gen.u128(), _runner_builder.route_builder(), alfred)
-      end
-    end
-
-    KeyedStateAddresses[Key](consume m)
-
-trait PreStateSubpartition
   fun build(app_name: String, worker_name: String, 
-    runner_builder: RunnerBuilder val,
-    state_addresses: StateAddresses val, metrics_conn: TCPConnection,
+    metrics_conn: TCPConnection,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    state_comp_router: Router val = EmptyRouter,
+    initializables: Array[Initializable tag],
+    data_routes: Map[U128, CreditFlowConsumerStep tag],
     default_router: (Router val | None) = None): PartitionRouter val
 
-class KeyedPreStateSubpartition[PIn: Any val,
-  Key: (Hashable val & Equatable[Key] val)] is PreStateSubpartition
+class KeyedStateSubpartition[PIn: Any val,
+  Key: (Hashable val & Equatable[Key] val)] is StateSubpartition
   let _partition_addresses: KeyedPartitionAddresses[Key] val
   let _id_map: Map[Key, U128] val
   let _partition_function: PartitionFunction[PIn, Key] val
   let _pipeline_name: String
+  let _runner_builder: RunnerBuilder val
 
   new val create(partition_addresses': KeyedPartitionAddresses[Key] val,
-    id_map': Map[Key, U128] val,
+    id_map': Map[Key, U128] val, runner_builder: RunnerBuilder val,
     partition_function': PartitionFunction[PIn, Key] val,
     pipeline_name': String)
   =>
@@ -164,16 +124,19 @@ class KeyedPreStateSubpartition[PIn: Any val,
     _id_map = id_map'
     _partition_function = partition_function'
     _pipeline_name = pipeline_name'
+    _runner_builder = runner_builder
 
   fun build(app_name: String, worker_name: String,
-    runner_builder: RunnerBuilder val,
-    state_addresses: StateAddresses val, metrics_conn: TCPConnection,
+    metrics_conn: TCPConnection, 
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    state_comp_router: Router val = EmptyRouter,
+    initializables: Array[Initializable tag],
+    data_routes: Map[U128, CreditFlowConsumerStep tag],
     default_router: (Router val | None) = None):
     LocalPartitionRouter[PIn, Key] val
   =>
+    let guid_gen = GuidGenerator
+
     let routes: Map[Key, (Step | ProxyRouter val)] trn =
       recover Map[Key, (Step | ProxyRouter val)] end
 
@@ -186,23 +149,17 @@ class KeyedPreStateSubpartition[PIn: Any val,
       match proxy_address
       | let pa: ProxyAddress val =>
         if pa.worker == worker_name then
-          let state_step = state_addresses(key)
-          match state_step
-          | let s: Step =>
-            // Create prestate step for this key
-            let next_step = Step(runner_builder(
-                MetricsReporter(app_name, metrics_conn)
-                where alfred = alfred, router = state_comp_router),
-              MetricsReporter(app_name, metrics_conn), id,
-              runner_builder.route_builder(), alfred,
-              DirectRouter(s))
-            m(id) = next_step
+          let reporter = MetricsReporter(app_name, metrics_conn)
+          let next_state_step = Step(_runner_builder(reporter.clone() 
+              where alfred = alfred),
+            consume reporter, guid_gen.u128(), _runner_builder.route_builder(),
+              alfred)
 
-            routes(key) = next_step
-            partition_count = partition_count + 1
-          else
-            @printf[I32]("Subpartition: Missing state step!\n".cstring())
-          end
+          initializables.push(next_state_step)
+          data_routes(id) = next_state_step
+          m(id) = next_state_step
+          routes(key) = next_state_step
+          partition_count = partition_count + 1
         else
           try
             let boundary = outgoing_boundaries(pa.worker)
@@ -218,7 +175,7 @@ class KeyedPreStateSubpartition[PIn: Any val,
       end
     end
 
-    @printf[I32](("Spinning up " + partition_count.string() + " prestate partitions for " + _pipeline_name + " pipeline\n").cstring())
+    @printf[I32](("Spinning up " + partition_count.string() + " state partitions for " + _pipeline_name + " pipeline\n").cstring())
 
     LocalPartitionRouter[PIn, Key](consume m, _id_map, consume routes,
       _partition_function, default_router)

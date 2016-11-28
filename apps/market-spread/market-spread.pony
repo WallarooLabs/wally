@@ -17,11 +17,12 @@ nc -l 127.0.0.1 5001 >> /dev/null
 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
 
 4) orders:
-giles/sender/sender -b 127.0.0.1:7001 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
+giles/sender/sender -b 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/350k-orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
 
 5) nbbo:
-giles/sender/sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
+giles/sender/sender -b 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 """
+use "assert"
 use "collections"
 use "net"
 use "time"
@@ -55,6 +56,15 @@ actor Main
 
       let application = recover val
         Application("Market Spread App")
+          .new_pipeline[FixOrderMessage val, OrderResult val](
+            "Orders", FixOrderFrameHandler)
+            // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
+            .to_state_partition[Symboly val, String, 
+              (OrderResult val | None), SymbolData](CheckOrder, 
+              SymbolDataBuilder, "symbol-data", symbol_data_partition
+              where multi_worker = true)
+            .to_sink(OrderResultEncoder, recover [0] end,
+              initial_report_msgs)     
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo", FixNbboFrameHandler
               where init_file = init_file)
@@ -62,16 +72,8 @@ actor Main
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
             .done()
-          .new_pipeline[FixOrderMessage val, OrderResult val](
-            "Orders", FixOrderFrameHandler)
-            .to_state_partition[Symboly val, String, 
-              (OrderResult val | None), SymbolData](CheckOrder, 
-              SymbolDataBuilder, "symbol-data", symbol_data_partition
-              where multi_worker = true)
-            .to_sink(OrderResultEncoder, recover [0] end,
-              initial_report_msgs)     
       end
-      Startup(env, application, "/tmp/market-spread.evlog")
+      Startup(env, application, "market-spread")
     else
       env.out.print("Couldn't build topology")
     end
@@ -145,6 +147,16 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
     sc_repo: StateChangeRepository[SymbolData], 
     state: SymbolData): (None, StateChange[SymbolData] ref)
   =>
+    ifdef debug then
+      try
+        Assert(sc_repo.contains("SymbolDataStateChange"),
+        "Invariant violated: sc_repo.contains('SymbolDataStateChange')")
+      else
+        //TODO: how do we bail out here?
+        None
+      end
+    end
+
     // @printf[I32]("!!Update NBBO\n".cstring())
     let state_change: SymbolDataStateChange ref =
       try
@@ -252,7 +264,9 @@ class OrderResult
 
 primitive OrderResultEncoder
   fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
-    // @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
+    ifdef "market_results" then
+      @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
+    end
     //Header (size == 55 bytes)
     let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
     wb.u32_be(msgs_size.u32())

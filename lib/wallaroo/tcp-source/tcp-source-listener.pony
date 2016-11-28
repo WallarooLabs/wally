@@ -2,13 +2,16 @@ use "collections"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/resilience"
+use "wallaroo/tcp-sink"
 use "wallaroo/topology"
 
 class TCPSourceListenerBuilder
   let _source_builder: SourceBuilder val
   let _router: Router val
   let _route_builder: RouteBuilder val
+  let _default_in_route_builder: (RouteBuilder val | None)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _tcp_sinks: Array[TCPSink] val
   let _alfred: Alfred
   let _default_target: (Step | None)
   let _target_router: Router val
@@ -18,19 +21,23 @@ class TCPSourceListenerBuilder
   let _init_size: USize
   let _max_size: USize
 
-  new create(source_builder: SourceBuilder val, router: Router val,
+  new val create(source_builder: SourceBuilder val, router: Router val,
     route_builder: RouteBuilder val, 
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
-    target_router: Router val,
+    default_in_route_builder: (RouteBuilder val | None) = None, 
+    target_router: Router val = EmptyRouter, 
     host: String = "", service: String = "0", limit: USize = 0, 
     init_size: USize = 64, max_size: USize = 16384)
   =>
     _source_builder = source_builder
     _router = router
     _route_builder = route_builder
+    _default_in_route_builder = default_in_route_builder
     _outgoing_boundaries = outgoing_boundaries
+    _tcp_sinks = tcp_sinks
     _alfred = alfred
     _default_target = default_target
     _target_router = target_router
@@ -41,11 +48,10 @@ class TCPSourceListenerBuilder
     _max_size = max_size
 
   fun apply(): TCPSourceListener =>
-    TCPSourceListener(
-      _source_builder, _router, _route_builder, _outgoing_boundaries,
-      _alfred, _default_target, _target_router, _host, _service, _limit,
-      _init_size, _max_size
-    ) 
+    TCPSourceListener(_source_builder, _router, _route_builder, 
+      _outgoing_boundaries, _tcp_sinks, _alfred, _default_target, 
+      _default_in_route_builder, _target_router, _host, _service, _limit, 
+      _init_size, _max_size) 
 
 actor TCPSourceListener
   """
@@ -55,7 +61,9 @@ actor TCPSourceListener
   let _notify: TCPSourceListenerNotify
   let _router: Router val
   let _route_builder: RouteBuilder val
+  let _default_in_route_builder: (RouteBuilder val | None)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _tcp_sinks: Array[TCPSink] val
   let _default_target: (Step | None)
   var _fd: U32
   var _event: AsioEventID = AsioEvent.none()
@@ -66,10 +74,12 @@ actor TCPSourceListener
   var _max_size: USize
 
   new create(source_builder: SourceBuilder val, router: Router val,
-    route_builder: RouteBuilder val, 
+    route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
+    default_in_route_builder: (RouteBuilder val | None) = None, 
     target_router: Router val = EmptyRouter, 
     host: String = "", service: String = "0", limit: USize = 0, 
     init_size: USize = 64, max_size: USize = 16384)
@@ -80,7 +90,9 @@ actor TCPSourceListener
     _notify = SourceListenerNotify(source_builder, alfred, target_router)
     _router = router
     _route_builder = route_builder
+    _default_in_route_builder = default_in_route_builder
     _outgoing_boundaries = outgoing_boundaries
+    _tcp_sinks = tcp_sinks
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.cstring(), service.cstring())
     _limit = limit
@@ -90,6 +102,7 @@ actor TCPSourceListener
     _max_size = max_size
     _fd = @pony_asio_event_fd(_event)
     _notify_listening()
+    @printf[I32]((source_builder.name() + " source listening on " + host + ":" + service + "\n").cstring())
 
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
@@ -148,8 +161,8 @@ actor TCPSourceListener
     """
     try
       TCPSource._accept(this, _notify.connected(this), _router.routes(), 
-        _route_builder, _outgoing_boundaries, ns, _default_target, _init_size, 
-        _max_size)
+        _route_builder, _outgoing_boundaries, _tcp_sinks, ns, _default_target, 
+        _default_in_route_builder, _init_size, _max_size)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)

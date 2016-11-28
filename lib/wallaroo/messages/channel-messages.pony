@@ -239,12 +239,12 @@ class ReplayMsg is ChannelMsg
 trait DeliveryMsg is ChannelMsg
   fun target_id(): U128
   fun sender_name(): String
-  fun deliver(target_step: RunnableStep tag, origin: Origin tag,
-    seq_id: U64): Bool
+  fun deliver(target_step: RunnableStep tag, origin: Origin,
+    seq_id: SeqId): Bool
 
 trait ReplayableDeliveryMsg is DeliveryMsg
-  fun replay_deliver(target_step: RunnableStep tag, origin: Origin tag,
-    seq_id: U64): Bool
+  fun replay_deliver(target_step: RunnableStep tag, origin: Origin,
+    seq_id: SeqId): Bool
 
 class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _target_id: U128
@@ -272,15 +272,15 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun target_id(): U128 => _target_id
   fun sender_name(): String => _sender_name
 
-  fun deliver(target_step: RunnableStep tag, origin: Origin tag,
-    seq_id: U64): Bool 
+  fun deliver(target_step: RunnableStep tag, origin: Origin,
+    seq_id: SeqId): Bool 
   =>
     target_step.run[D](_metric_name, _source_ts, _data, origin, _msg_uid, 
       _frac_ids, seq_id, 0)
     false  
 
-  fun replay_deliver(target_step: RunnableStep tag, origin: Origin tag,
-    seq_id: U64): Bool
+  fun replay_deliver(target_step: RunnableStep tag, origin: Origin,
+    seq_id: SeqId): Bool
   =>
     target_step.replay_run[D](_metric_name, _source_ts, _data, origin, 
       _msg_uid, _frac_ids, seq_id, 0)
@@ -297,8 +297,8 @@ class RequestReplayMsg is DeliveryMsg
   fun target_id(): U128 => _target_id
   fun sender_name(): String => _sender_name
 
-  fun deliver(target_step: RunnableStep tag, origin: Origin tag,
-    seq_id: U64 = 0): Bool 
+  fun deliver(target_step: RunnableStep tag, origin: Origin,
+    seq_id: SeqId = 0): Bool 
   => 
     match target_step
     | let ob: OutgoingBoundary =>

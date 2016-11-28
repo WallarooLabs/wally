@@ -8,7 +8,6 @@ use "sendence/dag"
 use "sendence/guid"
 use "sendence/queue"
 use "sendence/messages"
-use "sendence/stack"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/messages"
@@ -21,43 +20,69 @@ use "wallaroo/tcp-source"
 
 class LocalTopology
   let _app_name: String
+  let _worker_name: String
   let _graph: Dag[StepInitializer val] val
+  let _step_map: Map[U128, (ProxyAddress val | U128)] val 
   // _state_builders maps from state_name to StateSubpartition
   let _state_builders: Map[String, StateSubpartition val] val
+  let _pre_state_data: Array[PreStateData val] val
   let _proxy_ids: Map[String, U128] val
   // TODO: Replace this default strategy with a better one after POC
   let default_target: (Array[StepBuilder val] val | ProxyAddress val | None)
-  let default_target_name: String
+  let default_state_name: String
   let default_target_id: U128
 
-  new val create(name': String, graph': Dag[StepInitializer val] val,
+  new val create(name': String, worker_name: String,
+    graph': Dag[StepInitializer val] val,
+    step_map': Map[U128, (ProxyAddress val | U128)] val,
     state_builders': Map[String, StateSubpartition val] val,
+    pre_state_data': Array[PreStateData val] val,
     proxy_ids': Map[String, U128] val,
     default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
       None,
-    default_target_name': String = "", default_target_id': U128 = 0)
+    default_state_name': String = "", default_target_id': U128 = 0)
   =>
     _app_name = name'
+    _worker_name = worker_name
     _graph = graph'
+    _step_map = step_map'
     _state_builders = state_builders'
+    _pre_state_data = pre_state_data'
     _proxy_ids = proxy_ids'
     // TODO: Replace this default strategy with a better one after POC
     default_target = default_target'
-    default_target_name = default_target_name'
+    default_state_name = default_state_name'
     default_target_id = default_target_id'
 
-  fun update_state_map(state_map: Map[String, StateAddresses val],
-    metrics_conn: TCPConnection, alfred: Alfred)
+  fun update_state_map(state_name: String,
+    state_map: Map[String, Router val],
+    metrics_conn: TCPConnection, alfred: Alfred,
+    connections: Connections, auth: AmbientAuth,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    initializables: Array[Initializable tag],
+    data_routes: Map[U128, CreditFlowConsumerStep tag],
+    default_router: (Router val | None)) ?
   =>
-    for (state_name, subpartition) in _state_builders.pairs() do
-      if not state_map.contains(state_name) then
-        @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
-        state_map(state_name) = subpartition.build(_app_name, metrics_conn,
-          alfred)
+    let subpartition = 
+      try
+        _state_builders(state_name)
+      else
+        @printf[I32](("Tried to update state map with nonexistent state name " + state_name + "\n").cstring())
+        error
       end
+
+    if not state_map.contains(state_name) then
+      @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
+      state_map(state_name) = subpartition.build(_app_name, _worker_name,
+         metrics_conn, auth, connections, alfred, outgoing_boundaries,
+         initializables, data_routes, default_router)
     end
 
   fun graph(): Dag[StepInitializer val] val => _graph
+
+  fun pre_state_data(): Array[PreStateData val] val => _pre_state_data
+
+  fun step_map(): Map[U128, (ProxyAddress val | U128)] val => _step_map
 
   fun name(): String => _app_name
 
@@ -80,6 +105,12 @@ actor LocalTopologyInitializer
   var _topology: (LocalTopology val | None) = None
   let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
   let _local_topology_file: String
+  var _topology_initialized: Bool = false
+
+  // Accumulate all TCPSourceListenerBuilders so we can build them
+  // once Alfred signals we're ready
+  let tcpsl_builders: Array[TCPSourceListenerBuilder val] =
+    recover iso Array[TCPSourceListenerBuilder val] end
 
   new create(worker_name: String, worker_count: USize, env: Env,
     auth: AmbientAuth, connections: Connections, metrics_conn: TCPConnection,
@@ -188,46 +219,48 @@ actor LocalTopologyInitializer
         @printf[I32]((graph.string() + "\n").cstring())
 
         // Make sure we only create shared state once and reuse it
-        let state_map: Map[String, StateAddresses val] = state_map.create()
-
-        // Keep track of all CreditFLowConsumerSteps by id so we can create a
-        // DataRouter for the data channel boundary
-        let data_routes: Map[U128, CreditFlowConsumerStep tag] trn =
-          recover Map[U128, CreditFlowConsumerStep tag] end
-
-        @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
-
-        // Create shared state for this topology
-        t.update_state_map(state_map, _metrics_conn, _alfred)
-
-        // // We'll need to register our proxies later over Connections
-        // let proxies: Map[String, Array[Step tag]] = proxies.create()
+        let state_map: Map[String, Router val] = state_map.create()
 
         // Keep track of everything we need to call initialize() on when
         // we're done
         let initializables: Array[Initializable tag] = initializables.create()
+
+        @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
+
+        // For passing into partition builders so they can add state steps
+        // to our data routes
+        let data_routes_ref = Map[U128, CreditFlowConsumerStep tag]
+       
+        // Keep track of all CreditFlowConsumerSteps by id so we can create a 
+        // DataRouter for the data channel boundary
+        var data_routes: Map[U128, CreditFlowConsumerStep tag] trn =
+          recover Map[U128, CreditFlowConsumerStep tag] end
 
         let tcp_sinks_trn: Array[TCPSink] trn = recover Array[TCPSink] end
 
         // Update the step ids for all OutgoingBoundaries
         _connections.update_boundary_ids(t.proxy_ids())
 
-        // Keep track of the steps we've built
-        let built = Map[U128, Router val]
+        // Keep track of routers to the steps we've built
+        let built_routers = Map[U128, Router val]
 
+        // Keep track of steps we've built that we'll use for the OmniRouter.
+        // Unlike data_routes, these will not include state steps, which will // never be direct targets for state computation outputs.
+        let built_stateless_steps: Map[U128, CreditFlowConsumerStep] trn = 
+          recover Map[U128, CreditFlowConsumerStep] end
 
         // TODO: Replace this when we move past the temporary POC based default
-        // target strategy
+        // target strategy. There can currently only be one partition default // target per topology.
+        var default_step_initializer: (StepInitializer val | None) = None
+        var default_in_route_builder: (RouteBuilder val | None) = None
         var default_target: (Step | None) = None
         var default_target_id: U128 = t.default_target_id
         var default_target_state_step_id: U128 = 0
-        var default_target_node: (DagNode[StepInitializer val] val | None) =
-          None
         var default_target_state_step: (Step | None) = None
         match t.default_target
         | let targets: Array[StepBuilder val] val =>
           @printf[I32]("A default target exists!\n".cstring())
-          let pre_state_builder =
+          let pre_state_initializer = 
             try
               targets(0)
             else
@@ -235,8 +268,8 @@ actor LocalTopologyInitializer
               error
             end
 
-          default_target_node = recover DagNode[StepInitializer val](
-            pre_state_builder, pre_state_builder.id()) end
+          default_step_initializer = pre_state_initializer
+          default_in_route_builder = pre_state_initializer.in_route_builder()
 
           let state_builder =
             try
@@ -251,17 +284,18 @@ actor LocalTopologyInitializer
             _alfred)
           state_step.update_route_builder(state_builder.forward_route_builder())
 
+          default_target_state_step = state_step
           initializables.push(state_step)
 
-          default_target_state_step = state_step
-          built(default_target_state_step_id) = DirectRouter(state_step)
+          let state_step_router = DirectRouter(state_step)
+          built_routers(default_target_state_step_id) = state_step_router
+          state_map(t.default_state_name) = state_step_router
         | let proxy_target: ProxyAddress val =>
           let proxy_router = ProxyRouter(_worker_name,
             _outgoing_boundaries(proxy_target.worker), proxy_target,
             _auth)
-          built(default_target_id) = proxy_router
+          built_routers(default_target_id) = proxy_router
         end
-
 
         /////////
         // Initialize based on DAG
@@ -272,11 +306,7 @@ actor LocalTopologyInitializer
         //   III. No direct chains of different partitions
         /////////
 
-        // TODO: Change this to a Stack for depth-first search so we have
-        // more control over the order things are initialized in (i.e. from
-        // one sink back before another sink begins)
-        let frontier = Stack[DagNode[StepInitializer val] val]
-
+        let frontier = Array[DagNode[StepInitializer val] val]
 
         /////////
         // 1. Find graph sinks and add to frontier queue.
@@ -284,25 +314,16 @@ actor LocalTopologyInitializer
         @printf[I32]("Adding sink nodes to frontier\n".cstring())
 
         // Hold non_partitions until the end because we need to build state
-        // comp targets first
+        // comp targets first. (Holding to the end means processing first,
+        // since we're pushing onto a stack)
         let non_partitions = Array[DagNode[StepInitializer val] val]
         for node in graph.nodes() do
-          if node.is_sink() then
-            match node.value
-            | let p: PartitionedPreStateStepBuilder val =>
-              @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
-              frontier.push(node)
-            else
-              non_partitions.push(node)
-            end
+          if node.is_sink() and node.value.is_prestate() then 
+            @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
+            frontier.push(node)
+          else  
+            non_partitions.push(node)
           end
-        end
-
-        // TODO: Change this when we move past POC default target strategy
-        match default_target_node
-        | let n: DagNode[StepInitializer val] val =>
-          @printf[I32](("Adding default target " + n.value.name() + " to frontier\n").cstring())
-          frontier.push(n)
         end
 
         for node in non_partitions.values() do
@@ -313,21 +334,17 @@ actor LocalTopologyInitializer
         /////////
         // 2. Loop: Check next frontier item for if all outgoing steps have
         //          been created
-        //       if no, send to back of frontier queue.
-        //       if yes, add ins to frontier queue, then build the step
+        //       if no, send to bottom of frontier stack.
+        //       if yes, add ins to frontier stack, then build the step 
         //       (connecting it to its out step, which has already been built)
-
-        //accumulation of all TCPSourceListenerBuilders for Alfred, so that it
-        //can make them when it's ready
-        let tcpsl_builders: Array[TCPSourceListenerBuilder val] iso =
-          recover iso Array[TCPSourceListenerBuilder val] end
         // If there are no cycles (I), this will terminate
         while frontier.size() > 0 do
           let next_node = frontier.pop()
 
-          if built.contains(next_node.id) then
-            // We've already handled this node (probably because it's
+          if built_routers.contains(next_node.id) then
+            // We've already handled this node (probably because it's 
             // pre-state)
+            // TODO: I don't think this should ever happen.
             @printf[I32](("We've already handled " + next_node.value.name() + " with id " + next_node.id.string() + " so we're not handling it again\n").cstring())
             continue
           end
@@ -337,63 +354,134 @@ actor LocalTopologyInitializer
           // splits (II), there will only be at most one output per node)
           var ready = true
           for out in next_node.outs() do
-            if not built.contains(out.id) then ready = false end
+            if not built_routers.contains(out.id) then ready = false end
           end
-          // match next_node.value
-          // | let p: PartitionedPreStateStepBuilder val =>
-          //   if not built.contains(p.pre_state_target_id()) then
-          //     ready = false
-          //   end
-          // end
+          match next_node.value
+          | let s_builder: StepBuilder val =>
+            match s_builder.pre_state_target_id()
+            | let psid: U128 =>
+              if not built_routers.contains(psid) then
+                ready = false
+              end
+            end
+          end
           if ready then
             @printf[I32](("Handling " + next_node.value.name() + " node\n").cstring())
             let next_initializer: StepInitializer val = next_node.value
 
             // ...match kind of initializer and go from there...
             match next_initializer
-            | let builder: StepBuilder val =>
+            | let builder: StepBuilder val => 
+            ///////////////
+            // STEP BUILDER
+            ///////////////       
               let next_id = builder.id()
               @printf[I32](("Handling id " + next_id.string() + "\n").cstring())
 
-              if not builder.is_stateful() then
+              if builder.is_prestate() then              
+              ///////////////////
+              // PRESTATE BUILDER
                 @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
-                // Currently there are no splits (II), so we know that a node // has only one output in the graph. We also know this is not
-                // a sink or proxy, so there is exactly one output.
-                let out_id: U128 = _get_output_node_id(next_node,
-                  default_target_id, default_target_state_step_id)
+ 
+                // TODO: Change this when we implement post-POC default 
+                // strategy
+                let dsn = builder.default_state_name()
+                let default_router =
+                  match default_step_initializer
+                  | let dsinit: StepBuilder val => 
+                    if (dsn != "") and (dsn == t.default_state_name) then
+                      // We need a default router
+                      let default_state_router = state_map(dsn)
 
-                let out_router =
-                  try
-                    built(out_id)
+                      let default_pre_state_id = dsinit.id()
+                      let default_pre_state_step = 
+                        dsinit(default_state_router,
+                          _metrics_conn, _alfred)
+                      default_target = default_pre_state_step
+                      initializables.push(default_pre_state_step)
+                      built_stateless_steps(default_pre_state_id) = 
+                        default_pre_state_step
+                      data_routes(default_pre_state_id) = default_pre_state_step
+                      let router = DirectRouter(default_pre_state_step)
+                      built_routers(default_pre_state_id) = router
+                      router                  
+                    else
+                      None
+                    end
                   else
-                    @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
+                    None
+                  end
+
+                ////
+                // Create the state partition if it doesn't exist
+                if builder.state_name() != "" then
+                  t.update_state_map(builder.state_name(), state_map, 
+                    _metrics_conn, _alfred, _connections, _auth, 
+                    _outgoing_boundaries, initializables,
+                    data_routes_ref, default_router)
+                end
+
+                let partition_router = 
+                  try
+                    builder.clone_router_and_set_input_type(
+                      state_map(builder.state_name()), default_router)
+                  else
+                    // Not a partition, so we need a direct target router
+                    @printf[I32](("No partition router found for " + builder.state_name() + "\n").cstring())
                     error
                   end
 
-                // If this is a default target, it might have a state comp
-                // target.
-                let state_comp_target_router =
-                  match builder.pre_state_target_id()
+                let state_comp_target_router = 
+                  match builder.pre_state_target_id() 
                   | let id: U128 =>
                     try
-                      built(id)
+                      built_routers(id)
                     else
-                      EmptyRouter
+                      @printf[I32]("No router found to prestate target step\n".cstring())
+                      error
                     end
                   else
+                    // This prestate has no computation target
                     EmptyRouter
                   end
 
-                // Check if this is a default target.  If so, route it
-                // to the appropriate default state step.
-                let next_step = builder(out_router, _metrics_conn, _alfred,
-                  state_comp_target_router)
+                let next_step = builder(partition_router, _metrics_conn, 
+                  _alfred, state_comp_target_router)
 
                 data_routes(next_id) = next_step
                 initializables.push(next_step)
 
+                built_stateless_steps(next_id) = next_step
                 let next_router = DirectRouter(next_step)
-                built(next_id) = next_router
+                built_routers(next_id) = next_router
+              elseif not builder.is_stateful() then
+              //////////////////////////////////
+              // STATELESS, NON-PRESTATE BUILDER
+                @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
+                // Currently there are no splits (II), so we know that a node // has only one output in the graph. We also know this is not
+                // a sink or proxy, so there is exactly one output.
+                let out_id: U128 = 
+                    _get_output_node_id(next_node, 
+                      default_target_id, default_target_state_step_id)
+
+                let out_router = 
+                  try
+                    builder.clone_router_and_set_input_type(built_routers(out_id))
+                  else
+                    @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
+                    error 
+                  end
+
+                // Check if this is a default target.  If so, route it
+                // to the appropriate default state step.
+                let next_step = builder(out_router, _metrics_conn, _alfred)
+
+                data_routes(next_id) = next_step
+                initializables.push(next_step)
+
+                built_stateless_steps(next_id) = next_step
+                let next_router = DirectRouter(next_step)
+                built_routers(next_id) = next_router
 
                 // If this is our default target, then keep a reference
                 // to it
@@ -401,7 +489,9 @@ actor LocalTopologyInitializer
                   default_target = next_step
                 end
               else
-                // Our step is stateful and non-partitioned, so we need to
+              ////////////////////////////////
+              // NON-PARTITIONED STATE BUILDER
+                // Our step is stateful and non-partitioned, so we need to 
                 // build both a state step and a prestate step
 
                 // First, we must check that all state computation targets
@@ -413,7 +503,7 @@ actor LocalTopologyInitializer
                   match in_node.value.pre_state_target_id()
                   | let id: U128 =>
                     try
-                      built(id)
+                      built_routers(id)
                     else
                       targets_ready = false
                     end
@@ -421,7 +511,7 @@ actor LocalTopologyInitializer
                 end
 
                 if not targets_ready then
-                  frontier.push(next_node)
+                  frontier.unshift(next_node)
                   continue
                 end
 
@@ -431,7 +521,7 @@ actor LocalTopologyInitializer
                 initializables.push(state_step)
 
                 let state_step_router = DirectRouter(state_step)
-                built(next_id) = state_step_router
+                built_routers(next_id) = state_step_router
 
                 // Before a non-partitioned state builder, we should
                 // always have one or more non-partitioned pre-state builders.
@@ -446,7 +536,7 @@ actor LocalTopologyInitializer
                       match b.pre_state_target_id()
                       | let id: U128 =>
                         try
-                          built(id)
+                          built_routers(id)
                         else
                           @printf[I32]("Prestate comp target not built! We should have already caught this\n".cstring())
                           error
@@ -461,15 +551,16 @@ actor LocalTopologyInitializer
                     data_routes(b.id()) = pre_state_step
                     initializables.push(pre_state_step)
 
+                    built_stateless_steps(b.id()) = pre_state_step
                     let pre_state_router = DirectRouter(pre_state_step)
-                    built(b.id()) = pre_state_router
+                    built_routers(b.id()) = pre_state_router
 
                     state_step.register_routes(state_comp_target,
                       b.forward_route_builder())
 
                     // Add ins to this prestate node to the frontier
                     for in_in_node in in_node.ins() do
-                      if not built.contains(in_in_node.id) then
+                      if not built_routers.contains(in_in_node.id) then
                         frontier.push(in_in_node)
                       end
                     end
@@ -481,58 +572,12 @@ actor LocalTopologyInitializer
                   end
                 end
               end
-            | let p_builder: PartitionedPreStateStepBuilder val =>
-              let next_id = p_builder.id()
-              let state_addresses = state_map(p_builder.state_name())
-
-              @printf[I32](("----Spinning up partition for " + p_builder.name() + "----\n").cstring())
-
-              let state_comp_target =
-                match p_builder.pre_state_target_id()
-                | let id: U128 =>
-                  try
-                    built(id)
-                  else
-                    @printf[I32]("Prestate comp target not built! Did you try to string two state steps in a row (that can't be done)?\n".cstring())
-                    error
-                  end
-                else
-                  EmptyRouter
-                end
-
-              state_addresses.register_routes(state_comp_target,
-                 p_builder.forward_route_builder())
-
-              // Check for default router
-              let default_router =
-                try
-                  if default_target_id != 0 then
-                    built(default_target_id)
-                  else
-                    None
-                  end
-                else
-                  None
-                end
-
-              let partition_router: PartitionRouter val =
-                p_builder.build_partition(_worker_name, state_addresses,
-                  _metrics_conn, _auth, _connections, _alfred,
-                  _outgoing_boundaries, state_comp_target, default_router)
-
-              // Create a data route to each pre-state step in the
-              // partition located on this worker
-              for (id, s) in partition_router.local_map().pairs() do
-                data_routes(id) = s
-                initializables.push(s)
-              end
-              // Add the partition router to our built list for nodes
-              // that connect to this node via an in edge and to prove
-              // we've handled it
-              built(next_id) = partition_router
             | let egress_builder: EgressBuilder val =>
+            ////////////////////////////////////
+            // EGRESS BUILDER (Sink or Boundary)
+            ////////////////////////////////////
               let next_id = egress_builder.id()
-              if not built.contains(next_id) then
+              if not built_routers.contains(next_id) then
                 let sink_reporter = MetricsReporter(t.name(),
                   _metrics_conn)
 
@@ -564,69 +609,205 @@ actor LocalTopologyInitializer
                     DirectRouter(sink)
                   end
 
+                built_stateless_steps(next_id) = sink
                 data_routes(next_id) = sink
-                built(next_id) = sink_router
+                built_routers(next_id) = sink_router
               end
             | let source_data: SourceData val =>
+            /////////////////
+            // SOURCE DATA
+            /////////////////            
               let next_id = source_data.id()
               let pipeline_name = source_data.pipeline_name()
 
-              // Currently there are no splits (II), so we know that a node has
-              // only one output in the graph. We also know this is not
-              // a sink or proxy, so there is exactly one output.
-              let out_id: U128 = _get_output_node_id(next_node,
-                default_target_id, default_target_state_step_id)
-              let out_router =
-                try
-                  built(out_id)
+              // TODO: Change this when we implement post-POC default 
+              // strategy
+              let dsn = source_data.default_state_name()
+              let default_router =
+                match default_step_initializer
+                | let dsinit: StepBuilder val => 
+                  if (dsn != "") and (dsn == t.default_state_name) then
+                    // We need a default router
+                    let default_state_router = state_map(dsn)
+
+                    let default_pre_state_id = dsinit.id()
+                    let default_pre_state_step = 
+                      dsinit(default_state_router,
+                        _metrics_conn, _alfred)
+                    default_target = default_pre_state_step
+                    initializables.push(default_pre_state_step)
+                    built_stateless_steps(default_pre_state_id) = 
+                      default_pre_state_step
+                    data_routes(default_pre_state_id) = default_pre_state_step
+                    let router = DirectRouter(default_pre_state_step)
+                    built_routers(default_pre_state_id) = router
+                    router                  
+                  else
+                    None
+                  end
                 else
-                  @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
-                  error
+                  None
+                end
+
+              ////
+              // Create the state partition if it doesn't exist
+              if source_data.state_name() != "" then
+                t.update_state_map(source_data.state_name(), state_map, 
+                  _metrics_conn, _alfred, _connections, _auth, 
+                  _outgoing_boundaries, initializables,
+                  data_routes_ref, default_router)
+              end
+
+              let state_comp_target_router = 
+                if source_data.is_prestate() then
+                  match source_data.pre_state_target_id()
+                  | let id: U128 =>
+                    try
+                      built_routers(id)
+                    else
+                      @printf[I32]("Prestate comp target not built! We should have already caught this\n".cstring())
+                      error
+                    end
+                  else
+                    @printf[I32]("There is no prestate comp target. Using an EmptyRouter\n".cstring())
+                    EmptyRouter
+                  end
+                else
+                  EmptyRouter
+                end
+
+              let out_router = 
+                if source_data.state_name() == "" then
+                  // Currently there are no splits (II), so we know that a node has
+                  // only one output in the graph. We also know this is not
+                  // a sink or proxy, so there is exactly one output.
+                  let out_id: U128 = _get_output_node_id(next_node,
+                    default_target_id, default_target_state_step_id)
+                  try
+                    built_routers(out_id)
+                  else
+                    @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
+                    error 
+                  end
+                else
+                  // Source has a prestate runner on it, so we have no 
+                  // direct target. We need a partition router. And we
+                  // need to register a route to our state comp target on those
+                  // state steps.
+                  try
+                    source_data.clone_router_and_set_input_type(
+                      state_map(source_data.state_name()), default_router)
+                  else
+                    @printf[I32]("State doesn't exist for state computation.\n".cstring())
+                    error 
+                  end
                 end
 
               let source_reporter = MetricsReporter(t.name(),
                 _metrics_conn)
 
-              // TODO: How do we add an Initializable to our list for
-              // the Source?
+              // Get all the sinks so far, which should include any sinks
+              // prestate on this source might target
+              let sinks_for_source_trn: Array[TCPSink] trn = 
+                recover Array[TCPSink] end
+              for sink in tcp_sinks_trn.values() do
+                sinks_for_source_trn.push(sink)
+              end
+              let sinks_for_source: Array[TCPSink] val =  
+                consume sinks_for_source_trn
 
               let listen_auth = TCPListenAuth(_auth)
               try
                 @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
-                tcpsl_builders.push( recover val
+                tcpsl_builders.push(
                   TCPSourceListenerBuilder(
-                    source_data.builder()(source_data.runner_builder(),
-                      out_router, _metrics_conn),
+                    source_data.builder()(source_data.runner_builder(), 
+                      out_router, _metrics_conn, 
+                      source_data.pre_state_target_id()),
                     out_router,
                     source_data.route_builder(),
-                    _outgoing_boundaries,
-                    _alfred, default_target, EmptyRouter,
-                    source_data.address()(0),
+                    _outgoing_boundaries, sinks_for_source,
+                    _alfred, default_target, default_in_route_builder,
+                    state_comp_target_router,
+                    source_data.address()(0), 
                     source_data.address()(1))
-                end )
+                )
               else
                 @printf[I32]("Ill-formed source address\n".cstring())
               end
 
               // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one
-              built(next_id) = EmptyRouter
+              built_routers(next_id) = EmptyRouter
             end
 
             // Add all the nodes with incoming edges to next_node to the
             // frontier
             for in_node in next_node.ins() do
-              if not built.contains(in_node.id) then
+              if not built_routers.contains(in_node.id) then
                 frontier.push(in_node)
               end
             end
 
             @printf[I32](("Finished handling " + next_node.value.name() + " node\n").cstring())
           else
-            frontier.push(next_node)
+            frontier.unshift(next_node)
           end
         end
-        _alfred.local_topology_ready(consume tcpsl_builders)
+
+        /////
+        // Register pre state target routes on corresponding state steps
+        for psd in t.pre_state_data().values() do
+          match psd.target_id()
+          | let tid: U128 =>
+            // If the corresponding state has not been built yet, build it
+            // now
+            // TODO: Do we need a default router here?
+            if psd.is_default_target() then
+              match default_target_state_step
+              | let ds: Step =>
+                let target_router = 
+                  try
+                    built_routers(tid)
+                  else
+                    @printf[I32]("Failed to build router for default target\n".cstring())
+                    error
+                  end
+                ds.register_routes(target_router, psd.forward_route_builder())
+              else
+                @printf[I32]("Default targets are not built on this worker\n".cstring())
+              end
+            else
+              if psd.state_name() != "" then
+                t.update_state_map(psd.state_name(), state_map, 
+                  _metrics_conn, _alfred, _connections, _auth, 
+                  _outgoing_boundaries, initializables,
+                  data_routes_ref, None)
+              end
+              let partition_router = 
+                try
+                  psd.clone_router_and_set_input_type(state_map(psd.state_name()))
+                else
+                  @printf[I32]("PartitionRouter was not built for expected state partition.\n".cstring())
+                  error 
+                end
+              let target_router = built_routers(tid)
+              match partition_router
+              | let pr: PartitionRouter val =>
+                pr.register_routes(target_router, psd.forward_route_builder())
+                @printf[I32](("Registered routes on state steps for " + psd.pre_state_name() + "\n").cstring())
+              else
+                @printf[I32](("Expected PartitionRouter but found something else!\n").cstring())
+                error
+              end
+            end
+          end
+        end
+        /////
+
+        for (k, v) in data_routes_ref.pairs() do
+          data_routes(k) = v
+        end
 
         let data_router = DataRouter(consume data_routes)
         for receiver in _data_receivers.values() do
@@ -658,13 +839,20 @@ actor LocalTopologyInitializer
           _connections.send_phone_home(ready_msg)
         end
 
+        let omni_router = StepIdRouter(_worker_name,
+          consume built_stateless_steps, t.step_map(), _outgoing_boundaries)
+
         // Initialize all our initializables to get backpressure started
         let tcp_sinks: Array[TCPSink] val = consume tcp_sinks_trn
         for i in initializables.values() do
-          i.initialize(_outgoing_boundaries, tcp_sinks)
+          i.initialize(_outgoing_boundaries, tcp_sinks, omni_router)
         end
 
         @printf[I32]("Local topology initialized\n".cstring())
+        _topology_initialized = true
+
+        // TODO: Notify Alfred to start reading data. This should be called by // Alfred after it's done.
+        spin_up_source_listeners()
       else
         @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end
@@ -673,6 +861,15 @@ actor LocalTopologyInitializer
       @printf[I32]("---------------------------------------------------------\n".cstring())
     else
       _env.err.print("Error initializing local topology")
+    end
+
+  be spin_up_source_listeners() =>
+    if not _topology_initialized then
+      @printf[I32]("ERROR: Tried to spin up source listeners before topology was initialized!\n".cstring())
+    else
+      for builder in tcpsl_builders.values() do
+        builder()
+      end
     end
 
   fun _get_output_node_id(node: DagNode[StepInitializer val] val,

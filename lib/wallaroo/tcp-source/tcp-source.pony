@@ -5,7 +5,6 @@ use "net"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/topology"
-use "wallaroo/messages"
 use "wallaroo/tcp-sink"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -26,6 +25,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _tcp_sinks: Array[TCPSink] val
 
   // TCP
   let _listen: TCPSourceListener
@@ -46,18 +46,20 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   var _muted: Bool = false
   var _expect_read_buf: Reader = Reader
 
-  // Resilience
-  let _hwm: HighWatermarkTable = HighWatermarkTable(10)
-  let _lwm: LowWatermarkTable = LowWatermarkTable(10)
-  let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
-  let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
-  let _origins: OriginSet = OriginSet(10)
+  // Origin (Resilience)
+  var _flushing: Bool = false
+  let _watermarks: Watermarks = _watermarks.create()
+  let _hwmt: HighWatermarkTable = _hwmt.create()
+  var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
+  var _wmcounter: U64 = 0
 
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val, 
+    tcp_sinks: Array[TCPSink] val,
+    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,  
+    forward_route_builder: (RouteBuilder val | None) = None, 
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -90,6 +92,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
+    _tcp_sinks = tcp_sinks
 
     //TODO: either only accept when we are done recovering or don't start
     //listening until we are done recovering
@@ -105,9 +108,16 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
         _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
+    for sink in tcp_sinks.values() do
+      _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
+    end
+
     match default_target
     | let r: CreditFlowConsumerStep =>
-      _routes(r) = _route_builder(this, r, StepRouteCallbackHandler)
+      match forward_route_builder
+      | let frb: RouteBuilder val =>
+        _routes(r) = frb(this, r, StepRouteCallbackHandler)
+      end
     end
 
     for r in _routes.values() do
@@ -116,28 +126,51 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
   //////////////
   // ORIGIN (resilience)
-  fun ref hwm_get(): HighWatermarkTable =>
-    _hwm
+  fun ref flushing(): Bool =>
+    _flushing
 
-  fun ref lwm_get(): LowWatermarkTable =>
-    _lwm
+  fun ref not_flushing() =>
+    _flushing = false
 
-  fun ref seq_translate_get(): SeqTranslationTable =>
-    _seq_translate
+  fun ref watermarks(): Watermarks =>
+    _watermarks
 
-  fun ref route_translate_get(): RouteTranslationTable =>
-    _route_translate
+  fun ref hwmt(): HighWatermarkTable =>
+    _hwmt
 
-  fun ref origins_get(): OriginSet =>
-    _origins
+  fun ref _watermarks_counter(): U64 =>
+    _wmcounter = _wmcounter + 1
 
-  fun ref _flush(low_watermark: U64, origin: Origin tag,
-    upstream_route_id: U64 , upstream_seq_id: U64) =>
+  // Override these for TCPSource as we are currently
+  // not resilient.
+
+  fun ref _flush(low_watermark: U64, origin: Origin,
+    upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
     None
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val)
+  be log_flushed(low_watermark: SeqId, i_origin: Origin,
+    i_route_id: RouteId, i_seq_id: SeqId)
   =>
+    None
+
+  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId, i_origin: Origin,
+    i_route_id: RouteId, i_seq_id: SeqId, msg_uid: U128)
+  =>
+    None
+
+  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
+    None
+
+  fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
+    None
+
+  fun ref _run_ack(i_origin: Origin, i_route_id: RouteId, i_seq_id: SeqId) =>
+    None
+
+  // Our actor
+  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
+  => 
     None
 
   be dispose() =>
@@ -175,8 +208,8 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
       None
     end
 
-  fun ref update_route_id(route_id: U64) =>
-    None // only used in Route to update the outgoing route_id for a message
+  fun ref next_sequence_id(): U64 =>
+    _seq_id = _seq_id + 1
 
   //
   // TCP
@@ -371,7 +404,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
          _read_len = _read_len + len
 
-        if _read_len >= _expect then
+        if _expect != 0 then
           let data = _read_buf = recover Array[U8] end
           data.truncate(_read_len)
           _read_len = 0
@@ -381,8 +414,14 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
           while (_expect_read_buf.size() > 0) and
             (_expect_read_buf.size() >= _expect)
           do
-            let out = _expect_read_buf.block(_expect)
-            let osize = _expect
+            let block_size = if _expect != 0 then
+              _expect
+            else
+              _expect_read_buf.size()
+            end
+
+            let out = _expect_read_buf.block(block_size)
+            let osize = block_size
 
             let carry_on = _notify.received(this, consume out)
             ifdef osx then

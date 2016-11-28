@@ -2,6 +2,7 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "sendence/guid"
 use "sendence/queue"
 use "wallaroo/backpressure"
 use "wallaroo/messages"
@@ -25,7 +26,8 @@ class OutgoingBoundaryBuilder
     OutgoingBoundary(auth, worker_name, consume reporter, host,
       service)
 
-actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
+actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
+  & Initializable & Origin)
   // Steplike
   // let _encoder: EncoderWrapper val
   let _wb: Writer = Writer
@@ -50,13 +52,15 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _writeable: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
-  embed _pending_tracking: List[(USize, TrackingInfo val)] = _pending_tracking.create()
+  embed _pending_tracking: List[USize] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
+  var _muted: Bool = false
+  var _expect_read_buf: Reader = Reader
 
   // Connection, Acking and Replay
   let _auth: AmbientAuth
@@ -68,6 +72,13 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   let _queue: Queue[Array[ByteSeq] val] = _queue.create(500_000)
   var _lowest_queue_id: U64 = 0
   var _seq_id: U64 = 0
+
+  // Origin (Resilience)
+  var _flushing: Bool = false
+  let _watermarks: Watermarks = _watermarks.create()
+  let _hwmt: HighWatermarkTable = _hwmt.create()
+  let _route_id: RouteId = GuidGenerator.u64()
+  var _wmcounter: U64 = 0
 
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -93,8 +104,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       from.cstring())
     _notify_connecting()
 
+    @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + service + "\n").cstring())
+
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val)
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
   =>
     try
       if _step_id == 0 then
@@ -113,24 +126,31 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _step_id = step_id
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, seq_id: U64, route_id: U64)
+    origin: Origin, msg_uid: U128,
+    frac_ids: None, seq_id: SeqId, route_id: RouteId)
   =>
     @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin tag, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: U64, route_id: U64)
+    origin: Origin, msg_uid: U128,
+    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
   =>
     @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
 
   // TODO: open question: how do we reconnect if our external system goes away?
-  be forward(delivery_msg: ReplayableDeliveryMsg val)
+  be forward(delivery_msg: ReplayableDeliveryMsg val,
+    i_origin: Origin, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
+    i_route_id: RouteId)
   =>
     try
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         _seq_id, _wb, _auth)
       _queue.enqueue(outgoing_msg)
+
+      ifdef "resilience" then
+        _bookkeeping(_route_id, _seq_id, i_origin, i_route_id,
+          i_seq_id, msg_uid)
+      end
 
       _writev(outgoing_msg)
 
@@ -144,9 +164,16 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     if seq_id > _lowest_queue_id then
       let flush_count: USize = (seq_id - _lowest_queue_id).usize()
       _queue.clear_n(flush_count)
-      // _queue.clear()
       _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-    end
+
+      ifdef "trace" then
+        @printf[I32](
+          "Got ack callback from downstream worker --------\n\n".cstring())
+      end
+
+      //TODO: Batching
+      _update_watermark(_route_id, seq_id)
+  end
 
   be replay_msgs() =>
     for msg in _queue.values() do
@@ -172,8 +199,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     close()
 
-  fun ref _unit_finished(number_finished: ISize, last_sent:
-    TrackingInfo val)
+  fun ref _unit_finished(number_finished: ISize)
   =>
     """
     Handles book keeping related to resilience and backpressure. Called when
@@ -190,7 +216,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     ifdef debug then
       try
         Assert(not _upstreams.contains(producer),
-          "Producer attempted registered with sink more than once")
+          "Producer attempted registered with boundary more than once")
       else
         _hard_close()
         return
@@ -334,9 +360,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
     _resubscribe_event()
 
-  // TODO: Fix this when we get a real message envelope
-  fun ref _writev(data: ByteSeqIter, tracking_info: TrackingInfo val =
-    TrackingInfo) =>
+  fun ref _writev(data: ByteSeqIter) =>
     """
     Write a sequence of sequences of bytes.
     """
@@ -350,14 +374,14 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         _pending_writev_total = _pending_writev_total + bytes.size()
         data_size = data_size + bytes.size()
       end
- 
-      _pending_tracking.push((data_size, tracking_info))
+
+      _pending_tracking.push(data_size)
       _pending_writes()
 
       _in_sent = false
     end
 
-  fun ref _write_final(data: ByteSeq, tracking_info: TrackingInfo val) =>
+  fun ref _write_final(data: ByteSeq) =>
     """
     Write as much as possible to the socket. Set _writeable to false if not
     everything was written. On an error, close the connection. This is for
@@ -365,7 +389,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     _pending_writev.push(data.cpointer().usize()).push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
-    _pending_tracking.push((data.size(), tracking_info))
+    _pending_tracking.push(data.size())
     _pending.push((data, 0))
     _pending_writes()
 
@@ -442,12 +466,47 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
     _notify.closed(this)
 
-  // TODO: switch to using single sys call "expect"
   fun ref _pending_reads() =>
+    """
+    Unless this connection is currently muted, read while data is available,
+    guessing the next packet length as we go. If we read 4 kb of data, send
+    ourself a resume message and stop reading, to avoid starving other actors.
+    """
     try
       var sum: USize = 0
 
       while _readable and not _shutdown_peer do
+        if _muted then
+          return
+        end
+
+        while (_expect_read_buf.size() > 0) and
+          (_expect_read_buf.size() >= _expect)
+        do
+          let block_size = if _expect != 0 then
+            _expect
+          else
+            _expect_read_buf.size()
+          end
+
+          let out = _expect_read_buf.block(block_size)
+          let carry_on = _notify.received(this, consume out)
+          ifdef osx then
+            if not carry_on then
+              _read_again()
+              return
+            end
+
+            sum = sum + block_size
+
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
+            end
+          end
+        end
+
         // Read as much data as possible.
         _read_buf_size()
         let len = @pony_os_recv[USize](
@@ -466,11 +525,47 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
           _next_size = _max_size.min(_next_size * 2)
         end
 
-        _read_len = _read_len + len
+         _read_len = _read_len + len
 
-        if _read_len >= _expect then
+        if _expect != 0 then
           let data = _read_buf = recover Array[U8] end
           data.truncate(_read_len)
+          _read_len = 0
+
+          _expect_read_buf.append(consume data)
+
+          while (_expect_read_buf.size() > 0) and
+            (_expect_read_buf.size() >= _expect)
+          do
+            let block_size = if _expect != 0 then
+              _expect
+            else
+              _expect_read_buf.size()
+            end
+
+            let out = _expect_read_buf.block(block_size)
+            let osize = block_size
+
+            let carry_on = _notify.received(this, consume out)
+            ifdef osx then
+              if not carry_on then
+                _read_again()
+                return
+              end
+
+              sum = sum + osize
+
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                _read_again()
+                return
+              end
+            end
+          end
+        else
+          let data = _read_buf = recover Array[U8] end
+          data.truncate(_read_len)
+          let dsize = _read_len
           _read_len = 0
 
           let carry_on = _notify.received(this, consume data)
@@ -480,7 +575,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
               return
             end
 
-            sum = sum + len
+            sum = sum + dsize
 
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
@@ -565,7 +660,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
             _pending.clear()
 
             // do trackinginfo finished stuff
-            _tracking_info_finished(bytes_sent)
+            _bytes_finished(bytes_sent)
             return true
           else
             for d in Range[USize](0, num_to_send, 1) do
@@ -573,6 +668,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
               _pending_writev.shift()
               _pending.shift()
             end
+
           end
         end
       else
@@ -582,41 +678,35 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     // do trackinginfo finished stuff
-    _tracking_info_finished(bytes_sent)
+    _bytes_finished(bytes_sent)
 
     false
 
 
-  fun ref _tracking_info_finished(num_bytes_sent: USize) =>
+  fun ref _bytes_finished(num_bytes_sent: USize) =>
     """
     Call _unit_finished with # of sent messages and last TrackingInfo
     """
     var num_sent: ISize = 0
-    var final_pending_sent: (TrackingInfo val | None) = None
     var bytes_sent = num_bytes_sent
 
     try
       while bytes_sent > 0 do
-        let node = _pending_tracking.head()
-        (let bytes, let tracking_info) = node()
+        let bytes = _pending_tracking(0)
         if bytes <= bytes_sent then
           num_sent = num_sent + 1
           bytes_sent = bytes_sent - bytes
-          final_pending_sent = tracking_info
           _pending_tracking.shift()
         else
           let bytes_remaining = bytes - bytes_sent
           bytes_sent = 0
           // update remaining for this message
-          node() = (bytes_remaining, tracking_info)
+          _pending_tracking(0) = bytes_remaining
         end
       end
-
-      match final_pending_sent
-      | let sent: TrackingInfo val =>
-        _unit_finished(num_sent, sent)
-      end
     end
+
+    _unit_finished(num_sent)
 
   fun ref _apply_backpressure() =>
     _writeable = false
@@ -657,6 +747,30 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
       @pony_asio_event_resubscribe(_event, flags)
     end
+
+  //////////////
+  // ORIGIN (resilience)
+  fun ref flushing(): Bool =>
+    _flushing
+
+  fun ref not_flushing() =>
+    _flushing = false
+
+  fun ref watermarks(): Watermarks =>
+    _watermarks
+
+  fun ref hwmt(): HighWatermarkTable =>
+    _hwmt
+
+  fun ref _flush(low_watermark: U64, origin: Origin,
+    upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
+    """
+    No-op: OutgoingBoundary has no resilient state
+    """
+    None
+
+  fun ref _watermarks_counter(): U64 =>
+    _wmcounter = _wmcounter + 1
 
 interface _OutgoingBoundaryNotify
   fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
