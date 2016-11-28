@@ -65,6 +65,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 500_000
   var _distributable_credits: ISize = 0
+  var _unacked_credits: ISize = 0
 
   // Resilience routes
   // TODO: This needs to be merged with credit flow producer routes
@@ -362,12 +363,27 @@ actor Step is (RunnableStep & Resilient & Producer &
 
     from.receive_credits(desired_give_out, this)
     _distributable_credits = _distributable_credits - desired_give_out
+    _unacked_credits = _unacked_credits + desired_give_out
 
     if _distributable_credits == 0 then
       for r in _routes.values() do
         r.request_credits()
       end
     end
+
+  be ack_credits(acked: ISize, unused: ISize) =>
+    ifdef debug then
+      try
+        Assert(acked <= _unacked_credits,
+          "More credits were acked then are still outstanding!")
+      else
+        // TODO: CREDITFLOW - What is our error response here?
+        return
+      end
+    end
+
+    _unacked_credits = _unacked_credits - acked
+    _distributable_credits = _distributable_credits + unused
 
   fun _lowest_route_credit_level(): ISize =>
     var lowest: ISize = ISize.max_value()

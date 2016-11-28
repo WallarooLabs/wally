@@ -39,6 +39,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 500_000
   var _distributable_credits: ISize = _max_distributable_credits
+  var _unacked_credits: ISize = 0
 
   // TCP
   var _notify: _OutgoingBoundaryNotify
@@ -264,6 +265,21 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
+    _unacked_credits = _unacked_credits + give_out
+
+  be ack_credits(acked: ISize, unused: ISize) =>
+    ifdef debug then
+      try
+        Assert(acked <= _unacked_credits,
+          "More credits were acked then are still outstanding!")
+      else
+        _hard_close()
+        return
+      end
+    end
+
+    _unacked_credits = _unacked_credits - acked
+    _distributable_credits = _distributable_credits + unused
 
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup

@@ -47,6 +47,9 @@ actor EmptySink is CreditFlowConsumerStep
   be credit_request(from: Producer) =>
     None
 
+  be ack_credits(acked: ISize, unused: ISize) =>
+    None
+
 class TCPSinkBuilder
   let _encoder_wrapper: EncoderWrapper val
   let _initial_msgs: Array[Array[ByteSeq] val] val
@@ -101,6 +104,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 175_000_000
   var _distributable_credits: ISize = _max_distributable_credits
+  var _unacked_credits: ISize = 0
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -249,7 +253,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     ifdef debug then
       try
         Assert(_upstreams.contains(producer),
-          "Producer attempted to unregistered with sink " +
+          "Producer attempted to unregister with sink " +
           "it isn't registered with")
       else
         _hard_close()
@@ -314,9 +318,24 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
+    _unacked_credits = _unacked_credits + give_out
 
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
+
+  be ack_credits(acked: ISize, unused: ISize) =>
+    ifdef debug then
+      try
+        Assert(acked <= _unacked_credits,
+          "More credits were acked then are still outstanding!")
+      else
+        _hard_close()
+        return
+      end
+    end
+
+    _unacked_credits = _unacked_credits - acked
+    _distributable_credits = _distributable_credits + unused
 
   //
   // TCP

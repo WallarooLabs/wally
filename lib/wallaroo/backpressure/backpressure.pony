@@ -14,6 +14,7 @@ trait tag CreditFlowConsumer
   be register_producer(producer: Producer)
   be unregister_producer(producer: Producer, credits_returned: ISize)
   be credit_request(from: Producer)
+  be ack_credits(acked: ISize, unused: ISize)
 
 type CreditFlowProducerConsumer is (Producer & CreditFlowConsumer)
 
@@ -202,7 +203,15 @@ class TypedRoute[In: Any val] is Route
     end 
 
     _request_outstanding = false
-    _credits_available = _credits_available + number
+    let credits_recouped = 
+      if (_credits_available + number) > _max_credits then
+        _max_credits - _credits_available
+      else
+        number
+      end
+    _credits_available = _credits_available + credits_recouped
+    _step.recoup_credits(credits_recouped)
+    _consumer.ack_credits(number, number - credits_recouped)
 
     if _credits_available > 0 then
       if (_credits_available - number) == 0 then
@@ -394,6 +403,8 @@ class BoundaryRoute is Route
   var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
+  var _last_credit_ts: U64 = 0 // Timestamp we last requested
+
   // Store tuples of the form
   // (delivery_msg, cfp, i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
   let _queue: Array[(ReplayableDeliveryMsg val, Producer ref,
@@ -451,6 +462,7 @@ class BoundaryRoute is Route
       end
     _credits_available = _credits_available + credits_recouped
     _step.recoup_credits(credits_recouped)
+    _consumer.ack_credits(number, number - credits_recouped)
 
     if _credits_available > 0 then
       if (_credits_available - number) == 0 then
@@ -474,8 +486,18 @@ class BoundaryRoute is Route
 
   fun ref request_credits() =>
     if not _request_outstanding then
-      _consumer.credit_request(_step)
-      _request_outstanding = true
+      if (Time.nanos() - _last_credit_ts) > 1_000_000_000 then
+        ifdef "credit_trace" then
+          @printf[I32]("--BoundaryRoute: requesting credits\n".cstring())
+        end
+        _consumer.credit_request(_step)
+        _last_credit_ts = Time.nanos()
+        _request_outstanding = true
+      end
+    else
+      ifdef "credit_trace" then
+        @printf[I32]("----Request already outstanding\n".cstring())
+      end
     end
 
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
