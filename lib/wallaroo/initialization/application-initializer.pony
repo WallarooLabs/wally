@@ -19,20 +19,17 @@ actor ApplicationInitializer
   let _output_addr: Array[String] val
   let _alfred: Alfred tag
   var _application: (Application val | None) = None
-  let _worker_names_filepath: FilePath
   
   new create(auth: AmbientAuth,
     local_topology_initializer: LocalTopologyInitializer,
     input_addrs: Array[Array[String]] val, 
-    output_addr: Array[String] val, alfred: Alfred tag,
-    worker_names_filepath: FilePath) 
+    output_addr: Array[String] val, alfred: Alfred tag)
   =>
     _auth = auth
     _local_topology_initializer = local_topology_initializer
     _input_addrs = input_addrs
     _output_addr = output_addr
     _alfred = alfred
-    _worker_names_filepath = worker_names_filepath
 
   be update_application(app: Application val) =>
     _application = app
@@ -766,8 +763,7 @@ actor ApplicationInitializer
               sendable_step_map, state_subpartitions, sendable_pre_state_data,
               consume p_ids, default_target, application.default_state_name,
               application.default_target_id,
-              worker_names,
-              _worker_names_filepath)
+              worker_names)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error

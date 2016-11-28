@@ -32,7 +32,6 @@ class LocalTopology
   let default_state_name: String
   let default_target_id: U128
   // resilience
-  let worker_names_filepath: FilePath
   let worker_names: Array[String] val
 
   
@@ -45,8 +44,7 @@ class LocalTopology
     default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
       None,
     default_state_name': String = "", default_target_id': U128 = 0,
-    worker_names': Array[String] val,
-    worker_names_filepath': FilePath)
+    worker_names': Array[String] val)
   =>
     _app_name = name'
     _worker_name = worker_name
@@ -61,9 +59,6 @@ class LocalTopology
     default_target_id = default_target_id'
     //resilience
     worker_names = worker_names'
-    worker_names_filepath = worker_names_filepath'
-
-
     
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
@@ -117,6 +112,7 @@ actor LocalTopologyInitializer
   let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
   let _local_topology_file: String
   let _data_channel_file: String
+  let _worker_names_file: String
   var _topology_initialized: Bool = false
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
@@ -127,7 +123,7 @@ actor LocalTopologyInitializer
   new create(worker_name: String, worker_count: USize, env: Env,
     auth: AmbientAuth, connections: Connections, metrics_conn: TCPConnection,
     is_initializer: Bool, alfred: Alfred tag, local_topology_file: String,
-    data_channel_file: String)
+    data_channel_file: String, worker_names_file: String)
   =>
     _worker_name = worker_name
     _worker_count = worker_count
@@ -139,6 +135,7 @@ actor LocalTopologyInitializer
     _alfred = alfred
     _local_topology_file = local_topology_file
     _data_channel_file = data_channel_file
+    _worker_names_file = worker_names_file
 
   be update_topology(t: LocalTopology val) =>
     _topology = t
@@ -190,12 +187,11 @@ actor LocalTopologyInitializer
     let file = File(worker_names_filepath)
     for worker_name in worker_names.values() do
       file.print(worker_name)
-      @printf[I32](("LocalTopology._save_worker_names: " + worker_name).cstring())
+      @printf[I32](("LocalTopology._save_worker_names: " + worker_name +
+      "\n").cstring())
     end
     file.sync()
     file.dispose()
-
-    
     
   be initialize(worker_initializer: (WorkerInitializer | None) = None) =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
@@ -231,6 +227,7 @@ actor LocalTopologyInitializer
       match _topology
       | let t: LocalTopology val =>
         ifdef "resilience" then
+          @printf[I32]("Saving topology!\n".cstring())
           try
             let local_topology_file = FilePath(_auth, _local_topology_file)
             let file = File(local_topology_file)
@@ -241,10 +238,15 @@ actor LocalTopologyInitializer
             wb.write(serialised_topology)
             file.writev(recover val wb.done() end)
           else
-            @printf[I32]("error saving topology!".cstring())
+            @printf[I32]("Error saving topology!\n".cstring())
           end
           // save list of worker names to file
-          _save_worker_names(t.worker_names_filepath, t.worker_names)
+          @printf[I32](("Saving worker names to file: " + _worker_names_file +
+            "\n").cstring())
+          let worker_names_filepath = FilePath(_auth, _worker_names_file)
+          _save_worker_names(worker_names_filepath, t.worker_names)
+
+          
         end
 
         if t.is_empty() then

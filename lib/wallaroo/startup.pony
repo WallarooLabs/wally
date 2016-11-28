@@ -139,17 +139,17 @@ actor Startup
       let control_channel_file = "/tmp/" + name + "-" + worker_name +
           ".tcp-control"
       let worker_names_file = "/tmp/" + name + "-" + worker_name + ".workers"
-          
+      @printf[I32](("worker_names_file: " + worker_names_file + "\n").cstring())
+      
       let alfred = Alfred(env, event_log_file)
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 
         worker_count, env, auth, connections, metrics_conn, is_initializer, 
-        alfred, local_topology_file, data_channel_file)
+        alfred, local_topology_file, data_channel_file, worker_names_file)
 
       if is_initializer then
         env.out.print("Running as Initializer...")
         let application_initializer = ApplicationInitializer(auth,
-          local_topology_initializer, input_addrs, o_addr, alfred,
-          FilePath(auth, worker_names_file))
+          local_topology_initializer, input_addrs, o_addr, alfred)
 
         worker_initializer = WorkerInitializer(auth, worker_count, connections,
           application_initializer, local_topology_initializer, d_addr, 
