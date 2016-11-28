@@ -322,6 +322,7 @@ actor TCPSource is (Initializable & Producer)
       for r in _routes.values() do
         r.dispose()
       end
+      _cancel_credit_timer()
       _unregistered = true
     end
 
@@ -352,6 +353,7 @@ actor TCPSource is (Initializable & Producer)
     for r in _routes.values() do
       r.dispose()
     end
+    _cancel_credit_timer()
     _unregistered = true
 
   fun ref _pending_reads() =>
@@ -505,13 +507,16 @@ actor TCPSource is (Initializable & Producer)
     end
 
   fun ref _unmute() =>
+    _cancel_credit_timer()
+    _muted = false
+    _pending_reads()
+
+  fun ref _cancel_credit_timer() =>
     match _credit_timer
     | let t: Timer tag =>
       _credit_timers.cancel(t)
       _credit_timer = None
     end
-    _muted = false
-    _pending_reads()
 
   fun ref expect(qty: USize = 0) =>
     """
