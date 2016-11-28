@@ -128,6 +128,8 @@ actor TCPSource is (Initializable & Producer)
       r.initialize(ISize.max_value())
     end
 
+    request_credits()
+
   //////////////
   // ORIGIN (resilience)
   fun ref _x_resilience_routes(): Routes =>
