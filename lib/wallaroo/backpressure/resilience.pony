@@ -49,8 +49,10 @@ trait tag Producer
     ifdef "trace" then
       @printf[I32]("Bookkeeping called for route %llu\n".cstring(), o_route_id)
     end
-    _x_resilience_routes().send(this, o_route_id, o_seq_id,
-      i_origin, i_route_id, i_seq_id)
+    ifdef "resilience" then
+      _x_resilience_routes().send(this, o_route_id, o_seq_id,
+        i_origin, i_route_id, i_seq_id)
+    end
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
   """
