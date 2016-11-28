@@ -289,6 +289,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     let give_out =  if _can_send() then
       (_distributable_credits / _upstreams.size().isize())
     else
+      ifdef "credit_trace" then
+        @printf[I32]("Boundary: Cannot give credits because _can_send() is false\n".cstring())
+      end
       0
     end
 
