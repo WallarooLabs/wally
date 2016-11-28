@@ -357,7 +357,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     // end
 
     ifdef "credit_trace" then
-      @printf[I32]("Step: credit request and giving %llu credits".cstring(),
+      @printf[I32]("Step: credit request and giving %llu credits\n".cstring(),
         desired_give_out)
     end
 
