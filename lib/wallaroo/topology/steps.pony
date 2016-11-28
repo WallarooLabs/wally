@@ -311,7 +311,9 @@ actor Step is (RunnableStep & Resilient & Producer &
       Invariant(not _upstreams.contains(producer))
     end
 
-    @printf[I32]("!!Registered producer!\n".cstring())
+    ifdef "credit_trace" then
+      @printf[I32]("Registered producer!\n".cstring())
+    end
     _upstreams.push(producer)
 
   be unregister_producer(producer: Producer,

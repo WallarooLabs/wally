@@ -194,7 +194,7 @@ class TypedRoute[In: Any val] is Route
     """
     _consumer.unregister_producer(_step, _credits_available)
     //TODO: Will this gum up the works?
-    _flush_queue()
+    _hard_flush()
 
   fun ref receive_credits(number: ISize) =>
     ifdef debug then
@@ -359,6 +359,15 @@ class TypedRoute[In: Any val] is Route
       end
     end
 
+  fun ref _hard_flush() =>
+    while (_queue.size() > 0) do 
+      try
+        let d =_queue.dequeue()
+        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6,
+          d._7, d._8, d._9)
+      end
+    end
+
 type BoundaryRouteQueueTuple is (ReplayableDeliveryMsg val, Producer ref,
   Origin, U128, None, SeqId)
 
@@ -451,8 +460,8 @@ class BoundaryRoute is Route
     """
     _consumer.unregister_producer(_step, _credits_available)
     //TODO: Will this gum up the works?
-    _flush_queue()
-    
+    _hard_flush()
+
   fun ref receive_credits(number: ISize) =>
     ifdef debug then
       Invariant(number > 0)
@@ -608,6 +617,14 @@ class BoundaryRoute is Route
 
   fun ref _flush_queue() =>
     while ((_credits_available > 0) and (_queue.size() > 0)) do
+      try
+        let d =_queue.dequeue()
+        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id)
+      end
+    end
+
+  fun ref _hard_flush() =>
+    while (_queue.size() > 0) do 
       try
         let d =_queue.dequeue()
         _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id)

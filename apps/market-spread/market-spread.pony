@@ -158,7 +158,7 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
       end
     end
 
-    @printf[I32]("!!Update NBBO\n".cstring())
+    // @printf[I32]("!!Update NBBO\n".cstring())
     let state_change: SymbolDataStateChange ref =
       try
         sc_repo.lookup_by_name("SymbolDataStateChange") as SymbolDataStateChange
