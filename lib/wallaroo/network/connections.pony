@@ -78,9 +78,6 @@ actor Connections
         @printf[I32]("could not recover host and port from file (replace with Fail())\n".cstring())
       end
     else
-        let file = File(recovery_addr_file)
-        file.print(host)
-        file.print(port)      
       _listeners.push(TCPListener(auth, consume notifier, host, port))
     end
 
