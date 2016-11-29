@@ -535,8 +535,22 @@ ArizonaStateComputation::ArizonaStateComputation() : _nProcessed(0)
 void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
 {
   _nProcessed += 1;
+<<<<<<< Updated upstream
   if ( _nProcessed > 10000 )
     _logger->info("Processed messages:{}", _nProcessed);
+=======
+
+  if ( _nProcessed > 10000 )
+    _logger->info("Processed messages:{}", _nProcessed);
+
+
+  if (OrderMessage *om = dynamic_cast<OrderMessage *>(input_))
+  {
+    uint64_t message_id = om->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(*(om->get_isin())), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+>>>>>>> Stashed changes
 
   ClientMessage* cm = dynamic_cast<ClientMessage*>(input_); 
   if ( cm != nullptr ) 
