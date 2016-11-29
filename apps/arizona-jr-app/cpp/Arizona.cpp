@@ -600,9 +600,51 @@ wallaroo::Key *ArizonaPartitionFunction::partition(wallaroo::Data *data_)
   if (ClientMessage *cm = dynamic_cast<ClientMessage *>(data_))
   {
     string *client = cm->get_client();
-    return new ArizonaPartitionKey(std::stoul(*client, nullptr));
+    string id = client->substr(4, client->length());
+    return new ArizonaPartitionKey(std::stoul(id, nullptr));
   }
   // TODO: Really we should come up with a better plan here.
   std::cerr << "could not get a key for message" << std::endl;
   return new ArizonaPartitionKey(0);
 }
+
+const char *ArizonaDefaultStateComputation::name()
+{
+  return "arizona default state computation";
+}
+
+void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+{
+  // std::cerr << "DEFAULT COMPUTE" << std::endl;
+  if (OrderMessage *om = dynamic_cast<OrderMessage *>(input_))
+  {
+    uint64_t message_id = om->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(*(om->get_isin())), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+
+  if (CancelMessage *cm = dynamic_cast<CancelMessage *>(input_))
+  {
+    uint64_t message_id = cm->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+
+  if (ExecuteMessage *em = dynamic_cast<ExecuteMessage *>(input_))
+  {
+    uint64_t message_id = em->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+
+  if (AdminMessage *am = dynamic_cast<AdminMessage *>(input_))
+  {
+    uint64_t message_id = am->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+    
+  return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
+}
+
+
