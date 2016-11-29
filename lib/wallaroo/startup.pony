@@ -14,7 +14,7 @@ actor Startup
   new create(env: Env, application: Application val, 
     app_name: (String val | None)) 
   =>
-    ifdef "use_backpressure" then
+    ifdef "backpressure" then
       env.out.print("****BACKPRESSURE is active****")
     end
     ifdef "resilience" then
@@ -77,7 +77,12 @@ actor Startup
         end
       end
 
-      if worker_count == 1 then is_initializer = true end
+      if worker_count == 1 then 
+        env.out.print("Single worker topology")
+        is_initializer = true 
+      else
+        env.out.print(worker_count.string() + " worker topology")
+      end
 
       if is_initializer then worker_name = "initializer" end
 
@@ -140,9 +145,10 @@ actor Startup
           worker_name + ".local-topology"
         
       let alfred = Alfred(env, event_log_file)
-      let local_topology_initializer = LocalTopologyInitializer(worker_name, 
-        worker_count, env, auth, connections, metrics_conn, is_initializer, 
-        alfred, local_topology_file)
+      let local_topology_initializer = LocalTopologyInitializer(
+        application, worker_name, worker_count, env, auth, connections, 
+        metrics_conn, is_initializer, alfred, input_addrs,
+        local_topology_file)
 
       if is_initializer then
         env.out.print("Running as Initializer...")

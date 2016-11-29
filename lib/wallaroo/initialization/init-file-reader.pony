@@ -32,6 +32,7 @@ class InitFileReader
       end
 
       _file.dispose()
+      conn.dispose()
 
       @printf[I32](("Read initialization messages from " + _filename + "\n").cstring())
       // TODO: Calling this here makes reading in messages non-deterministic.

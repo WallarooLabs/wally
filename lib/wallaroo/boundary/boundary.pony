@@ -38,7 +38,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 500_000
-  var _distributable_credits: ISize = _max_distributable_credits
+  var _distributable_credits: ISize = 200_000
+  var _unacked_credits: ISize = 0
 
   // TCP
   var _notify: _OutgoingBoundaryNotify
@@ -156,6 +157,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       _queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
+
+      _distributable_credits = _distributable_credits + 1
     end
 
   be writev(data: Array[ByteSeq] val) =>
@@ -163,19 +166,39 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
   be ack(seq_id: SeqId) =>
     if seq_id > _lowest_queue_id then
+      ifdef "trace" then
+        @printf[I32](
+          "OutgoingBoundary: got ack from downstream worker\n".cstring())
+      end
+
       let flush_count: USize = (seq_id - _lowest_queue_id).usize()
       _queue.clear_n(flush_count)
       _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-
-      ifdef "trace" then
-        @printf[I32](
-          "Got ack callback from downstream worker --------\n\n".cstring())
+      _distributable_credits = _distributable_credits + flush_count.isize()
+      ifdef "credit_trace" then
+        var recouped_credits = flush_count.isize()
+        if _distributable_credits > _max_distributable_credits then
+          recouped_credits = 
+            _max_distributable_credits - _distributable_credits
+          _distributable_credits = _max_distributable_credits
+          @printf[I32]("OutgoingBoundary: recouped %llu credits. Now at %llu\n".cstring(), recouped_credits,
+            _distributable_credits)
+        end
+      else
+        if _distributable_credits > _max_distributable_credits then
+          _distributable_credits = _max_distributable_credits
+        end
       end
 
       ifdef "resilience" then
         _terminus_route.receive_ack(seq_id)
       end
-  end
+    else
+      ifdef "trace" then
+        @printf[I32](
+          "OutgoingBoundary: got repeat ack from downstream worker\n".cstring())
+      end
+    end
 
   be replay_msgs() =>
     for msg in _queue.values() do
@@ -210,7 +233,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
-    _recoup_credits(number_finished)
+    None
+
+    // TODO: This doesn't line up with actual messages.  We need a new 
+    // strategy.
+    //_recoup_credits(number_finished)
 
   //
   // CREDIT FLOW
@@ -259,11 +286,33 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     let give_out =  if _can_send() then
       (_distributable_credits / _upstreams.size().isize())
     else
+      ifdef "credit_trace" then
+        @printf[I32]("Boundary: Cannot give credits because _can_send() is false\n".cstring())
+      end
       0
+    end
+
+    ifdef "credit_trace" then
+      @printf[I32]("Boundary: credit request and giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
     end
 
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
+    _unacked_credits = _unacked_credits + give_out
+
+  be ack_credits(acked: ISize, unused: ISize) =>
+    ifdef debug then
+      try
+        Assert(acked <= _unacked_credits,
+          "More credits were acked then are still outstanding!")
+      else
+        _hard_close()
+        return
+      end
+    end
+
+    _unacked_credits = _unacked_credits - acked
+    _distributable_credits = _distributable_credits + unused
 
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup

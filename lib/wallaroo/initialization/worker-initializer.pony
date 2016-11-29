@@ -109,16 +109,21 @@ actor WorkerInitializer
 
   be topology_ready(worker_name: String) =>
     if not _ready_workers.contains(worker_name) then
+      @printf[I32]("%s reported topology ready!\n".cstring(), 
+        worker_name.cstring())
       _ready_workers.set(worker_name)
       _initialized = _initialized + 1
       if _initialized == _expected then
-        @printf[I32]("All workers reporting Topology ready!\n".cstring())
+        @printf[I32]("All %llu workers reporting Topology ready!\n".cstring(),
+          _expected)
         _application_initializer.topology_ready()
 
         let topology_ready_msg = 
           ExternalMsgEncoder.topology_ready("initializer")
         _connections.send_phone_home(topology_ready_msg)
       end
+    else
+      @printf[I32]("Duplicate topology ready sent to worker initializer!\n".cstring())
     end
 
   // be register_proxy(worker: String, proxy: Step tag) =>

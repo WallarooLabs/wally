@@ -2,6 +2,7 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "time"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/invariant"
@@ -27,6 +28,10 @@ actor TCPSource is (Initializable & Producer)
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _tcp_sinks: Array[TCPSink] val
+  var _credit_timer: (Timer tag | None) = None
+  let _credit_timers: Timers = Timers
+  // Determines if we can still process credits from consumers
+  var _unregistered: Bool = false
 
   // TCP
   let _listen: TCPSourceListener
@@ -44,7 +49,7 @@ actor TCPSource is (Initializable & Producer)
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
-  var _muted: Bool = false
+  var _muted: Bool = true
   var _expect_read_buf: Reader = Reader
 
   // Origin (Resilience)
@@ -105,9 +110,10 @@ actor TCPSource is (Initializable & Producer)
         _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
-    for sink in tcp_sinks.values() do
-      _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
-    end
+    // TODO: Remove this if possible.
+    // for sink in tcp_sinks.values() do
+    //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
+    // end
 
     match default_target
     | let r: CreditFlowConsumerStep =>
@@ -118,8 +124,13 @@ actor TCPSource is (Initializable & Producer)
     end
 
     for r in _routes.values() do
-      r.initialize()
+      // TODO: What should the initial max credits per route from 
+      // a Source be?  I'm starting at max_value because that makes
+      // us dependent on how many can be distributed from downstream.
+      r.initialize(ISize.max_value())
     end
+
+    request_credits()
 
   //////////////
   // ORIGIN (resilience)
@@ -156,25 +167,39 @@ actor TCPSource is (Initializable & Producer)
     None
 
   be dispose() =>
-     """
-    - Close the connection gracefully.
-    - Dispose of our routes
     """
+    - Close the connection gracefully.
+    """
+    _cancel_credit_timer()
     close()
-    for r in _routes.values() do
-      r.dispose()
-    end
 
   //
   // CREDIT FLOW
+  be request_credits() =>
+    ifdef "credit_trace" then
+      @printf[I32]("Source: Periodic credit request while muted\n".cstring())
+    end
+    for r in _routes.values() do
+      r.request_credits()
+    end
+
+  fun ref recoup_credits(credits: ISize) => None
+
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
     ifdef debug then
       Invariant(_routes.contains(from))
     end
 
-    try
-      let route = _routes(from)
-      route.receive_credits(credits)
+    if _unregistered then
+      ifdef "credit_trace" then
+        @printf[I32]("Unregistered source returning credits unused\n".cstring())
+      end
+      from.ack_credits(credits, credits)
+    else
+      try
+        let route = _routes(from)
+        route.receive_credits(credits)
+      end
     end
 
   fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
@@ -293,6 +318,10 @@ actor TCPSource is (Initializable & Producer)
 
     if _connected and _shutdown and _shutdown_peer then
       _hard_close()
+    else
+      if not _unregistered then
+        _dispose_routes()
+      end
     end
 
   fun ref _hard_close() =>
@@ -318,6 +347,19 @@ actor TCPSource is (Initializable & Producer)
     _notify.closed(this)
 
     _listen._conn_closed()
+    if not _unregistered then
+      _dispose_routes()
+    end
+    _unregistered = true
+
+  fun ref _dispose_routes() =>
+    @printf[I32]("!!Disposing of routes\n".cstring())
+    for r in _routes.values() do
+      r.dispose()
+    end
+    _cancel_credit_timer()
+    _muted = true
+    _unregistered = true
 
   fun ref _pending_reads() =>
     """
@@ -458,11 +500,30 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
-    _muted = true
+    try
+      if (_credit_timer is None) and (not _unregistered) then
+        let t = Timer(_RequestCredits(this), 1_000_000_000, 1_000_000_000)
+        _credit_timer = t as Timer tag
+        _credit_timers(consume t)
+      end
+      _muted = true
+    else
+      ifdef debug then
+        @printf[I32]("Failed to mute source\n".cstring())
+      end
+    end
 
   fun ref _unmute() =>
+    _cancel_credit_timer()
     _muted = false
     _pending_reads()
+
+  fun ref _cancel_credit_timer() =>
+    match _credit_timer
+    | let t: Timer tag =>
+      _credit_timers.cancel(t)
+      _credit_timer = None
+    end
 
   fun ref expect(qty: USize = 0) =>
     """
@@ -512,3 +573,12 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       p._mute()
     end
 
+class _RequestCredits is TimerNotify
+ let _source: TCPSource
+
+ new iso create(source: TCPSource) =>
+  _source = source
+
+ fun ref apply(timer: Timer, count: U64): Bool =>
+   _source.request_credits()
+   true
