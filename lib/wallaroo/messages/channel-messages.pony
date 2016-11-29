@@ -8,8 +8,8 @@ use "wallaroo/initialization"
 use "wallaroo/topology"
 
 primitive ChannelMsgEncoder
-  fun _encode(msg: ChannelMsg val, auth: AmbientAuth, 
-    wb: Writer = Writer): Array[ByteSeq] val ? 
+  fun _encode(msg: ChannelMsg val, auth: AmbientAuth,
+    wb: Writer = Writer): Array[ByteSeq] val ?
   =>
     let serialised: Array[U8] val =
       Serialised(SerialiseAuth(auth), msg).output(OutputSerialisedAuth(auth))
@@ -25,78 +25,78 @@ primitive ChannelMsgEncoder
   =>
     _encode(DataMsg(delivery_msg, seq_id), auth, wb)
 
-  fun delivery[D: Any val](target_id: U128, 
+  fun delivery[D: Any val](target_id: U128,
     from_worker_name: String, source_ts: U64, msg_data: D,
     metric_name: String, auth: AmbientAuth,
-    proxy_address: ProxyAddress val, msg_uid: U128, 
+    proxy_address: ProxyAddress val, msg_uid: U128,
     frac_ids: None): Array[ByteSeq] val ?
   =>
-    _encode(ForwardMsg[D](target_id, from_worker_name, source_ts, 
+    _encode(ForwardMsg[D](target_id, from_worker_name, source_ts,
       msg_data, metric_name, proxy_address, msg_uid, frac_ids), auth)
 
   fun identify_control_port(worker_name: String, service: String,
-    auth: AmbientAuth): Array[ByteSeq] val ? 
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(IdentifyControlPortMsg(worker_name, service), auth)
 
   fun identify_data_port(worker_name: String, service: String,
-    auth: AmbientAuth): Array[ByteSeq] val ? 
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(IdentifyDataPortMsg(worker_name, service), auth)
 
-  fun spin_up_local_topology(local_topology: LocalTopology val, 
+  fun spin_up_local_topology(local_topology: LocalTopology val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(SpinUpLocalTopologyMsg(local_topology), auth)
 
-  fun spin_up_step(step_id: U64, step_builder: StepBuilder val, 
-    auth: AmbientAuth): Array[ByteSeq] val ? 
+  fun spin_up_step(step_id: U64, step_builder: StepBuilder val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(SpinUpStepMsg(step_id, step_builder), auth)
 
-  fun topology_ready(worker_name: String, auth: AmbientAuth): 
-    Array[ByteSeq] val ? 
+  fun topology_ready(worker_name: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
     _encode(TopologyReadyMsg(worker_name), auth)
 
   fun create_connections(
-    addresses: Map[String, Map[String, (String, String)]] val, 
+    addresses: Map[String, Map[String, (String, String)]] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(CreateConnectionsMsg(addresses), auth)
 
-  fun connections_ready(worker_name: String, auth: AmbientAuth): 
-    Array[ByteSeq] val ? 
+  fun connections_ready(worker_name: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
     _encode(ConnectionsReadyMsg(worker_name), auth)
 
-  fun create_data_receivers(workers: Array[String] val, auth: AmbientAuth): 
-    Array[ByteSeq] val ? 
+  fun create_data_receivers(workers: Array[String] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
     _encode(CreateDataReceivers(workers), auth)
 
-  fun data_connect(sender_name: String, sender_step_id: U128, 
-    auth: AmbientAuth): Array[ByteSeq] val ? 
+  fun data_connect(sender_name: String, sender_step_id: U128,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(DataConnectMsg(sender_name, sender_step_id), auth)
 
-  fun request_replay(sender_name: String, target_id: U128, auth: AmbientAuth): 
-    Array[ByteSeq] val ? 
+  fun request_replay(sender_name: String, target_id: U128, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
     _encode(RequestReplayMsg(sender_name, target_id), auth)
 
-  fun replay_complete(sender_name: String, auth: AmbientAuth): 
-    Array[ByteSeq] val ? 
+  fun replay_complete(sender_name: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
     _encode(ReplayCompleteMsg(sender_name), auth)
 
-  fun ack_watermark(sender_name: String, sender_step_id: U128, seq_id: U64, 
-    auth: AmbientAuth): Array[ByteSeq] val ? 
+  fun ack_watermark(sender_name: String, sender_step_id: U128, seq_id: U64,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(AckWatermarkMsg(sender_name, sender_step_id, seq_id), auth)
 
-  fun replay(delivery_bytes: Array[ByteSeq] val, auth: AmbientAuth): 
-    Array[ByteSeq] val ? 
+  fun replay(delivery_bytes: Array[ByteSeq] val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
   =>
     _encode(ReplayMsg(delivery_bytes), auth)
 
@@ -105,7 +105,7 @@ primitive ChannelMsgDecoder
     try
       match Serialised.input(InputSerialisedAuth(auth), data)(
         DeserialiseAuth(auth))
-      | let m: ChannelMsg val => 
+      | let m: ChannelMsg val =>
         m
       else
         UnknownChannelMsg(data)
@@ -186,7 +186,7 @@ class DataConnectMsg is ChannelMsg
 
 class ReplayCompleteMsg is ChannelMsg
   let _sender_name: String
-  
+
   new val create(from: String) =>
     _sender_name = from
 
@@ -201,7 +201,7 @@ class AckWatermarkMsg is ChannelMsg
     sender_name = sender_name'
     sender_step_id = sender_step_id'
     seq_id = seq_id'
-  
+
 class DataMsg is ChannelMsg
   let seq_id: U64
   let delivery_msg: ReplayableDeliveryMsg val
@@ -239,11 +239,11 @@ class ReplayMsg is ChannelMsg
 trait DeliveryMsg is ChannelMsg
   fun target_id(): U128
   fun sender_name(): String
-  fun deliver(target_step: RunnableStep tag, origin: Origin,
+  fun deliver(target_step: RunnableStep tag, origin: Producer,
     seq_id: SeqId): Bool
 
 trait ReplayableDeliveryMsg is DeliveryMsg
-  fun replay_deliver(target_step: RunnableStep tag, origin: Origin,
+  fun replay_deliver(target_step: RunnableStep tag, origin: Producer,
     seq_id: SeqId): Bool
 
 class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
@@ -256,9 +256,9 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _msg_uid: U128
   let _frac_ids: None
 
-  new val create(t_id: U128, from: String, s_ts: U64, 
-    m_data: D, m_name: String, proxy_address: ProxyAddress val, msg_uid: U128, 
-    frac_ids: None) 
+  new val create(t_id: U128, from: String, s_ts: U64,
+    m_data: D, m_name: String, proxy_address: ProxyAddress val, msg_uid: U128,
+    frac_ids: None)
   =>
     _target_id = t_id
     _sender_name = from
@@ -272,19 +272,19 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun target_id(): U128 => _target_id
   fun sender_name(): String => _sender_name
 
-  fun deliver(target_step: RunnableStep tag, origin: Origin,
-    seq_id: SeqId): Bool 
-  =>
-    target_step.run[D](_metric_name, _source_ts, _data, origin, _msg_uid, 
-      _frac_ids, seq_id, 0)
-    false  
-
-  fun replay_deliver(target_step: RunnableStep tag, origin: Origin,
+  fun deliver(target_step: RunnableStep tag, origin: Producer,
     seq_id: SeqId): Bool
   =>
-    target_step.replay_run[D](_metric_name, _source_ts, _data, origin, 
+    target_step.run[D](_metric_name, _source_ts, _data, origin, _msg_uid,
+      _frac_ids, seq_id, 0)
+    false
+
+  fun replay_deliver(target_step: RunnableStep tag, origin: Producer,
+    seq_id: SeqId): Bool
+  =>
+    target_step.replay_run[D](_metric_name, _source_ts, _data, origin,
       _msg_uid, _frac_ids, seq_id, 0)
-    false  
+    false
 
 class RequestReplayMsg is DeliveryMsg
   let _sender_name: String
@@ -297,9 +297,9 @@ class RequestReplayMsg is DeliveryMsg
   fun target_id(): U128 => _target_id
   fun sender_name(): String => _sender_name
 
-  fun deliver(target_step: RunnableStep tag, origin: Origin,
-    seq_id: SeqId = 0): Bool 
-  => 
+  fun deliver(target_step: RunnableStep tag, origin: Producer,
+    seq_id: SeqId = 0): Bool
+  =>
     match target_step
     | let ob: OutgoingBoundary =>
       ob.replay_msgs()

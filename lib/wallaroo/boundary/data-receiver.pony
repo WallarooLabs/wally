@@ -8,7 +8,7 @@ use "wallaroo/resilience"
 use "wallaroo/topology"
 
 
-actor DataReceiver is Origin
+actor DataReceiver is Producer
   let _auth: AmbientAuth
   let _worker_name: String
   var _sender_name: String
@@ -21,11 +21,6 @@ actor DataReceiver is Origin
   var _reconnecting: Bool = false
   let _alfred: Alfred
   let _timers: Timers = Timers
-  // Origin (Resilience)
-  var _flushing: Bool = false
-  let _watermarks: Watermarks = _watermarks.create()
-  let _hwmt: HighWatermarkTable = _hwmt.create()
-  var _wmcounter: U64 = 0
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     connections: Connections, alfred: Alfred)
@@ -66,27 +61,16 @@ actor DataReceiver is Origin
   be upstream_replay_finished() =>
     _alfred.upstream_replay_finished(this)
 
-  fun ref _flush(low_watermark: U64, origin: Origin,
-    upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
+  fun ref _flush(low_watermark: U64) =>
     """This is not a real Origin, so it doesn't write any State"""
     None
 
   //////////////
   // ORIGIN (resilience)
-  fun ref flushing(): Bool =>
-    _flushing
-
-  fun ref not_flushing() =>
-    _flushing = false
-
-  fun ref watermarks(): Watermarks =>
-    _watermarks
-
-  fun ref hwmt(): HighWatermarkTable =>
-    _hwmt
-
-  fun ref _watermarks_counter(): U64 =>
-    _wmcounter = _wmcounter + 1
+  fun ref _x_resilience_routes(): Routes =>
+    // TODO: I dont think we need this.
+    // Need to discuss with John
+    Routes
 
   be update_router(router: DataRouter val) =>
     _router = router
@@ -124,6 +108,16 @@ actor DataReceiver is Origin
  be dispose() =>
    _timers.dispose()
 
+// TODO: From credit flow producer part of Producer
+// Remove once traits/interfaces are cleaned up
+  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
+    None
+
+  fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
+    None
+
+  fun ref next_sequence_id(): U64 =>
+    0
 
 //
 //  be open_connection() =>

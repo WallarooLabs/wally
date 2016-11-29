@@ -7,28 +7,22 @@ use "sendence/epoch"
 use "sendence/guid"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
 use "wallaroo/tcp-sink"
 
-// trait RunnableStep
-//   be update_router(router: Router val)
-//   be run[D: Any val](metric_name: String, source_ts: U64, data: D)
-//   be dispose()
-
 // TODO: CREDITFLOW- Every runnable step is also a credit flow consumer
 // Really this should probably be another method on CreditFlowConsumer
 // At which point CreditFlowConsumerStep goes away as well
 trait tag RunnableStep
-  // TODO: Fix the Origin None once we know how to look up Proxy
-  // for messages crossing boundary
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin, msg_uid: U128,
+    origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId)
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin, msg_uid: U128,
+    origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
 
 
@@ -56,7 +50,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _initialized: Bool = false
   // list of envelopes
   // (origin, msg_uid, frac_ids, seq_id, route_id)
-  let _deduplication_list: Array[(Origin, U128, (Array[U64] val | None),
+  let _deduplication_list: Array[(Producer, U128, (Array[U64] val | None),
     SeqId, RouteId)] = _deduplication_list.create()
   let _alfred: Alfred
   var _id: U128
@@ -68,18 +62,17 @@ actor Step is (RunnableStep & Resilient & Producer &
   let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
 
    // CreditFlow Consumer
-  var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
+  var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 500_000
   var _distributable_credits: ISize = _max_distributable_credits
 
-  // Origin (Resilience)
-  var _flushing: Bool = false
-  let _watermarks: Watermarks = _watermarks.create()
-  let _hwmt: HighWatermarkTable = _hwmt.create()
-  var _wmcounter: U64 = 0
+  // Resilience routes
+  // TODO: This needs to be merged with credit flow producer routes
+  let _resilience_routes: Routes = Routes
 
-  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, id: U128,
-    route_builder: RouteBuilder val, alfred: Alfred, router: Router val = EmptyRouter, default_target: (Step | None) = None,
+  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
+    id: U128, route_builder: RouteBuilder val, alfred: Alfred,
+    router: Router val = EmptyRouter, default_target: (Step | None) = None,
     omni_router: OmniRouter val = EmptyOmniRouter)
   =>
     _runner = consume runner
@@ -96,7 +89,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     _default_target = default_target
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
   =>
     for consumer in _router.routes().values() do
       _routes(consumer) =
@@ -119,6 +112,9 @@ actor Step is (RunnableStep & Resilient & Producer &
 
     for r in _routes.values() do
       r.initialize()
+      ifdef "resilience" then
+        _resilience_routes.add_route(r)
+      end
     end
 
     _omni_router = omni_router
@@ -140,11 +136,11 @@ actor Step is (RunnableStep & Resilient & Producer &
   // TODO: This needs to dispose of the old routes and replace with new routes
   be update_router(router: Router val) => _router = router
 
-  be update_omni_router(omni_router: OmniRouter val) => 
+  be update_omni_router(omni_router: OmniRouter val) =>
     _omni_router = omni_router
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     ifdef "trace" then
@@ -154,14 +150,15 @@ actor Step is (RunnableStep & Resilient & Producer &
       this, _router, _omni_router,
       i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
     if is_finished then
-      //TODO: be more efficient (batching?)
-      //this makes sure we never skip watermarks because everything is always
-      //finished
       ifdef "resilience" then
-        let sid: SeqId = next_sequence_id()
-        _bookkeeping(_filter_route_id, sid, i_origin, i_route_id,
-          i_seq_id, msg_uid)
-        _update_watermark(_filter_route_id, sid)
+        ifdef "trace" then
+          @printf[I32]("Filtering\n".cstring())
+        end
+        // TODO ideally we want filter to create the id
+        // but there's problems initializing Routes with a ref
+        // back to its container. Especially in Boundary etc
+        _resilience_routes.filter(this, next_sequence_id(),
+          i_origin, i_route_id, i_seq_id)
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     end
@@ -171,7 +168,7 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   ///////////
   // RECOVERY
-  fun _is_duplicate(origin: Origin, msg_uid: U128,
+  fun _is_duplicate(origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId): Bool
   =>
     for e in _deduplication_list.values() do
@@ -205,7 +202,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     false
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     if not _is_duplicate(i_origin, msg_uid, i_frac_ids, i_seq_id,
@@ -219,11 +216,8 @@ actor Step is (RunnableStep & Resilient & Producer &
       if is_finished then
         //TODO: be more efficient (batching?)
         ifdef "resilience" then
-          @printf[I32]("Calling _update_watermark() during replay \n\n".cstring())
-          let sid: SeqId = next_sequence_id()
-          _bookkeeping(_filter_route_id, sid, i_origin, i_route_id,
-            i_seq_id, msg_uid)
-          _update_watermark(_filter_route_id, sid)
+          _resilience_routes.filter(this, next_sequence_id(),
+            i_origin, i_route_id, i_seq_id)
         end
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
       end
@@ -231,35 +225,19 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   //////////////
   // ORIGIN (resilience)
-  fun ref flushing(): Bool =>
-    _flushing
+  fun ref _x_resilience_routes(): Routes =>
+    _resilience_routes
 
-  fun ref not_flushing() =>
-    _flushing = false
-
-  fun ref watermarks(): Watermarks =>
-    _watermarks
-
-  fun ref hwmt(): HighWatermarkTable =>
-    _hwmt
-
-  fun ref _flush(low_watermark: SeqId, origin: Origin,
-    upstream_route_id: RouteId , upstream_seq_id: SeqId)
-  =>
+  fun ref _flush(low_watermark: SeqId) =>
     ifdef "trace" then
-      @printf[I32]("flushing below: %llu\n".cstring(), upstream_seq_id)
+      @printf[I32]("flushing at and below: %llu\n".cstring(), low_watermark)
     end
     match _id
     | let id: U128 =>
-      _flushing = true
-      _alfred.flush_buffer(id, low_watermark, origin, upstream_route_id,
-        upstream_seq_id)
+      _alfred.flush_buffer(id, low_watermark)
     else
       @printf[I32]("Tried to flush a non-existing buffer!".cstring())
     end
-
-  fun ref _watermarks_counter(): U64 =>
-    _wmcounter = _wmcounter + 1
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val)
   =>
@@ -292,13 +270,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   // CREDIT FLOW PRODUCER
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
     ifdef debug then
-      try
-        Assert(_routes.contains(from),
-        "Step received credits from consumer it isn't registered with.")
-      else
-        // TODO: CREDITFLOW - What is our error response here?
-        return
-      end
+      Invariant(_routes.contains(from))
     end
 
     try
@@ -315,31 +287,18 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   //////////////
   // CREDIT FLOW CONSUMER
-  be register_producer(producer: CreditFlowProducer) =>
+  be register_producer(producer: Producer) =>
     ifdef debug then
-      try
-        Assert(not _upstreams.contains(producer),
-          "Producer attempted registered with step more than once")
-      else
-        // TODO: CREDITFLOW - What is our error response here?
-        return
-      end
+      Invariant(not _upstreams.contains(producer))
     end
 
     _upstreams.push(producer)
 
-  be unregister_producer(producer: CreditFlowProducer,
+  be unregister_producer(producer: Producer,
     credits_returned: ISize)
   =>
     ifdef debug then
-      try
-        Assert(_upstreams.contains(producer),
-          "Producer attempted to unregistered with step " +
-          "it isn't registered with")
-      else
-        // TODO: CREDITFLOW - What is our error response here?
-        return
-      end
+      Invariant(_upstreams.contains(producer))
     end
 
     try
@@ -351,19 +310,13 @@ actor Step is (RunnableStep & Resilient & Producer &
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
 
-  be credit_request(from: CreditFlowProducer) =>
+  be credit_request(from: Producer) =>
     """
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
     """
     ifdef debug then
-      try
-        Assert(_upstreams.contains(from),
-          "Credit request from unregistered producer")
-      else
-        // TODO: CREDITFLOW - What is our error response here?
-        return
-      end
+      Invariant(_upstreams.contains(from))
     end
 
     // TODO: CREDITFLOW - this is a very naive strategy
@@ -391,12 +344,12 @@ actor Step is (RunnableStep & Resilient & Producer &
     lowest
 
 class StepRouteCallbackHandler is RouteCallbackHandler
-  fun shutdown(producer: CreditFlowProducer ref) =>
+  fun shutdown(producer: Producer ref) =>
     // TODO: CREDITFLOW - What is our error handling?
     None
 
-  fun ref credits_replenished(producer: CreditFlowProducer ref) =>
+  fun ref credits_replenished(producer: Producer ref) =>
     None
 
-  fun ref credits_exhausted(producer: CreditFlowProducer ref) =>
+  fun ref credits_exhausted(producer: Producer ref) =>
     None

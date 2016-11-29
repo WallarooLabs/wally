@@ -36,6 +36,7 @@ use "wallaroo"
 use "wallaroo/metrics"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
+use "wallaroo/fail"
 
 actor Main
   new create(env: Env) =>
@@ -211,7 +212,10 @@ primitive FixOrderFrameHandler is FramedSourceHandler[FixOrderMessage val]
   fun decode(data: Array[U8] val): FixOrderMessage val ? =>
     match FixishMsgDecoder(data)
     | let m: FixOrderMessage val => m
+    | let m: FixNbboMessage val => @printf[I32]("Got FixNbbo\n".cstring()); Fail(); error
     else
+      @printf[I32]("Could not get FixOrder from incoming data\n".cstring())
+      @printf[I32]("data size: %d\n".cstring(), data.size())
       error
     end
 
@@ -225,8 +229,10 @@ primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
   fun decode(data: Array[U8] val): FixNbboMessage val ? =>
     match FixishMsgDecoder(data)
     | let m: FixNbboMessage val => m
+    | let m: FixOrderMessage val => @printf[I32]("Got FixOrder\n".cstring()); Fail(); error
     else
-      // @printf[I32]("Could not get FixNbbo from incoming data\n".cstring())
+      @printf[I32]("Could not get FixNbbo from incoming data\n".cstring())
+      @printf[I32]("data size: %d\n".cstring(), data.size())
       error
     end
 

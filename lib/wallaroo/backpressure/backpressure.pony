@@ -2,29 +2,25 @@ use "assert"
 use "sendence/guid"
 use "sendence/queue"
 use "wallaroo/boundary"
+use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/tcp-sink"
 use "wallaroo/topology"
 
 trait tag CreditFlowConsumer
-  be register_producer(producer: CreditFlowProducer)
-  be unregister_producer(producer: CreditFlowProducer, credits_returned: ISize)
-  be credit_request(from: CreditFlowProducer)
+  be register_producer(producer: Producer)
+  be unregister_producer(producer: Producer, credits_returned: ISize)
+  be credit_request(from: Producer)
 
-trait tag CreditFlowProducer
-  be receive_credits(credits: ISize, from: CreditFlowConsumer)
-  fun ref route_to(c: CreditFlowConsumerStep): (Route | None)
-  fun ref next_sequence_id(): U64
+type CreditFlowProducerConsumer is (Producer & CreditFlowConsumer)
 
-type CreditFlowProducerConsumer is (CreditFlowProducer & CreditFlowConsumer)
-
-type Producer is (CreditFlowProducer & Origin)
 type Consumer is CreditFlowConsumer
 
 trait RouteCallbackHandler
-  fun shutdown(p: CreditFlowProducer ref)
-  fun ref credits_replenished(p: CreditFlowProducer ref)
-  fun ref credits_exhausted(p: CreditFlowProducer ref)
+  fun shutdown(p: Producer ref)
+  fun ref credits_replenished(p: Producer ref)
+  fun ref credits_exhausted(p: Producer ref)
 
 trait RouteBuilder
   fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
@@ -49,33 +45,37 @@ primitive EmptyRouteBuilder is RouteBuilder
 
 trait Route
   fun ref initialize()
+  fun id(): U64
   fun credits(): ISize
   fun ref dispose()
   fun ref receive_credits(number: ISize)
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
-    origin: Origin, msg_uid: U128,
+    origin: Producer, msg_uid: U128,
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
-    i_origin: Origin, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
+    i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId)
 
 
 class EmptyRoute is Route
+  let _route_id: U64 = 1 + GuidGenerator.u64() // route 0 is used for filtered messages
+
   fun ref initialize() => None
+  fun id(): U64 => _route_id
   fun credits(): ISize => 0
   fun ref dispose() => None
   fun ref receive_credits(number: ISize) => None
 
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
-    origin: Origin, msg_uid: U128,
+    origin: Producer, msg_uid: U128,
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     None
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
-    i_origin: Origin, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
+    i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId)
   =>
     None
@@ -95,9 +95,9 @@ class TypedRoute[In: Any val] is Route
   // _queue stores tuples of the form:
   // (metric_name: String, source_ts: U64, data: D,
   //  cfp: Producer ref,
-  //  origin: Origin, msg_uid: U128,
+  //  origin: Producer, msg_uid: U128,
   //  frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
-  let _queue: Array[(String, U64, In, Producer ref, Origin, U128,
+  let _queue: Array[(String, U64, In, Producer ref, Producer, U128,
     None, SeqId, RouteId)]
 
   new create(step: Producer ref, consumer: CreditFlowConsumerStep,
@@ -112,13 +112,17 @@ class TypedRoute[In: Any val] is Route
     else
       0
     end
-    _queue = Array[(String, U64, In, Producer ref, Origin, U128,
+    _queue = Array[(String, U64, In, Producer ref, Producer, U128,
       None, SeqId, RouteId)](q_size)
 
   fun ref initialize() =>
     None
 
-  fun credits(): ISize => _credits_available
+  fun id(): U64 =>
+    _route_id
+
+  fun credits(): ISize =>
+    _credits_available
 
   fun ref dispose() =>
     """
@@ -127,14 +131,8 @@ class TypedRoute[In: Any val] is Route
     _consumer.unregister_producer(_step, _credits_available)
 
   fun ref receive_credits(number: ISize) =>
-     ifdef debug then
-      try
-        Assert(number > 0,
-        "Producer received credits negative credits")
-      else
-        _callback.shutdown(_step)
-        return
-      end
+    ifdef debug then
+      Invariant(number >= 0)
     end
 
     _request_outstanding = false
@@ -168,7 +166,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
-    origin: Origin, msg_uid: U128,
+    origin: Producer, msg_uid: U128,
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     ifdef "trace" then
@@ -212,19 +210,18 @@ class TypedRoute[In: Any val] is Route
           msg_uid, frac_ids, i_seq_id, i_route_id)
       end
     else
-      ifdef debug then
-        @printf[I32]("Route received input of wrong type\n".cstring())
-      end
+      Fail()
     end
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
-    i_origin: Origin, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
+    i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId)
   =>
-    @printf[I32]("Forward should never be called on a TypedRoute\n".cstring())
+    // Forward should never be called on a TypedRoute
+    Fail()
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64, input: In,
-    cfp: Producer ref, i_origin: Origin, msg_uid: U128, frac_ids: None,
+    cfp: Producer ref, i_origin: Producer, msg_uid: U128, frac_ids: None,
     i_seq_id: SeqId, i_route_id: RouteId)
   =>
     let o_seq_id = cfp.next_sequence_id()
@@ -238,20 +235,15 @@ class TypedRoute[In: Any val] is Route
       o_seq_id,
       _route_id)
 
-    // update the route_id of the outgoing envelope
     ifdef "resilience" then
-      //TODO: be more efficient (batching?)
-      //TODO: Should the outgoing frac_ids be the same as the incoming frac_id?
-      let o_route_id = _route_id
-      cfp._bookkeeping(o_route_id, o_seq_id, i_origin, i_route_id,
-        i_seq_id, msg_uid)
+      cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id, i_seq_id)
     end
 
     _credits_available = _credits_available - 1
 
 
   fun ref _add_to_queue(metric_name: String, source_ts: U64, input: In,
-    cfp: Producer ref, origin: Origin, msg_uid: U128,
+    cfp: Producer ref, origin: Producer, msg_uid: U128,
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     _queue.push((metric_name, source_ts, input, cfp,
@@ -280,7 +272,7 @@ class BoundaryRoute is Route
   // Store tuples of the form
   // (delivery_msg, cfp, i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
   let _queue: Array[(ReplayableDeliveryMsg val, Producer ref,
-    Origin, U128, None, SeqId, RouteId)]
+    Producer, U128, None, SeqId, RouteId)]
 
   new create(step: Producer ref, consumer: OutgoingBoundary,
     handler: RouteCallbackHandler)
@@ -295,12 +287,16 @@ class BoundaryRoute is Route
       0
     end
     _queue = Array[(ReplayableDeliveryMsg val, Producer ref,
-      Origin, U128, None, SeqId, RouteId)](q_size)
+      Producer, U128, None, SeqId, RouteId)](q_size)
 
   fun ref initialize() =>
     None
 
-  fun credits(): ISize => _credits_available
+  fun id(): U64 =>
+    _route_id
+
+  fun credits(): ISize =>
+    _credits_available
 
   fun ref dispose() =>
     """
@@ -309,14 +305,8 @@ class BoundaryRoute is Route
     _consumer.unregister_producer(_step, _credits_available)
 
   fun ref receive_credits(number: ISize) =>
-     ifdef debug then
-      try
-        Assert(number > 0,
-        "Producer received credits negative credits")
-      else
-        _callback.shutdown(_step)
-        return
-      end
+    ifdef debug then
+      Invariant(number > 0)
     end
 
     _request_outstanding = false
@@ -350,13 +340,14 @@ class BoundaryRoute is Route
 
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
-    origin: Origin, msg_uid: U128,
+    origin: Producer, msg_uid: U128,
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    @printf[I32]("Run should never be called on a BoundaryRoute\n".cstring())
+    // Run should never be called on a BoundaryRoute
+    Fail()
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
-    i_origin: Origin, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
+    i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId)
   =>
     ifdef "trace" then
@@ -419,7 +410,7 @@ class BoundaryRoute is Route
     end
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val,
-    cfp: Producer ref, i_origin: Origin, msg_uid: U128, i_frac_ids: None,
+    cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
     i_seq_id: SeqId, i_route_id: RouteId)
   =>
     let o_seq_id = cfp.next_sequence_id()
@@ -431,19 +422,14 @@ class BoundaryRoute is Route
       o_seq_id,
       _route_id)
 
-    // TODO need o_seq_id the same as Typed Route
-
     ifdef "resilience" then
-      //TODO: be more efficient (batching?)
-      //TODO: Should the outgoing frac_ids be the same as the incoming frac_id?
-      cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id,
-        i_seq_id, msg_uid)
+      cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id, i_seq_id)
     end
 
     _credits_available = _credits_available - 1
 
   fun ref _add_to_queue(delivery_msg: ReplayableDeliveryMsg val,
-    cfp: Producer ref, i_origin: Origin, msg_uid: U128, i_frac_ids: None,
+    cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
     i_seq_id: SeqId, i_route_id: RouteId)
   =>
     _queue.push((delivery_msg, cfp,
