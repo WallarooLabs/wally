@@ -9,6 +9,11 @@
 #include "WallarooCppApi/Data.hpp"
 #include "WallarooCppApi/Key.hpp"
 #include "WallarooCppApi/PartitionFunction.hpp"
+#include <spdlog/spdlog.h>
+#include <memory>
+
+using namespace std;
+using namespace spdlog;
 
 // Buffer
 
@@ -208,7 +213,12 @@ public:
 
 class ArizonaStateComputation: public wallaroo::StateComputation
 {
+private:
+  size_t _nProcessed;
+  shared_ptr<logger> _logger;
+
 public:
+  ArizonaStateComputation();
   virtual const char *name();
   virtual void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void* state_change_Respository_helper_, wallaroo::State *state_, void *none);
   virtual size_t get_number_of_state_change_builders() { return 0;}
