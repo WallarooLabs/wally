@@ -14,7 +14,7 @@ class Routes
   let _ack_batch_size: USize
   let _outgoing_to_incoming: _OutgoingToIncoming
 
-  new create(ack_batch_size': USize = 10_000) =>
+  new create(ack_batch_size': USize = 100) =>
     _ack_batch_size = ack_batch_size'
     _outgoing_to_incoming = _OutgoingToIncoming(_ack_batch_size)
 

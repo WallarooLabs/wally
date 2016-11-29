@@ -18,7 +18,7 @@ class TerminusRoute
   let _tracking_id_to_incoming: _OutgoingToIncoming
   var _acked_watermark: U64 = 0
 
-  new create(ack_batch_size': USize = 10_000) =>
+  new create(ack_batch_size': USize = 100) =>
     _ack_batch_size = ack_batch_size'
     _tracking_id_to_incoming = _OutgoingToIncoming(_ack_batch_size)
 
