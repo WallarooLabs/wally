@@ -34,7 +34,9 @@ use @get_partition_function[PartitionFunctionP]()
 use @get_source_decoder[SourceDecoderP]()
 use @get_sink_encoder[SinkEncoderP]()
 use @get_state_computation[ComputationP]()
+use @get_default_state_computation[ComputationP]()
 use @get_state[StateP]()
+use @get_default_state[StateP]()
 
 primitive ArizonaStateBuilder
   fun name(): String => "state builder"
@@ -42,11 +44,17 @@ primitive ArizonaStateBuilder
     // Debug("Building state")
     CPPState(CPPManagedObject(@get_state()))
 
+primitive ArizonaDefaultStateBuilder
+  fun name(): String => "default state builder"
+  fun apply(): CPPState =>
+    // Debug("Building state")
+    CPPState(CPPManagedObject(@get_default_state()))
+
 actor Main
   new create(env: Env) =>
     try
       let partition_function = recover val CPPPartitionFunction(recover CPPManagedObject(@get_partition_function()) end) end
-      let partition_keys: Array[CPPKey val] val = partition_factory(10000, 99999)
+      let partition_keys: Array[CPPKey val] val = partition_factory(10000, 10100)
       let data_partition = Partition[CPPData val, CPPKey val](
         partition_function, partition_keys)
 
@@ -59,11 +67,23 @@ actor Main
           //   ArizonaStateBuilder, "state-builder")
 
           // PARTITIONED
+          // .to_state_partition[CPPData val, CPPKey val, CPPData val, CPPState](
+          //     computation_factory(),
+          //     ArizonaStateBuilder, "state-builder", data_partition where multi_worker = true)
+
+          // PARITIONED WITH DEFAULT (A)
           .to_state_partition[CPPData val, CPPKey val, CPPData val, CPPState](
               computation_factory(),
-              ArizonaStateBuilder, "state-builder", data_partition where multi_worker = true)
-
+              ArizonaStateBuilder, "state-builder", data_partition
+              where
+              multi_worker = true, default_state_name = "default-state")
           .to_sink(recover CPPSinkEncoder(recover CPPManagedObject(@get_sink_encoder()) end) end, recover [0] end)
+
+          // PARITIONED WITH DEFAULT (B)
+          .partition_default_target[CPPData val, CPPData val, CPPState](
+              "Arizona Default Test", "default-state", default_computation_factory(),
+              ArizonaDefaultStateBuilder)
+
       end
       Startup(env, application, None)
     else
@@ -72,6 +92,9 @@ actor Main
 
   fun computation_factory(): CPPStateComputation val =>
     recover CPPStateComputation(recover CPPManagedObject(@get_state_computation()) end) end
+
+  fun default_computation_factory(): CPPStateComputation val =>
+    recover CPPStateComputation(recover CPPManagedObject(@get_default_state_computation()) end) end
 
   fun partition_factory(partition_start: USize, partition_end: USize): Array[CPPKey val] val =>
     let partition_count = partition_end - partition_start
@@ -82,4 +105,3 @@ actor Main
       end
       consume partitions
     end
-      

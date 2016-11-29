@@ -446,10 +446,20 @@ extern "C" {
   {
     return new ArizonaStateComputation();
   }
-  
+
+  extern wallaroo::StateComputation *get_default_state_computation()
+  {
+    return new ArizonaDefaultStateComputation();
+  }
+
   extern wallaroo::State *get_state()
   {
     return new ArizonaState();
+  }
+
+  extern wallaroo::State *get_default_state()
+  {
+    return new ArizonaDefaultState();
   }
 
   extern wallaroo::Serializable *w_user_serializable_deserialize(char *bytes_, size_t sz_)
@@ -476,6 +486,8 @@ extern "C" {
       return nullptr;
     case 5:
       return new ArizonaPartitionFunction();
+    case SerializationType::DefaultComputation:
+      return new ArizonaDefaultStateComputation();
     }
     // TODO: do something better here
     std::cerr << "Don't know how to deserialize type=" << serialized_type << std::endl;
@@ -515,6 +527,45 @@ const char *ArizonaStateComputation::name()
 
 void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
 {
+  if (OrderMessage *om = dynamic_cast<OrderMessage *>(input_))
+  {
+    uint64_t message_id = om->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(*(om->get_isin())), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+
+  if (CancelMessage *cm = dynamic_cast<CancelMessage *>(input_))
+  {
+    uint64_t message_id = cm->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+
+  if (ExecuteMessage *em = dynamic_cast<ExecuteMessage *>(input_))
+  {
+    uint64_t message_id = em->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+
+  if (AdminMessage *am = dynamic_cast<AdminMessage *>(input_))
+  {
+    uint64_t message_id = am->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+    
+  return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
+}
+
+const char *ArizonaDefaultStateComputation::name()
+{
+  return "arizona default state computation";
+}
+
+void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+{
+  // std::cerr << "DEFAULT COMPUTE" << std::endl;
   if (OrderMessage *om = dynamic_cast<OrderMessage *>(input_))
   {
     uint64_t message_id = om->get_message_id();

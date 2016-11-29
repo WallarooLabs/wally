@@ -48,7 +48,8 @@ enum SerializationType
   SinkEncoder = 2,
   PartitionKey = 3,
   StateChangeBuilder = 4,
-  PartitionFunction = 5
+  PartitionFunction = 5,
+  DefaultComputation = 6
 };
 
 // Messages
@@ -199,6 +200,12 @@ public:
   ArizonaState() {};
 };
 
+class ArizonaDefaultState: public wallaroo::State
+{
+public:
+  ArizonaDefaultState() {};
+};
+
 class ArizonaStateComputation: public wallaroo::StateComputation
 {
 public:
@@ -207,6 +214,17 @@ public:
   virtual size_t get_number_of_state_change_builders() { return 0;}
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_) { return NULL; }
   virtual void serialize(char* bytes_, size_t nsz_) { Writer writer((unsigned char *)bytes_); writer.u16_be(SerializationType::Computation); }
+  virtual size_t serialize_get_size () { return 2; }
+};
+
+class ArizonaDefaultStateComputation: public wallaroo::StateComputation
+{
+public:
+  virtual const char *name();
+  virtual void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void* state_change_Respository_helper_, wallaroo::State *state_, void *none);
+  virtual size_t get_number_of_state_change_builders() { return 0;}
+  virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_) { return NULL; }
+  virtual void serialize(char* bytes_, size_t nsz_) { Writer writer((unsigned char *)bytes_); writer.u16_be(SerializationType::DefaultComputation); }
   virtual size_t serialize_get_size () { return 2; }
 };
 
