@@ -9,6 +9,7 @@ use "options"
 use "time"
 use "sendence/messages"
 use "sendence/tcp"
+use "sendence/bytes"
 use "debug"
 
 // documentation
@@ -22,6 +23,7 @@ actor Main
     var interval: U64 = 5_000_000
     var should_repeat = false
     var binary_fmt = false
+    var variable_size = false
     var msg_size: USize = 80
     var write_to_file: Bool = true
 
@@ -47,9 +49,11 @@ actor Main
           .add("interval", "i", I64Argument)
           .add("repeat", "r", None)
           .add("binary", "y", None)
+          .add("variable-size", "z", None)
           .add("msg-size", "g", I64Argument)
           .add("no-write", "w", None)
 
+        //TODO: error if --msg-size and --variable-size
         for option in options do
           match option
           | ("buffy", let arg: String) => b_arg = arg.split(":")
@@ -61,6 +65,7 @@ actor Main
           | ("interval", let arg: I64) => interval = arg.u64()
           | ("repeat", None) => should_repeat = true
           | ("binary", None) => binary_fmt = true
+          | ("variable-size", None) => variable_size = true
           | ("msg-size", let arg: I64) => msg_size = arg.usize()
           | ("no-write", None) => write_to_file = false
           end
@@ -135,8 +140,13 @@ actor Main
                 paths.push(FilePath(env.root as AmbientAuth, str))
               end
               if binary_fmt then
-                MultiFileBinaryDataSource(consume paths,
-                  should_repeat, msg_size)
+                if variable_size then
+                  MultiFileVariableBinaryDataSource(consume paths,
+                    should_repeat)
+                else
+                  MultiFileBinaryDataSource(consume paths,
+                    should_repeat, msg_size)
+                end
               else
                 MultiFileDataSource(consume paths, should_repeat)
               end
@@ -153,6 +163,7 @@ actor Main
             batch_size,
             interval,
             binary_fmt,
+            variable_size,
             write_to_file)
 
           coordinator.sending_actor(sa)
@@ -374,6 +385,7 @@ actor SendingActor
   let _timers: Timers
   let _data_source: Iterator[ByteSeq] iso
   let _binary_fmt: Bool
+  let _variable_size: Bool
   var _paused: Bool = false
   var _finished: Bool = false
   let _batch_size: USize
@@ -389,6 +401,7 @@ actor SendingActor
     batch_size: USize,
     interval: U64,
     binary_fmt: Bool,
+    variable_size: Bool,
     write_to_file: Bool)
   =>
     _messages_to_send = messages_to_send
@@ -400,6 +413,7 @@ actor SendingActor
     _batch_size = batch_size
     _interval = interval
     _binary_fmt = binary_fmt
+    _variable_size = variable_size
     _write_to_file = write_to_file
     _wb = Writer
 
@@ -426,7 +440,7 @@ actor SendingActor
       let d' = recover Array[ByteSeq](current_batch_size) end
       for i in Range(0, current_batch_size) do
         try
-          if _binary_fmt then
+          if _binary_fmt and not _variable_size then
             let n = _data_source.next()
             if n.size() > 0 then
               d'.push(n)
@@ -664,6 +678,63 @@ class MultiFileBinaryDataSource is Iterator[Array[U8 val] val]
       error
     end
 
+class MultiFileVariableBinaryDataSource is Iterator[Array[U8 val] val]
+  let _paths: Array[FilePath val] val
+  var _cur_source: (VariableLengthBinaryFileDataSource | None)
+  var _idx: USize = 0
+  var _should_repeat: Bool
+
+  new iso create(paths: Array[FilePath val] val, should_repeat: Bool = false) =>
+    _paths = paths
+    _cur_source =
+      try
+        VariableLengthBinaryFileDataSource(_paths(_idx))
+      else
+        None
+      end
+    _should_repeat = should_repeat
+
+  fun ref has_next(): Bool =>
+    match _cur_source
+    | let f: VariableLengthBinaryFileDataSource =>
+      if f.has_next() then
+        true
+      else
+        _idx = _idx + 1
+        try
+          _cur_source = VariableLengthBinaryFileDataSource(_paths(_idx))
+          has_next()
+        else
+          if _should_repeat then
+            _idx = 0
+            _cur_source =
+              try
+                VariableLengthBinaryFileDataSource(_paths(_idx))
+              else
+                None
+              end
+            has_next()
+          else
+            false
+          end
+        end
+      end
+    else
+      false
+    end
+
+  fun ref next(): Array[U8 val] val ? =>
+    match _cur_source
+    | let f: VariableLengthBinaryFileDataSource =>
+      if f.has_next() then
+        f.next()
+      else
+        error
+      end
+    else
+      error
+    end
+
 class BinaryFileDataSource is Iterator[Array[U8] val]
   let _file: File
   let _msg_size: USize
@@ -681,3 +752,26 @@ class BinaryFileDataSource is Iterator[Array[U8] val]
 
   fun ref next(): Array[U8] val =>
     _file.read(_msg_size)
+
+class VariableLengthBinaryFileDataSource is Iterator[Array[U8] val]
+  let _file: File
+
+  new iso create(path: FilePath val) =>
+    _file = File(path)
+
+  fun ref has_next(): Bool =>
+    if _file.position() < _file.size() then
+      true
+    else
+      false
+    end
+
+  fun ref next(): Array[U8] val =>
+    let h = _file.read(4)
+    try
+      let expect: USize = Bytes.to_u32(h(0), h(1), h(2), h(3)).usize()
+      _file.read(expect)
+    else
+      @printf[I32]("Failed to convert message header!!\n".cstring())
+      recover val Array[U8] end
+    end
