@@ -2,6 +2,7 @@
 #include "WallarooCppApi/Serializable.hpp"
 #include "WallarooCppApi/ApiHooks.hpp"
 #include "WallarooCppApi/UserHooks.hpp"
+#include "WallarooCppApi/Logger.hpp"
 
 #include <iostream>
 #include <cstring>
@@ -525,8 +526,20 @@ const char *ArizonaStateComputation::name()
   return "arizona state computation";
 }
 
+ArizonaStateComputation::ArizonaStateComputation() : _nProcessed(0)
+{
+  _logger = wallaroo::Logger::getLogger();
+  _logger->info("ArizonaStateComputation::ArizonaStateComputation()");
+}
+
 void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
 {
+  _nProcessed += 1;
+
+  if ( _nProcessed > 10000 )
+    _logger->info("Processed messages:{}", _nProcessed);
+
+
   if (OrderMessage *om = dynamic_cast<OrderMessage *>(input_))
   {
     uint64_t message_id = om->get_message_id();
