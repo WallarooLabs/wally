@@ -22,7 +22,7 @@ Incoming messages:
 [valueN] -- value N, 32-bit big endian
 
 Outgoing messages:
-[total] -- total count so far, 32-bit big endian
+[total] -- total count so far, 64-bit big endian
 
 To send a message:
 
@@ -87,40 +87,54 @@ primitive SimplePartitionFunction
 
 actor Main
   new create(env: Env) =>
-    try
-      let partition_function = recover val CPPPartitionFunction(recover CPPManagedObject(@get_partition_function()) end) end
-      let partition_keys: Array[CPPKey val] val = recover [as CPPKey val:
-        recover CPPKey(recover CPPManagedObject(@get_partition_key(0)) end) end,
-        recover CPPKey(recover CPPManagedObject(@get_partition_key(1)) end) end
-        ] end
-      let data_partition = Partition[CPPData val, CPPKey val](
-        partition_function, partition_keys)
-      let application = recover val
-        Application("Passthrough Topology")
-          .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end
-            where coalescing = false)
-          // .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end)
-          .to_state_partition[CPPData val, CPPKey val, CPPData val, CPPState](
-            StateComputationFactory(),
-            AccumulatorStateBuilder, "accumulator-builder", data_partition where multi_worker = true)
-          //
-          // MULTIWORKER
-          //
-          // .to[CPPData val](ComputationFactory0)
-          // .to[CPPData val](ComputationFactory1)
-          // .to[CPPData val](ComputationFactory2)
-          // .to_stateful[CPPData val, CPPState](
-          //   StateComputationFactory(),
-          //   AccumulatorStateBuilder, "accumulator-builder")
-          //
-          // DUMMY COMPUTATION
-          // 
-          // .to_stateful[CPPData val, CPPState](
-          //   DummyComputationFactory(),
-          //   AccumulatorStateBuilder, "accumulator-builder")
-          .to_sink(recover CPPSinkEncoder(recover CPPManagedObject(@get_sink_encoder()) end) end, recover [0] end)
-      end
-      Startup(env, application, None)
+    let action: String = try
+      env.args(1)
     else
-      env.out.print("Could not build topology")
+      ""
+    end
+
+    if action == "spewer" then
+      env.err.print("Entering spewer mode")
+      SpewerApp(env)
+    elseif action == "listener" then
+      env.err.print("Entering listener mode")
+    else
+      env.err.print("Entering topology mode")
+      try
+        let partition_function = recover val CPPPartitionFunction(recover CPPManagedObject(@get_partition_function()) end) end
+        let partition_keys: Array[CPPKey val] val = recover [as CPPKey val:
+          recover CPPKey(recover CPPManagedObject(@get_partition_key(0)) end) end,
+          recover CPPKey(recover CPPManagedObject(@get_partition_key(1)) end) end
+          ] end
+        let data_partition = Partition[CPPData val, CPPKey val](
+          partition_function, partition_keys)
+        let application = recover val
+          Application("Passthrough Topology")
+            .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end
+              where coalescing = false)
+            // .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end)
+            .to_state_partition[CPPData val, CPPKey val, CPPData val, CPPState](
+              StateComputationFactory(),
+              AccumulatorStateBuilder, "accumulator-builder", data_partition where multi_worker = true)
+            //
+            // MULTIWORKER
+            //
+            // .to[CPPData val](ComputationFactory0)
+            // .to[CPPData val](ComputationFactory1)
+            // .to[CPPData val](ComputationFactory2)
+            // .to_stateful[CPPData val, CPPState](
+            //   StateComputationFactory(),
+            //   AccumulatorStateBuilder, "accumulator-builder")
+            //
+            // DUMMY COMPUTATION
+            // 
+            // .to_stateful[CPPData val, CPPState](
+            //   DummyComputationFactory(),
+            //   AccumulatorStateBuilder, "accumulator-builder")
+            .to_sink(recover CPPSinkEncoder(recover CPPManagedObject(@get_sink_encoder()) end) end, recover [0] end)
+        end
+        Startup(env, application, None)
+      else
+        env.out.print("Could not build topology")
+      end
     end
