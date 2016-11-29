@@ -73,6 +73,8 @@ class ClientMessage
 {
 public:
   virtual string *get_client() = 0;
+  virtual int get_message_type() = 0;
+  virtual uint64_t get_message_id() = 0;
 };
 
 class ConfigMessage: public wallaroo::Data
@@ -102,11 +104,12 @@ public:
   OrderMessage(uint64_t _message_id);
   virtual ~OrderMessage();
   virtual string *get_client() { return _client; }
-  uint64_t get_message_id() { return _message_id; }
+  virtual uint64_t get_message_id() { return _message_id; }
   string *get_isin() { return _isin; }
   void from_bytes(char *bytes_);
   virtual void serialize(char* bytes_, size_t nsz_);
   virtual size_t serialize_get_size();
+  virtual int get_message_type() { return 1; }
 };
 
 class CancelMessage: public wallaroo::Data, public ClientMessage
@@ -121,10 +124,11 @@ public:
   CancelMessage(uint64_t _message_id);
   virtual ~CancelMessage();
   virtual string *get_client() { return _client; }
-  uint64_t get_message_id() { return _message_id; }
+  virtual uint64_t get_message_id() { return _message_id; }
   void from_bytes(char *bytes_);
   virtual void serialize(char* bytes_, size_t nsz_);
   virtual size_t serialize_get_size();
+  virtual int get_message_type() { return 2; }
 };
 
 class ExecuteMessage: public wallaroo::Data, public ClientMessage
@@ -139,10 +143,11 @@ public:
   ExecuteMessage(uint64_t _message_id);
   virtual ~ExecuteMessage();
   virtual string *get_client() { return _client; }
-  uint64_t get_message_id() { return _message_id; }
+  virtual uint64_t get_message_id() { return _message_id; }
   void from_bytes(char *bytes_);
   virtual void serialize(char* bytes_, size_t nsz_);
   virtual size_t serialize_get_size();
+  virtual int get_message_type() { return 2; }
 };
 
 class AdminMessage: public wallaroo::Data, public ClientMessage
@@ -156,10 +161,11 @@ public:
   AdminMessage(uint64_t message_id_);
   virtual ~AdminMessage();
   virtual string *get_client() { return _client; }
-  uint64_t get_message_id() { return _message_id; }
+  virtual uint64_t get_message_id() { return _message_id; }
   void from_bytes(char *bytes);
   virtual void serialize(char* bytes_, size_t nsz_);
   virtual size_t serialize_get_size();
+  virtual int get_message_type() { return 4; }
 };
 
 class ProceedsMessage: public wallaroo::EncodableData
