@@ -11,7 +11,7 @@ fi
 # arizona
 #
 #mkdir -p build
-#g++ -Wall -std=c++11 -o build/libarizona-jr-app.o -I"hpp" -I"../../lib/wallaroo/cpp-api/cpp/cppapi/" -c cpp/Arizona.cpp && rm build/libarizona-jr-app.a ; ar rvs build/libarizona-jr-app.a build/libarizona-jr-app.o
+g++ -Wall -std=c++11 -o build/libarizona-jr-app.o -I"hpp" -I"../../lib/wallaroo/cpp-api/cpp/cppapi/" -c cpp/Arizona.cpp && rm build/libarizona-jr-app.a ; ar rvs build/libarizona-jr-app.a build/libarizona-jr-app.o
 
 
 
