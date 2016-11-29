@@ -37,7 +37,7 @@ Logger::Logger()
     _logger = spdlog::get("console");
   }
 #else
-  int q_size = 8192;
+  int q_size = 262144;
   spdlog::set_async_mode(q_size, spdlog::async_overflow_policy::block_retry,
       nullptr,
       std::chrono::seconds(2));
