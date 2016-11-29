@@ -367,7 +367,6 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
           end
 
           let out = _expect_read_buf.block(block_size)
-
           let carry_on = _notify.received(this, consume out)
           ifdef osx then
             if not carry_on then
@@ -405,7 +404,7 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
          _read_len = _read_len + len
 
-        if _read_len >= _expect then
+        if _expect != 0 then
           let data = _read_buf = recover Array[U8] end
           data.truncate(_read_len)
           _read_len = 0
@@ -422,7 +421,6 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
             end
 
             let out = _expect_read_buf.block(block_size)
-
             let osize = block_size
 
             let carry_on = _notify.received(this, consume out)
@@ -447,38 +445,21 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
           let dsize = _read_len
           _read_len = 0
 
-          _expect_read_buf.append(consume data)
-
-          while (_expect_read_buf.size() > 0) and
-            (_expect_read_buf.size() >= _expect)
-          do
-            let block_size = if _expect != 0 then
-              _expect
-            else
-              _expect_read_buf.size()
+          let carry_on = _notify.received(this, consume data)
+          ifdef osx then
+            if not carry_on then
+              _read_again()
+              return
             end
 
-            let out = _expect_read_buf.block(block_size)
+            sum = sum + dsize
 
-            let osize = block_size
-
-            let carry_on = _notify.received(this, consume out)
-            ifdef osx then
-              if not carry_on then
-                _read_again()
-                return
-              end
-
-              sum = sum + osize
-
-              if sum >= _max_size then
-                // If we've read _max_size, yield and read again later.
-                _read_again()
-                return
-              end
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
             end
           end
-
         end
       end
     else

@@ -59,6 +59,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
+  var _muted: Bool = false
+  var _expect_read_buf: Reader = Reader
 
   // Connection, Acking and Replay
   let _auth: AmbientAuth
@@ -464,12 +466,47 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
     _notify.closed(this)
 
-  // TODO: switch to using single sys call "expect"
   fun ref _pending_reads() =>
+    """
+    Unless this connection is currently muted, read while data is available,
+    guessing the next packet length as we go. If we read 4 kb of data, send
+    ourself a resume message and stop reading, to avoid starving other actors.
+    """
     try
       var sum: USize = 0
 
       while _readable and not _shutdown_peer do
+        if _muted then
+          return
+        end
+
+        while (_expect_read_buf.size() > 0) and
+          (_expect_read_buf.size() >= _expect)
+        do
+          let block_size = if _expect != 0 then
+            _expect
+          else
+            _expect_read_buf.size()
+          end
+
+          let out = _expect_read_buf.block(block_size)
+          let carry_on = _notify.received(this, consume out)
+          ifdef osx then
+            if not carry_on then
+              _read_again()
+              return
+            end
+
+            sum = sum + block_size
+
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
+            end
+          end
+        end
+
         // Read as much data as possible.
         _read_buf_size()
         let len = @pony_os_recv[USize](
@@ -488,11 +525,47 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
           _next_size = _max_size.min(_next_size * 2)
         end
 
-        _read_len = _read_len + len
+         _read_len = _read_len + len
 
-        if _read_len >= _expect then
+        if _expect != 0 then
           let data = _read_buf = recover Array[U8] end
           data.truncate(_read_len)
+          _read_len = 0
+
+          _expect_read_buf.append(consume data)
+
+          while (_expect_read_buf.size() > 0) and
+            (_expect_read_buf.size() >= _expect)
+          do
+            let block_size = if _expect != 0 then
+              _expect
+            else
+              _expect_read_buf.size()
+            end
+
+            let out = _expect_read_buf.block(block_size)
+            let osize = block_size
+
+            let carry_on = _notify.received(this, consume out)
+            ifdef osx then
+              if not carry_on then
+                _read_again()
+                return
+              end
+
+              sum = sum + osize
+
+              if sum >= _max_size then
+                // If we've read _max_size, yield and read again later.
+                _read_again()
+                return
+              end
+            end
+          end
+        else
+          let data = _read_buf = recover Array[U8] end
+          data.truncate(_read_len)
+          let dsize = _read_len
           _read_len = 0
 
           let carry_on = _notify.received(this, consume data)
@@ -502,7 +575,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
               return
             end
 
-            sum = sum + len
+            sum = sum + dsize
 
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
