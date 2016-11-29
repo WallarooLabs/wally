@@ -15,14 +15,14 @@
 class Numbers: public wallaroo::EncodableData
 {
 private:
-  std::vector<int> numbers;
+  std::vector<uint32_t> numbers;
 public:
   Numbers();
   Numbers(Numbers& n);
   void decode(char* bytes);
-  virtual ~Numbers() {}
-  std::vector<int> get_numbers() { return numbers; }
-  int sum();
+  virtual ~Numbers() { }
+  std::vector<uint32_t> get_numbers() { return numbers; }
+  uint32_t sum();
 
   virtual void deserialize (char* bytes);
   virtual void serialize (char* bytes, size_t nsz_);
@@ -34,14 +34,14 @@ public:
 class Total: public wallaroo::EncodableData
 {
 private:
-  int _total;
+  uint64_t _total;
 public:
   Total(Total& t);
-  Total(int total);
+  Total(uint64_t total);
   virtual void deserialize (char* bytes);
   virtual void serialize (char* bytes, size_t nsz_);
-  virtual size_t serialize_get_size () { return 6; }
-  virtual size_t encode_get_size() { return 4; }
+  virtual size_t serialize_get_size () { return 10; }
+  virtual size_t encode_get_size() { return 8; }
   virtual void encode(char *bytes);
   virtual ~Total() {};
 };
@@ -68,18 +68,18 @@ public:
 class CounterState: public wallaroo::State
 {
 private:
-  int _counter;
+  uint64_t _counter;
 public:
   CounterState();
-  void add(int value);
-  int get_counter();
+  void add(uint64_t value);
+  uint64_t get_counter();
 };
 
 class CounterAdd: public wallaroo::StateChange
 {
 private:
   uint64_t _id;
-  int _value;
+  uint64_t _value;
 public:
   CounterAdd(uint64_t id);
   virtual const char *name();
@@ -90,7 +90,7 @@ public:
   virtual size_t get_log_entry_size_header_size();
   virtual size_t read_log_entry_size_header(char *bytes_) { return 0; }
   virtual bool read_log_entry(char *bytes_);
-  void set_value(int value_);
+  void set_value(uint64_t value_);
 };
 
 class CounterAddBuilder: public wallaroo::StateChangeBuilder
