@@ -139,7 +139,6 @@ actor Startup
       let control_channel_file = "/tmp/" + name + "-" + worker_name +
           ".tcp-control"
       let worker_names_file = "/tmp/" + name + "-" + worker_name + ".workers"
-      @printf[I32](("worker_names_file: " + worker_names_file + "\n").cstring())
       
       let alfred = Alfred(env, event_log_file)
       let local_topology_initializer = LocalTopologyInitializer(worker_name, 

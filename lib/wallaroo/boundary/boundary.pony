@@ -98,7 +98,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
-    _notify = EmptyBoundaryNotify
+    _notify = BoundaryNotify
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
       _from.cstring())
@@ -703,16 +703,13 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
   be reconnect_to_downstream() =>
     @printf[I32](("OutgoingBoundary: trying to reconnect to downstream: " +
-      _host + ": " + _service + "\n\n").cstring())
-    // the connection is dead. Reset everything.
-    // _connected = false
-    // _closed = true
-    // _writeable = false
+      _host + ": " + _service + "\n").cstring())
       
     // try to reconnect to downstream data-channel
     if not _connected then
-      _notify = EmptyBoundaryNotify
-      _connect_count = _try_reconnect_to_downstream()
+      _notify = BoundaryNotify
+      _connect_count = @pony_os_connect_tcp[U32](this, _host.cstring(),
+        _service.cstring(), _from.cstring())
       _notify_connecting()
     end
     
@@ -722,12 +719,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       _timers(consume timer)
     end
     
-  fun ref _try_reconnect_to_downstream(): U32 =>
-    @printf[I32]("Reconnecting to downstream.\n".cstring())
-    @pony_os_connect_tcp[U32](this,
-      _host.cstring(), _service.cstring(),
-      _from.cstring())
-
     
 interface _OutgoingBoundaryNotify
   fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
@@ -802,17 +793,35 @@ interface _OutgoingBoundaryNotify
     """
     None
 
-class EmptyBoundaryNotify is _OutgoingBoundaryNotify //TODO: rename this!
+class BoundaryNotify is _OutgoingBoundaryNotify 
+  fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
+    """
+    Called if name resolution succeeded for a TCPConnection and we are now
+    waiting for a connection to the server to succeed. The count is the number
+    of connections we're trying. The notifier will be informed each time the
+    count changes, until a connection is made or connect_failed() is called.
+    """
+    @printf[I32]("BoundaryNotify: connecting\n\n".cstring())
+    None
+
+
   fun ref connected(conn: OutgoingBoundary ref) =>
   """
   Called when we have successfully connected to the server.
   """
-    @printf[I32]("EmptyBoundaryNotify: connected\n\n".cstring())
+    @printf[I32]("BoundaryNotify: connected\n\n".cstring())
     None
 
   fun ref closed(conn: OutgoingBoundary ref) =>
-    @printf[I32]("EmptyBoundaryNotify: closed\n\n".cstring())
+    @printf[I32]("BoundaryNotify: closed\n\n".cstring())
     conn.reconnect_to_downstream()
+
+  fun ref connect_failed(conn: OutgoingBoundary ref) =>
+    """
+    Called when we have failed to connect to all possible addresses for the
+    server. At this point, the connection will never be established.
+    """
+    @printf[I32]("BoundaryNotify: connect_failed\n\n".cstring())
 
 
 class WaitForReconnect is TimerNotify
