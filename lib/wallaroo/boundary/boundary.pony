@@ -190,16 +190,13 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
         end
       end
 
-      //TODO: Batching
-      _update_watermark(_route_id, seq_id)
+      ifdef "resilience" then
+        _terminus_route.receive_ack(seq_id)
+      end
     else
       ifdef "trace" then
         @printf[I32](
           "OutgoingBoundary: got repeat ack from downstream worker\n".cstring())
-      end
-
-      ifdef "resilience" then
-        _terminus_route.receive_ack(seq_id)
       end
     end
 
