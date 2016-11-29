@@ -18,7 +18,8 @@ nc -l 127.0.0.1 7003 >> /dev/null
 
 use "lib:wallaroo"
 use "lib:arizona-jr-app"
-use "lib:c++"
+use "lib:c++" if osx
+use "lib:stdc++" if linux
 
 use "collections"
 
