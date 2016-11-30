@@ -188,6 +188,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     else
       Fail()
     end
+    // DO NOT REMOVE. THIS IS AN INTENTIONAL GC
+    @pony_triggergc[None](this)
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     i_origin: Producer, msg_uid: U128,
@@ -313,7 +315,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
     ifdef "credit_trace" then
       @printf[I32]("Sink: Credits requested. Giving %llu out of %llu\n".cstring(), give_out, _distributable_credits)
-    end 
+    end
 
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
