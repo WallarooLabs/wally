@@ -608,7 +608,6 @@ wallaroo::Key *ArizonaPartitionFunction::partition(wallaroo::Data *data_)
   if (ClientMessage *cm = dynamic_cast<ClientMessage *>(data_))
   {
     string *client = cm->get_client();
-    std::reverse(client->begin(), client->end());
     string id = client->substr(4, client->length());
     return new ArizonaPartitionKey(std::stoul(id, nullptr));
   }
