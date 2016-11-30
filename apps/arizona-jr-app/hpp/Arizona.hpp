@@ -137,6 +137,8 @@ private:
   uint64_t _message_id;
   string *_client;
   string *_account;
+  string *_order_id;
+  string *_execution_id;
   uint32_t _quantity;
   double _price;
 public:
