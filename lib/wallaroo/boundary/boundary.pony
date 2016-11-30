@@ -701,23 +701,23 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   fun ref _watermarks_counter(): U64 =>
     _wmcounter = _wmcounter + 1
 
-  be reconnect_to_downstream() =>
-    @printf[I32](("OutgoingBoundary: trying to reconnect to downstream: " +
-      _host + ": " + _service + "\n").cstring())
+  // be reconnect_to_downstream() =>
+  //   @printf[I32](("OutgoingBoundary: trying to reconnect to downstream: " +
+  //     _host + ": " + _service + "\n").cstring())
       
-    // try to reconnect to downstream data-channel
-    if not _connected then
-      _notify = BoundaryNotify
-      _connect_count = @pony_os_connect_tcp[U32](this, _host.cstring(),
-        _service.cstring(), _from.cstring())
-      _notify_connecting()
-    end
+  //   // try to reconnect to downstream data-channel
+  //   if not _connected then
+  //     _notify = BoundaryNotify
+  //     _connect_count = @pony_os_connect_tcp[U32](this, _host.cstring(),
+  //       _service.cstring(), _from.cstring())
+  //     _notify_connecting()
+  //   end
     
-    if not _connected then
-      // start a timer and retry
-      let timer = Timer(WaitForReconnect(this), 1_000_000_000, 10_000_000_000)
-      _timers(consume timer)
-    end
+  //   if not _connected then
+  //     // start a timer and retry
+  //     let timer = Timer(WaitForReconnect(this), 1_000_000_000, 10_000_000_000)
+  //     _timers(consume timer)
+  //   end
     
     
 interface _OutgoingBoundaryNotify
@@ -814,7 +814,6 @@ class BoundaryNotify is _OutgoingBoundaryNotify
 
   fun ref closed(conn: OutgoingBoundary ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
-    // conn.reconnect_to_downstream()
 
   fun ref connect_failed(conn: OutgoingBoundary ref) =>
     """
