@@ -440,10 +440,13 @@ actor SendingActor
       let d' = recover Array[ByteSeq](current_batch_size) end
       for i in Range(0, current_batch_size) do
         try
-          if _binary_fmt and not _variable_size then
+          if _binary_fmt then
             let n = _data_source.next()
             if n.size() > 0 then
               d'.push(n)
+              if _variable_size then
+                _wb.u16_be(n.size().u16() + 2)
+              end
               _wb.write(n)
               _messages_sent = _messages_sent + 1
             end
@@ -767,9 +770,9 @@ class VariableLengthBinaryFileDataSource is Iterator[Array[U8] val]
     end
 
   fun ref next(): Array[U8] val =>
-    let h = _file.read(4)
+    let h = _file.read(2)
     try
-      let expect: USize = Bytes.to_u32(h(0), h(1), h(2), h(3)).usize()
+      let expect: USize = Bytes.to_u16(h(0), h(1)).usize() - 2
       _file.read(expect)
     else
       @printf[I32]("Failed to convert message header!!\n".cstring())

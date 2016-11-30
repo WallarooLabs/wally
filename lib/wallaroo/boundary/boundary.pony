@@ -5,6 +5,8 @@ use "net"
 use "sendence/guid"
 use "sendence/queue"
 use "wallaroo/backpressure"
+use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/tcp-sink"
@@ -27,16 +29,17 @@ class OutgoingBoundaryBuilder
       service)
 
 actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
-  & Initializable & Origin)
+  & Initializable)
   // Steplike
   // let _encoder: EncoderWrapper val
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
 
   // CreditFlow
-  var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
+  var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 500_000
-  var _distributable_credits: ISize = _max_distributable_credits
+  var _distributable_credits: ISize = 200_000
+  var _unacked_credits: ISize = 0
 
   // TCP
   var _notify: _OutgoingBoundaryNotify
@@ -71,14 +74,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   let _from: String
   let _queue: Queue[Array[ByteSeq] val] = _queue.create(500_000)
   var _lowest_queue_id: U64 = 0
-  var _seq_id: U64 = 0
+  // TODO: this should go away and TerminusRoute entirely takes
+  // over seq_id generation whether there is resilience or not.
+  var _seq_id: U64 = 1
 
   // Origin (Resilience)
-  var _flushing: Bool = false
-  let _watermarks: Watermarks = _watermarks.create()
-  let _hwmt: HighWatermarkTable = _hwmt.create()
-  let _route_id: RouteId = GuidGenerator.u64()
-  var _wmcounter: U64 = 0
+  let _terminus_route: TerminusRoute = TerminusRoute
 
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -102,6 +103,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
       from.cstring())
+
     _notify_connecting()
 
     @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + service + "\n").cstring())
@@ -111,69 +113,92 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   =>
     try
       if _step_id == 0 then
-        @printf[I32]("Never registered step id for OutgoingBoundary!\n".cstring())
-        error
+        Fail()
       end
 
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
         _auth)
       writev(connect_msg)
     else
-      @printf[I32]("Failed to create DataConnectMsg\n".cstring())
+      Fail()
     end
 
   be register_step_id(step_id: U128) =>
     _step_id = step_id
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin, msg_uid: U128,
+    origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId)
   =>
-    @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
+    // Run should never be called on an OutgoingBoundary
+    Fail()
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin, msg_uid: U128,
+    origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
   =>
-    @printf[I32]("Run should never be called on an OutgoingBoundary\n".cstring())
+    // Should never be called on an OutgoingBoundary
+    Fail()
 
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: ReplayableDeliveryMsg val,
-    i_origin: Origin, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
+    i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId)
   =>
     try
-      let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
-        _seq_id, _wb, _auth)
-      _queue.enqueue(outgoing_msg)
-
-      ifdef "resilience" then
-        _bookkeeping(_route_id, _seq_id, i_origin, i_route_id,
-          i_seq_id, msg_uid)
+      let seq_id = ifdef "resilience" then
+        _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
+      else
+        _seq_id = _seq_id + 1
       end
+
+      let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
+        seq_id, _wb, _auth)
+      _queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
 
-      _seq_id = _seq_id + 1
+      _distributable_credits = _distributable_credits + 1
     end
 
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
 
-  be ack(seq_id: U64) =>
+  be ack(seq_id: SeqId) =>
     if seq_id > _lowest_queue_id then
+      ifdef "trace" then
+        @printf[I32](
+          "OutgoingBoundary: got ack from downstream worker\n".cstring())
+      end
+
       let flush_count: USize = (seq_id - _lowest_queue_id).usize()
       _queue.clear_n(flush_count)
       _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-
-      ifdef "trace" then
-        @printf[I32](
-          "Got ack callback from downstream worker --------\n\n".cstring())
+      _distributable_credits = _distributable_credits + flush_count.isize()
+      ifdef "credit_trace" then
+        var recouped_credits = flush_count.isize()
+        if _distributable_credits > _max_distributable_credits then
+          recouped_credits = 
+            _max_distributable_credits - _distributable_credits
+          _distributable_credits = _max_distributable_credits
+          @printf[I32]("OutgoingBoundary: recouped %llu credits. Now at %llu\n".cstring(), recouped_credits,
+            _distributable_credits)
+        end
+      else
+        if _distributable_credits > _max_distributable_credits then
+          _distributable_credits = _max_distributable_credits
+        end
       end
 
-      //TODO: Batching
-      _update_watermark(_route_id, seq_id)
-  end
+      ifdef "resilience" then
+        _terminus_route.receive_ack(seq_id)
+      end
+    else
+      ifdef "trace" then
+        @printf[I32](
+          "OutgoingBoundary: got repeat ack from downstream worker\n".cstring())
+      end
+    end
 
   be replay_msgs() =>
     for msg in _queue.values() do
@@ -208,35 +233,26 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
-    _recoup_credits(number_finished)
+    None
+
+    // TODO: This doesn't line up with actual messages.  We need a new 
+    // strategy.
+    //_recoup_credits(number_finished)
 
   //
   // CREDIT FLOW
-  be register_producer(producer: CreditFlowProducer) =>
+  be register_producer(producer: Producer) =>
     ifdef debug then
-      try
-        Assert(not _upstreams.contains(producer),
-          "Producer attempted registered with boundary more than once")
-      else
-        _hard_close()
-        return
-      end
+      Invariant(not _upstreams.contains(producer))
     end
 
     _upstreams.push(producer)
 
-  be unregister_producer(producer: CreditFlowProducer,
+  be unregister_producer(producer: Producer,
     credits_returned: ISize)
   =>
     ifdef debug then
-      try
-        Assert(_upstreams.contains(producer),
-          "Producer attempted to unregistered with sink " +
-          "it isn't registered with")
-      else
-        _hard_close()
-        return
-      end
+      Invariant(_upstreams.contains(producer))
     end
 
     try
@@ -245,7 +261,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       _recoup_credits(credits_returned)
     end
 
-  be credit_request(from: CreditFlowProducer) =>
+  be credit_request(from: Producer) =>
     """
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
@@ -264,23 +280,39 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     and we are experiencing backpressure, they don't get any more.
     """
     ifdef debug then
+      Invariant(_upstreams.contains(from))
+    end
+
+    let give_out =  if _can_send() then
+      (_distributable_credits / _upstreams.size().isize())
+    else
+      ifdef "credit_trace" then
+        @printf[I32]("Boundary: Cannot give credits because _can_send() is false\n".cstring())
+      end
+      0
+    end
+
+    ifdef "credit_trace" then
+      @printf[I32]("Boundary: credit request and giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
+    end
+
+    from.receive_credits(give_out, this)
+    _distributable_credits = _distributable_credits - give_out
+    _unacked_credits = _unacked_credits + give_out
+
+  be ack_credits(acked: ISize, unused: ISize) =>
+    ifdef debug then
       try
-        Assert(_upstreams.contains(from),
-          "Credit request from unregistered producer")
+        Assert(acked <= _unacked_credits,
+          "More credits were acked then are still outstanding!")
       else
         _hard_close()
         return
       end
     end
 
-    let give_out =  if _can_send() then
-      (_distributable_credits / _upstreams.size().isize())
-    else
-      0
-    end
-
-    from.receive_credits(give_out, this)
-    _distributable_credits = _distributable_credits - give_out
+    _unacked_credits = _unacked_credits - acked
+    _distributable_credits = _distributable_credits + unused
 
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
@@ -554,7 +586,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
               end
 
               sum = sum + osize
-
               if sum >= _max_size then
                 // If we've read _max_size, yield and read again later.
                 _read_again()
@@ -747,30 +778,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
       @pony_asio_event_resubscribe(_event, flags)
     end
-
-  //////////////
-  // ORIGIN (resilience)
-  fun ref flushing(): Bool =>
-    _flushing
-
-  fun ref not_flushing() =>
-    _flushing = false
-
-  fun ref watermarks(): Watermarks =>
-    _watermarks
-
-  fun ref hwmt(): HighWatermarkTable =>
-    _hwmt
-
-  fun ref _flush(low_watermark: U64, origin: Origin,
-    upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
-    """
-    No-op: OutgoingBoundary has no resilient state
-    """
-    None
-
-  fun ref _watermarks_counter(): U64 =>
-    _wmcounter = _wmcounter + 1
 
 interface _OutgoingBoundaryNotify
   fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>

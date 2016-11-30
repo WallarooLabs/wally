@@ -4,6 +4,8 @@ use "collections"
 use "net"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -15,12 +17,9 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-type Envelope is (Origin, U128, None, SeqId, RouteId)
-
-
 actor EmptySink is CreditFlowConsumerStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin, msg_uid: U128,
+    origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId)
   =>
     ifdef "trace" then
@@ -29,25 +28,26 @@ actor EmptySink is CreditFlowConsumerStep
     None
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Origin, msg_uid: U128,
+    origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
   =>
     None
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
-  => 
-    None
-
-  be register_producer(producer: CreditFlowProducer) =>
-    None
-
-  be unregister_producer(producer: CreditFlowProducer,
-    credits_returned: ISize)
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
   =>
     None
 
-  be credit_request(from: CreditFlowProducer) =>
+  be register_producer(producer: Producer) =>
+    None
+
+  be unregister_producer(producer: Producer, credits_returned: ISize) =>
+    None
+
+  be credit_request(from: Producer) =>
+    None
+
+  be ack_credits(acked: ISize, unused: ISize) =>
     None
 
 class TCPSinkBuilder
@@ -101,9 +101,10 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   let _metrics_reporter: MetricsReporter
 
   // CreditFlow
-  var _upstreams: Array[CreditFlowProducer] = _upstreams.create()
+  var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 175_000_000
   var _distributable_credits: ISize = _max_distributable_credits
+  var _unacked_credits: ISize = 0
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -119,7 +120,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _writeable: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
-  embed _pending_tracking: List[(USize, Envelope)] = _pending_tracking.create()
+  embed _pending_tracking: List[(USize, SeqId)] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
   var _muted: Bool = false
@@ -132,11 +133,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
   // Origin (Resilience)
-  var _flushing: Bool = false
-  let _watermarks: Watermarks = _watermarks.create()
-  let _hwmt: HighWatermarkTable = _hwmt.create()
-  var _outgoing_seq_id: U64
-  let _outgoing_route_id: U64 = 0 // there's only one route
+  let _terminus_route: TerminusRoute ref = recover ref TerminusRoute end
 
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -147,8 +144,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    // Resilience
-    _outgoing_seq_id = 0
+
     //
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
@@ -163,43 +159,38 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _notify_connecting()
 
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
-  => 
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  =>
     None
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at TCPSink\n".cstring())
     end
     try
-      _outgoing_seq_id = _outgoing_seq_id + 1
       let encoded = _encoder.encode[D](data, _wb)
 
-      let envelope = (i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
+      let tracking_id = ifdef "resilience" then
+        _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
+      else
+        None
+      end
 
-      _writev(encoded, envelope)
+      _writev(encoded, tracking_id)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     else
-      ifdef debug then
-        try
-          Assert(false, "Encoder sink received unrecognized input type.")
-        else
-          _hard_close()
-          return
-        end
-      end
-      return
+      Fail()
     end
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     //TODO: deduplication like in the Step <- this is pointless if the Sink
@@ -223,7 +214,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     close()
 
   fun ref _unit_finished(number_finished: ISize,
-    envelope: (Envelope | None))
+    tracking_id: (SeqId | None))
   =>
     """
     Handles book keeping related to resilience and backpressure. Called when
@@ -237,33 +228,15 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     ifdef "resilience" then
-      match envelope
-      | let sent: Envelope =>
-        (let i_origin, let msg_uid, let i_frac_ids,
-          let i_seq_id, let i_route_id) = sent
-
-        ifdef "trace" then
-          @printf[I32]((
-            "tcp-sink:\ni_origin: " +
-            i_origin.hash().string() +
-            "\tmsg_uid: " +
-            msg_uid.string() +
-            "\ti_seq_id: " +
-            i_seq_id.string() +
-            "\ti_route_id: " +
-            i_route_id.string() +
-            "\n\n").cstring())
-        end
-
-        // We are finished with the message and can update watermarks (batched)
-        i_origin.update_watermark(i_route_id, i_seq_id)
-        //_watermark_batcher.queue(i_origin, i_route_id, i_seq_id)
+      match tracking_id
+      | let sent: SeqId =>
+        _terminus_route.receive_ack(sent)
       end
     end
 
   //
   // CREDIT FLOW
-  be register_producer(producer: CreditFlowProducer) =>
+  be register_producer(producer: Producer) =>
     ifdef debug then
       try
         Assert(not _upstreams.contains(producer),
@@ -276,13 +249,11 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
     _upstreams.push(producer)
 
-  be unregister_producer(producer: CreditFlowProducer,
-    credits_returned: ISize)
-  =>
+  be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
       try
         Assert(_upstreams.contains(producer),
-          "Producer attempted to unregistered with sink " +
+          "Producer attempted to unregister with sink " +
           "it isn't registered with")
       else
         _hard_close()
@@ -296,7 +267,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       _recoup_credits(credits_returned)
     end
 
-  be credit_request(from: CreditFlowProducer) =>
+  be credit_request(from: Producer) =>
     """
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
@@ -324,17 +295,46 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    let give_out =  if _can_send() then
+    let give_out = if _can_send() then
       (_distributable_credits / _upstreams.size().isize())
     else
       0
     end
 
+    ifdef debug then
+      try
+        Assert(give_out >= 0,
+          "TCPSink calculated and is trying to send back negative credits")
+      else
+        _hard_close()
+        return
+      end
+    end
+
+    ifdef "credit_trace" then
+      @printf[I32]("Sink: Credits requested. Giving %llu out of %llu\n".cstring(), give_out, _distributable_credits)
+    end 
+
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
+    _unacked_credits = _unacked_credits + give_out
 
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
+
+  be ack_credits(acked: ISize, unused: ISize) =>
+    ifdef debug then
+      try
+        Assert(acked <= _unacked_credits,
+          "More credits were acked then are still outstanding!")
+      else
+        _hard_close()
+        return
+      end
+    end
+
+    _unacked_credits = _unacked_credits - acked
+    _distributable_credits = _distributable_credits + unused
 
   //
   // TCP
@@ -413,8 +413,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
     _resubscribe_event()
 
-  // TODO: Fix this when we get a real message envelope
-  fun ref _writev(data: ByteSeqIter, envelope: (Envelope | None))
+  fun ref _writev(data: ByteSeqIter, tracking_id: (SeqId | None))
   =>
     """
     Write a sequence of sequences of bytes.
@@ -430,10 +429,11 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
         data_size = data_size + bytes.size()
       end
 
-      match envelope
-      | let e: Envelope =>
-        // only track if there is an envelope to track
-        _pending_tracking.push((data_size, e))
+      ifdef "backpressure" or "resilience" then
+        match tracking_id
+        | let id: SeqId =>
+          _pending_tracking.push((data_size, id))
+        end
       end
 
       _pending_writes()
@@ -441,7 +441,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       _in_sent = false
     end
 
-  fun ref _write_final(data: ByteSeq, envelope: (Envelope | None)) =>
+  fun ref _write_final(data: ByteSeq, tracking_id: (SeqId | None)) =>
     """
     Write as much as possible to the socket. Set _writeable to false if not
     everything was written. On an error, close the connection. This is for
@@ -449,10 +449,11 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     _pending_writev.push(data.cpointer().usize()).push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
-    match envelope
-    | let e: Envelope =>
-      // only track if there is an envelope to track
-      _pending_tracking.push((data.size(), e))
+    ifdef "backpressure" or "resilience" then
+      match tracking_id
+        | let id: SeqId =>
+          _pending_tracking.push((data.size(), id))
+        end
     end
     _pending.push((data, 0))
     _pending_writes()
@@ -609,7 +610,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
             let out = _expect_read_buf.block(block_size)
             let osize = block_size
-
             let carry_on = _notify.received(this, consume out)
             ifdef osx then
               if not carry_on then
@@ -717,8 +717,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
             _pending_writev.clear()
             _pending.clear()
 
-            // do envelope finished stuff
-            _envelope_finished(bytes_sent)
+            // do tracking finished stuff
+            _tracking_finished(bytes_sent)
             return true
           else
            for d in Range[USize](0, num_to_send, 1) do
@@ -735,40 +735,40 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    // do envelope finished stuff
-    _envelope_finished(bytes_sent)
+    // do tracking finished stuff
+    _tracking_finished(bytes_sent)
 
     false
 
 
-  fun ref _envelope_finished(num_bytes_sent: USize) =>
+  fun ref _tracking_finished(num_bytes_sent: USize) =>
     """
-    Call _unit_finished with # of sent messages and last Envelope
+    Call _unit_finished with # of sent messages and last tracking_id
     """
     ifdef "backpressure" or "resilience" then
       var num_sent: ISize = 0
-      var final_pending_sent: (Envelope | None) = None
+      var final_pending_sent: (SeqId | None) = None
       var bytes_sent = num_bytes_sent
 
       try
         while bytes_sent > 0 do
           let node = _pending_tracking.head()
-          (let bytes, let envelope) = node()
+          (let bytes, let tracking_id) = node()
           if bytes <= bytes_sent then
             num_sent = num_sent + 1
             bytes_sent = bytes_sent - bytes
-            final_pending_sent = envelope
+            final_pending_sent = tracking_id
             _pending_tracking.shift()
           else
             let bytes_remaining = bytes - bytes_sent
             bytes_sent = 0
             // update remaining for this message
-            node() = (bytes_remaining, envelope)
+            node() = (bytes_remaining, tracking_id)
           end
         end
 
         match final_pending_sent
-        | let sent: Envelope =>
+        | let sent: SeqId =>
           _unit_finished(num_sent, sent)
         end
       end

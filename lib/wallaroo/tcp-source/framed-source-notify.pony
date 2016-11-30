@@ -1,6 +1,7 @@
 use "time"
 use "sendence/guid"
 use "wallaroo/backpressure"
+use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -23,7 +24,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
   var _outgoing_seq_id: U64 = 0
-  var _origin: (Origin | None) = None
+  var _origin: (Producer | None) = None
 
   new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
@@ -34,7 +35,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     // TODO: Figure out how to name sources
     _source_name = pipeline_name + " source"
     _handler = handler
-    _runner = runner_builder(metrics_reporter.clone(), alfred, None, 
+    _runner = runner_builder(metrics_reporter.clone(), alfred, None,
       target_router, pre_state_target_id)
     _router = _runner.clone_router_and_set_input_type(router)
     _metrics_reporter = consume metrics_reporter
@@ -43,7 +44,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   fun routes(): Array[CreditFlowConsumerStep] val =>
     _router.routes()
 
-  fun ref set_origin(origin: Origin) =>
+  fun ref set_origin(origin: Producer) =>
     _origin = origin
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
@@ -66,16 +67,16 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       let is_finished =
         try
           match _origin
-          | let o: Origin =>
+          | let o: Producer =>
             _outgoing_seq_id = _outgoing_seq_id + 1
-            let decoded = 
+            let decoded =
               try
                 _handler.decode(consume data)
               else
                 ifdef debug then
                   @printf[I32]("Error decoding message at source\n".cstring())
                 end
-                error 
+                error
               end
             ifdef "trace" then
               @printf[I32](("Msg decoded at " + _pipeline_name + " source\n").cstring())
@@ -84,11 +85,12 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
               conn, _router, _omni_router,
               o,  _guid_gen.u128(), None, 0, 0)
           else
-            @printf[I32]("FramedSourceNotify needs an Origin to pass along!\n".cstring())
+            // FramedSourceNotify needs an Producer to pass along
+            Fail()
             true
           end
         else
-          // TODO: we need to provide a good error handling route for crap
+          Fail()
           true
         end
 
