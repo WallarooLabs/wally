@@ -54,7 +54,7 @@ actor Main
   new create(env: Env) =>
     try
       let partition_function = recover val CPPPartitionFunction(recover CPPManagedObject(@get_partition_function()) end) end
-      let partition_keys: Array[CPPKey val] val = partition_factory(10000, 10100)
+      let partition_keys: Array[WeightedKey[CPPKey val] val] val = partition_factory(10000, 10100)
       let data_partition = Partition[CPPData val, CPPKey val](
         partition_function, partition_keys)
 
@@ -96,12 +96,12 @@ actor Main
   fun default_computation_factory(): CPPStateComputation val =>
     recover CPPStateComputation(recover CPPManagedObject(@get_default_state_computation()) end) end
 
-  fun partition_factory(partition_start: USize, partition_end: USize): Array[CPPKey val] val =>
+  fun partition_factory(partition_start: USize, partition_end: USize): Array[WeightedKey[CPPKey val]] val =>
     let partition_count = partition_end - partition_start
     recover val
-      let partitions = Array[CPPKey val](partition_count)
+      let partitions = Array[WeightedKey[CPPKey val]](partition_count)
       for i in Range(partition_start, partition_end + 1) do
-        partitions.push(recover CPPKey(recover CPPManagedObject(@get_partition_key(i.u64())) end) end)
+        partitions.push((recover CPPKey(recover CPPManagedObject(@get_partition_key(i.u64())) end) end, 1))
       end
       consume partitions
     end

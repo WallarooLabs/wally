@@ -2,8 +2,10 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "time"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/invariant"
 use "wallaroo/topology"
 use "wallaroo/tcp-sink"
 
@@ -14,7 +16,7 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is (CreditFlowProducer & Initializable & Origin)
+actor TCPSource is (Initializable & Producer)
   """
   # TCPSource
 
@@ -26,6 +28,10 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _tcp_sinks: Array[TCPSink] val
+  var _credit_timer: (Timer tag | None) = None
+  let _credit_timers: Timers = Timers
+  // Determines if we can still process credits from consumers
+  var _unregistered: Bool = false
 
   // TCP
   let _listen: TCPSourceListener
@@ -43,23 +49,19 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
-  var _muted: Bool = false
+  var _muted: Bool = true
   var _expect_read_buf: Reader = Reader
 
   // Origin (Resilience)
-  var _flushing: Bool = false
-  let _watermarks: Watermarks = _watermarks.create()
-  let _hwmt: HighWatermarkTable = _hwmt.create()
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
-  var _wmcounter: U64 = 0
 
   // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val, 
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val,
-    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,  
-    forward_route_builder: (RouteBuilder val | None) = None, 
+    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,
+    forward_route_builder: (RouteBuilder val | None) = None,
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -108,9 +110,10 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
         _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
-    for sink in tcp_sinks.values() do
-      _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
-    end
+    // TODO: Remove this if possible.
+    // for sink in tcp_sinks.values() do
+    //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
+    // end
 
     match default_target
     | let r: CreditFlowConsumerStep =>
@@ -121,84 +124,82 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     end
 
     for r in _routes.values() do
-      r.initialize()
+      // TODO: What should the initial max credits per route from 
+      // a Source be?  I'm starting at max_value because that makes
+      // us dependent on how many can be distributed from downstream.
+      r.initialize(ISize.max_value())
     end
+
+    request_credits()
 
   //////////////
   // ORIGIN (resilience)
-  fun ref flushing(): Bool =>
-    _flushing
-
-  fun ref not_flushing() =>
-    _flushing = false
-
-  fun ref watermarks(): Watermarks =>
-    _watermarks
-
-  fun ref hwmt(): HighWatermarkTable =>
-    _hwmt
-
-  fun ref _watermarks_counter(): U64 =>
-    _wmcounter = _wmcounter + 1
+  fun ref _x_resilience_routes(): Routes =>
+    // TODO: we don't really need this
+    // Because we dont actually do any resilience work
+    Routes
 
   // Override these for TCPSource as we are currently
   // not resilient.
-
-  fun ref _flush(low_watermark: U64, origin: Origin,
-    upstream_route_id: RouteId , upstream_seq_id: SeqId) =>
+  fun ref _flush(low_watermark: U64) =>
     None
 
-  be log_flushed(low_watermark: SeqId, i_origin: Origin,
-    i_route_id: RouteId, i_seq_id: SeqId)
-  =>
+  be log_flushed(low_watermark: SeqId) =>
     None
 
-  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId, i_origin: Origin,
-    i_route_id: RouteId, i_seq_id: SeqId, msg_uid: U128)
+  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId,
+    i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
   =>
     None
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    None
+    ifdef "trace" then
+      @printf[I32]("TCPSource received update_watermark\n".cstring())
+    end
 
   fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
     None
 
-  fun ref _run_ack(i_origin: Origin, i_route_id: RouteId, i_seq_id: SeqId) =>
-    None
-
   // Our actor
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val) 
-  => 
+    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  =>
     None
 
   be dispose() =>
-     """
-    - Close the connection gracefully.
-    - Dispose of our routes
     """
+    - Close the connection gracefully.
+    """
+    _cancel_credit_timer()
     close()
-    for r in _routes.values() do
-      r.dispose()
-    end
 
   //
   // CREDIT FLOW
-  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-    ifdef debug then
-      try
-        Assert(_routes.contains(from),
-        "Source received credits from consumer it isn't registered with.")
-      else
-        _hard_close()
-        return
-      end
+  be request_credits() =>
+    ifdef "credit_trace" then
+      @printf[I32]("Source: Periodic credit request while muted\n".cstring())
+    end
+    for r in _routes.values() do
+      r.request_credits()
     end
 
-    try
-      let route = _routes(from)
-      route.receive_credits(credits)
+  fun ref recoup_credits(credits: ISize) => None
+
+  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
+    ifdef debug then
+      Invariant(_routes.contains(from))
+    end
+
+    if _unregistered then
+      ifdef "credit_trace" then
+        @printf[I32]("Unregistered source returning credits unused\n".cstring())
+      end
+      from.ack_credits(credits, credits)
+    else
+      try
+        let route = _routes(from)
+        route.receive_credits(credits)
+      end
     end
 
   fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
@@ -317,6 +318,10 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 
     if _connected and _shutdown and _shutdown_peer then
       _hard_close()
+    else
+      if not _unregistered then
+        _dispose_routes()
+      end
     end
 
   fun ref _hard_close() =>
@@ -342,6 +347,19 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     _notify.closed(this)
 
     _listen._conn_closed()
+    if not _unregistered then
+      _dispose_routes()
+    end
+    _unregistered = true
+
+  fun ref _dispose_routes() =>
+    @printf[I32]("!!Disposing of routes\n".cstring())
+    for r in _routes.values() do
+      r.dispose()
+    end
+    _cancel_credit_timer()
+    _muted = true
+    _unregistered = true
 
   fun ref _pending_reads() =>
     """
@@ -482,11 +500,30 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
-    _muted = true
+    try
+      if (_credit_timer is None) and (not _unregistered) then
+        let t = Timer(_RequestCredits(this), 1_000_000_000, 1_000_000_000)
+        _credit_timer = t as Timer tag
+        _credit_timers(consume t)
+      end
+      _muted = true
+    else
+      ifdef debug then
+        @printf[I32]("Failed to mute source\n".cstring())
+      end
+    end
 
   fun ref _unmute() =>
+    _cancel_credit_timer()
     _muted = false
     _pending_reads()
+
+  fun ref _cancel_credit_timer() =>
+    match _credit_timer
+    | let t: Timer tag =>
+      _credit_timers.cancel(t)
+      _credit_timer = None
+    end
 
   fun ref expect(qty: USize = 0) =>
     """
@@ -510,23 +547,17 @@ actor TCPSource is (CreditFlowProducer & Initializable & Origin)
 class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   var _muted: ISize = 0
 
-  fun shutdown(producer: CreditFlowProducer ref) =>
+  fun shutdown(producer: Producer ref) =>
     match producer
     | let p: TCPSource ref =>
       p._hard_close()
     end
 
-  fun ref credits_replenished(producer: CreditFlowProducer ref) =>
+  fun ref credits_replenished(producer: Producer ref) =>
     ifdef debug then
-      try
-        Assert(_muted > 0,
-          "credits_replenished() should only be called when the calling " +
-          "Route was already muted.")
-      else
-        shutdown(producer)
-        return
-      end
+      Invariant(_muted > 0)
     end
+
     match producer
     | let p: TCPSource ref =>
       _muted = _muted - 1
@@ -535,10 +566,19 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       end
     end
 
-  fun ref credits_exhausted(producer: CreditFlowProducer ref) =>
+  fun ref credits_exhausted(producer: Producer ref) =>
     match producer
     | let p: TCPSource ref =>
       _muted = _muted + 1
       p._mute()
     end
 
+class _RequestCredits is TimerNotify
+ let _source: TCPSource
+
+ new iso create(source: TCPSource) =>
+  _source = source
+
+ fun ref apply(timer: Timer, count: U64): Bool =>
+   _source.request_credits()
+   true

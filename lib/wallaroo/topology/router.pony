@@ -8,7 +8,7 @@ use "wallaroo/tcp-sink"
 interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, i_msg_uid: U128,
+    i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   fun routes(): Array[CreditFlowConsumerStep] val
 
@@ -18,7 +18,7 @@ interface RouterBuilder
 class EmptyRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, i_msg_uid: U128,
+    i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     true
@@ -34,7 +34,7 @@ class DirectRouter
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, i_msg_uid: U128,
+    i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
@@ -86,7 +86,7 @@ class ProxyRouter
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
@@ -127,14 +127,14 @@ trait OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
 
 class EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n".cstring())
@@ -159,7 +159,7 @@ class StepIdRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, msg_uid: U128,
+    i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
@@ -244,7 +244,7 @@ class DataRouter
   =>
     _data_routes = data_routes
 
-  fun route(d_msg: DeliveryMsg val, origin: Origin, seq_id: SeqId) =>
+  fun route(d_msg: DeliveryMsg val, origin: Producer, seq_id: SeqId) =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataRouter\n".cstring())
     end
@@ -263,7 +263,7 @@ class DataRouter
       true
     end
 
-  fun replay_route(r_msg: ReplayableDeliveryMsg val, origin: Origin,
+  fun replay_route(r_msg: ReplayableDeliveryMsg val, origin: Producer,
     seq_id: SeqId)
   =>
     try
@@ -321,7 +321,7 @@ class LocalPartitionRouter[In: Any val,
 
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
-    i_origin: Origin, i_msg_uid: U128,
+    i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef "trace" then

@@ -294,6 +294,8 @@ ExecuteMessage::~ExecuteMessage()
 {
   delete _client;
   delete _account;
+  delete _order_id;
+  delete _execution_id;
 }
 
 void ExecuteMessage::from_bytes(char *bytes_)
@@ -302,6 +304,8 @@ void ExecuteMessage::from_bytes(char *bytes_)
 
   _client = reader.arizona_string();
   _account = reader.arizona_string();
+  _order_id = reader.arizona_string();
+  _execution_id = reader.arizona_string();
   _quantity = reader.u32_be();
   _price = reader.arizona_double();
 }
@@ -316,6 +320,8 @@ void ExecuteMessage::serialize(char* bytes_, size_t nsz_)
   writer.u64_be(_message_id);
   writer.arizona_string(_client);
   writer.arizona_string(_account);
+  writer.arizona_string(_order_id);
+  writer.arizona_string(_execution_id);
   writer.u32_be(_quantity);
   writer.arizona_double(_price);
 }
@@ -327,6 +333,8 @@ size_t ExecuteMessage::serialize_get_size()
     8 + // message id
     2 + _client->size() +
     2 + _account->size() +
+    2 + _order_id->size() +
+    2 + _execution_id->size() +
     4 + // quantity
     8; // price
   return sz;
