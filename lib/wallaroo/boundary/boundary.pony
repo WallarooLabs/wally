@@ -72,7 +72,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   let _host: String
   let _service: String
   let _from: String
-  let _queue: Queue[Array[ByteSeq] val] = _queue.create(500_000)
+  let _queue: Queue[Array[ByteSeq] val] = _queue.create()
   var _lowest_queue_id: U64 = 0
   // TODO: this should go away and TerminusRoute entirely takes
   // over seq_id generation whether there is resilience or not.
