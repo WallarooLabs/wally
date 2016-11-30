@@ -38,8 +38,8 @@ namespace wallaroo
 
 //------------------------------------------------
 BufferWriter::BufferWriter(int sz_) :
-        Buffer(),
-        _internallyAllocatedBuffer(true)
+    Buffer(),
+    _internallyAllocatedBuffer(true)
 {
   _bodySize = sz_;
   setBody(_bodySize);
@@ -51,8 +51,8 @@ BufferWriter::BufferWriter(int sz_) :
 
 //------------------------------------------------
 BufferWriter::BufferWriter(char* buff_, int sz_) :
-        Buffer(),
-        _internallyAllocatedBuffer(false)
+    Buffer(),
+    _internallyAllocatedBuffer(false)
 {
   _body = buff_;
   _bodySize = sz_;
@@ -67,8 +67,8 @@ BufferWriter::BufferWriter(char* buff_, int sz_) :
 
 //------------------------------------------------
 BufferWriter::BufferWriter(const BufferWriter& buff_) :
-        Buffer(),
-        _internallyAllocatedBuffer(false)
+    Buffer(),
+    _internallyAllocatedBuffer(false)
 {
   Logger::getLogger()->error("{}, Error:{}", __PRETTY_FUNCTION__, "not defined yet");
 }
@@ -200,11 +200,10 @@ BufferWriter& BufferWriter::operator<<(const string& str_)
 {
   short sz = (short) str_.size();
   writeData(&sz, sizeof(short));
-  writeData(str_.c_str(), sz);
+  std::memcpy(_write, str_.c_str(), sz);
+  _write += sz;
   return *this;
 }
-
-
 
 
 
@@ -215,7 +214,8 @@ BufferWriter& BufferWriter::operator<<(const char* str_)
 {
   short sz = (short) std::strlen(str_);
   writeData(&sz, sizeof(short));
-  writeData(str_, sz);
+  std::memcpy(_write, str_, sz);
+  _write += sz;
   return *this;
 }
 
