@@ -202,6 +202,11 @@ extern wallaroo::Key *w_partition_function_partition(wallaroo::PartitionFunction
   return partition_function_->partition(data_);
 }
 
+extern uint64_t w_partition_function_u64_partition(wallaroo::PartitionFunctionU64 *partition_function_, wallaroo::Data *data_)
+{
+  return partition_function_->partition(data_);
+}
+
 extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_)
 {
   delete obj_;
