@@ -18,6 +18,7 @@ g++ -Wall -std=c++11 -o build/libarizona-jr-app.o -I"hpp" -I"../../lib/wallaroo/
 #
 # wallaroo
 #
-PRIV_WALL=/home/kgoldstein/dev/buffy/lib
-echo $PRIV_WALL
-ponyc --debug --path=/usr/lib:./build:$PRIV_WALL:../../lib/wallaroo/cpp-api/cpp/cppapi/build/build/lib --output=build arizona-jr-app/
+echo $WALLAROO_HOME
+WALL_PATH=/usr/lib:./build:$WALLAROO_HOME:../../lib/wallaroo/cpp-api/cpp/cppapi/build/build/lib 
+echo "Wallaroo path: $WALL_PATH"
+ponyc --debug --path=$WALL_PATH --output=build arizona-jr-app/
