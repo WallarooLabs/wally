@@ -134,7 +134,9 @@ actor TCPSource is (Initializable & Producer)
     end
 
     ifdef "backpressure" then
-      request_credits()
+      for r in _routes.values() do
+        r.request_credits()
+      end
     end
 
   //////////////
@@ -179,15 +181,10 @@ actor TCPSource is (Initializable & Producer)
 
   //
   // CREDIT FLOW
-  be request_credits() =>
-    ifdef "credit_trace" then
-      @printf[I32]("Source: Periodic credit request while muted\n".cstring())
-    end
-    for r in _routes.values() do
-      r.request_credits()
-    end
-
-  fun ref recoup_credits(credits: ISize) => None
+  fun ref recoup_credits(credits: ISize) =>
+    // We don't hand credits upstream from a source, so we don't need to
+    // recoup them
+    None
 
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
     ifdef debug then
