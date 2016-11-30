@@ -205,12 +205,14 @@ BufferReader& BufferReader::operator>> (char* param_)
   short sz;
   readData(&sz, sizeof(short));
 
-  char* newStrData = new char[sz + 1];
-  newStrData[sz] = '\0';
-  readData(newStrData, sz);
+  //char* newStrData = new char[sz + 1];
+  //newStrData[sz] = '\0';
+  //readData(newStrData, sz);
 
-  std::strncpy(newStrData, param_, sz);
-  delete[] newStrData;
+  std::memcpy(param_, _read, sz);
+  _read += sz;
+  //std::strncpy(newStrData, param_, sz);
+  //delete[] newStrData;
   return *this;
 }
 
@@ -227,9 +229,13 @@ BufferReader& BufferReader::operator>> (char** param_)
   readData(&sz, sizeof(short));
 
   *param_ = new char[sz + 1];
-  readData(*param_, sz);
+  std::memcpy(*param_, _read, sz);
+  _read += sz;
   (*param_)[sz] = '\0';
 
   return *this;
 }
+
+
+
 }
