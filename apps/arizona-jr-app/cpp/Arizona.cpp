@@ -435,12 +435,12 @@ void ProceedsMessage::encode(char *bytes)
 // Arizona
 
 extern "C" {
-  extern wallaroo::Key *get_partition_key(uint64_t value_)
+  extern uint64_t get_partition_key(uint64_t value_)
   {
-    return new ArizonaPartitionKey(value_);
+    return value_;
   }
 
-  extern wallaroo::PartitionFunction* get_partition_function()
+  extern wallaroo::PartitionFunctionU64* get_partition_function()
   {
     return new ArizonaPartitionFunction();
   }
@@ -607,7 +607,7 @@ void ArizonaPartitionKey::serialize(char *bytes_, size_t nsz_)
   writer.u64_be(_value);
 }
 
-wallaroo::Key *ArizonaPartitionFunction::partition(wallaroo::Data *data_)
+uint64_t ArizonaPartitionFunction::partition(wallaroo::Data *data_)
 {
   if (ClientMessage *cm = dynamic_cast<ClientMessage *>(data_))
   {
@@ -617,7 +617,7 @@ wallaroo::Key *ArizonaPartitionFunction::partition(wallaroo::Data *data_)
   // TODO: Really we should come up with a better plan here.
   std::cerr << "could not get a key for message" << std::endl;
   wallaroo::Logger::getLogger()->critical("could not get a key for message");
-  return new ArizonaPartitionKey(0);
+  return 0;
 }
 
 const char *ArizonaDefaultStateComputation::name()
