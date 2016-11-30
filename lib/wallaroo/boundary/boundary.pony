@@ -154,7 +154,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         seq_id, _wb, _auth)
-      _queue.enqueue(outgoing_msg)
+      //_queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
 
@@ -178,7 +178,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       ifdef "credit_trace" then
         var recouped_credits = flush_count.isize()
         if _distributable_credits > _max_distributable_credits then
-          recouped_credits = 
+          recouped_credits =
             _max_distributable_credits - _distributable_credits
           _distributable_credits = _max_distributable_credits
           @printf[I32]("OutgoingBoundary: recouped %llu credits. Now at %llu\n".cstring(), recouped_credits,
@@ -235,7 +235,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     """
     None
 
-    // TODO: This doesn't line up with actual messages.  We need a new 
+    // TODO: This doesn't line up with actual messages.  We need a new
     // strategy.
     //_recoup_credits(number_finished)
 
