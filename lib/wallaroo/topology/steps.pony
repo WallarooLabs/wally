@@ -74,8 +74,8 @@ actor Step is (RunnableStep & Resilient & Producer &
   //!!
   var _count: USize = 0
 
-  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, 
-    id: U128, route_builder: RouteBuilder val, alfred: Alfred, 
+  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
+    id: U128, route_builder: RouteBuilder val, alfred: Alfred,
     router: Router val = EmptyRouter, default_target: (Step | None) = None,
     omni_router: OmniRouter val = EmptyOmniRouter)
   =>
@@ -114,7 +114,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
     // end
 
-    let max_credits_per_route = 
+    let max_credits_per_route =
       _max_distributable_credits / _routes.size().isize()
 
     for r in _routes.values() do
@@ -136,7 +136,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
       _routes(consumer) = next_route
       if _initialized then
-        let new_max_credits_per_route = 
+        let new_max_credits_per_route =
           _max_distributable_credits / _routes.size().isize()
 
         next_route.initialize(new_max_credits_per_route)
@@ -176,12 +176,9 @@ actor Step is (RunnableStep & Resilient & Producer &
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
       _recoup_credits(1)
     end
+    // DO NOT REMOVE. THIS GC TRIGGERING IS INTENTIONAL.
+    @pony_triggergc(this)
 
-    //!
-    // _count = _count + 1
-    // if (_count % 10_000) == 0 then
-    //   @printf[I32]("!!Next 10,000 recvd at STEP\n".cstring())
-    // end
 
   fun ref next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
