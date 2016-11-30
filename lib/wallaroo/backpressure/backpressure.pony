@@ -87,7 +87,7 @@ class EmptyRoute is Route
   =>
     None
 
-type TypedRouteQueueTuple[D: Any val] is (String, U64, D, Producer ref, 
+type TypedRouteQueueTuple[D: Any val] is (String, U64, D, Producer ref,
   Producer, U128, None, SeqId, RouteId)
 
 class TypedRouteQueueData[D: Any val]
@@ -164,7 +164,9 @@ class TypedRoute[In: Any val] is Route
     _callback = handler
     // @printf[I32]("!!Route: Registering producer\n".cstring())
     _consumer.register_producer(_step)
-    handler.credits_exhausted(_step)
+    ifdef "backpressure" then
+      handler.credits_exhausted(_step)
+    end
     let q_size: USize = ifdef "backpressure" then
       500_000
     else
@@ -220,7 +222,7 @@ class TypedRoute[In: Any val] is Route
     end
 
     _request_outstanding = false
-    let credits_recouped = 
+    let credits_recouped =
       if (_credits_available + number) > _max_credits then
         _max_credits - _credits_available
       else
@@ -231,9 +233,9 @@ class TypedRoute[In: Any val] is Route
     _consumer.ack_credits(number, number - credits_recouped)
 
     ifdef "credit_trace" then
-      @printf[I32]("--Route: rcvd %llu credits. Used %llu. Had %llu out of %llu\n".cstring(), number, credits_recouped, 
+      @printf[I32]("--Route: rcvd %llu credits. Used %llu. Had %llu out of %llu\n".cstring(), number, credits_recouped,
         _credits_available - credits_recouped, _max_credits)
-    end 
+    end
 
     if _credits_available > 0 then
       if (_credits_available - credits_recouped) == 0 then
@@ -360,7 +362,7 @@ class TypedRoute[In: Any val] is Route
     cfp: Producer ref, origin: Producer, msg_uid: U128,
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    // TODO: Bring back using ContainerQueue if perf results are good    
+    // TODO: Bring back using ContainerQueue if perf results are good
     // try
       _queue.push((metric_name, source_ts, input, cfp,
         origin, msg_uid, frac_ids, i_seq_id, i_route_id))
@@ -385,7 +387,7 @@ class TypedRoute[In: Any val] is Route
     end
 
   fun ref _hard_flush() =>
-    while (_queue.size() > 0) do 
+    while (_queue.size() > 0) do
       try
         // TODO: Bring back using ContainerQueue if perf results are good
         let d =_queue.shift()
@@ -426,7 +428,7 @@ class BoundaryRouteQueueData
     (delivery_msg, producer, i_origin, msg_uid, i_frac_ids, i_seq_id)
 
 class BoundaryRouteQueueDataBuilder
-  fun apply(t: BoundaryRouteQueueTuple): BoundaryRouteQueueData 
+  fun apply(t: BoundaryRouteQueueTuple): BoundaryRouteQueueData
   =>
     BoundaryRouteQueueData(t)
 
@@ -448,7 +450,7 @@ class BoundaryRoute is Route
   // (delivery_msg, cfp, i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
   let _queue: Array[(ReplayableDeliveryMsg val, Producer ref,
     Producer, U128, None, SeqId, RouteId)]
-//  let _queue: ContainerQueue[BoundaryRouteQueueTuple, 
+//  let _queue: ContainerQueue[BoundaryRouteQueueTuple,
 //    BoundaryRouteQueueData]
 
   new create(step: Producer ref, consumer: OutgoingBoundary,
@@ -465,7 +467,7 @@ class BoundaryRoute is Route
     end
     _queue = Array[(ReplayableDeliveryMsg val, Producer ref,
       Producer, U128, None, SeqId, RouteId)](q_size)
-    // _queue = ContainerQueue[BoundaryRouteQueueTuple, 
+    // _queue = ContainerQueue[BoundaryRouteQueueTuple,
     //   BoundaryRouteQueueData](BoundaryRouteQueueDataBuilder, q_size)
 
   fun ref initialize(max_credits: ISize) =>
@@ -495,7 +497,7 @@ class BoundaryRoute is Route
     end
 
     _request_outstanding = false
-    let credits_recouped = 
+    let credits_recouped =
       if (_credits_available + number) > _max_credits then
         _max_credits - _credits_available
       else
@@ -650,7 +652,7 @@ class BoundaryRoute is Route
 
   fun ref _flush_queue() =>
     while ((_credits_available > 0) and (_queue.size() > 0)) do
-      try 
+      try
         // TODO: Bring back using ContainerQueue if perf results are good
         let d =_queue.shift()
         // let d =_queue.dequeue()
@@ -659,7 +661,7 @@ class BoundaryRoute is Route
     end
 
   fun ref _hard_flush() =>
-    while (_queue.size() > 0) do 
+    while (_queue.size() > 0) do
       try
         // TODO: Bring back using ContainerQueue if perf results are good
         let d =_queue.shift()
