@@ -506,10 +506,12 @@ actor TCPSource is (Initializable & Producer)
 
   fun ref _mute() =>
     try
-      if (_credit_timer is None) and (not _unregistered) then
-        let t = Timer(_RequestCredits(this), 1_000_000_000, 1_000_000_000)
-        _credit_timer = t as Timer tag
-        _credit_timers(consume t)
+      ifdef "backpressure" then
+        if (_credit_timer is None) and (not _unregistered) then
+          let t = Timer(_RequestCredits(this), 1_000_000_000, 1_000_000_000)
+          _credit_timer = t as Timer tag
+          _credit_timers(consume t)
+        end
       end
       _muted = true
     else
