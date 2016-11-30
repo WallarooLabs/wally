@@ -111,14 +111,14 @@ actor DataReceiver is Producer
 
 // TODO: From credit flow producer part of Producer
 // Remove once traits/interfaces are cleaned up
-  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-    None
+be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
+  None
 
-  fun ref recoup_credits(credits: ISize) =>
-    None
+fun ref recoup_credits(credits: ISize) =>
+  None
 
-  fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
-    None
+fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
+  None
 
-  fun ref next_sequence_id(): U64 =>
-    0
+fun ref next_sequence_id(): U64 =>
+  0
