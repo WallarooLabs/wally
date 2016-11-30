@@ -543,7 +543,7 @@ ArizonaStateComputation::ArizonaStateComputation() : _nProcessed(0)
 void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
 {
   _nProcessed += 1;
-  if ( _nProcessed > 10000 )
+  if ( _nProcessed % 10000 == 0  )
     _logger->info("Processed messages:{}", _nProcessed);
 
   ClientMessage* cm = dynamic_cast<ClientMessage*>(input_); 
