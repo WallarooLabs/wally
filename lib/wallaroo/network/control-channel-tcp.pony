@@ -116,6 +116,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: TopologyReadyMsg val =>
         match _initializer
         | let i: WorkerInitializer =>
+          ifdef debug then
+            if m.worker_name == "initializer" then
+              @printf[I32]("Initializer shouldn't be sending itself a TopologyReady message!\n".cstring())
+            end
+          end
           i.topology_ready(m.worker_name)
         end
       | let m: CreateConnectionsMsg val =>

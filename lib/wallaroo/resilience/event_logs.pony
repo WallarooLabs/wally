@@ -13,15 +13,13 @@ type LogEntry is (U128, None, U64, U64, Array[ByteSeq] val)
 trait EventLogBuffer
   fun ref queue(uid: U128, frac_ids: None,
     statechange_id: U64, seq_id: U64, payload: Array[ByteSeq] val)
-  fun ref flush(low_watermark: U64, origin: Origin,
-    upstream_route_id: RouteId, upstream_seq_id: SeqId)
+  fun ref flush(low_watermark: U64)
 
 class DeactivatedEventLogBuffer is EventLogBuffer
   new create() => None
   fun ref queue(uid: U128, frac_ids: None,
     statechange_id: U64, seq_id: U64, payload: Array[ByteSeq] val) => None
-  fun ref flush(low_watermark: U64, origin: Origin,
-    upstream_route_id: RouteId, upstream_seq_id: SeqId) =>
+  fun ref flush(low_watermark: U64) =>
     @printf[I32]("DeactivatedEventLogBuffer.flush ....\n\n".cstring())
     None
 
@@ -40,8 +38,7 @@ class StandardEventLogBuffer is EventLogBuffer
 
     _buf.push((uid, frac_ids, statechange_id, seq_id, payload))
 
-  fun ref flush(low_watermark: U64, origin: Origin,
-    upstream_route_id: RouteId, upstream_seq_id: SeqId) =>
+  fun ref flush(low_watermark: U64) =>
     let out_buf: Array[LogEntry val] iso = recover iso Array[LogEntry val] end
     let residual: Array[LogEntry val] = Array[LogEntry val]
 
@@ -60,6 +57,5 @@ class StandardEventLogBuffer is EventLogBuffer
     ifdef "trace" then
       @printf[I32]("flush size: %llu\n".cstring(), out_buf.size())
     end
-    _alfred.write_log(_origin_id, consume out_buf, low_watermark, origin,
-      upstream_route_id, upstream_seq_id)
+    _alfred.write_log(_origin_id, consume out_buf, low_watermark)
     _buf = residual

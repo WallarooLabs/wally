@@ -10,7 +10,7 @@ actor Main is TestList
 
   new create(env: Env) =>
     PonyTest(env, this)
-  
+
   new make() =>
     None
 
@@ -23,18 +23,18 @@ actor Main is TestList
     test(_TestEventLog)
 
 
-actor _TestOrigin is Origin 
+actor _TestOrigin is Origin
   let _hwm: HighWatermarkTable = HighWatermarkTable(10)
   let _lwm: LowWatermarkTable = LowWatermarkTable(10)
   let _seq_translate: SeqTranslationTable = SeqTranslationTable(10)
   let _route_translate: RouteTranslationTable = RouteTranslationTable(10)
   let _origins: OriginSet = OriginSet(10)
 
-  fun ref hwm_get(): HighWatermarkTable => _hwm 
-  fun ref lwm_get(): LowWatermarkTable => _lwm 
-  fun ref seq_translate_get(): SeqTranslationTable => _seq_translate 
-  fun ref route_translate_get(): RouteTranslationTable => _route_translate 
-  fun ref origins_get(): OriginSet => _origins 
+  fun ref hwm_get(): HighWatermarkTable => _hwm
+  fun ref lwm_get(): LowWatermarkTable => _lwm
+  fun ref seq_translate_get(): SeqTranslationTable => _seq_translate
+  fun ref route_translate_get(): RouteTranslationTable => _route_translate
+  fun ref origins_get(): OriginSet => _origins
   fun ref _flush(low_watermark: U64, origin: Origin tag,
     upstream_route_id: U64 , upstream_seq_id: U64) =>
     None
@@ -61,8 +61,8 @@ class iso _TestHashOriginRoute is UnitTest
     let hash2: U64 = HashOriginRoute.hash(pair)
     h.assert_true(hash1 == hash2)
     h.complete(HashOriginRoute.eq(pair, pair))
-    
-    
+
+
 class iso _TestHighWatermarkTable is UnitTest
   fun name(): String =>
     "messages/HighWatermarkTable"
@@ -81,7 +81,7 @@ class iso _TestHighWatermarkTable is UnitTest
     else
       h.fail("HighWatermarkTable lookup failed!")
     end
-    
+
 class iso _TestBookkeeping is UnitTest
   fun name(): String =>
     "messages/bookkeeping"
@@ -96,7 +96,7 @@ class iso _TestUpdateWatermark is UnitTest
   fun apply(h: TestHelper) =>
     None
 
-    
+
     // h.complete(false)
     // h.fail("test failed")
     // h.long_test(5_000_000_000)
@@ -167,11 +167,11 @@ actor TestOrigin is ResilientOrigin
     let buffer2 = StandardEventLogBuffer(alfred2,0)
     alfred2.register_origin(this,0)
     alfred2.start()
-    
+
   fun ref hwm_get(): HighWatermarkTable => _hwm
   fun ref lwm_get(): LowWatermarkTable => _lwm
-  fun ref seq_translate_get(): SeqTranslationTable => _seq_translate 
-  fun ref route_translate_get(): RouteTranslationTable => _route_translate 
+  fun ref seq_translate_get(): SeqTranslationTable => _seq_translate
+  fun ref route_translate_get(): RouteTranslationTable => _route_translate
   fun ref origins_get(): OriginSet => _origins
 
 class TestState
@@ -186,7 +186,7 @@ class TestStateChange is StateChange[TestState]
   fun id(): U64 => _id
   fun apply(state: TestState) => state.sum = state.sum + value
 
-  fun write_log_entry(out_writer: Writer) => 
+  fun write_log_entry(out_writer: Writer) =>
     out_writer.u64_be(value)
 
   fun ref read_log_entry(in_reader: Reader) =>
@@ -199,7 +199,7 @@ class TestStateChange is StateChange[TestState]
 class iso _TestEventLog is UnitTest
 
   fun name(): String => "resilience/alfred"
-  
+
   fun ref apply(h: TestHelper) =>
     let msg_count: U64 = 100
     let finished: Promise[None] = finished.create()

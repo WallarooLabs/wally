@@ -63,7 +63,7 @@ interface TCPSourceNotify
     """
     None
 
-  fun ref set_origin(origin: Origin) =>
+  fun ref set_origin(origin: Producer) =>
     """
     Needed to be able to set what the origin is for incoming messages
     """
