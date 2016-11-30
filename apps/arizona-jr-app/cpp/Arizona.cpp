@@ -7,6 +7,31 @@
 #include <iostream>
 #include <cstring>
 
+// OS X doesn't include the endian conversion functions we need, so
+// I've resorted to this.  https://gist.github.com/panzi/6856583
+#if defined(__linux__)
+#include <endian.h>
+#elif defined(__APPLE__)
+#include <libkern/OSByteOrder.h>
+#define htobe16(x) OSSwapHostToBigInt16(x)
+#define htole16(x) OSSwapHostToLittleInt16(x)
+#define be16toh(x) OSSwapBigToHostInt16(x)
+#define le16toh(x) OSSwapLittleToHostInt16(x)
+#define htobe32(x) OSSwapHostToBigInt32(x)
+#define htole32(x) OSSwapHostToLittleInt32(x)
+#define be32toh(x) OSSwapBigToHostInt32(x)
+#define le32toh(x) OSSwapLittleToHostInt32(x)
+#define htobe64(x) OSSwapHostToBigInt64(x)
+#define htole64(x) OSSwapHostToLittleInt64(x)
+#define be64toh(x) OSSwapBigToHostInt64(x)
+#define le64toh(x) OSSwapLittleToHostInt64(x)
+
+#define __BYTE_ORDER    BYTE_ORDER
+#define __BIG_ENDIAN    BIG_ENDIAN
+#define __LITTLE_ENDIAN LITTLE_ENDIAN
+#define __PDP_ENDIAN    PDP_ENDIAN
+#endif
+
 // Utility
 
 wallaroo::Data *message_from_bytes(char *bytes_)
@@ -69,31 +94,21 @@ Reader::Reader(unsigned char *bytes_): _ptr(bytes_)
 
 uint16_t Reader::u16_be()
 {
-  uint16_t ret = ((uint16_t)(_ptr[0]) << 8) + ((uint16_t)(_ptr[1]));
+  uint16_t ret = be16toh(*((uint16_t *)_ptr));
   _ptr += 2;
   return ret;
 }
 
 uint32_t Reader::u32_be()
 {
-  uint32_t ret = ((uint32_t)(_ptr[0]) << 24) +
-    ((uint32_t)(_ptr[1]) << 16) +
-    ((uint32_t)(_ptr[2]) << 8) +
-    ((uint32_t)(_ptr[3]));
+  uint32_t ret = be32toh(*((uint32_t *)_ptr));
   _ptr += 4;
   return ret;
 }
 
 uint64_t Reader::u64_be()
 {
-  uint64_t ret = ((uint64_t)(_ptr[0]) << 56) +
-    ((uint64_t)(_ptr[1]) << 48) +
-    ((uint64_t)(_ptr[2]) << 40) +
-    ((uint64_t)(_ptr[3]) << 32) +
-    ((uint64_t)(_ptr[4]) << 24) +
-    ((uint64_t)(_ptr[5]) << 16) +
-    ((uint64_t)(_ptr[6]) << 8) +
-    ((uint64_t)(_ptr[7]));
+  uint64_t ret = be64toh(*((uint64_t *)_ptr));
   _ptr += 8;
   return ret;
 }
@@ -125,30 +140,19 @@ Writer::Writer(unsigned char *bytes_): _ptr(bytes_)
 
 void Writer::u16_be(uint16_t value_)
 {
-  _ptr[0] = (value_ >> 8) & 0xFF;
-  _ptr[1] = value_ & 0xFF;
+  *(uint16_t *)(_ptr) = htobe16(value_);  
   _ptr += 2;
 }
 
 void Writer::u32_be(uint32_t value_)
 {
-  _ptr[0] = (value_ >> 24) & 0xFF;
-  _ptr[1] = (value_ >> 16) & 0xFF;
-  _ptr[2] = (value_ >> 8) & 0xFF;
-  _ptr[3] = value_ & 0xFF;
+  *(uint32_t *)(_ptr) = htobe32(value_);  
   _ptr += 4;
 }
 
 void Writer::u64_be(uint64_t value_)
 {
-  _ptr[0] = (value_ >> 56) & 0xFF;
-  _ptr[1] = (value_ >> 48) & 0xFF;
-  _ptr[2] = (value_ >> 40) & 0xFF;
-  _ptr[3] = (value_ >> 32) & 0xFF;
-  _ptr[4] = (value_ >> 24) & 0xFF;
-  _ptr[5] = (value_ >> 16) & 0xFF;
-  _ptr[6] = (value_ >> 8) & 0xFF;
-  _ptr[7] = value_ & 0xFF;
+  *(uint32_t *)(_ptr) = htobe64(value_);  
   _ptr += 8;
 }
 
@@ -655,5 +659,3 @@ void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::
     
   return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
 }
-
-
