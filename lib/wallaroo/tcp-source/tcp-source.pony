@@ -49,7 +49,12 @@ actor TCPSource is (Initializable & Producer)
   var _readable: Bool = false
   var _read_len: USize = 0
   var _shutdown: Bool = false
-  var _muted: Bool = true
+  var _muted: Bool =
+    ifdef "backpressure" then
+      true
+    else
+      false
+    end
   var _expect_read_buf: Reader = Reader
 
   // Origin (Resilience)
@@ -124,7 +129,7 @@ actor TCPSource is (Initializable & Producer)
     end
 
     for r in _routes.values() do
-      // TODO: What should the initial max credits per route from 
+      // TODO: What should the initial max credits per route from
       // a Source be?  I'm starting at max_value because that makes
       // us dependent on how many can be distributed from downstream.
       r.initialize(ISize.max_value())
