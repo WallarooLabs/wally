@@ -64,14 +64,18 @@ actor Step is (RunnableStep & Resilient & Producer &
    // CreditFlow Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 500_000
-  var _distributable_credits: ISize = _max_distributable_credits
+  var _distributable_credits: ISize = 0
+  var _unacked_credits: ISize = 0
 
   // Resilience routes
   // TODO: This needs to be merged with credit flow producer routes
   let _resilience_routes: Routes = Routes
 
-  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
-    id: U128, route_builder: RouteBuilder val, alfred: Alfred,
+  //!!
+  var _count: USize = 0
+
+  new create(runner: Runner iso, metrics_reporter: MetricsReporter iso, 
+    id: U128, route_builder: RouteBuilder val, alfred: Alfred, 
     router: Router val = EmptyRouter, default_target: (Step | None) = None,
     omni_router: OmniRouter val = EmptyOmniRouter)
   =>
@@ -110,8 +114,11 @@ actor Step is (RunnableStep & Resilient & Producer &
     //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
     // end
 
+    let max_credits_per_route = 
+      _max_distributable_credits / _routes.size().isize()
+
     for r in _routes.values() do
-      r.initialize()
+      r.initialize(max_credits_per_route)
       ifdef "resilience" then
         _resilience_routes.add_route(r)
       end
@@ -129,7 +136,13 @@ actor Step is (RunnableStep & Resilient & Producer &
       let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
       _routes(consumer) = next_route
       if _initialized then
-        next_route.initialize()
+        let new_max_credits_per_route = 
+          _max_distributable_credits / _routes.size().isize()
+
+        next_route.initialize(new_max_credits_per_route)
+        for r in _routes.values() do
+          r.update_max_credits(new_max_credits_per_route)
+        end
       end
     end
 
@@ -161,7 +174,14 @@ actor Step is (RunnableStep & Resilient & Producer &
           i_origin, i_route_id, i_seq_id)
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
+      _recoup_credits(1)
     end
+
+    //!
+    // _count = _count + 1
+    // if (_count % 10_000) == 0 then
+    //   @printf[I32]("!!Next 10,000 recvd at STEP\n".cstring())
+    // end
 
   fun ref next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
@@ -219,6 +239,7 @@ actor Step is (RunnableStep & Resilient & Producer &
           _resilience_routes.filter(this, next_sequence_id(),
             i_origin, i_route_id, i_seq_id)
         end
+        _recoup_credits(1)
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
       end
     end
@@ -292,6 +313,9 @@ actor Step is (RunnableStep & Resilient & Producer &
       Invariant(not _upstreams.contains(producer))
     end
 
+    ifdef "credit_trace" then
+      @printf[I32]("Registered producer!\n".cstring())
+    end
     _upstreams.push(producer)
 
   be unregister_producer(producer: Producer,
@@ -307,8 +331,15 @@ actor Step is (RunnableStep & Resilient & Producer &
       _recoup_credits(credits_returned)
     end
 
+  fun ref recoup_credits(recoup: ISize) =>
+    _recoup_credits(recoup)
+
   fun ref _recoup_credits(recoup: ISize) =>
+    // @printf[I32]("!!Recouping".cstring())
     _distributable_credits = _distributable_credits + recoup
+    if _distributable_credits > _max_distributable_credits then
+      _distributable_credits = _max_distributable_credits
+    end
 
   be credit_request(from: Producer) =>
     """
@@ -321,16 +352,41 @@ actor Step is (RunnableStep & Resilient & Producer &
 
     // TODO: CREDITFLOW - this is a very naive strategy
     // Could quite possibly deadlock. Would need to look into that more.
-    let lccl = _lowest_route_credit_level()
+    // let lccl = _lowest_route_credit_level()
     let desired_give_out = _distributable_credits / _upstreams.size().isize()
-    let give_out = if lccl > desired_give_out then
-      desired_give_out
-    else
-      lccl
+    // let give_out = if lccl > desired_give_out then
+      // desired_give_out
+    // else
+      // lccl
+    // end
+
+    ifdef "credit_trace" then
+      @printf[I32]("Step: credit request and giving %llu credits out of %llu\n".cstring(), desired_give_out, _distributable_credits)
     end
 
-    from.receive_credits(give_out, this)
-    _distributable_credits = _distributable_credits - give_out
+    from.receive_credits(desired_give_out, this)
+    _distributable_credits = _distributable_credits - desired_give_out
+    _unacked_credits = _unacked_credits + desired_give_out
+
+    if _distributable_credits == 0 then
+      for r in _routes.values() do
+        r.request_credits()
+      end
+    end
+
+  be ack_credits(acked: ISize, unused: ISize) =>
+    ifdef debug then
+      try
+        Assert(acked <= _unacked_credits,
+          "More credits were acked then are still outstanding!")
+      else
+        // TODO: CREDITFLOW - What is our error response here?
+        return
+      end
+    end
+
+    _unacked_credits = _unacked_credits - acked
+    _distributable_credits = _distributable_credits + unused
 
   fun _lowest_route_credit_level(): ISize =>
     var lowest: ISize = ISize.max_value()

@@ -445,6 +445,8 @@ actor _TestProducer is Producer
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
     None
 
+  fun ref recoup_credits(credits: ISize) => None
+
   fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
     None
 
