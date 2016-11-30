@@ -8,6 +8,8 @@ nc -l 127.0.0.1 5555 >> /dev/null
 2) metrics sink (if not using Monitoring Hub):
 nc -l 127.0.0.1 5001 >> /dev/null
 
+350 Symbols
+
 3a) market spread app (1 worker):
 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock
 
@@ -21,12 +23,29 @@ giles/sender/sender -b 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f demos/ma
 
 5) nbbo:
 giles/sender/sender -b 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
+
+R3K or other Symbol Set (700, 1400, 2100)
+
+3a) market spread app (1 worker):
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../demos/marketspread/r3k-legal-symbols.msg -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg --ponythreads=4 --ponynoblock
+
+3b) market spread app (2 workers):
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name -s ../../demos/marketspread/r3k-legal-symbols.msg -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg --ponythreads=4 --ponynoblock -t -w 2
+
+./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
+
+4) orders:
+giles/sender/sender -b 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f demos/marketspread/r3k-orders-fixish.msg -r --ponythreads=1 -y -g 57 -w
+
+5) nbbo:
+giles/sender/sender -b 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/r3k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 """
 use "assert"
 use "collections"
 use "net"
 use "time"
 use "buffered"
+use "options"
 use "sendence/bytes"
 use "sendence/fix"
 use "sendence/new-fix"
@@ -41,18 +60,42 @@ use "wallaroo/fail"
 actor Main
   new create(env: Env) =>
     try
-      let symbol_data_partition = Partition[Symboly val, String](
-        SymbolPartitionFunction, LegalSymbols.symbols)
+      var initial_nbbo_file_path =
+        "../../demos/marketspread/initial-nbbo-fixish.msg"
+      var symbols_file_path: (String | None) = None
+      let options = Options(env.args, false)
 
-      let init_file = InitFile("../../demos/marketspread/initial-nbbo-fixish.msg", 46)
+      options
+        .add("initial-nbbo-file", "f", StringArgument)
+        .add("symbols-file", "s", StringArgument)
 
-      let initial_report_msgs_trn: Array[Array[ByteSeq] val] trn = 
+      for option in options do
+        match option
+        | ("initial-nbbo-file", let arg: String) =>
+          initial_nbbo_file_path = arg
+        | ("symbols-file", let arg: String) =>
+          symbols_file_path = arg
+        end
+      end
+      let symbol_data_partition = if symbols_file_path is None then
+          Partition[Symboly val, String](
+            SymbolPartitionFunction, LegalSymbols.symbols)
+        else
+          Partition[Symboly val, String](
+            SymbolPartitionFunction,
+            PartitionFileReader(symbols_file_path as String,
+              env.root as AmbientAuth))
+        end
+
+      let init_file = InitFile(initial_nbbo_file_path, 46)
+
+      let initial_report_msgs_trn: Array[Array[ByteSeq] val] trn =
         recover Array[Array[ByteSeq] val] end
       let connect_msg = HubProtocol.connect()
       let join_msg = HubProtocol.join("reports:market-spread")
       initial_report_msgs_trn.push(connect_msg)
       initial_report_msgs_trn.push(join_msg)
-      let initial_report_msgs: Array[Array[ByteSeq] val] val = 
+      let initial_report_msgs: Array[Array[ByteSeq] val] val =
         consume initial_report_msgs_trn
 
       let application = recover val
@@ -60,12 +103,12 @@ actor Main
           .new_pipeline[FixOrderMessage val, OrderResult val](
             "Orders", FixOrderFrameHandler)
             // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
-            .to_state_partition[Symboly val, String, 
-              (OrderResult val | None), SymbolData](CheckOrder, 
+            .to_state_partition[Symboly val, String,
+              (OrderResult val | None), SymbolData](CheckOrder,
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
             .to_sink(OrderResultEncoder, recover [0] end,
-              initial_report_msgs)     
+              initial_report_msgs)
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo", FixNbboFrameHandler
               where init_file = init_file)
@@ -88,7 +131,7 @@ primitive Identity[In: Any val]
 primitive IdentityBuilder[In: Any val]
   fun apply(): Computation[In, In] val =>
     Identity[In]
- 
+
 
 interface Symboly
   fun symbol(): String
@@ -111,7 +154,7 @@ class SymbolDataStateChange is StateChange[SymbolData]
 
   fun name(): String => _name
   fun id(): U64 => _id
-  
+
   new create(id': U64, name': String) =>
     _id = id'
     _name = name'
@@ -144,8 +187,8 @@ class SymbolDataStateChangeBuilder is StateChangeBuilder[SymbolData]
 primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
   fun name(): String => "Update NBBO"
 
-  fun apply(msg: FixNbboMessage val, 
-    sc_repo: StateChangeRepository[SymbolData], 
+  fun apply(msg: FixNbboMessage val,
+    sc_repo: StateChangeRepository[SymbolData],
     state: SymbolData): (None, StateChange[SymbolData] ref)
   =>
     ifdef debug then
@@ -180,12 +223,12 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
       scbs.push(recover val SymbolDataStateChangeBuilder end)
     end
 
-class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val, 
+class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
   SymbolData]
   fun name(): String => "Check Order against NBBO"
 
-  fun apply(msg: FixOrderMessage val, 
-    sc_repo: StateChangeRepository[SymbolData], 
+  fun apply(msg: FixOrderMessage val,
+    sc_repo: StateChangeRepository[SymbolData],
     state: SymbolData): ((OrderResult val | None), None)
   =>
     // @printf[I32]("!!CheckOrder\n".cstring())
@@ -196,7 +239,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     else
       (None, None)
     end
-  
+
   fun state_change_builders(): Array[StateChangeBuilder[SymbolData] val] val =>
     recover val
       Array[StateChangeBuilder[SymbolData] val]
@@ -237,7 +280,7 @@ primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
     end
 
 primitive SymbolPartitionFunction
-  fun apply(input: Symboly val): String 
+  fun apply(input: Symboly val): String
   =>
     input.symbol()
 
@@ -290,7 +333,7 @@ primitive OrderResultEncoder
     wb.f64_be(r.offer)
     wb.u64_be(r.timestamp)
     let payload = wb.done()
-    HubProtocol.payload("rejected-orders", "reports:market-spread", 
+    HubProtocol.payload("rejected-orders", "reports:market-spread",
       consume payload, wb)
 
 class LegalSymbols
@@ -298,7 +341,7 @@ class LegalSymbols
 
   new create() =>
     let padded: Array[String] trn = recover Array[String] end
-    for symbol in RawSymbols().values() do 
+    for symbol in RawSymbols().values() do
       padded.push(RawSymbols.pad_symbol(symbol))
     end
     symbols = consume padded
@@ -314,11 +357,11 @@ primitive RawSymbols
         padded = " " + padded
       end
       padded
-    end   
+    end
 
 //!!
   fun apply(): Array[String] val =>
-    recover      
+    recover
       [
 "AA",
 "BAC",
