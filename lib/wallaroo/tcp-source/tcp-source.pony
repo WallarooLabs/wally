@@ -500,13 +500,7 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
-    try
-      _muted = true
-    else
-      ifdef debug then
-        @printf[I32]("Failed to mute source\n".cstring())
-      end
-    end
+    _muted = true
 
   fun ref _unmute() =>
     _muted = false
