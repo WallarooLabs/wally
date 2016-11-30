@@ -8,10 +8,27 @@ fi
 
 
 #
+# loading up the path for sourcing
+#
+CC=`type -P c++` 
+if [ "$?" -gt 0 ] ; then
+    echo "Unable to find compiler, sourcing dev-4" 
+    source /opt/rh/devtoolset-4/enable 
+    echo `which c++` 
+else
+    echo "Compiler: $CC" 
+fi
+
+
+
+#
 # arizona
 #
-#mkdir -p build
-g++ -Wall -std=c++11 -o build/libarizona-jr-app.o -I"hpp" -I"../../lib/wallaroo/cpp-api/cpp/cppapi/" -c cpp/Arizona.cpp && rm build/libarizona-jr-app.a ; ar rvs build/libarizona-jr-app.a build/libarizona-jr-app.o
+mkdir -p build
+pushd build
+cmake ../
+make
+popd
 
 
 
@@ -19,6 +36,6 @@ g++ -Wall -std=c++11 -o build/libarizona-jr-app.o -I"hpp" -I"../../lib/wallaroo/
 # wallaroo
 #
 echo $WALLAROO_HOME
-WALL_PATH=/usr/lib:./build:$WALLAROO_HOME:../../lib/wallaroo/cpp-api/cpp/cppapi/build/build/lib 
+WALL_PATH=$WALLAROO_HOME:../../lib/wallaroo/cpp-api/cpp/cppapi/build/build/lib:./build/lib:/usr/lib
 echo "Wallaroo path: $WALL_PATH"
 ponyc --debug --path=$WALL_PATH --output=build arizona-jr-app/
