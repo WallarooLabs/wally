@@ -28,8 +28,6 @@ actor TCPSource is (Initializable & Producer)
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _tcp_sinks: Array[TCPSink] val
-  var _credit_timer: (Timer tag | None) = None
-  let _credit_timers: Timers = Timers
   // Determines if we can still process credits from consumers
   var _unregistered: Bool = false
 
@@ -177,7 +175,6 @@ actor TCPSource is (Initializable & Producer)
     """
     - Close the connection gracefully.
     """
-    _cancel_credit_timer()
     close()
 
   //
@@ -364,7 +361,6 @@ actor TCPSource is (Initializable & Producer)
     for r in _routes.values() do
       r.dispose()
     end
-    _cancel_credit_timer()
     _muted = true
     _unregistered = true
 
@@ -508,13 +504,6 @@ actor TCPSource is (Initializable & Producer)
 
   fun ref _mute() =>
     try
-      ifdef "backpressure" then
-        if (_credit_timer is None) and (not _unregistered) then
-          let t = Timer(_RequestCredits(this), 1_000_000_000, 1_000_000_000)
-          _credit_timer = t as Timer tag
-          _credit_timers(consume t)
-        end
-      end
       _muted = true
     else
       ifdef debug then
@@ -523,16 +512,8 @@ actor TCPSource is (Initializable & Producer)
     end
 
   fun ref _unmute() =>
-    _cancel_credit_timer()
     _muted = false
     _pending_reads()
-
-  fun ref _cancel_credit_timer() =>
-    match _credit_timer
-    | let t: Timer tag =>
-      _credit_timers.cancel(t)
-      _credit_timer = None
-    end
 
   fun ref expect(qty: USize = 0) =>
     """
@@ -581,13 +562,3 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       _muted = _muted + 1
       p._mute()
     end
-
-class _RequestCredits is TimerNotify
- let _source: TCPSource
-
- new iso create(source: TCPSource) =>
-  _source = source
-
- fun ref apply(timer: Timer, count: U64): Bool =>
-   _source.request_credits()
-   true
