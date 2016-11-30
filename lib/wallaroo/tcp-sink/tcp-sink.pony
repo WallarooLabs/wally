@@ -266,7 +266,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
-      _recoup_credits(credits_returned)
+      ifdef "backpressure" then
+        _recoup_credits(credits_returned)
+      end
     end
 
   be credit_request(from: Producer) =>

@@ -174,7 +174,9 @@ actor Step is (RunnableStep & Resilient & Producer &
           i_origin, i_route_id, i_seq_id)
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
-      _recoup_credits(1)
+      ifdef "backpressure" then
+        _recoup_credits(1)
+      end
     end
     // DO NOT REMOVE. THIS GC TRIGGERING IS INTENTIONAL.
     @pony_triggergc[None](this)
@@ -236,7 +238,9 @@ actor Step is (RunnableStep & Resilient & Producer &
           _resilience_routes.filter(this, next_sequence_id(),
             i_origin, i_route_id, i_seq_id)
         end
-        _recoup_credits(1)
+        ifdef "backpressure" then
+          _recoup_credits(1)
+        end
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
       end
     end
