@@ -53,10 +53,9 @@ primitive ArizonaDefaultStateBuilder
 actor Main
   new create(env: Env) =>
     try
-      let partition_function = recover val CPPPartitionFunction(recover CPPManagedObject(@get_partition_function()) end) end
-      let partition_keys: Array[WeightedKey[CPPKey val] val] val = partition_factory(10000, 10100)
-      let data_partition = Partition[CPPData val, CPPKey val](
-        partition_function, partition_keys)
+      let partition_function = recover val CPPPartitionFunctionU64(recover CPPManagedObject(@get_partition_function()) end) end
+      let partition_keys: Array[U64] val = partition_factory(10000, 11000)
+      let data_partition = Partition[CPPData val, U64](partition_function, partition_keys)
 
       let application = recover val
         Application("Passthrough Topology")
@@ -72,7 +71,7 @@ actor Main
           //     ArizonaStateBuilder, "state-builder", data_partition where multi_worker = true)
 
           // PARITIONED WITH DEFAULT (A)
-          .to_state_partition[CPPData val, CPPKey val, CPPData val, CPPState](
+          .to_state_partition[CPPData val, U64, CPPData val, CPPState](
               computation_factory(),
               ArizonaStateBuilder, "state-builder", data_partition
               where
@@ -96,12 +95,12 @@ actor Main
   fun default_computation_factory(): CPPStateComputation val =>
     recover CPPStateComputation(recover CPPManagedObject(@get_default_state_computation()) end) end
 
-  fun partition_factory(partition_start: USize, partition_end: USize): Array[WeightedKey[CPPKey val]] val =>
+  fun partition_factory(partition_start: USize, partition_end: USize): Array[U64] val =>
     let partition_count = partition_end - partition_start
     recover val
-      let partitions = Array[WeightedKey[CPPKey val]](partition_count)
+      let partitions = Array[U64 val](partition_count)
       for i in Range(partition_start, partition_end + 1) do
-        partitions.push((recover CPPKey(recover CPPManagedObject(@get_partition_key(i.u64())) end) end, 1))
+        partitions.push(i.u64())
       end
       consume partitions
     end

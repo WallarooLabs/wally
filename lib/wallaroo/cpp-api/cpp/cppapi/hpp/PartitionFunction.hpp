@@ -33,6 +33,11 @@ class PartitionFunction: public ManagedObject
 public:
   virtual Key *partition(Data *data_) = 0;
 };
+class PartitionFunctionU64: public ManagedObject
+{
+public:
+  virtual uint64_t partition(Data *data_) = 0;
+};
 }
 
 #endif // __PARTITION_FUNCTION_HPP

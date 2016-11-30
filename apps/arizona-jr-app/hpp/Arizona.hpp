@@ -261,12 +261,12 @@ public:
   virtual size_t serialize_get_size () { return 10; }
 };
 
-class ArizonaPartitionFunction: public wallaroo::PartitionFunction
+class ArizonaPartitionFunction: public wallaroo::PartitionFunctionU64
 {
 public:
   ArizonaPartitionFunction() {}
   virtual ~ArizonaPartitionFunction() {}
-  virtual wallaroo::Key *partition(wallaroo::Data *data_);
+  virtual uint64_t partition(wallaroo::Data *data_);
   virtual void serialize(char* bytes_, size_t nsz_) { Writer writer((unsigned char *)bytes_); writer.u16_be(SerializationType::PartitionFunction); }
   virtual size_t serialize_get_size () { return 2; }
 };
