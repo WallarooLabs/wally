@@ -177,7 +177,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       _recoup_credits(1)
     end
     // DO NOT REMOVE. THIS GC TRIGGERING IS INTENTIONAL.
-    @pony_triggergc(this)
+    @pony_triggergc[None](this)
 
 
   fun ref next_sequence_id(): U64 =>
