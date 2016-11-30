@@ -135,7 +135,9 @@ actor TCPSource is (Initializable & Producer)
       r.initialize(ISize.max_value())
     end
 
-    request_credits()
+    ifdef "backpressure" then
+      request_credits()
+    end
 
   //////////////
   // ORIGIN (resilience)
