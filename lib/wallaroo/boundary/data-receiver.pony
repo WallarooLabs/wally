@@ -122,29 +122,3 @@ actor DataReceiver is Producer
 
   fun ref next_sequence_id(): U64 =>
     0
-
-//
-//  be open_connection() =>
-//    if _connected == true then
-//      _reconnecting = true
-//    else
-//      // _connect_ack()
-//      _connected = true
-//      _reconnecting = false
-//    end
-//
-//  be close_connection() =>
-//    if _reconnecting == true then
-//      // _connect_ack()
-//      _reconnecting = false
-//      _connected = true
-//    else
-//      _connected = false
-//    end
-//
-//  // be connect_ack() => _connect_ack()
-//
-//  // fun ref _connect_ack() =>
-//  //   _connections.ack_connect_msg_id(_sender_name, _last_id_seen)
-
-
