@@ -814,7 +814,7 @@ class BoundaryNotify is _OutgoingBoundaryNotify
 
   fun ref closed(conn: OutgoingBoundary ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
-    conn.reconnect_to_downstream()
+    // conn.reconnect_to_downstream()
 
   fun ref connect_failed(conn: OutgoingBoundary ref) =>
     """
