@@ -159,8 +159,8 @@ actor Step is (RunnableStep & Resilient & Producer &
     ifdef "trace" then
       @printf[I32](("Rcvd msg at " + _runner.name() + " step\n").cstring())
     end
-    let is_finished = _runner.run[D](metric_name, source_ts, data,
-      this, _router, _omni_router,
+    (let is_finished, _) = _runner.run[D](metric_name, 
+      source_ts, data, this, _router, _omni_router,
       i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
     if is_finished then
       ifdef "resilience" then
@@ -228,7 +228,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       i_route_id) then
       _deduplication_list.push((i_origin, msg_uid, i_frac_ids, i_seq_id,
         i_route_id))
-      let is_finished = _runner.run[D](metric_name, source_ts, data,
+      (let is_finished, _) = _runner.run[D](metric_name, source_ts, data,
         this, _router, _omni_router,
         i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
 

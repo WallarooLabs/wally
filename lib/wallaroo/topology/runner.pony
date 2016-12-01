@@ -14,10 +14,11 @@ use "wallaroo/resilience"
 // TODO: Eliminate producer None when we can
 interface Runner
   // Return a Bool indicating whether the message is finished processing
+  // and a Bool indicating whether the Route has filled its queue
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   fun name(): String
   fun state_name(): String
   fun clone_router_and_set_input_type(r: Router val,
@@ -451,30 +452,30 @@ class ComputationRunner[In: Any val, Out: Any val]
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   =>
     let computation_start = Time.nanos()
 
-    let is_finished =
+    (let is_finished, let keep_sending) =
       match data
       | let input: In =>
         let result = _computation(input)
         match result
-        | None => true
+        | None => (true, true)
         | let output: Out =>
           _next.run[Out](metric_name, source_ts, output, producer, router,
             omni_router,
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
         else
-          true
+          (true, true)
         end
       else
-        true
+        (true, true)
       end
     let computation_end = Time.nanos()
     _metrics_reporter.step_metric(_computation_name,
       computation_start, computation_end)
-    is_finished
+    (is_finished, keep_sending)
 
   fun name(): String => _computation.name()
   fun state_name(): String => ""
@@ -505,10 +506,10 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   =>
     let computation_start = Time.nanos()
-    let is_finished =
+    (let is_finished, let keep_sending) =
       match data
       | let input: In =>
         match router
@@ -521,18 +522,18 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
             metric_name, source_ts, processor, producer,
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
         else
-          true
+          (true, true)
         end
       else
         @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
-        true
+        (true, true)
       end
     let computation_end = Time.nanos()
 
     _metrics_reporter.step_metric(_prep_name, computation_start,
       computation_end)
 
-    is_finished
+    (is_finished, keep_sending)
 
   fun name(): String => _name
   fun state_name(): String => _state_name
@@ -584,7 +585,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   =>
     match data
     | let sp: StateProcessor[State] val =>
@@ -593,7 +594,8 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
         metric_name, source_ts, producer,
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
       let is_finished = result._1
-      let state_change = result._2
+      let keep_sending = result._2
+      let state_change = result._3
 
       match state_change
       | let sc: StateChange[State] ref =>
@@ -616,16 +618,16 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
         let computation_end = Time.nanos()
         _metrics_reporter.step_metric(sp.name(), computation_start,
           computation_end)
-        is_finished
+        (is_finished, keep_sending)
       else
         let computation_end = Time.nanos()
         _metrics_reporter.step_metric(sp.name(), computation_start,
           computation_end)
-        is_finished
+        (is_finished, keep_sending)
       end
     else
       @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
-      true
+      (true, true)
     end
 
   fun rotate_log() =>
@@ -644,14 +646,14 @@ class iso RouterRunner
   fun ref run[Out: Any val](metric_name: String, source_ts: U64, output: Out,
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   =>
     match router
     | let r: Router val =>
       r.route[Out](metric_name, source_ts, output, producer,
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
     else
-      true
+      (true, true)
     end
 
   fun name(): String => "Router runner"

@@ -55,13 +55,15 @@ trait Route
   fun ref dispose()
   fun ref request_credits()
   fun ref receive_credits(number: ISize)
+  // Return false to indicate queue is full and if producer is a Source, it
+  // should mute
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId)
+    i_route_id: RouteId): Bool
 
 
 class EmptyRoute is Route
@@ -78,15 +80,15 @@ class EmptyRoute is Route
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
-    None
+    true
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId)
+    i_route_id: RouteId): Bool
   =>
-    None
+    true
 
 type TypedRouteQueueTuple[D: Any val] is (String, U64, D, Producer ref,
   Producer, U128, None, SeqId, RouteId)
@@ -287,7 +289,7 @@ class TypedRoute[In: Any val] is Route
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
       @printf[I32]("--Rcvd msg at Route\n".cstring())
@@ -320,28 +322,33 @@ class TypedRoute[In: Any val] is Route
               end
             end
           end
+          true
         else
           ifdef "trace" then
             @printf[I32]("----No credits: added msg to Route queue\n".cstring())
           end
-          _add_to_queue(metric_name, source_ts, input, cfp, origin, msg_uid,
-            frac_ids, i_seq_id, i_route_id)
+          let keep_sending = _add_to_queue(metric_name, source_ts, input, cfp, 
+            origin, msg_uid, frac_ids, i_seq_id, i_route_id)
           request_credits()
+          keep_sending
         end
       else
         _send_message_on_route(metric_name, source_ts, input, cfp, origin,
           msg_uid, frac_ids, i_seq_id, i_route_id)
+        true
       end
     else
       Fail()
+      true
     end
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId)
+    i_route_id: RouteId): Bool
   =>
     // Forward should never be called on a TypedRoute
     Fail()
+    true
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64, input: In,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, frac_ids: None,
@@ -371,15 +378,29 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _add_to_queue(metric_name: String, source_ts: U64, input: In,
     cfp: Producer ref, origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
+    ifdef debug then
+      Invariant(_queue.size() < _queue.max_size())
+    end
+
+    @printf[I32](("!!Queue size: " + _queue.max_size().string() + "\n").cstring())
+    @printf[I32](("!!Max credits: " + _max_credits.string() + "\n").cstring())
+
     try
       _queue.enqueue((metric_name, source_ts, input, cfp,
         origin, msg_uid, frac_ids, i_seq_id, i_route_id))
+      if _queue.size() == _queue.max_size() then
+        false
+      else
+        true
+      end
     else
       ifdef debug then
         @printf[I32]("Failure trying to enqueue typed route data\n".cstring())
       end
+      Fail()
+      true
     end
 
   fun ref _flush_queue() =>
@@ -549,14 +570,15 @@ class BoundaryRoute is Route
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     // Run should never be called on a BoundaryRoute
     Fail()
+    true
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId)
+    i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at BoundaryRoute\n".cstring())
@@ -597,8 +619,9 @@ class BoundaryRoute is Route
             end
           end
         end
+        true
       else
-        _add_to_queue(delivery_msg,
+        let keep_sending = _add_to_queue(delivery_msg,
           cfp,
           i_origin,
           msg_uid,
@@ -606,6 +629,7 @@ class BoundaryRoute is Route
           i_seq_id,
           i_route_id)
         request_credits()
+        keep_sending
       end
     else
       _send_message_on_route(delivery_msg,
@@ -615,6 +639,7 @@ class BoundaryRoute is Route
         i_frac_ids,
         i_seq_id,
         _route_id)
+      true
     end
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val,
@@ -638,15 +663,26 @@ class BoundaryRoute is Route
 
   fun ref _add_to_queue(delivery_msg: ReplayableDeliveryMsg val,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId)
+    i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
+    ifdef debug then
+      Invariant(_queue.size() < _queue.max_size())
+    end
+
     try
       _queue.enqueue((delivery_msg, cfp,
         i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id))
+      if _queue.size() == _queue.max_size() then
+        false
+      else
+        true
+      end
     else
       ifdef debug then
         @printf[I32]("Failure trying to enqueue boundary route data\n".cstring())
       end
+      Fail()
+      true
     end
 
   fun ref _flush_queue() =>

@@ -30,6 +30,7 @@ actor TCPSource is (Initializable & Producer)
   let _tcp_sinks: Array[TCPSink] val
   // Determines if we can still process credits from consumers
   var _unregistered: Bool = false
+  let _max_route_credits: ISize = 10_000
 
   // TCP
   let _listen: TCPSourceListener
@@ -130,7 +131,7 @@ actor TCPSource is (Initializable & Producer)
       // TODO: What should the initial max credits per route from
       // a Source be?  I'm starting at max_value because that makes
       // us dependent on how many can be distributed from downstream.
-      r.initialize(ISize.max_value())
+      r.initialize(_max_route_credits)
     end
 
     ifdef "backpressure" then

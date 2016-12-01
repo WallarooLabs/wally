@@ -9,7 +9,7 @@ interface Router
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   fun routes(): Array[CreditFlowConsumerStep] val
 
 interface RouterBuilder
@@ -19,9 +19,9 @@ class EmptyRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   =>
-    true
+    (true, true)
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
     recover val Array[CreditFlowConsumerStep] end
@@ -35,7 +35,7 @@ class DirectRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DirectRouter\n".cstring())
@@ -47,15 +47,15 @@ class DirectRouter
       ifdef "trace" then
         @printf[I32]("DirectRouter found Route\n".cstring())
       end
-      r.run[D](metric_name, source_ts, data,
+      let keep_sending = r.run[D](metric_name, source_ts, data,
         // hand down producer so we can call _next_sequence_id()
         producer,
         // incoming envelope
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
-      false
+      (false, keep_sending)
     else
       // TODO: What do we do if we get None?
-      true
+      (true, true)
     end
 
 
@@ -87,7 +87,7 @@ class ProxyRouter
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at ProxyRouter\n".cstring())
@@ -105,13 +105,13 @@ class ProxyRouter
         _target_proxy_address,
         msg_uid, i_frac_ids)
 
-      r.forward(delivery_msg, producer, i_origin, msg_uid, i_frac_ids,
-        i_seq_id, i_route_id)
+      let keep_sending = r.forward(delivery_msg, producer, i_origin, msg_uid, 
+        i_frac_ids, i_seq_id, i_route_id)
 
-      false
+      (false, keep_sending)
     else
       // TODO: What do we do if we get None?
-      true
+      (true, true)
     end
 
   fun copy_with_new_target_id(target_id: U128): ProxyRouter val =>
@@ -128,17 +128,17 @@ trait OmniRouter
     metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
 
 class EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   =>
     @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n".cstring())
-    true
+    (true, true)
 
 class StepIdRouter is OmniRouter
   let _worker_name: String
@@ -160,7 +160,7 @@ class StepIdRouter is OmniRouter
     metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at OmniRouter\n".cstring())
@@ -176,16 +176,16 @@ class StepIdRouter is OmniRouter
         ifdef "trace" then
           @printf[I32]("OmniRouter found Route to Step\n".cstring())
         end
-        r.run[D](metric_name, source_ts, data,
+        let keep_sending = r.run[D](metric_name, source_ts, data,
           // hand down producer so we can update route_id
           producer,
           // incoming envelope
           i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
 
-        false
+        (false, keep_sending)
       else
         // No route for this target
-        true
+        (true, true)
       end
     else
       // This target_id step exists on another worker
@@ -205,34 +205,34 @@ class StepIdRouter is OmniRouter
                 _worker_name, source_ts, data, metric_name,
                 pa, msg_uid, i_frac_ids)
 
-              r.forward(delivery_msg, producer, i_origin, msg_uid, i_frac_ids,
-                i_seq_id, i_route_id)
-              false
+              let keep_sending = r.forward(delivery_msg, producer, i_origin, 
+                msg_uid, i_frac_ids, i_seq_id, i_route_id)
+              (false, keep_sending)
             else
               // We don't have a route to this boundary
               ifdef debug then
                 @printf[I32]("OmniRouter had no Route\n".cstring())
               end
-              true
+              (true, true)
             end
           else
             // We don't have a reference to the right outgoing boundary
             ifdef debug then
               @printf[I32]("OmniRouter has no reference to OutgoingBoundary\n".cstring())
             end
-            true
+            (true, true)
           end
         | let sink_id: U128 =>
-          true
+          (true, true)
         else
-          true
+          (true, true)
         end
       else
         // Apparently this target_id does not refer to a valid step id
         ifdef debug then
           @printf[I32]("OmniRouter: target id does not refer to valid step id\n".cstring())
         end
-        true
+        (true, true)
       end
     end
 
@@ -322,7 +322,7 @@ class LocalPartitionRouter[In: Any val,
   fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): (Bool, Bool)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at PartitionRouter\n".cstring())
@@ -343,22 +343,22 @@ class LocalPartitionRouter[In: Any val,
               ifdef "trace" then
                 @printf[I32]("PartitionRouter found Route\n".cstring())
               end
-              r.run[D](metric_name, source_ts, data,
+              let keep_sending =r.run[D](metric_name, source_ts, data,
                 // hand down producer so we can update route_id
                 producer,
                 // incoming envelope
                 i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
-              false
+              (false, keep_sending)
             else
               // TODO: What do we do if we get None?
-              true
+              (true, true)
             end
           | let p: ProxyRouter val =>
-            p.route[D](metric_name, source_ts, data, producer,
-              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
+            p.route[D](metric_name, source_ts, data, producer, i_origin, 
+              i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
           else
             // No step or proxyrouter
-            true
+            (true, true)
           end
         else
           // There is no entry for this key!
@@ -375,7 +375,7 @@ class LocalPartitionRouter[In: Any val,
               @printf[I32](("LocalPartitionRouter.route: No entry for this" +
                 "key and no default\n\n").cstring())
             end
-            true
+            (true, true)
           end
         end
       else
@@ -383,10 +383,10 @@ class LocalPartitionRouter[In: Any val,
         ifdef debug then
           @printf[I32]("LocalPartitionRouter.route: InputWrapper doesn't contain data of type In\n".cstring())
         end
-        true
+        (true, true)
       end
     else
-      true
+      (true, true)
     end
 
   fun clone_and_set_input_type[NewIn: Any val](
