@@ -84,8 +84,8 @@ class EmptyRoute is Route
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16):
-    Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16): Bool
   =>
     true
 
@@ -283,8 +283,8 @@ class TypedRoute[In: Any val] is Route
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16):
-    Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16): Bool
   =>
     ifdef "trace" then
       @printf[I32]("--Rcvd msg at Route (%s)\n".cstring(),
@@ -361,7 +361,8 @@ class TypedRoute[In: Any val] is Route
     let o_seq_id = cfp.next_sequence_id()
 
     let my_latest_ts = Time.nanos()
-    _metrics_reporter.step_metric(metric_name, "Before send to next step via behavior", metrics_id,
+    _metrics_reporter.step_metric(metric_name,
+      "Before send to next step via behavior", metrics_id,
       latest_ts, my_latest_ts)
     let new_metrics_id = metrics_id + 1
 
@@ -390,7 +391,8 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _add_to_queue(metric_name: String, source_ts: U64, input: In,
     cfp: Producer ref, origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16)
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16)
   =>
     ifdef debug then
       Invariant((_queue.max_size() > 0) and
@@ -602,8 +604,8 @@ class BoundaryRoute is Route
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16):
-    Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16): Bool
   =>
     // Run should never be called on a BoundaryRoute
     Fail()
@@ -691,7 +693,8 @@ class BoundaryRoute is Route
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String)
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    metric_name: String)
   =>
     let o_seq_id = cfp.next_sequence_id()
 
@@ -713,7 +716,8 @@ class BoundaryRoute is Route
 
   fun ref _add_to_queue(delivery_msg: ReplayableDeliveryMsg val,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String)
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    metric_name: String)
   =>
     ifdef debug then
       Invariant((_queue.max_size() > 0) and
@@ -725,7 +729,8 @@ class BoundaryRoute is Route
 
     try
       _queue.enqueue((delivery_msg, cfp,
-        i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id, metric_name))
+        i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        latest_ts, metrics_id, metric_name))
 
       if _queue.size() == _queue.max_size() then
         ifdef "credit_trace" then
@@ -744,7 +749,8 @@ class BoundaryRoute is Route
     while ((_credits_available > 0) and (_queue.size() > 0)) do
       try
         let d =_queue.dequeue()
-        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id, d._8, d._9, d._10)
+        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id,
+          d._8, d._9, d._10)
       end
     end
 
@@ -752,6 +758,7 @@ class BoundaryRoute is Route
     while (_queue.size() > 0) do
       try
         let d =_queue.dequeue()
-        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id, d._8, d._9, d._10)
+        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id,
+          d._8, d._9, d._10)
       end
     end

@@ -80,7 +80,8 @@ actor TCPSourceListener
     default_in_route_builder: (RouteBuilder val | None) = None,
     target_router: Router val = EmptyRouter,
     host: String = "", service: String = "0", limit: USize = 0,
-    init_size: USize = 64, max_size: USize = 16384, metrics_reporter: MetricsReporter iso)
+    init_size: USize = 64, max_size: USize = 16384,
+    metrics_reporter: MetricsReporter iso)
   =>
     """
     Listens for both IPv4 and IPv6 connections.
@@ -170,7 +171,8 @@ actor TCPSourceListener
     try
       TCPSource._accept(this, _notify.connected(this), _router.routes(),
         _route_builder, _outgoing_boundaries, _tcp_sinks, ns, _default_target,
-        _default_in_route_builder, _init_size, _max_size, _metrics_reporter.clone())
+        _default_in_route_builder, _init_size, _max_size,
+        _metrics_reporter.clone())
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)

@@ -18,15 +18,16 @@ interface Runner
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
   fun name(): String
   fun state_name(): String
   fun clone_router_and_set_input_type(r: Router val,
     default_r: (Router val | None) = None): Router val
 
 trait ReplayableRunner
-  fun ref replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val,
-    origin: Producer)
+  fun ref replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
+    payload: ByteSeq val, origin: Producer)
   fun ref set_step_id(id: U128)
 
 trait RunnerBuilder
@@ -471,7 +472,8 @@ class ComputationRunner[In: Any val, Out: Any val]
         | let output: Out =>
           _next.run[Out](metric_name, source_ts, output, producer, router,
             omni_router,
-            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id, computation_end, new_metrics_id)
+            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+            computation_end, new_metrics_id)
         else
           (true, true, computation_end)
         end
@@ -513,7 +515,8 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
   =>
     (let is_finished, let keep_sending, let last_ts) =
       match data
@@ -526,7 +529,8 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
           shared_state_router.route[
             StateComputationWrapper[In, Out, State] val](
             metric_name, source_ts, processor, producer,
-            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id)
+            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+            latest_ts, metrics_id)
         else
           (true, true, latest_ts)
         end
@@ -570,8 +574,8 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   fun ref register_state_change(scb: StateChangeBuilder[State] val) : U64 =>
     _state_change_repository.make_and_register(scb)
 
-  fun ref replay_log_entry(msg_uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val,
-    origin: Producer)
+  fun ref replay_log_entry(msg_uid: U128, frac_ids: None, statechange_id: U64,
+    payload: ByteSeq val, origin: Producer)
   =>
     try
       let sc = _state_change_repository(statechange_id)
@@ -587,7 +591,8 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
   =>
     match data
     | let sp: StateProcessor[State] val =>
@@ -595,17 +600,18 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
       let new_metrics_id = metrics_id + 2
       let result = sp(_state, _state_change_repository, omni_router,
         metric_name, source_ts, producer,
-        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id, latest_ts, new_metrics_id)
+        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        latest_ts, new_metrics_id)
       let is_finished = result._1
       let keep_sending = result._2
       let state_change = result._3
       let sc_start_ts = result._4
       let sc_end_ts = result._5
       let last_ts = result._6
-      _metrics_reporter.step_metric(metric_name, sp.name(), metrics_id, latest_ts,
-        sc_start_ts where prefix = "Before")
-      _metrics_reporter.step_metric(metric_name, sp.name(), metrics_id + 1, sc_start_ts,
-        sc_end_ts)
+      _metrics_reporter.step_metric(metric_name, sp.name(), metrics_id,
+        latest_ts, sc_start_ts where prefix = "Before")
+      _metrics_reporter.step_metric(metric_name, sp.name(), metrics_id + 1,
+        sc_start_ts, sc_end_ts)
 
       match state_change
       | let sc: StateChange[State] ref =>
@@ -650,12 +656,14 @@ class iso RouterRunner
   fun ref run[Out: Any val](metric_name: String, source_ts: U64, output: Out,
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
   =>
     match router
     | let r: Router val =>
       r.route[Out](metric_name, source_ts, output, producer,
-        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id)
+        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        latest_ts, metrics_id)
     else
       (true, true, latest_ts)
     end

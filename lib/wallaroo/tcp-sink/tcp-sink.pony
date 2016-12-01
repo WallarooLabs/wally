@@ -21,7 +21,8 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 actor EmptySink is CreditFlowConsumerStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId, latest_ts: U64, metrics_id: U16)
+    frac_ids: None, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at EmptySink\n".cstring())
@@ -30,7 +31,8 @@ actor EmptySink is CreditFlowConsumerStep
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId, latest_ts: U64, metrics_id: U16)
+    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16)
   =>
     None
 
@@ -169,7 +171,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16)
   =>
     let receive_ts = Time.nanos()
     _metrics_reporter.step_metric(metric_name, "Before receive at sink", 9998,
@@ -202,7 +205,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16)
   =>
     //TODO: deduplication like in the Step <- this is pointless if the Sink
     //doesn't have state, because on recovery we won't have a list of "seen

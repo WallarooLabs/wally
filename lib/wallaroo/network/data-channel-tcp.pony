@@ -22,7 +22,8 @@ class DataChannelListenNotifier is TCPListenNotify
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
-    receivers: Map[String, DataReceiver] val, metrics_reporter: MetricsReporter iso)
+    receivers: Map[String, DataReceiver] val,
+    metrics_reporter: MetricsReporter iso)
   =>
     _name = name
     _env = env
@@ -47,7 +48,8 @@ class DataChannelListenNotifier is TCPListenNotify
     end
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelConnectNotifier(_receivers, _connections, _env, _auth, _metrics_reporter.clone())
+    DataChannelConnectNotifier(_receivers, _connections, _env, _auth,
+    _metrics_reporter.clone())
 
 
 class DataChannelConnectNotifier is TCPConnectionNotify
@@ -60,7 +62,8 @@ class DataChannelConnectNotifier is TCPConnectionNotify
   let _metrics_reporter: MetricsReporter
 
   new iso create(receivers: Map[String, DataReceiver] val,
-    connections: Connections, env: Env, auth: AmbientAuth, metrics_reporter: MetricsReporter iso)
+    connections: Connections, env: Env, auth: AmbientAuth,
+    metrics_reporter: MetricsReporter iso)
   =>
     _receivers = receivers
     _connections = connections
@@ -86,14 +89,12 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       end
       match ChannelMsgDecoder(consume data, _auth)
       | let data_msg: DataMsg val =>
-//        let seq_id = data_msg.seq_id
-//        let latest_ts = data_msg.latest_ts // wallclock from previous worker
-//        let metrics_id = data_msg.metrics_id
-//        let metric_name = data_msg.metric_name
         try
-          _metrics_reporter.step_metric(data_msg.metric_name, "Before receive on data channel", data_msg.metrics_id,
+          _metrics_reporter.step_metric(data_msg.metric_name,
+            "Before receive on data channel", data_msg.metrics_id,
             data_msg.latest_ts, my_latest_ts)
-          _receivers(data_msg.delivery_msg.sender_name()).received(data_msg.delivery_msg,
+          _receivers(data_msg.delivery_msg.sender_name()).received(
+            data_msg.delivery_msg,
             data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
@@ -109,12 +110,12 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       | let r: ReplayMsg val =>
         try
           let data_msg = r.data_msg(_auth)
-//          let delivery_msg = data_msg.delivery_msg
-
-          _metrics_reporter.step_metric(data_msg.metric_name, "Before replay receive on data channel", data_msg.metrics_id,
+          _metrics_reporter.step_metric(data_msg.metric_name, 
+            "Before replay receive on data channel", data_msg.metrics_id,
             data_msg.latest_ts, my_latest_ts)
           _receivers(data_msg.delivery_msg.sender_name())
-            .replay_received(data_msg.delivery_msg, data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1)
+            .replay_received(data_msg.delivery_msg, data_msg.seq_id, 
+            my_latest_ts, data_msg.metrics_id + 1)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end

@@ -99,7 +99,8 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
 
       if is_finished then
         let computation_end = Time.nanos()
-        _metrics_reporter.step_metric(_pipeline_name, "Before end at TCP Source", 9999,
+        _metrics_reporter.step_metric(_pipeline_name,
+          "Before end at TCP Source", 9999,
           last_ts, computation_end)
         _metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
       end

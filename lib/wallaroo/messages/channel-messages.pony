@@ -21,9 +21,11 @@ primitive ChannelMsgEncoder
     wb.done()
 
   fun data_channel(delivery_msg: ReplayableDeliveryMsg val,
-    seq_id: U64, wb: Writer, auth: AmbientAuth, latest_ts: U64, metrics_id: U16, metric_name: String): Array[ByteSeq] val ?
+    seq_id: U64, wb: Writer, auth: AmbientAuth, latest_ts: U64,
+    metrics_id: U16, metric_name: String): Array[ByteSeq] val ?
   =>
-    _encode(DataMsg(delivery_msg, seq_id, latest_ts, metrics_id, metric_name), auth, wb)
+    _encode(DataMsg(delivery_msg, seq_id, latest_ts, metrics_id, metric_name),
+      auth, wb)
 
   fun delivery[D: Any val](target_id: U128,
     from_worker_name: String, source_ts: U64, msg_data: D,
@@ -209,7 +211,9 @@ class DataMsg is ChannelMsg
   let metrics_id: U16
   let metric_name: String
 
-  new val create(msg: ReplayableDeliveryMsg val, seq_id': U64, latest_ts': U64, metrics_id': U16, metric_name': String) =>
+  new val create(msg: ReplayableDeliveryMsg val, seq_id': U64, latest_ts': U64,
+    metrics_id': U16, metric_name': String)
+  =>
     seq_id = seq_id'
     delivery_msg = msg
     latest_ts = latest_ts'

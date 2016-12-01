@@ -76,14 +76,19 @@ class MetricsReporter
   let _pipeline_metrics_map: Map[String, _MetricsReporter] =
     _pipeline_metrics_map.create()
 
-  new iso create(app_name: String, metrics_conn: TCPConnection, worker_name: String = "W") =>
+  new iso create(app_name: String, metrics_conn: TCPConnection, 
+    worker_name: String = "W")
+  =>
     _app_name = app_name
     _metrics_conn = metrics_conn
     _worker_name = worker_name
 
-  fun ref step_metric(pipeline: String, name: String, num: U16, start_ts: U64, end_ts: U64, prefix: String = "") =>
-    let str_size = _worker_name.size() + pipeline.size() + name.size() + prefix.size() + 14
-    let metric_name_tmp = recover String(pipeline.size() + name.size() + prefix.size() + 14) end
+  fun ref step_metric(pipeline: String, name: String, num: U16, start_ts: U64,
+    end_ts: U64, prefix: String = "")
+  =>
+    let str_size = _worker_name.size() + pipeline.size() + name.size() + 
+      prefix.size() + 14
+    let metric_name_tmp = recover String(str_size) end
     metric_name_tmp.append(pipeline)
     metric_name_tmp.append("@")
     metric_name_tmp.append(_worker_name)

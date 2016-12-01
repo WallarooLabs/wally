@@ -67,7 +67,8 @@ actor TCPSource is (Initializable & Producer)
     tcp_sinks: Array[TCPSink] val,
     fd: U32, default_target: (CreditFlowConsumerStep | None) = None,
     forward_route_builder: (RouteBuilder val | None) = None,
-    init_size: USize = 64, max_size: USize = 16384, metrics_reporter: MetricsReporter iso)
+    init_size: USize = 64, max_size: USize = 16384,
+    metrics_reporter: MetricsReporter iso)
   =>
     """
     A new connection accepted on a server.
@@ -100,19 +101,22 @@ actor TCPSource is (Initializable & Producer)
 
     for consumer in routes.values() do
       _routes(consumer) =
-        _route_builder(this, consumer, TCPSourceRouteCallbackHandler, metrics_reporter.clone())
+        _route_builder(this, consumer, TCPSourceRouteCallbackHandler,
+          metrics_reporter.clone())
     end
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
       _routes(boundary) =
-        _route_builder(this, boundary, TCPSourceRouteCallbackHandler, metrics_reporter.clone())
+        _route_builder(this, boundary, TCPSourceRouteCallbackHandler,
+          metrics_reporter.clone())
     end
 
     match default_target
     | let r: CreditFlowConsumerStep =>
       match forward_route_builder
       | let frb: RouteBuilder val =>
-        _routes(r) = frb(this, r, TCPSourceRouteCallbackHandler, metrics_reporter.clone())
+        _routes(r) = frb(this, r, TCPSourceRouteCallbackHandler, 
+          metrics_reporter.clone())
       end
     end
 

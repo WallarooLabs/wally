@@ -159,7 +159,8 @@ actor LocalTopologyInitializer
     if not _is_initializer then
       let data_notifier: TCPListenNotify iso =
         DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
-          _is_initializer, data_receivers, MetricsReporter(_application.name(), _metrics_conn))
+          _is_initializer, data_receivers,
+          MetricsReporter(_application.name(), _metrics_conn))
       _connections.register_listener(
         TCPListener(_auth, consume data_notifier))
     else
@@ -739,7 +740,8 @@ actor LocalTopologyInitializer
                     _alfred, default_target, default_in_route_builder,
                     state_comp_target_router,
                     source_data.address()(0), 
-                    source_data.address()(1) where metrics_reporter = source_reporter.clone())
+                    source_data.address()(1)
+                    where metrics_reporter = source_reporter.clone())
                 )
               else
                 @printf[I32]("Ill-formed source address\n".cstring())
