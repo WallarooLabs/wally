@@ -126,4 +126,3 @@ class FixedQueue[A]
     else
       false
     end
-

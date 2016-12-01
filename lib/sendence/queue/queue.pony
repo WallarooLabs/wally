@@ -3,7 +3,7 @@ use "debug"
 use "assert"
 
 class Queue[A: Any #alias]
-  let _data: Array[A]
+  embed _data: Array[A]
   var _front_ptr: USize = 0
   var _back_ptr: USize = 0
   var _mod: USize = 0
