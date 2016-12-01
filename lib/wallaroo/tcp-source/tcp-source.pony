@@ -127,7 +127,7 @@ actor TCPSource is (Initializable & Producer)
       // TODO: What should the initial max credits per route from
       // a Source be?  I'm starting at max_value because that makes
       // us dependent on how many can be distributed from downstream.
-      r.initialize(_max_route_credits)
+      r.initialize(_max_route_credits, "TCPSource")
     end
 
     ifdef "backpressure" then

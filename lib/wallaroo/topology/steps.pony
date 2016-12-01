@@ -117,7 +117,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     // end
 
     for r in _routes.values() do
-      r.initialize(_max_distributable_credits)
+      r.initialize(_max_distributable_credits, "Step")
       ifdef "resilience" then
         _resilience_routes.add_route(r)
       end
@@ -139,7 +139,7 @@ actor Step is (RunnableStep & Resilient & Producer &
         // same number of max credits as the step itself.  The commented
         // code surrounding this shows the old approach of dividing the
         // max credits among routes.
-        next_route.initialize(_max_distributable_credits)
+        next_route.initialize(_max_distributable_credits, "Step")
       end
     end
 
