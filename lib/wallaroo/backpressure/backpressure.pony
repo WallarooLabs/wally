@@ -31,11 +31,11 @@ trait RouteCallbackHandler
 
 trait RouteBuilder
   fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter iso): Route
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref): Route
 
 primitive TypedRouteBuilder[In: Any val] is RouteBuilder
   fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter iso): Route
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref): Route
   =>
     match consumer
     | let boundary: OutgoingBoundary =>
@@ -46,7 +46,7 @@ primitive TypedRouteBuilder[In: Any val] is RouteBuilder
 
 primitive EmptyRouteBuilder is RouteBuilder
   fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter iso): Route
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref): Route
   =>
     EmptyRoute
 
@@ -167,7 +167,7 @@ class TypedRoute[In: Any val] is Route
   // let _queue: ContainerQueue[TypedRouteQueueTuple[In], TypedRouteQueueData[In]]
 
   new create(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter iso)
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref)
   =>
     _step = step
     _consumer = consumer
@@ -498,7 +498,7 @@ class BoundaryRoute is Route
     Producer, U128, None, SeqId, RouteId, U64, U16, String)]
 
   new create(step: Producer ref, consumer: OutgoingBoundary,
-    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter iso)
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref)
   =>
     _step = step
     _consumer = consumer

@@ -102,24 +102,24 @@ actor Step is (RunnableStep & Resilient & Producer &
     for consumer in _router.routes().values() do
       _routes(consumer) =
         _route_builder(this, consumer, StepRouteCallbackHandler,
-        _metrics_reporter.clone())
+        _metrics_reporter)
     end
 
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _routes(boundary) =
         _route_builder(this, boundary, StepRouteCallbackHandler,
-        _metrics_reporter.clone())
+        _metrics_reporter)
     end
 
     match _default_target
     | let r: CreditFlowConsumerStep =>
       _routes(r) = _route_builder(this, r, StepRouteCallbackHandler,
-        _metrics_reporter.clone())
+        _metrics_reporter)
     end
 
     // for sink in tcp_sinks.values() do
     //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler,
-    //     _metrics_reporter.clone())
+    //     _metrics_reporter)
     // end
 
     for r in _routes.values() do
@@ -139,7 +139,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   be register_routes(router: Router val, route_builder: RouteBuilder val) =>
     for consumer in router.routes().values() do
       let next_route = route_builder(this, consumer, StepRouteCallbackHandler,
-         _metrics_reporter.clone())
+         _metrics_reporter)
       _routes(consumer) = next_route
       if _initialized then
         // TODO: This is a kind of hack right now. Each route has the
@@ -181,7 +181,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     (let is_finished, _, let last_ts) = _runner.run[D](metric_name, source_ts, data,
       this, _router, _omni_router,
       i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
-      my_latest_ts, my_metrics_id)
+      my_latest_ts, my_metrics_id, _metrics_reporter)
     if is_finished then
       ifdef "resilience" then
         ifdef "trace" then
@@ -258,7 +258,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       (let is_finished, _, let last_ts) = _runner.run[D](metric_name, source_ts, data,
         this, _router, _omni_router,
         i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
-        latest_ts, metrics_id)
+        latest_ts, metrics_id, _metrics_reporter)
 
       if is_finished then
         //TODO: be more efficient (batching?)

@@ -37,7 +37,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     // TODO: Figure out how to name sources
     _source_name = pipeline_name + " source"
     _handler = handler
-    _runner = runner_builder(metrics_reporter.clone(), alfred, None,
+    _runner = runner_builder(alfred, None,
       target_router, pre_state_target_id)
     _router = _runner.clone_router_and_set_input_type(router)
     _metrics_reporter = consume metrics_reporter
@@ -86,7 +86,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
             end
             _runner.run[In](_pipeline_name, ingest_ts, decoded,
               conn, _router, _omni_router,
-              o,  _guid_gen.u128(), None, 0, 0, lastest_ts, 1)
+              o, _guid_gen.u128(), None, 0, 0, lastest_ts, 1, _metrics_reporter)
           else
             // FramedSourceNotify needs an Producer to pass along
             Fail()

@@ -32,6 +32,8 @@ actor TCPSource is (Initializable & Producer)
   var _unregistered: Bool = false
   var _max_route_credits: ISize = 1_000
 
+  let _metrics_reporter: MetricsReporter
+
   // TCP
   let _listen: TCPSourceListener
   let _notify: TCPSourceNotify
@@ -74,6 +76,7 @@ actor TCPSource is (Initializable & Producer)
     A new connection accepted on a server.
     """
     _max_route_credits = _max_route_credits.usize().next_pow2().isize()
+    _metrics_reporter = consume metrics_reporter
     _listen = listen
     _notify = consume notify
     _notify.set_origin(this)
@@ -102,13 +105,13 @@ actor TCPSource is (Initializable & Producer)
     for consumer in routes.values() do
       _routes(consumer) =
         _route_builder(this, consumer, TCPSourceRouteCallbackHandler,
-          metrics_reporter.clone())
+          _metrics_reporter)
     end
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
       _routes(boundary) =
         _route_builder(this, boundary, TCPSourceRouteCallbackHandler,
-          metrics_reporter.clone())
+          _metrics_reporter)
     end
 
     match default_target
@@ -116,7 +119,7 @@ actor TCPSource is (Initializable & Producer)
       match forward_route_builder
       | let frb: RouteBuilder val =>
         _routes(r) = frb(this, r, TCPSourceRouteCallbackHandler, 
-          metrics_reporter.clone())
+          _metrics_reporter)
       end
     end
 

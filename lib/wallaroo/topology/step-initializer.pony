@@ -63,8 +63,7 @@ class StepBuilder
     omni_router: OmniRouter val = EmptyOmniRouter,
     default_target: (Step | None) = None): Step tag 
   =>
-    let runner = _runner_builder(MetricsReporter(_app_name, 
-      metrics_conn) where alfred = alfred, router = router, 
+    let runner = _runner_builder(where alfred = alfred, router = router,
       pre_state_target_id' = pre_state_target_id())
     let step = Step(consume runner, 
       MetricsReporter(_app_name, metrics_conn), _id,
@@ -170,7 +169,7 @@ class EgressBuilder
   fun target_address(): (Array[String] val | ProxyAddress val | 
     PartitionAddresses val) => _addr
 
-  fun apply(worker_name: String, reporter: MetricsReporter iso, 
+  fun apply(worker_name: String, reporter: MetricsReporter ref,
     auth: AmbientAuth,
     proxies: Map[String, OutgoingBoundary] val = 
       recover Map[String, OutgoingBoundary] end): CreditFlowConsumerStep tag ?

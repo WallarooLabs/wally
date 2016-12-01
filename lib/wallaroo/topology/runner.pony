@@ -19,7 +19,8 @@ interface Runner
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, metrics_reporter: MetricsReporter ref):
+    (Bool, Bool, U64)
   fun name(): String
   fun state_name(): String
   fun clone_router_and_set_input_type(r: Router val,
@@ -31,8 +32,7 @@ trait ReplayableRunner
   fun ref set_step_id(id: U128)
 
 trait RunnerBuilder
-  fun apply(metrics_reporter: MetricsReporter iso,
-    alfred: Alfred tag,
+  fun apply(alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
@@ -87,8 +87,7 @@ class RunnerSequenceBuilder is RunnerBuilder
         ""
       end
 
-  fun apply(metrics_reporter: MetricsReporter iso,
-    alfred: Alfred tag,
+  fun apply(alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
@@ -104,7 +103,7 @@ class RunnerSequenceBuilder is RunnerBuilder
         end
       match next_builder
       | let rb: RunnerBuilder val =>
-        latest_runner = rb(metrics_reporter.clone(), alfred,
+        latest_runner = rb(alfred,
           consume latest_runner, router, pre_state_target_id')
       end
       remaining = remaining - 1
@@ -173,19 +172,16 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
     _route_builder = route_builder'
     _id = if id' == 0 then GuidGenerator.u128() else id' end
 
-  fun apply(metrics_reporter: MetricsReporter iso,
-    alfred: Alfred tag,
+  fun apply(alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
     match (consume next_runner)
     | let r: Runner iso =>
-      ComputationRunner[In, Out](_comp_builder(), consume r,
-        consume metrics_reporter)
+      ComputationRunner[In, Out](_comp_builder(), consume r)
     else
-      ComputationRunner[In, Out](_comp_builder(), RouterRunner,
-        consume metrics_reporter)
+      ComputationRunner[In, Out](_comp_builder(), RouterRunner)
     end
 
   fun name(): String => _comp_builder().name()
@@ -230,20 +226,17 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
     _forward_route_builder = forward_route_builder'
     _in_route_builder = in_route_builder'
 
-  fun apply(metrics_reporter: MetricsReporter iso,
-    alfred: Alfred tag,
+  fun apply(alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
     match pre_state_target_id'
     | let t_id: U128 =>
-      PreStateRunner[In, Out, State](_state_comp, _state_name, t_id,
-        consume metrics_reporter)
+      PreStateRunner[In, Out, State](_state_comp, _state_name, t_id)
     else
       @printf[I32]("PreStateRunner should take a target_id on build!\n".cstring())
-      PreStateRunner[In, Out, State](_state_comp, _state_name, 0,
-        consume metrics_reporter)
+      PreStateRunner[In, Out, State](_state_comp, _state_name, 0)
     end
 
   fun name(): String => _state_comp.name()
@@ -285,13 +278,12 @@ class StateRunnerBuilder[State: Any #read] is RunnerBuilder
     _route_builder = route_builder'
     _id = GuidGenerator.u128()
 
-  fun apply(metrics_reporter: MetricsReporter iso,
-    alfred: Alfred tag,
+  fun apply(alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
-    let sr = StateRunner[State](_state_builder, consume metrics_reporter, alfred)
+    let sr = StateRunner[State](_state_builder, alfred)
     for scb in _state_change_builders.values() do
       sr.register_state_change(scb)
     end
@@ -346,23 +338,20 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
     _multi_worker = multi_worker
     _default_state_name = default_state_name'
 
-  fun apply(metrics_reporter: MetricsReporter iso,
-    alfred: Alfred tag,
+  fun apply(alfred: Alfred tag,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
-    _state_runner_builder(consume metrics_reporter, alfred,
+    _state_runner_builder(alfred,
       consume next_runner, router)
 
     // match router
     // | let r: Router val =>
-    //   PreStateRunner[In, Out, State](_state_comp, _state_name, r,
-    //     consume metrics_reporter)
+    //   PreStateRunner[In, Out, State](_state_comp, _state_name, r)
     // else
     //   @printf[I32]("PreStateRunner should take a Router on build!\n".cstring())
-    //   PreStateRunner[In, Out, State](_state_comp, _state_name, EmptyRouter,
-    //     consume metrics_reporter)
+    //   PreStateRunner[In, Out, State](_state_comp, _state_name, EmptyRouter)
     // end
 
   fun name(): String => _state_name
@@ -440,21 +429,19 @@ class ComputationRunner[In: Any val, Out: Any val]
   let _next: Runner
   let _computation: Computation[In, Out] val
   let _computation_name: String
-  let _metrics_reporter: MetricsReporter
 
   new iso create(computation: Computation[In, Out] val,
-    next: Runner iso, metrics_reporter: MetricsReporter iso)
+    next: Runner iso)
   =>
     _computation = computation
     _computation_name = _computation.name()
     _next = consume next
-    _metrics_reporter = consume metrics_reporter
 
   fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
-    metrics_id: U16): (Bool, Bool, U64)
+    metrics_id: U16, metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
     var computation_start: U64 = 0
     var computation_end: U64 = 0
@@ -479,7 +466,7 @@ class ComputationRunner[In: Any val, Out: Any val]
           _next.run[Out](metric_name, source_ts, output, producer, router,
             omni_router,
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-            computation_end, new_metrics_id)
+            computation_end, new_metrics_id, metrics_reporter)
         else
           (true, true, computation_end)
         end
@@ -488,14 +475,14 @@ class ComputationRunner[In: Any val, Out: Any val]
       end
 
     let latest_metrics_id = ifdef "detailed-metrics" then
-        _metrics_reporter.step_metric(metric_name, _computation_name, metrics_id,
+        metrics_reporter.step_metric(metric_name, _computation_name, metrics_id,
           latest_ts, computation_start where prefix = "Before")
         metrics_id + 1
       else
         metrics_id
       end
 
-    _metrics_reporter.step_metric(metric_name, _computation_name, latest_metrics_id,
+    metrics_reporter.step_metric(metric_name, _computation_name, latest_metrics_id,
       computation_start, computation_end)
     (is_finished, keep_sending, last_ts)
 
@@ -507,7 +494,6 @@ class ComputationRunner[In: Any val, Out: Any val]
     _next.clone_router_and_set_input_type(r)
 
 class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
-  let _metrics_reporter: MetricsReporter
   let _target_id: U128
   let _state_comp: StateComputation[In, Out, State] val
   let _name: String
@@ -515,10 +501,8 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _state_name: String
 
   new iso create(state_comp: StateComputation[In, Out, State] val,
-    state_name': String, target_id: U128,
-    metrics_reporter: MetricsReporter iso)
+    state_name': String, target_id: U128)
   =>
-    _metrics_reporter = consume metrics_reporter
     _target_id = target_id
     _state_comp = state_comp
     _name = _state_comp.name()
@@ -529,7 +513,8 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, metrics_reporter: MetricsReporter ref):
+    (Bool, Bool, U64)
   =>
     (let is_finished, let keep_sending, let last_ts) =
       match data
@@ -564,7 +549,6 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
 
 class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   let _state: State
-  let _metrics_reporter: MetricsReporter
   //TODO: this needs to be per-computation, rather than per-runner
   let _state_change_repository: StateChangeRepository[State] ref
   let _alfred: Alfred
@@ -573,10 +557,9 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   var _id: (U128 | None)
 
   new iso create(state_builder: {(): State} val,
-      metrics_reporter: MetricsReporter iso, alfred: Alfred)
+      alfred: Alfred)
   =>
     _state = state_builder()
-    _metrics_reporter = consume metrics_reporter
     _state_change_repository = StateChangeRepository[State]
     _alfred = alfred
     _id = None
@@ -605,7 +588,8 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, metrics_reporter: MetricsReporter ref):
+    (Bool, Bool, U64)
   =>
     match data
     | let sp: StateProcessor[State] val =>
@@ -629,14 +613,14 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
       let last_ts = result._6
 
       let latest_metrics_id = ifdef "detailed-metrics" then
-          _metrics_reporter.step_metric(metric_name, sp.name(), metrics_id,
+          metrics_reporter.step_metric(metric_name, sp.name(), metrics_id,
             latest_ts, sc_start_ts where prefix = "Before")
           metrics_id + 1
         else
           metrics_id
         end
 
-      _metrics_reporter.step_metric(metric_name, sp.name(), latest_metrics_id,
+      metrics_reporter.step_metric(metric_name, sp.name(), latest_metrics_id,
         sc_start_ts, sc_end_ts)
 
       match state_change
@@ -683,7 +667,8 @@ class iso RouterRunner
     producer: Producer ref, router: Router val, omni_router: OmniRouter val,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, metrics_reporter: MetricsReporter ref):
+    (Bool, Bool, U64)
   =>
     match router
     | let r: Router val =>
