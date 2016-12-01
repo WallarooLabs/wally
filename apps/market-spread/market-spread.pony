@@ -234,7 +234,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     // @printf[I32]("!!CheckOrder\n".cstring())
     if state.should_reject_trades then
       let res = OrderResult(msg, state.last_bid, state.last_offer,
-        Time.nanos())
+        WallClock.nanoseconds())
       (res, None)
     else
       (None, None)
