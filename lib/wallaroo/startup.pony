@@ -11,8 +11,8 @@ use "wallaroo/topology"
 use "wallaroo/resilience"
 
 actor Startup
-  new create(env: Env, application: Application val, 
-    app_name: (String val | None)) 
+  new create(env: Env, application: Application val,
+    app_name: (String val | None))
   =>
     ifdef "backpressure" then
       env.out.print("****BACKPRESSURE is active****")
@@ -29,14 +29,14 @@ actor Startup
     var c_arg: (Array[String] | None) = None
     var d_arg: (Array[String] | None) = None
     var p_arg: (Array[String] | None) = None
-    var i_addrs_write: Array[Array[String]] trn = 
+    var i_addrs_write: Array[Array[String]] trn =
       recover Array[Array[String]] end
     var worker_count: USize = 1
     var is_initializer = false
     var worker_initializer: (WorkerInitializer | None) = None
     var worker_name = ""
     try
-      var options = Options(env.args)
+      var options = Options(env.args, false)
       var auth = env.root as AmbientAuth
 
       options
@@ -57,10 +57,10 @@ actor Startup
 
       for option in options do
         match option
-        | ("expected", let arg: I64) => 
+        | ("expected", let arg: I64) =>
           env.out.print("--expected/-e is a deprecated parameter")
         | ("metrics", let arg: String) => m_arg = arg.split(":")
-        | ("in", let arg: String) => 
+        | ("in", let arg: String) =>
           for addr in arg.split(",").values() do
             i_addrs_write.push(addr.split(":"))
           end
@@ -68,18 +68,16 @@ actor Startup
         | ("control", let arg: String) => c_arg = arg.split(":")
         | ("data", let arg: String) => d_arg = arg.split(":")
         | ("phone-home", let arg: String) => p_arg = arg.split(":")
-        | ("file", let arg: String) => 
-          env.out.print("--file/-f is a deprecated parameter")
-        | ("worker-count", let arg: I64) => 
+        | ("worker-count", let arg: I64) =>
           worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
         | ("name", let arg: String) => worker_name = arg
         end
       end
 
-      if worker_count == 1 then 
+      if worker_count == 1 then
         env.out.print("Single worker topology")
-        is_initializer = true 
+        is_initializer = true
       else
         env.out.print(worker_count.string() + " worker topology")
       end
@@ -119,20 +117,20 @@ actor Startup
           m_addr(1))
 
       let connect_msg = HubProtocol.connect()
-      let metrics_join_msg = HubProtocol.join("metrics:" + application.name()) 
+      let metrics_join_msg = HubProtocol.join("metrics:" + application.name())
       metrics_conn.writev(connect_msg)
       metrics_conn.writev(metrics_join_msg)
 
-      (let ph_host, let ph_service) = 
+      (let ph_host, let ph_service) =
         match p_arg
-        | let addr: Array[String] => 
+        | let addr: Array[String] =>
           (addr(0), addr(1))
         else
           ("", "")
         end
 
       let connections = Connections(application.name(), worker_name, env, auth,
-        c_host, c_service, d_host, d_service, ph_host, ph_service, 
+        c_host, c_service, d_host, d_service, ph_host, ph_service,
         metrics_conn, is_initializer)
 
       let name =  match app_name
@@ -143,10 +141,10 @@ actor Startup
       let event_log_file = "/tmp/" + name + "-" + worker_name + ".evlog"
       let local_topology_file = "/tmp/" + name + "-" +
           worker_name + ".local-topology"
-        
+
       let alfred = Alfred(env, event_log_file)
       let local_topology_initializer = LocalTopologyInitializer(
-        application, worker_name, worker_count, env, auth, connections, 
+        application, worker_name, worker_count, env, auth, connections,
         metrics_conn, is_initializer, alfred, input_addrs,
         local_topology_file)
 
@@ -156,26 +154,26 @@ actor Startup
           local_topology_initializer, input_addrs, o_addr, alfred)
 
         worker_initializer = WorkerInitializer(auth, worker_count, connections,
-          application_initializer, local_topology_initializer, d_addr, 
+          application_initializer, local_topology_initializer, d_addr,
           metrics_conn)
         worker_name = "initializer"
       end
 
       let control_notifier: TCPListenNotify iso =
-        ControlChannelListenNotifier(worker_name, env, auth, connections, 
+        ControlChannelListenNotifier(worker_name, env, auth, connections,
           is_initializer, worker_initializer, local_topology_initializer, alfred)
 
       if is_initializer then
         connections.register_listener(
-          TCPListener(auth, consume control_notifier, c_host, c_service) 
+          TCPListener(auth, consume control_notifier, c_host, c_service)
         )
       else
         connections.register_listener(
-          TCPListener(auth, consume control_notifier) 
+          TCPListener(auth, consume control_notifier)
         )
       end
 
-      match worker_initializer 
+      match worker_initializer
       | let w: WorkerInitializer =>
         w.start(application)
       end

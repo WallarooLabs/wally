@@ -44,10 +44,10 @@ actor EmptySink is CreditFlowConsumerStep
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     None
 
-  be credit_request(from: Producer) =>
+  be credit_request(from: Producer, credits_requested: ISize) =>
     None
 
-  be ack_credits(acked: ISize, unused: ISize) =>
+  be return_credits(credits: ISize) =>
     None
 
 class TCPSinkBuilder
@@ -102,9 +102,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
-  let _max_distributable_credits: ISize = 175_000_000
+  var _max_distributable_credits: ISize = 350_000
   var _distributable_credits: ISize = _max_distributable_credits
-  var _unacked_credits: ISize = 0
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -144,8 +143,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-
-    //
+    _max_distributable_credits =
+      _max_distributable_credits.usize().next_pow2().isize()
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
@@ -161,7 +160,10 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
   =>
-    None
+    ifdef debug then
+      Invariant(_max_distributable_credits ==
+        (_max_distributable_credits.usize() - 1).next_pow2().isize())
+    end
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -188,6 +190,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     else
       Fail()
     end
+    // DO NOT REMOVE. THIS IS AN INTENTIONAL GC
+    @pony_triggergc[None](this)
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     i_origin: Producer, msg_uid: U128,
@@ -264,10 +268,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
-      _recoup_credits(credits_returned)
+      ifdef "backpressure" then
+        _recoup_credits(credits_returned)
+      end
     end
 
-  be credit_request(from: Producer) =>
+  be credit_request(from: Producer, credits_requested: ISize) =>
     """
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
@@ -295,11 +301,14 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    let give_out = if _can_send() then
+    let desired_give_out = if _can_send() then
       (_distributable_credits / _upstreams.size().isize())
     else
       0
     end
+
+    // let give_out = credits_requested.min(desired_give_out)
+    let give_out = desired_give_out
 
     ifdef debug then
       try
@@ -312,29 +321,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("Sink: Credits requested. Giving %llu out of %llu\n".cstring(), give_out, _distributable_credits)
-    end 
+      @printf[I32]("Sink: Credits requested: %llu. Giving %llu out of %llu\n".cstring(), credits_requested, give_out, _distributable_credits)
+    end
 
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
-    _unacked_credits = _unacked_credits + give_out
 
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
 
-  be ack_credits(acked: ISize, unused: ISize) =>
-    ifdef debug then
-      try
-        Assert(acked <= _unacked_credits,
-          "More credits were acked then are still outstanding!")
-      else
-        _hard_close()
-        return
-      end
-    end
-
-    _unacked_credits = _unacked_credits - acked
-    _distributable_credits = _distributable_credits + unused
+  be return_credits(credits: ISize) =>
+    _distributable_credits = _distributable_credits + credits
 
   //
   // TCP

@@ -64,7 +64,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       let ingest_ts = Time.nanos()
       let computation_start = Time.nanos()
 
-      let is_finished =
+      (let is_finished, let keep_sending) =
         try
           match _origin
           | let o: Producer =>
@@ -87,11 +87,11 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
           else
             // FramedSourceNotify needs an Producer to pass along
             Fail()
-            true
+            (true, true)
           end
         else
           Fail()
-          true
+          (true, true)
         end
 
       let computation_end = Time.nanos()
@@ -100,6 +100,11 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
         computation_start, computation_end)
       if is_finished then
         _metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
+      end
+
+      // We have a full queue at a route, so we need to stop reading.
+      if not keep_sending then
+        conn._mute()
       end
 
       conn.expect(_header_size)

@@ -21,6 +21,7 @@ actor DataReceiver is Producer
   var _reconnecting: Bool = false
   let _alfred: Alfred
   let _timers: Timers = Timers
+  var _ack_counter: U64 = 0
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     connections: Connections, alfred: Alfred)
@@ -31,12 +32,6 @@ actor DataReceiver is Producer
     _connections = connections
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
-    ifdef "resilience" then
-      None
-    else
-      let t = Timer(_Ack(this), 1_000_000_000, 1_000_000_000)
-      _timers(consume t)
-    end
 
   be data_connect(sender_step_id: U128) =>
     _sender_step_id = sender_step_id
@@ -81,8 +76,11 @@ actor DataReceiver is Producer
       @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
     end
     if seq_id >= _last_id_seen then
+      _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
       _router.route(d, this, seq_id)
+
+      _maybe_ack()
     end
 
   be replay_received(r: ReplayableDeliveryMsg val, seq_id: U64)
@@ -92,7 +90,10 @@ actor DataReceiver is Producer
       _router.replay_route(r, this, seq_id)
     end
 
-  be ack_latest() => _ack_latest()
+  fun ref _maybe_ack() =>
+    if (_ack_counter % 512) == 0 then
+      _ack_latest()
+    end
 
   fun ref _ack_latest() =>
     try
@@ -110,48 +111,14 @@ actor DataReceiver is Producer
 
 // TODO: From credit flow producer part of Producer
 // Remove once traits/interfaces are cleaned up
-  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-    None
+be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
+  None
 
-  fun ref recoup_credits(credits: ISize) => 
-    None
+fun ref recoup_credits(credits: ISize) =>
+  None
 
-  fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
-    None
+fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
+  None
 
-  fun ref next_sequence_id(): U64 =>
-    0
-
-//
-//  be open_connection() =>
-//    if _connected == true then
-//      _reconnecting = true
-//    else
-//      // _connect_ack()
-//      _connected = true
-//      _reconnecting = false
-//    end
-//
-//  be close_connection() =>
-//    if _reconnecting == true then
-//      // _connect_ack()
-//      _reconnecting = false
-//      _connected = true
-//    else
-//      _connected = false
-//    end
-//
-//  // be connect_ack() => _connect_ack()
-//
-//  // fun ref _connect_ack() =>
-//  //   _connections.ack_connect_msg_id(_sender_name, _last_id_seen)
-
-class _Ack is TimerNotify
- let _receiver: DataReceiver
-
- new iso create(receiver: DataReceiver) =>
-   _receiver = receiver
-
- fun ref apply(timer: Timer, count: U64): Bool =>
-   _receiver.ack_latest()
-   true
+fun ref next_sequence_id(): U64 =>
+  0

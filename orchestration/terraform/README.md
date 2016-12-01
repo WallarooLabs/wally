@@ -58,6 +58,7 @@ Software needed:
 * wc
 * head
 * tail
+* jq
 * terraform (need version `0.7.4`). Get the exact version here: https://releases.hashicorp.com/terraform/
 * Installing ansible (need version `ansible-2.1.1.0`): `pip install 'ansible==2.1.1.0' --force-reinstall`
 * Installing boto: `pip install boto`
