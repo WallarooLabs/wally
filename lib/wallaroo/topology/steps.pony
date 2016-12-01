@@ -63,7 +63,7 @@ actor Step is (RunnableStep & Resilient & Producer &
 
    // CreditFlow Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
-  let _max_distributable_credits: ISize = 10_000
+  var _max_distributable_credits: ISize = 10_000
   var _distributable_credits: ISize = 0
 
   // Resilience routes
@@ -75,6 +75,8 @@ actor Step is (RunnableStep & Resilient & Producer &
     router: Router val = EmptyRouter, default_target: (Step | None) = None,
     omni_router: OmniRouter val = EmptyOmniRouter)
   =>
+    _max_distributable_credits =
+      _max_distributable_credits.usize().next_pow2().isize()
     _runner = consume runner
     match _runner
     | let r: ReplayableRunner => r.set_step_id(id)
@@ -91,6 +93,10 @@ actor Step is (RunnableStep & Resilient & Producer &
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
   =>
+    ifdef debug then
+      Invariant(_max_distributable_credits ==
+        (_max_distributable_credits.usize() - 1).next_pow2().isize())
+    end
     for consumer in _router.routes().values() do
       _routes(consumer) =
         _route_builder(this, consumer, StepRouteCallbackHandler)

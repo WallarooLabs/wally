@@ -30,7 +30,7 @@ actor TCPSource is (Initializable & Producer)
   let _tcp_sinks: Array[TCPSink] val
   // Determines if we can still process credits from consumers
   var _unregistered: Bool = false
-  let _max_route_credits: ISize = 10_000
+  var _max_route_credits: ISize = 10_000
 
   // TCP
   let _listen: TCPSourceListener
@@ -71,6 +71,7 @@ actor TCPSource is (Initializable & Producer)
     """
     A new connection accepted on a server.
     """
+    _max_route_credits = _max_route_credits.usize().next_pow2().isize()
     _listen = listen
     _notify = consume notify
     _notify.set_origin(this)
@@ -168,6 +169,10 @@ actor TCPSource is (Initializable & Producer)
     tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
   =>
     None
+    ifdef debug then
+      Invariant(_max_route_credits ==
+        (_max_route_credits.usize() - 1).next_pow2().isize())
+    end
 
   be dispose() =>
     """

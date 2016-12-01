@@ -185,13 +185,11 @@ class TypedRoute[In: Any val] is Route
   fun ref initialize(max_credits: ISize) =>
     ifdef "backpressure" then
       ifdef debug then
-        try
-          Assert(max_credits > 0,
-            "Route max credits must be greater than 0")
-        else
-          _callback.shutdown(_step)
-          return
-        end
+        Invariant(max_credits > 0)
+      end
+      ifdef debug then
+        Invariant(max_credits ==
+          (max_credits.usize() - 1).next_pow2().isize())
       end
 
       _max_credits = max_credits
@@ -203,13 +201,11 @@ class TypedRoute[In: Any val] is Route
 
   fun ref update_max_credits(max_credits: ISize) =>
     ifdef debug then
-      try
-        Assert(max_credits > 0,
-          "Route max credits must be greater than 0")
-      else
-        _callback.shutdown(_step)
-        return
-      end
+      Invariant(_max_credits ==
+        (_max_credits.usize() - 1).next_pow2().isize())
+    end
+    ifdef debug then
+      Invariant(max_credits > 0)
     end
     _max_credits = max_credits
 
@@ -324,7 +320,7 @@ class TypedRoute[In: Any val] is Route
           ifdef "trace" then
             @printf[I32]("----No credits: added msg to Route queue\n".cstring())
           end
-          let keep_sending = _add_to_queue(metric_name, source_ts, input, cfp, 
+          let keep_sending = _add_to_queue(metric_name, source_ts, input, cfp,
             origin, msg_uid, frac_ids, i_seq_id, i_route_id)
           request_credits()
           keep_sending
@@ -378,7 +374,8 @@ class TypedRoute[In: Any val] is Route
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef debug then
-      Invariant(_queue.size() < _queue.max_size())
+      Invariant((_queue.max_size() > 0) and
+        (_queue.size() < _queue.max_size()))
     end
 
     try
@@ -488,6 +485,13 @@ class BoundaryRoute is Route
 
   fun ref initialize(max_credits: ISize) =>
     ifdef "backpressure" then
+      ifdef debug then
+        Invariant(max_credits ==
+          (max_credits.usize() - 1).next_pow2().isize())
+      end
+      ifdef debug then
+        Invariant(max_credits > 0)
+      end
       _max_credits = max_credits
       // Overwrite the old (placeholder) queue with one the correct size.
       _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
@@ -496,6 +500,13 @@ class BoundaryRoute is Route
     end
 
   fun ref update_max_credits(max_credits: ISize) =>
+    ifdef debug then
+      Invariant(_max_credits ==
+        (_max_credits.usize() - 1).next_pow2().isize())
+    end
+    ifdef debug then
+      Invariant(max_credits > 0)
+    end
     _max_credits = max_credits
 
   fun id(): U64 =>
@@ -664,8 +675,12 @@ class BoundaryRoute is Route
     i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef debug then
-      Invariant(_queue.size() < _queue.max_size())
+      Invariant((_queue.max_size() > 0) and
+        (_queue.size() < _queue.max_size()))
     end
+
+    // @printf[I32]("!!_q.max_size: %llu, q.size: %llu\n".cstring(),
+      // _queue.max_size(), _queue.size())
 
     try
       _queue.enqueue((delivery_msg, cfp,

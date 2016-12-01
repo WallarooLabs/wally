@@ -102,7 +102,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
-  let _max_distributable_credits: ISize = 350_000
+  var _max_distributable_credits: ISize = 350_000
   var _distributable_credits: ISize = _max_distributable_credits
 
   // TCP
@@ -143,8 +143,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-
-    //
+    _max_distributable_credits =
+      _max_distributable_credits.usize().next_pow2().isize()
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
@@ -160,7 +160,10 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
   =>
-    None
+    ifdef debug then
+      Invariant(_max_distributable_credits ==
+        (_max_distributable_credits.usize() - 1).next_pow2().isize())
+    end
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,

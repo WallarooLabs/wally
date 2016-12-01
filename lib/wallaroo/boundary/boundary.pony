@@ -37,7 +37,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
-  let _max_distributable_credits: ISize = 500_000
+  var _max_distributable_credits: ISize = 500_000
   var _distributable_credits: ISize = 200_000
   var _unacked_credits: ISize = 0
 
@@ -89,6 +89,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
+    _max_distributable_credits =
+      _max_distributable_credits.usize().next_pow2().isize()
     // _encoder = encoder_wrapper
     _auth = auth
     _worker_name = worker_name
@@ -111,6 +113,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
   =>
+    ifdef debug then
+      Invariant(_max_distributable_credits ==
+        (_max_distributable_credits.usize() - 1).next_pow2().isize())
+    end
     try
       if _step_id == 0 then
         Fail()
