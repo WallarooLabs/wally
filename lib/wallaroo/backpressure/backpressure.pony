@@ -165,7 +165,6 @@ class TypedRoute[In: Any val] is Route
     _step = step
     _consumer = consumer
     _callback = handler
-    // @printf[I32]("!!Route: Registering producer\n".cstring())
     _consumer.register_producer(_step)
     ifdef "backpressure" then
       handler.credits_exhausted(_step)
@@ -271,15 +270,13 @@ class TypedRoute[In: Any val] is Route
 
   fun ref request_credits() =>
     if not _request_outstanding then
-      if (Time.nanos() - _last_credit_ts) > 1_000_000_000 then
-        ifdef "credit_trace" then
-          @printf[I32]("--Route: requesting credits\n".cstring())
-        end
-        let credits_requested = _max_credits - _credits_available
-        _consumer.credit_request(_step, credits_requested)
-        _last_credit_ts = Time.nanos()
-        _request_outstanding = true
+      ifdef "credit_trace" then
+        @printf[I32]("--Route: requesting credits\n".cstring())
       end
+      let credits_requested = _max_credits - _credits_available
+      _consumer.credit_request(_step, credits_requested)
+      _last_credit_ts = Time.nanos()
+      _request_outstanding = true
     else
       ifdef "credit_trace" then
         @printf[I32]("----Request already outstanding\n".cstring())
@@ -384,13 +381,14 @@ class TypedRoute[In: Any val] is Route
       Invariant(_queue.size() < _queue.max_size())
     end
 
-    @printf[I32](("!!Queue size: " + _queue.max_size().string() + "\n").cstring())
-    @printf[I32](("!!Max credits: " + _max_credits.string() + "\n").cstring())
-
     try
       _queue.enqueue((metric_name, source_ts, input, cfp,
         origin, msg_uid, frac_ids, i_seq_id, i_route_id))
       if _queue.size() == _queue.max_size() then
+        ifdef "credit_trace" then
+          @printf[I32]("Route queue is full.\n".cstring())
+        end
+        @printf[I32]("!!Route queue is full.\n".cstring())
         false
       else
         true
@@ -673,6 +671,9 @@ class BoundaryRoute is Route
       _queue.enqueue((delivery_msg, cfp,
         i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id))
       if _queue.size() == _queue.max_size() then
+        ifdef "credit_trace" then
+          @printf[I32]("Route queue is full.\n".cstring())
+        end
         false
       else
         true

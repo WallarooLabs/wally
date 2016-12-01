@@ -57,10 +57,11 @@ class FixedQueue[A]
     Add an element to the back of the queue
     """
     if _size >= _max_size then
+      @printf[I32]("!!Passed max on queue!!\n".cstring())
       error
     end
 
-    if _data.size() < _max_size then
+    if (_back_ptr >= _data.size()) or (_data.size() < _max_size) then
       _data.push(consume a)
       _back_ptr = (_back_ptr + 1) and _mod
     else

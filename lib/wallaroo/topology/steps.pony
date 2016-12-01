@@ -70,9 +70,6 @@ actor Step is (RunnableStep & Resilient & Producer &
   // TODO: This needs to be merged with credit flow producer routes
   let _resilience_routes: Routes = Routes
 
-  //!!
-  var _count: USize = 0
-
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
     id: U128, route_builder: RouteBuilder val, alfred: Alfred,
     router: Router val = EmptyRouter, default_target: (Step | None) = None,
@@ -159,7 +156,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     ifdef "trace" then
       @printf[I32](("Rcvd msg at " + _runner.name() + " step\n").cstring())
     end
-    (let is_finished, _) = _runner.run[D](metric_name, 
+    (let is_finished, _) = _runner.run[D](metric_name,
       source_ts, data, this, _router, _omni_router,
       i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
     if is_finished then
@@ -180,7 +177,6 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
     // DO NOT REMOVE. THIS GC TRIGGERING IS INTENTIONAL.
     @pony_triggergc[None](this)
-
 
   fun ref next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
@@ -336,7 +332,6 @@ actor Step is (RunnableStep & Resilient & Producer &
     _recoup_credits(recoup)
 
   fun ref _recoup_credits(recoup: ISize) =>
-    // @printf[I32]("!!Recouping".cstring())
     _distributable_credits = _distributable_credits + recoup
     if _distributable_credits > _max_distributable_credits then
       _distributable_credits = _max_distributable_credits

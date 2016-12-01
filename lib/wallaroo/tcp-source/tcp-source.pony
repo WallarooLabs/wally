@@ -114,11 +114,6 @@ actor TCPSource is (Initializable & Producer)
         _route_builder(this, boundary, StepRouteCallbackHandler)
     end
 
-    // TODO: Remove this if possible.
-    // for sink in tcp_sinks.values() do
-    //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
-    // end
-
     match default_target
     | let r: CreditFlowConsumerStep =>
       match forward_route_builder
@@ -355,7 +350,6 @@ actor TCPSource is (Initializable & Producer)
     _unregistered = true
 
   fun ref _dispose_routes() =>
-    @printf[I32]("!!Disposing of routes\n".cstring())
     for r in _routes.values() do
       r.dispose()
     end

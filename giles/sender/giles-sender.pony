@@ -775,6 +775,8 @@ class VariableLengthBinaryFileDataSource is Iterator[Array[U8] val]
       let expect: USize = Bytes.to_u16(h(0), h(1)).usize() - 2
       _file.read(expect)
     else
-      @printf[I32]("Failed to convert message header!!\n".cstring())
+      ifdef debug then
+        @printf[I32]("Failed to convert message header!\n".cstring())
+      end
       recover val Array[U8] end
     end
