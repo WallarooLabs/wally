@@ -34,7 +34,7 @@ build:
     pull: true
     commands:
       - make clean arch=$$PONYC_VERSION in_docker=true VERBOSE=true
-      - make build-pony arch=$$PONYC_VERSION in_docker=true VERBOSE=true -j`nproc`
+      - make build-pony arch=$$PONYC_VERSION in_docker=true VERBOSE=true
 
   # run dagon tests
   run_dagon_test:
