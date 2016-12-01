@@ -8,7 +8,8 @@ use "wallaroo/fail"
 
 //TODO: origin needs to get its own file
 trait tag Resilient
-  be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq)
+  be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
+    payload: ByteSeq)
   be replay_finished()
   be start_without_replay()
 
@@ -138,8 +139,10 @@ class FileBackend is Backend
           end
         end
 
-        @printf[I32]("RESILIENCE: Replayed %d entries from recovery log file.\n".cstring(), num_replayed)
-        @printf[I32]("RESILIENCE: Skipped %d entries from recovery log file.\n".cstring(), num_skipped)
+        @printf[I32]("RESILIENCE: Replayed %d entries from recovery log file.\n"
+          .cstring(), num_replayed)
+        @printf[I32]("RESILIENCE: Skipped %d entries from recovery log file.\n"
+          .cstring(), num_skipped)
 
         _file.seek_end(0)
         _alfred.log_replay_finished()
@@ -147,7 +150,8 @@ class FileBackend is Backend
         @printf[I32]("Cannot recover state from eventlog\n".cstring())
       end
     else
-      @printf[I32]("RESILIENCE: Nothing to replay from recovery log file.\n".cstring())
+      @printf[I32]("RESILIENCE: Nothing to replay from recovery log file.\n"
+        .cstring())
       _alfred.start_without_replay()
     end
 
@@ -159,8 +163,9 @@ class FileBackend is Backend
 
   fun ref encode_entry(entry: LogEntry)
   =>
-    (let is_watermark: Bool, let origin_id: U128, let uid: U128, let frac_ids: None,
-     let statechange_id: U64, let seq_id: U64, let payload: Array[ByteSeq] val)
+    (let is_watermark: Bool, let origin_id: U128, let uid: U128,
+     let frac_ids: None, let statechange_id: U64, let seq_id: U64,
+     let payload: Array[ByteSeq] val)
     = entry
 
     _writer.bool(is_watermark)
@@ -229,7 +234,9 @@ actor Alfred
       _replay_complete_markers.create()
     var num_encoded: USize = 0
 
-    new create(env: Env, filename: (String val | None) = None, logging_batch_size: USize = 1000) =>
+    new create(env: Env, filename: (String val | None) = None,
+     logging_batch_size: USize = 1000)
+    =>
       _logging_batch_size = logging_batch_size
       _backend =
       recover iso
@@ -285,12 +292,16 @@ actor Alfred
         b.start_without_replay()
       end
 
-    be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val) =>
+    be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None,
+      statechange_id: U64, payload: ByteSeq val)
+    =>
       try
-        _origins(origin_id).replay_log_entry(uid, frac_ids, statechange_id, payload)
+        _origins(origin_id).replay_log_entry(uid, frac_ids, statechange_id,
+          payload)
       else
         //TODO: explode here
         @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
+        Fail()
       end
 
     be register_origin(origin: (Resilient & Producer), id: U128) =>
@@ -304,8 +315,8 @@ actor Alfred
         // add to backend buffer after encoding
         // encode right away to amortize encoding cost per entry when received
         // as opposed to when writing a batch to disk
-        _backend.encode_entry((false, origin_id, uid, frac_ids, statechange_id
-                         , seq_id, payload))
+        _backend.encode_entry((false, origin_id, uid, frac_ids, statechange_id,
+          seq_id, payload))
 
         num_encoded = num_encoded + 1
 
