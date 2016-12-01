@@ -33,7 +33,7 @@ trait StateProcessor[State: Any #read] is BasicComputation
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: SeqId,
-      latest_ts: U64, metrics_id: U16):
+      latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
       (Bool, Bool, (StateChange[State] ref | None), U64, U64, U64)
 
 trait InputWrapper
@@ -58,7 +58,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-      latest_ts: U64, metrics_id: U16):
+      latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
       (Bool, Bool, (StateChange[State] ref | None), U64, U64, U64)
   =>
     let computation_start = Time.nanos()
@@ -75,7 +75,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
         _target_id, metric_name, source_ts, output, producer,
         // incoming envelope
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-        computation_end, metrics_id)
+        computation_end, metrics_id, worker_ingress_ts)
 
       (is_finished, keep_sending, result._2, computation_start, computation_end, last_ts)
     else

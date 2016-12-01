@@ -75,12 +75,16 @@ class MetricsReporter
     _step_metrics_map.create()
   let _pipeline_metrics_map: Map[String, _MetricsReporter] =
     _pipeline_metrics_map.create()
+  let _worker_metrics_map: Map[String, _MetricsReporter] =
+    _worker_metrics_map.create()
 
-  new iso create(app_name: String, metrics_conn: TCPConnection, 
-    worker_name: String = "W")
+  let _worker_metrics_reporter: _MetricsReporter
+
+  new iso create(app_name: String, worker_name: String,
+    metrics_conn: TCPConnection,
+    period: U64 = 2_000_000_000)
   =>
     _app_name = app_name
-    _metrics_conn = metrics_conn
     _worker_name = worker_name
 
   fun ref step_metric(pipeline: String, name: String, num: U16, start_ts: U64,
@@ -131,4 +135,4 @@ class MetricsReporter
     metrics.report(WallClock.nanoseconds() - source_ts) // might be across workers
 
   fun clone(): MetricsReporter iso^ =>
-    MetricsReporter(_app_name, _metrics_conn, _worker_name)
+    MetricsReporter(_app_name, _worker_name, _metrics_conn)

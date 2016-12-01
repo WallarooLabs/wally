@@ -22,7 +22,7 @@ actor EmptySink is CreditFlowConsumerStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at EmptySink\n".cstring())
@@ -32,7 +32,7 @@ actor EmptySink is CreditFlowConsumerStep
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     None
 
@@ -172,7 +172,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     var receive_ts: U64 = 0
     ifdef "detailed-metrics" then
@@ -205,6 +205,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
 
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
+      _metrics_reporter.worker_metric(worker_ingress_ts)
     else
       Fail()
     end
@@ -214,13 +215,13 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     //TODO: deduplication like in the Step <- this is pointless if the Sink
     //doesn't have state, because on recovery we won't have a list of "seen
     //messages", which we would normally get from the eventlog.
     run[D](metric_name, source_ts, data, i_origin, msg_uid, i_frac_ids,
-      i_seq_id, i_route_id, latest_ts, metrics_id)
+      i_seq_id, i_route_id, latest_ts, metrics_id, worker_ingress_ts)
 
   be update_router(router: Router val) =>
     """

@@ -153,7 +153,8 @@ actor Connections
     service: String)
   =>
     let outgoing_boundary = OutgoingBoundary(_auth,
-      _worker_name, MetricsReporter(_app_name, _metrics_conn),
+      _worker_name, MetricsReporter(_app_name,
+      _worker_name, _metrics_conn),
       host, service)
     outgoing_boundary.register_step_id(_guid_gen.u128())
     _data_conns(target_name) = outgoing_boundary

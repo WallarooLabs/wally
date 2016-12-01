@@ -95,7 +95,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
             data_msg.latest_ts, my_latest_ts)
           _receivers(data_msg.delivery_msg.sender_name()).received(
             data_msg.delivery_msg,
-            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1)
+            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1, ingest_ts)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
@@ -115,7 +115,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
             data_msg.latest_ts, my_latest_ts)
           _receivers(data_msg.delivery_msg.sender_name())
             .replay_received(data_msg.delivery_msg, data_msg.seq_id, 
-            my_latest_ts, data_msg.metrics_id + 1)
+            my_latest_ts, data_msg.metrics_id + 1, ingest_ts)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end

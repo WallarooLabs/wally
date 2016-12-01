@@ -86,7 +86,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
             end
             _runner.run[In](_pipeline_name, ingest_ts, decoded,
               conn, _router, _omni_router,
-              o, _guid_gen.u128(), None, 0, 0, lastest_ts, 1, _metrics_reporter)
+              o, _guid_gen.u128(), None, 0, 0, lastest_ts, 1, ingest_ts, _metrics_reporter)
           else
             // FramedSourceNotify needs an Producer to pass along
             Fail()
@@ -107,6 +107,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
         end
 
         _metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
+        _metrics_reporter.worker_metric(ingest_ts)
       end
 
       // We have a full queue at a route, so we need to stop reading.

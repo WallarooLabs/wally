@@ -20,12 +20,12 @@ trait tag RunnableStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
 
 interface Initializable
@@ -159,7 +159,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     let my_latest_ts = ifdef "detailed-metrics" then
         Time.nanos()
@@ -181,7 +181,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     (let is_finished, _, let last_ts) = _runner.run[D](metric_name, source_ts, data,
       this, _router, _omni_router,
       i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
-      my_latest_ts, my_metrics_id, _metrics_reporter)
+      my_latest_ts, my_metrics_id, worker_ingress_ts, _metrics_reporter)
     if is_finished then
       ifdef "resilience" then
         ifdef "trace" then
@@ -193,6 +193,9 @@ actor Step is (RunnableStep & Resilient & Producer &
         _resilience_routes.filter(this, next_sequence_id(),
           i_origin, i_route_id, i_seq_id)
       end
+      ifdef "backpressure" then
+        _recoup_credits(1)
+      end
       let computation_end = Time.nanos()
 
       ifdef "detailed-metrics" then
@@ -201,9 +204,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       end
 
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
-      ifdef "backpressure" then
-        _recoup_credits(1)
-      end
+      _metrics_reporter.worker_metric(worker_ingress_ts)
     end
     // DO NOT REMOVE. THIS GC TRIGGERING IS INTENTIONAL.
     @pony_triggergc[None](this)
@@ -249,7 +250,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if not _is_duplicate(i_origin, msg_uid, i_frac_ids, i_seq_id,
       i_route_id) then
@@ -258,7 +259,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       (let is_finished, _, let last_ts) = _runner.run[D](metric_name, source_ts, data,
         this, _router, _omni_router,
         i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
-        latest_ts, metrics_id, _metrics_reporter)
+        latest_ts, metrics_id, worker_ingress_ts, _metrics_reporter)
 
       if is_finished then
         //TODO: be more efficient (batching?)
@@ -277,6 +278,7 @@ actor Step is (RunnableStep & Resilient & Producer &
         end
 
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
+        _metrics_reporter.worker_metric(worker_ingress_ts)
       end
     end
 

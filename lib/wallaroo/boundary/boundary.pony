@@ -137,7 +137,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Run should never be called on an OutgoingBoundary
     Fail()
@@ -145,7 +145,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Should never be called on an OutgoingBoundary
     Fail()
@@ -153,7 +153,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: ReplayableDeliveryMsg val,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String)
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64)
   =>
     let my_latest_ts = ifdef "detailed-metrics" then
         Time.nanos()
@@ -181,6 +182,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
         new_metrics_id, metric_name)
       //_queue.enqueue(outgoing_msg)
 
+      _writev(outgoing_msg)
+
       let end_ts = Time.nanos()
 
       ifdef "detailed-metrics" then
@@ -189,7 +192,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
           my_latest_ts, end_ts)
       end
 
-      _writev(outgoing_msg)
+      _metrics_reporter.worker_metric(worker_ingress_ts)
     end
 
   be writev(data: Array[ByteSeq] val) =>

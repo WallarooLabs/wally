@@ -10,7 +10,7 @@ interface Router
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   fun routes(): Array[CreditFlowConsumerStep] val
 
 interface RouterBuilder
@@ -21,7 +21,7 @@ class EmptyRouter
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     (true, true, latest_ts)
 
@@ -38,7 +38,7 @@ class DirectRouter
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DirectRouter\n".cstring())
@@ -55,7 +55,7 @@ class DirectRouter
         producer,
         // incoming envelope
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-        latest_ts, metrics_id)
+        latest_ts, metrics_id, worker_ingress_ts)
       (false, keep_sending, latest_ts)
     else
       // TODO: What do we do if we get None?
@@ -92,7 +92,7 @@ class ProxyRouter
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at ProxyRouter\n".cstring())
@@ -111,7 +111,7 @@ class ProxyRouter
         msg_uid, i_frac_ids)
 
       let keep_sending = r.forward(delivery_msg, producer, i_origin, msg_uid, i_frac_ids,
-        i_seq_id, i_route_id, latest_ts, metrics_id, metric_name)
+        i_seq_id, i_route_id, latest_ts, metrics_id, metric_name, worker_ingress_ts)
 
       (false, keep_sending, latest_ts)
     else
@@ -134,7 +134,7 @@ trait OmniRouter
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
 
 class EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
@@ -142,7 +142,7 @@ class EmptyOmniRouter is OmniRouter
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n".cstring())
     (true, true, latest_ts)
@@ -168,7 +168,7 @@ class StepIdRouter is OmniRouter
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at OmniRouter\n".cstring())
@@ -189,7 +189,7 @@ class StepIdRouter is OmniRouter
           producer,
           // incoming envelope
           i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
-          latest_ts, metrics_id)
+          latest_ts, metrics_id, worker_ingress_ts)
 
         (false, keep_sending, latest_ts)
       else
@@ -215,7 +215,7 @@ class StepIdRouter is OmniRouter
                 pa, msg_uid, i_frac_ids)
 
               let keep_sending = r.forward(delivery_msg, producer, i_origin, msg_uid, i_frac_ids,
-                i_seq_id, i_route_id, latest_ts, metrics_id, metric_name)
+                i_seq_id, i_route_id, latest_ts, metrics_id, metric_name, worker_ingress_ts)
               (false, keep_sending, latest_ts)
             else
               // We don't have a route to this boundary
@@ -254,7 +254,7 @@ class DataRouter
     _data_routes = data_routes
 
   fun route(d_msg: DeliveryMsg val, origin: Producer, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataRouter\n".cstring())
@@ -265,7 +265,7 @@ class DataRouter
       ifdef "trace" then
         @printf[I32]("DataRouter found Step\n".cstring())
       end
-      d_msg.deliver(target, origin, seq_id, latest_ts, metrics_id)
+      d_msg.deliver(target, origin, seq_id, latest_ts, metrics_id, worker_ingress_ts)
       false
     else
       ifdef debug then
@@ -275,13 +275,13 @@ class DataRouter
     end
 
   fun replay_route(r_msg: ReplayableDeliveryMsg val, origin: Producer,
-    seq_id: SeqId, latest_ts: U64, metrics_id: U16)
+    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     try
       let target_id = r_msg.target_id()
       //TODO: create and deliver envelope
       r_msg.replay_deliver(_data_routes(target_id), origin, seq_id,
-        latest_ts, metrics_id)
+        latest_ts, metrics_id, worker_ingress_ts)
       false
     else
       true
@@ -335,7 +335,7 @@ class LocalPartitionRouter[In: Any val,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16): (Bool, Bool, U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at PartitionRouter\n".cstring())
@@ -361,7 +361,7 @@ class LocalPartitionRouter[In: Any val,
                 producer,
                 // incoming envelope
                 i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-                latest_ts, metrics_id)
+                latest_ts, metrics_id, worker_ingress_ts)
               (false, keep_sending, latest_ts)
             else
               // TODO: What do we do if we get None?
@@ -370,7 +370,7 @@ class LocalPartitionRouter[In: Any val,
           | let p: ProxyRouter val =>
             p.route[D](metric_name, source_ts, data, producer,
               i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-              latest_ts, metrics_id)
+              latest_ts, metrics_id, worker_ingress_ts)
           else
             // No step or proxyrouter
             (true, true, latest_ts)
@@ -385,7 +385,7 @@ class LocalPartitionRouter[In: Any val,
             end
             r.route[In](metric_name, source_ts, input, producer,
               i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-              latest_ts, metrics_id)
+              latest_ts, metrics_id, worker_ingress_ts)
           else
             ifdef debug then
               @printf[I32](("LocalPartitionRouter.route: No entry for this" +
