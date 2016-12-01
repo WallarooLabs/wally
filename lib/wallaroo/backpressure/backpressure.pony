@@ -13,8 +13,8 @@ use "wallaroo/topology"
 trait tag CreditFlowConsumer
   be register_producer(producer: Producer)
   be unregister_producer(producer: Producer, credits_returned: ISize)
-  be credit_request(from: Producer)
-  be ack_credits(acked: ISize, unused: ISize)
+  be credit_request(from: Producer, credits_requested: ISize)
+  be return_credits(credits: ISize)
 
 type CreditFlowProducerConsumer is (Producer & CreditFlowConsumer)
 
@@ -50,7 +50,7 @@ trait Route
   fun ref initialize(max_credits: ISize)
   fun ref update_max_credits(max_credits: ISize)
   fun id(): U64
-  fun credits(): ISize
+  fun credits_available(): ISize
   fun ref dispose()
   fun ref request_credits()
   fun ref receive_credits(number: ISize)
@@ -69,7 +69,7 @@ class EmptyRoute is Route
   fun ref initialize(max_credits: ISize) => None
   fun id(): U64 => _route_id
   fun ref update_max_credits(max_credits: ISize) => None
-  fun credits(): ISize => 0
+  fun credits_available(): ISize => 0
   fun ref dispose() => None
   fun ref request_credits() => None
   fun ref receive_credits(number: ISize) => None
@@ -207,7 +207,7 @@ class TypedRoute[In: Any val] is Route
   fun id(): U64 =>
     _route_id
 
-  fun credits(): ISize =>
+  fun credits_available(): ISize =>
     _credits_available
 
   fun ref dispose() =>
@@ -218,9 +218,9 @@ class TypedRoute[In: Any val] is Route
     //TODO: Will this gum up the works?
     _hard_flush()
 
-  fun ref receive_credits(number: ISize) =>
+  fun ref receive_credits(credits: ISize) =>
     ifdef debug then
-      Invariant(number >= 0)
+      Invariant(credits >= 0)
     end
 
     _request_outstanding = false
@@ -240,7 +240,7 @@ class TypedRoute[In: Any val] is Route
     end
 
     if _credits_available > 0 then
-      if (_credits_available - credits_recouped) == 0 then
+      if (_credits_available - credits) == 0 then
         _callback.credits_replenished(_step)
       end
 
@@ -265,7 +265,8 @@ class TypedRoute[In: Any val] is Route
         ifdef "credit_trace" then
           @printf[I32]("--Route: requesting credits\n".cstring())
         end
-        _consumer.credit_request(_step)
+        let credits_requested = _max_credits - _credits_available
+        _consumer.credit_request(_step, credits_requested)
         _last_credit_ts = Time.nanos()
         _request_outstanding = true
       end
@@ -496,7 +497,7 @@ class BoundaryRoute is Route
   fun id(): U64 =>
     _route_id
 
-  fun credits(): ISize =>
+  fun credits_available(): ISize =>
     _credits_available
 
   fun ref dispose() =>
@@ -507,9 +508,9 @@ class BoundaryRoute is Route
     //TODO: Will this gum up the works?
     _hard_flush()
 
-  fun ref receive_credits(number: ISize) =>
+  fun ref receive_credits(credits: ISize) =>
     ifdef debug then
-      Invariant(number >= 0)
+      Invariant(credits >= 0)
     end
 
     _request_outstanding = false
@@ -521,10 +522,10 @@ class BoundaryRoute is Route
       end
     _credits_available = _credits_available + credits_recouped
     _step.recoup_credits(credits_recouped)
-    _consumer.ack_credits(number, number - credits_recouped)
+    _consumer.return_credits(credits - credits_recouped)
 
     if _credits_available > 0 then
-      if (_credits_available - credits_recouped) == 0 then
+      if (_credits_available - credits) == 0 then
         _callback.credits_replenished(_step)
       end
 
@@ -549,7 +550,8 @@ class BoundaryRoute is Route
         ifdef "credit_trace" then
           @printf[I32]("--BoundaryRoute: requesting credits\n".cstring())
         end
-        _consumer.credit_request(_step)
+        let requested_credits = _max_credits - _credits_available
+        _consumer.credit_request(_step, requested_credits)
         _last_credit_ts = Time.nanos()
         _request_outstanding = true
       else

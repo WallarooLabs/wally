@@ -195,7 +195,7 @@ actor TCPSource is (Initializable & Producer)
       ifdef "credit_trace" then
         @printf[I32]("Unregistered source returning credits unused\n".cstring())
       end
-      from.ack_credits(credits, credits)
+      from.return_credits(credits)
     else
       try
         let route = _routes(from)

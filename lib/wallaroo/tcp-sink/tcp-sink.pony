@@ -44,10 +44,10 @@ actor EmptySink is CreditFlowConsumerStep
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     None
 
-  be credit_request(from: Producer) =>
+  be credit_request(from: Producer, credits_requested: ISize) =>
     None
 
-  be ack_credits(acked: ISize, unused: ISize) =>
+  be return_credits(credits: ISize) =>
     None
 
 class TCPSinkBuilder
@@ -104,7 +104,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _upstreams: Array[Producer] = _upstreams.create()
   let _max_distributable_credits: ISize = 175_000_000
   var _distributable_credits: ISize = _max_distributable_credits
-  var _unacked_credits: ISize = 0
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -271,7 +270,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-  be credit_request(from: Producer) =>
+  be credit_request(from: Producer, credits_requested: ISize) =>
     """
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
@@ -299,11 +298,13 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    let give_out = if _can_send() then
+    let desired_give_out = if _can_send() then
       (_distributable_credits / _upstreams.size().isize())
     else
       0
     end
+
+    let give_out = credits_requested.min(desired_give_out)
 
     ifdef debug then
       try
@@ -321,24 +322,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
-    _unacked_credits = _unacked_credits + give_out
 
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
 
-  be ack_credits(acked: ISize, unused: ISize) =>
-    ifdef debug then
-      try
-        Assert(acked <= _unacked_credits,
-          "More credits were acked then are still outstanding!")
-      else
-        _hard_close()
-        return
-      end
-    end
-
-    _unacked_credits = _unacked_credits - acked
-    _distributable_credits = _distributable_credits + unused
+  be return_credits(credits: ISize) =>
+    _distributable_credits = _distributable_credits + credits
 
   //
   // TCP

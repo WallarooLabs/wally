@@ -261,7 +261,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       _recoup_credits(credits_returned)
     end
 
-  be credit_request(from: Producer) =>
+  be credit_request(from: Producer, credits_requested: ISize) =>
     """
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
@@ -283,7 +283,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       Invariant(_upstreams.contains(from))
     end
 
-    let give_out =  if _can_send() then
+    let desired_give_out =  if _can_send() then
       (_distributable_credits / _upstreams.size().isize())
     else
       ifdef "credit_trace" then
@@ -292,27 +292,17 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       0
     end
 
+    let give_out = credits_requested.min(desired_give_out)
+
     ifdef "credit_trace" then
       @printf[I32]("Boundary: credit request and giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
     end
 
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
-    _unacked_credits = _unacked_credits + give_out
 
-  be ack_credits(acked: ISize, unused: ISize) =>
-    ifdef debug then
-      try
-        Assert(acked <= _unacked_credits,
-          "More credits were acked then are still outstanding!")
-      else
-        _hard_close()
-        return
-      end
-    end
-
-    _unacked_credits = _unacked_credits - acked
-    _distributable_credits = _distributable_credits + unused
+  be return_credits(credits: ISize) =>
+    _distributable_credits = _distributable_credits + credits
 
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
