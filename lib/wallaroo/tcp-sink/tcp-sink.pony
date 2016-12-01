@@ -102,7 +102,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
-  let _max_distributable_credits: ISize = 175_000_000
+  let _max_distributable_credits: ISize = 350_000
   var _distributable_credits: ISize = _max_distributable_credits
 
   // TCP

@@ -63,7 +63,7 @@ actor Step is (RunnableStep & Resilient & Producer &
 
    // CreditFlow Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
-  let _max_distributable_credits: ISize = 500_000
+  let _max_distributable_credits: ISize = 10_000
   var _distributable_credits: ISize = 0
 
   // Resilience routes
@@ -113,11 +113,8 @@ actor Step is (RunnableStep & Resilient & Producer &
     //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
     // end
 
-    let max_credits_per_route =
-      _max_distributable_credits / _routes.size().isize()
-
     for r in _routes.values() do
-      r.initialize(max_credits_per_route)
+      r.initialize(_max_distributable_credits)
       ifdef "resilience" then
         _resilience_routes.add_route(r)
       end
@@ -135,13 +132,17 @@ actor Step is (RunnableStep & Resilient & Producer &
       let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
       _routes(consumer) = next_route
       if _initialized then
-        let new_max_credits_per_route =
-          _max_distributable_credits / _routes.size().isize()
+        // let new_max_credits_per_route =
+        //   _max_distributable_credits / _routes.size().isize()
 
-        next_route.initialize(new_max_credits_per_route)
-        for r in _routes.values() do
-          r.update_max_credits(new_max_credits_per_route)
-        end
+        // TODO: This is a kind of hack right now. Each route has the
+        // same number of max credits as the step itself.  The commented
+        // code surrounding this shows the old approach of dividing the
+        // max credits among routes.
+        next_route.initialize(_max_distributable_credits)
+        // for r in _routes.values() do
+        //   r.update_max_credits(new_max_credits_per_route)
+        // end
       end
     end
 

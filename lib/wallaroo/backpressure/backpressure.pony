@@ -2,6 +2,7 @@ use "assert"
 use "time"
 use "sendence/guid"
 use "sendence/container-queue"
+use "sendence/fixed-queue"
 use "sendence/queue"
 use "wallaroo/boundary"
 use "wallaroo/fail"
@@ -152,7 +153,7 @@ class TypedRoute[In: Any val] is Route
   //  cfp: Producer ref,
   //  origin: Producer, msg_uid: U128,
   //  frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
-  let _queue: Array[(String, U64, In, Producer ref, Producer, U128,
+  var _queue: FixedQueue[(String, U64, In, Producer ref, Producer, U128,
     None, SeqId, RouteId)]
   // let _queue: ContainerQueue[TypedRouteQueueTuple[In], TypedRouteQueueData[In]]
 
@@ -167,13 +168,16 @@ class TypedRoute[In: Any val] is Route
     ifdef "backpressure" then
       handler.credits_exhausted(_step)
     end
-    let q_size: USize = ifdef "backpressure" then
-      500_000
-    else
-      0
-    end
-    _queue = Array[(String, U64, In, Producer ref, Producer, U128,
-      None, SeqId, RouteId)](q_size)
+    // let q_size: USize = ifdef "backpressure" then
+    //   500_000
+    // else
+    //   0
+    // end
+
+    // We start at 0 size.  We need to know the max_credits before we
+    // can size this in the initialize method.
+    _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
+      None, SeqId, RouteId)](0)
     // _queue = ContainerQueue[TypedRouteQueueTuple[In], TypedRouteQueueData[In]](
     //   TypedRouteQueueDataBuilder[In], q_size)
 
@@ -188,7 +192,11 @@ class TypedRoute[In: Any val] is Route
           return
         end
       end
+
       _max_credits = max_credits
+      // Overwrite the old (placeholder) queue with one the correct size.
+      _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
+        None, SeqId, RouteId)](_max_credits.usize())
       request_credits()
     end
 
@@ -365,25 +373,19 @@ class TypedRoute[In: Any val] is Route
     cfp: Producer ref, origin: Producer, msg_uid: U128,
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    // TODO: Bring back using ContainerQueue if perf results are good
-    // try
-      _queue.push((metric_name, source_ts, input, cfp,
+    try
+      _queue.enqueue((metric_name, source_ts, input, cfp,
         origin, msg_uid, frac_ids, i_seq_id, i_route_id))
-
-      // _queue.enqueue((metric_name, source_ts, input, cfp,
-      //   origin, msg_uid, frac_ids, i_seq_id, i_route_id))
-    // else
-      // ifdef debug then
-        // @printf[I32]("Failure trying to enqueue typed route data\n".cstring())
-      // end
-    // end
+    else
+      ifdef debug then
+        @printf[I32]("Failure trying to enqueue typed route data\n".cstring())
+      end
+    end
 
   fun ref _flush_queue() =>
     while ((_credits_available > 0) and (_queue.size() > 0)) do
       try
-        // TODO: Bring back using ContainerQueue if perf results are good
-        let d =_queue.shift()
-        // let d =_queue.dequeue()
+        let d =_queue.dequeue()
         _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6,
           d._7, d._8, d._9)
       end
@@ -392,9 +394,7 @@ class TypedRoute[In: Any val] is Route
   fun ref _hard_flush() =>
     while (_queue.size() > 0) do
       try
-        // TODO: Bring back using ContainerQueue if perf results are good
-        let d =_queue.shift()
-        // let d =_queue.dequeue()
+        let d =_queue.dequeue()
         _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6,
           d._7, d._8, d._9)
       end
@@ -451,10 +451,8 @@ class BoundaryRoute is Route
 
   // Store tuples of the form
   // (delivery_msg, cfp, i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
-  let _queue: Array[(ReplayableDeliveryMsg val, Producer ref,
+  var _queue: FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
     Producer, U128, None, SeqId, RouteId)]
-//  let _queue: ContainerQueue[BoundaryRouteQueueTuple,
-//    BoundaryRouteQueueData]
 
   new create(step: Producer ref, consumer: OutgoingBoundary,
     handler: RouteCallbackHandler)
@@ -463,31 +461,18 @@ class BoundaryRoute is Route
     _consumer = consumer
     _callback = handler
     _consumer.register_producer(_step)
-    let q_size: USize = ifdef "backpressure" then
-      500_000
-    else
-      0
-    end
     ifdef "backpressure" then
       handler.credits_exhausted(_step)
     end
-    _queue = Array[(ReplayableDeliveryMsg val, Producer ref,
-      Producer, U128, None, SeqId, RouteId)](q_size)
-    // _queue = ContainerQueue[BoundaryRouteQueueTuple,
-    //   BoundaryRouteQueueData](BoundaryRouteQueueDataBuilder, q_size)
+    _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
+      Producer, U128, None, SeqId, RouteId)](0)
 
   fun ref initialize(max_credits: ISize) =>
     ifdef "backpressure" then
-      ifdef debug then
-        try
-          Assert(max_credits > 0,
-            "Route max credits must be greater than 0")
-        else
-          _callback.shutdown(_step)
-          return
-        end
-      end
       _max_credits = max_credits
+      // Overwrite the old (placeholder) queue with one the correct size.
+      _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
+        Producer, U128, None, SeqId, RouteId)](max_credits.usize())
       request_credits()
     end
 
@@ -655,25 +640,19 @@ class BoundaryRoute is Route
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
     i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    // TODO: Bring back using ContainerQueue if perf results are good
-    // try
-      _queue.push((delivery_msg, cfp,
+    try
+      _queue.enqueue((delivery_msg, cfp,
         i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id))
-
-      // _queue.enqueue((delivery_msg, cfp,
-      //   i_origin, msg_uid, i_frac_ids, i_seq_id))
-    // else
-    //   ifdef debug then
-    //     @printf[I32]("Failure trying to enqueue boundary route data\n".cstring())
-    //   end
-    // end
+    else
+      ifdef debug then
+        @printf[I32]("Failure trying to enqueue boundary route data\n".cstring())
+      end
+    end
 
   fun ref _flush_queue() =>
     while ((_credits_available > 0) and (_queue.size() > 0)) do
       try
-        // TODO: Bring back using ContainerQueue if perf results are good
-        let d =_queue.shift()
-        // let d =_queue.dequeue()
+        let d =_queue.dequeue()
         _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id)
       end
     end
@@ -681,9 +660,7 @@ class BoundaryRoute is Route
   fun ref _hard_flush() =>
     while (_queue.size() > 0) do
       try
-        // TODO: Bring back using ContainerQueue if perf results are good
-        let d =_queue.shift()
-        // let d =_queue.dequeue()
+        let d =_queue.dequeue()
         _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id)
       end
     end
