@@ -54,10 +54,14 @@ actor MetricsCollector
     _overall_metrics_msgs.create()
   let _computation_metrics_msgs: Map[String, Array[HubMetricsMsg val]] =
     _computation_metrics_msgs.create()
+  let _worker_metrics_msgs: Map[String, Array[HubMetricsMsg val]] =
+    _worker_metrics_msgs.create()
   let _overall_metrics_data: Map[String, MetricsData] =
     _overall_metrics_data.create()
   let _computation_metrics_data: Map[String, MetricsData] =
     _computation_metrics_data.create()
+  let _worker_metrics_data: Map[String, MetricsData] =
+    _worker_metrics_data.create()
 
   new create(env: Env, input_file_path: String, output_file_path: String) =>
     _env = env
@@ -71,6 +75,8 @@ actor MetricsCollector
       add_overall_metrics(metrics_msg)
     | ("computation") =>
       add_computation_metrics(metrics_msg)
+    | ("node-ingress-egress") =>
+      add_worker_metrics(metrics_msg)
     else
       _env.out.print("Unable to save metrics for category: " +
         metrics_msg.category)
@@ -90,6 +96,13 @@ actor MetricsCollector
     metrics_array.push(metrics_msg)
     _computation_metrics_msgs.update(name, metrics_array)
 
+  fun ref add_worker_metrics(metrics_msg: HubMetricsMsg val) =>
+    let name = metrics_msg.name
+    let metrics_array = _worker_metrics_msgs.get_or_else(name,
+      Array[HubMetricsMsg val])
+    metrics_array.push(metrics_msg)
+    _worker_metrics_msgs.update(name, metrics_array)
+
   be print_metrics() =>
     try
       let auth = _env.root as AmbientAuth
@@ -106,6 +119,13 @@ actor MetricsCollector
       output_file.write("Overall(Source -> Sink) Metrics\n")
       output_file.write(TextFormatter.main_header())
       for metrics_data in _overall_metrics_data.values() do
+        output_file.write(metrics_data.print_stats())
+      end
+      output_file.write(TextFormatter.line_break())
+      output_file.write(TextFormatter.main_header())
+      output_file.write("Worker Metrics\n")
+      output_file.write(TextFormatter.main_header())
+      for metrics_data in _worker_metrics_data.values() do
         output_file.write(metrics_data.print_stats())
       end
       output_file.write(TextFormatter.line_break())
@@ -159,12 +179,14 @@ actor MetricsCollector
     end
     generate_overall_metrics_data()
     generate_computation_metrics_data()
+    generate_worker_metrics_data()
     print_metrics()
 
   fun ref generate_metrics_data() =>
     _env.out.print("Generate Metrics Data")
     generate_overall_metrics_data()
     generate_computation_metrics_data()
+    generate_worker_metrics_data()
 
   fun ref generate_overall_metrics_data() =>
    for (name, metrics_msgs) in _overall_metrics_msgs.pairs() do
@@ -183,6 +205,16 @@ actor MetricsCollector
        let metrics_data = MetricsData(metrics_msg.name, metrics_msg.category,
          metrics_msg.period, metrics_msgs)
        _computation_metrics_data.insert(name, metrics_data)
+     end
+    end
+
+  fun ref generate_worker_metrics_data() =>
+    for (name, metrics_msgs) in _worker_metrics_msgs.pairs() do
+    try
+       let metrics_msg = metrics_msgs(0)
+       let metrics_data = MetricsData(metrics_msg.name, metrics_msg.category,
+         metrics_msg.period, metrics_msgs)
+       _worker_metrics_data.insert(name, metrics_data)
      end
     end
 
