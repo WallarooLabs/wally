@@ -182,17 +182,16 @@ class TypedRoute[In: Any val] is Route
     // _queue = ContainerQueue[TypedRouteQueueTuple[In], TypedRouteQueueData[In]](
     //   TypedRouteQueueDataBuilder[In], q_size)
 
-  fun ref initialize(max_credits: ISize) =>
+  fun ref initialize(new_max_credits: ISize) =>
     ifdef "backpressure" then
       ifdef debug then
-        Invariant(max_credits > 0)
+        Invariant(new_max_credits > 0)
       end
       ifdef debug then
-        Invariant(max_credits ==
-          (max_credits.usize() - 1).next_pow2().isize())
+        Invariant(new_max_credits ==
+          (new_max_credits.usize() - 1).next_pow2().isize())
       end
-
-      _max_credits = max_credits
+      _max_credits = new_max_credits
       // Overwrite the old (placeholder) queue with one the correct size.
       _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
         None, SeqId, RouteId)](_max_credits.usize())
@@ -483,19 +482,20 @@ class BoundaryRoute is Route
     _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
       Producer, U128, None, SeqId, RouteId)](0)
 
-  fun ref initialize(max_credits: ISize) =>
+  fun ref initialize(new_max_credits: ISize) =>
     ifdef "backpressure" then
       ifdef debug then
-        Invariant(max_credits ==
-          (max_credits.usize() - 1).next_pow2().isize())
+        Invariant(new_max_credits ==
+          (new_max_credits.usize() - 1).next_pow2().isize())
       end
       ifdef debug then
-        Invariant(max_credits > 0)
+        Invariant(new_max_credits > 0)
       end
-      _max_credits = max_credits
+      _max_credits = new_max_credits
       // Overwrite the old (placeholder) queue with one the correct size.
       _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
-        Producer, U128, None, SeqId, RouteId)](max_credits.usize())
+        Producer, U128, None, SeqId, RouteId)](_max_credits.usize())
+
       request_credits()
     end
 
