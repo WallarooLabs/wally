@@ -140,19 +140,19 @@ Writer::Writer(unsigned char *bytes_): _ptr(bytes_)
 
 void Writer::u16_be(uint16_t value_)
 {
-  *(uint16_t *)(_ptr) = htobe16(value_);  
+  *(uint16_t *)(_ptr) = htobe16(value_);
   _ptr += 2;
 }
 
 void Writer::u32_be(uint32_t value_)
 {
-  *(uint32_t *)(_ptr) = htobe32(value_);  
+  *(uint32_t *)(_ptr) = htobe32(value_);
   _ptr += 4;
 }
 
 void Writer::u64_be(uint64_t value_)
 {
-  *(uint32_t *)(_ptr) = htobe64(value_);  
+  *(uint64_t *)(_ptr) = htobe64(value_);
   _ptr += 8;
 }
 
@@ -444,12 +444,12 @@ extern "C" {
   {
     return new ArizonaPartitionFunction();
   }
-  
+
   extern wallaroo::SourceDecoder *get_source_decoder()
   {
     return new ArizonaSourceDecoder();
   }
-  
+
   extern wallaroo::SinkEncoder *get_sink_encoder()
   {
     return new ArizonaSinkEncoder();
@@ -482,7 +482,7 @@ extern "C" {
     uint16_t serialized_type = reader.u16_be();
 
     char *remaining_bytes = bytes_ + 2;
-    
+
     switch(serialized_type)
     {
     case 0:
@@ -550,8 +550,8 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
   if ( _nProcessed % 10000 == 0  )
     _logger->info("Processed messages:{}", _nProcessed);
 
-  ClientMessage* cm = dynamic_cast<ClientMessage*>(input_); 
-  if ( cm != nullptr ) 
+  ClientMessage* cm = dynamic_cast<ClientMessage*>(input_);
+  if ( cm != nullptr )
   {
     int messageType = cm->get_message_type();
     uint64_t message_id = cm->get_message_id();
@@ -560,26 +560,26 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
       ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
       return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
     }
-    
+
     else if ( messageType  == 2 )
     {
       ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
       return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
     }
-    
+
     else if ( messageType  == 3 )
     {
       ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
       return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
     }
-    
+
     else if ( messageType  == 4 )
     {
       ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
       return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
     }
   }
-  
+
   return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
 }
 
@@ -655,6 +655,6 @@ void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::
     ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
     return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
   }
-    
+
   return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
 }
