@@ -30,6 +30,7 @@ actor TCPSource is (Initializable & Producer)
   let _tcp_sinks: Array[TCPSink] val
   // Determines if we can still process credits from consumers
   var _unregistered: Bool = false
+  var _max_route_credits: ISize = 10_000
 
   // TCP
   let _listen: TCPSourceListener
@@ -70,6 +71,7 @@ actor TCPSource is (Initializable & Producer)
     """
     A new connection accepted on a server.
     """
+    _max_route_credits = _max_route_credits.usize().next_pow2().isize()
     _listen = listen
     _notify = consume notify
     _notify.set_origin(this)
@@ -110,19 +112,14 @@ actor TCPSource is (Initializable & Producer)
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
       _routes(boundary) =
-        _route_builder(this, boundary, StepRouteCallbackHandler)
+        _route_builder(this, boundary, TCPSourceRouteCallbackHandler)
     end
-
-    // TODO: Remove this if possible.
-    // for sink in tcp_sinks.values() do
-    //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
-    // end
 
     match default_target
     | let r: CreditFlowConsumerStep =>
       match forward_route_builder
       | let frb: RouteBuilder val =>
-        _routes(r) = frb(this, r, StepRouteCallbackHandler)
+        _routes(r) = frb(this, r, TCPSourceRouteCallbackHandler)
       end
     end
 
@@ -130,7 +127,7 @@ actor TCPSource is (Initializable & Producer)
       // TODO: What should the initial max credits per route from
       // a Source be?  I'm starting at max_value because that makes
       // us dependent on how many can be distributed from downstream.
-      r.initialize(ISize.max_value())
+      r.initialize(_max_route_credits)
     end
 
     ifdef "backpressure" then
@@ -172,6 +169,10 @@ actor TCPSource is (Initializable & Producer)
     tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
   =>
     None
+    ifdef debug then
+      Invariant(_max_route_credits ==
+        (_max_route_credits.usize() - 1).next_pow2().isize())
+    end
 
   be dispose() =>
     """
@@ -195,7 +196,7 @@ actor TCPSource is (Initializable & Producer)
       ifdef "credit_trace" then
         @printf[I32]("Unregistered source returning credits unused\n".cstring())
       end
-      from.ack_credits(credits, credits)
+      from.return_credits(credits)
     else
       try
         let route = _routes(from)
@@ -354,7 +355,6 @@ actor TCPSource is (Initializable & Producer)
     _unregistered = true
 
   fun ref _dispose_routes() =>
-    @printf[I32]("!!Disposing of routes\n".cstring())
     for r in _routes.values() do
       r.dispose()
     end
@@ -500,9 +500,11 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
+    @printf[I32]("!!MUTE\n".cstring())
     _muted = true
 
   fun ref _unmute() =>
+    @printf[I32]("!!UNMUTE\n".cstring())
     _muted = false
     _pending_reads()
 

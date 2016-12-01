@@ -22,7 +22,8 @@ interface StateComputation[In: Any val, Out: Any val, State: Any #read] is Basic
 trait StateProcessor[State: Any #read] is BasicComputation
   fun name(): String
   // Return a tuple containing a Bool indicating whether the message was
-  // finished processing here and the state change (or None if there was
+  // finished processing here, a Bool indicating whether a route can still 
+  // keep receiving data and the state change (or None if there was
   // no state change).
   // TODO: solve the situation where Out is None and we
   // still want the message passed along
@@ -31,7 +32,7 @@ trait StateProcessor[State: Any #read] is BasicComputation
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: SeqId):
-      (Bool, (StateChange[State] ref | None))
+      (Bool, Bool, (StateChange[State] ref | None))
 
 trait InputWrapper
   fun input(): Any val
@@ -55,23 +56,24 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId):
-      (Bool, (StateChange[State] ref | None))
+      (Bool, Bool, (StateChange[State] ref | None))
   =>
     let result = _state_comp(_input, sc_repo, state)
 
     // It matters that the None check comes first, since Out could be
     // type None if you always filter/end processing there
     match result
-    | (None, _) => (true, result._2) // This must come first
+    | (None, _) => (true, true, result._2) // This must come first
     | (let output: Out, _) =>
-      let is_finished = omni_router.route_with_target_id[Out](_target_id,
-        metric_name, source_ts, output, producer,
-        // incoming envelope
-        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
+      (let is_finished, let keep_sending) = 
+        omni_router.route_with_target_id[Out](_target_id, metric_name, 
+          source_ts, output, producer,
+          // incoming envelope
+          i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
 
-      (is_finished, result._2)
+      (is_finished, keep_sending, result._2)
     else
-      (true, result._2)
+      (true, true, result._2)
     end
 
   fun name(): String => _state_comp.name()
