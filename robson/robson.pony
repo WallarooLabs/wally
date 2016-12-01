@@ -4,7 +4,7 @@ use "options"
 use "files"
 use "collections"
 use "sendence/hub"
-use "sendence/epoch"
+use "sendence/wall-clock"
 use "format"
 
 actor Main
@@ -116,7 +116,7 @@ actor MetricsCollector
         output_file.write(metrics_data.print_stats())
       end
       output_file.write(TextFormatter.line_break())
-      let print_timestamp = Epoch.milliseconds()
+      let print_timestamp = WallClock.milliseconds()
       output_file.print("Report generated at: " + print_timestamp.string())
       output_file.dispose()
       _env.out.print("Output file disposed")
@@ -225,7 +225,7 @@ class MetricsData
     generate_throughput_stats()
     generate_latency_stats()
 
-  fun ref calculate_throughput_for_period(count_by_bin: 
+  fun ref calculate_throughput_for_period(count_by_bin:
     Array[U64 val] val): U64
   =>
     var total_throughput_for_period: U64 = 0
@@ -353,7 +353,7 @@ class ThroughputStats
     _trunc_period = _period / 1000000000
     calculate_throughput_per_sec()
     calculate_min_throughput_per_sec()
-    calculate_max_throughput_per_sec() 
+    calculate_max_throughput_per_sec()
 
   fun ref calculate_throughput_per_sec() =>
     let periods_count =
@@ -363,11 +363,11 @@ class ThroughputStats
     avg_throughput_per_sec = throughput_per_period / trunc_period.f64()
 
   fun ref calculate_min_throughput_per_sec() =>
-    min_throughput_per_sec = 
+    min_throughput_per_sec =
       min_throughput_by_period.f64() / _trunc_period.f64()
 
   fun ref calculate_max_throughput_per_sec() =>
-    max_throughput_per_sec = 
+    max_throughput_per_sec =
       max_throughput_by_period.f64() / _trunc_period.f64()
 
   fun format_throughput(throughput: F64): String iso^ =>
@@ -512,10 +512,10 @@ class LatencyStats
   primitive TextFormatter
     fun main_header(): String =>
       "****************************************\n"
-    
+
     fun secondary_header(): String =>
       "------------------------\n"
-    
+
     fun line_break(): String =>
       "\n"
 
