@@ -147,7 +147,6 @@ class TypedRoute[In: Any val] is Route
   var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
-  var _last_credit_ts: U64 = 0 // Timestamp we last requested
 
 
   // _queue stores tuples of the form:
@@ -186,8 +185,7 @@ class TypedRoute[In: Any val] is Route
     ifdef "backpressure" then
       ifdef debug then
         Invariant(new_max_credits > 0)
-      end
-      ifdef debug then
+
         Invariant(new_max_credits ==
           (new_max_credits.usize() - 1).next_pow2().isize())
       end
@@ -200,11 +198,10 @@ class TypedRoute[In: Any val] is Route
 
   fun ref update_max_credits(max_credits: ISize) =>
     ifdef debug then
+      Invariant(max_credits > 0)
+
       Invariant(_max_credits ==
         (_max_credits.usize() - 1).next_pow2().isize())
-    end
-    ifdef debug then
-      Invariant(max_credits > 0)
     end
     _max_credits = max_credits
 
@@ -229,22 +226,23 @@ class TypedRoute[In: Any val] is Route
 
     _request_outstanding = false
     let credits_recouped =
-      if (_credits_available + number) > _max_credits then
+      if (_credits_available + credits) > _max_credits then
         _max_credits - _credits_available
       else
-        number
+        credits
       end
     _credits_available = _credits_available + credits_recouped
     _step.recoup_credits(credits_recouped)
-    _consumer.ack_credits(number, number - credits_recouped)
+    if credits > credits_recouped then
+      _consumer.return_credits(credits - credits_recouped)
+    end
 
     ifdef "credit_trace" then
-      @printf[I32]("--Route: rcvd %llu credits. Used %llu. Had %llu out of %llu\n".cstring(), number, credits_recouped,
-        _credits_available - credits_recouped, _max_credits)
+      @printf[I32]("--Route: rcvd %llu credits. Had %llu out of %llu. Queue size: %llu\n".cstring(), credits, _credits_available - credits, _max_credits, _queue.size())
     end
 
     if _credits_available > 0 then
-      if (_credits_available - credits) == 0 then
+      if (_credits_available - credits_recouped) == 0 then
         _callback.credits_replenished(_step)
       end
 
@@ -266,11 +264,11 @@ class TypedRoute[In: Any val] is Route
   fun ref request_credits() =>
     if not _request_outstanding then
       ifdef "credit_trace" then
-        @printf[I32]("--Route: requesting credits\n".cstring())
+        @printf[I32]("--Route: requesting credits. Have %llu\n".cstring(),
+          _credits_available)
       end
       let credits_requested = _max_credits - _credits_available
       _consumer.credit_request(_step, credits_requested)
-      _last_credit_ts = Time.nanos()
       _request_outstanding = true
     else
       ifdef "credit_trace" then
@@ -384,7 +382,6 @@ class TypedRoute[In: Any val] is Route
         ifdef "credit_trace" then
           @printf[I32]("Route queue is full.\n".cstring())
         end
-        @printf[I32]("!!Route queue is full.\n".cstring())
         false
       else
         true
@@ -462,7 +459,6 @@ class BoundaryRoute is Route
   var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
-  var _last_credit_ts: U64 = 0 // Timestamp we last requested
 
   // Store tuples of the form
   // (delivery_msg, cfp, i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
@@ -530,17 +526,23 @@ class BoundaryRoute is Route
 
     _request_outstanding = false
     let credits_recouped =
-      if (_credits_available + number) > _max_credits then
+      if (_credits_available + credits) > _max_credits then
         _max_credits - _credits_available
       else
-        number
+        credits
       end
     _credits_available = _credits_available + credits_recouped
     _step.recoup_credits(credits_recouped)
-    _consumer.return_credits(credits - credits_recouped)
+    if credits > credits_recouped then
+      _consumer.return_credits(credits - credits_recouped)
+    end
+
+    ifdef "credit_trace" then
+      @printf[I32]("--BoundaryRoute: rcvd %llu credits. Had %llu out of %llu. Queue size: %llu\n".cstring(), credits, _credits_available - credits, _max_credits, _queue.size())
+    end
 
     if _credits_available > 0 then
-      if (_credits_available - credits) == 0 then
+      if (_credits_available - credits_recouped) == 0 then
         _callback.credits_replenished(_step)
       end
 
@@ -560,19 +562,16 @@ class BoundaryRoute is Route
     end
 
   fun ref request_credits() =>
-    if (Time.nanos() - _last_credit_ts) > 1_000_000_000 then
-      if not _request_outstanding then
-        ifdef "credit_trace" then
-          @printf[I32]("--BoundaryRoute: requesting credits\n".cstring())
-        end
-        let requested_credits = _max_credits - _credits_available
-        _consumer.credit_request(_step, requested_credits)
-        _last_credit_ts = Time.nanos()
-        _request_outstanding = true
-      else
-        ifdef "credit_trace" then
-          @printf[I32]("----Request already outstanding\n".cstring())
-        end
+    if not _request_outstanding then
+      ifdef "credit_trace" then
+        @printf[I32]("--BoundaryRoute: requesting credits. Have %llu\n".cstring(), _credits_available)
+      end
+      let requested_credits = _max_credits - _credits_available
+      _consumer.credit_request(_step, requested_credits)
+      _request_outstanding = true
+    else
+      ifdef "credit_trace" then
+        @printf[I32]("----BoundaryRoute: Request already outstanding\n".cstring())
       end
     end
 
@@ -685,9 +684,10 @@ class BoundaryRoute is Route
     try
       _queue.enqueue((delivery_msg, cfp,
         i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id))
+
       if _queue.size() == _queue.max_size() then
         ifdef "credit_trace" then
-          @printf[I32]("Route queue is full.\n".cstring())
+          @printf[I32]("Boundary route queue is full.\n".cstring())
         end
         false
       else

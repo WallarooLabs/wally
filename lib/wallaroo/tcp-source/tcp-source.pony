@@ -112,14 +112,14 @@ actor TCPSource is (Initializable & Producer)
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
       _routes(boundary) =
-        _route_builder(this, boundary, StepRouteCallbackHandler)
+        _route_builder(this, boundary, TCPSourceRouteCallbackHandler)
     end
 
     match default_target
     | let r: CreditFlowConsumerStep =>
       match forward_route_builder
       | let frb: RouteBuilder val =>
-        _routes(r) = frb(this, r, StepRouteCallbackHandler)
+        _routes(r) = frb(this, r, TCPSourceRouteCallbackHandler)
       end
     end
 
@@ -500,9 +500,11 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
+    @printf[I32]("!!MUTE\n".cstring())
     _muted = true
 
   fun ref _unmute() =>
+    @printf[I32]("!!UNMUTE\n".cstring())
     _muted = false
     _pending_reads()
 

@@ -163,8 +163,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       //_queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
-
-      _distributable_credits = _distributable_credits + 1
     end
 
   be writev(data: Array[ByteSeq] val) =>
@@ -180,7 +178,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       let flush_count: USize = (seq_id - _lowest_queue_id).usize()
       _queue.clear_n(flush_count)
       _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-      _distributable_credits = _distributable_credits + flush_count.isize()
+      // !! remove this
+      // _recoup_credits(flush_count.isize())
       ifdef "credit_trace" then
         var recouped_credits = flush_count.isize()
         if _distributable_credits > _max_distributable_credits then
@@ -239,11 +238,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
-    None
-
-    // TODO: This doesn't line up with actual messages.  We need a new
-    // strategy.
-    //_recoup_credits(number_finished)
+    _recoup_credits(number_finished)
+    // @printf[I32]("!!Distributable Credits: %llu\n".cstring(),
+      // _distributable_credits)
 
   //
   // CREDIT FLOW
@@ -298,10 +295,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       0
     end
 
-    let give_out = credits_requested.min(desired_give_out)
+    // let give_out = credits_requested.min(desired_give_out)
+    let give_out = desired_give_out
 
     ifdef "credit_trace" then
-      @printf[I32]("Boundary: credit request and giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
+      @printf[I32]("Boundary: credits requested: %llu. Giving %llu credits out of %llu\n".cstring(), credits_requested, give_out,
+        _distributable_credits)
     end
 
     from.receive_credits(give_out, this)

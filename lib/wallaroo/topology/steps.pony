@@ -352,20 +352,13 @@ actor Step is (RunnableStep & Resilient & Producer &
       Invariant(_upstreams.contains(from))
     end
 
-    // TODO: CREDITFLOW - this is a very naive strategy
-    // Could quite possibly deadlock. Would need to look into that more.
-    // let lccl = _lowest_route_credit_level()
     let desired_give_out = _distributable_credits / _upstreams.size().isize()
-    // let give_out = if lccl > desired_give_out then
-      // desired_give_out
-    // else
-      // lccl
-    // end
 
-    let give_out = credits_requested.min(desired_give_out)
+    // let give_out = credits_requested.min(desired_give_out)
+    let give_out = desired_give_out
 
     ifdef "credit_trace" then
-      @printf[I32]("Step: credit request and giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
+      @printf[I32]("Step: credit requested: %llu. Giving %llu credits out of %llu\n".cstring(), credits_requested, give_out, _distributable_credits)
     end
 
     from.receive_credits(give_out, this)

@@ -307,7 +307,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       0
     end
 
-    let give_out = credits_requested.min(desired_give_out)
+    // let give_out = credits_requested.min(desired_give_out)
+    let give_out = desired_give_out
 
     ifdef debug then
       try
@@ -320,7 +321,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("Sink: Credits requested. Giving %llu out of %llu\n".cstring(), give_out, _distributable_credits)
+      @printf[I32]("Sink: Credits requested: %llu. Giving %llu out of %llu\n".cstring(), credits_requested, give_out, _distributable_credits)
     end
 
     from.receive_credits(give_out, this)
