@@ -190,8 +190,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
             _distributable_credits)
         end
       else
-        if _distributable_credits > _max_distributable_credits then
-          _distributable_credits = _max_distributable_credits
+        ifdef "backpressure" then
+          if _distributable_credits > _max_distributable_credits then
+            _distributable_credits = _max_distributable_credits
+          end
         end
       end
 
@@ -238,9 +240,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
-    _recoup_credits(number_finished)
-    // @printf[I32]("!!Distributable Credits: %llu\n".cstring(),
-      // _distributable_credits)
+    ifdef "backpressure" then
+      _recoup_credits(number_finished)
+    end
 
   //
   // CREDIT FLOW

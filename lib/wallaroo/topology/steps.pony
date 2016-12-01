@@ -135,17 +135,11 @@ actor Step is (RunnableStep & Resilient & Producer &
       let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
       _routes(consumer) = next_route
       if _initialized then
-        // let new_max_credits_per_route =
-        //   _max_distributable_credits / _routes.size().isize()
-
         // TODO: This is a kind of hack right now. Each route has the
         // same number of max credits as the step itself.  The commented
         // code surrounding this shows the old approach of dividing the
         // max credits among routes.
         next_route.initialize(_max_distributable_credits)
-        // for r in _routes.values() do
-        //   r.update_max_credits(new_max_credits_per_route)
-        // end
       end
     end
 
