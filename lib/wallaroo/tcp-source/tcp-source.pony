@@ -47,6 +47,7 @@ actor TCPSource is (Initializable & Producer)
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
   var _read_len: USize = 0
+  var _reading: Bool = false
   var _shutdown: Bool = false
   var _muted: Bool =
     ifdef "backpressure" then
@@ -369,9 +370,11 @@ actor TCPSource is (Initializable & Producer)
     """
     try
       var sum: USize = 0
+      _reading = true
 
       while _readable and not _shutdown_peer do
         if _muted then
+          _reading = false
           return
         end
 
@@ -389,11 +392,13 @@ actor TCPSource is (Initializable & Producer)
           // We might have become muted while handling the
           // last batch of data
           if _muted then
+            _reading = false
             return
           end
           ifdef osx then
             if not carry_on then
               _read_again()
+              _reading = false
               return
             end
 
@@ -402,6 +407,7 @@ actor TCPSource is (Initializable & Producer)
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
               _read_again()
+              _reading = false
               return
             end
           end
@@ -419,6 +425,7 @@ actor TCPSource is (Initializable & Producer)
           // Would block, try again later.
           _readable = false
           _resubscribe_event()
+          _reading = false
           return
         | _next_size =>
           // Increase the read buffer size.
@@ -450,11 +457,13 @@ actor TCPSource is (Initializable & Producer)
             // We might have become muted while handling the
             // last batch of data
             if _muted then
+              _reading = false
               return
             end
             ifdef osx then
               if not carry_on then
                 _read_again()
+                _reading = false
                 return
               end
 
@@ -463,6 +472,7 @@ actor TCPSource is (Initializable & Producer)
               if sum >= _max_size then
                 // If we've read _max_size, yield and read again later.
                 _read_again()
+                _reading = false
                 return
               end
             end
@@ -477,11 +487,13 @@ actor TCPSource is (Initializable & Producer)
           // We might have become muted while handling the
           // last batch of data
           if _muted then
+            _reading = false
             return
           end
           ifdef osx then
             if not carry_on then
               _read_again()
+              _reading = false
               return
             end
 
@@ -490,6 +502,7 @@ actor TCPSource is (Initializable & Producer)
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
               _read_again()
+              _reading = false
               return
             end
           end
@@ -500,6 +513,8 @@ actor TCPSource is (Initializable & Producer)
       _shutdown_peer = true
       close()
     end
+
+    _reading = false
 
   be _read_again() =>
     """
@@ -519,7 +534,9 @@ actor TCPSource is (Initializable & Producer)
 
   fun ref _unmute() =>
     _muted = false
-    _pending_reads()
+    if not _reading then
+      _pending_reads()
+    end
 
   fun ref expect(qty: USize = 0) =>
     """
