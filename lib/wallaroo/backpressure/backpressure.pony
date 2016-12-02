@@ -167,21 +167,11 @@ class TypedRoute[In: Any val] is Route
     _consumer = consumer
     _callback = handler
     _consumer.register_producer(_step)
-    ifdef "backpressure" then
-      handler.credits_exhausted(_step)
-    end
-    // let q_size: USize = ifdef "backpressure" then
-    //   500_000
-    // else
-    //   0
-    // end
 
     // We start at 0 size.  We need to know the max_credits before we
     // can size this in the initialize method.
     _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
       None, SeqId, RouteId)](0)
-    // _queue = ContainerQueue[TypedRouteQueueTuple[In], TypedRouteQueueData[In]](
-    //   TypedRouteQueueDataBuilder[In], q_size)
 
   fun ref initialize(new_max_credits: ISize, step_type: String) =>
     _step_type = step_type
@@ -486,9 +476,6 @@ class BoundaryRoute is Route
     _consumer = consumer
     _callback = handler
     _consumer.register_producer(_step)
-    ifdef "backpressure" then
-      handler.credits_exhausted(_step)
-    end
     _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
       Producer, U128, None, SeqId, RouteId)](0)
 
