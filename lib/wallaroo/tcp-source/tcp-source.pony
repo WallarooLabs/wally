@@ -386,6 +386,11 @@ actor TCPSource is (Initializable & Producer)
 
           let out = _expect_read_buf.block(block_size)
           let carry_on = _notify.received(this, consume out)
+          // We might have become muted while handling the
+          // last batch of data
+          if _muted then
+            return
+          end
           ifdef osx then
             if not carry_on then
               _read_again()
@@ -442,6 +447,11 @@ actor TCPSource is (Initializable & Producer)
             let osize = block_size
 
             let carry_on = _notify.received(this, consume out)
+            // We might have become muted while handling the
+            // last batch of data
+            if _muted then
+              return
+            end
             ifdef osx then
               if not carry_on then
                 _read_again()
@@ -464,6 +474,11 @@ actor TCPSource is (Initializable & Producer)
           _read_len = 0
 
           let carry_on = _notify.received(this, consume data)
+          // We might have become muted while handling the
+          // last batch of data
+          if _muted then
+            return
+          end
           ifdef osx then
             if not carry_on then
               _read_again()
