@@ -584,6 +584,10 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       if (_muted == 0) then
         p._unmute()
       end
+      ifdef "credit_trace" then
+        @printf[I32]("Credits_replenished. Now _muted=%llu\n".cstring(),
+          _muted)
+      end
     else
       Fail()
     end
@@ -595,6 +599,10 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
         p._mute()
       end
       _muted = _muted + 1
+      ifdef "credit_trace" then
+        @printf[I32]("Credits_exhausted. Now _muted=%llu\n".cstring(),
+          _muted)
+      end
     else
       Fail()
     end
