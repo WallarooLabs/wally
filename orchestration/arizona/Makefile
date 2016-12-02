@@ -282,9 +282,9 @@ terraform-destroy: # actual terraform destroy command
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'!\033[0m"
 
 sleep60: # sleep 60 seconds
-	@echo "\033[36m==> Sleeping 60 seconds for cluster '$(cluster_name)' in\
+	@echo "\033[36m==> Sleeping 120 seconds for cluster '$(cluster_name)' in\
  region '$(region)' at provider '$(provider)' to spin up...\033[0m"
-	@sleep 60
+	@sleep 120
 
 cluster: in_cluster=true
 cluster: check-cluster-name apply sleep60 configure ## Creates a cluster and configures it with Ansible

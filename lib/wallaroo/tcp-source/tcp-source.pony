@@ -1,10 +1,9 @@
-use "assert"
 use "buffered"
 use "collections"
 use "net"
-use "time"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/topology"
 use "wallaroo/tcp-sink"
@@ -47,6 +46,7 @@ actor TCPSource is (Initializable & Producer)
   var _shutdown_peer: Bool = false
   var _readable: Bool = false
   var _read_len: USize = 0
+  var _reading: Bool = false
   var _shutdown: Bool = false
   var _muted: Bool =
     ifdef "backpressure" then
@@ -369,9 +369,11 @@ actor TCPSource is (Initializable & Producer)
     """
     try
       var sum: USize = 0
+      _reading = true
 
       while _readable and not _shutdown_peer do
         if _muted then
+          _reading = false
           return
         end
 
@@ -386,9 +388,16 @@ actor TCPSource is (Initializable & Producer)
 
           let out = _expect_read_buf.block(block_size)
           let carry_on = _notify.received(this, consume out)
+          // We might have become muted while handling the
+          // last batch of data
+          if _muted then
+            _reading = false
+            return
+          end
           ifdef osx then
             if not carry_on then
               _read_again()
+              _reading = false
               return
             end
 
@@ -397,6 +406,7 @@ actor TCPSource is (Initializable & Producer)
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
               _read_again()
+              _reading = false
               return
             end
           end
@@ -414,6 +424,7 @@ actor TCPSource is (Initializable & Producer)
           // Would block, try again later.
           _readable = false
           _resubscribe_event()
+          _reading = false
           return
         | _next_size =>
           // Increase the read buffer size.
@@ -442,9 +453,16 @@ actor TCPSource is (Initializable & Producer)
             let osize = block_size
 
             let carry_on = _notify.received(this, consume out)
+            // We might have become muted while handling the
+            // last batch of data
+            if _muted then
+              _reading = false
+              return
+            end
             ifdef osx then
               if not carry_on then
                 _read_again()
+                _reading = false
                 return
               end
 
@@ -453,6 +471,7 @@ actor TCPSource is (Initializable & Producer)
               if sum >= _max_size then
                 // If we've read _max_size, yield and read again later.
                 _read_again()
+                _reading = false
                 return
               end
             end
@@ -464,9 +483,16 @@ actor TCPSource is (Initializable & Producer)
           _read_len = 0
 
           let carry_on = _notify.received(this, consume data)
+          // We might have become muted while handling the
+          // last batch of data
+          if _muted then
+            _reading = false
+            return
+          end
           ifdef osx then
             if not carry_on then
               _read_again()
+              _reading = false
               return
             end
 
@@ -475,6 +501,7 @@ actor TCPSource is (Initializable & Producer)
             if sum >= _max_size then
               // If we've read _max_size, yield and read again later.
               _read_again()
+              _reading = false
               return
             end
           end
@@ -485,6 +512,8 @@ actor TCPSource is (Initializable & Producer)
       _shutdown_peer = true
       close()
     end
+
+    _reading = false
 
   be _read_again() =>
     """
@@ -500,13 +529,13 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
-    @printf[I32]("!!MUTE\n".cstring())
     _muted = true
 
   fun ref _unmute() =>
-    @printf[I32]("!!UNMUTE\n".cstring())
     _muted = false
-    _pending_reads()
+    if not _reading then
+      _pending_reads()
+    end
 
   fun ref expect(qty: USize = 0) =>
     """
@@ -534,6 +563,8 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
     match producer
     | let p: TCPSource ref =>
       p._hard_close()
+    else
+      Fail()
     end
 
   fun ref credits_replenished(producer: Producer ref) =>
@@ -547,6 +578,8 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       if (_muted == 0) then
         p._unmute()
       end
+    else
+      Fail()
     end
 
   fun ref credits_exhausted(producer: Producer ref) =>
@@ -554,4 +587,6 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
     | let p: TCPSource ref =>
       _muted = _muted + 1
       p._mute()
+    else
+      Fail()
     end
