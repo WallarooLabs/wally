@@ -20,7 +20,7 @@ primitive CPPStateChangeRepositoryHelper
     let d = if data.is_null() then
       None
     else
-      recover val CPPData(recover CPPManagedObject(data) end) end
+      recover val CPPData(data) end
     end
 
     (d, state_change)

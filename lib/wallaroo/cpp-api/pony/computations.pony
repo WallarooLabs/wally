@@ -10,66 +10,61 @@ use @w_state_computation_get_name[Pointer[U8]](state_computation: StateComputati
 use @w_state_computation_get_number_of_state_change_builders[USize](state_computaton: StateComputationP)
 use @w_state_computation_get_state_change_builder[StateChangeBuilderP](state_computation: StateComputationP, idx: USize)
 
-type ComputationP is ManagedObjectP
-type StateComputationP is ManagedObjectP
+type ComputationP is Pointer[U8] val
+type StateComputationP is Pointer[U8] val
 
 class CPPComputation is Computation[CPPData val, CPPData val]
-  let _computation: CPPManagedObject val
-  let _name: String
+  var _computation: ComputationP
 
-  new create(computation: CPPManagedObject val) =>
+  new create(computation: ComputationP) =>
     _computation = computation
-    _name = recover String.from_cstring(@w_computation_get_name(_computation.obj())) end
 
   fun apply(input: CPPData val): (CPPData val | None) =>
-    match @w_computation_compute(_computation.obj(), input.obj())
+    match @w_computation_compute(_computation, input.obj())
     | let result: DataP if (not result.is_null()) =>
-      recover CPPData(CPPManagedObject(result)) end
+      recover CPPData(result) end
     else
       None
     end
 
   fun name(): String =>
-    _name
+    recover String.from_cstring(@w_computation_get_name(_computation)) end
 
-struct StateComputationReturn
-  let has_data: Bool = false
-  embed data: Pointer[U8] val = recover Pointer[U8] end
-  let has_state_change: Bool = false
-  embed state_change: CPPStateChange = CPPStateChange(recover CPPManagedObject(recover Pointer[U8] end) end)
+  fun _final() =>
+    @w_managed_object_delete(_computation)
 
 class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState]
-  var _computation: CPPManagedObject val
-  // var _name: 
+  var _computation: StateComputationP
 
-  new create(computation: CPPManagedObject val) =>
+  new create(computation: StateComputationP) =>
     _computation = computation
-    // _name = recover String.from_cstring(@w_state_computation_get_name(_computation.obj())) end
 
   fun apply(input: CPPData val, sc_repo: StateChangeRepository[CPPState], state: CPPState):
     ((CPPData val | None), (CPPStateChange | None))
   =>
-    @w_state_computation_compute(_computation.obj(), input.obj(), sc_repo, CPPStateChangeRepositoryHelper, state.obj(), None)
+    @w_state_computation_compute(_computation, input.obj(), sc_repo, CPPStateChangeRepositoryHelper, state.obj(), None)
 
   fun name(): String =>
-    recover String.from_cstring(@w_state_computation_get_name(_computation.obj())) end
+    recover String.from_cstring(@w_state_computation_get_name(_computation)) end
 
   fun state_change_builders(): Array[StateChangeBuilder[CPPState] val] val =>
-    let num_builders = @w_state_computation_get_number_of_state_change_builders(_computation.obj())
+    let num_builders = @w_state_computation_get_number_of_state_change_builders(_computation)
     recover
       let builders = Array[StateChangeBuilder[CPPState] val](num_builders)
       for i in Range(0, num_builders) do
-        builders.push(recover CPPStateChangeBuilder(recover CPPManagedObject(@w_state_computation_get_state_change_builder(_computation.obj(), i)) end) end)
+        builders.push(recover CPPStateChangeBuilder(@w_state_computation_get_state_change_builder(_computation, i)) end)
       end
       builders
     end
 
-  // fun _serialise_space(): USize =>
-  //   @w_serializable_serialize_get_size(_computation.obj())
+  fun _serialise_space(): USize =>
+    @w_serializable_serialize_get_size(_computation)
 
-  // fun _serialise(bytes: Pointer[U8] tag) =>
-  //   @w_serializable_serialize(_computation.obj(), bytes, USize(0))
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    @w_serializable_serialize(_computation, bytes, USize(0))
 
-  // fun ref _deserialise(bytes: Pointer[U8] tag) =>
-  //   _computation = recover CPPManagedObject(recover @w_user_serializable_deserialize(bytes, USize(0)) end) end
-  //   _name = recover String.from_cstring(@w_computation_get_name(_computation.obj())) end
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _computation = recover @w_user_serializable_deserialize(bytes, USize(0)) end
+
+  fun _final() =>
+    @w_managed_object_delete(_computation)
