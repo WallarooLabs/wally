@@ -22,15 +22,14 @@ class TCPSourceListenerBuilder
   let _max_size: USize
 
   new val create(source_builder: SourceBuilder val, router: Router val,
-    route_builder: RouteBuilder val, 
+    route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder val | None) = None, 
-    target_router: Router val = EmptyRouter, 
-    host: String = "", service: String = "0", limit: USize = 0, 
-    init_size: USize = 64, max_size: USize = 16384)
+    default_in_route_builder: (RouteBuilder val | None) = None,
+    target_router: Router val = EmptyRouter,
+    host: String = "", service: String = "0")
   =>
     _source_builder = source_builder
     _router = router
@@ -48,10 +47,9 @@ class TCPSourceListenerBuilder
     _max_size = max_size
 
   fun apply(): TCPSourceListener =>
-    TCPSourceListener(_source_builder, _router, _route_builder, 
-      _outgoing_boundaries, _tcp_sinks, _alfred, _default_target, 
-      _default_in_route_builder, _target_router, _host, _service, _limit, 
-      _init_size, _max_size) 
+    TCPSourceListener(_source_builder, _router, _route_builder,
+      _outgoing_boundaries, _tcp_sinks, _alfred, _default_target,
+      _default_in_route_builder, _target_router, _host, _service, _limit)
 
 actor TCPSourceListener
   """
@@ -79,9 +77,9 @@ actor TCPSourceListener
     tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder val | None) = None, 
-    target_router: Router val = EmptyRouter, 
-    host: String = "", service: String = "0", limit: USize = 0, 
+    default_in_route_builder: (RouteBuilder val | None) = None,
+    target_router: Router val = EmptyRouter,
+    host: String = "", service: String = "0", limit: USize = 0,
     init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -160,8 +158,8 @@ actor TCPSourceListener
     Spawn a new connection.
     """
     try
-      TCPSource._accept(this, _notify.connected(this), _router.routes(), 
-        _route_builder, _outgoing_boundaries, _tcp_sinks, ns, _default_target, 
+      TCPSource._accept(this, _notify.connected(this), _router.routes(),
+        _route_builder, _outgoing_boundaries, _tcp_sinks, ns, _default_target,
         _default_in_route_builder, _init_size, _max_size)
       _count = _count + 1
     else
