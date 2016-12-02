@@ -766,10 +766,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           end
         end
 
-        match final_pending_sent
-        | let sent: SeqId =>
-          _unit_finished(num_sent, sent)
-        end
+        _unit_finished(num_sent, sent)
       end
     end
 
