@@ -253,8 +253,7 @@ class TypedRoute[In: Any val] is Route
         _flush_queue()
 
         if _credits_available == 0 then
-          _callback.credits_exhausted(_step)
-          request_credits()
+          _credits_exhausted()
         end
       end
 
@@ -263,6 +262,10 @@ class TypedRoute[In: Any val] is Route
     else
       request_credits()
     end
+
+  fun ref _credits_exhausted() =>
+    _callback.credits_exhausted(_step)
+    request_credits()
 
   fun ref request_credits() =>
     if not _request_outstanding then
@@ -312,8 +315,7 @@ class TypedRoute[In: Any val] is Route
           end
 
           if _credits_available == 0 then
-            _callback.credits_exhausted(_step)
-            request_credits()
+            _credits_exhausted()
           else
             if above_request_point then
               if _credits_available < _request_more_credits_after then
@@ -564,8 +566,7 @@ class BoundaryRoute is Route
         _flush_queue()
 
         if _credits_available == 0 then
-          _callback.credits_exhausted(_step)
-          request_credits()
+          _credits_exhausted()
         end
       end
 
@@ -574,6 +575,10 @@ class BoundaryRoute is Route
     else
       request_credits()
     end
+
+  fun ref _credits_exhausted() =>
+    _callback.credits_exhausted(_step)
+    request_credits()
 
   fun ref request_credits() =>
     if not _request_outstanding then
@@ -630,8 +635,7 @@ class BoundaryRoute is Route
         end
 
         if _credits_available == 0 then
-          _callback.credits_exhausted(_step)
-          request_credits()
+          _credits_exhausted()
         else
           if above_request_point then
             if _credits_available < _request_more_credits_after then
