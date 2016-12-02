@@ -322,7 +322,6 @@ class TypedRoute[In: Any val] is Route
           end
           _add_to_queue(metric_name, source_ts, input, cfp,
             origin, msg_uid, frac_ids, i_seq_id, i_route_id)
-          request_credits()
           not (_queue.size() == _queue.max_size())
         end
       else
@@ -638,7 +637,6 @@ class BoundaryRoute is Route
           i_frac_ids,
           i_seq_id,
           i_route_id)
-        request_credits()
         not (_queue.size() == _queue.max_size())
       end
     else
