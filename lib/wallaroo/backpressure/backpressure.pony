@@ -9,6 +9,7 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/tcp-sink"
+use "wallaroo/tcp-source"
 use "wallaroo/topology"
 
 trait tag CreditFlowConsumer
@@ -291,6 +292,13 @@ class TypedRoute[In: Any val] is Route
     | let input: In =>
       ifdef "backpressure" then
         if _credits_available > 0 then
+          ifdef debug then
+            match _step
+            | let source: TCPSource ref =>
+              Invariant(not source.is_muted())
+            end
+          end
+
           let above_request_point =
             _credits_available >= _request_more_credits_after
 

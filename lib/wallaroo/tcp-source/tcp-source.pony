@@ -543,6 +543,9 @@ actor TCPSource is (Initializable & Producer)
       _pending_reads()
     end
 
+  fun ref is_muted(): Bool =>
+    _muted
+
   fun ref expect(qty: USize = 0) =>
     """
     A `received` call on the notifier must contain exactly `qty` bytes. If
