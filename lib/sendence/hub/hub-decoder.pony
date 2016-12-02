@@ -58,6 +58,9 @@ primitive HubPayloadMsg is HubProtocolMsg
 class HubMetricsMsg is HubProtocolMsg
   var name: String = ""
   var category: String = ""
+  var pipeline_name: String = ""
+  var worker_name: String = ""
+  var id: U16 = 0
   var period_ends_at: U64 = 0
   var period: U64 = 0
   var histogram_min: U64 = 0
@@ -73,6 +76,11 @@ class HubMetricsMsg is HubProtocolMsg
       name = String.from_array(rb.block(name_size))
       let category_size = rb.u32_be().usize()
       category = String.from_array(rb.block(category_size))
+      let worker_name_size = rb.u32_be().usize()
+      worker_name = String.from_array(rb.block(worker_name_size))
+      let pipeline_name_size = rb.u32_be().usize()
+      pipeline_name = String.from_array(rb.block(pipeline_name_size))
+      id = rb.u16_be()
       for i in Range[U64](0, 65) do
         let bin = rb.u64_be()
         histogram.push(bin)
