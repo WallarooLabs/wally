@@ -42,24 +42,24 @@ primitive ArizonaStateBuilder
   fun name(): String => "state builder"
   fun apply(): CPPState =>
     // Debug("Building state")
-    CPPState(CPPManagedObject(@get_state()))
+    CPPState(@get_state())
 
 primitive ArizonaDefaultStateBuilder
   fun name(): String => "default state builder"
   fun apply(): CPPState =>
     // Debug("Building state")
-    CPPState(CPPManagedObject(@get_default_state()))
+    CPPState(@get_default_state())
 
 actor Main
   new create(env: Env) =>
     try
-      let partition_function = recover val CPPPartitionFunctionU64(recover CPPManagedObject(@get_partition_function()) end) end
+      let partition_function = recover val CPPPartitionFunctionU64(@get_partition_function()) end
       let partition_keys: Array[U64] val = partition_factory(10000, 11000)
       let data_partition = Partition[CPPData val, U64](partition_function, partition_keys)
 
       let application = recover val
         Application("Passthrough Topology")
-          .new_pipeline[CPPData val, CPPData val]("source-decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end)
+          .new_pipeline[CPPData val, CPPData val]("source-decoder", recover CPPSourceDecoder(@get_source_decoder()) end)
           // NO PARTITION
           // .to_stateful[CPPData val, CPPState](
           //   computation_factory(),
@@ -76,7 +76,7 @@ actor Main
               ArizonaStateBuilder, "state-builder", data_partition
               where
               multi_worker = true, default_state_name = "default-state")
-          .to_sink(recover CPPSinkEncoder(recover CPPManagedObject(@get_sink_encoder()) end) end, recover [0] end)
+          .to_sink(recover CPPSinkEncoder(recover @get_sink_encoder() end) end, recover [0] end)
 
           // PARITIONED WITH DEFAULT (B)
           .partition_default_target[CPPData val, CPPData val, CPPState](
@@ -90,10 +90,10 @@ actor Main
     end
 
   fun computation_factory(): CPPStateComputation val =>
-    recover CPPStateComputation(recover CPPManagedObject(@get_state_computation()) end) end
+    recover CPPStateComputation(recover @get_state_computation() end) end
 
   fun default_computation_factory(): CPPStateComputation val =>
-    recover CPPStateComputation(recover CPPManagedObject(@get_default_state_computation()) end) end
+    recover CPPStateComputation(recover @get_default_state_computation() end) end
 
   fun partition_factory(partition_start: USize, partition_end: USize): Array[U64] val =>
     let partition_count = partition_end - partition_start

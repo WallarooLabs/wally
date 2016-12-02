@@ -1,19 +1,22 @@
-type DataP is ManagedObjectP
+type DataP is Pointer[U8] val
 
 class CPPData
-  let _data: CPPManagedObject
+  var _data: Pointer[U8] val
 
-  new create(data: CPPManagedObject) =>
+  new create(data: Pointer[U8] val) =>
     _data = data
 
-  fun obj(): DataP =>
-    _data.obj()
-  
-  fun hash(): U64 =>
-    _data.hash()
+  fun obj(): DataP val =>
+    _data
 
-  fun eq(other: CPPData): Bool =>
-    _data.hash() == other.hash()
+  fun _serialise_space(): USize =>
+    @w_serializable_serialize_get_size(_data)
 
-  fun partition_index(): U64 =>
-    _data.partition_index()
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    @w_serializable_serialize(_data, bytes, USize(0))
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _data = recover @w_user_serializable_deserialize(bytes, USize(0)) end
+
+  fun _final() =>
+    @w_managed_object_delete(_data)
