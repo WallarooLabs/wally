@@ -361,12 +361,6 @@ actor Step is (RunnableStep & Resilient & Producer &
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
 
-    if _distributable_credits == 0 then
-      for r in _routes.values() do
-        r.request_credits()
-      end
-    end
-
   be return_credits(credits: ISize) =>
     _distributable_credits = _distributable_credits + credits
 
