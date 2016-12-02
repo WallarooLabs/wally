@@ -30,9 +30,9 @@ actor WorkerInitializer
   let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
 
   new create(auth: AmbientAuth, workers: USize, connections: Connections,
-    application_initializer: ApplicationInitializer, 
+    application_initializer: ApplicationInitializer,
     local_topology_initializer: LocalTopologyInitializer,
-    data_addr: Array[String] val, metrics_conn: TCPConnection) 
+    data_addr: Array[String] val, metrics_conn: TCPConnection)
   =>
     _auth = auth
     _expected = workers
@@ -46,20 +46,20 @@ actor WorkerInitializer
     _application_initializer.update_application(a)
 
     if _expected == 1 then
-      _application_initializer.initialize(this, _expected, 
-        recover Array[String] end)     
+      _application_initializer.initialize(this, _expected,
+        recover Array[String] end)
     end
 
   be identify_control_address(worker: String, host: String, service: String) =>
     if _control_addrs.contains(worker) then
       @printf[I32](("Initializer: " + worker + " tried registering control channel twice.\n").cstring())
-    else  
+    else
       _worker_names.push(worker)
       _control_addrs(worker) = (host, service)
       _control_identified = _control_identified + 1
       if _control_identified == _expected then
         @printf[I32]("All worker channels identified\n".cstring())
-    
+
         _create_data_receivers()
       end
     end
@@ -67,7 +67,7 @@ actor WorkerInitializer
   be identify_data_address(worker: String, host: String, service: String) =>
     if _data_addrs.contains(worker) then
       @printf[I32](("Initializer: " + worker + " tried registering data channel twice.\n").cstring())
-    else  
+    else
       _data_addrs(worker) = (host, service)
       _data_identified = _data_identified + 1
       if _data_identified == _expected then
@@ -77,15 +77,15 @@ actor WorkerInitializer
       end
     end
 
-  be distribute_local_topologies(ts: Array[LocalTopology val] val) =>
+  be distribute_local_topologies(ts: Map[String, LocalTopology val] val) =>
     if _worker_names.size() != ts.size() then
       @printf[I32]("We need one local topology for each worker\n".cstring())
     else
       @printf[I32]("Distributing local topologies to workers\n".cstring())
-      for (idx, worker) in _worker_names.pairs() do
+      for (worker, topology) in ts.pairs() do
         try
-          let spin_up_msg = ChannelMsgEncoder.spin_up_local_topology(ts(idx), 
-            _auth)
+          let spin_up_msg = ChannelMsgEncoder.spin_up_local_topology(
+            topology, _auth)
           _connections.send_control(worker, spin_up_msg)
         end
       end
@@ -102,14 +102,14 @@ actor WorkerInitializer
           names.push(name)
         end
 
-        _application_initializer.initialize(this, _expected, 
-          consume names)    
+        _application_initializer.initialize(this, _expected,
+          consume names)
       end
     end
 
   be topology_ready(worker_name: String) =>
     if not _ready_workers.contains(worker_name) then
-      @printf[I32]("%s reported topology ready!\n".cstring(), 
+      @printf[I32]("%s reported topology ready!\n".cstring(),
         worker_name.cstring())
       _ready_workers.set(worker_name)
       _initialized = _initialized + 1
@@ -118,7 +118,7 @@ actor WorkerInitializer
           _expected)
         _application_initializer.topology_ready()
 
-        let topology_ready_msg = 
+        let topology_ready_msg =
           ExternalMsgEncoder.topology_ready("initializer")
         _connections.send_phone_home(topology_ready_msg)
       end
@@ -133,7 +133,7 @@ actor WorkerInitializer
     let ws: Array[String] trn = recover Array[String] end
 
     ws.push("initializer")
-    for w in _worker_names.values() do 
+    for w in _worker_names.values() do
       ws.push(w)
     end
 
@@ -144,7 +144,7 @@ actor WorkerInitializer
         workers, _auth)
       for key in _control_addrs.keys() do
         _connections.send_control(key, create_data_receivers_msg)
-      end 
+      end
 
       _local_topology_initializer.create_data_receivers(workers, this)
     else
@@ -166,9 +166,9 @@ actor WorkerInitializer
 
   fun _generate_addresses_map(): Map[String, Map[String, (String, String)]] val
   =>
-    let map: Map[String, Map[String, (String, String)]] trn = 
+    let map: Map[String, Map[String, (String, String)]] trn =
       recover Map[String, Map[String, (String, String)]] end
-    let control_map: Map[String, (String, String)] trn = 
+    let control_map: Map[String, (String, String)] trn =
       recover Map[String, (String, String)] end
     for (key, value) in _control_addrs.pairs() do
       control_map(key) = value
