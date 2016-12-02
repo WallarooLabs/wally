@@ -3,6 +3,7 @@ use "collections"
 use "net"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/topology"
 use "wallaroo/tcp-sink"
@@ -562,6 +563,8 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
     match producer
     | let p: TCPSource ref =>
       p._hard_close()
+    else
+      Fail()
     end
 
   fun ref credits_replenished(producer: Producer ref) =>
@@ -575,6 +578,8 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       if (_muted == 0) then
         p._unmute()
       end
+    else
+      Fail()
     end
 
   fun ref credits_exhausted(producer: Producer ref) =>
@@ -582,4 +587,6 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
     | let p: TCPSource ref =>
       _muted = _muted + 1
       p._mute()
+    else
+      Fail()
     end
