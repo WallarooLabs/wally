@@ -23,6 +23,7 @@ type CreditFlowProducerConsumer is (Producer & CreditFlowConsumer)
 type Consumer is CreditFlowConsumer
 
 trait RouteCallbackHandler
+  fun ref register(producer: Producer ref, r: Route tag)
   fun shutdown(p: Producer ref)
   fun ref credits_replenished(p: Producer ref)
   fun ref credits_exhausted(p: Producer ref)
@@ -166,6 +167,7 @@ class TypedRoute[In: Any val] is Route
     _step = step
     _consumer = consumer
     _callback = handler
+    _callback.register(_step, this)
     _consumer.register_producer(_step)
 
     // We start at 0 size.  We need to know the max_credits before we
@@ -475,6 +477,7 @@ class BoundaryRoute is Route
     _step = step
     _consumer = consumer
     _callback = handler
+    _callback.register(_step, this)
     _consumer.register_producer(_step)
     _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
       Producer, U128, None, SeqId, RouteId)](0)

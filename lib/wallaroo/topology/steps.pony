@@ -376,6 +376,9 @@ actor Step is (RunnableStep & Resilient & Producer &
     lowest
 
 class StepRouteCallbackHandler is RouteCallbackHandler
+  fun ref register(producer: Producer ref, r: Route tag) =>
+    None
+
   fun shutdown(producer: Producer ref) =>
     // TODO: CREDITFLOW - What is our error handling?
     None

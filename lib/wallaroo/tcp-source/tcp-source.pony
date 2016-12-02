@@ -558,7 +558,23 @@ actor TCPSource is (Initializable & Producer)
     end
 
 class TCPSourceRouteCallbackHandler is RouteCallbackHandler
+  let _registered_routes: SetIs[Route tag] = _registered_routes.create()
   var _muted: ISize = 0
+
+  fun ref register(producer: Producer ref, r: Route tag) =>
+    ifdef debug then
+      Invariant(not _registered_routes.contains(r))
+    end
+
+    match producer
+    | let s: TCPSource ref =>
+      _registered_routes.set(r)
+      ifdef "backpressure" then
+        _try_mute(s)
+      end
+    else
+      Fail()
+    end
 
   fun shutdown(producer: Producer ref) =>
     match producer
@@ -589,11 +605,8 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
 
   fun ref credits_exhausted(producer: Producer ref) =>
     match producer
-    | let p: TCPSource ref =>
-      if _muted == 0 then
-        p._mute()
-      end
-      _muted = _muted + 1
+    | let s: TCPSource ref =>
+      _try_mute(s)
       ifdef "credit_trace" then
         @printf[I32]("Credits_exhausted. Now _muted=%llu\n".cstring(),
           _muted)
@@ -601,3 +614,9 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
     else
       Fail()
     end
+
+  fun ref _try_mute(s: TCPSource ref) =>
+    if _muted == 0 then
+      s._mute()
+    end
+    _muted = _muted + 1
