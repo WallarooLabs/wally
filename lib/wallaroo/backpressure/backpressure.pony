@@ -312,6 +312,9 @@ class TypedRoute[In: Any val] is Route
               end
             end
           end
+          ifdef debug then
+            Invariant(_queue.size() < _queue.max_size())
+          end
           true
         else
           ifdef "trace" then
@@ -622,6 +625,9 @@ class BoundaryRoute is Route
               request_credits()
             end
           end
+        end
+        ifdef debug then
+          Invariant(_queue.size() < _queue.max_size())
         end
         true
       else
