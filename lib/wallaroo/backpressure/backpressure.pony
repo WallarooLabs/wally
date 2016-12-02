@@ -317,10 +317,10 @@ class TypedRoute[In: Any val] is Route
           ifdef "trace" then
             @printf[I32]("----No credits: added msg to Route queue\n".cstring())
           end
-          let keep_sending = _add_to_queue(metric_name, source_ts, input, cfp,
+          _add_to_queue(metric_name, source_ts, input, cfp,
             origin, msg_uid, frac_ids, i_seq_id, i_route_id)
           request_credits()
-          keep_sending
+          not (_queue.size() == _queue.max_size())
         end
       else
         _send_message_on_route(metric_name, source_ts, input, cfp, origin,
@@ -368,7 +368,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _add_to_queue(metric_name: String, source_ts: U64, input: In,
     cfp: Producer ref, origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     ifdef debug then
       Invariant((_queue.max_size() > 0) and
@@ -382,16 +382,12 @@ class TypedRoute[In: Any val] is Route
         ifdef "credit_trace" then
           @printf[I32]("Route queue is full.\n".cstring())
         end
-        false
-      else
-        true
       end
     else
       ifdef debug then
         @printf[I32]("Failure trying to enqueue typed route data\n".cstring())
       end
       Fail()
-      true
     end
 
   fun ref _flush_queue() =>
@@ -629,7 +625,7 @@ class BoundaryRoute is Route
         end
         true
       else
-        let keep_sending = _add_to_queue(delivery_msg,
+        _add_to_queue(delivery_msg,
           cfp,
           i_origin,
           msg_uid,
@@ -637,7 +633,7 @@ class BoundaryRoute is Route
           i_seq_id,
           i_route_id)
         request_credits()
-        keep_sending
+        not (_queue.size() == _queue.max_size())
       end
     else
       _send_message_on_route(delivery_msg,
@@ -671,7 +667,7 @@ class BoundaryRoute is Route
 
   fun ref _add_to_queue(delivery_msg: ReplayableDeliveryMsg val,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_seq_id: SeqId, i_route_id: RouteId)
   =>
     ifdef debug then
       Invariant((_queue.max_size() > 0) and
@@ -689,16 +685,12 @@ class BoundaryRoute is Route
         ifdef "credit_trace" then
           @printf[I32]("Boundary route queue is full.\n".cstring())
         end
-        false
-      else
-        true
       end
     else
       ifdef debug then
         @printf[I32]("Failure trying to enqueue boundary route data\n".cstring())
       end
       Fail()
-      true
     end
 
   fun ref _flush_queue() =>
