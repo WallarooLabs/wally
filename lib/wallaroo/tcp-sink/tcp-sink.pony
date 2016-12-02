@@ -301,14 +301,16 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    let desired_give_out = if _can_send() then
-      (_distributable_credits / _upstreams.size().isize())
+    let give_out = if _can_send() then
+      let portion = _distributable_credits / _upstreams.size().isize()
+      if _distributable_credits > 0 then
+        portion.max(1)
+      else
+        0
+      end
     else
       0
     end
-
-    // let give_out = credits_requested.min(desired_give_out)
-    let give_out = desired_give_out
 
     ifdef debug then
       try

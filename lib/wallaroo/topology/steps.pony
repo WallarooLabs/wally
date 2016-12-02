@@ -346,10 +346,13 @@ actor Step is (RunnableStep & Resilient & Producer &
       Invariant(_upstreams.contains(from))
     end
 
-    let desired_give_out = _distributable_credits / _upstreams.size().isize()
-
-    // let give_out = credits_requested.min(desired_give_out)
-    let give_out = desired_give_out
+    let give_out =
+      if _distributable_credits > 0 then
+        let portion = _distributable_credits / _upstreams.size().isize()
+        portion.max(1)
+      else
+        0
+      end
 
     ifdef "credit_trace" then
       @printf[I32]("Step: Credits requested. Giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
