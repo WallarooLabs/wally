@@ -766,7 +766,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           end
         end
 
-        _unit_finished(num_sent, sent)
+        _unit_finished(num_sent, final_pending_sent)
       end
     end
 
