@@ -1,8 +1,6 @@
-use "assert"
 use "buffered"
 use "collections"
 use "net"
-use "time"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/invariant"
