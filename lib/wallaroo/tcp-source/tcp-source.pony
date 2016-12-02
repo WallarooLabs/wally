@@ -529,9 +529,15 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
+    ifdef "credit_trace" then
+      @printf[I32]("MUTE\n".cstring())
+    end
     _muted = true
 
   fun ref _unmute() =>
+    ifdef "credit_trace" then
+      @printf[I32]("UNMUTE\n".cstring())
+    end
     _muted = false
     if not _reading then
       _pending_reads()
@@ -585,8 +591,10 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   fun ref credits_exhausted(producer: Producer ref) =>
     match producer
     | let p: TCPSource ref =>
+      if _muted == 0 then
+        p._mute()
+      end
       _muted = _muted + 1
-      p._mute()
     else
       Fail()
     end
