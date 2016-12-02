@@ -14,7 +14,7 @@ use "wallaroo/topology"
 trait tag CreditFlowConsumer
   be register_producer(producer: Producer)
   be unregister_producer(producer: Producer, credits_returned: ISize)
-  be credit_request(from: Producer, credits_requested: ISize)
+  be credit_request(from: Producer)
   be return_credits(credits: ISize)
 
 type CreditFlowProducerConsumer is (Producer & CreditFlowConsumer)
@@ -269,8 +269,7 @@ class TypedRoute[In: Any val] is Route
         @printf[I32]("--Route (%s): requesting credits. Have %llu\n".cstring(),
           _step_type.cstring(), _credits_available)
       end
-      let credits_requested = _max_credits - _credits_available
-      _consumer.credit_request(_step, credits_requested)
+      _consumer.credit_request(_step)
       _request_outstanding = true
     else
       ifdef "credit_trace" then
@@ -573,8 +572,7 @@ class BoundaryRoute is Route
       ifdef "credit_trace" then
         @printf[I32]("--BoundaryRoute (%s): requesting credits. Have %llu\n".cstring(), _step_type.cstring(), _credits_available)
       end
-      let requested_credits = _max_credits - _credits_available
-      _consumer.credit_request(_step, requested_credits)
+      _consumer.credit_request(_step)
       _request_outstanding = true
     else
       ifdef "credit_trace" then

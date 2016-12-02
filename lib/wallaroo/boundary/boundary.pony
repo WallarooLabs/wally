@@ -266,7 +266,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       _recoup_credits(credits_returned)
     end
 
-  be credit_request(from: Producer, credits_requested: ISize) =>
+  be credit_request(from: Producer) =>
     """
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
@@ -301,8 +301,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     let give_out = desired_give_out
 
     ifdef "credit_trace" then
-      @printf[I32]("Boundary: credits requested: %llu. Giving %llu credits out of %llu\n".cstring(), credits_requested, give_out,
-        _distributable_credits)
+      @printf[I32]("Boundary: credits requested. Giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
     end
 
     from.receive_credits(give_out, this)

@@ -337,7 +337,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       _distributable_credits = _max_distributable_credits
     end
 
-  be credit_request(from: Producer, credits_requested: ISize) =>
+  be credit_request(from: Producer) =>
     """
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
@@ -352,7 +352,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     let give_out = desired_give_out
 
     ifdef "credit_trace" then
-      @printf[I32]("Step: Credits requested. Giving %llu credits out of %llu\n".cstring(), credits_requested, give_out, _distributable_credits)
+      @printf[I32]("Step: Credits requested. Giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
     end
 
     from.receive_credits(give_out, this)
