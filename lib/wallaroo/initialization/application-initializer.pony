@@ -22,8 +22,8 @@ actor ApplicationInitializer
 
   new create(auth: AmbientAuth,
     local_topology_initializer: LocalTopologyInitializer,
-    input_addrs: Array[Array[String]] val, 
-    output_addr: Array[String] val, alfred: Alfred tag) 
+    input_addrs: Array[Array[String]] val,
+    output_addr: Array[String] val, alfred: Alfred tag)
   =>
     _auth = auth
     _local_topology_initializer = local_topology_initializer
@@ -40,7 +40,7 @@ actor ApplicationInitializer
     match _application
     | let a: Application val =>
       @printf[I32]("Initializing application\n".cstring())
-      _automate_initialization(a, worker_initializer, worker_count, 
+      _automate_initialization(a, worker_initializer, worker_count,
         worker_names, _alfred)
     else
       @printf[I32]("No application provided!\n".cstring())
@@ -77,14 +77,14 @@ actor ApplicationInitializer
       // directly to a source. For a sink, we don't keep a proxy address but
       // a step id (U128), since every worker will have its own instance of
       // that sink.
-      let step_map: Map[U128, (ProxyAddress val | U128)] trn = 
+      let step_map: Map[U128, (ProxyAddress val | U128)] trn =
         recover Map[U128, (ProxyAddress val | U128)] end
 
       // Keep track of shared state so that it's only created once
       let state_partition_map: Map[String, PartitionAddresses val] trn =
         recover Map[String, PartitionAddresses val] end
 
-      // Keep track of all prestate data so we can register routes 
+      // Keep track of all prestate data so we can register routes
       let pre_state_data: Array[PreStateData val] trn =
         recover Array[PreStateData val] end
 
@@ -96,12 +96,12 @@ actor ApplicationInitializer
 
       // TODO: Replace this when POC default target strategy is updated
       // Map from worker name to default target
-      let default_targets: 
+      let default_targets:
         Map[String, (Array[StepBuilder val] val | ProxyAddress val)]
           = default_targets.create()
 
       // We use these graphs to build the local graphs for each worker
-      let local_graphs: Map[String, Dag[StepInitializer val] trn] trn =  
+      let local_graphs: Map[String, Dag[StepInitializer val] trn] trn =
         recover Map[String, Dag[StepInitializer val] trn] end
 
       // Initialize values for local graphs
@@ -111,12 +111,12 @@ actor ApplicationInitializer
       end
 
       // Create StateSubpartitions
-      let ssb_trn: Map[String, StateSubpartition val] trn = 
+      let ssb_trn: Map[String, StateSubpartition val] trn =
         recover Map[String, StateSubpartition val] end
       for (s_name, p_builder) in application.state_builders().pairs() do
         ssb_trn(s_name) = p_builder.state_subpartition(all_workers)
       end
-      let state_subpartitions: Map[String, StateSubpartition val] val = 
+      let state_subpartitions: Map[String, StateSubpartition val] val =
         consume ssb_trn
 
       // Keep track of proxy ids per worker
@@ -183,7 +183,7 @@ actor ApplicationInitializer
           recover Array[RunnerBuilder val] end
 
         for i in Range(0, pipeline.size()) do
-          let r_builder = 
+          let r_builder =
             try
               pipeline(i)
             else
@@ -232,9 +232,9 @@ actor ApplicationInitializer
         // initializer worker.
         let source_node_id = _guid_gen.u128()
         let source_seq_builder = RunnerSequenceBuilder(
-            source_runner_builders = recover Array[RunnerBuilder val] end) 
+            source_runner_builders = recover Array[RunnerBuilder val] end)
 
-        let source_partition_workers: (String | Array[String] val | None) = 
+        let source_partition_workers: (String | Array[String] val | None) =
           if source_seq_builder.is_prestate() then
             if source_seq_builder.is_multi() then
               @printf[I32]("Multiworker Partition\n".cstring())
@@ -253,9 +253,9 @@ actor ApplicationInitializer
             try
               runner_builders(0).id()
             else
-              // We need a sink on every worker involved in the 
+              // We need a sink on every worker involved in the
               // partition
-              let egress_builder = EgressBuilder(pipeline.name(), 
+              let egress_builder = EgressBuilder(pipeline.name(),
                 sink_id, sink_addr, pipeline.sink_builder())
 
               match source_partition_workers
@@ -267,7 +267,7 @@ actor ApplicationInitializer
                   error
                 end
               | let ws: Array[String] val =>
-                local_graphs("initializer").add_node(egress_builder, 
+                local_graphs("initializer").add_node(egress_builder,
                   sink_id)
                 for w in ws.values() do
                   try
@@ -292,7 +292,7 @@ actor ApplicationInitializer
             source_pre_state_target_id)
           pre_state_data.push(psd)
 
-          let state_builder = 
+          let state_builder =
             try
               application.state_builder(psd.state_name())
             else
@@ -305,15 +305,15 @@ actor ApplicationInitializer
           end
         end
 
-        let source_initializer = SourceData(source_node_id, 
-          pipeline.source_builder(), source_seq_builder, 
-          pipeline.source_route_builder(), source_addr, 
+        let source_initializer = SourceData(source_node_id,
+          pipeline.source_builder(), source_seq_builder,
+          pipeline.source_route_builder(), source_addr,
           source_pre_state_target_id)
 
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
 
         try
-          local_graphs("initializer").add_node(source_initializer, 
+          local_graphs("initializer").add_node(source_initializer,
             source_node_id)
         else
           @printf[I32]("problem adding node to initializer graph\n".cstring())
@@ -325,7 +325,7 @@ actor ApplicationInitializer
         // doesn't need to know its immediate cross-worker predecessor.
         // If the source has a prestate runner on it, then we set this
         // to None since it won't send directly to anything.
-        var last_initializer: ((U128, StepInitializer val) | None) = 
+        var last_initializer: ((U128, StepInitializer val) | None) =
           if source_seq_builder.state_name() == "" then
             (source_node_id, source_initializer)
           else
@@ -350,9 +350,9 @@ actor ApplicationInitializer
         // array will look like: [2, 4, 7]
         let boundaries: Array[USize] = boundaries.create()
         // Since we put the source on the first worker, start at -1 to
-        // indicate that it gets one less step than everyone else (all things 
+        // indicate that it gets one less step than everyone else (all things
         // being equal). per_worker must be at least 1, so the first worker's
-        // boundary will be at least 0. 
+        // boundary will be at least 0.
         var count: USize = 0
         for i in Range(0, worker_count) do
           count = count + per_worker
@@ -361,7 +361,7 @@ actor ApplicationInitializer
           // that is the "anchor" for the partition, so instead we
           // make sure it gets put on the same worker
           try
-            match runner_builders(count) 
+            match runner_builders(count)
             | let pb: PartitionBuilder val =>
               count = count + 1
             end
@@ -373,10 +373,10 @@ actor ApplicationInitializer
             // last worker if need be
             boundaries.push(runner_builders.size())
           else
-            let b = if count < runner_builders.size() then 
-              count 
+            let b = if count < runner_builders.size() then
+              count
             else
-              runner_builders.size() 
+              runner_builders.size()
             end
             boundaries.push(b)
           end
@@ -388,13 +388,13 @@ actor ApplicationInitializer
         var boundaries_idx: USize = 0
 
         ///////////
-        // WORKERS 
+        // WORKERS
 
         // For each worker, use its boundary value to determine which
         // runner_builders to use to create StepInitializers that will be
         // added to its local graph
         while boundaries_idx < boundaries.size() do
-          let boundary = 
+          let boundary =
             try
               boundaries(boundaries_idx)
             else
@@ -421,8 +421,8 @@ actor ApplicationInitializer
               None
             end
 
-          let local_proxy_ids = Map[String, U128] 
-          proxy_ids(worker) = local_proxy_ids          
+          let local_proxy_ids = Map[String, U128]
+          proxy_ids(worker) = local_proxy_ids
           if worker != "initializer" then
             local_proxy_ids("initializer") = _guid_gen.u128()
           end
@@ -451,7 +451,7 @@ actor ApplicationInitializer
               //////////////////////////
               // PRESTATE RUNNER BUILDER
                 // Determine which workers will be involved in this partition
-                let partition_workers: (String | Array[String] val) = 
+                let partition_workers: (String | Array[String] val) =
                   if next_runner_builder.is_multi() then
                     @printf[I32]("Multiworker Partition\n".cstring())
                     all_workers
@@ -463,9 +463,9 @@ actor ApplicationInitializer
                   try
                     runner_builders(runner_builder_idx + 1).id()
                   else
-                    // We need a sink on every worker involved in the 
+                    // We need a sink on every worker involved in the
                     // partition
-                    let egress_builder = EgressBuilder(pipeline.name(), 
+                    let egress_builder = EgressBuilder(pipeline.name(),
                       sink_id, sink_addr, pipeline.sink_builder())
 
                     match partition_workers
@@ -477,7 +477,7 @@ actor ApplicationInitializer
                         error
                       end
                     | let ws: Array[String] val =>
-                      local_graphs("initializer").add_node(egress_builder, 
+                      local_graphs("initializer").add_node(egress_builder,
                         sink_id)
                       for w in ws.values() do
                         try
@@ -498,7 +498,7 @@ actor ApplicationInitializer
                   pre_state_target_id)
                 pre_state_data.push(psd)
 
-                let state_builder = 
+                let state_builder =
                   try
                     application.state_builder(psd.state_name())
                   else
@@ -511,7 +511,7 @@ actor ApplicationInitializer
                 // ASSUMPTION: There is only one partititon default target
                 // per application.
                 if state_builder.default_state_name() != "" then
-                  pipeline_default_state_name = 
+                  pipeline_default_state_name =
                     state_builder.default_state_name()
                   pipeline_default_target_worker = "worker"
                 end
@@ -527,7 +527,7 @@ actor ApplicationInitializer
                   | (let last_id: U128, let step_init: StepInitializer val) =>
                     local_graphs(worker).add_edge(last_id, next_id)
                   end
-                  
+
                   // Pre state step uses a partition router and has no direct
                   // out, so don't connect an edge to the next node
                   last_initializer = None
@@ -552,8 +552,8 @@ actor ApplicationInitializer
                   | (let last_id: U128, let step_init: StepInitializer val) =>
                     local_graphs(worker).add_edge(last_id, next_id)
                   end
-                  
-                  last_initializer = (next_id, next_initializer) 
+
+                  last_initializer = (next_id, next_initializer)
                 else
                   @printf[I32](("No graph for worker " + worker + "\n").cstring())
                   error
@@ -575,7 +575,7 @@ actor ApplicationInitializer
           // pipeline
             match next_worker
             | let w: String =>
-              let next_runner_builder = 
+              let next_runner_builder =
                 try
                   runner_builders(runner_builder_idx)
                 else
@@ -589,7 +589,7 @@ actor ApplicationInitializer
                 error
               else
                 // Build our egress builder for the proxy
-                let egress_id = 
+                let egress_id =
                   try
                     runner_builders(runner_builder_idx).id()
                   else
@@ -598,7 +598,7 @@ actor ApplicationInitializer
                   end
 
                 let proxy_address = ProxyAddress(w, egress_id)
-                  
+
                 let egress_builder = EgressBuilder(pipeline.name(),
                   egress_id, proxy_address)
 
@@ -626,7 +626,7 @@ actor ApplicationInitializer
           ///////
           // We need a Sink since there are no more steps to go in this
           // pipeline
-            let egress_builder = EgressBuilder(pipeline.name(), 
+            let egress_builder = EgressBuilder(pipeline.name(),
               sink_id, sink_addr, pipeline.sink_builder())
 
             try
@@ -651,7 +651,7 @@ actor ApplicationInitializer
         ////////////////////////////////////////////////////////////////
         // HANDLE PARTITION DEFAULT STEP IF ONE EXISTS FOR THIS PIPELINE
         ////////
-        // TODO: Replace this default strategy with a better one 
+        // TODO: Replace this default strategy with a better one
         // after POC
         if pipeline_default_state_name != "" then
           @printf[I32]("-----We have a real default target name\n".cstring())
@@ -663,16 +663,16 @@ actor ApplicationInitializer
             // the temporary POC strategy)
             let default_pre_state_target_id = sink_id
 
-            let pre_state_runner_builder = 
-              try 
+            let pre_state_runner_builder =
+              try
                 default_target(0)
               else
                 @printf[I32]("Default target had no prestate value!\n".cstring())
                 error
               end
 
-            let state_runner_builder = 
-              try 
+            let state_runner_builder =
+              try
                 default_target(1)
               else
                 @printf[I32]("Default target had no state value!\n".cstring())
@@ -689,8 +689,8 @@ actor ApplicationInitializer
 
             let pre_state_builder = StepBuilder(application.name(),
               pipeline.name(),
-              pre_state_runner_builder, pre_state_id, 
-              false, 
+              pre_state_runner_builder, pre_state_id,
+              false,
               default_pre_state_target_id,
               pre_state_runner_builder.forward_route_builder())
 
@@ -699,14 +699,14 @@ actor ApplicationInitializer
             let state_builder = StepBuilder(application.name(),
               pipeline.name(),
               state_runner_builder, state_id,
-              true 
-              where forward_route_builder' = 
+              true
+              where forward_route_builder' =
                 state_runner_builder.route_builder())
 
             steps(pre_state_id) = pipeline_default_target_worker
             steps(state_id) = pipeline_default_target_worker
 
-            let next_default_targets: Array[StepBuilder val] trn = 
+            let next_default_targets: Array[StepBuilder val] trn =
               recover Array[StepBuilder val] end
 
             next_default_targets.push(pre_state_builder)
@@ -716,7 +716,7 @@ actor ApplicationInitializer
             default_targets(pipeline_default_target_worker) = consume next_default_targets
 
             // Create ProxyAddresses for the other workers
-            let proxy_address = ProxyAddress(pipeline_default_target_worker, 
+            let proxy_address = ProxyAddress(pipeline_default_target_worker,
               pre_state_id)
 
             for w in worker_names.values() do
@@ -725,13 +725,13 @@ actor ApplicationInitializer
           else
             @printf[I32]("----But no default target!\n".cstring())
           end
-        end        
+        end
 
         // Prepare to initialize the next pipeline
         pipeline_id = pipeline_id + 1
       end
 
-      let sendable_step_map: Map[U128, (ProxyAddress val | U128)] val = 
+      let sendable_step_map: Map[U128, (ProxyAddress val | U128)] val =
         consume step_map
 
       let sendable_pre_state_data: Array[PreStateData val] val =
@@ -739,8 +739,8 @@ actor ApplicationInitializer
 
       // Keep track of LocalTopologies that we need to send to other
       // (non-"initializer") workers
-      let other_local_topologies: Array[LocalTopology val] trn =
-        recover Array[LocalTopology val] end
+      let other_local_topologies: Map[String, LocalTopology val] trn =
+        recover Map[String, LocalTopology val] end
 
       // For each worker, generate a LocalTopology from its LocalGraph
       for (w, g) in local_graphs.pairs() do
@@ -749,7 +749,7 @@ actor ApplicationInitializer
           p_ids(target) = p_id
         end
 
-        let default_target = 
+        let default_target =
           try
             default_targets(w)
           else
@@ -757,7 +757,7 @@ actor ApplicationInitializer
             None
           end
 
-        let local_topology = 
+        let local_topology =
           try
             LocalTopology(application.name(), w, g.clone(),
               sendable_step_map, state_subpartitions, sendable_pre_state_data,
@@ -773,9 +773,9 @@ actor ApplicationInitializer
         // to the list we'll use to distribute to the other workers
         if w == "initializer" then
           _local_topology_initializer.update_topology(local_topology)
-          _local_topology_initializer.initialize(worker_initializer) 
+          _local_topology_initializer.initialize(worker_initializer)
         else
-          other_local_topologies.push(local_topology)
+          other_local_topologies(w) = local_topology
         end
       end
 
