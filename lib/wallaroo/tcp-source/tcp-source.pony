@@ -515,11 +515,9 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
-    @printf[I32]("!!MUTE\n".cstring())
     _muted = true
 
   fun ref _unmute() =>
-    @printf[I32]("!!UNMUTE\n".cstring())
     _muted = false
     _pending_reads()
 
