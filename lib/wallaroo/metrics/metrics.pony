@@ -25,11 +25,7 @@ class _MetricsReporter
   let _id: U16
   let _worker_name: String
   let _category: MetricsCategory
-  let _period: U64
-  let _output_to: MetricsSink
   var _histogram: Histogram iso = Histogram
-  var _period_ends_at: U64 = 0
-  let _wb: Writer = Writer
 
   new create(output_to': MetricsSink,
     app_name': String,
@@ -38,8 +34,7 @@ class _MetricsReporter
     metric_name': String,
     id': U16,
     prefix': String,
-    category': MetricsCategory,
-    period': U64 = 2_000_000_000)
+    category': MetricsCategory)
   =>
     _topic = "metrics:" + app_name'
     _pipeline = pipeline'
@@ -51,32 +46,38 @@ class _MetricsReporter
       else
         metric_name'
       end
-    _period = period'
-    _output_to = output_to'
-    let now = WallClock.nanoseconds()
-    _period_ends_at = _next_period_endtime(now, period')
 
   fun ref report(duration: U64) =>
-    let now = WallClock.nanoseconds()
-
-    if now > _period_ends_at then
-      let h = _histogram = Histogram
-      _output_to.send_metric(_metric_name, _category(), _pipeline,
-        _worker_name, _id, consume h, _period, _period_ends_at, _topic, "metrics")
-      _period_ends_at = _next_period_endtime(now, _period)
-    end
     _histogram(duration)
 
-  fun _next_period_endtime(time: U64, length: U64): U64 =>
-    """
-    Nanosecond end of the period in which time belongs
-    """
-    time + (length - (time % length))
+  fun ref topic(): String =>
+    _topic
+
+  fun ref metric_name(): String =>
+    _metric_name
+
+  fun ref pipeline(): String =>
+    _pipeline
+
+  fun ref worker_name(): String =>
+    _worker_name
+
+  fun ref id(): U16 =>
+    _id
+
+  fun ref category(): String =>
+    _category()
+
+  fun ref reset_histogram(): Histogram iso^ =>
+    _histogram = Histogram
 
 class MetricsReporter
   let _app_name: String
   let _worker_name: String
   let _metrics_conn: MetricsSink
+  var _period_ends_at: U64 = 0
+  let _period: U64
+  let _wb: Writer = Writer
 
   let _step_metrics_map: Map[String, _MetricsReporter] =
     _step_metrics_map.create()
@@ -88,11 +89,15 @@ class MetricsReporter
     _worker_metrics_map.create()
 
   new iso create(app_name: String, worker_name: String,
-    metrics_conn: MetricsSink)
+    metrics_conn: MetricsSink,
+    period: U64 = 2_000_000_000)
   =>
     _app_name = app_name
     _worker_name = worker_name
     _metrics_conn = metrics_conn
+    _period = period
+    let now = WallClock.nanoseconds()
+    _period_ends_at = _next_period_endtime(now, period)
 
   fun ref step_metric(pipeline: String, name: String, id: U16, start_ts: U64,
     end_ts: U64, prefix: String = "")
@@ -129,6 +134,14 @@ class MetricsReporter
 
     metrics.report(end_ts - start_ts)
 
+    _maybe_send_metrics()
+
+  fun ref _next_period_endtime(time: U64, length: U64): U64 =>
+    """
+    Nanosecond end of the period in which time belongs
+    """
+    time + (length - (time % length))
+
   fun ref pipeline_metric(source_name: String val, time_spent: U64) =>
     let metrics = try
         _pipeline_metrics_map(source_name)
@@ -142,6 +155,8 @@ class MetricsReporter
 
     metrics.report(time_spent)
 
+    _maybe_send_metrics()
+
   fun ref worker_metric(pipeline_name: String val, time_spent: U64) =>
     let metrics = try
         _worker_metrics_map(pipeline_name)
@@ -154,6 +169,34 @@ class MetricsReporter
       end
 
     metrics.report(time_spent)
+    _maybe_send_metrics()
+
+  fun ref _maybe_send_metrics() =>
+    let now = WallClock.nanoseconds()
+
+    if now > _period_ends_at then
+      for mr in _step_metrics_map.values() do
+        _send_histogram(mr)
+      end
+      for mr in _pipeline_metrics_map.values() do
+        _send_histogram(mr)
+      end
+      for mr in _worker_metrics_map.values() do
+        _send_histogram(mr)
+      end
+      _period_ends_at = _next_period_endtime(now, _period)
+    end
+
+  fun ref _send_histogram(mr: _MetricsReporter) =>
+    let h = mr.reset_histogram()
+    let metric_name = mr.metric_name()
+    let category = mr.category()
+    let topic = mr.topic()
+    let id = mr.id()
+    let pipeline = mr.pipeline()
+    let worker_name = mr.worker_name()
+    _metrics_conn.send_metric(metric_name, category, pipeline,
+      worker_name, id, consume h, _period, _period_ends_at, topic, "metrics")
 
   fun clone(): MetricsReporter iso^ =>
     MetricsReporter(_app_name, _worker_name, _metrics_conn)
