@@ -46,22 +46,11 @@ class _MetricsReporter
     _worker_name = worker_name'
     _id = id'
     _category = category'
-    let str_size = _worker_name.size() + _pipeline.size() + metric_name'.size() +
-      prefix'.size() + 14
-    let metric_name_tmp = recover String(str_size) end
-    metric_name_tmp.append(_pipeline)
-    metric_name_tmp.append("@")
-    metric_name_tmp.append(_worker_name)
-    metric_name_tmp.append(": ")
-    metric_name_tmp.append(_id.string())
-    metric_name_tmp.append(" - ")
-    if prefix' != "" then
-      metric_name_tmp.append(prefix')
-      metric_name_tmp.append(" ")
-    end
-    metric_name_tmp.append(metric_name')
-    _metric_name = consume metric_name_tmp
-
+    _metric_name = if prefix' != "" then
+        prefix' + " " + metric_name'
+      else
+        metric_name'
+      end
     _period = period'
     _output_to = output_to'
     let now = WallClock.nanoseconds()
@@ -84,8 +73,8 @@ class _MetricsReporter
     time + (length - (time % length))
 
   fun ref _send_histogram(h: Histogram) =>
-    let payload = HubProtocol.metrics(_metric_name, _category(), h,
-      _period, _period_ends_at, _wb)
+    let payload = HubProtocol.metrics(_metric_name, _category(), _pipeline,
+      _worker_name, _id, h, _period, _period_ends_at, _wb)
     let hub_msg = HubProtocol.payload("metrics", _topic, payload)
     _output_to.writev(hub_msg)
 
