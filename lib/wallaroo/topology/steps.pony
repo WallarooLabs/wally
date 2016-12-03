@@ -204,7 +204,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       end
 
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
-      _metrics_reporter.worker_metric(worker_ingress_ts)
+      _metrics_reporter.worker_metric(metric_name, worker_ingress_ts)
     end
     // DO NOT REMOVE. THIS GC TRIGGERING IS INTENTIONAL.
     @pony_triggergc[None](this)
@@ -278,7 +278,7 @@ actor Step is (RunnableStep & Resilient & Producer &
         end
 
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
-        _metrics_reporter.worker_metric(worker_ingress_ts)
+        _metrics_reporter.worker_metric(metric_name, worker_ingress_ts)
       end
     end
 

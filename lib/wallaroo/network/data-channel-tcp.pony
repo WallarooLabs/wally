@@ -92,10 +92,10 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         try
           _metrics_reporter.step_metric(data_msg.metric_name,
             "Before receive on data channel", data_msg.metrics_id,
-            data_msg.latest_ts, my_latest_ts)
+            data_msg.latest_ts, ingest_ts)
           _receivers(data_msg.delivery_msg.sender_name()).received(
             data_msg.delivery_msg,
-            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1, ingest_ts)
+            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1, my_latest_ts)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
@@ -112,10 +112,10 @@ class DataChannelConnectNotifier is TCPConnectionNotify
           let data_msg = r.data_msg(_auth)
           _metrics_reporter.step_metric(data_msg.metric_name, 
             "Before replay receive on data channel", data_msg.metrics_id,
-            data_msg.latest_ts, my_latest_ts)
+            data_msg.latest_ts, ingest_ts)
           _receivers(data_msg.delivery_msg.sender_name())
             .replay_received(data_msg.delivery_msg, data_msg.seq_id, 
-            my_latest_ts, data_msg.metrics_id + 1, ingest_ts)
+            my_latest_ts, data_msg.metrics_id + 1, my_latest_ts)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end

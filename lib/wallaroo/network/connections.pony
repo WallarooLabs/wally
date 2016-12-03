@@ -68,7 +68,7 @@ actor Connections
     let data_notifier: TCPListenNotify iso =
       DataChannelListenNotifier(_worker_name, _env, _auth, this,
         _is_initializer, data_receivers,
-        MetricsReporter(_app_name, _metrics_conn))
+        MetricsReporter(_app_name, _worker_name, _metrics_conn))
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     register_listener(TCPListener(_auth, consume data_notifier,

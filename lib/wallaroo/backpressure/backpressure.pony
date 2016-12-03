@@ -195,7 +195,7 @@ class TypedRoute[In: Any val] is Route
       _max_credits = new_max_credits
       // Overwrite the old (placeholder) queue with one the correct size.
       _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
-        None, SeqId, RouteId, U64, U16)](_max_credits.usize())
+        None, SeqId, RouteId, U64, U16, U64)](_max_credits.usize())
       request_credits()
     end
 
@@ -530,7 +530,7 @@ class BoundaryRoute is Route
       _max_credits = new_max_credits
       // Overwrite the old (placeholder) queue with one the correct size.
       _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
-        Producer, U128, None, SeqId, RouteId, U64, U16, String)](_max_credits.usize())
+        Producer, U128, None, SeqId, RouteId, U64, U16, String, U64)](_max_credits.usize())
 
       request_credits()
     end

@@ -162,7 +162,7 @@ actor LocalTopologyInitializer
       let data_notifier: TCPListenNotify iso =
         DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
           _is_initializer, data_receivers,
-          MetricsReporter(_application.name(), _metrics_conn))
+          MetricsReporter(_application.name(), _worker_name, _metrics_conn))
       _connections.register_listener(
         TCPListener(_auth, consume data_notifier))
     else

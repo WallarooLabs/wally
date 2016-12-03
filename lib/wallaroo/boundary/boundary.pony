@@ -192,7 +192,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
           my_latest_ts, end_ts)
       end
 
-      _metrics_reporter.worker_metric(worker_ingress_ts)
+      _metrics_reporter.worker_metric(metric_name, worker_ingress_ts)
     end
 
   be writev(data: Array[ByteSeq] val) =>

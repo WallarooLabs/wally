@@ -205,7 +205,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
 
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
-      _metrics_reporter.worker_metric(worker_ingress_ts)
+      _metrics_reporter.worker_metric(metric_name, worker_ingress_ts)
     else
       Fail()
     end
