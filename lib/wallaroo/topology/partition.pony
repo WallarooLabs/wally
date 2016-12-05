@@ -149,6 +149,7 @@ class KeyedStateSubpartition[PIn: Any val,
       let proxy_address = _partition_addresses(key)
       match proxy_address
       | let pa: ProxyAddress val =>
+	//@printf[I32]("%s == %s ?\n".cstring(), pa.worker.cstring(), worker_name.cstring())
         if pa.worker == worker_name then
           let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
           let next_state_step = Step(_runner_builder(where alfred = alfred),
