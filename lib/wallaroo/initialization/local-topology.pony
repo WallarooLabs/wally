@@ -58,7 +58,7 @@ class LocalTopology
 
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
-    metrics_conn: TCPConnection, alfred: Alfred,
+    metrics_conn: MetricsSink, alfred: Alfred,
     connections: Connections, auth: AmbientAuth,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: Array[Initializable tag],
@@ -103,7 +103,7 @@ actor LocalTopologyInitializer
   let _env: Env
   let _auth: AmbientAuth
   let _connections: Connections
-  let _metrics_conn: TCPConnection
+  let _metrics_conn: MetricsSink
   let _alfred : Alfred tag
   var _is_initializer: Bool
   var _outgoing_boundaries: Map[String, OutgoingBoundary] val =
@@ -121,7 +121,7 @@ actor LocalTopologyInitializer
 
   new create(app: Application val, worker_name: String, worker_count: USize, 
     env: Env, auth: AmbientAuth, connections: Connections, 
-    metrics_conn: TCPConnection, is_initializer: Bool, alfred: Alfred tag, 
+    metrics_conn: MetricsSink, is_initializer: Bool, alfred: Alfred tag, 
     input_addrs: Array[Array[String]] val, local_topology_file: String)
   =>
     _application = app

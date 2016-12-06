@@ -100,7 +100,7 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
 
 trait StateSubpartition
   fun build(app_name: String, worker_name: String,
-    metrics_conn: TCPConnection,
+    metrics_conn: MetricsSink,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: Array[Initializable tag],
@@ -127,7 +127,7 @@ class KeyedStateSubpartition[PIn: Any val,
     _runner_builder = runner_builder
 
   fun build(app_name: String, worker_name: String,
-    metrics_conn: TCPConnection,
+    metrics_conn: MetricsSink,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: Array[Initializable tag],

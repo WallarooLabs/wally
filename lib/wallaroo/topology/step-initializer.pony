@@ -61,7 +61,7 @@ class StepBuilder
   =>
     _runner_builder.clone_router_and_set_input_type(r, default_r)
 
-  fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred,
+  fun apply(next: Router val, metrics_conn: MetricsSink, alfred: Alfred,
     router: Router val = EmptyRouter,
     omni_router: OmniRouter val = EmptyOmniRouter,
     default_target: (Step | None) = None): Step tag

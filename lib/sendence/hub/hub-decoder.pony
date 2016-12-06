@@ -49,6 +49,7 @@ primitive HubPayloadMsg is HubProtocolMsg
       | "metrics" =>
         HubMetricsMsg(consume data')
       else
+        @printf[I32]("event: %s\n".cstring(), event.cstring())
         HubOtherMsg
       end
     else

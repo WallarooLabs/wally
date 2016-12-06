@@ -26,12 +26,12 @@ class _MetricsReporter
   let _worker_name: String
   let _category: MetricsCategory
   let _period: U64
-  let _output_to: TCPConnection
-  var _histogram: Histogram = Histogram
+  let _output_to: MetricsSink
+  var _histogram: Histogram iso = Histogram
   var _period_ends_at: U64 = 0
   let _wb: Writer = Writer
 
-  new create(output_to': TCPConnection,
+  new create(output_to': MetricsSink,
     app_name': String,
     worker_name': String,
     pipeline': String,
@@ -61,7 +61,8 @@ class _MetricsReporter
 
     if now > _period_ends_at then
       let h = _histogram = Histogram
-      _send_histogram(h)
+      _output_to.send_metric(_metric_name, _category(), _pipeline,
+        _worker_name, _id, consume h, _period, _period_ends_at, _topic, "metrics")
       _period_ends_at = _next_period_endtime(now, _period)
     end
     _histogram(duration)
@@ -72,16 +73,10 @@ class _MetricsReporter
     """
     time + (length - (time % length))
 
-  fun ref _send_histogram(h: Histogram) =>
-    let payload = HubProtocol.metrics(_metric_name, _category(), _pipeline,
-      _worker_name, _id, h, _period, _period_ends_at, _wb)
-    let hub_msg = HubProtocol.payload("metrics", _topic, payload)
-    _output_to.writev(hub_msg)
-
 class MetricsReporter
   let _app_name: String
   let _worker_name: String
-  let _metrics_conn: TCPConnection
+  let _metrics_conn: MetricsSink
 
   let _step_metrics_map: Map[String, _MetricsReporter] =
     _step_metrics_map.create()
@@ -93,7 +88,7 @@ class MetricsReporter
     _worker_metrics_map.create()
 
   new iso create(app_name: String, worker_name: String,
-    metrics_conn: TCPConnection)
+    metrics_conn: MetricsSink)
   =>
     _app_name = app_name
     _worker_name = worker_name

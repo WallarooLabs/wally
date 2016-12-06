@@ -16,7 +16,7 @@ actor WorkerInitializer
   let _application_initializer: ApplicationInitializer
   let _local_topology_initializer: LocalTopologyInitializer
   let _initializer_data_addr: Array[String] val
-  let _metrics_conn: TCPConnection
+  let _metrics_conn: MetricsSink
   let _connections_ready_workers: Set[String] = Set[String]
   let _ready_workers: Set[String] = Set[String]
   var _control_identified: USize = 1
@@ -32,7 +32,7 @@ actor WorkerInitializer
   new create(auth: AmbientAuth, workers: USize, connections: Connections,
     application_initializer: ApplicationInitializer,
     local_topology_initializer: LocalTopologyInitializer,
-    data_addr: Array[String] val, metrics_conn: TCPConnection)
+    data_addr: Array[String] val, metrics_conn: MetricsSink)
   =>
     _auth = auth
     _expected = workers

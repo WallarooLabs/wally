@@ -15,14 +15,14 @@ class _SourceBuilder[In: Any val]
   let _runner_builder: RunnerBuilder val
   let _handler: FramedSourceHandler[In] val
   let _router: Router val
-  let _metrics_conn: TCPConnection
+  let _metrics_conn: MetricsSink
   let _pre_state_target_id: (U128 | None)
 
   new val create(app_name: String, worker_name: String,
     name': String,
     runner_builder: RunnerBuilder val,
     handler: FramedSourceHandler[In] val,
-    router: Router val, metrics_conn: TCPConnection,
+    router: Router val, metrics_conn: MetricsSink,
     pre_state_target_id: (U128 | None) = None)
   =>
     _app_name = app_name
@@ -47,7 +47,7 @@ class _SourceBuilder[In: Any val]
 interface SourceBuilderBuilder
   fun name(): String
   fun apply(runner_builder: RunnerBuilder val, router: Router val,
-    metrics_conn: TCPConnection, pre_state_target_id: (U128 | None) = None,
+    metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
     worker_name: String):
       SourceBuilder val
 
@@ -66,7 +66,7 @@ class TypedSourceBuilderBuilder[In: Any val]
   fun name(): String => _name
 
   fun apply(runner_builder: RunnerBuilder val, router: Router val,
-    metrics_conn: TCPConnection, pre_state_target_id: (U128 | None) = None,
+    metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
     worker_name: String):
       SourceBuilder val
   =>
