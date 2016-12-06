@@ -11,6 +11,7 @@ use "wallaroo/messages"
 use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
+use "wallaroo/metrics"
 
 trait tag CreditFlowConsumer
   be register_producer(producer: Producer)
@@ -30,22 +31,22 @@ trait RouteCallbackHandler
 
 trait RouteBuilder
   fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler): Route
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter iso): Route
 
 primitive TypedRouteBuilder[In: Any val] is RouteBuilder
   fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler): Route
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter iso): Route
   =>
     match consumer
     | let boundary: OutgoingBoundary =>
-      BoundaryRoute(step, boundary, handler)
+      BoundaryRoute(step, boundary, handler, consume metrics_reporter)
     else
-      TypedRoute[In](step, consumer, handler)
+      TypedRoute[In](step, consumer, handler, consume metrics_reporter)
     end
 
 primitive EmptyRouteBuilder is RouteBuilder
   fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler): Route
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter iso): Route
   =>
     EmptyRoute
 
@@ -62,10 +63,11 @@ trait Route
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16): Bool
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId): Bool
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String): Bool
 
 
 class EmptyRoute is Route
@@ -82,13 +84,14 @@ class EmptyRoute is Route
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16):
+    Bool
   =>
     true
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId): Bool
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String): Bool
   =>
     true
 
@@ -146,6 +149,7 @@ class TypedRoute[In: Any val] is Route
   var _step_type: String = ""
   let _callback: RouteCallbackHandler
   let _consumer: CreditFlowConsumerStep
+  let _metrics_reporter: MetricsReporter
   var _max_credits: ISize = 0 // This is updated on initialize()
   var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
@@ -156,24 +160,26 @@ class TypedRoute[In: Any val] is Route
   // (metric_name: String, source_ts: U64, data: D,
   //  cfp: Producer ref,
   //  origin: Producer, msg_uid: U128,
-  //  frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+  //  frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+  //  latest_ts: U64, metrics_id: U16)
   var _queue: FixedQueue[(String, U64, In, Producer ref, Producer, U128,
-    None, SeqId, RouteId)]
+    None, SeqId, RouteId, U64, U16)]
   // let _queue: ContainerQueue[TypedRouteQueueTuple[In], TypedRouteQueueData[In]]
 
   new create(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler)
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter iso)
   =>
     _step = step
     _consumer = consumer
     _callback = handler
     _callback.register(_step, this)
+    _metrics_reporter = consume metrics_reporter
     _consumer.register_producer(_step)
 
     // We start at 0 size.  We need to know the max_credits before we
     // can size this in the initialize method.
     _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
-      None, SeqId, RouteId)](0)
+      None, SeqId, RouteId, U64, U16)](0)
 
   fun ref initialize(new_max_credits: ISize, step_type: String) =>
     _step_type = step_type
@@ -187,7 +193,7 @@ class TypedRoute[In: Any val] is Route
       _max_credits = new_max_credits
       // Overwrite the old (placeholder) queue with one the correct size.
       _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
-        None, SeqId, RouteId)](_max_credits.usize())
+        None, SeqId, RouteId, U64, U16)](_max_credits.usize())
       request_credits()
     end
 
@@ -277,7 +283,8 @@ class TypedRoute[In: Any val] is Route
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16):
+    Bool
   =>
     ifdef "trace" then
       @printf[I32]("--Rcvd msg at Route (%s)\n".cstring(),
@@ -299,11 +306,11 @@ class TypedRoute[In: Any val] is Route
 
           if _queue.size() > 0 then
             _add_to_queue(metric_name, source_ts, input, cfp, origin, msg_uid,
-              frac_ids, i_seq_id, i_route_id)
+              frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id)
             _flush_queue()
           else
             _send_message_on_route(metric_name, source_ts, input, cfp, origin,
-              msg_uid, frac_ids, i_seq_id, i_route_id)
+              msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id)
           end
 
           if _credits_available == 0 then
@@ -326,12 +333,12 @@ class TypedRoute[In: Any val] is Route
             @printf[I32]("----No credits: added msg to Route queue (%s)\n".cstring(), _step_type.cstring())
           end
           _add_to_queue(metric_name, source_ts, input, cfp,
-            origin, msg_uid, frac_ids, i_seq_id, i_route_id)
+            origin, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id)
           not (_queue.size() == _queue.max_size())
         end
       else
         _send_message_on_route(metric_name, source_ts, input, cfp, origin,
-          msg_uid, frac_ids, i_seq_id, i_route_id)
+          msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id)
         true
       end
     else
@@ -341,7 +348,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId): Bool
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String): Bool
   =>
     // Forward should never be called on a TypedRoute
     Fail()
@@ -349,9 +356,14 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _send_message_on_route(metric_name: String, source_ts: U64, input: In,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId)
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16)
   =>
     let o_seq_id = cfp.next_sequence_id()
+
+    let my_latest_ts = Time.nanos()
+    _metrics_reporter.step_metric(metric_name, "Before send to next step via behavior", metrics_id,
+      latest_ts, my_latest_ts)
+    let new_metrics_id = metrics_id + 1
 
     _consumer.run[In](metric_name,
       source_ts,
@@ -360,7 +372,9 @@ class TypedRoute[In: Any val] is Route
       msg_uid,
       frac_ids,
       o_seq_id,
-      _route_id)
+      _route_id,
+      my_latest_ts,
+      new_metrics_id)
 
     ifdef "trace" then
       @printf[I32]("Sent msg from Route (%s)\n".cstring(),
@@ -376,7 +390,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _add_to_queue(metric_name: String, source_ts: U64, input: In,
     cfp: Producer ref, origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16)
   =>
     ifdef debug then
       Invariant((_queue.max_size() > 0) and
@@ -385,7 +399,7 @@ class TypedRoute[In: Any val] is Route
 
     try
       _queue.enqueue((metric_name, source_ts, input, cfp,
-        origin, msg_uid, frac_ids, i_seq_id, i_route_id))
+        origin, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id))
       if _queue.size() == _queue.max_size() then
         ifdef "credit_trace" then
           @printf[I32]("Route queue is full (%s).\n".cstring(),
@@ -404,7 +418,7 @@ class TypedRoute[In: Any val] is Route
       try
         let d =_queue.dequeue()
         _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6,
-          d._7, d._8, d._9)
+          d._7, d._8, d._9, d._10, d._11)
       end
     end
 
@@ -413,7 +427,7 @@ class TypedRoute[In: Any val] is Route
       try
         let d =_queue.dequeue()
         _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6,
-          d._7, d._8, d._9)
+          d._7, d._8, d._9, d._10, d._11)
       end
     end
 
@@ -461,6 +475,7 @@ class BoundaryRoute is Route
   var _step_type: String = ""
   let _callback: RouteCallbackHandler
   let _consumer: OutgoingBoundary
+  let _metrics_reporter: MetricsReporter
   var _max_credits: ISize = 0 // This is updated on initialize()
   var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
@@ -469,18 +484,19 @@ class BoundaryRoute is Route
   // Store tuples of the form
   // (delivery_msg, cfp, i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
   var _queue: FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
-    Producer, U128, None, SeqId, RouteId)]
+    Producer, U128, None, SeqId, RouteId, U64, U16, String)]
 
   new create(step: Producer ref, consumer: OutgoingBoundary,
-    handler: RouteCallbackHandler)
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter iso)
   =>
     _step = step
     _consumer = consumer
     _callback = handler
     _callback.register(_step, this)
+    _metrics_reporter = consume metrics_reporter
     _consumer.register_producer(_step)
     _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
-      Producer, U128, None, SeqId, RouteId)](0)
+      Producer, U128, None, SeqId, RouteId, U64, U16, String)](0)
 
   fun ref initialize(new_max_credits: ISize, step_type: String) =>
     _step_type = step_type
@@ -495,7 +511,7 @@ class BoundaryRoute is Route
       _max_credits = new_max_credits
       // Overwrite the old (placeholder) queue with one the correct size.
       _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
-        Producer, U128, None, SeqId, RouteId)](_max_credits.usize())
+        Producer, U128, None, SeqId, RouteId, U64, U16, String)](_max_credits.usize())
 
       request_credits()
     end
@@ -586,7 +602,8 @@ class BoundaryRoute is Route
   fun ref run[D](metric_name: String, source_ts: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16):
+    Bool
   =>
     // Run should never be called on a BoundaryRoute
     Fail()
@@ -594,7 +611,7 @@ class BoundaryRoute is Route
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId): Bool
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String): Bool
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at BoundaryRoute (%s)\n".cstring(),
@@ -612,7 +629,10 @@ class BoundaryRoute is Route
             msg_uid,
             i_frac_ids,
             i_seq_id,
-            i_route_id)
+            i_route_id,
+            latest_ts,
+            metrics_id,
+            metric_name)
           _flush_queue()
         else
           _send_message_on_route(delivery_msg,
@@ -621,7 +641,10 @@ class BoundaryRoute is Route
             msg_uid,
             i_frac_ids,
             i_seq_id,
-            _route_id)
+            _route_id,
+            latest_ts,
+            metrics_id,
+            metric_name)
         end
 
         if _credits_available == 0 then
@@ -646,7 +669,10 @@ class BoundaryRoute is Route
           msg_uid,
           i_frac_ids,
           i_seq_id,
-          i_route_id)
+          i_route_id,
+          latest_ts,
+          metrics_id,
+          metric_name)
         not (_queue.size() == _queue.max_size())
       end
     else
@@ -656,13 +682,16 @@ class BoundaryRoute is Route
         msg_uid,
         i_frac_ids,
         i_seq_id,
-        _route_id)
+        _route_id,
+        latest_ts,
+        metrics_id,
+        metric_name)
       true
     end
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId)
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String)
   =>
     let o_seq_id = cfp.next_sequence_id()
 
@@ -671,7 +700,10 @@ class BoundaryRoute is Route
       msg_uid,
       i_frac_ids,
       o_seq_id,
-      _route_id)
+      _route_id,
+      latest_ts,
+      metrics_id,
+      metric_name)
 
     ifdef "resilience" then
       cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id, i_seq_id)
@@ -681,7 +713,7 @@ class BoundaryRoute is Route
 
   fun ref _add_to_queue(delivery_msg: ReplayableDeliveryMsg val,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId)
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String)
   =>
     ifdef debug then
       Invariant((_queue.max_size() > 0) and
@@ -693,7 +725,7 @@ class BoundaryRoute is Route
 
     try
       _queue.enqueue((delivery_msg, cfp,
-        i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id))
+        i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id, latest_ts, metrics_id, metric_name))
 
       if _queue.size() == _queue.max_size() then
         ifdef "credit_trace" then
@@ -712,7 +744,7 @@ class BoundaryRoute is Route
     while ((_credits_available > 0) and (_queue.size() > 0)) do
       try
         let d =_queue.dequeue()
-        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id)
+        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id, d._8, d._9, d._10)
       end
     end
 
@@ -720,6 +752,6 @@ class BoundaryRoute is Route
     while (_queue.size() > 0) do
       try
         let d =_queue.dequeue()
-        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id)
+        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6, _route_id, d._8, d._9, d._10)
       end
     end

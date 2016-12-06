@@ -2,8 +2,10 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "time"
 use "sendence/guid"
 use "sendence/queue"
+use "sendence/epoch"
 use "wallaroo/backpressure"
 use "wallaroo/fail"
 use "wallaroo/invariant"
@@ -134,14 +136,14 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId)
+    frac_ids: None, seq_id: SeqId, route_id: RouteId, latest_ts: U64, metrics_id: U16)
   =>
     // Run should never be called on an OutgoingBoundary
     Fail()
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
+    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId, latest_ts: U64, metrics_id: U16)
   =>
     // Should never be called on an OutgoingBoundary
     Fail()
@@ -149,8 +151,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: ReplayableDeliveryMsg val,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId)
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String)
   =>
+    let receive_ts = Time.nanos()
+    _metrics_reporter.step_metric(metric_name, "Before receive at boundary", metrics_id,
+      latest_ts, receive_ts)
+
     try
       let seq_id = ifdef "resilience" then
         _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
@@ -159,8 +165,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       end
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
-        seq_id, _wb, _auth)
+        seq_id, _wb, _auth, Epoch.nanoseconds(), metrics_id + 2, metric_name)
       //_queue.enqueue(outgoing_msg)
+
+      _metrics_reporter.step_metric(metric_name, "Before sending to next worker", metrics_id,
+        receive_ts, Time.nanos())
 
       _writev(outgoing_msg)
     end

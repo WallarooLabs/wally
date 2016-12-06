@@ -69,24 +69,40 @@ class _MetricsReporter
 
 class MetricsReporter
   let _app_name: String
+  let _worker_name: String
   let _metrics_conn: TCPConnection
   let _step_metrics_map: Map[String, _MetricsReporter] =
     _step_metrics_map.create()
   let _pipeline_metrics_map: Map[String, _MetricsReporter] =
     _pipeline_metrics_map.create()
 
-  new iso create(app_name: String, metrics_conn: TCPConnection) =>
+  new iso create(app_name: String, metrics_conn: TCPConnection, worker_name: String = "W") =>
     _app_name = app_name
     _metrics_conn = metrics_conn
+    _worker_name = worker_name
 
-  fun ref step_metric(name: String, start_ts: U64, end_ts: U64) =>
+  fun ref step_metric(pipeline: String, name: String, num: U16, start_ts: U64, end_ts: U64, prefix: String = "") =>
+    let str_size = _worker_name.size() + pipeline.size() + name.size() + prefix.size() + 14
+    let metric_name_tmp = recover String(pipeline.size() + name.size() + prefix.size() + 14) end
+    metric_name_tmp.append(pipeline)
+    metric_name_tmp.append("@")
+    metric_name_tmp.append(_worker_name)
+    metric_name_tmp.append(": ")
+    metric_name_tmp.append(num.string())
+    metric_name_tmp.append(" - ")
+    if prefix != "" then
+      metric_name_tmp.append(prefix)
+      metric_name_tmp.append(" ")
+    end
+    metric_name_tmp.append(name)
+    let metric_name: String val = consume metric_name_tmp
     let metrics = try
-      _step_metrics_map(name)
+      _step_metrics_map(metric_name)
     else
       let reporter =
-        _MetricsReporter(_metrics_conn, 1, _app_name, name,
+        _MetricsReporter(_metrics_conn, 1, _app_name, metric_name,
           ComputationCategory)
-      _step_metrics_map(name) = reporter
+      _step_metrics_map(metric_name) = reporter
       reporter
     end
 
@@ -103,7 +119,7 @@ class MetricsReporter
         reporter
       end
 
-    metrics.report(Time.nanos() - source_ts)
+    metrics.report(Epoch.nanoseconds() - source_ts) // might be across workers
 
   fun clone(): MetricsReporter iso^ =>
-    MetricsReporter(_app_name, _metrics_conn)
+    MetricsReporter(_app_name, _metrics_conn, _worker_name)

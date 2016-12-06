@@ -6,6 +6,8 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 use "wallaroo/resilience"
+use "sendence/epoch"
+
 
 interface FramedSourceHandler[In: Any val]
   fun header_length(): USize
@@ -58,13 +60,14 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       end
       true
     else
+      let ingest_ts = Epoch.nanoseconds() // might send across workers
+      let lastest_ts = Time.nanos()
+
       ifdef "trace" then
         @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
       end
-      let ingest_ts = Time.nanos()
-      let computation_start = Time.nanos()
 
-      (let is_finished, let keep_sending) =
+      (let is_finished, let keep_sending, let last_ts) =
         try
           match _origin
           | let o: Producer =>
@@ -83,22 +86,21 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
             end
             _runner.run[In](_pipeline_name, ingest_ts, decoded,
               conn, _router, _omni_router,
-              o,  _guid_gen.u128(), None, 0, 0)
+              o,  _guid_gen.u128(), None, 0, 0, lastest_ts, 1)
           else
             // FramedSourceNotify needs an Producer to pass along
             Fail()
-            (true, true)
+            (true, true, lastest_ts)
           end
         else
           Fail()
-          (true, true)
+          (true, true, lastest_ts)
         end
 
-      let computation_end = Time.nanos()
-
-      _metrics_reporter.step_metric(_source_name,
-        computation_start, computation_end)
       if is_finished then
+        let computation_end = Time.nanos()
+        _metrics_reporter.step_metric(_pipeline_name, "Before end at TCP Source", 9999,
+          last_ts, computation_end)
         _metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
       end
 

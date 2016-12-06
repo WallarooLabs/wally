@@ -1,4 +1,5 @@
 use "buffered"
+use "time"
 use "wallaroo/backpressure"
 
 trait BasicComputation
@@ -31,8 +32,8 @@ trait StateProcessor[State: Any #read] is BasicComputation
     omni_router: OmniRouter val, metric_name: String, source_ts: U64,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: SeqId):
-      (Bool, Bool, (StateChange[State] ref | None))
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: SeqId, latest_ts: U64, metrics_id: U16):
+      (Bool, Bool, (StateChange[State] ref | None), U64, U64, U64)
 
 trait InputWrapper
   fun input(): Any val
@@ -55,25 +56,26 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     omni_router: OmniRouter val, metric_name: String, source_ts: U64,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId):
-      (Bool, Bool, (StateChange[State] ref | None))
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16):
+      (Bool, Bool, (StateChange[State] ref | None), U64, U64, U64)
   =>
+    let computation_start = Time.nanos()
     let result = _state_comp(_input, sc_repo, state)
+    let computation_end = Time.nanos()
 
     // It matters that the None check comes first, since Out could be
     // type None if you always filter/end processing there
     match result
-    | (None, _) => (true, true, result._2) // This must come first
+    | (None, _) => (true, true, result._2, computation_start, computation_end, computation_end) // This must come first
     | (let output: Out, _) =>
-      (let is_finished, let keep_sending) = 
-        omni_router.route_with_target_id[Out](_target_id, metric_name, 
-          source_ts, output, producer,
-          // incoming envelope
-          i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
+      (let is_finished, let keep_sending, let last_ts) = omni_router.route_with_target_id[Out](_target_id,
+        metric_name, source_ts, output, producer,
+        // incoming envelope
+        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id, computation_end, metrics_id)
 
-      (is_finished, keep_sending, result._2)
+      (is_finished, keep_sending, result._2, computation_start, computation_end, last_ts)
     else
-      (true, true, result._2)
+      (true, true, result._2, computation_start, computation_end, computation_end)
     end
 
   fun name(): String => _state_comp.name()

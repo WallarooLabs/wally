@@ -2,6 +2,7 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "time"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
@@ -20,7 +21,7 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 actor EmptySink is CreditFlowConsumerStep
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId)
+    frac_ids: None, seq_id: SeqId, route_id: RouteId, latest_ts: U64, metrics_id: U16)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at EmptySink\n".cstring())
@@ -29,7 +30,7 @@ actor EmptySink is CreditFlowConsumerStep
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
+    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId, latest_ts: U64, metrics_id: U16)
   =>
     None
 
@@ -168,8 +169,11 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16)
   =>
+    let receive_ts = Time.nanos()
+    _metrics_reporter.step_metric(metric_name, "Before receive at sink", 9998,
+      latest_ts, receive_ts)
     ifdef "trace" then
       @printf[I32]("Rcvd msg at TCPSink\n".cstring())
     end
@@ -186,6 +190,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
+      let computation_end = Time.nanos()
+      _metrics_reporter.step_metric(metric_name, "Before end at sink", 9999,
+        receive_ts, computation_end)
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     else
       Fail()
@@ -195,13 +202,13 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16)
   =>
     //TODO: deduplication like in the Step <- this is pointless if the Sink
     //doesn't have state, because on recovery we won't have a list of "seen
     //messages", which we would normally get from the eventlog.
     run[D](metric_name, source_ts, data, i_origin, msg_uid, i_frac_ids,
-      i_seq_id, i_route_id)
+      i_seq_id, i_route_id, latest_ts, metrics_id)
 
   be update_router(router: Router val) =>
     """
