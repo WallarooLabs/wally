@@ -1,5 +1,6 @@
 use "collections"
 use "wallaroo/topology"
+use "wallaroo/fail"
 
 use @w_computation_compute[DataP](computation: ComputationP, input: DataP)
 use @w_computation_get_name[Pointer[U8]](computation: ComputationP)
@@ -20,12 +21,23 @@ class CPPComputation is Computation[CPPData val, CPPData val]
     _computation = computation
 
   fun apply(input: CPPData val): (CPPData val | None) =>
-    match @w_computation_compute(_computation, input.obj())
-    | let result: DataP if (not result.is_null()) =>
-      recover CPPData(result) end
+    //SUPER-EVIL-DANGER-ZONE
+    let ret = match @w_computation_compute(_computation, input.obj())
+    | let result: DataP =>
+      if input.obj() == result then
+        @print[I32]("returning the same object is not allowed\n".string())
+      end
+      if (not result.is_null()) then
+        recover CPPData(result) end
+      else
+        None
+      end
     else
+      @printf[I32]("result is not a DataP".cstring())
       None
     end
+    input.delete_obj()
+    ret
 
   fun name(): String =>
     recover String.from_cstring(@w_computation_get_name(_computation)) end
@@ -42,7 +54,16 @@ class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState
   fun apply(input: CPPData val, sc_repo: StateChangeRepository[CPPState], state: CPPState):
     ((CPPData val | None), (CPPStateChange | None))
   =>
-    @w_state_computation_compute(_computation, input.obj(), sc_repo, CPPStateChangeRepositoryHelper, state.obj(), None)
+    let result = @w_state_computation_compute(_computation, input.obj(), sc_repo, CPPStateChangeRepositoryHelper, state.obj(), None)
+    match result._1
+    | let r: CPPData val =>
+      if input.obj() == r.obj() then
+        @printf[I32]("returning the same object is not allowed".cstring())
+      end
+    end
+    //SUPER-EVIL-DANGER-ZONE
+    input.delete_obj()
+    result
 
   fun name(): String =>
     recover String.from_cstring(@w_state_computation_get_name(_computation)) end

@@ -24,6 +24,8 @@ class CPPSinkEncoder is SinkEncoder[CPPData val]
           @w_sink_encoder_encode(_sink_encoder, data.obj(),
             bytes.cpointer(), size)
         end
+        //SUPER-EVIL-DANGER-ZONE
+        data.delete_obj()
         bytes
       end]
     end

@@ -18,5 +18,5 @@ class CPPData
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
     _data = recover @w_user_serializable_deserialize(bytes, USize(0)) end
 
-  fun _final() =>
+  fun delete_obj() =>
     @w_managed_object_delete(_data)
