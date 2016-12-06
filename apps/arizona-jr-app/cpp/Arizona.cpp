@@ -34,6 +34,8 @@
 
 // Utility
 
+int ncnt = 0;
+
 wallaroo::Data *message_from_bytes(char *bytes_)
 {
   Reader reader((unsigned char *)bytes_);
@@ -541,14 +543,15 @@ const char *ArizonaStateComputation::name()
 ArizonaStateComputation::ArizonaStateComputation() : _nProcessed(0)
 {
   _logger = wallaroo::Logger::getLogger();
-  _logger->info("ArizonaStateComputation::ArizonaStateComputation()");
+  if ( ncnt <= 1 ) 
+    _logger->info("ArizonaStateComputation::ArizonaStateComputation()");
 }
 
 void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
 {
-  _nProcessed += 1;
-  if ( _nProcessed % 10000 == 0  )
-    _logger->info("Processed messages:{}", _nProcessed);
+  ncnt += 1;
+  if ( ncnt % 10000 == 0  )
+    _logger->info("Processed messages:{}", ncnt);
 
   ClientMessage* cm = dynamic_cast<ClientMessage*>(input_);
   if ( cm != nullptr )
