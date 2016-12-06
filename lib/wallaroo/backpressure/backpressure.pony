@@ -9,12 +9,13 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/tcp-sink"
+use "wallaroo/tcp-source"
 use "wallaroo/topology"
 
 trait tag CreditFlowConsumer
   be register_producer(producer: Producer)
   be unregister_producer(producer: Producer, credits_returned: ISize)
-  be credit_request(from: Producer, credits_requested: ISize)
+  be credit_request(from: Producer)
   be return_credits(credits: ISize)
 
 type CreditFlowProducerConsumer is (Producer & CreditFlowConsumer)
@@ -22,6 +23,7 @@ type CreditFlowProducerConsumer is (Producer & CreditFlowConsumer)
 type Consumer is CreditFlowConsumer
 
 trait RouteCallbackHandler
+  fun ref register(producer: Producer ref, r: Route tag)
   fun shutdown(p: Producer ref)
   fun ref credits_replenished(p: Producer ref)
   fun ref credits_exhausted(p: Producer ref)
@@ -48,7 +50,7 @@ primitive EmptyRouteBuilder is RouteBuilder
     EmptyRoute
 
 trait Route
-  fun ref initialize(max_credits: ISize)
+  fun ref initialize(max_credits: ISize, step_type: String)
   fun ref update_max_credits(max_credits: ISize)
   fun id(): U64
   fun credits_available(): ISize
@@ -69,7 +71,7 @@ trait Route
 class EmptyRoute is Route
   let _route_id: U64 = 1 + GuidGenerator.u64() // route 0 is used for filtered messages
 
-  fun ref initialize(max_credits: ISize) => None
+  fun ref initialize(max_credits: ISize, step_type: String) => None
   fun id(): U64 => _route_id
   fun ref update_max_credits(max_credits: ISize) => None
   fun credits_available(): ISize => 0
@@ -141,6 +143,7 @@ class TypedRoute[In: Any val] is Route
   """
   let _route_id: U64 = 1 + GuidGenerator.u64() // route 0 is used for filtered messages
   let _step: Producer ref
+  var _step_type: String = ""
   let _callback: RouteCallbackHandler
   let _consumer: CreditFlowConsumerStep
   var _max_credits: ISize = 0 // This is updated on initialize()
@@ -164,24 +167,16 @@ class TypedRoute[In: Any val] is Route
     _step = step
     _consumer = consumer
     _callback = handler
+    _callback.register(_step, this)
     _consumer.register_producer(_step)
-    ifdef "backpressure" then
-      handler.credits_exhausted(_step)
-    end
-    // let q_size: USize = ifdef "backpressure" then
-    //   500_000
-    // else
-    //   0
-    // end
 
     // We start at 0 size.  We need to know the max_credits before we
     // can size this in the initialize method.
     _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
       None, SeqId, RouteId)](0)
-    // _queue = ContainerQueue[TypedRouteQueueTuple[In], TypedRouteQueueData[In]](
-    //   TypedRouteQueueDataBuilder[In], q_size)
 
-  fun ref initialize(new_max_credits: ISize) =>
+  fun ref initialize(new_max_credits: ISize, step_type: String) =>
+    _step_type = step_type
     ifdef "backpressure" then
       ifdef debug then
         Invariant(new_max_credits > 0)
@@ -238,7 +233,7 @@ class TypedRoute[In: Any val] is Route
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("--Route: rcvd %llu credits. Had %llu out of %llu. Queue size: %llu\n".cstring(), credits, _credits_available - credits, _max_credits, _queue.size())
+      @printf[I32]("--Route (%s): rcvd %llu credits. Had %llu out of %llu. Queue size: %llu\n".cstring(), _step_type.cstring(), credits, _credits_available - credits, _max_credits, _queue.size())
     end
 
     if _credits_available > 0 then
@@ -250,8 +245,7 @@ class TypedRoute[In: Any val] is Route
         _flush_queue()
 
         if _credits_available == 0 then
-          _callback.credits_exhausted(_step)
-          request_credits()
+          _credits_exhausted()
         end
       end
 
@@ -261,18 +255,22 @@ class TypedRoute[In: Any val] is Route
       request_credits()
     end
 
+  fun ref _credits_exhausted() =>
+    _callback.credits_exhausted(_step)
+    request_credits()
+
   fun ref request_credits() =>
     if not _request_outstanding then
       ifdef "credit_trace" then
-        @printf[I32]("--Route: requesting credits. Have %llu\n".cstring(),
-          _credits_available)
+        @printf[I32]("--Route (%s): requesting credits. Have %llu\n".cstring(),
+          _step_type.cstring(), _credits_available)
       end
-      let credits_requested = _max_credits - _credits_available
-      _consumer.credit_request(_step, credits_requested)
+      _consumer.credit_request(_step)
       _request_outstanding = true
     else
       ifdef "credit_trace" then
-        @printf[I32]("----Request already outstanding\n".cstring())
+        @printf[I32]("----Route (%s): Request already outstanding\n".cstring(),
+          _step_type.cstring())
       end
     end
 
@@ -282,12 +280,20 @@ class TypedRoute[In: Any val] is Route
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
-      @printf[I32]("--Rcvd msg at Route\n".cstring())
+      @printf[I32]("--Rcvd msg at Route (%s)\n".cstring(),
+        _step_type.cstring())
     end
     match data
     | let input: In =>
       ifdef "backpressure" then
         if _credits_available > 0 then
+          ifdef debug then
+            match _step
+            | let source: TCPSource ref =>
+              Invariant(not source.is_muted())
+            end
+          end
+
           let above_request_point =
             _credits_available >= _request_more_credits_after
 
@@ -301,8 +307,7 @@ class TypedRoute[In: Any val] is Route
           end
 
           if _credits_available == 0 then
-            _callback.credits_exhausted(_step)
-            request_credits()
+            _credits_exhausted()
           else
             if above_request_point then
               if _credits_available < _request_more_credits_after then
@@ -312,15 +317,17 @@ class TypedRoute[In: Any val] is Route
               end
             end
           end
+          ifdef debug then
+            Invariant(_queue.size() < _queue.max_size())
+          end
           true
         else
           ifdef "trace" then
-            @printf[I32]("----No credits: added msg to Route queue\n".cstring())
+            @printf[I32]("----No credits: added msg to Route queue (%s)\n".cstring(), _step_type.cstring())
           end
-          let keep_sending = _add_to_queue(metric_name, source_ts, input, cfp,
+          _add_to_queue(metric_name, source_ts, input, cfp,
             origin, msg_uid, frac_ids, i_seq_id, i_route_id)
-          request_credits()
-          keep_sending
+          not (_queue.size() == _queue.max_size())
         end
       else
         _send_message_on_route(metric_name, source_ts, input, cfp, origin,
@@ -356,7 +363,8 @@ class TypedRoute[In: Any val] is Route
       _route_id)
 
     ifdef "trace" then
-      @printf[I32]("Sent msg from Route\n".cstring())
+      @printf[I32]("Sent msg from Route (%s)\n".cstring(),
+        _step_type.cstring())
     end
 
     ifdef "resilience" then
@@ -368,7 +376,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref _add_to_queue(metric_name: String, source_ts: U64, input: In,
     cfp: Producer ref, origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
   =>
     ifdef debug then
       Invariant((_queue.max_size() > 0) and
@@ -380,18 +388,15 @@ class TypedRoute[In: Any val] is Route
         origin, msg_uid, frac_ids, i_seq_id, i_route_id))
       if _queue.size() == _queue.max_size() then
         ifdef "credit_trace" then
-          @printf[I32]("Route queue is full.\n".cstring())
+          @printf[I32]("Route queue is full (%s).\n".cstring(),
+            _step_type.cstring())
         end
-        false
-      else
-        true
       end
     else
       ifdef debug then
         @printf[I32]("Failure trying to enqueue typed route data\n".cstring())
       end
       Fail()
-      true
     end
 
   fun ref _flush_queue() =>
@@ -453,6 +458,7 @@ class BoundaryRoute is Route
   """
   let _route_id: U64 = 1 + GuidGenerator.u64() // route 0 is used for filtered messages
   let _step: Producer ref
+  var _step_type: String = ""
   let _callback: RouteCallbackHandler
   let _consumer: OutgoingBoundary
   var _max_credits: ISize = 0 // This is updated on initialize()
@@ -471,14 +477,13 @@ class BoundaryRoute is Route
     _step = step
     _consumer = consumer
     _callback = handler
+    _callback.register(_step, this)
     _consumer.register_producer(_step)
-    ifdef "backpressure" then
-      handler.credits_exhausted(_step)
-    end
     _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
       Producer, U128, None, SeqId, RouteId)](0)
 
-  fun ref initialize(new_max_credits: ISize) =>
+  fun ref initialize(new_max_credits: ISize, step_type: String) =>
+    _step_type = step_type
     ifdef "backpressure" then
       ifdef debug then
         Invariant(new_max_credits ==
@@ -538,7 +543,8 @@ class BoundaryRoute is Route
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("--BoundaryRoute: rcvd %llu credits. Had %llu out of %llu. Queue size: %llu\n".cstring(), credits, _credits_available - credits, _max_credits, _queue.size())
+      @printf[I32]("--BoundaryRoute (%s): rcvd %llu credits. Had %llu out of %llu. Queue size: %llu\n".cstring(), _step_type.cstring(), credits,
+        _credits_available - credits, _max_credits, _queue.size())
     end
 
     if _credits_available > 0 then
@@ -550,8 +556,7 @@ class BoundaryRoute is Route
         _flush_queue()
 
         if _credits_available == 0 then
-          _callback.credits_exhausted(_step)
-          request_credits()
+          _credits_exhausted()
         end
       end
 
@@ -561,17 +566,20 @@ class BoundaryRoute is Route
       request_credits()
     end
 
+  fun ref _credits_exhausted() =>
+    _callback.credits_exhausted(_step)
+    request_credits()
+
   fun ref request_credits() =>
     if not _request_outstanding then
       ifdef "credit_trace" then
-        @printf[I32]("--BoundaryRoute: requesting credits. Have %llu\n".cstring(), _credits_available)
+        @printf[I32]("--BoundaryRoute (%s): requesting credits. Have %llu\n".cstring(), _step_type.cstring(), _credits_available)
       end
-      let requested_credits = _max_credits - _credits_available
-      _consumer.credit_request(_step, requested_credits)
+      _consumer.credit_request(_step)
       _request_outstanding = true
     else
       ifdef "credit_trace" then
-        @printf[I32]("----BoundaryRoute: Request already outstanding\n".cstring())
+        @printf[I32]("----BoundaryRoute (%s): Request already outstanding\n".cstring(), _step_type.cstring())
       end
     end
 
@@ -589,7 +597,8 @@ class BoundaryRoute is Route
     i_route_id: RouteId): Bool
   =>
     ifdef "trace" then
-      @printf[I32]("Rcvd msg at BoundaryRoute\n".cstring())
+      @printf[I32]("Rcvd msg at BoundaryRoute (%s)\n".cstring(),
+        _step_type.cstring())
     end
     ifdef "backpressure" then
       if _credits_available > 0 then
@@ -616,8 +625,7 @@ class BoundaryRoute is Route
         end
 
         if _credits_available == 0 then
-          _callback.credits_exhausted(_step)
-          request_credits()
+          _credits_exhausted()
         else
           if above_request_point then
             if _credits_available < _request_more_credits_after then
@@ -627,17 +635,19 @@ class BoundaryRoute is Route
             end
           end
         end
+        ifdef debug then
+          Invariant(_queue.size() < _queue.max_size())
+        end
         true
       else
-        let keep_sending = _add_to_queue(delivery_msg,
+        _add_to_queue(delivery_msg,
           cfp,
           i_origin,
           msg_uid,
           i_frac_ids,
           i_seq_id,
           i_route_id)
-        request_credits()
-        keep_sending
+        not (_queue.size() == _queue.max_size())
       end
     else
       _send_message_on_route(delivery_msg,
@@ -671,7 +681,7 @@ class BoundaryRoute is Route
 
   fun ref _add_to_queue(delivery_msg: ReplayableDeliveryMsg val,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId): Bool
+    i_seq_id: SeqId, i_route_id: RouteId)
   =>
     ifdef debug then
       Invariant((_queue.max_size() > 0) and
@@ -687,18 +697,15 @@ class BoundaryRoute is Route
 
       if _queue.size() == _queue.max_size() then
         ifdef "credit_trace" then
-          @printf[I32]("Boundary route queue is full.\n".cstring())
+          @printf[I32]("Boundary route queue is full (%s).\n".cstring(),
+            _step_type.cstring())
         end
-        false
-      else
-        true
       end
     else
       ifdef debug then
         @printf[I32]("Failure trying to enqueue boundary route data\n".cstring())
       end
       Fail()
-      true
     end
 
   fun ref _flush_queue() =>

@@ -44,7 +44,7 @@ actor EmptySink is CreditFlowConsumerStep
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     None
 
-  be credit_request(from: Producer, credits_requested: ISize) =>
+  be credit_request(from: Producer) =>
     None
 
   be return_credits(credits: ISize) =>
@@ -273,7 +273,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-  be credit_request(from: Producer, credits_requested: ISize) =>
+  be credit_request(from: Producer) =>
     """
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
@@ -301,14 +301,16 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    let desired_give_out = if _can_send() then
-      (_distributable_credits / _upstreams.size().isize())
+    let give_out = if _can_send() then
+      let portion = _distributable_credits / _upstreams.size().isize()
+      if _distributable_credits > 0 then
+        portion.max(1)
+      else
+        0
+      end
     else
       0
     end
-
-    // let give_out = credits_requested.min(desired_give_out)
-    let give_out = desired_give_out
 
     ifdef debug then
       try
@@ -321,7 +323,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("Sink: Credits requested: %llu. Giving %llu out of %llu\n".cstring(), credits_requested, give_out, _distributable_credits)
+      @printf[I32]("Sink: Credits requested. Giving %llu out of %llu\n".cstring(), give_out, _distributable_credits)
     end
 
     from.receive_credits(give_out, this)
@@ -764,10 +766,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           end
         end
 
-        match final_pending_sent
-        | let sent: SeqId =>
-          _unit_finished(num_sent, sent)
-        end
+        _unit_finished(num_sent, final_pending_sent)
       end
     end
 

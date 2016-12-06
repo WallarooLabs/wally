@@ -63,7 +63,7 @@ actor Step is (RunnableStep & Resilient & Producer &
 
    // CreditFlow Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
-  var _max_distributable_credits: ISize = 10_000
+  var _max_distributable_credits: ISize = 1_000
   var _distributable_credits: ISize = 0
 
   // Resilience routes
@@ -117,7 +117,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     // end
 
     for r in _routes.values() do
-      r.initialize(_max_distributable_credits)
+      r.initialize(_max_distributable_credits, "Step")
       ifdef "resilience" then
         _resilience_routes.add_route(r)
       end
@@ -139,7 +139,7 @@ actor Step is (RunnableStep & Resilient & Producer &
         // same number of max credits as the step itself.  The commented
         // code surrounding this shows the old approach of dividing the
         // max credits among routes.
-        next_route.initialize(_max_distributable_credits)
+        next_route.initialize(_max_distributable_credits, "Step")
       end
     end
 
@@ -337,7 +337,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       _distributable_credits = _max_distributable_credits
     end
 
-  be credit_request(from: Producer, credits_requested: ISize) =>
+  be credit_request(from: Producer) =>
     """
     Receive a credit request from a producer. For speed purposes, we assume
     the producer is already registered with us.
@@ -346,23 +346,20 @@ actor Step is (RunnableStep & Resilient & Producer &
       Invariant(_upstreams.contains(from))
     end
 
-    let desired_give_out = _distributable_credits / _upstreams.size().isize()
-
-    // let give_out = credits_requested.min(desired_give_out)
-    let give_out = desired_give_out
+    let give_out =
+      if _distributable_credits > 0 then
+        let portion = _distributable_credits / _upstreams.size().isize()
+        portion.max(1)
+      else
+        0
+      end
 
     ifdef "credit_trace" then
-      @printf[I32]("Step: credit requested: %llu. Giving %llu credits out of %llu\n".cstring(), credits_requested, give_out, _distributable_credits)
+      @printf[I32]("Step: Credits requested. Giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
     end
 
     from.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
-
-    if _distributable_credits == 0 then
-      for r in _routes.values() do
-        r.request_credits()
-      end
-    end
 
   be return_credits(credits: ISize) =>
     _distributable_credits = _distributable_credits + credits
@@ -379,6 +376,9 @@ actor Step is (RunnableStep & Resilient & Producer &
     lowest
 
 class StepRouteCallbackHandler is RouteCallbackHandler
+  fun ref register(producer: Producer ref, r: Route tag) =>
+    None
+
   fun shutdown(producer: Producer ref) =>
     // TODO: CREDITFLOW - What is our error handling?
     None

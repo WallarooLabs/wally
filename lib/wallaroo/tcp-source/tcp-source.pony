@@ -29,7 +29,7 @@ actor TCPSource is (Initializable & Producer)
   let _tcp_sinks: Array[TCPSink] val
   // Determines if we can still process credits from consumers
   var _unregistered: Bool = false
-  var _max_route_credits: ISize = 10_000
+  var _max_route_credits: ISize = 1_000
 
   // TCP
   let _listen: TCPSourceListener
@@ -85,17 +85,9 @@ actor TCPSource is (Initializable & Producer)
         AsioEvent.read_write(), 0, true)
     end
     _connected = true
-    /*
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
-    */
-
-    // TODO: replace with value of OS buffer size from socketopt.
-    // This value is stupid large
-    _read_buf = recover Array[U8].undefined(1_048_576) end
-    _next_size = 1_048_576
-    _max_size = 1_048_576
 
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
@@ -127,7 +119,7 @@ actor TCPSource is (Initializable & Producer)
       // TODO: What should the initial max credits per route from
       // a Source be?  I'm starting at max_value because that makes
       // us dependent on how many can be distributed from downstream.
-      r.initialize(_max_route_credits)
+      r.initialize(_max_route_credits, "TCPSource")
     end
 
     ifdef "backpressure" then
@@ -529,13 +521,22 @@ actor TCPSource is (Initializable & Producer)
     _read_buf.undefined(_next_size)
 
   fun ref _mute() =>
+    ifdef "credit_trace" then
+      @printf[I32]("MUTE\n".cstring())
+    end
     _muted = true
 
   fun ref _unmute() =>
+    ifdef "credit_trace" then
+      @printf[I32]("UNMUTE\n".cstring())
+    end
     _muted = false
     if not _reading then
       _pending_reads()
     end
+
+  fun ref is_muted(): Bool =>
+    _muted
 
   fun ref expect(qty: USize = 0) =>
     """
@@ -557,7 +558,23 @@ actor TCPSource is (Initializable & Producer)
     end
 
 class TCPSourceRouteCallbackHandler is RouteCallbackHandler
+  let _registered_routes: SetIs[Route tag] = _registered_routes.create()
   var _muted: ISize = 0
+
+  fun ref register(producer: Producer ref, r: Route tag) =>
+    ifdef debug then
+      Invariant(not _registered_routes.contains(r))
+    end
+
+    match producer
+    | let s: TCPSource ref =>
+      _registered_routes.set(r)
+      ifdef "backpressure" then
+        _try_mute(s)
+      end
+    else
+      Fail()
+    end
 
   fun shutdown(producer: Producer ref) =>
     match producer
@@ -578,15 +595,28 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       if (_muted == 0) then
         p._unmute()
       end
+      ifdef "credit_trace" then
+        @printf[I32]("Credits_replenished. Now _muted=%llu\n".cstring(),
+          _muted)
+      end
     else
       Fail()
     end
 
   fun ref credits_exhausted(producer: Producer ref) =>
     match producer
-    | let p: TCPSource ref =>
-      _muted = _muted + 1
-      p._mute()
+    | let s: TCPSource ref =>
+      _try_mute(s)
+      ifdef "credit_trace" then
+        @printf[I32]("Credits_exhausted. Now _muted=%llu\n".cstring(),
+          _muted)
+      end
     else
       Fail()
     end
+
+  fun ref _try_mute(s: TCPSource ref) =>
+    if _muted == 0 then
+      s._mute()
+    end
+    _muted = _muted + 1
