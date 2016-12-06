@@ -75,13 +75,13 @@ actor Main
               computation_factory(),
               ArizonaStateBuilder, "state-builder", data_partition
               where
-              multi_worker = true, default_state_name = "default-state")
+              multi_worker = true)//, default_state_name = "default-state")
           .to_sink(recover CPPSinkEncoder(recover @get_sink_encoder() end) end, recover [0] end)
 
           // PARITIONED WITH DEFAULT (B)
-          .partition_default_target[CPPData val, CPPData val, CPPState](
-              "Arizona Default Test", "default-state", default_computation_factory(),
-              ArizonaDefaultStateBuilder)
+//          .partition_default_target[CPPData val, CPPData val, CPPState](
+//              "Arizona Default Test", "default-state", default_computation_factory(),
+//             ArizonaDefaultStateBuilder)
 
       end
       Startup(env, application, None)
