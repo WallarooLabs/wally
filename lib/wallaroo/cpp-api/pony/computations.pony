@@ -21,7 +21,6 @@ class CPPComputation is Computation[CPPData val, CPPData val]
     _computation = computation
 
   fun apply(input: CPPData val): (CPPData val | None) =>
-    //SUPER-EVIL-DANGER-ZONE
     let ret = match @w_computation_compute(_computation, input.obj())
     | let result: DataP =>
       if input.obj() == result then
@@ -36,6 +35,7 @@ class CPPComputation is Computation[CPPData val, CPPData val]
       @printf[I32]("result is not a DataP".cstring())
       None
     end
+    //SUPER-EVIL-DANGER-ZONE
     input.delete_obj()
     ret
 
