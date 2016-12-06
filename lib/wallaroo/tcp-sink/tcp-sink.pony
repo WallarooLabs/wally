@@ -1,4 +1,3 @@
-use "assert"
 use "buffered"
 use "collections"
 use "net"
@@ -16,55 +15,6 @@ use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
-
-actor EmptySink is CreditFlowConsumerStep
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId)
-  =>
-    ifdef "trace" then
-      @printf[I32]("Rcvd msg at EmptySink\n".cstring())
-    end
-    None
-
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Producer, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
-  =>
-    None
-
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
-  =>
-    None
-
-  be register_producer(producer: Producer) =>
-    None
-
-  be unregister_producer(producer: Producer, credits_returned: ISize) =>
-    None
-
-  be credit_request(from: Producer) =>
-    None
-
-  be return_credits(credits: ISize) =>
-    None
-
-class TCPSinkBuilder
-  let _encoder_wrapper: EncoderWrapper val
-  let _initial_msgs: Array[Array[ByteSeq] val] val
-
-  new val create(encoder_wrapper: EncoderWrapper val,
-    initial_msgs: Array[Array[ByteSeq] val] val)
-  =>
-    _encoder_wrapper = encoder_wrapper
-    _initial_msgs = initial_msgs
-
-  fun apply(reporter: MetricsReporter iso, host: String, service: String):
-    TCPSink
-  =>
-    TCPSink(_encoder_wrapper, consume reporter, host, service,
-      _initial_msgs)
 
 actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   """
@@ -104,6 +54,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _upstreams: Array[Producer] = _upstreams.create()
   var _max_distributable_credits: ISize = 350_000
   var _distributable_credits: ISize = _max_distributable_credits
+  let _minimum_credit_response: ISize = 250
+  var _waiting_producers: Array[Producer] = _waiting_producers.create()
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -242,27 +194,14 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   // CREDIT FLOW
   be register_producer(producer: Producer) =>
     ifdef debug then
-      try
-        Assert(not _upstreams.contains(producer),
-          "Producer attempted registered with sink more than once")
-      else
-        _hard_close()
-        return
-      end
+      Invariant(not _upstreams.contains(producer))
     end
 
     _upstreams.push(producer)
 
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
-      try
-        Assert(_upstreams.contains(producer),
-          "Producer attempted to unregister with sink " +
-          "it isn't registered with")
-      else
-        _hard_close()
-        return
-      end
+      Invariant(_upstreams.contains(producer))
     end
 
     try
@@ -292,52 +231,72 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     and we are experiencing backpressure, they don't get any more.
     """
     ifdef debug then
+      Invariant(_upstreams.contains(from))
+    end
+
+    if _can_distribute_credits() and (_waiting_producers.size() == 0) then
+      _distribute_credits_to(from)
+    else
+      _waiting_producers.push(from)
+    end
+
+
+  fun ref _can_distribute_credits(): Bool =>
+    _can_send() and _above_minimum_response_level()
+
+  fun ref _distribute_credits() =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
+    end
+
+    while (_waiting_producers.size() > 0) and _can_distribute_credits() do
       try
-        Assert(_upstreams.contains(from),
-          "Credit request from unregistered producer")
+        let producer = _waiting_producers.shift()
+        _distribute_credits_to(producer)
       else
-        _hard_close()
-        return
+        Fail()
       end
     end
 
-    let give_out = if _can_send() then
-      let portion = _distributable_credits / _upstreams.size().isize()
-      if _distributable_credits > 0 then
-        portion.max(1)
-      else
-        0
-      end
-    else
-      0
+  fun ref _distribute_credits_to(producer: Producer) =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
     end
+
+    let give_out =
+      (_distributable_credits / _upstreams.size().isize())
+        .min(_minimum_credit_response)
 
     ifdef debug then
-      try
-        Assert(give_out >= 0,
-          "TCPSink calculated and is trying to send back negative credits")
-      else
-        _hard_close()
-        return
-      end
+      Invariant(give_out >= _minimum_credit_response)
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("Sink: Credits requested. Giving %llu out of %llu\n".cstring(), give_out, _distributable_credits)
+      @printf[I32]((
+        "Sink: Credits requested." +
+        " Giving %llu out of %llu\n"
+        ).cstring(),
+        give_out, _distributable_credits)
     end
 
-    from.receive_credits(give_out, this)
+    producer.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
+
+  be return_credits(credits: ISize) =>
+    _recoup_credits(credits)
 
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
+    if (_waiting_producers.size() > 0) and _above_minimum_response_level() then
+      _distribute_credits()
+    end
 
-  be return_credits(credits: ISize) =>
-    _distributable_credits = _distributable_credits + credits
+  fun _above_minimum_response_level(): Bool =>
+    _distributable_credits >= _minimum_credit_response
 
   //
   // TCP
- be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
+  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.
     """

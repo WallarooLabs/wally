@@ -7,6 +7,7 @@ use "sendence/epoch"
 use "sendence/guid"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -65,6 +66,8 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _upstreams: Array[Producer] = _upstreams.create()
   var _max_distributable_credits: ISize = 1_000
   var _distributable_credits: ISize = 0
+  let _minimum_credit_response: ISize = 250
+  var _waiting_producers: Array[Producer] = _waiting_producers.create()
 
   // Resilience routes
   // TODO: This needs to be merged with credit flow producer routes
@@ -172,7 +175,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       end
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
       ifdef "backpressure" then
-        _recoup_credits(1)
+        recoup_credits(1)
       end
     end
     // DO NOT REMOVE. THIS GC TRIGGERING IS INTENTIONAL.
@@ -235,7 +238,7 @@ actor Step is (RunnableStep & Resilient & Producer &
             i_origin, i_route_id, i_seq_id)
         end
         ifdef "backpressure" then
-          _recoup_credits(1)
+          recoup_credits(1)
         end
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
       end
@@ -325,16 +328,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     try
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
-      _recoup_credits(credits_returned)
-    end
-
-  fun ref recoup_credits(recoup: ISize) =>
-    _recoup_credits(recoup)
-
-  fun ref _recoup_credits(recoup: ISize) =>
-    _distributable_credits = _distributable_credits + recoup
-    if _distributable_credits > _max_distributable_credits then
-      _distributable_credits = _max_distributable_credits
+      recoup_credits(credits_returned)
     end
 
   be credit_request(from: Producer) =>
@@ -346,34 +340,68 @@ actor Step is (RunnableStep & Resilient & Producer &
       Invariant(_upstreams.contains(from))
     end
 
-    let give_out =
-      if _distributable_credits > 0 then
-        let portion = _distributable_credits / _upstreams.size().isize()
-        portion.max(1)
-      else
-        0
-      end
-
-    ifdef "credit_trace" then
-      @printf[I32]("Step: Credits requested. Giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
+    if _can_distribute_credits() and (_waiting_producers.size() == 0) then
+      _distribute_credits_to(from)
+    else
+      _waiting_producers.push(from)
     end
 
-    from.receive_credits(give_out, this)
+  fun ref _can_distribute_credits(): Bool =>
+    // TODO: should this account for route levels?
+    _above_minimum_response_level()
+
+  fun ref _distribute_credits() =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
+    end
+
+    while (_waiting_producers.size() > 0) and _can_distribute_credits() do
+      try
+        let producer = _waiting_producers.shift()
+        _distribute_credits_to(producer)
+      else
+        Fail()
+      end
+    end
+
+  fun ref _distribute_credits_to(producer: Producer) =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
+    end
+
+    let give_out =
+      (_distributable_credits / _upstreams.size().isize())
+        .min(_minimum_credit_response)
+
+    ifdef debug then
+      Invariant(give_out >= _minimum_credit_response)
+    end
+
+    ifdef "credit_trace" then
+      @printf[I32]((
+        "Step: Credits requested." +
+        " Giving %llu out of %llu\n"
+        ).cstring(),
+        give_out, _distributable_credits)
+    end
+
+    producer.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
 
   be return_credits(credits: ISize) =>
-    _distributable_credits = _distributable_credits + credits
+    recoup_credits(credits)
 
-  fun _lowest_route_credit_level(): ISize =>
-    var lowest: ISize = ISize.max_value()
-
-    for route in _routes.values() do
-      if route.credits_available() < lowest then
-        lowest = route.credits_available()
-      end
+  fun ref recoup_credits(recoup: ISize) =>
+    _distributable_credits = _distributable_credits + recoup
+    if _distributable_credits > _max_distributable_credits then
+      _distributable_credits = _max_distributable_credits
+    end
+    if (_waiting_producers.size() > 0) and _above_minimum_response_level() then
+      _distribute_credits()
     end
 
-    lowest
+  fun _above_minimum_response_level(): Bool =>
+    _distributable_credits >= _minimum_credit_response
 
 class StepRouteCallbackHandler is RouteCallbackHandler
   fun ref register(producer: Producer ref, r: Route tag) =>

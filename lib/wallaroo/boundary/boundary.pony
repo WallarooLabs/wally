@@ -40,6 +40,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   var _max_distributable_credits: ISize = 500_000
   var _distributable_credits: ISize = 200_000
   var _unacked_credits: ISize = 0
+  let _minimum_credit_response: ISize = 250
 
   // TCP
   var _notify: _OutgoingBoundaryNotify

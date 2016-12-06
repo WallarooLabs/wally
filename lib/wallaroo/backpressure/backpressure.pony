@@ -216,7 +216,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref receive_credits(credits: ISize) =>
     ifdef debug then
-      Invariant(credits >= 0)
+      Invariant(credits > 0)
     end
 
     _request_outstanding = false
@@ -526,7 +526,7 @@ class BoundaryRoute is Route
 
   fun ref receive_credits(credits: ISize) =>
     ifdef debug then
-      Invariant(credits >= 0)
+      Invariant(credits > 0)
     end
 
     _request_outstanding = false
