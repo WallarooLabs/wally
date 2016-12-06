@@ -1,4 +1,4 @@
-ec2-54-145-81-22.compute-1.amazonaws.com
-ec2-52-87-252-81.compute-1.amazonaws.com
-ec2-54-172-218-59.compute-1.amazonaws.com
-ec2-54-210-44-174.compute-1.amazonaws.com
+node1
+node2
+node3
+leader
