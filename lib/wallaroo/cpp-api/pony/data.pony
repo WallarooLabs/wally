@@ -13,10 +13,13 @@ class CPPData
     @w_serializable_serialize_get_size(_data)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    @w_serializable_serialize(_data, bytes, USize(0))
+    let s = @w_serializable_serialize(_data, bytes, USize(0))
+    //SUPER-EVIL-DANGER-ZONE
+    delete_obj()
+    s
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
     _data = recover @w_user_serializable_deserialize(bytes, USize(0)) end
 
-  fun _final() =>
+  fun delete_obj() =>
     @w_managed_object_delete(_data)
