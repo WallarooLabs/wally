@@ -146,14 +146,20 @@ actor MetricsSink
       _pending.push((data, 0))
     end
 
-  be send_metric(name: String, category: String, pipeline_name: String,
-    worker_name: String, id: U16, histogram: Histogram iso,
-    period: U64, period_ends_at: U64, topic: String, event: String)
+  be send_metrics(metrics: Array[(String, String, String, String, U16,
+    Histogram iso, U64, U64, String, String)] iso)
   =>
-    let payload = HubProtocol.metrics(name, category, pipeline_name,
-      worker_name, id, consume histogram, period, period_ends_at, _wb)
-    let hub_msg = HubProtocol.payload(event, topic, payload, _wb)
-    _writev(hub_msg)
+    try
+      while metrics.size() > 0 do
+        (let metric_name, let category, let pipeline, let worker_name, let id,
+          let histogram, let period, let period_ends_at, let topic, let event) =
+          metrics.shift()
+        let payload = HubProtocol.metrics(metric_name, category, pipeline,
+          worker_name, id, consume histogram, period, period_ends_at, _wb)
+        let hub_msg = HubProtocol.payload(event, topic, payload, _wb)
+        _writev(hub_msg)
+      end
+    end
 
   be writev(data: ByteSeqIter)
   =>

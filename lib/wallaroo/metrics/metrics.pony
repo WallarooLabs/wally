@@ -175,28 +175,44 @@ class MetricsReporter
     let now = WallClock.nanoseconds()
 
     if now > _period_ends_at then
+      let metrics = recover iso Array[(String, String, String, String, U16,
+        Histogram iso, U64, U64, String, String)] end
       for mr in _step_metrics_map.values() do
-        _send_histogram(mr)
+        let h = mr.reset_histogram()
+        let metric_name = mr.metric_name()
+        let category = mr.category()
+        let topic = mr.topic()
+        let id = mr.id()
+        let pipeline = mr.pipeline()
+        let worker_name = mr.worker_name()
+        metrics.push((metric_name, category, pipeline,
+          worker_name, id, consume h, _period, _period_ends_at, topic, "metrics"))
       end
       for mr in _pipeline_metrics_map.values() do
-        _send_histogram(mr)
+        let h = mr.reset_histogram()
+        let metric_name = mr.metric_name()
+        let category = mr.category()
+        let topic = mr.topic()
+        let id = mr.id()
+        let pipeline = mr.pipeline()
+        let worker_name = mr.worker_name()
+        metrics.push((metric_name, category, pipeline,
+          worker_name, id, consume h, _period, _period_ends_at, topic, "metrics"))
       end
       for mr in _worker_metrics_map.values() do
-        _send_histogram(mr)
+        let h = mr.reset_histogram()
+        let metric_name = mr.metric_name()
+        let category = mr.category()
+        let topic = mr.topic()
+        let id = mr.id()
+        let pipeline = mr.pipeline()
+        let worker_name = mr.worker_name()
+        metrics.push((metric_name, category, pipeline,
+          worker_name, id, consume h, _period, _period_ends_at, topic, "metrics"))
       end
+      _metrics_conn.send_metrics(consume metrics)
       _period_ends_at = _next_period_endtime(now, _period)
     end
-
-  fun ref _send_histogram(mr: _MetricsReporter) =>
-    let h = mr.reset_histogram()
-    let metric_name = mr.metric_name()
-    let category = mr.category()
-    let topic = mr.topic()
-    let id = mr.id()
-    let pipeline = mr.pipeline()
-    let worker_name = mr.worker_name()
-    _metrics_conn.send_metric(metric_name, category, pipeline,
-      worker_name, id, consume h, _period, _period_ends_at, topic, "metrics")
 
   fun clone(): MetricsReporter iso^ =>
     MetricsReporter(_app_name, _worker_name, _metrics_conn)
