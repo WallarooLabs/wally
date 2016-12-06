@@ -18,7 +18,7 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
 
   def init(args) do
     [log_name: log_name, interval_key: interval_key, pipeline_key: pipeline_key,
-     aggregate_interval: aggregate_interval, app_name: app_name, 
+     aggregate_interval: aggregate_interval, app_name: app_name,
      category: category] = args
     msg_log_name = message_log_name(app_name, category, pipeline_key, interval_key)
     stats_msg_log_name = stats_message_log_name(app_name, category, pipeline_key, interval_key)
@@ -38,7 +38,7 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
   def handle_info(:calculate_and_publish_latency_percentage_bins_msgs, state) do
     %{log_name: log_name, msg_log_name: msg_log_name, interval_key: interval_key, stats_msg_log_name: stats_msg_log_name,
     pipeline_key: pipeline_key, aggregate_interval: aggregate_interval, category: category, bins: bins, all_bins: all_bins} = state
-    :timer.sleep(1000)
+    :timer.sleep(2500)
     time_now = :os.system_time(:seconds)
     start_time = time_now - aggregate_interval
     case get_latency_bins_list(log_name, start_time) do
@@ -69,7 +69,7 @@ defmodule MetricsReporterUI.LatencyStatsBroadcaster.Worker do
 
   defp stats_message_log_name(app_name, category, pipeline_key, interval_key) do
     "app_name:" <> app_name <> "::category:" <> category <> "::cat-name:" <> pipeline_key <> "::latency-percentile-bin-stats:" <> interval_key
-  end  
+  end
 
   defp generate_worker_name(log_name, interval_key) do
     "log:" <> log_name <> "::interval-key:" <> interval_key

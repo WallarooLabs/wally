@@ -33,17 +33,16 @@ class ThroughputsStore extends ReduceStore {
 			throughputsList = List();
 		}
 		const updatedThroughputsList = throughputsList.push(fromJS(nextTotalThroughputData))
-			.sort(Comparators.propFor("time"))
 			.filter(d => {
-				return now - d.get("time") < minutes(15)
+				return now - d.get("time") < minutes(5)
 			});
 		return state.setIn([category, metricsKey], updatedThroughputsList);
 	}
 	filterInitialTotalThroughputsData(state, category, metricsKey, throughputs) {
 		const now = toSeconds(Date.now());
-		let sortedTotalThroughputsList = fromJS(throughputs.data).sort(Comparators.propFor("time"))
+		let sortedTotalThroughputsList = fromJS(throughputs.data)
 			.filter(d => {
-				return now - d.get("time") < minutes(15)
+				return now - d.get("time") < minutes(5)
 			});
 			return state.setIn([category, metricsKey], sortedTotalThroughputsList);
 	}
