@@ -265,7 +265,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
     let give_out =
       (_distributable_credits / _upstreams.size().isize())
-        .min(_minimum_credit_response)
+        .max(_minimum_credit_response)
 
     ifdef debug then
       Invariant(give_out >= _minimum_credit_response)
