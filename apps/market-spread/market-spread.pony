@@ -335,6 +335,7 @@ primitive OrderResultEncoder
     let payload = wb.done()
     HubProtocol.payload("rejected-orders", "reports:market-spread",
       consume payload, wb)
+    wb.done()
 
 class LegalSymbols
   let symbols: Array[String] val

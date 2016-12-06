@@ -16,7 +16,7 @@ primitive HubProtocol
     wb.done()
 
   fun payload(event: String, topic: String, data: Array[ByteSeq] val,
-    wb: Writer = Writer): Array[ByteSeq] val
+    wb: Writer)
   =>
     let event_size = event.size().u32()
     let topic_size = topic.size().u32()
@@ -34,11 +34,10 @@ primitive HubProtocol
     wb.write(topic)
     wb.u32_be(data_size)
     wb.writev(data)
-    wb.done()
 
   fun metrics(name: String, category: String, pipeline_name: String,
     worker_name: String, id: U16, histogram: Histogram,
-    period: U64, period_ends_at: U64, wb: Writer): Array[ByteSeq] val
+    period: U64, period_ends_at: U64, wb: Writer)
   =>
     let name_size = name.size().u32()
     let category_size = category.size().u32()
@@ -63,7 +62,6 @@ primitive HubProtocol
     wb.u64_be(histogram.max())
     wb.u64_be(period)
     wb.u64_be(period_ends_at)
-    wb.done()
 
 primitive HubMsgTypes
   fun connect(): U8 => 1

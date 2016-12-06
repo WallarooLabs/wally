@@ -2,6 +2,7 @@ use "buffered"
 use "collections"
 use "net"
 use "sendence/hub"
+use "wallaroo/fail"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -150,15 +151,18 @@ actor MetricsSink
     Histogram iso, U64, U64, String, String)] iso)
   =>
     try
+      let payload_wb: Writer = Writer
       while metrics.size() > 0 do
         (let metric_name, let category, let pipeline, let worker_name, let id,
           let histogram, let period, let period_ends_at, let topic, let event) =
           metrics.shift()
-        let payload = HubProtocol.metrics(metric_name, category, pipeline,
-          worker_name, id, consume histogram, period, period_ends_at, _wb)
-        let hub_msg = HubProtocol.payload(event, topic, payload, _wb)
-        _writev(hub_msg)
+        HubProtocol.metrics(metric_name, category, pipeline,
+          worker_name, id, consume histogram, period, period_ends_at, payload_wb)
+        HubProtocol.payload(event, topic, payload_wb.done(), _wb)
       end
+      _writev(_wb.done())
+    else
+      Fail()
     end
 
   be writev(data: ByteSeqIter)
