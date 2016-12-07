@@ -19,9 +19,11 @@ primitive NodeIngressEgressCategory
   fun apply(): String => "node-ingress-egress"
 
 class _MetricsReporter
-  let _id: U64
   let _topic: String
   let _metric_name: String
+  let _pipeline: String
+  let _id: U16
+  let _worker_name: String
   let _category: MetricsCategory
   let _period: U64
   let _output_to: TCPConnection
@@ -29,21 +31,41 @@ class _MetricsReporter
   var _period_ends_at: U64 = 0
   let _wb: Writer = Writer
 
-  new create(output_to: TCPConnection,
-    id: U64,
-    app_name: String,
-    metric_name: String,
-    category: MetricsCategory,
-    period: U64 = 2_000_000_000)
+  new create(output_to': TCPConnection,
+    app_name': String,
+    worker_name': String,
+    pipeline': String,
+    metric_name': String,
+    id': U16,
+    prefix': String,
+    category': MetricsCategory,
+    period': U64 = 2_000_000_000)
   =>
-    _id = id
-    _topic = "metrics:" + app_name
-    _metric_name = metric_name
-    _category = category
-    _period = period
-    _output_to = output_to
+    _topic = "metrics:" + app_name'
+    _pipeline = pipeline'
+    _worker_name = worker_name'
+    _id = id'
+    _category = category'
+    let str_size = _worker_name.size() + _pipeline.size() + metric_name'.size() +
+      prefix'.size() + 14
+    let metric_name_tmp = recover String(str_size) end
+    metric_name_tmp.append(_pipeline)
+    metric_name_tmp.append("@")
+    metric_name_tmp.append(_worker_name)
+    metric_name_tmp.append(": ")
+    metric_name_tmp.append(_id.string())
+    metric_name_tmp.append(" - ")
+    if prefix' != "" then
+      metric_name_tmp.append(prefix')
+      metric_name_tmp.append(" ")
+    end
+    metric_name_tmp.append(metric_name')
+    _metric_name = consume metric_name_tmp
+
+    _period = period'
+    _output_to = output_to'
     let now = WallClock.nanoseconds()
-    _period_ends_at = _next_period_endtime(now, period)
+    _period_ends_at = _next_period_endtime(now, period')
 
   fun ref report(duration: U64) =>
     let now = WallClock.nanoseconds()
@@ -72,14 +94,14 @@ class MetricsReporter
   let _worker_name: String
   let _metrics_conn: TCPConnection
 
-  let _step_metrics_map: Map[String, _MetricsReporter] =
-    _step_metrics_map.create()
+  let _step_metrics_map: MapIs[(String, String, U16, String), _MetricsReporter] =
+    MapIs[(String, String, U16, String), _MetricsReporter]
+
   let _pipeline_metrics_map: Map[String, _MetricsReporter] =
     _pipeline_metrics_map.create()
 
   let _worker_metrics_map: Map[String, _MetricsReporter] =
     _worker_metrics_map.create()
-
 
   new iso create(app_name: String, worker_name: String,
     metrics_conn: TCPConnection)
@@ -88,35 +110,16 @@ class MetricsReporter
     _worker_name = worker_name
     _metrics_conn = metrics_conn
 
-  fun ref step_metric(pipeline: String, name: String, num: U16, start_ts: U64,
+  fun ref step_metric(pipeline: String, name: String, id: U16, start_ts: U64,
     end_ts: U64, prefix: String = "")
   =>
-    let metric_name: String val = ifdef "detailed-metrics" then
-      let str_size = _worker_name.size() + pipeline.size() + name.size() + 
-        prefix.size() + 14
-      let metric_name_tmp = recover String(str_size) end
-      metric_name_tmp.append(pipeline)
-      metric_name_tmp.append("@")
-      metric_name_tmp.append(_worker_name)
-      metric_name_tmp.append(": ")
-      metric_name_tmp.append(num.string())
-      metric_name_tmp.append(" - ")
-      if prefix != "" then
-        metric_name_tmp.append(prefix)
-        metric_name_tmp.append(" ")
-      end
-      metric_name_tmp.append(name)
-      consume metric_name_tmp
-    else
-      name
-    end
     let metrics = try
-      _step_metrics_map(metric_name)
+      _step_metrics_map((pipeline, name, id, prefix))
     else
       let reporter =
-        _MetricsReporter(_metrics_conn, 1, _app_name, metric_name,
-          ComputationCategory)
-      _step_metrics_map(metric_name) = reporter
+        _MetricsReporter(_metrics_conn, _app_name, _worker_name, pipeline,
+          name, id, prefix, ComputationCategory)
+      _step_metrics_map((pipeline, name, id, prefix)) = reporter
       reporter
     end
 
@@ -127,8 +130,8 @@ class MetricsReporter
         _pipeline_metrics_map(source_name)
       else
         let reporter =
-          _MetricsReporter(_metrics_conn, 1, _app_name, source_name,
-            StartToEndCategory)
+          _MetricsReporter(_metrics_conn, _app_name, _worker_name, source_name,
+            source_name, 0, "", StartToEndCategory)
         _pipeline_metrics_map(source_name) = reporter
         reporter
       end
@@ -140,8 +143,8 @@ class MetricsReporter
         _worker_metrics_map(pipeline_name)
       else
         let reporter =
-          _MetricsReporter(_metrics_conn, 1, _app_name, _worker_name,
-            NodeIngressEgressCategory)
+          _MetricsReporter(_metrics_conn, _app_name, _worker_name, pipeline_name,
+            _worker_name, 0, "", NodeIngressEgressCategory)
         _worker_metrics_map(pipeline_name) = reporter
         reporter
       end
