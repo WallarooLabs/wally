@@ -14,7 +14,7 @@ trait tag Resilient
   be start_without_replay()
 
 //TODO: explain in comment
-type LogEntry is (Bool, U128, U128, None, U64, U64, Array[ByteSeq] val)
+type LogEntry is (Bool, U128, U128, None, U64, U64, Array[ByteSeq] iso)
 
 // used to hold a receovered log entry that might need to be replayed on
 // recovery
@@ -166,7 +166,7 @@ class FileBackend is Backend
     (let is_watermark: Bool, let origin_id: U128, let uid: U128,
      let frac_ids: None, let statechange_id: U64, let seq_id: U64,
      let payload: Array[ByteSeq] val)
-    = entry
+    = consume entry
 
     _writer.bool(is_watermark)
     _writer.u128_be(origin_id)
@@ -309,14 +309,14 @@ actor Alfred
 
     be queue_log_entry(origin_id: U128, uid: U128,
       frac_ids: None, statechange_id: U64, seq_id: U64,
-      payload: Array[ByteSeq] val)
+      payload: Array[ByteSeq] iso)
     =>
       ifdef "resilience" then
         // add to backend buffer after encoding
         // encode right away to amortize encoding cost per entry when received
         // as opposed to when writing a batch to disk
         _backend.encode_entry((false, origin_id, uid, frac_ids, statechange_id,
-          seq_id, payload))
+          seq_id, consume payload))
 
         num_encoded = num_encoded + 1
 
