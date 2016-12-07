@@ -60,8 +60,8 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       end
       true
     else
-      let ingest_ts = WallClock.nanoseconds() // might send across workers
-      let latest_ts = Time.nanos()
+      let ingest_ts = Time.nanos()
+      let pipeline_time_spent: U64 = 0
 
       ifdef "trace" then
         @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
@@ -84,30 +84,31 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
             ifdef "trace" then
               @printf[I32](("Msg decoded at " + _pipeline_name + " source\n").cstring())
             end
-            _runner.run[In](_pipeline_name, ingest_ts, decoded,
+            _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
               conn, _router, _omni_router,
-              o, _guid_gen.u128(), None, 0, 0, latest_ts, 1, latest_ts, _metrics_reporter)
+              o, _guid_gen.u128(), None, 0, 0, ingest_ts, 1, ingest_ts, _metrics_reporter)
           else
             // FramedSourceNotify needs an Producer to pass along
             Fail()
-            (true, true, latest_ts)
+            (true, true, ingest_ts)
           end
         else
           Fail()
-          (true, true, latest_ts)
+          (true, true, ingest_ts)
         end
 
       if is_finished then
-        let computation_end = Time.nanos()
+        let end_ts = Time.nanos()
+        let time_spent = end_ts - ingest_ts
 
         ifdef "detailed-metrics" then
           _metrics_reporter.step_metric(_pipeline_name,
             "Before end at TCP Source", 9999,
-            last_ts, computation_end)
+            last_ts, end_ts)
         end
 
-        _metrics_reporter.pipeline_metric(_pipeline_name, ingest_ts)
-        _metrics_reporter.worker_metric(_pipeline_name, latest_ts)
+        _metrics_reporter.pipeline_metric(_pipeline_name, time_spent + pipeline_time_spent)
+        _metrics_reporter.worker_metric(_pipeline_name, time_spent)
       end
 
       // We have a full queue at a route, so we need to stop reading.

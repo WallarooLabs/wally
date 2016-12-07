@@ -23,13 +23,13 @@ interface StateComputation[In: Any val, Out: Any val, State: Any #read] is Basic
 trait StateProcessor[State: Any #read] is BasicComputation
   fun name(): String
   // Return a tuple containing a Bool indicating whether the message was
-  // finished processing here, a Bool indicating whether a route can still 
+  // finished processing here, a Bool indicating whether a route can still
   // keep receiving data and the state change (or None if there was
   // no state change).
   // TODO: solve the situation where Out is None and we
   // still want the message passed along
   fun apply(state: State, sc_repo: StateChangeRepository[State],
-    omni_router: OmniRouter val, metric_name: String, source_ts: U64,
+    omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: SeqId,
@@ -54,7 +54,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
   fun input(): Any val => _input
 
   fun apply(state: State, sc_repo: StateChangeRepository[State],
-    omni_router: OmniRouter val, metric_name: String, source_ts: U64,
+    omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
@@ -68,11 +68,11 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
     // It matters that the None check comes first, since Out could be
     // type None if you always filter/end processing there
     match result
-    | (None, _) => (true, true, result._2, computation_start, 
+    | (None, _) => (true, true, result._2, computation_start,
         computation_end, computation_end) // This must come first
     | (let output: Out, _) =>
       (let is_finished, let keep_sending, let last_ts) = omni_router.route_with_target_id[Out](
-        _target_id, metric_name, source_ts, output, producer,
+        _target_id, metric_name, pipeline_time_spent, output, producer,
         // incoming envelope
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
         computation_end, metrics_id, worker_ingress_ts)

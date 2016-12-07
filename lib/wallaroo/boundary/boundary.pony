@@ -134,7 +134,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   be register_step_id(step_id: U128) =>
     _step_id = step_id
 
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -142,8 +142,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     // Run should never be called on an OutgoingBoundary
     Fail()
 
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Producer, msg_uid: U128,
+  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -151,7 +151,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     Fail()
 
   // TODO: open question: how do we reconnect if our external system goes away?
-  be forward(delivery_msg: ReplayableDeliveryMsg val,
+  be forward(delivery_msg: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64)
@@ -178,6 +178,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       end
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
+        pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
         seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)
       //_queue.enqueue(outgoing_msg)
@@ -192,7 +193,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
           my_latest_ts, end_ts)
       end
 
-      _metrics_reporter.worker_metric(metric_name, worker_ingress_ts)
+      _metrics_reporter.worker_metric(metric_name, end_ts - worker_ingress_ts)
     end
 
   be writev(data: Array[ByteSeq] val) =>

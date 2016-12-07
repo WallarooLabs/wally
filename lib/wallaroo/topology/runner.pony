@@ -15,9 +15,9 @@ use "wallaroo/resilience"
 interface Runner
   // Return a Bool indicating whether the message is finished processing
   // and a Bool indicating whether the Route has filled its queue
-  fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: Producer ref, router: Router val, omni_router: OmniRouter val,
-    i_origin: Producer, i_msg_uid: U128,
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, producer: Producer ref, router: Router val,
+    omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
@@ -437,9 +437,9 @@ class ComputationRunner[In: Any val, Out: Any val]
     _computation_name = _computation.name()
     _next = consume next
 
-  fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: Producer ref, router: Router val, omni_router: OmniRouter val,
-    i_origin: Producer, i_msg_uid: U128,
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, producer: Producer ref, router: Router val,
+    omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
@@ -464,8 +464,8 @@ class ComputationRunner[In: Any val, Out: Any val]
         match result
         | None => (true, true, computation_end)
         | let output: Out =>
-          _next.run[Out](metric_name, source_ts, output, producer, router,
-            omni_router,
+          _next.run[Out](metric_name, pipeline_time_spent, output, producer,
+            router, omni_router,
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
             computation_end, new_metrics_id, worker_ingress_ts, metrics_reporter)
         else
@@ -510,9 +510,9 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     _prep_name = _name + " prep"
     _state_name = state_name'
 
-  fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: Producer ref, router: Router val, omni_router: OmniRouter val,
-    i_origin: Producer, i_msg_uid: U128,
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, producer: Producer ref, router: Router val,
+    omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
@@ -527,7 +527,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
               _target_id)
           shared_state_router.route[
             StateComputationWrapper[In, Out, State] val](
-            metric_name, source_ts, processor, producer,
+            metric_name, pipeline_time_spent, processor, producer,
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
             latest_ts, metrics_id, worker_ingress_ts)
         else
@@ -585,9 +585,9 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
       @printf[I32]("FATAL: could not look up state_change with id %d".cstring(), statechange_id)
     end
 
-  fun ref run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    producer: Producer ref, router: Router val, omni_router: OmniRouter val,
-    i_origin: Producer, i_msg_uid: U128,
+  fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, producer: Producer ref, router: Router val,
+    omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
@@ -603,7 +603,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
         end
 
       let result = sp(_state, _state_change_repository, omni_router,
-        metric_name, source_ts, producer,
+        metric_name, pipeline_time_spent, producer,
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
         latest_ts, new_metrics_id, worker_ingress_ts)
       let is_finished = result._1
@@ -664,16 +664,16 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
     r
 
 class iso RouterRunner
-  fun ref run[Out: Any val](metric_name: String, source_ts: U64, output: Out,
-    producer: Producer ref, router: Router val, omni_router: OmniRouter val,
-    i_origin: Producer, i_msg_uid: U128,
+  fun ref run[Out: Any val](metric_name: String, pipeline_time_spent: U64,
+    output: Out, producer: Producer ref, router: Router val,
+    omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
     match router
     | let r: Router val =>
-      r.route[Out](metric_name, source_ts, output, producer,
+      r.route[Out](metric_name, pipeline_time_spent, output, producer,
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
         latest_ts, metrics_id, worker_ingress_ts)
     else

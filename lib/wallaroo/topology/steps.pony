@@ -17,13 +17,13 @@ use "wallaroo/tcp-sink"
 // Really this should probably be another method on CreditFlowConsumer
 // At which point CreditFlowConsumerStep goes away as well
 trait tag RunnableStep
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Producer, msg_uid: U128,
+  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
@@ -156,7 +156,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   be update_omni_router(omni_router: OmniRouter val) =>
     _omni_router = omni_router
 
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -178,8 +178,8 @@ actor Step is (RunnableStep & Resilient & Producer &
     ifdef "trace" then
       @printf[I32](("Rcvd msg at " + _runner.name() + " step\n").cstring())
     end
-    (let is_finished, _, let last_ts) = _runner.run[D](metric_name, source_ts, data,
-      this, _router, _omni_router,
+    (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
+      pipeline_time_spent, data, this, _router, _omni_router,
       i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
       my_latest_ts, my_metrics_id, worker_ingress_ts, _metrics_reporter)
     if is_finished then
@@ -196,15 +196,17 @@ actor Step is (RunnableStep & Resilient & Producer &
       ifdef "backpressure" then
         _recoup_credits(1)
       end
-      let computation_end = Time.nanos()
+      let end_ts = Time.nanos()
+      let time_spent = end_ts - worker_ingress_ts
 
       ifdef "detailed-metrics" then
         _metrics_reporter.step_metric(metric_name, "Before end at Step", 9999,
-          last_ts, computation_end)
+          last_ts, end_ts)
       end
 
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
-      _metrics_reporter.worker_metric(metric_name, worker_ingress_ts)
+      _metrics_reporter.pipeline_metric(metric_name,
+        time_spent + pipeline_time_spent)
+      _metrics_reporter.worker_metric(metric_name, time_spent)
     end
     // DO NOT REMOVE. THIS GC TRIGGERING IS INTENTIONAL.
     @pony_triggergc[None](this)
@@ -247,7 +249,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
     false
 
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -256,8 +258,8 @@ actor Step is (RunnableStep & Resilient & Producer &
       i_route_id) then
       _deduplication_list.push((i_origin, msg_uid, i_frac_ids, i_seq_id,
         i_route_id))
-      (let is_finished, _, let last_ts) = _runner.run[D](metric_name, source_ts, data,
-        this, _router, _omni_router,
+      (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
+        pipeline_time_spent, data, this, _router, _omni_router,
         i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
         latest_ts, metrics_id, worker_ingress_ts, _metrics_reporter)
 
@@ -270,15 +272,17 @@ actor Step is (RunnableStep & Resilient & Producer &
         ifdef "backpressure" then
           _recoup_credits(1)
         end
-        let computation_end = Time.nanos()
+        let end_ts = Time.nanos()
+        let time_spent = end_ts - worker_ingress_ts
 
         ifdef "detailed-metrics" then
           _metrics_reporter.step_metric(metric_name, "Before end at Step replay",
-            9999, last_ts, computation_end)
+            9999, last_ts, end_ts)
         end
 
-        _metrics_reporter.pipeline_metric(metric_name, source_ts)
-        _metrics_reporter.worker_metric(metric_name, worker_ingress_ts)
+        _metrics_reporter.pipeline_metric(metric_name,
+          time_spent + pipeline_time_spent)
+        _metrics_reporter.worker_metric(metric_name, time_spent)
       end
     end
 

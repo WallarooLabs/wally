@@ -122,7 +122,7 @@ class MetricsReporter
 
     metrics.report(end_ts - start_ts)
 
-  fun ref pipeline_metric(source_name: String val, source_ts: U64) =>
+  fun ref pipeline_metric(source_name: String val, time_spent: U64) =>
     let metrics = try
         _pipeline_metrics_map(source_name)
       else
@@ -133,9 +133,9 @@ class MetricsReporter
         reporter
       end
 
-    metrics.report(WallClock.nanoseconds() - source_ts) // might be across workers
+    metrics.report(time_spent)
 
-  fun ref worker_metric(pipeline_name: String val, ingest_ts: U64) =>
+  fun ref worker_metric(pipeline_name: String val, time_spent: U64) =>
     let metrics = try
         _worker_metrics_map(pipeline_name)
       else
@@ -146,7 +146,7 @@ class MetricsReporter
         reporter
       end
 
-    metrics.report(Time.nanos() - ingest_ts) // within a single worker
+    metrics.report(time_spent)
 
   fun clone(): MetricsReporter iso^ =>
     MetricsReporter(_app_name, _worker_name, _metrics_conn)

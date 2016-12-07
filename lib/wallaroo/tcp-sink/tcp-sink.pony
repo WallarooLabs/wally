@@ -19,7 +19,7 @@ use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 actor EmptySink is CreditFlowConsumerStep
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -29,8 +29,8 @@ actor EmptySink is CreditFlowConsumerStep
     end
     None
 
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Producer, msg_uid: U128,
+  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -169,7 +169,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
   // open question: how do we reconnect if our external system goes away?
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -197,30 +197,32 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
-      let computation_end = Time.nanos()
+      let end_ts = Time.nanos()
+      let time_spent = end_ts - worker_ingress_ts
 
       ifdef "detailed-metrics" then
         _metrics_reporter.step_metric(metric_name, "Before end at sink", 9999,
-          receive_ts, computation_end)
+          receive_ts, end_ts)
       end
 
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
-      _metrics_reporter.worker_metric(metric_name, worker_ingress_ts)
+      _metrics_reporter.pipeline_metric(metric_name,
+        time_spent + pipeline_time_spent)
+      _metrics_reporter.worker_metric(metric_name, time_spent)
     else
       Fail()
     end
     // DO NOT REMOVE. THIS IS AN INTENTIONAL GC
     @pony_triggergc[None](this)
 
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    i_origin: Producer, msg_uid: U128,
+  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     //TODO: deduplication like in the Step <- this is pointless if the Sink
     //doesn't have state, because on recovery we won't have a list of "seen
     //messages", which we would normally get from the eventlog.
-    run[D](metric_name, source_ts, data, i_origin, msg_uid, i_frac_ids,
+    run[D](metric_name, pipeline_time_spent, data, i_origin, msg_uid, i_frac_ids,
       i_seq_id, i_route_id, latest_ts, metrics_id, worker_ingress_ts)
 
   be update_router(router: Router val) =>

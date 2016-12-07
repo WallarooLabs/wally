@@ -6,7 +6,7 @@ use "wallaroo/messages"
 use "wallaroo/tcp-sink"
 
 interface Router
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+  fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
@@ -17,7 +17,7 @@ interface RouterBuilder
   fun apply(): Router val
 
 class EmptyRouter
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+  fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
@@ -34,7 +34,7 @@ class DirectRouter
   new val create(target: CreditFlowConsumerStep tag) =>
     _target = target
 
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+  fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
@@ -50,7 +50,7 @@ class DirectRouter
       ifdef "trace" then
         @printf[I32]("DirectRouter found Route\n".cstring())
       end
-      let keep_sending = r.run[D](metric_name, source_ts, data,
+      let keep_sending = r.run[D](metric_name, pipeline_time_spent, data,
         // hand down producer so we can call _next_sequence_id()
         producer,
         // incoming envelope
@@ -88,7 +88,7 @@ class ProxyRouter
     _target_proxy_address = target_proxy_address
     _auth = auth
 
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+  fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
@@ -106,12 +106,13 @@ class ProxyRouter
       end
       let delivery_msg = ForwardMsg[D](
         _target_proxy_address.step_id,
-        _worker_name, source_ts, data, metric_name,
+        _worker_name, data, metric_name,
         _target_proxy_address,
         msg_uid, i_frac_ids)
 
-      let keep_sending = r.forward(delivery_msg, producer, i_origin, msg_uid, i_frac_ids,
-        i_seq_id, i_route_id, latest_ts, metrics_id, metric_name, worker_ingress_ts)
+      let keep_sending = r.forward(delivery_msg, pipeline_time_spent, producer,
+        i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id, latest_ts,
+        metrics_id, metric_name, worker_ingress_ts)
 
       (false, keep_sending, latest_ts)
     else
@@ -130,7 +131,7 @@ class ProxyRouter
 
 trait OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
-    metric_name: String, source_ts: U64, data: D,
+    metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
@@ -138,7 +139,7 @@ trait OmniRouter
 
 class EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
-    metric_name: String, source_ts: U64, data: D,
+    metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
@@ -164,7 +165,7 @@ class StepIdRouter is OmniRouter
     _outgoing_boundaries = outgoing_boundaries
 
   fun route_with_target_id[D: Any val](target_id: U128,
-    metric_name: String, source_ts: U64, data: D,
+    metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
@@ -184,7 +185,7 @@ class StepIdRouter is OmniRouter
         ifdef "trace" then
           @printf[I32]("OmniRouter found Route to Step\n".cstring())
         end
-        let keep_sending = r.run[D](metric_name, source_ts, data,
+        let keep_sending = r.run[D](metric_name, pipeline_time_spent, data,
           // hand down producer so we can update route_id
           producer,
           // incoming envelope
@@ -208,14 +209,17 @@ class StepIdRouter is OmniRouter
             match might_be_route
             | let r: Route =>
               ifdef "trace" then
-                @printf[I32]("OmniRouter found Route to OutgoingBoundary\n".cstring())
+                @printf[I32]("OmniRouter found Route to OutgoingBoundary\n"
+                  .cstring())
               end
               let delivery_msg = ForwardMsg[D](pa.step_id,
-                _worker_name, source_ts, data, metric_name,
+                _worker_name, data, metric_name,
                 pa, msg_uid, i_frac_ids)
 
-              let keep_sending = r.forward(delivery_msg, producer, i_origin, msg_uid, i_frac_ids,
-                i_seq_id, i_route_id, latest_ts, metrics_id, metric_name, worker_ingress_ts)
+              let keep_sending = r.forward(delivery_msg, pipeline_time_spent,
+                producer, i_origin, msg_uid, i_frac_ids,
+                i_seq_id, i_route_id, latest_ts, metrics_id, metric_name,
+                worker_ingress_ts)
               (false, keep_sending, latest_ts)
             else
               // We don't have a route to this boundary
@@ -253,8 +257,8 @@ class DataRouter
   =>
     _data_routes = data_routes
 
-  fun route(d_msg: DeliveryMsg val, origin: Producer, seq_id: SeqId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun route(d_msg: DeliveryMsg val, pipeline_time_spent: U64, origin: Producer,
+    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataRouter\n".cstring())
@@ -265,7 +269,8 @@ class DataRouter
       ifdef "trace" then
         @printf[I32]("DataRouter found Step\n".cstring())
       end
-      d_msg.deliver(target, origin, seq_id, latest_ts, metrics_id, worker_ingress_ts)
+      d_msg.deliver(pipeline_time_spent, target, origin, seq_id, latest_ts,
+        metrics_id, worker_ingress_ts)
       false
     else
       ifdef debug then
@@ -274,14 +279,15 @@ class DataRouter
       true
     end
 
-  fun replay_route(r_msg: ReplayableDeliveryMsg val, origin: Producer,
-    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun replay_route(r_msg: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
+    origin: Producer, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     try
       let target_id = r_msg.target_id()
       //TODO: create and deliver envelope
-      r_msg.replay_deliver(_data_routes(target_id), origin, seq_id,
-        latest_ts, metrics_id, worker_ingress_ts)
+      r_msg.replay_deliver(pipeline_time_spent, _data_routes(target_id), origin,
+        seq_id, latest_ts, metrics_id, worker_ingress_ts)
       false
     else
       true
@@ -331,7 +337,7 @@ class LocalPartitionRouter[In: Any val,
     _partition_function = partition_function
     _default_router = default_router
 
-  fun route[D: Any val](metric_name: String, source_ts: U64, data: D,
+  fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
@@ -356,7 +362,7 @@ class LocalPartitionRouter[In: Any val,
               ifdef "trace" then
                 @printf[I32]("PartitionRouter found Route\n".cstring())
               end
-              let keep_sending =r.run[D](metric_name, source_ts, data,
+              let keep_sending =r.run[D](metric_name, pipeline_time_spent, data,
                 // hand down producer so we can update route_id
                 producer,
                 // incoming envelope
@@ -368,7 +374,7 @@ class LocalPartitionRouter[In: Any val,
               (true, true, latest_ts)
             end
           | let p: ProxyRouter val =>
-            p.route[D](metric_name, source_ts, data, producer,
+            p.route[D](metric_name, pipeline_time_spent, data, producer,
               i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
               latest_ts, metrics_id, worker_ingress_ts)
           else
@@ -383,7 +389,7 @@ class LocalPartitionRouter[In: Any val,
             ifdef "trace" then
               @printf[I32]("PartitionRouter sending to default step as there was no entry for key\n".cstring())
             end
-            r.route[In](metric_name, source_ts, input, producer,
+            r.route[In](metric_name, pipeline_time_spent, input, producer,
               i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
               latest_ts, metrics_id, worker_ingress_ts)
           else
