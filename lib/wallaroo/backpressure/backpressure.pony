@@ -50,7 +50,8 @@ primitive EmptyRouteBuilder is RouteBuilder
     EmptyRoute
 
 trait Route
-  fun ref initialize(max_credits: ISize, step_type: String)
+  fun ref application_created()
+  fun ref application_initialized(new_max_credits: ISize, step_type: String)
   fun ref update_max_credits(max_credits: ISize)
   fun id(): U64
   fun credits_available(): ISize
@@ -71,7 +72,12 @@ trait Route
 class EmptyRoute is Route
   let _route_id: U64 = 1 + GuidGenerator.u64() // route 0 is used for filtered messages
 
-  fun ref initialize(max_credits: ISize, step_type: String) => None
+  fun ref application_created() =>
+    None
+
+  fun ref application_initialized(new_max_credits: ISize, step_type: String) =>
+    None
+
   fun id(): U64 => _route_id
   fun ref update_max_credits(max_credits: ISize) => None
   fun credits_available(): ISize => 0
@@ -167,15 +173,17 @@ class TypedRoute[In: Any val] is Route
     _step = step
     _consumer = consumer
     _callback = handler
-    _callback.register(_step, this)
-    _consumer.register_producer(_step)
 
     // We start at 0 size.  We need to know the max_credits before we
     // can size this in the initialize method.
     _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
       None, SeqId, RouteId)](0)
 
-  fun ref initialize(new_max_credits: ISize, step_type: String) =>
+  fun ref application_created() =>
+    _callback.register(_step, this)
+    _consumer.register_producer(_step)
+
+  fun ref application_initialized(new_max_credits: ISize, step_type: String) =>
     _step_type = step_type
     ifdef "backpressure" then
       ifdef debug then
@@ -477,12 +485,14 @@ class BoundaryRoute is Route
     _step = step
     _consumer = consumer
     _callback = handler
-    _callback.register(_step, this)
-    _consumer.register_producer(_step)
     _queue = FixedQueue[(ReplayableDeliveryMsg val, Producer ref,
       Producer, U128, None, SeqId, RouteId)](0)
 
-  fun ref initialize(new_max_credits: ISize, step_type: String) =>
+  fun ref application_created() =>
+    _callback.register(_step, this)
+    _consumer.register_producer(_step)
+
+  fun ref application_initialized(new_max_credits: ISize, step_type: String) =>
     _step_type = step_type
     ifdef "backpressure" then
       ifdef debug then

@@ -15,7 +15,7 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is (Initializable & Producer)
+actor TCPSource is Producer
   """
   # TCPSource
 
@@ -59,7 +59,6 @@ actor TCPSource is (Initializable & Producer)
   // Origin (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
-  // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
@@ -116,16 +115,14 @@ actor TCPSource is (Initializable & Producer)
     end
 
     for r in _routes.values() do
+      // TODO: this is a hack, we shouldn't be calling application events
+      // directly. route lifecycle needs to be broken out better from
+      // application lifecycle
+      r.application_created()
       // TODO: What should the initial max credits per route from
       // a Source be?  I'm starting at max_value because that makes
       // us dependent on how many can be distributed from downstream.
-      r.initialize(_max_route_credits, "TCPSource")
-    end
-
-    ifdef "backpressure" then
-      for r in _routes.values() do
-        r.request_credits()
-      end
+      r.application_initialized(_max_route_credits, "TCPSource")
     end
 
   //////////////
@@ -155,16 +152,6 @@ actor TCPSource is (Initializable & Producer)
 
   fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
     None
-
-  // Our actor
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
-  =>
-    None
-    ifdef debug then
-      Invariant(_max_route_credits ==
-        (_max_route_credits.usize() - 1).next_pow2().isize())
-    end
 
   be dispose() =>
     """

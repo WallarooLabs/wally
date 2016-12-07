@@ -7,6 +7,7 @@ use "sendence/epoch"
 use "sendence/guid"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -27,8 +28,12 @@ trait tag RunnableStep
 
 
 interface Initializable
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  be application_created(initializer: LocalTopologyInitializer,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    omni_router: OmniRouter val)
+
+  be application_initialized(initializer: LocalTopologyInitializer)
+  be application_ready_to_work(initializer: LocalTopologyInitializer)
 
 type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer & Initializable tag)
 
@@ -47,7 +52,6 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
   let _default_target: (Step | None)
-  var _initialized: Bool = false
   // list of envelopes
   // (origin, msg_uid, frac_ids, seq_id, route_id)
   let _deduplication_list: Array[(Producer, U128, (Array[U64] val | None),
@@ -90,13 +94,14 @@ actor Step is (RunnableStep & Resilient & Producer &
     _id = id
     _default_target = default_target
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  //
+  // Application startup lifecycle event
+  //
+
+  be application_created(initializer: LocalTopologyInitializer,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    omni_router: OmniRouter val)
   =>
-    ifdef debug then
-      Invariant(_max_distributable_credits ==
-        (_max_distributable_credits.usize() - 1).next_pow2().isize())
-    end
     for consumer in _router.routes().values() do
       _routes(consumer) =
         _route_builder(this, consumer, StepRouteCallbackHandler)
@@ -112,20 +117,26 @@ actor Step is (RunnableStep & Resilient & Producer &
       _routes(r) = _route_builder(this, r, StepRouteCallbackHandler)
     end
 
-    // for sink in tcp_sinks.values() do
-    //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
-    // end
-
     for r in _routes.values() do
-      r.initialize(_max_distributable_credits, "Step")
       ifdef "resilience" then
+        r.application_created()
         _resilience_routes.add_route(r)
       end
     end
 
     _omni_router = omni_router
 
-    _initialized = true
+    //initializer.application_created_done(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    for r in _routes.values() do
+      r.application_initialized(_max_distributable_credits, "Step")
+    end
+
+    //initializer.application_initialized_done(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
 
   be update_route_builder(route_builder: RouteBuilder val) =>
     _route_builder = route_builder
@@ -134,13 +145,13 @@ actor Step is (RunnableStep & Resilient & Producer &
     for consumer in router.routes().values() do
       let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
       _routes(consumer) = next_route
-      if _initialized then
+      //if _initialized then
         // TODO: This is a kind of hack right now. Each route has the
         // same number of max credits as the step itself.  The commented
         // code surrounding this shows the old approach of dividing the
         // max credits among routes.
         next_route.initialize(_max_distributable_credits, "Step")
-      end
+      //end
     end
 
   // TODO: This needs to dispose of the old routes and replace with new routes

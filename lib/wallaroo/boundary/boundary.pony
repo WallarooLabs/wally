@@ -6,6 +6,7 @@ use "sendence/guid"
 use "sendence/queue"
 use "wallaroo/backpressure"
 use "wallaroo/fail"
+use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -46,7 +47,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
-  var _connect_count: U32
+  var _connect_count: U32 = 0
   var _fd: U32 = -1
   var _in_sent: Bool = false
   var _expect: USize = 0
@@ -102,17 +103,27 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     _next_size = init_size
     _max_size = max_size
     _notify = EmptyBoundaryNotify
+
+  //
+  // Application startup lifecycle event
+  //
+
+  be application_created(initializer: LocalTopologyInitializer,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    omni_router: OmniRouter val)
+  =>
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
-      from.cstring())
+      _from.cstring())
 
     _notify_connecting()
 
-    @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + service + "\n").cstring())
+    @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
-  =>
+    // If connecting failed, we should handle here
+    //initializer.application_created_done(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
     ifdef debug then
       Invariant(_max_distributable_credits ==
         (_max_distributable_credits.usize() - 1).next_pow2().isize())
@@ -128,6 +139,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     else
       Fail()
     end
+
+    //initializer.application_initialized_done(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
 
   be register_step_id(step_id: U128) =>
     _step_id = step_id

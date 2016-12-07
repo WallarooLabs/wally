@@ -5,6 +5,7 @@ use "net"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
+use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -33,9 +34,16 @@ actor EmptySink is CreditFlowConsumerStep
   =>
     None
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  be application_created(initializer: LocalTopologyInitializer,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    omni_router: OmniRouter val)
   =>
+    None
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    None
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
   be register_producer(producer: Producer) =>
@@ -157,13 +165,23 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       from.cstring())
     _notify_connecting()
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  //
+  // Application Lifecycle events
+  //
+
+  be application_created(initializer: LocalTopologyInitializer,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    omni_router: OmniRouter val)
   =>
-    ifdef debug then
-      Invariant(_max_distributable_credits ==
-        (_max_distributable_credits.usize() - 1).next_pow2().isize())
-    end
+    None
+    //initializer.application_created_done(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    None
+    //initializer.application_initialized_done(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
