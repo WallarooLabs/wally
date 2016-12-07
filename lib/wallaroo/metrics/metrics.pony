@@ -94,8 +94,8 @@ class MetricsReporter
   let _worker_name: String
   let _metrics_conn: TCPConnection
 
-  let _step_metrics_map: MapIs[(String, String, U16, String), _MetricsReporter] =
-    MapIs[(String, String, U16, String), _MetricsReporter]
+  let _step_metrics_map: Map[String, _MetricsReporter] =
+    _step_metrics_map.create()
 
   let _pipeline_metrics_map: Map[String, _MetricsReporter] =
     _pipeline_metrics_map.create()
@@ -113,13 +113,33 @@ class MetricsReporter
   fun ref step_metric(pipeline: String, name: String, id: U16, start_ts: U64,
     end_ts: U64, prefix: String = "")
   =>
+    // TODO: Figure out how to switch to a map without a performance penalty
+    // such as: `MapIs[(String, String, U16, String), _MetricsReporter]`
+    // NOTE: Previous attempt to switch to the tuple map resulted in a
+    // negative performance impact so that is why the following string concat is
+    // still being used.
+    let metric_name: String val = ifdef "detailed-metrics" then
+      let str_size = _worker_name.size() + pipeline.size() + name.size() +
+        prefix.size() + 6
+      let metric_name_tmp = recover String(str_size) end
+      metric_name_tmp.append(pipeline)
+      metric_name_tmp.append(_worker_name)
+      metric_name_tmp.append(id.string())
+      if prefix != "" then
+        metric_name_tmp.append(prefix)
+      end
+      metric_name_tmp.append(name)
+      consume metric_name_tmp
+    else
+      name
+    end
     let metrics = try
-      _step_metrics_map((pipeline, name, id, prefix))
+      _step_metrics_map(metric_name)
     else
       let reporter =
         _MetricsReporter(_metrics_conn, _app_name, _worker_name, pipeline,
           name, id, prefix, ComputationCategory)
-      _step_metrics_map((pipeline, name, id, prefix)) = reporter
+      _step_metrics_map(metric_name) = reporter
       reporter
     end
 
