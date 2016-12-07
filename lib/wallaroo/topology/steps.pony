@@ -66,7 +66,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _upstreams: Array[Producer] = _upstreams.create()
   var _max_distributable_credits: ISize = 1_000
   var _distributable_credits: ISize = 0
-  let _minimum_credit_response: ISize = 250
+  var _minimum_credit_response: ISize = 250
   var _waiting_producers: Array[Producer] = _waiting_producers.create()
   var _max_credit_response: ISize = _max_distributable_credits
 
@@ -320,6 +320,9 @@ actor Step is (RunnableStep & Resilient & Producer &
     _upstreams.push(producer)
     _max_credit_response =
       _max_distributable_credits / _upstreams.size().isize()
+     if (_max_credit_response < _minimum_credit_response) then
+       Fail()
+     end
 
   be unregister_producer(producer: Producer,
     credits_returned: ISize)
