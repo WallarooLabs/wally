@@ -5,9 +5,9 @@ use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/invariant"
-use "wallaroo/topology"
-use "wallaroo/tcp-sink"
 use "wallaroo/metrics"
+use "wallaroo/tcp-sink"
+use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)

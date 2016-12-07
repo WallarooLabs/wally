@@ -1,17 +1,17 @@
 use "assert"
 use "time"
-use "sendence/guid"
 use "sendence/container-queue"
 use "sendence/fixed-queue"
+use "sendence/guid"
 use "sendence/queue"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
+use "wallaroo/metrics"
 use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
-use "wallaroo/metrics"
 
 trait tag CreditFlowConsumer
   be register_producer(producer: Producer)

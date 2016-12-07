@@ -1,10 +1,10 @@
 use "buffered"
-use "files"
 use "collections"
+use "files"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
-use "wallaroo/messages"
 use "wallaroo/fail"
+use "wallaroo/messages"
 
 //TODO: origin needs to get its own file
 trait tag Resilient

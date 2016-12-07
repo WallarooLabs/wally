@@ -1,11 +1,11 @@
 use "buffered"
-use "net"
-use "options"
-use "files"
 use "collections"
+use "files"
+use "format"
+use "options"
+use "net"
 use "sendence/hub"
 use "sendence/wall-clock"
-use "format"
 
 actor Main
   new create(env: Env) =>

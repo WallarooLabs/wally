@@ -5,8 +5,8 @@ use "wallaroo/backpressure"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
-use "wallaroo/topology"
 use "wallaroo/resilience"
+use "wallaroo/topology"
 
 
 interface FramedSourceHandler[In: Any val]

@@ -1,15 +1,15 @@
+use "buffered"
 use "collections"
+use "files"
 use "net"
 use "options"
 use "time"
-use "buffered"
-use "files"
 use "sendence/hub"
 use "wallaroo/initialization"
-use "wallaroo/network"
-use "wallaroo/topology"
-use "wallaroo/resilience"
 use "wallaroo/metrics"
+use "wallaroo/network"
+use "wallaroo/resilience"
+use "wallaroo/topology"
 
 actor Startup
   new create(env: Env, application: Application val,

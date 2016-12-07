@@ -1,8 +1,8 @@
+use "buffered"
 use "collections"
 use "json"
 use "net"
 use "time"
-use "buffered"
 use "sendence/hub"
 use "sendence/wall-clock"
 

@@ -1,10 +1,10 @@
 use "collections"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/metrics"
 use "wallaroo/resilience"
 use "wallaroo/tcp-sink"
 use "wallaroo/topology"
-use "wallaroo/metrics"
 
 class TCPSourceListenerBuilder
   let _source_builder: SourceBuilder val
