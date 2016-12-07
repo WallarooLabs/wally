@@ -91,7 +91,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       | let data_msg: DataMsg val =>
         try
           _metrics_reporter.step_metric(data_msg.metric_name,
-            "Before receive on data channel", data_msg.metrics_id,
+            "Before receive on data channel (network time)", data_msg.metrics_id,
             data_msg.latest_ts, ingest_ts)
           _receivers(data_msg.delivery_msg.sender_name()).received(
             data_msg.delivery_msg,
@@ -112,7 +112,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         try
           let data_msg = r.data_msg(_auth)
           _metrics_reporter.step_metric(data_msg.metric_name,
-            "Before replay receive on data channel", data_msg.metrics_id,
+            "Before replay receive on data channel (network time)", data_msg.metrics_id,
             data_msg.latest_ts, ingest_ts)
           _receivers(data_msg.delivery_msg.sender_name())
             .replay_received(data_msg.delivery_msg,
