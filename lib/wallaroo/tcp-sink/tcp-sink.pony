@@ -56,6 +56,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _distributable_credits: ISize = _max_distributable_credits
   let _minimum_credit_response: ISize = 250
   var _waiting_producers: Array[Producer] = _waiting_producers.create()
+  var _max_credit_response: ISize = _max_distributable_credits
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -198,6 +199,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     _upstreams.push(producer)
+    _max_credit_response =
+      _max_distributable_credits / _upstreams.size().isize()
 
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
@@ -211,6 +214,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
         _recoup_credits(credits_returned)
       end
     end
+    _max_credit_response =
+      _max_distributable_credits / _upstreams.size().isize()
 
   be credit_request(from: Producer) =>
     """
@@ -264,8 +269,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     let give_out =
-      (_distributable_credits / _upstreams.size().isize())
-        .max(_minimum_credit_response)
+      _distributable_credits
+        .min(_max_credit_response)
+        .max(_minimum_credit_response
 
     ifdef debug then
       Invariant(give_out >= _minimum_credit_response)
