@@ -360,11 +360,20 @@ class TypedRoute[In: Any val] is Route
   =>
     let o_seq_id = cfp.next_sequence_id()
 
-    let my_latest_ts = Time.nanos()
-    _metrics_reporter.step_metric(metric_name,
-      "Before send to next step via behavior", metrics_id,
-      latest_ts, my_latest_ts)
-    let new_metrics_id = metrics_id + 1
+    let my_latest_ts = ifdef "detailed-metrics" then
+        Time.nanos()
+      else
+        latest_ts
+      end
+
+    let new_metrics_id = ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name,
+          "Before send to next step via behavior", metrics_id,
+          latest_ts, my_latest_ts)
+        metrics_id + 1
+      else
+        metrics_id
+      end
 
     _consumer.run[In](metric_name,
       source_ts,

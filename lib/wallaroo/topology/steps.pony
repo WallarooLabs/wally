@@ -161,10 +161,19 @@ actor Step is (RunnableStep & Resilient & Producer &
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16)
   =>
-    let my_latest_ts = Time.nanos()
-    _metrics_reporter.step_metric(metric_name, "Before receive at step behavior",
-      metrics_id, latest_ts, my_latest_ts)
-    let my_metrics_id = metrics_id + 1
+    let my_latest_ts = ifdef "detailed-metrics" then
+        Time.nanos()
+      else
+        latest_ts
+      end
+
+    let my_metrics_id = ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name, "Before receive at step behavior",
+          metrics_id, latest_ts, my_latest_ts)
+        metrics_id + 1
+      else
+        metrics_id
+      end
 
     ifdef "trace" then
       @printf[I32](("Rcvd msg at " + _runner.name() + " step\n").cstring())
@@ -185,8 +194,12 @@ actor Step is (RunnableStep & Resilient & Producer &
           i_origin, i_route_id, i_seq_id)
       end
       let computation_end = Time.nanos()
-      _metrics_reporter.step_metric(metric_name, "Before end at Step", 9999,
-        last_ts, computation_end)
+
+      ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name, "Before end at Step", 9999,
+          last_ts, computation_end)
+      end
+
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
       ifdef "backpressure" then
         _recoup_credits(1)
@@ -257,8 +270,12 @@ actor Step is (RunnableStep & Resilient & Producer &
           _recoup_credits(1)
         end
         let computation_end = Time.nanos()
-        _metrics_reporter.step_metric(metric_name, "Before end at Step replay",
-          9999, last_ts, computation_end)
+
+        ifdef "detailed-metrics" then
+          _metrics_reporter.step_metric(metric_name, "Before end at Step replay",
+            9999, last_ts, computation_end)
+        end
+
         _metrics_reporter.pipeline_metric(metric_name, source_ts)
       end
     end

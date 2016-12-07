@@ -465,8 +465,14 @@ class ComputationRunner[In: Any val, Out: Any val]
         computation_start = Time.nanos()
         let result = _computation(input)
         computation_end = Time.nanos()
-        // increment by 2 because we'll be reporting 2 step metrics below
-        let new_metrics_id = metrics_id + 2
+        let new_metrics_id = ifdef "detailed-metrics" then
+            // increment by 2 because we'll be reporting 2 step metrics below
+            metrics_id + 2
+          else
+            // increment by 1 because we'll be reporting 1 step metric below
+            metrics_id + 1
+          end
+
         match result
         | None => (true, true, computation_end)
         | let output: Out =>
@@ -480,9 +486,16 @@ class ComputationRunner[In: Any val, Out: Any val]
       else
         (true, true, latest_ts)
       end
-    _metrics_reporter.step_metric(metric_name, _computation_name, metrics_id,
-      latest_ts, computation_start where prefix = "Before")
-    _metrics_reporter.step_metric(metric_name, _computation_name, metrics_id + 1,
+
+    let latest_metrics_id = ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name, _computation_name, metrics_id,
+          latest_ts, computation_start where prefix = "Before")
+        metrics_id + 1
+      else
+        metrics_id
+      end
+
+    _metrics_reporter.step_metric(metric_name, _computation_name, latest_metrics_id,
       computation_start, computation_end)
     (is_finished, keep_sending, last_ts)
 
@@ -596,8 +609,14 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   =>
     match data
     | let sp: StateProcessor[State] val =>
-      // increment by 2 because we'll be reporting 2 step metrics below
-      let new_metrics_id = metrics_id + 2
+      let new_metrics_id = ifdef "detailed-metrics" then
+          // increment by 2 because we'll be reporting 2 step metrics below
+          metrics_id + 2
+        else
+          // increment by 1 because we'll be reporting 1 step metrics below
+          metrics_id + 1
+        end
+
       let result = sp(_state, _state_change_repository, omni_router,
         metric_name, source_ts, producer,
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
@@ -608,9 +627,16 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
       let sc_start_ts = result._4
       let sc_end_ts = result._5
       let last_ts = result._6
-      _metrics_reporter.step_metric(metric_name, sp.name(), metrics_id,
-        latest_ts, sc_start_ts where prefix = "Before")
-      _metrics_reporter.step_metric(metric_name, sp.name(), metrics_id + 1,
+
+      let latest_metrics_id = ifdef "detailed-metrics" then
+          _metrics_reporter.step_metric(metric_name, sp.name(), metrics_id,
+            latest_ts, sc_start_ts where prefix = "Before")
+          metrics_id + 1
+        else
+          metrics_id
+        end
+
+      _metrics_reporter.step_metric(metric_name, sp.name(), latest_metrics_id,
         sc_start_ts, sc_end_ts)
 
       match state_change

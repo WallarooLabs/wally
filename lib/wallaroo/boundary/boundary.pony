@@ -155,9 +155,19 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String)
   =>
-    let receive_ts = Time.nanos()
-    _metrics_reporter.step_metric(metric_name, "Before receive at boundary",
-      metrics_id, latest_ts, receive_ts)
+    let my_latest_ts = ifdef "detailed-metrics" then
+        Time.nanos()
+      else
+        latest_ts
+      end
+
+    let new_metrics_id = ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name, "Before receive at boundary",
+          metrics_id, latest_ts, my_latest_ts)
+        metrics_id + 2
+      else
+        metrics_id
+      end
 
     try
       let seq_id = ifdef "resilience" then
@@ -168,12 +178,16 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         seq_id, _wb, _auth, Epoch.nanoseconds(),
-        metrics_id + 2, metric_name)
+        new_metrics_id, metric_name)
       //_queue.enqueue(outgoing_msg)
 
-      _metrics_reporter.step_metric(metric_name,
-        "Before sending to next worker", metrics_id,
-        receive_ts, Time.nanos())
+      let end_ts = Time.nanos()
+
+      ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name,
+          "Before sending to next worker", metrics_id + 1,
+          my_latest_ts, end_ts)
+      end
 
       _writev(outgoing_msg)
     end

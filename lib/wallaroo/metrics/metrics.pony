@@ -86,21 +86,25 @@ class MetricsReporter
   fun ref step_metric(pipeline: String, name: String, num: U16, start_ts: U64,
     end_ts: U64, prefix: String = "")
   =>
-    let str_size = _worker_name.size() + pipeline.size() + name.size() + 
-      prefix.size() + 14
-    let metric_name_tmp = recover String(str_size) end
-    metric_name_tmp.append(pipeline)
-    metric_name_tmp.append("@")
-    metric_name_tmp.append(_worker_name)
-    metric_name_tmp.append(": ")
-    metric_name_tmp.append(num.string())
-    metric_name_tmp.append(" - ")
-    if prefix != "" then
-      metric_name_tmp.append(prefix)
-      metric_name_tmp.append(" ")
+    let metric_name: String val = ifdef "detailed-metrics" then
+      let str_size = _worker_name.size() + pipeline.size() + name.size() + 
+        prefix.size() + 14
+      let metric_name_tmp = recover String(str_size) end
+      metric_name_tmp.append(pipeline)
+      metric_name_tmp.append("@")
+      metric_name_tmp.append(_worker_name)
+      metric_name_tmp.append(": ")
+      metric_name_tmp.append(num.string())
+      metric_name_tmp.append(" - ")
+      if prefix != "" then
+        metric_name_tmp.append(prefix)
+        metric_name_tmp.append(" ")
+      end
+      metric_name_tmp.append(name)
+      consume metric_name_tmp
+    else
+      name
     end
-    metric_name_tmp.append(name)
-    let metric_name: String val = consume metric_name_tmp
     let metrics = try
       _step_metrics_map(metric_name)
     else

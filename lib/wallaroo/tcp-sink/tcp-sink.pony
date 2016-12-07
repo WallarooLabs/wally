@@ -174,9 +174,13 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16)
   =>
-    let receive_ts = Time.nanos()
-    _metrics_reporter.step_metric(metric_name, "Before receive at sink", 9998,
-      latest_ts, receive_ts)
+    var receive_ts: U64 = 0
+    ifdef "detailed-metrics" then
+      receive_ts = Time.nanos()
+      _metrics_reporter.step_metric(metric_name, "Before receive at sink", 9998,
+        latest_ts, receive_ts)
+    end
+
     ifdef "trace" then
       @printf[I32]("Rcvd msg at TCPSink\n".cstring())
     end
@@ -194,8 +198,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
       let computation_end = Time.nanos()
-      _metrics_reporter.step_metric(metric_name, "Before end at sink", 9999,
-        receive_ts, computation_end)
+
+      ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name, "Before end at sink", 9999,
+          receive_ts, computation_end)
+      end
+
       _metrics_reporter.pipeline_metric(metric_name, source_ts)
     else
       Fail()
