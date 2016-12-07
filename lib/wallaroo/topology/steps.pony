@@ -68,6 +68,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _distributable_credits: ISize = 0
   let _minimum_credit_response: ISize = 250
   var _waiting_producers: Array[Producer] = _waiting_producers.create()
+  var _max_credit_response: ISize = _max_distributable_credits
 
   // Resilience routes
   // TODO: This needs to be merged with credit flow producer routes
@@ -317,6 +318,8 @@ actor Step is (RunnableStep & Resilient & Producer &
       @printf[I32]("Registered producer!\n".cstring())
     end
     _upstreams.push(producer)
+    _max_credit_response =
+      _max_distributable_credits / _upstreams.size().isize()
 
   be unregister_producer(producer: Producer,
     credits_returned: ISize)
@@ -330,6 +333,8 @@ actor Step is (RunnableStep & Resilient & Producer &
       _upstreams.delete(i)
       recoup_credits(credits_returned)
     end
+    _max_credit_response =
+      _max_distributable_credits / _upstreams.size().isize()
 
   be credit_request(from: Producer) =>
     """
@@ -370,8 +375,9 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
 
     let give_out =
-      (_distributable_credits / _upstreams.size().isize())
-        .max(_minimum_credit_response)
+      _distributable_credits
+        .min(_max_credit_response)
+        .max(_minimum_credit_response
 
     ifdef debug then
       Invariant(give_out >= _minimum_credit_response)
