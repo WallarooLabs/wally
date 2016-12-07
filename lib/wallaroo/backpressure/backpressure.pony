@@ -151,16 +151,6 @@ class TypedRoute[In: Any val] is Route
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
 
-
-  // _queue stores tuples of the form:
-  // (metric_name: String, source_ts: U64, data: D,
-  //  cfp: Producer ref,
-  //  origin: Producer, msg_uid: U128,
-  //  frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
-  var _queue: FixedQueue[(String, U64, In, Producer ref, Producer, U128,
-    None, SeqId, RouteId)]
-  // let _queue: ContainerQueue[TypedRouteQueueTuple[In], TypedRouteQueueData[In]]
-
   new create(step: Producer ref, consumer: CreditFlowConsumerStep,
     handler: RouteCallbackHandler)
   =>
@@ -169,11 +159,6 @@ class TypedRoute[In: Any val] is Route
     _callback = handler
     _callback.register(_step, this)
     _consumer.register_producer(_step)
-
-    // We start at 0 size.  We need to know the max_credits before we
-    // can size this in the initialize method.
-    _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
-      None, SeqId, RouteId)](0)
 
   fun ref initialize(new_max_credits: ISize, step_type: String) =>
     _step_type = step_type
@@ -185,9 +170,6 @@ class TypedRoute[In: Any val] is Route
           (new_max_credits.usize() - 1).next_pow2().isize())
       end
       _max_credits = new_max_credits
-      // Overwrite the old (placeholder) queue with one the correct size.
-      _queue = FixedQueue[(String, U64, In, Producer ref, Producer, U128,
-        None, SeqId, RouteId)](_max_credits.usize())
       request_credits()
     end
 
@@ -211,8 +193,6 @@ class TypedRoute[In: Any val] is Route
     Return unused credits to downstream consumer
     """
     _consumer.unregister_producer(_step, _credits_available)
-    //TODO: Will this gum up the works?
-    _hard_flush()
 
   fun ref receive_credits(credits: ISize) =>
     ifdef debug then
@@ -233,20 +213,14 @@ class TypedRoute[In: Any val] is Route
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("--Route (%s): rcvd %llu credits. Had %llu out of %llu. Queue size: %llu\n".cstring(), _step_type.cstring(), credits, _credits_available - credits, _max_credits, _queue.size())
+      @printf[I32]("--Route (%s): rcvd %llu credits. Had %llu out of %llu.",
+       _step_type.cstring(), credits,
+       _credits_available - credits, _max_credits)
     end
 
     if _credits_available > 0 then
       if (_credits_available - credits_recouped) == 0 then
         _callback.credits_replenished(_step)
-      end
-
-      if (_queue.size() > 0) then
-        _flush_queue()
-
-        if _credits_available == 0 then
-          _credits_exhausted()
-        end
       end
 
       _request_more_credits_after =
@@ -286,49 +260,32 @@ class TypedRoute[In: Any val] is Route
     match data
     | let input: In =>
       ifdef "backpressure" then
-        if _credits_available > 0 then
-          ifdef debug then
-            match _step
-            | let source: TCPSource ref =>
-              Invariant(not source.is_muted())
-            end
+        ifdef debug then
+          Invariant(_credits_available > 0)
+          match _step
+          | let source: TCPSource ref =>
+            Invariant(not source.is_muted())
           end
-
-          let above_request_point =
-            _credits_available >= _request_more_credits_after
-
-          if _queue.size() > 0 then
-            _add_to_queue(metric_name, source_ts, input, cfp, origin, msg_uid,
-              frac_ids, i_seq_id, i_route_id)
-            _flush_queue()
-          else
-            _send_message_on_route(metric_name, source_ts, input, cfp, origin,
-              msg_uid, frac_ids, i_seq_id, i_route_id)
-          end
-
-          if _credits_available == 0 then
-            _credits_exhausted()
-          else
-            if above_request_point then
-              if _credits_available < _request_more_credits_after then
-                // we started above the request size and finished below,
-                // request credits
-                request_credits()
-              end
-            end
-          end
-          ifdef debug then
-            Invariant(_queue.size() < _queue.max_size())
-          end
-          true
-        else
-          ifdef "trace" then
-            @printf[I32]("----No credits: added msg to Route queue (%s)\n".cstring(), _step_type.cstring())
-          end
-          _add_to_queue(metric_name, source_ts, input, cfp,
-            origin, msg_uid, frac_ids, i_seq_id, i_route_id)
-          not (_queue.size() == _queue.max_size())
         end
+
+        let above_request_point =
+          _credits_available >= _request_more_credits_after
+
+        _send_message_on_route(metric_name, source_ts, input, cfp, origin,
+          msg_uid, frac_ids, i_seq_id, i_route_id)
+
+        if _credits_available == 0 then
+          _credits_exhausted()
+        else
+          if above_request_point then
+            if _credits_available < _request_more_credits_after then
+              // we started above the request size and finished below,
+              // request credits
+              request_credits()
+            end
+          end
+        end
+        true
       else
         _send_message_on_route(metric_name, source_ts, input, cfp, origin,
           msg_uid, frac_ids, i_seq_id, i_route_id)
@@ -372,50 +329,6 @@ class TypedRoute[In: Any val] is Route
     end
 
     _credits_available = _credits_available - 1
-
-
-  fun ref _add_to_queue(metric_name: String, source_ts: U64, input: In,
-    cfp: Producer ref, origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
-  =>
-    ifdef debug then
-      Invariant((_queue.max_size() > 0) and
-        (_queue.size() < _queue.max_size()))
-    end
-
-    try
-      _queue.enqueue((metric_name, source_ts, input, cfp,
-        origin, msg_uid, frac_ids, i_seq_id, i_route_id))
-      if _queue.size() == _queue.max_size() then
-        ifdef "credit_trace" then
-          @printf[I32]("Route queue is full (%s).\n".cstring(),
-            _step_type.cstring())
-        end
-      end
-    else
-      ifdef debug then
-        @printf[I32]("Failure trying to enqueue typed route data\n".cstring())
-      end
-      Fail()
-    end
-
-  fun ref _flush_queue() =>
-    while ((_credits_available > 0) and (_queue.size() > 0)) do
-      try
-        let d =_queue.dequeue()
-        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6,
-          d._7, d._8, d._9)
-      end
-    end
-
-  fun ref _hard_flush() =>
-    while (_queue.size() > 0) do
-      try
-        let d =_queue.dequeue()
-        _send_message_on_route(d._1, d._2, d._3, d._4, d._5, d._6,
-          d._7, d._8, d._9)
-      end
-    end
 
 type BoundaryRouteQueueTuple is (ReplayableDeliveryMsg val, Producer ref,
   Producer, U128, None, SeqId)
