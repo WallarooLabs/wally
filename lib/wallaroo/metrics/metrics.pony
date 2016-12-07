@@ -71,12 +71,14 @@ class MetricsReporter
   let _app_name: String
   let _worker_name: String
   let _metrics_conn: TCPConnection
+
   let _step_metrics_map: Map[String, _MetricsReporter] =
     _step_metrics_map.create()
   let _pipeline_metrics_map: Map[String, _MetricsReporter] =
     _pipeline_metrics_map.create()
 
-  let _worker_metrics_reporter: _MetricsReporter
+  let _worker_metrics_map: Map[String, _MetricsReporter] =
+    _worker_metrics_map.create()
 
 
   new iso create(app_name: String, worker_name: String,
@@ -85,8 +87,6 @@ class MetricsReporter
     _app_name = app_name
     _worker_name = worker_name
     _metrics_conn = metrics_conn
-    _worker_metrics_reporter = _MetricsReporter(_metrics_conn, 1,
-      _app_name, _worker_name, NodeIngressEgressCategory)
 
   fun ref step_metric(pipeline: String, name: String, num: U16, start_ts: U64,
     end_ts: U64, prefix: String = "")
@@ -135,8 +135,18 @@ class MetricsReporter
 
     metrics.report(WallClock.nanoseconds() - source_ts) // might be across workers
 
-  fun ref worker_metric(pipeline_name: String, ingest_ts: U64) =>
-    _worker_metrics_reporter.report(WallClock.nanoseconds() - ingest_ts)
+  fun ref worker_metric(pipeline_name: String val, ingest_ts: U64) =>
+    let metrics = try
+        _worker_metrics_map(pipeline_name)
+      else
+        let reporter =
+          _MetricsReporter(_metrics_conn, 1, _app_name, _worker_name,
+            NodeIngressEgressCategory)
+        _worker_metrics_map(pipeline_name) = reporter
+        reporter
+      end
+
+    metrics.report(Time.nanos() - ingest_ts) // within a single worker
 
   fun clone(): MetricsReporter iso^ =>
     MetricsReporter(_app_name, _worker_name, _metrics_conn)
