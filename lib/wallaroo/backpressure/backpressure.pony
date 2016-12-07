@@ -92,51 +92,6 @@ class EmptyRoute is Route
   =>
     true
 
-type TypedRouteQueueTuple[D: Any val] is (String, U64, D, Producer ref,
-  Producer, U128, None, SeqId, RouteId)
-
-class TypedRouteQueueData[D: Any val]
-  var metric_name: String
-  var source_ts: U64
-  var data: D
-  var producer: Producer ref
-  var origin: Producer
-  var msg_uid: U128
-  var frac_ids: None
-  var i_seq_id: SeqId
-  var i_route_id: RouteId
-
-  new create(t: TypedRouteQueueTuple[D]) =>
-    metric_name = t._1
-    source_ts = t._2
-    data = t._3
-    producer = t._4
-    origin = t._5
-    msg_uid = t._6
-    frac_ids = t._7
-    i_seq_id = t._8
-    i_route_id = t._9
-
-  fun ref write(t: TypedRouteQueueTuple[D]) =>
-    metric_name = t._1
-    source_ts = t._2
-    data = t._3
-    producer = t._4
-    origin = t._5
-    msg_uid = t._6
-    frac_ids = t._7
-    i_seq_id = t._8
-    i_route_id = t._9
-
-  fun ref read(): TypedRouteQueueTuple[D] =>
-    (metric_name, source_ts, data, producer, origin, msg_uid, frac_ids,
-      i_seq_id, i_route_id)
-
-class TypedRouteQueueDataBuilder[D: Any val]
-  fun apply(t: TypedRouteQueueTuple[D]): TypedRouteQueueData[D]
-  =>
-    TypedRouteQueueData[D](t)
-
 class TypedRoute[In: Any val] is Route
   """
   Relationship between a single producer and a single consumer.
@@ -276,6 +231,7 @@ class TypedRoute[In: Any val] is Route
 
         if _credits_available == 0 then
           _credits_exhausted()
+          return false
         else
           if above_request_point then
             if _credits_available < _request_more_credits_after then
