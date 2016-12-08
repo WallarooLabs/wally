@@ -73,6 +73,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _distributable_credits: ISize = 0
 
   // Lifecycle
+  var _initializer: (LocalTopologyInitializer | None) = None
   var _initialized: Bool = false
   var _ready_to_work_routes: SetIs[Route] = _ready_to_work_routes.create()
 
@@ -142,14 +143,24 @@ actor Step is (RunnableStep & Resilient & Producer &
     for r in _routes.values() do
       r.application_initialized(_max_distributable_credits, "Step")
     end
+    _initializer = initializer
 
-  // fun ref _report_route_ready_to_work(r: Route) =>
-  //   if not _ready_to_work_routes.contains(r) then
-  //     initializer.report_ready_to_work(this)
-  //   else
-  //     // A route should only signal this once
-  //     Fail()
-  //   end
+  fun ref report_route_ready_to_work(r: Route) =>
+    if not _ready_to_work_routes.contains(r) then
+      _ready_to_work_routes.set(r)
+
+      if _ready_to_work_routes.size() == _routes.size() then
+        match _initializer
+        | let lti: LocalTopologyInitializer =>
+          lti.report_ready_to_work(this)
+        else
+          Fail()
+        end
+      end
+    else
+      // A route should only signal this once
+      Fail()
+    end
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
@@ -284,15 +295,6 @@ actor Step is (RunnableStep & Resilient & Producer &
   =>
     // TODO: We need to handle the entire incoming envelope here
     None
-    // if not _is_duplicate(_incoming_envelope) then
-    //   _deduplication_list.push(_incoming_envelope)
-    //   match _runner
-    //   | let r: ReplayableRunner =>
-    //     r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
-    //   else
-    //     @printf[I32]("trying to replay a message to a non-replayable runner!".cstring())
-    //   end
-    // end
 
   be replay_finished() =>
     _deduplication_list.clear()
@@ -302,10 +304,6 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   be dispose() =>
     None
-    // match _router
-    // | let sender: DataSender =>
-    //   sender.dispose()
-    // end
 
   //////////////
   // CREDIT FLOW PRODUCER
@@ -317,6 +315,8 @@ actor Step is (RunnableStep & Resilient & Producer &
     try
       let route = _routes(from)
       route.receive_credits(credits)
+    else
+      Fail()
     end
 
   fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>

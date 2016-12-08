@@ -105,7 +105,7 @@ class ProxyRouter
         _target_proxy_address,
         msg_uid, i_frac_ids)
 
-      let keep_sending = r.forward(delivery_msg, producer, i_origin, msg_uid, 
+      let keep_sending = r.forward(delivery_msg, producer, i_origin, msg_uid,
         i_frac_ids, i_seq_id, i_route_id)
 
       (false, keep_sending)
@@ -205,7 +205,7 @@ class StepIdRouter is OmniRouter
                 _worker_name, source_ts, data, metric_name,
                 pa, msg_uid, i_frac_ids)
 
-              let keep_sending = r.forward(delivery_msg, producer, i_origin, 
+              let keep_sending = r.forward(delivery_msg, producer, i_origin,
                 msg_uid, i_frac_ids, i_seq_id, i_route_id)
               (false, keep_sending)
             else
@@ -354,7 +354,7 @@ class LocalPartitionRouter[In: Any val,
               (true, true)
             end
           | let p: ProxyRouter val =>
-            p.route[D](metric_name, source_ts, data, producer, i_origin, 
+            p.route[D](metric_name, source_ts, data, producer, i_origin,
               i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
           else
             // No step or proxyrouter

@@ -197,8 +197,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       let flush_count: USize = (seq_id - _lowest_queue_id).usize()
       _queue.clear_n(flush_count)
       _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-      // !! remove this
-      // _recoup_credits(flush_count.isize())
       ifdef "credit_trace" then
         var recouped_credits = flush_count.isize()
         if _distributable_credits > _max_distributable_credits then

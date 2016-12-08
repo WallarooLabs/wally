@@ -857,9 +857,6 @@ actor LocalTopologyInitializer
 
         @printf[I32]("Local topology initialized\n".cstring())
         _topology_initialized = true
-
-        // TODO: Notify Alfred to start reading data. This should be called by // Alfred after it's done.
-        _spin_up_source_listeners()
       else
         @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end
@@ -876,6 +873,7 @@ actor LocalTopologyInitializer
       | let o_router: OmniRouter val =>
         _created.set(initializable)
         if _created.size() == _initializables.size() then
+          @printf[I32]("Phase I: Application is created!\n".cstring())
           for i in _initializables.values() do
             i.application_created(this, _outgoing_boundaries, o_router)
           end
@@ -892,8 +890,12 @@ actor LocalTopologyInitializer
     if not _initialized.contains(initializable) then
       _initialized.set(initializable)
       if _initialized.size() == _initializables.size() then
+        @printf[I32]("Phase II: Application is initialized!\n".cstring())
         for i in _initializables.values() do
           i.application_initialized(this)
+        end
+        ifdef not "backpressure" then
+          _application_ready_to_work()
         end
       end
     else
@@ -905,14 +907,19 @@ actor LocalTopologyInitializer
     if not _ready_to_work.contains(initializable) then
       _ready_to_work.set(initializable)
       if _ready_to_work.size() == _initializables.size() then
-        _spin_up_source_listeners()
-        for i in _initializables.values() do
-          i.application_ready_to_work(this)
-        end
+        _application_ready_to_work()
       end
     else
       @printf[I32]("The same Initializable reported being ready to work twice\n".cstring())
       Fail()
+    end
+
+  fun ref _application_ready_to_work() =>
+    @printf[I32]("Phase III: Application is ready to work!\n".cstring())
+    // TODO: THis should also depend on Alfred having completed reading
+    _spin_up_source_listeners()
+    for i in _initializables.values() do
+      i.application_ready_to_work(this)
     end
 
   fun ref _spin_up_source_listeners() =>
