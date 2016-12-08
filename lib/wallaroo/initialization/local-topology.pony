@@ -147,6 +147,9 @@ actor LocalTopologyInitializer
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     _outgoing_boundaries = bs
+    for boundary in bs.values() do
+      _initializables.set(boundary)
+    end
 
   be create_data_receivers(ws: Array[String] val,
     worker_initializer: (WorkerInitializer | None) = None) =>

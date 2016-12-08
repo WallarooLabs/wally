@@ -170,6 +170,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId)
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd message at OutgoingBoundary\n".cstring())
+    end
     try
       let seq_id = ifdef "resilience" then
         _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
@@ -182,6 +185,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       //_queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
+    else
+      Fail()
     end
 
   be writev(data: Array[ByteSeq] val) =>
@@ -257,6 +262,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
+    ifdef "trace" then
+      @printf[I32]("Sent %d msgs over boundary\n".cstring(), number_finished)
+    end
     ifdef "backpressure" then
       _recoup_credits(number_finished)
     end
