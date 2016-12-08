@@ -332,7 +332,6 @@ actor Step is (RunnableStep & Resilient & Producer &
     ifdef debug then
       Invariant(not _upstreams.contains(producer))
     end
-
     ifdef "credit_trace" then
       @printf[I32]("Registered producer!\n".cstring())
     end
@@ -404,6 +403,9 @@ class StepRouteCallbackHandler is RouteCallbackHandler
 
   fun shutdown(producer: Producer ref) =>
     // TODO: CREDITFLOW - What is our error handling?
+    None
+
+  fun ref credits_initialized(producer: Producer ref, r: Route tag) =>
     None
 
   fun ref credits_replenished(producer: Producer ref) =>

@@ -25,6 +25,7 @@ type Consumer is CreditFlowConsumer
 trait RouteCallbackHandler
   fun ref register(producer: Producer ref, r: Route tag)
   fun shutdown(p: Producer ref)
+  fun ref credits_initialized(producer: Producer ref, r: Route tag)
   fun ref credits_replenished(p: Producer ref)
   fun ref credits_exhausted(p: Producer ref)
 
@@ -120,6 +121,8 @@ class TypedRoutePreparingToWorkCreditReceiver[In: Any val]
     _route._close_outstanding_request()
 
     if credits > 0 then
+      _route._credits_initialized()
+
       let credits_recouped =
         if (_route.credits_available() + credits) > _route.max_credits() then
           _route.max_credits() - _route.credits_available()
@@ -127,6 +130,12 @@ class TypedRoutePreparingToWorkCreditReceiver[In: Any val]
           credits
         end
       _route._recoup_credits(credits_recouped)
+
+      ifdef "credit_trace" then
+        @printf[I32]("--Route (Prep): rcvd %llu credits. Had %llu out of %llu. Queue size: %llu\n".cstring(),
+          credits, _route.credits_available() - credits,
+          _route.max_credits(), _route.queue_size())
+      end
 
       _route._update_request_more_credits_after(_route.credits_available() -
         (_route.credits_available() >> 2))
@@ -283,6 +292,9 @@ class TypedRoute[In: Any val] is Route
 
   fun ref receive_credits(credits: ISize) =>
     _credit_receiver.receive_credits(credits)
+
+  fun ref _credits_initialized() =>
+    _callback.credits_initialized(_step, this)
 
   fun ref _recoup_credits(credits: ISize) =>
     _credits_available = _credits_available + credits
@@ -477,6 +489,8 @@ class BoundaryRoutePreparingToWorkCreditReceiver
     _route._close_outstanding_request()
 
     if credits > 0 then
+      _route._credits_initialized()
+
       let credits_recouped =
         if (_route.credits_available() + credits) > _route.max_credits() then
           _route.max_credits() - _route.credits_available()
@@ -484,6 +498,12 @@ class BoundaryRoutePreparingToWorkCreditReceiver
           credits
         end
       _route._recoup_credits(credits_recouped)
+
+      ifdef "credit_trace" then
+        @printf[I32]("--BoundaryRoute: rcvd %llu credits. Had %llu out of %llu. Queue size: %llu\n".cstring(),
+          credits, _route.credits_available() - credits,
+          _route.max_credits(), _route.queue_size())
+      end
 
       _route._update_request_more_credits_after(_route.credits_available() -
         (_route.credits_available() >> 2))
@@ -634,6 +654,9 @@ class BoundaryRoute is Route
 
   fun ref receive_credits(credits: ISize) =>
     _credit_receiver.receive_credits(credits)
+
+  fun ref _credits_initialized() =>
+    _callback.credits_initialized(_step, this)
 
   fun ref _recoup_credits(credits: ISize) =>
     _credits_available = _credits_available + credits

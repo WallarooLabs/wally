@@ -96,21 +96,24 @@ actor TCPSource is Producer
     //listening until we are done recovering
     _notify.accepted(this)
 
+    let handler: TCPSourceRouteCallbackHandler ref =
+      TCPSourceRouteCallbackHandler
+
     for consumer in routes.values() do
       _routes(consumer) =
-        _route_builder(this, consumer, TCPSourceRouteCallbackHandler)
+        _route_builder(this, consumer, handler)
     end
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
       _routes(boundary) =
-        _route_builder(this, boundary, TCPSourceRouteCallbackHandler)
+        _route_builder(this, boundary, handler)
     end
 
     match default_target
     | let r: CreditFlowConsumerStep =>
       match forward_route_builder
       | let frb: RouteBuilder val =>
-        _routes(r) = frb(this, r, TCPSourceRouteCallbackHandler)
+        _routes(r) = frb(this, r, handler)
       end
     end
 
@@ -119,9 +122,9 @@ actor TCPSource is Producer
       // directly. route lifecycle needs to be broken out better from
       // application lifecycle
       r.application_created()
-      // TODO: What should the initial max credits per route from
-      // a Source be?  I'm starting at max_value because that makes
-      // us dependent on how many can be distributed from downstream.
+    end
+
+    for r in _routes.values() do
       r.application_initialized(_max_route_credits, "TCPSource")
     end
 
@@ -571,17 +574,24 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       Fail()
     end
 
+  fun ref credits_initialized(producer: Producer ref, r: Route tag) =>
+    ifdef debug then
+      Invariant(_registered_routes.contains(r))
+    end
+
+    match producer
+    | let s: TCPSource ref =>
+      _try_unmute(s)
+    end
+
   fun ref credits_replenished(producer: Producer ref) =>
     ifdef debug then
       Invariant(_muted > 0)
     end
 
     match producer
-    | let p: TCPSource ref =>
-      _muted = _muted - 1
-      if (_muted == 0) then
-        p._unmute()
-      end
+    | let s: TCPSource ref =>
+      _try_unmute(s)
       ifdef "credit_trace" then
         @printf[I32]("Credits_replenished. Now _muted=%llu\n".cstring(),
           _muted)
@@ -607,3 +617,9 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       s._mute()
     end
     _muted = _muted + 1
+
+  fun ref _try_unmute(s: TCPSource ref) =>
+    _muted = _muted - 1
+    if _muted == 0 then
+      s._unmute()
+    end
