@@ -98,51 +98,6 @@ class EmptyRoute is Route
   =>
     true
 
-type TypedRouteQueueTuple[D: Any val] is (String, U64, D, Producer ref,
-  Producer, U128, None, SeqId, RouteId)
-
-class TypedRouteQueueData[D: Any val]
-  var metric_name: String
-  var source_ts: U64
-  var data: D
-  var producer: Producer ref
-  var origin: Producer
-  var msg_uid: U128
-  var frac_ids: None
-  var i_seq_id: SeqId
-  var i_route_id: RouteId
-
-  new create(t: TypedRouteQueueTuple[D]) =>
-    metric_name = t._1
-    source_ts = t._2
-    data = t._3
-    producer = t._4
-    origin = t._5
-    msg_uid = t._6
-    frac_ids = t._7
-    i_seq_id = t._8
-    i_route_id = t._9
-
-  fun ref write(t: TypedRouteQueueTuple[D]) =>
-    metric_name = t._1
-    source_ts = t._2
-    data = t._3
-    producer = t._4
-    origin = t._5
-    msg_uid = t._6
-    frac_ids = t._7
-    i_seq_id = t._8
-    i_route_id = t._9
-
-  fun ref read(): TypedRouteQueueTuple[D] =>
-    (metric_name, source_ts, data, producer, origin, msg_uid, frac_ids,
-      i_seq_id, i_route_id)
-
-class TypedRouteQueueDataBuilder[D: Any val]
-  fun apply(t: TypedRouteQueueTuple[D]): TypedRouteQueueData[D]
-  =>
-    TypedRouteQueueData[D](t)
-
 class TypedRoute[In: Any val] is Route
   """
   Relationship between a single producer and a single consumer.
@@ -424,41 +379,6 @@ class TypedRoute[In: Any val] is Route
           d._7, d._8, d._9)
       end
     end
-
-type BoundaryRouteQueueTuple is (ReplayableDeliveryMsg val, Producer ref,
-  Producer, U128, None, SeqId)
-
-class BoundaryRouteQueueData
-  var delivery_msg: ReplayableDeliveryMsg val
-  var producer: Producer ref
-  var i_origin: Producer
-  var msg_uid: U128
-  var i_frac_ids: None
-  var i_seq_id: SeqId
-
-  new create(t: BoundaryRouteQueueTuple) =>
-    delivery_msg = t._1
-    producer = t._2
-    i_origin = t._3
-    msg_uid = t._4
-    i_frac_ids = t._5
-    i_seq_id = t._6
-
-  fun ref write(t: BoundaryRouteQueueTuple) =>
-    delivery_msg = t._1
-    producer = t._2
-    i_origin = t._3
-    msg_uid = t._4
-    i_frac_ids = t._5
-    i_seq_id = t._6
-
-  fun ref read(): BoundaryRouteQueueTuple =>
-    (delivery_msg, producer, i_origin, msg_uid, i_frac_ids, i_seq_id)
-
-class BoundaryRouteQueueDataBuilder
-  fun apply(t: BoundaryRouteQueueTuple): BoundaryRouteQueueData
-  =>
-    BoundaryRouteQueueData(t)
 
 class BoundaryRoute is Route
   """
