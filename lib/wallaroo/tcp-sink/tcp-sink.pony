@@ -38,13 +38,13 @@ actor EmptySink is CreditFlowConsumerStep
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     omni_router: OmniRouter val)
   =>
-    None
+    initializer.report_created(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
-    None
+    initializer.report_initialized(this)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
-    None
+    initializer.report_ready_to_work(this)
 
   be register_producer(producer: Producer) =>
     None
@@ -173,15 +173,13 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     omni_router: OmniRouter val)
   =>
-    None
-    //initializer.application_created_done(this)
+    initializer.report_created(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
-    None
-    //initializer.application_initialized_done(this)
+    initializer.report_initialized(this)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
-    None
+    initializer.report_ready_to_work(this)
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,

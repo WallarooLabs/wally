@@ -126,17 +126,17 @@ actor Step is (RunnableStep & Resilient & Producer &
 
     _omni_router = omni_router
 
-    //initializer.application_created_done(this)
+    initializer.report_created(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     for r in _routes.values() do
       r.application_initialized(_max_distributable_credits, "Step")
     end
 
-    //initializer.application_initialized_done(this)
+    initializer.report_initialized(this)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
-    None
+    initializer.report_ready_to_work()
 
   be update_route_builder(route_builder: RouteBuilder val) =>
     _route_builder = route_builder
