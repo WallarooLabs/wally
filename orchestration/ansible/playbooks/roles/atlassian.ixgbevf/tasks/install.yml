@@ -1,0 +1,41 @@
+- name: Install dependancies
+  apt: name="{{ item }}"
+       state=latest
+       update_cache=yes
+       cache_valid_time=3600
+  with_items:
+    - tar
+    - dkms
+
+- name: Copy local tarball (if available)
+  copy: src=ixgbevf-{{ ixgbevf_version }}.tar.gz
+        dest=/tmp/ixgbevf-{{ ixgbevf_version }}.tar.gz
+  ignore_errors: yes  # If this fails we just try and wget it in the next step.
+
+- name: Download Intel driver source
+  get_url: url="https://downloads.sourceforge.net/project/e1000/ixgbevf%20stable/{{ ixgbevf_version }}/ixgbevf-{{ ixgbevf_version }}.tar.gz"
+           dest=/tmp/ixgbevf-{{ ixgbevf_version }}.tar.gz
+           checksum=sha1:{{ ixgbevf_tar_sha1_hash }}
+  retries: 5
+  delay: 1
+
+- name: Unpack Intel driver source
+  unarchive: src="/tmp/ixgbevf-{{ ixgbevf_version }}.tar.gz"
+             dest=/usr/src/
+             copy=no
+
+- name: Install dkms.conf
+  template: src=dkms.conf
+            dest="/usr/src/ixgbevf-{{ ixgbevf_version }}/dkms.conf"
+
+- name: Add module via dkms
+  command: dkms add -m ixgbevf -v "{{ ixgbevf_version }}"
+
+- name: Build module via dkms
+  command: dkms build -m ixgbevf -v "{{ ixgbevf_version }}"
+
+- name: Install module via dkms
+  command: dkms install -m ixgbevf -v "{{ ixgbevf_version }}"
+
+- name: Rebuild kernel initramfs
+  command: update-initramfs -c -k all

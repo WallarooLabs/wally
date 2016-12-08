@@ -1,3 +1,53 @@
+# install python for full ansible support
+- hosts: tag_Project_arizona:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
+  tasks:
+  - name: Gather ec2 facts
+    action: ec2_facts
+  - name: Gather sriov status
+    shell: aws ec2 describe-instance-attribute --instance-id {{ ansible_ec2_instance_id }} --attribute sriovNetSupport --output text | grep -o simple
+    register: sriov_status
+    delegate_to: 127.0.0.1
+    become: no
+    ignore_errors: yes
+  - name: "Stop the AWS instance"
+    local_action:
+      module: ec2
+      state: stopped
+      instance_ids: "{{ ansible_ec2_instance_id }}"
+      region: "{{ ansible_ec2_placement_region }}"
+      wait: yes
+    when: sriov_status.stdout != "simple"
+  - name: enable sriov
+    shell: aws ec2 modify-instance-attribute --instance-id {{ ansible_ec2_instance_id }} --sriov-net-support simple
+    delegate_to: 127.0.0.1
+    become: no
+    when: sriov_status.stdout != "simple"
+  - name: Gather sriov status after
+    shell: aws ec2 describe-instance-attribute --instance-id {{ ansible_ec2_instance_id }} --attribute sriovNetSupport --output text | grep -o simple
+    register: sriov_status_after
+    delegate_to: 127.0.0.1
+    become: no
+  - name: Assert that sriov is enabled
+    assert: { that: "sriov_status_after.stdout == 'simple'" }
+  - name: "Start the AWS instance"
+    local_action:
+      module: ec2
+      state: running
+      instance_ids: "{{ ansible_ec2_instance_id }}"
+      region: "{{ ansible_ec2_placement_region }}"
+      wait: yes
+    when: sriov_status.stdout != "simple"
+  - name: wait for ssh
+    pause:
+      seconds: 30
+    delegate_to: 127.0.0.1
+    when: sriov_status.stdout != "simple"
+  - name: Refresh EC2 cache
+    command: "{{ playbook_dir }}/../ec2.py --refresh-cache"
+    delegate_to: 127.0.0.1
+  - name: Refresh in-memory EC2 cache
+    meta: refresh_inventory
+
 # create dynamic groups
 - hosts: tag_Project_arizona:&tag_Role_follower:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
   tasks:
