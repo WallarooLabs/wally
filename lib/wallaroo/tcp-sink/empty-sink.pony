@@ -1,6 +1,7 @@
 use "collections"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/initialization"
 use "wallaroo/topology"
 
 actor EmptySink is CreditFlowConsumerStep
@@ -19,9 +20,19 @@ actor EmptySink is CreditFlowConsumerStep
   =>
     None
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
+  be application_created(initializer: LocalTopologyInitializer,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    omni_router: OmniRouter val)
   =>
+    initializer.report_initialized(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    initializer.report_ready_to_work(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
   be register_producer(producer: Producer) =>

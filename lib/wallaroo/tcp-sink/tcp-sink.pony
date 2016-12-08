@@ -4,6 +4,7 @@ use "net"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
+use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -96,8 +97,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    _max_distributable_credits =
-      _max_distributable_credits.usize().next_pow2().isize()
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
@@ -110,13 +109,24 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       from.cstring())
     _notify_connecting()
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  //
+  // Application Lifecycle events
+  //
+
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
+  be application_created(initializer: LocalTopologyInitializer,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    omni_router: OmniRouter val)
   =>
-    ifdef debug then
-      Invariant(_max_distributable_credits ==
-        (_max_distributable_credits.usize() - 1).next_pow2().isize())
-    end
+    initializer.report_initialized(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    initializer.report_ready_to_work(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, source_ts: U64, data: D,
@@ -205,6 +215,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
        Fail()
      end
 
+    @printf[I32]("!!maxdistcredits: %d, Maxcreditresponse: %d, producers: %d\n".cstring(), _max_distributable_credits, _max_credit_response, _upstreams.size().isize())
+
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
@@ -242,6 +254,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       Invariant(_upstreams.contains(from))
     end
 
+    @printf[I32]("Upstreams: %d\n".cstring(), _upstreams.size())
+
     if _can_distribute_credits() and (_waiting_producers.size() == 0) then
       _distribute_credits_to(from)
     else
@@ -274,7 +288,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     let give_out =
       _distributable_credits
         .min(_max_credit_response)
-        .max(_minimum_credit_response
+        .max(_minimum_credit_response)
 
     ifdef debug then
       Invariant(give_out >= _minimum_credit_response)

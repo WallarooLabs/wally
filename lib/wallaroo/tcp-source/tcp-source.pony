@@ -15,7 +15,7 @@ use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is (Initializable & Producer)
+actor TCPSource is Producer
   """
   # TCPSource
 
@@ -59,7 +59,6 @@ actor TCPSource is (Initializable & Producer)
   // Origin (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
-  // TODO: remove consumers
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
@@ -71,7 +70,6 @@ actor TCPSource is (Initializable & Producer)
     """
     A new connection accepted on a server.
     """
-    _max_route_credits = _max_route_credits.usize().next_pow2().isize()
     _listen = listen
     _notify = consume notify
     _notify.set_origin(this)
@@ -97,35 +95,36 @@ actor TCPSource is (Initializable & Producer)
     //listening until we are done recovering
     _notify.accepted(this)
 
+    let handler: TCPSourceRouteCallbackHandler ref =
+      TCPSourceRouteCallbackHandler
+
     for consumer in routes.values() do
       _routes(consumer) =
-        _route_builder(this, consumer, TCPSourceRouteCallbackHandler)
+        _route_builder(this, consumer, handler)
     end
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
       _routes(boundary) =
-        _route_builder(this, boundary, TCPSourceRouteCallbackHandler)
+        _route_builder(this, boundary, handler)
     end
 
     match default_target
     | let r: CreditFlowConsumerStep =>
       match forward_route_builder
       | let frb: RouteBuilder val =>
-        _routes(r) = frb(this, r, TCPSourceRouteCallbackHandler)
+        _routes(r) = frb(this, r, handler)
       end
     end
 
     for r in _routes.values() do
-      // TODO: What should the initial max credits per route from
-      // a Source be?  I'm starting at max_value because that makes
-      // us dependent on how many can be distributed from downstream.
-      r.initialize(_max_route_credits, "TCPSource")
+      // TODO: this is a hack, we shouldn't be calling application events
+      // directly. route lifecycle needs to be broken out better from
+      // application lifecycle
+      r.application_created()
     end
 
-    ifdef "backpressure" then
-      for r in _routes.values() do
-        r.request_credits()
-      end
+    for r in _routes.values() do
+      r.application_initialized(_max_route_credits, "TCPSource")
     end
 
   //////////////
@@ -155,16 +154,6 @@ actor TCPSource is (Initializable & Producer)
 
   fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>
     None
-
-  // Our actor
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
-  =>
-    None
-    ifdef debug then
-      Invariant(_max_route_credits ==
-        (_max_route_credits.usize() - 1).next_pow2().isize())
-    end
 
   be dispose() =>
     """
@@ -584,17 +573,24 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       Fail()
     end
 
+  fun ref credits_initialized(producer: Producer ref, r: Route tag) =>
+    ifdef debug then
+      Invariant(_registered_routes.contains(r))
+    end
+
+    match producer
+    | let s: TCPSource ref =>
+      _try_unmute(s)
+    end
+
   fun ref credits_replenished(producer: Producer ref) =>
     ifdef debug then
       Invariant(_muted > 0)
     end
 
     match producer
-    | let p: TCPSource ref =>
-      _muted = _muted - 1
-      if (_muted == 0) then
-        p._unmute()
-      end
+    | let s: TCPSource ref =>
+      _try_unmute(s)
       ifdef "credit_trace" then
         @printf[I32]("Credits_replenished. Now _muted=%llu\n".cstring(),
           _muted)
@@ -620,3 +616,9 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       s._mute()
     end
     _muted = _muted + 1
+
+  fun ref _try_unmute(s: TCPSource ref) =>
+    _muted = _muted - 1
+    if _muted == 0 then
+      s._unmute()
+    end

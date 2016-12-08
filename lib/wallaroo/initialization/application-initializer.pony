@@ -5,6 +5,7 @@ use "sendence/guid"
 use "sendence/messages"
 use "wallaroo"
 use "wallaroo/backpressure"
+use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
@@ -131,14 +132,13 @@ actor ApplicationInitializer
           @printf[I32](("Coalescing is off for " + pipeline.name() + " pipeline\n").cstring())
         end
 
-        // This is the sink id for the sink for this pipeline, which
-        // will have an instance on each worker.
-        // ASSUMPTION: There is only at most one sink per pipeline.
-        let sink_id = _guid_gen.u128()
-
-        // Since every worker will have an instance of this sink, we record
-        // the step id and not the proxy address in our step map.
-        step_map(sink_id) = sink_id
+        // Since every worker will have an instance of the sink, we record
+        // the step id and not the proxy address in our step map if there
+        // is a step id for this pipeline.
+        match pipeline.sink_id()
+        | let sid: U128 =>
+          step_map(sid) = sid
+        end
 
         // TODO: Replace this when we have a better post-POC default strategy.
         // This is set if we need a default target in this pipeline.
@@ -248,40 +248,43 @@ actor ApplicationInitializer
 
         // If the source contains a prestate runner, then we might need
         // a pre state target id, None if not
-        let source_pre_state_target_id =
+        let source_pre_state_target_id: (U128 | None) =
           if source_seq_builder.is_prestate() then
             try
               runner_builders(0).id()
             else
-              // We need a sink on every worker involved in the
-              // partition
-              let egress_builder = EgressBuilder(pipeline.name(),
-                sink_id, sink_addr, pipeline.sink_builder())
+              match pipeline.sink_id()
+              | let sid: U128 =>
+                // We need a sink on every worker involved in the
+                // partition
+                let egress_builder = EgressBuilder(pipeline.name(),
+                  sid, sink_addr, pipeline.sink_builder())
 
-              match source_partition_workers
-              | let w: String =>
-                try
-                  local_graphs(w).add_node(egress_builder, sink_id)
-                else
-                  @printf[I32](("No graph for worker " + w + "\n").cstring())
-                  error
-                end
-              | let ws: Array[String] val =>
-                local_graphs("initializer").add_node(egress_builder,
-                  sink_id)
-                for w in ws.values() do
+                match source_partition_workers
+                | let w: String =>
                   try
-                    local_graphs(w).add_node(egress_builder, sink_id)
+                    local_graphs(w).add_node(egress_builder, sid)
                   else
                     @printf[I32](("No graph for worker " + w + "\n").cstring())
                     error
                   end
+                | let ws: Array[String] val =>
+                  local_graphs("initializer").add_node(egress_builder,
+                    sid)
+                  for w in ws.values() do
+                    try
+                      local_graphs(w).add_node(egress_builder, sid)
+                    else
+                      @printf[I32](("No graph for worker " + w + "\n").cstring())
+                      error
+                    end
+                  end
+                // source_partition_workers shouldn't be None since we showed
+                // that source_seq_builders.is_prestate() is true
                 end
-              // source_partition_workers shouldn't be None since we showed
-              // that source_seq_builders.is_prestate() is true
               end
 
-              sink_id
+              pipeline.sink_id()
             end
           else
             None
@@ -459,37 +462,40 @@ actor ApplicationInitializer
                     worker
                   end
 
-                let pre_state_target_id =
+                let pre_state_target_id: (U128 | None) =
                   try
                     runner_builders(runner_builder_idx + 1).id()
                   else
-                    // We need a sink on every worker involved in the
-                    // partition
-                    let egress_builder = EgressBuilder(pipeline.name(),
-                      sink_id, sink_addr, pipeline.sink_builder())
+                    match pipeline.sink_id()
+                    | let sid: U128 =>
+                      // We need a sink on every worker involved in the
+                      // partition
+                      let egress_builder = EgressBuilder(pipeline.name(),
+                        sid, sink_addr, pipeline.sink_builder())
 
-                    match partition_workers
-                    | let w: String =>
-                      try
-                        local_graphs(w).add_node(egress_builder, sink_id)
-                      else
-                        @printf[I32](("No graph for worker " + w + "\n").cstring())
-                        error
-                      end
-                    | let ws: Array[String] val =>
-                      local_graphs("initializer").add_node(egress_builder,
-                        sink_id)
-                      for w in ws.values() do
+                      match partition_workers
+                      | let w: String =>
                         try
-                          local_graphs(w).add_node(egress_builder, sink_id)
+                          local_graphs(w).add_node(egress_builder, sid)
                         else
                           @printf[I32](("No graph for worker " + w + "\n").cstring())
                           error
                         end
+                      | let ws: Array[String] val =>
+                        local_graphs("initializer").add_node(egress_builder,
+                          sid)
+                        for w in ws.values() do
+                          try
+                            local_graphs(w).add_node(egress_builder, sid)
+                          else
+                            @printf[I32](("No graph for worker " + w + "\n").cstring())
+                            error
+                          end
+                        end
                       end
                     end
 
-                    sink_id
+                    pipeline.sink_id()
                   end
 
                 @printf[I32](("Preparing to spin up prestate step " + next_runner_builder.name() + " on " + worker + "\n").cstring())
@@ -624,20 +630,23 @@ actor ApplicationInitializer
             end
           else
           ///////
-          // We need a Sink since there are no more steps to go in this
-          // pipeline
-            let egress_builder = EgressBuilder(pipeline.name(),
-              sink_id, sink_addr, pipeline.sink_builder())
+          // There are no more steps to go in this pipeline, so check if
+          // we need a sink
+            match pipeline.sink_id()
+            | let sid: U128 =>
+              let egress_builder = EgressBuilder(pipeline.name(),
+                sid, sink_addr, pipeline.sink_builder())
 
-            try
-              local_graphs(worker).add_node(egress_builder, sink_id)
-              match last_initializer
-              | (let last_id: U128, let step_init: StepInitializer val) =>
-                local_graphs(worker).add_edge(last_id, sink_id)
+              try
+                local_graphs(worker).add_node(egress_builder, sid)
+                match last_initializer
+                | (let last_id: U128, let step_init: StepInitializer val) =>
+                  local_graphs(worker).add_edge(last_id, sid)
+                end
+              else
+                @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                error
               end
-            else
-              @printf[I32](("No graph for worker " + worker + "\n").cstring())
-              error
             end
           end
 
@@ -661,66 +670,71 @@ actor ApplicationInitializer
 
             // The target will always be the sink (a stipulation of
             // the temporary POC strategy)
-            let default_pre_state_target_id = sink_id
+            match pipeline.sink_id()
+            | let default_pre_state_target_id: U128 =>
+              let pre_state_runner_builder =
+                try
+                  default_target(0)
+                else
+                  @printf[I32]("Default target had no prestate value!\n".cstring())
+                  error
+                end
 
-            let pre_state_runner_builder =
-              try
-                default_target(0)
-              else
-                @printf[I32]("Default target had no prestate value!\n".cstring())
-                error
+              let state_runner_builder =
+                try
+                  default_target(1)
+                else
+                  @printf[I32]("Default target had no state value!\n".cstring())
+                  error
+                end
+
+              let pre_state_id = pre_state_runner_builder.id()
+              let state_id = state_runner_builder.id()
+
+              // Add default prestate to PreStateData
+              let psd = PreStateData(pre_state_runner_builder,
+                default_pre_state_target_id, true)
+              pre_state_data.push(psd)
+
+              let pre_state_builder = StepBuilder(application.name(),
+                pipeline.name(),
+                pre_state_runner_builder, pre_state_id,
+                false,
+                default_pre_state_target_id,
+                pre_state_runner_builder.forward_route_builder())
+
+              @printf[I32](("Preparing to spin up default target state for " + state_runner_builder.name() + " on " + pipeline_default_target_worker + "\n").cstring())
+
+              let state_builder = StepBuilder(application.name(),
+                pipeline.name(),
+                state_runner_builder, state_id,
+                true
+                where forward_route_builder' =
+                  state_runner_builder.route_builder())
+
+              steps(pre_state_id) = pipeline_default_target_worker
+              steps(state_id) = pipeline_default_target_worker
+
+              let next_default_targets: Array[StepBuilder val] trn =
+                recover Array[StepBuilder val] end
+
+              next_default_targets.push(pre_state_builder)
+              next_default_targets.push(state_builder)
+
+              @printf[I32](("Adding default target for " + pipeline_default_target_worker + "\n").cstring())
+              default_targets(pipeline_default_target_worker) = consume next_default_targets
+
+              // Create ProxyAddresses for the other workers
+              let proxy_address = ProxyAddress(pipeline_default_target_worker,
+                pre_state_id)
+
+              for w in worker_names.values() do
+                default_targets(w) = proxy_address
               end
-
-            let state_runner_builder =
-              try
-                default_target(1)
-              else
-                @printf[I32]("Default target had no state value!\n".cstring())
-                error
-              end
-
-            let pre_state_id = pre_state_runner_builder.id()
-            let state_id = state_runner_builder.id()
-
-            // Add default prestate to PreStateData
-            let psd = PreStateData(pre_state_runner_builder,
-              default_pre_state_target_id, true)
-            pre_state_data.push(psd)
-
-            let pre_state_builder = StepBuilder(application.name(),
-              pipeline.name(),
-              pre_state_runner_builder, pre_state_id,
-              false,
-              default_pre_state_target_id,
-              pre_state_runner_builder.forward_route_builder())
-
-            @printf[I32](("Preparing to spin up default target state for " + state_runner_builder.name() + " on " + pipeline_default_target_worker + "\n").cstring())
-
-            let state_builder = StepBuilder(application.name(),
-              pipeline.name(),
-              state_runner_builder, state_id,
-              true
-              where forward_route_builder' =
-                state_runner_builder.route_builder())
-
-            steps(pre_state_id) = pipeline_default_target_worker
-            steps(state_id) = pipeline_default_target_worker
-
-            let next_default_targets: Array[StepBuilder val] trn =
-              recover Array[StepBuilder val] end
-
-            next_default_targets.push(pre_state_builder)
-            next_default_targets.push(state_builder)
-
-            @printf[I32](("Adding default target for " + pipeline_default_target_worker + "\n").cstring())
-            default_targets(pipeline_default_target_worker) = consume next_default_targets
-
-            // Create ProxyAddresses for the other workers
-            let proxy_address = ProxyAddress(pipeline_default_target_worker,
-              pre_state_id)
-
-            for w in worker_names.values() do
-              default_targets(w) = proxy_address
+            else
+              // We currently assume that a default step will target a sink
+              // but apparently there is no sink for this pipeline
+              Fail()
             end
           else
             @printf[I32]("----But no default target!\n".cstring())

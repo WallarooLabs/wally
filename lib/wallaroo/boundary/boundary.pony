@@ -6,6 +6,7 @@ use "sendence/guid"
 use "sendence/queue"
 use "wallaroo/backpressure"
 use "wallaroo/fail"
+use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -47,7 +48,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
-  var _connect_count: U32
+  var _connect_count: U32 = 0
   var _fd: U32 = -1
   var _in_sent: Bool = false
   var _expect: USize = 0
@@ -90,8 +91,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    _max_distributable_credits =
-      _max_distributable_credits.usize().next_pow2().isize()
     // _encoder = encoder_wrapper
     _auth = auth
     _worker_name = worker_name
@@ -103,21 +102,30 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     _next_size = init_size
     _max_size = max_size
     _notify = EmptyBoundaryNotify
+
+  //
+  // Application startup lifecycle event
+  //
+
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
+  be application_created(initializer: LocalTopologyInitializer,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    omni_router: OmniRouter val)
+  =>
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
-      from.cstring())
+      _from.cstring())
 
     _notify_connecting()
 
-    @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + service + "\n").cstring())
+    @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
-  =>
-    ifdef debug then
-      Invariant(_max_distributable_credits ==
-        (_max_distributable_credits.usize() - 1).next_pow2().isize())
-    end
+    // If connecting failed, we should handle here
+    initializer.report_initialized(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
     try
       if _step_id == 0 then
         Fail()
@@ -129,6 +137,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     else
       Fail()
     end
+
+    initializer.report_ready_to_work(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
 
   be register_step_id(step_id: U128) =>
     _step_id = step_id
@@ -152,6 +165,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId)
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd message at OutgoingBoundary\n".cstring())
+    end
     try
       let seq_id = ifdef "resilience" then
         _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
@@ -164,6 +180,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       //_queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
+    else
+      Fail()
     end
 
   be writev(data: Array[ByteSeq] val) =>
@@ -179,8 +197,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       let flush_count: USize = (seq_id - _lowest_queue_id).usize()
       _queue.clear_n(flush_count)
       _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-      // !! remove this
-      // _recoup_credits(flush_count.isize())
       ifdef "credit_trace" then
         var recouped_credits = flush_count.isize()
         if _distributable_credits > _max_distributable_credits then
@@ -241,6 +257,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
+    ifdef "trace" then
+      @printf[I32]("Sent %d msgs over boundary\n".cstring(), number_finished)
+    end
     ifdef "backpressure" then
       _recoup_credits(number_finished)
     end
