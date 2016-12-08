@@ -7,6 +7,7 @@ use "sendence/epoch"
 use "sendence/guid"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
@@ -71,6 +72,10 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _max_distributable_credits: ISize = 1_000
   var _distributable_credits: ISize = 0
 
+  // Lifecycle
+  var _initialized: Bool = false
+  var _ready_to_work_routes: SetIs[Route] = _ready_to_work_routes.create()
+
   // Resilience routes
   // TODO: This needs to be merged with credit flow producer routes
   let _resilience_routes: Routes = Routes
@@ -100,7 +105,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
-    initializer.report_created()
+    initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
@@ -122,14 +127,15 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
 
     for r in _routes.values() do
+      r.application_created()
       ifdef "resilience" then
-        r.application_created()
         _resilience_routes.add_route(r)
       end
     end
 
     _omni_router = omni_router
 
+    _initialized = true
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
@@ -137,7 +143,13 @@ actor Step is (RunnableStep & Resilient & Producer &
       r.application_initialized(_max_distributable_credits, "Step")
     end
 
-    initializer.report_ready_to_work(this)
+  // fun ref _report_route_ready_to_work(r: Route) =>
+  //   if not _ready_to_work_routes.contains(r) then
+  //     initializer.report_ready_to_work(this)
+  //   else
+  //     // A route should only signal this once
+  //     Fail()
+  //   end
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
@@ -149,13 +161,9 @@ actor Step is (RunnableStep & Resilient & Producer &
     for consumer in router.routes().values() do
       let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
       _routes(consumer) = next_route
-      //if _initialized then
-        // TODO: This is a kind of hack right now. Each route has the
-        // same number of max credits as the step itself.  The commented
-        // code surrounding this shows the old approach of dividing the
-        // max credits among routes.
-        next_route.initialize(_max_distributable_credits, "Step")
-      //end
+      if _initialized then
+        Fail()
+      end
     end
 
   // TODO: This needs to dispose of the old routes and replace with new routes

@@ -108,6 +108,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   // Application startup lifecycle event
   //
 
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
   be application_created(initializer: LocalTopologyInitializer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     omni_router: OmniRouter val)
@@ -121,9 +124,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
     // If connecting failed, we should handle here
-
-  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
-    initializer.report_created(this)
+    initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     ifdef debug then
@@ -142,10 +143,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       Fail()
     end
 
-    initializer.report_initialized(this)
+    initializer.report_ready_to_work(this)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
-    initializer.report_ready_to_work(this)
+    None
 
   be register_step_id(step_id: U128) =>
     _step_id = step_id

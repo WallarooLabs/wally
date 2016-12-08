@@ -61,7 +61,7 @@ class LocalTopology
     metrics_conn: TCPConnection, alfred: Alfred,
     connections: Connections, auth: AmbientAuth,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    initializables: Array[Initializable tag],
+    initializables: SetIs[Initializable tag],
     data_routes: Map[U128, CreditFlowConsumerStep tag],
     default_router: (Router val | None)) ?
   =>
@@ -118,7 +118,7 @@ actor LocalTopologyInitializer
   var _created: SetIs[Initializable tag] = _created.create()
   var _initialized: SetIs[Initializable tag] = _initialized.create()
   var _ready_to_work: SetIs[Initializable tag] = _ready_to_work.create()
-  let _initializables: Array[Initializable tag] = _initializables.create()
+  let _initializables: SetIs[Initializable tag] = _initializables.create()
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
   // once Alfred signals we're ready
@@ -298,7 +298,7 @@ actor LocalTopologyInitializer
           state_step.update_route_builder(state_builder.forward_route_builder())
 
           default_target_state_step = state_step
-          _initializables.push(state_step)
+          _initializables.set(state_step)
 
           let state_step_router = DirectRouter(state_step)
           built_routers(default_target_state_step_id) = state_step_router
@@ -411,7 +411,7 @@ actor LocalTopologyInitializer
                         dsinit(default_state_router,
                           _metrics_conn, _alfred)
                       default_target = default_pre_state_step
-                      _initializables.push(default_pre_state_step)
+                      _initializables.set(default_pre_state_step)
                       built_stateless_steps(default_pre_state_id) =
                         default_pre_state_step
                       data_routes(default_pre_state_id) = default_pre_state_step
@@ -462,7 +462,7 @@ actor LocalTopologyInitializer
                   _alfred, state_comp_target_router)
 
                 data_routes(next_id) = next_step
-                _initializables.push(next_step)
+                _initializables.set(next_step)
 
                 built_stateless_steps(next_id) = next_step
                 let next_router = DirectRouter(next_step)
@@ -490,7 +490,7 @@ actor LocalTopologyInitializer
                 let next_step = builder(out_router, _metrics_conn, _alfred)
 
                 data_routes(next_id) = next_step
-                _initializables.push(next_step)
+                _initializables.set(next_step)
 
                 built_stateless_steps(next_id) = next_step
                 let next_router = DirectRouter(next_step)
@@ -531,7 +531,7 @@ actor LocalTopologyInitializer
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn, _alfred)
                 data_routes(next_id) = state_step
-                _initializables.push(state_step)
+                _initializables.set(state_step)
 
                 let state_step_router = DirectRouter(state_step)
                 built_routers(next_id) = state_step_router
@@ -562,7 +562,7 @@ actor LocalTopologyInitializer
                     let pre_state_step = b(state_step_router, _metrics_conn,
                       _alfred, state_comp_target)
                     data_routes(b.id()) = pre_state_step
-                    _initializables.push(pre_state_step)
+                    _initializables.set(pre_state_step)
 
                     built_stateless_steps(b.id()) = pre_state_step
                     let pre_state_router = DirectRouter(pre_state_step)
@@ -605,7 +605,7 @@ actor LocalTopologyInitializer
                 end
 
                 if not _initializables.contains(sink) then
-                  _initializables.push(sink)
+                  _initializables.set(sink)
                 end
 
                 let sink_router =
@@ -648,7 +648,7 @@ actor LocalTopologyInitializer
                       dsinit(default_state_router,
                         _metrics_conn, _alfred)
                     default_target = default_pre_state_step
-                    _initializables.push(default_pre_state_step)
+                    _initializables.set(default_pre_state_step)
                     built_stateless_steps(default_pre_state_id) =
                       default_pre_state_step
                     data_routes(default_pre_state_id) = default_pre_state_step
@@ -859,7 +859,7 @@ actor LocalTopologyInitializer
         _topology_initialized = true
 
         // TODO: Notify Alfred to start reading data. This should be called by // Alfred after it's done.
-        spin_up_source_listeners()
+        _spin_up_source_listeners()
       else
         @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end
@@ -877,8 +877,7 @@ actor LocalTopologyInitializer
         _created.set(initializable)
         if _created.size() == _initializables.size() then
           for i in _initializables.values() do
-            i.application_created(_outgoing_boundaries, _tcp_sinks,
-              o_router)
+            i.application_created(this, _outgoing_boundaries, o_router)
           end
         end
       else
@@ -894,7 +893,7 @@ actor LocalTopologyInitializer
       _initialized.set(initializable)
       if _initialized.size() == _initializables.size() then
         for i in _initializables.values() do
-          i.application_initialized()
+          i.application_initialized(this)
         end
       end
     else
@@ -908,7 +907,7 @@ actor LocalTopologyInitializer
       if _ready_to_work.size() == _initializables.size() then
         _spin_up_source_listeners()
         for i in _initializables.values() do
-          i.application_ready_to_work()
+          i.application_ready_to_work(this)
         end
       end
     else
@@ -916,7 +915,7 @@ actor LocalTopologyInitializer
       Fail()
     end
 
-  fun _spin_up_source_listeners() =>
+  fun ref _spin_up_source_listeners() =>
     if not _topology_initialized then
       @printf[I32]("ERROR: Tried to spin up source listeners before topology was initialized!\n".cstring())
     else

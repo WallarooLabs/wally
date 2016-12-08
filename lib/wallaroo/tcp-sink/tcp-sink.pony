@@ -41,13 +41,13 @@ actor EmptySink is CreditFlowConsumerStep
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     omni_router: OmniRouter val)
   =>
-    initializer.report_created(this)
-
-  be application_initialized(initializer: LocalTopologyInitializer) =>
     initializer.report_initialized(this)
 
-  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+  be application_initialized(initializer: LocalTopologyInitializer) =>
     initializer.report_ready_to_work(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
 
   be register_producer(producer: Producer) =>
     None
