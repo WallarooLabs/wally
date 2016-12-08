@@ -121,6 +121,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
     // If connecting failed, we should handle here
+
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>

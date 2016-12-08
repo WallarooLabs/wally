@@ -11,6 +11,7 @@ use "sendence/messages"
 use "wallaroo"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -113,7 +114,7 @@ actor LocalTopologyInitializer
 
   // Lifecycle
   var _omni_router: (OmniRouter val | None) = None
-  var _tcp_sinks: Array[TCPSink] val = recover Array[TCPSink] val end
+  var _tcp_sinks: Array[TCPSink] val = recover Array[TCPSink] end
   var _created: SetIs[Initializable tag] = _created.create()
   var _initialized: SetIs[Initializable tag] = _initialized.create()
   var _ready_to_work: SetIs[Initializable tag] = _ready_to_work.create()
@@ -850,9 +851,9 @@ actor LocalTopologyInitializer
         // Initialize all our initializables to get backpressure started
         _tcp_sinks = consume tcp_sinks_trn
         _omni_router = omni_router
-        // for i in _initializables.values() do
-        //   i.application_created(_outgoing_boundaries, tcp_sinks, omni_router)
-        // end
+        for i in _initializables.values() do
+          i.application_begin_reporting(this)
+        end
 
         @printf[I32]("Local topology initialized\n".cstring())
         _topology_initialized = true
@@ -869,14 +870,15 @@ actor LocalTopologyInitializer
       _env.err.print("Error initializing local topology")
     end
 
-  be report_created(i: Initializable) =>
-    if not _created.contains(i)
+  be report_created(initializable: Initializable tag) =>
+    if not _created.contains(initializable) then
       match _omni_router
-      | let or: OmniRouter val =>
-        _created.set(i)
+      | let o_router: OmniRouter val =>
+        _created.set(initializable)
         if _created.size() == _initializables.size() then
           for i in _initializables.values() do
-            i.application_created(_outgoing_boundaries, _tcp_sinks, or)
+            i.application_created(_outgoing_boundaries, _tcp_sinks,
+              o_router)
           end
         end
       else
@@ -887,22 +889,22 @@ actor LocalTopologyInitializer
       Fail()
     end
 
-  be report_initialized(i: Initializable) =>
-    if not _initialized.contains(i)
-      _initialized.set(i)
+  be report_initialized(initializable: Initializable tag) =>
+    if not _initialized.contains(initializable) then
+      _initialized.set(initializable)
       if _initialized.size() == _initializables.size() then
         for i in _initializables.values() do
           i.application_initialized()
         end
       end
     else
-      @printf[I32]("The same Initializable reported being created twice\n".cstring())
+      @printf[I32]("The same Initializable reported being initialized twice\n".cstring())
       Fail()
     end
 
-  be report_ready_to_work(i: Initializable) =>
-    if not _ready_to_work.contains(i)
-      _ready_to_work.set(i)
+  be report_ready_to_work(initializable: Initializable tag) =>
+    if not _ready_to_work.contains(initializable) then
+      _ready_to_work.set(initializable)
       if _ready_to_work.size() == _initializables.size() then
         _spin_up_source_listeners()
         for i in _initializables.values() do
@@ -910,7 +912,7 @@ actor LocalTopologyInitializer
         end
       end
     else
-      @printf[I32]("The same Initializable reported being created twice\n".cstring())
+      @printf[I32]("The same Initializable reported being ready to work twice\n".cstring())
       Fail()
     end
 

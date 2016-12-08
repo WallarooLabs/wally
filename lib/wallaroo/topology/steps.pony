@@ -28,6 +28,7 @@ trait tag RunnableStep
 
 
 interface Initializable
+  be application_begin_reporting(initializer: LocalTopologyInitializer)
   be application_created(initializer: LocalTopologyInitializer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     omni_router: OmniRouter val)
@@ -98,6 +99,9 @@ actor Step is (RunnableStep & Resilient & Producer &
   // Application startup lifecycle event
   //
 
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created()
+
   be application_created(initializer: LocalTopologyInitializer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     omni_router: OmniRouter val)
@@ -126,17 +130,17 @@ actor Step is (RunnableStep & Resilient & Producer &
 
     _omni_router = omni_router
 
-    initializer.report_created(this)
+    initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     for r in _routes.values() do
       r.application_initialized(_max_distributable_credits, "Step")
     end
 
-    initializer.report_initialized(this)
+    initializer.report_ready_to_work(this)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
-    initializer.report_ready_to_work()
+    None
 
   be update_route_builder(route_builder: RouteBuilder val) =>
     _route_builder = route_builder
