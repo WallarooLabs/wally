@@ -61,11 +61,26 @@ in
                     rev    = ponyc;
                 };
 
+      makeFlags = [ "config=debug" ] ++ stdenv.lib.optionals stdenv.isDarwin [ "bits=64" ]
+                    ++ stdenv.lib.optionals (stdenv.isDarwin && (!use_lto)) [ "lto=no" ];
+
       patches = [ ];
 
       doCheck = run_ponyc_tests;
 
       checkTarget = "test";
+
+      installPhase = ''
+        make config=debug prefix=$out ''
+        + stdenv.lib.optionalString stdenv.isDarwin '' bits=64 ''
+        + stdenv.lib.optionalString (stdenv.isDarwin && (!use_lto)) '' lto=no ''
+        + '' install
+        mv $out/bin/ponyc $out/bin/ponyc.wrapped
+        makeWrapper $out/bin/ponyc.wrapped $out/bin/ponyc \
+          --prefix PONYPATH : "$out/lib" \
+          --prefix PONYPATH : "${stdenv.lib.getLib pcre2}/lib" \
+          --prefix PONYPATH : "${stdenv.lib.getLib libressl}/lib"
+      '';
 
     });
       hex-13 = stdenv.lib.overrideDerivation beamPackages.hex (oldAttrs: rec {
