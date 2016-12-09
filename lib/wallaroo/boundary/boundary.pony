@@ -187,7 +187,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _writev(data)
 
   be ack(seq_id: SeqId) =>
-    @printf[I32]("GOT ACK!\n".cstring())
     ifdef debug then
       Invariant(seq_id > _lowest_queue_id)
     end

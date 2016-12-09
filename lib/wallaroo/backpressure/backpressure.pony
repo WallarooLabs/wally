@@ -403,8 +403,6 @@ class BoundaryRoutePreparingToWorkCreditReceiver
       end
     _route._recoup_credits(credits_recouped)
 
-    // @printf[I32]("!!Recouping %d credits\n".cstring(), credits_recouped)
-
     if credits > credits_recouped then
       _route._return_credits(credits - credits_recouped)
     end

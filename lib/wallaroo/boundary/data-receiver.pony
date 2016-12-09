@@ -92,7 +92,6 @@ actor DataReceiver is Producer
 
   fun ref _maybe_ack() =>
     if (_ack_counter % 512) == 0 then
-      @printf[I32]("ACKING!\n".cstring())
       _ack_latest()
     end
 
