@@ -306,11 +306,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   fun ref _can_distribute_credits(): Bool =>
     _can_send() and _above_minimum_response_level()
 
-  fun ref _distribute_credits() =>
-    ifdef debug then
-      Invariant(_can_distribute_credits())
-    end
-
+  fun ref _maybe_distribute_credits() =>
     while (_waiting_producers.size() > 0) and _can_distribute_credits() do
       try
         let producer = _waiting_producers.shift()
@@ -353,9 +349,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     ifdef debug then
       Invariant(_distributable_credits <= _max_distributable_credits)
     end
-    if (_waiting_producers.size() > 0) and _can_distribute_credits() then
-      _distribute_credits()
-    end
+    _maybe_distribute_credits()
 
     ifdef "credit_trace" then
       @printf[I32]("OutgoingBoundary: recouped %llu credits. Now at %llu\n".cstring(), recoup, _distributable_credits)
@@ -759,6 +753,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _release_backpressure() =>
     _notify.unthrottled(this)
+    _maybe_distribute_credits()
 
   fun ref _read_buf_size() =>
     """
