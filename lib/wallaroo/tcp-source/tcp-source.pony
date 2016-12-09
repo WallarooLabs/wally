@@ -29,7 +29,7 @@ actor TCPSource is Producer
   let _tcp_sinks: Array[TCPSink] val
   // Determines if we can still process credits from consumers
   var _unregistered: Bool = false
-  var _max_route_credits: ISize = 1_000
+  var _max_route_credits: ISize = 1_024
 
   // TCP
   let _listen: TCPSourceListener

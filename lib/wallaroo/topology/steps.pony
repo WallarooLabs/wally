@@ -68,7 +68,7 @@ actor Step is (RunnableStep & Resilient & Producer &
 
    // CreditFlow Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
-  var _max_distributable_credits: ISize = 2_048
+  var _max_distributable_credits: ISize = 1_024
   var _distributable_credits: ISize = 0
   let _permanent_max_credit_response: ISize = _max_distributable_credits
   var _max_credit_response: ISize = _permanent_max_credit_response
