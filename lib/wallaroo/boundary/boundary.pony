@@ -111,7 +111,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
     omni_router: OmniRouter val)
   =>
     _connect_count = @pony_os_connect_tcp[U32](this,

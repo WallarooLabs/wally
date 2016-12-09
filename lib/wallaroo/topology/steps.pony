@@ -31,7 +31,6 @@ trait tag RunnableStep
 interface Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer)
   be application_created(initializer: LocalTopologyInitializer,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
     omni_router: OmniRouter val)
 
   be application_initialized(initializer: LocalTopologyInitializer)
@@ -110,18 +109,13 @@ actor Step is (RunnableStep & Resilient & Producer &
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
     omni_router: OmniRouter val)
   =>
-    let callback_handler = StepRouteCallbackHandler
+    let callback_handler: StepRouteCallbackHandler ref =
+      StepRouteCallbackHandler
     for consumer in _router.routes().values() do
       _routes(consumer) =
         _route_builder(this, consumer, callback_handler)
-    end
-
-    for (worker, boundary) in outgoing_boundaries.pairs() do
-      _routes(boundary) =
-        _route_builder(this, boundary, callback_handler)
     end
 
     match _default_target

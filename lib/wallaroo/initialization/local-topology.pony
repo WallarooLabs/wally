@@ -878,7 +878,7 @@ actor LocalTopologyInitializer
         if _created.size() == _initializables.size() then
           @printf[I32]("Phase I: Application is created!\n".cstring())
           for i in _initializables.values() do
-            i.application_created(this, _outgoing_boundaries, o_router)
+            i.application_created(this, o_router)
           end
         end
       else
