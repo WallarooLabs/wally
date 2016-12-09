@@ -176,7 +176,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
         seq_id, _wb, _auth)
-      //_queue.enqueue(outgoing_msg)
+      _queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
     else
