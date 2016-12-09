@@ -190,6 +190,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
+    ifdef debug then
+      Invariant(number_finished > 0)
+    end
     ifdef "backpressure" then
       recoup_credits(number_finished)
     end
@@ -751,7 +754,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           end
         end
 
-        _unit_finished(num_sent, final_pending_sent)
+        if num_sent > 0 then
+          _unit_finished(num_sent, final_pending_sent)
+        end
       end
     end
 

@@ -257,6 +257,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
+    ifdef debug then
+      Invariant(number_finished > 0)
+    end
     ifdef "trace" then
       @printf[I32]("Sent %d msgs over boundary\n".cstring(), number_finished)
     end
@@ -798,7 +801,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    _unit_finished(num_sent)
+    if num_sent > 0 then
+      _unit_finished(num_sent)
+    end
 
   fun ref _apply_backpressure() =>
     _writeable = false
