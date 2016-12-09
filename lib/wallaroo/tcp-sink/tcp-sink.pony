@@ -180,7 +180,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     close()
 
+
   fun ref _unit_finished(number_finished: ISize,
+    number_tracked_finished: ISize,
     tracking_id: (SeqId | None))
   =>
     """
@@ -192,9 +194,13 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     ifdef debug then
       Invariant(number_finished > 0)
+      Invariant(number_tracked_finished <= number_finished)
+    end
+    ifdef "trace" then
+      @printf[I32]("Sent %d msgs over sink\n".cstring(), number_finished)
     end
     ifdef "backpressure" then
-      recoup_credits(number_finished)
+      recoup_credits(number_tracked_finished)
     end
 
     ifdef "resilience" then
@@ -730,10 +736,14 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _tracking_finished(num_bytes_sent: USize) =>
     """
-    Call _unit_finished with # of sent messages and last tracking_id
+    Call _unit_finished with:
+      number of sent messages,
+      number of tracked messages sent
+      last tracking_id
     """
     ifdef "backpressure" or "resilience" then
       var num_sent: ISize = 0
+      var tracked_sent: ISize = 0
       var final_pending_sent: (SeqId | None) = None
       var bytes_sent = num_bytes_sent
 
@@ -744,8 +754,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           if bytes <= bytes_sent then
             num_sent = num_sent + 1
             bytes_sent = bytes_sent - bytes
-            final_pending_sent = tracking_id
             _pending_tracking.shift()
+            match tracking_id
+            | let id: SeqId =>
+              tracked_sent = tracked_sent + 1
+              final_pending_sent = tracking_id
+            end
           else
             let bytes_remaining = bytes - bytes_sent
             bytes_sent = 0
@@ -755,7 +769,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
         end
 
         if num_sent > 0 then
-          _unit_finished(num_sent, final_pending_sent)
+          _unit_finished(num_sent, tracked_sent, final_pending_sent)
         end
       end
     end
