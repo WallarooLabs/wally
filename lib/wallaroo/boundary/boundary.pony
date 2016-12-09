@@ -29,8 +29,7 @@ class OutgoingBoundaryBuilder
     OutgoingBoundary(auth, worker_name, consume reporter, host,
       service)
 
-actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
-  & Initializable)
+actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   // Steplike
   // let _encoder: EncoderWrapper val
   let _wb: Writer = Writer
