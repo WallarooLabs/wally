@@ -260,6 +260,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     ifdef debug then
       Invariant(number_finished > 0)
     end
+    @printf[I32]("Num finished: %d\n".cstring(), number_finished)
     ifdef "trace" then
       @printf[I32]("Sent %d msgs over boundary\n".cstring(), number_finished)
     end
@@ -300,6 +301,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
    if (_max_credit_response < _minimum_credit_response) then
+    @printf[I32]("Maxres: %d, maxdist: %d, minres: %d, upstreams: %d, portion: %d\n".cstring(), _max_credit_response, _max_distributable_credits, _minimum_credit_response, _upstreams.size(), portion)
      Fail()
    end
 
@@ -364,7 +366,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
     ifdef "credit_trace" then
       @printf[I32]((
-        "Sink: Credits requested." +
+        "OutgoingBoundary: Credits requested." +
         " Giving %llu out of %llu\n"
         ).cstring(),
         give_out, _distributable_credits)
@@ -377,6 +379,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _recoup_credits(credits)
 
   fun ref _recoup_credits(recoup: ISize) =>
+    // @printf[I32]("!!B: Recouping %d credits\n".cstring(), recoup)
     _distributable_credits = _distributable_credits + recoup
 
   fun _above_minimum_response_level(): Bool =>

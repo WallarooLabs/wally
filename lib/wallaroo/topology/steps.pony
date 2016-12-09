@@ -358,6 +358,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
 
    if (_max_credit_response < _minimum_credit_response) then
+    @printf[I32]("Maxres: %d, maxdist: %d, minres: %d, upstreams: %d, portion: %d\n".cstring(), _max_credit_response, _max_distributable_credits, _minimum_credit_response, _upstreams.size(), portion)
      Fail()
    end
 
