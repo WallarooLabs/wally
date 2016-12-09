@@ -58,7 +58,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _writeable: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
-  embed _pending_tracking: List[(USize, SeqId)] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
   var _shutdown_peer: Bool = false
@@ -179,61 +178,47 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         seq_id, _wb, _auth)
       //_queue.enqueue(outgoing_msg)
 
-      _writev(outgoing_msg, seq_id)
+      _writev(outgoing_msg)
     else
       Fail()
     end
 
   be writev(data: Array[ByteSeq] val) =>
-    _writev(data, None)
+    _writev(data)
 
   be ack(seq_id: SeqId) =>
-    if seq_id > _lowest_queue_id then
-      ifdef "trace" then
-        @printf[I32](
-          "OutgoingBoundary: got ack from downstream worker\n".cstring())
-      end
+    @printf[I32]("GOT ACK!\n".cstring())
+    ifdef debug then
+      Invariant(seq_id > _lowest_queue_id)
+    end
 
-      let flush_count: USize = (seq_id - _lowest_queue_id).usize()
-      _queue.clear_n(flush_count)
-      _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-      ifdef "credit_trace" then
-        var recouped_credits = flush_count.isize()
-        if _distributable_credits > _max_distributable_credits then
-          recouped_credits =
-            _max_distributable_credits - _distributable_credits
-          _distributable_credits = _max_distributable_credits
-          @printf[I32]("OutgoingBoundary: recouped %llu credits. Now at %llu\n".cstring(), recouped_credits,
-            _distributable_credits)
-        end
-      else
-        ifdef "backpressure" then
-          if _distributable_credits > _max_distributable_credits then
-            _distributable_credits = _max_distributable_credits
-          end
-        end
-      end
+    ifdef "trace" then
+      @printf[I32](
+        "OutgoingBoundary: got ack from downstream worker\n".cstring())
+    end
 
-      ifdef "resilience" then
-        _terminus_route.receive_ack(seq_id)
-      end
-    else
-      ifdef "trace" then
-        @printf[I32](
-          "OutgoingBoundary: got repeat ack from downstream worker\n".cstring())
-      end
+    let flush_count: USize = (seq_id - _lowest_queue_id).usize()
+    _queue.clear_n(flush_count)
+    _lowest_queue_id = _lowest_queue_id + flush_count.u64()
+
+    ifdef "backpressure" then
+      recoup_credits(flush_count.isize())
+    end
+
+    ifdef "resilience" then
+      _terminus_route.receive_ack(seq_id)
     end
 
   be replay_msgs() =>
     for msg in _queue.values() do
       try
-        _writev(ChannelMsgEncoder.replay(msg, _auth), None)
+        _writev(ChannelMsgEncoder.replay(msg, _auth))
       else
         Fail()
       end
     end
     try
-      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _auth), None)
+      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _auth))
     else
       Fail()
     end
@@ -251,36 +236,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     silently discarded and not acknowleged.
     """
     close()
-
-  fun ref _unit_finished(number_finished: ISize,
-    number_tracked_finished: ISize,
-    tracking_id: (SeqId | None))
-  =>
-    """
-    Handles book keeping related to resilience and backpressure. Called when
-    a collection of sends is completed. When backpressure hasn't been applied,
-    this would be called for each send. When backpressure has been applied and
-    there is pending work to send, this would be called once after we finish
-    attempting to catch up on sending pending data.
-    """
-    ifdef debug then
-      Invariant(number_finished > 0)
-      Invariant(number_tracked_finished <= number_finished)
-    end
-    ifdef "trace" then
-      @printf[I32]("Sent %d msgs over boundary, %d tracked\n".cstring(),
-        number_finished, number_tracked_finished)
-    end
-    ifdef "backpressure" then
-      recoup_credits(number_tracked_finished)
-    end
-
-    ifdef "resilience" then
-      match tracking_id
-      | let sent: SeqId =>
-        _terminus_route.receive_ack(sent)
-      end
-    end
 
   //
   // CREDIT FLOW
@@ -341,8 +296,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     if _can_distribute_credits() and (_waiting_producers.size() == 0) then
+      @printf[I32]("Distribute to...\n".cstring())
       _distribute_credits_to(from)
     else
+      @printf[I32]("Pushing onto waiting producers...\n".cstring())
       _waiting_producers.push(from)
     end
 
@@ -392,8 +349,17 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     recoup_credits(credits)
 
   fun ref recoup_credits(recoup: ISize) =>
-    // @printf[I32]("!!B: Recouping %d credits\n".cstring(), recoup)
     _distributable_credits = _distributable_credits + recoup
+    ifdef debug then
+      Invariant(_distributable_credits <= _max_distributable_credits)
+    end
+    if (_waiting_producers.size() > 0) and _can_distribute_credits() then
+      _distribute_credits()
+    end
+
+    ifdef "credit_trace" then
+      @printf[I32]("OutgoingBoundary: recouped %llu credits. Now at %llu\n".cstring(), recoup, _distributable_credits)
+    end
 
   fun _above_minimum_response_level(): Bool =>
     _distributable_credits >= _minimum_credit_response
@@ -472,7 +438,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
     _resubscribe_event()
 
-  fun ref _writev(data: ByteSeqIter, tracking_id: (SeqId | None))
+  fun ref _writev(data: ByteSeqIter)
   =>
     """
     Write a sequence of sequences of bytes.
@@ -488,19 +454,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         data_size = data_size + bytes.size()
       end
 
-      ifdef "backpressure" or "resilience" then
-        match tracking_id
-        | let id: SeqId =>
-          _pending_tracking.push((data_size, id))
-        end
-      end
-
       _pending_writes()
 
       _in_sent = false
     end
 
-  fun ref _write_final(data: ByteSeq, tracking_id: (SeqId | None)) =>
+  fun ref _write_final(data: ByteSeq) =>
     """
     Write as much as possible to the socket. Set _writeable to false if not
     everything was written. On an error, close the connection. This is for
@@ -508,12 +467,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     _pending_writev.push(data.cpointer().usize()).push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
-    ifdef "backpressure" or "resilience" then
-      match tracking_id
-        | let id: SeqId =>
-          _pending_tracking.push((data.size(), id))
-        end
-    end
+
     _pending.push((data, 0))
     _pending_writes()
 
@@ -578,7 +532,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
     // Unsubscribe immediately and drop all pending writes.
     @pony_asio_event_unsubscribe(_event)
-    _pending_tracking.clear()
     _pending_writev.clear()
     _pending.clear()
     _pending_writev_total = 0
@@ -782,8 +735,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
             _pending_writev.clear()
             _pending.clear()
 
-            // do trackinginfo finished stuff
-            _tracking_finished(bytes_sent)
             return true
           else
             for d in Range[USize](0, num_to_send, 1) do
@@ -800,50 +751,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-    // do trackinginfo finished stuff
-    _tracking_finished(bytes_sent)
     false
-
-
-  fun ref _tracking_finished(num_bytes_sent: USize) =>
-    """
-    Call _unit_finished with:
-      number of sent messages,
-      number of tracked messages sent
-      last tracking_id
-    """
-    ifdef "backpressure" or "resilience" then
-      var num_sent: ISize = 0
-      var tracked_sent: ISize = 0
-      var final_pending_sent: (SeqId | None) = None
-      var bytes_sent = num_bytes_sent
-
-      try
-        while bytes_sent > 0 do
-          let node = _pending_tracking.head()
-          (let bytes, let tracking_id) = node()
-          if bytes <= bytes_sent then
-            num_sent = num_sent + 1
-            bytes_sent = bytes_sent - bytes
-            _pending_tracking.shift()
-            match tracking_id
-            | let id: SeqId =>
-              tracked_sent = tracked_sent + 1
-              final_pending_sent = tracking_id
-            end
-          else
-            let bytes_remaining = bytes - bytes_sent
-            bytes_sent = 0
-            // update remaining for this message
-            node() = (bytes_remaining, tracking_id)
-          end
-        end
-
-        if num_sent > 0 then
-          _unit_finished(num_sent, tracked_sent, final_pending_sent)
-        end
-      end
-    end
 
   fun ref _apply_backpressure() =>
     _writeable = false

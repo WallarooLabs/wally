@@ -322,7 +322,10 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
-    if (_waiting_producers.size() > 0) and _above_minimum_response_level() then
+    ifdef debug then
+      Invariant(_distributable_credits <= _max_distributable_credits)
+    end
+    if (_waiting_producers.size() > 0) and _can_distribute_credits() then
       _distribute_credits()
     end
 

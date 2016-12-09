@@ -80,8 +80,8 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       | let data_msg: DataMsg val =>
         let seq_id = data_msg.seq_id
         try
-          _receivers(data_msg.delivery_msg.sender_name()).received(data_msg.delivery_msg,
-            seq_id)
+          _receivers(data_msg.delivery_msg.sender_name())
+            .received(data_msg.delivery_msg, seq_id)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end

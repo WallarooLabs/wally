@@ -149,7 +149,7 @@ class TypedRouteWorkingCreditReceiver[In: Any val]
 
   fun ref receive_credits(credits: ISize) =>
     ifdef debug then
-      Invariant(credits >= 0)
+      Invariant(credits > 0)
     end
 
     _route._close_outstanding_request()
@@ -428,7 +428,8 @@ class BoundaryRouteWorkingCreditReceiver
 
   fun ref receive_credits(credits: ISize) =>
     ifdef debug then
-      Invariant(credits >= 0)
+      Invariant(credits > 0)
+      Invariant(_route.credits_available() <= _route.max_credits())
     end
 
     _route._close_outstanding_request()
@@ -446,8 +447,8 @@ class BoundaryRouteWorkingCreditReceiver
 
     ifdef "credit_trace" then
       @printf[I32]("--BoundaryRoute (%s): rcvd %llu credits. Had %llu out of %llu.\n".cstring(),
-        _step_type.cstring(), credits, _route.credits_available() - credits,
-        _route.max_credits())
+        _step_type.cstring(), credits, _route.credits_available() -
+          credits_recouped, _route.max_credits())
     end
 
     if _route.credits_available() > 0 then
