@@ -295,10 +295,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     if _can_distribute_credits() and (_waiting_producers.size() == 0) then
-      @printf[I32]("Distribute to...\n".cstring())
       _distribute_credits_to(from)
     else
-      @printf[I32]("Pushing onto waiting producers...\n".cstring())
       _waiting_producers.push(from)
     end
 
