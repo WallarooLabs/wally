@@ -371,7 +371,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _distributable_credits = _distributable_credits - give_out
 
   be return_credits(credits: ISize) =>
-    _distributable_credits = _distributable_credits + credits
+    _recoup_credits(credits)
 
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
