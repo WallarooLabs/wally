@@ -301,15 +301,17 @@ class TypedRoute[In: Any val] is Route
     end
     match data
     | let input: In =>
-      ifdef "backpressure" then
-        ifdef debug then
-          Invariant(_credits_available > 0)
-          match _step
-          | let source: TCPSource ref =>
-            Invariant(not source.is_muted())
-          end
+      ifdef debug then
+        match _step
+        | let source: TCPSource ref =>
+          Invariant(not source.is_muted())
         end
+        ifdef "backpressure" then
+          Invariant(_credits_available > 0)
+        end
+      end
 
+      ifdef "backpressure" then
         let above_request_point =
           _credits_available >= _request_more_credits_after
 
@@ -351,7 +353,7 @@ class TypedRoute[In: Any val] is Route
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, frac_ids: None,
     i_seq_id: SeqId, i_route_id: RouteId)
   =>
-    ifdef debug then
+    ifdef debug and "backpressure" then
       Invariant(_credits_available > 0)
     end
 
@@ -576,7 +578,9 @@ class BoundaryRoute is Route
     i_route_id: RouteId): Bool
   =>
     ifdef debug then
-      Invariant(_credits_available > 0)
+      ifdef "backpressure" then
+        Invariant(_credits_available > 0)
+      end
       match _step
       | let source: TCPSource ref =>
         Invariant(not source.is_muted())

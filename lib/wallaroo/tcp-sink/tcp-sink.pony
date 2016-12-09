@@ -215,8 +215,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
        Fail()
      end
 
-    @printf[I32]("!!maxdistcredits: %d, Maxcreditresponse: %d, producers: %d\n".cstring(), _max_distributable_credits, _max_credit_response, _upstreams.size().isize())
-
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
