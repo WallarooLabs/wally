@@ -39,10 +39,14 @@ int ncnt = 0;
 wallaroo::Data *message_from_bytes(char *bytes_)
 {
   Reader reader((unsigned char *)bytes_);
+  uint32_t client_id = reader.u32_be();
   uint16_t message_type = reader.u16_be();
   uint64_t message_id = reader.u64_be();
 
-  char *remaining_bytes = bytes_ + 10;
+  char *remaining_bytes = bytes_ +
+      sizeof(uint32_t) +
+      sizeof(uint16_t) +
+      sizeof(uint64_t);
 
   switch (message_type)
   {
