@@ -55,9 +55,10 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _upstreams: Array[Producer] = _upstreams.create()
   var _max_distributable_credits: ISize = 350_000
   var _distributable_credits: ISize = _max_distributable_credits
+  let _permanent_max_credit_response: ISize = 1024
+  var _max_credit_response: ISize = _permanent_max_credit_response
   var _minimum_credit_response: ISize = 250
   var _waiting_producers: Array[Producer] = _waiting_producers.create()
-  var _max_credit_response: ISize = _max_distributable_credits
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -190,7 +191,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     attempting to catch up on sending pending data.
     """
     ifdef "backpressure" then
-      _recoup_credits(number_finished)
+      recoup_credits(number_finished)
     end
 
     ifdef "resilience" then
@@ -208,11 +209,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     _upstreams.push(producer)
-    _max_credit_response =
-      _max_distributable_credits / _upstreams.size().isize()
-     if (_max_credit_response < _minimum_credit_response) then
-       Fail()
-     end
+    _calculate_max_credit_response()
 
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
@@ -223,11 +220,22 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
       ifdef "backpressure" then
-        _recoup_credits(credits_returned)
+        recoup_credits(credits_returned)
       end
     end
-    _max_credit_response =
-      _max_distributable_credits / _upstreams.size().isize()
+    _calculate_max_credit_response()
+
+  fun ref _calculate_max_credit_response() =>
+    let portion = _max_distributable_credits / _upstreams.size().isize()
+    _max_credit_response = if portion > _permanent_max_credit_response then
+      _permanent_max_credit_response
+    else
+      portion
+    end
+
+   if (_max_credit_response < _minimum_credit_response) then
+     Fail()
+   end
 
   be credit_request(from: Producer) =>
     """
@@ -301,9 +309,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _distributable_credits = _distributable_credits - give_out
 
   be return_credits(credits: ISize) =>
-    _recoup_credits(credits)
+    recoup_credits(credits)
 
-  fun ref _recoup_credits(recoup: ISize) =>
+  fun ref recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
     if (_waiting_producers.size() > 0) and _above_minimum_response_level() then
       _distribute_credits()

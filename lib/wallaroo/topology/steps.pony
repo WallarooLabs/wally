@@ -68,11 +68,12 @@ actor Step is (RunnableStep & Resilient & Producer &
 
    // CreditFlow Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
-  var _max_distributable_credits: ISize = 2_024
+  var _max_distributable_credits: ISize = 2_048
   var _distributable_credits: ISize = 0
+  let _permanent_max_credit_response: ISize = _max_distributable_credits
+  var _max_credit_response: ISize = _permanent_max_credit_response
   var _minimum_credit_response: ISize = 250
   var _waiting_producers: Array[Producer] = _waiting_producers.create()
-  var _max_credit_response: ISize = _max_distributable_credits
 
   // Lifecycle
   var _initializer: (LocalTopologyInitializer | None) = None
@@ -330,19 +331,11 @@ actor Step is (RunnableStep & Resilient & Producer &
     ifdef debug then
       Invariant(not _upstreams.contains(producer))
     end
-    ifdef "credit_trace" then
-      @printf[I32]("Registered producer!\n".cstring())
-    end
-    _upstreams.push(producer)
-    _max_credit_response =
-      _max_distributable_credits / _upstreams.size().isize()
-     if (_max_credit_response < _minimum_credit_response) then
-       Fail()
-     end
 
-  be unregister_producer(producer: Producer,
-    credits_returned: ISize)
-  =>
+    _upstreams.push(producer)
+    _calculate_max_credit_response()
+
+  be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
@@ -350,10 +343,23 @@ actor Step is (RunnableStep & Resilient & Producer &
     try
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
-      recoup_credits(credits_returned)
+      ifdef "backpressure" then
+        recoup_credits(credits_returned)
+      end
     end
-    _max_credit_response =
-      _max_distributable_credits / _upstreams.size().isize()
+    _calculate_max_credit_response()
+
+  fun ref _calculate_max_credit_response() =>
+    let portion = _max_distributable_credits / _upstreams.size().isize()
+    _max_credit_response = if portion > _permanent_max_credit_response then
+      _permanent_max_credit_response
+    else
+      portion
+    end
+
+   if (_max_credit_response < _minimum_credit_response) then
+     Fail()
+   end
 
   be credit_request(from: Producer) =>
     """

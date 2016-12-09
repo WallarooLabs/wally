@@ -39,9 +39,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _upstreams: Array[Producer] = _upstreams.create()
   var _max_distributable_credits: ISize = 350_000
   var _distributable_credits: ISize = _max_distributable_credits
+  let _permanent_max_credit_response: ISize = 1024
+  var _max_credit_response: ISize = _permanent_max_credit_response
   var _minimum_credit_response: ISize = 250
   var _waiting_producers: Array[Producer] = _waiting_producers.create()
-  var _max_credit_response: ISize = _max_distributable_credits
 
   // TCP
   var _notify: _OutgoingBoundaryNotify
@@ -271,11 +272,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     _upstreams.push(producer)
-    _max_credit_response =
-      _max_distributable_credits / _upstreams.size().isize()
-     if (_max_credit_response < _minimum_credit_response) then
-       Fail()
-     end
+    _calculate_max_credit_response()
 
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
@@ -289,8 +286,19 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         _recoup_credits(credits_returned)
       end
     end
-    _max_credit_response =
-      _max_distributable_credits / _upstreams.size().isize()
+    _calculate_max_credit_response()
+
+  fun ref _calculate_max_credit_response() =>
+    let portion = _max_distributable_credits / _upstreams.size().isize()
+    _max_credit_response = if portion > _permanent_max_credit_response then
+      _permanent_max_credit_response
+    else
+      portion
+    end
+
+   if (_max_credit_response < _minimum_credit_response) then
+     Fail()
+   end
 
   be credit_request(from: Producer) =>
     """
