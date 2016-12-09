@@ -293,17 +293,16 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _calculate_max_credit_response()
 
   fun ref _calculate_max_credit_response() =>
-    let portion = _max_distributable_credits / _upstreams.size().isize()
-    _max_credit_response = if portion > _permanent_max_credit_response then
-      _permanent_max_credit_response
+    _max_credit_response = if _upstreams.size() > 0 then
+      let portion = _max_distributable_credits / _upstreams.size().isize()
+      portion.min(_permanent_max_credit_response)
     else
-      portion
+      _permanent_max_credit_response
     end
 
-   if (_max_credit_response < _minimum_credit_response) then
-    @printf[I32]("Maxres: %d, maxdist: %d, minres: %d, upstreams: %d, portion: %d\n".cstring(), _max_credit_response, _max_distributable_credits, _minimum_credit_response, _upstreams.size(), portion)
-     Fail()
-   end
+    if (_max_credit_response < _minimum_credit_response) then
+      Fail()
+    end
 
   be credit_request(from: Producer) =>
     """
