@@ -16,8 +16,8 @@ class Partition[In: Any val, Key: (Hashable val & Equatable[Key])]
   let _function: PartitionFunction[In, Key] val
   let _keys: (Array[WeightedKey[Key]] val | Array[Key] val)
 
-  new val create(f: PartitionFunction[In, Key] val, 
-    ks: (Array[WeightedKey[Key]] val | Array[Key] val)) 
+  new val create(f: PartitionFunction[In, Key] val,
+    ks: (Array[WeightedKey[Key]] val | Array[Key] val))
   =>
     _function = f
     _keys = ks
@@ -28,7 +28,7 @@ class Partition[In: Any val, Key: (Hashable val & Equatable[Key])]
 interface PartitionFunction[In: Any val, Key: (Hashable val & Equatable[Key] val)]
   fun apply(input: In): Key
 
-primitive SingleStepPartitionFunction[In: Any val] is 
+primitive SingleStepPartitionFunction[In: Any val] is
   PartitionFunction[In, U8]
   fun apply(input: In): U8 => 0
 
@@ -99,8 +99,8 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
     consume ss
 
 trait StateSubpartition
-  fun build(app_name: String, worker_name: String, 
-    metrics_conn: TCPConnection,
+  fun build(app_name: String, worker_name: String,
+    metrics_conn: MetricsSink,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: Array[Initializable tag],
@@ -127,7 +127,7 @@ class KeyedStateSubpartition[PIn: Any val,
     _runner_builder = runner_builder
 
   fun build(app_name: String, worker_name: String,
-    metrics_conn: TCPConnection, 
+    metrics_conn: MetricsSink,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: Array[Initializable tag],
@@ -149,9 +149,8 @@ class KeyedStateSubpartition[PIn: Any val,
       match proxy_address
       | let pa: ProxyAddress val =>
         if pa.worker == worker_name then
-          let reporter = MetricsReporter(app_name, metrics_conn)
-          let next_state_step = Step(_runner_builder(reporter.clone() 
-              where alfred = alfred),
+          let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
+          let next_state_step = Step(_runner_builder(where alfred = alfred),
             consume reporter, guid_gen.u128(), _runner_builder.route_builder(),
               alfred)
 
@@ -181,10 +180,10 @@ class KeyedStateSubpartition[PIn: Any val,
       _partition_function, default_router)
 
 primitive PartitionFileReader
-  fun apply(filename: String, auth: AmbientAuth): 
-    Array[WeightedKey[String]] val 
+  fun apply(filename: String, auth: AmbientAuth):
+    Array[WeightedKey[String]] val
   =>
-    let keys: Array[WeightedKey[String]] trn = 
+    let keys: Array[WeightedKey[String]] trn =
       recover Array[WeightedKey[String]] end
 
     try

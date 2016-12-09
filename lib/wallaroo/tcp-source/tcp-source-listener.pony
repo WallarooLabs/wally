@@ -1,6 +1,7 @@
 use "collections"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/metrics"
 use "wallaroo/resilience"
 use "wallaroo/tcp-sink"
 use "wallaroo/topology"
@@ -17,6 +18,7 @@ class TCPSourceListenerBuilder
   let _target_router: Router val
   let _host: String
   let _service: String
+  let _metrics_reporter: MetricsReporter
 
   new val create(source_builder: SourceBuilder val, router: Router val,
     route_builder: RouteBuilder val,
@@ -24,9 +26,10 @@ class TCPSourceListenerBuilder
     tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
     default_target: (Step | None) = None,
-    default_in_route_builder: (RouteBuilder val | None) = None,
-    target_router: Router val = EmptyRouter,
-    host: String = "", service: String = "0")
+    default_in_route_builder: (RouteBuilder val | None) = None, 
+    target_router: Router val = EmptyRouter, 
+    host: String = "", service: String = "0",
+    metrics_reporter: MetricsReporter iso)
   =>
     _source_builder = source_builder
     _router = router
@@ -39,11 +42,13 @@ class TCPSourceListenerBuilder
     _target_router = target_router
     _host = host
     _service = service
+    _metrics_reporter = consume metrics_reporter
 
   fun apply(): TCPSourceListener =>
-    TCPSourceListener(_source_builder, _router, _route_builder,
-      _outgoing_boundaries, _tcp_sinks, _alfred, _default_target,
-      _default_in_route_builder, _target_router, _host, _service)
+    TCPSourceListener(_source_builder, _router, _route_builder, 
+      _outgoing_boundaries, _tcp_sinks, _alfred, _default_target, 
+      _default_in_route_builder, _target_router, _host, _service
+      where metrics_reporter = _metrics_reporter.clone())
 
 actor TCPSourceListener
   """
@@ -64,6 +69,7 @@ actor TCPSourceListener
   var _closed: Bool = false
   var _init_size: USize
   var _max_size: USize
+  let _metrics_reporter: MetricsReporter
 
   new create(source_builder: SourceBuilder val, router: Router val,
     route_builder: RouteBuilder val,
@@ -74,7 +80,8 @@ actor TCPSourceListener
     default_in_route_builder: (RouteBuilder val | None) = None,
     target_router: Router val = EmptyRouter,
     host: String = "", service: String = "0", limit: USize = 0,
-    init_size: USize = 64, max_size: USize = 16384)
+    init_size: USize = 64, max_size: USize = 16384,
+    metrics_reporter: MetricsReporter iso)
   =>
     """
     Listens for both IPv4 and IPv6 connections.
@@ -98,6 +105,7 @@ actor TCPSourceListener
         limit
       end
     _default_target = default_target
+    _metrics_reporter = consume metrics_reporter
 
     _init_size = init_size
     _max_size = max_size
@@ -163,7 +171,8 @@ actor TCPSourceListener
     try
       TCPSource._accept(this, _notify.connected(this), _router.routes(),
         _route_builder, _outgoing_boundaries, _tcp_sinks, ns, _default_target,
-        _default_in_route_builder, _init_size, _max_size)
+        _default_in_route_builder, _init_size, _max_size,
+        _metrics_reporter.clone())
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)

@@ -38,6 +38,10 @@ export default class AppNav extends React.Component {
 				<MenuItem divider />
 				{sourceSinkLinks}
 				<MenuItem divider />
+				<MenuItem header>Worker</MenuItem>
+				<MenuItem divider />
+				{ingressEgressLinks}
+				<MenuItem divider />
 				<MenuItem header>Computation</MenuItem>
 				<MenuItem divider />
 				{stepLinks}

@@ -38,7 +38,8 @@ actor DataReceiver is Producer
 
   be update_watermark(route_id: U64, seq_id: U64) =>
     try
-      let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name, _sender_step_id, seq_id, _auth)
+      let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
+        _sender_step_id, seq_id, _auth)
       _connections.send_data(_sender_name, ack_msg)
     else
       @printf[I32]("Error creating ack watermark message\n".cstring())
@@ -70,7 +71,8 @@ actor DataReceiver is Producer
   be update_router(router: DataRouter val) =>
     _router = router
 
-  be received(d: DeliveryMsg val, seq_id: U64)
+  be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
@@ -78,16 +80,19 @@ actor DataReceiver is Producer
     if seq_id >= _last_id_seen then
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
-      _router.route(d, this, seq_id)
+      _router.route(d, pipeline_time_spent, this, seq_id, latest_ts, metrics_id,
+        worker_ingress_ts)
 
       _maybe_ack()
     end
 
-  be replay_received(r: ReplayableDeliveryMsg val, seq_id: U64)
+  be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
+    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if seq_id >= _last_id_seen then
       _last_id_seen = seq_id
-      _router.replay_route(r, this, seq_id)
+      _router.replay_route(r, pipeline_time_spent, this, seq_id, latest_ts,
+        metrics_id, worker_ingress_ts)
     end
 
   fun ref _maybe_ack() =>

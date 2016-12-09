@@ -1,14 +1,15 @@
+use "buffered"
 use "collections"
+use "files"
 use "net"
 use "options"
 use "time"
-use "buffered"
-use "files"
 use "sendence/hub"
 use "wallaroo/initialization"
+use "wallaroo/metrics"
 use "wallaroo/network"
-use "wallaroo/topology"
 use "wallaroo/resilience"
+use "wallaroo/topology"
 
 actor Startup
   new create(env: Env, application: Application val,
@@ -111,9 +112,7 @@ actor Startup
       end
 
       let connect_auth = TCPConnectAuth(auth)
-      let metrics_conn = TCPConnection(connect_auth,
-          OutNotify("metrics"),
-          m_addr(0),
+      let metrics_conn = MetricsSink(m_addr(0),
           m_addr(1))
 
       let connect_msg = HubProtocol.connect()

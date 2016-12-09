@@ -518,8 +518,8 @@ actor ApplicationInitializer
 
                 let next_id = next_runner_builder.id()
                 let next_initializer = StepBuilder(application.name(),
-                  pipeline.name(), next_runner_builder, next_id where
-                  pre_state_target_id' = pre_state_target_id)
+                  worker, pipeline.name(), next_runner_builder,
+                  next_id where pre_state_target_id' = pre_state_target_id)
                 step_map(next_id) = ProxyAddress(worker, next_id)
                 try
                   local_graphs(worker).add_node(next_initializer, next_id)
@@ -543,7 +543,7 @@ actor ApplicationInitializer
                 @printf[I32](("Preparing to spin up " + next_runner_builder.name() + " on " + worker + "\n").cstring())
                 let next_id = next_runner_builder.id()
                 let next_initializer = StepBuilder(application.name(),
-                  pipeline.name(), next_runner_builder, next_id)
+                  worker, pipeline.name(), next_runner_builder, next_id)
                 step_map(next_id) = ProxyAddress(worker, next_id)
 
                 try
@@ -688,6 +688,7 @@ actor ApplicationInitializer
             pre_state_data.push(psd)
 
             let pre_state_builder = StepBuilder(application.name(),
+              pipeline_default_target_worker,
               pipeline.name(),
               pre_state_runner_builder, pre_state_id,
               false,
@@ -697,6 +698,7 @@ actor ApplicationInitializer
             @printf[I32](("Preparing to spin up default target state for " + state_runner_builder.name() + " on " + pipeline_default_target_worker + "\n").cstring())
 
             let state_builder = StepBuilder(application.name(),
+              pipeline_default_target_worker,
               pipeline.name(),
               state_runner_builder, state_id,
               true

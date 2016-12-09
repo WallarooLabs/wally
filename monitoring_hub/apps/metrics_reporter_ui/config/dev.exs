@@ -7,8 +7,8 @@ use Mix.Config
 # watchers to your application. For example, we use it
 # with brunch.io to recompile .js and .css sources.
 config :metrics_reporter_ui, MetricsReporterUI.Endpoint,
-  http: [port: 4000],
-  tcp: [port: 5001],
+  http: [port: System.get_env("PHX_HTTP_PORT") || 4000],
+  tcp: [port: System.get_env("PHX_TCP_PORT") || 5001],
   debug_errors: true,
   code_reloader: true,
   check_origin: false,

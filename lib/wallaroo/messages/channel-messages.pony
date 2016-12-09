@@ -21,17 +21,19 @@ primitive ChannelMsgEncoder
     wb.done()
 
   fun data_channel(delivery_msg: ReplayableDeliveryMsg val,
-    seq_id: U64, wb: Writer, auth: AmbientAuth): Array[ByteSeq] val ?
+    pipeline_time_spent: U64, seq_id: U64, wb: Writer, auth: AmbientAuth,
+    latest_ts: U64, metrics_id: U16, metric_name: String): Array[ByteSeq] val ?
   =>
-    _encode(DataMsg(delivery_msg, seq_id), auth, wb)
+    _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
+      metrics_id, metric_name), auth, wb)
 
   fun delivery[D: Any val](target_id: U128,
-    from_worker_name: String, source_ts: U64, msg_data: D,
+    from_worker_name: String, msg_data: D,
     metric_name: String, auth: AmbientAuth,
     proxy_address: ProxyAddress val, msg_uid: U128,
     frac_ids: None): Array[ByteSeq] val ?
   =>
-    _encode(ForwardMsg[D](target_id, from_worker_name, source_ts,
+    _encode(ForwardMsg[D](target_id, from_worker_name,
       msg_data, metric_name, proxy_address, msg_uid, frac_ids), auth)
 
   fun identify_control_port(worker_name: String, service: String,
@@ -203,12 +205,22 @@ class AckWatermarkMsg is ChannelMsg
     seq_id = seq_id'
 
 class DataMsg is ChannelMsg
+  let pipeline_time_spent: U64
   let seq_id: U64
   let delivery_msg: ReplayableDeliveryMsg val
+  let latest_ts: U64
+  let metrics_id: U16
+  let metric_name: String
 
-  new val create(msg: ReplayableDeliveryMsg val, seq_id': U64) =>
+  new val create(msg: ReplayableDeliveryMsg val, pipeline_time_spent': U64,
+    seq_id': U64, latest_ts': U64, metrics_id': U16, metric_name': String)
+  =>
     seq_id = seq_id'
+    pipeline_time_spent = pipeline_time_spent'
     delivery_msg = msg
+    latest_ts = latest_ts'
+    metrics_id = metrics_id'
+    metric_name = metric_name'
 
 class ReplayMsg is ChannelMsg
   let data_bytes: Array[ByteSeq] val
@@ -239,30 +251,30 @@ class ReplayMsg is ChannelMsg
 trait DeliveryMsg is ChannelMsg
   fun target_id(): U128
   fun sender_name(): String
-  fun deliver(target_step: RunnableStep tag, origin: Producer,
-    seq_id: SeqId): Bool
+  fun deliver(pipeline_time_spent: U64, target_step: RunnableStep tag,
+    origin: Producer, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64): Bool
 
 trait ReplayableDeliveryMsg is DeliveryMsg
-  fun replay_deliver(target_step: RunnableStep tag, origin: Producer,
-    seq_id: SeqId): Bool
+  fun replay_deliver(pipeline_time_spent: U64, target_step: RunnableStep tag,
+    origin: Producer, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64): Bool
 
 class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _target_id: U128
   let _sender_name: String
-  let _source_ts: U64
   let _data: D
   let _metric_name: String
   let _proxy_address: ProxyAddress val
   let _msg_uid: U128
   let _frac_ids: None
 
-  new val create(t_id: U128, from: String, s_ts: U64,
+  new val create(t_id: U128, from: String,
     m_data: D, m_name: String, proxy_address: ProxyAddress val, msg_uid: U128,
     frac_ids: None)
   =>
     _target_id = t_id
     _sender_name = from
-    _source_ts = s_ts
     _data = m_data
     _metric_name = m_name
     _proxy_address = proxy_address
@@ -272,18 +284,20 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun target_id(): U128 => _target_id
   fun sender_name(): String => _sender_name
 
-  fun deliver(target_step: RunnableStep tag, origin: Producer,
-    seq_id: SeqId): Bool
+  fun deliver(pipeline_time_spent: U64, target_step: RunnableStep tag,
+    origin: Producer, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64): Bool
   =>
-    target_step.run[D](_metric_name, _source_ts, _data, origin, _msg_uid,
-      _frac_ids, seq_id, 0)
+    target_step.run[D](_metric_name, pipeline_time_spent, _data, origin,
+      _msg_uid, _frac_ids, seq_id, 0, latest_ts, metrics_id, worker_ingress_ts)
     false
 
-  fun replay_deliver(target_step: RunnableStep tag, origin: Producer,
-    seq_id: SeqId): Bool
+  fun replay_deliver(pipeline_time_spent: U64, target_step: RunnableStep tag,
+    origin: Producer, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64): Bool
   =>
-    target_step.replay_run[D](_metric_name, _source_ts, _data, origin,
-      _msg_uid, _frac_ids, seq_id, 0)
+    target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, origin,
+      _msg_uid, _frac_ids, seq_id, 0, latest_ts, metrics_id, worker_ingress_ts)
     false
 
 class RequestReplayMsg is DeliveryMsg
@@ -297,8 +311,8 @@ class RequestReplayMsg is DeliveryMsg
   fun target_id(): U128 => _target_id
   fun sender_name(): String => _sender_name
 
-  fun deliver(target_step: RunnableStep tag, origin: Producer,
-    seq_id: SeqId = 0): Bool
+  fun deliver(pipeline_time_spent: U64, target_step: RunnableStep tag, origin: Producer,
+    seq_id: SeqId = 0, latest_ts: U64 = 0, metrics_id: U16 = 0, worker_ingress_ts: U64): Bool
   =>
     match target_step
     | let ob: OutgoingBoundary =>

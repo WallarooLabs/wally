@@ -5,8 +5,9 @@ use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/invariant"
-use "wallaroo/topology"
+use "wallaroo/metrics"
 use "wallaroo/tcp-sink"
+use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool)
@@ -30,6 +31,8 @@ actor TCPSource is (Initializable & Producer)
   // Determines if we can still process credits from consumers
   var _unregistered: Bool = false
   var _max_route_credits: ISize = 1_000
+
+  let _metrics_reporter: MetricsReporter
 
   // TCP
   let _listen: TCPSourceListener
@@ -66,12 +69,14 @@ actor TCPSource is (Initializable & Producer)
     tcp_sinks: Array[TCPSink] val,
     fd: U32, default_target: (CreditFlowConsumerStep | None) = None,
     forward_route_builder: (RouteBuilder val | None) = None,
-    init_size: USize = 64, max_size: USize = 16384)
+    init_size: USize = 64, max_size: USize = 16384,
+    metrics_reporter: MetricsReporter iso)
   =>
     """
     A new connection accepted on a server.
     """
     _max_route_credits = _max_route_credits.usize().next_pow2().isize()
+    _metrics_reporter = consume metrics_reporter
     _listen = listen
     _notify = consume notify
     _notify.set_origin(this)
@@ -99,19 +104,22 @@ actor TCPSource is (Initializable & Producer)
 
     for consumer in routes.values() do
       _routes(consumer) =
-        _route_builder(this, consumer, TCPSourceRouteCallbackHandler)
+        _route_builder(this, consumer, TCPSourceRouteCallbackHandler,
+          _metrics_reporter)
     end
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
       _routes(boundary) =
-        _route_builder(this, boundary, TCPSourceRouteCallbackHandler)
+        _route_builder(this, boundary, TCPSourceRouteCallbackHandler,
+          _metrics_reporter)
     end
 
     match default_target
     | let r: CreditFlowConsumerStep =>
       match forward_route_builder
       | let frb: RouteBuilder val =>
-        _routes(r) = frb(this, r, TCPSourceRouteCallbackHandler)
+        _routes(r) = frb(this, r, TCPSourceRouteCallbackHandler, 
+          _metrics_reporter)
       end
     end
 
