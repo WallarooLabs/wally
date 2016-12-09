@@ -113,19 +113,20 @@ actor Step is (RunnableStep & Resilient & Producer &
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     omni_router: OmniRouter val)
   =>
+    let callback_handler = StepRouteCallbackHandler
     for consumer in _router.routes().values() do
       _routes(consumer) =
-        _route_builder(this, consumer, StepRouteCallbackHandler)
+        _route_builder(this, consumer, callback_handler)
     end
 
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _routes(boundary) =
-        _route_builder(this, boundary, StepRouteCallbackHandler)
+        _route_builder(this, boundary, callback_handler)
     end
 
     match _default_target
     | let r: CreditFlowConsumerStep =>
-      _routes(r) = _route_builder(this, r, StepRouteCallbackHandler)
+      _routes(r) = _route_builder(this, r, callback_handler)
     end
 
     for r in _routes.values() do
