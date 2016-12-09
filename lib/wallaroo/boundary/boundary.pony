@@ -37,10 +37,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
-  var _max_distributable_credits: ISize = 500_000
-  var _distributable_credits: ISize = 200_000
-  var _unacked_credits: ISize = 0
-  let _minimum_credit_response: ISize = 250
+  var _max_distributable_credits: ISize = 350_000
+  var _distributable_credits: ISize = _max_distributable_credits
+  var _minimum_credit_response: ISize = 250
+  var _waiting_producers: Array[Producer] = _waiting_producers.create()
+  var _max_credit_response: ISize = _max_distributable_credits
 
   // TCP
   var _notify: _OutgoingBoundaryNotify
@@ -271,10 +272,13 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     _upstreams.push(producer)
+    _max_credit_response =
+      _max_distributable_credits / _upstreams.size().isize()
+     if (_max_credit_response < _minimum_credit_response) then
+       Fail()
+     end
 
-  be unregister_producer(producer: Producer,
-    credits_returned: ISize)
-  =>
+  be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
@@ -282,8 +286,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
-      _recoup_credits(credits_returned)
+      ifdef "backpressure" then
+        _recoup_credits(credits_returned)
+      end
     end
+    _max_credit_response =
+      _max_distributable_credits / _upstreams.size().isize()
 
   be credit_request(from: Producer) =>
     """
@@ -307,25 +315,52 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       Invariant(_upstreams.contains(from))
     end
 
-    let give_out = if _can_send() then
-      if _distributable_credits > 0 then
-        let portion = (_distributable_credits / _upstreams.size().isize())
-        portion.max(1)
-      else
-        0
-      end
+    if _can_distribute_credits() and (_waiting_producers.size() == 0) then
+      _distribute_credits_to(from)
     else
-      ifdef "credit_trace" then
-        @printf[I32]("Boundary: Cannot give credits because _can_send() is false\n".cstring())
+      _waiting_producers.push(from)
+    end
+
+  fun ref _can_distribute_credits(): Bool =>
+    _can_send() and _above_minimum_response_level()
+
+  fun ref _distribute_credits() =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
+    end
+
+    while (_waiting_producers.size() > 0) and _can_distribute_credits() do
+      try
+        let producer = _waiting_producers.shift()
+        _distribute_credits_to(producer)
+      else
+        Fail()
       end
-      0
+    end
+
+  fun ref _distribute_credits_to(producer: Producer) =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
+    end
+
+    let give_out =
+      _distributable_credits
+        .min(_max_credit_response)
+        .max(_minimum_credit_response)
+
+    ifdef debug then
+      Invariant(give_out >= _minimum_credit_response)
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("Boundary: credits requested. Giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
+      @printf[I32]((
+        "Sink: Credits requested." +
+        " Giving %llu out of %llu\n"
+        ).cstring(),
+        give_out, _distributable_credits)
     end
 
-    from.receive_credits(give_out, this)
+    producer.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
 
   be return_credits(credits: ISize) =>
