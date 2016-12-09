@@ -254,8 +254,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       Invariant(_upstreams.contains(from))
     end
 
-    @printf[I32]("Upstreams: %d\n".cstring(), _upstreams.size())
-
     if _can_distribute_credits() and (_waiting_producers.size() == 0) then
       _distribute_credits_to(from)
     else
