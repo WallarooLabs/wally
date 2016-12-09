@@ -57,7 +57,7 @@ docker run -d -u root --cpuset-cpus 0,8 --privileged  \
 -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
 -e "BINS_TYPE=demo" -e "RELX_REPLACE_OS_VARS=true" \
 --name mui -h mui --net=buffy-leader \
-docker.sendence.com:5043/wallaroo-metrics-ui:latest
+docker.sendence.com:5043/wallaroo-metrics-ui-new:latest
 ```
 
 To run the Reports UI:
@@ -82,7 +82,7 @@ docker run -d -u root --cpuset-cpus 0,18 --privileged  \
 -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
 -e "BINS_TYPE=demo" -e "RELX_REPLACE_OS_VARS=true" \
 --name mui -h mui --net=buffy-leader \
-docker.sendence.com:5043/wallaroo-metrics-ui:latest
+docker.sendence.com:5043/wallaroo-metrics-ui-new:latest
 ```
 
 To run the Reports UI:
