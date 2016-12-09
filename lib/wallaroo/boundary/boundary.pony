@@ -369,6 +369,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   fun ref _recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
 
+  fun _above_minimum_response_level(): Bool =>
+    _distributable_credits >= _minimum_credit_response
   //
   // TCP
  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
