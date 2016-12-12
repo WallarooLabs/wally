@@ -60,6 +60,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _max_credit_response: ISize = _permanent_max_credit_response
   var _minimum_credit_response: ISize = 250
   var _waiting_producers: Array[Producer] = _waiting_producers.create()
+  var _backpressure_seq_id: U64 = 1
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -148,13 +149,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let encoded = _encoder.encode[D](data, _wb)
 
-      let tracking_id = ifdef "resilience" then
-        _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
-      else
-        None
-      end
-
-      _writev(encoded, tracking_id)
+      _writev(encoded, _next_tracking_id(i_origin, i_route_id, i_seq_id))
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
@@ -174,6 +169,19 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
     // DO NOT REMOVE. THIS IS AN INTENTIONAL GC
     @pony_triggergc[None](this)
+
+  fun ref _next_tracking_id(i_origin: Producer, i_route_id: RouteId,
+    i_seq_id: SeqId): (U64 | None)
+  =>
+    ifdef "backpressure" then
+      return (_backpressure_seq_id = _backpressure_seq_id + 1)
+    end
+
+    ifdef "resilience" then
+      return _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
+    end
+
+    None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, i_origin: Producer, msg_uid: U128,
