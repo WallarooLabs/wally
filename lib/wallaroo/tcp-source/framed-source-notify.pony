@@ -112,9 +112,9 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       end
 
       // We have a full queue at a route, so we need to stop reading.
-      if not keep_sending then
-        conn._mute()
-      end
+      // if not keep_sending then
+      //   conn._mute()
+      // end
 
       conn.expect(_header_size)
       _header = true
