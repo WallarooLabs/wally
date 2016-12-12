@@ -21,7 +21,7 @@ PLAY RECAP *********************************************************************
 
 You can SSH into the AWS machine using:
 
-```basj
+```bash
 ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
 ```
 
