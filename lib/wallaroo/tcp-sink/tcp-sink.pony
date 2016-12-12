@@ -220,7 +220,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       @printf[I32]("Sent %d msgs over sink\n".cstring(), number_finished)
     end
     ifdef "backpressure" then
-      recoup_credits(number_tracked_finished)
+      recoup_credits(number_finished)
     end
 
     ifdef "resilience" then
