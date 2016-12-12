@@ -43,6 +43,11 @@
     become: yes
 
 - hosts: buffy-leaders:buffy-followers
+  vars:
+    ixgbevf_version: 2.16.4
+    ixgbevf_tar_sha1_hash: 110fa89c30b029e946ed73105c471cf03f1767be
+  roles:
+  - { role: atlassian.ixgbevf, become: yes }
   tasks:
   - name: Create a group of all hosts for buffy
     group_by: key=buffy-all

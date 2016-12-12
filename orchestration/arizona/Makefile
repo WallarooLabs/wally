@@ -304,7 +304,7 @@ configure: check-cluster-name ## Configure nodes using ansible
 	@echo "\033[36m==> Running ansible playbook for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
 	PACKET_NET_API_KEY=$(packet_api_key) ansible-playbook $(ansible_parallelism_arg) -i \
-          ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no -i \
+          $(current_dir)/../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
           $(provider)_region=$(region) ptpd_experimental=$(ansible_ptpd_experimental)\
           $(ansible_sys_cpus_arg)" -u $(ansible_user) \

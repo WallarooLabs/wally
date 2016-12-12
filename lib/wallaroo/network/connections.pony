@@ -18,7 +18,7 @@ actor Connections
   let _control_conns: Map[String, TCPConnection] = _control_conns.create()
   let _data_conns: Map[String, OutgoingBoundary] = _data_conns.create()
   var _phone_home: (TCPConnection | None) = None
-  let _metrics_conn: TCPConnection
+  let _metrics_conn: MetricsSink
   let _init_d_host: String
   let _init_d_service: String
   let _listeners: Array[TCPListener] = Array[TCPListener]
@@ -27,7 +27,7 @@ actor Connections
   new create(app_name: String, worker_name: String, env: Env,
     auth: AmbientAuth, c_host: String, c_service: String, d_host: String,
     d_service: String, ph_host: String, ph_service: String,
-    metrics_conn: TCPConnection, is_initializer: Bool)
+    metrics_conn: MetricsSink, is_initializer: Bool)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -67,7 +67,8 @@ actor Connections
   =>
     let data_notifier: TCPListenNotify iso =
       DataChannelListenNotifier(_worker_name, _env, _auth, this,
-        _is_initializer, data_receivers)
+        _is_initializer, data_receivers,
+        MetricsReporter(_app_name, _worker_name, _metrics_conn))
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     register_listener(TCPListener(_auth, consume data_notifier,
@@ -152,7 +153,8 @@ actor Connections
     service: String)
   =>
     let outgoing_boundary = OutgoingBoundary(_auth,
-      _worker_name, MetricsReporter(_app_name, _metrics_conn),
+      _worker_name, MetricsReporter(_app_name,
+      _worker_name, _metrics_conn),
       host, service)
     outgoing_boundary.register_step_id(_guid_gen.u128())
     _data_conns(target_name) = outgoing_boundary

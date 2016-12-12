@@ -1,4 +1,5 @@
 use "buffered"
+use "time"
 use "wallaroo/backpressure"
 
 trait BasicComputation
@@ -22,17 +23,18 @@ interface StateComputation[In: Any val, Out: Any val, State: Any #read] is Basic
 trait StateProcessor[State: Any #read] is BasicComputation
   fun name(): String
   // Return a tuple containing a Bool indicating whether the message was
-  // finished processing here, a Bool indicating whether a route can still 
+  // finished processing here, a Bool indicating whether a route can still
   // keep receiving data and the state change (or None if there was
   // no state change).
   // TODO: solve the situation where Out is None and we
   // still want the message passed along
   fun apply(state: State, sc_repo: StateChangeRepository[State],
-    omni_router: OmniRouter val, metric_name: String, source_ts: U64,
+    omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: SeqId):
-      (Bool, Bool, (StateChange[State] ref | None))
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: SeqId,
+      latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
+      (Bool, Bool, (StateChange[State] ref | None), U64, U64, U64)
 
 trait InputWrapper
   fun input(): Any val
@@ -52,28 +54,32 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
   fun input(): Any val => _input
 
   fun apply(state: State, sc_repo: StateChangeRepository[State],
-    omni_router: OmniRouter val, metric_name: String, source_ts: U64,
+    omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId):
-      (Bool, Bool, (StateChange[State] ref | None))
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+      latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
+      (Bool, Bool, (StateChange[State] ref | None), U64, U64, U64)
   =>
+    let computation_start = Time.nanos()
     let result = _state_comp(_input, sc_repo, state)
+    let computation_end = Time.nanos()
 
     // It matters that the None check comes first, since Out could be
     // type None if you always filter/end processing there
     match result
-    | (None, _) => (true, true, result._2) // This must come first
+    | (None, _) => (true, true, result._2, computation_start,
+        computation_end, computation_end) // This must come first
     | (let output: Out, _) =>
-      (let is_finished, let keep_sending) = 
-        omni_router.route_with_target_id[Out](_target_id, metric_name, 
-          source_ts, output, producer,
-          // incoming envelope
-          i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id)
+      (let is_finished, let keep_sending, let last_ts) = omni_router.route_with_target_id[Out](
+        _target_id, metric_name, pipeline_time_spent, output, producer,
+        // incoming envelope
+        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        computation_end, metrics_id, worker_ingress_ts)
 
-      (is_finished, keep_sending, result._2)
+      (is_finished, keep_sending, result._2, computation_start, computation_end, last_ts)
     else
-      (true, true, result._2)
+      (true, true, result._2, computation_start, computation_end, computation_end)
     end
 
   fun name(): String => _state_comp.name()

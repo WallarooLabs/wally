@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  author: Sam Wilson <swilson@atlassian.com>
+  description: Installs the Intel ixgbevf driver required for AWS Enhanced Networking (SR-IOV)
+  company: Atlassian
+  license: MIT
+  # issue_tracker_url: http://example.com/issue/tracker
+  min_ansible_version: 1.9
+
+  platforms:
+  - name: Ubuntu
+    versions:
+    - vivid
+
+  categories:
+  - cloud:ec2
+  - networking
+  - system
+
+dependencies: []

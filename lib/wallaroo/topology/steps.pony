@@ -1,10 +1,10 @@
 use "assert"
 use "buffered"
-use "time"
-use "net"
 use "collections"
-use "sendence/epoch"
+use "net"
+use "time"
 use "sendence/guid"
+use "sendence/wall-clock"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/invariant"
@@ -17,13 +17,15 @@ use "wallaroo/tcp-sink"
 // Really this should probably be another method on CreditFlowConsumer
 // At which point CreditFlowConsumerStep goes away as well
 trait tag RunnableStep
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId)
+    frac_ids: None, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Producer, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
+  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, origin: Producer, msg_uid: U128,
+    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
 
 interface Initializable
@@ -99,21 +101,25 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
     for consumer in _router.routes().values() do
       _routes(consumer) =
-        _route_builder(this, consumer, StepRouteCallbackHandler)
+        _route_builder(this, consumer, StepRouteCallbackHandler,
+        _metrics_reporter)
     end
 
     for (worker, boundary) in outgoing_boundaries.pairs() do
       _routes(boundary) =
-        _route_builder(this, boundary, StepRouteCallbackHandler)
+        _route_builder(this, boundary, StepRouteCallbackHandler,
+        _metrics_reporter)
     end
 
     match _default_target
     | let r: CreditFlowConsumerStep =>
-      _routes(r) = _route_builder(this, r, StepRouteCallbackHandler)
+      _routes(r) = _route_builder(this, r, StepRouteCallbackHandler,
+        _metrics_reporter)
     end
 
     // for sink in tcp_sinks.values() do
-    //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler)
+    //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler,
+    //     _metrics_reporter)
     // end
 
     for r in _routes.values() do
@@ -132,7 +138,8 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   be register_routes(router: Router val, route_builder: RouteBuilder val) =>
     for consumer in router.routes().values() do
-      let next_route = route_builder(this, consumer, StepRouteCallbackHandler)
+      let next_route = route_builder(this, consumer, StepRouteCallbackHandler,
+         _metrics_reporter)
       _routes(consumer) = next_route
       if _initialized then
         // TODO: This is a kind of hack right now. Each route has the
@@ -149,16 +156,32 @@ actor Step is (RunnableStep & Resilient & Producer &
   be update_omni_router(omni_router: OmniRouter val) =>
     _omni_router = omni_router
 
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    let my_latest_ts = ifdef "detailed-metrics" then
+        Time.nanos()
+      else
+        latest_ts
+      end
+
+    let my_metrics_id = ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name, "Before receive at step behavior",
+          metrics_id, latest_ts, my_latest_ts)
+        metrics_id + 1
+      else
+        metrics_id
+      end
+
     ifdef "trace" then
       @printf[I32](("Rcvd msg at " + _runner.name() + " step\n").cstring())
     end
-    (let is_finished, _) = _runner.run[D](metric_name,
-      source_ts, data, this, _router, _omni_router,
-      i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
+    (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
+      pipeline_time_spent, data, this, _router, _omni_router,
+      i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
+      my_latest_ts, my_metrics_id, worker_ingress_ts, _metrics_reporter)
     if is_finished then
       ifdef "resilience" then
         ifdef "trace" then
@@ -170,10 +193,20 @@ actor Step is (RunnableStep & Resilient & Producer &
         _resilience_routes.filter(this, next_sequence_id(),
           i_origin, i_route_id, i_seq_id)
       end
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
       ifdef "backpressure" then
         _recoup_credits(1)
       end
+      let end_ts = Time.nanos()
+      let time_spent = end_ts - worker_ingress_ts
+
+      ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name, "Before end at Step", 9999,
+          last_ts, end_ts)
+      end
+
+      _metrics_reporter.pipeline_metric(metric_name,
+        time_spent + pipeline_time_spent)
+      _metrics_reporter.worker_metric(metric_name, time_spent)
     end
     // DO NOT REMOVE. THIS GC TRIGGERING IS INTENTIONAL.
     @pony_triggergc[None](this)
@@ -216,17 +249,19 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
     false
 
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if not _is_duplicate(i_origin, msg_uid, i_frac_ids, i_seq_id,
       i_route_id) then
       _deduplication_list.push((i_origin, msg_uid, i_frac_ids, i_seq_id,
         i_route_id))
-      (let is_finished, _) = _runner.run[D](metric_name, source_ts, data,
-        this, _router, _omni_router,
-        i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id)
+      (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
+        pipeline_time_spent, data, this, _router, _omni_router,
+        i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        latest_ts, metrics_id, worker_ingress_ts, _metrics_reporter)
 
       if is_finished then
         //TODO: be more efficient (batching?)
@@ -237,7 +272,17 @@ actor Step is (RunnableStep & Resilient & Producer &
         ifdef "backpressure" then
           _recoup_credits(1)
         end
-        _metrics_reporter.pipeline_metric(metric_name, source_ts)
+        let end_ts = Time.nanos()
+        let time_spent = end_ts - worker_ingress_ts
+
+        ifdef "detailed-metrics" then
+          _metrics_reporter.step_metric(metric_name, "Before end at Step replay",
+            9999, last_ts, end_ts)
+        end
+
+        _metrics_reporter.pipeline_metric(metric_name,
+          time_spent + pipeline_time_spent)
+        _metrics_reporter.worker_metric(metric_name, time_spent)
       end
     end
 

@@ -192,9 +192,6 @@
    - libxml2-dev
    - zlib1g-dev
    - software-properties-common
-   - llvm-3.8
-   - llvm
-   - lldb
   when: ({{ install_devtools is defined }} and {{ install_devtools == 'true' }})
 
 - name: Download pcre2
