@@ -101,7 +101,7 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
 
 trait StateSubpartition
   fun build(app_name: String, worker_name: String,
-    metrics_conn: TCPConnection,
+    metrics_conn: MetricsSink,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
@@ -128,7 +128,7 @@ class KeyedStateSubpartition[PIn: Any val,
     _runner_builder = runner_builder
 
   fun build(app_name: String, worker_name: String,
-    metrics_conn: TCPConnection,
+    metrics_conn: MetricsSink,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
@@ -150,9 +150,8 @@ class KeyedStateSubpartition[PIn: Any val,
       match proxy_address
       | let pa: ProxyAddress val =>
         if pa.worker == worker_name then
-          let reporter = MetricsReporter(app_name, metrics_conn)
-          let next_state_step = Step(_runner_builder(reporter.clone()
-              where alfred = alfred),
+          let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
+          let next_state_step = Step(_runner_builder(where alfred = alfred),
             consume reporter, guid_gen.u128(), _runner_builder.route_builder(),
               alfred)
 

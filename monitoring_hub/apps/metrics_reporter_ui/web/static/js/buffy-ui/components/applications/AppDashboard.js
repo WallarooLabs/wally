@@ -16,8 +16,15 @@ export default class AppDashboard extends React.Component {
 					<SourcesTable
 						appName={appName}
 						linked={true}
-						sourceType="start-to-end" 
+						sourceType="start-to-end"
 						sourceKeys={sourceSinkKeys} />
+				</Panel>
+				<Panel header={<h2>Worker Stats</h2>} >
+					<SourcesTable
+						appName={appName}
+						linked={true}
+						sourceType="node-ingress-egress"
+						sourceKeys={ingressEgressKeys} />
 				</Panel>
 				<Panel header={<h2>Computation Stats</h2>} >
 					<SourcesTable

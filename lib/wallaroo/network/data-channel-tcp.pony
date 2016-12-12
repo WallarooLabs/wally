@@ -1,8 +1,9 @@
-use "net"
-use "time"
 use "buffered"
 use "collections"
+use "net"
+use "time"
 use "sendence/bytes"
+use "sendence/wall-clock"
 use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -17,10 +18,12 @@ class DataChannelListenNotifier is TCPListenNotify
   var _service: String = ""
   let _connections: Connections
   let _receivers: Map[String, DataReceiver] val
+  let _metrics_reporter: MetricsReporter
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
-    receivers: Map[String, DataReceiver] val)
+    receivers: Map[String, DataReceiver] val,
+    metrics_reporter: MetricsReporter iso)
   =>
     _name = name
     _env = env
@@ -28,6 +31,7 @@ class DataChannelListenNotifier is TCPListenNotify
     _is_initializer = is_initializer
     _connections = connections
     _receivers = receivers
+    _metrics_reporter = consume metrics_reporter
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -44,7 +48,8 @@ class DataChannelListenNotifier is TCPListenNotify
     end
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelConnectNotifier(_receivers, _connections, _env, _auth)
+    DataChannelConnectNotifier(_receivers, _connections, _env, _auth,
+    _metrics_reporter.clone())
 
 
 class DataChannelConnectNotifier is TCPConnectionNotify
@@ -54,14 +59,17 @@ class DataChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   var _header: Bool = true
   let _timers: Timers = Timers
+  let _metrics_reporter: MetricsReporter
 
   new iso create(receivers: Map[String, DataReceiver] val,
-    connections: Connections, env: Env, auth: AmbientAuth)
+    connections: Connections, env: Env, auth: AmbientAuth,
+    metrics_reporter: MetricsReporter iso)
   =>
     _receivers = receivers
     _connections = connections
     _env = env
     _auth = auth
+    _metrics_reporter = consume metrics_reporter
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -73,15 +81,24 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       end
       true
     else
+      let ingest_ts = WallClock.nanoseconds() // because we received this from another worker
+      let my_latest_ts = Time.nanos()
+
       ifdef "trace" then
         @printf[I32]("Rcvd msg on data channel\n".cstring())
       end
       match ChannelMsgDecoder(consume data, _auth)
       | let data_msg: DataMsg val =>
-        let seq_id = data_msg.seq_id
         try
+
+          _metrics_reporter.step_metric(data_msg.metric_name,
+            "Before receive on data channel (network time)", data_msg.metrics_id,
+            data_msg.latest_ts, ingest_ts)
           _receivers(data_msg.delivery_msg.sender_name())
-            .received(data_msg.delivery_msg, seq_id)
+            .received(data_msg.delivery_msg,
+              data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
+              data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
+              my_latest_ts)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
@@ -96,10 +113,13 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       | let r: ReplayMsg val =>
         try
           let data_msg = r.data_msg(_auth)
-          let delivery_msg = data_msg.delivery_msg
-
-          _receivers(delivery_msg.sender_name())
-            .replay_received(delivery_msg, data_msg.seq_id)
+          _metrics_reporter.step_metric(data_msg.metric_name,
+            "Before replay receive on data channel (network time)", data_msg.metrics_id,
+            data_msg.latest_ts, ingest_ts)
+          _receivers(data_msg.delivery_msg.sender_name())
+            .replay_received(data_msg.delivery_msg,
+            data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
+            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1, my_latest_ts)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end

@@ -1,6 +1,6 @@
 use "time"
 
-primitive Epoch
+primitive WallClock
   fun nanoseconds(): U64 =>
     let wall = Time.now()
     ((wall._1 * 1000000000) + wall._2).u64()

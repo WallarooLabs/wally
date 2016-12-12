@@ -8,11 +8,12 @@ use "wallaroo/resilience"
 use "wallaroo/tcp-source"
 use "wallaroo/tcp-sink"
 
-type StepInitializer is (StepBuilder | //PartitionedStateStepBuilder | 
+type StepInitializer is (StepBuilder | //PartitionedStateStepBuilder |
   SourceData | EgressBuilder)
 
 class StepBuilder
   let _app_name: String
+  let _worker_name: String
   let _pipeline_name: String
   let _state_name: String
   let _runner_builder: RunnerBuilder val
@@ -21,12 +22,14 @@ class StepBuilder
   let _is_stateful: Bool
   let _forward_route_builder: RouteBuilder val
 
-  new val create(app_name: String, pipeline_name': String, 
-    r: RunnerBuilder val, id': U128, is_stateful': Bool = false, 
+  new val create(app_name: String, worker_name: String,
+    pipeline_name': String, r: RunnerBuilder val, id': U128,
+    is_stateful': Bool = false,
     pre_state_target_id': (U128 | None) = None,
-    forward_route_builder': RouteBuilder val = EmptyRouteBuilder) 
-  =>    
+    forward_route_builder': RouteBuilder val = EmptyRouteBuilder)
+  =>
     _app_name = app_name
+    _worker_name = worker_name
     _pipeline_name = pipeline_name'
     _runner_builder = r
     _state_name = _runner_builder.state_name()
@@ -37,9 +40,9 @@ class StepBuilder
 
   fun name(): String => _runner_builder.name()
   fun state_name(): String => _state_name
-  fun default_state_name(): String => 
+  fun default_state_name(): String =>
     match _runner_builder
-    | let ds: DefaultStateable val => 
+    | let ds: DefaultStateable val =>
       if ds.default_state_name() != "" then ds.default_state_name() else "" end
     else
       ""
@@ -51,23 +54,22 @@ class StepBuilder
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  fun in_route_builder(): (RouteBuilder val | None) => 
+  fun in_route_builder(): (RouteBuilder val | None) =>
     _runner_builder.in_route_builder()
   fun clone_router_and_set_input_type(r: Router val,
-    default_r: (Router val | None) = None): Router val 
+    default_r: (Router val | None) = None): Router val
   =>
     _runner_builder.clone_router_and_set_input_type(r, default_r)
 
-  fun apply(next: Router val, metrics_conn: TCPConnection, alfred: Alfred, 
-    router: Router val = EmptyRouter, 
+  fun apply(next: Router val, metrics_conn: MetricsSink, alfred: Alfred,
+    router: Router val = EmptyRouter,
     omni_router: OmniRouter val = EmptyOmniRouter,
-    default_target: (Step | None) = None): Step tag 
+    default_target: (Step | None) = None): Step tag
   =>
-    let runner = _runner_builder(MetricsReporter(_app_name, 
-      metrics_conn) where alfred = alfred, router = router, 
+    let runner = _runner_builder(where alfred = alfred, router = router,
       pre_state_target_id' = pre_state_target_id())
-    let step = Step(consume runner, 
-      MetricsReporter(_app_name, metrics_conn), _id,
+    let step = Step(consume runner,
+      MetricsReporter(_app_name, _worker_name, metrics_conn), _id,
       _runner_builder.route_builder(), alfred, router, default_target,
       omni_router)
     step.update_router(next)
@@ -86,7 +88,7 @@ class SourceData
 
   new val create(id': U128, b: SourceBuilderBuilder val, r: RunnerBuilder val,
     default_source_route_builder: RouteBuilder val,
-    a: Array[String] val, pre_state_target_id': (U128 | None) = None) 
+    a: Array[String] val, pre_state_target_id': (U128 | None) = None)
   =>
     _id = id'
     _pipeline_name = b.name()
@@ -94,7 +96,7 @@ class SourceData
     _builder = b
     _runner_builder = r
     _state_name = _runner_builder.state_name()
-    _route_builder = 
+    _route_builder =
       match _runner_builder.route_builder()
       | let e: EmptyRouteBuilder val =>
         default_source_route_builder
@@ -111,9 +113,9 @@ class SourceData
 
   fun name(): String => _name
   fun state_name(): String => _state_name
-  fun default_state_name(): String => 
+  fun default_state_name(): String =>
     match _runner_builder
-    | let ds: DefaultStateable val => 
+    | let ds: DefaultStateable val =>
       if ds.default_state_name() != "" then ds.default_state_name() else "" end
     else
       ""
@@ -124,10 +126,10 @@ class SourceData
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder val => 
+  fun forward_route_builder(): RouteBuilder val =>
     _runner_builder.forward_route_builder()
   fun clone_router_and_set_input_type(r: Router val,
-    default_r: (Router val | None) = None): Router val 
+    default_r: (Router val | None) = None): Router val
   =>
     _runner_builder.clone_router_and_set_input_type(r, default_r)
 
@@ -139,11 +141,11 @@ class EgressBuilder
   let _sink_builder: (TCPSinkBuilder val | None)
 
   new val create(pipeline_name': String, id': U128,
-    addr: (Array[String] val | ProxyAddress val), 
+    addr: (Array[String] val | ProxyAddress val),
     sink_builder: (TCPSinkBuilder val | None) = None)
   =>
     _pipeline_name = pipeline_name'
-    _name = 
+    _name =
       match addr
       | let pa: ProxyAddress val =>
         "Proxy to " + pa.worker
@@ -167,14 +169,14 @@ class EgressBuilder
   fun clone_router_and_set_input_type(r: Router val,
     dr: (Router val | None) = None): Router val => r
 
-  fun target_address(): (Array[String] val | ProxyAddress val | 
+  fun target_address(): (Array[String] val | ProxyAddress val |
     PartitionAddresses val) => _addr
 
-  fun apply(worker_name: String, reporter: MetricsReporter iso, 
+  fun apply(worker_name: String, reporter: MetricsReporter ref,
     auth: AmbientAuth,
-    proxies: Map[String, OutgoingBoundary] val = 
+    proxies: Map[String, OutgoingBoundary] val =
       recover Map[String, OutgoingBoundary] end): CreditFlowConsumerStep tag ?
-  =>    
+  =>
     match _addr
     | let a: Array[String] val =>
       try
@@ -201,7 +203,7 @@ class EgressBuilder
       // The match is exhaustive, so this can't happen
       @printf[I32]("Exhaustive match failed somehow\n".cstring())
       error
-    end 
+    end
 
 class PreStateData
   let _state_name: String

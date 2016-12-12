@@ -2,8 +2,10 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "time"
 use "sendence/guid"
 use "sendence/queue"
+use "sendence/wall-clock"
 use "wallaroo/backpressure"
 use "wallaroo/fail"
 use "wallaroo/initialization"
@@ -145,28 +147,46 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   be register_step_id(step_id: U128) =>
     _step_id = step_id
 
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId)
+    frac_ids: None, seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Run should never be called on an OutgoingBoundary
     Fail()
 
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    origin: Producer, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId)
+  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, origin: Producer, msg_uid: U128,
+    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Should never be called on an OutgoingBoundary
     Fail()
 
   // TODO: open question: how do we reconnect if our external system goes away?
-  be forward(delivery_msg: ReplayableDeliveryMsg val,
+  be forward(delivery_msg: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId)
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd message at OutgoingBoundary\n".cstring())
     end
+
+    let my_latest_ts = ifdef "detailed-metrics" then
+        Time.nanos()
+      else
+        latest_ts
+      end
+
+    let new_metrics_id = ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name, "Before receive at boundary",
+          metrics_id, latest_ts, my_latest_ts)
+        metrics_id + 2
+      else
+        metrics_id
+      end
+
     try
       let seq_id = ifdef "resilience" then
         _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
@@ -175,10 +195,22 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       end
 
       let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
-        seq_id, _wb, _auth)
+        pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
+        seq_id, _wb, _auth, WallClock.nanoseconds(),
+        new_metrics_id, metric_name)
       _queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
+
+      let end_ts = Time.nanos()
+
+      ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name,
+          "Before sending to next worker", metrics_id + 1,
+          my_latest_ts, end_ts)
+      end
+
+      _metrics_reporter.worker_metric(metric_name, end_ts - worker_ingress_ts)
     else
       Fail()
     end
@@ -806,7 +838,7 @@ interface _OutgoingBoundaryNotify
     Called when we have failed to connect to all possible addresses for the
     server. At this point, the connection will never be established.
     """
-    None
+    Fail()
 
   fun ref sentv(conn: OutgoingBoundary ref, data: ByteSeqIter): ByteSeqIter =>
     """

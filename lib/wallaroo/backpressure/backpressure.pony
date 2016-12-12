@@ -5,6 +5,7 @@ use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
+use "wallaroo/metrics"
 use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
@@ -28,22 +29,22 @@ trait RouteCallbackHandler
 
 trait RouteBuilder
   fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler): Route
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref): Route
 
 primitive TypedRouteBuilder[In: Any val] is RouteBuilder
   fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler): Route
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref): Route
   =>
     match consumer
     | let boundary: OutgoingBoundary =>
-      BoundaryRoute(step, boundary, handler)
+      BoundaryRoute(step, boundary, handler, consume metrics_reporter)
     else
-      TypedRoute[In](step, consumer, handler)
+      TypedRoute[In](step, consumer, handler, consume metrics_reporter)
     end
 
 primitive EmptyRouteBuilder is RouteBuilder
   fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler): Route
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref): Route
   =>
     EmptyRoute
 
@@ -58,13 +59,16 @@ trait Route
   fun ref receive_credits(number: ISize)
   // Return false to indicate queue is full and if producer is a Source, it
   // should mute
-  fun ref run[D](metric_name: String, source_ts: U64, data: D,
+  fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
-  fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+  fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
+    pipeline_time_spent: U64, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId): Bool
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64): Bool
 
 class EmptyRoute is Route
   let _route_id: U64 = 1 + GuidGenerator.u64() // route 0 is used for filtered messages
@@ -82,16 +86,19 @@ class EmptyRoute is Route
   fun ref request_credits() => None
   fun ref receive_credits(number: ISize) => None
 
-  fun ref run[D](metric_name: String, source_ts: U64, data: D,
+  fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     true
 
-  fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
+  fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
+    pipeline_time_spent: U64, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId): Bool
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64): Bool
   =>
     true
 
@@ -191,6 +198,7 @@ class TypedRoute[In: Any val] is Route
   var _step_type: String = ""
   let _callback: RouteCallbackHandler
   let _consumer: CreditFlowConsumerStep
+  let _metrics_reporter: MetricsReporter
   var _max_credits: ISize = 0 // This is updated on initialize()
   var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
@@ -199,11 +207,12 @@ class TypedRoute[In: Any val] is Route
   var _credit_receiver: CreditReceiver = EmptyCreditReceiver
 
   new create(step: Producer ref, consumer: CreditFlowConsumerStep,
-    handler: RouteCallbackHandler)
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref)
   =>
     _step = step
     _consumer = consumer
     _callback = handler
+    _metrics_reporter = metrics_reporter
 
     _credit_receiver = TypedRoutePreparingToWorkCreditReceiver[In](this)
 
@@ -290,10 +299,11 @@ class TypedRoute[In: Any val] is Route
   fun ref _close_outstanding_request() =>
     _request_outstanding = false
 
-  fun ref run[D](metric_name: String, source_ts: U64, data: D,
+  fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     ifdef "trace" then
       @printf[I32]("--Rcvd msg at Route (%s)\n".cstring(),
@@ -315,8 +325,9 @@ class TypedRoute[In: Any val] is Route
         let above_request_point =
           _credits_available >= _request_more_credits_after
 
-        _send_message_on_route(metric_name, source_ts, input, cfp, origin,
-          msg_uid, frac_ids, i_seq_id, i_route_id)
+        _send_message_on_route(metric_name, pipeline_time_spent, input, cfp,
+          origin,msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
+          metrics_id, worker_ingress_ts)
 
         if _credits_available == 0 then
           _credits_exhausted()
@@ -332,8 +343,9 @@ class TypedRoute[In: Any val] is Route
         end
         true
       else
-        _send_message_on_route(metric_name, source_ts, input, cfp, origin,
-          msg_uid, frac_ids, i_seq_id, i_route_id)
+        _send_message_on_route(metric_name, pipeline_time_spent, input, cfp,
+          origin, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
+          metrics_id, worker_ingress_ts)
         true
       end
     else
@@ -341,17 +353,20 @@ class TypedRoute[In: Any val] is Route
       true
     end
 
-  fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
+  fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
+    pipeline_time_spent: U64, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId): Bool
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64): Bool
   =>
     // Forward should never be called on a TypedRoute
     Fail()
     true
 
-  fun ref _send_message_on_route(metric_name: String, source_ts: U64, input: In,
-    cfp: Producer ref, i_origin: Producer, msg_uid: U128, frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId)
+  fun ref _send_message_on_route(metric_name: String, pipeline_time_spent: U64,
+    input: In, cfp: Producer ref, i_origin: Producer, msg_uid: U128,
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef debug and "backpressure" then
       Invariant(_credits_available > 0)
@@ -359,14 +374,32 @@ class TypedRoute[In: Any val] is Route
 
     let o_seq_id = cfp.next_sequence_id()
 
+    let my_latest_ts = ifdef "detailed-metrics" then
+        Time.nanos()
+      else
+        latest_ts
+      end
+
+    let new_metrics_id = ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name,
+          "Before send to next step via behavior", metrics_id,
+          latest_ts, my_latest_ts)
+        metrics_id + 1
+      else
+        metrics_id
+      end
+
     _consumer.run[In](metric_name,
-      source_ts,
+      pipeline_time_spent,
       input,
       cfp,
       msg_uid,
       frac_ids,
       o_seq_id,
-      _route_id)
+      _route_id,
+      my_latest_ts,
+      new_metrics_id,
+      worker_ingress_ts)
 
     ifdef "trace" then
       @printf[I32]("Sent msg from Route (%s)\n".cstring(),
@@ -469,6 +502,7 @@ class BoundaryRoute is Route
   var _step_type: String = ""
   let _callback: RouteCallbackHandler
   let _consumer: OutgoingBoundary
+  let _metrics_reporter: MetricsReporter
   var _max_credits: ISize = 0 // This is updated on initialize()
   var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
@@ -477,11 +511,12 @@ class BoundaryRoute is Route
   var _credit_receiver: CreditReceiver = EmptyCreditReceiver
 
   new create(step: Producer ref, consumer: OutgoingBoundary,
-    handler: RouteCallbackHandler)
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref)
   =>
     _step = step
     _consumer = consumer
     _callback = handler
+    _metrics_reporter = metrics_reporter
     _credit_receiver = BoundaryRoutePreparingToWorkCreditReceiver(this)
 
   fun ref application_created() =>
@@ -553,31 +588,36 @@ class BoundaryRoute is Route
   fun ref request_credits() =>
     if not _request_outstanding then
       ifdef "credit_trace" then
-        @printf[I32]("--BoundaryRoute (%s): requesting credits. Have %llu\n".cstring(), _step_type.cstring(), _credits_available)
+        @printf[I32]("--BoundaryRoute (%s): requesting credits. Have %llu\n"
+          .cstring(), _step_type.cstring(), _credits_available)
       end
       _consumer.credit_request(_step)
       _request_outstanding = true
     else
       ifdef "credit_trace" then
-        @printf[I32]("----BoundaryRoute (%s): Request already outstanding\n".cstring(), _step_type.cstring())
+        @printf[I32]("----BoundaryRoute (%s): Request already outstanding\n"
+          .cstring(), _step_type.cstring())
       end
     end
 
   fun ref _close_outstanding_request() =>
     _request_outstanding = false
 
-  fun ref run[D](metric_name: String, source_ts: U64, data: D,
+  fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId): Bool
+    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     // Run should never be called on a BoundaryRoute
     Fail()
     true
 
-  fun ref forward(delivery_msg: ReplayableDeliveryMsg val, cfp: Producer ref,
+  fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
+    pipeline_time_spent: U64, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId): Bool
+    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64): Bool
   =>
     ifdef debug then
       ifdef "backpressure" then
@@ -597,12 +637,17 @@ class BoundaryRoute is Route
         _credits_available >= _request_more_credits_after
 
       _send_message_on_route(delivery_msg,
+        pipeline_time_spent,
         cfp,
         i_origin,
         msg_uid,
         i_frac_ids,
         i_seq_id,
-        _route_id)
+        _route_id,
+        latest_ts,
+        metrics_id,
+        metric_name,
+        worker_ingress_ts)
 
       if _credits_available == 0 then
         _credits_exhausted()
@@ -619,27 +664,39 @@ class BoundaryRoute is Route
       true
     else
       _send_message_on_route(delivery_msg,
+        pipeline_time_spent,
         cfp,
         i_origin,
         msg_uid,
         i_frac_ids,
         i_seq_id,
-        _route_id)
+        _route_id,
+        latest_ts,
+        metrics_id,
+        metric_name,
+        worker_ingress_ts)
       true
     end
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val,
+    pipeline_time_spent: U64,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId)
+    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
+    metric_name: String, worker_ingress_ts: U64)
   =>
     let o_seq_id = cfp.next_sequence_id()
 
     _consumer.forward(delivery_msg,
+      pipeline_time_spent,
       cfp,
       msg_uid,
       i_frac_ids,
       o_seq_id,
-      _route_id)
+      _route_id,
+      latest_ts,
+      metrics_id,
+      metric_name,
+      worker_ingress_ts)
 
     ifdef "resilience" then
       cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id, i_seq_id)

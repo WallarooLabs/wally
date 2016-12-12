@@ -245,6 +245,7 @@ primitive ResultEncoder
     let payload = wb.done()
     HubProtocol.payload("default-test", "reports:default-test", 
       consume payload, wb)
+    wb.done()
 
 class Symbols
   let symbols: Array[String] val

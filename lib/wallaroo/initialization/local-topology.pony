@@ -1,13 +1,13 @@
-use "net"
+use "buffered"
 use "collections"
+use "files"
+use "net"
 use "promises"
 use "serialise"
-use "files"
-use "buffered"
 use "sendence/dag"
 use "sendence/guid"
-use "sendence/queue"
 use "sendence/messages"
+use "sendence/queue"
 use "wallaroo"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
@@ -16,9 +16,9 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
-use "wallaroo/topology"
 use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
+use "wallaroo/topology"
 
 class LocalTopology
   let _app_name: String
@@ -34,7 +34,7 @@ class LocalTopology
   let default_state_name: String
   let default_target_id: U128
 
-  new val create(name': String, worker_name: String,
+  new val create(name': String, worker_name': String,
     graph': Dag[StepInitializer val] val,
     step_map': Map[U128, (ProxyAddress val | U128)] val,
     state_builders': Map[String, StateSubpartition val] val,
@@ -45,7 +45,7 @@ class LocalTopology
     default_state_name': String = "", default_target_id': U128 = 0)
   =>
     _app_name = name'
-    _worker_name = worker_name
+    _worker_name = worker_name'
     _graph = graph'
     _step_map = step_map'
     _state_builders = state_builders'
@@ -58,7 +58,7 @@ class LocalTopology
 
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
-    metrics_conn: TCPConnection, alfred: Alfred,
+    metrics_conn: MetricsSink, alfred: Alfred,
     connections: Connections, auth: AmbientAuth,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
@@ -88,6 +88,8 @@ class LocalTopology
 
   fun name(): String => _app_name
 
+  fun worker_name(): String => _worker_name
+
   fun is_empty(): Bool =>
     _graph.is_empty()
 
@@ -101,7 +103,7 @@ actor LocalTopologyInitializer
   let _env: Env
   let _auth: AmbientAuth
   let _connections: Connections
-  let _metrics_conn: TCPConnection
+  let _metrics_conn: MetricsSink
   let _alfred : Alfred tag
   var _is_initializer: Bool
   var _outgoing_boundaries: Map[String, OutgoingBoundary] val =
@@ -127,7 +129,7 @@ actor LocalTopologyInitializer
 
   new create(app: Application val, worker_name: String, worker_count: USize,
     env: Env, auth: AmbientAuth, connections: Connections,
-    metrics_conn: TCPConnection, is_initializer: Bool, alfred: Alfred tag,
+    metrics_conn: MetricsSink, is_initializer: Bool, alfred: Alfred tag,
     input_addrs: Array[Array[String]] val, local_topology_file: String)
   =>
     _application = app
@@ -170,7 +172,8 @@ actor LocalTopologyInitializer
     if not _is_initializer then
       let data_notifier: TCPListenNotify iso =
         DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
-          _is_initializer, data_receivers)
+          _is_initializer, data_receivers,
+          MetricsReporter(_application.name(), _worker_name, _metrics_conn))
       _connections.register_listener(
         TCPListener(_auth, consume data_notifier))
     else
@@ -595,6 +598,7 @@ actor LocalTopologyInitializer
               let next_id = egress_builder.id()
               if not built_routers.contains(next_id) then
                 let sink_reporter = MetricsReporter(t.name(),
+                  t.worker_name(),
                   _metrics_conn)
 
                 // Create a sink or OutgoingBoundary proxy. If the latter,
@@ -720,6 +724,7 @@ actor LocalTopologyInitializer
                 end
 
               let source_reporter = MetricsReporter(t.name(),
+                t.worker_name(),
                 _metrics_conn)
 
               // Get all the sinks so far, which should include any sinks
@@ -739,14 +744,15 @@ actor LocalTopologyInitializer
                   TCPSourceListenerBuilder(
                     source_data.builder()(source_data.runner_builder(),
                       out_router, _metrics_conn,
-                      source_data.pre_state_target_id()),
+                      source_data.pre_state_target_id(), t.worker_name()),
                     out_router,
                     source_data.route_builder(),
                     _outgoing_boundaries, sinks_for_source,
                     _alfred, default_target, default_in_route_builder,
                     state_comp_target_router,
                     source_data.address()(0),
-                    source_data.address()(1))
+                    source_data.address()(1)
+                    where metrics_reporter = consume source_reporter)
                 )
               else
                 @printf[I32]("Ill-formed source address\n".cstring())

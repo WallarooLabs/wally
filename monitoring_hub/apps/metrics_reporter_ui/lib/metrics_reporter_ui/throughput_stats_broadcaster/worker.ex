@@ -23,11 +23,11 @@ defmodule MetricsReporterUI.ThroughputStatsBroadcaster.Worker do
 
   def handle_info(:get_and_broadcast_latest_throughput_stat_msgs, state) do
     %{log_name: log_name, interval_key: interval_key, msg_log_name: msg_log_name,
-      app_name: _app_name, category: category, pipeline_key: pipeline_key, 
+      app_name: _app_name, category: category, pipeline_key: pipeline_key,
       stats_interval: stats_interval} = state
+    :timer.sleep(2500)
     time_now = :os.system_time(:seconds)
     start_time = time_now - stats_interval
-    :timer.sleep(1000)
     case get_throughput_msgs(log_name, start_time) do
       [] ->
         :ok

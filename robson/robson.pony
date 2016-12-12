@@ -1,11 +1,11 @@
 use "buffered"
-use "net"
-use "options"
-use "files"
 use "collections"
-use "sendence/hub"
-use "sendence/epoch"
+use "files"
 use "format"
+use "options"
+use "net"
+use "sendence/hub"
+use "sendence/wall-clock"
 
 actor Main
   new create(env: Env) =>
@@ -54,10 +54,14 @@ actor MetricsCollector
     _overall_metrics_msgs.create()
   let _computation_metrics_msgs: Map[String, Array[HubMetricsMsg val]] =
     _computation_metrics_msgs.create()
+  let _worker_metrics_msgs: Map[String, Array[HubMetricsMsg val]] =
+    _worker_metrics_msgs.create()
   let _overall_metrics_data: Map[String, MetricsData] =
     _overall_metrics_data.create()
   let _computation_metrics_data: Map[String, MetricsData] =
     _computation_metrics_data.create()
+  let _worker_metrics_data: Map[String, MetricsData] =
+    _worker_metrics_data.create()
 
   new create(env: Env, input_file_path: String, output_file_path: String) =>
     _env = env
@@ -71,6 +75,8 @@ actor MetricsCollector
       add_overall_metrics(metrics_msg)
     | ("computation") =>
       add_computation_metrics(metrics_msg)
+    | ("node-ingress-egress") =>
+      add_worker_metrics(metrics_msg)
     else
       _env.out.print("Unable to save metrics for category: " +
         metrics_msg.category)
@@ -89,6 +95,13 @@ actor MetricsCollector
       Array[HubMetricsMsg val])
     metrics_array.push(metrics_msg)
     _computation_metrics_msgs.update(name, metrics_array)
+
+  fun ref add_worker_metrics(metrics_msg: HubMetricsMsg val) =>
+    let name = metrics_msg.name
+    let metrics_array = _worker_metrics_msgs.get_or_else(name,
+      Array[HubMetricsMsg val])
+    metrics_array.push(metrics_msg)
+    _worker_metrics_msgs.update(name, metrics_array)
 
   be print_metrics() =>
     try
@@ -110,13 +123,20 @@ actor MetricsCollector
       end
       output_file.write(TextFormatter.line_break())
       output_file.write(TextFormatter.main_header())
+      output_file.write("Worker Metrics\n")
+      output_file.write(TextFormatter.main_header())
+      for metrics_data in _worker_metrics_data.values() do
+        output_file.write(metrics_data.print_stats())
+      end
+      output_file.write(TextFormatter.line_break())
+      output_file.write(TextFormatter.main_header())
       output_file.write("Computation Metrics\n")
       output_file.write(TextFormatter.main_header())
       for metrics_data in _computation_metrics_data.values() do
         output_file.write(metrics_data.print_stats())
       end
       output_file.write(TextFormatter.line_break())
-      let print_timestamp = Epoch.milliseconds()
+      let print_timestamp = WallClock.milliseconds()
       output_file.print("Report generated at: " + print_timestamp.string())
       output_file.dispose()
       _env.out.print("Output file disposed")
@@ -159,12 +179,14 @@ actor MetricsCollector
     end
     generate_overall_metrics_data()
     generate_computation_metrics_data()
+    generate_worker_metrics_data()
     print_metrics()
 
   fun ref generate_metrics_data() =>
     _env.out.print("Generate Metrics Data")
     generate_overall_metrics_data()
     generate_computation_metrics_data()
+    generate_worker_metrics_data()
 
   fun ref generate_overall_metrics_data() =>
    for (name, metrics_msgs) in _overall_metrics_msgs.pairs() do
@@ -183,6 +205,16 @@ actor MetricsCollector
        let metrics_data = MetricsData(metrics_msg.name, metrics_msg.category,
          metrics_msg.period, metrics_msgs)
        _computation_metrics_data.insert(name, metrics_data)
+     end
+    end
+
+  fun ref generate_worker_metrics_data() =>
+    for (name, metrics_msgs) in _worker_metrics_msgs.pairs() do
+    try
+       let metrics_msg = metrics_msgs(0)
+       let metrics_data = MetricsData(metrics_msg.name, metrics_msg.category,
+         metrics_msg.period, metrics_msgs)
+       _worker_metrics_data.insert(name, metrics_data)
      end
     end
 
@@ -225,7 +257,7 @@ class MetricsData
     generate_throughput_stats()
     generate_latency_stats()
 
-  fun ref calculate_throughput_for_period(count_by_bin: 
+  fun ref calculate_throughput_for_period(count_by_bin:
     Array[U64 val] val): U64
   =>
     var total_throughput_for_period: U64 = 0
@@ -353,7 +385,7 @@ class ThroughputStats
     _trunc_period = _period / 1000000000
     calculate_throughput_per_sec()
     calculate_min_throughput_per_sec()
-    calculate_max_throughput_per_sec() 
+    calculate_max_throughput_per_sec()
 
   fun ref calculate_throughput_per_sec() =>
     let periods_count =
@@ -363,11 +395,11 @@ class ThroughputStats
     avg_throughput_per_sec = throughput_per_period / trunc_period.f64()
 
   fun ref calculate_min_throughput_per_sec() =>
-    min_throughput_per_sec = 
+    min_throughput_per_sec =
       min_throughput_by_period.f64() / _trunc_period.f64()
 
   fun ref calculate_max_throughput_per_sec() =>
-    max_throughput_per_sec = 
+    max_throughput_per_sec =
       max_throughput_by_period.f64() / _trunc_period.f64()
 
   fun format_throughput(throughput: F64): String iso^ =>
@@ -512,10 +544,10 @@ class LatencyStats
   primitive TextFormatter
     fun main_header(): String =>
       "****************************************\n"
-    
+
     fun secondary_header(): String =>
       "------------------------\n"
-    
+
     fun line_break(): String =>
       "\n"
 

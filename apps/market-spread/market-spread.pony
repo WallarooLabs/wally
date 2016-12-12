@@ -41,21 +41,21 @@ giles/sender/sender -b 127.0.0.1:7000 -m 5000000 -s 300 -i 5_000_000 -f demos/ma
 giles/sender/sender -b 127.0.0.1:7001 -m 10000000 -s 300 -i 2_500_000 -f demos/marketspread/r3k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 -w
 """
 use "assert"
+use "buffered"
 use "collections"
 use "net"
-use "time"
-use "buffered"
 use "options"
+use "time"
 use "sendence/bytes"
 use "sendence/fix"
-use "sendence/new-fix"
 use "sendence/hub"
-use "sendence/epoch"
+use "sendence/new-fix"
+use "sendence/wall-clock"
 use "wallaroo"
+use "wallaroo/fail"
 use "wallaroo/metrics"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
-use "wallaroo/fail"
 
 actor Main
   new create(env: Env) =>
@@ -234,7 +234,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     // @printf[I32]("!!CheckOrder\n".cstring())
     if state.should_reject_trades then
       let res = OrderResult(msg, state.last_bid, state.last_offer,
-        Epoch.nanoseconds())
+        WallClock.nanoseconds())
       (res, None)
     else
       (None, None)
@@ -335,6 +335,7 @@ primitive OrderResultEncoder
     let payload = wb.done()
     HubProtocol.payload("rejected-orders", "reports:market-spread",
       consume payload, wb)
+    wb.done()
 
 class LegalSymbols
   let symbols: Array[String] val

@@ -1,6 +1,7 @@
 use "buffered"
 use "collections"
 use "net"
+use "time"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
@@ -129,10 +130,18 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     None
 
   // open question: how do we reconnect if our external system goes away?
-  be run[D: Any val](metric_name: String, source_ts: U64, data: D,
+  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    var receive_ts: U64 = 0
+    ifdef "detailed-metrics" then
+      receive_ts = Time.nanos()
+      _metrics_reporter.step_metric(metric_name, "Before receive at sink", 9998,
+        latest_ts, receive_ts)
+    end
+
     ifdef "trace" then
       @printf[I32]("Rcvd msg at TCPSink\n".cstring())
     end
@@ -149,22 +158,33 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
-      _metrics_reporter.pipeline_metric(metric_name, source_ts)
+      let end_ts = Time.nanos()
+      let time_spent = end_ts - worker_ingress_ts
+
+      ifdef "detailed-metrics" then
+        _metrics_reporter.step_metric(metric_name, "Before end at sink", 9999,
+          receive_ts, end_ts)
+      end
+
+      _metrics_reporter.pipeline_metric(metric_name,
+        time_spent + pipeline_time_spent)
+      _metrics_reporter.worker_metric(metric_name, time_spent)
     else
       Fail()
     end
     // DO NOT REMOVE. THIS IS AN INTENTIONAL GC
     @pony_triggergc[None](this)
 
-  be replay_run[D: Any val](metric_name: String, source_ts: U64, data: D,
-    i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId)
+  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, i_origin: Producer, msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     //TODO: deduplication like in the Step <- this is pointless if the Sink
     //doesn't have state, because on recovery we won't have a list of "seen
     //messages", which we would normally get from the eventlog.
-    run[D](metric_name, source_ts, data, i_origin, msg_uid, i_frac_ids,
-      i_seq_id, i_route_id)
+    run[D](metric_name, pipeline_time_spent, data, i_origin, msg_uid, i_frac_ids,
+      i_seq_id, i_route_id, latest_ts, metrics_id, worker_ingress_ts)
 
   be update_router(router: Router val) =>
     """
@@ -840,7 +860,7 @@ interface _TCPSinkNotify
     Called when we have failed to connect to all possible addresses for the
     server. At this point, the connection will never be established.
     """
-    None
+    Fail()
 
   fun ref sentv(conn: TCPSink ref, data: ByteSeqIter): ByteSeqIter =>
     """

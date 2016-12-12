@@ -20,8 +20,8 @@ defmodule MetricsReporterUI.MetricsChannel do
     store_latency_list_msg(app_name, category, pipeline_key, latency_list_msg)
     throughput_msg = create_throughput_msg_from_latency_list(pipeline_key, end_timestamp, period, latency_list)
     store_period_throughput_msg(app_name, category, pipeline_key, throughput_msg)
-    {:ok, _pid} = find_or_start_latency_bins_worker(app_name, category, pipeline_key)
-    {:ok, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key)
+    {_response, _pid} = find_or_start_latency_bins_worker(app_name, category, pipeline_key)
+    {_response, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key)
     {:noreply, socket}
   end
 
@@ -30,7 +30,7 @@ defmodule MetricsReporterUI.MetricsChannel do
     Enum.each(metrics_collection, fn (%{"pipeline_key" => pipeline_key,
       "t0" => _start_timestamp, "t1" => end_timestamp,
       "category" => "step" = category,
-      "topics" => %{"latency_bins" => latency_bins, 
+      "topics" => %{"latency_bins" => latency_bins,
       "throughput_out" => throughput_data}}) ->
       int_end_timestamp = float_timestamp_to_int(end_timestamp)
       latency_bins_msg = create_latency_bins_msg(pipeline_key, int_end_timestamp, latency_bins)
@@ -39,7 +39,7 @@ defmodule MetricsReporterUI.MetricsChannel do
       store_throughput_msgs(app_name, category, pipeline_key, throughput_data)
       {:ok, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key)
     end)
-    {:reply, :ok, socket}  
+    {:reply, :ok, socket}
   end
 
   def handle_in("ingress-egress-metrics", metrics_collection, socket) do
@@ -47,7 +47,7 @@ defmodule MetricsReporterUI.MetricsChannel do
     Enum.each(metrics_collection, fn (%{"pipeline_key" => pipeline_key,
       "t0" => _start_timestamp, "t1" => end_timestamp,
       "category" => "ingress-egress" = category,
-      "topics" => %{"latency_bins" => latency_bins, 
+      "topics" => %{"latency_bins" => latency_bins,
       "throughput_out" => throughput_data}}) ->
       int_end_timestamp = float_timestamp_to_int(end_timestamp)
       latency_bins_msg = create_latency_bins_msg(pipeline_key, int_end_timestamp, latency_bins)
@@ -56,7 +56,7 @@ defmodule MetricsReporterUI.MetricsChannel do
       store_throughput_msgs(app_name, category, pipeline_key, throughput_data)
       {:ok, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key)
     end)
-    {:reply, :ok, socket}  
+    {:reply, :ok, socket}
   end
 
   def handle_in("source-sink-metrics", metrics_collection, socket) do
@@ -64,7 +64,7 @@ defmodule MetricsReporterUI.MetricsChannel do
     Enum.each(metrics_collection, fn (%{"pipeline_key" => pipeline_key,
       "t0" => _start_timestamp, "t1" => end_timestamp,
       "category" => "source-sink" = category,
-      "topics" => %{"latency_bins" => latency_bins, 
+      "topics" => %{"latency_bins" => latency_bins,
       "throughput_out" => throughput_data}}) ->
       int_end_timestamp = float_timestamp_to_int(end_timestamp)
       latency_bins_msg = create_latency_bins_msg(pipeline_key, int_end_timestamp, latency_bins)
@@ -73,7 +73,7 @@ defmodule MetricsReporterUI.MetricsChannel do
       store_throughput_msgs(app_name, category, pipeline_key, throughput_data)
       {:ok, _pid} = find_or_start_throughput_workers(app_name, category, pipeline_key)
     end)
-    {:reply, :ok, socket}  
+    {:reply, :ok, socket}
   end
 
   defp float_timestamp_to_int(timestamp) do
@@ -117,7 +117,7 @@ defmodule MetricsReporterUI.MetricsChannel do
   defp create_throughput_msg_from_latency_list(pipeline_key, timestamp, period, latency_list) do
     total_throughput = latency_list
       |> Enum.reduce(0, fn bin_count, acc -> bin_count + acc end)
-    %{"time" => timestamp, "pipeline_key" => pipeline_key, 
+    %{"time" => timestamp, "pipeline_key" => pipeline_key,
       "period" => period, "total_throughput" => total_throughput}
   end
 
@@ -151,7 +151,7 @@ defmodule MetricsReporterUI.MetricsChannel do
 
   defp find_or_start_latency_bins_worker(app_name, category, pipeline_key) do
     log_name = generate_latency_bins_log_name(app_name, category, pipeline_key)
-    args = [log_name: log_name, interval_key: "last-5-mins",  pipeline_key: pipeline_key, 
+    args = [log_name: log_name, interval_key: "last-5-mins",  pipeline_key: pipeline_key,
       aggregate_interval: 300, app_name: app_name, category: category]
     LatencyStatsBroadcaster.Supervisor.find_or_start_worker(args)
   end
