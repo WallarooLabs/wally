@@ -630,12 +630,12 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   fun ref _try_unmute(s: TCPSource ref) =>
     _muted = _muted - 1
     if _muted == 0 then
-      let t = Timer(Unmute(s), 2_000_000_000)
-      _timers(consume t)
-      // s._unmute()
+      // let t = Timer(Unmute(s), 2_000_000_000)
+      // _timers(consume t)
+      s._unmute()
     end
 
-actor Unmute
+actor Unmute is TimerNotify
   let _source: TCPSource tag
 
   new create(s: TCPSource tag) =>
