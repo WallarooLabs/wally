@@ -1,6 +1,7 @@
 use "buffered"
 use "collections"
 use "net"
+use "time"
 use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
@@ -529,6 +530,9 @@ actor TCPSource is Producer
       _pending_reads()
     end
 
+  be unmute() =>
+    _unmute()
+
   fun ref is_muted(): Bool =>
     _muted
 
@@ -554,6 +558,7 @@ actor TCPSource is Producer
 class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   let _registered_routes: SetIs[Route tag] = _registered_routes.create()
   var _muted: ISize = 0
+  let _timers: Timers
 
   fun ref register(producer: Producer ref, r: Route tag) =>
     ifdef debug then
@@ -625,5 +630,19 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   fun ref _try_unmute(s: TCPSource ref) =>
     _muted = _muted - 1
     if _muted == 0 then
-      s._unmute()
+      let t = Timer(Unmute(s), 2_000_000_000)
+      _timers(consume t)
+      // s._unmute()
     end
+
+actor Unmute
+  let _source: TCPSource tag
+
+  new create(s: TCPSource tag) =>
+    _source = s
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _source.unmute()
+    false
+
+
