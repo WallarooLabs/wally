@@ -558,7 +558,7 @@ actor TCPSource is Producer
 class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   let _registered_routes: SetIs[Route tag] = _registered_routes.create()
   var _muted: ISize = 0
-  let _timers: Timers
+  let _timers: Timers = Timers
 
   fun ref register(producer: Producer ref, r: Route tag) =>
     ifdef debug then
