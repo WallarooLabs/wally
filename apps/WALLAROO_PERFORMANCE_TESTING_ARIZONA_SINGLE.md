@@ -21,13 +21,8 @@ PLAY RECAP *********************************************************************
 
 You can SSH into the AWS machine using:
 
-```basj
-ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
-```
-
-And you can SSH into the Packet machine using:
 ```bash
-ssh -i ~/.ssh/ec2/us-east-1.pem sendence@<IP_ADDRESS>
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
 ```
 
 ### Verify optimal setup
