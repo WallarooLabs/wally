@@ -829,7 +829,7 @@ interface _OutgoingBoundaryNotify
     Called when we have failed to connect to all possible addresses for the
     server. At this point, the connection will never be established.
     """
-    None
+    Fail()
 
   fun ref sentv(conn: OutgoingBoundary ref, data: ByteSeqIter): ByteSeqIter =>
     """
