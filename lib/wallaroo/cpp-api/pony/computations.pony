@@ -24,7 +24,7 @@ class CPPComputation is Computation[CPPData val, CPPData val]
     let ret = match @w_computation_compute(_computation, input.obj())
     | let result: DataP =>
       if input.obj() == result then
-        @print[I32]("returning the same object is not allowed\n".string())
+        @printf[I32]("returning the same object is not allowed\n".string())
       end
       if (not result.is_null()) then
         recover CPPData(result) end

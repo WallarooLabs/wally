@@ -33,6 +33,7 @@ use @get_partition_key[KeyP](client_id: U64)
 use @get_partition_function[PartitionFunctionP]()
 use @get_source_decoder[SourceDecoderP]()
 use @get_sink_encoder[SinkEncoderP]()
+use @get_computation[ComputationP]()
 use @get_state_computation[ComputationP]()
 use @get_default_state_computation[ComputationP]()
 use @get_state[StateP]()
@@ -69,7 +70,7 @@ actor Main
       let application = recover val
         Application("Passthrough Topology")
           .new_pipeline[CPPData val, CPPData val]("source-decoder", recover CPPSourceDecoder(@get_source_decoder()) end)
-          .to[CPPData val](FilterBuilder[CPPData val])
+          .to[CPPData val](ComputationFactory)
           .done()
           // NO PARTITION
           // .to_stateful[CPPData val, CPPState](
@@ -100,11 +101,14 @@ actor Main
       env.out.print("Could not build topology")
     end
 
-  fun computation_factory(): CPPStateComputation val =>
-    recover CPPStateComputation(recover @get_state_computation() end) end
+  fun computation_factory(): CPPComputation val =>
+    recover CPPComputation(recover @get_computation() end) end
 
   fun default_computation_factory(): CPPStateComputation val =>
     recover CPPStateComputation(recover @get_default_state_computation() end) end
+
+  fun state_computation_factory(): CPPStateComputation val =>
+    recover CPPStateComputation(recover @get_state_computation() end) end
 
   fun partition_factory(partition_start: USize, partition_end: USize): Array[U64] val =>
     let partition_count = partition_end - partition_start
@@ -115,3 +119,8 @@ actor Main
       end
       consume partitions
     end
+
+class ComputationFactory
+  fun apply(): Computation[CPPData val, CPPData val] val =>
+    recover CPPComputation(recover @get_computation() end) end
+
