@@ -90,7 +90,6 @@ ClientMessage* message_from_bytes(char *bytes_)
     std::cerr << "unknown message type: " << message_type << std::endl;
   }
 
-  wallaroo::Logger::getLogger()->debug("MSG:{}", cm->str());
   return cm;
 }
 
