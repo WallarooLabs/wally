@@ -123,8 +123,6 @@ class TypedRoutePreparingToWorkCreditReceiver[In: Any val]
 
     _route._close_outstanding_request()
 
-    _route._credits_initialized()
-
     let credits_recouped =
       if (_route.credits_available() + credits) > _route.max_credits() then
         _route.max_credits() - _route.credits_available()
@@ -144,6 +142,7 @@ class TypedRoutePreparingToWorkCreditReceiver[In: Any val]
 
     _route._update_request_more_credits_after(_route.credits_available() -
       (_route.credits_available() >> 2))
+    _route._credits_initialized()
     _route._report_ready_to_work()
 
 class TypedRouteWorkingCreditReceiver[In: Any val]
