@@ -1,4 +1,5 @@
 use "buffered"
+use "sendence/bytes"
 use "wallaroo/metrics"
 
 primitive HubProtocol
@@ -34,6 +35,36 @@ primitive HubProtocol
     wb.write(topic)
     wb.u32_be(data_size)
     wb.writev(data)
+
+  fun payload_into_array(event: String, topic: String, data: Array[U8] iso):
+    Array[ByteSeq] val
+  =>
+    let encoded: Array[ByteSeq] trn = recover Array[ByteSeq](2) end
+
+    // Determine sizes
+    let event_size = event.size().u32()
+    let topic_size = topic.size().u32()
+    let data_size = data.size().u32()
+    let size_of_sizes: U32  = 8
+    let size = 1 + event_size + topic_size + size_of_sizes
+
+    // Encode into array
+    var header_arr: Array[U8] iso = recover Array[U8](size.usize()) end
+    header_arr = Bytes.from_u32(size, consume header_arr)
+    header_arr.push(HubMsgTypes.payload())
+    header_arr = Bytes.from_u32(event_size, consume header_arr)
+    for byte in event.array().values() do
+      header_arr.push(byte)
+    end
+    header_arr = Bytes.from_u32(topic_size, consume header_arr)
+    for byte in topic.array().values() do
+      header_arr.push(byte)
+    end
+    header_arr = Bytes.from_u32(data_size, consume header_arr)
+
+    encoded.push(consume header_arr)
+    encoded.push(consume data)
+    consume encoded
 
   fun metrics(name: String, category: String, pipeline_name: String,
     worker_name: String, id: U16, histogram: Histogram,
