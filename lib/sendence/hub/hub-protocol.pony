@@ -45,8 +45,8 @@ primitive HubProtocol
     let event_size = event.size().u32()
     let topic_size = topic.size().u32()
     let data_size = data.size().u32()
-    let size_of_sizes: U32  = 8
-    let size = 1 + event_size + topic_size + size_of_sizes
+    let size_of_sizes: U32  = 12
+    let size = 1 + event_size + topic_size + data_size + size_of_sizes
 
     // Encode into array
     var header_arr: Array[U8] iso = recover Array[U8](size.usize()) end

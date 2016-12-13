@@ -53,6 +53,7 @@ use "sendence/new-fix"
 use "sendence/wall-clock"
 use "wallaroo"
 use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
@@ -110,8 +111,8 @@ actor Main
             .to_sink(EmptyEncoder, recover [0] end,
               initial_report_msgs)
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler)
-              // where init_file = init_file)
+            "Nbbo", FixNbboFrameHandler
+              where init_file = init_file)
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
@@ -237,7 +238,6 @@ class CheckOrder is StateComputation[FixOrderMessage val, Array[ByteSeq] val,
         Time.nanos())
       (res, None)
     else
-      Fail()
       (None, None)
     end
 
@@ -328,10 +328,10 @@ primitive OrderResultEncoder
     //   order_qty(8) | price(8) | bid(8) | offer(8) | timestamp(8)
     //
 
-    var payload: Array[U8] iso = recover Array[U8](63) end
+    var payload: Array[U8] iso = recover Array[U8](59) end
 
-    //Payload header (size == 59 bytes)
-    payload = Bytes.from_u32(59, consume payload)
+    // //Payload header (size == 59 bytes)
+    // payload = Bytes.from_u32(59, consume payload)
 
     //Header (size == 55 bytes)
     let msgs_size: U32 = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
@@ -348,6 +348,11 @@ primitive OrderResultEncoder
     payload.push(side)
 
     payload = Bytes.from_u32(order.account(), consume payload)
+
+    ifdef debug then
+      Invariant(order.order_id().array().size() == 6)
+      Invariant(order.symbol().array().size() == 4)
+    end
 
     // ASSUMPTION: 6 bytes
     for byte in order.order_id().array().values() do
