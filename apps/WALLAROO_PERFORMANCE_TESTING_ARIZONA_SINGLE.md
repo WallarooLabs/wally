@@ -36,6 +36,9 @@ You should see:
 ```bash
 Network driver is set up correctly for optimal performance.
 System cpu isolation set up as expected for optimal performance.
+System clocksource is set up correctly for optimal performance.
+Transparent hugepages is disabled as required for optimal performance.
+Swappiness is set to 0 as required for optimal performance.
 ```
 
 ### Startup the Metrics UI
