@@ -21,13 +21,8 @@ PLAY RECAP *********************************************************************
 
 You can SSH into the AWS machine using:
 
-```basj
-ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
-```
-
-And you can SSH into the Packet machine using:
 ```bash
-ssh -i ~/.ssh/ec2/us-east-1.pem sendence@<IP_ADDRESS>
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
 ```
 
 ### Verify optimal setup
@@ -41,6 +36,9 @@ You should see:
 ```bash
 Network driver is set up correctly for optimal performance.
 System cpu isolation set up as expected for optimal performance.
+System clocksource is set up correctly for optimal performance.
+Transparent hugepages is disabled as required for optimal performance.
+Swappiness is set to 0 as required for optimal performance.
 ```
 
 ### Startup the Metrics UI
