@@ -539,6 +539,11 @@ extern "C" {
     return new ArizonaSinkEncoder();
   }
 
+  extern wallaroo::Computation *get_computation()
+  {
+    return new PassThroughComputation();
+  }
+
   extern wallaroo::StateComputation *get_state_computation()
   {
     return new ArizonaStateComputation();
@@ -633,10 +638,17 @@ ArizonaStateComputation::ArizonaStateComputation() : _nProcessed(0)
 
 void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
 {
-  ncnt += 1;
-  if ( ncnt % 10000 == 0  )
-    _logger->info("Processed messages:{}", ncnt);
   return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
+}
+
+const char *PassThroughComputation::name()
+{
+  return "PassThroughComputation";
+}
+
+wallaroo::Data *PassThroughComputation::compute(wallaroo::Data *input_)
+{
+  return NULL;
 }
 
 // Partition

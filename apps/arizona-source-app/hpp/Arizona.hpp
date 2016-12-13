@@ -259,6 +259,13 @@ public:
   virtual size_t serialize_get_size () { return 2; }
 };
 
+class PassThroughComputation: public wallaroo::Computation
+{
+  public:
+    virtual const char *name();
+    virtual wallaroo::Data *compute(wallaroo::Data *input_);
+};
+
 // Partitioning
 
 class ArizonaPartitionKey: public wallaroo::Key
