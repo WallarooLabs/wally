@@ -25,6 +25,13 @@ You can SSH into the AWS machine using:
 ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
 ```
 
+### Clone Wallaroo repo
+
+You'll need to clone the repo:
+```
+git clone https://github.com/sendence/buffy.git
+```
+
 ### Verify optimal setup
 
 ```bash
@@ -69,11 +76,6 @@ docker stop mui && docker start mui
 ```
 
 ### Running Market Spread
-
-You'll need to clone the repo:
-```
-git clone https://github.com/sendence/buffy.git
-```
 
 To build Market Spread:
 ```
