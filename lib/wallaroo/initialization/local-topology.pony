@@ -33,6 +33,8 @@ class LocalTopology
   let default_target: (Array[StepBuilder val] val | ProxyAddress val | None)
   let default_state_name: String
   let default_target_id: U128
+  // resilience
+  let worker_names: Array[String] val
 
   new val create(name': String, worker_name': String,
     graph': Dag[StepInitializer val] val,
@@ -42,7 +44,8 @@ class LocalTopology
     proxy_ids': Map[String, U128] val,
     default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
       None,
-    default_state_name': String = "", default_target_id': U128 = 0)
+    default_state_name': String = "", default_target_id': U128 = 0,
+    worker_names': Array[String] val)
   =>
     _app_name = name'
     _worker_name = worker_name'
@@ -55,6 +58,8 @@ class LocalTopology
     default_target = default_target'
     default_state_name = default_state_name'
     default_target_id = default_target_id'
+    //resilience
+    worker_names = worker_names'
 
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
@@ -112,6 +117,8 @@ actor LocalTopologyInitializer
   let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
   let _local_topology_file: String
   var _worker_initializer: (WorkerInitializer | None) = None
+  let _data_channel_file: String
+  let _worker_names_file: String
   var _topology_initialized: Bool = false
 
   // Lifecycle
@@ -130,7 +137,8 @@ actor LocalTopologyInitializer
   new create(app: Application val, worker_name: String, worker_count: USize,
     env: Env, auth: AmbientAuth, connections: Connections,
     metrics_conn: MetricsSink, is_initializer: Bool, alfred: Alfred tag,
-    input_addrs: Array[Array[String]] val, local_topology_file: String)
+    input_addrs: Array[Array[String]] val, local_topology_file: String,
+    data_channel_file: String, worker_names_file: String)
   =>
     _application = app
     _worker_name = worker_name
@@ -143,6 +151,8 @@ actor LocalTopologyInitializer
     _alfred = alfred
     _input_addrs = input_addrs
     _local_topology_file = local_topology_file
+    _data_channel_file = data_channel_file
+    _worker_names_file = worker_names_file
 
   be update_topology(t: LocalTopology val) =>
     _topology = t
@@ -168,20 +178,41 @@ actor LocalTopologyInitializer
     end
 
     let data_receivers: Map[String, DataReceiver] val = consume drs
-
-    if not _is_initializer then
-      let data_notifier: TCPListenNotify iso =
-        DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
-          _is_initializer, data_receivers,
-          MetricsReporter(_application.name(), _worker_name, _metrics_conn))
-      _connections.register_listener(
-        TCPListener(_auth, consume data_notifier))
-    else
-      match worker_initializer
-      | let wi: WorkerInitializer =>
-        _connections.create_initializer_data_channel(data_receivers, wi)
+    try
+      let data_channel_filepath = FilePath(_auth, _data_channel_file)
+      if not _is_initializer then
+        let data_notifier: TCPListenNotify iso =
+          DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
+            _is_initializer, data_receivers,
+            MetricsReporter(_application.name(), _worker_name, _metrics_conn),
+            data_channel_filepath)
+          _connections.make_and_register_recoverable_listener(
+            _auth, consume data_notifier, data_channel_filepath)
+      else
+        match worker_initializer
+          | let wi: WorkerInitializer =>
+            _connections.create_initializer_data_channel(data_receivers, wi,
+            data_channel_filepath)
+        end
       end
+    else
+      @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
+
+  fun ref _save_worker_names(worker_names_filepath: FilePath,
+    worker_names: Array[String] val)
+  =>
+    """
+    Save the list of worker names to a file.
+    """
+    let file = File(worker_names_filepath)
+    for worker_name in worker_names.values() do
+      file.print(worker_name)
+      @printf[I32](("LocalTopology._save_worker_names: " + worker_name +
+      "\n").cstring())
+    end
+    file.sync()
+    file.dispose()
 
   be initialize(worker_initializer: (WorkerInitializer | None) = None) =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
@@ -218,6 +249,7 @@ actor LocalTopologyInitializer
       match _topology
       | let t: LocalTopology val =>
         ifdef "resilience" then
+          @printf[I32]("Saving topology!\n".cstring())
           try
             let local_topology_file = FilePath(_auth, _local_topology_file)
             let file = File(local_topology_file)
@@ -228,8 +260,15 @@ actor LocalTopologyInitializer
             wb.write(serialised_topology)
             file.writev(recover val wb.done() end)
           else
-            @printf[I32]("error saving topology!".cstring())
+            @printf[I32]("Error saving topology!\n".cstring())
           end
+          // save list of worker names to file
+          @printf[I32](("Saving worker names to file: " + _worker_names_file +
+            "\n").cstring())
+          let worker_names_filepath = FilePath(_auth, _worker_names_file)
+          _save_worker_names(worker_names_filepath, t.worker_names)
+
+
         end
 
         if t.is_empty() then
@@ -264,12 +303,14 @@ actor LocalTopologyInitializer
         let built_routers = Map[U128, Router val]
 
         // Keep track of steps we've built that we'll use for the OmniRouter.
-        // Unlike data_routes, these will not include state steps, which will // never be direct targets for state computation outputs.
+        // Unlike data_routes, these will not include state steps, which will
+        // never be direct targets for state computation outputs.
         let built_stateless_steps: Map[U128, CreditFlowConsumerStep] trn =
           recover Map[U128, CreditFlowConsumerStep] end
 
         // TODO: Replace this when we move past the temporary POC based default
-        // target strategy. There can currently only be one partition default // target per topology.
+        // target strategy. There can currently only be one partition default
+        // target per topology.
         var default_step_initializer: (StepInitializer val | None) = None
         var default_in_route_builder: (RouteBuilder val | None) = None
         var default_target: (Step | None) = None

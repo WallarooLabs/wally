@@ -47,4 +47,4 @@ class HomeConnectNotify is TCPConnectionNotify
     true
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print(_name + ": server closed")
+    _env.out.print("HomeConnectNotify: " + _name + ": server closed")
