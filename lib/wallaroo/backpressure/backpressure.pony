@@ -10,6 +10,9 @@ use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
 
+type SeqId is U64
+type RouteId is U64
+
 trait tag CreditFlowConsumer
   be register_producer(producer: Producer)
   be unregister_producer(producer: Producer, credits_returned: ISize)

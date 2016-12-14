@@ -2,6 +2,8 @@ use "collections"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 
+type ProducerRouteSeqId is (Producer, RouteId, SeqId)
+
 class _OutgoingToIncoming
   let _seq_id_to_incoming: Array[(SeqId, ProducerRouteSeqId)] ref
 

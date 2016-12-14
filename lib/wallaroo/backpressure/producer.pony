@@ -1,21 +1,4 @@
-use "assert"
-use "collections"
-use "time"
 use "wallaroo/topology"
-use "sendence/guid"
-
-type SeqId is U64
-type RouteId is U64
-
-primitive HashProducer
-  fun hash(o: Producer): U64 =>
-    o.hash()
-
-  fun eq(o1: Producer, o2: Producer): Bool =>
-    o1.hash() == o2.hash()
-
-  fun ne(o1: Producer, o2: Producer): Bool =>
-    o1.hash() != o2.hash()
 
 trait tag Producer
   // from CreditFlowProducer
@@ -71,4 +54,12 @@ trait tag Producer
 
     _x_resilience_routes().receive_ack(route_id, seq_id)
 
-type ProducerRouteSeqId is (Producer, RouteId, SeqId)
+primitive HashProducer
+  fun hash(o: Producer): U64 =>
+    o.hash()
+
+  fun eq(o1: Producer, o2: Producer): Bool =>
+    o1.hash() == o2.hash()
+
+  fun ne(o1: Producer, o2: Producer): Bool =>
+    o1.hash() != o2.hash()
