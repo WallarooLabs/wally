@@ -60,6 +60,30 @@ primitive FilterBuilder[In: Any val]
   fun apply(): Computation[In, In] val =>
     Filter[In]
 
+primitive StateFilter[In: Any val] is StateComputation[In, None, String]
+  fun name(): String => "statefilter"
+  fun apply(msg: In,
+    sc_repo: StateChangeRepository[String],
+    state: String): (None, (StateChange[String] ref | None))
+  =>
+    match msg 
+    | let m: CPPData val => m.delete_obj()
+    end
+    (None, None)
+
+  fun state_change_builders(): Array[StateChangeBuilder[String] val] val =>
+    recover val
+      Array[StateChangeBuilder[String] val]
+    end
+
+class val DataBuilder
+  fun apply(): String => "FOO"
+  fun name(): String => "FOO"
+
+primitive StateFilterBuilder[In: Any val]
+  fun apply(): StateComputation[In, None, String] val =>
+    StateFilter[In]
+
 actor Main
   new create(env: Env) =>
     try
@@ -70,12 +94,15 @@ actor Main
       let application = recover val
         Application("Passthrough Topology")
           .new_pipeline[CPPData val, CPPData val]("source-decoder", recover CPPSourceDecoder(@get_source_decoder()) end)
-          .to[CPPData val](ComputationFactory)
+          //.to[CPPData val](ComputationFactory)
+          //.to_stateful[CPPData val, String](
+          //  StateFilter[CPPData val],
+          //  DataBuilder, "state-builder")
+          .to_stateful[CPPData val, CPPState](
+            state_computation_factory(),
+            ArizonaStateBuilder, "state-builder")
           .done()
           // NO PARTITION
-          // .to_stateful[CPPData val, CPPState](
-          //   computation_factory(),
-          //   ArizonaStateBuilder, "state-builder")
 
           // PARTITIONED
           // .to_state_partition[CPPData val, CPPKey val, CPPData val, CPPState](
