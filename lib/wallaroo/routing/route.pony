@@ -1,5 +1,6 @@
 use "sendence/guid"
 use "wallaroo/messages"
+use "wallaroo/topology"
 
 trait Route
   fun ref application_created()

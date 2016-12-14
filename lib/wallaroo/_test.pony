@@ -6,7 +6,7 @@ This package represents the unit test suite for Wallaroo.
 All tests can be run by compiling and running this package.
 """
 use "ponytest"
-use backpressure = "backpressure"
+use routing = "routing"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -16,4 +16,4 @@ actor Main is TestList
     None
 
   fun tag tests(test: PonyTest) =>
-    backpressure.Main.make().tests(test)
+    routing.Main.make().tests(test)

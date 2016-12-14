@@ -1,10 +1,10 @@
 use "collections"
 use "net"
 use "time"
-use "wallaroo/backpressure"
 use "wallaroo/messages"
 use "wallaroo/network"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 use "wallaroo/topology"
 
 
@@ -122,7 +122,7 @@ be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
 fun ref recoup_credits(credits: ISize) =>
   None
 
-fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
+fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
   None
 
 fun ref next_sequence_id(): U64 =>

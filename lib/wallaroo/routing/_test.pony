@@ -447,7 +447,7 @@ actor _TestProducer is Producer
 
   fun ref recoup_credits(credits: ISize) => None
 
-  fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
+  fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
     None
 
   fun ref next_sequence_id(): U64 =>

@@ -2,6 +2,7 @@ use "collections"
 use "time"
 use "wallaroo/fail"
 use "wallaroo/invariant"
+use "wallaroo/topology"
 
 class Routes
   """

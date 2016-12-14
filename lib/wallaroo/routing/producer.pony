@@ -1,10 +1,8 @@
-use "wallaroo/topology"
-
 trait tag Producer
   // from CreditFlowProducer
   be receive_credits(credits: ISize, from: CreditFlowConsumer)
   fun ref recoup_credits(credits: ISize)
-  fun ref route_to(c: CreditFlowConsumerStep): (Route | None)
+  fun ref route_to(c: CreditFlowConsumer): (Route | None)
   fun ref next_sequence_id(): U64
 
   // from Origin

@@ -5,7 +5,6 @@ use "net"
 use "time"
 use "sendence/guid"
 use "sendence/wall-clock"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/initialization"
@@ -13,6 +12,7 @@ use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 use "wallaroo/tcp-sink"
 
 // TODO: CREDITFLOW- Every runnable step is also a credit flow consumer
@@ -359,7 +359,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       Fail()
     end
 
-  fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
+  fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
     try
       _routes(c)
     else

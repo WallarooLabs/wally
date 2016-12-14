@@ -1,8 +1,8 @@
 use "collections"
 use "net"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/messages"
+use "wallaroo/routing"
 use "wallaroo/tcp-sink"
 
 interface Router

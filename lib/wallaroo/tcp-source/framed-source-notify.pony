@@ -1,11 +1,11 @@
 use "time"
 use "sendence/guid"
 use "sendence/wall-clock"
-use "wallaroo/backpressure"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 use "wallaroo/topology"
 
 

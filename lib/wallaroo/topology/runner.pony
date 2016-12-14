@@ -5,11 +5,11 @@ use "time"
 use "sendence/guid"
 use "sendence/wall-clock"
 use "sendence/weighted"
-use "wallaroo/backpressure"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 
 
 // TODO: Eliminate producer None when we can

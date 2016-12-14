@@ -2,11 +2,11 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
+use "wallaroo/routing"
 use "wallaroo/tcp-sink"
 use "wallaroo/topology"
 
@@ -191,7 +191,7 @@ actor TCPSource is Producer
       end
     end
 
-  fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
+  fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
     try
       _routes(c)
     else

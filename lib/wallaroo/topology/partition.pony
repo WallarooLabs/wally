@@ -2,13 +2,13 @@ use "collections"
 use "files"
 use "net"
 use "sendence/guid"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 
 type WeightedKey[Key: (Hashable val & Equatable[Key])] is
   (Key, USize)

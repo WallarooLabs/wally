@@ -1,6 +1,7 @@
 use "collections"
 use "wallaroo/fail"
 use "wallaroo/invariant"
+use "wallaroo/topology"
 
 type ProducerRouteSeqId is (Producer, RouteId, SeqId)
 

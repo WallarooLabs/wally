@@ -1,7 +1,6 @@
 use "collections"
 use "net"
 use "sendence/guid"
-use "wallaroo/backpressure"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -9,6 +8,7 @@ use "wallaroo/network"
 use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 use "wallaroo/topology"
 
 class Application
