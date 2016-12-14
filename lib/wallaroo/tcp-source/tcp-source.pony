@@ -556,11 +556,11 @@ actor TCPSource is Producer
     end
 
 class TCPSourceRouteCallbackHandler is RouteCallbackHandler
-  let _registered_routes: SetIs[Route tag] = _registered_routes.create()
+  let _registered_routes: SetIs[RouteLogic tag] = _registered_routes.create()
   var _muted: ISize = 0
   let _timers: Timers = Timers
 
-  fun ref register(producer: Producer ref, r: Route tag) =>
+  fun ref register(producer: Producer ref, r: RouteLogic tag) =>
     ifdef debug then
       Invariant(not _registered_routes.contains(r))
     end
@@ -583,7 +583,7 @@ class TCPSourceRouteCallbackHandler is RouteCallbackHandler
       Fail()
     end
 
-  fun ref credits_initialized(producer: Producer ref, r: Route tag) =>
+  fun ref credits_initialized(producer: Producer ref, r: RouteLogic tag) =>
     ifdef debug then
       Invariant(_registered_routes.contains(r))
     end

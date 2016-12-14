@@ -80,7 +80,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   // Lifecycle
   var _initializer: (LocalTopologyInitializer | None) = None
   var _initialized: Bool = false
-  var _ready_to_work_routes: SetIs[Route] = _ready_to_work_routes.create()
+  var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
 
   // Resilience routes
   // TODO: This needs to be merged with credit flow producer routes
@@ -144,7 +144,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
     _initializer = initializer
 
-  fun ref report_route_ready_to_work(r: Route) =>
+  fun ref report_route_ready_to_work(r: RouteLogic) =>
     if not _ready_to_work_routes.contains(r) then
       _ready_to_work_routes.set(r)
       // @printf[I32]("Reporting. routes: %d, ready: %d\n".cstring(),
@@ -476,14 +476,14 @@ actor Step is (RunnableStep & Resilient & Producer &
     _distributable_credits >= _minimum_credit_response
 
 class StepRouteCallbackHandler is RouteCallbackHandler
-  fun ref register(producer: Producer ref, r: Route tag) =>
+  fun ref register(producer: Producer ref, r: RouteLogic tag) =>
     None
 
   fun shutdown(producer: Producer ref) =>
     // TODO: CREDITFLOW - What is our error handling?
     None
 
-  fun ref credits_initialized(producer: Producer ref, r: Route tag) =>
+  fun ref credits_initialized(producer: Producer ref, r: RouteLogic tag) =>
     None
 
   fun ref credits_replenished(producer: Producer ref) =>
