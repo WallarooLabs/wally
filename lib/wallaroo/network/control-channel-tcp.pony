@@ -1,6 +1,7 @@
 use "net"
 use "collections"
 use "time"
+use "files"
 use "sendence/bytes"
 use "wallaroo/initialization"
 use "wallaroo/messages"
@@ -18,11 +19,13 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _local_topology_initializer: LocalTopologyInitializer
   let _connections: Connections
   let _alfred: Alfred tag
+  let _recovery_file: FilePath
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     initializer: (WorkerInitializer | None) = None,
-    local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag)
+    local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag,
+    recovery_file: FilePath)
   =>
     _env = env
     _auth = auth
@@ -32,12 +35,18 @@ class ControlChannelListenNotifier is TCPListenNotify
     _local_topology_initializer = local_topology_initializer
     _connections = connections
     _alfred = alfred
+    _recovery_file = recovery_file
 
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
+      let f = File(_recovery_file)
+      f.print(_host)
+      f.print(_service)
+      f.sync()
+      f.dispose()
       _env.out.print(_name + " control: listening on " + _host + ":" + _service)
-      if not _is_initializer then
+      if not (_is_initializer and _recovery_file.exists()) then
         let message = ChannelMsgEncoder.identify_control_port(_name, 
           _service, _auth)
         _connections.send_control("initializer", message)
@@ -151,7 +160,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _env.out.print(_name + ": connection failed!")
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print(_name + ": server closed")
+    _env.out.print("ControlChannelConnectNotifier :" + _name + ": server closed")
 
 class ControlSenderConnectNotifier is TCPConnectionNotify
   let _env: Env
