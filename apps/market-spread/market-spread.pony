@@ -53,6 +53,7 @@ use "sendence/new-fix"
 use "sendence/wall-clock"
 use "wallaroo"
 use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
@@ -100,16 +101,15 @@ actor Main
 
       let application = recover val
         Application("Market Spread App")
-          .new_pipeline[FixOrderMessage val, OrderResult val](
+          .new_pipeline[FixOrderMessage val](
             "Orders", FixOrderFrameHandler)
             // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
             .to_state_partition[Symboly val, String,
-              (OrderResult val | None), SymbolData](CheckOrder,
+              (Array[ByteSeq] val | None), SymbolData](CheckOrder,
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
-            .to_sink(OrderResultEncoder, recover [0] end,
-              initial_report_msgs)
-          .new_pipeline[FixNbboMessage val, None](
+            .to_sink(recover [0] end, initial_report_msgs)
+          .new_pipeline[FixNbboMessage val](
             "Nbbo", FixNbboFrameHandler
               where init_file = init_file)
             .to_state_partition[Symboly val, String, None,
@@ -223,17 +223,17 @@ primitive UpdateNbbo is StateComputation[FixNbboMessage val, None, SymbolData]
       scbs.push(recover val SymbolDataStateChangeBuilder end)
     end
 
-class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
+class CheckOrder is StateComputation[FixOrderMessage val, Array[ByteSeq] val,
   SymbolData]
   fun name(): String => "Check Order against NBBO"
 
   fun apply(msg: FixOrderMessage val,
     sc_repo: StateChangeRepository[SymbolData],
-    state: SymbolData): ((OrderResult val | None), None)
+    state: SymbolData): ((Array[ByteSeq] val | None), None)
   =>
     // @printf[I32]("!!CheckOrder\n".cstring())
     if state.should_reject_trades then
-      let res = OrderResult(msg, state.last_bid, state.last_offer,
+      let res = OrderResultEncoder(msg, state.last_bid, state.last_offer,
         Time.nanos())
       (res, None)
     else
@@ -311,31 +311,65 @@ class OrderResult
       .append(offer.string()).append(", ")
       .append(timestamp.string())).clone()
 
+primitive EmptyEncoder
+  fun apply(a: Array[ByteSeq] val, wb: Writer = Writer): Array[ByteSeq] val =>
+    a
+
 primitive OrderResultEncoder
-  fun apply(r: OrderResult val, wb: Writer = Writer): Array[ByteSeq] val =>
+  fun apply(order: FixOrderMessage val, bid: F64, offer: F64, timestamp: U64):
+    Array[ByteSeq] val
+  =>
     ifdef "market_results" then
-      @printf[I32](("!!" + r.order.order_id() + " " + r.order.symbol() + "\n").cstring())
+      @printf[I32](("!!" + order.order_id() + " " + order.symbol() + "\n").cstring())
     end
+    //
+    // msgs_size(4) | side(1) | account(4) | order_id(6) | symbol(4) |
+    //   order_qty(8) | price(8) | bid(8) | offer(8) | timestamp(8)
+    //
+
+    var payload: Array[U8] iso = recover Array[U8](59) end
+
+    // //Payload header (size == 59 bytes)
+    // payload = Bytes.from_u32(59, consume payload)
+
     //Header (size == 55 bytes)
-    let msgs_size: USize = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
-    wb.u32_be(msgs_size.u32())
+    let msgs_size: U32 = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
+    payload = Bytes.from_u32(msgs_size, consume payload)
+
     //Fields
-    match r.order.side()
-    | Buy => wb.u8(SideTypes.buy())
-    | Sell => wb.u8(SideTypes.sell())
+    let side: U8 = match order.side()
+    | Buy => SideTypes.buy()
+    | Sell => SideTypes.sell()
+    else
+      Fail()
+      0
     end
-    wb.u32_be(r.order.account())
-    wb.write(r.order.order_id().array()) // assumption: 6 bytes
-    wb.write(r.order.symbol().array()) // assumption: 4 bytes
-    wb.f64_be(r.order.order_qty())
-    wb.f64_be(r.order.price())
-    wb.f64_be(r.bid)
-    wb.f64_be(r.offer)
-    wb.u64_be(r.timestamp)
-    let payload = wb.done()
-    HubProtocol.payload("rejected-orders", "reports:market-spread",
-      consume payload, wb)
-    wb.done()
+    payload.push(side)
+
+    payload = Bytes.from_u32(order.account(), consume payload)
+
+    ifdef debug then
+      Invariant(order.order_id().array().size() == 6)
+      Invariant(order.symbol().array().size() == 4)
+    end
+
+    // ASSUMPTION: 6 bytes
+    for byte in order.order_id().array().values() do
+      payload.push(byte)
+    end
+    // ASSUMPTION: 4 bytes
+    for byte in order.symbol().array().values() do
+      payload.push(byte)
+    end
+
+    payload = Bytes.from_f64(order.order_qty(), consume payload)
+    payload = Bytes.from_f64(order.price(), consume payload)
+    payload = Bytes.from_f64(bid, consume payload)
+    payload = Bytes.from_f64(offer, consume payload)
+    payload = Bytes.from_u64(timestamp, consume payload)
+
+    HubProtocol.payload_into_array("rejected-orders",
+      "reports:market-spread", consume payload)
 
 class LegalSymbols
   let symbols: Array[String] val

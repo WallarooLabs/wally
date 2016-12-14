@@ -54,19 +54,16 @@ actor EmptySink is CreditFlowConsumerStep
     None
 
 class TCPSinkBuilder
-  let _encoder_wrapper: EncoderWrapper val
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
-  new val create(encoder_wrapper: EncoderWrapper val,
-    initial_msgs: Array[Array[ByteSeq] val] val)
+  new val create(initial_msgs: Array[Array[ByteSeq] val] val)
   =>
-    _encoder_wrapper = encoder_wrapper
     _initial_msgs = initial_msgs
 
   fun apply(reporter: MetricsReporter iso, host: String, service: String):
     TCPSink
   =>
-    TCPSink(_encoder_wrapper, consume reporter, host, service,
+    TCPSink(consume reporter, host, service,
       _initial_msgs)
 
 actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
@@ -99,7 +96,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     was acknowleged.)
   """
   // Steplike
-  let _encoder: EncoderWrapper val
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
 
@@ -137,9 +133,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   // Origin (Resilience)
   let _terminus_route: TerminusRoute ref = recover ref TerminusRoute end
 
-  new create(encoder_wrapper: EncoderWrapper val,
-    metrics_reporter: MetricsReporter iso, host: String, service: String,
-    initial_msgs: Array[Array[ByteSeq] val] val,
+  new create(metrics_reporter: MetricsReporter iso, host: String,
+    service: String, initial_msgs: Array[Array[ByteSeq] val] val,
     from: String = "", init_size: USize = 64, max_size: USize = 16384)
   =>
     """
@@ -148,7 +143,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     _max_distributable_credits =
       _max_distributable_credits.usize().next_pow2().isize()
-    _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
@@ -184,9 +178,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     ifdef "trace" then
       @printf[I32]("Rcvd msg at TCPSink\n".cstring())
     end
-    try
-      let encoded = _encoder.encode[D](data, _wb)
 
+    match data
+    | let encoded: Array[ByteSeq] val =>
       let tracking_id = ifdef "resilience" then
         _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
       else
@@ -209,8 +203,10 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
         time_spent + pipeline_time_spent)
       _metrics_reporter.worker_metric(metric_name, time_spent)
     else
+      @printf[I32]("A pipeline must end by outputting an Array[ByteSeq] val.")
       Fail()
     end
+
     // DO NOT REMOVE. THIS IS AN INTENTIONAL GC
     @pony_triggergc[None](this)
 

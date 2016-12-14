@@ -26,19 +26,19 @@ class Application
   new create(name': String) =>
     _name = name'
 
-  fun ref new_pipeline[In: Any val, Out: Any val] (
+  fun ref new_pipeline[In: Any val] (
     pipeline_name: String, decoder: FramedSourceHandler[In] val,
     init_file: (InitFile val | None) = None, coalescing: Bool = true):
-      PipelineBuilder[In, Out, In]
+      PipelineBuilder[In, In]
   =>
     let pipeline_id = pipelines.size()
     match init_file
     | let f: InitFile val =>
       add_init_file(pipeline_id, f)
     end
-    let pipeline = Pipeline[In, Out](_name, pipeline_id, pipeline_name,
+    let pipeline = Pipeline[In](_name, pipeline_id, pipeline_name,
       decoder, coalescing)
-    PipelineBuilder[In, Out, In](this, pipeline)
+    PipelineBuilder[In, In](this, pipeline)
 
   // TODO: Replace this with a better approach.  This is a shortcut to get
   // the POC working and handle unknown bucket in the partition.
@@ -103,7 +103,7 @@ trait BasicPipeline
   fun apply(i: USize): RunnerBuilder val ?
   fun size(): USize
 
-class Pipeline[In: Any val, Out: Any val] is BasicPipeline
+class Pipeline[In: Any val] is BasicPipeline
   let _pipeline_id: USize
   let _name: String
   let _decoder: FramedSourceHandler[In] val
@@ -152,27 +152,27 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 
   fun name(): String => _name
 
-class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
+class PipelineBuilder[In: Any val, Last: Any val]
   let _a: Application
-  let _p: Pipeline[In, Out]
+  let _p: Pipeline[In]
 
-  new create(a: Application, p: Pipeline[In, Out]) =>
+  new create(a: Application, p: Pipeline[In]) =>
     _a = a
     _p = p
 
   fun ref to[Next: Any val](
     comp_builder: ComputationBuilder[Last, Next] val,
-    id: U128 = 0): PipelineBuilder[In, Out, Next]
+    id: U128 = 0): PipelineBuilder[In, Next]
   =>
     let next_builder = ComputationRunnerBuilder[Last, Next](comp_builder,
       TypedRouteBuilder[Next])
     _p.add_runner_builder(next_builder)
-    PipelineBuilder[In, Out, Next](_a, _p)
+    PipelineBuilder[In, Next](_a, _p)
 
   fun ref to_stateful[Next: Any val, State: Any #read](
     s_comp: StateComputation[Last, Next, State] val,
     s_initializer: StateBuilder[State] val,
-    state_name: String): PipelineBuilder[In, Out, Next]
+    state_name: String): PipelineBuilder[In, Next]
   =>
     // TODO: This is a shortcut. Non-partitioned state is being treated as a
     // special case of partitioned state with one partition. This works but is
@@ -202,7 +202,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     _a.add_state_builder(state_name, state_builder)
 
-    PipelineBuilder[In, Out, Next](_a, _p)
+    PipelineBuilder[In, Next](_a, _p)
 
   fun ref to_state_partition[PIn: Any val,
     Key: (Hashable val & Equatable[Key]), Next: Any val = PIn,
@@ -213,7 +213,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
       partition: Partition[PIn, Key] val,
       multi_worker: Bool = false,
       default_state_name: String = ""
-    ): PipelineBuilder[In, Out, Next]
+    ): PipelineBuilder[In, Next]
   =>
     let guid_gen = GuidGenerator
     let step_id_map: Map[Key, U128] trn = recover Map[Key, U128] end
@@ -248,18 +248,18 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
 
     _a.add_state_builder(state_name, state_builder)
 
-    PipelineBuilder[In, Out, Next](_a, _p)
+    PipelineBuilder[In, Next](_a, _p)
 
   fun ref done(): Application ? =>
     _a.add_pipeline(_p as BasicPipeline)
     _a
 
-  fun ref to_sink(encoder: SinkEncoder[Out] val,
-    sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val
+  fun ref to_sink(sink_ids: Array[U64] val,
+    initial_msgs: Array[Array[ByteSeq] val] val
       = recover Array[Array[ByteSeq] val] end): Application ?
   =>
     let sink_builder: TCPSinkBuilder val =
-      TCPSinkBuilder(TypedEncoderWrapper[Out](encoder), initial_msgs)
+      TCPSinkBuilder(initial_msgs)
     _p.update_sink(sink_builder, sink_ids)
     _a.add_pipeline(_p as BasicPipeline)
     _a
