@@ -1,4 +1,5 @@
 use "collections"
+use "files"
 use "net"
 use "sendence/dag"
 use "sendence/guid"
@@ -17,9 +18,8 @@ actor ApplicationInitializer
   let _input_addrs: Array[Array[String]] val
   let _output_addr: Array[String] val
   let _alfred: Alfred tag
-
   var _application: (Application val | None) = None
-
+  
   new create(auth: AmbientAuth,
     local_topology_initializer: LocalTopologyInitializer,
     input_addrs: Array[Array[String]] val,
@@ -764,7 +764,8 @@ actor ApplicationInitializer
             LocalTopology(application.name(), w, g.clone(),
               sendable_step_map, state_subpartitions, sendable_pre_state_data,
               consume p_ids, default_target, application.default_state_name,
-              application.default_target_id)
+              application.default_target_id,
+              worker_names)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error
