@@ -89,13 +89,6 @@ class _RouteLogic is RouteLogic
   fun max_credits(): ISize =>
     _max_credits
 
-  fun ref _report_ready_to_work() =>
-    _credit_receiver = _ReadyRoute
-    match _step
-    | let s: Step ref =>
-      s.report_route_ready_to_work(this)
-    end
-
   fun ref receive_credits(credits: ISize) =>
     _credit_receiver.receive_credits(this, credits)
 
@@ -114,6 +107,14 @@ class _RouteLogic is RouteLogic
 
   fun ref _credits_initialized() =>
     _callback.credits_initialized(_step, this)
+    _report_ready_to_work()
+
+  fun ref _report_ready_to_work() =>
+    _credit_receiver = _ReadyRoute
+    match _step
+    | let s: Step ref =>
+      s.report_route_ready_to_work(this)
+    end
 
   fun ref _recoup_credits(credits: ISize) =>
     _credits_available = _credits_available + credits

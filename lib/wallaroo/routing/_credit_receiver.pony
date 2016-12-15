@@ -34,7 +34,6 @@ class ref _NotYetReadyRoute is _CreditReceiver
     route._update_request_more_credits_after(route.credits_available() -
       (route.credits_available() >> 2))
     route._credits_initialized()
-    route._report_ready_to_work()
 
 class ref _ReadyRoute is _CreditReceiver
   fun ref receive_credits(route: _RouteLogic, credits: ISize) =>
