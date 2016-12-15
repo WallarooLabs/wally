@@ -155,21 +155,27 @@ class _EmptyRouteLogic is RouteLogic
   fun ref application_initialized(new_max_credits: ISize, step_type: String) =>
     Fail()
     None
+
   fun ref register_with_callback() =>
     Fail()
     None
+
   fun ref receive_credits(credits: ISize) =>
     Fail()
     None
+
   fun credits_available(): ISize =>
     Fail()
     0
+
   fun ref use_credit() =>
     Fail()
     None
+
   fun ref try_request(): Bool =>
     Fail()
     true
+
   fun ref dispose() =>
     Fail()
     None
