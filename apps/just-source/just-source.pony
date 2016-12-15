@@ -41,6 +41,7 @@ actor Main
 primitive Filter[In: Any val]
   fun name(): String => "filter"
   fun apply(r: In): None =>
+    @printf[I32]("HI\n".cstring())
     None
 
 primitive FilterBuilder[In: Any val]
