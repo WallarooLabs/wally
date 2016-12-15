@@ -1,14 +1,14 @@
 use "wallaroo/fail"
 use "wallaroo/invariant"
 
-interface CreditReceiver
+interface _CreditReceiver
   fun ref receive_credits(credits: ISize)
 
-class EmptyCreditReceiver
+class _EmptyCreditReceiver
   fun ref receive_credits(credits: ISize) =>
     Fail()
 
-class PreparingToWorkCreditReceiver
+class _PreparingToWorkCreditReceiver
   let _route: _RouteLogic
 
   new create(r: _RouteLogic) =>
@@ -44,7 +44,7 @@ class PreparingToWorkCreditReceiver
     _route._credits_initialized()
     _route._report_ready_to_work()
 
-class WorkingCreditReceiver
+class _WorkingCreditReceiver
   let _route: _RouteLogic
   let _route_type: String
   let _step_type: String
