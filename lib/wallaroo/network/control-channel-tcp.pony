@@ -107,6 +107,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _env.err.print("Error reading header on control channel")
       end
     else
+      ifdef "trace" then
+        @printf[I32]("Received msg on Control Channel\n".cstring())
+      end
       let msg = ChannelMsgDecoder(consume data, _auth)
       match msg
       | let m: IdentifyControlPortMsg val =>

@@ -179,6 +179,8 @@ cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock -w -l 0.0.0.0:5555
 ```
 
+Make sure you have the same binary on both machines or you'll get segfaults with serialization.
+
 Machine 1:
 ```
 sudo cset proc -s user -e numactl -- -C 1-12,17 chrt -f 80 ~/buffy/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 12 --ponypinasio --ponynoblock -t -w 2
