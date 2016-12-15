@@ -40,16 +40,24 @@ class DataChannelListenNotifier is TCPListenNotify
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
-      let f = File(_recovery_file)
-      f.print(_host)
-      f.print(_service)
-      f.sync()
-      f.dispose()
-      _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
-      if not (_is_initializer and _recovery_file.exists()) then
-        let message = ChannelMsgEncoder.identify_data_port(_name, _service,
-          _auth)
-        _connections.send_control("initializer", message)
+      ifdef "resilience" then
+        let f = File(_recovery_file)
+        f.print(_host)
+        f.print(_service)
+        f.sync()
+        f.dispose()
+        if not (_is_initializer or _recovery_file.exists()) then
+          let message = ChannelMsgEncoder.identify_data_port(_name, _service,
+            _auth)
+          _connections.send_control("initializer", message)
+        end
+      else
+        _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
+        if not _is_initializer then
+          let message = ChannelMsgEncoder.identify_data_port(_name, _service,
+            _auth)
+          _connections.send_control("initializer", message)
+        end
       end
     else
       _env.out.print(_name + "control : couldn't get local address")
@@ -99,7 +107,6 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       match ChannelMsgDecoder(consume data, _auth)
       | let data_msg: DataMsg val =>
         try
-
           _metrics_reporter.step_metric(data_msg.metric_name,
             "Before receive on data channel (network time)", data_msg.metrics_id,
             data_msg.latest_ts, ingest_ts)
@@ -167,8 +174,8 @@ class DataChannelConnectNotifier is TCPConnectionNotify
     _env.out.print("DataChannelConnectNotifier : server closed")
     //TODO: Initiate reconnect to downstream node here. We need to
     //      create a new connection in OutgoingBoundary
-    
-    
+
+
 // class DataSenderConnectNotifier is TCPConnectionNotify
 //   let _env: Env
 

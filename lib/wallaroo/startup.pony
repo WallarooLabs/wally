@@ -5,6 +5,7 @@ use "net"
 use "options"
 use "time"
 use "sendence/hub"
+use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -153,6 +154,11 @@ actor Startup
 
       if is_initializer then
         env.out.print("Running as Initializer...")
+        // TODO: Currently, an initializer cannot recover because it's
+        // the home of sources.
+        ifdef "resilience" then
+          Fail()
+        end
         let application_initializer = ApplicationInitializer(auth,
           local_topology_initializer, input_addrs, o_addr, alfred)
 
@@ -168,28 +174,38 @@ actor Startup
         is_initializer, worker_initializer, local_topology_initializer,
         alfred, control_channel_filepath)
 
-      if is_initializer then
-        connections.make_and_register_recoverable_listener(
-          auth, consume control_notifier, control_channel_filepath,
-          c_host, c_service)
+      ifdef "resilience" then
+        if is_initializer then
+          connections.make_and_register_recoverable_listener(
+            auth, consume control_notifier, control_channel_filepath,
+            c_host, c_service)
+        else
+          connections.make_and_register_recoverable_listener(
+            auth, consume control_notifier, control_channel_filepath)
+        end
       else
-        connections.make_and_register_recoverable_listener(
-          auth, consume control_notifier, control_channel_filepath)
+        if is_initializer then
+          connections.register_listener(
+            TCPListener(auth, consume control_notifier, c_host, c_service))
+        else
+          connections.register_listener(
+            TCPListener(auth, consume control_notifier))
+        end
       end
 
-      // If the file worker_names_file exists we need to recover the list of
-      // known workers and recreate the data receivers
-      let worker_names_filepath: FilePath = FilePath(auth, worker_names_file)
-      if worker_names_filepath.exists() then
-        let recovered_workers = _recover_worker_names(worker_names_filepath)
-        local_topology_initializer.create_data_receivers(recovered_workers,
-          worker_initializer)
+      ifdef "resilience" then
+        // If the file worker_names_file exists we need to recover the list of
+        // known workers and recreate the data receivers
+        let worker_names_filepath: FilePath = FilePath(auth, worker_names_file)
+        if worker_names_filepath.exists() then
+          let recovered_workers = _recover_worker_names(worker_names_filepath)
+          local_topology_initializer.create_data_receivers(recovered_workers,
+            worker_initializer)
+        end
       end
 
       // TODO: We are not recreating the control channel connection from upstream!
-      // TODO: An initializer cannot recover in this way. Make sure that we fail
-      //       immediately if an initializer tries to recover.
-      
+
       match worker_initializer
       | let w: WorkerInitializer =>
         w.start(application)
@@ -215,4 +231,4 @@ actor Startup
     end
 
     ws
-    
+

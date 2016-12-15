@@ -40,14 +40,13 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
-      let f = File(_recovery_file)
-      f.print(_host)
-      f.print(_service)
-      f.sync()
-      f.dispose()
-      _env.out.print(_name + " control: listening on " + _host + ":" + _service)
       ifdef "resilience" then
-        if not (_is_initializer and _recovery_file.exists()) then
+        let f = File(_recovery_file)
+        f.print(_host)
+        f.print(_service)
+        f.sync()
+        f.dispose()
+        if not (_is_initializer or _recovery_file.exists()) then
           let message = ChannelMsgEncoder.identify_control_port(_name,
             _service, _auth)
           _connections.send_control("initializer", message)
@@ -59,6 +58,7 @@ class ControlChannelListenNotifier is TCPListenNotify
           _connections.send_control("initializer", message)
         end
       end
+      _env.out.print(_name + " control: listening on " + _host + ":" + _service)
     else
       _env.out.print(_name + "control : couldn't get local address")
       listen.close()

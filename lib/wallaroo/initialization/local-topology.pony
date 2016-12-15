@@ -186,8 +186,14 @@ actor LocalTopologyInitializer
             _is_initializer, data_receivers,
             MetricsReporter(_application.name(), _worker_name, _metrics_conn),
             data_channel_filepath)
+
+        ifdef "resilience" then
           _connections.make_and_register_recoverable_listener(
             _auth, consume data_notifier, data_channel_filepath)
+        else
+          _connections.register_listener(TCPListener(_auth,
+            consume data_notifier))
+        end
       else
         match worker_initializer
           | let wi: WorkerInitializer =>
