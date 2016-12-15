@@ -46,10 +46,18 @@ class ControlChannelListenNotifier is TCPListenNotify
       f.sync()
       f.dispose()
       _env.out.print(_name + " control: listening on " + _host + ":" + _service)
-      if not (_is_initializer and _recovery_file.exists()) then
-        let message = ChannelMsgEncoder.identify_control_port(_name, 
-          _service, _auth)
-        _connections.send_control("initializer", message)
+      ifdef "resilience" then
+        if not (_is_initializer and _recovery_file.exists()) then
+          let message = ChannelMsgEncoder.identify_control_port(_name,
+            _service, _auth)
+          _connections.send_control("initializer", message)
+        end
+      else
+        if not _is_initializer then
+          let message = ChannelMsgEncoder.identify_control_port(_name,
+            _service, _auth)
+          _connections.send_control("initializer", message)
+        end
       end
     else
       _env.out.print(_name + "control : couldn't get local address")
@@ -61,7 +69,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    ControlChannelConnectNotifier(_name, _env, _auth, _connections, 
+    ControlChannelConnectNotifier(_name, _env, _auth, _connections,
       _initializer, _local_topology_initializer, _alfred)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
@@ -74,9 +82,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _alfred: Alfred tag
   var _header: Bool = true
 
-  new iso create(name: String, env: Env, auth: AmbientAuth, 
+  new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, initializer: (WorkerInitializer | None),
-    local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag) 
+    local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag)
   =>
     _env = env
     _auth = auth
@@ -133,7 +141,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           i.topology_ready(m.worker_name)
         end
       | let m: CreateConnectionsMsg val =>
-        _connections.create_connections(m.addresses, 
+        _connections.create_connections(m.addresses,
           _local_topology_initializer)
       | let m: ConnectionsReadyMsg val =>
         match _initializer
