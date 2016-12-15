@@ -43,8 +43,7 @@ class _RouteLogic is RouteLogic
   var _credits_available: ISize = 0
   var _request_more_credits_after: ISize = 0
   var _request_outstanding: Bool = false
-
-  var _credit_receiver: _CreditReceiver = _EmptyCreditReceiver
+  var _credit_receiver: _CreditReceiver
 
   new create(step: Producer ref, consumer: CreditFlowConsumer,
     handler: RouteCallbackHandler, r_type: String)
@@ -53,7 +52,7 @@ class _RouteLogic is RouteLogic
     _consumer = consumer
     _callback = handler
     _route_type = r_type
-    _credit_receiver = _PreparingToWorkCreditReceiver(this)
+    _credit_receiver = _NotYetReadyRoute
 
   fun ref application_initialized(new_max_credits: ISize, step_type: String) =>
     _step_type = step_type
@@ -91,14 +90,14 @@ class _RouteLogic is RouteLogic
     _max_credits
 
   fun ref _report_ready_to_work() =>
-    _credit_receiver = _WorkingCreditReceiver(this, _step_type, _route_type)
+    _credit_receiver = _ReadyRoute
     match _step
     | let s: Step ref =>
       s.report_route_ready_to_work(this)
     end
 
   fun ref receive_credits(credits: ISize) =>
-    _credit_receiver.receive_credits(credits)
+    _credit_receiver.receive_credits(this, credits)
 
   fun ref try_request(): Bool =>
     if _credits_available == 0 then
