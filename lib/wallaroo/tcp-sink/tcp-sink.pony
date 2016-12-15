@@ -1,14 +1,14 @@
-use "assert"
 use "buffered"
 use "collections"
 use "net"
 use "time"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
+use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/routing"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -17,57 +17,6 @@ use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
 use @pony_asio_event_destroy[None](event: AsioEventID)
-
-actor EmptySink is CreditFlowConsumerStep
-  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    ifdef "trace" then
-      @printf[I32]("Rcvd msg at EmptySink\n".cstring())
-    end
-    None
-
-  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, origin: Producer, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  =>
-    None
-
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
-  =>
-    None
-
-  be register_producer(producer: Producer) =>
-    None
-
-  be unregister_producer(producer: Producer, credits_returned: ISize) =>
-    None
-
-  be credit_request(from: Producer) =>
-    None
-
-  be return_credits(credits: ISize) =>
-    None
-
-class TCPSinkBuilder
-  let _encoder_wrapper: EncoderWrapper val
-  let _initial_msgs: Array[Array[ByteSeq] val] val
-
-  new val create(encoder_wrapper: EncoderWrapper val,
-    initial_msgs: Array[Array[ByteSeq] val] val)
-  =>
-    _encoder_wrapper = encoder_wrapper
-    _initial_msgs = initial_msgs
-
-  fun apply(reporter: MetricsReporter iso, host: String, service: String):
-    TCPSink
-  =>
-    TCPSink(_encoder_wrapper, consume reporter, host, service,
-      _initial_msgs)
 
 actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   """
@@ -107,6 +56,11 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _upstreams: Array[Producer] = _upstreams.create()
   var _max_distributable_credits: ISize = 350_000
   var _distributable_credits: ISize = _max_distributable_credits
+  let _permanent_max_credit_response: ISize = 1024
+  var _max_credit_response: ISize = _permanent_max_credit_response
+  var _minimum_credit_response: ISize = 250
+  var _waiting_producers: Array[Producer] = _waiting_producers.create()
+  var _backpressure_seq_id: U64 = 1
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -146,8 +100,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    _max_distributable_credits =
-      _max_distributable_credits.usize().next_pow2().isize()
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
@@ -160,13 +112,23 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       from.cstring())
     _notify_connecting()
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  //
+  // Application Lifecycle events
+  //
+
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
+  be application_created(initializer: LocalTopologyInitializer,
+    omni_router: OmniRouter val)
   =>
-    ifdef debug then
-      Invariant(_max_distributable_credits ==
-        (_max_distributable_credits.usize() - 1).next_pow2().isize())
-    end
+    initializer.report_initialized(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    initializer.report_ready_to_work(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -187,13 +149,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let encoded = _encoder.encode[D](data, _wb)
 
-      let tracking_id = ifdef "resilience" then
-        _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
-      else
-        None
-      end
-
-      _writev(encoded, tracking_id)
+      _writev(encoded, _next_tracking_id(i_origin, i_route_id, i_seq_id))
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
@@ -213,6 +169,19 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
     // DO NOT REMOVE. THIS IS AN INTENTIONAL GC
     @pony_triggergc[None](this)
+
+  fun ref _next_tracking_id(i_origin: Producer, i_route_id: RouteId,
+    i_seq_id: SeqId): (U64 | None)
+  =>
+    ifdef "backpressure" then
+      return (_backpressure_seq_id = _backpressure_seq_id + 1)
+    end
+
+    ifdef "resilience" then
+      return _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
+    end
+
+    None
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, i_origin: Producer, msg_uid: U128,
@@ -239,7 +208,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     close()
 
+
   fun ref _unit_finished(number_finished: ISize,
+    number_tracked_finished: ISize,
     tracking_id: (SeqId | None))
   =>
     """
@@ -249,8 +220,15 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     there is pending work to send, this would be called once after we finish
     attempting to catch up on sending pending data.
     """
+    ifdef debug then
+      Invariant(number_finished > 0)
+      Invariant(number_tracked_finished <= number_finished)
+    end
+    ifdef "trace" then
+      @printf[I32]("Sent %d msgs over sink\n".cstring(), number_finished)
+    end
     ifdef "backpressure" then
-      _recoup_credits(number_finished)
+      recoup_credits(number_finished)
     end
 
     ifdef "resilience" then
@@ -264,35 +242,36 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   // CREDIT FLOW
   be register_producer(producer: Producer) =>
     ifdef debug then
-      try
-        Assert(not _upstreams.contains(producer),
-          "Producer attempted registered with sink more than once")
-      else
-        _hard_close()
-        return
-      end
+      Invariant(not _upstreams.contains(producer))
     end
 
     _upstreams.push(producer)
+    _calculate_max_credit_response()
 
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
-      try
-        Assert(_upstreams.contains(producer),
-          "Producer attempted to unregister with sink " +
-          "it isn't registered with")
-      else
-        _hard_close()
-        return
-      end
+      Invariant(_upstreams.contains(producer))
     end
 
     try
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
       ifdef "backpressure" then
-        _recoup_credits(credits_returned)
+        recoup_credits(credits_returned)
       end
+    end
+    _calculate_max_credit_response()
+
+  fun ref _calculate_max_credit_response() =>
+    _max_credit_response = if _upstreams.size() > 0 then
+      let portion = _max_distributable_credits / _upstreams.size().isize()
+      portion.min(_permanent_max_credit_response)
+    else
+      _permanent_max_credit_response
+    end
+
+    if (_max_credit_response < _minimum_credit_response) then
+      Fail()
     end
 
   be credit_request(from: Producer) =>
@@ -314,52 +293,70 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     and we are experiencing backpressure, they don't get any more.
     """
     ifdef debug then
+      Invariant(_upstreams.contains(from))
+    end
+
+    if _can_distribute_credits() and (_waiting_producers.size() == 0) then
+      _distribute_credits_to(from)
+    else
+      _waiting_producers.push(from)
+    end
+
+
+  fun ref _can_distribute_credits(): Bool =>
+    _can_send() and _above_minimum_response_level()
+
+  fun ref _maybe_distribute_credits() =>
+    while (_waiting_producers.size() > 0) and _can_distribute_credits() do
       try
-        Assert(_upstreams.contains(from),
-          "Credit request from unregistered producer")
+        let producer = _waiting_producers.shift()
+        _distribute_credits_to(producer)
       else
-        _hard_close()
-        return
+        Fail()
       end
     end
 
-    let give_out = if _can_send() then
-      let portion = _distributable_credits / _upstreams.size().isize()
-      if _distributable_credits > 0 then
-        portion.max(1)
-      else
-        0
-      end
-    else
-      0
+  fun ref _distribute_credits_to(producer: Producer) =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
     end
+
+    let give_out =
+      _distributable_credits
+        .min(_max_credit_response)
+        .max(_minimum_credit_response)
 
     ifdef debug then
-      try
-        Assert(give_out >= 0,
-          "TCPSink calculated and is trying to send back negative credits")
-      else
-        _hard_close()
-        return
-      end
+      Invariant(give_out >= _minimum_credit_response)
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("Sink: Credits requested. Giving %llu out of %llu\n".cstring(), give_out, _distributable_credits)
+      @printf[I32]((
+        "Sink: Credits requested." +
+        " Giving %llu out of %llu\n"
+        ).cstring(),
+        give_out, _distributable_credits)
     end
 
-    from.receive_credits(give_out, this)
+    producer.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
 
-  fun ref _recoup_credits(recoup: ISize) =>
-    _distributable_credits = _distributable_credits + recoup
-
   be return_credits(credits: ISize) =>
-    _distributable_credits = _distributable_credits + credits
+    recoup_credits(credits)
+
+  fun ref recoup_credits(recoup: ISize) =>
+    _distributable_credits = _distributable_credits + recoup
+    ifdef debug then
+      Invariant(_distributable_credits <= _max_distributable_credits)
+    end
+    _maybe_distribute_credits()
+
+  fun _above_minimum_response_level(): Bool =>
+    _distributable_credits >= _minimum_credit_response
 
   //
   // TCP
- be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
+  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.
     """
@@ -764,10 +761,14 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _tracking_finished(num_bytes_sent: USize) =>
     """
-    Call _unit_finished with # of sent messages and last tracking_id
+    Call _unit_finished with:
+      number of sent messages,
+      number of tracked messages sent
+      last tracking_id
     """
     ifdef "backpressure" or "resilience" then
       var num_sent: ISize = 0
+      var tracked_sent: ISize = 0
       var final_pending_sent: (SeqId | None) = None
       var bytes_sent = num_bytes_sent
 
@@ -778,8 +779,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           if bytes <= bytes_sent then
             num_sent = num_sent + 1
             bytes_sent = bytes_sent - bytes
-            final_pending_sent = tracking_id
             _pending_tracking.shift()
+            match tracking_id
+            | let id: SeqId =>
+              tracked_sent = tracked_sent + 1
+              final_pending_sent = tracking_id
+            end
           else
             let bytes_remaining = bytes - bytes_sent
             bytes_sent = 0
@@ -788,7 +793,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           end
         end
 
-        _unit_finished(num_sent, final_pending_sent)
+        if num_sent > 0 then
+          _unit_finished(num_sent, tracked_sent, final_pending_sent)
+        end
       end
     end
 
@@ -798,6 +805,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _release_backpressure() =>
     _notify.unthrottled(this)
+    _maybe_distribute_credits()
 
   fun ref _read_buf_size() =>
     """

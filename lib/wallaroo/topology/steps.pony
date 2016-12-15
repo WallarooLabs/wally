@@ -5,12 +5,14 @@ use "net"
 use "time"
 use "sendence/guid"
 use "sendence/wall-clock"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/fail"
+use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 use "wallaroo/tcp-sink"
 
 // TODO: CREDITFLOW- Every runnable step is also a credit flow consumer
@@ -29,8 +31,12 @@ trait tag RunnableStep
 
 
 interface Initializable
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  be application_begin_reporting(initializer: LocalTopologyInitializer)
+  be application_created(initializer: LocalTopologyInitializer,
+    omni_router: OmniRouter val)
+
+  be application_initialized(initializer: LocalTopologyInitializer)
+  be application_ready_to_work(initializer: LocalTopologyInitializer)
 
 type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer & Initializable tag)
 
@@ -49,7 +55,6 @@ actor Step is (RunnableStep & Resilient & Producer &
   var _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
   let _default_target: (Step | None)
-  var _initialized: Bool = false
   // list of envelopes
   // (origin, msg_uid, frac_ids, seq_id, route_id)
   let _deduplication_list: Array[(Producer, U128, (Array[U64] val | None),
@@ -65,8 +70,17 @@ actor Step is (RunnableStep & Resilient & Producer &
 
    // CreditFlow Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
-  var _max_distributable_credits: ISize = 1_000
+  var _max_distributable_credits: ISize = 1_024
   var _distributable_credits: ISize = 0
+  let _permanent_max_credit_response: ISize = _max_distributable_credits
+  var _max_credit_response: ISize = _permanent_max_credit_response
+  var _minimum_credit_response: ISize = 250
+  var _waiting_producers: Array[Producer] = _waiting_producers.create()
+
+  // Lifecycle
+  var _initializer: (LocalTopologyInitializer | None) = None
+  var _initialized: Bool = false
+  var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
 
   // Resilience routes
   // TODO: This needs to be merged with credit flow producer routes
@@ -77,8 +91,6 @@ actor Step is (RunnableStep & Resilient & Producer &
     router: Router val = EmptyRouter, default_target: (Step | None) = None,
     omni_router: OmniRouter val = EmptyOmniRouter)
   =>
-    _max_distributable_credits =
-      _max_distributable_credits.usize().next_pow2().isize()
     _runner = consume runner
     match _runner
     | let r: ReplayableRunner => r.set_step_id(id)
@@ -92,38 +104,30 @@ actor Step is (RunnableStep & Resilient & Producer &
     _id = id
     _default_target = default_target
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
+  //
+  // Application startup lifecycle event
+  //
+
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
+  be application_created(initializer: LocalTopologyInitializer,
+    omni_router: OmniRouter val)
   =>
-    ifdef debug then
-      Invariant(_max_distributable_credits ==
-        (_max_distributable_credits.usize() - 1).next_pow2().isize())
-    end
+    let callback_handler: StepRouteCallbackHandler ref =
+      StepRouteCallbackHandler
     for consumer in _router.routes().values() do
       _routes(consumer) =
-        _route_builder(this, consumer, StepRouteCallbackHandler,
-        _metrics_reporter)
-    end
-
-    for (worker, boundary) in outgoing_boundaries.pairs() do
-      _routes(boundary) =
-        _route_builder(this, boundary, StepRouteCallbackHandler,
-        _metrics_reporter)
+        _route_builder(this, consumer, callback_handler, _metrics_reporter)
     end
 
     match _default_target
     | let r: CreditFlowConsumerStep =>
-      _routes(r) = _route_builder(this, r, StepRouteCallbackHandler,
-        _metrics_reporter)
+      _routes(r) = _route_builder(this, r, callback_handler, _metrics_reporter)
     end
 
-    // for sink in tcp_sinks.values() do
-    //   _routes(sink) = _route_builder(this, sink, StepRouteCallbackHandler,
-    //     _metrics_reporter)
-    // end
-
     for r in _routes.values() do
-      r.initialize(_max_distributable_credits, "Step")
+      r.application_created()
       ifdef "resilience" then
         _resilience_routes.add_route(r)
       end
@@ -132,6 +136,35 @@ actor Step is (RunnableStep & Resilient & Producer &
     _omni_router = omni_router
 
     _initialized = true
+    initializer.report_initialized(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
+    for r in _routes.values() do
+      r.application_initialized(_max_distributable_credits, "Step")
+    end
+    _initializer = initializer
+
+  fun ref report_route_ready_to_work(r: RouteLogic) =>
+    if not _ready_to_work_routes.contains(r) then
+      _ready_to_work_routes.set(r)
+      // @printf[I32]("Reporting. routes: %d, ready: %d\n".cstring(),
+        // _routes.size(), _ready_to_work_routes.size())
+
+      if _ready_to_work_routes.size() == _routes.size() then
+        match _initializer
+        | let lti: LocalTopologyInitializer =>
+          lti.report_ready_to_work(this)
+        else
+          Fail()
+        end
+      end
+    else
+      // A route should only signal this once
+      Fail()
+    end
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
 
   be update_route_builder(route_builder: RouteBuilder val) =>
     _route_builder = route_builder
@@ -142,11 +175,7 @@ actor Step is (RunnableStep & Resilient & Producer &
          _metrics_reporter)
       _routes(consumer) = next_route
       if _initialized then
-        // TODO: This is a kind of hack right now. Each route has the
-        // same number of max credits as the step itself.  The commented
-        // code surrounding this shows the old approach of dividing the
-        // max credits among routes.
-        next_route.initialize(_max_distributable_credits, "Step")
+        Fail()
       end
     end
 
@@ -194,7 +223,7 @@ actor Step is (RunnableStep & Resilient & Producer &
           i_origin, i_route_id, i_seq_id)
       end
       ifdef "backpressure" then
-        _recoup_credits(1)
+        recoup_credits(1)
       end
       let end_ts = Time.nanos()
       let time_spent = end_ts - worker_ingress_ts
@@ -270,7 +299,7 @@ actor Step is (RunnableStep & Resilient & Producer &
             i_origin, i_route_id, i_seq_id)
         end
         ifdef "backpressure" then
-          _recoup_credits(1)
+          recoup_credits(1)
         end
         let end_ts = Time.nanos()
         let time_spent = end_ts - worker_ingress_ts
@@ -306,15 +335,6 @@ actor Step is (RunnableStep & Resilient & Producer &
   =>
     // TODO: We need to handle the entire incoming envelope here
     None
-    // if not _is_duplicate(_incoming_envelope) then
-    //   _deduplication_list.push(_incoming_envelope)
-    //   match _runner
-    //   | let r: ReplayableRunner =>
-    //     r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
-    //   else
-    //     @printf[I32]("trying to replay a message to a non-replayable runner!".cstring())
-    //   end
-    // end
 
   be replay_finished() =>
     _deduplication_list.clear()
@@ -324,10 +344,6 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   be dispose() =>
     None
-    // match _router
-    // | let sender: DataSender =>
-    //   sender.dispose()
-    // end
 
   //////////////
   // CREDIT FLOW PRODUCER
@@ -339,9 +355,11 @@ actor Step is (RunnableStep & Resilient & Producer &
     try
       let route = _routes(from)
       route.receive_credits(credits)
+    else
+      Fail()
     end
 
-  fun ref route_to(c: CreditFlowConsumerStep): (Route | None) =>
+  fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
     try
       _routes(c)
     else
@@ -355,14 +373,10 @@ actor Step is (RunnableStep & Resilient & Producer &
       Invariant(not _upstreams.contains(producer))
     end
 
-    ifdef "credit_trace" then
-      @printf[I32]("Registered producer!\n".cstring())
-    end
     _upstreams.push(producer)
+    _calculate_max_credit_response()
 
-  be unregister_producer(producer: Producer,
-    credits_returned: ISize)
-  =>
+  be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
@@ -370,16 +384,22 @@ actor Step is (RunnableStep & Resilient & Producer &
     try
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
-      _recoup_credits(credits_returned)
+      ifdef "backpressure" then
+        recoup_credits(credits_returned)
+      end
+    end
+    _calculate_max_credit_response()
+
+  fun ref _calculate_max_credit_response() =>
+    _max_credit_response = if _upstreams.size() > 0 then
+      let portion = _max_distributable_credits / _upstreams.size().isize()
+      portion.min(_permanent_max_credit_response)
+    else
+      _permanent_max_credit_response
     end
 
-  fun ref recoup_credits(recoup: ISize) =>
-    _recoup_credits(recoup)
-
-  fun ref _recoup_credits(recoup: ISize) =>
-    _distributable_credits = _distributable_credits + recoup
-    if _distributable_credits > _max_distributable_credits then
-      _distributable_credits = _max_distributable_credits
+    if (_max_credit_response < _minimum_credit_response) then
+      Fail()
     end
 
   be credit_request(from: Producer) =>
@@ -391,41 +411,79 @@ actor Step is (RunnableStep & Resilient & Producer &
       Invariant(_upstreams.contains(from))
     end
 
-    let give_out =
-      if _distributable_credits > 0 then
-        let portion = _distributable_credits / _upstreams.size().isize()
-        portion.max(1)
-      else
-        0
-      end
-
-    ifdef "credit_trace" then
-      @printf[I32]("Step: Credits requested. Giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
+    if _can_distribute_credits() and (_waiting_producers.size() == 0) then
+      _distribute_credits_to(from)
+    else
+      _waiting_producers.push(from)
     end
 
-    from.receive_credits(give_out, this)
+  fun ref _can_distribute_credits(): Bool =>
+    // TODO: should this account for route levels?
+    _above_minimum_response_level()
+
+  fun ref _distribute_credits() =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
+    end
+
+    while (_waiting_producers.size() > 0) and _can_distribute_credits() do
+      try
+        let producer = _waiting_producers.shift()
+        _distribute_credits_to(producer)
+      else
+        Fail()
+      end
+    end
+
+  fun ref _distribute_credits_to(producer: Producer) =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
+    end
+
+    let give_out =
+      _distributable_credits
+        .min(_max_credit_response)
+        .max(_minimum_credit_response)
+
+    ifdef debug then
+      Invariant(give_out >= _minimum_credit_response)
+    end
+
+    ifdef "credit_trace" then
+      @printf[I32]((
+        "Step: Credits requested." +
+        " Giving %llu out of %llu\n"
+        ).cstring(),
+        give_out, _distributable_credits)
+    end
+
+    producer.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
 
   be return_credits(credits: ISize) =>
-    _distributable_credits = _distributable_credits + credits
+    recoup_credits(credits)
 
-  fun _lowest_route_credit_level(): ISize =>
-    var lowest: ISize = ISize.max_value()
-
-    for route in _routes.values() do
-      if route.credits_available() < lowest then
-        lowest = route.credits_available()
-      end
+  fun ref recoup_credits(recoup: ISize) =>
+    _distributable_credits = _distributable_credits + recoup
+    if _distributable_credits > _max_distributable_credits then
+      _distributable_credits = _max_distributable_credits
+    end
+    if (_waiting_producers.size() > 0) and _above_minimum_response_level() then
+      _distribute_credits()
     end
 
-    lowest
+  fun _above_minimum_response_level(): Bool =>
+    _distributable_credits >= _minimum_credit_response
 
 class StepRouteCallbackHandler is RouteCallbackHandler
-  fun ref register(producer: Producer ref, r: Route tag) =>
+  fun ref register(producer: Producer ref, r: RouteLogic tag) =>
     None
 
   fun shutdown(producer: Producer ref) =>
     // TODO: CREDITFLOW - What is our error handling?
+    None
+
+  fun ref credits_initialized(producer: Producer ref, r: RouteLogic tag) =>
     None
 
   fun ref credits_replenished(producer: Producer ref) =>

@@ -6,11 +6,12 @@ use "time"
 use "sendence/guid"
 use "sendence/queue"
 use "sendence/wall-clock"
-use "wallaroo/backpressure"
 use "wallaroo/fail"
+use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/routing"
 use "wallaroo/tcp-sink"
 use "wallaroo/topology"
 
@@ -30,8 +31,7 @@ class OutgoingBoundaryBuilder
     OutgoingBoundary(auth, worker_name, consume reporter, host,
       service)
 
-actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
-  & Initializable)
+actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   // Steplike
   // let _encoder: EncoderWrapper val
   let _wb: Writer = Writer
@@ -39,16 +39,19 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
-  var _max_distributable_credits: ISize = 500_000
-  var _distributable_credits: ISize = 200_000
-  var _unacked_credits: ISize = 0
+  var _max_distributable_credits: ISize = 350_000
+  var _distributable_credits: ISize = _max_distributable_credits
+  let _permanent_max_credit_response: ISize = 1024
+  var _max_credit_response: ISize = _permanent_max_credit_response
+  var _minimum_credit_response: ISize = 250
+  var _waiting_producers: Array[Producer] = _waiting_producers.create()
 
   // TCP
-  var _notify: _OutgoingBoundaryNotify
+  var _notify: _OutgoingBoundaryNotify = BoundaryNotify
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
-  var _connect_count: U32
+  var _connect_count: U32 = 0
   var _fd: U32 = -1
   var _in_sent: Bool = false
   var _expect: USize = 0
@@ -57,7 +60,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
   var _writeable: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
-  embed _pending_tracking: List[USize] = _pending_tracking.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
   var _pending_writev_total: USize = 0
   var _shutdown_peer: Bool = false
@@ -91,8 +93,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    _max_distributable_credits =
-      _max_distributable_credits.usize().next_pow2().isize()
     // _encoder = encoder_wrapper
     _auth = auth
     _worker_name = worker_name
@@ -103,22 +103,28 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
-    _notify = EmptyBoundaryNotify
+
+  //
+  // Application startup lifecycle event
+  //
+
+  be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    initializer.report_created(this)
+
+  be application_created(initializer: LocalTopologyInitializer,
+    omni_router: OmniRouter val)
+  =>
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
-      from.cstring())
-
+      _from.cstring())
     _notify_connecting()
 
-    @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + service + "\n").cstring())
+    @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
-  be initialize(outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val, omni_router: OmniRouter val)
-  =>
-    ifdef debug then
-      Invariant(_max_distributable_credits ==
-        (_max_distributable_credits.usize() - 1).next_pow2().isize())
-    end
+    // If connecting failed, we should handle here
+    initializer.report_initialized(this)
+
+  be application_initialized(initializer: LocalTopologyInitializer) =>
     try
       if _step_id == 0 then
         Fail()
@@ -130,6 +136,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     else
       Fail()
     end
+
+    initializer.report_ready_to_work(this)
+
+  be application_ready_to_work(initializer: LocalTopologyInitializer) =>
+    None
 
   be register_step_id(step_id: U128) =>
     _step_id = step_id
@@ -156,6 +167,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64)
   =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd message at OutgoingBoundary\n".cstring())
+    end
+
     let my_latest_ts = ifdef "detailed-metrics" then
         Time.nanos()
       else
@@ -181,7 +196,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
         seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)
-      //_queue.enqueue(outgoing_msg)
+      _queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
 
@@ -194,58 +209,47 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       end
 
       _metrics_reporter.worker_metric(metric_name, end_ts - worker_ingress_ts)
+    else
+      Fail()
     end
 
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
 
   be ack(seq_id: SeqId) =>
-    if seq_id > _lowest_queue_id then
-      ifdef "trace" then
-        @printf[I32](
-          "OutgoingBoundary: got ack from downstream worker\n".cstring())
-      end
+    ifdef debug then
+      Invariant(seq_id > _lowest_queue_id)
+    end
 
-      let flush_count: USize = (seq_id - _lowest_queue_id).usize()
-      _queue.clear_n(flush_count)
-      _lowest_queue_id = _lowest_queue_id + flush_count.u64()
-      // !! remove this
-      // _recoup_credits(flush_count.isize())
-      ifdef "credit_trace" then
-        var recouped_credits = flush_count.isize()
-        if _distributable_credits > _max_distributable_credits then
-          recouped_credits =
-            _max_distributable_credits - _distributable_credits
-          _distributable_credits = _max_distributable_credits
-          @printf[I32]("OutgoingBoundary: recouped %llu credits. Now at %llu\n".cstring(), recouped_credits,
-            _distributable_credits)
-        end
-      else
-        ifdef "backpressure" then
-          if _distributable_credits > _max_distributable_credits then
-            _distributable_credits = _max_distributable_credits
-          end
-        end
-      end
+    ifdef "trace" then
+      @printf[I32](
+        "OutgoingBoundary: got ack from downstream worker\n".cstring())
+    end
 
-      ifdef "resilience" then
-        _terminus_route.receive_ack(seq_id)
-      end
-    else
-      ifdef "trace" then
-        @printf[I32](
-          "OutgoingBoundary: got repeat ack from downstream worker\n".cstring())
-      end
+    let flush_count: USize = (seq_id - _lowest_queue_id).usize()
+    _queue.clear_n(flush_count)
+    _lowest_queue_id = _lowest_queue_id + flush_count.u64()
+
+    ifdef "backpressure" then
+      recoup_credits(flush_count.isize())
+    end
+
+    ifdef "resilience" then
+      _terminus_route.receive_ack(seq_id)
     end
 
   be replay_msgs() =>
     for msg in _queue.values() do
       try
         _writev(ChannelMsgEncoder.replay(msg, _auth))
+      else
+        Fail()
       end
     end
     try
       _writev(ChannelMsgEncoder.replay_complete(_worker_name, _auth))
+    else
+      Fail()
     end
 
   be update_router(router: Router val) =>
@@ -262,19 +266,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     """
     close()
 
-  fun ref _unit_finished(number_finished: ISize)
-  =>
-    """
-    Handles book keeping related to resilience and backpressure. Called when
-    a collection of sends is completed. When backpressure hasn't been applied,
-    this would be called for each send. When backpressure has been applied and
-    there is pending work to send, this would be called once after we finish
-    attempting to catch up on sending pending data.
-    """
-    ifdef "backpressure" then
-      _recoup_credits(number_finished)
-    end
-
   //
   // CREDIT FLOW
   be register_producer(producer: Producer) =>
@@ -283,10 +274,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     end
 
     _upstreams.push(producer)
+    _calculate_max_credit_response()
 
-  be unregister_producer(producer: Producer,
-    credits_returned: ISize)
-  =>
+  be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
@@ -294,7 +284,22 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     try
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
-      _recoup_credits(credits_returned)
+      ifdef "backpressure" then
+        recoup_credits(credits_returned)
+      end
+    end
+    _calculate_max_credit_response()
+
+  fun ref _calculate_max_credit_response() =>
+    _max_credit_response = if _upstreams.size() > 0 then
+      let portion = _max_distributable_credits / _upstreams.size().isize()
+      portion.min(_permanent_max_credit_response)
+    else
+      _permanent_max_credit_response
+    end
+
+    if (_max_credit_response < _minimum_credit_response) then
+      Fail()
     end
 
   be credit_request(from: Producer) =>
@@ -319,33 +324,66 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       Invariant(_upstreams.contains(from))
     end
 
-    let give_out = if _can_send() then
-      if _distributable_credits > 0 then
-        let portion = (_distributable_credits / _upstreams.size().isize())
-        portion.max(1)
-      else
-        0
-      end
+    if _can_distribute_credits() and (_waiting_producers.size() == 0) then
+      _distribute_credits_to(from)
     else
-      ifdef "credit_trace" then
-        @printf[I32]("Boundary: Cannot give credits because _can_send() is false\n".cstring())
+      _waiting_producers.push(from)
+    end
+
+  fun ref _can_distribute_credits(): Bool =>
+    _can_send() and _above_minimum_response_level()
+
+  fun ref _maybe_distribute_credits() =>
+    while (_waiting_producers.size() > 0) and _can_distribute_credits() do
+      try
+        let producer = _waiting_producers.shift()
+        _distribute_credits_to(producer)
+      else
+        Fail()
       end
-      0
+    end
+
+  fun ref _distribute_credits_to(producer: Producer) =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
+    end
+
+    let give_out =
+      _distributable_credits
+        .min(_max_credit_response)
+        .max(_minimum_credit_response)
+
+    ifdef debug then
+      Invariant(give_out >= _minimum_credit_response)
     end
 
     ifdef "credit_trace" then
-      @printf[I32]("Boundary: credits requested. Giving %llu credits out of %llu\n".cstring(), give_out, _distributable_credits)
+      @printf[I32]((
+        "OutgoingBoundary: Credits requested." +
+        " Giving %llu out of %llu\n"
+        ).cstring(),
+        give_out, _distributable_credits)
     end
 
-    from.receive_credits(give_out, this)
+    producer.receive_credits(give_out, this)
     _distributable_credits = _distributable_credits - give_out
 
   be return_credits(credits: ISize) =>
-    _distributable_credits = _distributable_credits + credits
+    recoup_credits(credits)
 
-  fun ref _recoup_credits(recoup: ISize) =>
+  fun ref recoup_credits(recoup: ISize) =>
     _distributable_credits = _distributable_credits + recoup
+    ifdef debug then
+      Invariant(_distributable_credits <= _max_distributable_credits)
+    end
+    _maybe_distribute_credits()
 
+    ifdef "credit_trace" then
+      @printf[I32]("OutgoingBoundary: recouped %llu credits. Now at %llu\n".cstring(), recoup, _distributable_credits)
+    end
+
+  fun _above_minimum_response_level(): Bool =>
+    _distributable_credits >= _minimum_credit_response
   //
   // TCP
  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
@@ -421,7 +459,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     end
     _resubscribe_event()
 
-  fun ref _writev(data: ByteSeqIter) =>
+  fun ref _writev(data: ByteSeqIter)
+  =>
     """
     Write a sequence of sequences of bytes.
     """
@@ -431,12 +470,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       var data_size: USize = 0
       for bytes in _notify.sentv(this, data).values() do
         _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
-        _pending.push((bytes, 0))
         _pending_writev_total = _pending_writev_total + bytes.size()
+        _pending.push((bytes, 0))
         data_size = data_size + bytes.size()
       end
 
-      _pending_tracking.push(data_size)
       _pending_writes()
 
       _in_sent = false
@@ -450,7 +488,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
     """
     _pending_writev.push(data.cpointer().usize()).push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
-    _pending_tracking.push(data.size())
+
     _pending.push((data, 0))
     _pending_writes()
 
@@ -515,7 +553,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
     // Unsubscribe immediately and drop all pending writes.
     @pony_asio_event_unsubscribe(_event)
-    _pending_tracking.clear()
     _pending_writev.clear()
     _pending.clear()
     _pending_writev_total = 0
@@ -719,8 +756,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
             _pending_writev.clear()
             _pending.clear()
 
-            // do trackinginfo finished stuff
-            _bytes_finished(bytes_sent)
             return true
           else
             for d in Range[USize](0, num_to_send, 1) do
@@ -737,36 +772,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
       end
     end
 
-    // do trackinginfo finished stuff
-    _bytes_finished(bytes_sent)
-
     false
-
-
-  fun ref _bytes_finished(num_bytes_sent: USize) =>
-    """
-    Call _unit_finished with # of sent messages and last TrackingInfo
-    """
-    var num_sent: ISize = 0
-    var bytes_sent = num_bytes_sent
-
-    try
-      while bytes_sent > 0 do
-        let bytes = _pending_tracking(0)
-        if bytes <= bytes_sent then
-          num_sent = num_sent + 1
-          bytes_sent = bytes_sent - bytes
-          _pending_tracking.shift()
-        else
-          let bytes_remaining = bytes - bytes_sent
-          bytes_sent = 0
-          // update remaining for this message
-          _pending_tracking(0) = bytes_remaining
-        end
-      end
-    end
-
-    _unit_finished(num_sent)
 
   fun ref _apply_backpressure() =>
     _writeable = false
@@ -774,6 +780,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep
 
   fun ref _release_backpressure() =>
     _notify.unthrottled(this)
+    _maybe_distribute_credits()
 
   fun ref _read_buf_size() =>
     """
@@ -881,9 +888,28 @@ interface _OutgoingBoundaryNotify
     """
     None
 
-class EmptyBoundaryNotify is _OutgoingBoundaryNotify
+class BoundaryNotify is _OutgoingBoundaryNotify
+  fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
+    """
+    Called if name resolution succeeded for a TCPConnection and we are now
+    waiting for a connection to the server to succeed. The count is the number
+    of connections we're trying. The notifier will be informed each time the
+    count changes, until a connection is made or connect_failed() is called.
+    """
+    @printf[I32]("BoundaryNotify: connecting\n\n".cstring())
+
   fun ref connected(conn: OutgoingBoundary ref) =>
-  """
-  Called when we have successfully connected to the server.
-  """
-  None
+    """
+    Called when we have successfully connected to the server.
+    """
+    @printf[I32]("BoundaryNotify: connected\n\n".cstring())
+
+  fun ref closed(conn: OutgoingBoundary ref) =>
+    @printf[I32]("BoundaryNotify: closed\n\n".cstring())
+
+  fun ref connect_failed(conn: OutgoingBoundary ref) =>
+    """
+    Called when we have failed to connect to all possible addresses for the
+    server. At this point, the connection will never be established.
+    """
+    @printf[I32]("BoundaryNotify: connect_failed\n\n".cstring())

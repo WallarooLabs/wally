@@ -1,10 +1,11 @@
 use "buffered"
 use "collections"
 use "files"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/messages"
+use "wallaroo/routing"
 
 //TODO: origin needs to get its own file
 trait tag Resilient
@@ -233,9 +234,10 @@ actor Alfred
     let _replay_complete_markers: Map[U64, Bool] =
       _replay_complete_markers.create()
     var num_encoded: USize = 0
+    var _flush_waiting: USize = 0
 
     new create(env: Env, filename: (String val | None) = None,
-     logging_batch_size: USize = 1000)
+      logging_batch_size: USize = 10)
     =>
       _logging_batch_size = logging_batch_size
       _backend =
@@ -328,8 +330,7 @@ actor Alfred
         None
       end
 
-    fun ref write_log()
-    =>
+    fun ref write_log() =>
       try
         num_encoded = 0
 
@@ -352,15 +353,19 @@ actor Alfred
                          , recover Array[ByteSeq] end))
 
         num_encoded = num_encoded + 1
-
+        _flush_waiting = _flush_waiting + 1
         //write buffer to disk
         write_log()
 
-        // flush any written data to disk
-        _backend.flush()
+        if (_flush_waiting % 50) == 0 then
+          // flush any written data to disk
+          _backend.flush()
 
-        // sync any written data to disk
-        _backend.sync()
+          // sync any written data to disk
+          //_backend.sync()
+        end
+
+        _origins(origin_id).log_flushed(low_watermark)
       else
         @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
         Fail()

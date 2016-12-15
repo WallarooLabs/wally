@@ -9,13 +9,13 @@ use "sendence/guid"
 use "sendence/messages"
 use "sendence/queue"
 use "wallaroo"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
@@ -33,6 +33,8 @@ class LocalTopology
   let default_target: (Array[StepBuilder val] val | ProxyAddress val | None)
   let default_state_name: String
   let default_target_id: U128
+  // resilience
+  let worker_names: Array[String] val
 
   new val create(name': String, worker_name': String,
     graph': Dag[StepInitializer val] val,
@@ -42,7 +44,8 @@ class LocalTopology
     proxy_ids': Map[String, U128] val,
     default_target': (Array[StepBuilder val] val | ProxyAddress val | None) =
       None,
-    default_state_name': String = "", default_target_id': U128 = 0)
+    default_state_name': String = "", default_target_id': U128 = 0,
+    worker_names': Array[String] val)
   =>
     _app_name = name'
     _worker_name = worker_name'
@@ -55,13 +58,15 @@ class LocalTopology
     default_target = default_target'
     default_state_name = default_state_name'
     default_target_id = default_target_id'
+    //resilience
+    worker_names = worker_names'
 
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
     metrics_conn: MetricsSink, alfred: Alfred,
     connections: Connections, auth: AmbientAuth,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    initializables: Array[Initializable tag],
+    initializables: SetIs[Initializable tag],
     data_routes: Map[U128, CreditFlowConsumerStep tag],
     default_router: (Router val | None)) ?
   =>
@@ -112,17 +117,28 @@ actor LocalTopologyInitializer
   let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
   let _local_topology_file: String
   var _worker_initializer: (WorkerInitializer | None) = None
+  let _data_channel_file: String
+  let _worker_names_file: String
   var _topology_initialized: Bool = false
+
+  // Lifecycle
+  var _omni_router: (OmniRouter val | None) = None
+  var _tcp_sinks: Array[TCPSink] val = recover Array[TCPSink] end
+  var _created: SetIs[Initializable tag] = _created.create()
+  var _initialized: SetIs[Initializable tag] = _initialized.create()
+  var _ready_to_work: SetIs[Initializable tag] = _ready_to_work.create()
+  let _initializables: SetIs[Initializable tag] = _initializables.create()
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
   // once Alfred signals we're ready
   let tcpsl_builders: Array[TCPSourceListenerBuilder val] =
     recover iso Array[TCPSourceListenerBuilder val] end
 
-  new create(app: Application val, worker_name: String, worker_count: USize, 
-    env: Env, auth: AmbientAuth, connections: Connections, 
-    metrics_conn: MetricsSink, is_initializer: Bool, alfred: Alfred tag, 
-    input_addrs: Array[Array[String]] val, local_topology_file: String)
+  new create(app: Application val, worker_name: String, worker_count: USize,
+    env: Env, auth: AmbientAuth, connections: Connections,
+    metrics_conn: MetricsSink, is_initializer: Bool, alfred: Alfred tag,
+    input_addrs: Array[Array[String]] val, local_topology_file: String,
+    data_channel_file: String, worker_names_file: String)
   =>
     _application = app
     _worker_name = worker_name
@@ -135,12 +151,17 @@ actor LocalTopologyInitializer
     _alfred = alfred
     _input_addrs = input_addrs
     _local_topology_file = local_topology_file
+    _data_channel_file = data_channel_file
+    _worker_names_file = worker_names_file
 
   be update_topology(t: LocalTopology val) =>
     _topology = t
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     _outgoing_boundaries = bs
+    for boundary in bs.values() do
+      _initializables.set(boundary)
+    end
 
   be create_data_receivers(ws: Array[String] val,
     worker_initializer: (WorkerInitializer | None) = None) =>
@@ -157,20 +178,41 @@ actor LocalTopologyInitializer
     end
 
     let data_receivers: Map[String, DataReceiver] val = consume drs
-
-    if not _is_initializer then
-      let data_notifier: TCPListenNotify iso =
-        DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
-          _is_initializer, data_receivers,
-          MetricsReporter(_application.name(), _worker_name, _metrics_conn))
-      _connections.register_listener(
-        TCPListener(_auth, consume data_notifier))
-    else
-      match worker_initializer
-      | let wi: WorkerInitializer =>
-        _connections.create_initializer_data_channel(data_receivers, wi)
+    try
+      let data_channel_filepath = FilePath(_auth, _data_channel_file)
+      if not _is_initializer then
+        let data_notifier: TCPListenNotify iso =
+          DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
+            _is_initializer, data_receivers,
+            MetricsReporter(_application.name(), _worker_name, _metrics_conn),
+            data_channel_filepath)
+          _connections.make_and_register_recoverable_listener(
+            _auth, consume data_notifier, data_channel_filepath)
+      else
+        match worker_initializer
+          | let wi: WorkerInitializer =>
+            _connections.create_initializer_data_channel(data_receivers, wi,
+            data_channel_filepath)
+        end
       end
+    else
+      @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
+
+  fun ref _save_worker_names(worker_names_filepath: FilePath,
+    worker_names: Array[String] val)
+  =>
+    """
+    Save the list of worker names to a file.
+    """
+    let file = File(worker_names_filepath)
+    for worker_name in worker_names.values() do
+      file.print(worker_name)
+      @printf[I32](("LocalTopology._save_worker_names: " + worker_name +
+      "\n").cstring())
+    end
+    file.sync()
+    file.dispose()
 
   be initialize(worker_initializer: (WorkerInitializer | None) = None) =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
@@ -207,6 +249,7 @@ actor LocalTopologyInitializer
       match _topology
       | let t: LocalTopology val =>
         ifdef "resilience" then
+          @printf[I32]("Saving topology!\n".cstring())
           try
             let local_topology_file = FilePath(_auth, _local_topology_file)
             let file = File(local_topology_file)
@@ -217,8 +260,15 @@ actor LocalTopologyInitializer
             wb.write(serialised_topology)
             file.writev(recover val wb.done() end)
           else
-            @printf[I32]("error saving topology!".cstring())
+            @printf[I32]("Error saving topology!\n".cstring())
           end
+          // save list of worker names to file
+          @printf[I32](("Saving worker names to file: " + _worker_names_file +
+            "\n").cstring())
+          let worker_names_filepath = FilePath(_auth, _worker_names_file)
+          _save_worker_names(worker_names_filepath, t.worker_names)
+
+
         end
 
         if t.is_empty() then
@@ -232,10 +282,6 @@ actor LocalTopologyInitializer
 
         // Make sure we only create shared state once and reuse it
         let state_map: Map[String, Router val] = state_map.create()
-
-        // Keep track of everything we need to call initialize() on when
-        // we're done
-        let initializables: Array[Initializable tag] = initializables.create()
 
         @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
 
@@ -257,12 +303,14 @@ actor LocalTopologyInitializer
         let built_routers = Map[U128, Router val]
 
         // Keep track of steps we've built that we'll use for the OmniRouter.
-        // Unlike data_routes, these will not include state steps, which will // never be direct targets for state computation outputs.
+        // Unlike data_routes, these will not include state steps, which will
+        // never be direct targets for state computation outputs.
         let built_stateless_steps: Map[U128, CreditFlowConsumerStep] trn =
           recover Map[U128, CreditFlowConsumerStep] end
 
         // TODO: Replace this when we move past the temporary POC based default
-        // target strategy. There can currently only be one partition default // target per topology.
+        // target strategy. There can currently only be one partition default
+        // target per topology.
         var default_step_initializer: (StepInitializer val | None) = None
         var default_in_route_builder: (RouteBuilder val | None) = None
         var default_target: (Step | None) = None
@@ -297,7 +345,7 @@ actor LocalTopologyInitializer
           state_step.update_route_builder(state_builder.forward_route_builder())
 
           default_target_state_step = state_step
-          initializables.push(state_step)
+          _initializables.set(state_step)
 
           let state_step_router = DirectRouter(state_step)
           built_routers(default_target_state_step_id) = state_step_router
@@ -410,7 +458,7 @@ actor LocalTopologyInitializer
                         dsinit(default_state_router,
                           _metrics_conn, _alfred)
                       default_target = default_pre_state_step
-                      initializables.push(default_pre_state_step)
+                      _initializables.set(default_pre_state_step)
                       built_stateless_steps(default_pre_state_id) =
                         default_pre_state_step
                       data_routes(default_pre_state_id) = default_pre_state_step
@@ -429,7 +477,7 @@ actor LocalTopologyInitializer
                 if builder.state_name() != "" then
                   t.update_state_map(builder.state_name(), state_map,
                     _metrics_conn, _alfred, _connections, _auth,
-                    _outgoing_boundaries, initializables,
+                    _outgoing_boundaries, _initializables,
                     data_routes_ref, default_router)
                 end
 
@@ -461,7 +509,7 @@ actor LocalTopologyInitializer
                   _alfred, state_comp_target_router)
 
                 data_routes(next_id) = next_step
-                initializables.push(next_step)
+                _initializables.set(next_step)
 
                 built_stateless_steps(next_id) = next_step
                 let next_router = DirectRouter(next_step)
@@ -489,7 +537,7 @@ actor LocalTopologyInitializer
                 let next_step = builder(out_router, _metrics_conn, _alfred)
 
                 data_routes(next_id) = next_step
-                initializables.push(next_step)
+                _initializables.set(next_step)
 
                 built_stateless_steps(next_id) = next_step
                 let next_router = DirectRouter(next_step)
@@ -530,7 +578,7 @@ actor LocalTopologyInitializer
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
                 let state_step = builder(EmptyRouter, _metrics_conn, _alfred)
                 data_routes(next_id) = state_step
-                initializables.push(state_step)
+                _initializables.set(state_step)
 
                 let state_step_router = DirectRouter(state_step)
                 built_routers(next_id) = state_step_router
@@ -561,7 +609,7 @@ actor LocalTopologyInitializer
                     let pre_state_step = b(state_step_router, _metrics_conn,
                       _alfred, state_comp_target)
                     data_routes(b.id()) = pre_state_step
-                    initializables.push(pre_state_step)
+                    _initializables.set(pre_state_step)
 
                     built_stateless_steps(b.id()) = pre_state_step
                     let pre_state_router = DirectRouter(pre_state_step)
@@ -604,8 +652,8 @@ actor LocalTopologyInitializer
                   tcp_sinks_trn.push(tcp)
                 end
 
-                if not initializables.contains(sink) then
-                  initializables.push(sink)
+                if not _initializables.contains(sink) then
+                  _initializables.set(sink)
                 end
 
                 let sink_router =
@@ -648,7 +696,7 @@ actor LocalTopologyInitializer
                       dsinit(default_state_router,
                         _metrics_conn, _alfred)
                     default_target = default_pre_state_step
-                    initializables.push(default_pre_state_step)
+                    _initializables.set(default_pre_state_step)
                     built_stateless_steps(default_pre_state_id) =
                       default_pre_state_step
                     data_routes(default_pre_state_id) = default_pre_state_step
@@ -667,7 +715,7 @@ actor LocalTopologyInitializer
               if source_data.state_name() != "" then
                 t.update_state_map(source_data.state_name(), state_map,
                   _metrics_conn, _alfred, _connections, _auth,
-                  _outgoing_boundaries, initializables,
+                  _outgoing_boundaries, _initializables,
                   data_routes_ref, default_router)
               end
 
@@ -743,7 +791,7 @@ actor LocalTopologyInitializer
                     _outgoing_boundaries, sinks_for_source,
                     _alfred, default_target, default_in_route_builder,
                     state_comp_target_router,
-                    source_data.address()(0), 
+                    source_data.address()(0),
                     source_data.address()(1)
                     where metrics_reporter = consume source_reporter)
                 )
@@ -796,7 +844,7 @@ actor LocalTopologyInitializer
               if psd.state_name() != "" then
                 t.update_state_map(psd.state_name(), state_map,
                   _metrics_conn, _alfred, _connections, _auth,
-                  _outgoing_boundaries, initializables,
+                  _outgoing_boundaries, _initializables,
                   data_routes_ref, None)
               end
               let partition_router =
@@ -831,7 +879,7 @@ actor LocalTopologyInitializer
 
         if not _is_initializer then
           // Inform the initializer that we're done initializing our local
-          // topology. If this is the initializer worker, we'll inform 
+          // topology. If this is the initializer worker, we'll inform
           // our WorkerInitializer actor once we've spun up the source
           // listeners.
           let topology_ready_msg =
@@ -851,16 +899,14 @@ actor LocalTopologyInitializer
           consume built_stateless_steps, t.step_map(), _outgoing_boundaries)
 
         // Initialize all our initializables to get backpressure started
-        let tcp_sinks: Array[TCPSink] val = consume tcp_sinks_trn
-        for i in initializables.values() do
-          i.initialize(_outgoing_boundaries, tcp_sinks, omni_router)
+        _tcp_sinks = consume tcp_sinks_trn
+        _omni_router = omni_router
+        for i in _initializables.values() do
+          i.application_begin_reporting(this)
         end
 
         @printf[I32]("Local topology initialized\n".cstring())
         _topology_initialized = true
-
-        // TODO: Notify Alfred to start reading data. This should be called by // Alfred after it's done.
-        spin_up_source_listeners()
       else
         @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end
@@ -871,7 +917,62 @@ actor LocalTopologyInitializer
       _env.err.print("Error initializing local topology")
     end
 
-  be spin_up_source_listeners() =>
+  be report_created(initializable: Initializable tag) =>
+    if not _created.contains(initializable) then
+      match _omni_router
+      | let o_router: OmniRouter val =>
+        _created.set(initializable)
+        if _created.size() == _initializables.size() then
+          @printf[I32]("Phase I: Application is created!\n".cstring())
+          for i in _initializables.values() do
+            i.application_created(this, o_router)
+          end
+        end
+      else
+        Fail()
+      end
+    else
+      @printf[I32]("The same Initializable reported being created twice\n".cstring())
+      Fail()
+    end
+
+  be report_initialized(initializable: Initializable tag) =>
+    if not _initialized.contains(initializable) then
+      _initialized.set(initializable)
+      if _initialized.size() == _initializables.size() then
+        @printf[I32]("Phase II: Application is initialized!\n".cstring())
+        for i in _initializables.values() do
+          i.application_initialized(this)
+        end
+        ifdef not "backpressure" then
+          _application_ready_to_work()
+        end
+      end
+    else
+      @printf[I32]("The same Initializable reported being initialized twice\n".cstring())
+      Fail()
+    end
+
+  be report_ready_to_work(initializable: Initializable tag) =>
+    if not _ready_to_work.contains(initializable) then
+      _ready_to_work.set(initializable)
+      if _ready_to_work.size() == _initializables.size() then
+        _application_ready_to_work()
+      end
+    else
+      @printf[I32]("The same Initializable reported being ready to work twice\n".cstring())
+      Fail()
+    end
+
+  fun ref _application_ready_to_work() =>
+    @printf[I32]("Phase III: Application is ready to work!\n".cstring())
+    // TODO: THis should also depend on Alfred having completed reading
+    _spin_up_source_listeners()
+    for i in _initializables.values() do
+      i.application_ready_to_work(this)
+    end
+
+  fun ref _spin_up_source_listeners() =>
     if not _topology_initialized then
       @printf[I32]("ERROR: Tried to spin up source listeners before topology was initialized!\n".cstring())
     else

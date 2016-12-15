@@ -2,9 +2,9 @@ use "buffered"
 use "serialise"
 use "net"
 use "collections"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/initialization"
+use "wallaroo/routing"
 use "wallaroo/topology"
 
 primitive ChannelMsgEncoder

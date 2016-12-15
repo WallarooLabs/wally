@@ -2,6 +2,7 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
+use "files"
 use "sendence/bytes"
 use "sendence/wall-clock"
 use "wallaroo/boundary"
@@ -14,6 +15,7 @@ class DataChannelListenNotifier is TCPListenNotify
   let _env: Env
   let _auth: AmbientAuth
   let _is_initializer: Bool
+  let _recovery_file: FilePath
   var _host: String = ""
   var _service: String = ""
   let _connections: Connections
@@ -23,7 +25,8 @@ class DataChannelListenNotifier is TCPListenNotify
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     receivers: Map[String, DataReceiver] val,
-    metrics_reporter: MetricsReporter iso)
+    metrics_reporter: MetricsReporter iso,
+    recovery_file: FilePath)
   =>
     _name = name
     _env = env
@@ -32,12 +35,18 @@ class DataChannelListenNotifier is TCPListenNotify
     _connections = connections
     _receivers = receivers
     _metrics_reporter = consume metrics_reporter
+    _recovery_file = recovery_file
 
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
+      let f = File(_recovery_file)
+      f.print(_host)
+      f.print(_service)
+      f.sync()
+      f.dispose()
       _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
-      if not _is_initializer then
+      if not (_is_initializer and _recovery_file.exists()) then
         let message = ChannelMsgEncoder.identify_data_port(_name, _service,
           _auth)
         _connections.send_control("initializer", message)
@@ -90,13 +99,15 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       match ChannelMsgDecoder(consume data, _auth)
       | let data_msg: DataMsg val =>
         try
+
           _metrics_reporter.step_metric(data_msg.metric_name,
             "Before receive on data channel (network time)", data_msg.metrics_id,
             data_msg.latest_ts, ingest_ts)
-          _receivers(data_msg.delivery_msg.sender_name()).received(
-            data_msg.delivery_msg,
-            data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
-            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1, my_latest_ts)
+          _receivers(data_msg.delivery_msg.sender_name())
+            .received(data_msg.delivery_msg,
+              data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
+              data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
+              my_latest_ts)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
@@ -152,6 +163,12 @@ class DataChannelConnectNotifier is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     _env.out.print("incoming connected on data channel")
 
+  fun ref closed(conn: TCPConnection ref) =>
+    _env.out.print("DataChannelConnectNotifier : server closed")
+    //TODO: Initiate reconnect to downstream node here. We need to
+    //      create a new connection in OutgoingBoundary
+    
+    
 // class DataSenderConnectNotifier is TCPConnectionNotify
 //   let _env: Env
 

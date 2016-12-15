@@ -1,10 +1,10 @@
 use "collections"
 use "net"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 use "wallaroo/tcp-source"
 use "wallaroo/tcp-sink"
 

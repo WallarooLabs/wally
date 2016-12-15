@@ -1,5 +1,5 @@
-use "wallaroo/backpressure"
 use "wallaroo/messages"
+use "wallaroo/routing"
 use "wallaroo/topology"
 
 interface TCPSourceNotify

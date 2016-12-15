@@ -110,8 +110,8 @@ actor Main
             .to_sink(OrderResultEncoder, recover [0] end,
               initial_report_msgs)
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler
-              where init_file = init_file)
+            "Nbbo", FixNbboFrameHandler)
+              // where init_file = init_file)
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
                symbol_data_partition where multi_worker = true)
@@ -234,7 +234,7 @@ class CheckOrder is StateComputation[FixOrderMessage val, OrderResult val,
     // @printf[I32]("!!CheckOrder\n".cstring())
     if state.should_reject_trades then
       let res = OrderResult(msg, state.last_bid, state.last_offer,
-        WallClock.nanoseconds())
+        Time.nanos())
       (res, None)
     else
       (None, None)

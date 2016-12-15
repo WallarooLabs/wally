@@ -58,6 +58,16 @@ primitive Bytes
     arr.push(l1)
     consume arr
 
+  fun from_f32(f32: F32, arr: Array[U8] iso = recover Array[U8] end):
+    Array[U8] iso^
+  =>
+    from_u32(f32.bits(), consume arr)
+
+  fun from_f64(f64: F64, arr: Array[U8] iso = recover Array[U8] end):
+    Array[U8] iso^
+  =>
+    from_u64(f64.bits(), consume arr)
+
   fun u16_from_idx(idx: USize, arr: Array[U8]): U16 ? =>
     Bytes.to_u16(arr(idx), arr(idx + 1))
 

@@ -5,10 +5,11 @@ use "time"
 use "sendence/guid"
 use "sendence/wall-clock"
 use "sendence/weighted"
-use "wallaroo/backpressure"
 use "wallaroo/initialization"
+use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 
 
 // TODO: Eliminate producer None when we can
@@ -235,7 +236,6 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
     | let t_id: U128 =>
       PreStateRunner[In, Out, State](_state_comp, _state_name, t_id)
     else
-      @printf[I32]("PreStateRunner should take a target_id on build!\n".cstring())
       PreStateRunner[In, Out, State](_state_comp, _state_name, 0)
     end
 
@@ -345,14 +345,6 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
   =>
     _state_runner_builder(alfred,
       consume next_runner, router)
-
-    // match router
-    // | let r: Router val =>
-    //   PreStateRunner[In, Out, State](_state_comp, _state_name, r)
-    // else
-    //   @printf[I32]("PreStateRunner should take a Router on build!\n".cstring())
-    //   PreStateRunner[In, Out, State](_state_comp, _state_name, EmptyRouter)
-    // end
 
   fun name(): String => _state_name
   fun state_name(): String => _state_name
@@ -509,6 +501,19 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     _name = _state_comp.name()
     _prep_name = _name + " prep"
     _state_name = state_name'
+    //TODO: Fix the types on this so we can check something like this.
+    // We want to prove that target_id is 0 iff the output type is None
+    // and not just a subtype of (X | None)
+    // ifdef debug then
+    //   Invariant(
+    //     match None
+    //     | let o: Out =>
+    //       _target_id == 0
+    //     else
+    //       _target_id != 0
+    //     end
+    //   )
+    // end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router val,

@@ -2,12 +2,13 @@ use "collections"
 use "files"
 use "net"
 use "sendence/guid"
-use "wallaroo/backpressure"
 use "wallaroo/boundary"
+use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 
 type WeightedKey[Key: (Hashable val & Equatable[Key])] is
   (Key, USize)
@@ -103,7 +104,7 @@ trait StateSubpartition
     metrics_conn: MetricsSink,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    initializables: Array[Initializable tag],
+    initializables: SetIs[Initializable tag],
     data_routes: Map[U128, CreditFlowConsumerStep tag],
     default_router: (Router val | None) = None): PartitionRouter val
 
@@ -130,7 +131,7 @@ class KeyedStateSubpartition[PIn: Any val,
     metrics_conn: MetricsSink,
     auth: AmbientAuth, connections: Connections, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    initializables: Array[Initializable tag],
+    initializables: SetIs[Initializable tag],
     data_routes: Map[U128, CreditFlowConsumerStep tag],
     default_router: (Router val | None) = None):
     LocalPartitionRouter[PIn, Key] val
@@ -155,7 +156,7 @@ class KeyedStateSubpartition[PIn: Any val,
             consume reporter, guid_gen.u128(), _runner_builder.route_builder(),
               alfred)
 
-          initializables.push(next_state_step)
+          initializables.set(next_state_step)
           data_routes(id) = next_state_step
           m(id) = next_state_step
           routes(key) = next_state_step

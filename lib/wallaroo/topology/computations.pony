@@ -1,6 +1,6 @@
 use "buffered"
 use "time"
-use "wallaroo/backpressure"
+use "wallaroo/routing"
 
 trait BasicComputation
   fun name(): String

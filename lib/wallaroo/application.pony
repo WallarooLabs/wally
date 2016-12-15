@@ -1,13 +1,14 @@
 use "collections"
 use "net"
 use "sendence/guid"
-use "wallaroo/backpressure"
+use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/tcp-sink"
 use "wallaroo/tcp-source"
 use "wallaroo/resilience"
+use "wallaroo/routing"
 use "wallaroo/topology"
 
 class Application
@@ -99,6 +100,9 @@ trait BasicPipeline
   fun source_route_builder(): RouteBuilder val
   fun sink_builder(): (TCPSinkBuilder val | None)
   fun sink_target_ids(): Array[U64] val
+  // TODO: Change this when we need more sinks per pipeline
+  // ASSUMPTION: There is at most one sink per pipeline
+  fun sink_id(): (U128 | None)
   fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder val ?
   fun size(): USize
@@ -112,6 +116,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _source_builder: SourceBuilderBuilder val
   let _source_route_builder: RouteBuilder val
   var _sink_builder: (TCPSinkBuilder val | None) = None
+  var _sink_id: (U128 | None) = None
   let _is_coalesced: Bool
 
   new create(app_name: String, p_id: USize, n: String,
@@ -145,6 +150,13 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun sink_builder(): (TCPSinkBuilder val | None) => _sink_builder
 
   fun sink_target_ids(): Array[U64] val => _sink_target_ids
+
+  // TODO: Change this when we need more sinks per pipeline
+  // ASSUMPTION: There is at most one sink per pipeline
+  fun sink_id(): (U128 | None) => _sink_id
+
+  fun ref update_sink_id() =>
+    _sink_id = GuidGenerator.u128()
 
   fun is_coalesced(): Bool => _is_coalesced
 
@@ -261,5 +273,6 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     let sink_builder: TCPSinkBuilder val =
       TCPSinkBuilder(TypedEncoderWrapper[Out](encoder), initial_msgs)
     _p.update_sink(sink_builder, sink_ids)
+    _p.update_sink_id()
     _a.add_pipeline(_p as BasicPipeline)
     _a
