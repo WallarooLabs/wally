@@ -940,7 +940,6 @@ actor LocalTopologyInitializer
     end
 
   be report_created(initializable: Initializable tag) =>
-    @printf[I32]("!!Report created was called\n".cstring())
     if not _created.contains(initializable) then
       match _omni_router
       | let o_router: OmniRouter val =>
