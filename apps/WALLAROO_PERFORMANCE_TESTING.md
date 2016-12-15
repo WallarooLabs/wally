@@ -172,17 +172,21 @@ sudo cset proc -s user -e numactl -- -C 16,17 chrt -f 80 ~/buffy/giles/sender/se
 ```
 
 ####2 MACHINE market spread (2 workers)
-### Running 2 MACHINE/ 2 worker market spread:
-Giles receiver needs to be running before marketspread:
+Giles receiver needs to be running before marketspread (can be on either machine, but for consistency put it on
+machine 2):
 ```
 cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock -w -l 0.0.0.0:5555
 ```
 
+Machine 1:
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 stap /home/ubuntu/ponyc/examples/systemtap/actor-telemetry-heap-only.stp -o market-stap-w1.txt -g --suppress-time-limits -c '~/buffy/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -w 2 -t'
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ~/buffy/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -t -w 2
+```
 
-sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 stap /home/ubuntu/ponyc/examples/systemtap/actor-telemetry-heap-only.stp -o market-stap-w2.txt -g --suppress-time-limits -c '~/buffy/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -w 2'
+Machine 2:
+```
+sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 ~/buffy/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -w 2
 ```
 
 ###Packet
