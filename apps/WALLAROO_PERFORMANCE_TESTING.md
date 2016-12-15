@@ -181,12 +181,12 @@ sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/buffy/giles/receiver/rec
 
 Machine 1:
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ~/buffy/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -t -w 2
+sudo cset proc -s user -e numactl -- -C 1-12,17 chrt -f 80 ~/buffy/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 12 --ponypinasio --ponynoblock -t -w 2
 ```
 
 Machine 2:
 ```
-sudo cset proc -s user -e numactl -- -C 5-8,17 chrt -f 80 ~/buffy/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -w 2
+sudo cset proc -s user -e numactl -- -C 1-12,17 chrt -f 80 ~/buffy/apps/market-spread/market-spread -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 12 --ponypinasio --ponynoblock -n worker2 -w 2
 ```
 
 ###Packet
