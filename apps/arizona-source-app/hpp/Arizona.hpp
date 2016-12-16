@@ -76,6 +76,7 @@ public:
   virtual ~ClientMessage(){};
 public:
   virtual string *get_client() = 0;
+  virtual uint32_t get_client_id() = 0;
   virtual int get_message_type() = 0;
   virtual uint64_t get_message_id() = 0;
   virtual string str() = 0;
@@ -86,13 +87,15 @@ class ConfigMessage: public ClientMessage
 {
 private:
   uint64_t _message_id;
+  uint32_t _client_id;
 public:
-  ConfigMessage(uint64_t _message_id);
+  ConfigMessage(uint64_t message_id, uint32_t client_id);
   virtual ~ConfigMessage();
   uint64_t get_message_id() { return _message_id; }
   virtual void from_bytes(char *bytes_) { }
   virtual int get_message_type() { return -1; }
   virtual string *get_client() { return new string(""); }
+  virtual uint32_t get_client_id() { return _client_id; }
   virtual string str();
 };
 
@@ -102,6 +105,7 @@ class OrderMessage: /*public wallaroo::Data,*/ public ClientMessage
 {
 private:
   uint64_t _message_id;
+  uint32_t _client_id;
   string *_client;
   string *_account;
   string *_isin;
@@ -111,9 +115,10 @@ private:
   uint32_t _quantity;
   double _price;
 public:
-  OrderMessage(uint64_t _message_id);
+  OrderMessage(uint64_t message_id, uint32_t client_id);
   virtual ~OrderMessage();
-  virtual uint64_t get_message_id() { return _message_id; }
+  uint32_t get_client_id() { return _client_id; }
+  uint64_t get_message_id() { return _message_id; }
   string *get_client() { return _client; }
   string *get_account() { return _account; }
   string *get_isin() { return _isin; }
@@ -131,17 +136,19 @@ public:
 class CancelMessage: /*public wallaroo::Data,*/ public ClientMessage
 {
 private:
-  uint16_t _message_id;
+  uint64_t _message_id;
+  uint32_t _client_id;
   string *_client;
   string *_account;
   string *_order_id;
   string *_cancel_id;
 public:
-  CancelMessage(uint64_t _message_id);
+  CancelMessage(uint64_t message_id, uint32_t client_id);
   virtual ~CancelMessage();
   virtual string *get_client() { return _client; }
   string *get_account() { return _account; }
   string *get_order_id() { return _order_id; }
+  virtual uint32_t get_client_id() { return _client_id; }
   virtual uint64_t get_message_id() { return _message_id; }
   virtual void from_bytes(char *bytes_);
   virtual void serialize(char* bytes_, size_t nsz_);
@@ -154,6 +161,7 @@ class ExecuteMessage: /* public wallaroo::Data, */public ClientMessage
 {
 private:
   uint64_t _message_id;
+  uint32_t _client_id;
   string *_client;
   string *_account;
   string *_order_id;
@@ -161,9 +169,10 @@ private:
   uint32_t _quantity;
   double _price;
 public:
-  ExecuteMessage(uint64_t _message_id);
+  ExecuteMessage(uint64_t message_id, uint32_t client_id);
   virtual ~ExecuteMessage();
   virtual string *get_client() { return _client; }
+  virtual uint32_t get_client_id() { return _client_id; }
   virtual uint64_t get_message_id() { return _message_id; }
   virtual void from_bytes(char *bytes_);
   virtual void serialize(char* bytes_, size_t nsz_);
@@ -176,13 +185,15 @@ class AdminMessage: /*public wallaroo::Data, */public ClientMessage
 {
 private:
   uint64_t _message_id;
+  uint32_t _client_id;
   uint16_t _request_type;
   string *_client;
   string *_account;
 public:
-  AdminMessage(uint64_t message_id_);
+  AdminMessage(uint64_t message_id_, uint32_t client_id);
   virtual ~AdminMessage();
   virtual string *get_client() { return _client; }
+  virtual uint32_t get_client_id() { return _client_id; }
   virtual uint64_t get_message_id() { return _message_id; }
   virtual void from_bytes(char *bytes);
   virtual void serialize(char* bytes_, size_t nsz_);
