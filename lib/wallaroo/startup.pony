@@ -154,11 +154,6 @@ actor Startup
 
       if is_initializer then
         env.out.print("Running as Initializer...")
-        // TODO: Currently, an initializer cannot recover because it's
-        // the home of sources.
-        ifdef "resilience" then
-          Fail()
-        end
         let application_initializer = ApplicationInitializer(auth,
           local_topology_initializer, input_addrs, o_addr, alfred)
 
