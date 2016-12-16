@@ -41,16 +41,19 @@ class DataChannelListenNotifier is TCPListenNotify
     try
       (_host, _service) = listen.local_address().name()
       ifdef "resilience" then
-        let f = File(_recovery_file)
-        f.print(_host)
-        f.print(_service)
-        f.sync()
-        f.dispose()
+        if _recovery_file.exists() then
+          @printf[I32]("Recovery file exists for control channel\n".cstring())
+        end
         if not (_is_initializer or _recovery_file.exists()) then
           let message = ChannelMsgEncoder.identify_data_port(_name, _service,
             _auth)
           _connections.send_control("initializer", message)
         end
+        let f = File(_recovery_file)
+        f.print(_host)
+        f.print(_service)
+        f.sync()
+        f.dispose()
       else
         _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
         if not _is_initializer then
