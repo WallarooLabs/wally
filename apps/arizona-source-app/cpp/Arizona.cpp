@@ -57,27 +57,27 @@ ClientMessage* message_from_bytes(char *bytes_)
   switch (message_type)
   {
     case MessageType::Config:
-      cm = new ConfigMessage(message_id);
+      cm = new ConfigMessage(message_id, client_id);
       cm->from_bytes(remaining_bytes);
       break;
 
     case MessageType::Order:
-      cm = new OrderMessage(message_id);
+      cm = new OrderMessage(message_id, client_id);
       cm->from_bytes(remaining_bytes);
       break;
 
     case MessageType::Cancel:
-      cm = new CancelMessage(message_id);
+      cm = new CancelMessage(message_id, client_id);
       cm->from_bytes(remaining_bytes);
       break;
 
     case MessageType::Execute:
-      cm = new ExecuteMessage(message_id);
+      cm = new ExecuteMessage(message_id, client_id);
       cm->from_bytes(remaining_bytes);
       break;
 
     case MessageType::Admin:
-      cm = new AdminMessage(message_id);
+      cm = new AdminMessage(message_id, client_id);
       cm->from_bytes(remaining_bytes);
       break;
 
@@ -189,7 +189,7 @@ void Writer::arizona_string(string *str) {
 
 // Messages
 
-ConfigMessage::ConfigMessage(uint64_t message_id_): _message_id(message_id_)
+ConfigMessage::ConfigMessage(uint64_t message_id_, uint32_t client_id_): _message_id(message_id_), _client_id(client_id_)
 {
 }
 
@@ -204,8 +204,9 @@ string ConfigMessage::str()
   return out.str();
 }
 
-OrderMessage::OrderMessage(uint64_t message_id_) :
+OrderMessage::OrderMessage(uint64_t message_id_, uint32_t client_id_) :
     _message_id(message_id_),
+    _client_id(client_id_),
     _price(0.0),
     _quantity(0),
     _side(0),
@@ -289,7 +290,7 @@ string OrderMessage::str()
 }
 
 
-CancelMessage::CancelMessage(uint64_t message_id_): _message_id(message_id_)
+CancelMessage::CancelMessage(uint64_t message_id_, uint32_t client_id_): _message_id(message_id_), _client_id(client_id_)
 {
 }
 
@@ -350,7 +351,7 @@ string CancelMessage::str()
   return out.str();
 }
 
-ExecuteMessage::ExecuteMessage(uint64_t message_id_): _message_id(message_id_)
+ExecuteMessage::ExecuteMessage(uint64_t message_id_, uint32_t client_id_): _message_id(message_id_), _client_id(client_id_)
 {
 }
 
@@ -417,7 +418,7 @@ string ExecuteMessage::str()
   return out.str();
 }
 
-AdminMessage::AdminMessage(uint64_t message_id_): _message_id(message_id_)
+AdminMessage::AdminMessage(uint64_t message_id_, uint32_t client_id_): _message_id(message_id_), _client_id(client_id_)
 {
 }
 
@@ -770,8 +771,7 @@ uint64_t ArizonaPartitionFunction::partition(wallaroo::Data *data_)
 {
   if (ClientMessage *cm = dynamic_cast<ClientMessage *>(data_))
   {
-    string *client = cm->get_client();
-    return std::stoul(client->c_str() + 4, nullptr);
+    return cm->get_client_id();
   }
   // TODO: Really we should come up with a better plan here.
   std::cerr << "could not get a key for message" << std::endl;
