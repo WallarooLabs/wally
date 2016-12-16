@@ -174,10 +174,11 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   fun ref _next_tracking_id(i_origin: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): (U64 | None)
   =>
+    // The order of these matter. If we're in both backpressure and resilience,
+    // we need to update the terminus route id.
     ifdef "resilience" then
       return _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
     end
-
     ifdef "backpressure" then
       return (_backpressure_seq_id = _backpressure_seq_id + 1)
     end
