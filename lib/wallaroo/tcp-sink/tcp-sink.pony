@@ -89,7 +89,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
   // Origin (Resilience)
-  let _terminus_route: TerminusRoute ref = recover ref TerminusRoute end
+  let _terminus_route: TerminusRoute = TerminusRoute
 
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -149,7 +149,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let encoded = _encoder.encode[D](data, _wb)
 
-      _writev(encoded, _next_tracking_id(i_origin, i_route_id, i_seq_id))
+      let next_tracking_id = _next_tracking_id(i_origin, i_route_id, i_seq_id)
+      _writev(encoded, next_tracking_id)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
@@ -173,12 +174,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   fun ref _next_tracking_id(i_origin: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): (U64 | None)
   =>
-    ifdef "backpressure" then
-      return (_backpressure_seq_id = _backpressure_seq_id + 1)
-    end
-
     ifdef "resilience" then
       return _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
+    end
+
+    ifdef "backpressure" then
+      return (_backpressure_seq_id = _backpressure_seq_id + 1)
     end
 
     None
