@@ -76,7 +76,13 @@ actor Startup
           worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
         | ("name", let arg: String) => worker_name = arg
-        | ("resilience-dir", let arg: String) => resilience_dir = arg
+        | ("resilience-dir", let arg: String) =>
+          if arg.substring(arg.size().isize() - 1) == "/" then
+            env.out.print("--resilience-dir must not end in /")
+            error
+          else
+            resilience_dir = arg
+          end
         end
       end
 
