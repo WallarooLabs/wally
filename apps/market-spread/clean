@@ -1,7 +1,12 @@
 #!/bin/sh
 
-sudo rm /tmp/market-spread-*.evlog
-sudo rm /tmp/market-spread-*.local-topology
-sudo rm /tmp/market-spread-*.tcp-control
-sudo rm /tmp/market-spread-*.tcp-data
-sudo rm /tmp/market-spread-*.workers
+if [[ -z $1 ]] then
+	echo "USAGE ./clean directory"
+	exit 0
+fi
+
+sudo rm $1/market-spread-*.evlog
+sudo rm $1/market-spread-*.local-topology
+sudo rm $1/market-spread-*.tcp-control
+sudo rm $1/market-spread-*.tcp-data
+sudo rm $1/market-spread-*.workers
