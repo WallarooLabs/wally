@@ -14,8 +14,9 @@ primitive StartupHelp
       --worker-name/-n *[Sets name for this worker]
 
       --metrics/-m [Sets address for external metrics (e.g. monitoring hub)]
-      --topology-initializer/-t [Sets this process as the topology 
+      --topology-initializer/-t [Sets this process as the topology
         initializing process (that status is meaningless after init is done)]
+      --resilience-dir/-r [Sets directory to write resilience files to]
       -----------------------------------------------------------------------------------
       """
     )

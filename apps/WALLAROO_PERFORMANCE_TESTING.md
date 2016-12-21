@@ -10,6 +10,11 @@ Once set up, an AWS cluster can be started with the following command:
 make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=36 num_followers=0 force_instance=c4.8xlarge spot_bid_factor=100 ansible_system_cpus=0,18 ansible_isolcpus=false no_spot=true
 ```
 
+For resilience runs, use:
+```
+make cluster cluster_name=<YOUR_CLUSTER_NAME> num_followers=0 force_instance=i2.8xlarge spot_bid_factor=100 ansible_system_cpus=0,16 ansible_isolcpus=false no_spot=true
+```
+
 
 A packet cluster with this command:
 ```

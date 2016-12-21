@@ -37,6 +37,7 @@ actor Startup
     var is_initializer = false
     var worker_initializer: (WorkerInitializer | None) = None
     var worker_name = ""
+    var resilience_dir = "/tmp"
     try
       var options = Options(env.args, false)
       var auth = env.root as AmbientAuth
@@ -56,6 +57,7 @@ actor Startup
         .add("topology-initializer", "t", None)
         .add("leader", "l", None)
         .add("name", "n", StringArgument)
+        .add("resilience-dir", "r", StringArgument)
 
       for option in options do
         match option
@@ -74,7 +76,12 @@ actor Startup
           worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
         | ("name", let arg: String) => worker_name = arg
+        | ("resilience-dir", let arg: String) => resilience_dir = arg
         end
+      end
+
+      ifdef "resilience" then
+        env.out.print("|||Resilience directory: " + resilience_dir + "|||")
       end
 
       if worker_count == 1 then
@@ -138,13 +145,16 @@ actor Startup
         else
           ""
         end
-      let event_log_file = "/tmp/" + name + "-" + worker_name + ".evlog"
-      let local_topology_file = "/tmp/" + name + "-" +
-          worker_name + ".local-topology"
-      let data_channel_file = "/tmp/" + name + "-" + worker_name + ".tcp-data"
-      let control_channel_file = "/tmp/" + name + "-" + worker_name +
-          ".tcp-control"
-      let worker_names_file = "/tmp/" + name + "-" + worker_name + ".workers"
+      let event_log_file = resilience_dir + "/" + name + "-" +
+        worker_name + ".evlog"
+      let local_topology_file = resilience_dir + "/" + name + "-" +
+        worker_name + ".local-topology"
+      let data_channel_file = resilience_dir + "/" + name + "-" + worker_name +
+        ".tcp-data"
+      let control_channel_file = resilience_dir + "/" + name + "-" +
+        worker_name + ".tcp-control"
+      let worker_names_file = resilience_dir + "/" + name + "-" + worker_name +
+        ".workers"
 
       let alfred = Alfred(env, event_log_file)
       let local_topology_initializer = LocalTopologyInitializer(
