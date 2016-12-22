@@ -40,6 +40,7 @@ actor TCPSource is Producer
   let _notify: TCPSourceNotify
   var _next_size: USize
   let _max_size: USize
+  let _max_read: USize
   var _connect_count: U32
   var _fd: U32 = -1
   var _expect: USize = 0
@@ -91,7 +92,8 @@ actor TCPSource is Producer
     _connected = true
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = max_size
+    _max_size = 65_536
+    _max_read = 16_384
 
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
@@ -381,21 +383,19 @@ actor TCPSource is Producer
             _reading = false
             return
           end
-          ifdef osx then
-            if not carry_on then
-              _read_again()
-              _reading = false
-              return
-            end
+          if not carry_on then
+            _read_again()
+            _reading = false
+            return
+          end
 
-            sum = sum + block_size
+          sum = sum + block_size
 
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              _reading = false
-              return
-            end
+          if sum >= _max_size then
+            // If we've read _max_size, yield and read again later.
+            _read_again()
+            _reading = false
+            return
           end
         end
 
@@ -415,7 +415,7 @@ actor TCPSource is Producer
           return
         | _next_size =>
           // Increase the read buffer size.
-          _next_size = _max_size.min(_next_size * 2)
+          _next_size = _max_read.min(_next_size * 2)
         end
 
          _read_len = _read_len + len
@@ -446,21 +446,19 @@ actor TCPSource is Producer
               _reading = false
               return
             end
-            ifdef osx then
-              if not carry_on then
-                _read_again()
-                _reading = false
-                return
-              end
+            if not carry_on then
+              _read_again()
+              _reading = false
+              return
+            end
 
-              sum = sum + osize
+            sum = sum + osize
 
-              if sum >= _max_size then
-                // If we've read _max_size, yield and read again later.
-                _read_again()
-                _reading = false
-                return
-              end
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              _reading = false
+              return
             end
           end
         else
@@ -476,21 +474,19 @@ actor TCPSource is Producer
             _reading = false
             return
           end
-          ifdef osx then
-            if not carry_on then
-              _read_again()
-              _reading = false
-              return
-            end
+          if not carry_on then
+            _read_again()
+            _reading = false
+            return
+          end
 
-            sum = sum + dsize
+          sum = sum + dsize
 
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              _reading = false
-              return
-            end
+          if sum >= _max_size then
+            // If we've read _max_size, yield and read again later.
+            _read_again()
+            _reading = false
+            return
           end
         end
       end

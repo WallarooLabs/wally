@@ -67,6 +67,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
+  let _max_read: USize
   var _connect_count: U32
   var _fd: U32 = -1
   var _in_sent: Bool = false
@@ -104,7 +105,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = max_size
+    _max_size = 65_536
+    _max_read = 16_384
     _notify = EmptyNotify
     _initial_msgs = initial_msgs
     _connect_count = @pony_os_connect_tcp[U32](this,
@@ -576,19 +578,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
           let out = _expect_read_buf.block(block_size)
           let carry_on = _notify.received(this, consume out)
-          ifdef osx then
-            if not carry_on then
-              _read_again()
-              return
-            end
+          if not carry_on then
+            _read_again()
+            return
+          end
 
-            sum = sum + block_size
+          sum = sum + block_size
 
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              return
-            end
+          if sum >= _max_size then
+            // If we've read _max_size, yield and read again later.
+            _read_again()
+            return
           end
         end
 
@@ -607,7 +607,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           return
         | _next_size =>
           // Increase the read buffer size.
-          _next_size = _max_size.min(_next_size * 2)
+          _next_size = _max_read.min(_next_size * 2)
         end
 
          _read_len = _read_len + len
@@ -631,19 +631,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
             let out = _expect_read_buf.block(block_size)
             let osize = block_size
             let carry_on = _notify.received(this, consume out)
-            ifdef osx then
-              if not carry_on then
-                _read_again()
-                return
-              end
+            if not carry_on then
+              _read_again()
+              return
+            end
 
-              sum = sum + osize
+            sum = sum + osize
 
-              if sum >= _max_size then
-                // If we've read _max_size, yield and read again later.
-                _read_again()
-                return
-              end
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
             end
           end
         else
@@ -653,19 +651,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           _read_len = 0
 
           let carry_on = _notify.received(this, consume data)
-          ifdef osx then
-            if not carry_on then
-              _read_again()
-              return
-            end
+          if not carry_on then
+            _read_again()
+            return
+          end
 
-            sum = sum + dsize
+          sum = sum + dsize
 
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              return
-            end
+          if sum >= _max_size then
+            // If we've read _max_size, yield and read again later.
+            _read_again()
+            return
           end
         end
       end
