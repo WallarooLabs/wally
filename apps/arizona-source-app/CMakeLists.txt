@@ -47,11 +47,13 @@ message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 set(
     HEADER_FILES
     hpp/Arizona.hpp
+    hpp/ArizonaState.hpp
 )
 
 set(
     CFG_GEN_SOURCE_FILES
     cpp/Arizona.cpp
+    cpp/ArizonaState.cpp
 )
 
 
