@@ -1,3 +1,4 @@
+#include "ArizonaState.hpp"
 #include "Arizona.hpp"
 #include "WallarooCppApi/Serializable.hpp"
 #include "WallarooCppApi/ApiHooks.hpp"
@@ -624,6 +625,16 @@ void ArizonaSinkEncoder::encode(wallaroo::EncodableData *data, char *bytes)
   data->encode(bytes);
 }
 
+class Proceeds ArizonaState::proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_)
+{
+  return _clients.proceeds_with_order(client_id_, account_id_, isin_id_, order_id_, side_, quantity_, price_);
+}
+
+class Proceeds ArizonaDefaultState::proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_)
+{
+  return _clients.proceeds_with_order(client_id_, account_id_, isin_id_, order_id_, side_, quantity_, price_);
+}
+
 const char *ArizonaStateComputation::name()
 {
   return "arizona state computation";
@@ -638,6 +649,51 @@ ArizonaStateComputation::ArizonaStateComputation() : _nProcessed(0)
 
 void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
 {
+  wallaroo::Logger::getLogger()->critical("COMPUTE");
+  if (OrderMessage *om = dynamic_cast<OrderMessage *>(input_))
+  {
+    ArizonaState *az_state = (ArizonaState*) state_;
+    OrderMessage *order_message = (OrderMessage*) input_;
+
+    class Proceeds proceeds = az_state->proceeds_with_order(*order_message->get_client(),
+                                                            *order_message->get_account(),
+                                                            *order_message->get_isin(),
+                                                            *order_message->get_order_id(),
+                                                            (Side) order_message->get_side(),
+                                                            order_message->get_quantity(),
+                                                            order_message->get_price());
+
+    ProceedsMessage *proceeds_message = new ProceedsMessage(order_message->get_message_id(),
+                                                            new string(*order_message->get_isin()),
+                                                            proceeds.open_short(),
+                                                            proceeds.open_long(),
+                                                            proceeds.proceeds_short(),
+                                                            proceeds.proceeds_long());
+
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+
+  if (CancelMessage *cm = dynamic_cast<CancelMessage *>(input_))
+  {
+    uint64_t message_id = cm->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+
+  if (ExecuteMessage *em = dynamic_cast<ExecuteMessage *>(input_))
+  {
+    uint64_t message_id = em->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+
+  if (AdminMessage *am = dynamic_cast<AdminMessage *>(input_))
+  {
+    uint64_t message_id = am->get_message_id();
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+  }
+
   return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
 }
 
@@ -695,11 +751,27 @@ const char *ArizonaDefaultStateComputation::name()
 
 void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
 {
-  // std::cerr << "DEFAULT COMPUTE" << std::endl;
+  wallaroo::Logger::getLogger()->critical("DEFAULT COMPUTE");
   if (OrderMessage *om = dynamic_cast<OrderMessage *>(input_))
   {
-    uint64_t message_id = om->get_message_id();
-    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(*(om->get_isin())), 0.0, 0.0, 0.0, 0.0);
+    ArizonaState *az_state = (ArizonaState*) state_;
+    OrderMessage *order_message = (OrderMessage*) input_;
+
+    class Proceeds proceeds = az_state->proceeds_with_order(*order_message->get_client(),
+                                                            *order_message->get_account(),
+                                                            *order_message->get_isin(),
+                                                            *order_message->get_order_id(),
+                                                            (Side) order_message->get_side(),
+                                                            order_message->get_quantity(),
+                                                            order_message->get_price());
+
+    ProceedsMessage *proceeds_message = new ProceedsMessage(order_message->get_message_id(),
+                                                            order_message->get_isin(),
+                                                            proceeds.open_short(),
+                                                            proceeds.open_long(),
+                                                            proceeds.proceeds_short(),
+                                                            proceeds.proceeds_long());
+
     return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
   }
 
@@ -723,6 +795,7 @@ void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::
     ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
     return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
   }
+
 
   return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
 }

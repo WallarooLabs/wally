@@ -9,6 +9,7 @@
 #include "WallarooCppApi/Data.hpp"
 #include "WallarooCppApi/Key.hpp"
 #include "WallarooCppApi/PartitionFunction.hpp"
+#include "ArizonaState.hpp"
 #include <spdlog/spdlog.h>
 #include <memory>
 
@@ -112,9 +113,14 @@ private:
 public:
   OrderMessage(uint64_t _message_id);
   virtual ~OrderMessage();
-  virtual string *get_client() { return _client; }
   virtual uint64_t get_message_id() { return _message_id; }
+  string *get_client() { return _client; }
+  string *get_account() { return _account; }
   string *get_isin() { return _isin; }
+  string *get_order_id() { return _order_id; }
+  uint16_t get_side() { return _side; }
+  uint32_t get_quantity() { return _quantity; }
+  double get_price() { return _price; }
   virtual void from_bytes(char *bytes_);
   virtual void serialize(char* bytes_, size_t nsz_);
   virtual size_t serialize_get_size();
@@ -222,14 +228,20 @@ public:
 
 class ArizonaState: public wallaroo::State
 {
+private:
+  Clients _clients;
 public:
-  ArizonaState() {};
+  ArizonaState(): _clients() {};
+  class Proceeds proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
 };
 
 class ArizonaDefaultState: public wallaroo::State
 {
+private:
+  Clients _clients;
 public:
-  ArizonaDefaultState() {};
+  ArizonaDefaultState(): _clients() {};
+  class Proceeds proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
 };
 
 class ArizonaStateComputation: public wallaroo::StateComputation
