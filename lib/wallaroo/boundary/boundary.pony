@@ -776,6 +776,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _apply_backpressure() =>
     _writeable = false
+    ifdef linux then
+      _resubscribe_event()
+    end
     _notify.throttled(this)
 
   fun ref _release_backpressure() =>
