@@ -22,7 +22,6 @@ type LogEntry is (Bool, U128, U128, None, U64, U64, Array[ByteSeq] iso)
 type ReplayEntry is (U128, U128, None, U64, U64, ByteSeq val)
 
 trait Backend
-  fun ref flush() ?
   fun ref sync() ?
   fun ref start()
   fun ref write() ?
@@ -30,7 +29,6 @@ trait Backend
 
 class DummyBackend is Backend
   new create() => None
-  fun ref flush() => None
   fun ref sync() => None
   fun ref start() => None
   fun ref write() => None
@@ -191,14 +189,6 @@ class FileBackend is Backend
     // write data to write buffer
     _writer.writev(payload)
 
-  fun ref flush() ? =>
-    _file.flush()
-    match _file.errno()
-    | FileOK => None
-    else
-      error
-    end
-
   fun ref sync() ? =>
     _file.sync()
     match _file.errno()
@@ -340,13 +330,10 @@ actor Alfred
         //write buffer to disk
         write_log()
 
-        if (_flush_waiting % 50) == 0 then
-          // flush any written data to disk
-          _backend.flush()
-
+        // if (_flush_waiting % 50) == 0 then
           // sync any written data to disk
           //_backend.sync()
-        end
+        // end
 
         _origins(origin_id).log_flushed(low_watermark)
       else
