@@ -22,6 +22,10 @@ private:
   double _open_long;
 public:
   Proceeds(double proceeds_short_, double proceeds_long_, double open_short_, double open_long_);
+  double proceeds_short() { return _proceeds_short; }
+  double proceeds_long() { return _proceeds_long; }
+  double open_short() { return _open_short; }
+  double open_long() { return _open_long; }
   Proceeds& add(Proceeds& that);
   bool operator==(Proceeds& that);
 };
