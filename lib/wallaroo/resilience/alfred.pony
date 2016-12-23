@@ -53,11 +53,15 @@ class FileBackend is Backend
   let _writer: Writer iso
   var _replay_on_start: Bool
 
-  new create(filepath: FilePath, alfred: Alfred) =>
+  new create(filepath: FilePath, alfred: Alfred,
+    file_length: (USize | None) = None) =>
     _writer = recover iso Writer end
     _filepath = filepath
     _replay_on_start = _filepath.exists()
     _file = recover iso File(filepath) end
+    match file_length
+    | let len: USize => _file.set_length(len)
+    end
     _alfred = alfred
 
   fun ref start() =>
@@ -220,7 +224,8 @@ actor Alfred
     var _flush_waiting: USize = 0
 
     new create(env: Env, filename: (String val | None) = None,
-      logging_batch_size: USize = 10)
+      logging_batch_size: USize = 10,
+      backend_file_length: (USize | None) = None)
     =>
       _logging_batch_size = logging_batch_size
       _backend =
@@ -228,7 +233,8 @@ actor Alfred
         match filename
         | let f: String val =>
           try
-            FileBackend(FilePath(env.root as AmbientAuth, f), this)
+            FileBackend(FilePath(env.root as AmbientAuth, f), this,
+              backend_file_length)
           else
             DummyBackend
           end
