@@ -23,6 +23,7 @@ type ReplayEntry is (U128, U128, None, U64, U64, ByteSeq val)
 
 trait Backend
   fun ref sync() ?
+  fun ref datasync() ?
   fun ref start()
   fun ref write() ?
   fun ref encode_entry(entry: LogEntry)
@@ -30,6 +31,7 @@ trait Backend
 class DummyBackend is Backend
   new create() => None
   fun ref sync() => None
+  fun ref datasync() => None
   fun ref start() => None
   fun ref write() => None
   fun ref encode_entry(entry: LogEntry) => None
@@ -197,6 +199,14 @@ class FileBackend is Backend
       error
     end
 
+  fun ref datasync() ? =>
+    _file.datasync()
+    match _file.errno()
+    | FileOK => None
+    else
+      error
+    end
+
 
 actor Alfred
     let _origins: Map[U128, (Resilient & Producer)] = _origins.create()
@@ -331,8 +341,9 @@ actor Alfred
         write_log()
 
         // if (_flush_waiting % 50) == 0 then
-          // sync any written data to disk
-          //_backend.sync()
+        //   //sync any written data to disk
+        //   _backend.sync()
+        //   _backend.datasync()
         // end
 
         _origins(origin_id).log_flushed(low_watermark)
