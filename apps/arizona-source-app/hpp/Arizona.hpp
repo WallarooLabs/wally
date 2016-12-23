@@ -233,6 +233,34 @@ private:
 public:
   ArizonaState(): _clients() {};
   class Proceeds proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
+  void add_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_) { _clients.add_order(client_id_, account_id_, isin_id_, order_id_, side_, quantity_, price_); }
+};
+
+class AddOrderStateChange: public wallaroo::StateChange
+{
+private:
+  string _client_id;
+  string _account_id;
+  string _isin_id;
+  string _order_id;
+  Side _side;
+  uint32_t _quantity;
+  double _price;
+public:
+  AddOrderStateChange(uint64_t id_);
+  virtual const char* name() { return "add order state change"; };
+  virtual void apply(wallaroo::State *state_);
+  virtual void to_log_entry(char *bytes_) {}
+  virtual size_t get_log_entry_size() { return 0; }
+  virtual size_t get_log_entry_size_header_size() { return 0; }
+  virtual size_t read_log_entry_size_header(char *bytes_) { return 0; }
+  virtual bool read_log_entry(char *bytes_) { return true; }
+  void update(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, uint16_t side_, uint32_t quantity_, double price_);
+};
+
+class AddOrderStateChangeBuilder: public wallaroo::StateChangeBuilder
+{
+  virtual wallaroo::StateChange *build(uint64_t id_) { return new AddOrderStateChange(id_); }
 };
 
 class ArizonaDefaultState: public wallaroo::State
@@ -254,8 +282,8 @@ public:
   ArizonaStateComputation();
   virtual const char *name();
   virtual void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void* state_change_Respository_helper_, wallaroo::State *state_, void *none);
-  virtual size_t get_number_of_state_change_builders() { return 0;}
-  virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_) { return NULL; }
+  virtual size_t get_number_of_state_change_builders() { return 1;}
+  virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_) { return new AddOrderStateChangeBuilder(); }
   virtual void serialize(char* bytes_, size_t nsz_) { Writer writer((unsigned char *)bytes_); writer.u16_be(SerializationType::Computation); }
   virtual size_t serialize_get_size () { return 2; }
 };

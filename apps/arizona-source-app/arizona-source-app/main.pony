@@ -66,7 +66,7 @@ primitive StateFilter[In: Any val] is StateComputation[In, None, String]
     sc_repo: StateChangeRepository[String],
     state: String): (None, (StateChange[String] ref | None))
   =>
-    match msg 
+    match msg
     | let m: CPPData val => m.delete_obj()
     end
     (None, None)
@@ -101,7 +101,8 @@ actor Main
           .to_stateful[CPPData val, CPPState](
             state_computation_factory(),
             ArizonaStateBuilder, "state-builder")
-          .done()
+          .to_sink(recover CPPSinkEncoder(recover @get_sink_encoder() end) end, recover [0] end)
+          // .done()
           // NO PARTITION
 
           // PARTITIONED
@@ -150,4 +151,3 @@ actor Main
 class ComputationFactory
   fun apply(): Computation[CPPData val, CPPData val] val =>
     recover CPPComputation(recover @get_computation() end) end
-
