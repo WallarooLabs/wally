@@ -40,7 +40,6 @@ actor TCPSource is Producer
   let _notify: TCPSourceNotify
   var _next_size: USize
   let _max_size: USize
-  let _max_read: USize
   var _connect_count: U32
   var _fd: U32 = -1
   var _expect: USize = 0
@@ -93,7 +92,6 @@ actor TCPSource is Producer
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = 65_536
-    _max_read = 16_384
 
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
@@ -400,7 +398,7 @@ actor TCPSource is Producer
         end
 
         // Read as much data as possible.
-        _read_buf_size()
+        _read_buf_size(sum)
         let len = @pony_os_recv[USize](
           _event,
           _read_buf.cpointer().usize() + _read_len,
@@ -415,7 +413,7 @@ actor TCPSource is Producer
           return
         | _next_size =>
           // Increase the read buffer size.
-          _next_size = _max_read.min(_next_size * 2)
+          _next_size = _max_size.min(_next_size * 2)
         end
 
          _read_len = _read_len + len
@@ -505,11 +503,18 @@ actor TCPSource is Producer
 
     _pending_reads()
 
-  fun ref _read_buf_size() =>
+  fun ref _read_buf_size(less: USize) =>
     """
     Resize the read buffer.
     """
-    _read_buf.undefined(_next_size)
+
+    let size = if (_next_size + less) <= _max_size then
+      _next_size
+    else
+      _next_size.min(_max_size - less)
+    end
+
+    _read_buf.undefined(size)
 
   fun ref _mute() =>
     ifdef "credit_trace" then
