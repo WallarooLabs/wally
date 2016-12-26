@@ -91,7 +91,7 @@ actor TCPSource is Producer
     _connected = true
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = 65_536
+    _max_size = 90_000
 
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
