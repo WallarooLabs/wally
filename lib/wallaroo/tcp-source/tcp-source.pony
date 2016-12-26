@@ -364,39 +364,6 @@ actor TCPSource is Producer
           return
         end
 
-        while (_expect_read_buf.size() > 0) and
-          (_expect_read_buf.size() >= _expect)
-        do
-          let block_size = if _expect != 0 then
-            _expect
-          else
-            _expect_read_buf.size()
-          end
-
-          let out = _expect_read_buf.block(block_size)
-          let carry_on = _notify.received(this, consume out)
-          // We might have become muted while handling the
-          // last batch of data
-          if _muted then
-            _reading = false
-            return
-          end
-          if not carry_on then
-            _read_again()
-            _reading = false
-            return
-          end
-
-          sum = sum + block_size
-
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            _read_again()
-            _reading = false
-            return
-          end
-        end
-
         // Read as much data as possible.
         _read_buf_size(sum)
         let len = @pony_os_recv[USize](
