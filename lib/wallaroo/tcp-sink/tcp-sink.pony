@@ -67,6 +67,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
+  let _max_read: USize
   var _connect_count: U32
   var _fd: U32 = -1
   var _in_sent: Bool = false
@@ -89,7 +90,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
   // Origin (Resilience)
-  let _terminus_route: TerminusRoute ref = recover ref TerminusRoute end
+  let _terminus_route: TerminusRoute = TerminusRoute
 
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
@@ -104,7 +105,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _metrics_reporter = consume metrics_reporter
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = max_size
+    _max_size = 65_536
+    _max_read = 16_384
     _notify = EmptyNotify
     _initial_msgs = initial_msgs
     _connect_count = @pony_os_connect_tcp[U32](this,
@@ -149,7 +151,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let encoded = _encoder.encode[D](data, _wb)
 
-      _writev(encoded, _next_tracking_id(i_origin, i_route_id, i_seq_id))
+      let next_tracking_id = _next_tracking_id(i_origin, i_route_id, i_seq_id)
+      _writev(encoded, next_tracking_id)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
@@ -173,12 +176,13 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   fun ref _next_tracking_id(i_origin: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): (U64 | None)
   =>
-    ifdef "backpressure" then
-      return (_backpressure_seq_id = _backpressure_seq_id + 1)
-    end
-
+    // The order of these matter. If we're in both backpressure and resilience,
+    // we need to update the terminus route id.
     ifdef "resilience" then
       return _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
+    end
+    ifdef "backpressure" then
+      return (_backpressure_seq_id = _backpressure_seq_id + 1)
     end
 
     None
@@ -574,19 +578,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
           let out = _expect_read_buf.block(block_size)
           let carry_on = _notify.received(this, consume out)
-          ifdef osx then
-            if not carry_on then
-              _read_again()
-              return
-            end
+          if not carry_on then
+            _read_again()
+            return
+          end
 
-            sum = sum + block_size
+          sum = sum + block_size
 
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              return
-            end
+          if sum >= _max_size then
+            // If we've read _max_size, yield and read again later.
+            _read_again()
+            return
           end
         end
 
@@ -605,7 +607,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           return
         | _next_size =>
           // Increase the read buffer size.
-          _next_size = _max_size.min(_next_size * 2)
+          _next_size = _max_read.min(_next_size * 2)
         end
 
          _read_len = _read_len + len
@@ -629,19 +631,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
             let out = _expect_read_buf.block(block_size)
             let osize = block_size
             let carry_on = _notify.received(this, consume out)
-            ifdef osx then
-              if not carry_on then
-                _read_again()
-                return
-              end
+            if not carry_on then
+              _read_again()
+              return
+            end
 
-              sum = sum + osize
+            sum = sum + osize
 
-              if sum >= _max_size then
-                // If we've read _max_size, yield and read again later.
-                _read_again()
-                return
-              end
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              return
             end
           end
         else
@@ -651,19 +651,17 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
           _read_len = 0
 
           let carry_on = _notify.received(this, consume data)
-          ifdef osx then
-            if not carry_on then
-              _read_again()
-              return
-            end
+          if not carry_on then
+            _read_again()
+            return
+          end
 
-            sum = sum + dsize
+          sum = sum + dsize
 
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              return
-            end
+          if sum >= _max_size then
+            // If we've read _max_size, yield and read again later.
+            _read_again()
+            return
           end
         end
       end
@@ -801,6 +799,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _apply_backpressure() =>
     _writeable = false
+    ifdef linux then
+      _resubscribe_event()
+    end
     _notify.throttled(this)
 
   fun ref _release_backpressure() =>

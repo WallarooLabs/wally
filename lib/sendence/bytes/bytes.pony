@@ -21,14 +21,14 @@ primitive Bytes
     (a.u64() << 56) or (b.u64() << 48) or (c.u64() << 40) or (d.u64() << 32)
     or (e.u64() << 24) or (f.u64() << 16) or (g.u64() << 8) or h.u64()
 
-  fun from_u16(u16: U16, arr: Array[U8] iso = recover Array[U8] end): Array[U8] iso^ =>
+  fun from_u16(u16: U16, arr: Array[U8] iso = recover Array[U8](2) end): Array[U8] iso^ =>
     let l1: U8 = (u16 and 0xFF).u8()
     let l2: U8 = ((u16 >> 8) and 0xFF).u8()
     arr.push(l2)
     arr.push(l1)
     consume arr
 
-  fun from_u32(u32: U32, arr: Array[U8] iso = recover Array[U8] end): Array[U8] iso^ =>
+  fun from_u32(u32: U32, arr: Array[U8] iso = recover Array[U8](4) end): Array[U8] iso^ =>
     let l1: U8 = (u32 and 0xFF).u8()
     let l2: U8 = ((u32 >> 8) and 0xFF).u8()
     let l3: U8 = ((u32 >> 16) and 0xFF).u8()
@@ -39,7 +39,7 @@ primitive Bytes
     arr.push(l1)
     consume arr
 
-  fun from_u64(u64: U64, arr: Array[U8] iso = recover Array[U8] end): Array[U8] iso^ =>
+  fun from_u64(u64: U64, arr: Array[U8] iso = recover Array[U8](8) end): Array[U8] iso^ =>
     let l1: U8 = (u64 and 0xFF).u8()
     let l2: U8 = ((u64 >> 8) and 0xFF).u8()
     let l3: U8 = ((u64 >> 16) and 0xFF).u8()
@@ -58,12 +58,12 @@ primitive Bytes
     arr.push(l1)
     consume arr
 
-  fun from_f32(f32: F32, arr: Array[U8] iso = recover Array[U8] end):
+  fun from_f32(f32: F32, arr: Array[U8] iso = recover Array[U8](4) end):
     Array[U8] iso^
   =>
     from_u32(f32.bits(), consume arr)
 
-  fun from_f64(f64: F64, arr: Array[U8] iso = recover Array[U8] end):
+  fun from_f64(f64: F64, arr: Array[U8] iso = recover Array[U8](8) end):
     Array[U8] iso^
   =>
     from_u64(f64.bits(), consume arr)

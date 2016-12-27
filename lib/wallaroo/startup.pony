@@ -5,6 +5,7 @@ use "net"
 use "options"
 use "time"
 use "sendence/hub"
+use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -36,6 +37,7 @@ actor Startup
     var is_initializer = false
     var worker_initializer: (WorkerInitializer | None) = None
     var worker_name = ""
+    var resilience_dir = "/tmp"
     try
       var options = Options(env.args, false)
       var auth = env.root as AmbientAuth
@@ -55,6 +57,7 @@ actor Startup
         .add("topology-initializer", "t", None)
         .add("leader", "l", None)
         .add("name", "n", StringArgument)
+        .add("resilience-dir", "r", StringArgument)
 
       for option in options do
         match option
@@ -73,7 +76,18 @@ actor Startup
           worker_count = arg.usize()
         | ("topology-initializer", None) => is_initializer = true
         | ("name", let arg: String) => worker_name = arg
+        | ("resilience-dir", let arg: String) =>
+          if arg.substring(arg.size().isize() - 1) == "/" then
+            env.out.print("--resilience-dir must not end in /")
+            error
+          else
+            resilience_dir = arg
+          end
         end
+      end
+
+      ifdef "resilience" then
+        env.out.print("|||Resilience directory: " + resilience_dir + "|||")
       end
 
       if worker_count == 1 then
@@ -137,13 +151,16 @@ actor Startup
         else
           ""
         end
-      let event_log_file = "/tmp/" + name + "-" + worker_name + ".evlog"
-      let local_topology_file = "/tmp/" + name + "-" +
-          worker_name + ".local-topology"
-      let data_channel_file = "/tmp/" + name + "-" + worker_name + ".tcp-data"
-      let control_channel_file = "/tmp/" + name + "-" + worker_name +
-          ".tcp-control"
-      let worker_names_file = "/tmp/" + name + "-" + worker_name + ".workers"
+      let event_log_file = resilience_dir + "/" + name + "-" +
+        worker_name + ".evlog"
+      let local_topology_file = resilience_dir + "/" + name + "-" +
+        worker_name + ".local-topology"
+      let data_channel_file = resilience_dir + "/" + name + "-" + worker_name +
+        ".tcp-data"
+      let control_channel_file = resilience_dir + "/" + name + "-" +
+        worker_name + ".tcp-control"
+      let worker_names_file = resilience_dir + "/" + name + "-" + worker_name +
+        ".workers"
 
       let alfred = Alfred(env, event_log_file)
       let local_topology_initializer = LocalTopologyInitializer(
@@ -168,28 +185,38 @@ actor Startup
         is_initializer, worker_initializer, local_topology_initializer,
         alfred, control_channel_filepath)
 
-      if is_initializer then
-        connections.make_and_register_recoverable_listener(
-          auth, consume control_notifier, control_channel_filepath,
-          c_host, c_service)
+      ifdef "resilience" then
+        if is_initializer then
+          connections.make_and_register_recoverable_listener(
+            auth, consume control_notifier, control_channel_filepath,
+            c_host, c_service)
+        else
+          connections.make_and_register_recoverable_listener(
+            auth, consume control_notifier, control_channel_filepath)
+        end
       else
-        connections.make_and_register_recoverable_listener(
-          auth, consume control_notifier, control_channel_filepath)
+        if is_initializer then
+          connections.register_listener(
+            TCPListener(auth, consume control_notifier, c_host, c_service))
+        else
+          connections.register_listener(
+            TCPListener(auth, consume control_notifier))
+        end
       end
 
-      // If the file worker_names_file exists we need to recover the list of
-      // known workers and recreate the data receivers
-      let worker_names_filepath: FilePath = FilePath(auth, worker_names_file)
-      if worker_names_filepath.exists() then
-        let recovered_workers = _recover_worker_names(worker_names_filepath)
-        local_topology_initializer.create_data_receivers(recovered_workers,
-          worker_initializer)
+      ifdef "resilience" then
+        // If the file worker_names_file exists we need to recover the list of
+        // known workers and recreate the data receivers
+        let worker_names_filepath: FilePath = FilePath(auth, worker_names_file)
+        if worker_names_filepath.exists() then
+          let recovered_workers = _recover_worker_names(worker_names_filepath)
+          local_topology_initializer.create_data_receivers(recovered_workers,
+            worker_initializer)
+        end
       end
 
       // TODO: We are not recreating the control channel connection from upstream!
-      // TODO: An initializer cannot recover in this way. Make sure that we fail
-      //       immediately if an initializer tries to recover.
-      
+
       match worker_initializer
       | let w: WorkerInitializer =>
         w.start(application)
@@ -215,4 +242,4 @@ actor Startup
     end
 
     ws
-    
+

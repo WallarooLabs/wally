@@ -324,12 +324,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     ifdef "trace" then
       @printf[I32]("flushing at and below: %llu\n".cstring(), low_watermark)
     end
-    match _id
-    | let id: U128 =>
-      _alfred.flush_buffer(id, low_watermark)
-    else
-      @printf[I32]("Tried to flush a non-existing buffer!".cstring())
-    end
+    _alfred.flush_buffer(_id, low_watermark)
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val)
   =>

@@ -54,7 +54,9 @@ actor WorkerInitializer
     if _control_addrs.contains(worker) then
       @printf[I32](("Initializer: " + worker +
         " tried registering control channel twice\n").cstring())
-    else  
+    else
+      @printf[I32]("Worker %s control channel identified\n".cstring(),
+        worker.cstring())
       _worker_names.push(worker)
       _control_addrs(worker) = (host, service)
       _control_identified = _control_identified + 1
@@ -69,7 +71,9 @@ actor WorkerInitializer
     if _data_addrs.contains(worker) then
       @printf[I32](("Initializer: " + worker +
         " tried registering data channel twice.\n").cstring())
-    else  
+    else
+      @printf[I32]("Worker %s control channel identified\n".cstring(),
+        worker.cstring())
       _data_addrs(worker) = (host, service)
       _data_identified = _data_identified + 1
       if _data_identified == _expected then
@@ -130,7 +134,7 @@ actor WorkerInitializer
 
   // be register_proxy(worker: String, proxy: Step tag) =>
   //   _connections.register_proxy(worker, proxy)
-    
+
   fun _create_data_receivers() =>
     let ws: Array[String] trn = recover Array[String] end
 

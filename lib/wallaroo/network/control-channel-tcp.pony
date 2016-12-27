@@ -40,17 +40,28 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
-      let f = File(_recovery_file)
-      f.print(_host)
-      f.print(_service)
-      f.sync()
-      f.dispose()
-      _env.out.print(_name + " control: listening on " + _host + ":" + _service)
-      if not (_is_initializer and _recovery_file.exists()) then
-        let message = ChannelMsgEncoder.identify_control_port(_name, 
-          _service, _auth)
-        _connections.send_control("initializer", message)
+      ifdef "resilience" then
+        if _recovery_file.exists() then
+          @printf[I32]("Recovery file exists for control channel\n".cstring())
+        end
+        if not (_is_initializer or _recovery_file.exists()) then
+          let message = ChannelMsgEncoder.identify_control_port(_name,
+            _service, _auth)
+          _connections.send_control("initializer", message)
+        end
+        let f = File(_recovery_file)
+        f.print(_host)
+        f.print(_service)
+        f.sync()
+        f.dispose()
+      else
+        if not _is_initializer then
+          let message = ChannelMsgEncoder.identify_control_port(_name,
+            _service, _auth)
+          _connections.send_control("initializer", message)
+        end
       end
+      _env.out.print(_name + " control: listening on " + _host + ":" + _service)
     else
       _env.out.print(_name + "control : couldn't get local address")
       listen.close()
@@ -61,7 +72,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    ControlChannelConnectNotifier(_name, _env, _auth, _connections, 
+    ControlChannelConnectNotifier(_name, _env, _auth, _connections,
       _initializer, _local_topology_initializer, _alfred)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
@@ -74,9 +85,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _alfred: Alfred tag
   var _header: Bool = true
 
-  new iso create(name: String, env: Env, auth: AmbientAuth, 
+  new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, initializer: (WorkerInitializer | None),
-    local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag) 
+    local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag)
   =>
     _env = env
     _auth = auth
@@ -99,6 +110,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _env.err.print("Error reading header on control channel")
       end
     else
+      ifdef "trace" then
+        @printf[I32]("Received msg on Control Channel\n".cstring())
+      end
       let msg = ChannelMsgDecoder(consume data, _auth)
       match msg
       | let m: IdentifyControlPortMsg val =>
@@ -133,7 +147,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           i.topology_ready(m.worker_name)
         end
       | let m: CreateConnectionsMsg val =>
-        _connections.create_connections(m.addresses, 
+        _connections.create_connections(m.addresses,
           _local_topology_initializer)
       | let m: ConnectionsReadyMsg val =>
         match _initializer

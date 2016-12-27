@@ -177,23 +177,6 @@ class FileBackend is Backend
 
       _writer.u128_be(uid)
 
-      // match frac_ids
-      // | let ids: Array[U64] val =>
-      //   let s = ids.size()
-      //   _writer.u64_be(s.u64())
-      //   for j in Range(0,s) do
-      //     try
-      //       _writer.u64_be(ids(j))
-      //     else
-      //       @printf[I32]("fractional id %d on message %d disappeared!".cstring(),
-      //         j, uid)
-      //     end
-      //   end
-      // else
-      // //we have no frac_ids
-      // _writer.u64_be(0)
-      // end
-
       //we have no frac_ids
       _writer.u64_be(0)
 

@@ -91,7 +91,7 @@ actor TCPSource is Producer
     _connected = true
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = max_size
+    _max_size = 65_536
 
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
@@ -364,43 +364,8 @@ actor TCPSource is Producer
           return
         end
 
-        while (_expect_read_buf.size() > 0) and
-          (_expect_read_buf.size() >= _expect)
-        do
-          let block_size = if _expect != 0 then
-            _expect
-          else
-            _expect_read_buf.size()
-          end
-
-          let out = _expect_read_buf.block(block_size)
-          let carry_on = _notify.received(this, consume out)
-          // We might have become muted while handling the
-          // last batch of data
-          if _muted then
-            _reading = false
-            return
-          end
-          ifdef osx then
-            if not carry_on then
-              _read_again()
-              _reading = false
-              return
-            end
-
-            sum = sum + block_size
-
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              _reading = false
-              return
-            end
-          end
-        end
-
         // Read as much data as possible.
-        _read_buf_size()
+        _read_buf_size(sum)
         let len = @pony_os_recv[USize](
           _event,
           _read_buf.cpointer().usize() + _read_len,
@@ -446,21 +411,19 @@ actor TCPSource is Producer
               _reading = false
               return
             end
-            ifdef osx then
-              if not carry_on then
-                _read_again()
-                _reading = false
-                return
-              end
+            if not carry_on then
+              _read_again()
+              _reading = false
+              return
+            end
 
-              sum = sum + osize
+            sum = sum + osize
 
-              if sum >= _max_size then
-                // If we've read _max_size, yield and read again later.
-                _read_again()
-                _reading = false
-                return
-              end
+            if sum >= _max_size then
+              // If we've read _max_size, yield and read again later.
+              _read_again()
+              _reading = false
+              return
             end
           end
         else
@@ -476,21 +439,19 @@ actor TCPSource is Producer
             _reading = false
             return
           end
-          ifdef osx then
-            if not carry_on then
-              _read_again()
-              _reading = false
-              return
-            end
+          if not carry_on then
+            _read_again()
+            _reading = false
+            return
+          end
 
-            sum = sum + dsize
+          sum = sum + dsize
 
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              _reading = false
-              return
-            end
+          if sum >= _max_size then
+            // If we've read _max_size, yield and read again later.
+            _read_again()
+            _reading = false
+            return
           end
         end
       end
@@ -509,11 +470,18 @@ actor TCPSource is Producer
 
     _pending_reads()
 
-  fun ref _read_buf_size() =>
+  fun ref _read_buf_size(less: USize) =>
     """
     Resize the read buffer.
     """
-    _read_buf.undefined(_next_size)
+
+    let size = if (_next_size + less) <= _max_size then
+      _next_size
+    else
+      _next_size.min(_max_size - less)
+    end
+
+    _read_buf.undefined(size)
 
   fun ref _mute() =>
     ifdef "credit_trace" then

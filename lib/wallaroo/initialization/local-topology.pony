@@ -186,8 +186,14 @@ actor LocalTopologyInitializer
             _is_initializer, data_receivers,
             MetricsReporter(_application.name(), _worker_name, _metrics_conn),
             data_channel_filepath)
+
+        ifdef "resilience" then
           _connections.make_and_register_recoverable_listener(
             _auth, consume data_notifier, data_channel_filepath)
+        else
+          _connections.register_listener(TCPListener(_auth,
+            consume data_notifier))
+        end
       else
         match worker_initializer
           | let wi: WorkerInitializer =>
@@ -521,8 +527,13 @@ actor LocalTopologyInitializer
                 // Currently there are no splits (II), so we know that a node // has only one output in the graph. We also know this is not
                 // a sink or proxy, so there is exactly one output.
                 let out_id: U128 =
-                    _get_output_node_id(next_node,
-                      default_target_id, default_target_state_step_id)
+                  match _get_output_node_id(next_node,
+                    default_target_id, default_target_state_step_id)
+                  | let id: U128 => id
+                  else
+                    @printf[I32]("Invariant was violated: non-sink node had no output node.")
+                    error
+                  end
 
                 let out_router =
                   try
@@ -742,13 +753,19 @@ actor LocalTopologyInitializer
                   // Currently there are no splits (II), so we know that a node has
                   // only one output in the graph. We also know this is not
                   // a sink or proxy, so there is exactly one output.
-                  let out_id: U128 = _get_output_node_id(next_node,
+                  let out_id: (U128 | None) = _get_output_node_id(next_node,
                     default_target_id, default_target_state_step_id)
-                  try
-                    built_routers(out_id)
+
+                  match out_id
+                  | let id: U128 => id
+                    try
+                      built_routers(id)
+                    else
+                      @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
+                      error
+                    end
                   else
-                    @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
-                    error
+                    EmptyRouter
                   end
                 else
                   // Source has a prestate runner on it, so we have no
@@ -907,6 +924,11 @@ actor LocalTopologyInitializer
 
         @printf[I32]("Local topology initialized\n".cstring())
         _topology_initialized = true
+
+        if _initializables.size() == 0 then
+          @printf[I32]("Phases I-II skipped (this topology must only have sources.)\n".cstring())
+          _application_ready_to_work()
+        end
       else
         @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end
@@ -992,7 +1014,8 @@ actor LocalTopologyInitializer
     end
 
   fun _get_output_node_id(node: DagNode[StepInitializer val] val,
-    default_target_id: U128, default_target_state_step_id: U128): U128 ?
+    default_target_id: U128, default_target_state_step_id: U128):
+    (U128 | None) ?
   =>
     // TODO: Replace this once we move past POC default target strategy
     if node.id == default_target_id then
@@ -1010,22 +1033,10 @@ actor LocalTopologyInitializer
       error
     end
 
-    // Since this is not a sink or proxy, there should be exactly one
-    // output.
-    var out_id: U128 = 0
+    // ASSUMPTION: Since this is not a sink or proxy, there should be at most
+    // one output.
+    var out_id: (U128 | None) = None
     for out in node.outs() do
       out_id = out.id
     end
-    if out_id == 0 then
-      @printf[I32]("Invariant was violated: non-sink node had no output node.\n".cstring())
-      error
-    end
     out_id
-
-  // Connections knows how to plug proxies into other workers via TCP
-  // fun _register_proxies(proxies: Map[String, Array[Step tag]]) =>
-  //   for (worker, ps) in proxies.pairs() do
-  //     for proxy in ps.values() do
-  //       _connections.register_proxy(worker, proxy)
-  //     end
-  //   end

@@ -4,6 +4,7 @@ use "files"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo/boundary"
+use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -67,6 +68,10 @@ actor Connections
     notifier: TCPListenNotify iso, recovery_addr_file: FilePath val,
     host: String val = "", port: String val = "0")
   =>
+    // TODO: Not sure if this is the right way to check this
+    ifdef not "resilience" then
+      Fail()
+    end
     if recovery_addr_file.exists() then
       try
         let file = File(recovery_addr_file)
