@@ -81,21 +81,6 @@ sudo make install
 ### Build ponyc
 ```
 cd ~/
-wget
-http://llvm.org/releases/3.8.1/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-tar xvf clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-export PATH=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/:$PATH
-echo "export PATH=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/:\$PATH"
->> ~/.bashrcsudo apt-get update
-sudo apt-get install -y build-essential git zlib1g-dev libncurses5-dev
-libssl-dev cmake
-cd ~/
-wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2
-tar xvf pcre2-10.21.tar.bz2
-cd pcre2-10.21
-./configure --prefix=/usr
-sudo make install
-cd ~/
 git clone https://github.com/Sendence/ponyc.git
 cd ~/ponyc/
 git checkout export-and-serialize
