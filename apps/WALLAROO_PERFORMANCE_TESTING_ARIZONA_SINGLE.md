@@ -90,7 +90,7 @@ sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/b
 ### Build spdlog
 ```
 git clone https://github.com/gabime/spdlog.git
-cd ~spdlog
+cd ~/spdlog
 mkdir build
 cd build
 cmake ..
@@ -125,9 +125,7 @@ cd build
 cmake ..
 make
 cd ..
-ponyc
---path=/home/ubuntu/buffy/lib:/usr/local/lib/WallarooCppApi/:/home/ubuntu/buffy/apps/arizona-source-app/build/lib/
---output=build arizona-source-app/
+ponyc --path=/home/ubuntu/buffy/lib:/usr/local/lib/WallarooCppApi/:/home/ubuntu/buffy/apps/arizona-source-app/build/lib/ --output=build arizona-source-app/
 ```
 
 ### Startup the Metrics UI
@@ -162,8 +160,10 @@ Before you can run Arizona, you need to generate data for it with the datagen
 app
 
 ```
+sudo apt-get install pkg-config libconfig++-dev
 cd
 git clone https://github.com/Sendence/arizona.git
+git checkout state-node-compute
 cd ~/arizona
 mkdir build
 cd build
