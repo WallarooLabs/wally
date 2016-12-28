@@ -84,8 +84,7 @@ cd ~/
 git clone https://github.com/Sendence/ponyc.git
 cd ~/ponyc/
 git checkout export-and-serialize
-sudo make install
-LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/llvm-config
+sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/llvm-config
 ```
 
 ### Build spdlog
