@@ -211,22 +211,3 @@ To run the Orders Sender:
 ```
 sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-100k.dat -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
-
-#### Install Sendence ponyc
-
-```bash
-cd ~/
-git clone https://github.com/Sendence/ponyc.git
-cd ~/ponyc/
-sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/llvm-config
-```
-
-#### Install pony-stable
-
-```bash
-cd ~/
-git clone https://github.com/jemc/pony-stable.git
-cd pony-stable
-sudo make install
-```
-
