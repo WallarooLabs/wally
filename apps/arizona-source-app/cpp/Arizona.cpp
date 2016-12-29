@@ -636,7 +636,7 @@ AddOrderStateChange::AddOrderStateChange(uint64_t id_): StateChange(id_), _clien
 
 void AddOrderStateChange::update(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, uint16_t side_, uint32_t quantity_, double price_)
 {
-  wallaroo::Logger::getLogger()->critical("update state change");
+  //wallaroo::Logger::getLogger()->critical("update state change");
   _client_id = client_id_;
   _account_id = account_id_;
   _isin_id = isin_id_;
@@ -648,7 +648,7 @@ void AddOrderStateChange::update(string& client_id_, string& account_id_, string
 
 void AddOrderStateChange::apply(wallaroo::State *state_)
 {
-  wallaroo::Logger::getLogger()->critical("apply state change");
+  //wallaroo::Logger::getLogger()->critical("apply state change");
   ArizonaState *az_state = (ArizonaState *)state_;
   az_state->add_order(_client_id, _account_id, _isin_id, _order_id, _side, _quantity, _price);
 }
