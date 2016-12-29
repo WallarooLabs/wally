@@ -89,6 +89,8 @@ sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/b
 
 ### Build spdlog
 ```
+sudo apt-get install cmake
+cd
 git clone https://github.com/gabime/spdlog.git
 cd ~/spdlog
 mkdir build
