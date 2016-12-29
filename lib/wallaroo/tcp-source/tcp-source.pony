@@ -91,7 +91,7 @@ actor TCPSource is Producer
     _connected = true
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
-    _max_size = 65_536
+    _max_size = max_size
 
     _route_builder = route_builder
     _outgoing_boundaries = outgoing_boundaries
@@ -355,6 +355,8 @@ actor TCPSource is Producer
     ourself a resume message and stop reading, to avoid starving other actors.
     """
     try
+      var max_reads: U8 = 50
+      var reads: U8 = 0
       var sum: USize = 0
       _reading = true
 
@@ -370,6 +372,8 @@ actor TCPSource is Producer
           _event,
           _read_buf.cpointer().usize() + _read_len,
           _read_buf.size() - _read_len) ?
+
+        reads = reads + 1
 
         match len
         | 0 =>
@@ -419,7 +423,7 @@ actor TCPSource is Producer
 
             sum = sum + osize
 
-            if sum >= _max_size then
+            if (sum >= _max_size) or (reads >= max_reads) then
               // If we've read _max_size, yield and read again later.
               _read_again()
               _reading = false
@@ -475,10 +479,15 @@ actor TCPSource is Producer
     Resize the read buffer.
     """
 
-    let size = if (_next_size + less) <= _max_size then
-      _next_size
+
+    let size = if _expect != 0 then
+      _expect
     else
-      _next_size.min(_max_size - less)
+      if (_next_size + less) <= _max_size then
+        _next_size
+      else
+        _next_size.min(_max_size - less)
+      end
     end
 
     _read_buf.undefined(size)
