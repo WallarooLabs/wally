@@ -630,6 +630,21 @@ class Proceeds ArizonaState::proceeds_with_order(string& client_id_, string& acc
   return _clients.proceeds_with_order(client_id_, account_id_, isin_id_, order_id_, side_, quantity_, price_);
 }
 
+void ArizonaState::add_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_)
+{
+  _clients.add_order(client_id_, account_id_, isin_id_, order_id_, side_, quantity_, price_);
+}
+
+class Proceeds ArizonaState::proceeds_with_cancel(string& client_id_, string& account_id_, string& order_id_)
+{
+  return _clients.proceeds_with_cancel(client_id_, account_id_, order_id_);
+}
+
+void ArizonaState::cancel_order(string& client_id_, string& account_id_, string& order_id_)
+{
+  _clients.cancel_order(client_id_, account_id_, order_id_);
+}
+
 AddOrderStateChange::AddOrderStateChange(uint64_t id_): StateChange(id_), _client_id(), _account_id(), _isin_id(), _order_id(), _quantity(0), _price(0.0)
 {
 }
@@ -710,7 +725,20 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
   if (CancelMessage *cm = dynamic_cast<CancelMessage *>(input_))
   {
     uint64_t message_id = cm->get_message_id();
-    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+
+    ArizonaState *az_state = (ArizonaState*) state_;
+
+    class Proceeds proceeds = az_state->proceeds_with_cancel(*cm->get_client(),
+                                                            *cm->get_account(),
+                                                            *cm->get_order_id());
+
+    ProceedsMessage *proceeds_message = new ProceedsMessage(cm->get_message_id(),
+                                                            new string(proceeds.isin()),
+                                                            proceeds.open_short(),
+                                                            proceeds.open_long(),
+                                                            proceeds.proceeds_short(),
+                                                            proceeds.proceeds_long());
+
     return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
   }
 
