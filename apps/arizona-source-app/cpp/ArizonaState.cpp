@@ -1,7 +1,7 @@
 #include "ArizonaState.hpp"
 
-Proceeds::Proceeds(double proceeds_short_, double proceeds_long_, double open_short_, double open_long_):
-  _proceeds_short(proceeds_short_), _proceeds_long(proceeds_long_), _open_short(open_short_), _open_long(open_long_)
+Proceeds::Proceeds(double proceeds_short_, double proceeds_long_, double open_short_, double open_long_, string isin_id_):
+  _proceeds_short(proceeds_short_), _proceeds_long(proceeds_long_), _open_short(open_short_), _open_long(open_long_), _isin_id(isin_id_)
 {
 }
 
@@ -20,7 +20,8 @@ bool Proceeds::operator==(Proceeds& that)
   return (_proceeds_short == that._proceeds_short)
     && (_proceeds_long == that._proceeds_long)
     && (_open_short == that._open_short)
-    && (_open_long == that._open_long);
+    && (_open_long == that._open_long)
+    && (_isin_id == that._isin_id);
 }
 
 Order::Order(string& order_id_, Side side_, uint32_t quantity_, double price_):
@@ -40,11 +41,11 @@ Proceeds Order::proceeds()
   {
   default:
     // TODO: Log this
-    return Proceeds(0.0, 0.0, 0.0, 0.0);
+    return Proceeds(0.0, 0.0, 0.0, 0.0, "");
   case Side::Sell:
-    return Proceeds(total, 0.0, 0.0, 0.0);
+    return Proceeds(total, 0.0, 0.0, 0.0, "");
   case Side::Buy:
-    return Proceeds(0.0, total, 0.0, 0.0);
+    return Proceeds(0.0, total, 0.0, 0.0, "");
   }
 }
 
@@ -80,7 +81,7 @@ void Orders::cancel_order(string& order_id_)
 
 Proceeds Orders::proceeds()
 {
-  Proceeds p(0.0, 0.0, 0.0, 0.0);
+  Proceeds p(0.0, 0.0, 0.0, 0.0, "");
   for(map<string, Order *>::iterator it = _orders.begin(); it != _orders.end(); it++)
   {
     Proceeds p_order = it->second->proceeds();
@@ -92,7 +93,7 @@ Proceeds Orders::proceeds()
 
 Proceeds Orders::proceeds_without_order(string& order_id_)
 {
-  Proceeds p(0.0, 0.0, 0.0, 0.0);
+  Proceeds p(0.0, 0.0, 0.0, 0.0, "");
   for(map<string, Order *>::iterator it = _orders.begin(); it != _orders.end(); it++)
   {
     if (it->first != order_id_)
@@ -122,12 +123,16 @@ void ISIN::cancel_order(string& order_id_)
 
 Proceeds ISIN::proceeds()
 {
-  return _orders.proceeds();
+  Proceeds p(0.0, 0.0, 0.0, 0.0, _isin_id);
+  Proceeds op = _orders.proceeds();
+  return p.add(op);
 }
 
 Proceeds ISIN::proceeds_without_order(string& order_id_)
 {
-  return _orders.proceeds_without_order(order_id_);
+  Proceeds p(0.0, 0.0, 0.0, 0.0, _isin_id);
+  Proceeds op = _orders.proceeds_without_order(order_id_);
+  return p.add(op);
 }
 
 ISINs::ISINs(): _isins()
@@ -199,7 +204,7 @@ Proceeds ISINs::proceeds_for_isin(string& isin_id_)
   // TODO: log if we can't find the isin
   if (isin == nullptr)
   {
-    return Proceeds(0.0, 0.0, 0.0, 0.0);
+    return Proceeds(0.0, 0.0, 0.0, 0.0, isin_id_);
   }
 
   return isin->proceeds();
@@ -214,7 +219,7 @@ Proceeds ISINs::proceeds_for_isin_without_order(string& isin_id_, string& order_
   // TODO: log if we can't find the isin
   if (isin == nullptr)
   {
-    return Proceeds(0.0, 0.0, 0.0, 0.0);
+    return Proceeds(0.0, 0.0, 0.0, 0.0, isin_id_);
   }
 
   return isin->proceeds_without_order(order_id_);
@@ -224,7 +229,7 @@ Proceeds ISINs::proceeds_with_order(string& isin_id_, string& order_id_, Side si
 {
   Proceeds p_isin = proceeds_for_isin(isin_id_);
   Proceeds p_order = Order(order_id_, side_, quantity_, price_).proceeds();
-  return p_order.add(p_isin);
+  return p_isin.add(p_order);
 }
 
 Proceeds ISINs::proceeds_with_cancel(string& isin_id_, string& order_id_)
@@ -282,7 +287,7 @@ Proceeds Account::proceeds_with_cancel(string& order_id_)
   if (it == _order_id_to_isin_id.end())
   {
     // TODO: this should be an error
-    return Proceeds(-1.0 ,-1.0, -1.0, -1.0);
+    return Proceeds(-1.0 ,-1.0, -1.0, -1.0, "");
   }
   string isin_id = it->second;
 
@@ -368,7 +373,7 @@ Proceeds Accounts::proceeds_for_isin(string& account_id_, string& isin_id_)
   Account *account = _account_by_account_id(account_id_);
   if (account == nullptr)
   {
-    return Proceeds(0.0, 0.0, 0.0, 0.0);
+    return Proceeds(0.0, 0.0, 0.0, 0.0, isin_id_);
   }
   return account->proceeds_for_isin(isin_id_);
 }
@@ -379,7 +384,9 @@ Proceeds Accounts::proceeds_with_order(string& account_id_, string& isin_id_, st
 
   if (account == nullptr)
   {
-    return Order(order_id_, side_, quantity_, price_).proceeds();
+    Proceeds p(0.0, 0.0, 0.0, 0.0, isin_id_);
+    Proceeds op = Order(order_id_, side_, quantity_, price_).proceeds();
+    return p.add(op);
   }
   return account->proceeds_with_order(isin_id_, order_id_, side_, quantity_, price_);
 }
@@ -391,7 +398,7 @@ Proceeds Accounts::proceeds_with_cancel(string& account_id_, string& order_id_)
   if (account == nullptr)
   {
     // TODO: canceling an order for an account that doesn't exist should be an error
-    return Proceeds(-1.0, -1.0, -1.0, -1.0);
+    return Proceeds(-1.0, -1.0, -1.0, -1.0, "");
   }
   return account->proceeds_with_cancel(order_id_);
 }
@@ -488,7 +495,7 @@ Proceeds Clients::proceeds_for_isin(string& client_id_, string& account_id_, str
 
   if (client == nullptr)
   {
-    return Proceeds(0.0, 0.0, 0.0, 0.0);
+    return Proceeds(0.0, 0.0, 0.0, 0.0, isin_id_);
   }
   return client->proceeds_for_isin(account_id_, isin_id_);
 }
@@ -499,7 +506,9 @@ Proceeds Clients::proceeds_with_order(string& client_id_, string& account_id_, s
 
   if (client == nullptr)
   {
-    return Order(order_id_, side_, quantity_, price_).proceeds();
+    Proceeds p = Proceeds(0.0, 0.0, 0.0, 0.0, isin_id_);
+    Proceeds op = Order(order_id_, side_, quantity_, price_).proceeds();
+    return p.add(op);
   }
   return client->proceeds_with_order(account_id_, isin_id_, order_id_, side_, quantity_, price_);
 }
@@ -511,7 +520,7 @@ Proceeds Clients::proceeds_with_cancel(string& client_id_, string& account_id_, 
   if (client == nullptr)
   {
     // TODO: it should be an error to cancel an order for a client that doesn't exist
-    return Proceeds(0.0, 0.0, 0.0, 0.0);
+    return Proceeds(0.0, 0.0, 0.0, 0.0, "");
   }
   return client->proceeds_with_cancel(account_id_, order_id_);
 }
