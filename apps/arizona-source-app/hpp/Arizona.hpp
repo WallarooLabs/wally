@@ -140,6 +140,8 @@ public:
   CancelMessage(uint64_t _message_id);
   virtual ~CancelMessage();
   virtual string *get_client() { return _client; }
+  string *get_account() { return _account; }
+  string *get_order_id() { return _order_id; }
   virtual uint64_t get_message_id() { return _message_id; }
   virtual void from_bytes(char *bytes_);
   virtual void serialize(char* bytes_, size_t nsz_);
@@ -233,7 +235,10 @@ private:
 public:
   ArizonaState(): _clients() {};
   class Proceeds proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
-  void add_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_) { _clients.add_order(client_id_, account_id_, isin_id_, order_id_, side_, quantity_, price_); }
+  void add_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
+
+  class Proceeds proceeds_with_cancel(string& client_id_, string& account_id_, string& order_id_);
+  void cancel_order(string& client_id_, string& account_id_, string& order_id_);
 };
 
 class AddOrderStateChange: public wallaroo::StateChange
