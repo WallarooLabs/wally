@@ -919,8 +919,8 @@ interface _TCPSinkNotify
     receiving this notification, you should feel free to start making calls to
     `write` and `writev` again.
     """
-    @printf[None]("TCPSink is no longer experiencing" +
-      " back pressure\n".cstring())
+    @printf[None](("TCPSink is no longer experiencing" +
+      " back pressure\n").cstring())
 
 
 class EmptyNotify is _TCPSinkNotify
