@@ -912,3 +912,21 @@ class BoundaryNotify is _OutgoingBoundaryNotify
     server. At this point, the connection will never be established.
     """
     @printf[I32]("BoundaryNotify: connect_failed\n\n".cstring())
+
+   fun ref throttled(conn: OutgoingBoundary ref) =>
+    """
+    Called when the connection starts experiencing TCP backpressure. You should
+    respond to this by pausing additional calls to `write` and `writev` until
+    you are informed that pressure has been released. Failure to respond to
+    the `throttled` notification will result in outgoing data queuing in the
+    connection and increasing memory usage.
+    """
+    @printf[I32]("BoundaryNotify: throttled\n\n".cstring())
+
+  fun ref unthrottled(conn: OutgoingBoundary ref) =>
+    """
+    Called when the connection stops experiencing TCP backpressure. Upon
+    receiving this notification, you should feel free to start making calls to
+    `write` and `writev` again.
+    """
+    @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
