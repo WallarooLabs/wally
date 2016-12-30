@@ -39,12 +39,14 @@ bool test_orders()
 
 bool test_isin()
 {
+  string account_id("a1");
+  Account account(account_id);
   string isin_id("i1");
   ISIN isin(isin_id);
   string order_id1("o1");
   string order_id2("o2");
-  isin.add_order(order_id1, Side::Buy, 10, 50.0);
-  isin.add_order(order_id2, Side::Buy, 20, 70.0);
+  isin.add_order(order_id1, Side::Buy, 10, 50.0, &account);
+  isin.add_order(order_id2, Side::Buy, 20, 70.0, &account);
   Proceeds p1 = Proceeds(0.0, 1900.0, 0, 0.0);
   Proceeds p2 = isin.proceeds();
   return p1 == p2;
@@ -52,12 +54,14 @@ bool test_isin()
 
 bool test_isins()
 {
+  string account_id("a1");
+  Account account(account_id);
   ISINs isins;
   string isin_id("i1");
   ISIN isin(isin_id);
   string order_id1("o1");
   string order_id2("o2");
-  isins.add_order(isin_id, order_id1, Side::Buy, 10, 50.0);
+  isins.add_order(isin_id, order_id1, Side::Buy, 10, 50.0, &account);
   Proceeds p1 = Proceeds(0.0, 1900.0, 0, 0.0);
   Proceeds p2 = isins.proceeds_with_order(isin_id, order_id2, Side::Buy, 20, 70.0);
   return p1 == p2;
@@ -153,6 +157,41 @@ bool test_clients_first_proceeds()
   return p1 == p2;
 }
 
+bool test_clients_cancel()
+{
+  Clients clients;
+  string client_id("c1");
+  string account_id("a1");
+  string isin_id("i1");
+  string order_id1("o1");
+  string order_id2("o2");
+  string order_id3("o3");
+  Proceeds p1 = Proceeds(0.0, 3500.0, 0.0, 0.0);
+  clients.add_order(client_id, account_id, isin_id, order_id1, Side::Buy, 20, 70.0);
+  clients.add_order(client_id, account_id, isin_id, order_id2, Side::Buy, 10, 70.0);
+  clients.add_order(client_id, account_id, isin_id, order_id3, Side::Buy, 40, 70.0);
+  clients.cancel_order(client_id, account_id, order_id1);
+  Proceeds p2 = clients.proceeds_for_isin(client_id, account_id, isin_id);
+  return p1 == p2;
+}
+
+bool test_clients_proceeds_with_cancel()
+{
+  Clients clients;
+  string client_id("c1");
+  string account_id("a1");
+  string isin_id("i1");
+  string order_id1("o1");
+  string order_id2("o2");
+  string order_id3("o3");
+  Proceeds p1 = Proceeds(0.0, 3500.0, 0.0, 0.0);
+  clients.add_order(client_id, account_id, isin_id, order_id1, Side::Buy, 20, 70.0);
+  clients.add_order(client_id, account_id, isin_id, order_id2, Side::Buy, 10, 70.0);
+  clients.add_order(client_id, account_id, isin_id, order_id3, Side::Buy, 40, 70.0);
+  Proceeds p2 = clients.proceeds_with_cancel(client_id, account_id, order_id1);
+  return p1 == p2;
+}
+
 #define TEST(TEST_NAME) if (TEST_NAME()) { printf("passed: " #TEST_NAME "\n"); } else { printf("FAILED: " #TEST_NAME "\n"); }
 
 int main(int argc, char** argv)
@@ -170,5 +209,7 @@ int main(int argc, char** argv)
   TEST(test_client);
   TEST(test_clients);
   TEST(test_clients_first_proceeds);
+  TEST(test_clients_proceeds_with_cancel);
+  TEST(test_clients_cancel);
   return 0;
 }
