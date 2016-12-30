@@ -676,18 +676,17 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
   if (OrderMessage *om = dynamic_cast<OrderMessage *>(input_))
   {
     ArizonaState *az_state = (ArizonaState*) state_;
-    OrderMessage *order_message = (OrderMessage*) input_;
 
-    class Proceeds proceeds = az_state->proceeds_with_order(*order_message->get_client(),
-                                                            *order_message->get_account(),
-                                                            *order_message->get_isin(),
-                                                            *order_message->get_order_id(),
-                                                            (Side) order_message->get_side(),
-                                                            order_message->get_quantity(),
-                                                            order_message->get_price());
+    class Proceeds proceeds = az_state->proceeds_with_order(*om->get_client(),
+                                                            *om->get_account(),
+                                                            *om->get_isin(),
+                                                            *om->get_order_id(),
+                                                            (Side) om->get_side(),
+                                                            om->get_quantity(),
+                                                            om->get_price());
 
-    ProceedsMessage *proceeds_message = new ProceedsMessage(order_message->get_message_id(),
-                                                            new string(*order_message->get_isin()),
+    ProceedsMessage *proceeds_message = new ProceedsMessage(om->get_message_id(),
+                                                            new string(*om->get_isin()),
                                                             proceeds.open_short(),
                                                             proceeds.open_long(),
                                                             proceeds.proceeds_short(),
@@ -697,13 +696,13 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
 
     AddOrderStateChange *add_order_state_change = (AddOrderStateChange *)w_state_change_get_state_change_object(state_change_repository_helper_, state_change_handle);
 
-    add_order_state_change->update(*order_message->get_client(),
-                                   *order_message->get_account(),
-                                   *order_message->get_isin(),
-                                   *order_message->get_order_id(),
-                                   order_message->get_side(),
-                                   order_message->get_quantity(),
-                                   order_message->get_price());
+    add_order_state_change->update(*om->get_client(),
+                                   *om->get_account(),
+                                   *om->get_isin(),
+                                   *om->get_order_id(),
+                                   om->get_side(),
+                                   om->get_quantity(),
+                                   om->get_price());
 
     return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, state_change_handle);
   }
