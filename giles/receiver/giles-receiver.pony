@@ -20,6 +20,7 @@ actor Main
     var run_tests = env.args.size() == 1
     var use_metrics = false
     var no_write = false
+    var throw_away = false
 
     if run_tests then
       TestMain(env)
@@ -39,6 +40,7 @@ actor Main
           .add("expect", "e", I64Argument)
           .add("metrics", "m", None)
           .add("no-write", "w", None)
+          .add("throw-away", "t", None)
 
         for option in options do
           match option
@@ -48,6 +50,7 @@ actor Main
           | ("expect", let arg: I64) => e_arg = arg.usize()
           | ("metrics", None) => use_metrics = true
           | ("no-write", None) => no_write = true
+          | ("throw-away", None) => throw_away = true
           | let err: ParseError =>
             err.report(env.err)
             required_args_are_present = false
@@ -104,7 +107,7 @@ actor Main
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
             FromBuffyListenerNotify(coordinator, store, env.err, e_arg, 
-              use_metrics, no_write),
+              use_metrics, no_write, throw_away),
             listener_addr(0),
             listener_addr(1))
 
@@ -128,10 +131,11 @@ class FromBuffyListenerNotify is TCPListenNotify
   let _expected: (USize | None)
   let _use_metrics: Bool
   let _no_write: Bool
+  let _throw_away: Bool
 
   new iso create(coordinator: Coordinator,
     store: Store, stderr: StdStream, expected: (USize | None) = None,
-    use_metrics: Bool, no_write: Bool)
+    use_metrics: Bool, no_write: Bool, throw_away: Bool)
   =>
     _coordinator = coordinator
     _store = store
@@ -139,6 +143,7 @@ class FromBuffyListenerNotify is TCPListenNotify
     _expected = expected
     _use_metrics = use_metrics
     _no_write = no_write
+    _throw_away = throw_away
 
   fun ref not_listening(listen: TCPListener ref) =>
     _coordinator.from_buffy_listener(listen, Failed)
@@ -148,7 +153,7 @@ class FromBuffyListenerNotify is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     FromBuffyNotify(_coordinator, _store, _stderr, _expected, _use_metrics,
-      _no_write)
+      _no_write, _throw_away)
 
 class FromBuffyNotify is TCPConnectionNotify
   let _coordinator: Coordinator
@@ -162,18 +167,21 @@ class FromBuffyNotify is TCPConnectionNotify
   let _metrics: Metrics tag = Metrics
   let _use_metrics: Bool 
   let _no_write: Bool 
+  let _throw_away: Bool
   var _closed: Bool = false
 
   new iso create(coordinator: Coordinator,
     store: Store, stderr: StdStream, 
     expected: (USize | None),
-    use_metrics: Bool, no_write: Bool)
+    use_metrics: Bool, no_write: Bool,
+    throw_away: Bool)
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
     _use_metrics = use_metrics
     _no_write = no_write
+    _throw_away = throw_away
     try
       if (expected as USize) > 0 then
         _expected = expected as USize
@@ -183,43 +191,45 @@ class FromBuffyNotify is TCPConnectionNotify
     end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
-    if _header then
-      try
-        _count = _count + 1
-        if (_count == 1) and _use_metrics then
-          _metrics.set_start(Time.nanos())
-        end
-        if (_count % 100_000) == 0 then
-          @printf[I32]("%zu received\n".cstring(), _count)
-        end
-        if _expect_termination then
-          _remaining = _remaining - 1
-        end
-
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
-
-        conn.expect(expect)
-        _header = false
-      else
-        _stderr.print("Blew up reading header from Buffy")
-      end
-    else
-      if not _no_write then
-        _store.received(consume data, Time.wall_to_nanos(Time.now()))
-      end
-      if _expect_termination and (_remaining <= 0) then
-        if not _closed then
-          _stderr.print(_count.string() + " expected messages received. " +
-            "Terminating...")
-          if _use_metrics then
-            _metrics.set_end(Time.nanos(), _expected)
+    if not _throw_away then
+      if _header then
+        try
+          _count = _count + 1
+          if (_count == 1) and _use_metrics then
+            _metrics.set_start(Time.nanos())
           end
-          _coordinator.finished()
+          if (_count % 100_000) == 0 then
+            @printf[I32]("%zu received\n".cstring(), _count)
+          end
+          if _expect_termination then
+            _remaining = _remaining - 1
+          end
+  
+          let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+  
+          conn.expect(expect)
+          _header = false
+        else
+          _stderr.print("Blew up reading header from Buffy")
         end
-        _closed = true
       else
-        conn.expect(4)
-        _header = true
+        if not _no_write then
+          _store.received(consume data, Time.wall_to_nanos(Time.now()))
+        end
+        if _expect_termination and (_remaining <= 0) then
+          if not _closed then
+            _stderr.print(_count.string() + " expected messages received. " +
+              "Terminating...")
+            if _use_metrics then
+              _metrics.set_end(Time.nanos(), _expected)
+            end
+            _coordinator.finished()
+          end
+          _closed = true
+        else
+          conn.expect(4)
+          _header = true
+        end
       end
     end
     true
