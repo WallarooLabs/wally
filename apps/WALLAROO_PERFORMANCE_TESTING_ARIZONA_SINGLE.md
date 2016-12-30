@@ -165,8 +165,8 @@ app
 sudo apt-get install -y pkg-config libconfig++-dev
 cd
 git clone https://github.com/Sendence/arizona.git
-git checkout state-node-compute
 cd ~/arizona
+git checkout state-node-compute
 mkdir build
 cd build
 cmake ..

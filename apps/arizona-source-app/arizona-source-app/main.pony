@@ -88,21 +88,16 @@ actor Main
   new create(env: Env) =>
     try
       let partition_function = recover val CPPPartitionFunctionU64(@get_partition_function()) end
-      let partition_keys: Array[U64] val = partition_factory(10000, 11000)
+      let partition_keys: Array[U64] val = partition_factory(10000, 10750)
       let data_partition = Partition[CPPData val, U64](partition_function, partition_keys)
 
       let application = recover val
         Application("Passthrough Topology")
           .new_pipeline[CPPData val, CPPData val]("source-decoder", recover CPPSourceDecoder(@get_source_decoder()) end)
-          //.to[CPPData val](ComputationFactory)
-          //.to_stateful[CPPData val, String](
-          //  StateFilter[CPPData val],
-          //  DataBuilder, "state-builder")
-          .to_stateful[CPPData val, CPPState](
-            state_computation_factory(),
-            ArizonaStateBuilder, "state-builder")
-          .to_sink(recover CPPSinkEncoder(recover @get_sink_encoder() end) end, recover [0] end)
-          // .done()
+            .to_state_partition[CPPData val, U64, CPPData val, CPPState](
+              state_computation_factory(),
+              ArizonaStateBuilder, "state-builder", data_partition where multi_worker = true)
+            .to_sink(recover CPPSinkEncoder(recover @get_sink_encoder() end) end, recover [0] end)
           // NO PARTITION
 
           // PARTITIONED
