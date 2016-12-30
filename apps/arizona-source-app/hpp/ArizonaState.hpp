@@ -23,12 +23,14 @@ private:
   double _proceeds_long;
   double _open_short;
   double _open_long;
+  string _isin_id;
 public:
-  Proceeds(double proceeds_short_, double proceeds_long_, double open_short_, double open_long_);
+  Proceeds(double proceeds_short_, double proceeds_long_, double open_short_, double open_long_, string isin_id_);
   double proceeds_short() { return _proceeds_short; }
   double proceeds_long() { return _proceeds_long; }
   double open_short() { return _open_short; }
   double open_long() { return _open_long; }
+  string isin() { return _isin_id; }
   Proceeds& add(Proceeds& that);
   bool operator==(Proceeds& that);
 };
