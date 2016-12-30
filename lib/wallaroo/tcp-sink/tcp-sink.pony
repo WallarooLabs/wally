@@ -911,7 +911,7 @@ interface _TCPSinkNotify
     the `throttled` notification will result in outgoing data queuing in the
     connection and increasing memory usage.
     """
-    None
+    @printf[None]("TCPSink is experiencing back pressure\n".cstring())
 
   fun ref unthrottled(conn: TCPSink ref) =>
     """
@@ -919,7 +919,9 @@ interface _TCPSinkNotify
     receiving this notification, you should feel free to start making calls to
     `write` and `writev` again.
     """
-    None
+    @printf[None]("TCPSink is no longer experiencing" +
+      " back pressure\n".cstring())
+
 
 class EmptyNotify is _TCPSinkNotify
   fun ref connected(conn: TCPSink ref) =>
