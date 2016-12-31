@@ -668,6 +668,24 @@ void AddOrderStateChange::apply(wallaroo::State *state_)
   az_state->add_order(_client_id, _account_id, _isin_id, _order_id, _side, _quantity, _price);
 }
 
+CancelOrderStateChange::CancelOrderStateChange(uint64_t id_): StateChange(id_), _client_id(), _account_id(), _order_id()
+{
+}
+
+void CancelOrderStateChange::update(string& client_id_, string& account_id_, string& order_id_)
+{
+  _client_id = client_id_;
+  _account_id = account_id_;
+  _order_id = order_id_;
+}
+
+void CancelOrderStateChange::apply(wallaroo::State *state_)
+{
+  //wallaroo::Logger::getLogger()->critical("apply state change");
+  ArizonaState *az_state = (ArizonaState *)state_;
+  az_state->cancel_order(_client_id, _account_id, _order_id);
+}
+
 class Proceeds ArizonaDefaultState::proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_)
 {
   return _clients.proceeds_with_order(client_id_, account_id_, isin_id_, order_id_, side_, quantity_, price_);
@@ -739,7 +757,15 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
                                                             proceeds.proceeds_short(),
                                                             proceeds.proceeds_long());
 
-    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+    void *state_change_handle = w_state_change_repository_lookup_by_name(state_change_repository_helper_, state_change_repository_, "cancel order state change");
+
+    CancelOrderStateChange *cancel_order_state_change = (CancelOrderStateChange *)w_state_change_get_state_change_object(state_change_repository_helper_, state_change_handle);
+
+    cancel_order_state_change->update(*cm->get_client(),
+                                      *cm->get_account(),
+                                      *cm->get_order_id());
+
+    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, state_change_handle);
   }
 
   if (ExecuteMessage *em = dynamic_cast<ExecuteMessage *>(input_))
@@ -757,6 +783,19 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
   }
 
   return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
+}
+
+wallaroo::StateChangeBuilder *ArizonaStateComputation::get_state_change_builder(size_t idx_)
+{
+  switch (idx_)
+  {
+  case 0:
+    return new AddOrderStateChangeBuilder();
+  case 1:
+    return new CancelOrderStateChangeBuilder();
+  }
+  // TODO: This should be an error
+  return nullptr;
 }
 
 const char *PassThroughComputation::name()
