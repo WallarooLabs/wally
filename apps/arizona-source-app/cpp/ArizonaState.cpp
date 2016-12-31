@@ -63,6 +63,13 @@ Orders::~Orders()
 
 void Orders::add_order(string& order_id_, Side side_, uint32_t quantity_, double price_)
 {
+  map<string, Order *>::iterator it = _orders.find(order_id_);
+  if (it != _orders.end())
+  {
+    // TODO: this should be an error
+    return;
+  }
+
   Order *order = new Order(order_id_, side_, quantity_, price_);
   _orders.insert(std::pair<string, Order*>(order_id_, order));
 }
@@ -76,6 +83,7 @@ void Orders::cancel_order(string& order_id_)
     return;
   }
 
+  delete it->second;
   _orders.erase(it);
 }
 
