@@ -18,6 +18,8 @@ primitive StartupHelp
         initializing process (that status is meaningless after init is done)]
       --resilience-dir/-r [Sets directory to write resilience files to,
         e.g. -r /tmp/data (no trailing slash)]
+      --alfred-file-length/-l [Optionally sets initial file length for alfred
+        backend file]
       -----------------------------------------------------------------------------------
       """
     )

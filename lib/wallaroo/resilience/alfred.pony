@@ -22,16 +22,16 @@ type LogEntry is (Bool, U128, U128, None, U64, U64, Array[ByteSeq] iso)
 type ReplayEntry is (U128, U128, None, U64, U64, ByteSeq val)
 
 trait Backend
-  fun ref flush() ?
   fun ref sync() ?
+  fun ref datasync() ?
   fun ref start()
   fun ref write() ?
   fun ref encode_entry(entry: LogEntry)
 
 class DummyBackend is Backend
   new create() => None
-  fun ref flush() => None
   fun ref sync() => None
+  fun ref datasync() => None
   fun ref start() => None
   fun ref write() => None
   fun ref encode_entry(entry: LogEntry) => None
@@ -53,11 +53,15 @@ class FileBackend is Backend
   let _writer: Writer iso
   var _replay_on_start: Bool
 
-  new create(filepath: FilePath, alfred: Alfred) =>
+  new create(filepath: FilePath, alfred: Alfred,
+    file_length: (USize | None) = None) =>
     _writer = recover iso Writer end
     _filepath = filepath
     _replay_on_start = _filepath.exists()
     _file = recover iso File(filepath) end
+    match file_length
+    | let len: USize => _file.set_length(len)
+    end
     _alfred = alfred
 
   fun ref start() =>
@@ -191,16 +195,16 @@ class FileBackend is Backend
     // write data to write buffer
     _writer.writev(payload)
 
-  fun ref flush() ? =>
-    _file.flush()
+  fun ref sync() ? =>
+    _file.sync()
     match _file.errno()
     | FileOK => None
     else
       error
     end
 
-  fun ref sync() ? =>
-    _file.sync()
+  fun ref datasync() ? =>
+    _file.datasync()
     match _file.errno()
     | FileOK => None
     else
@@ -220,7 +224,8 @@ actor Alfred
     var _flush_waiting: USize = 0
 
     new create(env: Env, filename: (String val | None) = None,
-      logging_batch_size: USize = 10)
+      logging_batch_size: USize = 10,
+      backend_file_length: (USize | None) = None)
     =>
       _logging_batch_size = logging_batch_size
       _backend =
@@ -228,7 +233,8 @@ actor Alfred
         match filename
         | let f: String val =>
           try
-            FileBackend(FilePath(env.root as AmbientAuth, f), this)
+            FileBackend(FilePath(env.root as AmbientAuth, f), this,
+              backend_file_length)
           else
             DummyBackend
           end
@@ -340,13 +346,11 @@ actor Alfred
         //write buffer to disk
         write_log()
 
-        if (_flush_waiting % 50) == 0 then
-          // flush any written data to disk
-          _backend.flush()
-
-          // sync any written data to disk
-          //_backend.sync()
-        end
+        // if (_flush_waiting % 50) == 0 then
+        //   //sync any written data to disk
+        //   _backend.sync()
+        //   _backend.datasync()
+        // end
 
         _origins(origin_id).log_flushed(low_watermark)
       else
