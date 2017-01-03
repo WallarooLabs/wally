@@ -185,7 +185,7 @@ You'll need to have 3 terminals available. 1 for giles sender, 1 for giles recei
 
 Giles receiver needs to be running before arizona:
 ```
-sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock -w -l 127.0.0.1:5555 -t
+sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555 -t
 ```
 
 ```
