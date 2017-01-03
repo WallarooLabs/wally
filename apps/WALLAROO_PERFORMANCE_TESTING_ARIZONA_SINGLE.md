@@ -89,7 +89,7 @@ sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/b
 
 ### Build spdlog
 ```
-sudo apt-get install cmake
+sudo apt-get install -y cmake
 cd
 git clone https://github.com/gabime/spdlog.git
 cd ~/spdlog
@@ -162,7 +162,7 @@ Before you can run Arizona, you need to generate data for it with the datagen
 app
 
 ```
-sudo apt-get install pkg-config libconfig++-dev
+sudo apt-get install -y pkg-config libconfig++-dev
 cd
 git clone https://github.com/Sendence/arizona.git
 cd ~/arizona
@@ -174,7 +174,7 @@ make
 cd ~/arizona/bin_cfggen/etc
 ../../build/bin_cfggen/bin/datagen -c test_source_app.cfg
 ```
-this will create ~/arizona/bin_cfggen/etc/test-source-100k.dat and the four
+this will create ~/arizona/bin_cfggen/etc/test-source-100k.dat.full and the
 "separate message types" files, if those are what you need to test a specific
 order type. You can even `cat` them together if you need combinations (e.g.
 orders + cancels) - they just won't be interleaved.
@@ -185,7 +185,7 @@ You'll need to have 3 terminals available. 1 for giles sender, 1 for giles recei
 
 Giles receiver needs to be running before arizona:
 ```
-sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock -w -l 127.0.0.1:5555
+sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555 -t
 ```
 
 ```
@@ -195,5 +195,5 @@ sudo cset proc -s user -e numactl -- -C 1-12,17 chrt -f 80 ./build/arizona-sourc
 
 To run the Orders Sender:
 ```
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-100k.dat -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-100k.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
