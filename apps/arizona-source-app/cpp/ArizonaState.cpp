@@ -43,9 +43,9 @@ Proceeds Order::proceeds()
     // TODO: Log this
     return Proceeds(0.0, 0.0, 0.0, 0.0, "");
   case Side::Sell:
-    return Proceeds(total, 0.0, 0.0, 0.0, "");
+    return Proceeds(0.0, 0.0, total, 0.0, "");
   case Side::Buy:
-    return Proceeds(0.0, total, 0.0, 0.0, "");
+    return Proceeds(0.0, 0.0, 0.0, total, "");
   }
 }
 
