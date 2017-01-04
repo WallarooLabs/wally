@@ -32,7 +32,7 @@ bool test_orders()
   string order_id2("o2");
   orders.add_order(order_id1, Side::Buy, 10, 50.0);
   orders.add_order(order_id2, Side::Buy, 20, 70.0);
-  Proceeds p1 = Proceeds(0.0, 1900.0, 0, 0.0, "");
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 1900.0, "");
   Proceeds p2 = orders.proceeds();
   return p1 == p2;
 }
@@ -47,7 +47,7 @@ bool test_isin()
   string order_id2("o2");
   isin.add_order(order_id1, Side::Buy, 10, 50.0, &account);
   isin.add_order(order_id2, Side::Buy, 20, 70.0, &account);
-  Proceeds p1 = Proceeds(0.0, 1900.0, 0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 1900.0, isin_id);
   Proceeds p2 = isin.proceeds();
   return p1 == p2;
 }
@@ -62,7 +62,7 @@ bool test_isins()
   string order_id1("o1");
   string order_id2("o2");
   isins.add_order(isin_id, order_id1, Side::Buy, 10, 50.0, &account);
-  Proceeds p1 = Proceeds(0.0, 1900.0, 0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 1900.0, isin_id);
   Proceeds p2 = isins.proceeds_with_order(isin_id, order_id2, Side::Buy, 20, 70.0);
   return p1 == p2;
 }
@@ -73,7 +73,7 @@ bool test_isins_first_proceeds()
   string isin_id("i1");
   ISIN isin(isin_id);
   string order_id1("o1");
-  Proceeds p1 = Proceeds(0.0, 1400.0, 0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 1400.0, isin_id);
   Proceeds p2 = isins.proceeds_with_order(isin_id, order_id1, Side::Buy, 20, 70.0);
   return p1 == p2;
 }
@@ -87,7 +87,7 @@ bool test_account()
   string order_id2("o2");
   account.add_order(isin_id, order_id1, Side::Buy, 10, 50.0);
   account.add_order(isin_id, order_id2, Side::Buy, 20, 70.0);
-  Proceeds p1 = Proceeds(0.0, 1900.0, 0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 1900.0, isin_id);
   Proceeds p2 = account.proceeds_for_isin(isin_id);
   return p1 == p2;
 }
@@ -100,7 +100,7 @@ bool test_accounts()
   string order_id1("o1");
   string order_id2("o2");
   accounts.add_order(account_id, isin_id, order_id1, Side::Buy, 10, 50.0);
-  Proceeds p1 = Proceeds(0.0, 1900.0, 0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 1900.0, isin_id);
   Proceeds p2 = accounts.proceeds_with_order(account_id, isin_id, order_id2, Side::Buy, 20, 70.0);
   return p1 == p2;
 }
@@ -111,7 +111,7 @@ bool test_accounts_first_proceeds()
   string account_id("a1");
   string isin_id("i1");
   string order_id1("o1");
-  Proceeds p1 = Proceeds(0.0, 1400.0, 0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 1400.0, isin_id);
   Proceeds p2 = accounts.proceeds_with_order(account_id, isin_id, order_id1, Side::Buy, 20, 70.0);
   return p1 == p2;
 }
@@ -126,7 +126,7 @@ bool test_client()
   string order_id2("o2");
   client.add_order(account_id, isin_id, order_id1, Side::Buy, 10, 50.0);
   client.add_order(account_id, isin_id, order_id2, Side::Buy, 20, 70.0);
-  Proceeds p1 = Proceeds(0.0, 1900.0, 0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 1900.0, isin_id);
   Proceeds p2 = client.proceeds_for_isin(account_id, isin_id);
   return p1 == p2;
 }
@@ -140,7 +140,7 @@ bool test_clients()
   string order_id1("o1");
   string order_id2("o2");
   clients.add_order(client_id, account_id, isin_id, order_id1, Side::Buy, 10, 50.0);
-  Proceeds p1 = Proceeds(0.0, 1900.0, 0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 1900.0, isin_id);
   Proceeds p2 = clients.proceeds_with_order(client_id, account_id, isin_id, order_id2, Side::Buy, 20, 70.0);
   return p1 == p2;
 }
@@ -152,7 +152,7 @@ bool test_clients_first_proceeds()
   string account_id("a1");
   string isin_id("i1");
   string order_id1("o1");
-  Proceeds p1 = Proceeds(0.0, 1400.0, 0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 1400.0, isin_id);
   Proceeds p2 = clients.proceeds_with_order(client_id, account_id, isin_id, order_id1, Side::Buy, 20, 70.0);
   return p1 == p2;
 }
@@ -166,7 +166,7 @@ bool test_clients_cancel()
   string order_id1("o1");
   string order_id2("o2");
   string order_id3("o3");
-  Proceeds p1 = Proceeds(0.0, 3500.0, 0.0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 3500.0, isin_id);
   clients.add_order(client_id, account_id, isin_id, order_id1, Side::Buy, 20, 70.0);
   clients.add_order(client_id, account_id, isin_id, order_id2, Side::Buy, 10, 70.0);
   clients.add_order(client_id, account_id, isin_id, order_id3, Side::Buy, 40, 70.0);
@@ -184,7 +184,7 @@ bool test_clients_proceeds_with_cancel()
   string order_id1("o1");
   string order_id2("o2");
   string order_id3("o3");
-  Proceeds p1 = Proceeds(0.0, 3500.0, 0.0, 0.0, isin_id);
+  Proceeds p1 = Proceeds(0.0, 0.0, 0.0, 3500.0, isin_id);
   clients.add_order(client_id, account_id, isin_id, order_id1, Side::Buy, 20, 70.0);
   clients.add_order(client_id, account_id, isin_id, order_id2, Side::Buy, 10, 70.0);
   clients.add_order(client_id, account_id, isin_id, order_id3, Side::Buy, 40, 70.0);
