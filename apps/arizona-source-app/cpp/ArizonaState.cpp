@@ -24,8 +24,59 @@ bool Proceeds::operator==(Proceeds& that)
     && (_isin_id == that._isin_id);
 }
 
+Execution::Execution(string& execution_id_, Side side_, uint32_t quantity_, double price_):
+  _side(side_), _quantity(quantity_), _price(price_), _proceeds(0.0, 0.0, 0.0, 0.0, "")
+{
+  double total = quantity_ * price_;
+  if (side_ == Side::Buy)
+  {
+    _proceeds = Proceeds(0.0, total, 0.0, -total, "");
+  }
+  else
+  {
+    _proceeds = Proceeds(total, 0.0, -total, 0.0, "");
+  }
+}
+
+ExecutionResult Executions::execute(string& execution_id_, Side side_, uint32_t quantity_, double price_, uint32_t order_quantity_)
+{
+  uint32_t total_quantity = quantity_;
+  for (vector<Execution>::iterator it = _executions.begin(); it != _executions.end(); it++)
+  {
+    total_quantity += it->quantity();
+  }
+
+  if (total_quantity > order_quantity_)
+  {
+    return ExecutionNotAdded;
+  }
+
+  Execution e(execution_id_, side_, quantity_, price_);
+  _executions.push_back(e);
+
+  if (total_quantity == order_quantity_)
+  {
+    return ExecutionFilledOrder;
+  }
+
+  return ExecutionAdded;
+}
+
+Proceeds Executions::proceeds()
+{
+  Proceeds p = Proceeds(0.0, 0.0, 0.0, 0.0, "");
+
+  for(vector<Execution>::iterator it = _executions.begin(); it != _executions.end(); it++)
+  {
+    Proceeds pe = it->proceeds();
+    p.add(pe);
+  }
+
+  return p;
+}
+
 Order::Order(string& order_id_, Side side_, uint32_t quantity_, double price_):
-  _order_id(order_id_), _side(side_), _quantity(quantity_), _price(price_)
+  _executions(), _order_id(order_id_), _side(side_), _quantity(quantity_), _price(price_)
 {
 }
 
@@ -37,16 +88,51 @@ bool Order::operator==(Order& that)
 Proceeds Order::proceeds()
 {
   double total = _quantity * _price;
+
+  Proceeds p = _executions.proceeds();
+
   switch (_side)
   {
   default:
     // TODO: Log this
-    return Proceeds(0.0, 0.0, 0.0, 0.0, "");
+    return Proceeds(-1.0, -1.0, -1.0, -1.0, "");
   case Side::Sell:
-    return Proceeds(0.0, 0.0, total, 0.0, "");
-  case Side::Buy:
-    return Proceeds(0.0, 0.0, 0.0, total, "");
+  {
+    Proceeds p_short = Proceeds(0.0, 0.0, total, 0.0, "");
+    p.add(p_short);
+    break;
   }
+  case Side::Buy:
+  {
+    Proceeds p_long = Proceeds(0.0, 0.0, 0.0, total, "");
+    p.add(p_long);
+    break;
+  }
+  }
+
+  return p;
+}
+
+ExecutionResult Order::execute(string& execution_id_, uint32_t quantity_, double price_, ISIN *isin_)
+{
+  ExecutionResult execution_result = _executions.execute(execution_id_, _side, quantity_, price_, _quantity);
+
+  if (execution_result == ExecutionFilledOrder)
+  {
+    Proceeds op = final_proceeds();
+    isin_->add_proceeds(op);
+  }
+
+  return execution_result;
+}
+
+Proceeds Order::final_proceeds()
+{
+  Proceeds pe = _executions.proceeds();
+
+  Proceeds p(pe.proceeds_short(), pe.proceeds_long(), 0.0, 0.0, "");
+
+  return p;
 }
 
 Orders::Orders(): _orders()
@@ -74,7 +160,7 @@ void Orders::add_order(string& order_id_, Side side_, uint32_t quantity_, double
   _orders.insert(std::pair<string, Order*>(order_id_, order));
 }
 
-void Orders::cancel_order(string& order_id_)
+void Orders::cancel_order(string& order_id_, ISIN *isin_)
 {
   map<string, Order *>::iterator it = _orders.find(order_id_);
   if (it == _orders.end())
@@ -83,8 +169,31 @@ void Orders::cancel_order(string& order_id_)
     return;
   }
 
+  Proceeds final_proceeds = it->second->final_proceeds();
+  isin_->add_proceeds(final_proceeds);
+
   delete it->second;
   _orders.erase(it);
+}
+
+bool Orders::execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_, ISIN *isin_)
+{
+  map<string, Order *>::iterator it = _orders.find(order_id_);
+  if (it == _orders.end())
+  {
+    // TODO: this should probably be an error
+    return false;
+  }
+
+  if (it->second->execute(execution_id_, quantity_, price_, isin_) == ExecutionFilledOrder)
+  {
+    delete it->second;
+    _orders.erase(it);
+
+    return true;
+  }
+
+  return false;
 }
 
 Proceeds Orders::proceeds()
@@ -114,31 +223,36 @@ Proceeds Orders::proceeds_without_order(string& order_id_)
   return p;
 }
 
-ISIN::ISIN(string& isin_id_): _isin_id(isin_id_)
+ISIN::ISIN(string& isin_id_): _isin_id(isin_id_), _proceeds(0.0, 0.0, 0.0, 0.0, isin_id_)
 {
 }
 
 void ISIN::add_order(string& order_id_, Side side_, double quantity_, double price_, Account *account_)
 {
   account_->associate_order_id_to_isin_id(order_id_, _isin_id);
-  return _orders.add_order(order_id_, side_, quantity_, price_);
+  _orders.add_order(order_id_, side_, quantity_, price_);
 }
 
 void ISIN::cancel_order(string& order_id_)
 {
-  _orders.cancel_order(order_id_);
+  _orders.cancel_order(order_id_, this);
+}
+
+bool ISIN::execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_)
+{
+  return _orders.execute(order_id_, execution_id_, quantity_, price_, this);
 }
 
 Proceeds ISIN::proceeds()
 {
-  Proceeds p(0.0, 0.0, 0.0, 0.0, _isin_id);
+  Proceeds p = _proceeds;
   Proceeds op = _orders.proceeds();
   return p.add(op);
 }
 
 Proceeds ISIN::proceeds_without_order(string& order_id_)
 {
-  Proceeds p(0.0, 0.0, 0.0, 0.0, _isin_id);
+  Proceeds p = _proceeds;
   Proceeds op = _orders.proceeds_without_order(order_id_);
   return p.add(op);
 }
@@ -203,6 +317,21 @@ void ISINs::cancel_order(string& isin_id_, string& order_id_)
   isin->cancel_order(order_id_);
 }
 
+bool ISINs::execute(string& isin_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_)
+{
+  // look up isin by isin_id_
+
+  ISIN *isin = _isin_by_isin_id(isin_id_);
+
+  if (isin == nullptr)
+  {
+    // TODO: This should probably be an error
+    return false;
+  }
+
+  return isin->execute(order_id_, execution_id_, quantity_, price_);
+}
+
 Proceeds ISINs::proceeds_for_isin(string& isin_id_)
 {
   // look up isin by isin_id_
@@ -218,7 +347,7 @@ Proceeds ISINs::proceeds_for_isin(string& isin_id_)
   return isin->proceeds();
 }
 
-Proceeds ISINs::proceeds_for_isin_without_order(string& isin_id_, string& order_id_)
+Proceeds ISINs::proceeds_with_cancel(string& isin_id_, string& order_id_)
 {
   // look up isin by isin_id_
 
@@ -238,12 +367,6 @@ Proceeds ISINs::proceeds_with_order(string& isin_id_, string& order_id_, Side si
   Proceeds p_isin = proceeds_for_isin(isin_id_);
   Proceeds p_order = Order(order_id_, side_, quantity_, price_).proceeds();
   return p_isin.add(p_order);
-}
-
-Proceeds ISINs::proceeds_with_cancel(string& isin_id_, string& order_id_)
-{
-  Proceeds p_isin = proceeds_for_isin_without_order(isin_id_, order_id_);
-  return p_isin;
 }
 
 Account::Account(string& account_id_): _account_id(account_id_), _isins(), _order_id_to_isin_id()
@@ -272,6 +395,22 @@ void Account::cancel_order(string& order_id_)
   _isins.cancel_order(isin_id, order_id_);
   // disassociate can safely be done here because if we got this far then the order_id is in the map
   disassociate_order_id_to_isin_id(order_id_, isin_id);
+}
+
+void Account::execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_)
+{
+  map<string, string>::iterator it = _order_id_to_isin_id.find(order_id_);
+  if (it == _order_id_to_isin_id.end())
+  {
+    // TODO: this should be an error
+    return;
+  }
+  string isin_id = it->second;
+  bool filled = _isins.execute(isin_id, order_id_, execution_id_, quantity_, price_);
+  if (filled)
+  {
+    disassociate_order_id_to_isin_id(order_id_, isin_id);
+  }
 }
 
 Proceeds Account::proceeds_for_isin(string& isin_id_)
@@ -376,6 +515,19 @@ void Accounts::cancel_order(string& account_id_, string& order_id_)
   account->cancel_order(order_id_);
 }
 
+void Accounts::execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_)
+{
+  Account *account = _account_by_account_id(account_id_);
+
+  if (account == nullptr)
+  {
+    // TODO: this should probably be an error
+    return;
+  }
+
+  account->execute(order_id_, execution_id_, quantity_, price_);
+}
+
 Proceeds Accounts::proceeds_for_isin(string& account_id_, string& isin_id_)
 {
   Account *account = _account_by_account_id(account_id_);
@@ -423,6 +575,11 @@ void Client::add_order(string& account_id_, string& isin_id_, string& order_id_,
 void Client::cancel_order(string& account_id_, string& order_id_)
 {
   _accounts.cancel_order(account_id_, order_id_);
+}
+
+void Client::execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_)
+{
+  _accounts.execute(account_id_, order_id_, execution_id_, quantity_, price_);
 }
 
 Proceeds Client::proceeds_for_isin(string& account_id_, string& isin_id_)
@@ -495,6 +652,19 @@ void Clients::cancel_order(string& client_id_, string& account_id_, string& orde
   }
 
   client->cancel_order(account_id_, order_id_);
+}
+
+void Clients::execute(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_)
+{
+  Client *client = _client_by_client_id(client_id_);
+
+  if (client == nullptr)
+  {
+    // TODO: this should probably be an error
+    return;
+  }
+
+  client->execute(account_id_, order_id_, execution_id_, quantity_, price_);
 }
 
 Proceeds Clients::proceeds_for_isin(string& client_id_, string& account_id_, string& isin_id_)
