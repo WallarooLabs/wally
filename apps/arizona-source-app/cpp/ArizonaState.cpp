@@ -208,7 +208,7 @@ Proceeds Orders::proceeds()
   return p;
 }
 
-Proceeds Orders::proceeds_without_order(string& order_id_)
+Proceeds Orders::proceeds_with_cancel(string& order_id_)
 {
   Proceeds p(0.0, 0.0, 0.0, 0.0, "");
   for(map<string, Order *>::iterator it = _orders.begin(); it != _orders.end(); it++)
@@ -217,6 +217,11 @@ Proceeds Orders::proceeds_without_order(string& order_id_)
     {
       Proceeds p_order = it->second->proceeds();
       p.add(p_order);
+    }
+    else
+    {
+      Proceeds p_final = it->second->final_proceeds();
+      p.add(p_final);
     }
   }
 
@@ -250,10 +255,10 @@ Proceeds ISIN::proceeds()
   return p.add(op);
 }
 
-Proceeds ISIN::proceeds_without_order(string& order_id_)
+Proceeds ISIN::proceeds_with_cancel(string& order_id_)
 {
   Proceeds p = _proceeds;
-  Proceeds op = _orders.proceeds_without_order(order_id_);
+  Proceeds op = _orders.proceeds_with_cancel(order_id_);
   return p.add(op);
 }
 
@@ -359,7 +364,7 @@ Proceeds ISINs::proceeds_with_cancel(string& isin_id_, string& order_id_)
     return Proceeds(0.0, 0.0, 0.0, 0.0, isin_id_);
   }
 
-  return isin->proceeds_without_order(order_id_);
+  return isin->proceeds_with_cancel(order_id_);
 }
 
 Proceeds ISINs::proceeds_with_order(string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_)

@@ -95,7 +95,7 @@ public:
   void cancel_order(string& order_id_, ISIN *isin_);
   bool execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_, ISIN *isin_);
   Proceeds proceeds();
-  Proceeds proceeds_without_order(string& order_id_);
+  Proceeds proceeds_with_cancel(string& order_id_);
   size_t count() { return _orders.size(); }
 };
 
@@ -112,7 +112,7 @@ public:
   bool execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
   void add_proceeds(Proceeds& proceeds_) { _proceeds.add(proceeds_); };
   Proceeds proceeds();
-  Proceeds proceeds_without_order(string& order_id_);
+  Proceeds proceeds_with_cancel(string& order_id_);
 };
 
 class ISINs
