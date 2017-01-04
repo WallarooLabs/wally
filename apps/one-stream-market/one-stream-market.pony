@@ -11,7 +11,7 @@ sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/
 350 Symbols
 
 3a) one stream market app (1 worker):
-./one-stream-market -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ~/buffy/apps/one-stream-market/one-stream-market -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock
 
 3b) one stream market app (multi-machine):
 sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ~/buffy/apps/one-stream-market/one-stream-market -i 0.0.0.0:7000 -o 127.0.0.1:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 4 --ponypinasio --ponynoblock -t -w 4
@@ -20,7 +20,7 @@ For each follower:
 sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ~/buffy/apps/one-stream-market/one-stream-market -i 0.0.0.0:7000 -o 127.0.0.1:5555 -m <METRICS>:5001 -c <INITIALIZER>:12500 -d <INITIALIZER>:12501 --ponythreads 4 --ponypinasio --ponynoblock -n <NAME> -w 4
 
 4) nbbo:
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7000 -m 10000000000 -s 300 -i 2_500_000 -f ~/buffy/demos/marketspread/350k-nbbo-fixish.msg -r --ponythreads=1 -y -g 46 --ponypinasio -w —ponynoblock
 """
 use "assert"
 use "buffered"
