@@ -3,10 +3,10 @@ One Stream Market App
 
 Setting up a market spread run (in order):
 1) reports sink (if not using Monitoring Hub):
-sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock -w -l 0.0.0.0:5555
+sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponypinasio --ponynoblock -w -l 0.0.0.0:5555
 
 2) metrics sink (if not using Monitoring Hub):
-sudo cset proc -s user -e numactl -- -C 14 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock -w -l 0.0.0.0:5001
+sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponypinasio --ponynoblock -w -l 0.0.0.0:5001
 
 350 Symbols
 

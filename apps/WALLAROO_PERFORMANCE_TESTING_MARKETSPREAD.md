@@ -141,6 +141,17 @@ Model for running stap (you need to fill in the -c argument as in the example be
 stap ~/ponyc/examples/systemtap/actor-telemetry-heap-only.stp -o stap-out.txt -g --suppress-time-limits -c 'command + args in a string'
 ```
 
+#### Analyzing output
+Get sizes for gc
+```grep gc_heapsize telemout.txt | awk -F: '{print $2}' | sort -n| tail```
+
+Get sizes for alloc
+```grep alloc_heapsize telemout.txt | awk -F: '{print $2}' | sort -n | tail```
+
+Get type_ids. Replace the values with sizes you're looking for.
+```egrep '500405056|478746624|2997216|2599456|1185184|135232' -B 4 telemout.txt```
+
+
 ### Installing a custom Ponyc environment
 
 This is needed if you are going to be making changes to the Pony runtime as
