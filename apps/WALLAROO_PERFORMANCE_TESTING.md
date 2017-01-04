@@ -239,6 +239,20 @@ Model for running stap (you need to fill in the -c argument as in the example be
 stap ~/ponyc/examples/systemtap/actor-telemetry-heap-only.stp -o stap-out.txt -g --suppress-time-limits -c 'command + args in a string'
 ```
 
+
+#### Analyzing output
+Get sizes for gc
+```grep gc_heapsize telemout.txt | awk -F: '{print $2}' | sort -n| tail```
+
+Get sizes for alloc
+```grep alloc_heapsize telemout.txt | awk -F: '{print $2}' | sort -n | tail```
+
+Get type_ids. Replace the values with sizes you're looking for.
+```egrep '500405056|478746624|2997216|2599456|1185184|135232' -B 4 telemout.txt```
+
+Find type_id type names by doing
+```ponyc -d -r=ir``` and inspecting the output <APP-NAME.ll>
+
 Running 2 worker market spread:
 ```
 sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 stap /home/ubuntu/ponyc/examples/systemtap/actor-telemetry-heap-only.stp -o market-stap-w1.txt -g --suppress-time-limits -c '~/buffy/apps/market-spread/market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 -c 127.0.0.1:12500 -d 127.0.0.1:12501 -f ../../demos/marketspread/r3k-initial-nbbo-fixish.msg -s ../../demos/marketspread/r3k-legal-symbols.msg --ponythreads 4 --ponypinasio --ponynoblock -w 2 -t'
