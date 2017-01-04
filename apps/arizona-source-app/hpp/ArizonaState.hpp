@@ -3,17 +3,27 @@
 
 #include <string>
 #include <map>
+#include <vector>
 
 using std::string;
 using std::map;
+using std::vector;
 
 // forward declaration
 class Account;
+class ISIN;
 
 enum Side
 {
   Buy = 0,
   Sell = 1
+};
+
+enum ExecutionResult
+{
+  ExecutionAdded = 0,
+  ExecutionNotAdded = 1,
+  ExecutionFilledOrder = 2
 };
 
 class Proceeds
@@ -35,9 +45,33 @@ public:
   bool operator==(Proceeds& that);
 };
 
+class Execution
+{
+private:
+  Side _side;
+  uint32_t _quantity;
+  double _price;
+  Proceeds _proceeds;
+public:
+  Execution(string& execution_id_, Side side_, uint32_t quantity_, double price_);
+  Proceeds proceeds() { return _proceeds; }
+  uint32_t quantity() { return _quantity; }
+};
+
+class Executions
+{
+private:
+  vector<Execution> _executions;
+public:
+  Executions(): _executions() {}
+  ExecutionResult execute(string& execution_id_, Side side_, uint32_t quantity_, double price_, uint32_t order_quantity_);
+  Proceeds proceeds();
+};
+
 class Order
 {
 private:
+  Executions _executions;
   string _order_id;
   Side _side;
   uint32_t _quantity;
@@ -46,6 +80,8 @@ public:
   Order(string& order_id_, Side side_, uint32_t quantity_, double price_);
   bool operator==(Order& that);
   Proceeds proceeds();
+  ExecutionResult execute(string& execution_id_, uint32_t quantity_, double price_, ISIN* isin_);
+  Proceeds final_proceeds();
 };
 
 class Orders
@@ -56,7 +92,8 @@ public:
   Orders();
   ~Orders();
   void add_order(string& order_id, Side side_, uint32_t quantity, double price_);
-  void cancel_order(string& order_id);
+  void cancel_order(string& order_id_, ISIN *isin_);
+  bool execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_, ISIN *isin_);
   Proceeds proceeds();
   Proceeds proceeds_without_order(string& order_id_);
   size_t count() { return _orders.size(); }
@@ -67,10 +104,13 @@ class ISIN
 private:
   string _isin_id;
   Orders _orders;
+  Proceeds _proceeds;
 public:
   ISIN(string& isin_id_);
   void add_order(string& _order_id_, Side side_, double quantity_, double price_, Account *account_);
   void cancel_order(string& _order_id_);
+  bool execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
+  void add_proceeds(Proceeds& proceeds_) { _proceeds.add(proceeds_); };
   Proceeds proceeds();
   Proceeds proceeds_without_order(string& order_id_);
 };
@@ -86,8 +126,8 @@ public:
   ~ISINs();
   void add_order(string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_, Account *account_);
   void cancel_order(string& isin_id_, string& order_id_);
+  bool execute(string& isin_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
   Proceeds proceeds_for_isin(string& isin_id_);
-  Proceeds proceeds_for_isin_without_order(string& isin_id_, string& order_id_);
   Proceeds proceeds_with_order(string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& isin_id_, string& order_id_);
 };
@@ -103,6 +143,7 @@ public:
   void add_order(string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   void cancel_order(string& isin_id_, string& order_id_);
   void cancel_order(string& order_id_);
+  void execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
   Proceeds proceeds_for_isin(string& isin_id_);
   Proceeds proceeds_with_order(string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& isin_id_, string& order_id_);
@@ -122,6 +163,7 @@ public:
   ~Accounts();
   void add_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   void cancel_order(string& account_id_, string& order_id_);
+  void execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
   Proceeds proceeds_for_isin(string& account_id_, string& isin_id_);
   Proceeds proceeds_with_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& account_id_, string& order_id_);
@@ -136,6 +178,7 @@ public:
   Client(string& client_id_);
   void add_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   void cancel_order(string& account_id_, string& order_id_);
+  void execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
   Proceeds proceeds_for_isin(string& account_id_, string& isin_id_);
   Proceeds proceeds_with_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& account_id_, string& order_id_);
@@ -152,6 +195,7 @@ public:
   ~Clients();
   void add_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   void cancel_order(string& client_id_, string& isin_id_, string& order_id_);
+  void execute(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
   Proceeds proceeds_for_isin(string& client_id, string& account_id_, string& isin_id_);
   Proceeds proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& client_id_, string& account_id_, string& order_id_);
