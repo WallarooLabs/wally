@@ -172,6 +172,11 @@ public:
   ExecuteMessage(uint64_t message_id, uint32_t client_id);
   virtual ~ExecuteMessage();
   virtual string *get_client() { return _client; }
+  string *get_account() { return _account; }
+  string *get_order_id() { return _order_id; }
+  string *get_execution_id() { return _execution_id; }
+  uint32_t get_quantity() { return _quantity; }
+  double get_price() { return _price; }
   virtual uint32_t get_client_id() { return _client_id; }
   virtual uint64_t get_message_id() { return _message_id; }
   virtual void from_bytes(char *bytes_);
@@ -250,6 +255,9 @@ public:
 
   class Proceeds proceeds_with_cancel(string& client_id_, string& account_id_, string& order_id_);
   void cancel_order(string& client_id_, string& account_id_, string& order_id_);
+
+  class Proceeds proceeds_with_execute(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
+  void execute_order(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
 };
 
 class AddOrderStateChange: public wallaroo::StateChange
@@ -302,6 +310,32 @@ class CancelOrderStateChangeBuilder: public wallaroo::StateChangeBuilder
   virtual wallaroo::StateChange *build(uint64_t id_) { return new CancelOrderStateChange(id_); }
 };
 
+class ExecuteOrderStateChange: public wallaroo::StateChange
+{
+private:
+  string _client_id;
+  string _account_id;
+  string _order_id;
+  string _execution_id;
+  uint32_t _quantity;
+  double _price;
+public:
+  ExecuteOrderStateChange(uint64_t id_);
+  virtual const char* name() { return "execute order state change"; };
+  virtual void apply(wallaroo::State *state_);
+  virtual void to_log_entry(char *bytes_) {}
+  virtual size_t get_log_entry_size() { return 0; }
+  virtual size_t get_log_entry_size_header_size() { return 0; }
+  virtual size_t read_log_entry_size_header(char *bytes_) { return 0; }
+  virtual bool read_log_entry(char *bytes_) { return true; }
+  void update(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
+};
+
+class ExecuteOrderStateChangeBuilder: public wallaroo::StateChangeBuilder
+{
+  virtual wallaroo::StateChange *build(uint64_t id_) { return new ExecuteOrderStateChange(id_); }
+};
+
 class ArizonaDefaultState: public wallaroo::State
 {
 private:
@@ -321,7 +355,7 @@ public:
   ArizonaStateComputation();
   virtual const char *name();
   virtual void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void* state_change_Respository_helper_, wallaroo::State *state_, void *none);
-  virtual size_t get_number_of_state_change_builders() { return 2;}
+  virtual size_t get_number_of_state_change_builders() { return 3;}
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_);
   virtual void serialize(char* bytes_, size_t nsz_) { Writer writer((unsigned char *)bytes_); writer.u16_be(SerializationType::Computation); }
   virtual size_t serialize_get_size () { return 2; }
