@@ -2,6 +2,7 @@ use "buffered"
 use "serialise"
 use "net"
 use "collections"
+use "sendence/byte_buffer"
 use "wallaroo/boundary"
 use "wallaroo/initialization"
 use "wallaroo/routing"
@@ -21,11 +22,9 @@ primitive ChannelMsgEncoder
     wb.done()
 
   fun _encode_in_place(msg: ChannelMsg val, auth: AmbientAuth,
-    buf: Array[U8], buf_offset: USize): USize ?
+    buf: ByteBuffer): USize ?
   =>
-    let serialised_buffer = SerialisedBuffer(SerialiseAuth(auth), msg, buf,
-      buf_offset)
-    serialised_buffer.size()
+    buf.add_serialised[ChannelMsg val](msg, auth)
 
   fun data_channel(delivery_msg: ReplayableDeliveryMsg val,
     pipeline_time_spent: U64, seq_id: U64, wb: Writer, auth: AmbientAuth,
@@ -35,12 +34,12 @@ primitive ChannelMsgEncoder
       metrics_id, metric_name), auth, wb)
 
   fun data_channel_in_place(delivery_msg: ReplayableDeliveryMsg val,
-    pipeline_time_spent: U64, seq_id: U64, buf: Array[U8], buf_offset: USize,
+    pipeline_time_spent: U64, seq_id: U64, buf: ByteBuffer,
     auth: AmbientAuth, latest_ts: U64, metrics_id: U16, metric_name: String):
       USize ?
   =>
     _encode_in_place(DataMsg(delivery_msg, pipeline_time_spent, seq_id,
-      latest_ts, metrics_id, metric_name), auth, buf, buf_offset)
+      latest_ts, metrics_id, metric_name), auth, buf)
 
   fun delivery[D: Any val](target_id: U128,
     from_worker_name: String, msg_data: D,

@@ -3,6 +3,7 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
+use "sendence/byte_buffer"
 use "sendence/bytes"
 use "sendence/guid"
 use "sendence/queue"
@@ -37,9 +38,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   // let _encoder: EncoderWrapper val
   // let _wb: Writer = Writer
   let _serialise_buf_threshold: USize = 1000
-  // HACK: Add some extra headroom to the array so we have space for the
-  // last serialised data structure
-  let _serialise_buf: Array[U8] = Array[U8](_serialise_buf_threshold + 1000)
+  let _serialise_buf: ByteBuffer = ByteBuffer(_serialise_buf_threshold)
   let _metrics_reporter: MetricsReporter
 
   // CreditFlow
@@ -192,7 +191,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         metrics_id
       end
 
-    try
+    // try
       let seq_id = ifdef "resilience" then
         _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
       else
@@ -201,16 +200,16 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
       let next_block_idx = _serialise_buf.size()
 
-      let next_msg_size = ChannelMsgEncoder.data_channel_in_place(delivery_msg,
-        pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
-        seq_id, _serialise_buf, next_block_idx + 4, _auth,
-        WallClock.nanoseconds(), new_metrics_id, metric_name)
-      try
-        Bytes.write_u32_at_idx(next_msg_size.u32(), _serialise_buf,
-          next_block_idx)
-      else
-        Fail()
-      end
+
+      let next_msg_size =
+        try
+          ChannelMsgEncoder.data_channel_in_place(delivery_msg,
+            pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
+            seq_id, _serialise_buf, _auth,
+            WallClock.nanoseconds(), new_metrics_id, metric_name)
+        else
+          Fail()
+        end
       // _queue.enqueue(outgoing_msg)
 
       if _serialise_buf.size() > _serialise_buf_threshold then
@@ -226,9 +225,9 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       end
 
       _metrics_reporter.worker_metric(metric_name, end_ts - worker_ingress_ts)
-    else
-      Fail()
-    end
+    // else
+    //   Fail()
+    // end
 
   fun ref _write_from_buf() =>
     let buf_size = _serialise_buf.size()
