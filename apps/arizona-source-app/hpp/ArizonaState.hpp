@@ -66,6 +66,8 @@ public:
   Executions(): _executions() {}
   ExecutionResult execute(string& execution_id_, Side side_, uint32_t quantity_, double price_, uint32_t order_quantity_);
   Proceeds proceeds();
+  Proceeds proceeds_with_execute(string& execution_id_, Side side_, uint32_t quantity_, double price_);
+  uint32_t quantity();
 };
 
 class Order
@@ -79,7 +81,9 @@ private:
 public:
   Order(string& order_id_, Side side_, uint32_t quantity_, double price_);
   bool operator==(Order& that);
+  Proceeds base_proceeds();
   Proceeds proceeds();
+  Proceeds proceeds_with_execute(string& execution_id_, uint32_t quantity_, double price_);
   ExecutionResult execute(string& execution_id_, uint32_t quantity_, double price_, ISIN* isin_);
   Proceeds final_proceeds();
 };
@@ -96,6 +100,7 @@ public:
   bool execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_, ISIN *isin_);
   Proceeds proceeds();
   Proceeds proceeds_with_cancel(string& order_id_);
+  Proceeds proceeds_with_execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
   size_t count() { return _orders.size(); }
 };
 
@@ -113,6 +118,7 @@ public:
   void add_proceeds(Proceeds& proceeds_) { _proceeds.add(proceeds_); };
   Proceeds proceeds();
   Proceeds proceeds_with_cancel(string& order_id_);
+  Proceeds proceeds_with_execute(string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
 };
 
 class ISINs
@@ -130,6 +136,7 @@ public:
   Proceeds proceeds_for_isin(string& isin_id_);
   Proceeds proceeds_with_order(string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& isin_id_, string& order_id_);
+  Proceeds proceeds_with_execute(string& isin_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
 };
 
 class Account
@@ -148,6 +155,8 @@ public:
   Proceeds proceeds_with_order(string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& isin_id_, string& order_id_);
   Proceeds proceeds_with_cancel(string& order_id_);
+  Proceeds proceeds_with_execute(string& isin_id, string& order_id_, string& execution_id_, uint32_t quantity, double price);
+  Proceeds proceeds_with_execute(string& order_id_, string& execution_id_, uint32_t quantity, double price);
   void associate_order_id_to_isin_id(string& order_id_, string& isin_id_);
   void disassociate_order_id_to_isin_id(string& order_id_, string& isin_id_);
 };
@@ -167,6 +176,7 @@ public:
   Proceeds proceeds_for_isin(string& account_id_, string& isin_id_);
   Proceeds proceeds_with_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& account_id_, string& order_id_);
+  Proceeds proceeds_with_execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
 };
 
 class Client
@@ -182,6 +192,7 @@ public:
   Proceeds proceeds_for_isin(string& account_id_, string& isin_id_);
   Proceeds proceeds_with_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& account_id_, string& order_id_);
+  Proceeds proceeds_with_execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
 };
 
 class Clients
@@ -199,6 +210,7 @@ public:
   Proceeds proceeds_for_isin(string& client_id, string& account_id_, string& isin_id_);
   Proceeds proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& client_id_, string& account_id_, string& order_id_);
+  Proceeds proceeds_with_execute(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
 };
 
 #endif // __ARIZONA_STATE_HPP__
