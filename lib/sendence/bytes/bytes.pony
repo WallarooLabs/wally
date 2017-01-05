@@ -58,6 +58,40 @@ primitive Bytes
     arr.push(l1)
     consume arr
 
+  fun write_u16_at_idx(u16: U16, arr: Array[U8], idx: USize) ? =>
+    let l1: U8 = (u16 and 0xFF).u8()
+    let l2: U8 = ((u16 >> 8) and 0xFF).u8()
+    arr(idx) = l2
+    arr(idx + 1) = l1
+
+  fun write_u32_at_idx(u32: U32, arr: Array[U8], idx: USize) ? =>
+    let l1: U8 = (u32 and 0xFF).u8()
+    let l2: U8 = ((u32 >> 8) and 0xFF).u8()
+    let l3: U8 = ((u32 >> 16) and 0xFF).u8()
+    let l4: U8 = ((u32 >> 24) and 0xFF).u8()
+    arr(idx) = l4
+    arr(idx + 1) = l3
+    arr(idx + 2) = l2
+    arr(idx + 3) = l1
+
+  fun write_u64_at_idx(u64: U64, arr: Array[U8], idx: USize) ? =>
+    let l1: U8 = (u64 and 0xFF).u8()
+    let l2: U8 = ((u64 >> 8) and 0xFF).u8()
+    let l3: U8 = ((u64 >> 16) and 0xFF).u8()
+    let l4: U8 = ((u64 >> 24) and 0xFF).u8()
+    let l5: U8 = ((u64 >> 32) and 0xFF).u8()
+    let l6: U8 = ((u64 >> 40) and 0xFF).u8()
+    let l7: U8 = ((u64 >> 48) and 0xFF).u8()
+    let l8: U8 = ((u64 >> 56) and 0xFF).u8()
+    arr(idx) = l8
+    arr(idx + 1) = l7
+    arr(idx + 2) = l6
+    arr(idx + 3) = l5
+    arr(idx + 4) = l4
+    arr(idx + 5) = l3
+    arr(idx + 6) = l2
+    arr(idx + 7) = l1
+
   fun from_f32(f32: F32, arr: Array[U8] iso = recover Array[U8](4) end):
     Array[U8] iso^
   =>

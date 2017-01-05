@@ -20,12 +20,27 @@ primitive ChannelMsgEncoder
     end
     wb.done()
 
+  fun _encode_in_place(msg: ChannelMsg val, auth: AmbientAuth,
+    buf: Array[U8], buf_offset: USize): USize ?
+  =>
+    let serialised_buffer = SerialisedBuffer(SerialiseAuth(auth), msg, buf,
+      buf_offset)
+    serialised_buffer.size()
+
   fun data_channel(delivery_msg: ReplayableDeliveryMsg val,
     pipeline_time_spent: U64, seq_id: U64, wb: Writer, auth: AmbientAuth,
     latest_ts: U64, metrics_id: U16, metric_name: String): Array[ByteSeq] val ?
   =>
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, metric_name), auth, wb)
+
+  fun data_channel_in_place(delivery_msg: ReplayableDeliveryMsg val,
+    pipeline_time_spent: U64, seq_id: U64, buf: Array[U8], buf_offset: USize,
+    auth: AmbientAuth, latest_ts: U64, metrics_id: U16, metric_name: String):
+      USize ?
+  =>
+    _encode_in_place(DataMsg(delivery_msg, pipeline_time_spent, seq_id,
+      latest_ts, metrics_id, metric_name), auth, buf, buf_offset)
 
   fun delivery[D: Any val](target_id: U128,
     from_worker_name: String, msg_data: D,

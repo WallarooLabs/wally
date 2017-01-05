@@ -3,6 +3,7 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
+use "sendence/bytes"
 use "sendence/guid"
 use "sendence/queue"
 use "sendence/wall-clock"
@@ -34,7 +35,11 @@ class OutgoingBoundaryBuilder
 actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   // Steplike
   // let _encoder: EncoderWrapper val
-  let _wb: Writer = Writer
+  // let _wb: Writer = Writer
+  let _serialise_buf_threshold: USize = 1000
+  // HACK: Add some extra headroom to the array so we have space for the
+  // last serialised data structure
+  let _serialise_buf: Array[U8] = Array[U8](_serialise_buf_threshold + 1000)
   let _metrics_reporter: MetricsReporter
 
   // CreditFlow
@@ -194,13 +199,23 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         _seq_id = _seq_id + 1
       end
 
-      let outgoing_msg = ChannelMsgEncoder.data_channel(delivery_msg,
-        pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
-        seq_id, _wb, _auth, WallClock.nanoseconds(),
-        new_metrics_id, metric_name)
-      _queue.enqueue(outgoing_msg)
+      let next_block_idx = _serialise_buf.size()
 
-      _writev(outgoing_msg)
+      let next_msg_size = ChannelMsgEncoder.data_channel_in_place(delivery_msg,
+        pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
+        seq_id, _serialise_buf, next_block_idx + 4, _auth,
+        WallClock.nanoseconds(), new_metrics_id, metric_name)
+      try
+        Bytes.write_u32_at_idx(next_msg_size.u32(), _serialise_buf,
+          next_block_idx)
+      else
+        Fail()
+      end
+      // _queue.enqueue(outgoing_msg)
+
+      if _serialise_buf.size() > _serialise_buf_threshold then
+        _write_from_buf()
+      end
 
       let end_ts = Time.nanos()
 
@@ -214,6 +229,18 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     else
       Fail()
     end
+
+  fun ref _write_from_buf() =>
+    let buf_size = _serialise_buf.size()
+    let output_trn: Array[U8] trn =
+      recover Array[U8](buf_size) end
+    for byte in _serialise_buf.values() do
+      output_trn.push(byte)
+    end
+    let output: Array[U8] val = consume output_trn
+    // _queue.enqueue(output)
+    _write(consume output)
+    _serialise_buf.clear()
 
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
@@ -461,8 +488,24 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
     _resubscribe_event()
 
-  fun ref _writev(data: ByteSeqIter)
-  =>
+  fun ref _write(data: ByteSeq) =>
+    """
+    Write a sequence of bytes.
+    """
+    if _connected and not _closed then
+      _in_sent = true
+
+      let bytes = _notify.sent(this, data)
+      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+      _pending_writev_total = _pending_writev_total + bytes.size()
+      _pending.push((bytes, 0))
+
+      _pending_writes()
+
+      _in_sent = false
+    end
+
+  fun ref _writev(data: ByteSeqIter) =>
     """
     Write a sequence of sequences of bytes.
     """
@@ -836,6 +879,15 @@ interface _OutgoingBoundaryNotify
     server. At this point, the connection will never be established.
     """
     Fail()
+
+  fun ref sent(conn: OutgoingBoundary ref, data: ByteSeq): ByteSeq =>
+    """
+    Called when a chunk of data is sent to the connection in a single
+    call. This gives the notifier an opportunity to modify the sent data chunk
+    before it is written. To swallow the send, return an empty
+    Array[U8].
+    """
+    data
 
   fun ref sentv(conn: OutgoingBoundary ref, data: ByteSeqIter): ByteSeqIter =>
     """
