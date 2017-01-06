@@ -21,7 +21,7 @@ actor Main
               symbol_data_partition where multi_worker = true)
             .to_sink(LetterTotalEncoder, recover [0] end)
       end
-      Startup(env, application, None)
+      Startup(env, application, "alphabet-contest")
     else
       env.out.print("Couldn't build topology")
     end

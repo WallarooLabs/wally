@@ -1,6 +1,8 @@
-# Test
+# API Basics
 
-## Test
+## Stateless Computations
+
+### Defining an Application
 
 Let's start by looking at how to create a linear pipeline of computations.
 We're going to start simple by creating an app that converts Celsius values to
@@ -21,10 +23,9 @@ primitive Multiply is Computation[F32, F32]
   fun name(): String => "Multiply by 1.8"
 ```
 
-A few points of interest. First, we are naming our computation `Multiply` and define it as a `primitive`. You can think of a `primitive` as a stateless class. Second, we specify that it is a `Computation` transforming values of type `F32` (32-bit floats) to values of type `F32`. Third, we define an `apply`
-method that constitutes the computation logic itself. Finally, all 
+A few points of interest. First, we are naming our computation `Multiply` and define it as a `primitive`. You can think of a `primitive` as a stateless class. Second, we specify that `Multiply` is a `Computation` transforming values of type `F32` (32-bit floats) to values of type `F32`. Third, we define an `apply` method that constitutes the computation logic itself. Finally, all 
 `Computation` objects must implement a `name` method for performance
-monitoring purposes.
+monitoring purposes, so we include one here.
 
 We similarly define the addition step:
 
@@ -39,7 +40,7 @@ primitive Add is Computation[F32, F32]
 Our application consists of a single pipeline which takes an `F32`, passes it
 to a `Multiply`, which passes it to an `Add`, which passes it to a sink for 
 sending to external systems. Here is all the code for defining the application
-(we'll break it down step by step):
+itself (we'll break it down step by step):
 
 ```
 Application("Celsius Conversion App")
@@ -87,7 +88,48 @@ Finally we define our sink for the pipeline:
 The `FahrenheitEncoder` transforms the Fahrenheit values (which are of type
 `F32`) to sequences of bytes for transmission via TCP. The `recover [0] end` clause says that we are using the sink with id 0. Currently Wallaroo only supports one sink per pipeline.
 
+### Hooking into Wallaroo
 
+In order to actually use our app, we need to pass the `Application` object we
+just defined to Wallaroo. We'll create a file called `conversion.pony` and 
+define a `Main` actor (which is the Pony equivalent of `main()` in C). Here's
+our `Application` definition in context:
 
+```
+use "wallaroo"
+use "wallaroo/tcp-source"
+use "wallaroo/topology"
+
+actor Main
+  new create(env: Env) =>
+    try
+      let application = recover val
+        Application("Celsius Conversion App")
+          .new_pipeline[F32, F32]("Celsius Conversion", CelsiusDecoder)
+            .to[F32]({(): Multiply => Multiply})
+            .to[F32]({(): Add => Add})
+            .to_sink(FahrenheitEncoder, recover [0] end)
+      end
+      Startup(env, application, "celsius-conversion")
+    else
+      env.out.print("Couldn't build topology")
+    end
+```
+
+All Wallaroo Pony applications must currently include the three packages included at the top. Currently, we only support tcp sources, though this will
+change in the near future.
+
+You can treat most of this new code as boilerplate for now, except for this line:
+
+```
+      Startup(env, application, "celsius-conversion")
+```
+
+The `Startup` object is the entry point into Wallaroo itself. We pass the
+Pony environment, our application, and a string to use for tagging files and metrics related to this app.
+
+### Decoding and Encoding
+
+If you are using TCP to send data in and out of the system, then you probably need a way to convert streams of bytes into semantically useful types and convert your output types to streams of bytes. This is where the decoders and encoders mentioned earlier come into play.
 
 

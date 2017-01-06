@@ -14,7 +14,7 @@ actor Main
             .to[F32]({(): Add => Add})
             .to_sink(FahrenheitEncoder, recover [0] end)
       end
-      Startup(env, application, None)
+      Startup(env, application, "celsius-conversion")
     else
       env.out.print("Couldn't build topology")
     end
