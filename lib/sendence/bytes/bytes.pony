@@ -21,6 +21,12 @@ primitive Bytes
     (a.u64() << 56) or (b.u64() << 48) or (c.u64() << 40) or (d.u64() << 32)
     or (e.u64() << 24) or (f.u64() << 16) or (g.u64() << 8) or h.u64()
 
+  fun to_f32(a: U8, b: U8, c: U8, d: U8): F32 =>
+    F32.from_bits(to_u32(a, b, c, d))
+
+  fun to_64(a: U8, b: U8, c: U8, d: U8, e: U8, f: U8, g: U8, h: U8): F64 =>
+    F64.from_bits(to_u64(a, b, c, d, e, f, g, h))
+
   fun from_u16(u16: U16, arr: Array[U8] iso = recover Array[U8](2) end): Array[U8] iso^ =>
     let l1: U8 = (u16 and 0xFF).u8()
     let l2: U8 = ((u16 >> 8) and 0xFF).u8()
