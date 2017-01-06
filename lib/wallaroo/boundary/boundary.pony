@@ -198,9 +198,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         _seq_id = _seq_id + 1
       end
 
-      let next_block_idx = _serialise_buf.size()
-
-
       let next_msg_size =
         try
           ChannelMsgEncoder.data_channel_in_place(delivery_msg,
