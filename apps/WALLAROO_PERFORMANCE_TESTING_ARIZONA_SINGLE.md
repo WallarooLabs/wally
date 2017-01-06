@@ -90,7 +90,7 @@ sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/b
 ### Build spdlog
 ```
 sudo apt-get install -y cmake
-cd
+cd ~/
 git clone https://github.com/gabime/spdlog.git
 cd ~/spdlog
 mkdir build
@@ -101,9 +101,7 @@ sudo make install
 
 ### Build Arizona-CPP
 ```
-cd ~
-git clone https://github.com/Sendence/buffy.git
-cd buffy
+cd ~/buffy
 git checkout arizona-add-state
 cd lib/wallaroo/cpp-api/cpp/cppapi
 mkdir build
