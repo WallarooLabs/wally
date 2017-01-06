@@ -38,6 +38,7 @@ actor Startup
     var worker_initializer: (WorkerInitializer | None) = None
     var worker_name = ""
     var resilience_dir = "/tmp"
+    var alfred_file_length: (USize | None) = None
     try
       var options = Options(env.args, false)
       var auth = env.root as AmbientAuth
@@ -55,9 +56,9 @@ actor Startup
         // persisting leader
         .add("worker-count", "w", I64Argument)
         .add("topology-initializer", "t", None)
-        .add("leader", "l", None)
         .add("name", "n", StringArgument)
         .add("resilience-dir", "r", StringArgument)
+        .add("alfred-file-length", "l", I64Argument)
 
       for option in options do
         match option
@@ -83,6 +84,8 @@ actor Startup
           else
             resilience_dir = arg
           end
+        | ("alfred-file-length", let arg: I64) =>
+          alfred_file_length = arg.usize()
         end
       end
 
@@ -162,7 +165,8 @@ actor Startup
       let worker_names_file = resilience_dir + "/" + name + "-" + worker_name +
         ".workers"
 
-      let alfred = Alfred(env, event_log_file)
+      let alfred = Alfred(env, event_log_file
+        where backend_file_length = alfred_file_length)
       let local_topology_initializer = LocalTopologyInitializer(
         application, worker_name, worker_count, env, auth, connections,
         metrics_conn, is_initializer, alfred, input_addrs,
