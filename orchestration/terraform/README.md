@@ -252,4 +252,12 @@ Test ansible communication with the leader nodes only:
 
 `ansible -i ../ansible/packet_net.py --ssh-extra-args="-o StrictHostKeyChecking=no -i ~/.ssh/ec2/us-east-1.pem" -u root 'tag_Project_buffy:&tag_Role_leader' -m ping`
 
+## Manually cleaning up AWS resources
 
+If for some reason the `make destroy` command isn't working correctly and deleting the AWS resources previously created, you can manually clean things up instead.
+
+Go into `AWS Console (Web UI) -> EC2 -> Auto Scaling Groups` and find/delete the entries related to your cluster (the cluster_name is at the beginning of the resource name).
+
+Go into `AWS Console (Web UI) -> EC2 -> Launch Configurations` and find/delete the entries related to your cluster (the cluster_name is at the beginning of the resource name).
+
+Go into `AWS Console (Web UI) -> EC2 -> Placement Groups` and find/delete the entry related to your cluster (the cluster_name is at the end of the resource name with a format of `buffy-<CLUSTER_NAME>`).
