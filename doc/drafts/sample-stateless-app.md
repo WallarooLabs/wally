@@ -128,6 +128,6 @@ Pony environment, our application, and a string to use for tagging files and met
 
 ## Decoding and Encoding
 
-If you are using TCP to send data in and out of the system, then you probably need a way to convert streams of bytes into semantically useful types and convert your output types to streams of bytes. This is where the decoders and encoders mentioned earlier come into play.
+If you are using TCP to send data in and out of the system, then you need a way to convert streams of bytes into semantically useful types and convert your output types to streams of bytes. This is where the decoders and encoders mentioned earlier come into play. For more information, see [Decoders and Encoders](...).
 
 
