@@ -8,7 +8,7 @@ use "wallaroo/topology"
 actor Main
   new create(env: Env) =>
     try
-      let symbol_data_partition = Partition[Votes val, String](
+      let letter_partition = Partition[Votes val, String](
         LetterPartitionFunction, PartitionFileReader("letters.txt",
           env.root as AmbientAuth))
 
@@ -18,7 +18,7 @@ actor Main
             VotesDecoder)
             .to_state_partition[Votes val, String, LetterTotal val,
               LetterState](AddVotes, LetterStateBuilder, "letter-state",
-              symbol_data_partition where multi_worker = true)
+              letter_partition where multi_worker = true)
             .to_sink(LetterTotalEncoder, recover [0] end)
       end
       Startup(env, application, "alphabet-contest")

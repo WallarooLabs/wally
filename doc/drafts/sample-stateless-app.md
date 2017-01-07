@@ -1,8 +1,6 @@
-# API Basics
+# API Basics: Stateless App
 
-## Stateless Computations
-
-### Defining an Application
+## Defining an Application
 
 Let's start by looking at how to create a linear pipeline of computations.
 We're going to start simple by creating an app that converts Celsius values to
@@ -88,7 +86,7 @@ Finally we define our sink for the pipeline:
 The `FahrenheitEncoder` transforms the Fahrenheit values (which are of type
 `F32`) to sequences of bytes for transmission via TCP. The `recover [0] end` clause says that we are using the sink with id 0. Currently Wallaroo only supports one sink per pipeline.
 
-### Hooking into Wallaroo
+## Hooking into Wallaroo
 
 In order to actually use our app, we need to pass the `Application` object we
 just defined to Wallaroo. We'll create a file called `conversion.pony` and 
@@ -128,7 +126,7 @@ You can treat most of this new code as boilerplate for now, except for this line
 The `Startup` object is the entry point into Wallaroo itself. We pass the
 Pony environment, our application, and a string to use for tagging files and metrics related to this app.
 
-### Decoding and Encoding
+## Decoding and Encoding
 
 If you are using TCP to send data in and out of the system, then you probably need a way to convert streams of bytes into semantically useful types and convert your output types to streams of bytes. This is where the decoders and encoders mentioned earlier come into play.
 
