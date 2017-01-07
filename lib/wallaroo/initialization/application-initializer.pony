@@ -19,7 +19,7 @@ actor ApplicationInitializer
   let _output_addr: Array[String] val
   let _alfred: Alfred tag
   var _application: (Application val | None) = None
-  
+
   new create(auth: AmbientAuth,
     local_topology_initializer: LocalTopologyInitializer,
     input_addrs: Array[Array[String]] val,
@@ -236,7 +236,9 @@ actor ApplicationInitializer
         let source_partition_workers: (String | Array[String] val | None) =
           if source_seq_builder.is_prestate() then
             if source_seq_builder.is_multi() then
-              @printf[I32]("Multiworker Partition\n".cstring())
+              if all_workers.size() > 1 then
+                @printf[I32]("Multiworker Partition\n".cstring())
+              end
               all_workers
             else
               "initializer"
@@ -455,7 +457,9 @@ actor ApplicationInitializer
                 // Determine which workers will be involved in this partition
                 let partition_workers: (String | Array[String] val) =
                   if next_runner_builder.is_multi() then
-                    @printf[I32]("Multiworker Partition\n".cstring())
+                    if all_workers.size() > 1 then
+                      @printf[I32]("Multiworker Partition\n".cstring())
+                    end
                     all_workers
                   else
                     worker
