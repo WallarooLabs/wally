@@ -177,4 +177,28 @@ We pass in the Pony environment, our application, and a string to use for taggin
 
 If you are using TCP to send data in and out of the system, then you need a way to convert streams of bytes into semantically useful types and convert your output types to streams of bytes. This is where the decoders and encoders mentioned earlier come into play. For more information, see [Decoders and Encoders](...).
 
+```
+primitive VotesDecoder is FramedSourceHandler[Votes val]
+  fun header_length(): USize =>
+    4
+
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    5
+
+  fun decode(data: Array[U8] val): Votes val ? =>
+    // Assumption: 1 byte for letter
+    let letter = String.from_array(data.trim(0, 1))
+    let count = Bytes.to_u32(data(1), data(2), data(3), data(4))
+    Votes(letter, count)
+```
+
+```
+primitive LetterTotalEncoder
+  fun apply(t: LetterTotal val, wb: Writer = Writer): Array[ByteSeq] val =>
+    wb.write(t.letter) // Assumption: letter is 1 byte
+    wb.u32_be(t.count)
+    wb.done()
+```
+
+
 

@@ -105,7 +105,7 @@ primitive VotesDecoder is FramedSourceHandler[Votes val]
     4
 
   fun payload_length(data: Array[U8] iso): USize ? =>
-    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+    5
 
   fun decode(data: Array[U8] val): Votes val ? =>
     // Assumption: 1 byte for letter
@@ -133,6 +133,7 @@ class LetterTotal
     letter = l
     count = c
 
+// TODO: Remove need to call done() on Writer, and have no return type
 primitive LetterTotalEncoder
   fun apply(t: LetterTotal val, wb: Writer = Writer): Array[ByteSeq] val =>
     wb.write(t.letter) // Assumption: letter is 1 byte

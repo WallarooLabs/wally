@@ -130,4 +130,25 @@ Pony environment, our application, and a string to use for tagging files and met
 
 If you are using TCP to send data in and out of the system, then you need a way to convert streams of bytes into semantically useful types and convert your output types to streams of bytes. This is where the decoders and encoders mentioned earlier come into play. For more information, see [Decoders and Encoders](...).
 
+```
+primitive CelsiusDecoder is FramedSourceHandler[F32]
+  fun header_length(): USize =>
+    4
+
+  fun payload_length(data: Array[U8] iso): USize =>
+    4
+
+  fun decode(data: Array[U8] val): F32 ? =>
+    Bytes.to_f32(data(0), data(1), data(2), data(3))
+```
+
+```
+primitive FahrenheitEncoder
+  fun apply(f: F32, wb: Writer): Array[ByteSeq] val =>
+    wb.f32_be(f)
+    wb.done()
+```
+
+
+
 

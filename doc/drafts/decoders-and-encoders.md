@@ -18,12 +18,12 @@ PayloadSize [x bytes] : Payload [bytes specified in PayloadSize]
 
 You decide both how many bytes you will use to specify the payload
 size (depending on whether you're encoding a 16, 32, or 64-bit 
-integer, for example) and how you encode that size (for example, as
-a big-endian or little-endian encoding).  
+integer, for example) and how you encode that size (for example,
+using a big-endian or little-endian encoding).  
 
 In order for Wallaroo to know how to parse your incoming stream,
 you need to implement a `FramedSourceHandler`. You must implement
-three methods, where type `In` is the input type for your stream:
+three methods, where type `In` is the input type for your pipeline:
 
 ```
   fun header_length(): USize
@@ -75,3 +75,53 @@ In this example, since the payload will always be 5 bytes long, we could have ac
 ```
 
 In the near future, Wallaroo will allow users to use fixed length protocols without the need for size headers, but at the moment that is not supported.
+
+A simple example where our payload would not be fixed length is if we are
+sending in a stream of strings, such as customer names. Here's a
+possible `FramedSourceHandler` for that case:
+
+```
+primitive NamesDecoder is FramedSourceHandler[String]
+  fun header_length(): USize =>
+    4
+
+  fun payload_length(data: Array[U8] iso): USize ? =>
+    Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+
+  fun decode(data: Array[U8] val): String ? =>
+    String.from_array(data)
+```
+
+Here our input type to our pipeline is `String`. Our payload size field
+tells Wallaroo how many bytes to pull out of the stream for each payload,
+and in this case this size varies over time. Wallaroo will always pass
+an `Array` of bytes of this size to `decode()`. And then
+in `decode()` we simply convert those bytes directly to a `String`.
+
+## Creating an Encoder
+
+If your application uses a TCP sink to send outputs to an external system,
+then you will need an encoder converting your pipeline output types to a
+stream of bytes. For this purpose you need to create an encoder `primitive`
+that implements the following function (where `Out` is the output type for
+your pipeline):
+
+```
+  fun apply(o: Out, wb: Writer = Writer): Array[ByteSeq] val
+```
+
+Wallaroo provides you with a `Writer` which you will use to buffer 
+data to be sent out. Here's an example from the [Alphabet Popularity Contest app](...): 
+
+```
+primitive LetterTotalEncoder
+  fun apply(t: LetterTotal val, wb: Writer = Writer): Array[ByteSeq] val =>
+    wb.write(t.letter)
+    wb.u32_be(t.count)
+    wb.done()
+```
+
+You currently need to call `done()` on the `Writer` at the end of this 
+function, though that will be changing soon.
+
+ 
