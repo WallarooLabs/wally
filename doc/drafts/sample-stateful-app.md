@@ -6,7 +6,7 @@ the `Startup` object. We showed how to create an application with a single pipel
 
 ## Defining a Stateful Application
 
-Have you ever wondered which letter of the alphabet is the most popular? If so, you're in luck, since we'll be creating an application that tallies votes for best letter and outputs running totals as the state associated with a letter is updated.
+Have you ever wondered which letter of the alphabet is the most popular? If so, you're in luck, since we'll be creating an application that tallies votes for best letter and outputs running totals whenever we update the state associated with a letter.
 
 Here is all the code defining the `Application` object and passing it to the Wallaroo entry point. Don't worry if you don't understand what's happening; we'll be covering this piece by piece:
 
