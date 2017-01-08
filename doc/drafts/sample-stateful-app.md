@@ -200,5 +200,110 @@ primitive LetterTotalEncoder
     wb.done()
 ```
 
+## Rewriting our Application to Use Two Streams
 
+To illustrate the use of two interacting stream, we're going to create a
+variant on the Alphabet Popularity Contest app. Instead of emitting a running
+total every time we update a letter's vote count, we're going to add a 
+second stream of letters that trigger outputting the running total for the
+corresponding letter. The new code looks like this:
 
+```
+actor Main
+  new create(env: Env) =>
+    try
+      let letter_partition = Partition[(Votes val | String), String](
+        LetterPartitionFunction, PartitionFileReader("letters.txt",
+          env.root as AmbientAuth))
+
+      let application = recover val
+        Application("Alphabet Popularity Contest")
+          .new_pipeline[Votes val, None]("Alphabet Votes",
+            VotesDecoder)
+            .to_state_partition[Votes val, String, None, LetterState](
+              AddVotes, LetterStateBuilder, "letter-state",
+              letter_partition where multi_worker = true)
+            .done()
+          .new_pipeline[String, LetterTotal val]("Running Totals",
+            LetterDecoder)
+            .to_state_partition[String, String, LetterTotal val,
+              LetterState](GetRunningTotal, LetterStateBuilder, "letter-state",
+              letter_partition where multi_worker = true)
+            .to_sink(LetterTotalEncoder, recover [0] end)
+      end
+      Startup(env, application, "alphabet-contest")
+    else
+      env.out.print("Couldn't build topology")
+    end
+```
+
+Let's break down the differences step by step. The first difference is in
+our `PartitionFunction`. In our single stream version, we knew that we would
+always be partitioning based on the same incoming type, namely `Votes`. But now
+we have two streams, one consisting of `Votes` data and the other consisting of
+`String` data (the letters we're requesting running totals for). So we need a
+partition function that can act on either type. We define this as follows:
+
+```
+primitive LetterPartitionFunction
+  fun apply(input: (Votes val | String)): String =>
+    match input
+    | let v: Votes val => v.letter
+    | let s: String => s
+    else
+      // TODO: We'll never reach this code, but Pony doesn't currently infer
+      // that our match is exhaustive.
+      ""
+    end
+```
+
+We define our first, vote-count-updating pipeline as follows:
+
+```
+          .new_pipeline[Votes val, None]("Alphabet Votes",
+            VotesDecoder)
+            .to_state_partition[Votes val, String, None, LetterState](
+              AddVotes, LetterStateBuilder, "letter-state",
+              letter_partition where multi_worker = true)
+            .done()
+```
+
+This is very similar to our initial version, except for a few key differences.
+First, look at the beginning of our pipeline definition:
+
+```
+          .new_pipeline[Votes val, None]("Alphabet Votes",
+            VotesDecoder)
+```
+
+We specify input type `Votes`, as before, but the output type is now `None`.
+That's because this pipeline no longer has an output type (or a corresponding sink). It simply updates state and then finishes. Our third type argument to 
+`to_state_partition()` is also type `None`. 
+
+Finally, instead of defining a sink, we finish the pipeline definition with:
+
+```
+            .done()
+```
+
+This indicates the pipeline ends there without emitting an output to an 
+external system.
+
+Our second pipeline (the one triggering running total outputs), is defined
+as follows:
+
+```
+          .new_pipeline[String, LetterTotal val]("Running Totals",
+            LetterDecoder)
+            .to_state_partition[String, String, LetterTotal val,
+              LetterState](GetRunningTotal, LetterStateBuilder, "letter-state",
+              letter_partition where multi_worker = true)
+            .to_sink(LetterTotalEncoder, recover [0] end)
+```
+
+Our pipeline input type is `String` and our output type is `LetterTotal`. We
+specify our state computation as `GetRunningTotal` and we use the same state
+identifier, "letter-state", as we used in our first pipeline. This tells 
+Wallaroo that we're using the same state partition for both pipelines. We
+define our sink here since this pipeline does have outputs to an external
+system.
