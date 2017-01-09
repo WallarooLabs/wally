@@ -54,8 +54,10 @@ class DelayReceived is TCPConnectionNotify
   fun ref sentv(conn: TCPConnection ref, data: ByteSeqIter): ByteSeqIter =>
     _letter.sentv(conn, data)
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
-    _delayer.received(conn, consume data, this)
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
+    _delayer.received(conn, consume data, this, n)
     true
 
   fun ref expect(conn: TCPConnection ref, qty: USize): USize =>
@@ -107,8 +109,10 @@ class DelaySent is TCPConnectionNotify
       recover Array[String] end
     end
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
-    _letter.received(conn, consume data)
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
+    _letter.received(conn, consume data, n)
     true
 
   fun ref expect(conn: TCPConnection ref, qty: USize): USize =>

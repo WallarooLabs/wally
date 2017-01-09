@@ -103,7 +103,7 @@ actor Main
 
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
-            FromBuffyListenerNotify(coordinator, store, env.err, e_arg, 
+            FromBuffyListenerNotify(coordinator, store, env.err, e_arg,
               use_metrics, no_write),
             listener_addr(0),
             listener_addr(1))
@@ -160,12 +160,12 @@ class FromBuffyNotify is TCPConnectionNotify
   var _expected: USize = 0
   var _expect_termination: Bool = false
   let _metrics: Metrics tag = Metrics
-  let _use_metrics: Bool 
-  let _no_write: Bool 
+  let _use_metrics: Bool
+  let _no_write: Bool
   var _closed: Bool = false
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream, 
+    store: Store, stderr: StdStream,
     expected: (USize | None),
     use_metrics: Bool, no_write: Bool)
   =>
@@ -182,7 +182,9 @@ class FromBuffyNotify is TCPConnectionNotify
       end
     end
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
     if _header then
       try
         _count = _count + 1
@@ -406,7 +408,7 @@ actor Store
   var _count: USize = 0
 
   new create(auth: AmbientAuth) =>
-    _received_file = 
+    _received_file =
       try
         let f = File(FilePath(auth, "received.txt"))
         f.set_length(0)

@@ -91,7 +91,9 @@ class DataChannelConnectNotifier is TCPConnectionNotify
     _auth = auth
     _metrics_reporter = consume metrics_reporter
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
@@ -177,18 +179,3 @@ class DataChannelConnectNotifier is TCPConnectionNotify
     _env.out.print("DataChannelConnectNotifier : server closed")
     //TODO: Initiate reconnect to downstream node here. We need to
     //      create a new connection in OutgoingBoundary
-
-
-// class DataSenderConnectNotifier is TCPConnectionNotify
-//   let _env: Env
-
-//   new iso create(env: Env)
-//   =>
-//     _env = env
-
-//   fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
-//     _env.out.print("Data sender channel received data.")
-//     true
-
-  // fun ref closed(conn: TCPConnection ref) =>
-  //   _coordinator.reconnect_data(_target_name)

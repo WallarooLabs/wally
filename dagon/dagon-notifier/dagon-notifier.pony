@@ -34,7 +34,7 @@ actor Main
           required_args_are_present = false
         end
       end
-      
+
       if m_arg is None then
         env.err.print("Must also supply required '--msg-type' argument")
         required_args_are_present = false
@@ -120,7 +120,9 @@ class DagonNotify is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("Dagon accepted connection")
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
     // parse Dagon command
     for chunked in _framer.chunk(consume data).values() do
       try

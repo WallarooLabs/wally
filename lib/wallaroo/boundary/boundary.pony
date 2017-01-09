@@ -574,39 +574,14 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     try
       var sum: USize = 0
+      var received_called: USize = 0
 
       while _readable and not _shutdown_peer do
         if _muted then
           return
         end
 
-        while (_expect_read_buf.size() > 0) and
-          (_expect_read_buf.size() >= _expect)
-        do
-          let block_size = if _expect != 0 then
-            _expect
-          else
-            _expect_read_buf.size()
-          end
-
-          let out = _expect_read_buf.block(block_size)
-          let carry_on = _notify.received(this, consume out)
-          if not carry_on then
-            _read_again()
-            return
-          end
-
-          sum = sum + block_size
-
-          if sum >= _max_size then
-            // If we've read _max_size, yield and read again later.
-            _read_again()
-            return
-          end
-        end
-
         // Read as much data as possible.
-        _read_buf_size()
         let len = @pony_os_recv[USize](
           _event,
           _read_buf.cpointer().usize() + _read_len,
@@ -616,60 +591,31 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         | 0 =>
           // Would block, try again later.
           _readable = false
-          _resubscribe_event()
           return
         | _next_size =>
           // Increase the read buffer size.
-          _next_size = _max_read.min(_next_size * 2)
+          _next_size = _max_size.min(_next_size * 2)
         end
 
-         _read_len = _read_len + len
+        _read_len = _read_len + len
 
-        if _expect != 0 then
+        if _read_len >= _expect then
           let data = _read_buf = recover Array[U8] end
           data.truncate(_read_len)
           _read_len = 0
 
-          _expect_read_buf.append(consume data)
-
-          while (_expect_read_buf.size() > 0) and
-            (_expect_read_buf.size() >= _expect)
-          do
-            let block_size = if _expect != 0 then
-              _expect
-            else
-              _expect_read_buf.size()
-            end
-
-            let out = _expect_read_buf.block(block_size)
-            let osize = block_size
-
-            let carry_on = _notify.received(this, consume out)
-            if not carry_on then
-              _read_again()
-              return
-            end
-
-            sum = sum + osize
-            if sum >= _max_size then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              return
-            end
-          end
-        else
-          let data = _read_buf = recover Array[U8] end
-          data.truncate(_read_len)
-          let dsize = _read_len
-          _read_len = 0
-
-          let carry_on = _notify.received(this, consume data)
-          if not carry_on then
+          received_called = received_called + 1
+          if not _notify.received(this, consume data,
+            received_called)
+          then
+            _read_buf_size()
             _read_again()
             return
+          else
+            _read_buf_size()
           end
 
-          sum = sum + dsize
+          sum = sum + len
 
           if sum >= _max_size then
             // If we've read _max_size, yield and read again later.
@@ -689,6 +635,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     Resume reading.
     """
     _pending_reads()
+    _resubscribe_event()
 
   fun _can_send(): Bool =>
     _connected and not _closed and _writeable
@@ -772,9 +719,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _apply_backpressure() =>
     _writeable = false
-    ifdef linux then
-      _resubscribe_event()
-    end
     _notify.throttled(this)
 
   fun ref _release_backpressure() =>
@@ -789,6 +733,17 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       _read_buf.undefined(_expect)
     else
       _read_buf.undefined(_next_size)
+    end
+
+  fun ref expect(qty: USize = 0) =>
+    """
+    A `received` call on the notifier must contain exactly `qty` bytes. If
+    `qty` is zero, the call can contain any amount of data. This has no effect
+    if called in the `sent` notifier callback.
+    """
+    if not _in_sent then
+      _expect = _notify.expect(this, qty)
+      _read_buf_size()
     end
 
   fun local_address(): IPAddress =>
@@ -846,12 +801,17 @@ interface _OutgoingBoundaryNotify
     """
     data
 
-  fun ref received(conn: OutgoingBoundary ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: OutgoingBoundary ref, data: Array[U8] iso,
+    times: USize): Bool
+  =>
     """
     Called when new data is received on the connection. Return true if you
     want to continue receiving messages without yielding until you read
     max_size on the TCPConnection.  Return false to cause the TCPConnection
     to yield now.
+
+    `times` parameter is the number of times this method has been called during
+    this behavior. Starts at 1.
     """
     true
 
