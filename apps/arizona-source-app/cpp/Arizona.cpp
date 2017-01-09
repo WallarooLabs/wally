@@ -101,6 +101,26 @@ wallaroo::Key *partition_key_from_bytes(char *bytes_)
   return new ArizonaPartitionKey(value);
 }
 
+//StateChangeBuilder
+
+wallaroo::StateChangeBuilder *state_change_builder_from_bytes(char *bytes_)
+{
+  Reader reader((unsigned char *)bytes_);
+  uint16_t scb_type = reader.u16_be();
+  //TODO: find a way to efficiently reuse ArizonaStateComputation::get_state_change_builder()
+  switch (scb_type)
+  {
+    case StateChangeBuilderType::AddOrder:
+      return new AddOrderStateChangeBuilder();
+    case StateChangeBuilderType::CancelOrder:
+      return new CancelOrderStateChangeBuilder();
+    case StateChangeBuilderType::ExecuteOrder:
+      return new ExecuteOrderStateChangeBuilder();
+  }
+  // TODO: This should be an error
+  return nullptr;
+}
+
 // Buffer
 
 Reader::Reader(unsigned char *bytes_): _ptr(bytes_)
@@ -576,24 +596,22 @@ extern "C" {
 
     switch(serialized_type)
     {
-    case 0:
-      // KAGR
-      //return message_from_bytes(remaining_bytes);
-      return nullptr;
-    case 1:
-      return new ArizonaStateComputation();
-    case 2:
-      return new ArizonaSinkEncoder();
-    case 3:
-      return partition_key_from_bytes(remaining_bytes);
-    case 4:
-      // TODO: deserialize the state change builders here
-      std::cerr << "deserialization of state change builders is not implemented yet." << std::endl;
-      return nullptr;
-    case 5:
-      return new ArizonaPartitionFunction();
-    case SerializationType::DefaultComputation:
-      return new ArizonaDefaultStateComputation();
+      case SerializationType::Message:
+        return message_from_bytes(remaining_bytes);
+      case SerializationType::Computation:
+        return new ArizonaStateComputation();
+      case SerializationType::SinkEncoder:
+        return new ArizonaSinkEncoder();
+      case SerializationType::PartitionKey:
+        return partition_key_from_bytes(remaining_bytes);
+      case SerializationType::StateChangeBuilder:
+        return state_change_builder_from_bytes(remaining_bytes);
+      case SerializationType::PartitionFunction:
+        return new ArizonaPartitionFunction();
+      case SerializationType::DefaultComputation:
+        return new ArizonaDefaultStateComputation();
+      case SerializationType::SourceDecoder:
+        return new ArizonaSourceDecoder();
     }
     // TODO: do something better here
     std::cerr << "Don't know how to deserialize type=" << serialized_type << std::endl;
@@ -679,8 +697,76 @@ void AddOrderStateChange::apply(wallaroo::State *state_)
   az_state->add_order(_client_id, _account_id, _isin_id, _order_id, _side, _quantity, _price);
 }
 
+void AddOrderStateChange::to_log_entry(char *bytes_)
+{
+  Writer writer((unsigned char *)bytes_);
+  writer.u32_be(get_log_entry_size());
+  writer.arizona_string(&_client_id);
+  writer.arizona_string(&_account_id);
+  writer.arizona_string(&_isin_id);
+  writer.arizona_string(&_order_id);
+  writer.u16_be(_side);
+  writer.u32_be(_quantity);
+  writer.arizona_double(_price);
+}
+size_t AddOrderStateChange::get_log_entry_size()
+{
+  return _client_id.size() + 
+  _account_id.size() + 
+  _isin_id.size() + 
+  _order_id.size() +
+  sizeof(uint16_t) + 
+  sizeof(uint32_t) +
+  sizeof(double);
+}
+size_t AddOrderStateChange::read_log_entry_size_header(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  return reader.u32_be();
+}
+bool AddOrderStateChange::read_log_entry(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  _client_id = *reader.arizona_string();
+  _account_id = *reader.arizona_string();
+  _isin_id = *reader.arizona_string();
+  _order_id = *reader.arizona_string();
+  _side = (Side) reader.u16_be();
+  _quantity = reader.u32_be();
+  _price = reader.arizona_double();
+  return true;
+}
+
 CancelOrderStateChange::CancelOrderStateChange(uint64_t id_): StateChange(id_), _client_id(), _account_id(), _order_id()
 {
+}
+
+void CancelOrderStateChange::to_log_entry(char *bytes_)
+{
+  Writer writer((unsigned char *)bytes_);
+  writer.u32_be(get_log_entry_size());
+  writer.arizona_string(&_client_id);
+  writer.arizona_string(&_account_id);
+  writer.arizona_string(&_order_id);
+}
+size_t CancelOrderStateChange::get_log_entry_size()
+{
+  return _client_id.size() + 
+  _account_id.size() + 
+  _order_id.size();
+}
+size_t CancelOrderStateChange::read_log_entry_size_header(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  return reader.u32_be();
+}
+bool CancelOrderStateChange::read_log_entry(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  _client_id = *reader.arizona_string();
+  _account_id = *reader.arizona_string();
+  _order_id = *reader.arizona_string();
+  return true;
 }
 
 void CancelOrderStateChange::update(string& client_id_, string& account_id_, string& order_id_)
@@ -710,6 +796,45 @@ void ExecuteOrderStateChange::update(string& client_id_, string& account_id_, st
   _execution_id = execution_id_;
   _quantity = quantity_;
   _price = price_;
+}
+
+void ExecuteOrderStateChange::to_log_entry(char *bytes_)
+{
+  Writer writer((unsigned char *)bytes_);
+  writer.u32_be(get_log_entry_size());
+  writer.arizona_string(&_client_id);
+  writer.arizona_string(&_account_id);
+  writer.arizona_string(&_order_id);
+  writer.arizona_string(&_execution_id);
+  writer.u32_be(_quantity);
+  writer.arizona_double(_price);
+}
+
+size_t ExecuteOrderStateChange::get_log_entry_size()
+{
+  return _client_id.size() + 
+  _account_id.size() + 
+  _order_id.size() +
+  _execution_id.size() + 
+  sizeof(uint32_t) +
+  sizeof(double);
+}
+
+size_t ExecuteOrderStateChange::read_log_entry_size_header(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  return reader.u32_be();
+}
+bool ExecuteOrderStateChange::read_log_entry(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  _client_id = *reader.arizona_string();
+  _account_id = *reader.arizona_string();
+  _order_id = *reader.arizona_string();
+  _execution_id = *reader.arizona_string();
+  _quantity = reader.u32_be();
+  _price = reader.arizona_double();
+  return true;
 }
 
 void ExecuteOrderStateChange::apply(wallaroo::State *state_)
@@ -848,12 +973,12 @@ wallaroo::StateChangeBuilder *ArizonaStateComputation::get_state_change_builder(
 {
   switch (idx_)
   {
-  case 0:
-    return new AddOrderStateChangeBuilder();
-  case 1:
-    return new CancelOrderStateChangeBuilder();
-  case 2:
-    return new ExecuteOrderStateChangeBuilder();
+    case StateChangeBuilderType::AddOrder:
+      return new AddOrderStateChangeBuilder();
+    case StateChangeBuilderType::CancelOrder:
+      return new CancelOrderStateChangeBuilder();
+    case StateChangeBuilderType::ExecuteOrder:
+      return new ExecuteOrderStateChangeBuilder();
   }
   // TODO: This should be an error
   return nullptr;

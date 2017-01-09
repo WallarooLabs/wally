@@ -161,7 +161,7 @@ app
 
 ```
 sudo apt-get install -y pkg-config libconfig++-dev
-cd
+cd ~/
 git clone https://github.com/Sendence/arizona.git
 cd ~/arizona
 git checkout state-node-compute
@@ -183,16 +183,18 @@ You'll need to have 3 terminals available. 1 for giles sender, 1 for giles recei
 
 Giles receiver needs to be running before arizona:
 ```
+cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555 -t
 ```
 
 ```
 cd ~/buffy/apps/arizona-source-app
-sudo cset proc -s user -e numactl -- -C 1-12,17 chrt -f 80 ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 12 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
 ```
 
 To run the Orders Sender:
 ```
+cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-100k.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
