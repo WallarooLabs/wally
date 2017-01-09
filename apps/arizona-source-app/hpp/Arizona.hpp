@@ -58,6 +58,14 @@ enum SerializationType
   DefaultComputation = 6
 };
 
+// StateChangeBuilders
+enum StateChangeBuilderType
+{
+  AddOrder = 0,
+  CancelOrder = 1,
+  ExecuteOrder = 2
+};
+
 // Messages
 
 enum MessageType
@@ -274,17 +282,24 @@ public:
   AddOrderStateChange(uint64_t id_);
   virtual const char* name() { return "add order state change"; };
   virtual void apply(wallaroo::State *state_);
-  virtual void to_log_entry(char *bytes_) {}
-  virtual size_t get_log_entry_size() { return 0; }
-  virtual size_t get_log_entry_size_header_size() { return 0; }
-  virtual size_t read_log_entry_size_header(char *bytes_) { return 0; }
-  virtual bool read_log_entry(char *bytes_) { return true; }
+  virtual void to_log_entry(char *bytes_);
+  virtual size_t get_log_entry_size();
+  virtual size_t get_log_entry_size_header_size() { return sizeof(uint32_t); }
+  virtual size_t read_log_entry_size_header(char *bytes_);
+  virtual bool read_log_entry(char *bytes_);
   void update(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, uint16_t side_, uint32_t quantity_, double price_);
 };
 
 class AddOrderStateChangeBuilder: public wallaroo::StateChangeBuilder
 {
   virtual wallaroo::StateChange *build(uint64_t id_) { return new AddOrderStateChange(id_); }
+  virtual void serialize (char* bytes_, size_t nsz_)
+  {
+    Writer writer((unsigned char *)bytes_);
+    writer.u16_be(SerializationType::StateChangeBuilder);
+    writer.u16_be(StateChangeBuilderType::AddOrder);
+  }
+  virtual size_t serialize_get_size () { return 4; }
 };
 
 class CancelOrderStateChange: public wallaroo::StateChange
@@ -297,17 +312,24 @@ public:
   CancelOrderStateChange(uint64_t id_);
   virtual const char* name() { return "cancel order state change"; };
   virtual void apply(wallaroo::State *state_);
-  virtual void to_log_entry(char *bytes_) {}
-  virtual size_t get_log_entry_size() { return 0; }
-  virtual size_t get_log_entry_size_header_size() { return 0; }
-  virtual size_t read_log_entry_size_header(char *bytes_) { return 0; }
-  virtual bool read_log_entry(char *bytes_) { return true; }
+  virtual void to_log_entry(char *bytes_);
+  virtual size_t get_log_entry_size();
+  virtual size_t get_log_entry_size_header_size() { return sizeof(uint32_t); }
+  virtual size_t read_log_entry_size_header(char *bytes_);
+  virtual bool read_log_entry(char *bytes_);
   void update(string& client_id_, string& account_id_, string& order_id_);
 };
 
 class CancelOrderStateChangeBuilder: public wallaroo::StateChangeBuilder
 {
   virtual wallaroo::StateChange *build(uint64_t id_) { return new CancelOrderStateChange(id_); }
+  virtual void serialize (char* bytes_, size_t nsz_)
+  {
+    Writer writer((unsigned char *)bytes_);
+    writer.u16_be(SerializationType::StateChangeBuilder);
+    writer.u16_be(StateChangeBuilderType::CancelOrder);
+  }
+  virtual size_t serialize_get_size () { return 4; }
 };
 
 class ExecuteOrderStateChange: public wallaroo::StateChange
@@ -323,17 +345,24 @@ public:
   ExecuteOrderStateChange(uint64_t id_);
   virtual const char* name() { return "execute order state change"; };
   virtual void apply(wallaroo::State *state_);
-  virtual void to_log_entry(char *bytes_) {}
-  virtual size_t get_log_entry_size() { return 0; }
-  virtual size_t get_log_entry_size_header_size() { return 0; }
-  virtual size_t read_log_entry_size_header(char *bytes_) { return 0; }
-  virtual bool read_log_entry(char *bytes_) { return true; }
+  virtual void to_log_entry(char *bytes_);
+  virtual size_t get_log_entry_size();
+  virtual size_t get_log_entry_size_header_size() { return sizeof(uint32_t); }
+  virtual size_t read_log_entry_size_header(char *bytes_);
+  virtual bool read_log_entry(char *bytes_);
   void update(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
 };
 
 class ExecuteOrderStateChangeBuilder: public wallaroo::StateChangeBuilder
 {
   virtual wallaroo::StateChange *build(uint64_t id_) { return new ExecuteOrderStateChange(id_); }
+  virtual void serialize (char* bytes_, size_t nsz_)
+  {
+    Writer writer((unsigned char *)bytes_);
+    writer.u16_be(SerializationType::StateChangeBuilder);
+    writer.u16_be(StateChangeBuilderType::ExecuteOrder);
+  }
+  virtual size_t serialize_get_size () { return 4; }
 };
 
 class ArizonaDefaultState: public wallaroo::State
