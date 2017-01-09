@@ -55,7 +55,8 @@ enum SerializationType
   PartitionKey = 3,
   StateChangeBuilder = 4,
   PartitionFunction = 5,
-  DefaultComputation = 6
+  DefaultComputation = 6,
+  SourceDecoder = 7
 };
 
 // StateChangeBuilders
@@ -241,6 +242,8 @@ public:
   virtual size_t header_length();
   virtual size_t payload_length(char *bytes);
   virtual wallaroo::Data *decode(char *bytes, size_t sz_);
+  virtual void serialize (char* bytes_, size_t nsz_) { Writer writer((unsigned char *)bytes_); writer.u16_be(SerializationType::SourceDecoder); }
+  virtual size_t serialize_get_size () { return 2; }
 };
 
 class ArizonaSinkEncoder: public wallaroo::SinkEncoder

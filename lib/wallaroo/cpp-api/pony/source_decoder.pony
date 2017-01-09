@@ -11,7 +11,7 @@ use @w_source_decoder_decode[DataP](source_decoder: SourceDecoderP,
 type SourceDecoderP is Pointer[U8] val
 
 class CPPSourceDecoder is FramedSourceHandler[CPPData val]
-  let _source_decoder: SourceDecoderP
+  var _source_decoder: SourceDecoderP
   let _header_length: USize
 
   new create(source_decoder: SourceDecoderP) =>
@@ -32,6 +32,15 @@ class CPPSourceDecoder is FramedSourceHandler[CPPData val]
     else
       error
     end
+
+  fun _serialise_space(): USize =>
+    @w_serializable_serialize_get_size(_source_decoder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    @w_serializable_serialize(_source_decoder, bytes, USize(0))
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _source_decoder = recover @w_user_serializable_deserialize(bytes, USize(0)) end
 
   fun _final() =>
     @w_managed_object_delete(_source_decoder)
