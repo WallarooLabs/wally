@@ -596,22 +596,22 @@ extern "C" {
 
     switch(serialized_type)
     {
-    case 0:
-      // KAGR
-      //return message_from_bytes(remaining_bytes);
-      return nullptr;
-    case 1:
-      return new ArizonaStateComputation();
-    case 2:
-      return new ArizonaSinkEncoder();
-    case 3:
-      return partition_key_from_bytes(remaining_bytes);
-    case 4:
-      return state_change_builder_from_bytes(remaining_bytes);
-    case 5:
-      return new ArizonaPartitionFunction();
-    case SerializationType::DefaultComputation:
-      return new ArizonaDefaultStateComputation();
+      case SerializationType::Message:
+        return message_from_bytes(remaining_bytes);
+      case SerializationType::Computation:
+        return new ArizonaStateComputation();
+      case SerializationType::SinkEncoder:
+        return new ArizonaSinkEncoder();
+      case SerializationType::PartitionKey:
+        return partition_key_from_bytes(remaining_bytes);
+      case SerializationType::StateChangeBuilder:
+        return state_change_builder_from_bytes(remaining_bytes);
+      case SerializationType::PartitionFunction:
+        return new ArizonaPartitionFunction();
+      case SerializationType::DefaultComputation:
+        return new ArizonaDefaultStateComputation();
+      case SerializationType::SourceDecoder:
+        return new ArizonaSourceDecoder();
     }
     // TODO: do something better here
     std::cerr << "Don't know how to deserialize type=" << serialized_type << std::endl;
