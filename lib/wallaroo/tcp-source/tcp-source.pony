@@ -20,7 +20,7 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 actor TCPSource is Producer
   """
   # TCPSource
-
+@
   ## Future work
   * Switch to requesting credits via promise
   """
@@ -373,13 +373,10 @@ actor TCPSource is Producer
           _read_buf.cpointer().usize() + _read_len,
           _read_buf.size() - _read_len) ?
 
-        reads = reads + 1
-
         match len
         | 0 =>
           // Would block, try again later.
           _readable = false
-          _resubscribe_event()
           _reading = false
           return
         | _next_size =>
@@ -387,58 +384,15 @@ actor TCPSource is Producer
           _next_size = _max_size.min(_next_size * 2)
         end
 
-         _read_len = _read_len + len
+        _read_len = _read_len + len
 
-        if _expect != 0 then
+        if _read_len >= _expect then
+          reads = reads + 1
           let data = _read_buf = recover Array[U8] end
           data.truncate(_read_len)
-          _read_len = 0
-
-          _expect_read_buf.append(consume data)
-
-          while (_expect_read_buf.size() > 0) and
-            (_expect_read_buf.size() >= _expect)
-          do
-            let block_size = if _expect != 0 then
-              _expect
-            else
-              _expect_read_buf.size()
-            end
-
-            let out = _expect_read_buf.block(block_size)
-            let osize = block_size
-
-            let carry_on = _notify.received(this, consume out)
-            // We might have become muted while handling the
-            // last batch of data
-            if _muted then
-              _reading = false
-              return
-            end
-            if not carry_on then
-              _read_again()
-              _reading = false
-              return
-            end
-
-            sum = sum + osize
-
-            if (sum >= _max_size) or (reads >= max_reads) then
-              // If we've read _max_size, yield and read again later.
-              _read_again()
-              _reading = false
-              return
-            end
-          end
-        else
-          let data = _read_buf = recover Array[U8] end
-          data.truncate(_read_len)
-          let dsize = _read_len
           _read_len = 0
 
           let carry_on = _notify.received(this, consume data)
-          // We might have become muted while handling the
-          // last batch of data
           if _muted then
             _reading = false
             return
@@ -449,9 +403,9 @@ actor TCPSource is Producer
             return
           end
 
-          sum = sum + dsize
+          sum = sum + len
 
-          if sum >= _max_size then
+          if (sum >= _max_size) or (reads >= max_reads) then
             // If we've read _max_size, yield and read again later.
             _read_again()
             _reading = false
@@ -473,6 +427,7 @@ actor TCPSource is Producer
     """
 
     _pending_reads()
+    _resubscribe_event()
 
   fun ref _read_buf_size(less: USize) =>
     """
