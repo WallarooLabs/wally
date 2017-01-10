@@ -170,8 +170,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     else
       Fail()
     end
-    // DO NOT REMOVE. THIS IS AN INTENTIONAL GC
-    @pony_triggergc[None](this)
 
   fun ref _next_tracking_id(i_origin: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): (U64 | None)

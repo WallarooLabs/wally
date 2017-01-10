@@ -237,8 +237,6 @@ actor Step is (RunnableStep & Resilient & Producer &
         time_spent + pipeline_time_spent)
       _metrics_reporter.worker_metric(metric_name, time_spent)
     end
-    // DO NOT REMOVE. THIS GC TRIGGERING IS INTENTIONAL.
-    @pony_triggergc[None](this)
 
   fun ref next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
