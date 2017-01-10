@@ -619,7 +619,11 @@ uint64_t ArizonaPartitionFunction::partition(wallaroo::Data *data_)
   if (ClientMessage *cm = dynamic_cast<ClientMessage *>(data_))
   {
     string *client = cm->get_client();
+<<<<<<< HEAD
     return new ArizonaPartitionKey(std::stoul(client->c_str() + 4, nullptr));
+=======
+    return std::stoul(client->c_str() + 4, nullptr);
+>>>>>>> ea3c1b009dd4a130184028efbf12efa068e444ca
   }
   // TODO: Really we should come up with a better plan here.
   std::cerr << "could not get a key for message" << std::endl;
