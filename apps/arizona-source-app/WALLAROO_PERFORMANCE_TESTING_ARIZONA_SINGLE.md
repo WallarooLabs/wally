@@ -25,6 +25,54 @@ You can SSH into the AWS machine using:
 ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
 ```
 
+### Generate data
+Before you can run Arizona, you need to generate data for it with the datagen
+app
+
+```
+sudo apt-get install -y pkg-config libconfig++-dev
+cd ~/
+git clone https://github.com/Sendence/arizona.git
+cd ~/arizona
+git checkout state-node-compute
+mkdir build
+cd build
+cmake ..
+make
+cd ~/arizona/bin_cfggen/etc
+../../build/bin_cfggen/bin/datagen -c test_source_app.cfg
+```
+this will create ~/arizona/bin_cfggen/etc/test-source-100k.dat.full and the
+"separate message types" files, if those are what you need to test a specific
+order type. You can even `cat` them together if you need combinations (e.g.
+orders + cancels) - they just won't be interleaved.
+
+#### Create a really small file (150000 message) that you can loop through, should not have memory growth
+
+(have a specific .cfg file for this)
+
+(Each order needs a correspoding cancel or execute message, use `pairgen`, use the `full` file)
+
+TODO
+
+#### Create a 15 minute data set (do we crash?)
+
+(have a specific .cfg file for this)
+
+TODO
+
+#### Create a 60 minute data set (are there long-term problems?)
+
+(have a specific .cfg file for this)
+
+TODO
+
+#### Create an 8 hour data set (does this work for the full 8 hours?)
+
+(have a specific .cfg file for this)
+
+TODO
+
 ### Clone Wallaroo repo
 
 You'll need to clone the repo:
@@ -155,31 +203,13 @@ If you need to restart the UI, this can be accomplished by:
 docker stop mui && docker start mui
 ```
 
-### Generate data
-Before you can run Arizona, you need to generate data for it with the datagen
-app
 
-```
-sudo apt-get install -y pkg-config libconfig++-dev
-cd ~/
-git clone https://github.com/Sendence/arizona.git
-cd ~/arizona
-git checkout state-node-compute
-mkdir build
-cd build
-cmake ..
-make
-cd ~/arizona/bin_cfggen/etc
-../../build/bin_cfggen/bin/datagen -c test_source_app.cfg
-```
-this will create ~/arizona/bin_cfggen/etc/test-source-100k.dat.full and the
-"separate message types" files, if those are what you need to test a specific
-order type. You can even `cat` them together if you need combinations (e.g.
-orders + cancels) - they just won't be interleaved.
 
 ### Running Arizona
 
 You'll need to have 3 terminals available. 1 for giles sender, 1 for giles receiver, and 1 for the application:
+
+#### Running the Receiver
 
 Giles receiver needs to be running before arizona:
 ```
@@ -187,15 +217,43 @@ cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555 -t
 ```
 
+#### Running the application
+
 ```
 cd ~/buffy/apps/arizona-source-app
 sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
 ```
 
+#### Running the Sender
+
 To run the Orders Sender:
+
+##### With Looping (for the pairgen'd file)
+
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-100k.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-looping.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+```
+
+##### For the 15 minute run
+
+```
+cd ~/buffy
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-15-minute.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+```
+
+##### For the 60 minute run
+
+```
+cd ~/buffy
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-60-minute.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+```
+
+##### For the 8 hour run
+
+```
+cd ~/buffy
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-8-hour.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 #### 2 MACHINES
@@ -209,3 +267,4 @@ sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source
 Machine 2:
 ```
 sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c <INITIALIZER>:12500 -d <INITIALIZER>:12501 --ponythreads 4 --ponypinasio --ponynoblock -n worker2 -w 2
+```
