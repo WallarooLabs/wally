@@ -10,7 +10,7 @@ your `orchestration/arizona` directory.
 Once set up, an AWS cluster can be started with the following command:
 
 ```bash
-make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=36 num_followers=0 force_instance=c4.8xlarge spot_bid_factor=100 ansible_system_cpus=0,18 ansible_isolcpus=false no_spot=true
+make cluster cluster_name=<CLUSTER_NAME> num_followers=<NUMBER_FOLLOWERS> force_instance=r3.4xlarge arizona_node_type=build ansible_system_cpus=0,8
 ```
 
 You'll get a response ending with something similar to this if successful:
@@ -22,12 +22,11 @@ PLAY RECAP *********************************************************************
 You can SSH into the AWS machine using:
 
 ```bash
-ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
+ssh -i ~/.ssh/ec2/us-east-1.pem ec2-user@<IP_ADDRESS>
 ```
 
 ### Generate data
-Before you can run Arizona, you need to generate data for it with the datagen
-app.
+Before you can run Arizona, you need to generate data for it with the datagen app. This can take some time (depending on how large of a dataset you are building), so do this step first.
 
 ```
 sudo apt-get install -y pkg-config libconfig++-dev
