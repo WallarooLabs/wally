@@ -50,6 +50,7 @@ At this point, you will be ready to generate data. The options are:
 ../../build/bin_cfggen/bin/pairgen -c pairgen_150K.cfg
 ```
 Your data files will appear in: /apps/dev/arizona/pairgen_150K.dat[*]
+
 Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
 
