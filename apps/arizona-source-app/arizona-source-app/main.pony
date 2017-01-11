@@ -88,7 +88,7 @@ primitive StateFilterBuilder[In: Any val]
 actor Main
   var _clients: USize = 750
   new create(env: Env) =>
-    var options = Options(env.args)
+    var options = Options(env.args, false)
     options.add("clients", None, I64Argument)
     for option in options do
       match option
