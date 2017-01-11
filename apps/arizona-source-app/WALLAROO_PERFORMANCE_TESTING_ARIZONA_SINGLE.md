@@ -5,7 +5,7 @@ If you have not followed the setup instructions in the orchestration/terraform [
 ## Configuring Cluster:
 
 Before configuring your cluster, make sure you are in
-your `orchestration/terraform` directory.
+your `orchestration/arizona` directory.
 
 Once set up, an AWS cluster can be started with the following command:
 
@@ -27,7 +27,7 @@ ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
 
 ### Generate data
 Before you can run Arizona, you need to generate data for it with the datagen
-app
+app.
 
 ```
 sudo apt-get install -y pkg-config libconfig++-dev
@@ -40,38 +40,45 @@ cd build
 cmake ..
 make
 cd ~/arizona/bin_cfggen/etc
-../../build/bin_cfggen/bin/datagen -c test_source_app.cfg
+mkdir -p /apps/dev/arizona/data
 ```
-this will create ~/arizona/bin_cfggen/etc/test-source-100k.dat.full and the
-"separate message types" files, if those are what you need to test a specific
-order type. You can even `cat` them together if you need combinations (e.g.
-orders + cancels) - they just won't be interleaved.
+
+At this point, you will be ready to generate data. The options are:
 
 #### Create a really small file (150000 message) that you can loop through, should not have memory growth
 
-(have a specific .cfg file for this)
+```
+../../build/bin_cfggen/bin/pairgen -c pairgen_150K.cfg
+```
+Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
-(Each order needs a correspoding cancel or execute message, use `pairgen`, use the `full` file)
 
-TODO
 
 #### Create a 15 minute data set (do we crash?)
 
-(have a specific .cfg file for this)
+```
+../../build/bin_cfggen/bin/pairgen -c data_15min.cfg
+```
 
-TODO
+Do not use the files for looping.
 
 #### Create a 60 minute data set (are there long-term problems?)
 
-(have a specific .cfg file for this)
+```
+../../build/bin_cfggen/bin/pairgen -c data_1hour.cfg
+```
 
-TODO
+Do not use the files for looping.
 
 #### Create an 8 hour data set (does this work for the full 8 hours?)
 
-(have a specific .cfg file for this)
 
-TODO
+```
+../../build/bin_cfggen/bin/pairgen -c data_8hour.cfg
+```
+
+Do not use the files for looping.
+
 
 ### Clone Wallaroo repo
 
