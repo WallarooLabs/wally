@@ -256,15 +256,26 @@ cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-8-hour.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
-#### 2 MACHINES
-Make sure you have the same binary on both machines or you'll get segfaults with serialization.
+#### 2 MACHINES/2 WORKERS
+Make sure you have the same binary on both machines or you'll get segfaults with serialization. Compile the binary on Machine 1 and use `scp` to copy to the other machine:
 
-Machine 1:
+`scp -i ~/.ssh/us-east-1.pem arizona-binary ubuntu@<TARGET-MACHINE-IP>:~/path/to/copy/to`
+
+On each machine, run Giles receiver before arizona:
+```
+cd ~/buffy
+sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555 -t
+```
+
+Run Arizona on Machine 1:
 ```
 sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 4 --ponypinasio --ponynoblock -t -w 2
 ```
 
-Machine 2:
+Run Arizona on Machine 2:
 ```
 sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c <INITIALIZER>:12500 -d <INITIALIZER>:12501 --ponythreads 4 --ponypinasio --ponynoblock -n worker2 -w 2
 ```
+
+Orders Sender on Machine 1:
+Follow instructions in 1 MACHINE run section
