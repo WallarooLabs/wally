@@ -446,15 +446,17 @@ AdminMessage::~AdminMessage()
 {
   delete _client;
   delete _account;
+  delete _aggunit;
 }
 
 void AdminMessage::from_bytes(char *bytes_)
 {
   Reader reader((unsigned char *)bytes_);
 
-  _request_type = reader.u16_be();
+  _request_type = (AdminRequestType) reader.u16_be();
   _client = reader.arizona_string();
   _account = reader.arizona_string();
+  _aggunit = reader.arizona_string();
 }
 
 void AdminMessage::serialize(char* bytes_, size_t nsz_)
@@ -468,6 +470,7 @@ void AdminMessage::serialize(char* bytes_, size_t nsz_)
   writer.u16_be(_request_type);
   writer.arizona_string(_client);
   writer.arizona_string(_account);
+  writer.arizona_string(_aggunit);
 }
 
 size_t AdminMessage::serialize_get_size()
@@ -962,6 +965,21 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
   if (AdminMessage *am = dynamic_cast<AdminMessage *>(input_))
   {
     uint64_t message_id = am->get_message_id();
+    switch(am->get_request_type())
+    {
+      case AdminRequestType::CreateAggUnit:
+        //TODO: add aggunit to client
+        break;
+      case AdminRequestType::QueryAggUnit:
+        //TODO: query aggunit
+        break;
+      case AdminRequestType::AddAggUnit:
+        //TODO: add account to agguint
+        break;
+      case AdminRequestType::RemoveAggUnit:
+        //TODO: delete account from aggunit
+        break;
+    }
     ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
     return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
   }

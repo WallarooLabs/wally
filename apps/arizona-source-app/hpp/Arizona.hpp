@@ -68,7 +68,6 @@ enum StateChangeBuilderType
 };
 
 // Messages
-
 enum MessageType
 {
   Config = 0,
@@ -77,6 +76,14 @@ enum MessageType
   Execute = 3,
   Admin = 4,
   Proceeds = 5
+};
+
+enum AdminRequestType
+{
+  CreateAggUnit = 0,
+  QueryAggUnit = 1,
+  AddAggUnit = 2,
+  RemoveAggUnit = 3
 };
 
 class ClientMessage: public wallaroo::Data
@@ -107,8 +114,6 @@ public:
   virtual uint32_t get_client_id() { return _client_id; }
   virtual string str();
 };
-
-
 
 class OrderMessage: /*public wallaroo::Data,*/ public ClientMessage
 {
@@ -200,13 +205,16 @@ class AdminMessage: /*public wallaroo::Data, */public ClientMessage
 private:
   uint64_t _message_id;
   uint32_t _client_id;
-  uint16_t _request_type;
+  AdminRequestType _request_type;
   string *_client;
   string *_account;
+  string *_aggunit;
 public:
   AdminMessage(uint64_t message_id_, uint32_t client_id);
   virtual ~AdminMessage();
   virtual string *get_client() { return _client; }
+  virtual string *get_account() { return _account; }
+  virtual string *get_aggunit() { return _aggunit; }
   virtual uint32_t get_client_id() { return _client_id; }
   virtual uint64_t get_message_id() { return _message_id; }
   virtual uint16_t get_request_type() { return _request_type; }
