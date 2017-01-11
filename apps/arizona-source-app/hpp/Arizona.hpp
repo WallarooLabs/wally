@@ -102,7 +102,7 @@ public:
   virtual ~ConfigMessage();
   uint64_t get_message_id() { return _message_id; }
   virtual void from_bytes(char *bytes_) { }
-  virtual int get_message_type() { return -1; }
+  virtual int get_message_type() { return MessageType::Config; }
   virtual string *get_client() { return new string(""); }
   virtual uint32_t get_client_id() { return _client_id; }
   virtual string str();
@@ -138,7 +138,7 @@ public:
   virtual void from_bytes(char *bytes_);
   virtual void serialize(char* bytes_, size_t nsz_);
   virtual size_t serialize_get_size();
-  virtual int get_message_type() { return 1; }
+  virtual int get_message_type() { return MessageType::Order; }
   virtual string str();
 };
 
@@ -162,7 +162,7 @@ public:
   virtual void from_bytes(char *bytes_);
   virtual void serialize(char* bytes_, size_t nsz_);
   virtual size_t serialize_get_size();
-  virtual int get_message_type() { return 2; }
+  virtual int get_message_type() { return MessageType::Cancel; }
   virtual string str();
 };
 
@@ -191,7 +191,7 @@ public:
   virtual void from_bytes(char *bytes_);
   virtual void serialize(char* bytes_, size_t nsz_);
   virtual size_t serialize_get_size();
-  virtual int get_message_type() { return 2; }
+  virtual int get_message_type() { return MessageType::Execute; }
   virtual string str();
 };
 
@@ -209,10 +209,11 @@ public:
   virtual string *get_client() { return _client; }
   virtual uint32_t get_client_id() { return _client_id; }
   virtual uint64_t get_message_id() { return _message_id; }
+  virtual uint16_t get_request_type() { return _request_type; }
   virtual void from_bytes(char *bytes);
   virtual void serialize(char* bytes_, size_t nsz_);
   virtual size_t serialize_get_size();
-  virtual int get_message_type() { return 4; }
+  virtual int get_message_type() { return MessageType::Admin; }
   virtual string str();
 };
 
