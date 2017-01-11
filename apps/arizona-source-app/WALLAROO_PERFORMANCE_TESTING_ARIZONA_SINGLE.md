@@ -44,11 +44,12 @@ mkdir -p /apps/dev/arizona/data
 
 At this point, you will be ready to generate data. The options are:
 
-#### Create a really small file (150000 message) that you can loop through, should not have memory growth
+#### Create a really small file (150K message) that you can loop through, should not have memory growth
 
 ```
 ../../build/bin_cfggen/bin/pairgen -c pairgen_150K.cfg
 ```
+Your data files will appear in: /apps/dev/arizona/pairgen_150K.dat[*]
 Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
 
