@@ -28,6 +28,7 @@ use "wallaroo/topology"
 use "wallaroo/tcp-source"
 use "wallaroo/cpp-api/pony"
 use "debug"
+use "options"
 
 use @get_partition_key[KeyP](client_id: U64)
 use @get_partition_function[PartitionFunctionP]()
@@ -85,10 +86,19 @@ primitive StateFilterBuilder[In: Any val]
     StateFilter[In]
 
 actor Main
+  var _clients: USize = 750
   new create(env: Env) =>
+    var options = Options(env.args)
+    options.add("clients", None, I64Argument)
+    for option in options do
+      match option
+      | ("clients", let arg: I64) => _clients = arg.usize()
+      end
+    end
+    @printf[I32]("Application has %u clients".cstring(), _clients)
     try
       let partition_function = recover val CPPPartitionFunctionU64(@get_partition_function()) end
-      let partition_keys: Array[U64] val = partition_factory(10000, 10750)
+      let partition_keys: Array[U64] val = partition_factory(10000, 10000 + _clients)
       let data_partition = Partition[CPPData val, U64](partition_function, partition_keys)
 
       let application = recover val
