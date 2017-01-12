@@ -38,9 +38,14 @@ ssh -i ~/.ssh/ec2/us-east-1.pem ec2-user@<IP_ADDRESS>
 ```
 
 # Ubuntu cluster
+If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
 ## Configuring Cluster:
-make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=36 num_followers=0 force_instance=c4.8xlarge spot_bid_factor=100 ansible_system_cpus=0,18 ansible_isolcpus=false no_spot=true
 
+Before configuring your cluster, make sure you are in
+your `orchestration/terraform` directory.
+```
+make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=36 num_followers=0 force_instance=c4.8xlarge spot_bid_factor=100 ansible_system_cpus=0,18 ansible_isolcpus=false no_spot=true
+```
 You'll get a response ending with something similar to this if successful:
 ```bash
 PLAY RECAP *********************************************************************
