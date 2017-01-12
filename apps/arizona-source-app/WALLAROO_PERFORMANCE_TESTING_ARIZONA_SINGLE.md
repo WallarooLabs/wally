@@ -43,7 +43,7 @@ As for how long it will take to generate your data, a good rule of thumb is to h
 #### Build spdlog
 **Note:**You don't have to do this if you are using the arizona-build-server
 ```
-*scl enable devtoolset-4 bash* -- only for redhat executuon machines
+scl enable devtoolset-4 bash //only for redhat executuon machines
 cd ~/
 git clone https://github.com/gabime/spdlog.git
 cd ~/spdlog
@@ -56,7 +56,7 @@ sudo make install
 #### Build Arizona-CPP
 **Note:**You don't have to do this if you are using the arizona-build-server
 ```
-*scl enable devtoolset-4 bash* -- only for redhat executuon machines
+scl enable devtoolset-4 bash //only for redhat executuon machines
 cd ~/buffy
 git checkout arizona-add-state
 cd lib/wallaroo/cpp-api/cpp/cppapi
@@ -68,7 +68,7 @@ sudo make install
 
 #### The Arizona Ancillary Tools (AZAT)
 ```
-*scl enable devtoolset-4 bash* -- only for redhat executuon machines
+scl enable devtoolset-4 bash //only for redhat executuon machines
 export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:PKG_CONFIG_PATH
 cd ~/
 git clone https://github.com/Sendence/arizona.git
