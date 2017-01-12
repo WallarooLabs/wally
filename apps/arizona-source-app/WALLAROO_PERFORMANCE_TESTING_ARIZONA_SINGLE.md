@@ -281,7 +281,7 @@ sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/
 
 ```
 cd ~/buffy/apps/arizona-source-app
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 --clients=5500
 ```
 
 #### Running the Sender
@@ -329,12 +329,12 @@ sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/
 
 Run Arizona on Machine 1:
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 4 --ponypinasio --ponynoblock -t -w 2
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 4 --ponypinasio --ponynoblock -t -w 2 --clients=5500
 ```
 
 Run Arizona on Machine 2:
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c <INITIALIZER>:12500 -d <INITIALIZER>:12501 --ponythreads 4 --ponypinasio --ponynoblock -n worker2 -w 2
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c <INITIALIZER>:12500 -d <INITIALIZER>:12501 --ponythreads 4 --ponypinasio --ponynoblock -n worker2 -w 2 --clients=5500
 ```
 
 Orders Sender on Machine 1:
