@@ -35,17 +35,42 @@ ssh -i ~/.ssh/ec2/us-east-1.pem ec2-user@<IP_ADDRESS>
 Before you can run Arizona, you need to generate data for it with the datagen app. This can take some time (depending on how large of a dataset you are building), so do this step first.
 
 As for how long it will take to generate your data, a good rule of thumb is to halve the time you want to generate. So, if you want to generate 20 mins of data, it will take 10 mins to do. If you want to do 1 hour, it will take 30 mins... etc.
-
+### Build spdlog
 ```
-sudo apt-get install -y pkg-config libconfig++-dev
+scl enable devtoolset-4 bash
+cd ~/
+git clone https://github.com/gabime/spdlog.git
+cd ~/spdlog
+mkdir build
+cd build
+cmake ..
+sudo make install
+```
+
+### Build Arizona-CPP
+```
+scl enable devtoolset-4 bash
+cd ~/buffy
+git checkout arizona-add-state
+cd lib/wallaroo/cpp-api/cpp/cppapi
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+sudo make install
+```
+
+### The Arizona Ancillary Tools (AZAT)
+```
+scl enable devtoolset-4 bash
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:PKG_CONFIG_PATH
 cd ~/
 git clone https://github.com/Sendence/arizona.git
 cd ~/arizona
 git checkout state-node-compute
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/apps/dev/arizona ..
-make
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/apps/dev/arizona ../
+sudo make install
 cd ~/arizona/bin_cfggen/etc
 ssh ec2-user@EXECUTION_HOST_IP -e "mkdir -p /apps/dev/arizona"
 ssh ec2-user@EXECUTION_HOST_IP -e "mkdir -p /apps/dev/arizona/etc"
