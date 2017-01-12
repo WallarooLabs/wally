@@ -7,8 +7,8 @@ If you have not followed the setup instructions in the orchestration/terraform [
 Before configuring your cluster, make sure you are in
 your `orchestration/arizona` directory.
 
-Arizona has two different kinds of machiens, build and execution.
-*This document assumes you build all binaries on a build machine and then copy them onto the execution machiens.*
+Arizona has two different kinds of machiens, build and execution.      
+**This document assumes you build all binaries on a build machine and then copy them onto the execution machiens.**
 To create a build machine, use:
 ```
 make cluster cluster_name=<CLUSTER_NAME> num_followers=<NUMBER_FOLLOWERS> force_instance=r3.4xlarge arizona_node_type=build ansible_system_cpus=0,8
