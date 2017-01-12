@@ -78,6 +78,7 @@ sudo make install
 ```
 scl enable devtoolset-4 bash //only for redhat executuon machines
 cd ~/buffy
+https://github.com/Sendence/arizona.git
 git checkout arizona-add-state
 cd lib/wallaroo/cpp-api/cpp/cppapi
 mkdir build
