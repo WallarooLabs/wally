@@ -116,6 +116,8 @@ wallaroo::StateChangeBuilder *state_change_builder_from_bytes(char *bytes_)
       return new CancelOrderStateChangeBuilder();
     case StateChangeBuilderType::ExecuteOrder:
       return new ExecuteOrderStateChangeBuilder();
+    case StateChangeBuilderType::CreateAggUnit:
+      return new CreateAggUnitStateChangeBuilder();
   }
   // TODO: This should be an error
   return nullptr;
@@ -677,6 +679,26 @@ void ArizonaState::execute_order(string& client_id_, string& account_id_, string
   _clients.execute(client_id_, account_id_, order_id_, execution_id_, quantity_, price_);
 }
 
+void ArizonaState::create_agg_unit(string& client_id_, string& agg_unit_id_)
+{
+  _clients.create_agg_unit(client_id_, agg_unit_id_);
+}
+
+class Proceeds ArizonaState::proceeds_for_agg_unit(string& client_id_, string& agg_unit_id_)
+{
+  return _clients.proceeds_for_agg_unit(client_id_, agg_unit_id_);
+}
+
+void ArizonaState::add_account_to_agg_unit(string& client_id_, string& account_id_, string& agg_unit_id_)
+{
+  _clients.add_account_to_agg_unit(client_id_, account_id_, agg_unit_id_);
+}
+
+void ArizonaState::remove_account_from_agg_unit(string& client_id_, string& account_id_, string& agg_unit_id_)
+{
+  _clients.remove_account_from_agg_unit(client_id_, account_id_, agg_unit_id_);
+}
+
 AddOrderStateChange::AddOrderStateChange(uint64_t id_): StateChange(id_), _client_id(), _account_id(), _isin_id(), _order_id(), _quantity(0), _price(0.0)
 {
 }
@@ -714,11 +736,11 @@ void AddOrderStateChange::to_log_entry(char *bytes_)
 }
 size_t AddOrderStateChange::get_log_entry_size()
 {
-  return _client_id.size() + 
-  _account_id.size() + 
-  _isin_id.size() + 
+  return _client_id.size() +
+  _account_id.size() +
+  _isin_id.size() +
   _order_id.size() +
-  sizeof(uint16_t) + 
+  sizeof(uint16_t) +
   sizeof(uint32_t) +
   sizeof(double);
 }
@@ -754,8 +776,8 @@ void CancelOrderStateChange::to_log_entry(char *bytes_)
 }
 size_t CancelOrderStateChange::get_log_entry_size()
 {
-  return _client_id.size() + 
-  _account_id.size() + 
+  return _client_id.size() +
+  _account_id.size() +
   _order_id.size();
 }
 size_t CancelOrderStateChange::read_log_entry_size_header(char *bytes_)
@@ -815,10 +837,10 @@ void ExecuteOrderStateChange::to_log_entry(char *bytes_)
 
 size_t ExecuteOrderStateChange::get_log_entry_size()
 {
-  return _client_id.size() + 
-  _account_id.size() + 
+  return _client_id.size() +
+  _account_id.size() +
   _order_id.size() +
-  _execution_id.size() + 
+  _execution_id.size() +
   sizeof(uint32_t) +
   sizeof(double);
 }
@@ -844,6 +866,50 @@ void ExecuteOrderStateChange::apply(wallaroo::State *state_)
 {
   ArizonaState *az_state = (ArizonaState *)state_;
   az_state->execute_order(_client_id, _account_id, _order_id, _execution_id, _quantity, _price);
+}
+
+CreateAggUnitStateChange::CreateAggUnitStateChange(uint64_t id_):
+  StateChange(id_), _client_id(), _agg_unit_id()
+{
+}
+
+void CreateAggUnitStateChange::update(string& client_id_, string& agg_unit_id_)
+{
+  _client_id = client_id_;
+  _agg_unit_id = agg_unit_id_;
+}
+
+void CreateAggUnitStateChange::to_log_entry(char *bytes_)
+{
+  Writer writer((unsigned char *)bytes_);
+  writer.u32_be(get_log_entry_size());
+  writer.arizona_string(&_client_id);
+  writer.arizona_string(&_agg_unit_id);
+}
+
+size_t CreateAggUnitStateChange::get_log_entry_size()
+{
+  return 2 + _client_id.size() +
+    2 + _agg_unit_id.size();
+}
+
+size_t CreateAggUnitStateChange::read_log_entry_size_header(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  return reader.u32_be();
+}
+bool CreateAggUnitStateChange::read_log_entry(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  _client_id = *reader.arizona_string();
+  _agg_unit_id = *reader.arizona_string();
+  return true;
+}
+
+void CreateAggUnitStateChange::apply(wallaroo::State *state_)
+{
+  ArizonaState *az_state = (ArizonaState *)state_;
+  az_state->create_agg_unit(_client_id, _agg_unit_id);
 }
 
 class Proceeds ArizonaDefaultState::proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_)
@@ -967,7 +1033,7 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
     uint64_t message_id = am->get_message_id();
     switch(am->get_request_type())
     {
-      case AdminRequestType::CreateAggUnit:
+      case AdminRequestType::CreateAggUnitRequest:
         //TODO: add aggunit to client
         break;
       case AdminRequestType::QueryAggUnit:
@@ -997,6 +1063,8 @@ wallaroo::StateChangeBuilder *ArizonaStateComputation::get_state_change_builder(
       return new CancelOrderStateChangeBuilder();
     case StateChangeBuilderType::ExecuteOrder:
       return new ExecuteOrderStateChangeBuilder();
+    case StateChangeBuilderType::CreateAggUnit:
+      return new CreateAggUnitStateChangeBuilder();
   }
   // TODO: This should be an error
   return nullptr;

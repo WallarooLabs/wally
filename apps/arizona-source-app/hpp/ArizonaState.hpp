@@ -137,6 +137,7 @@ public:
   Proceeds proceeds_with_order(string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& isin_id_, string& order_id_);
   Proceeds proceeds_with_execute(string& isin_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
+  Proceeds all_proceeds();
 };
 
 class Account
@@ -157,6 +158,7 @@ public:
   Proceeds proceeds_with_cancel(string& order_id_);
   Proceeds proceeds_with_execute(string& isin_id, string& order_id_, string& execution_id_, uint32_t quantity, double price);
   Proceeds proceeds_with_execute(string& order_id_, string& execution_id_, uint32_t quantity, double price);
+  Proceeds all_proceeds();
   void associate_order_id_to_isin_id(string& order_id_, string& isin_id_);
   void disassociate_order_id_to_isin_id(string& order_id_, string& isin_id_);
 };
@@ -165,11 +167,11 @@ class Accounts
 {
 private:
   map<string, Account *> _accounts;
-  Account *_account_by_account_id(string& account_id_);
   Account *_add_account(string& account_id_);
 public:
   Accounts();
   ~Accounts();
+  Account *account_by_account_id(string& account_id_);
   void add_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   void cancel_order(string& account_id_, string& order_id_);
   void execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
@@ -179,10 +181,35 @@ public:
   Proceeds proceeds_with_execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
 };
 
+class AggUnit
+{
+private:
+  string _agg_unit_id;
+  vector<Account *> _accounts;
+public:
+  AggUnit(string& agg_unit_id_);
+  Proceeds proceeds();
+  void add_account(Account *account_);
+  void remove_account(Account *account_);
+};
+
+class AggUnits
+{
+private:
+  map<string, AggUnit> _agg_unit_id_to_agg_unit;
+public:
+  AggUnits();
+  void create_agg_unit(string& agg_unit_id_);
+  Proceeds proceeds_for_agg_unit(string& agg_unit_id_);
+  void add_account(string& agg_unit_id_, Account *account_);
+  void remove_account(string& agg_unit_id_, Account *account_);
+};
+
 class Client
 {
 private:
   Accounts _accounts;
+  AggUnits _agg_units;
   string _client_id;
 public:
   Client(string& client_id_);
@@ -193,6 +220,10 @@ public:
   Proceeds proceeds_with_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& account_id_, string& order_id_);
   Proceeds proceeds_with_execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
+  Proceeds proceeds_for_agg_unit(string& agg_unit_id_);
+  void create_agg_unit(string& agg_unit_id_);
+  void add_account_to_agg_unit(string& account_id_, string& agg_unit_id_);
+  void remove_account_from_agg_unit(string& account_id_, string& agg_unit_id_);
 };
 
 class Clients
@@ -211,6 +242,10 @@ public:
   Proceeds proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& client_id_, string& account_id_, string& order_id_);
   Proceeds proceeds_with_execute(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
+  Proceeds proceeds_for_agg_unit(string& client_id_, string& agg_unit_id_);
+  void create_agg_unit(string& client_id_, string& agg_unit_id_);
+  void add_account_to_agg_unit(string& client_id_, string& agg_unit_id_, string& account_id_);
+  void remove_account_from_agg_unit(string& client_id_, string& agg_unit_id_, string& account_id_);
 };
 
 #endif // __ARIZONA_STATE_HPP__

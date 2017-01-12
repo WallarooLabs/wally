@@ -404,6 +404,31 @@ bool test_clients_proceeds_with_execution()
   Proceeds p2 = clients.proceeds_with_execute(client_id, account_id, order_id2, execution_id2, 500, 12.00);
   return p1 == p2;
 }
+
+bool test_clients_with_agg_unit()
+{
+  Clients clients;
+  string client_id("c1");
+  string agg_unit_id("au1");
+  string account_id1("a1");
+  string account_id2("a2");
+  string isin_id("i1");
+  string order_id1("o1");
+  string order_id2("o2");
+  string execution_id1("e1");
+  string execution_id2("e2");
+  clients.add_order(client_id, account_id1, isin_id, order_id1, Side::Buy, 2100, 12.50);
+  clients.add_order(client_id, account_id2, isin_id, order_id2, Side::Sell, 1500, 12.0);
+  clients.execute(client_id, account_id1, order_id1, execution_id1, 500, 12.50);
+  clients.execute(client_id, account_id2, order_id2, execution_id2, 500, 12.00);
+  clients.create_agg_unit(client_id, agg_unit_id);
+  clients.add_account_to_agg_unit(client_id, account_id1, agg_unit_id);
+  clients.add_account_to_agg_unit(client_id, account_id2, agg_unit_id);
+  Proceeds p1 = Proceeds(6000.0, 6250.0, 12000.0, 20000.0, "");
+  Proceeds p2 = clients.proceeds_for_agg_unit(client_id, agg_unit_id);
+  return p1 == p2;
+}
+
 #define TEST(TEST_NAME) if (TEST_NAME()) { printf("passed: " #TEST_NAME "\n"); } else { printf("FAILED: " #TEST_NAME "\n"); }
 
 int main(int argc, char** argv)
@@ -433,5 +458,6 @@ int main(int argc, char** argv)
   TEST(test_clients_with_executions);
   TEST(test_clients_proceeds_with_cancel_partially_filled_orders);
   TEST(test_clients_proceeds_with_execution);
+  TEST(test_clients_with_agg_unit);
   return 0;
 }
