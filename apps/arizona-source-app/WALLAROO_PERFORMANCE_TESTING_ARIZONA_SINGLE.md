@@ -62,7 +62,7 @@ ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
 Before you can run Arizona, you need to generate data for it with the datagen app. This can take some time (depending on how large of a dataset you are building), so do this step first.
 
 As for how long it will take to generate your data, a good rule of thumb is to halve the time you want to generate. So, if you want to generate 20 mins of data, it will take 10 mins to do. If you want to do 1 hour, it will take 30 mins... etc.
-
+### Building data generation tools
 #### Build libconfig
 **Please note:** this is only needed on the machines where `datagen`, `pairgen`, etc. will be built.
 ```
@@ -127,7 +127,7 @@ scp -i YOUR_PEM_FILE -r /apps/dev/arizona ec2-user@EXECUTION_HOST_IP:/apps/dev/a
 ```
 
 At this point, you will be ready to generate data. Log into the executon host that you copied your files to. The options are:
-
+### Actual data generation
 #### Create a really small file (150K message) that you can loop through, should not have memory growth
 
 ```
