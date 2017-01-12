@@ -2,6 +2,7 @@
 
 If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
 
+# Arizona Cluster
 ## Configuring Cluster:
 
 Before configuring your cluster, make sure you are in
@@ -23,6 +24,22 @@ To create execution machines, use:
 ```bash
 make cluster cluster_name=###REPLACE_ME### num_followers=###NUM_FOLLOWERS##
 ```
+
+You'll get a response ending with something similar to this if successful:
+```bash
+PLAY RECAP *********************************************************************
+54.165.9.39                : ok=70   changed=39   unreachable=0    failed=0
+```
+
+You can SSH into the build machine using:
+
+```bash
+ssh -i ~/.ssh/ec2/us-east-1.pem ec2-user@<IP_ADDRESS>
+```
+
+# Ubuntu cluster
+## Configuring Cluster:
+make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=36 num_followers=0 force_instance=c4.8xlarge spot_bid_factor=100 ansible_system_cpus=0,18 ansible_isolcpus=false no_spot=true
 
 You'll get a response ending with something similar to this if successful:
 ```bash
