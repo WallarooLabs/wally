@@ -6,7 +6,7 @@ use "sendence/tcp"
 
 
 actor Main
-  
+
   new create(env: Env) =>
     var options = Options(env.args)
     var args = options.remaining()
@@ -42,13 +42,13 @@ actor Main
     env.out.print("\t" + node_name + ": phone_home_service: " + phone_home_service)
     DagonChild(env, node_name, phone_home_host, phone_home_service)
 
-    
+
 actor DagonChild
   let _env: Env
   let node_name: String
   var _conn: (TCPConnection | None) = None
 
-  
+
   new create(env: Env, node_name': String, host: String, service:String) =>
     _env = env
     node_name = node_name'
@@ -62,8 +62,8 @@ actor DagonChild
       send_topology_ready()
     else
       _env.out.print("\t" + node_name + ": Couldn't get ambient authority")
-    end   
-    
+    end
+
   be send_ready() =>
     """
     Send a "ready" message back to Dagon.
@@ -92,7 +92,7 @@ actor DagonChild
       else
         _env.out.print("\t" + node_name + ": Failed sending topology ready")
       end
-    end    
+    end
 
   be send_done() =>
     """
@@ -108,7 +108,7 @@ actor DagonChild
         _env.out.print("\t" + node_name + ": Failed sending done")
       end
     end
-    
+
   be send_done_shutdown() =>
     """
     Send a "done_shutdown" message back to Dagon.
@@ -122,8 +122,8 @@ actor DagonChild
       else
         _env.out.print("\t" + node_name + ": Failed sending done_shutdown")
       end
-    end   
-    
+    end
+
   be start() =>
     _env.out.print("\t" + node_name + ": Starting...")
     // fake some work here
@@ -131,7 +131,7 @@ actor DagonChild
     let timer = Timer(FakeWork(_env, node_name, this, 10), 0, 10_000_000_000)
     timers(consume timer)
 
-    
+
   be shutdown() =>
     if (_conn isnt None) then
       _env.out.print("\t" + node_name + ": Shutting down " + node_name)
@@ -144,7 +144,7 @@ actor DagonChild
       end
     end
 
-    
+
 class HomeConnectNotify is TCPConnectionNotify
   let _env: Env
   let _child: DagonChild
@@ -159,7 +159,9 @@ class HomeConnectNotify is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("\t" + node_name + ": Dagon accepted connection")
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
     // parse Dagon command
     for chunked in _framer.chunk(consume data).values() do
       try
@@ -180,12 +182,12 @@ class HomeConnectNotify is TCPConnectionNotify
       end
     end
     true
-    
+
   fun ref closed(conn: TCPConnection ref) =>
     _env.out.print("\t" + node_name + ": server closed connection")
 
 
-class FakeWork is TimerNotify  
+class FakeWork is TimerNotify
   let _env: Env
   var _counter: U64
   let _limit: U64
