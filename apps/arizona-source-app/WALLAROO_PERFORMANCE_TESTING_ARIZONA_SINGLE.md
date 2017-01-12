@@ -2,8 +2,8 @@
 
 If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
 
-# Arizona Cluster
-## Configuring Cluster:
+## Arizona Cluster
+### Configuring Cluster:
 
 Before configuring your cluster, make sure you are in
 your `orchestration/arizona` directory.
@@ -37,9 +37,9 @@ You can SSH into the build machine using:
 ssh -i ~/.ssh/ec2/us-east-1.pem ec2-user@<IP_ADDRESS>
 ```
 
-# Ubuntu cluster
+## Ubuntu cluster
 If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
-## Configuring Cluster:
+### Configuring Cluster:
 
 Before configuring your cluster, make sure you are in
 your `orchestration/terraform` directory.
