@@ -10,7 +10,7 @@ your `orchestration/arizona` directory.
 Once set up, an AWS cluster can be started with the following command:
 
 ```bash
-make cluster cluster_name=<CLUSTER_NAME> num_followers=<NUMBER_FOLLOWERS> force_instance=r3.4xlarge arizona_node_type=build ansible_system_cpus=0,8
+make cluster cluster_name=###REPLACE_ME### num_followers=###NUM_FOLLOWERS##
 ```
 
 You'll get a response ending with something similar to this if successful:
@@ -61,8 +61,10 @@ At this point, you will be ready to generate data. The options are:
 ```
 ../../build/bin_cfggen/bin/pairgen -c data_15min.cfg
 ```
+* Do not use the files for looping.
+* Your data files will appear in: /apps/dev/arizona/data/azdata_15mins.dat[*]
+* Use the `full` for messages of multiple types(orders,cancels,executes)
 
-Do not use the files for looping.
 
 #### Create a 60 minute data set (are there long-term problems?)
 
