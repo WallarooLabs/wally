@@ -463,6 +463,19 @@ Proceeds ISINs::proceeds_with_execute(string& isin_id_, string& order_id_, strin
   return isin->proceeds_with_execute(order_id_, execution_id_, quantity_, price_);
 }
 
+Proceeds ISINs::all_proceeds()
+{
+  Proceeds p(0.0, 0.0, 0.0, 0.0, "");
+
+  for(map<string, ISIN*>::iterator it = _isins.begin(); it != _isins.end(); it++)
+  {
+    Proceeds pi = it->second->proceeds();
+    p.add(pi);
+  }
+
+  return p;
+}
+
 Account::Account(string& account_id_): _account_id(account_id_), _isins(), _order_id_to_isin_id()
 {
 }
@@ -553,6 +566,11 @@ Proceeds Account::proceeds_with_execute(string& order_id_, string& execution_id_
   return _isins.proceeds_with_execute(isin_id, order_id_, execution_id_, quantity_, price_);
 }
 
+Proceeds Account::all_proceeds()
+{
+  return _isins.all_proceeds();
+}
+
 void Account::associate_order_id_to_isin_id(string& order_id_, string& isin_id_)
 {
   _order_id_to_isin_id.insert(std::pair<string, string>(order_id_, isin_id_));
@@ -582,7 +600,15 @@ Accounts::~Accounts()
   }
 }
 
-Account *Accounts::_account_by_account_id(string& account_id_)
+Account* Accounts::_add_account(string& account_id_)
+{
+  Account *account = new Account(account_id_);
+  _accounts.insert(std::pair<string, Account*>(account_id_, account));
+
+  return account;
+}
+
+Account *Accounts::account_by_account_id(string& account_id_)
 {
   map<string, Account*>::iterator it = _accounts.find(account_id_);
 
@@ -594,17 +620,9 @@ Account *Accounts::_account_by_account_id(string& account_id_)
   return it->second;
 }
 
-Account* Accounts::_add_account(string& account_id_)
-{
-  Account *account = new Account(account_id_);
-  _accounts.insert(std::pair<string, Account*>(account_id_, account));
-
-  return account;
-}
-
 void Accounts::add_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_)
 {
-  Account *account = _account_by_account_id(account_id_);
+  Account *account = account_by_account_id(account_id_);
 
   if (account == nullptr)
   {
@@ -616,7 +634,7 @@ void Accounts::add_order(string& account_id_, string& isin_id_, string& order_id
 
 void Accounts::cancel_order(string& account_id_, string& order_id_)
 {
-  Account *account = _account_by_account_id(account_id_);
+  Account *account = account_by_account_id(account_id_);
 
   if (account == nullptr)
   {
@@ -629,7 +647,7 @@ void Accounts::cancel_order(string& account_id_, string& order_id_)
 
 void Accounts::execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_)
 {
-  Account *account = _account_by_account_id(account_id_);
+  Account *account = account_by_account_id(account_id_);
 
   if (account == nullptr)
   {
@@ -642,7 +660,7 @@ void Accounts::execute(string& account_id_, string& order_id_, string& execution
 
 Proceeds Accounts::proceeds_for_isin(string& account_id_, string& isin_id_)
 {
-  Account *account = _account_by_account_id(account_id_);
+  Account *account = account_by_account_id(account_id_);
   if (account == nullptr)
   {
     return Proceeds(0.0, 0.0, 0.0, 0.0, isin_id_);
@@ -652,7 +670,7 @@ Proceeds Accounts::proceeds_for_isin(string& account_id_, string& isin_id_)
 
 Proceeds Accounts::proceeds_with_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_)
 {
-  Account *account = _account_by_account_id(account_id_);
+  Account *account = account_by_account_id(account_id_);
 
   if (account == nullptr)
   {
@@ -665,7 +683,7 @@ Proceeds Accounts::proceeds_with_order(string& account_id_, string& isin_id_, st
 
 Proceeds Accounts::proceeds_with_cancel(string& account_id_, string& order_id_)
 {
-  Account *account = _account_by_account_id(account_id_);
+  Account *account = account_by_account_id(account_id_);
 
   if (account == nullptr)
   {
@@ -677,7 +695,7 @@ Proceeds Accounts::proceeds_with_cancel(string& account_id_, string& order_id_)
 
 Proceeds Accounts::proceeds_with_execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_)
 {
-  Account *account = _account_by_account_id(account_id_);
+  Account *account = account_by_account_id(account_id_);
 
   if (account == nullptr)
   {
@@ -687,7 +705,102 @@ Proceeds Accounts::proceeds_with_execute(string& account_id_, string& order_id_,
   return account->proceeds_with_execute(order_id_, execution_id_, quantity_, price_);
 }
 
-Client::Client(string& client_id_): _client_id(client_id_)
+AggUnit::AggUnit(string& agg_unit_id_): _agg_unit_id(agg_unit_id_), _accounts()
+{
+}
+
+Proceeds AggUnit::proceeds()
+{
+  Proceeds p(0.0, 0.0, 0.0, 0.0, "");
+  for (vector<Account *>::iterator it = _accounts.begin(); it != _accounts.end(); it++)
+  {
+    Proceeds pa = (*it)->all_proceeds();
+    p.add(pa);
+  }
+
+  return p;
+}
+
+void AggUnit::add_account(Account *account_)
+{
+  _accounts.push_back(account_);
+}
+
+void AggUnit::remove_account(Account *account_)
+{
+  for (vector<Account *>::iterator it = _accounts.begin();
+       it != _accounts.end();
+       it++)
+  {
+    if (*it == account_)
+    {
+      _accounts.erase(it);
+      break;
+    }
+  }
+}
+
+AggUnits::AggUnits(): _agg_unit_id_to_agg_unit()
+{
+}
+
+void AggUnits::create_agg_unit(string& agg_unit_id_)
+{
+  map<string, AggUnit>::iterator it = _agg_unit_id_to_agg_unit.find(agg_unit_id_);
+
+  if (it != _agg_unit_id_to_agg_unit.end())
+  {
+    // TODO: should this be an error?
+    return;
+  }
+
+  AggUnit au(agg_unit_id_);
+
+  _agg_unit_id_to_agg_unit.insert(std::pair<string, AggUnit>(agg_unit_id_, au));
+}
+
+Proceeds AggUnits::proceeds_for_agg_unit(string& agg_unit_id)
+{
+  Proceeds p = Proceeds(0.0, 0.0, 0.0, 0.0, "");
+
+  for(map<string, AggUnit>::iterator it = _agg_unit_id_to_agg_unit.begin();
+      it != _agg_unit_id_to_agg_unit.end();
+      it++)
+  {
+    Proceeds pa = it->second.proceeds();
+    p.add(pa);
+  }
+
+  return p;
+}
+
+void AggUnits::add_account(string& agg_unit_id_, Account *account_)
+{
+  map<string, AggUnit>::iterator it = _agg_unit_id_to_agg_unit.find(agg_unit_id_);
+
+  if (it == _agg_unit_id_to_agg_unit.end())
+  {
+    // TODO: should this be an error?
+    return;
+  }
+
+  it->second.add_account(account_);
+}
+
+void AggUnits::remove_account(string& agg_unit_id_, Account *account_)
+{
+  map<string, AggUnit>::iterator it = _agg_unit_id_to_agg_unit.find(agg_unit_id_);
+
+  if (it == _agg_unit_id_to_agg_unit.end())
+  {
+    // TODO: should this be an error?
+    return;
+  }
+
+  _agg_unit_id_to_agg_unit.erase(it);
+}
+
+Client::Client(string& client_id_): _accounts(), _agg_units(), _client_id(client_id_)
 {
 }
 
@@ -724,6 +837,42 @@ Proceeds Client::proceeds_with_cancel(string& account_id_, string& order_id_)
 Proceeds Client::proceeds_with_execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_)
 {
   return _accounts.proceeds_with_execute(account_id_, order_id_, execution_id_, quantity_, price_);
+}
+
+Proceeds Client::proceeds_for_agg_unit(string& agg_unit_id_)
+{
+  return _agg_units.proceeds_for_agg_unit(agg_unit_id_);
+}
+
+void Client::create_agg_unit(string& agg_unit_id_)
+{
+  _agg_units.create_agg_unit(agg_unit_id_);
+}
+
+void Client::add_account_to_agg_unit(string& account_id_, string& agg_unit_id_)
+{
+  Account *account = _accounts.account_by_account_id(account_id_);
+
+  if (account == nullptr)
+  {
+    // TODO: this should be an error.
+    return;
+  }
+
+  _agg_units.add_account(agg_unit_id_, account);
+}
+
+void Client::remove_account_from_agg_unit(string& account_id_, string& agg_unit_id_)
+{
+  Account *account = _accounts.account_by_account_id(account_id_);
+
+  if (account == nullptr)
+  {
+    // TODO: this should be an error.
+    return;
+  }
+
+  _agg_units.remove_account(agg_unit_id_, account);
 }
 
 Clients::Clients(): _clients()
@@ -842,4 +991,52 @@ Proceeds Clients::proceeds_with_execute(string& client_id_, string& account_id_,
     return Proceeds(0.0, 0.0, 0.0, 0.0, "");
   }
   return client->proceeds_with_execute(account_id_, order_id_, execution_id_, quantity_, price_);
+}
+
+Proceeds Clients::proceeds_for_agg_unit(string& client_id_, string& agg_unit_id_)
+{
+  Client *client = _client_by_client_id(client_id_);
+
+  if (client == nullptr)
+  {
+    // TODO: it should be an error to do something for a client that doesn't exist
+    return Proceeds(0.0, 0.0, 0.0, 0.0, "");
+  }
+  return client->proceeds_for_agg_unit(agg_unit_id_);
+}
+
+void Clients::create_agg_unit(string& client_id_, string& agg_unit_id_)
+{
+  Client *client = _client_by_client_id(client_id_);
+
+  if (client == nullptr)
+  {
+    // TODO: it should be an error to do something for a client that doesn't exist
+    return;
+  }
+  return client->create_agg_unit(agg_unit_id_);
+}
+
+void Clients::add_account_to_agg_unit(string& client_id_, string& agg_unit_id_, string& account_id_)
+{
+  Client *client = _client_by_client_id(client_id_);
+
+  if (client == nullptr)
+  {
+    // TODO: it should be an error to do something for a client that doesn't exist
+    return;
+  }
+  client->add_account_to_agg_unit(agg_unit_id_, account_id_);
+}
+
+void Clients::remove_account_from_agg_unit(string& client_id_, string& agg_unit_id_, string& account_id_)
+{
+  Client *client = _client_by_client_id(client_id_);
+
+  if (client == nullptr)
+  {
+    // TODO: it should be an error to do something for a client that doesn't exist
+    return;
+  }
+  client->remove_account_from_agg_unit(agg_unit_id_, account_id_);
 }
