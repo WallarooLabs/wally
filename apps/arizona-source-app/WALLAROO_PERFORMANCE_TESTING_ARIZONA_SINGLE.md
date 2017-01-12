@@ -9,9 +9,14 @@ your `orchestration/arizona` directory.
 
 Arizona has two different kinds of machiens, build and execution.      
 **This document assumes you build all binaries on a build machine and then copy them onto the execution machines.**
-To create a build machine, use:
+We already have a build machine, called ***arizona-build-server*** you can log in to that host with:
 ```
-make cluster cluster_name=<CLUSTER_NAME> num_followers=<NUMBER_FOLLOWERS> force_instance=r3.4xlarge arizona_node_type=build ansible_system_cpus=0,8
+ssh -i YOUR_PEM_FILE ec2-user@AWS-HOST-NAME
+```
+
+Or, you can create a build machine, by running:
+```
+make cluster cluster_name=<CLUSTER_NAME> num_followers=0 force_instance=r3.4xlarge arizona_node_type=build ansible_system_cpus=0,8
 ```
 
 To create execution machines, use:
@@ -71,20 +76,20 @@ mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/apps/dev/arizona ../
 sudo make install
+sudo mkdir /apps/dev/arizona/etc
 cd ~/arizona/bin_cfggen/etc
-ssh ec2-user@EXECUTION_HOST_IP -e "mkdir -p /apps/dev/arizona"
-ssh ec2-user@EXECUTION_HOST_IP -e "mkdir -p /apps/dev/arizona/etc"
-ssh ec2-user@EXECUTION_HOST_IP -e "mkdir -p /apps/dev/arizona/data"
-scp *.cfg ec2-user@EXECUTION_HOST_IP:/apps/dev/arizona/etc
-scp -r /apps/dev/arizona/bin ec2-user@EXECUTION_HOST_IP:/apps/dev/arizona/bin
+cp *.cfg /apps/dev/arizona/etc/
+scp -i YOUR_PEM_FILE -r /apps/dev/arizona ec2-user@EXECUTION_HOST_IP:/apps/dev/arizona
 ```
 
-At this point, you will be ready to generate data. Log into the executon host. The options are:
+At this point, you will be ready to generate data. Log into the executon host that you copied your files to. The options are:
 
 #### Create a really small file (150K message) that you can loop through, should not have memory growth
 
 ```
-/apps/dev/arizona/bin/pairgen -c pairgen_150K.cfg
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+mkdir -p /apps/dev/arizona/data
+/apps/dev/arizona/bin/arizona/pairgen -c /apps/dev/arizona/etc/pairgen_150K.cfg
 ```
 * Your data files will appear in: /apps/dev/arizona/pairgen_150K.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
@@ -94,7 +99,9 @@ At this point, you will be ready to generate data. Log into the executon host. T
 #### Create a 15 minute data set (do we crash?)
 
 ```
-/apps/dev/arizona/bin/datagen-c data_15min.cfg
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+mkdir -p /apps/dev/arizona/data
+/apps/dev/arizona/bin/arizona/datagen-c data_15min.cfg
 ```
 * Do not use the files for looping.
 * Your data files will appear in: /apps/dev/arizona/data/azdata_15mins.dat[*]
@@ -104,6 +111,8 @@ At this point, you will be ready to generate data. Log into the executon host. T
 #### Create a 60 minute data set (are there long-term problems?)
 
 ```
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+mkdir -p /apps/dev/arizona/data
 /apps/dev/arizona/bin/datagen -c data_1hour.cfg
 ```
 * Do not use the files for looping
@@ -114,6 +123,8 @@ At this point, you will be ready to generate data. Log into the executon host. T
 
 
 ```
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+mkdir -p /apps/dev/arizona/data
 /apps/dev/arizona/bin/datagen -c data_8hours.cfg
 ```
 
