@@ -40,6 +40,17 @@ ssh -i ~/.ssh/ec2/us-east-1.pem ec2-user@<IP_ADDRESS>
 Before you can run Arizona, you need to generate data for it with the datagen app. This can take some time (depending on how large of a dataset you are building), so do this step first.
 
 As for how long it will take to generate your data, a good rule of thumb is to halve the time you want to generate. So, if you want to generate 20 mins of data, it will take 10 mins to do. If you want to do 1 hour, it will take 30 mins... etc.
+
+#### LibConfig
+```
+wget http://libconfig.sourcearchive.com/downloads/1.5-0.2/libconfig_1.5.orig.tar.gz
+tar zxvf libconfig_1.5.orig.tar.gz
+cd libconfig_1.5.orig
+./configure
+make
+sudo make install
+```
+
 #### Build spdlog
 **Note:**You don't have to do this if you are using the arizona-build-server
 ```
