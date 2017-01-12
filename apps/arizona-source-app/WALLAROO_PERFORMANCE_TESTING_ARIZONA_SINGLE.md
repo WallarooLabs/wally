@@ -41,7 +41,8 @@ Before you can run Arizona, you need to generate data for it with the datagen ap
 
 As for how long it will take to generate your data, a good rule of thumb is to halve the time you want to generate. So, if you want to generate 20 mins of data, it will take 10 mins to do. If you want to do 1 hour, it will take 30 mins... etc.
 
-#### LibConfig
+#### Build libconfig
+Please note - this is only needed on the machines where datagen, pairgen, etc. will be run.
 ```
 wget http://libconfig.sourcearchive.com/downloads/1.5-0.2/libconfig_1.5.orig.tar.gz
 tar zxvf libconfig_1.5.orig.tar.gz
