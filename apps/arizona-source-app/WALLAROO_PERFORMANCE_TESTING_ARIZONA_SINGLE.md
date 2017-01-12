@@ -41,7 +41,7 @@ Before you can run Arizona, you need to generate data for it with the datagen ap
 
 As for how long it will take to generate your data, a good rule of thumb is to halve the time you want to generate. So, if you want to generate 20 mins of data, it will take 10 mins to do. If you want to do 1 hour, it will take 30 mins... etc.
 #### Build spdlog
-**You don't have to do this if you are using the arizona-build-server**
+**Note:**You don't have to do this if you are using the arizona-build-server
 ```
 scl enable devtoolset-4 bash
 cd ~/
@@ -54,7 +54,7 @@ sudo make install
 ```
 
 #### Build Arizona-CPP
-**You don't have to do this if you are using the arizona-build-server**
+**Note:**You don't have to do this if you are using the arizona-build-server
 ```
 scl enable devtoolset-4 bash
 cd ~/buffy
