@@ -25,7 +25,7 @@ PLAY RECAP *********************************************************************
 54.165.9.39                : ok=70   changed=39   unreachable=0    failed=0
 ```
 
-You can SSH into the AWS machine using:
+You can SSH into the build machine using:
 
 ```bash
 ssh -i ~/.ssh/ec2/us-east-1.pem ec2-user@<IP_ADDRESS>
@@ -44,18 +44,22 @@ cd ~/arizona
 git checkout state-node-compute
 mkdir build
 cd build
-cmake ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/apps/dev/arizona ..
 make
 cd ~/arizona/bin_cfggen/etc
-mkdir -p /apps/dev/arizona/data
+ssh ec2-user@EXECUTION_HOST_IP -e "mkdir -p /apps/dev/arizona"
+ssh ec2-user@EXECUTION_HOST_IP -e "mkdir -p /apps/dev/arizona/etc"
+ssh ec2-user@EXECUTION_HOST_IP -e "mkdir -p /apps/dev/arizona/data"
+scp *.cfg ec2-user@EXECUTION_HOST_IP:/apps/dev/arizona/etc
+scp -r /apps/dev/arizona/bin ec2-user@EXECUTION_HOST_IP:/apps/dev/arizona/bin
 ```
 
-At this point, you will be ready to generate data. The options are:
+At this point, you will be ready to generate data. Log into the executon host. The options are:
 
 #### Create a really small file (150K message) that you can loop through, should not have memory growth
 
 ```
-../../build/bin_cfggen/bin/pairgen -c pairgen_150K.cfg
+/apps/dev/arizona/bin/pairgen -c pairgen_150K.cfg
 ```
 * Your data files will appear in: /apps/dev/arizona/pairgen_150K.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
@@ -65,7 +69,7 @@ At this point, you will be ready to generate data. The options are:
 #### Create a 15 minute data set (do we crash?)
 
 ```
-../../build/bin_cfggen/bin/pairgen -c data_15min.cfg
+/apps/dev/arizona/bin/datagen-c data_15min.cfg
 ```
 * Do not use the files for looping.
 * Your data files will appear in: /apps/dev/arizona/data/azdata_15mins.dat[*]
@@ -75,7 +79,7 @@ At this point, you will be ready to generate data. The options are:
 #### Create a 60 minute data set (are there long-term problems?)
 
 ```
-../../build/bin_cfggen/bin/pairgen -c data_1hour.cfg
+/apps/dev/arizona/bin/datagen -c data_1hour.cfg
 ```
 * Do not use the files for looping
 * Your data diles will appear in: /apps/dev/arizona/data/azdata_1hour.dat
@@ -85,7 +89,7 @@ At this point, you will be ready to generate data. The options are:
 
 
 ```
-../../build/bin_cfggen/bin/pairgen -c data_8hours.cfg
+/apps/dev/arizona/bin/datagen -c data_8hours.cfg
 ```
 
 * Do not use the files for looping
