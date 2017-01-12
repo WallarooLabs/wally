@@ -705,6 +705,29 @@ Proceeds Accounts::proceeds_with_execute(string& account_id_, string& order_id_,
   return account->proceeds_with_execute(order_id_, execution_id_, quantity_, price_);
 }
 
+Proceeds Accounts::proceeds()
+{
+  Proceeds p(0.0, 0.0, 0.0, 0.0, "");
+  for(map<string, Account *>::iterator it = _accounts.begin(); it != _accounts.end(); it++)
+  {
+    Proceeds pa = it->second->all_proceeds();
+    p.add(pa);
+  }
+  return p;
+}
+
+Proceeds Accounts::proceeds_for_account(string& account_id_)
+{
+  Account *account = account_by_account_id(account_id_);
+
+  if (account == nullptr)
+  {
+    // TODO: executing  an order for an account that doesn't exist should be an error
+    return Proceeds(-1.0, -1.0, -1.0, -1.0, "");
+  }
+  return account->all_proceeds();
+}
+
 AggUnit::AggUnit(string& agg_unit_id_): _agg_unit_id(agg_unit_id_), _accounts()
 {
 }
@@ -837,6 +860,16 @@ Proceeds Client::proceeds_with_cancel(string& account_id_, string& order_id_)
 Proceeds Client::proceeds_with_execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_)
 {
   return _accounts.proceeds_with_execute(account_id_, order_id_, execution_id_, quantity_, price_);
+}
+
+Proceeds Client::proceeds()
+{
+  return _accounts.proceeds();
+}
+
+Proceeds Client::proceeds_for_account(string& account_id_)
+{
+  return _accounts.proceeds_for_account(account_id_);
 }
 
 Proceeds Client::proceeds_for_agg_unit(string& agg_unit_id_)
@@ -991,6 +1024,30 @@ Proceeds Clients::proceeds_with_execute(string& client_id_, string& account_id_,
     return Proceeds(0.0, 0.0, 0.0, 0.0, "");
   }
   return client->proceeds_with_execute(account_id_, order_id_, execution_id_, quantity_, price_);
+}
+
+Proceeds Clients::proceeds_for_client(string& client_id_)
+{
+  Client *client = _client_by_client_id(client_id_);
+
+  if (client == nullptr)
+  {
+    // TODO: it should be an error to do something for a client that doesn't exist
+    return Proceeds(0.0, 0.0, 0.0, 0.0, "");
+  }
+  return client->proceeds();
+}
+
+Proceeds Clients::proceeds_for_account(string& client_id_, string& account_id_)
+{
+  Client *client = _client_by_client_id(client_id_);
+
+  if (client == nullptr)
+  {
+    // TODO: it should be an error to do something for a client that doesn't exist
+    return Proceeds(0.0, 0.0, 0.0, 0.0, "");
+  }
+  return client->proceeds_for_account(account_id_);
 }
 
 Proceeds Clients::proceeds_for_agg_unit(string& client_id_, string& agg_unit_id_)
