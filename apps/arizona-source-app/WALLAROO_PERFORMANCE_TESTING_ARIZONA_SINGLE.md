@@ -51,7 +51,15 @@ cd libconfig-1.5
 make
 sudo make install
 ```
-
+#### Build cmake
+**Note:**You don't have to do this if you are using the arizona-build-server
+```
+https://cmake.org/files/v3.7/cmake-3.7.1.tar.gz
+tar zxvf cmake-3.7.1.tar.gz
+cd cmake-3.7.1
+./configure
+sudo make install
+```
 #### Build spdlog
 **Note:**You don't have to do this if you are using the arizona-build-server
 ```
