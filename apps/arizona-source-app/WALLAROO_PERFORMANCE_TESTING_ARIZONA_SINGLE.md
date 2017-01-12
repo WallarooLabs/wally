@@ -45,7 +45,7 @@ As for how long it will take to generate your data, a good rule of thumb is to h
 ```
 wget http://libconfig.sourcearchive.com/downloads/1.5-0.2/libconfig_1.5.orig.tar.gz
 tar zxvf libconfig_1.5.orig.tar.gz
-cd libconfig_1.5.orig
+cd libconfig-1.5
 ./configure
 make
 sudo make install
