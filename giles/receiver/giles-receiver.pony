@@ -106,7 +106,7 @@ actor Main
 
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
-            FromBuffyListenerNotify(coordinator, store, env.err, e_arg, 
+            FromBuffyListenerNotify(coordinator, store, env.err, e_arg,
               use_metrics, no_write, throw_away),
             listener_addr(0),
             listener_addr(1))
@@ -165,8 +165,8 @@ class FromBuffyNotify is TCPConnectionNotify
   var _expected: USize = 0
   var _expect_termination: Bool = false
   let _metrics: Metrics tag = Metrics
-  let _use_metrics: Bool 
-  let _no_write: Bool 
+  let _use_metrics: Bool
+  let _no_write: Bool
   let _throw_away: Bool
   var _closed: Bool = false
 
@@ -190,27 +190,17 @@ class FromBuffyNotify is TCPConnectionNotify
       end
     end
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
-    if not _throw_away then
-      if _header then
-        try
-          _count = _count + 1
-          if (_count == 1) and _use_metrics then
-            _metrics.set_start(Time.nanos())
-          end
-          if (_count % 100_000) == 0 then
-            @printf[I32]("%zu received\n".cstring(), _count)
-          end
-          if _expect_termination then
-            _remaining = _remaining - 1
-          end
-  
-          let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
-  
-          conn.expect(expect)
-          _header = false
-        else
-          _stderr.print("Blew up reading header from Buffy")
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
+    if _header then
+      try
+        _count = _count + 1
+        if (_count == 1) and _use_metrics then
+          _metrics.set_start(Time.nanos())
+        end
+        if _expect_termination then
+          _remaining = _remaining - 1
         end
       else
         if not _no_write then

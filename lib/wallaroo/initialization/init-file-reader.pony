@@ -44,5 +44,7 @@ class InitFileReader
 
 
 class InitFileNotify is TCPConnectionNotify
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
     true
