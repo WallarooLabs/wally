@@ -246,7 +246,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     _upstreams.push(producer)
-    _calculate_max_credit_response()
+    ifdef "backpressure" then
+      _calculate_max_credit_response()
+    end
 
   be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
@@ -260,7 +262,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
         recoup_credits(credits_returned)
       end
     end
-    _calculate_max_credit_response()
+    ifdef "backpressure" then
+      _calculate_max_credit_response()
+    end
 
   fun ref _calculate_max_credit_response() =>
     _max_credit_response = if _upstreams.size() > 0 then
