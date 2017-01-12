@@ -64,7 +64,10 @@ enum StateChangeBuilderType
 {
   AddOrder = 0,
   CancelOrder = 1,
-  ExecuteOrder = 2
+  ExecuteOrder = 2,
+  CreateAggUnit = 3,
+  AddAccountToAggUnit = 4,
+  RemoveAccountFromAggUnit = 5
 };
 
 // Messages
@@ -80,7 +83,7 @@ enum MessageType
 
 enum AdminRequestType
 {
-  CreateAggUnit = 0,
+  CreateAggUnitRequest = 0,
   QueryAggUnit = 1,
   AddAggUnit = 2,
   RemoveAggUnit = 3
@@ -278,6 +281,11 @@ public:
 
   class Proceeds proceeds_with_execute(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
   void execute_order(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
+
+  void create_agg_unit(string& client_id_, string& agg_unit_id_);
+  class Proceeds proceeds_for_agg_unit(string& client_id_, string& agg_unit_id_);
+  void add_account_to_agg_unit(string& client_id_, string& account_id_, string& agg_unit_id_);
+  void remove_account_from_agg_unit(string& client_id_, string& account_id_, string& agg_unit_id_);
 };
 
 class AddOrderStateChange: public wallaroo::StateChange
@@ -377,6 +385,35 @@ class ExecuteOrderStateChangeBuilder: public wallaroo::StateChangeBuilder
   virtual size_t serialize_get_size () { return 4; }
 };
 
+class CreateAggUnitStateChange: public wallaroo::StateChange
+{
+private:
+  string _client_id;
+  string _agg_unit_id;
+public:
+  CreateAggUnitStateChange(uint64_t id_);
+  virtual const char* name() { return "create agg unit state change"; };
+  virtual void apply(wallaroo::State *state_);
+  virtual void to_log_entry(char *bytes_);
+  virtual size_t get_log_entry_size();
+  virtual size_t get_log_entry_size_header_size() { return 4; }
+  virtual size_t read_log_entry_size_header(char *bytes_);
+  virtual bool read_log_entry(char *bytes_);
+  void update(string& client_id_, string& agg_unit_id_);
+};
+
+class CreateAggUnitStateChangeBuilder: public wallaroo::StateChangeBuilder
+{
+  virtual wallaroo::StateChange *build(uint64_t id_) { return new CreateAggUnitStateChange(id_); }
+  virtual void serialize (char* bytes_, size_t nsz_)
+  {
+    Writer writer((unsigned char *)bytes_);
+    writer.u16_be(SerializationType::StateChangeBuilder);
+    writer.u16_be(StateChangeBuilderType::CreateAggUnit);
+  }
+  virtual size_t serialize_get_size () { return 4; }
+};
+
 class ArizonaDefaultState: public wallaroo::State
 {
 private:
@@ -396,7 +433,7 @@ public:
   ArizonaStateComputation();
   virtual const char *name();
   virtual void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void* state_change_Respository_helper_, wallaroo::State *state_, void *none);
-  virtual size_t get_number_of_state_change_builders() { return 3;}
+  virtual size_t get_number_of_state_change_builders() { return 4;}
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_);
   virtual void serialize(char* bytes_, size_t nsz_) { Writer writer((unsigned char *)bytes_); writer.u16_be(SerializationType::Computation); }
   virtual size_t serialize_get_size () { return 2; }
