@@ -55,7 +55,7 @@ PLAY RECAP *********************************************************************
 You can SSH into the build machine using:
 
 ```bash
-ssh -i ~/.ssh/ec2/us-east-1.pem ec2-user@<IP_ADDRESS>
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
 ```
 
 ## Generate data
