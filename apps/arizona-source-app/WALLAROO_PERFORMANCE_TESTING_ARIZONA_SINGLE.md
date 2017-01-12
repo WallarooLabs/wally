@@ -44,12 +44,7 @@ As for how long it will take to generate your data, a good rule of thumb is to h
 #### Build libconfig
 **Please note:** this is only needed on the machines where `datagen`, `pairgen`, etc. will be run.
 ```
-wget http://libconfig.sourcearchive.com/downloads/1.5-0.2/libconfig_1.5.orig.tar.gz
-tar zxvf libconfig_1.5.orig.tar.gz
-cd libconfig-1.5
-./configure
-make
-sudo make install
+sudo apt-get install -y pkg-config libconfig++-dev
 ```
 #### Build cmake
 **Note:**You don't have to do this if you are using the arizona-build-server
@@ -78,7 +73,7 @@ sudo make install
 ```
 scl enable devtoolset-4 bash //only for redhat executuon machines
 cd ~/buffy
-https://github.com/Sendence/arizona.git
+git clone https://github.com/Sendence/buffy.git
 git checkout arizona-add-state
 cd lib/wallaroo/cpp-api/cpp/cppapi
 mkdir build
