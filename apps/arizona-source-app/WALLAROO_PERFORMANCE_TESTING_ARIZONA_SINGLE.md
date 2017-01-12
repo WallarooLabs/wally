@@ -126,8 +126,9 @@ cp *.cfg /apps/dev/arizona/etc/
 scp -i YOUR_PEM_FILE -r /apps/dev/arizona ec2-user@EXECUTION_HOST_IP:/apps/dev/arizona
 ```
 
-At this point, you will be ready to generate data. Log into the executon host that you copied your files to. The options are:
+At this point, you will be ready to generate data. Log into the executon host that you copied your files to.
 ### Actual data generation
+Your options are:
 #### Create a really small file (150K message) that you can loop through, should not have memory growth
 
 ```
@@ -136,7 +137,8 @@ export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 mkdir -p /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/pairgen -c /apps/dev/arizona/etc/pairgen_150K.cfg
 ```
-* Your data files will appear in: /apps/dev/arizona/pairgen_150K.dat[*]
+* Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
+* Data files: pairgen_150K.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
 
@@ -150,7 +152,8 @@ mkdir -p /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/datagen-c data_15min.cfg
 ```
 * Do not use the files for looping.
-* Your data files will appear in: /apps/dev/arizona/data/azdata_15mins.dat[*]
+* Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
+* Data files: azdata_15mins.dat[*]
 * Use the `full` for messages of multiple types(orders,cancels,executes)
 
 
@@ -163,7 +166,8 @@ mkdir -p /apps/dev/arizona/data
 /apps/dev/arizona/bin/datagen -c data_1hour.cfg
 ```
 * Do not use the files for looping
-* Your data files will appear in: /apps/dev/arizona/data/azdata_1hour.dat
+* Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
+* Data files: azdata_1hrs.dat[*]
 * Use the `full` for messages of multiple types(orders,cancels,executes)
 
 #### Create an 8 hour data set (does this work for the full 8 hours?)
@@ -177,10 +181,11 @@ mkdir -p /apps/dev/arizona/data
 ```
 
 * Do not use the files for looping
-* Your data files will appear in: /apps/dev/arizona/data/azdata_8hrs.dat
+* Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
+* Data files: azdata_8hrs.dat[*]
 * Use the `full` for messages of multiple types(orders,cancels,executes)
 
-
+## Arizona/Wallaroo
 ### Clone Wallaroo repo
 
 You'll need to clone the repo:
