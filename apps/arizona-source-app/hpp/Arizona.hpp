@@ -78,7 +78,8 @@ enum MessageType
   Cancel = 2,
   Execute = 3,
   Admin = 4,
-  Proceeds = 5
+  Proceeds = 5,
+  AdminResponse = 6
 };
 
 enum AdminRequestType
@@ -87,6 +88,12 @@ enum AdminRequestType
   QueryAggUnit = 1,
   AddAggUnit = 2,
   RemoveAggUnit = 3
+};
+
+enum AdminResponseType
+{
+  Ok = 0,
+  Error = 1
 };
 
 class ClientMessage: public wallaroo::Data
@@ -242,6 +249,19 @@ public:
                   double open_long_, double open_short_,
                   double filled_long_, double filled_short_);
   ~ProceedsMessage();
+  virtual size_t encode_get_size();
+  virtual void encode(char *bytes);
+};
+
+class AdminResponseMessage: public wallaroo::EncodableData
+{
+private:
+  uint64_t _message_id;
+  AdminResponseType _response;
+public:
+  AdminResponseMessage(uint64_t message_id_, AdminResponseType response_):
+    _message_id(message_id_), _response(response_) { }
+  ~AdminResponseMessage() { };
   virtual size_t encode_get_size();
   virtual void encode(char *bytes);
 };

@@ -543,6 +543,23 @@ void ProceedsMessage::encode(char *bytes)
   writer.arizona_double(_filled_short);
 }
 
+size_t AdminResponseMessage::encode_get_size()
+{
+  size_t sz = 2 + // framing length
+    2 + // message type
+    2; // response type
+  return sz;
+}
+
+void AdminResponseMessage::encode(char *bytes)
+{
+  Writer writer((unsigned char *)bytes);
+
+  writer.u16_be(encode_get_size());
+  writer.u16_be(MessageType::AdminResponse);
+  writer.u16_be(_response);
+}
+
 // Arizona
 
 extern "C" {
@@ -1034,8 +1051,24 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
     switch(am->get_request_type())
     {
       case AdminRequestType::CreateAggUnitRequest:
+      {
         //TODO: add aggunit to client
-        break;
+        void *state_change_handle = w_state_change_repository_lookup_by_name(
+            state_change_repository_helper_,
+            state_change_repository_,
+            "create agg unit state change");
+        CreateAggUnitStateChange *create_aggunit_state_change =
+          (CreateAggUnitStateChange *) w_state_change_get_state_change_object(
+              state_change_repository_helper_, state_change_handle);
+        create_aggunit_state_change->update(*am->get_client(), *am->get_aggunit());
+        AdminResponseMessage *response_message = 
+          new AdminResponseMessage(am->get_message_id(), AdminResponseType::Ok);
+        return w_stateful_computation_get_return(
+            state_change_repository_helper_,
+            response_message,
+            state_change_handle);
+      }
+      break;
       case AdminRequestType::QueryAggUnit:
         //TODO: query aggunit
         break;
