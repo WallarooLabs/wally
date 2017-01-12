@@ -71,17 +71,20 @@ At this point, you will be ready to generate data. The options are:
 ```
 ../../build/bin_cfggen/bin/pairgen -c data_1hour.cfg
 ```
-
-Do not use the files for looping.
+* Do not use the files for looping
+* Your data diles will appear in: /apps/dev/arizona/data/azdata_1hour.dat
+* Use the `full` for messages of multiple types(orders,cancels,executes)
 
 #### Create an 8 hour data set (does this work for the full 8 hours?)
 
 
 ```
-../../build/bin_cfggen/bin/pairgen -c data_8hour.cfg
+../../build/bin_cfggen/bin/pairgen -c data_8hours.cfg
 ```
 
-Do not use the files for looping.
+* Do not use the files for looping
+* Your data diles will appear in: /apps/dev/arizona/data/azdata_8hrs.dat
+* Use the `full` for messages of multiple types(orders,cancels,executes)
 
 
 ### Clone Wallaroo repo
