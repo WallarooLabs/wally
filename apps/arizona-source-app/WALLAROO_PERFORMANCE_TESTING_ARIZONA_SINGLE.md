@@ -44,7 +44,8 @@ As for how long it will take to generate your data, a good rule of thumb is to h
 #### Build libconfig
 **Please note:** this is only needed on the machines where `datagen`, `pairgen`, etc. will be run.
 ```
-sudo apt-get install -y pkg-config libconfig++-dev
+sudo apt-get install -y pkg-config 
+sudo apt-get install -y libconfig++-dev
 ```
 #### Build cmake
 **Note:**You don't have to do this if you are using the arizona-build-server
