@@ -92,7 +92,7 @@ make build-giles-sender arch=amd64 ponyc_tag=sendence-14.0.5-release
 To build Giles Receiver:
 ```
 cd ~/buffy
-make build-giles-receiver arch=amd64 ponyc_tag=sendence-14.0.5-release
+make build-giles-receiver arch=amd64
 ```
 
 ### SINGLE WORKER market spread:
