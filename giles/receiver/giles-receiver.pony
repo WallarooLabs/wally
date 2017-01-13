@@ -412,9 +412,10 @@ actor Store
         None
       end
 
-  be received(msg: Array[U8] val, at: U64) =>
+  be received(msg: Array[U8] iso, at: U64) =>
     match _received_file
-      | let file: File => file.writev(FallorMsgEncoder.timestamp_raw(at, msg))
+      | let file: File => file.writev(
+          FallorMsgEncoder.timestamp_raw(at, consume msg))
     end
 
   be dump() =>
