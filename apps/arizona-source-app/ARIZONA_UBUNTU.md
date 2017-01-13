@@ -125,7 +125,7 @@ cd /apps/dev/arizona/data
 ```
 * Do not use the files for looping
 * Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
-* Data files: azdata_1hrs.dat[*]
+* Data files: azdata_1hr_noloop.dat[*]
 * Use the `full` for messages of multiple types(orders,cancels,executes)
 
 #### Create an 8 hour data set (does this work for the full 8 hours?)
@@ -139,7 +139,7 @@ cd /apps/dev/arizona/data
 ```
 * Do not use the files for looping
 * Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
-* Data files: azdata_8hrs.dat[*]
+* Data files: azdata_8hrs_noloop.dat[*]
 * Use the `full` for messages of multiple types(orders,cancels,executes)
 
 ## Arizona/Wallaroo
