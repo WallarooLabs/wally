@@ -25,10 +25,12 @@ ansible_isolcpus ?= false## Use isolcpus kernel boot param
 ansible_install_devtools ?= false## Install dev tools on nodes
 ansible_raid_level ?= 0## raid level for ansible for local instance store ssds
 ansible_raid_fs ?= ext4## raid filesystem for ansible for local instance store ssds
+ptpd_offset_max ?= 0.00025## ptpd offset tolerance beyond which things care considered out of sync (default is 250 microseconds)
 
 inventory_script := ec2.py
 ansible_user := ubuntu
 all_instances := 'tag_Project_buffy:&tag_ClusterName_$(cluster_name):&$(region)'
+follower_instances := 'tag_Project_buffy:&tag_ClusterName_$(cluster_name):&tag_Role_follower:&$(region)'
 
 # if debug shell command output requested
 ifdef DEBUG_SHELL
@@ -308,6 +310,20 @@ cluster: check-cluster-name apply sleep60 configure ## Creates a cluster and con
 
 destroy: check-cluster-name acquire-cluster-lock init-terraform setup_$(provider)_ci_arg setup_$(provider)_az_arg terraform-destroy release-cluster-lock ## Run terraform destroy step
 
+check-ptpd-offsets: check-cluster-name ## Check ptpd offsets for all followers in the cluster
+	@echo "\033[36m==> Running ansible ptpd check for followers in cluster \
+'$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
+	@echo "\033[36m==> Using '$(ptpd_offset_max)' as maximum offset allowed.\033[0m"
+	@echo "\033[36m==> NOTE: Use 'ptpd_offset_max=<offset>' to change.\033[0m"
+	PACKET_NET_API_KEY=$(packet_api_key) ansible $(follower_instances) \
+          -i ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no \
+          -i  $(cluster_full_pem)"  -u $(ansible_user) -m shell -a \
+          'tail -n 1 /var/log/ptpd-stats.log | awk -F\, '"'"'{if (length($$6) > 0 && \
+           ($$6 > $(ptpd_offset_max) || $$6 < -$(ptpd_offset_max))) {print $$6; exit 1}}'"'"
+	@echo "\033[36m==> Successfully ran ansible ptpd check for cluster \
+'$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
+	@echo "\033[36m==> All followers are currently within offset tolerance of '$(ptpd_offset_max)'.\033[0m"
+
 test-ansible-connection: check-cluster-name ## Check ansible connectivity/authentication with servers
 	@echo "\033[36m==> Running ansible connectivity/authentication check for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
@@ -572,6 +588,12 @@ force-release-cluster-lock: check-cluster-name ## Force release cluster lock (NO
           terraform_locking --item-name $(provider)-$(region)_lock --attributes \
           Name=$(cluster_name)-lock,Value=free,Replace=true
 	@echo "\033[36m==> Cluster lock successfully released!\033[0m"
+
+force-delete-cluster-state: check-cluster-name ## Force delete cluster state (NOTE: ONLY USE IN EMERGENCY AS IT DELETES TERRAFORM CACHE!!!!)
+	@echo "\033[36m==> Forcing delete of terraform cluster state...\033[0m"
+	aws s3 rm s3://sendence-dev/terraform-state/cluster/$(provider)-$(region)-$(cluster_name)-terraform.tfstate
+	@echo "\033[36m==> Cluster terraform state successfully deleted!\033[0m"
+	@echo "\033[36m==> NOTE: PLEASE MAKE SURE TO MANUALLY DELETE ANY LINGERING RESOURCES!!!\033[0m"
 
 release-vpc-lock: check-cluster-name ## Release vpc lock after safely running terraform commands on shared remote state in S3
 	@echo "\033[36m==> Releasing vpc lock...\033[0m"

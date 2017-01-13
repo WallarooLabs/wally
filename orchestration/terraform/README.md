@@ -202,6 +202,8 @@ for t2.nano level of CPU] values):
 * Create and configure (with ansible) a cluster with name `example` where
   the instances have at least 8 cpus and 16 GB of RAM and don't use spot pricing:
   `make cluster mem_required=16 cpus_required=8 no_spot=true cluster_name=example`
+* Check ptpd offset for all followers in a cluster with name `sample`:
+  `make check-ptpd-offsets cluster_name=sample`
 
 ### Packet Examples
 
@@ -221,7 +223,8 @@ cases for the Packet provider.
   `make plan cluster_name=sample provider=packet use_automagic_instances=false terraform_args="--version"`
 * Destroy a cluster with name `sample`:
   `make destroy cluster_name=sample provider=packet use_automagic_instances=false`
-
+* Check ptpd offset for all followers in a cluster with name `sample`:
+  `make check-ptpd-offsets cluster_name=sample`
 
 ## Debugging Ansible for AWS
 
@@ -255,9 +258,20 @@ Test ansible communication with the leader nodes only:
 ## Manually cleaning up AWS resources
 
 If for some reason the `make destroy` command isn't working correctly and deleting the AWS resources previously created, you can manually clean things up instead.
+NOTE: You shouldn't have to do this unless `make destroy` repeatedly fails as it is safe to run multiple times until it succeeds.
 
 Go into `AWS Console (Web UI) -> EC2 -> Auto Scaling Groups` and find/delete the entries related to your cluster (the cluster_name is at the beginning of the resource name).
 
 Go into `AWS Console (Web UI) -> EC2 -> Launch Configurations` and find/delete the entries related to your cluster (the cluster_name is at the beginning of the resource name).
 
 Go into `AWS Console (Web UI) -> EC2 -> Placement Groups` and find/delete the entry related to your cluster (the cluster_name is at the end of the resource name with a format of `buffy-<CLUSTER_NAME>`).
+
+## Major recovery
+
+If `make destroy` and `make cluster` are both failing for a cluster and it's in some sort of invalid state where terraform state file doesn't match up with AWS reality any more.
+
+Run the following to completely remove the terraform state:
+
+`make force-delete-cluster-state` ## WARNING: It is very important to run this command passing in all the normal arguments you would normally pass when creating a cluster as those arguments are used to determine which state file needs to be deleted.
+
+NOTE: You will have to manually clean up any lingering resources after this but it should resolve the issues with the make command not working.
