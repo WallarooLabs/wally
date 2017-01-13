@@ -445,7 +445,7 @@ actor SendingActor
             if n.size() > 0 then
               d'.push(n)
               if _variable_size then
-                _wb.u16_be(n.size().u16() + 2)
+                _wb.u32_be(n.size().u32())
               end
               _wb.write(n)
               _messages_sent = _messages_sent + 1

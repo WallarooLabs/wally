@@ -517,7 +517,7 @@ ProceedsMessage::~ProceedsMessage()
 
 size_t ProceedsMessage::encode_get_size()
 {
-  size_t sz = 2 + // framing length
+  size_t sz = 4 + // framing length
     2 + // message type
     8 + // message id
     2 + // _isin size
@@ -533,7 +533,7 @@ void ProceedsMessage::encode(char *bytes)
 {
   Writer writer((unsigned char *)bytes);
 
-  writer.u16_be(encode_get_size());
+  writer.u32_be(encode_get_size() - 4);
   writer.u16_be(MessageType::Proceeds);
   writer.u64_be(_message_id);
   writer.arizona_string(_isin);
@@ -545,7 +545,7 @@ void ProceedsMessage::encode(char *bytes)
 
 size_t AdminResponseMessage::encode_get_size()
 {
-  size_t sz = 2 + // framing length
+  size_t sz = 4 + // framing length
     2 + // message type
     2; // response type
   return sz;
@@ -555,7 +555,7 @@ void AdminResponseMessage::encode(char *bytes)
 {
   Writer writer((unsigned char *)bytes);
 
-  writer.u16_be(encode_get_size());
+  writer.u32_be(encode_get_size() - 4);
   writer.u16_be(MessageType::AdminResponse);
   writer.u16_be(_response);
 }
@@ -643,12 +643,15 @@ extern "C" {
 
 size_t ArizonaSourceDecoder::header_length()
 {
-  return 2;
+  return 4;
 }
 
 size_t ArizonaSourceDecoder::payload_length(char *bytes)
 {
-  return ((size_t)(bytes[0]) << 8) + (size_t)(bytes[1]) - 2;
+  return ((size_t)(bytes[0]) << 24) +
+         ((size_t)(bytes[1]) << 16) +
+         ((size_t)(bytes[2]) << 8) +
+         ((size_t)(bytes[3]) << 0);
 }
 
 wallaroo::Data *ArizonaSourceDecoder::decode(char *bytes, size_t sz_)
