@@ -118,6 +118,10 @@ wallaroo::StateChangeBuilder *state_change_builder_from_bytes(char *bytes_)
       return new ExecuteOrderStateChangeBuilder();
     case StateChangeBuilderType::CreateAggUnit:
       return new CreateAggUnitStateChangeBuilder();
+    case StateChangeBuilderType::AddAccountToAggUnit:
+      return new AddAccountToAggUnitStateChangeBuilder();
+    case StateChangeBuilderType::RemoveAccountFromAggUnit:
+      return new RemoveAccountFromAggUnitStateChangeBuilder();
   }
   // TODO: This should be an error
   return nullptr;
@@ -929,6 +933,104 @@ void CreateAggUnitStateChange::apply(wallaroo::State *state_)
   az_state->create_agg_unit(_client_id, _agg_unit_id);
 }
 
+AddAccountToAggUnitStateChange::AddAccountToAggUnitStateChange(uint64_t id_):
+  StateChange(id_), _client_id(), _account_id(), _agg_unit_id()
+{
+}
+
+void AddAccountToAggUnitStateChange::update(string& client_id_, string& account_id_, string& agg_unit_id_)
+{
+  _client_id = client_id_;
+  _account_id = account_id_;
+  _agg_unit_id = agg_unit_id_;
+}
+
+void AddAccountToAggUnitStateChange::to_log_entry(char *bytes_)
+{
+  Writer writer((unsigned char *)bytes_);
+  writer.u32_be(get_log_entry_size());
+  writer.arizona_string(&_client_id);
+  writer.arizona_string(&_account_id);
+  writer.arizona_string(&_agg_unit_id);
+}
+
+size_t AddAccountToAggUnitStateChange::get_log_entry_size()
+{
+  return 2 + _client_id.size() +
+    2 + _account_id.size() +
+    2 + _agg_unit_id.size();
+}
+
+size_t AddAccountToAggUnitStateChange::read_log_entry_size_header(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  return reader.u32_be();
+}
+
+bool AddAccountToAggUnitStateChange::read_log_entry(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  _client_id = *reader.arizona_string();
+  _account_id = *reader.arizona_string();
+  _agg_unit_id = *reader.arizona_string();
+  return true;
+}
+
+void AddAccountToAggUnitStateChange::apply(wallaroo::State *state_)
+{
+  ArizonaState *az_state = (ArizonaState *)state_;
+  az_state->add_account_to_agg_unit(_client_id, _account_id, _agg_unit_id);
+}
+
+RemoveAccountFromAggUnitStateChange::RemoveAccountFromAggUnitStateChange(uint64_t id_):
+  StateChange(id_), _client_id(), _account_id(), _agg_unit_id()
+{
+}
+
+void RemoveAccountFromAggUnitStateChange::update(string& client_id_, string& account_id_, string& agg_unit_id_)
+{
+  _client_id = client_id_;
+  _account_id = account_id_;
+  _agg_unit_id = agg_unit_id_;
+}
+
+void RemoveAccountFromAggUnitStateChange::to_log_entry(char *bytes_)
+{
+  Writer writer((unsigned char *)bytes_);
+  writer.u32_be(get_log_entry_size());
+  writer.arizona_string(&_client_id);
+  writer.arizona_string(&_account_id);
+  writer.arizona_string(&_agg_unit_id);
+}
+
+size_t RemoveAccountFromAggUnitStateChange::get_log_entry_size()
+{
+  return 2 + _client_id.size() +
+    2 + _account_id.size() +
+    2 + _agg_unit_id.size();
+}
+
+size_t RemoveAccountFromAggUnitStateChange::read_log_entry_size_header(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  return reader.u32_be();
+}
+
+bool RemoveAccountFromAggUnitStateChange::read_log_entry(char *bytes_)
+{
+  Reader reader((unsigned char *) bytes_);
+  _client_id = *reader.arizona_string();
+  _account_id = *reader.arizona_string();
+  _agg_unit_id = *reader.arizona_string();
+  return true;
+}
+
+void RemoveAccountFromAggUnitStateChange::apply(wallaroo::State *state_)
+{
+  ArizonaState *az_state = (ArizonaState *)state_;
+  az_state->remove_account_from_agg_unit(_client_id, _account_id, _agg_unit_id);
+}
+
 class Proceeds ArizonaDefaultState::proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_)
 {
   return _clients.proceeds_with_order(client_id_, account_id_, isin_id_, order_id_, side_, quantity_, price_);
@@ -1061,7 +1163,7 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
           (CreateAggUnitStateChange *) w_state_change_get_state_change_object(
               state_change_repository_helper_, state_change_handle);
         create_aggunit_state_change->update(*am->get_client(), *am->get_aggunit());
-        AdminResponseMessage *response_message = 
+        AdminResponseMessage *response_message =
           new AdminResponseMessage(am->get_message_id(), AdminResponseType::Ok);
         return w_stateful_computation_get_return(
             state_change_repository_helper_,
@@ -1098,6 +1200,10 @@ wallaroo::StateChangeBuilder *ArizonaStateComputation::get_state_change_builder(
       return new ExecuteOrderStateChangeBuilder();
     case StateChangeBuilderType::CreateAggUnit:
       return new CreateAggUnitStateChangeBuilder();
+    case StateChangeBuilderType::AddAccountToAggUnit:
+      return new AddAccountToAggUnitStateChangeBuilder();
+    case StateChangeBuilderType::RemoveAccountFromAggUnit:
+      return new RemoveAccountFromAggUnitStateChangeBuilder();
   }
   // TODO: This should be an error
   return nullptr;
