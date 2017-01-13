@@ -150,7 +150,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       let encoded = _encoder.encode[D](data, _wb)
 
       let next_tracking_id = _next_tracking_id(i_origin, i_route_id, i_seq_id)
-      _writev(encoded, next_tracking_id)
+      //_writev(encoded, next_tracking_id)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
@@ -746,10 +746,12 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   fun ref _apply_backpressure() =>
     _writeable = false
     _notify.throttled(this)
+    _mute_upstreams()
 
   fun ref _release_backpressure() =>
     _notify.unthrottled(this)
     _maybe_distribute_credits()
+    _unmute_upstreams()
 
   fun ref _read_buf_size() =>
     """
@@ -803,6 +805,25 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       @pony_asio_event_resubscribe(_event, flags)
     end
 
+  fun ref _mute_upstreams() =>
+    for u in _upstreams.values() do
+      u.mute(this)
+    end
+
+  fun ref _unmute_upstreams() =>
+    for u in _upstreams.values() do
+      u.unmute(this)
+    end
+
+  fun ref set_nodelay(state: Bool) =>
+    """
+    Turn Nagle on/off. Defaults to on. This can only be set on a connected
+    socket.
+    """
+    if _connected then
+      @pony_os_nodelay[None](_fd, state)
+    end
+
 interface _TCPSinkNotify
   fun ref connecting(conn: TCPSink ref, count: U32) =>
     """
@@ -817,7 +838,7 @@ interface _TCPSinkNotify
     """
     Called when we have successfully connected to the server.
     """
-    None
+    conn.set_nodelay(true)
 
   fun ref connect_failed(conn: TCPSink ref) =>
     """

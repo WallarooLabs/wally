@@ -198,11 +198,12 @@ actor Connections
     end
 
   be ack_watermark_to_boundary(receiver_name: String, seq_id: U64) =>
-    try
+    None
+/*    try
       _data_conns(receiver_name).ack(seq_id)
     else
       @printf[I32](("No outgoing boundary to worker " + receiver_name + "\n").cstring())
-    end
+    end*/
 
   be request_replay(receiver_name: String) =>
     try

@@ -472,6 +472,16 @@ actor Step is (RunnableStep & Resilient & Producer &
   fun _above_minimum_response_level(): Bool =>
     _distributable_credits >= _minimum_credit_response
 
+  be mute(c: CreditFlowConsumer) =>
+    for u in _upstreams.values() do
+      u.mute(c)
+    end
+
+  be unmute(c: CreditFlowConsumer) =>
+    for u in _upstreams.values() do
+      u.unmute(c)
+    end
+
 class StepRouteCallbackHandler is RouteCallbackHandler
   fun ref register(producer: Producer ref, r: RouteLogic tag) =>
     None

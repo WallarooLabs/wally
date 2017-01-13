@@ -125,7 +125,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         end
       | let dc: DataConnectMsg val =>
         try
-          _receivers(dc.sender_name).data_connect(dc.sender_step_id)
+          _receivers(dc.sender_name).data_connect(dc.sender_step_id, conn)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
@@ -170,6 +170,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("accepted data channel connection")
+    conn.set_nodelay(true)
     conn.expect(4)
 
   fun ref connected(sock: TCPConnection ref) =>

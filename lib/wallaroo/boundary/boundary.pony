@@ -3,6 +3,7 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
+use "sendence/bytes"
 use "sendence/guid"
 use "sendence/queue"
 use "sendence/wall-clock"
@@ -37,6 +38,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
 
+  var _c: USize = 0
+
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
   var _max_distributable_credits: ISize = 350_000
@@ -47,7 +50,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _waiting_producers: Array[Producer] = _waiting_producers.create()
 
   // TCP
-  var _notify: _OutgoingBoundaryNotify = BoundaryNotify
+  var _notify: _OutgoingBoundaryNotify
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
@@ -96,6 +99,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     // _encoder = encoder_wrapper
     _auth = auth
+    _notify = BoundaryNotify(_auth)
     _worker_name = worker_name
     _host = host
     _service = service
@@ -203,6 +207,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         new_metrics_id, metric_name)
       // _queue.enqueue(outgoing_msg)
 
+      _c = _c + 1
+      if (_c % 100_000) == 0 then
+        @printf[I32]("Size: %llu, id: %llu\n".cstring(), _queue.size(),
+          _step_id)
+      end
+
       _writev(outgoing_msg)
 
       let end_ts = Time.nanos()
@@ -221,7 +231,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
 
-  be ack(seq_id: SeqId) =>
+  fun ref ack(seq_id: SeqId) =>
     ifdef debug then
       Invariant(seq_id > _lowest_queue_id)
     end
@@ -727,10 +737,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   fun ref _apply_backpressure() =>
     _writeable = false
     _notify.throttled(this)
+    _mute_upstreams()
 
   fun ref _release_backpressure() =>
     _notify.unthrottled(this)
     _maybe_distribute_credits()
+    _unmute_upstreams()
 
   fun ref _read_buf_size() =>
     """
@@ -774,6 +786,25 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       end
 
       @pony_asio_event_resubscribe(_event, flags)
+    end
+
+  fun ref set_nodelay(state: Bool) =>
+    """
+    Turn Nagle on/off. Defaults to on. This can only be set on a connected
+    socket.
+    """
+    if _connected then
+      @pony_os_nodelay[None](_fd, state)
+    end
+
+  fun ref _mute_upstreams() =>
+    for u in _upstreams.values() do
+      u.mute(this)
+    end
+
+  fun ref _unmute_upstreams() =>
+    for u in _upstreams.values() do
+      u.unmute(this)
     end
 
 interface _OutgoingBoundaryNotify
@@ -855,6 +886,44 @@ interface _OutgoingBoundaryNotify
     None
 
 class BoundaryNotify is _OutgoingBoundaryNotify
+  let _auth: AmbientAuth
+  var _header: Bool = true
+
+  new create(auth: AmbientAuth) =>
+    _auth = auth
+
+  fun ref received(conn: OutgoingBoundary ref, data: Array[U8] iso,
+    times: USize): Bool
+  =>
+    if _header then
+      try
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+
+        conn.expect(expect)
+        _header = false
+      end
+      true
+    else
+      ifdef "trace" then
+        @printf[I32]("Rcvd msg at OutgoingBoundary\n".cstring())
+      end
+      match ChannelMsgDecoder(consume data, _auth)
+      | let aw: AckWatermarkMsg val =>
+        conn.ack(aw.seq_id)
+      else
+        @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring()
+)      end
+
+      conn.expect(4)
+      _header = true
+
+      ifdef linux then
+        true
+      else
+        false
+      end
+    end
+
   fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
     """
     Called if name resolution succeeded for a TCPConnection and we are now
@@ -869,6 +938,8 @@ class BoundaryNotify is _OutgoingBoundaryNotify
     Called when we have successfully connected to the server.
     """
     @printf[I32]("BoundaryNotify: connected\n\n".cstring())
+    conn.set_nodelay(true)
+    conn.expect(4)
 
   fun ref closed(conn: OutgoingBoundary ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
