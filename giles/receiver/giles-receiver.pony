@@ -190,11 +190,8 @@ class FromBuffyNotify is TCPConnectionNotify
       end
     end
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
-    n: USize): Bool
-  =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
-      try
         _count = _count + 1
         if (_count == 1) and _use_metrics then
           _metrics.set_start(Time.nanos())
@@ -221,7 +218,6 @@ class FromBuffyNotify is TCPConnectionNotify
           _header = true
         end
       end
-    end
     true
 
   fun ref accepted(conn: TCPConnection ref) =>
