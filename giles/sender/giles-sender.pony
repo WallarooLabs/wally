@@ -770,9 +770,9 @@ class VariableLengthBinaryFileDataSource is Iterator[Array[U8] val]
     end
 
   fun ref next(): Array[U8] val =>
-    let h = _file.read(2)
+    let h = _file.read(4)
     try
-      let expect: USize = Bytes.to_u16(h(0), h(1)).usize() - 2
+      let expect: USize = Bytes.to_u32(h(0), h(1), h(2), h(3)).usize()
       _file.read(expect)
     else
       ifdef debug then
