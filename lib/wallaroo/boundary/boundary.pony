@@ -165,10 +165,13 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   // TODO: open question: how do we reconnect if our external system goes away?
   be forward(delivery_msg: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
-    i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
-    worker_ingress_ts: U64)
+    i_origin: Producer, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64)
   =>
+    let metric_name = delivery_msg.metric_name()
+    let i_frac_ids = delivery_msg.frac_ids()
+    let msg_uid = delivery_msg.msg_uid()
+
     ifdef "trace" then
       @printf[I32]("Rcvd message at OutgoingBoundary\n".cstring())
     end
@@ -198,7 +201,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
         seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)
-      _queue.enqueue(outgoing_msg)
+      // _queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
 

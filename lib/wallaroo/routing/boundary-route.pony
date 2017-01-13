@@ -117,13 +117,10 @@ class BoundaryRoute is Route
     _consumer.forward(delivery_msg,
       pipeline_time_spent,
       cfp,
-      msg_uid,
-      i_frac_ids,
       o_seq_id,
       _route_id,
       latest_ts,
       metrics_id,
-      metric_name,
       worker_ingress_ts)
 
     ifdef "resilience" then
