@@ -1,4 +1,4 @@
-# Building and Testinhg `Arizona` 
+# Building and Testing `Arizona` 
 
 If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
 
