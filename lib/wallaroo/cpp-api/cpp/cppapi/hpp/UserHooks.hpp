@@ -25,10 +25,10 @@
 #define __USERHOOKS_HPP__
 
 
-#include "Data.hpp"
+#include "Serializable.hpp"
 
 extern "C" {
-extern wallaroo::Data* w_user_data_deserialize (char* bytes_, size_t sz_);
+extern wallaroo::Serializable* w_user_data_deserialize (char* bytes_, size_t sz_);
 }
 
 #endif //__USERHOOKS__HPP

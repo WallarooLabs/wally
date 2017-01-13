@@ -259,6 +259,11 @@ trait ReplayableDeliveryMsg is DeliveryMsg
   fun replay_deliver(pipeline_time_spent: U64, target_step: RunnableStep tag,
     origin: Producer, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64): Bool
+  fun input(): Any val
+  fun metric_name(): String
+  fun msg_uid(): U128
+  fun frac_ids(): None => None
+
 
 class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _target_id: U128
@@ -269,17 +274,21 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   let _msg_uid: U128
   let _frac_ids: None
 
+  fun input(): Any val => _data
+  fun metric_name(): String => _metric_name
+  fun msg_uid(): U128 => _msg_uid
+
   new val create(t_id: U128, from: String,
-    m_data: D, m_name: String, proxy_address: ProxyAddress val, msg_uid: U128,
-    frac_ids: None)
+    m_data: D, m_name: String, proxy_address: ProxyAddress val, msg_uid': U128,
+    frac_ids': None)
   =>
     _target_id = t_id
     _sender_name = from
     _data = m_data
     _metric_name = m_name
     _proxy_address = proxy_address
-    _msg_uid = msg_uid
-    _frac_ids = frac_ids
+    _msg_uid = msg_uid'
+    _frac_ids = frac_ids'
 
   fun target_id(): U128 => _target_id
   fun sender_name(): String => _sender_name

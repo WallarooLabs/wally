@@ -1,10 +1,13 @@
-type StateP is ManagedObjectP
+type StateP is Pointer[U8] val
 
 class CPPState
-  let _state: CPPManagedObject
+  let _state: StateP
 
-  new create(state: CPPManagedObject) =>
+  new create(state: StateP) =>
     _state = state
 
   fun obj(): StateP =>
-    _state.obj()
+    _state
+
+  fun _final() =>
+    @w_managed_object_delete(_state)

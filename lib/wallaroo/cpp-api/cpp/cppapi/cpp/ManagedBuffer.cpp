@@ -37,7 +37,9 @@ namespace wallaroo
 
 
 //------------------------------------------------
-BufferWriter::BufferWriter (int sz_) : Buffer(), _internallyAllocatedBuffer(true)
+BufferWriter::BufferWriter(int sz_) :
+    Buffer(),
+    _internallyAllocatedBuffer(true)
 {
   _bodySize = sz_;
   setBody(_bodySize);
@@ -48,13 +50,15 @@ BufferWriter::BufferWriter (int sz_) : Buffer(), _internallyAllocatedBuffer(true
 
 
 //------------------------------------------------
-BufferWriter::BufferWriter (char* buff_, int sz_) : Buffer(), _internallyAllocatedBuffer(false)
+BufferWriter::BufferWriter(char* buff_, int sz_) :
+    Buffer(),
+    _internallyAllocatedBuffer(false)
 {
   _body = buff_;
   _bodySize = sz_;
 
   _read = _body + sz_;
-  _write = _body;// + sz_;
+  _write = _body; // + sz_;
 }
 
 
@@ -62,9 +66,11 @@ BufferWriter::BufferWriter (char* buff_, int sz_) : Buffer(), _internallyAllocat
 
 
 //------------------------------------------------
-BufferWriter::BufferWriter (const BufferWriter& buff_)
+BufferWriter::BufferWriter(const BufferWriter& buff_) :
+    Buffer(),
+    _internallyAllocatedBuffer(false)
 {
-  Logger::getLogger()->error("BufferWriter (const ManagedBuffer& cpy_) --> not defined yet");
+  Logger::getLogger()->error("{}, Error:{}", __PRETTY_FUNCTION__, "not defined yet");
 }
 
 
@@ -72,7 +78,7 @@ BufferWriter::BufferWriter (const BufferWriter& buff_)
 
 
 //------------------------------------------------
-BufferWriter::~BufferWriter ()
+BufferWriter::~BufferWriter()
 {
   if (_body != nullptr && _internallyAllocatedBuffer)
   {
@@ -91,7 +97,7 @@ BufferWriter::~BufferWriter ()
 
 
 //------------------------------------------------
-BufferWriter& BufferWriter::operator<< (const bool param_)
+BufferWriter& BufferWriter::operator<<(const bool param_)
 {
   writeData(&param_, sizeof(param_));
   return *this;
@@ -102,7 +108,7 @@ BufferWriter& BufferWriter::operator<< (const bool param_)
 
 
 //------------------------------------------------
-BufferWriter& BufferWriter::operator<< (const char param_)
+BufferWriter& BufferWriter::operator<<(const char param_)
 {
   writeData(&param_, sizeof(param_));
   return *this;
@@ -113,7 +119,7 @@ BufferWriter& BufferWriter::operator<< (const char param_)
 
 
 //------------------------------------------------
-BufferWriter& BufferWriter::operator<< (const unsigned short param_)
+BufferWriter& BufferWriter::operator<<(const unsigned short param_)
 {
   writeData(&param_, sizeof(param_));
   return *this;
@@ -124,7 +130,7 @@ BufferWriter& BufferWriter::operator<< (const unsigned short param_)
 
 
 //------------------------------------------------
-BufferWriter& BufferWriter::operator<< (const short param_)
+BufferWriter& BufferWriter::operator<<(const short param_)
 {
   writeData(&param_, sizeof(param_));
   return *this;
@@ -135,7 +141,7 @@ BufferWriter& BufferWriter::operator<< (const short param_)
 
 
 //------------------------------------------------
-BufferWriter& BufferWriter::operator<< (const unsigned int param_)
+BufferWriter& BufferWriter::operator<<(const unsigned int param_)
 {
   writeData(&param_, sizeof(param_));
   return *this;
@@ -146,17 +152,7 @@ BufferWriter& BufferWriter::operator<< (const unsigned int param_)
 
 
 //------------------------------------------------
-BufferWriter& BufferWriter::operator<< (const int param_)
-{
-  writeData(&param_, sizeof(param_));
-  return *this;
-}
-
-
-
-
-//------------------------------------------------
-BufferWriter& BufferWriter::operator<< (const unsigned long param_)
+BufferWriter& BufferWriter::operator<<(const int param_)
 {
   writeData(&param_, sizeof(param_));
   return *this;
@@ -167,7 +163,7 @@ BufferWriter& BufferWriter::operator<< (const unsigned long param_)
 
 
 //------------------------------------------------
-BufferWriter& BufferWriter::operator<< (const long param_)
+BufferWriter& BufferWriter::operator<<(const unsigned long param_)
 {
   writeData(&param_, sizeof(param_));
   return *this;
@@ -178,7 +174,7 @@ BufferWriter& BufferWriter::operator<< (const long param_)
 
 
 //------------------------------------------------
-BufferWriter& BufferWriter::operator<< (const double param_)
+BufferWriter& BufferWriter::operator<<(const long param_)
 {
   writeData(&param_, sizeof(param_));
   return *this;
@@ -189,11 +185,37 @@ BufferWriter& BufferWriter::operator<< (const double param_)
 
 
 //------------------------------------------------
-BufferWriter& BufferWriter::operator<< (const string& str_)
+BufferWriter& BufferWriter::operator<<(const double param_)
+{
+  writeData(&param_, sizeof(param_));
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<<(const string& str_)
 {
   short sz = (short) str_.size();
   writeData(&sz, sizeof(short));
-  writeData(str_.c_str(), sz);
+  std::memcpy(_write, str_.c_str(), sz);
+  _write += sz;
+  return *this;
+}
+
+
+
+
+
+//------------------------------------------------
+BufferWriter& BufferWriter::operator<<(const char* str_)
+{
+  short sz = (short) std::strlen(str_);
+  writeData(&sz, sizeof(short));
+  std::memcpy(_write, str_, sz);
+  _write += sz;
   return *this;
 }
 

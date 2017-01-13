@@ -1,27 +1,25 @@
-use @w_data_serialize_get_size[USize](data: DataP)
-use @w_data_serialize[None](data: DataP, bytes: Pointer[U8] tag, size: USize)
-use @w_data_deserialize[DataP](bytes: Pointer[U8] tag, size: USize)
-
-type DataP is ManagedObjectP
-
-primitive CPPDataDeserialize
-  fun apply(bytes: Array[U8] val): CPPData =>
-    CPPData(CPPManagedObject(@w_data_deserialize(bytes.cpointer(), bytes.size())))
+type DataP is Pointer[U8] val
 
 class CPPData
-  let _data: CPPManagedObject
+  var _data: Pointer[U8] val
 
-  new create(data: CPPManagedObject) =>
+  new create(data: Pointer[U8] val) =>
     _data = data
 
-  fun serialize(): Array[U8] val =>
-    let size = @w_data_serialize_get_size(obj())
-    let bytes = recover val
-      let b = Array[U8].undefined(size)
-      @w_data_serialize(obj(), b.cpointer(), size)
-      b
-    end
-    bytes
+  fun obj(): DataP val =>
+    _data
 
-  fun obj(): DataP =>
-    _data.obj()
+  fun _serialise_space(): USize =>
+    @w_serializable_serialize_get_size(_data)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    let s = @w_serializable_serialize(_data, bytes, USize(0))
+    //SUPER-EVIL-DANGER-ZONE
+    delete_obj()
+    s
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _data = recover @w_user_serializable_deserialize(bytes, USize(0)) end
+
+  fun delete_obj() =>
+    @w_managed_object_delete(_data)

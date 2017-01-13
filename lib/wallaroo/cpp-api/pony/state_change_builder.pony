@@ -5,10 +5,22 @@ use @w_state_change_builder_build[StateChangeP](builder_function: Pointer[U8] va
 type StateChangeBuilderP is Pointer[U8] val
 
 class CPPStateChangeBuilder is StateChangeBuilder[CPPState]
-  let _state_change_builder: CPPManagedObject val
+  var _state_change_builder: StateChangeBuilderP
 
-  new create(state_change_builder: CPPManagedObject val) =>
+  new create(state_change_builder: StateChangeBuilderP) =>
     _state_change_builder = state_change_builder
 
   fun apply(id: U64): CPPStateChange =>
-    CPPStateChange(recover CPPManagedObject(@w_state_change_builder_build(_state_change_builder.obj(), id)) end)
+    CPPStateChange(recover @w_state_change_builder_build(_state_change_builder, id) end)
+
+  fun _serialise_space(): USize =>
+    @w_serializable_serialize_get_size(_state_change_builder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    @w_serializable_serialize(_state_change_builder, bytes, USize(0))
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _state_change_builder = recover @w_user_serializable_deserialize(bytes, USize(0)) end
+
+  fun _final() =>
+    @w_managed_object_delete(_state_change_builder)

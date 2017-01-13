@@ -35,15 +35,13 @@ class Data: public ManagedObject
 {
 public:
     virtual ~Data();
-
-    virtual void deserialize (char* bytes) = 0;
-    virtual void serialize (char* bytes, size_t nsz_) = 0;
-    virtual size_t serialize_get_size () = 0;
 };
 
 class EncodableData: public Data
 {
 public:
+  virtual ~EncodableData() {};
+  virtual size_t encode_get_size() = 0;
   virtual void encode(char *bytes) = 0;
 };
 

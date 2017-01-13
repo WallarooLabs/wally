@@ -21,6 +21,7 @@ else()
     message(STATUS "LITTLE_ENDIAN")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_LITTLE_ENDIAN")
 endif()
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_BIG_ENDIAN")
 
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
@@ -30,23 +31,28 @@ if(COMPILER_SUPPORTS_CXX11)
 	set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -std=c++11")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG} -DCONSOLE")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}")
 message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
 set(HEADER_FILES
-	hpp/Logger.hpp
-	hpp/Buffers.hpp
 	hpp/ApiHooks.hpp
-	hpp/ApiObject.hpp
-	hpp/WallarooVersion.hpp
-        hpp/ApiUser.hpp
+	hpp/Buffers.hpp
         hpp/Computation.hpp
-        hpp/State.hpp
-        hpp/StateChange.hpp
-        hpp/StateChangeRepository.hpp
-        hpp/StateChangeBuilder.hpp
+	hpp/Data.hpp
+      	hpp/Key.hpp
+	hpp/Logger.hpp
+	hpp/ManagedObject.hpp
+	hpp/Serializable.hpp
+	hpp/SinkEncoder.hpp
+	hpp/SourceDecoder.hpp
+	hpp/StateChangeBuilder.hpp
+	hpp/StateChange.hpp
+	hpp/StateChangeRepository.hpp
+	hpp/State.hpp
+	hpp/UserHooks.hpp
+	hpp/WallarooVersion.hpp
 )
 
 
@@ -59,6 +65,7 @@ set(SOURCE_FILES
 	cpp/ManagedObject.cpp
 	cpp/Data.cpp
 	cpp/ApiHooks.cpp
+  cpp/Hashable.cpp
 )
 
 message("Inside sibdir, include dir: ${PROJECT_SOURCE_DIR}/cppapi/hpp")
@@ -67,7 +74,6 @@ message("Inside sibdir, include dir: ${PROJECT_SOURCE_DIR}/cppapi/hpp")
 include_directories("${PROJECT_SOURCE_DIR}/cppapi/hpp")
 include_directories("hpp")
 
-# add_executable(testapi ${SOURCE_FILES} cpp/tester.cpp)
 add_library(wallaroo-static STATIC ${SOURCE_FILES})
 set_target_properties(wallaroo-static PROPERTIES OUTPUT_NAME "wallaroo")
 set_target_properties(wallaroo-static PROPERTIES PREFIX "lib")

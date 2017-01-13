@@ -27,7 +27,10 @@
 
 #include <cstddef>
 #include "Computation.hpp"
+#include "Serializable.hpp"
 #include "Data.hpp"
+#include "Key.hpp"
+#include "PartitionFunction.hpp"
 #include "ManagedObject.hpp"
 #include "SinkEncoder.hpp"
 #include "SourceDecoder.hpp"
@@ -49,12 +52,12 @@ extern const char *w_state_computation_get_name(wallaroo::StateComputation *stat
 extern size_t w_state_computation_get_number_of_state_change_builders(wallaroo::StateComputation *state_computaton_);
 extern wallaroo::StateChangeBuilder *w_state_computation_get_state_change_builder(wallaroo::StateComputation *state_computation_, uint64_t idx_);
 
-extern size_t w_data_serialize_get_size(wallaroo::Data* data_);
-extern void w_data_serialize(wallaroo::Data* data_, char* bytes_, size_t sz_);
-extern wallaroo::Data* w_data_deserialize (char* bytes_, size_t sz_);
+extern size_t w_serializable_serialize_get_size(wallaroo::Serializable* serializable_);
+extern void w_serializable_serialize(wallaroo::Serializable* serializable_, char* bytes_, size_t sz_);
+extern wallaroo::Serializable* w_serializable_deserialize (char* bytes_, size_t sz_);
 
 extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
-  wallaroo::Data *data_);
+  wallaroo::EncodableData *data_);
 extern void w_sink_encoder_encode(wallaroo::SinkEncoder *sink_encoder,
   wallaroo::EncodableData *data_, char *bytes);
 
@@ -76,6 +79,15 @@ extern wallaroo::StateChange *w_state_change_builder_build(wallaroo::StateChange
 extern void *w_state_change_repository_lookup_by_name(void *state_change_repository_helper_, void *state_change_repository_, const char *name_);
 extern wallaroo::StateChange *w_state_change_get_state_change_object(void *state_change_repository_helper_, void *state_change_);
 extern void *w_stateful_computation_get_return(void *state_change_repository_helper_, wallaroo::Data* data_, void *state_change_);
+
+extern uint64_t w_hashable_hash(wallaroo::Hashable const *obj_);
+extern uint64_t w_hashable_partition_index(wallaroo::Hashable const *obj_);
+
+extern uint64_t w_key_hash(wallaroo::Key *key_);
+extern bool w_key_eq(wallaroo::Key *key_, wallaroo::Key *other_);
+
+extern wallaroo::Key *w_partition_function_partition(wallaroo::PartitionFunction *partition_function_, wallaroo::Data *data_);
+extern uint64_t w_partition_function_u64_partition(wallaroo::PartitionFunctionU64 *partition_function_u64_, wallaroo::Data *data_);
 
 extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_);
 }

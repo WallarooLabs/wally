@@ -24,6 +24,9 @@
 #include "ApiHooks.hpp"
 #include "Computation.hpp"
 #include "Data.hpp"
+#include "Key.hpp"
+#include "PartitionFunction.hpp"
+#include "Serializable.hpp"
 #include "ManagedObject.hpp"
 #include "SinkEncoder.hpp"
 #include "SourceDecoder.hpp"
@@ -76,18 +79,18 @@ extern wallaroo::StateChangeBuilder *w_state_computation_get_state_change_builde
   return state_computation_->get_state_change_builder(idx_);
 }
 
-extern size_t w_data_serialize_get_size(wallaroo::Data* data_)
+extern size_t w_serializable_serialize_get_size(wallaroo::Serializable* serializable_)
 {
-  return data_->serialize_get_size();
+  return serializable_->serialize_get_size();
 }
 
-extern void w_data_serialize(wallaroo::Data* data_, char* bytes_, size_t sz_)
+extern void w_serializable_serialize(wallaroo::Serializable* serializable_, char* bytes_, size_t sz_)
 {
-  data_->serialize(bytes_, sz_);
+  serializable_->serialize(bytes_, sz_);
 }
 
 extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
-  wallaroo::Data *data_)
+  wallaroo::EncodableData *data_)
 {
   return sink_encoder->get_size(data_);
 }
@@ -173,6 +176,37 @@ void *w_stateful_computation_get_return(void *state_change_repository_helper_, w
   return pony_CPPStateChangeRepositoryHelper_get_stateful_computation_return(state_change_repository_helper_, data_, state_change_);
 }
   
+extern uint64_t w_hashable_hash(wallaroo::Hashable const *obj_)
+{
+  return obj_->hash();
+}
+
+extern uint64_t w_hashable_partition_index(wallaroo::Hashable const *obj_)
+{
+  return obj_->partition_index();
+}
+
+
+extern uint64_t w_key_hash(wallaroo::Key *key_)
+{
+  return key_->hash();
+}
+  
+extern bool w_key_eq(wallaroo::Key *key_, wallaroo::Key *other_)
+{
+  return key_->eq(other_);
+}
+
+extern wallaroo::Key *w_partition_function_partition(wallaroo::PartitionFunction *partition_function_, wallaroo::Data *data_)
+{
+  return partition_function_->partition(data_);
+}
+
+extern uint64_t w_partition_function_u64_partition(wallaroo::PartitionFunctionU64 *partition_function_, wallaroo::Data *data_)
+{
+  return partition_function_->partition(data_);
+}
+
 extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_)
 {
   delete obj_;
