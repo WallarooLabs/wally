@@ -182,9 +182,7 @@ class FromBuffyNotify is TCPConnectionNotify
       end
     end
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
-    n: USize): Bool
-  =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
       try
         _count = _count + 1
@@ -244,9 +242,7 @@ class ToDagonNotify is TCPConnectionNotify
     sock.expect(4)
     _coordinator.to_dagon_socket(sock, Ready)
 
-    fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
-      n: USize): Bool
-    =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
