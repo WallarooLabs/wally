@@ -201,7 +201,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
         seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)
-      _queue.enqueue(outgoing_msg)
+      // _queue.enqueue(outgoing_msg)
 
       _writev(outgoing_msg)
 
