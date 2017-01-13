@@ -142,4 +142,6 @@ class TypedRoute[In: Any val] is Route
       cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id, i_seq_id)
     end
 
-    _route.use_credit()
+    ifdef "backpressure" then
+      _route.use_credit()
+    end

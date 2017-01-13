@@ -100,7 +100,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
@@ -183,6 +185,8 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
   =>
     _env = env
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
     _env.out.print("Control sender channel received data.")
     true
