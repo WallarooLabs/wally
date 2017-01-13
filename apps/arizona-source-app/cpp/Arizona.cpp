@@ -1157,7 +1157,6 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
     {
       case AdminRequestType::CreateAggUnitRequest:
       {
-        //TODO: add aggunit to client
         void *state_change_handle = w_state_change_repository_lookup_by_name(
             state_change_repository_helper_,
             state_change_repository_,
@@ -1178,11 +1177,45 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
         //TODO: query aggunit
         break;
       case AdminRequestType::AddAggUnit:
+      {
         //TODO: add account to agguint
-        break;
+        //AddAccountToAggUnitStateChange
+        void *state_change_handle = w_state_change_repository_lookup_by_name(
+            state_change_repository_helper_,
+            state_change_repository_,
+            "add account to agg unit state change");
+        AddAccountToAggUnitStateChange *create_aggunit_state_change =
+          (AddAccountToAggUnitStateChange *) w_state_change_get_state_change_object(
+              state_change_repository_helper_, state_change_handle);
+        create_aggunit_state_change->update(*am->get_client(), *am->get_account(), *am->get_aggunit());
+        AdminResponseMessage *response_message =
+          new AdminResponseMessage(am->get_message_id(), AdminResponseType::Ok);
+        return w_stateful_computation_get_return(
+            state_change_repository_helper_,
+            response_message,
+            state_change_handle);
+      }
+      break;
       case AdminRequestType::RemoveAggUnit:
+      {
         //TODO: delete account from aggunit
-        break;
+        //RemoveAccountFromAggUnitStateChange
+        void *state_change_handle = w_state_change_repository_lookup_by_name(
+            state_change_repository_helper_,
+            state_change_repository_,
+            "add account to agg unit state change");
+        RemoveAccountFromAggUnitStateChange *create_aggunit_state_change =
+          (RemoveAccountFromAggUnitStateChange *) w_state_change_get_state_change_object(
+              state_change_repository_helper_, state_change_handle);
+        create_aggunit_state_change->update(*am->get_client(), *am->get_account(), *am->get_aggunit());
+        AdminResponseMessage *response_message =
+          new AdminResponseMessage(am->get_message_id(), AdminResponseType::Ok);
+        return w_stateful_computation_get_return(
+            state_change_repository_helper_,
+            response_message,
+            state_change_handle);
+      }
+      break;
     }
     ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
     return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
