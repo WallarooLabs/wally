@@ -179,6 +179,8 @@ public:
   Proceeds proceeds_with_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& account_id_, string& order_id_);
   Proceeds proceeds_with_execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
+  Proceeds proceeds();
+  Proceeds proceeds_for_account(string& account_id_);
 };
 
 class AggUnit
@@ -220,6 +222,8 @@ public:
   Proceeds proceeds_with_order(string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& account_id_, string& order_id_);
   Proceeds proceeds_with_execute(string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
+  Proceeds proceeds();
+  Proceeds proceeds_for_account(string& account_id_);
   Proceeds proceeds_for_agg_unit(string& agg_unit_id_);
   void create_agg_unit(string& agg_unit_id_);
   void add_account_to_agg_unit(string& account_id_, string& agg_unit_id_);
@@ -242,6 +246,8 @@ public:
   Proceeds proceeds_with_order(string& client_id_, string& account_id_, string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_);
   Proceeds proceeds_with_cancel(string& client_id_, string& account_id_, string& order_id_);
   Proceeds proceeds_with_execute(string& client_id_, string& account_id_, string& order_id_, string& execution_id_, uint32_t quantity_, double price_);
+  Proceeds proceeds_for_client(string& client_id);
+  Proceeds proceeds_for_account(string& client_id_, string& account_id_);
   Proceeds proceeds_for_agg_unit(string& client_id_, string& agg_unit_id_);
   void create_agg_unit(string& client_id_, string& agg_unit_id_);
   void add_account_to_agg_unit(string& client_id_, string& agg_unit_id_, string& account_id_);

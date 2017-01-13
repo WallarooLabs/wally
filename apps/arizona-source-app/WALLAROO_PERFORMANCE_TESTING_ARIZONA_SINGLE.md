@@ -2,7 +2,8 @@
 
 If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
 
-## Configuring Cluster:
+## Arizona Cluster
+### Configuring Cluster:
 
 Before configuring your cluster, make sure you are in
 your `orchestration/arizona` directory.
@@ -36,13 +37,54 @@ You can SSH into the build machine using:
 ssh -i ~/.ssh/ec2/us-east-1.pem ec2-user@<IP_ADDRESS>
 ```
 
+## Ubuntu cluster
+If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
+### Configuring Cluster:
+
+Before configuring your cluster, make sure you are in
+your `orchestration/terraform` directory.
+```
+make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=36 num_followers=0 force_instance=c4.8xlarge spot_bid_factor=100 ansible_system_cpus=0,18 ansible_isolcpus=false no_spot=true
+```
+You'll get a response ending with something similar to this if successful:
+```bash
+PLAY RECAP *********************************************************************
+54.165.9.39                : ok=70   changed=39   unreachable=0    failed=0
+```
+
+You can SSH into the build machine using:
+
+```bash
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
+```
+
 ## Generate data
 Before you can run Arizona, you need to generate data for it with the datagen app. This can take some time (depending on how large of a dataset you are building), so do this step first.
 
 As for how long it will take to generate your data, a good rule of thumb is to halve the time you want to generate. So, if you want to generate 20 mins of data, it will take 10 mins to do. If you want to do 1 hour, it will take 30 mins... etc.
-#### Build spdlog
+### Building data generation tools
+#### Build libconfig
+**Please note:** this is only needed on the machines where `datagen`, `pairgen`, etc. will be built.
 ```
-scl enable devtoolset-4 bash
+sudo apt-get install -y pkg-config 
+```
+**Please note:** this is only needed on the machines where `datagen`, `pairgen`, etc. will be run.
+```
+sudo apt-get install -y libconfig++-dev
+```
+#### Build cmake
+**Note:**You don't have to do this if you are using the arizona-build-server
+```
+https://cmake.org/files/v3.7/cmake-3.7.1.tar.gz
+tar zxvf cmake-3.7.1.tar.gz
+cd cmake-3.7.1
+./configure
+sudo make install
+```
+#### Build spdlog
+**Note:**You don't have to do this if you are using the arizona-build-server
+```
+scl enable devtoolset-4 bash //only for redhat executuon machines
 cd ~/
 git clone https://github.com/gabime/spdlog.git
 cd ~/spdlog
@@ -53,9 +95,11 @@ sudo make install
 ```
 
 #### Build Arizona-CPP
+**Note:**You don't have to do this if you are using the arizona-build-server
 ```
-scl enable devtoolset-4 bash
+scl enable devtoolset-4 bash //only for redhat executuon machines
 cd ~/buffy
+git clone https://github.com/Sendence/buffy.git
 git checkout arizona-add-state
 cd lib/wallaroo/cpp-api/cpp/cppapi
 mkdir build
@@ -66,7 +110,7 @@ sudo make install
 
 #### The Arizona Ancillary Tools (AZAT)
 ```
-scl enable devtoolset-4 bash
+scl enable devtoolset-4 bash //only for redhat executuon machines
 export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:PKG_CONFIG_PATH
 cd ~/
 git clone https://github.com/Sendence/arizona.git
@@ -82,16 +126,19 @@ cp *.cfg /apps/dev/arizona/etc/
 scp -i YOUR_PEM_FILE -r /apps/dev/arizona ec2-user@EXECUTION_HOST_IP:/apps/dev/arizona
 ```
 
-At this point, you will be ready to generate data. Log into the executon host that you copied your files to. The options are:
-
+At this point, you will be ready to generate data. Log into the executon host that you copied your files to.
+### Actual data generation
+Your options are:
 #### Create a really small file (150K message) that you can loop through, should not have memory growth
 
 ```
+ssh -i YOUR_PEM ec2-user@YOUR-EXECUTION-SERVER-IP
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 mkdir -p /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/pairgen -c /apps/dev/arizona/etc/pairgen_150K.cfg
 ```
-* Your data files will appear in: /apps/dev/arizona/pairgen_150K.dat[*]
+* Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
+* Data files: pairgen_150K.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
 
@@ -99,40 +146,46 @@ mkdir -p /apps/dev/arizona/data
 #### Create a 15 minute data set (do we crash?)
 
 ```
+ssh -i YOUR_PEM ec2-user@YOUR-EXECUTION-SERVER-IP
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 mkdir -p /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/datagen-c data_15min.cfg
 ```
 * Do not use the files for looping.
-* Your data files will appear in: /apps/dev/arizona/data/azdata_15mins.dat[*]
+* Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
+* Data files: azdata_15mins.dat[*]
 * Use the `full` for messages of multiple types(orders,cancels,executes)
 
 
 #### Create a 60 minute data set (are there long-term problems?)
 
 ```
+ssh -i YOUR_PEM ec2-user@YOUR-EXECUTION-SERVER-IP
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 mkdir -p /apps/dev/arizona/data
 /apps/dev/arizona/bin/datagen -c data_1hour.cfg
 ```
 * Do not use the files for looping
-* Your data diles will appear in: /apps/dev/arizona/data/azdata_1hour.dat
+* Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
+* Data files: azdata_1hrs.dat[*]
 * Use the `full` for messages of multiple types(orders,cancels,executes)
 
 #### Create an 8 hour data set (does this work for the full 8 hours?)
 
 
 ```
+ssh -i YOUR_PEM ec2-user@YOUR-EXECUTION-SERVER-IP
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 mkdir -p /apps/dev/arizona/data
 /apps/dev/arizona/bin/datagen -c data_8hours.cfg
 ```
 
 * Do not use the files for looping
-* Your data diles will appear in: /apps/dev/arizona/data/azdata_8hrs.dat
+* Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
+* Data files: azdata_8hrs.dat[*]
 * Use the `full` for messages of multiple types(orders,cancels,executes)
 
-
+## Arizona/Wallaroo
 ### Clone Wallaroo repo
 
 You'll need to clone the repo:
@@ -193,29 +246,6 @@ git clone https://github.com/Sendence/ponyc.git
 cd ~/ponyc/
 git checkout export-and-serialize
 sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/llvm-config
-```
-
-### Build spdlog
-```
-sudo apt-get install -y cmake
-cd ~/
-git clone https://github.com/gabime/spdlog.git
-cd ~/spdlog
-mkdir build
-cd build
-cmake ..
-sudo make install
-```
-
-### Build Arizona-CPP
-```
-cd ~/buffy
-git checkout arizona-add-state
-cd lib/wallaroo/cpp-api/cpp/cppapi
-mkdir build
-cd build
-cmake ..
-sudo make install
 ```
 
 ### Build giles
