@@ -111,6 +111,7 @@ mkdir build
 cd build
 cmake ..
 sudo make install
+make build-giles-receiver arch=amd64
 ```
 
 ### Build giles
