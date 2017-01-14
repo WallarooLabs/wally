@@ -3,7 +3,7 @@
 If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
 
 ## Arizona Cluster
-**Please note:** WHEN DOING MULTIPLE MACHINE TESTS YOU HAVE TO USE TERRAFORM FOLLOWERS VALUE.
+**Please note:** WHEN DOING MULTIPLE MACHINE TESTS YOU HAVE TO USE TERRAFORM FOLLOWERS VALUE.  If you spin up individual machines, they won’t end up in the same placement group and then not good performance.
 
 ### Configuring Cluster:
 
@@ -13,7 +13,7 @@ your `orchestration/terraform` directory.
 If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
 
 ```
-make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=36 num_followers=0 force_instance=c4.8xlarge spot_bid_factor=100 ansible_system_cpus=0,18 ansible_isolcpus=false no_spot=true
+make cluster cluster_name=<YOUR_CLUSTER_NAME> mem_required=30 cpus_required=36 num_followers=<NUM_FOLLOWERS> force_instance=c4.8xlarge spot_bid_factor=100 ansible_system_cpus=0,18 ansible_isolcpus=false no_spot=true
 ```
 You'll get a response ending with something similar to this if successful:
 ```bash

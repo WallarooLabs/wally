@@ -17,7 +17,7 @@ We already have a build machine, called ***arizona-build-server*** you can log i
 ssh -i YOUR_PEM_FILE ec2-user@AWS-HOST-NAME
 ```
 
-Or, you can create a build machine, by running:
+Or, you can create a build machine by running:
 ```
 make cluster cluster_name=<BUILD_MACHINE_NAME> num_followers=0 force_instance=r3.4xlarge arizona_node_type=build ansible_system_cpus=0,8
 ```
