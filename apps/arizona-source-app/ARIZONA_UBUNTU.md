@@ -21,7 +21,7 @@ PLAY RECAP *********************************************************************
 54.165.9.39                : ok=70   changed=39   unreachable=0    failed=0
 ```
 
-You can SSH into the build machine using:
+You can SSH into the target machine using:
 
 ```bash
 ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
@@ -31,6 +31,11 @@ ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@<IP_ADDRESS>
 Before you can run Arizona, you need to generate data for it with the datagen app. This can take some time (depending on how large of a dataset you are building), so do this step first.
 
 As for how long it will take to generate your data, a good rule of thumb is to halve the time you want to generate. So, if you want to generate 20 mins of data, it will take 10 mins to do. If you want to do 1 hour, it will take 30 mins... etc.
+
+IMPORTANT: all the configs are for generating data with 750 clients. If you want
+to run on multiworker with 5500 clients, there is a `-multiworker` version of
+each config.
+ 
 ### Building data generation tools
 
 #### Install libconfig
@@ -56,10 +61,9 @@ sudo make install
 
 #### Build Arizona-CPP
 ```
-cd ~/buffy
+cd ~/
 git clone https://github.com/Sendence/buffy.git
-cd buffy
-cd lib/wallaroo/cpp-api/cpp/cppapi
+cd buffy/lib/wallaroo/cpp-api/cpp/cppapi
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
@@ -77,20 +81,18 @@ mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/apps/dev/arizona ../
 sudo make install
-sudo mkdir /apps/dev/arizona/etc
+sudo mkdir -p /apps/dev/arizona/etc
 sudo mkdir -p /apps/dev/arizona/data
 sudo chown -R ubuntu:ubuntu /apps/dev/arizona
 cd ~/arizona/bin_cfggen/etc
 cp *.cfg /apps/dev/arizona/etc/
 ```
 
-At this point, you will be ready to generate data. Log into the executon host that you copied your files to.
 ### Actual data generation
 Your options are:
 #### Create a really small file (150K message) that you can loop through, should not have memory growth
 
 ```
-ssh -i <YOUR_PEM> ec2-user@<YOUR-EXECUTION-SERVER-IP>
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 cd /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/pairgen -c /apps/dev/arizona/etc/pairgen_150K.cfg
@@ -104,7 +106,6 @@ cd /apps/dev/arizona/data
 #### Create a 15 minute data set (do we crash?)
 
 ```
-ssh -i <YOUR_PEM> ec2-user@<YOUR-EXECUTION-SERVER-IP>
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 cd /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/datagen -c /apps/dev/arizona/etc/data_15min.cfg
@@ -118,7 +119,6 @@ cd /apps/dev/arizona/data
 #### Create a 60 minute data set (are there long-term problems?)
 
 ```
-ssh -i <YOUR_PEM> ec2-user@<YOUR-EXECUTION-SERVER-IP>
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 cd /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/datagen -c /apps/dev/arizona/etc/data_1hour.cfg
@@ -132,7 +132,6 @@ cd /apps/dev/arizona/data
 
 
 ```
-ssh -i <YOUR_PEM> ec2-user@<YOUR-EXECUTION-SERVER-IP>
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 cd /apps/dev/arizona/data
 /apps/dev/arizona/bin/datagen -c /apps/dev/arizona/etc/data_8hours.cfg
@@ -267,7 +266,7 @@ sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/
 
 ```
 cd ~/buffy/apps/arizona-source-app
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 --clients=5500
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 --clients=750
 ```
 
 #### Running the Sender
