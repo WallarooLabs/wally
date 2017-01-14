@@ -84,10 +84,10 @@ enum MessageType
 
 enum AdminRequestType
 {
-  CreateAggUnitRequest = 0,
+  CreateAggUnitRequest = 4,
   QueryAggUnit = 1,
-  AddAggUnit = 2,
-  RemoveAggUnit = 3
+  AddAggUnit = 7,
+  RemoveAggUnit = 8
 };
 
 enum AdminResponseType
