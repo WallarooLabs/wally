@@ -157,6 +157,8 @@ for t2.nano level of CPU] values):
 * Create and configure (with ansible) a cluster with name `example` where
   the instances have at least 8 cpus and 16 GB of RAM:
   `make cluster mem_required=16 cpus_required=8 cluster_name=example`
+* Check ptpd offset for all followers in a cluster with name `sample`:
+  `make check-ptpd-offsets cluster_name=sample`
 
 ## Debugging Ansible for AWS
 

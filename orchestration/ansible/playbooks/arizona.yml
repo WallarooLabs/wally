@@ -56,13 +56,22 @@
   - name: set hostname
     hostname: name=arizona-follower-{{ groups['arizona-followers'].index(inventory_hostname) + 1 }}
     become: yes
-  - name: "Add hostname to hosts file"
+  - name: "Add follower hostnames to hosts file"
     lineinfile:
       dest: /etc/hosts
-      regexp: .*arizona-follower-{{ groups['arizona-followers'].index(inventory_hostname) + 1 }}$
-      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} arizona-follower-{{ groups['arizona-followers'].index(inventory_hostname) + 1 }}"
+      regexp: .*arizona-follower-{{ groups['arizona-followers'].index(item) + 1 }}$
+      line: "{{ hostvars[item].ansible_default_ipv4.address }} arizona-follower-{{ groups['arizona-followers'].index(item) + 1 }}"
       state: present
     become: yes
+    with_inventory_hostnames: arizona-followers
+  - name: "Add leader hostnames to hosts file"
+    lineinfile:
+      dest: /etc/hosts
+      regexp: .*arizona-leader-{{ groups['arizona-leaders'].index(item) + 1 }}$
+      line: "{{ hostvars[item].ansible_default_ipv4.address }} arizona-leader-{{ groups['arizona-leaders'].index(item) + 1 }}"
+      state: present
+    become: yes
+    with_inventory_hostnames: arizona-leaders
 
 - hosts: tag_Project_arizona:&tag_Role_leader:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
   vars:
@@ -75,13 +84,22 @@
   - name: set hostname
     hostname: name=arizona-leader-{{ groups['arizona-leaders'].index(inventory_hostname) + 1 }}
     become: yes
-  - name: "Add hostname to hosts file"
+  - name: "Add follower hostnames to hosts file"
     lineinfile:
       dest: /etc/hosts
-      regexp: .*arizona-leader-{{ groups['arizona-leaders'].index(inventory_hostname) + 1 }}$
-      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} arizona-leader-{{ groups['arizona-leaders'].index(inventory_hostname) + 1 }}"
+      regexp: .*arizona-follower-{{ groups['arizona-followers'].index(item) + 1 }}$
+      line: "{{ hostvars[item].ansible_default_ipv4.address }} arizona-follower-{{ groups['arizona-followers'].index(item) + 1 }}"
       state: present
     become: yes
+    with_inventory_hostnames: arizona-followers
+  - name: "Add leader hostnames to hosts file"
+    lineinfile:
+      dest: /etc/hosts
+      regexp: .*arizona-leader-{{ groups['arizona-leaders'].index(item) + 1 }}$
+      line: "{{ hostvars[item].ansible_default_ipv4.address }} arizona-leader-{{ groups['arizona-leaders'].index(item) + 1 }}"
+      state: present
+    become: yes
+    with_inventory_hostnames: arizona-leaders
 
 - hosts: arizona-leaders:arizona-followers
   tasks:
@@ -115,6 +133,14 @@
   - name: create cpu shield
     script: roles/common/files/create_cpu_shield.sh {{ system_cpus if system_cpus is defined else "" }} > /create_cpu_shield.out
     become: yes
+  - name: Put ssh private key onto server
+    copy:
+      src: "{{ ssh_key_file }}"
+      dest: /home/{{ ansible_user_id }}/.ssh/id_rsa
+      owner: "{{ ansible_ssh_user }}"
+      group: "{{ ansible_ssh_user }}"
+      mode: 0700
+
 
 # Configure and deploy leader servers.
 - hosts: arizona-leaders

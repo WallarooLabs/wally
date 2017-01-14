@@ -16,10 +16,12 @@ num_followers ?= ## Number of follower nodes (2 by default)
 ansible_ptpd_experimental ?= false## Whether to use experimental PTPd or not
 arizona_node_type ?= execution## Type of arizona node to launch. Options are: 'execution', 'development', 'build'
 ansible_system_cpus ?= ## Number of cpus to dedicate for system processes (the rest are isolated for user processes)
+ptpd_offset_max ?= 0.00025## ptpd offset tolerance beyond which things care considered out of sync (default is 250 microseconds)
 
 inventory_script := ec2.py
 ansible_user := ec2-user
 all_instances := 'tag_Project_arizona:&tag_ClusterName_$(cluster_name):&$(region)'
+follower_instances := 'tag_Project_arizona:&tag_ClusterName_$(cluster_name):&tag_Role_follower:&$(region)'
 
 # if debug shell command output requested
 ifdef DEBUG_SHELL
@@ -291,6 +293,20 @@ cluster: check-cluster-name apply sleep60 configure ## Creates a cluster and con
 
 destroy: check-cluster-name acquire-cluster-lock init-terraform setup_$(provider)_ci_arg setup_$(provider)_az_arg terraform-destroy release-cluster-lock ## Run terraform destroy step
 
+check-ptpd-offsets: check-cluster-name ## Check ptpd offsets for all followers in the cluster
+	@echo "\033[36m==> Running ansible ptpd check for followers in cluster \
+'$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
+	@echo "\033[36m==> Using '$(ptpd_offset_max)' as maximum offset allowed.\033[0m"
+	@echo "\033[36m==> NOTE: Use 'ptpd_offset_max=<offset>' to change.\033[0m"
+	PACKET_NET_API_KEY=$(packet_api_key) ansible $(follower_instances) \
+          -i ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no \
+          -i  $(cluster_full_pem)"  -u $(ansible_user) -m shell -a \
+          'tail -n 1 /var/log/ptpd-stats.log | awk -F\, '"'"'{if (length($$6) > 0 && \
+           ($$6 > $(ptpd_offset_max) || $$6 < -$(ptpd_offset_max))) {print $$6; exit 1}}'"'"
+	@echo "\033[36m==> Successfully ran ansible ptpd check for cluster \
+'$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
+	@echo "\033[36m==> All followers are currently within offset tolerance of '$(ptpd_offset_max)'.\033[0m"
+
 test-ansible-connection: check-cluster-name ## Check ansible connectivity/authentication with servers
 	@echo "\033[36m==> Running ansible connectivity/authentication check for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
@@ -307,7 +323,7 @@ configure: check-cluster-name ## Configure nodes using ansible
           $(current_dir)/../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
           $(provider)_region=$(region) ptpd_experimental=$(ansible_ptpd_experimental)\
-          $(ansible_sys_cpus_arg)" -u $(ansible_user) \
+          $(ansible_sys_cpus_arg) ssh_key_file=$(cluster_full_pem)" -u $(ansible_user) \
           ../ansible/playbooks/arizona.yml
 	@echo "\033[36m==> Successfully ran ansible playbook for cluster \
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'!\033[0m"
