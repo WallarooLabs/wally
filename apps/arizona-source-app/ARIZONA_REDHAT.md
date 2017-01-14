@@ -3,6 +3,8 @@
 If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
 
 ## Arizona Cluster
+**Please note:** WHEN DOING MULTIPLE MACHINE TESTS YOU HAVE TO USE TERRAFORM FOLLOWERS VALUE.  If you spin up individual machines, they won’t end up in the same placement group and then not good performance.
+
 ### Configuring Cluster:
 
 Before configuring your cluster, make sure you are in
