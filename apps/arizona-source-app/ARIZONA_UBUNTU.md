@@ -1,4 +1,4 @@
-# Building and Testing `Arizona` 
+# Building and Testing `Arizona`
 
 If you have not followed the setup instructions in the orchestration/terraform [README](https://github.com/Sendence/buffy/tree/master/orchestration/terraform) please do so before continuing.
 
@@ -30,18 +30,17 @@ Before you can run Arizona, you need to generate data for it with the datagen ap
 
 As for how long it will take to generate your data, a good rule of thumb is to halve the time you want to generate. So, if you want to generate 20 mins of data, it will take 10 mins to do. If you want to do 1 hour, it will take 30 mins... etc.
 ### Building data generation tools
-#### Build libconfig
+
+#### Install libconfig
 ```
 sudo apt-get install -y pkg-config libconfig++-dev
 ```
-#### Build cmake
+
+#### Install cmake
 ```
-wget https://cmake.org/files/v3.7/cmake-3.7.1.tar.gz
-tar zxvf cmake-3.7.1.tar.gz
-cd cmake-3.7.1
-./configure
-sudo make install
+sudo apt-get install -y cmake
 ```
+
 #### Build spdlog
 ```
 cd ~/
@@ -58,7 +57,6 @@ sudo make install
 cd ~/buffy
 git clone https://github.com/Sendence/buffy.git
 cd buffy
-git checkout arizona-add-state
 cd lib/wallaroo/cpp-api/cpp/cppapi
 mkdir build
 cd build
@@ -201,7 +199,6 @@ sudo make install
 cd ~/
 git clone https://github.com/Sendence/ponyc.git
 cd ~/ponyc/
-git checkout export-and-serialize
 sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/llvm-config
 ```
 
@@ -209,7 +206,7 @@ sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/b
 ```
 cd ~/buffy
 make build-giles-sender arch=amd64 ponyc_tag=sendence-14.0.5-release
-make build-giles-receiver arch=amd64 ponyc_tag=sendence-14.0.5-release
+make build-giles-receiver arch=amd64
 ```
 
 ### Build Arizona-source-app
@@ -261,7 +258,7 @@ You'll need to have 3 terminals available. 1 for giles sender, 1 for giles recei
 Giles receiver needs to be running before arizona:
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555 -t
+sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555
 ```
 
 #### Running the application
@@ -279,7 +276,7 @@ To run the Orders Sender:
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-looping.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f /apps/dev/arizona/data/azdata_pairgen_loop.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 ##### For the 15 minute run
