@@ -5,6 +5,24 @@
   - name: install python for full ansible support
     raw: apt-get install -y python
     become: yes
+  - name: gather facts
+    action: setup
+  - name: set tsc reliable, max c-state and max cpus as boot param
+    lineinfile:
+      dest: /etc/default/grub.d/50-cloudimg-settings.cfg
+      regexp: '(^GRUB_CMDLINE_LINUX_DEFAULT="(\s*(?!tsc)[\w=/\-\.]+)*\s*)"\s*$'
+      line: '\1 tsc=reliable intel_idle.max_cstate=1 maxcpus={{ ((ansible_processor_vcpus/2)+1) | int }} nr_cpus={{ ((ansible_processor_vcpus/2)+1) | int }} possible_cpus={{ ((ansible_processor_vcpus/2)+1) | int }}"'
+      backrefs: true
+      state: present
+      backup: true
+    register: gfile
+    become: yes
+  - name: update grub
+    command: update-grub
+    become: yes
+    when: (gfile|changed)
+
+
 
 # create dynamic groups
 - hosts: tag_Project_buffy:&tag_Role_follower:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
@@ -159,3 +177,8 @@
   - { role: ptpd, become: yes }
   - { role: docker, become: yes }
 
+- hosts: buffy-leaders:buffy-followers
+  tasks:
+  - name: change ptpd to be realtime priority
+    shell: chrt -f -p 80 $(pidof ptpd)
+    become: yes

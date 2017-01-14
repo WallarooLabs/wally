@@ -41,9 +41,13 @@ git clone https://github.com/sendence/buffy.git
 You should see:
 
 ```bash
+CPU governor is set up correctly (performance) for optimal performance.
+CPU turbo boost is disabled for optimal performance so the hardware can't change cpu frequencies during a run.
+Hyperthreaded cpus are disabled/set up correctly for optimal performance.
 Network driver is set up correctly for optimal performance.
 System cpu isolation set up as expected for optimal performance.
 System clocksource is set up correctly for optimal performance.
+tsc clocksource is set as reliable correctly for optimal performance.
 Transparent hugepages is disabled as required for optimal performance.
 Swappiness is set to 0 as required for optimal performance.
 ```
