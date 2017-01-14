@@ -360,7 +360,7 @@ configure: check-cluster-name ## Configure nodes using ansible
           ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
           $(provider)_region=$(region) isolcpus=$(ansible_isolcpus) \
-	  install_devtools=$(ansible_install_devtools) \
+	  install_devtools=$(ansible_install_devtools) ssh_key_file=$(cluster_full_pem) \
           $(ansible_raid_level_arg) $(ansible_raid_fs_arg) \
           $(ansible_sys_cpus_arg)" -u $(ansible_user) \
           ../ansible/playbooks/$(provider).yml

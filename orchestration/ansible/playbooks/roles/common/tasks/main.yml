@@ -59,6 +59,24 @@
   become: false
   when: ('vagrant' != '{{ ansible_ssh_user }}' and (grubfile|changed or grubfile2|changed or grubfile3|changed or grubfile4|changed))
 
+- name: Put ssh private key onto server
+  copy:
+    src: "{{ ssh_key_file }}"
+    dest: /home/{{ ansible_user_id }}/.ssh/id_rsa
+    owner: "{{ ansible_ssh_user }}"
+    group: "{{ ansible_ssh_user }}"
+    mode: 0700
+  when: (ansible_ssh_user != "root")
+
+- name: Put ssh private key onto server
+  copy:
+    src: "{{ ssh_key_file }}"
+    dest: /root/.ssh/id_rsa
+    owner: "{{ ansible_ssh_user }}"
+    group: "{{ ansible_ssh_user }}"
+    mode: 0700
+  when: (ansible_ssh_user == "root")
+
 - name: Get groups for ssh user
   command: groups {{ ansible_ssh_user }}
   register: my_groups

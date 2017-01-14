@@ -14,14 +14,22 @@
   - name: set hostname
     hostname: name=buffy-follower-{{ groups['buffy-followers'].index(inventory_hostname) + 1 }}
     become: yes
-  - name: "Add hostname to hosts file"
+  - name: "Add follower hostnames to hosts file"
     lineinfile:
       dest: /etc/hosts
-      regexp: .*buffy-follower-{{ groups['buffy-followers'].index(inventory_hostname) + 1 }}$
-      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} buffy-follower-{{ groups['buffy-followers'].index(inventory_hostname) + 1 }}"
+      regexp: .*buffy-follower-{{ groups['buffy-followers'].index(item) + 1 }}$
+      line: "{{ hostvars[item].ansible_default_ipv4.address }} buffy-follower-{{ groups['buffy-followers'].index(item) + 1 }}"
       state: present
     become: yes
-
+    with_inventory_hostnames: buffy-followers
+  - name: "Add leader hostnames to hosts file"
+    lineinfile:
+      dest: /etc/hosts
+      regexp: .*buffy-leader-{{ groups['buffy-leaders'].index(item) + 1 }}$
+      line: "{{ hostvars[item].ansible_default_ipv4.address }} buffy-leader-{{ groups['buffy-leaders'].index(item) + 1 }}"
+      state: present
+    become: yes
+    with_inventory_hostnames: buffy-leaders
 
 - hosts: tag_Project_buffy:&tag_Role_leader:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
   vars:
@@ -34,13 +42,22 @@
   - name: set hostname
     hostname: name=buffy-leader-{{ groups['buffy-leaders'].index(inventory_hostname) + 1 }}
     become: yes
-  - name: "Add hostname to hosts file"
+  - name: "Add follower hostnames to hosts file"
     lineinfile:
       dest: /etc/hosts
-      regexp: .*buffy-leader-{{ groups['buffy-leaders'].index(inventory_hostname) + 1 }}$
-      line: "{{ hostvars[inventory_hostname].ansible_default_ipv4.address }} buffy-leader-{{ groups['buffy-leaders'].index(inventory_hostname) + 1 }}"
+      regexp: .*buffy-follower-{{ groups['buffy-followers'].index(item) + 1 }}$
+      line: "{{ hostvars[item].ansible_default_ipv4.address }} buffy-follower-{{ groups['buffy-followers'].index(item) + 1 }}"
       state: present
     become: yes
+    with_inventory_hostnames: buffy-followers
+  - name: "Add leader hostnames to hosts file"
+    lineinfile:
+      dest: /etc/hosts
+      regexp: .*buffy-leader-{{ groups['buffy-leaders'].index(item) + 1 }}$
+      line: "{{ hostvars[item].ansible_default_ipv4.address }} buffy-leader-{{ groups['buffy-leaders'].index(item) + 1 }}"
+      state: present
+    become: yes
+    with_inventory_hostnames: buffy-leaders
 
 - hosts: buffy-leaders:buffy-followers
   vars:
