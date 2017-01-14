@@ -35,7 +35,7 @@ As for how long it will take to generate your data, a good rule of thumb is to h
 IMPORTANT: all the configs are for generating data with 750 clients. If you want
 to run on multiworker with 5500 clients, there is a `-multiworker` version of
 each config.
- 
+
 ### Building data generation tools
 
 #### Install libconfig
@@ -101,6 +101,16 @@ cd /apps/dev/arizona/data
 * Data files: azdata_pairgen_loop.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
+#### Create a really small file (150K message) that you can loop through with 1325 clients, should not have memory growth
+
+```
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+cd /apps/dev/arizona/data
+/apps/dev/arizona/bin/arizona/pairgen -c /apps/dev/arizona/etc/pairgen_1325_150K.cfg
+```
+* Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
+* Data files: azdata_pairgen_loop_1325.dat[*]
+* Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
 
 #### Create a 15 minute data set (do we crash?)
@@ -273,11 +283,18 @@ sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source
 
 To run the Orders Sender:
 
-##### With Looping (for the pairgen'd file)
+##### With Looping, 750 clients (for the pairgen'd file)
 
 ```
 cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f /apps/dev/arizona/data/azdata_pairgen_loop.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+```
+
+##### With Looping, 1325 clients (for the pairgen'd file)
+
+```
+cd ~/buffy
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f /apps/dev/arizona/data/azdata_pairgen_loop_1325.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 ##### For the 15 minute run
