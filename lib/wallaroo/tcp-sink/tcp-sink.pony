@@ -150,7 +150,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       let encoded = _encoder.encode[D](data, _wb)
 
       let next_tracking_id = _next_tracking_id(i_origin, i_route_id, i_seq_id)
-      //_writev(encoded, next_tracking_id)
+      _writev(encoded, next_tracking_id)
 
       // TODO: Should happen when tracking info comes back from writev as
       // being done.
