@@ -775,7 +775,7 @@ interface _MetricsSinkNotify
     """
     Called when we have successfully connected to the server.
     """
-    None
+    conn.set_nodelay(true)
 
   fun ref accepted(conn: MetricsSink ref) =>
     """
