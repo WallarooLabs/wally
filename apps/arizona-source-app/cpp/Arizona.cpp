@@ -713,6 +713,16 @@ class Proceeds ArizonaState::proceeds_for_agg_unit(string& client_id_, string& a
   return _clients.proceeds_for_agg_unit(client_id_, agg_unit_id_);
 }
 
+class Proceeds ArizonaState::proceeds_for_client(string& client_id_)
+{
+  return _clients.proceeds_for_client(client_id_);
+}
+
+class Proceeds ArizonaState::proceeds_for_account(string& client_id_, string& account_id_)
+{
+  return _clients.proceeds_for_account(client_id_, account_id_);
+}
+
 void ArizonaState::add_account_to_agg_unit(string& client_id_, string& account_id_, string& agg_unit_id_)
 {
   _clients.add_account_to_agg_unit(client_id_, account_id_, agg_unit_id_);
@@ -1173,13 +1183,49 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
             state_change_handle);
       }
       break;
+      case AdminRequestType::QueryClient:
+        {
+          ArizonaState *az_state = (ArizonaState*) state_;
+          class Proceeds proceeds = az_state->proceeds_for_client(*am->get_client());
+          ProceedsMessage *proceeds_message = new ProceedsMessage(am->get_message_id(),
+                                                                  new string(proceeds.isin()),
+                                                                  proceeds.open_short(),
+                                                                  proceeds.open_long(),
+                                                                  proceeds.proceeds_short(),
+                                                                  proceeds.proceeds_long());
+          return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+        }
+        break;
       case AdminRequestType::QueryAggUnit:
-        //TODO: query aggunit
+        {
+          ArizonaState *az_state = (ArizonaState*) state_;
+          class Proceeds proceeds = az_state->proceeds_for_agg_unit(*am->get_client(),
+                                                                  *am->get_aggunit());
+          ProceedsMessage *proceeds_message = new ProceedsMessage(am->get_message_id(),
+                                                                  new string(proceeds.isin()),
+                                                                  proceeds.open_short(),
+                                                                  proceeds.open_long(),
+                                                                  proceeds.proceeds_short(),
+                                                                  proceeds.proceeds_long());
+          return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+        }
+        break;
+      case AdminRequestType::QueryAccount:
+        {
+          ArizonaState *az_state = (ArizonaState*) state_;
+          class Proceeds proceeds = az_state->proceeds_for_account(*am->get_client(),
+                                                                  *am->get_account());
+          ProceedsMessage *proceeds_message = new ProceedsMessage(am->get_message_id(),
+                                                                  new string(proceeds.isin()),
+                                                                  proceeds.open_short(),
+                                                                  proceeds.open_long(),
+                                                                  proceeds.proceeds_short(),
+                                                                  proceeds.proceeds_long());
+          return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+        }
         break;
       case AdminRequestType::AddAggUnit:
       {
-        //TODO: add account to agguint
-        //AddAccountToAggUnitStateChange
         void *state_change_handle = w_state_change_repository_lookup_by_name(
             state_change_repository_helper_,
             state_change_repository_,
@@ -1198,8 +1244,6 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
       break;
       case AdminRequestType::RemoveAggUnit:
       {
-        //TODO: delete account from aggunit
-        //RemoveAccountFromAggUnitStateChange
         void *state_change_handle = w_state_change_repository_lookup_by_name(
             state_change_repository_helper_,
             state_change_repository_,
@@ -1217,8 +1261,12 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
       }
       break;
     }
-    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
-    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+    AdminResponseMessage *response_message =
+      new AdminResponseMessage(am->get_message_id(), AdminResponseType::Error);
+    return w_stateful_computation_get_return(
+        state_change_repository_helper_,
+        response_message,
+        none);
   }
 
   return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);

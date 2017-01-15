@@ -86,6 +86,8 @@ enum AdminRequestType
 {
   CreateAggUnitRequest = 4,
   QueryAggUnit = 1,
+  QueryClient = 9,
+  QueryAccount = 0,
   AddAggUnit = 7,
   RemoveAggUnit = 8
 };
@@ -304,6 +306,8 @@ public:
 
   void create_agg_unit(string& client_id_, string& agg_unit_id_);
   class Proceeds proceeds_for_agg_unit(string& client_id_, string& agg_unit_id_);
+  class Proceeds proceeds_for_account(string& client_id_, string& account_id_);
+  class Proceeds proceeds_for_client(string& client_id_);
   void add_account_to_agg_unit(string& client_id_, string& account_id_, string& agg_unit_id_);
   void remove_account_from_agg_unit(string& client_id_, string& account_id_, string& agg_unit_id_);
 };
