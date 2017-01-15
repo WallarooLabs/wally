@@ -101,7 +101,6 @@ cd /apps/dev/arizona/data
 * Data files: azdata_pairgen_loop.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
-<<<<<<< HEAD
 #### Create a really small file (150K message), loopable, with admin messages - no memory growth expected
 * Creates admin messages (report on aggunits & accounts)
 * Does **NOT** create config messages at the start
@@ -128,8 +127,6 @@ cd /apps/dev/arizona/data
 * Data files: azdata_pairgen_admin_loop.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
-
-=======
 #### Create a really small file (150K message) that you can loop through with 1325 clients, should not have memory growth
 
 ```
@@ -140,11 +137,8 @@ cd /apps/dev/arizona/data
 * Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
 * Data files: azdata_pairgen_loop_1325.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
->>>>>>> 1fc521b2e7e5b8eeced6edbeb35006629cc84ff2
-
 
 #### Create a 15 minute data set (do we crash?)
-
 ```
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 cd /apps/dev/arizona/data
@@ -169,7 +163,6 @@ cd /apps/dev/arizona/data
 * Use the `full` for messages of multiple types(orders,cancels,executes)
 
 #### Create an 8 hour data set (does this work for the full 8 hours?)
-
 
 ```
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
