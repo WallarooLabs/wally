@@ -11,10 +11,11 @@ use "wallaroo/tcp-sink"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool)
+  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
-use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
+use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
+use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 actor TCPSource is Producer
@@ -84,10 +85,10 @@ actor TCPSource is Producer
     _fd = fd
     ifdef linux then
       _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write_oneshot(), 0, true)
+        AsioEvent.read_write_oneshot(), 0, true, true)
     else
       _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write(), 0, true)
+        AsioEvent.read_write(), 0, true, false)
     end
     _connected = true
     _read_buf = recover Array[U8].undefined(init_size) end
@@ -254,7 +255,6 @@ actor TCPSource is Producer
 
       _try_shutdown()
     end
-    _resubscribe_event()
 
   fun ref _notify_connecting() =>
     """
@@ -330,6 +330,10 @@ actor TCPSource is Producer
     // Unsubscribe immediately and drop all pending writes.
     @pony_asio_event_unsubscribe(_event)
     _readable = false
+    ifdef linux then
+      AsioEvent.set_readable(_event, false)
+    end
+
 
     @pony_os_socket_close[None](_fd)
     _fd = -1
@@ -377,7 +381,15 @@ actor TCPSource is Producer
         match len
         | 0 =>
           // Would block, try again later.
-          _readable = false
+          ifdef linux then
+            // this is safe because asio thread isn't currently subscribed
+            // for a read event so will not be writing to the readable flag
+            AsioEvent.set_readable(_event, false)
+            _readable = false
+            @pony_asio_event_resubscribe_read(_event)
+          else
+            _readable = false
+          end
           _reading = false
           return
         | _next_size =>
@@ -428,7 +440,6 @@ actor TCPSource is Producer
     """
 
     _pending_reads()
-    _resubscribe_event()
 
   fun ref _read_buf_size(less: USize) =>
     """
@@ -486,17 +497,6 @@ actor TCPSource is Producer
     """
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
-
-  fun ref _resubscribe_event() =>
-    ifdef linux then
-      let flags = if not _readable then
-        AsioEvent.read() or AsioEvent.oneshot()
-      else
-        return
-      end
-
-      @pony_asio_event_resubscribe(_event, flags)
-    end
 
 class TCPSourceRouteCallbackHandler is RouteCallbackHandler
   let _registered_routes: SetIs[RouteLogic tag] = _registered_routes.create()

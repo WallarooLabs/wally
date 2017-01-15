@@ -5,10 +5,11 @@ use "sendence/hub"
 use "wallaroo/fail"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool)
+  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
-use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
+use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
+use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 actor MetricsSink
@@ -112,12 +113,15 @@ actor MetricsSink
     _fd = fd
     ifdef linux then
       _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write_oneshot(), 0, true)
+        AsioEvent.read_write_oneshot(), 0, true, true)
     else
       _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write(), 0, true)
+        AsioEvent.read_write(), 0, true, false)
     end
     _connected = true
+    ifdef linux then
+      AsioEvent.set_writeable(_event, true)
+    end
     _writeable = true
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
@@ -365,7 +369,6 @@ actor MetricsSink
 
       _try_shutdown()
     end
-    _resubscribe_event()
 
   be _read_again() =>
     """
@@ -594,7 +597,15 @@ actor MetricsSink
         match len
         | 0 =>
           // Would block, try again later.
-          _readable = false
+          ifdef linux then
+            // this is safe because asio thread isn't currently subscribed
+            // for a read event so will not be writing to the readable flag
+            AsioEvent.set_readable(_event, false)
+            _readable = false
+            @pony_asio_event_resubscribe_read(_event)
+          else
+            _readable = false
+          end
           return
         | _next_size =>
           // Increase the read buffer size.
@@ -728,6 +739,10 @@ actor MetricsSink
       _pending_writev_total = 0
       _readable = false
       _writeable = false
+      ifdef linux then
+        AsioEvent.set_readable(_event, false)
+        AsioEvent.set_writeable(_event, false)
+      end
     end
 
     // On windows, this will also cancel all outstanding IOCP operations.
@@ -739,27 +754,18 @@ actor MetricsSink
   fun ref _apply_backpressure() =>
     ifdef not windows then
       _writeable = false
+      ifdef linux then
+        // this is safe because asio thread isn't currently subscribed
+        // for a write event so will not be writing to the readable flag
+        AsioEvent.set_writeable(_event, false)
+        @pony_asio_event_resubscribe_write(_event)
+      end
     end
 
     _notify.throttled(this)
 
   fun ref _release_backpressure() =>
     _notify.unthrottled(this)
-
-  fun ref _resubscribe_event() =>
-    ifdef linux then
-      let flags = if not _readable and not _writeable then
-        AsioEvent.read_write_oneshot()
-      elseif not _readable then
-        AsioEvent.read() or AsioEvent.oneshot()
-      elseif not _writeable then
-        AsioEvent.write() or AsioEvent.oneshot()
-      else
-        return
-      end
-
-      @pony_asio_event_resubscribe(_event, flags)
-    end
 
 interface _MetricsSinkNotify
   fun ref connecting(conn: MetricsSink ref, count: U32) =>
