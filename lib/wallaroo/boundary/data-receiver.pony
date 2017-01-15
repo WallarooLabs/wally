@@ -22,6 +22,9 @@ actor DataReceiver is Producer
   let _alfred: Alfred
   let _timers: Timers = Timers
   var _ack_counter: U64 = 0
+  // TODO: Test replacing this with state machine class
+  // to avoid matching on every ack
+  var _latest_conn: (TCPConnection | None) = None
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     connections: Connections, alfred: Alfred)
@@ -33,8 +36,13 @@ actor DataReceiver is Producer
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
 
-  be data_connect(sender_step_id: U128) =>
+  be data_connect(sender_step_id: U128, conn: TCPConnection) =>
     _sender_step_id = sender_step_id
+    //TODO: This is commented out because of a weird scenario where
+    // just holding onto this tag causes rapid memory growth. Once
+    // we've figured that issue out, this needs to be reinstated since we
+    // need it for acking and tcpconnection muting and unmuting.
+    //_latest_conn = conn
 
   be update_watermark(route_id: U64, seq_id: U64) =>
     try
@@ -69,7 +77,20 @@ actor DataReceiver is Producer
     Routes
 
   be update_router(router: DataRouter val) =>
+    // TODO: This commented line conflicts with invariant downstream. The
+    // idea is to unregister if we've registered but not otherwise.
+    // The invariant says you can only call this method on a step if
+    // you've already registered. If we allow calling it whether or not
+    // you've registered, this will work, but that might cause other
+    // problems. However, otherwise, when updating, we might register twice
+    // with the same step or never unregister with one we'll no longer
+    // be sending to.
+    // Currently, this behavior should only be called once in the lifecycle
+    // of a DataReceiver, so we would only need this if that were to change.
+    //_router.unregister_producer(this, 0)
+
     _router = router
+    _router.register_producer(this)
 
   be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -107,25 +128,41 @@ actor DataReceiver is Producer
       if _last_id_seen > 0 then
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, _last_id_seen, _auth)
-        _connections.send_data(_sender_name, ack_msg)
+        match _latest_conn
+        | let conn: TCPConnection =>
+          conn.writev(ack_msg)
+        end
+        // _connections.send_data(_sender_name, ack_msg)
       end
     else
       @printf[I32]("Error creating ack watermark message\n".cstring())
     end
 
- be dispose() =>
-   _timers.dispose()
+  be dispose() =>
+    _timers.dispose()
 
-// TODO: From credit flow producer part of Producer
-// Remove once traits/interfaces are cleaned up
-be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-  None
+  // TODO: From credit flow producer part of Producer
+  // Remove once traits/interfaces are cleaned up
+  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
+    None
 
-fun ref recoup_credits(credits: ISize) =>
-  None
+  fun ref recoup_credits(credits: ISize) =>
+    None
 
-fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
-  None
+  fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
+    None
 
-fun ref next_sequence_id(): U64 =>
-  0
+  fun ref next_sequence_id(): U64 =>
+    0
+
+  be mute(c: CreditFlowConsumer) =>
+    match _latest_conn
+    | let conn: TCPConnection =>
+      conn.mute(c)
+    end
+
+  be unmute(c: CreditFlowConsumer) =>
+    match _latest_conn
+    | let conn: TCPConnection =>
+      conn.unmute(c)
+    end

@@ -442,6 +442,12 @@ actor _TestProducer is Producer
   be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
     None
 
+  be mute(c: CreditFlowConsumer) =>
+    None
+
+  be unmute(c: CreditFlowConsumer) =>
+    None
+
   fun ref recoup_credits(credits: ISize) =>
     None
 

@@ -59,6 +59,7 @@ actor TCPSource is Producer
       false
     end
   var _expect_read_buf: Reader = Reader
+  let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
   // Origin (Resilience)
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
@@ -462,8 +463,18 @@ actor TCPSource is Producer
       _pending_reads()
     end
 
-  be unmute() =>
-    _unmute()
+  be mute(c: CreditFlowConsumer) =>
+    @printf[I32]("MUTE\n".cstring())
+    _muted_downstream.set(c)
+    _mute()
+
+  be unmute(c: CreditFlowConsumer) =>
+    @printf[I32]("UNMUTE\n".cstring())
+    _muted_downstream.unset(c)
+
+    if _muted_downstream.size() == 0 then
+      _unmute()
+    end
 
   fun ref is_muted(): Bool =>
     _muted

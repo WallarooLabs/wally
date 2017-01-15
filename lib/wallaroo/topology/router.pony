@@ -293,6 +293,16 @@ class DataRouter
       true
     end
 
+  fun register_producer(producer: Producer) =>
+    for step in _data_routes.values() do
+      step.register_producer(producer)
+    end
+
+  fun unregister_producer(producer: Producer, credits_returned: ISize) =>
+    for step in _data_routes.values() do
+      step.unregister_producer(producer, credits_returned)
+    end
+
   fun routes(): Array[CreditFlowConsumerStep] val =>
     // TODO: CREDITFLOW - real implmentation?
     recover val Array[CreditFlowConsumerStep] end
