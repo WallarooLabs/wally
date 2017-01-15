@@ -81,7 +81,7 @@ actor Main
         consume initial_report_msgs_trn
 
       let application = recover val
-        Application("Market Spread App")
+        Application("One Steam NBBO Updater App")
           .new_pipeline[FixNbboMessage val, NbboResult val](
             "Nbbo", FixNbboFrameHandler
               where init_file = init_file)
