@@ -32,22 +32,6 @@
   - name: set hostname
     hostname: name=buffy-follower-{{ groups['buffy-followers'].index(inventory_hostname) + 1 }}
     become: yes
-  - name: "Add follower hostnames to hosts file"
-    lineinfile:
-      dest: /etc/hosts
-      regexp: .*buffy-follower-{{ groups['buffy-followers'].index(item) + 1 }}$
-      line: "{{ hostvars[item].ansible_default_ipv4.address }} buffy-follower-{{ groups['buffy-followers'].index(item) + 1 }}"
-      state: present
-    become: yes
-    with_inventory_hostnames: buffy-followers
-  - name: "Add leader hostnames to hosts file"
-    lineinfile:
-      dest: /etc/hosts
-      regexp: .*buffy-leader-{{ groups['buffy-leaders'].index(item) + 1 }}$
-      line: "{{ hostvars[item].ansible_default_ipv4.address }} buffy-leader-{{ groups['buffy-leaders'].index(item) + 1 }}"
-      state: present
-    become: yes
-    with_inventory_hostnames: buffy-leaders
 
 - hosts: tag_Project_buffy:&tag_Role_leader:&tag_ClusterName_{{ cluster_name }}:&{{ aws_region }}
   vars:
@@ -60,6 +44,14 @@
   - name: set hostname
     hostname: name=buffy-leader-{{ groups['buffy-leaders'].index(inventory_hostname) + 1 }}
     become: yes
+
+- hosts: buffy-leaders:buffy-followers
+  vars:
+    ixgbevf_version: 2.16.4
+    ixgbevf_tar_sha1_hash: 110fa89c30b029e946ed73105c471cf03f1767be
+  roles:
+  - { role: atlassian.ixgbevf, become: yes }
+  tasks:
   - name: "Add follower hostnames to hosts file"
     lineinfile:
       dest: /etc/hosts
@@ -76,14 +68,6 @@
       state: present
     become: yes
     with_inventory_hostnames: buffy-leaders
-
-- hosts: buffy-leaders:buffy-followers
-  vars:
-    ixgbevf_version: 2.16.4
-    ixgbevf_tar_sha1_hash: 110fa89c30b029e946ed73105c471cf03f1767be
-  roles:
-  - { role: atlassian.ixgbevf, become: yes }
-  tasks:
   - name: Create a group of all hosts for buffy
     group_by: key=buffy-all
   - name: Gather ec2 facts
