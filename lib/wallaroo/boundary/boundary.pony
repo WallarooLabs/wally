@@ -38,8 +38,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
 
-  var _c: USize = 0
-
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
@@ -207,12 +205,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)
         _add_to_upstream_backup(outgoing_msg)
-
-      _c = _c + 1
-      if (_c % 100_000) == 0 then
-        @printf[I32]("Size: %llu, id: %llu\n".cstring(), _queue.size(),
-          _step_id)
-      end
 
       _writev(outgoing_msg)
 
