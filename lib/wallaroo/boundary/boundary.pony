@@ -17,10 +17,11 @@ use "wallaroo/tcp-sink"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool)
+  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
-use @pony_asio_event_resubscribe[None](event: AsioEventID, flags: U32)
+use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
+use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
@@ -476,7 +477,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
       _try_shutdown()
     end
-    _resubscribe_event()
 
   fun ref _writev(data: ByteSeqIter)
   =>
@@ -577,6 +577,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _pending_writev_total = 0
     _readable = false
     _writeable = false
+    ifdef linux then
+      AsioEvent.set_readable(_event, false)
+      AsioEvent.set_writeable(_event, false)
+    end
 
     @pony_os_socket_close[None](_fd)
     _fd = -1
@@ -607,7 +611,15 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         match len
         | 0 =>
           // Would block, try again later.
-          _readable = false
+          ifdef linux then
+            // this is safe because asio thread isn't currently subscribed
+            // for a read event so will not be writing to the readable flag
+            AsioEvent.set_readable(_event, false)
+            _readable = false
+            @pony_asio_event_resubscribe_read(_event)
+          else
+            _readable = false
+          end
           return
         | _next_size =>
           // Increase the read buffer size.
@@ -652,7 +664,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     Resume reading.
     """
     _pending_reads()
-    _resubscribe_event()
 
   fun _can_send(): Bool =>
     _connected and not _closed and _writeable
@@ -736,6 +747,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _apply_backpressure() =>
     _writeable = false
+    ifdef linux then
+      // this is safe because asio thread isn't currently subscribed
+      // for a write event so will not be writing to the readable flag
+      AsioEvent.set_writeable(_event, false)
+      @pony_asio_event_resubscribe_write(_event)
+    end
     _notify.throttled(this)
     _mute_upstreams()
 
@@ -772,21 +789,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     let ip = recover IPAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
-
-  fun ref _resubscribe_event() =>
-    ifdef linux then
-      let flags = if not _readable and not _writeable then
-        AsioEvent.read_write_oneshot()
-      elseif not _readable then
-        AsioEvent.read() or AsioEvent.oneshot()
-      elseif not _writeable then
-        AsioEvent.write() or AsioEvent.oneshot()
-      else
-        return
-      end
-
-      @pony_asio_event_resubscribe(_event, flags)
-    end
 
   fun ref set_nodelay(state: Bool) =>
     """
