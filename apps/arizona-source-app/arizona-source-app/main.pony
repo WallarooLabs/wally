@@ -106,28 +106,12 @@ actor Main
           .new_pipeline[CPPData val, CPPData val]("source-decoder", recover CPPSourceDecoder(@get_source_decoder()) end)
             .to_state_partition[CPPData val, U64, CPPData val, CPPState](
               state_computation_factory(),
-              ArizonaStateBuilder, "state-builder", data_partition where multi_worker = true)
+              ArizonaStateBuilder, "state-builder", data_partition
+              where multi_worker = true, default_state_name = "default-state")
             .to_sink(recover CPPSinkEncoder(recover @get_sink_encoder() end) end, recover [0] end)
-          // NO PARTITION
-
-          // PARTITIONED
-          // .to_state_partition[CPPData val, CPPKey val, CPPData val, CPPState](
-          //     computation_factory(),
-          //     ArizonaStateBuilder, "state-builder", data_partition where multi_worker = true)
-
-          // PARITIONED WITH DEFAULT (A)
-          //.to_state_partition[CPPData val, U64, CPPData val, CPPState](
-          //    computation_factory(),
-          //    ArizonaStateBuilder, "state-builder", data_partition
-          //    where
-          //    multi_worker = true)//, default_state_name = "default-state")
-          //.to_sink(recover CPPSinkEncoder(recover @get_sink_encoder() end) end, recover [0] end)
-
-          // PARITIONED WITH DEFAULT (B)
-//          .partition_default_target[CPPData val, CPPData val, CPPState](
-//              "Arizona Default Test", "default-state", default_computation_factory(),
-//             ArizonaDefaultStateBuilder)
-
+          .partition_default_target[CPPData val, CPPData val, CPPState](
+            "Arizona Default Test", "default-state", state_computation_factory(),
+            ArizonaDefaultStateBuilder)
       end
       Startup(env, application, None)
     else
