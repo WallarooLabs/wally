@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "time"
+use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/network"
 use "wallaroo/resilience"
@@ -38,11 +39,7 @@ actor DataReceiver is Producer
 
   be data_connect(sender_step_id: U128, conn: TCPConnection) =>
     _sender_step_id = sender_step_id
-    //TODO: This is commented out because of a weird scenario where
-    // just holding onto this tag causes rapid memory growth. Once
-    // we've figured that issue out, this needs to be reinstated since we
-    // need it for acking and tcpconnection muting and unmuting.
-    //_latest_conn = conn
+    _latest_conn = conn
 
   be update_watermark(route_id: U64, seq_id: U64) =>
     try
@@ -93,8 +90,7 @@ actor DataReceiver is Producer
     _router.register_producer(this)
 
   be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
-    conn: TCPConnection)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
@@ -102,10 +98,10 @@ actor DataReceiver is Producer
     if seq_id >= _last_id_seen then
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
-      _router.route(d, pipeline_time_spent, this, seq_id, latest_ts, metrics_id,
-        worker_ingress_ts)
+      _router.route(d, pipeline_time_spent, this, seq_id, latest_ts,
+        metrics_id, worker_ingress_ts)
 
-      _maybe_ack(conn)
+      _maybe_ack()
     end
 
   be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
@@ -117,23 +113,24 @@ actor DataReceiver is Producer
         metrics_id, worker_ingress_ts)
     end
 
-  fun ref _maybe_ack(conn: TCPConnection) =>
+  fun ref _maybe_ack() =>
     ifdef not "resilience" then
       if (_ack_counter % 512) == 0 then
         _ack_latest(conn)
       end
     end
 
-  fun ref _ack_latest(conn: TCPConnection) =>
+  fun ref _ack_latest() =>
     try
       if _last_id_seen > 0 then
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, _last_id_seen, _auth)
-        //match _latest_conn
-        //| let conn: TCPConnection =>
+        match _latest_conn
+        | let conn: TCPConnection =>
           conn.writev(ack_msg)
-        //end
-        // _connections.send_data(_sender_name, ack_msg)
+        else
+          Fail()
+        end
       end
     else
       @printf[I32]("Error creating ack watermark message\n".cstring())
