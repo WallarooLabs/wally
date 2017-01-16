@@ -98,7 +98,7 @@ cd /apps/dev/arizona/data
 ```
 * Containts admin and config messages
 * Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
-* Data files: azdata_pairgen_loop_5Kclnt_1M_admin.dat.full[*]
+* Data files: azdata_pairgen_loop_1375_1M_admin.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
 #### Create a really small file (1M messages), 5.5K clients, loopable, should not have memory growth
@@ -109,7 +109,7 @@ cd /apps/dev/arizona/data
 ```
 * Containts admin and config messages
 * Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
-* Data files: azdata_pairgen_loop_5Kclnt_1M_admin.dat.full[*]
+* Data files: azdata_pairgen_loop_5Kclnt_1M_admin.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
 #### Create a 15 minute data set (do we crash?)
@@ -284,25 +284,23 @@ sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source
 
 To run the Orders Sender:
 
-##### With Looping, 750 clients (for the pairgen'd file)
+##### With Looping, 1375 clients (for the pairgen'd file)
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f /apps/dev/arizona/data/azdata_pairgen_loop.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f /apps/dev/arizona/data/azdata_pairgen_loop_1375_1M_admin.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
-
-##### With Looping, 1325 clients (for the pairgen'd file)
-
+##### With Looping, 5.5K clients (for the pairgen'd file)
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f /apps/dev/arizona/data/azdata_pairgen_loop_1325.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f /apps/dev/arizona/data/azdata_pairgen_loop_5Kclnt_1M_admin.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 ##### For the 15 minute run
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-15-minute.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/azdata_15mins_noloop.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 ##### For the 60 minute run
