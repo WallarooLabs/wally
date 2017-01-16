@@ -116,7 +116,7 @@ actor DataReceiver is Producer
   fun ref _maybe_ack() =>
     ifdef not "resilience" then
       if (_ack_counter % 512) == 0 then
-        _ack_latest(conn)
+        _ack_latest()
       end
     end
 
