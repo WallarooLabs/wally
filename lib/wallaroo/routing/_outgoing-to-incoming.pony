@@ -53,20 +53,18 @@ class _OutgoingToIncoming
     exists in within the mapping.
     """
     try
-      let index = (id - _seq_id_to_incoming(0)._1).usize()
-      ifdef "trace" then
-        @printf[I32]("id: %llu o: %llu\n".cstring(),
-          id, _seq_id_to_incoming(index)._1)
+      let low_id = _seq_id_to_incoming(0)._1
+      if id >= low_id then
+        let index = (id - low_id).usize()
+        ifdef debug then
+          LazyInvariant({
+            ()(_seq_id_to_incoming, index, id): Bool ? =>
+            _seq_id_to_incoming(index)._1 == id})
+        end
+        index
+      else
+        error
       end
-      ifdef debug then
-        LazyInvariant({
-          ()(_seq_id_to_incoming, index, id): Bool ? =>
-          _seq_id_to_incoming(index)._1 <= id})
-        LazyInvariant({
-          ()(_seq_id_to_incoming, index, id): Bool ? =>
-          _seq_id_to_incoming(index)._1 == id})
-      end
-      index
     else
       error
     end

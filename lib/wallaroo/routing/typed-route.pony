@@ -145,3 +145,6 @@ class TypedRoute[In: Any val] is Route
     ifdef "backpressure" then
       _route.use_credit()
     end
+
+  fun ref request_ack() =>
+    _consumer.request_ack()

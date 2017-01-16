@@ -242,6 +242,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
+  be request_ack() =>
+    _terminus_route.request_ack()
+
   //
   // CREDIT FLOW
   be register_producer(producer: Producer) =>
@@ -927,3 +930,10 @@ class EmptyNotify is _TCPSinkNotify
   Called when we have successfully connected to the server.
   """
   None
+
+fun ref closed(conn: TCPSink ref) =>
+  """
+  Called when the connection is closed.
+  """
+  @printf[I32]("TCPSink connection closed\n".cstring())
+

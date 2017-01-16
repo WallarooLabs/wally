@@ -14,10 +14,18 @@ class Routes
   var _flushing: Bool = false
   let _ack_batch_size: USize
   let _outgoing_to_incoming: _OutgoingToIncoming
+  var _ack_next_time: Bool = false
+  var _last_proposed_watermark: SeqId = 0
 
+  // TODO: Change this to a reasonable value!
   new create(ack_batch_size': USize = 100) =>
     _ack_batch_size = ack_batch_size'
     _outgoing_to_incoming = _OutgoingToIncoming(_ack_batch_size)
+
+  fun print_flushing() =>
+    if _flushing then
+      @printf[I32]("Still Flushing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n".cstring())
+    end
 
   fun ref add_route(route: Route) =>
     // This is our wedge into current routes until John
@@ -51,8 +59,11 @@ class Routes
     """
     _filter_route.filter(o_seq_id)
     _add_incoming(producer, o_seq_id, i_origin, i_route_id, i_seq_id)
+    _maybe_ack(producer)
 
-  fun ref receive_ack(route_id: RouteId, seq_id: SeqId) =>
+  fun ref receive_ack(producer: Producer ref, route_id: RouteId,
+    seq_id: SeqId)
+  =>
     ifdef debug then
       Invariant(_routes.contains(route_id))
       LazyInvariant({()(_routes, route_id, seq_id): Bool ? =>
@@ -61,6 +72,7 @@ class Routes
 
     try
       _routes(route_id).receive_ack(seq_id)
+      _maybe_ack(producer)
     else
       Fail()
     end
@@ -87,11 +99,11 @@ class Routes
     i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
   =>
     _outgoing_to_incoming.add(o_seq_id, i_origin, i_route_id, i_seq_id)
-    _maybe_ack(producer)
 
   fun ref _maybe_ack(producer: Producer ref) =>
     if not _flushing and
-      ((_outgoing_to_incoming.size() % _ack_batch_size) == 0)
+      (((_outgoing_to_incoming.size() % _ack_batch_size) == 0) or
+      _ack_next_time)
     then
       _ack(producer)
     end
@@ -99,18 +111,26 @@ class Routes
   fun ref _ack(producer: Producer ref) =>
     let proposed_watermark = propose_new_watermark()
 
-    if proposed_watermark == _flushed_watermark then
+    if proposed_watermark <= _flushed_watermark then
       return
     end
 
     _flushing = true
+    _ack_next_time = false
     producer._flush(proposed_watermark)
+
+  fun ref request_ack(producer: Producer ref) =>
+    _ack_next_time = true
+    if not _flushing then
+      _ack(producer)
+    end
 
   fun ref propose_new_watermark(): U64 =>
     let proposed_watermark = _ProposeWatermark(_filter_route, _routes)
     ifdef debug then
       Invariant(proposed_watermark >= _flushed_watermark)
     end
+    _last_proposed_watermark = proposed_watermark
     proposed_watermark
 
 // incorporate into TypedRoute

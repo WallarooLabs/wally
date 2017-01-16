@@ -29,6 +29,7 @@ trait tag RunnableStep
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
+  be request_ack()
 
 interface Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer)
@@ -107,6 +108,9 @@ actor Step is (RunnableStep & Resilient & Producer &
   //
   // Application startup lifecycle event
   //
+
+  be print_flushing() =>
+    _resilience_routes.print_flushing()
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
@@ -313,8 +317,14 @@ actor Step is (RunnableStep & Resilient & Producer &
       end
     end
 
-  //////////////
+  //////////////////////
   // ORIGIN (resilience)
+  be request_ack() =>
+    _resilience_routes.request_ack(this)
+    for route in _routes.values() do
+      route.request_ack()
+    end
+
   fun ref _x_resilience_routes(): Routes =>
     _resilience_routes
 

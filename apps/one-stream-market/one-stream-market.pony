@@ -83,8 +83,7 @@ actor Main
       let application = recover val
         Application("One Steam NBBO Updater App")
           .new_pipeline[FixNbboMessage val, NbboResult val](
-            "Nbbo", FixNbboFrameHandler
-              where init_file = init_file)
+            "Nbbo", FixNbboFrameHandler)
             .to_state_partition[Symboly val, String,
               (NbboResult val | None), SymbolData](ProcessNbbo,
                 SymbolDataBuilder, "symbol-data",

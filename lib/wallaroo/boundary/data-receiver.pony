@@ -18,14 +18,26 @@ actor DataReceiver is Producer
   var _router: DataRouter val =
     DataRouter(recover Map[U128, CreditFlowConsumerStep tag] end)
   var _last_id_seen: U64 = 0
+  var _last_id_acked: U64 = 0
   var _connected: Bool = false
   var _reconnecting: Bool = false
   let _alfred: Alfred
-  let _timers: Timers = Timers
-  var _ack_counter: U64 = 0
+  var _ack_counter: USize = 0
+  // TODO: Get this information via data_connect()
+  var _boundary_queue_max: USize = 16_000
+  var _request_threshold: USize = 8_000
+  var _request_pause: USize = 4_000
+  var _last_request: USize = 0
+  var _estimated_boundary_queue_size: USize = 0
+
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
   var _latest_conn: (TCPConnection | None) = None
+
+  let _resilience_routes: DataReceiverRoutes = DataReceiverRoutes
+
+  // Timer to periodically request acks to prevent deadlock.
+  let _timers: Timers = Timers
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     connections: Connections, alfred: Alfred)
@@ -36,16 +48,38 @@ actor DataReceiver is Producer
     _connections = connections
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
+    ifdef "resilience" then
+      let t = Timer(_RequestAck(this), 0, 15_000_000)
+      _timers(consume t)
+    end
 
   be data_connect(sender_step_id: U128, conn: TCPConnection) =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
 
-  be update_watermark(route_id: U64, seq_id: U64) =>
+  be update_watermark(route_id: RouteId, seq_id: SeqId) =>
+    _resilience_routes.receive_ack(route_id, seq_id)
     try
-      let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
-        _sender_step_id, seq_id, _auth)
-      _connections.send_data(_sender_name, ack_msg)
+      let watermark = _resilience_routes.propose_new_watermark()
+
+      if watermark > _last_id_acked then
+        ifdef "trace" then
+          @printf[I32]("DataReceiver acking seq_id %lu\n".cstring(),
+            watermark)
+        end
+
+        let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
+          _sender_step_id, watermark, _auth)
+        match _latest_conn
+        | let conn: TCPConnection =>
+          conn.writev(ack_msg)
+        else
+          Fail()
+        end
+        _estimated_boundary_queue_size =
+          _estimated_boundary_queue_size - (watermark - _last_id_acked).usize()
+        _last_id_acked = watermark
+      end
     else
       @printf[I32]("Error creating ack watermark message\n".cstring())
     end
@@ -73,6 +107,17 @@ actor DataReceiver is Producer
     // Need to discuss with John
     Routes
 
+  fun ref bookkeeping(route_id: RouteId, seq_id: SeqId) =>
+    """
+    Process envelopes and keep track of things
+    """
+    ifdef "trace" then
+      @printf[I32]("Bookkeeping called for DataReceiver route %lu\n".cstring(), route_id)
+    end
+    ifdef "resilience" then
+      _resilience_routes.send(route_id, seq_id)
+    end
+
   be update_router(router: DataRouter val) =>
     // TODO: This commented line conflicts with invariant downstream. The
     // idea is to unregister if we've registered but not otherwise.
@@ -88,10 +133,14 @@ actor DataReceiver is Producer
 
     _router = router
     _router.register_producer(this)
+    for id in _router.route_ids().values() do
+      _resilience_routes.add_route(id)
+    end
 
   be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    _estimated_boundary_queue_size = _estimated_boundary_queue_size + 1
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
     end
@@ -101,8 +150,23 @@ actor DataReceiver is Producer
       _router.route(d, pipeline_time_spent, this, seq_id, latest_ts,
         metrics_id, worker_ingress_ts)
 
+      // ifdef "resilience" then
+      //   if (_estimated_boundary_queue_size > _request_threshold) and
+      //     ((_ack_counter - _last_request) > _request_pause)
+      //   then
+      //     _request_ack()
+      //   end
+      // end
+
       _maybe_ack()
     end
+
+  be request_ack() =>
+    _request_ack()
+
+  fun ref _request_ack() =>
+    _router.request_ack(this)
+    _last_request = _ack_counter
 
   be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
@@ -122,7 +186,14 @@ actor DataReceiver is Producer
 
   fun ref _ack_latest() =>
     try
-      if _last_id_seen > 0 then
+      if _last_id_seen > _last_id_acked then
+        ifdef "trace" then
+          @printf[I32]("DataReceiver acking seq_id %lu\n".cstring(),
+            _last_id_seen)
+        end
+        _estimated_boundary_queue_size = _estimated_boundary_queue_size -
+          (_last_id_seen - _last_id_acked).usize()
+        _last_id_acked = _last_id_seen
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, _last_id_seen, _auth)
         match _latest_conn
@@ -164,3 +235,13 @@ actor DataReceiver is Producer
     | let conn: TCPConnection =>
       conn.unmute(c)
     end
+
+class _RequestAck is TimerNotify
+  let _d: DataReceiver
+
+  new iso create(d: DataReceiver) =>
+    _d = d
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _d.request_ack()
+    true
