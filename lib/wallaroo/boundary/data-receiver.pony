@@ -93,7 +93,8 @@ actor DataReceiver is Producer
     _router.register_producer(this)
 
   be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
+    conn: TCPConnection)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
@@ -104,7 +105,7 @@ actor DataReceiver is Producer
       _router.route(d, pipeline_time_spent, this, seq_id, latest_ts, metrics_id,
         worker_ingress_ts)
 
-      _maybe_ack()
+      _maybe_ack(conn)
     end
 
   be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
@@ -116,22 +117,22 @@ actor DataReceiver is Producer
         metrics_id, worker_ingress_ts)
     end
 
-  fun ref _maybe_ack() =>
+  fun ref _maybe_ack(conn: TCPConnection) =>
     ifdef not "resilience" then
       if (_ack_counter % 512) == 0 then
-        _ack_latest()
+        _ack_latest(conn)
       end
     end
 
-  fun ref _ack_latest() =>
+  fun ref _ack_latest(conn: TCPConnection) =>
     try
       if _last_id_seen > 0 then
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, _last_id_seen, _auth)
-        match _latest_conn
-        | let conn: TCPConnection =>
+        //match _latest_conn
+        //| let conn: TCPConnection =>
           conn.writev(ack_msg)
-        end
+        //end
         // _connections.send_data(_sender_name, ack_msg)
       end
     else

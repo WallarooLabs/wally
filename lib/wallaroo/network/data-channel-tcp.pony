@@ -119,7 +119,7 @@ class DataChannelConnectNotifier is TCPConnectionNotify
             .received(data_msg.delivery_msg,
               data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
               data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
-              my_latest_ts)
+              my_latest_ts, conn)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end

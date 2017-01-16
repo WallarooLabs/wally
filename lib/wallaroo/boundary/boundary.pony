@@ -5,7 +5,6 @@ use "net"
 use "time"
 use "sendence/bytes"
 use "sendence/guid"
-use "sendence/queue"
 use "sendence/wall-clock"
 use "wallaroo/fail"
 use "wallaroo/initialization"
@@ -81,7 +80,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   let _host: String
   let _service: String
   let _from: String
-  let _queue: Queue[Array[ByteSeq] val] = _queue.create()
+  let _queue: Array[Array[ByteSeq] val] = _queue.create()
   var _lowest_queue_id: U64 = 0
   // TODO: this should go away and TerminusRoute entirely takes
   // over seq_id generation whether there is resilience or not.
@@ -206,7 +205,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
         seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)
-      // _queue.enqueue(outgoing_msg)
+        _queue.push(outgoing_msg)
 
       _c = _c + 1
       if (_c % 100_000) == 0 then
@@ -243,7 +242,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     let flush_count: USize = (seq_id - _lowest_queue_id).usize()
-    _queue.clear_n(flush_count)
+    _queue.remove(0, flush_count)
     _lowest_queue_id = _lowest_queue_id + flush_count.u64()
 
     ifdef "backpressure" then
