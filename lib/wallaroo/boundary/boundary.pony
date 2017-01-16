@@ -42,6 +42,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
+  var _mute_outstanding: Bool = false
   var _max_distributable_credits: ISize = 350_000
   var _distributable_credits: ISize = _max_distributable_credits
   let _permanent_max_credit_response: ISize = 1024
@@ -205,7 +206,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
         seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)
-        _queue.push(outgoing_msg)
+        _add_to_upstream_backup(outgoing_msg)
 
       _c = _c + 1
       if (_c % 100_000) == 0 then
@@ -744,22 +745,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
     false
 
-  fun ref _apply_backpressure() =>
-    _writeable = false
-    ifdef linux then
-      // this is safe because asio thread isn't currently subscribed
-      // for a write event so will not be writing to the readable flag
-      AsioEvent.set_writeable(_event, false)
-      @pony_asio_event_resubscribe_write(_event)
-    end
-    _notify.throttled(this)
-    _mute_upstreams()
-
-  fun ref _release_backpressure() =>
-    _notify.unthrottled(this)
-    _maybe_distribute_credits()
-    _unmute_upstreams()
-
   fun ref _read_buf_size() =>
     """
     Resize the read buffer.
@@ -798,15 +783,52 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       @pony_os_nodelay[None](_fd, state)
     end
 
+  fun ref _add_to_upstream_backup(msg: Array[ByteSeq] val) =>
+    _queue.push(msg)
+    _maybe_mute_or_unmute_upstreams()
+
+  fun ref _apply_backpressure() =>
+    _writeable = false
+    ifdef linux then
+      // this is safe because asio thread isn't currently subscribed
+      // for a write event so will not be writing to the readable flag
+      AsioEvent.set_writeable(_event, false)
+      @pony_asio_event_resubscribe_write(_event)
+    end
+    _notify.throttled(this)
+    _maybe_mute_or_unmute_upstreams()
+
+  fun ref _release_backpressure() =>
+    _notify.unthrottled(this)
+    _maybe_distribute_credits()
+    _maybe_mute_or_unmute_upstreams()
+
+  fun ref _maybe_mute_or_unmute_upstreams() =>
+    if _mute_outstanding then
+      if _writeable and not _backup_queue_is_overflowing() then
+        _unmute_upstreams()
+      end
+    else
+      if not _writeable or _backup_queue_is_overflowing() then
+        _mute_upstreams()
+      end
+    end
+
   fun ref _mute_upstreams() =>
     for u in _upstreams.values() do
       u.mute(this)
     end
+    _mute_outstanding = true
 
   fun ref _unmute_upstreams() =>
     for u in _upstreams.values() do
       u.unmute(this)
     end
+    _mute_outstanding = false
+
+
+  fun _backup_queue_is_overflowing(): Bool =>
+    _queue.size() >= 16_384
 
 interface _OutgoingBoundaryNotify
   fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
