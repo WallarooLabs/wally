@@ -64,7 +64,6 @@ sudo make install
 scl enable devtoolset-4 bash 
 git clone https://github.com/Sendence/buffy.git
 cd ~/buffy
-git checkout arizona-add-state
 cd lib/wallaroo/cpp-api/cpp/cppapi
 mkdir build
 cd build
@@ -101,10 +100,10 @@ Your options are:
 ssh -i YOUR_PEM ec2-user@YOUR-EXECUTION-SERVER-IP
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 cd /apps/dev/arizona/data
-/apps/dev/arizona/bin/arizona/pairgen -c /apps/dev/arizona/etc/pairgen_150K.cfg
+/apps/dev/arizona/bin/arizona/pairgen -c /apps/dev/arizona/etc/pairgen_1375_1M_admin.cfg
 ```
 * Your data files will appear in your current directory, suggested: /apps/dev/arizona/data
-* Data files: azdata_pairgen_loop.dat[*]
+* Data files: azdata_pairgen_loop_1375_1M_admin.dat[*]
 * Each order needs a correspoding cancel or execute message. Use the `full` file for loops.
 
 
