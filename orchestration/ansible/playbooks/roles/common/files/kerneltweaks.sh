@@ -110,14 +110,14 @@ echo 0 > /proc/sys/kernel/sched_rt_runtime_us
 # If a soft limit is set for the maximum realtime priority which is less than the hard limit and needs to be raised, the "ulimit -r" command can do so
 ulimit -r 90
 
-# cpu frequency related stuff
-if [ -a /sys/devices/system/cpu/cpu0/cpufreq ]; then
-  echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo # disable turbo boost to limit cpu frequency variations
-fi
-
 # set performance cpu governor and default cpu fequency
 if [ -a /sys/devices/system/cpu/cpu0/cpufreq ]; then
   cpupower -c all frequency-set -g performance --min $(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq) --max $(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)
+fi
+
+# cpu frequency related stuff
+if [ -a /sys/devices/system/cpu/cpu0/cpufreq ]; then
+  echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo # disable turbo boost to limit cpu frequency variations
 fi
 
 ##ethtool based tweaks
