@@ -771,9 +771,9 @@ void AddOrderStateChange::to_log_entry(char *bytes_)
 size_t AddOrderStateChange::get_log_entry_size()
 {
   return _client_id.size() +
-  _account_id.size() +
-  _isin_id.size() +
-  _order_id.size() +
+  2 + _account_id.size() +
+  2 + _isin_id.size() +
+  2 + _order_id.size() +
   sizeof(uint16_t) +
   sizeof(uint32_t) +
   sizeof(double);
@@ -811,8 +811,8 @@ void CancelOrderStateChange::to_log_entry(char *bytes_)
 size_t CancelOrderStateChange::get_log_entry_size()
 {
   return _client_id.size() +
-  _account_id.size() +
-  _order_id.size();
+  2 + _account_id.size() +
+  2 + _order_id.size();
 }
 size_t CancelOrderStateChange::read_log_entry_size_header(char *bytes_)
 {
@@ -872,9 +872,9 @@ void ExecuteOrderStateChange::to_log_entry(char *bytes_)
 size_t ExecuteOrderStateChange::get_log_entry_size()
 {
   return _client_id.size() +
-  _account_id.size() +
-  _order_id.size() +
-  _execution_id.size() +
+  2 + _account_id.size() +
+  2 + _order_id.size() +
+  2 + _execution_id.size() +
   sizeof(uint32_t) +
   sizeof(double);
 }
