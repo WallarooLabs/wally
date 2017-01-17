@@ -17,6 +17,11 @@ if [ "${SYS_CPUS}" == "" ]; then
   cset set -l -r
   echo "Done disabling cpu isolation if it is enabled."
 else
+  old_sys_cpus=`cset set -l -r system | grep '/system$' | awk '{print $2}'`
+  if [ "${old_sys_cpus}" == "${SYS_CPUS}" ]; then
+    echo "SYS CPUS (${old_sys_cpus}) didn't change. Nothing to do."
+    exit
+  fi
   echo "Isolating general system processes to cpus '${SYS_CPUS}'."
   echo "Current process map by cpuset:"
   cset set -l -r
@@ -45,6 +50,22 @@ else
   if [ "${current_cpuspec_frag}" != "" ]; then
     user_cpuspec=${user_cpuspec},${current_cpuspec_frag}-${bit}
   fi
+  for (( bit=0; bit<${num_procs}; bit++)); do
+    mask=$((1<<bit))
+    if [ $((user_cpus&mask)) -ne 0 ]; then
+      echo "Temporarily disabling user cpu: ${bit}"
+      echo 0 > /sys/devices/system/cpu/cpu${bit}/online
+    fi
+  done
+  sleep 1
+  cat /proc/cpuinfo | grep proc
+  for (( bit=0; bit<${num_procs}; bit++)); do
+    mask=$((1<<bit))
+    if [ $((user_cpus&mask)) -ne 0 ]; then
+      echo "Re-enabling user cpu: ${bit}"
+      echo 1 > /sys/devices/system/cpu/cpu${bit}/online
+    fi
+  done
   cset set -c ${user_cpuspec} -m ${mem_nodes} -s user
   cset proc -m -k --threads -f root -t system
   echo "Modified process map by cpuset:"

@@ -1,64 +1,3 @@
-- name: setup isolcpus boot param (ec2)
-  lineinfile:
-    dest: /etc/default/grub.d/50-cloudimg-settings.cfg
-    regexp: '(^GRUB_CMDLINE_LINUX_DEFAULT="(\s*(?!isolcpus)[\w=/\-\.]+)*\s*)"\s*$'
-    line: '\1 isolcpus={{ system_cpus }}"'
-    backrefs: true
-    state: present
-    backup: true
-  register: grubfile
-  when: ({{ 'vagrant' != ansible_ssh_user }} and {{ system_cpus is defined }} and {{ isolcpus is defined }} and {{ isolcpus == 'true' }} and {{ ansible_ec2_instance_id is defined }})
-
-- name: remove isolcpus boot param if it exists (ec2)
-  lineinfile:
-    dest: /etc/default/grub.d/50-cloudimg-settings.cfg
-    regexp: '(^GRUB_CMDLINE_LINUX_DEFAULT=".*) isolcpus.*"$'
-    line: '\1"'
-    backrefs: true
-    state: present
-    backup: true
-  register: grubfile2
-  when: ({{ 'vagrant' != ansible_ssh_user }} and ({{ isolcpus is not defined }} or ({{ isolcpus is defined }} and {{ isolcpus != 'true' }})) and {{ ansible_ec2_instance_id is defined }})
-
-- name: update grub
-  command: update-grub
-  when: ('vagrant' != '{{ ansible_ssh_user }}' and (grubfile|changed or grubfile2|changed) and {{ ansible_ec2_instance_id is defined }})
-
-- name: setup isolcpus boot param (not ec2)
-  lineinfile:
-    dest: /boot/grub/grub.cfg
-    regexp: '^( +linux.+/boot/vmlinuz)( isolcpus={{ system_cpus }} )?(.+(?!single).+\s*)$'
-    line: '\1 isolcpus={{ system_cpus }} \3'
-    backrefs: true
-    state: present
-    backup: true
-  register: grubfile3
-  when: ({{ 'vagrant' != ansible_ssh_user }} and {{ system_cpus is defined }} and {{ isolcpus is defined }} and {{ isolcpus == 'true' }} and {{ ansible_ec2_instance_id is not defined }})
-
-- name: remove isolcpus boot param if it exists (not ec2)
-  lineinfile:
-    dest: /boot/grub/grub.cfg
-    regexp: '(^ +linux.*) isolcpus=\d+ +(.*)$'
-    line: '\1 \2'
-    backrefs: true
-    state: present
-    backup: true
-  register: grubfile4
-  when: ({{ 'vagrant' != ansible_ssh_user }} and ({{ isolcpus is not defined }} or ({{ isolcpus is defined }} and {{ isolcpus != 'true' }})) and {{ ansible_ec2_instance_id is not defined }})
-
-
-- name: reboot to apply isolcpus boot param
-  shell: sleep 2 && /sbin/shutdown -r now "Apply isolcpus boot param"
-  when: ('vagrant' != '{{ ansible_ssh_user }}' and (grubfile|changed or grubfile2|changed or grubfile3|changed or grubfile4|changed))
-  async: 1
-  poll: 0
-  ignore_errors: true
-
-- name: waiting for server to come back
-  local_action: wait_for host={{ inventory_hostname }} state=started delay=30 timeout=600 port=22
-  become: false
-  when: ('vagrant' != '{{ ansible_ssh_user }}' and (grubfile|changed or grubfile2|changed or grubfile3|changed or grubfile4|changed))
-
 - name: Put ssh private key onto server
   copy:
     src: "{{ ssh_key_file }}"
@@ -288,11 +227,11 @@
     copy=no
   with_items: custom_libs
 
-- name: apply kernel tweaks
-  script: kerneltweaks.sh > /kerneltweaks.out
-  when: ('vagrant' != '{{ ansible_ssh_user }}')
-
 - name: create cpu shield
   script: create_cpu_shield.sh {{ system_cpus if system_cpus is defined else "" }} > /create_cpu_shield.out
+  when: ('vagrant' != '{{ ansible_ssh_user }}')
+
+- name: apply kernel tweaks
+  script: kerneltweaks.sh > /kerneltweaks.out
   when: ('vagrant' != '{{ ansible_ssh_user }}')
 

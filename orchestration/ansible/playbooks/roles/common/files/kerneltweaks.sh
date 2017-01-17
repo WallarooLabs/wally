@@ -36,35 +36,46 @@ sysctl -w net.ipv4.tcp_sack=0
 sysctl -w net.ipv4.tcp_fin_timeout=15
 sysctl -w net.ipv4.tcp_moderate_rcvbuf=1
 sysctl -w net.core.rps_sock_flow_entries=65536
-if [ -a /sys/class/net/eth0/queues/rx-0/rps_flow_cnt ]; then
-  echo 32768 > /sys/class/net/eth0/queues/rx-0/rps_flow_cnt
-  echo FFFFFFFF > /sys/class/net/eth0/queues/rx-0/rps_cpus
+
+sys_cpus=`cset set -l -r -x system | grep '/system$' | awk '{print $2}'`
+interface=`ifconfig |  grep '^e' | awk '{print $1}'`
+
+if [ -a /sys/class/net/${interface}/queues/rx-0/rps_flow_cnt ]; then
+  echo 32768 > /sys/class/net/${interface}/queues/rx-0/rps_flow_cnt
+  echo ${sys_cpus} > /sys/class/net/${interface}/queues/rx-0/rps_cpus
 fi
 
-if [ -a /sys/class/net/eth0/queues/rx-1/rps_flow_cnt ]; then
-  echo 32768 > /sys/class/net/eth0/queues/rx-1/rps_flow_cnt
-  echo FFFFFFFF > /sys/class/net/eth0/queues/rx-1/rps_cpus
+if [ -a /sys/class/net/${interface}/queues/rx-1/rps_flow_cnt ]; then
+  echo 32768 > /sys/class/net/${interface}/queues/rx-1/rps_flow_cnt
+  echo ${sys_cpus} > /sys/class/net/${interface}/queues/rx-1/rps_cpus
 fi
 
-if [ -a /sys/class/net/eth0/queues/tx-0/xps_cpus ]; then
-  echo FFFFFFFF > /sys/class/net/eth0/queues/tx-0/xps_cpus
+if [ -a /sys/class/net/${interface}/queues/tx-0/xps_cpus ]; then
+  echo FFFFFFFF > /sys/class/net/${interface}/queues/tx-0/xps_cpus
 fi
 
-if [ -a /sys/class/net/eth0/queues/tx-1/xps_cpus ]; then
-  echo FFFFFFFF > /sys/class/net/eth0/queues/tx-1/xps_cpus
+if [ -a /sys/class/net/${interface}/queues/tx-1/xps_cpus ]; then
+  echo FFFFFFFF > /sys/class/net/${interface}/queues/tx-1/xps_cpus
 fi
+
+for irq in `cat /proc/interrupts| grep ${interface} | awk -F: '{print $1}'`; do
+  echo ${sys_cpus} > /proc/irq/${irq}/smp_affinity
+done
+
+#if tc qdisc show dev ${interface} | grep pfifo_fast; then
+#  tc qdisc add dev ${interface} root fq_codel
+#fi
+
+sysctl -w net.core.dev_weight=600
+sysctl -w net.core.netdev_budget=600
+sysctl -w net.core.netdev_tstamp_prequeue=1
+sysctl -w net.ipv4.tcp_congestion_control=dctcp
+sysctl -w net.ipv4.tcp_ecn=1
 
 sysctl -w net.ipv4.tcp_fastopen=3
 
 sysctl -w net.core.busy_poll=50 # spend cpu for lower latency
 sysctl -w net.core.busy_read=50 # spend cpu for lower latency
-
-##ethtool based tweaks
-#ethtool -G eth0 rx 4096 tx 4096 || true # for to always succeed because if value is correct already it fails
-#ethtool -K eth0 gso off
-#ethtool -K eth0 gro off
-#ethtool -K eth0 tso off
-#ethtool -C eth0 rx-usecs 100 || true # for to always succeed because if value is correct already it fails
 
 
 # filesystem stuff
@@ -108,3 +119,10 @@ fi
 if [ -a /sys/devices/system/cpu/cpu0/cpufreq ]; then
   cpupower -c all frequency-set -g performance --min $(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq) --max $(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)
 fi
+
+##ethtool based tweaks
+ethtool -G ${interface} rx 4096 tx 4096 || true # for to always succeed because if value is correct already it fails
+#ethtool -K eth0 gso off # don't disable becuase only used when sending large packets and helps offload work from cpu
+ethtool -K ${interface} gro off # disable because this slows packet delivery up network stack
+#ethtool -K eth0 tso off # don't disable becuase only used when sending large packets and helps offload work from cpu
+ethtool -C ${interface} rx-usecs 0 || true # for to always succeed because if value is correct already it fails
