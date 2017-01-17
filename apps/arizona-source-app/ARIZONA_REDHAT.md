@@ -10,7 +10,7 @@ If you have not followed the setup instructions in the orchestration/terraform [
 Before configuring your cluster, make sure you are in
 your `orchestration/arizona` directory.
 
-Arizona has two different kinds of machines: build and execution.      
+Arizona has two different kinds of machines: build and execution.
 **This document assumes you build all binaries on a build machine and then copy them onto the execution machines.**
 We already have a build machine, called ***arizona-build-server*** you can log in to that host with:
 ```
@@ -19,7 +19,7 @@ ssh -i YOUR_PEM_FILE ec2-user@AWS-HOST-NAME
 
 Or, you can create a build machine by running:
 ```
-make cluster cluster_name=<BUILD_MACHINE_NAME> num_followers=0 force_instance=r3.4xlarge arizona_node_type=build ansible_system_cpus=0,8
+make cluster cluster_name=<BUILD_MACHINE_NAME> num_followers=0 force_instance=r3.4xlarge arizona_node_type=development ansible_system_cpus=0,8
 ```
 
 To create execution machines, use:
@@ -48,7 +48,7 @@ Please note - you only have to run the `scl` command once. If you are copying th
 #### Build spdlog
 **Note:**You don't have to do this if you are using the arizona-build-server
 ```
-scl enable devtoolset-4 bash 
+scl enable devtoolset-4 bash
 cd ~/
 git clone https://github.com/gabime/spdlog.git
 cd ~/spdlog
@@ -61,7 +61,7 @@ sudo make install
 #### Build Arizona-CPP
 **Note:**You don't have to do this if you are using the arizona-build-server
 ```
-scl enable devtoolset-4 bash 
+scl enable devtoolset-4 bash
 git clone https://github.com/Sendence/buffy.git
 cd ~/buffy
 cd lib/wallaroo/cpp-api/cpp/cppapi
@@ -73,7 +73,7 @@ sudo make install
 
 #### The Arizona Ancillary Tools (AZAT)
 ```
-scl enable devtoolset-4 bash 
+scl enable devtoolset-4 bash
 export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:PKG_CONFIG_PATH
 cd ~/
 git clone https://github.com/Sendence/arizona.git
@@ -153,8 +153,9 @@ cd /apps/dev/arizona/data
 ## Arizona/Wallaroo
 ### Clone Wallaroo repo
 
-You'll need to clone the repo:
+You'll need to clone the repo if you don't have it already:
 ```
+cd ~/
 git clone https://github.com/sendence/buffy.git
 ```
 
@@ -178,50 +179,54 @@ Transparent hugepages is disabled as required for optimal performance.
 Swappiness is set to 0 as required for optimal performance.
 ```
 
-#### Install Clang/LLVM
-
-You should install prebuilt Clang 3.8 from the [LLVM download page](http://llvm.org/releases/download.html#3.8.0) under Pre-Built Binaries:
-
-```bash
-cd ~/
-wget http://llvm.org/releases/3.8.1/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-tar xvf clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-export PATH=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/:$PATH
-echo "export PATH=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/:\$PATH" >> ~/.bashrc
-```
-
-#### Install Ponyc dependencies
-
-```bash
-sudo apt-get update
-sudo apt-get install -y build-essential git zlib1g-dev libncurses5-dev libssl-dev
-```
-
-#### Install PCRE2
-
-```bash
-cd ~/
-wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2
-tar xvf pcre2-10.21.tar.bz2
-cd pcre2-10.21
-./configure --prefix=/usr
-sudo make install
-```
-
 ### Build ponyc
 ```
 cd ~/
 git clone https://github.com/Sendence/ponyc.git
 cd ~/ponyc/
-git checkout export-and-serialize
-sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/bin/llvm-config
+```
+```
+<manually edit Makefile for>
+llvm.libs := $(shell $(LLVM_CONFIG) --libs) -lz -lncurses
+to
+llvm.libs := $(shell $(LLVM_CONFIG) --libs) -lz -lncurses -ltinfo
+(append ' -ltinfo')
+
+symlink.flags = -srf
+to
+symlink.flags = -sf
 ```
 
-### Build giles
 ```
-cd ~/buffy
-make build-giles-sender arch=amd64 ponyc_tag=sendence-14.0.5-release
-make build-giles-receiver arch=amd64 ponyc_tag=sendence-14.0.5-release
+scl enable devtoolset-4 python27 "LTO_PLUGIN=/opt/rh/devtoolset-4/root/usr/libexec/gcc/x86_64-redhat-linux/5.3.1/liblto_plugin.so make prefix=/usr/local verbose=1 -j`nproc` test"
+
+scl enable devtoolset-4 python27 "LTO_PLUGIN=/opt/rh/devtoolset-4/root/usr/libexec/gcc/x86_64-redhat-linux/5.3.1/liblto_plugin.so sudo make prefix=/usr/local verbose=1 install"
+
+cd ..
+```
+
+### Install pony stable
+```
+cd ~/
+git clone https://github.com/jemc/pony-stable.git
+cd pony-stable/
+scl enable devtoolset-4 python27 "make"
+scl enable devtoolset-4 python27 "sudo make install"
+```
+
+
+### Build giles sender
+**Note:**You must use sendence ponyc version: sendence-14.0.5
+```
+cd ~/buffy/giles/sender
+scl enable devtoolset-4 python27 "stable env ponyc"
+```
+
+### Build giles sender
+**Note:**You must use sendence ponyc version: sendence-17.0.4 or greater
+```
+cd ~/buffy/giles/receiver
+scl enable devtoolset-4 python27 "stable env ponyc"
 ```
 
 ### Build Arizona-source-app
@@ -229,29 +234,27 @@ make build-giles-receiver arch=amd64 ponyc_tag=sendence-14.0.5-release
 cd ~/buffy/apps/arizona-source-app
 mkdir build
 cd build
-cmake ..
-make
+scl enable devtoolset-4 python27  "cmake .."
+scl enable devtoolset-4 python27  "make"
 cd ..
-ponyc --path=/home/ubuntu/buffy/lib:/usr/local/lib/WallarooCppApi/:/home/ubuntu/buffy/apps/arizona-source-app/build/lib/ --output=build arizona-source-app/
+scl enable devtoolset-4 python27  "ponyc --path=/home/ec2-user/buffy/lib:/usr/local/lib/WallarooCppApi/:/home/ec2-user/buffy/apps/arizona-source-app/build/lib/ --output=build arizona-source-app/"
 ```
 
 ### Startup the Metrics UI
 
-You need to create a docker network for the UI's with the following command:
+You need to download and untar the Metrics UI with the following commands:
 ```bash
-docker network create buffy-leader
+cd ~/
+mkdir metrics_reporter_ui
+wget
+https://s3.amazonaws.com/sendence-dev/wallaroo/metrics_reporter_ui-bins/linux/metrics_reporter_ui-new-rhel.tar.gz
+tar -xvf -C metrics_reporter_ui/
 ```
 
 To run the Metrics UI:
 ```bash
-docker run -d -u root --cpuset-cpus 0,18 --privileged  \
--v /usr/bin:/usr/bin:ro   -v /var/run/docker.sock:/var/run/docker.sock \
--v /bin:/bin:ro  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  \
--v /tmp:/apps/metrics_reporter_ui/log  \
--p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
--e "BINS_TYPE=demo" -e "RELX_REPLACE_OS_VARS=true" \
---name mui -h mui --net=buffy-leader \
-docker.sendence.com:5043/wallaroo-metrics-ui-new:latest
+cd ~/metrics_reporter_ui
+./bin/metrics_reporter_ui start
 ```
 
 #### Restarting UIs
@@ -259,7 +262,8 @@ docker.sendence.com:5043/wallaroo-metrics-ui-new:latest
 If you need to restart the UI, this can be accomplished by:
 
 ```bash
-docker stop mui && docker start mui
+cd ~/metrics_reporter_ui
+./bin/metrics_reporter_ui restart
 ```
 
 
@@ -273,14 +277,14 @@ You'll need to have 3 terminals available. 1 for giles sender, 1 for giles recei
 Giles receiver needs to be running before arizona:
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555
+sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555
 ```
 
 #### Running the application
 
 ```
 cd ~/buffy/apps/arizona-source-app
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 --clients=5500
+sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 --clients=1375
 ```
 
 #### Running the Sender
@@ -291,44 +295,44 @@ To run the Orders Sender:
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-looping.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-looping.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 ##### For the 15 minute run
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-15-minute.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-15-minute.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 ##### For the 60 minute run
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-60-minute.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-60-minute.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 ##### For the 8 hour run
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-8-hour.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 5,7 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-8-hour.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 #### 2 MACHINES/2 WORKERS
 Make sure you have the same binary on both machines or you'll get segfaults with serialization. Compile the binary on Machine 1 and use `scp` to copy to the other machine:
 
-`scp -i ~/.ssh/us-east-1.pem arizona-binary ubuntu@<TARGET-MACHINE-IP>:~/path/to/copy/to`
+`scp -i ~/.ssh/us-east-1.pem arizona-binary ec2-user@<TARGET-MACHINE-IP>:~/path/to/copy/to`
 
 On each machine, run Giles receiver before arizona:
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555
+sudo cset proc -s user -e numactl -- -C 6,7 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555
 ```
 
 Run Arizona on Machine 1:
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 4 --ponypinasio --ponynoblock -w 2 --clients=5500
+sudo cset proc -s user -e numactl -- -C 1-4,7 chrt -f 80 ./build/arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 4 --ponypinasio --ponynoblock -w 2 --clients=5500
 ```
 
 Run Arizona on Machine 2:
