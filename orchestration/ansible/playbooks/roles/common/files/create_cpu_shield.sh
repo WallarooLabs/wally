@@ -17,7 +17,7 @@ if [ "${SYS_CPUS}" == "" ]; then
   cset set -l -r
   echo "Done disabling cpu isolation if it is enabled."
 else
-  old_sys_cpus=`cset set -l -r system | grep '/system$' | awk '{print $2}'`
+  old_sys_cpus=`cset set -l -r system | grep '/system$' | awk '{print $2}' || true`
   if [ "${old_sys_cpus}" == "${SYS_CPUS}" ]; then
     echo "SYS CPUS (${old_sys_cpus}) didn't change. Nothing to do."
     exit
