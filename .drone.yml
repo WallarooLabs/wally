@@ -30,7 +30,7 @@ build:
 
   # main build and test of buffy
   main_build:
-    image: sendence/ponyc:sendence-15.0.0-$$PONYC_CONFIG
+    image: sendence/ponyc:sendence-19.0.1-$$PONYC_CONFIG
     pull: true
     commands:
       - make clean arch=$$PONYC_VERSION in_docker=true VERBOSE=true
@@ -125,77 +125,77 @@ build:
       matrix:
         PONYC_VERSION: amd64
 
-  # build docker images and test dagon
-  build_docker_images_dagon_test:
-    image: sendence/docker-runner:0.0.4
-    pull: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    commands:
-      - >
-        make clean-docker arch=$$PONYC_VERSION VERBOSE=true
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-      - >
-        make build-docker-pony arch=$$PONYC_VERSION VERBOSE=true
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-      - >
-        make dagon-docker-test arch=$$PONYC_VERSION VERBOSE=true
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
-        docker_no_pull=true
-    privileged: true
-
-  # build and push final docker images on a push event
-  build_docker_images_push:
-    image: sendence/docker-runner:0.0.4
-    pull: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /root/.docker/config.json:/root/.docker/config.json
-    commands:
-      - >
-        make push-docker-pony arch=$$PONYC_VERSION VERBOSE=true
-        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG
-      - >
-        make arch=$$PONYC_VERSION VERBOSE=true
-        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG clean-docker
-      - >
-        make arch=$$PONYC_VERSION VERBOSE=true
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
-    privileged: true
-    when:
-      event: push
-
-  # build and push final docker images on a tag event
-  build_docker_images_tag:
-    image: sendence/docker-runner:0.0.4
-    pull: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /root/.docker/config.json:/root/.docker/config.json
-    commands:
-      - >
-        make push-docker-pony arch=$$PONYC_VERSION VERBOSE=true
-        docker_image_version=$$TAG-$$PONYC_CONFIG
-      - >
-        make arch=$$PONYC_VERSION docker_image_version=$$TAG-$$PONYC_CONFIG
-        VERBOSE=true clean-docker
-      - >
-        make arch=$$PONYC_VERSION VERBOSE=true
-        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
-    privileged: true
-    when:
-      event: tag
-
-  # run dagon spike tests
-  run_dagon_spike_test:
-    image: sendence/$$PONYC_VERSION-python-runner:0.0.4
-    pull: true
-    environment:
-      - LC_ALL=C.UTF-8
-      - LANG=C.UTF-8
-    commands:
-      - chrt -f 80 make dagon-spike-test arch=$$PONYC_VERSION VERBOSE=true
-    privileged: true
+#  # build docker images and test dagon
+#  build_docker_images_dagon_test:
+#    image: sendence/docker-runner:0.0.4
+#    pull: true
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#    commands:
+#      - >
+#        make clean-docker arch=$$PONYC_VERSION VERBOSE=true
+#        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+#      - >
+#        make build-docker-pony arch=$$PONYC_VERSION VERBOSE=true
+#        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+#      - >
+#        make dagon-docker-test arch=$$PONYC_VERSION VERBOSE=true
+#        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG
+#        docker_no_pull=true
+#    privileged: true
+#
+#  # build and push final docker images on a push event
+#  build_docker_images_push:
+#    image: sendence/docker-runner:0.0.4
+#    pull: true
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#      - /root/.docker/config.json:/root/.docker/config.json
+#    commands:
+#      - >
+#        make push-docker-pony arch=$$PONYC_VERSION VERBOSE=true
+#        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG
+#      - >
+#        make arch=$$PONYC_VERSION VERBOSE=true
+#        docker_image_version=$$BRANCH-$$COMMIT-$$PONYC_CONFIG clean-docker
+#      - >
+#        make arch=$$PONYC_VERSION VERBOSE=true
+#        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
+#    privileged: true
+#    when:
+#      event: push
+#
+#  # build and push final docker images on a tag event
+#  build_docker_images_tag:
+#    image: sendence/docker-runner:0.0.4
+#    pull: true
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#      - /root/.docker/config.json:/root/.docker/config.json
+#    commands:
+#      - >
+#        make push-docker-pony arch=$$PONYC_VERSION VERBOSE=true
+#        docker_image_version=$$TAG-$$PONYC_CONFIG
+#      - >
+#        make arch=$$PONYC_VERSION docker_image_version=$$TAG-$$PONYC_CONFIG
+#        VERBOSE=true clean-docker
+#      - >
+#        make arch=$$PONYC_VERSION VERBOSE=true
+#        docker_image_version=build-$$BUILD_NUMBER-$$PONYC_CONFIG clean-docker
+#    privileged: true
+#    when:
+#      event: tag
+#
+#  # run dagon spike tests
+#  run_dagon_spike_test:
+#    image: sendence/$$PONYC_VERSION-python-runner:0.0.4
+#    pull: true
+#    environment:
+#      - LC_ALL=C.UTF-8
+#      - LANG=C.UTF-8
+#    commands:
+#      - chrt -f 80 make dagon-spike-test arch=$$PONYC_VERSION VERBOSE=true
+#    privileged: true
 
 # send notifications to slack
 notify:
@@ -217,6 +217,6 @@ matrix:
     - debug
     - release
   PONYC_VERSION:
-    - armhf
+#    - armhf
     - amd64
 
