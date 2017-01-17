@@ -10,21 +10,9 @@ If you have not followed the setup instructions in the orchestration/terraform [
 Before configuring your cluster, make sure you are in
 your `orchestration/arizona` directory.
 
-Arizona has two different kinds of machines: build and execution.
-**This document assumes you build all binaries on a build machine and then copy them onto the execution machines.**
-We already have a build machine, called ***arizona-build-server*** you can log in to that host with:
+Create a cluster by running (NOTE: These instances are faster than what the bank has provided us. If you're testing for a "bank equivalent" environment, change `c4.8xlarge` to `r3.4xlarge` and `0,18` to `0,8`):
 ```
-ssh -i YOUR_PEM_FILE ec2-user@AWS-HOST-NAME
-```
-
-Or, you can create a build machine by running:
-```
-make cluster cluster_name=<BUILD_MACHINE_NAME> num_followers=0 force_instance=r3.4xlarge arizona_node_type=development ansible_system_cpus=0,8
-```
-
-To create execution machines, use:
-```bash
-make cluster cluster_name=###REPLACE_ME### num_followers=###NUM_FOLLOWERS##
+make cluster cluster_name=###REPLACE_ME### num_followers=###NUM_FOLLOWERS## force_instance=c4.8xlarge arizona_node_type=development ansible_system_cpus=0,18
 ```
 
 You'll get a response ending with something similar to this if successful:
@@ -33,7 +21,7 @@ PLAY RECAP *********************************************************************
 54.165.9.39                : ok=70   changed=39   unreachable=0    failed=0
 ```
 
-You can SSH into the build machine using:
+You can SSH into the machine using:
 
 ```bash
 ssh -i ~/.ssh/ec2/us-east-1.pem ec2-user@<IP_ADDRESS>
@@ -46,7 +34,6 @@ As for how long it will take to generate your data, a good rule of thumb is to h
 ### Building data generation tools
 Please note - you only have to run the `scl` command once. If you are copying these instructions into a script, do **NOT** include that. Run it from the command  line and then your script.
 #### Build spdlog
-**Note:**You don't have to do this if you are using the arizona-build-server
 ```
 scl enable devtoolset-4 bash
 cd ~/
@@ -59,7 +46,6 @@ sudo make install
 ```
 
 #### Build Arizona-CPP
-**Note:**You don't have to do this if you are using the arizona-build-server
 ```
 scl enable devtoolset-4 bash
 git clone https://github.com/Sendence/buffy.git
@@ -88,16 +74,13 @@ sudo mkdir -p /apps/dev/arizona/data
 sudo chown -R ec2-user:ec2-user /apps/dev/arizona
 cd ~/arizona/bin_cfggen/etc
 cp *.cfg /apps/dev/arizona/etc/
-scp -i <YOUR_PEM_FILE> -r /apps/dev/arizona ec2-user@<EXECUTION_HOST_IP>:/apps/dev/arizona
 ```
 
-At this point, you will be ready to generate data. Log into the executon host that you copied your files to.
 ### Actual data generation
 Your options are:
 #### Create a really small file (150K message) that you can loop through, should not have memory growth
 
 ```
-ssh -i YOUR_PEM ec2-user@YOUR-EXECUTION-SERVER-IP
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 cd /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/pairgen -c /apps/dev/arizona/etc/pairgen_1375_1M_admin.cfg
@@ -111,7 +94,6 @@ cd /apps/dev/arizona/data
 #### Create a 15 minute data set (do we crash?)
 
 ```
-ssh -i YOUR_PEM ec2-user@YOUR-EXECUTION-SERVER-IP
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 cd /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/datagen -c /apps/dev/arizona/etc/data_15min.cfg
@@ -125,7 +107,6 @@ cd /apps/dev/arizona/data
 #### Create a 60 minute data set (are there long-term problems?)
 
 ```
-ssh -i YOUR_PEM ec2-user@YOUR-EXECUTION-SERVER-IP
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 cd /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/datagen -c /apps/dev/arizona/etc/data_1hour.cfg
@@ -139,7 +120,6 @@ cd /apps/dev/arizona/data
 
 
 ```
-ssh -i YOUR_PEM ec2-user@YOUR-EXECUTION-SERVER-IP
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 cd /apps/dev/arizona/data
 /apps/dev/arizona/bin/arizona/datagen -c /apps/dev/arizona/etc/data_8hours.cfg
