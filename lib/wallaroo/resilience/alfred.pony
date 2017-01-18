@@ -6,6 +6,7 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/routing"
+use "wallaroo/initialization"
 
 //TODO: origin needs to get its own file
 trait tag Resilient
@@ -115,7 +116,13 @@ class FileBackend is Backend
             r.append(_file.read(16)) //TODO: use sizeof-type things?
             let statechange_id = r.u64_be()
             let payload_length = r.u64_be()
-            let payload = recover val _file.read(payload_length.usize()) end
+            let payload = recover val
+              if payload_length > 0 then
+                _file.read(payload_length.usize())
+              else
+                Array[U8]
+              end
+            end
 
             // put entry into temporary recovered buffer
             replay_buffer.push((origin_id, uid, None, statechange_id, seq_id
@@ -243,8 +250,9 @@ actor Alfred
         end
       end
 
-    be start() =>
+    be start(initializer: LocalTopologyInitializer) =>
       _backend.start()
+      initializer.report_alfred_ready_to_work()
 
     be register_incoming_boundary(boundary: DataReceiver tag) =>
       _incoming_boundaries.push(boundary)

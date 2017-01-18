@@ -139,10 +139,10 @@ actor Step is (RunnableStep & Resilient & Producer &
     initializer.report_initialized(this)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
+    _initializer = initializer
     for r in _routes.values() do
       r.application_initialized(_max_distributable_credits, "Step")
     end
-    _initializer = initializer
 
   fun ref report_route_ready_to_work(r: RouteLogic) =>
     if not _ready_to_work_routes.contains(r) then

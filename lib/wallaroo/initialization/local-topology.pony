@@ -966,9 +966,6 @@ actor LocalTopologyInitializer
         for i in _initializables.values() do
           i.application_initialized(this)
         end
-        ifdef not "backpressure" then
-          _application_ready_to_work()
-        end
       end
     else
       @printf[I32]("The same Initializable reported being initialized twice\n".cstring())
@@ -979,12 +976,15 @@ actor LocalTopologyInitializer
     if not _ready_to_work.contains(initializable) then
       _ready_to_work.set(initializable)
       if _ready_to_work.size() == _initializables.size() then
-        _application_ready_to_work()
+        _alfred.start(this)
       end
     else
       @printf[I32]("The same Initializable reported being ready to work twice\n".cstring())
       Fail()
     end
+
+  be report_alfred_ready_to_work() =>
+    _application_ready_to_work()
 
   fun ref _application_ready_to_work() =>
     @printf[I32]("Phase III: Application is ready to work!\n".cstring())

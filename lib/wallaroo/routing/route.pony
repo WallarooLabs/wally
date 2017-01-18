@@ -63,6 +63,10 @@ class _RouteLogic is RouteLogic
       _max_credits = new_max_credits
 
       _request_credits()
+    else
+      match _step
+      | let s: Step ref => s.report_route_ready_to_work(this)
+      end
     end
 
   fun ref dispose() =>
