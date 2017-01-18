@@ -34,8 +34,6 @@ cd into `ponyc`:
 Checkout to the specific version you want:
 `git checkout sendence-15.0.0`
 
-Note: `giles-sender` still requires `sendence-14.0.5` in order to run correctly
-
 Manual edits to `Makefile`:
 
 Change this line:
