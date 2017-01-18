@@ -502,11 +502,12 @@ string AdminMessage::str()
   return out.str();
 }
 
-ProceedsMessage::ProceedsMessage(uint64_t message_id_, string *isin_,
+ProceedsMessage::ProceedsMessage(uint64_t message_id_, string *isin_, string *client_,
                                  double open_long_, double open_short_,
                                  double filled_long_, double filled_short_):
   _message_id(message_id_),
   _isin(isin_),
+  _client(client_),
   _open_long(open_long_),
   _open_short(open_short_),
   _filled_long(filled_long_),
@@ -517,6 +518,7 @@ ProceedsMessage::ProceedsMessage(uint64_t message_id_, string *isin_,
 ProceedsMessage::~ProceedsMessage()
 {
   delete _isin;
+  delete _client;
 }
 
 size_t ProceedsMessage::encode_get_size()
@@ -526,6 +528,8 @@ size_t ProceedsMessage::encode_get_size()
     8 + // message id
     2 + // _isin size
     _isin->size() + // isin characters
+    2 + // _client size
+    _client->size() + // client characters
     8 + // open long
     8 + // open short
     8 + // filled long
@@ -541,6 +545,7 @@ void ProceedsMessage::encode(char *bytes)
   writer.u16_be(MessageType::Proceeds);
   writer.u64_be(_message_id);
   writer.arizona_string(_isin);
+  writer.arizona_string(_client);
   writer.arizona_double(_open_long);
   writer.arizona_double(_open_short);
   writer.arizona_double(_filled_long);
@@ -1084,6 +1089,7 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
 
     ProceedsMessage *proceeds_message = new ProceedsMessage(om->get_message_id(),
                                                             new string(*om->get_isin()),
+                                                            new string(*om->get_client()),
                                                             proceeds.open_short(),
                                                             proceeds.open_long(),
                                                             proceeds.proceeds_short(),
@@ -1116,6 +1122,7 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
 
     ProceedsMessage *proceeds_message = new ProceedsMessage(cm->get_message_id(),
                                                             new string(proceeds.isin()),
+                                                            new string(*cm->get_client()),
                                                             proceeds.open_short(),
                                                             proceeds.open_long(),
                                                             proceeds.proceeds_short(),
@@ -1147,6 +1154,7 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
 
     ProceedsMessage *proceeds_message = new ProceedsMessage(em->get_message_id(),
                                                             new string(proceeds.isin()),
+                                                            new string(*em->get_client()),
                                                             proceeds.open_short(),
                                                             proceeds.open_long(),
                                                             proceeds.proceeds_short(),
@@ -1195,6 +1203,7 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
           class Proceeds proceeds = az_state->proceeds_for_client(*am->get_client());
           ProceedsMessage *proceeds_message = new ProceedsMessage(am->get_message_id(),
                                                                   new string(proceeds.isin()),
+                                                                  new string(*am->get_client()),
                                                                   proceeds.open_short(),
                                                                   proceeds.open_long(),
                                                                   proceeds.proceeds_short(),
@@ -1209,6 +1218,7 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
                                                                   *am->get_aggunit());
           ProceedsMessage *proceeds_message = new ProceedsMessage(am->get_message_id(),
                                                                   new string(proceeds.isin()),
+                                                                  new string(*am->get_client()),
                                                                   proceeds.open_short(),
                                                                   proceeds.open_long(),
                                                                   proceeds.proceeds_short(),
@@ -1223,6 +1233,7 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
                                                                   *am->get_account());
           ProceedsMessage *proceeds_message = new ProceedsMessage(am->get_message_id(),
                                                                   new string(proceeds.isin()),
+                                                                  new string(*am->get_client()),
                                                                   proceeds.open_short(),
                                                                   proceeds.open_long(),
                                                                   proceeds.proceeds_short(),
@@ -1368,6 +1379,7 @@ void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::
 
     ProceedsMessage *proceeds_message = new ProceedsMessage(order_message->get_message_id(),
                                                             order_message->get_isin(),
+                                                            order_message->get_client(),
                                                             proceeds.open_short(),
                                                             proceeds.open_long(),
                                                             proceeds.proceeds_short(),
@@ -1379,21 +1391,21 @@ void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::
   if (CancelMessage *cm = dynamic_cast<CancelMessage *>(input_))
   {
     uint64_t message_id = cm->get_message_id();
-    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), new string(*cm->get_client()), 0.0, 0.0, 0.0, 0.0);
     return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
   }
 
   if (ExecuteMessage *em = dynamic_cast<ExecuteMessage *>(input_))
   {
     uint64_t message_id = em->get_message_id();
-    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), new string(*em->get_client()), 0.0, 0.0, 0.0, 0.0);
     return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
   }
 
   if (AdminMessage *am = dynamic_cast<AdminMessage *>(input_))
   {
     uint64_t message_id = am->get_message_id();
-    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), 0.0, 0.0, 0.0, 0.0);
+    ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), new string(*am->get_client()), 0.0, 0.0, 0.0, 0.0);
     return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
   }
 
