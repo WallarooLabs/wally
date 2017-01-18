@@ -206,7 +206,9 @@ class ToDagonNotify is TCPConnectionNotify
   fun ref connected(sock: TCPConnection ref) =>
     _coordinator.to_dagon_socket(sock, Ready)
 
-  fun ref received(conn: TCPConnection ref, data: Array[U8] iso): Bool =>
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize):
+  Bool =>
     for chunked in _framer.chunk(consume data).values() do
       try
         let decoded = ExternalMsgDecoder(consume chunked)
@@ -467,7 +469,9 @@ actor SendingActor
         end
       end
 
-      _to_buffy_socket.writev(_wb.done())
+      for i in _wb.done().values() do
+        _to_buffy_socket.write(i)
+      end
       if _write_to_file then
         _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
       end

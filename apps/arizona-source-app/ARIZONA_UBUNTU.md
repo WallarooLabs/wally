@@ -217,7 +217,7 @@ sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/b
 ### Build giles
 ```
 cd ~/buffy
-make build-giles-sender arch=amd64 ponyc_tag=sendence-14.0.5-release
+make build-giles-sender arch=amd64
 make build-giles-receiver arch=amd64
 ```
 

@@ -196,7 +196,6 @@ scl enable devtoolset-4 python27 "sudo make install"
 
 
 ### Build giles sender
-**Note:**You must use sendence ponyc version: sendence-14.0.5
 ```
 cd ~/buffy/giles/sender
 scl enable devtoolset-4 python27 "stable env ponyc"

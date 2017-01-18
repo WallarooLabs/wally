@@ -77,7 +77,7 @@ make arch=amd64 build-apps-market-spread
 
 To build Giles Sender:
 ```
-make build-giles-sender arch=amd64 ponyc_tag=sendence-14.0.5-release
+make build-giles-sender arch=amd64
 ```
 
 To build Giles Receiver:
