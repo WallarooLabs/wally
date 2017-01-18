@@ -76,17 +76,13 @@ class _OutgoingToIncoming
       Invariant(index < _seq_id_to_incoming.size())
     end
 
-
     let high_by_origin_route: MapIs[(Producer, RouteId), U64] =
       MapIs[(Producer, RouteId), U64]
 
     try
       for i in Reverse(index, 0) do
         (let o, let r, let s) = _seq_id_to_incoming(i)._2
-        // TODO: add "insert_if_absent" to map
-        if not high_by_origin_route.contains((o, r)) then
-          high_by_origin_route((o, r)) = s
-        end
+        high_by_origin_route.insert_if_absent((o, r), s)
       end
     else
       Fail()
