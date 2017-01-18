@@ -242,12 +242,13 @@ class ProceedsMessage: public wallaroo::EncodableData
 private:
   uint64_t _message_id;
   string *_isin;
+  string *_client;
   double _open_long;
   double _open_short;
   double _filled_long;
   double _filled_short;
 public:
-  ProceedsMessage(uint64_t message_id_, string *isin_,
+  ProceedsMessage(uint64_t message_id_, string *isin_, string *client_,
                   double open_long_, double open_short_,
                   double filled_long_, double filled_short_);
   ~ProceedsMessage();
