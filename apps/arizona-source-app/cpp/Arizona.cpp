@@ -759,7 +759,7 @@ void AddOrderStateChange::apply(wallaroo::State *state_)
 void AddOrderStateChange::to_log_entry(char *bytes_)
 {
   Writer writer((unsigned char *)bytes_);
-  writer.u32_be(get_log_entry_size());
+  writer.u32_be(get_log_entry_size() - 4);
   writer.arizona_string(&_client_id);
   writer.arizona_string(&_account_id);
   writer.arizona_string(&_isin_id);
@@ -770,13 +770,14 @@ void AddOrderStateChange::to_log_entry(char *bytes_)
 }
 size_t AddOrderStateChange::get_log_entry_size()
 {
-  return _client_id.size() +
-  2 + _account_id.size() +
-  2 + _isin_id.size() +
-  2 + _order_id.size() +
-  sizeof(uint16_t) +
-  sizeof(uint32_t) +
-  sizeof(double);
+  return 4 +
+    2 + _client_id.size() +
+    2 + _account_id.size() +
+    2 + _isin_id.size() +
+    2 + _order_id.size() +
+    sizeof(uint16_t) +
+    sizeof(uint32_t) +
+    sizeof(double);
 }
 size_t AddOrderStateChange::read_log_entry_size_header(char *bytes_)
 {
@@ -803,16 +804,17 @@ CancelOrderStateChange::CancelOrderStateChange(uint64_t id_): StateChange(id_), 
 void CancelOrderStateChange::to_log_entry(char *bytes_)
 {
   Writer writer((unsigned char *)bytes_);
-  writer.u32_be(get_log_entry_size());
+  writer.u32_be(get_log_entry_size() - 4);
   writer.arizona_string(&_client_id);
   writer.arizona_string(&_account_id);
   writer.arizona_string(&_order_id);
 }
 size_t CancelOrderStateChange::get_log_entry_size()
 {
-  return _client_id.size() +
-  2 + _account_id.size() +
-  2 + _order_id.size();
+  return 4 +
+    2 + _client_id.size() +
+    2 + _account_id.size() +
+    2 + _order_id.size();
 }
 size_t CancelOrderStateChange::read_log_entry_size_header(char *bytes_)
 {
@@ -860,7 +862,7 @@ void ExecuteOrderStateChange::update(string& client_id_, string& account_id_, st
 void ExecuteOrderStateChange::to_log_entry(char *bytes_)
 {
   Writer writer((unsigned char *)bytes_);
-  writer.u32_be(get_log_entry_size());
+  writer.u32_be(get_log_entry_size() - 4);
   writer.arizona_string(&_client_id);
   writer.arizona_string(&_account_id);
   writer.arizona_string(&_order_id);
@@ -871,12 +873,13 @@ void ExecuteOrderStateChange::to_log_entry(char *bytes_)
 
 size_t ExecuteOrderStateChange::get_log_entry_size()
 {
-  return _client_id.size() +
-  2 + _account_id.size() +
-  2 + _order_id.size() +
-  2 + _execution_id.size() +
-  sizeof(uint32_t) +
-  sizeof(double);
+  return 4 +
+    2 + _client_id.size() +
+    2 + _account_id.size() +
+    2 + _order_id.size() +
+    2 + _execution_id.size() +
+    sizeof(uint32_t) +
+    sizeof(double);
 }
 
 size_t ExecuteOrderStateChange::read_log_entry_size_header(char *bytes_)
@@ -916,14 +919,15 @@ void CreateAggUnitStateChange::update(string& client_id_, string& agg_unit_id_)
 void CreateAggUnitStateChange::to_log_entry(char *bytes_)
 {
   Writer writer((unsigned char *)bytes_);
-  writer.u32_be(get_log_entry_size());
+  writer.u32_be(get_log_entry_size() - 4);
   writer.arizona_string(&_client_id);
   writer.arizona_string(&_agg_unit_id);
 }
 
 size_t CreateAggUnitStateChange::get_log_entry_size()
 {
-  return 2 + _client_id.size() +
+  return 4 +
+    2 + _client_id.size() +
     2 + _agg_unit_id.size();
 }
 
@@ -961,7 +965,7 @@ void AddAccountToAggUnitStateChange::update(string& client_id_, string& account_
 void AddAccountToAggUnitStateChange::to_log_entry(char *bytes_)
 {
   Writer writer((unsigned char *)bytes_);
-  writer.u32_be(get_log_entry_size());
+  writer.u32_be(get_log_entry_size() - 4);
   writer.arizona_string(&_client_id);
   writer.arizona_string(&_account_id);
   writer.arizona_string(&_agg_unit_id);
@@ -969,7 +973,8 @@ void AddAccountToAggUnitStateChange::to_log_entry(char *bytes_)
 
 size_t AddAccountToAggUnitStateChange::get_log_entry_size()
 {
-  return 2 + _client_id.size() +
+  return 4 +
+    2 + _client_id.size() +
     2 + _account_id.size() +
     2 + _agg_unit_id.size();
 }
@@ -1010,7 +1015,7 @@ void RemoveAccountFromAggUnitStateChange::update(string& client_id_, string& acc
 void RemoveAccountFromAggUnitStateChange::to_log_entry(char *bytes_)
 {
   Writer writer((unsigned char *)bytes_);
-  writer.u32_be(get_log_entry_size());
+  writer.u32_be(get_log_entry_size() - 4);
   writer.arizona_string(&_client_id);
   writer.arizona_string(&_account_id);
   writer.arizona_string(&_agg_unit_id);
@@ -1018,7 +1023,8 @@ void RemoveAccountFromAggUnitStateChange::to_log_entry(char *bytes_)
 
 size_t RemoveAccountFromAggUnitStateChange::get_log_entry_size()
 {
-  return 2 + _client_id.size() +
+  return 4 +
+    2 + _client_id.size() +
     2 + _account_id.size() +
     2 + _agg_unit_id.size();
 }
