@@ -35,6 +35,8 @@ actor Main
       var p_arg: (Array[String] | None) = None
       var n_arg: (String | None) = None
       var f_arg: (String | None) = None
+      var g_arg: (USize | None) = None
+      var z_arg: (Bool | None) = None
 
       try
         var options = Options(env.args)
@@ -53,7 +55,6 @@ actor Main
           .add("msg-size", "g", I64Argument)
           .add("no-write", "w", None)
 
-        //TODO: error if --msg-size and --variable-size
         for option in options do
           match option
           | ("buffy", let arg: String) => b_arg = arg.split(":")
@@ -66,7 +67,7 @@ actor Main
           | ("repeat", None) => should_repeat = true
           | ("binary", None) => binary_fmt = true
           | ("variable-size", None) => variable_size = true
-          | ("msg-size", let arg: I64) => msg_size = arg.usize()
+          | ("msg-size", let arg: I64) => g_arg = arg.usize()
           | ("no-write", None) => write_to_file = false
           end
         end
@@ -99,6 +100,20 @@ actor Main
           if (p_arg is None) or (n_arg is None) then
             env.err.print(
               "'--dagon' must be used in conjunction with '--name'")
+            required_args_are_present = false
+          end
+        end
+
+        if (g_arg isnt None) and variable_size then
+          env.err.print(
+            "--msg-size and --variable-size can't be used together")
+          required_args_are_present = false
+        end
+
+        if binary_fmt then
+          if (variable_size == false) and (g_arg is None) then
+            env.err.print(
+              "--binary requires either --msg-size or --variable-size")
             required_args_are_present = false
           end
         end
@@ -145,7 +160,7 @@ actor Main
                     should_repeat)
                 else
                   MultiFileBinaryDataSource(consume paths,
-                    should_repeat, msg_size)
+                    should_repeat, g_arg as USize)
                 end
               else
                 MultiFileDataSource(consume paths, should_repeat)
