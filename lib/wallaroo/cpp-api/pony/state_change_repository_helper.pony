@@ -15,7 +15,8 @@ primitive CPPStateChangeRepositoryHelper
     state_change.obj()
 
   fun get_stateful_computation_return(data: Pointer[U8] val, state_change: (CPPStateChange | None)):
-    ((CPPData val | None), (CPPStateChange | None))
+    CPPStateComputationReturnPairWrapper ref
+//    ((CPPData val | None), (CPPStateChange | None))
   =>
     let d = if data.is_null() then
       None
@@ -23,4 +24,4 @@ primitive CPPStateChangeRepositoryHelper
       recover val CPPData(data) end
     end
 
-    (d, state_change)
+    CPPStateComputationReturnPairWrapper(d, state_change)
