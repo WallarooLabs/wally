@@ -201,7 +201,7 @@ cd ~/buffy/giles/sender
 scl enable devtoolset-4 python27 "stable env ponyc"
 ```
 
-### Build giles sender
+### Build giles receiver
 **Note:**You must use sendence ponyc version: sendence-17.0.4 or greater
 ```
 cd ~/buffy/giles/receiver
