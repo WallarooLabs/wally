@@ -326,7 +326,7 @@ actor Alfred
       try
         _origins(origin_id)
       else
-        Debug("no origin id in _origins")
+        Debug(origin_id.string() + " not in _origins")
       end
       try
         _origins(origin_id).replay_log_entry(uid, frac_ids, statechange_id,
