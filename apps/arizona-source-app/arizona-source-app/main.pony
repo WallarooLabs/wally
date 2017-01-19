@@ -113,7 +113,7 @@ actor Main
             "Arizona Default Test", "default-state", state_computation_factory(),
             ArizonaDefaultStateBuilder)
       end
-      Startup(env, application, None)
+      Startup(env, application, "Arizona")
     else
       env.out.print("Could not build topology")
     end

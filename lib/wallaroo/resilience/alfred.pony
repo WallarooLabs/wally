@@ -7,6 +7,7 @@ use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/routing"
 use "wallaroo/initialization"
+use "debug"
 
 //TODO: origin needs to get its own file
 trait tag Resilient
@@ -137,18 +138,39 @@ class FileBackend is Backend
         // iterate through recovered buffer and replay entries at or below
         // watermark
         for entry in replay_buffer.values() do
-          try
+          // print out the entry's contents in debug
+          // type ReplayEntry is (U128, U128, None, U64, U64, ByteSeq val)
+          //    (origin_id, uid, None, statechange_id, seq_id, payload)
+          Debug("entry:")
+          Debug("origin_id: " + entry._1.string())
+          Debug("uid: " + entry._2.string())
+          Debug("None: None")
+          Debug("statechange_id: " + entry._4.string())
+          Debug("seq_id: " + entry._5.string())
+          Debug("payload_size: " + entry._6.size().string())
             // only replay if at or below watermark
-            if entry._5 <= watermarks(entry._1) then
-              num_replayed = num_replayed + 1
-              _alfred.replay_log_entry(entry._1, entry._2, entry._3, entry._4
-                                      , entry._6)
+            Debug("AFLRED 1: " + _filepath.path)
+            Debug("watermarks_size: " + watermarks.size().string())
+            try
+              watermarks(entry._1)
             else
+              Debug(entry._1.string() + " does not have an entry in watermarks")
+            end
+            Debug("ALFRED 1.1: ")
+            try 
+              if entry._5 <= watermarks(entry._1) then
+                Debug("ALFRED 2")
+                num_replayed = num_replayed + 1
+                _alfred.replay_log_entry(entry._1, entry._2, entry._3, entry._4
+                                        , entry._6)
+               Debug("ALFRED 3")
+              else
+                num_skipped = num_skipped + 1
+              end
+            else
+              Debug("ALFRED 4")
               num_skipped = num_skipped + 1
             end
-          else
-            Fail()
-          end
         end
 
         @printf[I32]("RESILIENCE: Replayed %d entries from recovery log file.\n"
@@ -294,6 +316,15 @@ actor Alfred
     be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None,
       statechange_id: U64, payload: ByteSeq val)
     =>
+      Debug("origin_id: " + origin_id.string())
+      Debug("uid: " + uid.string())
+      Debug("statechange_id: " + statechange_id.string())
+      Debug("payload_size: " + payload.size().string())
+      try
+        _origins(origin_id)
+      else
+        Debug("no origin id in _origins")
+      end
       try
         _origins(origin_id).replay_log_entry(uid, frac_ids, statechange_id,
           payload)
@@ -304,6 +335,7 @@ actor Alfred
       end
 
     be register_origin(origin: (Resilient & Producer), id: U128) =>
+      Debug("REGISTER ORIGIN: " + id.string())
       _origins(id) = origin
 
     be queue_log_entry(origin_id: U128, uid: U128,
