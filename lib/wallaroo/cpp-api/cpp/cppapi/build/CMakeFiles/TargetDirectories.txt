@@ -1,0 +1,9 @@
+/home/nisan/proj/sendence/Buffy/lib/wallaroo/cpp-api/cpp/cppapi/build/CMakeFiles/edit_cache.dir
+/home/nisan/proj/sendence/Buffy/lib/wallaroo/cpp-api/cpp/cppapi/build/CMakeFiles/package_source.dir
+/home/nisan/proj/sendence/Buffy/lib/wallaroo/cpp-api/cpp/cppapi/build/CMakeFiles/rebuild_cache.dir
+/home/nisan/proj/sendence/Buffy/lib/wallaroo/cpp-api/cpp/cppapi/build/CMakeFiles/package.dir
+/home/nisan/proj/sendence/Buffy/lib/wallaroo/cpp-api/cpp/cppapi/build/CMakeFiles/wallaroo-static.dir
+/home/nisan/proj/sendence/Buffy/lib/wallaroo/cpp-api/cpp/cppapi/build/CMakeFiles/install/local.dir
+/home/nisan/proj/sendence/Buffy/lib/wallaroo/cpp-api/cpp/cppapi/build/CMakeFiles/install/strip.dir
+/home/nisan/proj/sendence/Buffy/lib/wallaroo/cpp-api/cpp/cppapi/build/CMakeFiles/list_install_components.dir
+/home/nisan/proj/sendence/Buffy/lib/wallaroo/cpp-api/cpp/cppapi/build/CMakeFiles/install.dir
