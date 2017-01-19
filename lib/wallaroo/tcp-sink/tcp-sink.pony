@@ -171,6 +171,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       Fail()
     end
 
+    _maybe_mute_or_unmute_upstreams()
+
   fun ref _next_tracking_id(i_origin: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): (U64 | None)
   =>
@@ -239,6 +241,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
         _terminus_route.receive_ack(sent)
       end
     end
+
+  be request_ack() =>
+    _terminus_route.request_ack()
 
   //
   // CREDIT FLOW
@@ -441,28 +446,26 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     Write a sequence of sequences of bytes.
     """
-    if _connected and not _closed then
-      _in_sent = true
+    _in_sent = true
 
-      var data_size: USize = 0
-      for bytes in _notify.sentv(this, data).values() do
-        _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
-        _pending_writev_total = _pending_writev_total + bytes.size()
-        _pending.push((bytes, 0))
-        data_size = data_size + bytes.size()
-      end
-
-      ifdef "backpressure" or "resilience" then
-        match tracking_id
-        | let id: SeqId =>
-          _pending_tracking.push((data_size, id))
-        end
-      end
-
-      _pending_writes()
-
-      _in_sent = false
+    var data_size: USize = 0
+    for bytes in _notify.sentv(this, data).values() do
+      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+      _pending_writev_total = _pending_writev_total + bytes.size()
+      _pending.push((bytes, 0))
+      data_size = data_size + bytes.size()
     end
+
+    ifdef "backpressure" or "resilience" then
+      match tracking_id
+      | let id: SeqId =>
+        _pending_tracking.push((data_size, id))
+      end
+    end
+
+    _pending_writes()
+
+    _in_sent = false
 
   fun ref _write_final(data: ByteSeq, tracking_id: (SeqId | None)) =>
     """
@@ -630,9 +633,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       _shutdown_peer = true
       close()
     end
-
-  fun _can_send(): Bool =>
-    _connected and not _closed and _writeable
 
   fun ref _pending_writes(): Bool =>
     """
@@ -811,11 +811,11 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _maybe_mute_or_unmute_upstreams() =>
     if _mute_outstanding then
-      if _writeable then
+      if _can_send() then
         _unmute_upstreams()
       end
     else
-      if not _writeable then
+      if not _can_send() then
         _mute_upstreams()
       end
     end
@@ -831,6 +831,9 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       u.unmute(this)
     end
     _mute_outstanding = false
+
+  fun _can_send(): Bool =>
+    _connected and not _closed and _writeable
 
   fun ref set_nodelay(state: Bool) =>
     """
@@ -927,3 +930,10 @@ class EmptyNotify is _TCPSinkNotify
   Called when we have successfully connected to the server.
   """
   None
+
+fun ref closed(conn: TCPSink ref) =>
+  """
+  Called when the connection is closed.
+  """
+  @printf[I32]("TCPSink connection closed\n".cstring())
+

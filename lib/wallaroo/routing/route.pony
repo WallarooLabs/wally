@@ -23,6 +23,7 @@ trait Route
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
     i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64): Bool
+  fun ref request_ack()
 
 trait RouteLogic
   fun ref application_initialized(new_max_credits: ISize, step_type: String)
@@ -199,6 +200,7 @@ class EmptyRoute is Route
   fun ref dispose() => None
   fun ref request_credits() => None
   fun ref receive_credits(number: ISize) => None
+  fun ref request_ack() => None
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
     cfp: Producer ref,

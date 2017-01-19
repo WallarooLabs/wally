@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "wallaroo/boundary"
+use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/routing"
 use "wallaroo/tcp-sink"
@@ -251,14 +252,21 @@ class StepIdRouter is OmniRouter
 
 class DataRouter
   let _data_routes: Map[U128, CreditFlowConsumerStep tag] val
+  let _route_ids: Map[U128, RouteId] = _route_ids.create()
 
   new val create(data_routes: Map[U128, CreditFlowConsumerStep tag] val =
       recover Map[U128, CreditFlowConsumerStep tag] end)
   =>
     _data_routes = data_routes
+    var route_id: RouteId = 0
+    for step_id in _data_routes.keys() do
+      route_id = route_id + 1
+      _route_ids(step_id) = route_id
+    end
 
-  fun route(d_msg: DeliveryMsg val, pipeline_time_spent: U64, origin: Producer,
-    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun route(d_msg: DeliveryMsg val, pipeline_time_spent: U64,
+    origin: DataReceiver ref, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    worker_ingress_ts: U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataRouter\n".cstring())
@@ -269,13 +277,25 @@ class DataRouter
       ifdef "trace" then
         @printf[I32]("DataRouter found Step\n".cstring())
       end
-      d_msg.deliver(pipeline_time_spent, target, origin, seq_id, latest_ts,
-        metrics_id, worker_ingress_ts)
-      false
+      try
+        let route_id = _route_ids(target_id)
+        d_msg.deliver(pipeline_time_spent, target, origin, seq_id, route_id,
+          latest_ts, metrics_id, worker_ingress_ts)
+        ifdef "resilience" then
+          origin.bookkeeping(route_id, seq_id)
+        end
+        false
+      else
+        // This shouldn't happen. If we have a route, we should have a route
+        // id.
+        Fail()
+        false
+      end
     else
       ifdef debug then
         @printf[I32]("DataRouter failed to find route\n".cstring())
       end
+      Fail()
       true
     end
 
@@ -285,11 +305,16 @@ class DataRouter
   =>
     try
       let target_id = r_msg.target_id()
+      let route_id = _route_ids(target_id)
       //TODO: create and deliver envelope
-      r_msg.replay_deliver(pipeline_time_spent, _data_routes(target_id), origin,
-        seq_id, latest_ts, metrics_id, worker_ingress_ts)
+      r_msg.replay_deliver(pipeline_time_spent, _data_routes(target_id),
+        origin, seq_id, route_id, latest_ts, metrics_id, worker_ingress_ts)
       false
     else
+      ifdef debug then
+        @printf[I32]("DataRouter failed to find route on replay\n".cstring())
+      end
+      Fail()
       true
     end
 
@@ -302,6 +327,18 @@ class DataRouter
     for step in _data_routes.values() do
       step.unregister_producer(producer, credits_returned)
     end
+
+  fun request_ack(producer: Producer) =>
+    for (target_id, r) in _data_routes.pairs() do
+      r.request_ack()
+    end
+
+  fun route_ids(): Array[RouteId] =>
+    let ids: Array[RouteId] = ids.create()
+    for id in _route_ids.values() do
+      ids.push(id)
+    end
+    ids
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
     // TODO: CREDITFLOW - real implmentation?

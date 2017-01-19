@@ -271,6 +271,7 @@ void OrderMessage::serialize(char* bytes_, size_t nsz_)
   Writer writer((unsigned char *)bytes_);
 
   writer.u16_be(SerializationType::Message);
+  writer.u32_be(0);
   writer.u16_be(MessageType::Order);
 
   writer.u64_be(_message_id);
@@ -287,6 +288,7 @@ void OrderMessage::serialize(char* bytes_, size_t nsz_)
 size_t OrderMessage::serialize_get_size()
 {
   size_t sz = 2 + // object type
+    4 + // client id
     2 + // message type
     8 + // message id
     2 + _client->size() +
@@ -343,6 +345,7 @@ void CancelMessage::serialize(char* bytes_, size_t nsz_)
   Writer writer((unsigned char *)bytes_);
 
   writer.u16_be(SerializationType::Message);
+  writer.u32_be(0);
   writer.u16_be(MessageType::Cancel);
 
   writer.u64_be(_message_id);
@@ -355,6 +358,7 @@ void CancelMessage::serialize(char* bytes_, size_t nsz_)
 size_t CancelMessage::serialize_get_size()
 {
   size_t sz = 2 + // object type
+    4 + // client id
     2 + // message type
     8 + // message id
     2 + _client->size() +
@@ -406,6 +410,7 @@ void ExecuteMessage::serialize(char* bytes_, size_t nsz_)
   Writer writer((unsigned char *)bytes_);
 
   writer.u16_be(SerializationType::Message);
+  writer.u32_be(0);
   writer.u16_be(MessageType::Execute);
 
   writer.u64_be(_message_id);
@@ -420,6 +425,7 @@ void ExecuteMessage::serialize(char* bytes_, size_t nsz_)
 size_t ExecuteMessage::serialize_get_size()
 {
   size_t sz = 2 + // object type
+    4 + // client id
     2 + // message type
     8 + // message id
     2 + _client->size() +
@@ -470,6 +476,7 @@ void AdminMessage::serialize(char* bytes_, size_t nsz_)
   Writer writer((unsigned char *)bytes_);
 
   writer.u16_be(SerializationType::Message);
+  writer.u32_be(0);
   writer.u16_be(MessageType::Admin);
 
   writer.u64_be(_message_id);
@@ -482,11 +489,13 @@ void AdminMessage::serialize(char* bytes_, size_t nsz_)
 size_t AdminMessage::serialize_get_size()
 {
   size_t sz = 2 + // object type
+    4 + // client id
     2 + // message type
     8 + // message id
     2 + // request type
     2 + _client->size() +
-    2 + _account->size();
+    2 + _account->size() +
+    2 + _aggunit->size();
   return sz;
 }
 

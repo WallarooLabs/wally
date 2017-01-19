@@ -18,7 +18,9 @@ class TerminusRoute
   var _tracking_id: U64 = 0
   let _tracking_id_to_incoming: _OutgoingToIncoming
   var _acked_watermark: U64 = 0
+  var _ack_next_time: Bool = false
 
+  // TODO: Change this to a reasonable value!
   new create(ack_batch_size': USize = 100) =>
     _ack_batch_size = ack_batch_size'
     _tracking_id_to_incoming = _OutgoingToIncoming(_ack_batch_size)
@@ -31,7 +33,6 @@ class TerminusRoute
     """
     let id = _next_tracking_id()
     _tracking_id_to_incoming.add(id, i_origin, i_route_id, i_seq_id)
-    _maybe_ack()
 
     id
 
@@ -44,6 +45,7 @@ class TerminusRoute
     end
 
     _highest_tracking_id_acked = seq_id
+    _maybe_ack()
 
   fun is_fully_acked(): Bool =>
     _tracking_id == _highest_tracking_id_acked
@@ -53,7 +55,9 @@ class TerminusRoute
     _tracking_id
 
   fun ref _maybe_ack() =>
-    if (_tracking_id_to_incoming.size() % _ack_batch_size) == 0 then
+    if ((_tracking_id_to_incoming.size() % _ack_batch_size) == 0) or
+      _ack_next_time
+    then
       if _highest_tracking_id_acked > _acked_watermark then
         _ack()
       end
@@ -73,6 +77,14 @@ class TerminusRoute
       end
       _tracking_id_to_incoming.evict(up_to)
       _acked_watermark = up_to
+      _ack_next_time = false
     else
       Fail()
+    end
+
+  fun ref request_ack() =>
+    if _highest_tracking_id_acked > _acked_watermark then
+      _ack()
+    else
+      _ack_next_time = true
     end
