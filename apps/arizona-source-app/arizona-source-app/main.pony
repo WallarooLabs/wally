@@ -98,7 +98,7 @@ actor Main
     @printf[I32]("Application has %u clients".cstring(), _clients)
     try
       let partition_function = recover val CPPPartitionFunctionU64(@get_partition_function()) end
-      let partition_keys: Array[U64] val = partition_factory(10000, 10000 + _clients)
+      let partition_keys: Array[U64] val = partition_factory(10001, 10001 + _clients)
       let data_partition = Partition[CPPData val, U64](partition_function, partition_keys)
 
       let application = recover val
@@ -131,7 +131,7 @@ actor Main
     let partition_count = partition_end - partition_start
     recover val
       let partitions = Array[U64 val](partition_count)
-      for i in Range(partition_start, partition_end + 1) do
+      for i in Range(partition_start, partition_end) do
         partitions.push(i.u64())
       end
       consume partitions

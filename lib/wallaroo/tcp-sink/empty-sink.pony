@@ -47,3 +47,6 @@ actor EmptySink is CreditFlowConsumerStep
 
   be return_credits(credits: ISize) =>
     None
+
+  be request_ack() =>
+    None

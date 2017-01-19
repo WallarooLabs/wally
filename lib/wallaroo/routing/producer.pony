@@ -52,7 +52,7 @@ trait tag Producer
       "\tseq_id: " + seq_id.string() + "\n\n").cstring())
     end
 
-    _x_resilience_routes().receive_ack(route_id, seq_id)
+    _x_resilience_routes().receive_ack(this, route_id, seq_id)
 
 primitive HashProducer
   fun hash(o: Producer): U64 =>

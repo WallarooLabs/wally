@@ -38,6 +38,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
 
+  // Lifecycle
+  var _initializer: (LocalTopologyInitializer | None) = None
+  var _reported_initialized: Bool = false
+
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
@@ -112,6 +116,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    _initializer = initializer
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
@@ -122,10 +127,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       _from.cstring())
     _notify_connecting()
 
-    @printf[I32](("Connected OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
-
-    // If connecting failed, we should handle here
-    initializer.report_initialized(this)
+    @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     try
@@ -135,7 +137,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
       let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
         _auth)
-      writev(connect_msg)
+      _writev(connect_msg)
     else
       Fail()
     end
@@ -236,6 +238,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
     let flush_count: USize = (seq_id - _lowest_queue_id).usize()
     _queue.remove(0, flush_count)
+    _maybe_mute_or_unmute_upstreams()
     _lowest_queue_id = _lowest_queue_id + flush_count.u64()
 
     ifdef "backpressure" then
@@ -273,6 +276,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     silently discarded and not acknowleged.
     """
     close()
+
+  be request_ack() =>
+    // TODO: How do we propagate this down?
+    None
 
   //
   // CREDIT FLOW
@@ -398,7 +405,19 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _distributable_credits >= _minimum_credit_response
   //
   // TCP
- be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
+  be connected() =>
+    if not _reported_initialized then
+      // If connecting failed, we should handle here
+      match _initializer
+      | let lti: LocalTopologyInitializer =>
+        lti.report_initialized(this)
+        _reported_initialized = true
+      else
+        Fail()
+      end
+    end
+
+  be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.
     """
@@ -954,6 +973,7 @@ class BoundaryNotify is _OutgoingBoundaryNotify
     """
     @printf[I32]("BoundaryNotify: connected\n\n".cstring())
     conn.set_nodelay(true)
+    conn.connected()
     conn.expect(4)
 
   fun ref closed(conn: OutgoingBoundary ref) =>

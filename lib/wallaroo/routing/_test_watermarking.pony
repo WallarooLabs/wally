@@ -8,12 +8,20 @@ actor TestWatermarking is TestList
 
   fun tag tests(test: PonyTest) =>
     test(_TestProposeWatermarkFullyAcked)
+    test(_TestProposeWatermarkFullyAckedFilterLast)
+    test(_TestProposeWatermarkOnlyFilter)
     test(_TestProposeWatermarkFullyAckedNoneFiltered)
     test(_TestProposeWatermark1)
     test(_TestProposeWatermark2)
     test(_TestProposeWatermark3)
     test(_TestProposeWatermark4)
     test(_TestProposeWatermark5)
+    test(_TestDataReceiverProposeWatermarkFullyAcked)
+    test(_TestDataReceiverProposeWatermark1)
+    test(_TestDataReceiverProposeWatermark2)
+    test(_TestDataReceiverProposeWatermark3)
+    test(_TestDataReceiverProposeWatermark4)
+    test(_TestDataReceiverProposeWatermark5)
     test(_TestOutgoingToIncomingEmptyIndexFor)
     test(_TestOutgoingToIncomingIndexFor1)
     test(_TestOutgoingToIncomingIndexFor2)
@@ -45,6 +53,51 @@ class iso _TestProposeWatermarkFullyAcked is UnitTest
     let routes = [route1, route2]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](3, proposed)
+
+class iso _TestProposeWatermarkFullyAckedFilterLast is UnitTest
+  """
+  Test we get the correct proposed watermark when
+  all routes are fully acked
+  """
+  fun name(): String =>
+    "resilience/ProposeWatermarkFullyAckedFilterLast"
+
+  fun ref apply(h: TestHelper) =>
+    let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
+    let route1: _Route ref = recover ref _Route end
+    let route2: _Route ref = recover ref _Route end
+
+    route1.send(SeqId(1))
+    route2.send(SeqId(2))
+    filter_route.filter(SeqId(3))
+    filter_route.filter(SeqId(4))
+
+    route1.receive_ack(SeqId(1))
+    route2.receive_ack(SeqId(2))
+
+    let routes = [route1, route2]
+    let proposed: U64 = _ProposeWatermark(filter_route, routes)
+    h.assert_eq[U64](4, proposed)
+
+class iso _TestProposeWatermarkOnlyFilter is UnitTest
+  """
+  Test we get the correct proposed watermark when
+  all routes are fully acked
+  """
+  fun name(): String =>
+    "resilience/ProposeWatermarkOnlyFilter"
+
+  fun ref apply(h: TestHelper) =>
+    let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
+    let route1: _Route ref = recover ref _Route end
+    let route2: _Route ref = recover ref _Route end
+
+    filter_route.filter(SeqId(3))
+    filter_route.filter(SeqId(4))
+
+    let routes = [route1, route2]
+    let proposed: U64 = _ProposeWatermark(filter_route, routes)
+    h.assert_eq[U64](4, proposed)
 
 class iso _TestProposeWatermarkFullyAckedNoneFiltered is UnitTest
   """
@@ -244,6 +297,216 @@ class iso _TestProposeWatermark5 is UnitTest
     let routes = [route1, route2, route3]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](0, proposed)
+
+///
+///
+class iso _TestDataReceiverProposeWatermarkFullyAcked is UnitTest
+  """
+  Test we get the correct proposed watermark when
+  all routes are fully acked
+  """
+  fun name(): String =>
+    "resilience/DataReceiverProposeWatermarkFullyAcked"
+
+  fun ref apply(h: TestHelper) =>
+    let routes: DataReceiverRoutes = DataReceiverRoutes
+    let route_id_1 = RouteId(1)
+    let route_id_2 = RouteId(2)
+    routes.add_route(route_id_1)
+    routes.add_route(route_id_2)
+
+    routes.send(route_id_1, SeqId(2))
+    routes.send(route_id_2, SeqId(3))
+
+    routes.receive_ack(route_id_1, SeqId(2))
+    routes.receive_ack(route_id_2, SeqId(3))
+
+    let proposed: SeqId = routes.propose_new_watermark()
+    h.assert_eq[SeqId](3, proposed)
+
+class iso _TestDataReceiverProposeWatermark1 is UnitTest
+  """
+  Route | Sent | Ack
+  A       0     0
+  B       2     1
+  C       5     5
+  D       7     4
+
+  Should be 1
+  """
+  fun name(): String =>
+    "resilience/DataReceiverProposeWatermark1"
+
+  fun ref apply(h: TestHelper) =>
+    let routes: DataReceiverRoutes = DataReceiverRoutes
+    let route_id_1 = RouteId(1)
+    let route_id_2 = RouteId(2)
+    let route_id_3 = RouteId(3)
+    routes.add_route(route_id_1)
+    routes.add_route(route_id_2)
+    routes.add_route(route_id_3)
+
+    routes.send(route_id_1, SeqId(1))
+    routes.send(route_id_1, SeqId(2))
+    routes.receive_ack(route_id_1, SeqId(1))
+
+    routes.send(route_id_2, SeqId(5))
+    routes.receive_ack(route_id_2, SeqId(5))
+
+    routes.send(route_id_3, SeqId(4))
+    routes.send(route_id_3, SeqId(6))
+    routes.send(route_id_3, SeqId(7))
+    routes.receive_ack(route_id_3, SeqId(4))
+
+    let proposed: SeqId = routes.propose_new_watermark()
+    h.assert_eq[SeqId](1, proposed)
+
+class iso _TestDataReceiverProposeWatermark2 is UnitTest
+  """
+  Route | Sent | Ack
+    A       0     0
+    B       3     1
+    C       5     5
+    D       7     4
+
+  Should be 1
+  """
+  fun name(): String =>
+    "resilience/DataReceiverProposeWatermark2"
+
+  fun ref apply(h: TestHelper) =>
+    let routes: DataReceiverRoutes = DataReceiverRoutes
+    let route_id_1 = RouteId(1)
+    let route_id_2 = RouteId(2)
+    let route_id_3 = RouteId(3)
+    routes.add_route(route_id_1)
+    routes.add_route(route_id_2)
+    routes.add_route(route_id_3)
+
+    routes.send(route_id_1, SeqId(1))
+    routes.send(route_id_1, SeqId(2))
+    routes.send(route_id_1, SeqId(3))
+    routes.receive_ack(route_id_1, SeqId(1))
+
+    routes.send(route_id_2, SeqId(5))
+    routes.receive_ack(route_id_2, SeqId(5))
+
+    routes.send(route_id_3, SeqId(4))
+    routes.send(route_id_3, SeqId(6))
+    routes.send(route_id_3, SeqId(7))
+    routes.receive_ack(route_id_3, SeqId(4))
+
+    let proposed: SeqId = routes.propose_new_watermark()
+    h.assert_eq[SeqId](1, proposed)
+
+class iso _TestDataReceiverProposeWatermark3 is UnitTest
+  """
+  Route | Sent | Ack
+    A       0     0
+    B       9     1
+    C       5     5
+    D       7     4
+
+  Should be 1
+  """
+  fun name(): String =>
+    "resilience/DataReceiverProposeWatermark3"
+
+  fun ref apply(h: TestHelper) =>
+    let routes: DataReceiverRoutes = DataReceiverRoutes
+    let route_id_1 = RouteId(1)
+    let route_id_2 = RouteId(2)
+    let route_id_3 = RouteId(3)
+    routes.add_route(route_id_1)
+    routes.add_route(route_id_2)
+    routes.add_route(route_id_3)
+
+    routes.send(route_id_1, SeqId(1))
+    routes.send(route_id_1, SeqId(3))
+    routes.send(route_id_1, SeqId(8))
+    routes.send(route_id_1, SeqId(9))
+    routes.receive_ack(route_id_1, SeqId(1))
+
+    routes.send(route_id_2, SeqId(5))
+    routes.receive_ack(route_id_2, SeqId(5))
+
+    routes.send(route_id_3, SeqId(4))
+    routes.send(route_id_3, SeqId(6))
+    routes.send(route_id_3, SeqId(7))
+    routes.receive_ack(route_id_3, SeqId(4))
+
+    let proposed: SeqId = routes.propose_new_watermark()
+    h.assert_eq[SeqId](1, proposed)
+
+class iso _TestDataReceiverProposeWatermark4 is UnitTest
+  """
+  Route | Sent | Ack
+    A       9     3
+    B       5     5
+    C       0     0
+
+  Should be 3
+  """
+  fun name(): String =>
+    "resilience/DataReceiverProposeWatermark4"
+
+  fun ref apply(h: TestHelper) =>
+    let routes: DataReceiverRoutes = DataReceiverRoutes
+    let route_id_1 = RouteId(1)
+    let route_id_2 = RouteId(2)
+    let route_id_3 = RouteId(3)
+    routes.add_route(route_id_1)
+    routes.add_route(route_id_2)
+    routes.add_route(route_id_3)
+
+    routes.send(route_id_1, SeqId(3))
+    routes.send(route_id_1, SeqId(8))
+    routes.send(route_id_1, SeqId(9))
+    routes.receive_ack(route_id_1, SeqId(3))
+
+    routes.send(route_id_2, SeqId(5))
+    routes.receive_ack(route_id_2, SeqId(5))
+
+    let proposed: SeqId = routes.propose_new_watermark()
+    h.assert_eq[SeqId](3, proposed)
+
+class iso _TestDataReceiverProposeWatermark5 is UnitTest
+  """
+  Route | Sent | Ack
+    A       9     3
+    B       5     5
+    C       1     0
+
+  Should be 0
+  """
+  fun name(): String =>
+    "resilience/DataReceiverProposeWatermark5"
+
+  fun ref apply(h: TestHelper) =>
+    let routes: DataReceiverRoutes = DataReceiverRoutes
+    let route_id_1 = RouteId(1)
+    let route_id_2 = RouteId(2)
+    let route_id_3 = RouteId(3)
+    routes.add_route(route_id_1)
+    routes.add_route(route_id_2)
+    routes.add_route(route_id_3)
+
+    routes.send(route_id_1, SeqId(3))
+    routes.send(route_id_1, SeqId(8))
+    routes.send(route_id_1, SeqId(9))
+    routes.receive_ack(route_id_1, SeqId(3))
+
+    routes.send(route_id_2, SeqId(5))
+    routes.receive_ack(route_id_2, SeqId(5))
+
+    routes.send(route_id_3, SeqId(1))
+
+    let proposed: SeqId = routes.propose_new_watermark()
+    h.assert_eq[SeqId](0, proposed)
+///
+///
+
+
 
 class iso _TestOutgoingToIncomingEmptyIndexFor is UnitTest
   """
