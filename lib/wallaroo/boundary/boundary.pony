@@ -53,7 +53,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
-  let _max_read: USize
   var _connect_count: U32 = 0
   var _fd: U32 = -1
   var _in_sent: Bool = false
@@ -107,7 +106,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = 65_536
-    _max_read = 16_384
 
   //
   // Application startup lifecycle event

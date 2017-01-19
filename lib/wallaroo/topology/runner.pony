@@ -12,7 +12,6 @@ use "wallaroo/resilience"
 use "wallaroo/routing"
 
 
-// TODO: Eliminate producer None when we can
 interface Runner
   // Return a Bool indicating whether the message is finished processing
   // and a Bool indicating whether the Route has filled its queue
