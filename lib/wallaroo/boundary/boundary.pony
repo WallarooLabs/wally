@@ -219,6 +219,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       Fail()
     end
 
+    _maybe_mute_or_unmute_upstreams()
+
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
 
@@ -473,21 +475,19 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     Write a sequence of sequences of bytes.
     """
-    if _connected and not _closed then
-      _in_sent = true
+    _in_sent = true
 
-      var data_size: USize = 0
-      for bytes in _notify.sentv(this, data).values() do
-        _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
-        _pending_writev_total = _pending_writev_total + bytes.size()
-        _pending.push((bytes, 0))
-        data_size = data_size + bytes.size()
-      end
-
-      _pending_writes()
-
-      _in_sent = false
+    var data_size: USize = 0
+    for bytes in _notify.sentv(this, data).values() do
+      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+      _pending_writev_total = _pending_writev_total + bytes.size()
+      _pending.push((bytes, 0))
+      data_size = data_size + bytes.size()
     end
+
+    _pending_writes()
+
+    _in_sent = false
 
   fun ref _write_final(data: ByteSeq) =>
     """
@@ -655,9 +655,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     _pending_reads()
 
-  fun _can_send(): Bool =>
-    _connected and not _closed and _writeable
-
   fun ref _pending_writes(): Bool =>
     """
     Send pending data. If any data can't be sent, keep it and mark as not
@@ -795,11 +792,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _maybe_mute_or_unmute_upstreams() =>
     if _mute_outstanding then
-      if _writeable and not _backup_queue_is_overflowing() then
+      if _can_send() then
         _unmute_upstreams()
       end
     else
-      if not _writeable or _backup_queue_is_overflowing() then
+      if not _can_send() then
         _mute_upstreams()
       end
     end
@@ -816,6 +813,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
     _mute_outstanding = false
 
+  fun _can_send(): Bool =>
+    _connected and
+      _writeable and
+      not _closed and
+      not _backup_queue_is_overflowing()
 
   fun _backup_queue_is_overflowing(): Bool =>
     _queue.size() >= 16_384
