@@ -229,7 +229,9 @@ cd build
 cmake ..
 make
 cd ..
-ponyc --path=/home/ubuntu/buffy/lib:/usr/local/lib/WallarooCppApi/:/home/ubuntu/buffy/apps/arizona-source-app/build/lib/ --output=build arizona-source-app/
+ponyc \
+  --path=/home/ubuntu/buffy/lib:/usr/local/lib/WallarooCppApi/:/home/ubuntu/buffy/apps/arizona-source-app/build/lib/ \
+  --output=build arizona-source-app/
 ```
 
 ### Startup the Metrics UI
@@ -270,14 +272,19 @@ You'll need to have 3 terminals available. 1 for giles sender, 1 for giles recei
 Giles receiver needs to be running before arizona:
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555
+sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 \
+  ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio \
+  -w -l 127.0.0.1:5555
 ```
 
 #### Running the application
 
 ```
 cd ~/buffy/apps/arizona-source-app
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 --clients=750
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 \
+  ./build/arizona-source-app -i 127.0.0.1:7001 -o 127.0.0.1:5555 \
+  -m 127.0.0.1:5001 --ponythreads 4 --ponypinasio --ponynoblock \
+  -c 127.0.0.1:12500 -d 127.0.0.1:12501 --clients=1375
 ```
 
 #### Running the Sender
@@ -288,33 +295,53 @@ To run the Orders Sender:
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f /apps/dev/arizona/data/azdata_pairgen_loop_1375_1M_admin.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 \
+  ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 \
+  -s 300 -i 2_500_000 \
+  -f /apps/dev/arizona/data/azdata_pairgen_loop_1375_1M_admin.dat.full \
+  -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 ##### With Looping, 5.5K clients (for the pairgen'd file)
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f /apps/dev/arizona/data/azdata_pairgen_loop_5Kclnt_1M_admin.dat.full -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 \
+  ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 \
+  -s 300 -i 2_500_000 \
+  -f /apps/dev/arizona/data/azdata_pairgen_loop_5Kclnt_1M_admin.dat.full \
+  -r --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 ##### For the 15 minute run
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/azdata_15mins_noloop.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 \
+  ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 \
+  -s 300 -i 2_500_000 \
+  -f ~/arizona/bin_cfggen/etc/azdata_15mins_noloop.dat.full \
+  --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 ##### For the 60 minute run
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-60-minute.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 \
+  ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 \
+  -s 300 -i 2_500_000 \
+  -f ~/arizona/bin_cfggen/etc/test-source-60-minute.dat.full \
+  --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 ##### For the 8 hour run
 
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 -s 300 -i 2_500_000 -f ~/arizona/bin_cfggen/etc/test-source-8-hour.dat.full --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
+sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 \
+  ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 \
+  -s 300 -i 2_500_000 \
+  -f ~/arizona/bin_cfggen/etc/test-source-8-hour.dat.full \
+  --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
 #### 2 MACHINES/2 WORKERS
@@ -325,17 +352,29 @@ Make sure you have the same binary on both machines or you'll get segfaults with
 On each machine, run Giles receiver before arizona:
 ```
 cd ~/buffy
-sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555 -t
+sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 \
+  ~/buffy/giles/receiver/receiver --ponythreads=1 \
+  --ponynoblock --ponypinasio -w -l 127.0.0.1:5555 -t
 ```
 
 Run Arizona on Machine 1:
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./build/arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c 0.0.0.0:12500 -d 0.0.0.0:12501 --ponythreads 4 --ponypinasio --ponynoblock -t -w 2 --clients=5500
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 \
+  ./build/arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 \
+  -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 \
+  -m <MACHINE IP ADDRESS FOR METRICS>:5001 \
+  -c 0.0.0.0:12500 -d 0.0.0.0:12501 \
+  --ponythreads 4 --ponypinasio --ponynoblock -t -w 2 --clients=5500
 ```
 
 Run Arizona on Machine 2:
 ```
-sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 ./arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 -m <MACHINE IP ADDRESS FOR METRICS>:5001 -c <INITIALIZER>:12500 -d <INITIALIZER>:12501 --ponythreads 4 --ponypinasio --ponynoblock -n worker2 -w 2 --clients=5500
+sudo cset proc -s user -e numactl -- -C 1-4,17 chrt -f 80 \
+  ./arizona-source-app -i 0.0.0.0:7000,0.0.0.0:7001 \
+  -o <MACHINE IP ADDRESS FOR OUTPUT>:5555 \
+  -m <MACHINE IP ADDRESS FOR METRICS>:5001 \
+  -c <INITIALIZER>:12500 -d <INITIALIZER>:12501 \
+  --ponythreads 4 --ponypinasio --ponynoblock -n worker2 -w 2 --clients=5500
 ```
 
 Orders Sender on Machine 1:

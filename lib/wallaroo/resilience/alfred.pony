@@ -132,6 +132,9 @@ class FileBackend is Backend
           end
 
           // clear read buffer to free file data read so far
+          if r.size() > 0 then
+            Fail()
+          end
           r.clear()
         end
 
