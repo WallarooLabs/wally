@@ -1099,10 +1099,10 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
     ProceedsMessage *proceeds_message = new ProceedsMessage(om->get_message_id(),
                                                             new string(*om->get_isin()),
                                                             new string(*om->get_client()),
-                                                            proceeds.open_short(),
                                                             proceeds.open_long(),
-                                                            proceeds.proceeds_short(),
-                                                            proceeds.proceeds_long());
+                                                            proceeds.open_short(),
+                                                            proceeds.proceeds_long(),
+                                                            proceeds.proceeds_short());
 
     void *state_change_handle = w_state_change_repository_lookup_by_name(state_change_repository_helper_, state_change_repository_, "add order state change");
 
@@ -1132,10 +1132,10 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
     ProceedsMessage *proceeds_message = new ProceedsMessage(cm->get_message_id(),
                                                             new string(proceeds.isin()),
                                                             new string(*cm->get_client()),
-                                                            proceeds.open_short(),
                                                             proceeds.open_long(),
-                                                            proceeds.proceeds_short(),
-                                                            proceeds.proceeds_long());
+                                                            proceeds.open_short(),
+                                                            proceeds.proceeds_long(),
+                                                            proceeds.proceeds_short());
 
     void *state_change_handle = w_state_change_repository_lookup_by_name(state_change_repository_helper_, state_change_repository_, "cancel order state change");
 
@@ -1164,10 +1164,10 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
     ProceedsMessage *proceeds_message = new ProceedsMessage(em->get_message_id(),
                                                             new string(proceeds.isin()),
                                                             new string(*em->get_client()),
-                                                            proceeds.open_short(),
                                                             proceeds.open_long(),
-                                                            proceeds.proceeds_short(),
-                                                            proceeds.proceeds_long());
+                                                            proceeds.open_short(),
+                                                            proceeds.proceeds_long(),
+                                                            proceeds.proceeds_short());
 
     void *state_change_handle = w_state_change_repository_lookup_by_name(state_change_repository_helper_, state_change_repository_, "execute order state change");
 
@@ -1213,10 +1213,10 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
           ProceedsMessage *proceeds_message = new ProceedsMessage(am->get_message_id(),
                                                                   new string(proceeds.isin()),
                                                                   new string(*am->get_client()),
-                                                                  proceeds.open_short(),
                                                                   proceeds.open_long(),
-                                                                  proceeds.proceeds_short(),
-                                                                  proceeds.proceeds_long());
+                                                                  proceeds.open_short(),
+                                                                  proceeds.proceeds_long(),
+                                                                  proceeds.proceeds_short());
           return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
         }
         break;
@@ -1228,10 +1228,10 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
           ProceedsMessage *proceeds_message = new ProceedsMessage(am->get_message_id(),
                                                                   new string(proceeds.isin()),
                                                                   new string(*am->get_client()),
-                                                                  proceeds.open_short(),
                                                                   proceeds.open_long(),
-                                                                  proceeds.proceeds_short(),
-                                                                  proceeds.proceeds_long());
+                                                                  proceeds.open_short(),
+                                                                  proceeds.proceeds_long(),
+                                                                  proceeds.proceeds_short());
           return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
         }
         break;
@@ -1243,10 +1243,10 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
           ProceedsMessage *proceeds_message = new ProceedsMessage(am->get_message_id(),
                                                                   new string(proceeds.isin()),
                                                                   new string(*am->get_client()),
-                                                                  proceeds.open_short(),
                                                                   proceeds.open_long(),
-                                                                  proceeds.proceeds_short(),
-                                                                  proceeds.proceeds_long());
+                                                                  proceeds.open_short(),
+                                                                  proceeds.proceeds_long(),
+                                                                  proceeds.proceeds_short());
           return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
         }
         break;
@@ -1273,11 +1273,11 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
         void *state_change_handle = w_state_change_repository_lookup_by_name(
             state_change_repository_helper_,
             state_change_repository_,
-            "add account to agg unit state change");
-        RemoveAccountFromAggUnitStateChange *create_aggunit_state_change =
+            "remove account from agg unit state change");
+        RemoveAccountFromAggUnitStateChange *remove_aggunit_state_change =
           (RemoveAccountFromAggUnitStateChange *) w_state_change_get_state_change_object(
               state_change_repository_helper_, state_change_handle);
-        create_aggunit_state_change->update(*am->get_client(), *am->get_account(), *am->get_aggunit());
+        remove_aggunit_state_change->update(*am->get_client(), *am->get_account(), *am->get_aggunit());
         AdminResponseMessage *response_message =
           new AdminResponseMessage(am->get_message_id(), AdminResponseType::Ok);
         return w_stateful_computation_get_return(

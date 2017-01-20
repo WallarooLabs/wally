@@ -820,7 +820,7 @@ void AggUnits::remove_account(string& agg_unit_id_, Account *account_)
     return;
   }
 
-  _agg_unit_id_to_agg_unit.erase(it);
+  it->second.remove_account(account_);
 }
 
 Client::Client(string& client_id_): _accounts(), _agg_units(), _client_id(client_id_)
@@ -1074,7 +1074,7 @@ void Clients::create_agg_unit(string& client_id_, string& agg_unit_id_)
   return client->create_agg_unit(agg_unit_id_);
 }
 
-void Clients::add_account_to_agg_unit(string& client_id_, string& agg_unit_id_, string& account_id_)
+void Clients::add_account_to_agg_unit(string& client_id_, string& account_id_, string& agg_unit_id_)
 {
   Client *client = _client_by_client_id(client_id_);
 
@@ -1083,10 +1083,10 @@ void Clients::add_account_to_agg_unit(string& client_id_, string& agg_unit_id_, 
     // TODO: it should be an error to do something for a client that doesn't exist
     return;
   }
-  client->add_account_to_agg_unit(agg_unit_id_, account_id_);
+  client->add_account_to_agg_unit(account_id_, agg_unit_id_);
 }
 
-void Clients::remove_account_from_agg_unit(string& client_id_, string& agg_unit_id_, string& account_id_)
+void Clients::remove_account_from_agg_unit(string& client_id_, string& account_id_, string& agg_unit_id_)
 {
   Client *client = _client_by_client_id(client_id_);
 
@@ -1095,5 +1095,5 @@ void Clients::remove_account_from_agg_unit(string& client_id_, string& agg_unit_
     // TODO: it should be an error to do something for a client that doesn't exist
     return;
   }
-  client->remove_account_from_agg_unit(agg_unit_id_, account_id_);
+  client->remove_account_from_agg_unit(account_id_, agg_unit_id_);
 }
