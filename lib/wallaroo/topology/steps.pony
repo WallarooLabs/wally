@@ -318,8 +318,17 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val)
   =>
-    // TODO: We need to handle the entire incoming envelope here
-    None
+    //TODO: replace origin_id seq_id and route_id in here if needed (amosca believes not)
+    if not _is_duplicate(this, uid, frac_ids, 0, 0) then
+      _deduplication_list.push((this, uid, frac_ids, 0, 0))
+      match _runner
+      | let r: ReplayableRunner =>
+        r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
+      else
+        @printf[I32]("trying to replay a message to a non-replayable
+        runner!".cstring())
+      end
+    end
 
   be replay_finished() =>
     _deduplication_list.clear()
