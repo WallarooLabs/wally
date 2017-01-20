@@ -339,7 +339,7 @@ cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 \
   ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 \
   -s 300 -i 2_500_000 \
-  -f ~/arizona/bin_cfggen/etc/azdata_1hr_noloop.dat.full \
+  -f /apps/dev/arizona/data/azdata_1hr_noloop.dat.full \
   --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 
