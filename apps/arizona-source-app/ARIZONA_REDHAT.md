@@ -225,9 +225,9 @@ You need to download and untar the Metrics UI with the following commands:
 ```bash
 cd ~/
 mkdir metrics_reporter_ui
-wget
-https://s3.amazonaws.com/sendence-dev/wallaroo/metrics_reporter_ui-bins/linux/metrics_reporter_ui-new-rhel.tar.gz
-tar -xvf -C metrics_reporter_ui/
+cd metrics_reporter_ui
+wget https://s3.amazonaws.com/sendence-dev/wallaroo/metrics_reporter_ui-bins/linux/metrics_reporter_ui-new-rhel.tar.gz
+tar -xvf metrics_reporter_ui-new-rhel.tar.gz -C metrics_reporter_ui/
 ```
 
 To run the Metrics UI:
