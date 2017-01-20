@@ -1,2 +1,0 @@
-/usr/bin/ar qc build/lib/libwallaroo.a  CMakeFiles/wallaroo-static.dir/cpp/Logger.cpp.o CMakeFiles/wallaroo-static.dir/cpp/Buffer.cpp.o CMakeFiles/wallaroo-static.dir/cpp/RawBuffer.cpp.o CMakeFiles/wallaroo-static.dir/cpp/ManagedBuffer.cpp.o CMakeFiles/wallaroo-static.dir/cpp/ManagedObject.cpp.o CMakeFiles/wallaroo-static.dir/cpp/Data.cpp.o CMakeFiles/wallaroo-static.dir/cpp/ApiHooks.cpp.o CMakeFiles/wallaroo-static.dir/cpp/Hashable.cpp.o
-/usr/bin/ranlib build/lib/libwallaroo.a
