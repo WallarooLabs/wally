@@ -140,17 +140,13 @@ class FileBackend is Backend
         // iterate through recovered buffer and replay entries at or below
         // watermark
         for entry in replay_buffer.values() do
-          try
-            // only replay if at or below watermark
-            if entry._5 <= watermarks(entry._1) then
-              num_replayed = num_replayed + 1
-              _alfred.replay_log_entry(entry._1, entry._2, entry._3, entry._4
-                                      , entry._6)
-            else
-              num_skipped = num_skipped + 1
-            end
+          // only replay if at or below watermark
+          if entry._5 <= watermarks.get_or_else(entry._1, 0) then
+            num_replayed = num_replayed + 1
+            _alfred.replay_log_entry(entry._1, entry._2, entry._3, entry._4
+                                    , entry._6)
           else
-            Fail()
+            num_skipped = num_skipped + 1
           end
         end
 
