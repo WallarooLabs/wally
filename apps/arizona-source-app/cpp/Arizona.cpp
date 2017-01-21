@@ -1081,7 +1081,7 @@ ArizonaStateComputation::ArizonaStateComputation() : _nProcessed(0)
     _logger->info("{}", __PRETTY_FUNCTION__);
 }
 
-void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out)
 {
   // wallaroo::Logger::getLogger()->critical("COMPUTE");
   if (OrderMessage *om = dynamic_cast<OrderMessage *>(input_))
@@ -1116,7 +1116,8 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
                                    om->get_quantity(),
                                    om->get_price());
 
-    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, state_change_handle);
+    *data_out = proceeds_message;
+    return state_change_handle;
   }
 
   if (CancelMessage *cm = dynamic_cast<CancelMessage *>(input_))
@@ -1145,7 +1146,8 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
                                       *cm->get_account(),
                                       *cm->get_order_id());
 
-    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, state_change_handle);
+    *data_out = proceeds_message;
+    return state_change_handle;
   }
 
   if (ExecuteMessage *em = dynamic_cast<ExecuteMessage *>(input_))
@@ -1180,7 +1182,8 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
                                        em->get_quantity(),
                                        em->get_price());
 
-    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, state_change_handle);
+    *data_out = proceeds_message;
+    return state_change_handle;
   }
 
   if (AdminMessage *am = dynamic_cast<AdminMessage *>(input_))
@@ -1200,10 +1203,8 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
         create_aggunit_state_change->update(*am->get_client(), *am->get_aggunit());
         AdminResponseMessage *response_message =
           new AdminResponseMessage(am->get_message_id(), AdminResponseType::Ok);
-        return w_stateful_computation_get_return(
-            state_change_repository_helper_,
-            response_message,
-            state_change_handle);
+        *data_out = response_message;
+        return state_change_handle;
       }
       break;
       case AdminRequestType::QueryClient:
@@ -1217,7 +1218,8 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
                                                                   proceeds.open_short(),
                                                                   proceeds.proceeds_long(),
                                                                   proceeds.proceeds_short());
-          return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+          *data_out = proceeds_message;
+          return none;
         }
         break;
       case AdminRequestType::QueryAggUnit:
@@ -1232,7 +1234,8 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
                                                                   proceeds.open_short(),
                                                                   proceeds.proceeds_long(),
                                                                   proceeds.proceeds_short());
-          return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+          *data_out = proceeds_message;
+          return none;
         }
         break;
       case AdminRequestType::QueryAccount:
@@ -1247,7 +1250,8 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
                                                                   proceeds.open_short(),
                                                                   proceeds.proceeds_long(),
                                                                   proceeds.proceeds_short());
-          return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+          *data_out = proceeds_message;
+          return none;
         }
         break;
       case AdminRequestType::AddAggUnit:
@@ -1262,10 +1266,8 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
         create_aggunit_state_change->update(*am->get_client(), *am->get_account(), *am->get_aggunit());
         AdminResponseMessage *response_message =
           new AdminResponseMessage(am->get_message_id(), AdminResponseType::Ok);
-        return w_stateful_computation_get_return(
-            state_change_repository_helper_,
-            response_message,
-            state_change_handle);
+        *data_out = response_message;
+        return state_change_handle;
       }
       break;
       case AdminRequestType::RemoveAggUnit:
@@ -1280,22 +1282,19 @@ void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateCh
         remove_aggunit_state_change->update(*am->get_client(), *am->get_account(), *am->get_aggunit());
         AdminResponseMessage *response_message =
           new AdminResponseMessage(am->get_message_id(), AdminResponseType::Ok);
-        return w_stateful_computation_get_return(
-            state_change_repository_helper_,
-            response_message,
-            state_change_handle);
+        *data_out = response_message;
+        return state_change_handle;
       }
       break;
     }
     AdminResponseMessage *response_message =
       new AdminResponseMessage(am->get_message_id(), AdminResponseType::Error);
-    return w_stateful_computation_get_return(
-        state_change_repository_helper_,
-        response_message,
-        none);
+    *data_out = response_message;
+    return none;
   }
 
-  return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
+  *data_out = NULL;
+  return none;
 }
 
 wallaroo::StateChangeBuilder *ArizonaStateComputation::get_state_change_builder(size_t idx_)
@@ -1370,7 +1369,7 @@ const char *ArizonaDefaultStateComputation::name()
   return "arizona default state computation";
 }
 
-void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out)
 {
   wallaroo::Logger::getLogger()->critical("DEFAULT COMPUTE");
   if (OrderMessage *om = dynamic_cast<OrderMessage *>(input_))
@@ -1394,30 +1393,35 @@ void *ArizonaDefaultStateComputation::compute(wallaroo::Data *input_, wallaroo::
                                                             proceeds.proceeds_short(),
                                                             proceeds.proceeds_long());
 
-    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+    *data_out = proceeds_message;
+    return none;
   }
 
   if (CancelMessage *cm = dynamic_cast<CancelMessage *>(input_))
   {
     uint64_t message_id = cm->get_message_id();
     ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), new string(*cm->get_client()), 0.0, 0.0, 0.0, 0.0);
-    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+    *data_out = proceeds_message;
+    return none;
   }
 
   if (ExecuteMessage *em = dynamic_cast<ExecuteMessage *>(input_))
   {
     uint64_t message_id = em->get_message_id();
     ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), new string(*em->get_client()), 0.0, 0.0, 0.0, 0.0);
-    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+    *data_out = proceeds_message;
+    return none;
   }
 
   if (AdminMessage *am = dynamic_cast<AdminMessage *>(input_))
   {
     uint64_t message_id = am->get_message_id();
     ProceedsMessage *proceeds_message = new ProceedsMessage(message_id, new string(), new string(*am->get_client()), 0.0, 0.0, 0.0, 0.0);
-    return w_stateful_computation_get_return(state_change_repository_helper_, proceeds_message, none);
+    *data_out = proceeds_message;
+    return none;
   }
 
 
-  return w_stateful_computation_get_return(state_change_repository_helper_, NULL, none);
+  *data_out = NULL;
+  return none;
 }

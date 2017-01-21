@@ -5,10 +5,8 @@ use "wallaroo/fail"
 use @w_computation_compute[DataP](computation: ComputationP, input: DataP)
 use @w_computation_get_name[Pointer[U8]](computation: ComputationP)
 
-//use @w_state_computation_compute[((CPPData val | None), (CPPStateChange | None))](state_computation: StateComputationP,
-//  input: DataP, sc_repo: StateChangeRepository[CPPState], sc_repo_helper: CPPStateChangeRepositoryHelper, state: StateP, n: None)
-use @w_state_computation_compute[CPPStateComputationReturnPairWrapper ref](state_computation: StateComputationP,
-  input: DataP, sc_repo: StateChangeRepository[CPPState], sc_repo_helper: CPPStateChangeRepositoryHelper, state: StateP, n: None)
+use @w_state_computation_compute[(CPPStateChange | None)](state_computation: StateComputationP,
+  input: DataP, sc_repo: StateChangeRepository[CPPState], sc_repo_helper: CPPStateChangeRepositoryHelper, state: StateP, n: None, data_out: Pointer[DataP iso] ref)
 use @w_state_computation_get_name[Pointer[U8]](state_computation: StateComputationP)
 use @w_state_computation_get_number_of_state_change_builders[USize](state_computaton: StateComputationP)
 use @w_state_computation_get_state_change_builder[StateChangeBuilderP](state_computation: StateComputationP, idx: USize)
@@ -47,15 +45,6 @@ class CPPComputation is Computation[CPPData val, CPPData val]
   fun _final() =>
     @w_managed_object_delete(_computation)
 
-class CPPStateComputationReturnPairWrapper
-  let data: (CPPData val | None)
-  let change: (CPPStateChange ref | None)
-  fun ref get_tuple(): ((CPPData val | None), (CPPStateChange ref | None)) =>
-    (data, change)
-  new create(data': (CPPData val |None), change': (CPPStateChange ref | None)) =>
-    data = data'
-    change = change'
-
 class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState]
   var _computation: StateComputationP
 
@@ -65,17 +54,22 @@ class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState
   fun apply(input: CPPData val, sc_repo: StateChangeRepository[CPPState], state: CPPState):
     ((CPPData val | None), (CPPStateChange | None))
   =>
-    let result_p = @w_state_computation_compute(_computation, input.obj(), sc_repo, CPPStateChangeRepositoryHelper, state.obj(), None)
-    let result = result_p.get_tuple()
-    match result._1
-    | let r: CPPData val =>
-      if input.obj() == r.obj() then
-        @printf[I32]("returning the same object is not allowed".cstring())
-      end
+    var data_p: DataP iso = recover iso DataP end
+    let state_change = @w_state_computation_compute(_computation, input.obj(), sc_repo, CPPStateChangeRepositoryHelper, state.obj(), None, addressof data_p)
+
+    if input.obj() == data_p then
+      @printf[I32]("returning the same object is not allowed".cstring())
     end
+
+    let d = if data_p.is_null() then
+      None
+    else
+      recover val CPPData(consume data_p) end
+    end
+
     //SUPER-EVIL-DANGER-ZONE
     input.delete_obj()
-    result
+    (d, state_change)
 
   fun name(): String =>
     recover String.from_cstring(@w_state_computation_get_name(_computation)) end

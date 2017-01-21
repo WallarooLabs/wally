@@ -388,7 +388,7 @@ const char *CounterComputation::name()
   return "counter computation";
 }
 
-void *CounterComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+void *CounterComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out))
 {
   // std::cerr << "inside counter computation!" << std::endl;
   
@@ -407,7 +407,8 @@ void *CounterComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeR
 
   counter_add->set_value(sum);
 
-  return w_stateful_computation_get_return(state_change_repository_helper_, total, state_change_handle);
+  *data_out = total;
+  return state_change_handle;
 }
 
 size_t CounterComputation::get_number_of_state_change_builders()
@@ -425,12 +426,13 @@ const char *DummyComputation::name()
   return "dummy computation";
 }
 
-void *DummyComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+void *DummyComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out))
 {
   // std::cerr << "inside dummy computation!" << std::endl;
   Total *total = new Total(*((Total *) input_));
 
-  return w_stateful_computation_get_return(state_change_repository_helper_, total, none);
+  *data_out = total;
+  return none;
 }
 
 size_t DummyComputation::get_number_of_state_change_builders(){

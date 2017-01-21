@@ -345,17 +345,19 @@ uint64_t SymbolPartitionFunction::partition(wallaroo::Data *data_)
   return pm->get_partition();
 }
 
-void *CheckOrderNoUpdateNoOutput::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+void *CheckOrderNoUpdateNoOutput::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out)
 {
-  return w_stateful_computation_get_return(state_change_repository_helper_, nullptr, none);
+  *data_out = nullptr;
+  return none;
 }
 
-void *CheckOrderNoOutput::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+void *CheckOrderNoOutput::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out)
 {
-  return w_stateful_computation_get_return(state_change_repository_helper_, nullptr, none);
+  *data_out = nullptr;
+  return none;
 }
 
-void *CheckOrder::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+void *CheckOrder::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out)
 {
   OrderMessage *order_message = (OrderMessage *) input_;
 
@@ -366,36 +368,21 @@ void *CheckOrder::compute(wallaroo::Data *input_, wallaroo::StateChangeRepositor
     // std::cerr << "rejected" << std::endl;
     // TODO: not getting time here, is this a problem?
     OrderResult *order_result = new OrderResult(order_message, symbol_data->last_bid, symbol_data->last_offer, 0);
-    return w_stateful_computation_get_return(state_change_repository_helper_, order_result, none);
+    *data_out = order_result;
+    return none;
   }
 
-  return w_stateful_computation_get_return(state_change_repository_helper_, nullptr, none);
+  *data_out = nullptr;
+  return none;
 }
 
-void *UpdateNbboNoUpdateNoOutput::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+void *UpdateNbboNoUpdateNoOutput::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out)
 {
-  return w_stateful_computation_get_return(state_change_repository_helper_, nullptr, none);
+  *data_out = nullptr;
+  return none;
 }
 
-void *UpdateNbboNoOutput::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
-{
-  NbboMessage *nbbo_message = (NbboMessage *) input_;
-
-  void *state_change_handle = w_state_change_repository_lookup_by_name(state_change_repository_helper_, state_change_repository_, "symbol data state change");
-
-  SymbolDataStateChange *symbol_data_state_change = (SymbolDataStateChange *)w_state_change_get_state_change_object(state_change_repository_helper_, state_change_handle);
-
-
-  double offer_bid_difference = nbbo_message->offer_price() - nbbo_message->bid_price();
-
-  bool should_reject_trades = (offer_bid_difference >= 0.05) || ((offer_bid_difference / nbbo_message->mid()) >= 0.05);
-
-  symbol_data_state_change->update(should_reject_trades, nbbo_message->bid_price(), nbbo_message->offer_price());
-
-  return w_stateful_computation_get_return(state_change_repository_helper_, nullptr, state_change_handle);
-}
-
-void *UpdateNbbo::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
+void *UpdateNbboNoOutput::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out)
 {
   NbboMessage *nbbo_message = (NbboMessage *) input_;
 
@@ -410,7 +397,27 @@ void *UpdateNbbo::compute(wallaroo::Data *input_, wallaroo::StateChangeRepositor
 
   symbol_data_state_change->update(should_reject_trades, nbbo_message->bid_price(), nbbo_message->offer_price());
 
-  return w_stateful_computation_get_return(state_change_repository_helper_, nullptr, state_change_handle);
+  *data_out = nullptr;
+  return state_change_handle;
+}
+
+void *UpdateNbbo::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out)
+{
+  NbboMessage *nbbo_message = (NbboMessage *) input_;
+
+  void *state_change_handle = w_state_change_repository_lookup_by_name(state_change_repository_helper_, state_change_repository_, "symbol data state change");
+
+  SymbolDataStateChange *symbol_data_state_change = (SymbolDataStateChange *)w_state_change_get_state_change_object(state_change_repository_helper_, state_change_handle);
+
+
+  double offer_bid_difference = nbbo_message->offer_price() - nbbo_message->bid_price();
+
+  bool should_reject_trades = (offer_bid_difference >= 0.05) || ((offer_bid_difference / nbbo_message->mid()) >= 0.05);
+
+  symbol_data_state_change->update(should_reject_trades, nbbo_message->bid_price(), nbbo_message->offer_price());
+
+  *data_out = nullptr;
+  return state_change_handle;
 }
 
 OrderResult::OrderResult(OrderMessage *order_message_, double bid_, double offer_, uint64_t timestamp_): bid(bid_), offer(offer_), timestamp(timestamp_)
