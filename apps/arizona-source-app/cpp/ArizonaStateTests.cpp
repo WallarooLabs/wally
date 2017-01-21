@@ -19,9 +19,8 @@ bool test_proceeds_add()
 
 bool test_order()
 {
-  string order_id("o1");
-  Order x(order_id, Side::Buy, 10, 50.0);
-  Order y(order_id, Side::Buy, 10, 50.0);
+  Order x(Side::Buy, 10, 50.0);
+  Order y(Side::Buy, 10, 50.0);
   return x == y;
 }
 

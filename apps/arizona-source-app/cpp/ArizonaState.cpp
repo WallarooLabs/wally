@@ -106,14 +106,14 @@ uint32_t Executions::quantity()
   return sum_quantity;
 }
 
-Order::Order(string& order_id_, Side side_, uint32_t quantity_, double price_):
-  _executions(), _order_id(order_id_), _side(side_), _quantity(quantity_), _price(price_)
+Order::Order(Side side_, uint32_t quantity_, double price_):
+  _executions(), _side(side_), _quantity(quantity_), _price(price_)
 {
 }
 
 bool Order::operator==(Order& that)
 {
-  return (_order_id == that._order_id) && (_side == that._side) && (_quantity == that._quantity) && (_price == that._price);
+  return (_side == that._side) && (_quantity == that._quantity) && (_price == that._price);
 }
 
 Proceeds Order::base_proceeds()
@@ -202,7 +202,7 @@ void Orders::add_order(string& order_id_, Side side_, uint32_t quantity_, double
     return;
   }
 
-  Order *order = new Order(order_id_, side_, quantity_, price_);
+  Order *order = new Order(side_, quantity_, price_);
   _orders.insert(std::pair<string, Order*>(order_id_, order));
 }
 
@@ -429,7 +429,7 @@ Proceeds ISINs::proceeds_for_isin(string& isin_id_)
 Proceeds ISINs::proceeds_with_order(string& isin_id_, string& order_id_, Side side_, uint32_t quantity_, double price_)
 {
   Proceeds p_isin = proceeds_for_isin(isin_id_);
-  Proceeds p_order = Order(order_id_, side_, quantity_, price_).proceeds();
+  Proceeds p_order = Order(side_, quantity_, price_).proceeds();
   return p_isin.add(p_order);
 }
 
@@ -675,7 +675,7 @@ Proceeds Accounts::proceeds_with_order(string& account_id_, string& isin_id_, st
   if (account == nullptr)
   {
     Proceeds p(0.0, 0.0, 0.0, 0.0, isin_id_);
-    Proceeds op = Order(order_id_, side_, quantity_, price_).proceeds();
+    Proceeds op = Order(side_, quantity_, price_).proceeds();
     return p.add(op);
   }
   return account->proceeds_with_order(isin_id_, order_id_, side_, quantity_, price_);
@@ -996,7 +996,7 @@ Proceeds Clients::proceeds_with_order(string& client_id_, string& account_id_, s
   if (client == nullptr)
   {
     Proceeds p = Proceeds(0.0, 0.0, 0.0, 0.0, isin_id_);
-    Proceeds op = Order(order_id_, side_, quantity_, price_).proceeds();
+    Proceeds op = Order(side_, quantity_, price_).proceeds();
     return p.add(op);
   }
   return client->proceeds_with_order(account_id_, isin_id_, order_id_, side_, quantity_, price_);
