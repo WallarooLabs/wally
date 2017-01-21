@@ -47,8 +47,7 @@ extern void *w_state_computation_compute(wallaroo::StateComputation *state_compu
                                          wallaroo::StateChangeRepository *state_change_repo_,
                                          void *state_change_repository_helper_,
                                          wallaroo::State *state_,
-                                         void *none_,
-                                         wallaroo::Data **data_out);
+                                         void *none_);
 extern const char *w_state_computation_get_name(wallaroo::StateComputation *state_computation_);
 extern size_t w_state_computation_get_number_of_state_change_builders(wallaroo::StateComputation *state_computaton_);
 extern wallaroo::StateChangeBuilder *w_state_computation_get_state_change_builder(wallaroo::StateComputation *state_computation_, uint64_t idx_);
@@ -79,6 +78,7 @@ extern wallaroo::StateChange *w_state_change_builder_build(wallaroo::StateChange
 
 extern void *w_state_change_repository_lookup_by_name(void *state_change_repository_helper_, void *state_change_repository_, const char *name_);
 extern wallaroo::StateChange *w_state_change_get_state_change_object(void *state_change_repository_helper_, void *state_change_);
+extern void *w_stateful_computation_get_return(void *state_change_repository_helper_, wallaroo::Data* data_, void *state_change_);
 
 extern uint64_t w_hashable_hash(wallaroo::Hashable const *obj_);
 extern uint64_t w_hashable_partition_index(wallaroo::Hashable const *obj_);

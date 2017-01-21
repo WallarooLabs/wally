@@ -40,6 +40,7 @@ extern "C"
 // These functions are generated when building the Wallaroo application.
 void* pony_CPPStateChangeRepositoryHelper_lookup_by_name(void* self, void* sc_repo, const char* name_p);
 void* pony_CPPStateChangeRepositoryHelper_get_state_change_object(void *state_change_repository_helper_, void* state_change_);
+void* pony_CPPStateChangeRepositoryHelper_get_stateful_computation_return(void *state_change_repository_helper_, void* data_, void* state_change_);
 
 //------------------------------------------------------------------------
 //
@@ -58,10 +59,9 @@ extern void *w_state_computation_compute(wallaroo::StateComputation *state_compu
                                          wallaroo::StateChangeRepository *state_change_repo_,
                                          void *state_change_repository_helper_,
                                          wallaroo::State *state_,
-                                         void *none_,
-                                         wallaroo::Data **data_out)
+                                         void *none_)
 {
-  return state_computation_->compute(data_, state_change_repo_, state_change_repository_helper_, state_, none_, data_out);
+  return state_computation_->compute(data_, state_change_repo_, state_change_repository_helper_, state_, none_);
 }
 
 extern const char *w_state_computation_get_name(wallaroo::StateComputation *state_computation_)
@@ -171,6 +171,11 @@ extern wallaroo::StateChange *w_state_change_get_state_change_object(void *state
   return (wallaroo::StateChange *)pony_CPPStateChangeRepositoryHelper_get_state_change_object(state_change_repository_helper_, state_change_);
 }
 
+void *w_stateful_computation_get_return(void *state_change_repository_helper_, wallaroo::Data* data_, void *state_change_)
+{
+  return pony_CPPStateChangeRepositoryHelper_get_stateful_computation_return(state_change_repository_helper_, data_, state_change_);
+}
+  
 extern uint64_t w_hashable_hash(wallaroo::Hashable const *obj_)
 {
   return obj_->hash();

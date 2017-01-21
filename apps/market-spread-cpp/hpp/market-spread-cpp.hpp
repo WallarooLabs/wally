@@ -167,7 +167,7 @@ public:
 class CheckOrderNoUpdateNoOutput: public wallaroo::StateComputation
 {
   const char *name() { return "Check Order against NBBO, no update, no output"; }
-  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out);
+  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none);
   virtual size_t get_number_of_state_change_builders() { return 0;}
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_) { return NULL; }
 };
@@ -175,7 +175,7 @@ class CheckOrderNoUpdateNoOutput: public wallaroo::StateComputation
 class CheckOrderNoOutput: public wallaroo::StateComputation
 {
   const char *name() { return "Check Order against NBBO, no output"; }
-  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out);
+  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none);
   virtual size_t get_number_of_state_change_builders() { return 0;}
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_) { return NULL; }
 };
@@ -183,7 +183,7 @@ class CheckOrderNoOutput: public wallaroo::StateComputation
 class CheckOrder: public wallaroo::StateComputation
 {
   const char *name() { return "Check Order against NBBO"; }
-  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out);
+  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none);
   virtual size_t get_number_of_state_change_builders() { return 0;}
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_) { return NULL; }
 };
@@ -191,7 +191,7 @@ class CheckOrder: public wallaroo::StateComputation
 class UpdateNbboNoUpdateNoOutput: public wallaroo::StateComputation
 {
   const char *name() { return "Update NBBO, no update, no output"; }
-  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out);
+  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none);
 
   virtual size_t get_number_of_state_change_builders() { return 0;}
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_) { return NULL; }
@@ -200,7 +200,7 @@ class UpdateNbboNoUpdateNoOutput: public wallaroo::StateComputation
 class UpdateNbboNoOutput: public wallaroo::StateComputation
 {
   const char *name() { return "Update NBBO, no output"; }
-  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out);
+  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none);
 
   virtual size_t get_number_of_state_change_builders() { return 1;}
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_) { return new SymbolDataStateChangeBuilder(); }
@@ -209,7 +209,7 @@ class UpdateNbboNoOutput: public wallaroo::StateComputation
 class UpdateNbbo: public wallaroo::StateComputation
 {
   const char *name() { return "Update NBBO"; }
-  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none, wallaroo::Data** data_out);
+  void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none);
 
   virtual size_t get_number_of_state_change_builders() { return 1;}
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_) { return new SymbolDataStateChangeBuilder(); }
