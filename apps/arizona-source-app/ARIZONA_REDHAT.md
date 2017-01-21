@@ -49,6 +49,7 @@ sudo make install
 ```
 scl enable devtoolset-4 bash
 git clone https://github.com/Sendence/buffy.git
+
 cd ~/buffy
 cd lib/wallaroo/cpp-api/cpp/cppapi
 mkdir build
@@ -63,6 +64,7 @@ scl enable devtoolset-4 bash
 export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:PKG_CONFIG_PATH
 cd ~/
 git clone https://github.com/Sendence/arizona.git
+
 cd ~/arizona
 git checkout state-node-compute
 mkdir build
@@ -227,7 +229,7 @@ cd ~/
 mkdir metrics_reporter_ui
 cd metrics_reporter_ui
 wget https://s3.amazonaws.com/sendence-dev/wallaroo/metrics_reporter_ui-bins/linux/metrics_reporter_ui-new-rhel.tar.gz
-tar -xvf metrics_reporter_ui-new-rhel.tar.gz -C metrics_reporter_ui/
+tar -xvf metrics_reporter_ui-new-rhel.tar.gz -C ~/metrics_reporter_ui/
 ```
 
 To run the Metrics UI:
