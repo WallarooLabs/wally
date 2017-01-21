@@ -102,7 +102,7 @@ actor Main
       let data_partition = Partition[CPPData val, U64](partition_function, partition_keys)
 
       let application = recover val
-        Application("Passthrough Topology")
+        Application("Arizona Topology")
           .new_pipeline[CPPData val, CPPData val]("source-decoder", recover CPPSourceDecoder(@get_source_decoder()) end)
             .to_state_partition[CPPData val, U64, CPPData val, CPPState](
               state_computation_factory(),
@@ -113,7 +113,7 @@ actor Main
             "Arizona Default Test", "default-state", state_computation_factory(),
             ArizonaDefaultStateBuilder)
       end
-      Startup(env, application, None)
+      Startup(env, application, "Arizona")
     else
       env.out.print("Could not build topology")
     end
