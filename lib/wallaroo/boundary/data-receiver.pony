@@ -33,6 +33,7 @@ actor DataReceiver is Producer
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
   var _latest_conn: (TCPConnection | None) = None
+  var _replay_pending: Bool = false
 
   let _resilience_routes: DataReceiverRoutes = DataReceiverRoutes
 
@@ -53,6 +54,9 @@ actor DataReceiver is Producer
   be data_connect(sender_step_id: U128, conn: TCPConnection) =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
+    if _replay_pending then
+      request_replay()
+    end
 
   fun ref init_timer() =>
     ifdef "resilience" then
@@ -92,9 +96,17 @@ actor DataReceiver is Producer
 
   be request_replay() =>
     try
-      let request_msg = ChannelMsgEncoder.request_replay(_worker_name,
-        _sender_step_id, _auth)
-      _connections.send_data(_sender_name, request_msg)
+      match _latest_conn
+      | let conn: TCPConnection =>
+        @printf[I32]("data receiver for worker %s requesting replay from sender %s\n".cstring(), _worker_name.cstring(), _sender_name.cstring())
+        let request_msg = ChannelMsgEncoder.request_replay(_worker_name,
+          _sender_step_id, _auth)
+        conn.writev(request_msg)
+        _replay_pending = false
+      else
+        _replay_pending = true
+      end
+
     else
       @printf[I32]("Error creating request replay message\n".cstring())
     end
