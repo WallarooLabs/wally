@@ -46,6 +46,11 @@ primitive ChannelMsgEncoder
   =>
     _encode(IdentifyDataPortMsg(worker_name, service), auth)
 
+  fun reconnect_data_port(worker_name: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ReconnectDataPortMsg(worker_name), auth)
+
   fun spin_up_local_topology(local_topology: LocalTopology val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -139,6 +144,12 @@ class IdentifyDataPortMsg is ChannelMsg
   new val create(name: String, s: String) =>
     worker_name = name
     service = s
+
+class ReconnectDataPortMsg is ChannelMsg
+  let worker_name: String
+
+  new val create(name: String) =>
+    worker_name = name
 
 class SpinUpLocalTopologyMsg is ChannelMsg
   let local_topology: LocalTopology val
@@ -238,6 +249,9 @@ class ReplayMsg is ChannelMsg
     for bytes in data_bytes.values() do
       buffer.append(bytes)
     end
+
+    // trim first 4 bytes that are for size of tcp header
+    buffer.trim_in_place(4)
 
     match ChannelMsgDecoder(consume buffer, auth)
     | let r: DataMsg val =>

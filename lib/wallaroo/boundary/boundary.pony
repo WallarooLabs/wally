@@ -124,6 +124,15 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
     @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
+  be reconnect()
+  =>
+    _connect_count = @pony_os_connect_tcp[U32](this,
+      _host.cstring(), _service.cstring(),
+      _from.cstring())
+    _notify_connecting()
+
+    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
+
   be application_initialized(initializer: LocalTopologyInitializer) =>
     try
       if _step_id == 0 then
@@ -314,6 +323,49 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
             _notify.connected(this)
             _on_connected()
+
+            ifdef not windows then
+              if _pending_writes() then
+                //sent all data; release backpressure
+                _release_backpressure()
+              end
+            end
+
+          else
+            // The connection failed, unsubscribe the event and close.
+            @pony_asio_event_unsubscribe(event)
+            @pony_os_socket_close[None](fd)
+            _notify_connecting()
+          end
+        elseif not _connected and _closed then
+          @printf[I32]("Reconnection asio event\n".cstring())
+          if @pony_os_connected[Bool](fd) then
+            // The connection was successful, make it ours.
+            _fd = fd
+            _event = event
+
+            // clear anything pending to be sent because on recovery we're going to
+            // have to replay from our queue when requested
+            _pending_writev.clear()
+            _pending.clear()
+            _pending_writev_total = 0
+
+            _connected = true
+            _writeable = true
+
+            _closed = false
+            _shutdown = false
+            _shutdown_peer = false
+
+            _notify.connected(this)
+
+            try
+              let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
+                _auth)
+              _writev(connect_msg)
+            else
+              @printf[I32]("error creating data connect message on reconnect\n".cstring())
+            end
 
             ifdef not windows then
               if _pending_writes() then
@@ -831,7 +883,15 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
       end
       match ChannelMsgDecoder(consume data, _auth)
       | let aw: AckWatermarkMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
+        end
         conn.receive_ack(aw.seq_id)
+      | let m: RequestReplayMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received RequestReplayMsg on Data Channel\n".cstring())
+        end
+        conn.replay_msgs()
       else
         @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring()
 )      end

@@ -118,6 +118,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       let msg = ChannelMsgDecoder(consume data, _auth)
       match msg
       | let m: IdentifyControlPortMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received IdentifyControlPortMsg on Control Channel\n".cstring())
+        end
         try
           (let host, _) = conn.remote_address().name()
           match _initializer
@@ -127,6 +130,9 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           _connections.create_control_connection(m.worker_name, host, m.service)
         end
       | let m: IdentifyDataPortMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received IdentifyDataPortMsg on Control Channel\n".cstring())
+        end
         try
           (let host, _) = conn.remote_address().name()
           match _initializer
@@ -135,10 +141,21 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           end
           _connections.create_data_connection(m.worker_name, host, m.service)
         end
+      | let m: ReconnectDataPortMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received ReconnectDataPortMsg on Control Channel\n".cstring())
+        end
+        _connections.reconnect_data_connection(m.worker_name)
       | let m: SpinUpLocalTopologyMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received SpinUpLocalTopologyMsg on Control Channel\n".cstring())
+        end
         _local_topology_initializer.update_topology(m.local_topology)
         _local_topology_initializer.initialize()
       | let m: TopologyReadyMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received TopologyReadyMsg on Control Channel\n".cstring())
+        end
         match _initializer
         | let i: WorkerInitializer =>
           ifdef debug then
@@ -149,14 +166,23 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           i.topology_ready(m.worker_name)
         end
       | let m: CreateConnectionsMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received CreateConnectionsMsg on Control Channel\n".cstring())
+        end
         _connections.create_connections(m.addresses,
           _local_topology_initializer)
       | let m: ConnectionsReadyMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received ConnectionsReadyMsg on Control Channel\n".cstring())
+        end
         match _initializer
         | let wi: WorkerInitializer =>
           wi.connections_ready(m.worker_name)
         end
       | let m: CreateDataReceivers val =>
+        ifdef "trace" then
+          @printf[I32]("Received CreateDataReceivers on Control Channel\n".cstring())
+        end
         _local_topology_initializer.create_data_receivers(m.workers)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")

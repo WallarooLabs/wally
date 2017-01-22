@@ -1,6 +1,8 @@
+use "buffered"
 use "collections"
-use "net"
 use "files"
+use "net"
+use "serialise"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo/boundary"
@@ -10,7 +12,6 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/tcp-source"
 use "wallaroo/topology"
-//use "wallaroo/fail"
 
 actor Connections
   let _app_name: String
@@ -26,11 +27,13 @@ actor Connections
   let _init_d_service: String
   let _listeners: Array[TCPListener] = Array[TCPListener]
   let _guid_gen: GuidGenerator = GuidGenerator
+  let _connection_addresses_file: String
 
   new create(app_name: String, worker_name: String, env: Env,
     auth: AmbientAuth, c_host: String, c_service: String, d_host: String,
     d_service: String, ph_host: String, ph_service: String,
-    metrics_conn: MetricsSink, is_initializer: Bool)
+    metrics_conn: MetricsSink, is_initializer: Bool,
+    connection_addresses_file: String)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -40,6 +43,7 @@ actor Connections
     _metrics_conn = metrics_conn
     _init_d_host = d_host
     _init_d_service = d_service
+    _connection_addresses_file = connection_addresses_file
 
     if not _is_initializer then
       create_control_connection("initializer", c_host, c_service)
@@ -130,7 +134,8 @@ actor Connections
       _env.err.print("There is no phone home connection to send on!")
     end
 
-  be update_boundaries(local_topology_initializer: LocalTopologyInitializer) =>
+  be update_boundaries(local_topology_initializer: LocalTopologyInitializer,
+    recovering: Bool = false) =>
     let out_bs: Map[String, OutgoingBoundary] trn =
       recover Map[String, OutgoingBoundary] end
 
@@ -139,16 +144,34 @@ actor Connections
     end
 
     local_topology_initializer.update_boundaries(consume out_bs)
+    local_topology_initializer.initialize(where recovering = recovering)
 
   be create_connections(
     addresses: Map[String, Map[String, (String, String)]] val,
     local_topology_initializer: LocalTopologyInitializer)
   =>
     try
+      ifdef "resilience" then
+        @printf[I32]("Saving connection addresses!\n".cstring())
+        try
+          let connection_addresses_file = FilePath(_auth, _connection_addresses_file)
+          let file = File(connection_addresses_file)
+          let wb = Writer
+          let serialised_connection_addresses: Array[U8] val =
+            Serialised(SerialiseAuth(_auth), addresses).output(
+              OutputSerialisedAuth(_auth))
+          wb.write(serialised_connection_addresses)
+          file.writev(recover val wb.done() end)
+        else
+          @printf[I32]("Error saving connection addresses!\n".cstring())
+        end
+      end
       let control_addrs = addresses("control")
       let data_addrs = addresses("data")
       for (target, address) in control_addrs.pairs() do
-        create_control_connection(target, address._1, address._2)
+        if target != _worker_name then
+          create_control_connection(target, address._1, address._2)
+        end
       end
 
       for (target, address) in data_addrs.pairs() do
@@ -169,6 +192,59 @@ actor Connections
       _env.out.print("Problem creating interconnections with other workers")
     end
 
+  be recover_connections(
+    local_topology_initializer: LocalTopologyInitializer)
+  =>
+    var addresses: Map[String, Map[String, (String, String)]] val =
+      recover val Map[String, Map[String, (String, String)]] end
+    try
+      ifdef "resilience" then
+        @printf[I32]("Recovering connection addresses!\n".cstring())
+        try
+          let connection_addresses_file = FilePath(_auth, _connection_addresses_file)
+          if connection_addresses_file.exists() then
+            //we are recovering an existing worker topology
+            let data = recover val
+              let file = File(connection_addresses_file)
+              file.read(file.size())
+            end
+            match Serialised.input(InputSerialisedAuth(_auth), data)(
+              DeserialiseAuth(_auth))
+            | let a: Map[String, Map[String, (String, String)]] val =>
+              addresses = a
+            else
+              @printf[I32]("error restoring connection addresses!".cstring())
+              Fail()
+            end
+          end
+        else
+          @printf[I32]("error restoring connection addresses!".cstring())
+          Fail()
+        end
+      else
+        Fail()
+      end
+      let control_addrs = addresses("control")
+      let data_addrs = addresses("data")
+      for (target, address) in control_addrs.pairs() do
+        if target != _worker_name then
+          create_control_connection(target, address._1, address._2)
+        end
+      end
+
+      for (target, address) in data_addrs.pairs() do
+        if target != _worker_name then
+          create_data_connection(target, address._1, address._2)
+        end
+      end
+
+      update_boundaries(local_topology_initializer where recovering = true)
+
+      _env.out.print(_worker_name + ": Interconnections with other workers created.")
+    else
+      _env.out.print("Problem creating interconnections with other workers")
+    end
+
   be create_control_connection(target_name: String, host: String,
     service: String)
   =>
@@ -177,6 +253,18 @@ actor Connections
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
     _control_conns(target_name) = control_conn
+
+  be reconnect_data_connection(target_name: String)
+  =>
+    if _data_conns.contains(target_name) then
+      try
+        let outgoing_boundary = _data_conns(target_name)
+        outgoing_boundary.reconnect()
+      end
+    else
+      @printf[I32]("Target: %s not found in data connection map!\n".cstring(), target_name.cstring())
+      Fail()
+    end
 
   be create_data_connection(target_name: String, host: String,
     service: String)
