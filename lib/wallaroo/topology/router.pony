@@ -300,7 +300,7 @@ class DataRouter
     end
 
   fun replay_route(r_msg: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
-    origin: Producer, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
+    origin: DataReceiver ref, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
     worker_ingress_ts: U64)
   =>
     try
@@ -309,6 +309,9 @@ class DataRouter
       //TODO: create and deliver envelope
       r_msg.replay_deliver(pipeline_time_spent, _data_routes(target_id),
         origin, seq_id, route_id, latest_ts, metrics_id, worker_ingress_ts)
+      ifdef "resilience" then
+        origin.bookkeeping(route_id, seq_id)
+      end
       false
     else
       ifdef debug then

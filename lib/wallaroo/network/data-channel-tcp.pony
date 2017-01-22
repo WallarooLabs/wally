@@ -40,9 +40,10 @@ class DataChannelListenNotifier is TCPListenNotify
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
+      _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
       ifdef "resilience" then
         if _recovery_file.exists() then
-          @printf[I32]("Recovery file exists for control channel\n".cstring())
+          @printf[I32]("Recovery file exists for data channel\n".cstring())
         end
         if not (_is_initializer or _recovery_file.exists()) then
           let message = ChannelMsgEncoder.identify_data_port(_name, _service,
@@ -55,7 +56,6 @@ class DataChannelListenNotifier is TCPListenNotify
         f.sync()
         f.dispose()
       else
-        _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
         if not _is_initializer then
           let message = ChannelMsgEncoder.identify_data_port(_name, _service,
             _auth)
@@ -63,7 +63,7 @@ class DataChannelListenNotifier is TCPListenNotify
         end
       end
     else
-      _env.out.print(_name + "control : couldn't get local address")
+      _env.out.print(_name + "data : couldn't get local address")
       listen.close()
     end
 
@@ -111,6 +111,9 @@ class DataChannelConnectNotifier is TCPConnectionNotify
       end
       match ChannelMsgDecoder(consume data, _auth)
       | let data_msg: DataMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received DataMsg on Data Channel\n".cstring())
+        end
         try
           _metrics_reporter.step_metric(data_msg.metric_name,
             "Before receive on data channel (network time)", data_msg.metrics_id,
@@ -124,14 +127,23 @@ class DataChannelConnectNotifier is TCPConnectionNotify
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
       | let dc: DataConnectMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received DataConnectMsg on Data Channel\n".cstring())
+        end
         try
           _receivers(dc.sender_name).data_connect(dc.sender_step_id, conn)
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
       | let aw: AckWatermarkMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
+        end
         _connections.ack_watermark_to_boundary(aw.sender_name, aw.seq_id)
       | let r: ReplayMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())
+        end
         try
           let data_msg = r.data_msg(_auth)
           _metrics_reporter.step_metric(data_msg.metric_name,
@@ -145,6 +157,9 @@ class DataChannelConnectNotifier is TCPConnectionNotify
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
       | let c: ReplayCompleteMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received ReplayCompleteMsg on Data Channel\n".cstring())
+        end
         try
           _receivers(c.sender_name()).upstream_replay_finished()
         else
@@ -152,8 +167,12 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         end
       | let m: SpinUpLocalTopologyMsg val =>
         _env.out.print("Received spin up local topology message!")
+      | let m: RequestReplayMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received RequestReplayMsg on Data Channel\n".cstring())
+        end
       | let m: UnknownChannelMsg val =>
-        _env.err.print("Unknown Wallaroo data message type.")
+        _env.err.print("Unknown Wallaroo data message type: UnknownChannelMsg.")
       else
         _env.err.print("Unknown Wallaroo data message type.")
       end

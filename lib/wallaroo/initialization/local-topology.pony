@@ -120,6 +120,8 @@ actor LocalTopologyInitializer
   let _data_channel_file: String
   let _worker_names_file: String
   var _topology_initialized: Bool = false
+  var _recovered_worker_names: Array[String] val = recover val Array[String] end
+  var _recovering: Bool = false
 
   // Lifecycle
   var _omni_router: (OmniRouter val | None) = None
@@ -205,6 +207,53 @@ actor LocalTopologyInitializer
       @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
 
+  be recover_and_initialize(ws: Array[String] val,
+    worker_initializer: (WorkerInitializer | None) = None)
+  =>
+    _recovering = true
+    _recovered_worker_names = ws
+    let drs: Map[String, DataReceiver] trn =
+      recover Map[String, DataReceiver] end
+
+    for w in ws.values() do
+      if w != _worker_name then
+        let data_receiver = DataReceiver(_auth, _worker_name, w, _connections,
+          _alfred)
+        drs(w) = data_receiver
+        _data_receivers(w) = data_receiver
+      end
+    end
+
+    let data_receivers: Map[String, DataReceiver] val = consume drs
+    try
+      let data_channel_filepath = FilePath(_auth, _data_channel_file)
+      if not _is_initializer then
+        let data_notifier: TCPListenNotify iso =
+          DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
+            _is_initializer, data_receivers,
+            MetricsReporter(_application.name(), _worker_name, _metrics_conn),
+            data_channel_filepath)
+
+        ifdef "resilience" then
+          _connections.make_and_register_recoverable_listener(
+            _auth, consume data_notifier, data_channel_filepath)
+        else
+          _connections.register_listener(TCPListener(_auth,
+            consume data_notifier))
+        end
+      else
+        match worker_initializer
+          | let wi: WorkerInitializer =>
+            _connections.create_initializer_data_channel(data_receivers, wi,
+            data_channel_filepath)
+        end
+      end
+    else
+      @printf[I32]("FAIL: cannot create data channel\n".cstring())
+    end
+
+    _connections.recover_connections(this)
+
   fun ref _save_worker_names(worker_names_filepath: FilePath,
     worker_names: Array[String] val)
   =>
@@ -217,10 +266,16 @@ actor LocalTopologyInitializer
       @printf[I32](("LocalTopology._save_worker_names: " + worker_name +
       "\n").cstring())
     end
+    if not _is_initializer then
+      file.print("initializer")
+      @printf[I32](("LocalTopology._save_worker_names: " + "initializer" +
+      "\n").cstring())
+    end
     file.sync()
     file.dispose()
 
-  be initialize(worker_initializer: (WorkerInitializer | None) = None) =>
+  be initialize(worker_initializer: (WorkerInitializer | None) = None,
+    recovering: Bool = false) =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("|^|^|^Initializing Local Topology^|^|^|\n\n".cstring())
     _worker_initializer = worker_initializer
@@ -906,7 +961,10 @@ actor LocalTopologyInitializer
               @printf[I32]("ChannelMsgEncoder failed\n".cstring())
               error
             end
-          _connections.send_control("initializer", topology_ready_msg)
+
+          if not recovering then
+            _connections.send_control("initializer", topology_ready_msg)
+          end
 
           let ready_msg = ExternalMsgEncoder.ready(_worker_name)
           _connections.send_phone_home(ready_msg)
@@ -935,6 +993,7 @@ actor LocalTopologyInitializer
 
       @printf[I32]("\n|^|^|^Finished Initializing Local Topology^|^|^|\n".cstring())
       @printf[I32]("---------------------------------------------------------\n".cstring())
+
     else
       _env.err.print("Error initializing local topology")
     end
@@ -992,6 +1051,23 @@ actor LocalTopologyInitializer
     _spin_up_source_listeners()
     for i in _initializables.values() do
       i.application_ready_to_work(this)
+    end
+
+    if _recovering then
+      @printf[I32]("tell upstream boundaries we're ready for reconnection\n".cstring())
+      // tell upstream boundaries we're ready for reconnection
+      for w in _recovered_worker_names.values() do
+        if w != _worker_name then
+          try
+            let message = ChannelMsgEncoder.reconnect_data_port(_worker_name,
+              _auth)
+            _connections.send_control(w, message)
+          else
+            @printf[I32]("Couldn't create/sent reconnect data port message\n".cstring())
+            Fail()
+          end
+        end
+      end
     end
 
   fun ref _spin_up_source_listeners() =>
