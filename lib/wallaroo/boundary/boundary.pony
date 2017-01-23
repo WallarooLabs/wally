@@ -71,6 +71,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _expect_read_buf: Reader = Reader
 
   // Connection, Acking and Replay
+  var _replaying: Bool = false
   let _auth: AmbientAuth
   let _worker_name: String
   var _step_id: U128 = 0
@@ -250,6 +251,8 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
   be replay_msgs() =>
+    @printf[I32](("Replaying messages to " + _host + ":" + _service + "\n"
+      ).cstring())
     for msg in _queue.values() do
       try
         _writev(ChannelMsgEncoder.replay(msg, _auth))
@@ -259,6 +262,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
     try
       _writev(ChannelMsgEncoder.replay_complete(_worker_name, _auth))
+
+      @printf[I32](("Done replaying messages to " + _host + ":" + _service +
+        "\n").cstring())
+      // set replaying to false and try to unmute
+      _replaying = false
+      _maybe_mute_or_unmute_upstreams()
     else
       Fail()
     end
@@ -352,6 +361,10 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
             _connected = true
             _writeable = true
+
+            // set replaying to true since we might need to replay to downstream
+            // refore resuming
+            _replaying = true
 
             _closed = false
             _shutdown = false
@@ -776,6 +789,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _connected and
       _writeable and
       not _closed and
+      not _replaying and
       not _backup_queue_is_overflowing()
 
   fun _backup_queue_is_overflowing(): Bool =>
