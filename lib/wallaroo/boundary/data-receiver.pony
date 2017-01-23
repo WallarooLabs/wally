@@ -37,6 +37,7 @@ actor DataReceiver is Producer
   let _resilience_routes: DataReceiverRoutes = DataReceiverRoutes
 
   // Timer to periodically request acks to prevent deadlock.
+  var _timer_init: _TimerInit = _UninitializedTimerInit
   let _timers: Timers = Timers
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
@@ -48,14 +49,17 @@ actor DataReceiver is Producer
     _connections = connections
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
-    ifdef "resilience" then
-      let t = Timer(_RequestAck(this), 0, 15_000_000)
-      _timers(consume t)
-    end
 
   be data_connect(sender_step_id: U128, conn: TCPConnection) =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
+
+  fun ref init_timer() =>
+    ifdef "resilience" then
+      let t = Timer(_RequestAck(this), 0, 15_000_000)
+      _timers(consume t)
+    end
+    _timer_init = _EmptyTimerInit
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
     _resilience_routes.receive_ack(route_id, seq_id)
@@ -140,6 +144,7 @@ actor DataReceiver is Producer
   be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    _timer_init(this)
     _estimated_boundary_queue_size = _estimated_boundary_queue_size + 1
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
@@ -237,6 +242,16 @@ actor DataReceiver is Producer
     | let conn: TCPConnection =>
       conn.unmute(c)
     end
+
+trait _TimerInit
+  fun apply(d: DataReceiver ref)
+
+class _UninitializedTimerInit is _TimerInit
+  fun apply(d: DataReceiver ref) =>
+    d.init_timer()
+
+class _EmptyTimerInit is _TimerInit
+  fun apply(d: DataReceiver ref) => None
 
 class _RequestAck is TimerNotify
   let _d: DataReceiver
