@@ -82,6 +82,15 @@ class HubMetricsMsg is HubProtocolMsg
       let pipeline_name_size = rb.u32_be().usize()
       pipeline_name = String.from_array(rb.block(pipeline_name_size))
       id = rb.u16_be()
+      match category
+        | "start-to-end" =>
+          name = pipeline_name + "@" + worker_name
+        | "node-ingress-egress" =>
+          name = pipeline_name + "*" + worker_name
+        | "computation" =>
+          name = pipeline_name + "@" + worker_name
+            + ": " + id.string() + " - " + name
+        end
       for i in Range[U64](0, 65) do
         let bin = rb.u64_be()
         histogram.push(bin)
