@@ -116,8 +116,10 @@ class WindowStateChange is StateChange[WindowState]
       out_writer.u64_be(v)
     end
     out_writer.u64_be(_window.ring.pos().u64())
+    Debug("SW: log entry written")
 
   fun ref read_log_entry(in_reader: Reader) ? =>
+    Debug("SW: reading log entry:")
     let idx' = in_reader.u64_be().usize()
     let a = recover Array[U64 val] end
     for x in Range[USize](0,4) do
@@ -128,6 +130,7 @@ class WindowStateChange is StateChange[WindowState]
     _window = WindowState
     _window.idx = idx'
     _window.ring.update(a', pos')
+    Debug("SW: log entry read")
 
 
 class WindowStateChangeBuilder is StateChangeBuilder[WindowState]
