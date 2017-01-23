@@ -312,19 +312,20 @@ actor Startup
         end
       end
 
-      // TODO: We are not recreating the control channel connection from upstream!
-      if is_multi_worker then
-        match worker_initializer
-        | let w: WorkerInitializer =>
-          w.start(application)
-        end
-      else
-        match application_initializer
-        | let ai: ApplicationInitializer =>
-          ai.update_application(application)
-          ai.initialize(None, 1, recover Array[String] end)
+      if not recovering then
+        if is_multi_worker then
+          match worker_initializer
+          | let w: WorkerInitializer =>
+            w.start(application)
+          end
         else
-          Fail()
+          match application_initializer
+          | let ai: ApplicationInitializer =>
+            ai.update_application(application)
+            ai.initialize(None, 1, recover Array[String] end)
+          else
+            Fail()
+          end
         end
       end
 
