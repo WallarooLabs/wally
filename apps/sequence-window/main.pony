@@ -178,7 +178,9 @@ primitive U64FramedHandler is FramedSourceHandler[U64 val]
 primitive WindowEncoder
   fun apply(s: String val, wb: Writer = Writer): Array[ByteSeq] val =>
     Debug("output: " + s)
-    wb.write(s)
+    try
+    wb.write(Bytes.length_encode(s)(0))
+    end
     wb.done()
 
 
