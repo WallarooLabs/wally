@@ -578,14 +578,20 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   fun ref replay_log_entry(msg_uid: U128, frac_ids: None, statechange_id: U64,
     payload: ByteSeq val, origin: Producer)
   =>
+    Debug("runner.pony: replay_log_entry")
     try
+      Debug("Runner.pony:reply_log_entry.1")
       let sc = _state_change_repository(statechange_id)
       _rb.append(payload as Array[U8] val)
+      Debug("Runner.pony:reply_log_entry.2")
       try
+        Debug("Runner.pony:reply_log_entry.3")
         sc.read_log_entry(_rb)
         sc.apply(_state)
+        Debug("Runner.pony:reply_log_entry.4")
       end
     else
+        Debug("Runner.pony:reply_log_entry.5")
       @printf[I32]("FATAL: could not look up state_change with id %d".cstring(), statechange_id)
     end
 
