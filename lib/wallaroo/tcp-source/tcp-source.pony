@@ -73,7 +73,6 @@ actor TCPSource is Producer
     _metrics_reporter = consume metrics_reporter
     _listen = listen
     _notify = consume notify
-    _notify.set_origin(this)
     _connect_count = 0
     _fd = fd
     ifdef linux then
@@ -170,6 +169,9 @@ actor TCPSource is Producer
 
   fun ref next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
+
+  fun ref current_sequence_id(): U64 =>
+    _seq_id
 
   //
   // TCP

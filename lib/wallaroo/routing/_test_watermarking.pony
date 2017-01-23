@@ -714,6 +714,9 @@ actor _TestProducer is Producer
   fun ref next_sequence_id(): U64 =>
     0
 
+  fun ref current_sequence_id(): U64 =>
+    0
+
   fun ref _x_resilience_routes(): Routes =>
     Routes
 

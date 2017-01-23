@@ -85,7 +85,7 @@ class TypedRoute[In: Any val] is Route
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
-    let o_seq_id = cfp.next_sequence_id()
+    let o_seq_id = cfp.current_sequence_id()
 
     let my_latest_ts = ifdef "detailed-metrics" then
         Time.nanos()

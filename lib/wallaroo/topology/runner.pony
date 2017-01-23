@@ -639,7 +639,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
           | let buffer_id: U128 =>
 
             _alfred.queue_log_entry(buffer_id, i_msg_uid, None,
-              sc.id(), i_seq_id, consume payload) //TODO: Alan check i_seq_id is correct
+              sc.id(), producer.current_sequence_id(), consume payload)
           else
             @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
           end

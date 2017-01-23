@@ -62,9 +62,3 @@ interface TCPSourceNotify
     Called when the connection is closed.
     """
     None
-
-  fun ref set_origin(origin: Producer) =>
-    """
-    Needed to be able to set what the origin is for incoming messages
-    """
-    None
