@@ -29,6 +29,7 @@ trait Backend
   fun ref start()
   fun ref write() ?
   fun ref encode_entry(entry: LogEntry)
+  fun has_replayed(): Bool
 
 class DummyBackend is Backend
   new create() => None
@@ -37,6 +38,7 @@ class DummyBackend is Backend
   fun ref start() => None
   fun ref write() => None
   fun ref encode_entry(entry: LogEntry) => None
+  fun has_replayed() : Bool => false
 
 class FileBackend is Backend
   //a record looks like this:
@@ -205,6 +207,14 @@ class FileBackend is Backend
      let payload: Array[ByteSeq] val)
     = consume entry
 
+    if is_watermark then
+      @printf[I32]("Writing Watermark: %s\n".cstring(),
+      seq_id.string().cstring())
+    else
+      @printf[I32]("Writing Message: %s\n".cstring(),
+      seq_id.string().cstring())
+    end
+
     _writer.bool(is_watermark)
     _writer.u128_be(origin_id)
     _writer.u64_be(seq_id)
@@ -243,6 +253,7 @@ class FileBackend is Backend
       error
     end
 
+  fun has_replayed() : Bool => _replay_on_start
 
 actor Alfred
     let _origins: Map[U128, (Resilient & Producer)] = _origins.create()
@@ -277,6 +288,18 @@ actor Alfred
 
     be start(initializer: LocalTopologyInitializer) =>
       _backend.start()
+      //force a 0 watermark at the beginning of the logfile
+      @printf[I32]("foo\n".cstring())
+      if not _backend.has_replayed() then
+        for o in _origins.keys() do
+          @printf[I32]("force 0 watermark: %s\n".cstring(),
+          o.string().cstring())
+          _backend.encode_entry((true, o, 0, None, 0, 0, recover Array[ByteSeq] end))
+          num_encoded = num_encoded + 1
+          _flush_waiting = _flush_waiting + 1
+          write_log()
+        end
+      end
       initializer.report_alfred_ready_to_work()
 
     be register_incoming_boundary(boundary: DataReceiver tag) =>
@@ -374,6 +397,9 @@ actor Alfred
       end
 
     be flush_buffer(origin_id: U128, low_watermark:U64) =>
+      _flush_buffer(origin_id, low_watermark)
+
+    fun ref _flush_buffer(origin_id: U128, low_watermark:U64) =>
       ifdef "trace" then
         @printf[I32](("flush_buffer for id: " +
           origin_id.string() + "\n\n").cstring())
