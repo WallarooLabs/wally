@@ -286,9 +286,11 @@ actor Startup
         end
       end
 
-      match worker_initializer
-      | let w: WorkerInitializer =>
-        w.start(application)
+      if not recovering then
+        match worker_initializer
+        | let w: WorkerInitializer =>
+          w.start(application)
+        end
       end
 
     else
