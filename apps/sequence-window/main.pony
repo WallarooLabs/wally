@@ -13,7 +13,7 @@ and the output is the encoded string of the array, in the format
 To run, use the following commands:
 1. Giles receiver:
 ```
-../../giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -w -l 127.0.0.1:5555
+../../giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555
 ```
 2. Initializer worker
 ```
@@ -25,7 +25,7 @@ To run, use the following commands:
 ```
 4. Sender
 ```
-giles/sender/sender -b 127.0.0.1:7000 -m 10000000 -s 300 -i 2_500_000 -u --ponythreads=1 -y -g 12
+../../giles/sender/sender -b 127.0.0.1:7000 -s 1 -i 1_000_000_000 -u --ponythreads=1 -y -g 12 -w -m 1000
 ```
 """
 
@@ -171,10 +171,8 @@ primitive U64FramedHandler is FramedSourceHandler[U64 val]
     Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
   fun decode(data: Array[U8] val): U64 ? =>
-    Debug("data: ")
-    Debug(data)
-    Bytes.to_u64(data(4), data(5), data(6), data(7), data(8), data(9), data(10),
-      data(11))
+    Bytes.to_u64(data(0), data(1), data(2), data(3),
+      data(4), data(5), data(6), data(7))
 
 
 primitive WindowEncoder
