@@ -1,3 +1,35 @@
+"""
+Sequence Window is an application designed to test recovery
+
+It holds the last 4 values observed in an ordered ring buffer, and on every
+incoming new value, it replaces the oldest value with the new value, and prints
+the last 4 values (including the current one.
+
+The ring buffer holding the last 4 values represents Stateful memory that should
+be recovered. The input is a binary encoded sequence of U64 integers,
+and the output is the encoded string of the array, in the format
+"[a, b, c, d]\n"
+
+To run, use the following commands:
+1. External sink:
+```
+nc -l 127.0.0.1 8000 > waka.out
+```
+2. Initializer worker
+```
+./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t
+```
+3. Second worker
+```
+./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker2
+```
+4. Sender
+```
+giles/sender/sender -b 127.0.0.1:6000 -m 10000000 -s 300 -i 2_500_000 -u --ponythreads=1 -y -g 12
+```
+"""
+
+
 use "buffered"
 use "collections"
 use "sendence/bytes"
