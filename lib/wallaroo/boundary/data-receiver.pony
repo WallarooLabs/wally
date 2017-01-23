@@ -167,7 +167,7 @@ actor DataReceiver is Producer
     end
 
   fun ref _request_ack() =>
-    _router.request_ack(this)
+    _router.request_ack(_resilience_routes.unacked_route_ids())
     _last_request = _ack_counter
 
   be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,

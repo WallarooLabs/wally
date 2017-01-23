@@ -38,5 +38,14 @@ class DataReceiverRoutes
       Fail()
     end
 
+  fun unacked_route_ids(): Array[RouteId] =>
+    let arr = Array[RouteId]
+    for (r_id, r) in _routes.pairs() do
+      if r.is_fully_acked() then
+        arr.push(r_id)
+      end
+    end
+    arr
+
   fun ref propose_new_watermark(): SeqId =>
     _ProposeWatermark(_filter_route, _routes)
