@@ -7,7 +7,6 @@ use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/routing"
 use "wallaroo/initialization"
-use "debug"
 
 //TODO: origin needs to get its own file
 trait tag Resilient
