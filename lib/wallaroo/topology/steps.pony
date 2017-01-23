@@ -182,6 +182,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    next_sequence_id()
     let my_latest_ts = ifdef "detailed-metrics" then
         Time.nanos()
       else
@@ -211,7 +212,7 @@ actor Step is (RunnableStep & Resilient & Producer &
         // TODO ideally we want filter to create the id
         // but there's problems initializing Routes with a ref
         // back to its container. Especially in Boundary etc
-        _resilience_routes.filter(this, next_sequence_id(),
+        _resilience_routes.filter(this, current_sequence_id(),
           i_origin, i_route_id, i_seq_id)
       end
       let end_ts = Time.nanos()
@@ -229,6 +230,9 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   fun ref next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
+
+  fun ref current_sequence_id(): U64 =>
+    _seq_id
 
   ///////////
   // RECOVERY
@@ -270,6 +274,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    next_sequence_id()
     if not _is_duplicate(i_origin, msg_uid, i_frac_ids, i_seq_id,
       i_route_id) then
       _deduplication_list.push((i_origin, msg_uid, i_frac_ids, i_seq_id,
@@ -282,7 +287,7 @@ actor Step is (RunnableStep & Resilient & Producer &
       if is_finished then
         //TODO: be more efficient (batching?)
         ifdef "resilience" then
-          _resilience_routes.filter(this, next_sequence_id(),
+          _resilience_routes.filter(this, current_sequence_id(),
             i_origin, i_route_id, i_seq_id)
         end
         let end_ts = Time.nanos()
@@ -305,7 +310,7 @@ actor Step is (RunnableStep & Resilient & Producer &
         // TODO ideally we want filter to create the id
         // but there's problems initializing Routes with a ref
         // back to its container. Especially in Boundary etc
-        _resilience_routes.filter(this, next_sequence_id(),
+        _resilience_routes.filter(this, current_sequence_id(),
           i_origin, i_route_id, i_seq_id)
       end
     end

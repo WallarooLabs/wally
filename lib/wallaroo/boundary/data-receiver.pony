@@ -237,6 +237,9 @@ actor DataReceiver is Producer
   fun ref next_sequence_id(): U64 =>
     0
 
+  fun ref current_sequence_id(): U64 =>
+    0
+
   be mute(c: CreditFlowConsumer) =>
     match _latest_conn
     | let conn: TCPConnection =>
