@@ -63,6 +63,9 @@ sudo make install
 ```
 cd ~/
 git clone https://github.com/Sendence/buffy.git
+```
+
+```
 cd buffy/lib/wallaroo/cpp-api/cpp/cppapi
 mkdir build
 cd build
@@ -75,6 +78,9 @@ sudo make install
 export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:PKG_CONFIG_PATH
 cd ~/
 git clone https://github.com/Sendence/arizona.git
+```
+
+```
 cd ~/arizona
 git checkout state-node-compute
 mkdir build
@@ -218,6 +224,10 @@ sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/b
 ```
 cd ~/buffy
 make build-giles-sender arch=amd64
+```
+
+```
+cd ~/buffy
 make build-giles-receiver arch=amd64
 ```
 
@@ -329,7 +339,7 @@ cd ~/buffy
 sudo cset proc -s user -e numactl -- -C 15,17 chrt -f 80 \
   ~/buffy/giles/sender/sender -b 127.0.0.1:7001 -m 10000000000 \
   -s 300 -i 2_500_000 \
-  -f ~/arizona/bin_cfggen/etc/test-source-60-minute.dat.full \
+  -f /apps/dev/arizona/data/azdata_1hr_noloop.dat.full \
   --ponythreads=1 -y -z --ponypinasio -w —ponynoblock
 ```
 

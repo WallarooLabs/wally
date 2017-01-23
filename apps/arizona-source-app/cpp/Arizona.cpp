@@ -1076,9 +1076,6 @@ const char *ArizonaStateComputation::name()
 
 ArizonaStateComputation::ArizonaStateComputation() : _nProcessed(0)
 {
-  _logger = wallaroo::Logger::getLogger();
-  if ( ncnt <= 1 )
-    _logger->info("{}", __PRETTY_FUNCTION__);
 }
 
 void *ArizonaStateComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
