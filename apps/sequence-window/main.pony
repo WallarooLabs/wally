@@ -57,6 +57,7 @@ actor Main
       let part_ar: Array[(U64, USize)] val = recover 
         let pa = Array[(U64, USize)]
         pa.push((0,0))
+        pa.push((1,1))
         consume pa
       end
       let partition = Partition[U64, U64](WindowPartitionFunction, part_ar)
@@ -79,7 +80,7 @@ actor Main
 primitive WindowPartitionFunction
   fun apply(u: U64 val): U64 =>
     // Always use the same partition
-    0
+    u % 2
 
 
 class val WindowStateBuilder
