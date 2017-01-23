@@ -24,7 +24,7 @@ primitive Bytes
   fun to_f32(a: U8, b: U8, c: U8, d: U8): F32 =>
     F32.from_bits(to_u32(a, b, c, d))
 
-  fun to_64(a: U8, b: U8, c: U8, d: U8, e: U8, f: U8, g: U8, h: U8): F64 =>
+  fun to_f64(a: U8, b: U8, c: U8, d: U8, e: U8, f: U8, g: U8, h: U8): F64 =>
     F64.from_bits(to_u64(a, b, c, d, e, f, g, h))
 
   fun from_u16(u16: U16, arr: Array[U8] iso = recover Array[U8](2) end): Array[U8] iso^ =>

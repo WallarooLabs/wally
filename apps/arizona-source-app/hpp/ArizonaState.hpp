@@ -74,12 +74,11 @@ class Order
 {
 private:
   Executions _executions;
-  string _order_id;
   Side _side;
   uint32_t _quantity;
   double _price;
 public:
-  Order(string& order_id_, Side side_, uint32_t quantity_, double price_);
+  Order(Side side_, uint32_t quantity_, double price_);
   bool operator==(Order& that);
   Proceeds base_proceeds();
   Proceeds proceeds();
