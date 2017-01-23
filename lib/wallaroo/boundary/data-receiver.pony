@@ -162,7 +162,9 @@ actor DataReceiver is Producer
     end
 
   be request_ack() =>
-    _request_ack()
+    if _last_id_acked < _last_id_seen then
+      _request_ack()
+    end
 
   fun ref _request_ack() =>
     _router.request_ack(this)
