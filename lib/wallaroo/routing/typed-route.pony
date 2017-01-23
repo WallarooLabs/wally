@@ -104,7 +104,7 @@ class TypedRoute[In: Any val] is Route
       Invariant(_route.credits_available() > 0)
     end
 
-    let o_seq_id = cfp.next_sequence_id()
+    let o_seq_id = cfp.current_sequence_id()
 
     let my_latest_ts = ifdef "detailed-metrics" then
         Time.nanos()
