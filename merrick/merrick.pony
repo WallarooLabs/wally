@@ -110,10 +110,6 @@ actor Main
               forward_addr(0),
               forward_addr(1))
             forwarding_actor = MsgForwarder(forward_conn)
-            // SignalHandler(ForwarderTermHandler(
-            //   forwarding_actor as MsgForwarder), Sig.term())
-            // SignalHandler(ForwarderTermHandler(
-            //   forwarding_actor as MsgForwarder), Sig.int())
           end
           let from_wallaroo_listener = TCPListener(tcp_listen_auth,
             FromWallarooListenerNotify(coordinator, store, env.err,
@@ -167,7 +163,6 @@ class FromWallarooNotify is TCPConnectionNotify
   let _forward: Bool
   let _forwarding_actor: (MsgForwarder | None)
   var _header: Bool = true
-  var _count: USize = 0
   var _closed: Bool = false
 
   new iso create(coordinator: Coordinator,
@@ -184,10 +179,7 @@ class FromWallarooNotify is TCPConnectionNotify
     n: USize): Bool
   =>
     if _header then
-      try _count = _count + 1
-        if (_count % 1000) == 0 then
-          @printf[I32]("%zu received\n".cstring(), _count)
-        end
+      try
 
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
         conn.expect(expect)
@@ -390,7 +382,6 @@ actor WithDagonCoordinator is Coordinator
 
 actor Store
   let _received_file: (File | None)
-  var _count: USize = 0
 
   new create(auth: AmbientAuth, output_file_path: String) =>
     _received_file =
