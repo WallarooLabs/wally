@@ -25,8 +25,22 @@ To run, use the following commands:
 ```
 4. Sender
 ```
-../../giles/sender/sender -b 127.0.0.1:7000 -s 1 -i 1_000_000_000 -u --ponythreads=1 -y -g 12 -w -m 1000
+../../giles/sender/sender -b 127.0.0.1:7000 -s 100 -i 50_000_000 --ponythreads=1 -y -g 12 -w -u -m 10000
 ```
+
+Then once giles sender is finished, terminate `sequence-window` with `Ctrl-C`.
+Note that the last output from the sequence-window application shows "[9997,
+9998, 9999, 10000]".
+Restart `sequence-window`, and wait for it to complete its recovery process.
+
+Send one more message with giles sender:
+```
+../../giles/sender/sender -b 127.0.0.1:7000 -s 100 -i 50_000_000 --ponythreads=1 -y -g -12 -w -u -m 1 -v 10000
+```
+
+The application's output should show the sequence "[9998, 9999, 10000, 10001]",
+indicating that the last state before termination was restored succesfully, and
+that the application resumed the sequence-window functionality correctly.
 """
 
 use "debug"
