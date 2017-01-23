@@ -112,7 +112,7 @@ class BoundaryRoute is Route
     i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
     metric_name: String, worker_ingress_ts: U64)
   =>
-    let o_seq_id = cfp.next_sequence_id()
+    let o_seq_id = cfp.current_sequence_id()
 
     _consumer.forward(delivery_msg,
       pipeline_time_spent,
