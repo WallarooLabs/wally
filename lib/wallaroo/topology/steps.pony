@@ -297,6 +297,17 @@ actor Step is (RunnableStep & Resilient & Producer &
           time_spent + pipeline_time_spent)
         _metrics_reporter.worker_metric(metric_name, time_spent)
       end
+    else
+      ifdef "resilience" then
+        ifdef "trace" then
+          @printf[I32]("Filtering a dupe in replay\n".cstring())
+        end
+        // TODO ideally we want filter to create the id
+        // but there's problems initializing Routes with a ref
+        // back to its container. Especially in Boundary etc
+        _resilience_routes.filter(this, next_sequence_id(),
+          i_origin, i_route_id, i_seq_id)
+      end
     end
 
   //////////////////////
