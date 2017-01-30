@@ -10,5 +10,4 @@ actor Main is TestList
     None
 
   fun tag tests(test: PonyTest) =>
-    TestCreditReceiving.make().tests(test)
     TestWatermarking.make().tests(test)

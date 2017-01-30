@@ -26,15 +26,10 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   `TCPSink` replaces the Pony standard library class `TCPConnection`
   within Wallaroo for outgoing connections to external systems. While
   `TCPConnection` offers a number of excellent features it doesn't
-  account for our needs around resilience and backpressure.
+  account for our needs around resilience.
 
   `TCPSink` incorporates basic send/recv functionality from `TCPConnection` as
-  well as supporting our CreditFlow backpressure system and working with
-  our upstream backup/message acknowledgement system.
-
-  ## Backpressure
-
-  ...
+  well working with our upstream backup/message acknowledgement system.
 
   ## Resilience and message tracking
 
@@ -56,13 +51,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
-  var _max_distributable_credits: ISize = 350_000
-  var _distributable_credits: ISize = _max_distributable_credits
-  let _permanent_max_credit_response: ISize = 1024
-  var _max_credit_response: ISize = _permanent_max_credit_response
-  var _minimum_credit_response: ISize = 250
-  var _waiting_producers: Array[Producer] = _waiting_producers.create()
-  var _backpressure_seq_id: U64 = 1
 
   // TCP
   var _notify: _TCPSinkNotify
@@ -176,13 +164,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   fun ref _next_tracking_id(i_origin: Producer, i_route_id: RouteId,
     i_seq_id: SeqId): (U64 | None)
   =>
-    // The order of these matter. If we're in both backpressure and resilience,
-    // we need to update the terminus route id.
     ifdef "resilience" then
       return _terminus_route.terminate(i_origin, i_route_id, i_seq_id)
-    end
-    ifdef "backpressure" then
-      return (_backpressure_seq_id = _backpressure_seq_id + 1)
     end
 
     None
@@ -218,7 +201,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     tracking_id: (SeqId | None))
   =>
     """
-    Handles book keeping related to resilience and backpressure. Called when
+    Handles book keeping related to resilience. Called when
     a collection of sends is completed. When backpressure hasn't been applied,
     this would be called for each send. When backpressure has been applied and
     there is pending work to send, this would be called once after we finish
@@ -230,9 +213,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
     ifdef "trace" then
       @printf[I32]("Sent %d msgs over sink\n".cstring(), number_finished)
-    end
-    ifdef "backpressure" then
-      recoup_credits(number_finished)
     end
 
     ifdef "resilience" then
@@ -253,11 +233,8 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     _upstreams.push(producer)
-    ifdef "backpressure" then
-      _calculate_max_credit_response()
-    end
 
-  be unregister_producer(producer: Producer, credits_returned: ISize) =>
+  be unregister_producer(producer: Producer) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
@@ -265,105 +242,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
-      ifdef "backpressure" then
-        recoup_credits(credits_returned)
-      end
     end
-    ifdef "backpressure" then
-      _calculate_max_credit_response()
-    end
-
-  fun ref _calculate_max_credit_response() =>
-    _max_credit_response = if _upstreams.size() > 0 then
-      let portion = _max_distributable_credits / _upstreams.size().isize()
-      portion.min(_permanent_max_credit_response)
-    else
-      _permanent_max_credit_response
-    end
-
-    if (_max_credit_response < _minimum_credit_response) then
-      Fail()
-    end
-
-  be credit_request(from: Producer) =>
-    """
-    Receive a credit request from a producer. For speed purposes, we assume
-    the producer is already registered with us.
-
-    Even if we have credits available in the "distributable pool", we can't
-    give them out if our outgoing socket is in a non-sendable state. The
-    following are non-sendable states:
-
-    - Not connected
-    - Closed
-    - Not currently writeable
-
-    By not giving out credits when we are "not currently writable", we can
-    implement backpressure without having to inform our upstream producers
-    to stop sending. They only send when they have credits. If they run out
-    and we are experiencing backpressure, they don't get any more.
-    """
-    ifdef debug then
-      Invariant(_upstreams.contains(from))
-    end
-
-    if _can_distribute_credits() and (_waiting_producers.size() == 0) then
-      _distribute_credits_to(from)
-    else
-      _waiting_producers.push(from)
-    end
-
-
-  fun ref _can_distribute_credits(): Bool =>
-    _can_send() and _above_minimum_response_level()
-
-  fun ref _maybe_distribute_credits() =>
-    while (_waiting_producers.size() > 0) and _can_distribute_credits() do
-      try
-        let producer = _waiting_producers.shift()
-        _distribute_credits_to(producer)
-      else
-        Fail()
-      end
-    end
-
-  fun ref _distribute_credits_to(producer: Producer) =>
-    ifdef debug then
-      Invariant(_can_distribute_credits())
-    end
-
-    let give_out =
-      _distributable_credits
-        .min(_max_credit_response)
-        .max(_minimum_credit_response)
-
-    ifdef debug then
-      Invariant(give_out >= _minimum_credit_response)
-    end
-
-    ifdef "credit_trace" then
-      @printf[I32]((
-        "Sink: Credits requested." +
-        " Giving %llu out of %llu\n"
-        ).cstring(),
-        give_out, _distributable_credits)
-    end
-
-    producer.receive_credits(give_out, this)
-    _distributable_credits = _distributable_credits - give_out
-
-  be return_credits(credits: ISize) =>
-    recoup_credits(credits)
-
-  fun ref recoup_credits(recoup: ISize) =>
-    _distributable_credits = _distributable_credits + recoup
-    ifdef debug then
-      Invariant(_distributable_credits <= _max_distributable_credits)
-    end
-    _maybe_distribute_credits()
-
-  fun _above_minimum_response_level(): Bool =>
-    _distributable_credits >= _minimum_credit_response
 
   //
   // TCP
@@ -456,7 +335,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       data_size = data_size + bytes.size()
     end
 
-    ifdef "backpressure" or "resilience" then
+    ifdef "resilience" then
       match tracking_id
       | let id: SeqId =>
         _pending_tracking.push((data_size, id))
@@ -475,7 +354,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     """
     _pending_writev.push(data.cpointer().usize()).push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
-    ifdef "backpressure" or "resilience" then
+    ifdef "resilience" then
       match tracking_id
         | let id: SeqId =>
           _pending_tracking.push((data.size(), id))
@@ -724,7 +603,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       number of tracked messages sent
       last tracking_id
     """
-    ifdef "backpressure" or "resilience" then
+    ifdef "resilience" then
       var num_sent: ISize = 0
       var tracked_sent: ISize = 0
       var final_pending_sent: (SeqId | None) = None
@@ -806,7 +685,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _release_backpressure() =>
     _notify.unthrottled(this)
-    _maybe_distribute_credits()
     _maybe_mute_or_unmute_upstreams()
 
   fun ref _maybe_mute_or_unmute_upstreams() =>

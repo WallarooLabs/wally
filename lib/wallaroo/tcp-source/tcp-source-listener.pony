@@ -94,16 +94,7 @@ actor TCPSourceListener
     _tcp_sinks = tcp_sinks
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.cstring(), service.cstring())
-    // TODO: Right now backpressure only works for one incoming
-    // data stream at a time. This prevents two connections to a single
-    // source, though it doesn't prevent more than one sources.
-    // This needs to be fixed.
-    _limit =
-      ifdef "backpressure" then
-        1
-      else
-        limit
-      end
+    _limit = limit
     _default_target = default_target
     _metrics_reporter = consume metrics_reporter
 

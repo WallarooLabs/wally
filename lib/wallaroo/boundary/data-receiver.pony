@@ -219,14 +219,6 @@ actor DataReceiver is Producer
   be dispose() =>
     _timers.dispose()
 
-  // TODO: From credit flow producer part of Producer
-  // Remove once traits/interfaces are cleaned up
-  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-    None
-
-  fun ref recoup_credits(credits: ISize) =>
-    None
-
   fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
     None
 
