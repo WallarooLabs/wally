@@ -18,6 +18,7 @@ readable.txt
 metrics-report.txt
 .drone.sec.yml
 test.t
+tags
 
 # partial compilation files
 *.o
