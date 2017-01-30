@@ -59,6 +59,8 @@ actor DataReceiver is Producer
       let t = Timer(_RequestAck(this), 0, 15_000_000)
       _timers(consume t)
     end
+    // We are finished initializing timer, so set it to _EmptyTimerInit
+    // so we don't create two timers.
     _timer_init = _EmptyTimerInit
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
