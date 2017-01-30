@@ -19,26 +19,22 @@ class BoundaryRoute is Route
   var _route: RouteLogic = _EmptyRouteLogic
 
   new create(step: Producer ref, consumer: OutgoingBoundary,
-    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref)
+    metrics_reporter: MetricsReporter ref)
   =>
     _step = step
     _consumer = consumer
     _metrics_reporter = metrics_reporter
-    _route = _RouteLogic(step, consumer, handler, "Boundary")
+    _route = _RouteLogic(step, consumer, "Boundary")
 
   fun ref application_created() =>
-    _route.register_with_callback()
     _consumer.register_producer(_step)
 
-  fun ref application_initialized(new_max_credits: ISize, step_type: String) =>
+  fun ref application_initialized(step_type: String) =>
     _step_type = step_type
-    _route.application_initialized(new_max_credits, step_type)
+    _route.application_initialized(step_type)
 
   fun id(): U64 =>
     _route_id
-
-  fun ref receive_credits(credits: ISize) =>
-    _route.receive_credits(credits)
 
   fun ref dispose() =>
     """
@@ -63,9 +59,6 @@ class BoundaryRoute is Route
     worker_ingress_ts: U64): Bool
   =>
     ifdef debug then
-      ifdef "backpressure" then
-        Invariant(_route.credits_available() > 0)
-      end
       match _step
       | let source: TCPSource ref =>
         Invariant(not source.is_muted())
@@ -75,36 +68,19 @@ class BoundaryRoute is Route
       @printf[I32]("Rcvd msg at BoundaryRoute (%s)\n".cstring(),
         _step_type.cstring())
     end
-    ifdef "backpressure" then
-      _send_message_on_route(delivery_msg,
-        pipeline_time_spent,
-        cfp,
-        i_origin,
-        msg_uid,
-        i_frac_ids,
-        i_seq_id,
-        _route_id,
-        latest_ts,
-        metrics_id,
-        metric_name,
-        worker_ingress_ts)
-
-      _route.try_request()
-    else
-      _send_message_on_route(delivery_msg,
-        pipeline_time_spent,
-        cfp,
-        i_origin,
-        msg_uid,
-        i_frac_ids,
-        i_seq_id,
-        _route_id,
-        latest_ts,
-        metrics_id,
-        metric_name,
-        worker_ingress_ts)
-      true
-    end
+    _send_message_on_route(delivery_msg,
+      pipeline_time_spent,
+      cfp,
+      i_origin,
+      msg_uid,
+      i_frac_ids,
+      i_seq_id,
+      _route_id,
+      latest_ts,
+      metrics_id,
+      metric_name,
+      worker_ingress_ts)
+    true
 
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val,
     pipeline_time_spent: U64,
@@ -127,10 +103,5 @@ class BoundaryRoute is Route
       cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id, i_seq_id)
     end
 
-    ifdef "backpressure" then
-      _route.use_credit()
-    end
-
   fun ref request_ack() =>
     _consumer.request_ack()
-

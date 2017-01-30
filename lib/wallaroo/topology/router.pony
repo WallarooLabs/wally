@@ -323,9 +323,9 @@ class DataRouter
       step.register_producer(producer)
     end
 
-  fun unregister_producer(producer: Producer, credits_returned: ISize) =>
+  fun unregister_producer(producer: Producer) =>
     for step in _data_routes.values() do
-      step.unregister_producer(producer, credits_returned)
+      step.unregister_producer(producer)
     end
 
   fun request_ack(producer: Producer) =>
