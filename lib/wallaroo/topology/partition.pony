@@ -1,7 +1,6 @@
 use "collections"
 use "files"
 use "net"
-use "sendence/guid"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/initialization"
@@ -102,7 +101,7 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
 trait StateSubpartition
   fun build(app_name: String, worker_name: String,
     metrics_conn: MetricsSink,
-    auth: AmbientAuth, connections: Connections, alfred: Alfred,
+    auth: AmbientAuth, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
     data_routes: Map[U128, CreditFlowConsumerStep tag],
@@ -129,15 +128,13 @@ class KeyedStateSubpartition[PIn: Any val,
 
   fun build(app_name: String, worker_name: String,
     metrics_conn: MetricsSink,
-    auth: AmbientAuth, connections: Connections, alfred: Alfred,
+    auth: AmbientAuth, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
     data_routes: Map[U128, CreditFlowConsumerStep tag],
     default_router: (Router val | None) = None):
     LocalPartitionRouter[PIn, Key] val
   =>
-    let guid_gen = GuidGenerator
-
     let routes: Map[Key, (Step | ProxyRouter val)] trn =
       recover Map[Key, (Step | ProxyRouter val)] end
 
@@ -153,7 +150,7 @@ class KeyedStateSubpartition[PIn: Any val,
         if pa.worker == worker_name then
           let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
           let next_state_step = Step(_runner_builder(where alfred = alfred),
-            consume reporter, guid_gen.u128(), _runner_builder.route_builder(),
+            consume reporter, id, _runner_builder.route_builder(),
               alfred)
 
           initializables.set(next_state_step)

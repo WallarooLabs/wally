@@ -37,6 +37,7 @@ actor DataReceiver is Producer
   let _resilience_routes: DataReceiverRoutes = DataReceiverRoutes
 
   // Timer to periodically request acks to prevent deadlock.
+  var _timer_init: _TimerInit = _UninitializedTimerInit
   let _timers: Timers = Timers
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
@@ -48,14 +49,19 @@ actor DataReceiver is Producer
     _connections = connections
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
-    ifdef "resilience" then
-      let t = Timer(_RequestAck(this), 0, 15_000_000)
-      _timers(consume t)
-    end
 
   be data_connect(sender_step_id: U128, conn: TCPConnection) =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
+
+  fun ref init_timer() =>
+    ifdef "resilience" then
+      let t = Timer(_RequestAck(this), 0, 15_000_000)
+      _timers(consume t)
+    end
+    // We are finished initializing timer, so set it to _EmptyTimerInit
+    // so we don't create two timers.
+    _timer_init = _EmptyTimerInit
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
     _resilience_routes.receive_ack(route_id, seq_id)
@@ -140,6 +146,7 @@ actor DataReceiver is Producer
   be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    _timer_init(this)
     _estimated_boundary_queue_size = _estimated_boundary_queue_size + 1
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
@@ -167,7 +174,7 @@ actor DataReceiver is Producer
     end
 
   fun ref _request_ack() =>
-    _router.request_ack(this)
+    _router.request_ack(_resilience_routes.unacked_route_ids())
     _last_request = _ack_counter
 
   be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
@@ -212,14 +219,6 @@ actor DataReceiver is Producer
   be dispose() =>
     _timers.dispose()
 
-  // TODO: From credit flow producer part of Producer
-  // Remove once traits/interfaces are cleaned up
-  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
-    None
-
-  fun ref recoup_credits(credits: ISize) =>
-    None
-
   fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
     None
 
@@ -237,6 +236,16 @@ actor DataReceiver is Producer
     | let conn: TCPConnection =>
       conn.unmute(c)
     end
+
+trait _TimerInit
+  fun apply(d: DataReceiver ref)
+
+class _UninitializedTimerInit is _TimerInit
+  fun apply(d: DataReceiver ref) =>
+    d.init_timer()
+
+class _EmptyTimerInit is _TimerInit
+  fun apply(d: DataReceiver ref) => None
 
 class _RequestAck is TimerNotify
   let _d: DataReceiver

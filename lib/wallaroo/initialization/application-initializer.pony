@@ -34,8 +34,8 @@ actor ApplicationInitializer
   be update_application(app: Application val) =>
     _application = app
 
-  be initialize(worker_initializer: WorkerInitializer, worker_count: USize,
-    worker_names: Array[String] val)
+  be initialize(worker_initializer: (WorkerInitializer | None),
+    worker_count: USize, worker_names: Array[String] val)
   =>
     match _application
     | let a: Application val =>
@@ -61,7 +61,7 @@ actor ApplicationInitializer
     end
 
   fun ref _automate_initialization(application: Application val,
-    worker_initializer: WorkerInitializer, worker_count: USize,
+    worker_initializer: (WorkerInitializer | None), worker_count: USize,
     worker_names: Array[String] val, alfred: Alfred tag)
   =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
@@ -800,13 +800,14 @@ actor ApplicationInitializer
       end
 
       // Distribute the LocalTopologies to the other (non-initializer) workers
-      match worker_initializer
-      | let wi: WorkerInitializer =>
-        wi.distribute_local_topologies(consume other_local_topologies)
-      else
-        @printf[I32]("Error distributing local topologies!\n".cstring())
+      if worker_count > 1 then
+        match worker_initializer
+        | let wi: WorkerInitializer =>
+          wi.distribute_local_topologies(consume other_local_topologies)
+        else
+          @printf[I32]("Error distributing local topologies!\n".cstring())
+        end
       end
-
       @printf[I32]("\n^^^^^^Finished Initializing Topologies for Workers^^^^^^^\n".cstring())
       @printf[I32]("---------------------------------------------------------\n".cstring())
     else
