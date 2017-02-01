@@ -15,6 +15,7 @@ actor Main
   new create(env: Env) =>
     var required_args_are_present = true
     var run_tests = env.args.size() == 1
+    var forward: Bool = false
 
     if run_tests then
       TestMain(env)
@@ -24,6 +25,7 @@ actor Main
       var n_arg: (String | None) = None
       var e_arg: (USize | None) = None
       var o_arg = "recevied-metrics.txt"
+      var f_addr_arg: (Array[String] | None) = None
 
       try
         var options = Options(env.args)
@@ -33,6 +35,8 @@ actor Main
           .add("name", "n", StringArgument)
           .add("listen", "l", StringArgument)
           .add("output-file", "o", StringArgument)
+          .add("forward", "f", None)
+          .add("forward-addr", "m", StringArgument)
 
         for option in options do
           match option
@@ -40,6 +44,8 @@ actor Main
           | ("phone-home", let arg: String) => p_arg = arg.split(":")
           | ("listen", let arg: String) => l_arg = arg.split(":")
           | ("output-file", let arg: String) => o_arg = arg
+          | ("forward", None) => forward = true
+          | ("forward-addr", let arg: String) => f_addr_arg = arg.split(":")
           | let err: ParseError =>
             err.report(env.err)
             required_args_are_present = false
@@ -73,6 +79,18 @@ actor Main
           end
         end
 
+        if forward isnt false then
+          if f_addr_arg is None then
+            env.err.print(
+              "'--forward-addr' must be used in conjucion with '--forward'")
+          else
+            if (f_addr_arg as Array[String]).size() != 2 then
+              env.err.print(
+                "'--forward-addr' arg should be in format: '127.0.0.1:8080")
+            end
+          end
+        end
+
         if required_args_are_present then
           let listener_addr = l_arg as Array[String]
 
@@ -82,9 +100,20 @@ actor Main
           SignalHandler(TermHandler(coordinator), Sig.term())
           SignalHandler(TermHandler(coordinator), Sig.int())
 
-          let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
-          let from_wallaroo_listener = TCPListener(tcp_auth,
-            FromWallarooListenerNotify(coordinator, store, env.err),
+          let tcp_listen_auth = TCPListenAuth(env.root as AmbientAuth)
+          let tcp_connect_auth = TCPConnectAuth(env.root as AmbientAuth)
+          var forwarding_actor: (MsgForwarder | None) = None
+          if forward then
+            let forward_addr = f_addr_arg as Array[String]
+            let forward_conn = TCPConnection(tcp_connect_auth,
+              ForwarderNotify(),
+              forward_addr(0),
+              forward_addr(1))
+            forwarding_actor = MsgForwarder(forward_conn)
+          end
+          let from_wallaroo_listener = TCPListener(tcp_listen_auth,
+            FromWallarooListenerNotify(coordinator, store, env.err,
+              forward, forwarding_actor),
             listener_addr(0),
             listener_addr(1))
         end
@@ -103,14 +132,19 @@ class FromWallarooListenerNotify is TCPListenNotify
   let _coordinator: Coordinator
   let _store: Store
   let _stderr: StdStream
+  let _forward: Bool
+  let _forwarding_actor: (MsgForwarder | None)
 
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream)
+    store: Store, stderr: StdStream,
+    forward: Bool, forwarding_actor: (MsgForwarder | None))
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
+    _forward = forward
+    _forwarding_actor = forwarding_actor
 
     fun ref not_listening(listen: TCPListener ref) =>
       _coordinator.from_wallaroo_listener(listen, Failed)
@@ -119,31 +153,33 @@ class FromWallarooListenerNotify is TCPListenNotify
       _coordinator.from_wallaroo_listener(listen, Ready)
 
     fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-      FromWallarooNotify(_coordinator, _store, _stderr)
+      FromWallarooNotify(_coordinator, _store, _stderr,
+        _forward, _forwarding_actor)
 
 class FromWallarooNotify is TCPConnectionNotify
   let _coordinator: Coordinator
   let _store: Store
   let _stderr: StdStream
+  let _forward: Bool
+  let _forwarding_actor: (MsgForwarder | None)
   var _header: Bool = true
-  var _count: USize = 0
   var _closed: Bool = false
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream)
+    store: Store, stderr: StdStream,
+    forward: Bool, forwarding_actor: (MsgForwarder | None))
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
+    _forward = forward
+    _forwarding_actor = forwarding_actor
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
   =>
     if _header then
-      try _count = _count + 1
-        if (_count % 1000) == 0 then
-          @printf[I32]("%zu received\n".cstring(), _count)
-        end
+      try
 
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
         conn.expect(expect)
@@ -152,7 +188,13 @@ class FromWallarooNotify is TCPConnectionNotify
         _stderr.print("Blew up reading header from Wallaroo")
       end
     else
-      _store.received(consume data)
+      var data_copy: Array[U8 val] val = consume data
+      if _forward then
+        try
+          (_forwarding_actor as MsgForwarder).forward_msg(data_copy)
+        end
+      end
+      _store.received(data_copy)
       conn.expect(4)
       _header = true
     end
@@ -340,7 +382,6 @@ actor WithDagonCoordinator is Coordinator
 
 actor Store
   let _received_file: (File | None)
-  var _count: USize = 0
 
   new create(auth: AmbientAuth, output_file_path: String) =>
     _received_file =
@@ -378,3 +419,44 @@ class TermHandler is SignalNotify
   fun ref apply(count: U32): Bool =>
     _coordinator.finished()
     true
+
+class ForwarderTermHandler is SignalNotify
+  let _forwarding_actor: MsgForwarder
+
+  new iso create(forwarding_actor: MsgForwarder) =>
+    _forwarding_actor = forwarding_actor
+
+  fun ref apply(count: U32): Bool =>
+    _forwarding_actor.finished()
+    true
+
+actor MsgForwarder
+  let _forwarding_conn: TCPConnection
+
+  new create(forwarding_conn: TCPConnection) =>
+    _forwarding_conn = forwarding_conn
+
+  be forward_msg(msg: Array[U8] val) =>
+    let len_encoded_msg = Bytes.length_encode(msg)
+    _forwarding_conn.writev(len_encoded_msg)
+
+  be finished() =>
+    _forwarding_conn.dispose()
+
+class ForwarderNotify is TCPConnectionNotify
+  let _name: String
+
+  new iso create(name: String = "Forwarder") =>
+    _name = name
+
+  fun ref connected(sock: TCPConnection ref) =>
+    @printf[None]("%s outgoing connected\n".cstring(),
+      _name.cstring())
+
+  fun ref throttled(sock: TCPConnection ref) =>
+    @printf[None]("%s outgoing throttled\n".cstring(),
+      _name.cstring())
+
+  fun ref unthrottled(sock: TCPConnection ref) =>
+    @printf[None]("%s outgoing no longer throttled\n".cstring(),
+      _name.cstring())

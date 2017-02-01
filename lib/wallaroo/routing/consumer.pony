@@ -1,8 +1,6 @@
 trait tag CreditFlowConsumer
   be register_producer(producer: Producer)
-  be unregister_producer(producer: Producer, credits_returned: ISize)
-  be credit_request(from: Producer)
-  be return_credits(credits: ISize)
+  be unregister_producer(producer: Producer)
 
 type CreditFlowProducerConsumer is (Producer & CreditFlowConsumer)
 

@@ -8,6 +8,8 @@
 *.bc
 *.ll
 *.pyc
+*.swp
+Session.vim
 fallor-readable.txt
 fixish-readable.txt
 sent.txt
@@ -16,6 +18,7 @@ readable.txt
 metrics-report.txt
 .drone.sec.yml
 test.t
+tags
 
 # partial compilation files
 *.o

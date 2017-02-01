@@ -1,9 +1,7 @@
 trait tag Producer
   // from CreditFlowProducer
-  be receive_credits(credits: ISize, from: CreditFlowConsumer)
   be mute(c: CreditFlowConsumer)
   be unmute(c: CreditFlowConsumer)
-  fun ref recoup_credits(credits: ISize)
   fun ref route_to(c: CreditFlowConsumer): (Route | None)
   fun ref next_sequence_id(): U64
   fun ref current_sequence_id(): U64
