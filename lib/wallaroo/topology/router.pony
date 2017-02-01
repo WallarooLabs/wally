@@ -252,10 +252,7 @@ class StepIdRouter is OmniRouter
 
 class DataRouter
   let _data_routes: Map[U128, CreditFlowConsumerStep tag] val
-  let _target_ids_to_route_ids: Map[U128, RouteId] =
-    _target_ids_to_route_ids.create()
-  let _route_ids_to_target_ids: Map[RouteId, U128] =
-    _route_ids_to_target_ids.create()
+  let _route_ids: Map[U128, RouteId] = _route_ids.create()
 
   new val create(data_routes: Map[U128, CreditFlowConsumerStep tag] val =
       recover Map[U128, CreditFlowConsumerStep tag] end)
@@ -264,10 +261,7 @@ class DataRouter
     var route_id: RouteId = 0
     for step_id in _data_routes.keys() do
       route_id = route_id + 1
-      _target_ids_to_route_ids(step_id) = route_id
-    end
-    for (t_id, r_id) in _target_ids_to_route_ids.pairs() do
-      _route_ids_to_target_ids(r_id) = t_id
+      _route_ids(step_id) = route_id
     end
 
   fun route(d_msg: DeliveryMsg val, pipeline_time_spent: U64,
@@ -284,7 +278,7 @@ class DataRouter
         @printf[I32]("DataRouter found Step\n".cstring())
       end
       try
-        let route_id = _target_ids_to_route_ids(target_id)
+        let route_id = _route_ids(target_id)
         d_msg.deliver(pipeline_time_spent, target, origin, seq_id, route_id,
           latest_ts, metrics_id, worker_ingress_ts)
         ifdef "resilience" then
@@ -311,7 +305,7 @@ class DataRouter
   =>
     try
       let target_id = r_msg.target_id()
-      let route_id = _target_ids_to_route_ids(target_id)
+      let route_id = _route_ids(target_id)
       //TODO: create and deliver envelope
       r_msg.replay_deliver(pipeline_time_spent, _data_routes(target_id),
         origin, seq_id, route_id, latest_ts, metrics_id, worker_ingress_ts)
@@ -332,24 +326,19 @@ class DataRouter
       step.register_producer(producer)
     end
 
-  fun unregister_producer(producer: Producer) =>
+  fun unregister_producer(producer: Producer, credits_returned: ISize) =>
     for step in _data_routes.values() do
-      step.unregister_producer(producer)
+      step.unregister_producer(producer, credits_returned)
     end
 
-  fun request_ack(r_ids: Array[RouteId]) =>
-    try
-      for r_id in r_ids.values() do
-        let t_id = _route_ids_to_target_ids(r_id)
-        _data_routes(t_id).request_ack()
-      end
-    else
-      Fail()
+  fun request_ack(producer: Producer) =>
+    for (target_id, r) in _data_routes.pairs() do
+      r.request_ack()
     end
 
   fun route_ids(): Array[RouteId] =>
     let ids: Array[RouteId] = ids.create()
-    for id in _target_ids_to_route_ids.values() do
+    for id in _route_ids.values() do
       ids.push(id)
     end
     ids

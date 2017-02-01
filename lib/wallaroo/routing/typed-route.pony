@@ -19,22 +19,26 @@ class TypedRoute[In: Any val] is Route
   var _route: RouteLogic = _EmptyRouteLogic
 
   new create(step: Producer ref, consumer: CreditFlowConsumerStep,
-    metrics_reporter: MetricsReporter ref)
+    handler: RouteCallbackHandler, metrics_reporter: MetricsReporter ref)
   =>
     _step = step
     _consumer = consumer
     _metrics_reporter = metrics_reporter
-    _route = _RouteLogic(step, consumer, "Typed")
+    _route = _RouteLogic(step, consumer, handler, "Typed")
 
   fun ref application_created() =>
+    _route.register_with_callback()
     _consumer.register_producer(_step)
 
-  fun ref application_initialized(step_type: String) =>
+  fun ref application_initialized(new_max_credits: ISize, step_type: String) =>
     _step_type = step_type
-    _route.application_initialized(step_type)
+    _route.application_initialized(new_max_credits, step_type)
 
   fun id(): U64 =>
     _route_id
+
+  fun ref receive_credits(credits: ISize) =>
+    _route.receive_credits(credits)
 
   fun ref dispose() =>
     """
@@ -59,12 +63,23 @@ class TypedRoute[In: Any val] is Route
         | let source: TCPSource ref =>
           Invariant(not source.is_muted())
         end
+        ifdef "backpressure" then
+          Invariant(_route.credits_available() > 0)
+        end
       end
 
-      _send_message_on_route(metric_name, pipeline_time_spent, input, cfp,
-        origin, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
-        metrics_id, worker_ingress_ts)
-      true
+      ifdef "backpressure" then
+        _send_message_on_route(metric_name, pipeline_time_spent, input, cfp,
+          origin,msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
+          metrics_id, worker_ingress_ts)
+
+        _route.try_request()
+      else
+        _send_message_on_route(metric_name, pipeline_time_spent, input, cfp,
+          origin, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
+          metrics_id, worker_ingress_ts)
+        true
+      end
     else
       Fail()
       true
@@ -85,7 +100,11 @@ class TypedRoute[In: Any val] is Route
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
-    let o_seq_id = cfp.next_sequence_id()
+    ifdef debug and "backpressure" then
+      Invariant(_route.credits_available() > 0)
+    end
+
+    let o_seq_id = cfp.current_sequence_id()
 
     let my_latest_ts = ifdef "detailed-metrics" then
         Time.nanos()
@@ -121,6 +140,10 @@ class TypedRoute[In: Any val] is Route
 
     ifdef "resilience" then
       cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id, i_seq_id)
+    end
+
+    ifdef "backpressure" then
+      _route.use_credit()
     end
 
   fun ref request_ack() =>

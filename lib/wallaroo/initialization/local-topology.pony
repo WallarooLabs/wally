@@ -64,7 +64,8 @@ class LocalTopology
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
     metrics_conn: MetricsSink, alfred: Alfred,
-    auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    connections: Connections, auth: AmbientAuth,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
     data_routes: Map[U128, CreditFlowConsumerStep tag],
     default_router: (Router val | None)) ?
@@ -80,7 +81,7 @@ class LocalTopology
     if not state_map.contains(state_name) then
       @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
       state_map(state_name) = subpartition.build(_app_name, _worker_name,
-         metrics_conn, auth, alfred, outgoing_boundaries,
+         metrics_conn, auth, connections, alfred, outgoing_boundaries,
          initializables, data_routes, default_router)
     end
 
@@ -106,7 +107,7 @@ actor LocalTopologyInitializer
   let _worker_count: USize
   let _env: Env
   let _auth: AmbientAuth
-  let _connections: (Connections | None)
+  let _connections: Connections
   let _metrics_conn: MetricsSink
   let _alfred : Alfred tag
   var _is_initializer: Bool
@@ -136,7 +137,7 @@ actor LocalTopologyInitializer
     recover iso Array[TCPSourceListenerBuilder val] end
 
   new create(app: Application val, worker_name: String, worker_count: USize,
-    env: Env, auth: AmbientAuth, connections: (Connections | None),
+    env: Env, auth: AmbientAuth, connections: Connections,
     metrics_conn: MetricsSink, is_initializer: Bool, alfred: Alfred tag,
     input_addrs: Array[Array[String]] val, local_topology_file: String,
     data_channel_file: String, worker_names_file: String)
@@ -166,51 +167,44 @@ actor LocalTopologyInitializer
 
   be create_data_receivers(ws: Array[String] val,
     worker_initializer: (WorkerInitializer | None) = None) =>
-    if _worker_count == 1 then Fail() end
+    let drs: Map[String, DataReceiver] trn =
+      recover Map[String, DataReceiver] end
 
-    match _connections
-    | let conns: Connections =>
-      let drs: Map[String, DataReceiver] trn =
-        recover Map[String, DataReceiver] end
-
-      for w in ws.values() do
-        if w != _worker_name then
-          let data_receiver = DataReceiver(_auth, _worker_name, w, conns,
-            _alfred)
-          drs(w) = data_receiver
-          _data_receivers(w) = data_receiver
-        end
+    for w in ws.values() do
+      if w != _worker_name then
+        let data_receiver = DataReceiver(_auth, _worker_name, w, _connections,
+          _alfred)
+        drs(w) = data_receiver
+        _data_receivers(w) = data_receiver
       end
+    end
 
-      let data_receivers: Map[String, DataReceiver] val = consume drs
-      try
-        let data_channel_filepath = FilePath(_auth, _data_channel_file)
-        if not _is_initializer then
-          let data_notifier: TCPListenNotify iso =
-            DataChannelListenNotifier(_worker_name, _env, _auth, conns,
-              _is_initializer, data_receivers,
-              MetricsReporter(_application.name(), _worker_name, _metrics_conn),
-              data_channel_filepath)
+    let data_receivers: Map[String, DataReceiver] val = consume drs
+    try
+      let data_channel_filepath = FilePath(_auth, _data_channel_file)
+      if not _is_initializer then
+        let data_notifier: TCPListenNotify iso =
+          DataChannelListenNotifier(_worker_name, _env, _auth, _connections,
+            _is_initializer, data_receivers,
+            MetricsReporter(_application.name(), _worker_name, _metrics_conn),
+            data_channel_filepath)
 
-          ifdef "resilience" then
-            conns.make_and_register_recoverable_listener(
-              _auth, consume data_notifier, data_channel_filepath)
-          else
-            conns.register_listener(TCPListener(_auth,
-              consume data_notifier))
-          end
+        ifdef "resilience" then
+          _connections.make_and_register_recoverable_listener(
+            _auth, consume data_notifier, data_channel_filepath)
         else
-          match worker_initializer
-            | let wi: WorkerInitializer =>
-              conns.create_initializer_data_channel(data_receivers, wi,
-              data_channel_filepath)
-          end
+          _connections.register_listener(TCPListener(_auth,
+            consume data_notifier))
         end
       else
-        @printf[I32]("FAIL: cannot create data channel\n".cstring())
+        match worker_initializer
+          | let wi: WorkerInitializer =>
+            _connections.create_initializer_data_channel(data_receivers, wi,
+            data_channel_filepath)
+        end
       end
     else
-      Fail()
+      @printf[I32]("FAIL: cannot create data channel\n".cstring())
     end
 
   be recover_and_initialize(ws: Array[String] val,
@@ -364,14 +358,7 @@ actor LocalTopologyInitializer
         let tcp_sinks_trn: Array[TCPSink] trn = recover Array[TCPSink] end
 
         // Update the step ids for all OutgoingBoundaries
-        if _worker_count > 1 then
-          match _connections
-          | let conns: Connections =>
-            conns.update_boundary_ids(t.proxy_ids())
-          else
-            Fail()
-          end
-        end
+        _connections.update_boundary_ids(t.proxy_ids())
 
         // Keep track of routers to the steps we've built
         let built_routers = Map[U128, Router val]
@@ -550,7 +537,7 @@ actor LocalTopologyInitializer
                 // Create the state partition if it doesn't exist
                 if builder.state_name() != "" then
                   t.update_state_map(builder.state_name(), state_map,
-                    _metrics_conn, _alfred, _auth,
+                    _metrics_conn, _alfred, _connections, _auth,
                     _outgoing_boundaries, _initializables,
                     data_routes_ref, default_router)
                 end
@@ -793,7 +780,7 @@ actor LocalTopologyInitializer
               // Create the state partition if it doesn't exist
               if source_data.state_name() != "" then
                 t.update_state_map(source_data.state_name(), state_map,
-                  _metrics_conn, _alfred, _auth,
+                  _metrics_conn, _alfred, _connections, _auth,
                   _outgoing_boundaries, _initializables,
                   data_routes_ref, default_router)
               end
@@ -928,7 +915,7 @@ actor LocalTopologyInitializer
             else
               if psd.state_name() != "" then
                 t.update_state_map(psd.state_name(), state_map,
-                  _metrics_conn, _alfred, _auth,
+                  _metrics_conn, _alfred, _connections, _auth,
                   _outgoing_boundaries, _initializables,
                   data_routes_ref, None)
               end
@@ -974,13 +961,13 @@ actor LocalTopologyInitializer
               @printf[I32]("ChannelMsgEncoder failed\n".cstring())
               error
             end
-          match _connections
-          | let conns: Connections =>
-            conns.send_control("initializer", topology_ready_msg)
 
-            let ready_msg = ExternalMsgEncoder.ready(_worker_name)
-            conns.send_phone_home(ready_msg)
+          if not recovering then
+            _connections.send_control("initializer", topology_ready_msg)
           end
+
+          let ready_msg = ExternalMsgEncoder.ready(_worker_name)
+          _connections.send_phone_home(ready_msg)
         end
 
         let omni_router = StepIdRouter(_worker_name,

@@ -209,9 +209,6 @@ class ToBuffyNotify is TCPConnectionNotify
     _coordinator.to_buffy_socket(sock, Failed)
 
   fun ref connected(sock: TCPConnection ref) =>
-    if sock.local_address() != sock.remote_address() then
-      sock.set_nodelay(true)
-    end
     _coordinator.to_buffy_socket(sock, Ready)
 
   fun ref throttled(sock: TCPConnection ref) =>
@@ -233,9 +230,6 @@ class ToDagonNotify is TCPConnectionNotify
     _coordinator.to_dagon_socket(sock, Failed)
 
   fun ref connected(sock: TCPConnection ref) =>
-    if sock.local_address() != sock.remote_address() then
-      sock.set_nodelay(true)
-    end
     _coordinator.to_dagon_socket(sock, Ready)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
