@@ -13,19 +13,25 @@ and the output is the encoded string of the array, in the format
 To run, use the following commands:
 1. Giles receiver:
 ```
-../../giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555
+../../giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -l
+127.0.0.1:5555
 ```
 2. Initializer worker
 ```
-./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t
+./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001
+--ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d
+127.0.0.1:12501 -r res-data -w 2 -n worker1 -t
 ```
 3. Second worker
 ```
-./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker2
+./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001
+--ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d
+127.0.0.1:12501 -r res-data -w 2 -n worker2
 ```
 4. Sender
 ```
-../../giles/sender/sender -b 127.0.0.1:7000 -s 100 -i 50_000_000 --ponythreads=1 -y -g 12 -w -u -m 10000
+../../giles/sender/sender -b 127.0.0.1:7000 -s 100 -i 50_000_000 --ponythreads=1
+-y -g 12 -w -u -m 10000
 ```
 
 Then once giles sender is finished, terminate `sequence-window` with `Ctrl-C`.
@@ -35,10 +41,12 @@ Restart `sequence-window`, and wait for it to complete its recovery process.
 
 Send one more message with giles sender:
 ```
-../../giles/sender/sender -b 127.0.0.1:7000 -s 100 -i 50_000_000 --ponythreads=1 -y -g -12 -w -u -m 1 -v 10000
+../../giles/sender/sender -b 127.0.0.1:7000 -s 100 -i 50_000_000 --ponythreads=1
+-y -g -12 -w -u -m 2 -v 10000
 ```
 
-The application's output should show the sequence "[9998, 9999, 10000, 10001]",
+The application's output should show the sequence "[9995, 9997, 9999, 10001]"
+and "[9996, 9998, 10000, 10002]" on the two workers respectively,
 indicating that the last state before termination was restored succesfully, and
 that the application resumed the sequence-window functionality correctly.
 """
