@@ -13,6 +13,25 @@ sudo: required
 matrix:
   include:
     - os: osx
+      env:
+        - LLVM_VERSION="3.9.1"
+        - LLVM_CONFIG="llvm-config-3.9"
+        - CC1=clang-3.9
+        - CXX1=clang++-3.9
+        - lto=no
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-5
+      env:
+        - LLVM_VERSION="3.9.1"
+        - LLVM_CONFIG="llvm-config-3.9"
+        - CC1=gcc-5
+        - CXX1=g++-5
+        - lto=no
 
 install:
   # Based on how travis-ci works, when this is run, we are in the source
@@ -29,19 +48,38 @@ install:
     then
       brew update;
       brew install gmp; brew link --overwrite gmp;
-      brew install llvm; brew link --overwrite --force llvm;
       brew install pcre2 libressl;
+      brew install llvm; brew link --overwrite --force llvm;
+      mkdir /tmp/llvmsym;
+      ln -s `which llvm-config` /tmp/llvmsym/llvm-config-3.9;
+      ln -s `which clang++` /tmp/llvmsym/clang++-3.9;
+      export PATH=/tmp/llvmsym:$PATH;
     fi;
-  - echo "Installing sendence/ponyc"
+  - if [ "${TRAVIS_OS_NAME}" = "linux" ];
+    then
+      mkdir /tmp/dl;
+      cd /tmp/dl;
+      wget "http://llvm.org/releases/${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-debian8.tar.xz";
+      tar -xvf clang+llvm*;
+      cd clang+llvm* && sudo mkdir /tmp/llvm && sudo cp -r * /tmp/llvm/;
+      sudo ln -s /tmp/llvm/bin/llvm-config /usr/local/bin/${LLVM_CONFIG};
+      export PATH=/tmp/llvm/bin:$PATH;
+      cd /tmp/dl;
+      wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2;
+      tar -xjvf pcre2-10.21.tar.bz2;
+      cd pcre2-10.21 && ./configure --prefix=/usr && make && sudo make install;
+    fi;
+  - echo "Installing sendence/ponyc";
     cd /tmp;
     git clone git@github.com:Sendence/ponyc.git;
     cd ponyc;
-    sudo make config=release lto=no install
+    make CC=$CC1 CXX=$CXX1;
+    sudo make install;
   - echo "Installing pony-stable";
     cd /tmp;
     git clone https://github.com/jemc/pony-stable.git;
     cd pony-stable;
-    sudo make install
+    sudo make install;
   - cd $INSTALL_STARTED_AT
 
 script:
