@@ -3,6 +3,9 @@ language: c
 rvm:
   - 2.2.3
 
+notifications:
+  email: false
+
 branches:
   only:
     - master
