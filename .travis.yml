@@ -1,0 +1,50 @@
+language: c
+
+rvm:
+  - 2.2.3
+
+branches:
+  only:
+    - master
+
+dist: trusty
+sudo: required
+
+matrix:
+  include:
+    - os: osx
+
+install:
+  # Based on how travis-ci works, when this is run, we are in the source
+  # directory for Buffy. This means, when we go to git clone and install
+  # dependencies, we need to leave that directory and then return to it when
+  # done.
+  # If we clone into the Buffy directory, our recursive Makefile will try to
+  # build the cloned dependencies and fail
+  # If we clone our dependencies into another directory using `cd` and don't
+  # return to our starting directory, then our `script` step will fail because
+  # its in the wrong directory.
+  - export INSTALL_STARTED_AT=`pwd`
+  - if [ "${TRAVIS_OS_NAME}" = "osx" ];
+    then
+      brew update;
+      brew install gmp; brew link --overwrite gmp;
+      brew install llvm; brew link --overwrite --force llvm;
+      brew install pcre2 libressl;
+    fi;
+  - echo "Installing sendence/ponyc"
+    cd /tmp;
+    git clone git@github.com:Sendence/ponyc.git;
+    cd ponyc;
+    sudo make config=release lto=no install
+  - echo "Installing pony-stable";
+    cd /tmp;
+    git clone https://github.com/jemc/pony-stable.git;
+    cd pony-stable;
+    sudo make install
+  - cd $INSTALL_STARTED_AT
+
+script:
+  - cd lib/wallaroo;
+    stable env ponyc;
+    ./wallaroo
