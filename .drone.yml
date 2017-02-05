@@ -201,7 +201,7 @@ build:
 notify:
   slack:
     webhook_url: $$SLACK_WEBHOOK
-    channel: b-drone-ci
+    channel: b-ci-status
     username: drone-ci
     template: >
       build `#{{ build.number }}` for {{repo.clone_url}} for commit
