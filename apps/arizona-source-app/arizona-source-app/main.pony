@@ -67,9 +67,6 @@ primitive StateFilter[In: Any val] is StateComputation[In, None, String]
     sc_repo: StateChangeRepository[String],
     state: String): (None, (StateChange[String] ref | None))
   =>
-    match msg
-    | let m: CPPData val => m.delete_obj()
-    end
     (None, None)
 
   fun state_change_builders(): Array[StateChangeBuilder[String] val] val =>
