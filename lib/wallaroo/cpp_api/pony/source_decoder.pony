@@ -40,7 +40,9 @@ class CPPSourceDecoder is FramedSourceHandler[CPPData val]
     @w_serializable_serialize(_source_decoder, bytes, USize(0))
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _source_decoder = recover @w_user_serializable_deserialize(bytes, USize(0)) end
+    _source_decoder = recover
+      @w_user_serializable_deserialize(bytes, USize(0))
+    end
 
   fun _final() =>
     @w_managed_object_delete(_source_decoder)

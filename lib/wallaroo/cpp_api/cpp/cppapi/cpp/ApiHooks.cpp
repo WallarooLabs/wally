@@ -1,26 +1,3 @@
-/*************************************************************************
- * 
- * SENDENCE LLC CONFIDENTIAL
- * __________________
- * 
- *  [2016] Sendence LLC
- *  All Rights Reserved.
- *  Copyright (c) 2016 Sendence LLC All rights reserved.
- * 
- * NOTICE:  All information contained herein is, and remains
- * the property of Sendence LLC and its suppliers,
- * if any.  The intellectual and technical concepts contained
- * herein are proprietary to Sendence LLC and its suppliers 
- * and may be covered by U.S. and Foreign Patents, patents in 
- * process, and are protected by trade secret or copyright law.
- * Dissemination of this information or reproduction of this material
- * is strictly forbidden unless prior written permission is obtained
- * from Sendence LLC.
- *
- * Copyright (c) 2016 Sendence LLC All rights reserved.
- */
-
-
 #include "ApiHooks.hpp"
 #include "Computation.hpp"
 #include "Data.hpp"
@@ -35,179 +12,192 @@
 #include "StateChangeRepository.hpp"
 #include "StateChangeBuilder.hpp"
 
+using namespace wallaroo;
+
 extern "C"
 {
 // These functions are generated when building the Wallaroo application.
-void* pony_CPPStateChangeRepositoryHelper_lookup_by_name(void* self, void* sc_repo, const char* name_p);
-void* pony_CPPStateChangeRepositoryHelper_get_state_change_object(void *state_change_repository_helper_, void* state_change_);
-void* pony_CPPStateChangeRepositoryHelper_get_stateful_computation_return(void *state_change_repository_helper_, void* data_, void* state_change_);
+  void* pony_CPPStateChangeRepositoryHelper_lookup_by_name(void* self,
+    void* sc_repo, const char* name_p);
+  void* pony_CPPStateChangeRepositoryHelper_get_state_change_object(
+  void *state_change_repository_helper_, void* state_change_);
+  void* pony_CPPStateChangeRepositoryHelper_get_stateful_computation_return(
+    void *state_change_repository_helper_, void* data_, void* state_change_);
 
-//------------------------------------------------------------------------
-//
-extern wallaroo::Data *w_computation_compute(wallaroo::Computation *computation_, wallaroo::Data *data_)
+extern Data *w_computation_compute(Computation *computation_, Data *data_)
 {
   return computation_->compute(data_);
 }
 
-extern const char *w_computation_get_name(wallaroo::Computation *computation_)
+extern const char *w_computation_get_name(Computation *computation_)
 {
   return computation_->name();
 }
 
-extern void *w_state_computation_compute(wallaroo::StateComputation *state_computation_,
-                                         wallaroo::Data *data_,
-                                         wallaroo::StateChangeRepository *state_change_repo_,
-                                         void *state_change_repository_helper_,
-                                         wallaroo::State *state_,
-                                         void *none_)
+extern void *w_state_computation_compute(StateComputation *state_computation_,
+  Data *data_, StateChangeRepository *state_change_repo_,
+  void *state_change_repository_helper_, State *state_, void *none_)
 {
-  return state_computation_->compute(data_, state_change_repo_, state_change_repository_helper_, state_, none_);
+  return state_computation_->compute(data_, state_change_repo_,
+    state_change_repository_helper_, state_, none_);
 }
 
-extern const char *w_state_computation_get_name(wallaroo::StateComputation *state_computation_)
+extern const char *w_state_computation_get_name(
+  StateComputation *state_computation_)
 {
   return state_computation_->name();
 }
 
-extern size_t w_state_computation_get_number_of_state_change_builders(wallaroo::StateComputation *state_computation_)
+extern size_t w_state_computation_get_number_of_state_change_builders(
+  StateComputation *state_computation_)
 {
   return state_computation_->get_number_of_state_change_builders();
 }
 
-extern wallaroo::StateChangeBuilder *w_state_computation_get_state_change_builder(wallaroo::StateComputation *state_computation_, uint64_t idx_)
+extern StateChangeBuilder *w_state_computation_get_state_change_builder(
+  StateComputation *state_computation_, uint64_t idx_)
 {
   return state_computation_->get_state_change_builder(idx_);
 }
 
-extern size_t w_serializable_serialize_get_size(wallaroo::Serializable* serializable_)
+extern size_t w_serializable_serialize_get_size(Serializable* serializable_)
 {
   return serializable_->serialize_get_size();
 }
 
-extern void w_serializable_serialize(wallaroo::Serializable* serializable_, char* bytes_, size_t sz_)
+extern void w_serializable_serialize(Serializable* serializable_, char* bytes_,
+  size_t sz_)
 {
   serializable_->serialize(bytes_, sz_);
 }
 
-extern size_t w_sink_encoder_get_size(wallaroo::SinkEncoder *sink_encoder,
-  wallaroo::EncodableData *data_)
+extern size_t w_sink_encoder_get_size(SinkEncoder *sink_encoder_,
+  EncodableData *data_)
 {
-  return sink_encoder->get_size(data_);
+  return sink_encoder_->get_size(data_);
 }
 
-extern void w_sink_encoder_encode(wallaroo::SinkEncoder *sink_encoder,
-  wallaroo::EncodableData *data_, char *bytes)
+extern void w_sink_encoder_encode(SinkEncoder *sink_encoder_,
+  EncodableData *data_, char *bytes_)
 {
-  sink_encoder->encode(data_, bytes);
+  sink_encoder_->encode(data_, bytes_);
 }
 
-extern size_t w_source_decoder_header_length(wallaroo::SourceDecoder *source_decoder)
+extern size_t w_source_decoder_header_length(SourceDecoder *source_decoder_)
 {
-  return source_decoder->header_length();
+  return source_decoder_->header_length();
 }
 
-extern size_t w_source_decoder_payload_length(wallaroo::SourceDecoder *source_decoder, char *bytes)
+extern size_t w_source_decoder_payload_length(SourceDecoder *source_decoder_,
+  char *bytes_)
 {
-  return source_decoder->payload_length(bytes);
+  return source_decoder_->payload_length(bytes_);
 }
 
-extern wallaroo::Data *w_source_decoder_decode(wallaroo::SourceDecoder *source_decoder,
-  char *bytes, size_t sz_)
+extern Data *w_source_decoder_decode(SourceDecoder *source_decoder_,
+  char *bytes_, size_t sz_)
 {
-  return source_decoder->decode(bytes, sz_);
+  return source_decoder_->decode(bytes_, sz_);
 }
 
-extern const char *w_state_change_get_name(wallaroo::StateChange *state_change_)
+extern const char *w_state_change_get_name(StateChange *state_change_)
 {
   return state_change_->name();
 }
 
-extern uint64_t w_state_change_get_id(wallaroo::StateChange *state_change_)
+extern uint64_t w_state_change_get_id(StateChange *state_change_)
 {
   return state_change_->id();
 }
 
-extern void w_state_change_apply(wallaroo::StateChange *state_change_, wallaroo::State *state_)
+extern void w_state_change_apply(StateChange *state_change_, State *state_)
 {
   return state_change_->apply(state_);
 }
 
-extern size_t w_state_change_get_log_entry_size(wallaroo::StateChange *state_change_)
+extern size_t w_state_change_get_log_entry_size(StateChange *state_change_)
 {
   return state_change_->get_log_entry_size();
 }
 
-extern void w_state_change_to_log_entry(wallaroo::StateChange *state_change_, char *bytes_)
+extern void w_state_change_to_log_entry(StateChange *state_change_,
+  char *bytes_)
 {
   state_change_->to_log_entry(bytes_);
 }
 
-extern size_t w_state_change_get_log_entry_size_header_size(wallaroo::StateChange *state_change_)
+extern size_t w_state_change_get_log_entry_size_header_size(
+  StateChange *state_change_)
 {
   return state_change_->get_log_entry_size_header_size();
 }
 
-extern size_t w_state_change_read_log_entry_size_header(wallaroo::StateChange *state_change_, char *bytes_)
+extern size_t w_state_change_read_log_entry_size_header(
+  StateChange *state_change_, char *bytes_)
 {
   return state_change_->read_log_entry_size_header(bytes_);
 }
 
-extern bool w_state_change_read_log_entry(wallaroo::StateChange *state_change_, char *bytes_)
+extern bool w_state_change_read_log_entry(StateChange *state_change_,
+  char *bytes_)
 {
   return state_change_->read_log_entry(bytes_);
 }
 
-extern wallaroo::StateChange *w_state_change_builder_build(wallaroo::StateChangeBuilder *state_change_builder_, uint64_t id_){
+extern StateChange *w_state_change_builder_build(
+  StateChangeBuilder *state_change_builder_, uint64_t id_)
+{
   return state_change_builder_->build(id_);
 }
 
-extern void *w_state_change_repository_lookup_by_name(void *state_change_repository_helper_, void *state_change_repository_, const char *name_)
+extern void *w_state_change_repository_lookup_by_name(
+  void *state_change_repository_helper_, void *state_change_repository_,
+  const char *name_)
 {
-  return (void *)pony_CPPStateChangeRepositoryHelper_lookup_by_name(state_change_repository_helper_, state_change_repository_, name_);
+  return (void *)
+    pony_CPPStateChangeRepositoryHelper_lookup_by_name(
+      state_change_repository_helper_, state_change_repository_, name_);
 }
 
-extern wallaroo::StateChange *w_state_change_get_state_change_object(void *state_change_repository_helper_, void *state_change_)
+extern StateChange *w_state_change_get_state_change_object(
+  void *state_change_repository_helper_, void *state_change_)
 {
-  return (wallaroo::StateChange *)pony_CPPStateChangeRepositoryHelper_get_state_change_object(state_change_repository_helper_, state_change_);
+  return (StateChange *)
+    pony_CPPStateChangeRepositoryHelper_get_state_change_object(
+      state_change_repository_helper_, state_change_);
 }
 
-void *w_stateful_computation_get_return(void *state_change_repository_helper_, wallaroo::Data* data_, void *state_change_)
+void *w_stateful_computation_get_return(void *state_change_repository_helper_,
+  Data* data_, void *state_change_)
 {
-  return pony_CPPStateChangeRepositoryHelper_get_stateful_computation_return(state_change_repository_helper_, data_, state_change_);
-}
-  
-extern uint64_t w_hashable_hash(wallaroo::Hashable const *obj_)
-{
-  return obj_->hash();
+  return
+    pony_CPPStateChangeRepositoryHelper_get_stateful_computation_return(
+      state_change_repository_helper_, data_, state_change_);
 }
 
-extern uint64_t w_hashable_partition_index(wallaroo::Hashable const *obj_)
-{
-  return obj_->partition_index();
-}
-
-
-extern uint64_t w_key_hash(wallaroo::Key *key_)
+extern uint64_t w_key_hash(Key *key_)
 {
   return key_->hash();
 }
-  
-extern bool w_key_eq(wallaroo::Key *key_, wallaroo::Key *other_)
+
+extern bool w_key_eq(Key *key_, Key *other_)
 {
   return key_->eq(other_);
 }
 
-extern wallaroo::Key *w_partition_function_partition(wallaroo::PartitionFunction *partition_function_, wallaroo::Data *data_)
+extern Key *w_partition_function_partition(
+  PartitionFunction *partition_function_, Data *data_)
 {
   return partition_function_->partition(data_);
 }
 
-extern uint64_t w_partition_function_u64_partition(wallaroo::PartitionFunctionU64 *partition_function_, wallaroo::Data *data_)
+extern uint64_t w_partition_function_u64_partition(
+  PartitionFunctionU64 *partition_function_, Data *data_)
 {
   return partition_function_->partition(data_);
 }
 
-extern void w_managed_object_delete(wallaroo::ManagedObject const *obj_)
+extern void w_managed_object_delete(ManagedObject const *obj_)
 {
   delete obj_;
 }

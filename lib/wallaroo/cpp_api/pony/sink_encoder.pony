@@ -35,7 +35,9 @@ class CPPSinkEncoder is SinkEncoder[CPPData val]
     @w_serializable_serialize(_sink_encoder, bytes, USize(0))
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _sink_encoder = recover @w_user_serializable_deserialize(bytes, USize(0)) end
+    _sink_encoder = recover
+      @w_user_serializable_deserialize(bytes, USize(0))
+    end
 
   fun _final() =>
     @w_managed_object_delete(_sink_encoder)
