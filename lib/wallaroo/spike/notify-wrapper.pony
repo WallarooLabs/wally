@@ -1,5 +1,5 @@
-use "net"
 use "time"
+use "wallaroo/network"
 
 class SpikeConfig
   let delay: Bool
@@ -12,13 +12,13 @@ class SpikeConfig
     seed = seed'
 
 primitive SpikeWrapper
-  fun apply(letter: TCPConnectionNotify iso, config: SpikeConfig val)
-    : TCPConnectionNotify iso^
+  fun apply(letter: WallarooOutgoingNetworkActorNotify iso,
+    config: SpikeConfig val): WallarooOutgoingNetworkActorNotify iso^
   =>
-    var notify: TCPConnectionNotify iso = consume letter
-    if config.delay then
+    var notify: WallarooOutgoingNetworkActorNotify iso = consume letter
+   /* if config.delay then
       notify = DelayReceived(consume notify)
-    end
+    end*/
     if config.drop then
       notify = DropConnection(config.seed, 10, consume notify)
     end
