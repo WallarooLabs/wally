@@ -185,18 +185,20 @@ actor Startup
           connection_addresses_file)
         if not is_initializer then
           if event_log_filepath.exists() or
-             local_topology_filepath.exists() or
-             data_channel_filepath.exists() or
-             control_channel_filepath.exists() or
-             worker_names_filepath.exists() or
-             connection_addresses_filepath.exists() then
+            local_topology_filepath.exists() or
+            data_channel_filepath.exists() or
+            control_channel_filepath.exists() or
+            worker_names_filepath.exists() or
+            connection_addresses_filepath.exists()
+          then
 
             if not (event_log_filepath.exists() and
-               local_topology_filepath.exists() and
-               data_channel_filepath.exists() and
-               control_channel_filepath.exists() and
-               worker_names_filepath.exists() and
-               connection_addresses_filepath.exists()) then
+              local_topology_filepath.exists() and
+              data_channel_filepath.exists() and
+              control_channel_filepath.exists() and
+              worker_names_filepath.exists() and
+              connection_addresses_filepath.exists())
+            then
 
               @printf[I32](("Some of the resilience recovery files are" +
                 " missing but others exist! Cannot continue!\n").cstring())
@@ -209,14 +211,16 @@ actor Startup
           end
         else
           if event_log_filepath.exists() or
-             local_topology_filepath.exists() or
-             control_channel_filepath.exists() or
-             worker_names_filepath.exists() then
+            local_topology_filepath.exists() or
+            control_channel_filepath.exists() or
+            worker_names_filepath.exists()
+          then
 
             if not (event_log_filepath.exists() and
-               local_topology_filepath.exists() and
-               control_channel_filepath.exists() and
-               worker_names_filepath.exists()) then
+              local_topology_filepath.exists() and
+              control_channel_filepath.exists() and
+              worker_names_filepath.exists())
+            then
 
               @printf[I32](("Some of the resilience recovery files are" +
                 " missing but others exist! Cannot continue!\n").cstring())
@@ -345,7 +349,8 @@ actor Startup
     let file = File(worker_names_filepath)
     for worker_name in file.lines() do
       ws.push(worker_name)
-      @printf[I32](("recover_worker_names: " + worker_name).cstring())
+      @printf[I32]("recover_worker_names: %s\n".cstring(),
+        worker_name.cstring())
     end
 
     ws

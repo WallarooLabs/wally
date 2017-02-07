@@ -172,8 +172,7 @@ actor Main
                 MultiFileDataSource(consume paths, should_repeat)
               end
             else
-              if binary_integer
-              then
+              if binary_integer then
                 BinaryIntegerDataSource(start_from)
               else
                 IntegerDataSource(start_from)
