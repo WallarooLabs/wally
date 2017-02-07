@@ -16,7 +16,8 @@ interface WallarooOutgoingNetworkActor
 
   fun ref receive_ack(seq_id: SeqId)
     """
-    TODO: doc string
+    Called when processing an acknowledgment of a message sent over the
+    connection
     """
 
   fun ref close()
