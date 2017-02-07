@@ -11,6 +11,7 @@ use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/network"
 use "wallaroo/routing"
 use "wallaroo/tcp-sink"
 use "wallaroo/topology"
@@ -220,7 +221,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
 
-  fun ref ack(seq_id: SeqId) =>
+  fun ref receive_ack(seq_id: SeqId) =>
     ifdef debug then
       Invariant(seq_id > _lowest_queue_id)
     end
@@ -292,18 +293,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   //
   // TCP
-  be connected() =>
-    if not _reported_initialized then
-      // If connecting failed, we should handle here
-      match _initializer
-      | let lti: LocalTopologyInitializer =>
-        lti.report_initialized(this)
-        _reported_initialized = true
-      else
-        Fail()
-      end
-    end
-
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
     Handle socket events.
@@ -324,6 +313,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
             _writeable = true
 
             _notify.connected(this)
+            _on_connected()
 
             ifdef not windows then
               if _pending_writes() then
@@ -374,6 +364,18 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       end
 
       _try_shutdown()
+    end
+
+  fun ref _on_connected() =>
+    if not _reported_initialized then
+      // If connecting failed, we should handle here
+      match _initializer
+      | let lti: LocalTopologyInitializer =>
+        lti.report_initialized(this)
+        _reported_initialized = true
+      else
+        Fail()
+      end
     end
 
   fun ref _writev(data: ByteSeqIter)
@@ -805,21 +807,21 @@ interface _OutgoingBoundaryNotify
     """
     None
 
-class BoundaryNotify is _OutgoingBoundaryNotify
+class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
   var _header: Bool = true
 
   new create(auth: AmbientAuth) =>
     _auth = auth
 
-  fun ref received(conn: OutgoingBoundary ref, data: Array[U8] iso,
+  fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
     times: USize): Bool
   =>
     if _header then
       try
-        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        let e = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
-        conn.expect(expect)
+        conn.expect(e)
         _header = false
       end
       true
@@ -829,7 +831,7 @@ class BoundaryNotify is _OutgoingBoundaryNotify
       end
       match ChannelMsgDecoder(consume data, _auth)
       | let aw: AckWatermarkMsg val =>
-        conn.ack(aw.seq_id)
+        conn.receive_ack(aw.seq_id)
       else
         @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring()
 )      end
@@ -844,48 +846,30 @@ class BoundaryNotify is _OutgoingBoundaryNotify
       end
     end
 
-  fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
-    """
-    Called if name resolution succeeded for a TCPConnection and we are now
-    waiting for a connection to the server to succeed. The count is the number
-    of connections we're trying. The notifier will be informed each time the
-    count changes, until a connection is made or connect_failed() is called.
-    """
+  fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32) =>
     @printf[I32]("BoundaryNotify: connecting\n\n".cstring())
 
-  fun ref connected(conn: OutgoingBoundary ref) =>
-    """
-    Called when we have successfully connected to the server.
-    """
+  fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connected\n\n".cstring())
     conn.set_nodelay(true)
-    conn.connected()
     conn.expect(4)
 
-  fun ref closed(conn: OutgoingBoundary ref) =>
+  fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
 
-  fun ref connect_failed(conn: OutgoingBoundary ref) =>
-    """
-    Called when we have failed to connect to all possible addresses for the
-    server. At this point, the connection will never be established.
-    """
+  fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connect_failed\n\n".cstring())
 
-   fun ref throttled(conn: OutgoingBoundary ref) =>
-    """
-    Called when the connection starts experiencing TCP backpressure. You should
-    respond to this by pausing additional calls to `write` and `writev` until
-    you are informed that pressure has been released. Failure to respond to
-    the `throttled` notification will result in outgoing data queuing in the
-    connection and increasing memory usage.
-    """
+  fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
+    data: ByteSeqIter): ByteSeqIter
+  =>
+    data
+
+  fun ref expect(conn: WallarooOutgoingNetworkActor ref, qty: USize): USize =>
+    qty
+
+  fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: throttled\n\n".cstring())
 
-  fun ref unthrottled(conn: OutgoingBoundary ref) =>
-    """
-    Called when the connection stops experiencing TCP backpressure. Upon
-    receiving this notification, you should feel free to start making calls to
-    `write` and `writev` again.
-    """
+  fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
