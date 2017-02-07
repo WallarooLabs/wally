@@ -8,6 +8,7 @@ use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/network"
 use "wallaroo/routing"
 use "wallaroo/topology"
 
@@ -53,7 +54,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
   var _mute_outstanding: Bool = false
 
   // TCP
-  var _notify: _TCPSinkNotify
+  var _notify: WallarooOutgoingNetworkActorNotify
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
@@ -95,7 +96,7 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
-    _notify = EmptyNotify
+    _notify = TCPSinkNotify
     _initial_msgs = initial_msgs
     _connect_count = @pony_os_connect_tcp[U32](this,
       host.cstring(), service.cstring(),
@@ -266,7 +267,6 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
             _writeable = true
 
             _notify.connected(this)
-
 
             for msg in _initial_msgs.values() do
               _writev(msg, None)
@@ -722,96 +722,44 @@ actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
       @pony_os_nodelay[None](_fd, state)
     end
 
-interface _TCPSinkNotify
-  fun ref connecting(conn: TCPSink ref, count: U32) =>
+  fun ref receive_ack(seq_id: SeqId) =>
     """
-    Called if name resolution succeeded for a TCPConnection and we are now
-    waiting for a connection to the server to succeed. The count is the number
-    of connections we're trying. The notifier will be informed each time the
-    count changes, until a connection is made or connect_failed() is called.
+    For WallarooOutgoingNetworkActor only.
+    This would be needed if we start only acking once we receive some kind
+    of confirmation from the downstream.
     """
     None
 
-  fun ref connected(conn: TCPSink ref) =>
-    """
-    Called when we have successfully connected to the server.
-    """
-    conn.set_nodelay(true)
+class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
+  fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32) =>
+    None
 
-  fun ref connect_failed(conn: TCPSink ref) =>
-    """
-    Called when we have failed to connect to all possible addresses for the
-    server. At this point, the connection will never be established.
-    """
+  fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
+    @printf[I32]("TCPSink connected\n".cstring())
+
+
+  fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
+    @printf[I32]("TCPSink connection closed\n".cstring())
+
+  fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     Fail()
 
-  fun ref sentv(conn: TCPSink ref, data: ByteSeqIter): ByteSeqIter =>
-    """
-    Called when multiple chunks of data are sent to the connection in a single
-    call. This gives the notifier an opportunity to modify the sent data chunks
-    before they are written. To swallow the send, return an empty
-    Array[String].
-    """
+  fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
+    data: ByteSeqIter): ByteSeqIter
+  =>
     data
 
-  fun ref received(conn: TCPSink ref, data: Array[U8] iso,
+  fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
     times: USize): Bool
   =>
-    """
-    Called when new data is received on the connection. Return true if you
-    want to continue receiving messages without yielding until you read
-    max_size on the TCPConnection.  Return false to cause the TCPConnection
-    to yield now.
-
-    The `times` parameter is the number of times during this behavior run that
-    `received` has been called. Starts at 1
-    """
     true
 
-  fun ref expect(conn: TCPSink ref, qty: USize): USize =>
-    """
-    Called when the connection has been told to expect a certain quantity of
-    bytes. This allows nested notifiers to change the expected quantity, which
-    allows a lower level protocol to handle any framing (e.g. SSL).
-    """
+  fun ref expect(conn: WallarooOutgoingNetworkActor ref, qty: USize): USize =>
     qty
 
-  fun ref closed(conn: TCPSink ref) =>
-    """
-    Called when the connection is closed.
-    """
-    None
-
-  fun ref throttled(conn: TCPSink ref) =>
-    """
-    Called when the connection starts experiencing TCP backpressure. You should
-    respond to this by pausing additional calls to `write` and `writev` until
-    you are informed that pressure has been released. Failure to respond to
-    the `throttled` notification will result in outgoing data queuing in the
-    connection and increasing memory usage.
-    """
+  fun ref throttled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[None]("TCPSink is experiencing back pressure\n".cstring())
 
-  fun ref unthrottled(conn: TCPSink ref) =>
-    """
-    Called when the connection stops experiencing TCP backpressure. Upon
-    receiving this notification, you should feel free to start making calls to
-    `write` and `writev` again.
-    """
+  fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[None](("TCPSink is no longer experiencing" +
       " back pressure\n").cstring())
-
-
-class EmptyNotify is _TCPSinkNotify
-  fun ref connected(conn: TCPSink ref) =>
-  """
-  Called when we have successfully connected to the server.
-  """
-  None
-
-fun ref closed(conn: TCPSink ref) =>
-  """
-  Called when the connection is closed.
-  """
-  @printf[I32]("TCPSink connection closed\n".cstring())
-
