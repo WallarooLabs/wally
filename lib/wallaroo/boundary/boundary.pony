@@ -125,8 +125,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
     @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
-  be reconnect()
-  =>
+  be reconnect() =>
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
       _from.cstring())
@@ -265,7 +264,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
       @printf[I32](("Done replaying messages to " + _host + ":" + _service +
         "\n").cstring())
-      // set replaying to false and try to unmute
       _replaying = false
       _maybe_mute_or_unmute_upstreams()
     else
@@ -339,7 +337,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
                 _release_backpressure()
               end
             end
-
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -386,7 +383,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
                 _release_backpressure()
               end
             end
-
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)
@@ -415,7 +411,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
             _release_backpressure()
           end
         end
-
       end
 
       if AsioEvent.readable(flags) then
@@ -443,8 +438,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
       end
     end
 
-  fun ref _writev(data: ByteSeqIter)
-  =>
+  fun ref _writev(data: ByteSeqIter) =>
     """
     Write a sequence of sequences of bytes.
     """
@@ -694,7 +688,6 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
               _pending_writev.shift()
               _pending.shift()
             end
-
           end
         end
       else
@@ -908,7 +901,8 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
         conn.replay_msgs()
       else
         @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring()
-)      end
+)
+      end
 
       conn.expect(4)
       _header = true

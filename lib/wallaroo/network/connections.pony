@@ -98,7 +98,7 @@ actor Connections
     worker_initializer: WorkerInitializer, data_channel_file: FilePath)
   =>
     let data_notifier: TCPListenNotify iso =
-      DataChannelListenNotifier(_worker_name, _env, _auth, this,
+      DataChannelListenNotifier(_worker_name, _auth, this,
         _is_initializer, data_receivers,
         MetricsReporter(_app_name, _worker_name, _metrics_conn),
         data_channel_file)
@@ -135,7 +135,8 @@ actor Connections
     end
 
   be update_boundaries(local_topology_initializer: LocalTopologyInitializer,
-    recovering: Bool = false) =>
+    recovering: Bool = false)
+  =>
     let out_bs: Map[String, OutgoingBoundary] trn =
       recover Map[String, OutgoingBoundary] end
 
@@ -164,6 +165,7 @@ actor Connections
           file.writev(recover val wb.done() end)
         else
           @printf[I32]("Error saving connection addresses!\n".cstring())
+          Fail()
         end
       end
       let control_addrs = addresses("control")
@@ -192,8 +194,7 @@ actor Connections
       _env.out.print("Problem creating interconnections with other workers")
     end
 
-  be recover_connections(
-    local_topology_initializer: LocalTopologyInitializer)
+  be recover_connections(local_topology_initializer: LocalTopologyInitializer)
   =>
     var addresses: Map[String, Map[String, (String, String)]] val =
       recover val Map[String, Map[String, (String, String)]] end
@@ -254,8 +255,7 @@ actor Connections
       TCPConnection(_auth, consume control_notifier, host, service)
     _control_conns(target_name) = control_conn
 
-  be reconnect_data_connection(target_name: String)
-  =>
+  be reconnect_data_connection(target_name: String) =>
     if _data_conns.contains(target_name) then
       try
         let outgoing_boundary = _data_conns(target_name)

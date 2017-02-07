@@ -187,7 +187,7 @@ actor LocalTopologyInitializer
         let data_channel_filepath = FilePath(_auth, _data_channel_file)
         if not _is_initializer then
           let data_notifier: TCPListenNotify iso =
-            DataChannelListenNotifier(_worker_name, _env, _auth, conns,
+            DataChannelListenNotifier(_worker_name, _auth, conns,
               _is_initializer, data_receivers,
               MetricsReporter(_application.name(), _worker_name, _metrics_conn),
               data_channel_filepath)
@@ -237,7 +237,7 @@ actor LocalTopologyInitializer
         let data_channel_filepath = FilePath(_auth, _data_channel_file)
         if not _is_initializer then
           let data_notifier: TCPListenNotify iso =
-            DataChannelListenNotifier(_worker_name, _env, _auth, conns,
+            DataChannelListenNotifier(_worker_name, _auth, conns,
               _is_initializer, data_receivers,
               MetricsReporter(_application.name(), _worker_name, _metrics_conn),
               data_channel_filepath)
@@ -251,9 +251,9 @@ actor LocalTopologyInitializer
           end
         else
           match worker_initializer
-            | let wi: WorkerInitializer =>
-              conns.create_initializer_data_channel(data_receivers, wi,
-              data_channel_filepath)
+          | let wi: WorkerInitializer =>
+            conns.create_initializer_data_channel(data_receivers, wi,
+            data_channel_filepath)
           end
         end
       else
@@ -284,7 +284,8 @@ actor LocalTopologyInitializer
     file.dispose()
 
   be initialize(worker_initializer: (WorkerInitializer | None) = None,
-    recovering: Bool = false) =>
+    recovering: Bool = false)
+  =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("|^|^|^Initializing Local Topology^|^|^|\n\n".cstring())
     _worker_initializer = worker_initializer

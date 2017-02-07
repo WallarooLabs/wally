@@ -98,7 +98,9 @@ actor DataReceiver is Producer
     try
       match _latest_conn
       | let conn: TCPConnection =>
-        @printf[I32]("data receiver for worker %s requesting replay from sender %s\n".cstring(), _worker_name.cstring(), _sender_name.cstring())
+        @printf[I32](("data receiver for worker %s requesting replay from " +
+                      "sender %s\n").cstring(), _worker_name.cstring(),
+                      _sender_name.cstring())
         let request_msg = ChannelMsgEncoder.request_replay(_worker_name,
           _sender_step_id, _auth)
         conn.writev(request_msg)
@@ -130,7 +132,8 @@ actor DataReceiver is Producer
     Process envelopes and keep track of things
     """
     ifdef "trace" then
-      @printf[I32]("Bookkeeping called for DataReceiver route %lu\n".cstring(), route_id)
+      @printf[I32]("Bookkeeping called for DataReceiver route %lu\n".cstring(),
+        route_id)
     end
     ifdef "resilience" then
       _resilience_routes.send(route_id, seq_id)

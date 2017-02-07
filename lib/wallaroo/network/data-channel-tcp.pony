@@ -12,7 +12,6 @@ use "wallaroo/topology"
 
 class DataChannelListenNotifier is TCPListenNotify
   let _name: String
-  let _env: Env
   let _auth: AmbientAuth
   let _is_initializer: Bool
   let _recovery_file: FilePath
@@ -22,14 +21,13 @@ class DataChannelListenNotifier is TCPListenNotify
   let _receivers: Map[String, DataReceiver] val
   let _metrics_reporter: MetricsReporter
 
-  new iso create(name: String, env: Env, auth: AmbientAuth,
+  new iso create(name: String, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     receivers: Map[String, DataReceiver] val,
     metrics_reporter: MetricsReporter iso,
     recovery_file: FilePath)
   =>
     _name = name
-    _env = env
     _auth = auth
     _is_initializer = is_initializer
     _connections = connections
@@ -40,7 +38,8 @@ class DataChannelListenNotifier is TCPListenNotify
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
-      _env.out.print(_name + " data channel: listening on " + _host + ":" + _service)
+      @printf[I32]((_name + " data channel: listening on " + _host + ":" +
+        _service).cstring())
       ifdef "resilience" then
         if _recovery_file.exists() then
           @printf[I32]("Recovery file exists for data channel\n".cstring())
@@ -63,31 +62,29 @@ class DataChannelListenNotifier is TCPListenNotify
         end
       end
     else
-      _env.out.print(_name + "data : couldn't get local address")
+      @printf[I32]((_name + "data : couldn't get local address").cstring())
       listen.close()
     end
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    DataChannelConnectNotifier(_receivers, _connections, _env, _auth,
+    DataChannelConnectNotifier(_receivers, _connections, _auth,
     _metrics_reporter.clone())
 
 
 class DataChannelConnectNotifier is TCPConnectionNotify
   let _receivers: Map[String, DataReceiver] val
   let _connections: Connections
-  let _env: Env
   let _auth: AmbientAuth
   var _header: Bool = true
   let _timers: Timers = Timers
   let _metrics_reporter: MetricsReporter
 
   new iso create(receivers: Map[String, DataReceiver] val,
-    connections: Connections, env: Env, auth: AmbientAuth,
+    connections: Connections, auth: AmbientAuth,
     metrics_reporter: MetricsReporter iso)
   =>
     _receivers = receivers
     _connections = connections
-    _env = env
     _auth = auth
     _metrics_reporter = consume metrics_reporter
 
@@ -166,15 +163,16 @@ class DataChannelConnectNotifier is TCPConnectionNotify
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
       | let m: SpinUpLocalTopologyMsg val =>
-        _env.out.print("Received spin up local topology message!")
+        @printf[I32]("Received spin up local topology message!".cstring())
       | let m: RequestReplayMsg val =>
         ifdef "trace" then
           @printf[I32]("Received RequestReplayMsg on Data Channel\n".cstring())
         end
       | let m: UnknownChannelMsg val =>
-        _env.err.print("Unknown Wallaroo data message type: UnknownChannelMsg.")
+        @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg."
+          .cstring())
       else
-        _env.err.print("Unknown Wallaroo data message type.")
+        @printf[I32]("Unknown Wallaroo data message type.".cstring())
       end
 
       conn.expect(4)
@@ -188,14 +186,14 @@ class DataChannelConnectNotifier is TCPConnectionNotify
     end
 
   fun ref accepted(conn: TCPConnection ref) =>
-    _env.out.print("accepted data channel connection")
+    @printf[I32]("accepted data channel connection".cstring())
     conn.set_nodelay(true)
     conn.expect(4)
 
   fun ref connected(sock: TCPConnection ref) =>
-    _env.out.print("incoming connected on data channel")
+    @printf[I32]("incoming connected on data channel".cstring())
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print("DataChannelConnectNotifier : server closed")
+    @printf[I32]("DataChannelConnectNotifier : server closed".cstring())
     //TODO: Initiate reconnect to downstream node here. We need to
     //      create a new connection in OutgoingBoundary

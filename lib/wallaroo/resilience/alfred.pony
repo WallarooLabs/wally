@@ -7,6 +7,7 @@ use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/routing"
 use "wallaroo/initialization"
+use "debug"
 
 //TODO: origin needs to get its own file
 trait tag Resilient
@@ -179,6 +180,14 @@ class FileBackend is Backend
      let payload: Array[ByteSeq] val)
     = consume entry
 
+    ifdef "trace" then
+      if is_watermark then
+        @printf[I32]("Writing Watermark: %d\n".cstring(), seq_id)
+      else
+        @printf[I32]("Writing Message: %d\n".cstring(), seq_id)
+      end
+    end
+
     _writer.bool(is_watermark)
     _writer.u128_be(origin_id)
     _writer.u64_be(seq_id)
@@ -339,8 +348,7 @@ actor Alfred
 
     be flush_buffer(origin_id: U128, low_watermark:U64) =>
       ifdef "trace" then
-        @printf[I32](("flush_buffer for id: " +
-          origin_id.string() + "\n\n").cstring())
+        @printf[I32]("flush_buffer for id: %d\n\n".cstring(), origin_id)
       end
 
       try

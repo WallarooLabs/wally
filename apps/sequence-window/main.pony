@@ -51,7 +51,6 @@ ndicating that the last state before termination was restored succesfully, and
 that the application resumed the sequence-window functionality correctly.
 """
 
-use "debug"
 use "buffered"
 use "collections"
 use "sendence/bytes"
@@ -74,27 +73,24 @@ actor Main
         Application("Sequence Window Printer")
           .new_pipeline[U64 val, String val]("Sequence Window",
             U64FramedHandler)
-            .to_state_partition[U64 val, U64 val, String val,
-              WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
-                partition where multi_worker = true)
-            .to_sink(WindowEncoder, recover [0] end)
+          .to_state_partition[U64 val, U64 val, String val,
+            WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
+              partition where multi_worker = true)
+          .to_sink(WindowEncoder, recover [0] end)
       end
       Startup(env, application, "sequence-window")
     else
       env.out.print("Couldn't build topology")
     end
 
-
 primitive WindowPartitionFunction
   fun apply(u: U64 val): U64 =>
     // Always use the same partition
     u % 2
 
-
 class val WindowStateBuilder
   fun apply(): WindowState => WindowState
   fun name(): String => "Window State"
-
 
 class WindowState
   var idx: USize = 0
@@ -107,7 +103,6 @@ class WindowState
     let o = ring.push(u)
     idx = idx + 1
     o
-
 
 class WindowStateChange is StateChange[WindowState]
   // Log size is 4x U64 + 2x USize (U64?)
@@ -152,7 +147,6 @@ class WindowStateChange is StateChange[WindowState]
     _window.idx = idx'
     _window.ring.update(a', pos')
 
-
 class WindowStateChangeBuilder is StateChangeBuilder[WindowState]
   fun apply(id: U64): StateChange[WindowState] =>
     WindowStateChange(id)
@@ -185,7 +179,6 @@ primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
       scbs.push(recover val WindowStateChangeBuilder end)
     end
 
-
 primitive U64FramedHandler is FramedSourceHandler[U64 val]
   fun header_length(): USize =>
     4
@@ -197,15 +190,15 @@ primitive U64FramedHandler is FramedSourceHandler[U64 val]
     Bytes.to_u64(data(0), data(1), data(2), data(3),
       data(4), data(5), data(6), data(7))
 
-
 primitive WindowEncoder
   fun apply(s: String val, wb: Writer = Writer): Array[ByteSeq] val =>
-    Debug("output: " + s)
+    ifdef debug then
+      @printf[I32]("output: %s\n".cstring(), s.cstring())
+    end
     try
-    wb.write(Bytes.length_encode(s)(0))
+      wb.write(Bytes.length_encode(s)(0))
     end
     wb.done()
-
 
 class Ring
   var _buf: Array[U64 val]
