@@ -18,3 +18,8 @@ interface WallarooOutgoingNetworkActor
     """
     TODO: doc string
     """
+
+  fun ref close()
+    """
+    Called to close the connection in a graceful fashion
+    """

@@ -4,6 +4,7 @@ use "buffered"
 use "random"
 use "time"
 
+/*
 class DelayerConfig
   let seed: U64
   let through_min_bytes: USize
@@ -272,4 +273,4 @@ trait _Delayer
 
   fun ref _next_interval(min: USize, max: USize, d: Dice): USize =>
     d(min.u64(), max.u64()).usize()
-
+*/

@@ -7,6 +7,7 @@ All tests can be run by compiling and running this package.
 """
 use "ponytest"
 use routing = "routing"
+use spike = "spike"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -17,3 +18,4 @@ actor Main is TestList
 
   fun tag tests(test: PonyTest) =>
     routing.Main.make().tests(test)
+    spike.Main.make().tests(test)

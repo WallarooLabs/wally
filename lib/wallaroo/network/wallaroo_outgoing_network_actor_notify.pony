@@ -13,15 +13,15 @@ interface WallarooOutgoingNetworkActorNotify
     Called when we have successfully connected to the server.
     """
 
-  fun ref closed(conn: WallarooOutgoingNetworkActor ref)
-    """
-    Called when the connection is closed.
-    """
-
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref)
     """
     Called when we have failed to connect to all possible addresses for the
     server. At this point, the connection will never be established.
+    """
+
+  fun ref closed(conn: WallarooOutgoingNetworkActor ref)
+    """
+    Called when the connection is closed.
     """
 
   fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
@@ -44,6 +44,7 @@ interface WallarooOutgoingNetworkActorNotify
     `times` parameter is the number of times this method has been called during
     this behavior. Starts at 1.
     """
+
   fun ref expect(conn: WallarooOutgoingNetworkActor ref, qty: USize): USize
     """
     Called when the connection has been told to expect a certain quantity of
