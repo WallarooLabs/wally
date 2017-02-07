@@ -4,14 +4,16 @@ use "wallaroo/fail"
 
 use @w_computation_compute[DataP](computation: ComputationP, input: DataP)
 use @w_computation_get_name[Pointer[U8]](computation: ComputationP)
-
-//use @w_state_computation_compute[((CPPData val | None), (CPPStateChange | None))](state_computation: StateComputationP,
-//  input: DataP, sc_repo: StateChangeRepository[CPPState], sc_repo_helper: CPPStateChangeRepositoryHelper, state: StateP, n: None)
-use @w_state_computation_compute[CPPStateComputationReturnPairWrapper ref](state_computation: StateComputationP,
-  input: DataP, sc_repo: StateChangeRepository[CPPState], sc_repo_helper: CPPStateChangeRepositoryHelper, state: StateP, n: None)
-use @w_state_computation_get_name[Pointer[U8]](state_computation: StateComputationP)
-use @w_state_computation_get_number_of_state_change_builders[USize](state_computaton: StateComputationP)
-use @w_state_computation_get_state_change_builder[StateChangeBuilderP](state_computation: StateComputationP, idx: USize)
+use @w_state_computation_compute[CPPStateComputationReturnPairWrapper ref]
+  (state_computation: StateComputationP, input: DataP,
+  sc_repo: StateChangeRepository[CPPState],
+  sc_repo_helper: CPPStateChangeRepositoryHelper, state: StateP, n: None)
+use @w_state_computation_get_name[Pointer[U8]]
+  (state_computation: StateComputationP)
+use @w_state_computation_get_number_of_state_change_builders[USize]
+  (state_computaton: StateComputationP)
+use @w_state_computation_get_state_change_builder[StateChangeBuilderP]
+  (state_computation: StateComputationP, idx: USize)
 
 type ComputationP is Pointer[U8] val
 type StateComputationP is Pointer[U8] val
@@ -60,28 +62,38 @@ class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState
   new create(computation: StateComputationP) =>
     _computation = computation
 
-  fun apply(input: CPPData val, sc_repo: StateChangeRepository[CPPState], state: CPPState):
+  fun apply(input: CPPData val,
+    sc_repo: StateChangeRepository[CPPState], state: CPPState):
     ((CPPData val | None), (CPPStateChange | None))
   =>
-    let result_p = @w_state_computation_compute(_computation, input.obj(), sc_repo, CPPStateChangeRepositoryHelper, state.obj(), None)
+    let result_p = @w_state_computation_compute(_computation, input.obj(), sc_repo,
+      CPPStateChangeRepositoryHelper, state.obj(), None)
+
     let result = result_p.get_tuple()
+
     match result._1
     | let r: CPPData val =>
       if input.obj() == r.obj() then
         @printf[I32]("returning the same object is not allowed".cstring())
       end
     end
+
     result
 
   fun name(): String =>
     recover String.from_cstring(@w_state_computation_get_name(_computation)) end
 
   fun state_change_builders(): Array[StateChangeBuilder[CPPState] val] val =>
-    let num_builders = @w_state_computation_get_number_of_state_change_builders(_computation)
+    let num_builders =
+      @w_state_computation_get_number_of_state_change_builders(_computation)
+
     recover
       let builders = Array[StateChangeBuilder[CPPState] val](num_builders)
       for i in Range(0, num_builders) do
-        builders.push(recover CPPStateChangeBuilder(@w_state_computation_get_state_change_builder(_computation, i)) end)
+        builders.push(recover
+          CPPStateChangeBuilder(
+            @w_state_computation_get_state_change_builder(_computation, i))
+        end)
       end
       builders
     end

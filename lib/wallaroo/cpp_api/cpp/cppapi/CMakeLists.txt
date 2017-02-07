@@ -65,7 +65,6 @@ set(SOURCE_FILES
 	cpp/ManagedObject.cpp
 	cpp/Data.cpp
 	cpp/ApiHooks.cpp
-  cpp/Hashable.cpp
 )
 
 message("Inside sibdir, include dir: ${PROJECT_SOURCE_DIR}/cppapi/hpp")
