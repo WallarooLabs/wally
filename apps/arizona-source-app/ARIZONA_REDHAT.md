@@ -144,7 +144,7 @@ git clone https://github.com/sendence/buffy.git
 ### Verify optimal setup
 
 ```bash
-~/buffy/scratch/misc/validate_environment.sh
+~/buffy/orchestration/validate_environment.sh
 ```
 
 You should see:
