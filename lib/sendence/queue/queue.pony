@@ -18,22 +18,6 @@ class Queue[A: Any #alias]
     _data = Array[A](n)
     _size = 0
 
-  // new from(els: Array[A] = Array[A], len: USize = 0) =>
-  //   """
-  //   Create a queue of elements from the supplied array.
-  //   """
-  //   let n =
-  //     if len >= els.size() then
-  //       len.max(2).next_pow2()
-  //     else
-  //       els.size().max(2).next_pow2()
-  //     end
-  //   _mod = n - 1
-  //   _data = els
-  //   _data.reserve(n)
-  //   _size = _data.size()
-  //   _back_ptr = _size
-
   fun size(): USize =>
     """
     The size of the queue.
@@ -99,10 +83,6 @@ class Queue[A: Any #alias]
       end
     end
     _size = _size + 1
-
-    // Assert(_data.size() <= space(), "Data size is not <= space()")
-    // Assert(_size <= space(), "Size is not <= space()")
-    // Assert(_size <= _data.size(), "Size is not <= data size")
 
   fun ref dequeue(): A! ? =>
     if _size > 0 then
