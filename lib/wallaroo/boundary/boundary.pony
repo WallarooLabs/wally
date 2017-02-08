@@ -898,7 +898,10 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
         ifdef "trace" then
           @printf[I32]("Received RequestReplayMsg on Data Channel\n".cstring())
         end
-        conn.replay_msgs()
+        match conn
+        | let c: OutgoingBoundary =>
+          c.replay_msgs()
+        end
       else
         @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring()
 )
