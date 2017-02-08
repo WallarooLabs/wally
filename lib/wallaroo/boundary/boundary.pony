@@ -45,6 +45,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   // CreditFlow
   var _upstreams: Array[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
+  var _max_distributable_credits: ISize = 350_000
+  var _distributable_credits: ISize = _max_distributable_credits
+  let _permanent_max_credit_response: ISize = 1024
+  var _max_credit_response: ISize = _permanent_max_credit_response
+  var _minimum_credit_response: ISize = 250
+  var _waiting_producers: Array[Producer] = _waiting_producers.create()
 
   // TCP
   var _notify: _OutgoingBoundaryNotify
@@ -70,6 +76,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
   var _expect_read_buf: Reader = Reader
 
   // Connection, Acking and Replay
+  var _replaying: Bool = false
   let _auth: AmbientAuth
   let _worker_name: String
   var _step_id: U128 = 0
@@ -122,6 +129,15 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _notify_connecting()
 
     @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
+
+  be reconnect()
+  =>
+    _connect_count = @pony_os_connect_tcp[U32](this,
+      _host.cstring(), _service.cstring(),
+      _from.cstring())
+    _notify_connecting()
+
+    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     try
@@ -235,11 +251,17 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _maybe_mute_or_unmute_upstreams()
     _lowest_queue_id = _lowest_queue_id + flush_count.u64()
 
+    ifdef "backpressure" then
+      recoup_credits(flush_count.isize())
+    end
+
     ifdef "resilience" then
       _terminus_route.receive_ack(seq_id)
     end
 
   be replay_msgs() =>
+    @printf[I32](("Replaying messages to " + _host + ":" + _service + "\n"
+      ).cstring())
     for msg in _queue.values() do
       try
         _writev(ChannelMsgEncoder.replay(msg, _auth))
@@ -249,6 +271,12 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
     try
       _writev(ChannelMsgEncoder.replay_complete(_worker_name, _auth))
+
+      @printf[I32](("Done replaying messages to " + _host + ":" + _service +
+        "\n").cstring())
+      // set replaying to false and try to unmute
+      _replaying = false
+      _maybe_mute_or_unmute_upstreams()
     else
       Fail()
     end
@@ -279,8 +307,11 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     end
 
     _upstreams.push(producer)
+    ifdef "backpressure" then
+      _calculate_max_credit_response()
+    end
 
-  be unregister_producer(producer: Producer) =>
+  be unregister_producer(producer: Producer, credits_returned: ISize) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
@@ -288,8 +319,108 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     try
       let i = _upstreams.find(producer)
       _upstreams.delete(i)
+      ifdef "backpressure" then
+        recoup_credits(credits_returned)
+      end
+    end
+    ifdef "backpressure" then
+      _calculate_max_credit_response()
     end
 
+  fun ref _calculate_max_credit_response() =>
+    _max_credit_response = if _upstreams.size() > 0 then
+      let portion = _max_distributable_credits / _upstreams.size().isize()
+      portion.min(_permanent_max_credit_response)
+    else
+      _permanent_max_credit_response
+    end
+
+    if (_max_credit_response < _minimum_credit_response) then
+      Fail()
+    end
+
+  be credit_request(from: Producer) =>
+    """
+    Receive a credit request from a producer. For speed purposes, we assume
+    the producer is already registered with us.
+
+    Even if we have credits available in the "distributable pool", we can't
+    give them out if our outgoing socket is in a non-sendable state. The
+    following are non-sendable states:
+
+    - Not connected
+    - Closed
+    - Not currently writeable
+
+    By not giving out credits when we are "not currently writable", we can
+    implement backpressure without having to inform our upstream producers
+    to stop sending. They only send when they have credits. If they run out
+    and we are experiencing backpressure, they don't get any more.
+    """
+    ifdef debug then
+      Invariant(_upstreams.contains(from))
+    end
+
+    if _can_distribute_credits() and (_waiting_producers.size() == 0) then
+      _distribute_credits_to(from)
+    else
+      _waiting_producers.push(from)
+    end
+
+  fun ref _can_distribute_credits(): Bool =>
+    _can_send() and _above_minimum_response_level()
+
+  fun ref _maybe_distribute_credits() =>
+    while (_waiting_producers.size() > 0) and _can_distribute_credits() do
+      try
+        let producer = _waiting_producers.shift()
+        _distribute_credits_to(producer)
+      else
+        Fail()
+      end
+    end
+
+  fun ref _distribute_credits_to(producer: Producer) =>
+    ifdef debug then
+      Invariant(_can_distribute_credits())
+    end
+
+    let give_out =
+      _distributable_credits
+        .min(_max_credit_response)
+        .max(_minimum_credit_response)
+
+    ifdef debug then
+      Invariant(give_out >= _minimum_credit_response)
+    end
+
+    ifdef "credit_trace" then
+      @printf[I32]((
+        "OutgoingBoundary: Credits requested." +
+        " Giving %llu out of %llu\n"
+        ).cstring(),
+        give_out, _distributable_credits)
+    end
+
+    producer.receive_credits(give_out, this)
+    _distributable_credits = _distributable_credits - give_out
+
+  be return_credits(credits: ISize) =>
+    recoup_credits(credits)
+
+  fun ref recoup_credits(recoup: ISize) =>
+    _distributable_credits = _distributable_credits + recoup
+    ifdef debug then
+      Invariant(_distributable_credits <= _max_distributable_credits)
+    end
+    _maybe_distribute_credits()
+
+    ifdef "credit_trace" then
+      @printf[I32]("OutgoingBoundary: recouped %llu credits. Now at %llu\n".cstring(), recoup, _distributable_credits)
+    end
+
+  fun _above_minimum_response_level(): Bool =>
+    _distributable_credits >= _minimum_credit_response
   //
   // TCP
   be connected() =>
@@ -324,6 +455,53 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
             _writeable = true
 
             _notify.connected(this)
+
+            ifdef not windows then
+              if _pending_writes() then
+                //sent all data; release backpressure
+                _release_backpressure()
+              end
+            end
+
+          else
+            // The connection failed, unsubscribe the event and close.
+            @pony_asio_event_unsubscribe(event)
+            @pony_os_socket_close[None](fd)
+            _notify_connecting()
+          end
+        elseif not _connected and _closed then
+          @printf[I32]("Reconnection asio event\n".cstring())
+          if @pony_os_connected[Bool](fd) then
+            // The connection was successful, make it ours.
+            _fd = fd
+            _event = event
+
+            // clear anything pending to be sent because on recovery we're going to
+            // have to replay from our queue when requested
+            _pending_writev.clear()
+            _pending.clear()
+            _pending_writev_total = 0
+
+            _connected = true
+            _writeable = true
+
+            // set replaying to true since we might need to replay to downstream
+            // refore resuming
+            _replaying = true
+
+            _closed = false
+            _shutdown = false
+            _shutdown_peer = false
+
+            _notify.connected(this)
+
+            try
+              let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
+                _auth)
+              _writev(connect_msg)
+            else
+              @printf[I32]("error creating data connect message on reconnect\n".cstring())
+            end
 
             ifdef not windows then
               if _pending_writes() then
@@ -693,6 +871,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
 
   fun ref _release_backpressure() =>
     _notify.unthrottled(this)
+    _maybe_distribute_credits()
     _maybe_mute_or_unmute_upstreams()
 
   fun ref _maybe_mute_or_unmute_upstreams() =>
@@ -722,6 +901,7 @@ actor OutgoingBoundary is (CreditFlowConsumer & RunnableStep & Initializable)
     _connected and
       _writeable and
       not _closed and
+      not _replaying and
       not _backup_queue_is_overflowing()
 
   fun _backup_queue_is_overflowing(): Bool =>
@@ -829,7 +1009,15 @@ class BoundaryNotify is _OutgoingBoundaryNotify
       end
       match ChannelMsgDecoder(consume data, _auth)
       | let aw: AckWatermarkMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
+        end
         conn.ack(aw.seq_id)
+      | let m: RequestReplayMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received RequestReplayMsg on Data Channel\n".cstring())
+        end
+        conn.replay_msgs()
       else
         @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring()
 )      end

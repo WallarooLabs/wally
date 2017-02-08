@@ -25,8 +25,6 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _omni_router: OmniRouter val = EmptyOmniRouter
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
-  var _outgoing_seq_id: U64 = 0
-  var _origin: (Producer | None) = None
 
   new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
@@ -45,9 +43,6 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
 
   fun routes(): Array[CreditFlowConsumerStep] val =>
     _router.routes()
-
-  fun ref set_origin(origin: Producer) =>
-    _origin = origin
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
@@ -69,29 +64,22 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
 
       (let is_finished, let keep_sending, let last_ts) =
         try
-          match _origin
-          | let o: Producer =>
-            _outgoing_seq_id = _outgoing_seq_id + 1
-            let decoded =
-              try
-                _handler.decode(consume data)
-              else
-                ifdef debug then
-                  @printf[I32]("Error decoding message at source\n".cstring())
-                end
-                error
+          conn.next_sequence_id()
+          let decoded =
+            try
+              _handler.decode(consume data)
+            else
+              ifdef debug then
+                @printf[I32]("Error decoding message at source\n".cstring())
               end
-            ifdef "trace" then
-              @printf[I32](("Msg decoded at " + _pipeline_name + " source\n").cstring())
+              error
             end
-            _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-              conn, _router, _omni_router,
-              o, _guid_gen.u128(), None, 0, 0, ingest_ts, 1, ingest_ts, _metrics_reporter)
-          else
-            // FramedSourceNotify needs an Producer to pass along
-            Fail()
-            (true, true, ingest_ts)
+          ifdef "trace" then
+            @printf[I32](("Msg decoded at " + _pipeline_name + " source\n").cstring())
           end
+          _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
+            conn, _router, _omni_router,
+            conn, _guid_gen.u128(), None, 0, 0, ingest_ts, 1, ingest_ts, _metrics_reporter)
         else
           Fail()
           (true, true, ingest_ts)

@@ -30,7 +30,9 @@ actor TCPSource is Producer
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _tcp_sinks: Array[TCPSink] val
+  // Determines if we can still process credits from consumers
   var _unregistered: Bool = false
+  var _max_route_credits: ISize = 1_024
 
   let _metrics_reporter: MetricsReporter
 
@@ -51,7 +53,12 @@ actor TCPSource is Producer
   var _read_len: USize = 0
   var _reading: Bool = false
   var _shutdown: Bool = false
-  var _muted: Bool = false
+  var _muted: Bool =
+    ifdef "backpressure" then
+      true
+    else
+      false
+    end
   var _expect_read_buf: Reader = Reader
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
@@ -73,7 +80,6 @@ actor TCPSource is Producer
     _metrics_reporter = consume metrics_reporter
     _listen = listen
     _notify = consume notify
-    _notify.set_origin(this)
     _connect_count = 0
     _fd = fd
     ifdef linux then
@@ -96,21 +102,24 @@ actor TCPSource is Producer
     //listening until we are done recovering
     _notify.accepted(this)
 
+    let handler: TCPSourceRouteCallbackHandler ref =
+      TCPSourceRouteCallbackHandler
+
     for consumer in routes.values() do
       _routes(consumer) =
-        _route_builder(this, consumer, _metrics_reporter)
+        _route_builder(this, consumer, handler, _metrics_reporter)
     end
 
     for (worker, boundary) in _outgoing_boundaries.pairs() do
       _routes(boundary) =
-        _route_builder(this, boundary, _metrics_reporter)
+        _route_builder(this, boundary, handler, _metrics_reporter)
     end
 
     match default_target
     | let r: CreditFlowConsumerStep =>
       match forward_route_builder
       | let frb: RouteBuilder val =>
-        _routes(r) = frb(this, r, _metrics_reporter)
+        _routes(r) = frb(this, r, handler, _metrics_reporter)
       end
     end
 
@@ -122,7 +131,7 @@ actor TCPSource is Producer
     end
 
     for r in _routes.values() do
-      r.application_initialized("TCPSource")
+      r.application_initialized(_max_route_credits, "TCPSource")
     end
 
   //////////////
@@ -161,6 +170,28 @@ actor TCPSource is Producer
 
   //
   // CREDIT FLOW
+  fun ref recoup_credits(credits: ISize) =>
+    // We don't hand credits upstream from a source, so we don't need to
+    // recoup them
+    None
+
+  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
+    ifdef debug then
+      Invariant(_routes.contains(from))
+    end
+
+    if _unregistered then
+      ifdef "credit_trace" then
+        @printf[I32]("Unregistered source returning credits unused\n".cstring())
+      end
+      from.return_credits(credits)
+    else
+      try
+        let route = _routes(from)
+        route.receive_credits(credits)
+      end
+    end
+
   fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
     try
       _routes(c)
@@ -170,6 +201,9 @@ actor TCPSource is Producer
 
   fun ref next_sequence_id(): U64 =>
     _seq_id = _seq_id + 1
+
+  fun ref current_sequence_id(): U64 =>
+    _seq_id
 
   //
   // TCP
@@ -465,3 +499,81 @@ actor TCPSource is Producer
     """
     // TODO: verify that removal of "in_sent" check is harmless
     _expect = _notify.expect(this, qty)
+
+class TCPSourceRouteCallbackHandler is RouteCallbackHandler
+  let _registered_routes: SetIs[RouteLogic tag] = _registered_routes.create()
+  var _muted: ISize = 0
+  let _timers: Timers = Timers
+
+  fun ref register(producer: Producer ref, r: RouteLogic tag) =>
+    ifdef debug then
+      Invariant(not _registered_routes.contains(r))
+    end
+
+    match producer
+    | let s: TCPSource ref =>
+      _registered_routes.set(r)
+      ifdef "backpressure" then
+        _try_mute(s)
+      end
+    else
+      Fail()
+    end
+
+  fun shutdown(producer: Producer ref) =>
+    match producer
+    | let p: TCPSource ref =>
+      p._hard_close()
+    else
+      Fail()
+    end
+
+  fun ref credits_initialized(producer: Producer ref, r: RouteLogic tag) =>
+    ifdef debug then
+      Invariant(_registered_routes.contains(r))
+    end
+
+    match producer
+    | let s: TCPSource ref =>
+      _try_unmute(s)
+    end
+
+  fun ref credits_replenished(producer: Producer ref) =>
+    ifdef debug then
+      Invariant(_muted > 0)
+    end
+
+    match producer
+    | let s: TCPSource ref =>
+      _try_unmute(s)
+      ifdef "credit_trace" then
+        @printf[I32]("Credits_replenished. Now _muted=%llu\n".cstring(),
+          _muted)
+      end
+    else
+      Fail()
+    end
+
+  fun ref credits_exhausted(producer: Producer ref) =>
+    match producer
+    | let s: TCPSource ref =>
+      _try_mute(s)
+      ifdef "credit_trace" then
+        @printf[I32]("Credits_exhausted. Now _muted=%llu\n".cstring(),
+          _muted)
+      end
+    else
+      Fail()
+    end
+
+  fun ref _try_mute(s: TCPSource ref) =>
+    if _muted == 0 then
+      s._mute()
+    end
+    _muted = _muted + 1
+
+  fun ref _try_unmute(s: TCPSource ref) =>
+    _muted = _muted - 1
+    if _muted == 0 then
+      s._unmute()
+    end

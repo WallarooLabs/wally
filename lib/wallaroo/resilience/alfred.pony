@@ -7,6 +7,8 @@ use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/routing"
 use "wallaroo/initialization"
+use "debug"
+
 
 //TODO: origin needs to get its own file
 trait tag Resilient
@@ -28,6 +30,7 @@ trait Backend
   fun ref start()
   fun ref write() ?
   fun ref encode_entry(entry: LogEntry)
+  fun has_replayed(): Bool
 
 class DummyBackend is Backend
   new create() => None
@@ -36,6 +39,7 @@ class DummyBackend is Backend
   fun ref start() => None
   fun ref write() => None
   fun ref encode_entry(entry: LogEntry) => None
+  fun has_replayed() : Bool => false
 
 class FileBackend is Backend
   //a record looks like this:
@@ -140,17 +144,13 @@ class FileBackend is Backend
         // iterate through recovered buffer and replay entries at or below
         // watermark
         for entry in replay_buffer.values() do
-          try
-            // only replay if at or below watermark
-            if entry._5 <= watermarks(entry._1) then
-              num_replayed = num_replayed + 1
-              _alfred.replay_log_entry(entry._1, entry._2, entry._3, entry._4
-                                      , entry._6)
-            else
-              num_skipped = num_skipped + 1
-            end
+          // only replay if at or below watermark
+          if entry._5 <= watermarks.get_or_else(entry._1, 0) then
+            num_replayed = num_replayed + 1
+            _alfred.replay_log_entry(entry._1, entry._2, entry._3, entry._4
+                                    , entry._6)
           else
-            Fail()
+            num_skipped = num_skipped + 1
           end
         end
 
@@ -182,6 +182,12 @@ class FileBackend is Backend
      let frac_ids: None, let statechange_id: U64, let seq_id: U64,
      let payload: Array[ByteSeq] val)
     = consume entry
+
+    if is_watermark then
+      Debug("Writing Watermark: " + seq_id.string())
+    else
+      Debug("Writing Message: " + seq_id.string())
+    end
 
     _writer.bool(is_watermark)
     _writer.u128_be(origin_id)
@@ -221,6 +227,7 @@ class FileBackend is Backend
       error
     end
 
+  fun has_replayed() : Bool => _replay_on_start
 
 actor Alfred
     let _origins: Map[U128, (Resilient & Producer)] = _origins.create()
@@ -255,6 +262,18 @@ actor Alfred
 
     be start(initializer: LocalTopologyInitializer) =>
       _backend.start()
+      //force a 0 watermark at the beginning of the logfile
+      @printf[I32]("foo\n".cstring())
+      if not _backend.has_replayed() then
+        for o in _origins.keys() do
+          @printf[I32]("force 0 watermark: %s\n".cstring(),
+          o.string().cstring())
+          _backend.encode_entry((true, o, 0, None, 0, 0, recover Array[ByteSeq] end))
+          num_encoded = num_encoded + 1
+          _flush_waiting = _flush_waiting + 1
+          write_log()
+        end
+      end
       initializer.report_alfred_ready_to_work()
 
     be register_incoming_boundary(boundary: DataReceiver tag) =>
@@ -297,6 +316,9 @@ actor Alfred
     be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None,
       statechange_id: U64, payload: ByteSeq val)
     =>
+      try
+        _origins(origin_id)
+      end
       try
         _origins(origin_id).replay_log_entry(uid, frac_ids, statechange_id,
           payload)
@@ -342,6 +364,9 @@ actor Alfred
       end
 
     be flush_buffer(origin_id: U128, low_watermark:U64) =>
+      _flush_buffer(origin_id, low_watermark)
+
+    fun ref _flush_buffer(origin_id: U128, low_watermark:U64) =>
       ifdef "trace" then
         @printf[I32](("flush_buffer for id: " +
           origin_id.string() + "\n\n").cstring())

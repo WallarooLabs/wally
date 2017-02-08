@@ -26,6 +26,8 @@ actor Main
     var variable_size = false
     var msg_size: USize = 80
     var write_to_file: Bool = true
+    var binary_integer: Bool = false
+    var start_from: U64 = 0
 
     if run_tests then
       TestMain(env)
@@ -51,6 +53,8 @@ actor Main
           .add("interval", "i", I64Argument)
           .add("repeat", "r", None)
           .add("binary", "y", None)
+          .add("u64", "u", None)
+          .add("start-from", "v", I64Argument)
           .add("variable-size", "z", None)
           .add("msg-size", "g", I64Argument)
           .add("no-write", "w", None)
@@ -66,6 +70,8 @@ actor Main
           | ("interval", let arg: I64) => interval = arg.u64()
           | ("repeat", None) => should_repeat = true
           | ("binary", None) => binary_fmt = true
+          | ("u64", None) => binary_integer = true
+          | ("start-from", let arg: I64) => start_from = arg.u64()
           | ("variable-size", None) => variable_size = true
           | ("msg-size", let arg: I64) => g_arg = arg.usize()
           | ("no-write", None) => write_to_file = false
@@ -166,7 +172,12 @@ actor Main
                 MultiFileDataSource(consume paths, should_repeat)
               end
             else
-              IntegerDataSource
+              if binary_integer
+              then
+                BinaryIntegerDataSource(start_from)
+              else
+                IntegerDataSource(start_from)
+              end
             end
 
           let sa = SendingActor(
@@ -198,9 +209,6 @@ class ToBuffyNotify is TCPConnectionNotify
     _coordinator.to_buffy_socket(sock, Failed)
 
   fun ref connected(sock: TCPConnection ref) =>
-    if sock.local_address() != sock.remote_address() then
-      sock.set_nodelay(true)
-    end
     _coordinator.to_buffy_socket(sock, Ready)
 
   fun ref throttled(sock: TCPConnection ref) =>
@@ -222,9 +230,6 @@ class ToDagonNotify is TCPConnectionNotify
     _coordinator.to_dagon_socket(sock, Failed)
 
   fun ref connected(sock: TCPConnection ref) =>
-    if sock.local_address() != sock.remote_address() then
-      sock.set_nodelay(true)
-    end
     _coordinator.to_dagon_socket(sock, Ready)
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
@@ -559,10 +564,10 @@ class SentLogEncoder
 //
 
 class IntegerDataSource is Iterator[String]
-  var _counter: U32
+  var _counter: U64
 
-  new iso create() =>
-    _counter = 0
+  new iso create(start_from: U64 = 0) =>
+    _counter = start_from
 
   fun ref has_next(): Bool =>
     true
@@ -571,6 +576,18 @@ class IntegerDataSource is Iterator[String]
     _counter = _counter + 1
     _counter.string()
 
+class BinaryIntegerDataSource is Iterator[Array[U8] val]
+  var _counter: U64
+
+  new iso create(start_from: U64 = 0) =>
+    _counter = start_from
+
+  fun ref has_next(): Bool =>
+    true
+
+  fun ref next(): Array[U8] val =>
+    _counter = _counter + 1
+    Bytes.from_u64(_counter, Bytes.from_u32(U32(8)))
 
 class FileDataSource is Iterator[String]
   let _lines: Iterator[String]

@@ -702,16 +702,25 @@ class iso _TestOutgoingToIncomingBadEviction is UnitTest
     end
 
 actor _TestProducer is Producer
+  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
+    None
+
   be mute(c: CreditFlowConsumer) =>
     None
 
   be unmute(c: CreditFlowConsumer) =>
     None
 
+  fun ref recoup_credits(credits: ISize) =>
+    None
+
   fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
     None
 
   fun ref next_sequence_id(): U64 =>
+    0
+
+  fun ref current_sequence_id(): U64 =>
     0
 
   fun ref _x_resilience_routes(): Routes =>

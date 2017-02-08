@@ -39,7 +39,13 @@ actor EmptySink is CreditFlowConsumerStep
   be register_producer(producer: Producer) =>
     None
 
-  be unregister_producer(producer: Producer) =>
+  be unregister_producer(producer: Producer, credits_returned: ISize) =>
+    None
+
+  be credit_request(from: Producer) =>
+    None
+
+  be return_credits(credits: ISize) =>
     None
 
   be request_ack() =>

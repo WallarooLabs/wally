@@ -33,11 +33,11 @@ actor DataReceiver is Producer
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
   var _latest_conn: (TCPConnection | None) = None
+  var _replay_pending: Bool = false
 
   let _resilience_routes: DataReceiverRoutes = DataReceiverRoutes
 
   // Timer to periodically request acks to prevent deadlock.
-  var _timer_init: _TimerInit = _UninitializedTimerInit
   let _timers: Timers = Timers
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
@@ -49,19 +49,17 @@ actor DataReceiver is Producer
     _connections = connections
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
-
-  be data_connect(sender_step_id: U128, conn: TCPConnection) =>
-    _sender_step_id = sender_step_id
-    _latest_conn = conn
-
-  fun ref init_timer() =>
     ifdef "resilience" then
       let t = Timer(_RequestAck(this), 0, 15_000_000)
       _timers(consume t)
     end
-    // We are finished initializing timer, so set it to _EmptyTimerInit
-    // so we don't create two timers.
-    _timer_init = _EmptyTimerInit
+
+  be data_connect(sender_step_id: U128, conn: TCPConnection) =>
+    _sender_step_id = sender_step_id
+    _latest_conn = conn
+    if _replay_pending then
+      request_replay()
+    end
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
     _resilience_routes.receive_ack(route_id, seq_id)
@@ -92,9 +90,17 @@ actor DataReceiver is Producer
 
   be request_replay() =>
     try
-      let request_msg = ChannelMsgEncoder.request_replay(_worker_name,
-        _sender_step_id, _auth)
-      _connections.send_data(_sender_name, request_msg)
+      match _latest_conn
+      | let conn: TCPConnection =>
+        @printf[I32]("data receiver for worker %s requesting replay from sender %s\n".cstring(), _worker_name.cstring(), _sender_name.cstring())
+        let request_msg = ChannelMsgEncoder.request_replay(_worker_name,
+          _sender_step_id, _auth)
+        conn.writev(request_msg)
+        _replay_pending = false
+      else
+        _replay_pending = true
+      end
+
     else
       @printf[I32]("Error creating request replay message\n".cstring())
     end
@@ -146,7 +152,6 @@ actor DataReceiver is Producer
   be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    _timer_init(this)
     _estimated_boundary_queue_size = _estimated_boundary_queue_size + 1
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
@@ -169,12 +174,10 @@ actor DataReceiver is Producer
     end
 
   be request_ack() =>
-    if _last_id_acked < _last_id_seen then
-      _request_ack()
-    end
+    _request_ack()
 
   fun ref _request_ack() =>
-    _router.request_ack(_resilience_routes.unacked_route_ids())
+    _router.request_ack(this)
     _last_request = _ack_counter
 
   be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
@@ -219,10 +222,21 @@ actor DataReceiver is Producer
   be dispose() =>
     _timers.dispose()
 
+  // TODO: From credit flow producer part of Producer
+  // Remove once traits/interfaces are cleaned up
+  be receive_credits(credits: ISize, from: CreditFlowConsumer) =>
+    None
+
+  fun ref recoup_credits(credits: ISize) =>
+    None
+
   fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
     None
 
   fun ref next_sequence_id(): U64 =>
+    0
+
+  fun ref current_sequence_id(): U64 =>
     0
 
   be mute(c: CreditFlowConsumer) =>
@@ -236,16 +250,6 @@ actor DataReceiver is Producer
     | let conn: TCPConnection =>
       conn.unmute(c)
     end
-
-trait _TimerInit
-  fun apply(d: DataReceiver ref)
-
-class _UninitializedTimerInit is _TimerInit
-  fun apply(d: DataReceiver ref) =>
-    d.init_timer()
-
-class _EmptyTimerInit is _TimerInit
-  fun apply(d: DataReceiver ref) => None
 
 class _RequestAck is TimerNotify
   let _d: DataReceiver

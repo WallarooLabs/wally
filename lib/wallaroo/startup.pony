@@ -16,6 +16,9 @@ actor Startup
   new create(env: Env, application: Application val,
     app_name: (String val | None))
   =>
+    ifdef "backpressure" then
+      env.out.print("****BACKPRESSURE is active****")
+    end
     ifdef "resilience" then
       env.out.print("****RESILIENCE is active****")
     end
@@ -32,10 +35,7 @@ actor Startup
       recover Array[Array[String]] end
     var worker_count: USize = 1
     var is_initializer = false
-    var is_multi_worker = true
-    var connections: (Connections | None) = None
     var worker_initializer: (WorkerInitializer | None) = None
-    var application_initializer: (ApplicationInitializer | None) = None
     var worker_name = ""
     var resilience_dir = "/tmp"
     var alfred_file_length: (USize | None) = None
@@ -96,7 +96,6 @@ actor Startup
       if worker_count == 1 then
         env.out.print("Single worker topology")
         is_initializer = true
-        is_multi_worker = false
       else
         env.out.print(worker_count.string() + " worker topology")
       end
@@ -105,30 +104,24 @@ actor Startup
 
       let input_addrs: Array[Array[String]] val = consume i_addrs_write
       let m_addr = m_arg as Array[String]
-      (let c_addr, let c_host, let c_service) =
-        match c_arg
-        | let addr: Array[String] =>
-          (addr, addr(0), addr(1))
-        else
-          (Array[String], "", "")
-        end
-      (let d_addr: Array[String] val, let d_host, let d_service) =
-        match d_arg
-        | let addr: Array[String] =>
-          let d_addr_trn: Array[String] trn = recover Array[String] end
-          d_addr_trn.push(addr(0))
-          d_addr_trn.push(addr(1))
-          (consume d_addr_trn, addr(0), addr(1))
-        else
-          (recover Array[String] end, "", "")
-        end
-
+      let c_addr = c_arg as Array[String]
+      let c_host = c_addr(0)
+      let c_service = c_addr(1)
 
       let o_addr_ref = o_arg as Array[String]
       let o_addr_trn: Array[String] trn = recover Array[String] end
       o_addr_trn.push(o_addr_ref(0))
       o_addr_trn.push(o_addr_ref(1))
       let o_addr: Array[String] val = consume o_addr_trn
+
+      let d_addr_ref = d_arg as Array[String]
+      let d_addr_trn: Array[String] trn = recover Array[String] end
+      d_addr_trn.push(d_addr_ref(0))
+      d_addr_trn.push(d_addr_ref(1))
+      let d_addr: Array[String] val = consume d_addr_trn
+
+      let d_host = d_addr(0)
+      let d_service = d_addr(1)
 
       if worker_name == "" then
         env.out.print("You must specify a worker name via --worker-name/-n.")
@@ -152,12 +145,6 @@ actor Startup
           ("", "")
         end
 
-      if is_multi_worker then
-        connections = Connections(application.name(), worker_name, env, auth,
-          c_host, c_service, d_host, d_service, ph_host, ph_service,
-          metrics_conn, is_initializer)
-      end
-
       let name =  match app_name
         | let n: String => n
         else
@@ -173,9 +160,80 @@ actor Startup
         worker_name + ".tcp-control"
       let worker_names_file = resilience_dir + "/" + name + "-" + worker_name +
         ".workers"
+      let connection_addresses_file = resilience_dir + "/" + name + "-" +
+        worker_name + ".connection-addresses"
 
-      let alfred = Alfred(env, event_log_file
-        where backend_file_length = alfred_file_length)
+      var recovering: Bool = false
+
+      // check to see if we can recover
+      ifdef "resilience" then
+        let event_log_filepath: FilePath = FilePath(auth, event_log_file)
+        let local_topology_filepath: FilePath = FilePath(auth,
+          local_topology_file)
+        let data_channel_filepath: FilePath = FilePath(auth, data_channel_file)
+        let control_channel_filepath: FilePath = FilePath(auth,
+          control_channel_file)
+        let worker_names_filepath: FilePath = FilePath(auth, worker_names_file)
+        let connection_addresses_filepath: FilePath = FilePath(auth,
+          connection_addresses_file)
+        if not is_initializer then
+          if event_log_filepath.exists() or
+             local_topology_filepath.exists() or
+             data_channel_filepath.exists() or
+             control_channel_filepath.exists() or
+             worker_names_filepath.exists() or
+             connection_addresses_filepath.exists() then
+
+            if not (event_log_filepath.exists() and
+               local_topology_filepath.exists() and
+               data_channel_filepath.exists() and
+               control_channel_filepath.exists() and
+               worker_names_filepath.exists() and
+               connection_addresses_filepath.exists()) then
+
+              @printf[I32](("Some of the resilience recovery files are" +
+                " missing but others exist! Cannot continue!\n").cstring())
+              Fail()
+            else
+              @printf[I32]("Recovering from recovery files!!\n".cstring())
+              // we are recovering because all files exist
+              recovering = true
+            end
+          end
+        else
+          if event_log_filepath.exists() or
+             local_topology_filepath.exists() or
+             control_channel_filepath.exists() or
+             worker_names_filepath.exists() then
+
+            if not (event_log_filepath.exists() and
+               local_topology_filepath.exists() and
+               control_channel_filepath.exists() and
+               worker_names_filepath.exists()) then
+
+              @printf[I32](("Some of the resilience recovery files are" +
+                " missing but others exist! Cannot continue!\n").cstring())
+              Fail()
+            else
+              @printf[I32]("Recovering from recovery files!!\n".cstring())
+              // we are recovering because all files exist
+              recovering = true
+            end
+          end
+        end
+      end
+
+      let alfred = ifdef "resilience" then
+          Alfred(env, event_log_file
+            where backend_file_length = alfred_file_length)
+        else
+          Alfred(env, None)
+        end
+
+      let connections = Connections(application.name(), worker_name, env, auth,
+        c_host, c_service, d_host, d_service, ph_host, ph_service,
+        metrics_conn, is_initializer, connection_addresses_file)
+
       let local_topology_initializer = LocalTopologyInitializer(
         application, worker_name, worker_count, env, auth, connections,
         metrics_conn, is_initializer, alfred, input_addrs,
@@ -183,81 +241,55 @@ actor Startup
 
       if is_initializer then
         env.out.print("Running as Initializer...")
-        application_initializer = ApplicationInitializer(auth,
+        let application_initializer = ApplicationInitializer(auth,
           local_topology_initializer, input_addrs, o_addr, alfred)
-        if is_multi_worker then
-          match connections
-          | let conns: Connections =>
-            match application_initializer
-            | let ai: ApplicationInitializer =>
-              worker_initializer = WorkerInitializer(auth, worker_count, conns,
-                ai, local_topology_initializer, d_addr, metrics_conn)
-            end
-          else
-            Fail()
-          end
-        end
+
+        worker_initializer = WorkerInitializer(auth, worker_count, connections,
+          application_initializer, local_topology_initializer, d_addr,
+          metrics_conn)
         worker_name = "initializer"
       end
 
-      if is_multi_worker then
-        match connections
-        | let conns: Connections =>
-          let control_channel_filepath: FilePath = FilePath(auth, control_channel_file)
-          let control_notifier: TCPListenNotify iso =
-            ControlChannelListenNotifier(worker_name, env, auth, conns,
-            is_initializer, worker_initializer, local_topology_initializer,
-            alfred, control_channel_filepath)
+      let control_channel_filepath: FilePath = FilePath(auth, control_channel_file)
+      let control_notifier: TCPListenNotify iso =
+        ControlChannelListenNotifier(worker_name, env, auth, connections,
+        is_initializer, worker_initializer, local_topology_initializer,
+        alfred, control_channel_filepath)
 
-          ifdef "resilience" then
-            if is_initializer then
-              conns.make_and_register_recoverable_listener(
-                auth, consume control_notifier, control_channel_filepath,
-                c_host, c_service)
-            else
-              conns.make_and_register_recoverable_listener(
-                auth, consume control_notifier, control_channel_filepath)
-            end
-          else
-            if is_initializer then
-              conns.register_listener(
-                TCPListener(auth, consume control_notifier, c_host, c_service))
-            else
-              conns.register_listener(
-                TCPListener(auth, consume control_notifier))
-            end
-          end
+      ifdef "resilience" then
+        if is_initializer then
+          connections.make_and_register_recoverable_listener(
+            auth, consume control_notifier, control_channel_filepath,
+            c_host, c_service)
         else
-          Fail()
+          connections.make_and_register_recoverable_listener(
+            auth, consume control_notifier, control_channel_filepath)
+        end
+      else
+        if is_initializer then
+          connections.register_listener(
+            TCPListener(auth, consume control_notifier, c_host, c_service))
+        else
+          connections.register_listener(
+            TCPListener(auth, consume control_notifier))
         end
       end
 
       ifdef "resilience" then
-        // If the file worker_names_file exists we need to recover the list of
-        // known workers and recreate the data receivers
-        let worker_names_filepath: FilePath = FilePath(auth, worker_names_file)
-        if worker_names_filepath.exists() then
+        if recovering then
+          // need to do this before recreating the data connection as at that point
+          // replay starts
+          let worker_names_filepath: FilePath = FilePath(auth, worker_names_file)
           let recovered_workers = _recover_worker_names(worker_names_filepath)
-          if is_multi_worker then
-            local_topology_initializer.create_data_receivers(recovered_workers,
-              worker_initializer)
-          end
+          local_topology_initializer.recover_and_initialize(recovered_workers,
+            worker_initializer)
         end
       end
 
-      // TODO: We are not recreating the control channel connection from upstream!
-      if is_multi_worker then
+      if not recovering then
         match worker_initializer
         | let w: WorkerInitializer =>
           w.start(application)
-        end
-      else
-        match application_initializer
-        | let ai: ApplicationInitializer =>
-          ai.update_application(application)
-          ai.initialize(None, 1, recover Array[String] end)
-        else
-          Fail()
         end
       end
 
