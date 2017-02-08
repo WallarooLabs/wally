@@ -4,7 +4,7 @@ use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/routing"
-use "wallaroo/tcp-sink"
+use "wallaroo/tcp_sink"
 
 interface Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,

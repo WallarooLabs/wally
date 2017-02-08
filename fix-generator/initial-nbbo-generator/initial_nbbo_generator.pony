@@ -4,7 +4,7 @@ use "buffered"
 use "collections"
 use "debug"
 use "sendence/fix"
-use "sendence/fix-generator-utils"
+use "sendence/fix_generator_utils"
 use "random"
 use "time"
 
@@ -41,14 +41,14 @@ actor Main
        (symbols_file_path == "") then
       help()
       return
-    end 
+    end
 
-    try 
+    try
       let auth = env.root as AmbientAuth
 
       let nonrejected_symbols_file =
         File(FilePath(auth, symbols_file_path))
-      let rejected_symbols_file = 
+      let rejected_symbols_file =
         File(FilePath(auth, rejected_symbols_file_path))
       let rejected_instruments =
         generate_instruments(rejected_symbols_file)
@@ -118,7 +118,7 @@ actor InitialNbboFileGenerator
     generate_nbbo_messages(_nonrejected_instruments, false)
     write_to_file()
 
-  be generate_nbbo_messages(instruments: Array[InstrumentData val] val, 
+  be generate_nbbo_messages(instruments: Array[InstrumentData val] val,
     reject: Bool)
   =>
     for instrument in instruments.values() do

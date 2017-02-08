@@ -16,7 +16,7 @@ use "buffered"
 use "sendence/bytes"
 use "sendence/hub"
 use "wallaroo/"
-use "wallaroo/tcp-source"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 actor Main
@@ -31,7 +31,7 @@ actor Main
             WeightedTestFrameHandler)
             .to_state_partition[String, String, Result val, NormalState](UpdateState, NormalStateBuilder, "normal-state",
               symbol_data_partition where multi_worker = true)
-            .to_sink(ResultEncoder, recover [0] end) 
+            .to_sink(ResultEncoder, recover [0] end)
       end
       Startup(env, application, None)//, 1)
     else
@@ -54,7 +54,7 @@ class NormalStateChange is StateChange[NormalState]
 
   fun name(): String => _name
   fun id(): U64 => _id
-  
+
   new create(id': U64, name': String) =>
     _id = id'
     _name = name'
@@ -85,8 +85,8 @@ class NormalStateChangeBuilder is StateChangeBuilder[NormalState]
 primitive UpdateState is StateComputation[String, Result val, NormalState]
   fun name(): String => "Update Normal State"
 
-  fun apply(msg: String, 
-    sc_repo: StateChangeRepository[NormalState], 
+  fun apply(msg: String,
+    sc_repo: StateChangeRepository[NormalState],
     state: NormalState): (Result val, StateChange[NormalState] ref)
   =>
     // @printf[I32]("!!Update Normal State\n".cstring())
@@ -102,8 +102,8 @@ primitive UpdateState is StateComputation[String, Result val, NormalState]
 
     (Result(new_count, msg), state_change)
 
-  fun state_change_builders(): 
-    Array[StateChangeBuilder[NormalState] val] val 
+  fun state_change_builders():
+    Array[StateChangeBuilder[NormalState] val] val
   =>
     recover val
       let scbs = Array[StateChangeBuilder[NormalState] val]
@@ -152,7 +152,7 @@ primitive ResultEncoder
     wb.write(r.defaulted_string.array())
     wb.u64_be(r.letter_count)
     let payload = wb.done()
-    HubProtocol.payload("default-test", "reports:default-test", 
+    HubProtocol.payload("default-test", "reports:default-test",
       consume payload, wb)
     wb.done()
 

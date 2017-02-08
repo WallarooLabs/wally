@@ -16,7 +16,7 @@ use "buffered"
 use "sendence/bytes"
 use "sendence/hub"
 use "wallaroo/"
-use "wallaroo/tcp-source"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 actor Main
@@ -32,9 +32,9 @@ actor Main
             .to_state_partition[String, String, Result val, NormalState](UpdateState, NormalStateBuilder, "normal-state",
               symbol_data_partition where multi_worker = true,
               default_state_name = "default-state")
-            .to_sink(ResultEncoder, recover [0] end)                 
+            .to_sink(ResultEncoder, recover [0] end)
           .partition_default_target[String, Result val, DefaultState](
-            "Default Test", "default-state", UpdateDefaultState, 
+            "Default Test", "default-state", UpdateDefaultState,
             DefaultStateBuilder)
 
       end
@@ -59,7 +59,7 @@ class NormalStateChange is StateChange[NormalState]
 
   fun name(): String => _name
   fun id(): U64 => _id
-  
+
   new create(id': U64, name': String) =>
     _id = id'
     _name = name'
@@ -90,8 +90,8 @@ class NormalStateChangeBuilder is StateChangeBuilder[NormalState]
 primitive UpdateState is StateComputation[String, Result val, NormalState]
   fun name(): String => "Update Normal State"
 
-  fun apply(msg: String, 
-    sc_repo: StateChangeRepository[NormalState], 
+  fun apply(msg: String,
+    sc_repo: StateChangeRepository[NormalState],
     state: NormalState): (Result val, StateChange[NormalState] ref)
   =>
     // @printf[I32]("!!Update Normal State\n".cstring())
@@ -105,13 +105,13 @@ primitive UpdateState is StateComputation[String, Result val, NormalState]
     let new_count = state.count + 1
     state_change.update(new_count, msg)
 
-   let res = Result(new_count, msg) 
+   let res = Result(new_count, msg)
    // @printf[I32](("N>>>>R: [" + res.count.string() + " | " + res.defaulted_string + " | " + res.letter_count.string() + " |\n").cstring())
 
     (res, state_change)
 
-  fun state_change_builders(): 
-    Array[StateChangeBuilder[NormalState] val] val 
+  fun state_change_builders():
+    Array[StateChangeBuilder[NormalState] val] val
   =>
     recover val
       let scbs = Array[StateChangeBuilder[NormalState] val]
@@ -136,7 +136,7 @@ class DefaultStateChange is StateChange[DefaultState]
 
   fun name(): String => _name
   fun id(): U64 => _id
-  
+
   new create(id': U64, name': String) =>
     _id = id'
     _name = name'
@@ -168,12 +168,12 @@ class DefaultStateChangeBuilder is StateChangeBuilder[DefaultState]
   fun apply(id: U64): StateChange[DefaultState] =>
     DefaultStateChange(id, "DefaultStateChange")
 
-primitive UpdateDefaultState is StateComputation[String, Result val, 
+primitive UpdateDefaultState is StateComputation[String, Result val,
   DefaultState]
   fun name(): String => "Update Default State"
 
-  fun apply(msg: String, 
-    sc_repo: StateChangeRepository[DefaultState], 
+  fun apply(msg: String,
+    sc_repo: StateChangeRepository[DefaultState],
     state: DefaultState): (Result val, StateChange[DefaultState] ref)
   =>
     // @printf[I32]("!!Update Default State\n".cstring())
@@ -189,13 +189,13 @@ primitive UpdateDefaultState is StateComputation[String, Result val,
     let new_letter_count = state.letter_count + msg.size().u64()
     state_change.update(new_count, last_string, new_letter_count)
 
-    let res = Result(new_count, last_string, new_letter_count) 
+    let res = Result(new_count, last_string, new_letter_count)
     // @printf[I32](("D>>>>R: [" + res.count.string() + " | " + res.defaulted_string + " | " + res.letter_count.string() + " |\n").cstring())
 
     (res, state_change)
 
-  fun state_change_builders(): 
-    Array[StateChangeBuilder[DefaultState] val] val 
+  fun state_change_builders():
+    Array[StateChangeBuilder[DefaultState] val] val
   =>
     recover val
       let scbs = Array[StateChangeBuilder[DefaultState] val]
@@ -243,7 +243,7 @@ primitive ResultEncoder
     wb.write(r.defaulted_string.array())
     wb.u64_be(r.letter_count)
     let payload = wb.done()
-    HubProtocol.payload("default-test", "reports:default-test", 
+    HubProtocol.payload("default-test", "reports:default-test",
       consume payload, wb)
     wb.done()
 

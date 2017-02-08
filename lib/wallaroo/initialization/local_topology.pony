@@ -16,8 +16,8 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
 use "wallaroo/routing"
-use "wallaroo/tcp-sink"
-use "wallaroo/tcp-source"
+use "wallaroo/tcp_sink"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 class LocalTopology

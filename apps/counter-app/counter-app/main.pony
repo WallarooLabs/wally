@@ -36,8 +36,8 @@ use "lib:c++"
 use "buffered"
 use "wallaroo"
 use "wallaroo/topology"
-use "wallaroo/tcp-source"
-use "wallaroo/cpp-api/pony"
+use "wallaroo/tcp_source"
+use "wallaroo/cpp_api/pony"
 use "debug"
 
 use @get_partition_key[KeyP](idx: USize)
@@ -127,7 +127,7 @@ actor Main
             //   AccumulatorStateBuilder, "accumulator-builder")
             //
             // DUMMY COMPUTATION
-            // 
+            //
             // .to_stateful[CPPData val, CPPState](
             //   DummyComputationFactory(),
             //   AccumulatorStateBuilder, "accumulator-builder")

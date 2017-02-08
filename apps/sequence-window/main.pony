@@ -55,13 +55,13 @@ use "buffered"
 use "collections"
 use "sendence/bytes"
 use "wallaroo/"
-use "wallaroo/tcp-source"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 actor Main
   new create(env: Env) =>
     try
-      let part_ar: Array[(U64, USize)] val = recover 
+      let part_ar: Array[(U64, USize)] val = recover
         let pa = Array[(U64, USize)]
         pa.push((0,0))
         pa.push((1,1))

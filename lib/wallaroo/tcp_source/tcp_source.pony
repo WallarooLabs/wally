@@ -7,7 +7,7 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/routing"
-use "wallaroo/tcp-sink"
+use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,

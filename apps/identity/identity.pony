@@ -21,7 +21,7 @@ giles/sender/sender -b 127.0.0.1:7010 -m 10000000 -s 300 -i 2_500_000 -f apps/co
 use "buffered"
 use "sendence/bytes"
 use "wallaroo/"
-use "wallaroo/tcp-source"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 actor Main
@@ -57,7 +57,7 @@ class Complex
 
   fun plus(c: Complex val): Complex val =>
     Complex(_real + c._real, _imaginary + c._imaginary)
- 
+
   fun minus(c: Complex val): Complex val =>
     Complex(_real - c._real, _imaginary - c._imaginary)
 

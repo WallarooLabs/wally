@@ -3,7 +3,7 @@ use "files"
 use "buffered"
 use "collections"
 use "sendence/fix"
-use "sendence/fix-generator-utils"
+use "sendence/fix_generator_utils"
 use "random"
 use "ini"
 use "time"
@@ -32,7 +32,7 @@ actor Main
       let ini_file = File(FilePath(env.root as AmbientAuth, ini_file_path))
       let sections = IniParse(ini_file.lines())
       let nbbo_section = sections("nbbo")
-      nonrejected_instruments_file_path = 
+      nonrejected_instruments_file_path =
         nbbo_section("nonrejected_instruments_file")
       output_folder = nbbo_section("output_folder")
       output_msgs_per_sec = nbbo_section("output_msgs_per_sec").u64()
@@ -43,7 +43,7 @@ actor Main
       let instruments = generate_instruments(instruments_file)
 
       let nbbo_files_generator = NbboFilesGenerator(env, auth,
-        output_msgs_per_sec, messages_duration_secs, 
+        output_msgs_per_sec, messages_duration_secs,
         output_folder, instruments)
 
       env.out.print("Starting nbbo generation...")
@@ -150,7 +150,7 @@ actor NbboFilesGenerator
   fun ref generate_nbbo(timestamp: String) ? =>
     let index = _dice(1, _instruments.size().u64()).usize() - 1
     let instrument = _instruments(index)
-    let fix_nbbo_msg = RandomFixNbboGenerator(instrument, 
+    let fix_nbbo_msg = RandomFixNbboGenerator(instrument,
       _number_generator, false, timestamp)
     let fix_nbbo_string = FixMessageStringify.nbbo(fix_nbbo_msg)
     _file_limit_counter = _file_limit_counter + 1

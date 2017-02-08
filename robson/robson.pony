@@ -5,7 +5,7 @@ use "format"
 use "options"
 use "net"
 use "sendence/hub"
-use "sendence/wall-clock"
+use "sendence/wall_clock"
 
 actor Main
   new create(env: Env) =>

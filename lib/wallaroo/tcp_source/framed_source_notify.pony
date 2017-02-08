@@ -1,6 +1,6 @@
 use "time"
 use "sendence/guid"
-use "sendence/wall-clock"
+use "sendence/wall_clock"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"

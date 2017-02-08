@@ -10,7 +10,7 @@ use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
-use "wallaroo/tcp-source"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 actor Connections

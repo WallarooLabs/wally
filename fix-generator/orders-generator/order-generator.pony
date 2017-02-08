@@ -3,7 +3,7 @@ use "files"
 use "buffered"
 use "collections"
 use "sendence/fix"
-use "sendence/fix-generator-utils"
+use "sendence/fix_generator_utils"
 use "random"
 use "ini"
 use "time"
@@ -53,7 +53,7 @@ actor Main
       total_rejections =
         orders_section("total_rejections").u64()
       rejection_percent_per_sec =
-        (total_rejections.f64() / 
+        (total_rejections.f64() /
           (messages_duration_secs * output_msgs_per_sec).f64())
 
       let rejected_instruments_file = File(FilePath(auth,
@@ -65,7 +65,7 @@ actor Main
       let rejected_instruments =
         generate_instruments(rejected_instruments_file)
 
-      let order_file_generator = OrderFileGenerator(env, auth, 
+      let order_file_generator = OrderFileGenerator(env, auth,
         output_msgs_per_sec, msgs_processable_percent,
         messages_duration_secs, messages_skew_percent,
         instruments_skew_percent, rejection_percent_per_sec,
