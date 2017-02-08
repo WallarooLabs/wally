@@ -89,9 +89,6 @@ class ContainerQueue[Data, A: _Container[Data] ref]
       end
     end
     _size = _size + 1
-    // Assert(_data.size() <= space(), "Data size is not <= space()")
-    // Assert(_size <= space(), "Size is not <= space()")
-    // Assert(_size <= _data.size(), "Size is not <= data size")
 
   fun ref dequeue(): Data! ? =>
     if _size > 0 then
@@ -126,73 +123,4 @@ class ContainerQueue[Data, A: _Container[Data] ref]
       let to_clear = if _size < (n - 1) then (_size - 1) else n end
       _front_ptr = (_front_ptr + to_clear) and _mod
       _size = _size - to_clear
-      // _data.remove(0, to_clear)
     end
-
-//   fun values(): QueueValues[A, this->Array[A]]^ =>
-//     QueueValues[A, this->Array[A]](_data, _front_ptr, _back_ptr)
-
-//   fun pairs(): QueuePairs[A, this->Array[A]]^ =>
-//     QueuePairs[A, this->Array[A]](_data, _front_ptr, _back_ptr)
-
-// class QueueValues[A, B: Array[A] #read] is Iterator[B->A]
-//   let _data: B
-//   var _front: USize
-//   var _last_front: USize
-//   let _back: USize
-//   let _initial_front: USize
-
-//   new create(data: B, front: USize, back: USize) =>
-//     _data = data
-//     _front = front
-//     _last_front = _front
-//     _back = back
-//     _initial_front = front
-
-//   fun has_next(): Bool =>
-//     if _front >= _last_front then
-//       _front != _back
-//     else
-//       (_back < _data.size()) and (_front != _back)
-//     end
-
-//   fun ref next(): B->A ? =>
-//     _last_front = _front
-//     _data(_front = (_front + 1) % _data.size())
-
-//   fun ref rewind(): QueueValues[A, B] =>
-//     _front = _initial_front
-//     _last_front = _front
-//     this
-
-// class QueuePairs[A, B: Array[A] #read] is Iterator[(USize, B->A)]
-//   let _data: B
-//   var _front: USize
-//   var _last_front: USize
-//   let _back: USize
-//   let _initial_front: USize
-
-//   new create(data: B, front: USize, back: USize) =>
-//     _data = data
-//     _front = front
-//     _last_front = _front
-//     _back = back
-//     _initial_front = _front
-
-//   fun has_next(): Bool =>
-//     if _front >= _last_front then
-//       _front != _back
-//     else
-//       (_back < _data.size()) and (_front != _back)
-//     end
-
-//   fun ref next(): (USize, B->A) ? =>
-//     _last_front = _front
-//     let relative_idx =
-//       if _front >= _initial_front then
-//         _front - _initial_front
-//       else
-//         _front + (_data.size() - _initial_front)
-//       end
-//     (relative_idx, _data(_front = (_front + 1) % _data.size()))
-
