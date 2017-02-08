@@ -4,7 +4,7 @@ actor Main is TestList
   new create(env: Env) =>
     PonyTest(env, this)
 
-  new make(env: Env) => None
+  new make() => None
 
   fun tag tests(test: PonyTest) =>
     test(_TestFallorMsgEncoder)
@@ -31,7 +31,7 @@ class iso _TestFallorMsgEncoder is UnitTest
           end
         end
       end
-    end 
+    end
     let msgs = FallorMsgDecoder(consume bytes)
 
     h.assert_eq[USize](msgs.size(), 4)
