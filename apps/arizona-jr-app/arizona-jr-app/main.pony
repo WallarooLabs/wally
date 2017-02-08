@@ -25,8 +25,8 @@ use "collections"
 
 use "wallaroo"
 use "wallaroo/topology"
-use "wallaroo/tcp-source"
-use "wallaroo/cpp-api/pony"
+use "wallaroo/tcp_source"
+use "wallaroo/cpp_api/pony"
 use "debug"
 
 use @get_partition_key[KeyP](client_id: U64)

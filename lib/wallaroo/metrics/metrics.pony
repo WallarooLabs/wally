@@ -4,7 +4,7 @@ use "json"
 use "net"
 use "time"
 use "sendence/hub"
-use "sendence/wall-clock"
+use "sendence/wall_clock"
 
 type MetricsCategory is
   (ComputationCategory | StartToEndCategory | NodeIngressEgressCategory)

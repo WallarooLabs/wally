@@ -3,7 +3,7 @@ use "wallaroo/boundary"
 use "wallaroo/metrics"
 use "wallaroo/resilience"
 use "wallaroo/routing"
-use "wallaroo/tcp-sink"
+use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
 class TCPSourceListenerBuilder

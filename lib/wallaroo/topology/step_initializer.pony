@@ -5,8 +5,8 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
 use "wallaroo/routing"
-use "wallaroo/tcp-source"
-use "wallaroo/tcp-sink"
+use "wallaroo/tcp_source"
+use "wallaroo/tcp_sink"
 
 type StepInitializer is (StepBuilder | //PartitionedStateStepBuilder |
   SourceData | EgressBuilder)

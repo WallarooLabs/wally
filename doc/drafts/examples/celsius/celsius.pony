@@ -1,7 +1,7 @@
 use "buffered"
 use "sendence/bytes"
 use "wallaroo"
-use "wallaroo/tcp-source"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 actor Main

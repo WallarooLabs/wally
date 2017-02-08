@@ -3,7 +3,7 @@ use "options"
 use "files"
 use "sendence/messages"
 use "sendence/fix"
-use "sendence/new-fix"
+use "sendence/new_fix"
 use "buffered"
 use "collections"
 
@@ -28,7 +28,7 @@ actor Main
         | ("input", let arg: String) => input_file_path = arg
         | ("output", let arg: String) => output_file_path = arg
         | ("readable", None) => readable = true
-        | ("help", None) => 
+        | ("help", None) =>
           help()
           return
         end
@@ -57,7 +57,7 @@ actor Main
           match FixishMsgDecoder(consume next)
           | let m: FixOrderMessage val =>
             output_file.print(m.string())
-          | let m: FixNbboMessage val => 
+          | let m: FixNbboMessage val =>
             output_file.print(m.string())
           end
           left = left - (4 + size)
@@ -67,20 +67,20 @@ actor Main
         var p = true
         for line in input_file.lines() do
           match FixParser(line)
-          | let m: FixOrderMessage val => 
+          | let m: FixOrderMessage val =>
             try
               if m.order_id().size() != 6 then error end
               if m.transact_time().size() != 21 then error end
 
               let symbol = pad_symbol(m.symbol())
               let encoded = FixishMsgEncoder.order(m.side(), m.account(),
-                m.order_id(), symbol, m.order_qty(), m.price(), 
+                m.order_id(), symbol, m.order_qty(), m.price(),
                 m.transact_time())
               wb.writev(encoded)
             else
               @printf[I32]("Error: Field size not respected\n".cstring())
             end
-          | let m: FixNbboMessage val => 
+          | let m: FixNbboMessage val =>
             try
               if m.transact_time().size() != 21 then error end
               let symbol = pad_symbol(m.symbol())
@@ -94,8 +94,8 @@ actor Main
           end
         end
         output_file.writev(wb.done())
-      end 
-      
+      end
+
       input_file.dispose()
       output_file.dispose()
     else
@@ -104,7 +104,7 @@ actor Main
 
   fun pad_symbol(symbol': String): String =>
     var symbol = symbol'
-    var symbol_diff = 
+    var symbol_diff =
       if symbol.size() < 4 then
         4 - symbol.size()
       else

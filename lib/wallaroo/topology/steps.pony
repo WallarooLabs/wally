@@ -4,7 +4,7 @@ use "collections"
 use "net"
 use "time"
 use "sendence/guid"
-use "sendence/wall-clock"
+use "sendence/wall_clock"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/initialization"
@@ -13,7 +13,7 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
 use "wallaroo/routing"
-use "wallaroo/tcp-sink"
+use "wallaroo/tcp_sink"
 
 // TODO: CREDITFLOW- Every runnable step is also a credit flow consumer
 // Really this should probably be another method on Consumer

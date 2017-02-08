@@ -1,5 +1,5 @@
-use "wallaroo/tcp-source"
-use "wallaroo/tcp-sink"
+use "wallaroo/tcp_source"
+use "wallaroo/tcp_sink"
 
 class MySourceBuilder is SourceBuilder
   let _handler: MyHandler val
