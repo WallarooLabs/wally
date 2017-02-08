@@ -90,4 +90,9 @@ install:
 script:
   - cd lib/wallaroo;
     stable env ponyc;
-    ./wallaroo
+    ./wallaroo;
+    cd -;
+  - cd lib/sendence/;
+    stable env ponyc;
+    ./sendence;
+    cd -;
