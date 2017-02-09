@@ -44,7 +44,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   var _mute_outstanding: Bool = false
 
   // TCP
-  var _notify: _OutgoingBoundaryNotify
+  var _notify: WallarooOutgoingNetworkActorNotify
   var _read_buf: Array[U8] iso
   var _next_size: USize
   let _max_size: USize
@@ -782,84 +782,6 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   fun _backup_queue_is_overflowing(): Bool =>
     _queue.size() >= 16_384
-
-interface _OutgoingBoundaryNotify
-  fun ref connecting(conn: OutgoingBoundary ref, count: U32) =>
-    """
-    Called if name resolution succeeded for a TCPConnection and we are now
-    waiting for a connection to the server to succeed. The count is the number
-    of connections we're trying. The notifier will be informed each time the
-    count changes, until a connection is made or connect_failed() is called.
-    """
-    None
-
-  fun ref connected(conn: OutgoingBoundary ref) =>
-    """
-    Called when we have successfully connected to the server.
-    """
-    None
-
-  fun ref connect_failed(conn: OutgoingBoundary ref) =>
-    """
-    Called when we have failed to connect to all possible addresses for the
-    server. At this point, the connection will never be established.
-    """
-    Fail()
-
-  fun ref sentv(conn: OutgoingBoundary ref, data: ByteSeqIter): ByteSeqIter =>
-    """
-    Called when multiple chunks of data are sent to the connection in a single
-    call. This gives the notifier an opportunity to modify the sent data chunks
-    before they are written. To swallow the send, return an empty
-    Array[String].
-    """
-    data
-
-  fun ref received(conn: OutgoingBoundary ref, data: Array[U8] iso,
-    times: USize): Bool
-  =>
-    """
-    Called when new data is received on the connection. Return true if you
-    want to continue receiving messages without yielding until you read
-    max_size on the TCPConnection.  Return false to cause the TCPConnection
-    to yield now.
-
-    `times` parameter is the number of times this method has been called during
-    this behavior. Starts at 1.
-    """
-    true
-
-  fun ref expect(conn: OutgoingBoundary ref, qty: USize): USize =>
-    """
-    Called when the connection has been told to expect a certain quantity of
-    bytes. This allows nested notifiers to change the expected quantity, which
-    allows a lower level protocol to handle any framing (e.g. SSL).
-    """
-    qty
-
-  fun ref closed(conn: OutgoingBoundary ref) =>
-    """
-    Called when the connection is closed.
-    """
-    None
-
-  fun ref throttled(conn: OutgoingBoundary ref) =>
-    """
-    Called when the connection starts experiencing TCP backpressure. You should
-    respond to this by pausing additional calls to `write` and `writev` until
-    you are informed that pressure has been released. Failure to respond to
-    the `throttled` notification will result in outgoing data queuing in the
-    connection and increasing memory usage.
-    """
-    None
-
-  fun ref unthrottled(conn: OutgoingBoundary ref) =>
-    """
-    Called when the connection stops experiencing TCP backpressure. Upon
-    receiving this notification, you should feel free to start making calls to
-    `write` and `writev` again.
-    """
-    None
 
 class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
