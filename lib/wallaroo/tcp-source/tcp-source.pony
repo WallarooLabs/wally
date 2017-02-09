@@ -21,7 +21,7 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 actor TCPSource is Producer
   """
   # TCPSource
-@
+
   ## Future work
   * Switch to requesting credits via promise
   """
