@@ -120,14 +120,6 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
     @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
-  be reconnect() =>
-    _connect_count = @pony_os_connect_tcp[U32](this,
-      _host.cstring(), _service.cstring(),
-      _from.cstring())
-    _notify_connecting()
-
-    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
-
   be application_initialized(initializer: LocalTopologyInitializer) =>
     try
       if _step_id == 0 then
@@ -145,6 +137,14 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
+
+  be reconnect() =>
+    _connect_count = @pony_os_connect_tcp[U32](this,
+      _host.cstring(), _service.cstring(),
+      _from.cstring())
+    _notify_connecting()
+
+    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
   be register_step_id(step_id: U128) =>
     _step_id = step_id
