@@ -702,13 +702,13 @@ class iso _TestOutgoingToIncomingBadEviction is UnitTest
     end
 
 actor _TestProducer is Producer
-  be mute(c: CreditFlowConsumer) =>
+  be mute(c: Consumer) =>
     None
 
-  be unmute(c: CreditFlowConsumer) =>
+  be unmute(c: Consumer) =>
     None
 
-  fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
+  fun ref route_to(c: Consumer): (Route | None) =>
     None
 
   fun ref next_sequence_id(): U64 =>

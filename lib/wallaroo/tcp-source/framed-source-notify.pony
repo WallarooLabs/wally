@@ -41,7 +41,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
 
-  fun routes(): Array[CreditFlowConsumerStep] val =>
+  fun routes(): Array[ConsumerStep] val =>
     _router.routes()
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>

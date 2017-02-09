@@ -26,7 +26,7 @@ actor TCPSource is Producer
   * Switch to requesting credits via promise
   """
   // Credit Flow
-  let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
+  let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _tcp_sinks: Array[TCPSink] val
@@ -59,10 +59,10 @@ actor TCPSource is Producer
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
-    routes: Array[CreditFlowConsumerStep] val, route_builder: RouteBuilder val,
+    routes: Array[ConsumerStep] val, route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val,
-    fd: U32, default_target: (CreditFlowConsumerStep | None) = None,
+    fd: U32, default_target: (ConsumerStep | None) = None,
     forward_route_builder: (RouteBuilder val | None) = None,
     init_size: USize = 64, max_size: USize = 16384,
     metrics_reporter: MetricsReporter iso)
@@ -106,7 +106,7 @@ actor TCPSource is Producer
     end
 
     match default_target
-    | let r: CreditFlowConsumerStep =>
+    | let r: ConsumerStep =>
       match forward_route_builder
       | let frb: RouteBuilder val =>
         _routes(r) = frb(this, r, _metrics_reporter)
@@ -160,7 +160,7 @@ actor TCPSource is Producer
 
   //
   // CREDIT FLOW
-  fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
+  fun ref route_to(c: Consumer): (Route | None) =>
     try
       _routes(c)
     else
@@ -444,12 +444,12 @@ actor TCPSource is Producer
       _pending_reads()
     end
 
-  be mute(c: CreditFlowConsumer) =>
+  be mute(c: Consumer) =>
     @printf[I32]("MUTE\n".cstring())
     _muted_downstream.set(c)
     _mute()
 
-  be unmute(c: CreditFlowConsumer) =>
+  be unmute(c: Consumer) =>
     @printf[I32]("UNMUTE\n".cstring())
     _muted_downstream.unset(c)
 

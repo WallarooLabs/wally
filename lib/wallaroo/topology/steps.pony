@@ -16,8 +16,8 @@ use "wallaroo/routing"
 use "wallaroo/tcp-sink"
 
 // TODO: CREDITFLOW- Every runnable step is also a credit flow consumer
-// Really this should probably be another method on CreditFlowConsumer
-// At which point CreditFlowConsumerStep goes away as well
+// Really this should probably be another method on Consumer
+// At which point ConsumerStep goes away as well
 trait tag RunnableStep
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
@@ -39,7 +39,7 @@ interface Initializable
   be application_initialized(initializer: LocalTopologyInitializer)
   be application_ready_to_work(initializer: LocalTopologyInitializer)
 
-type CreditFlowConsumerStep is (RunnableStep & CreditFlowConsumer & Initializable tag)
+type ConsumerStep is (RunnableStep & Consumer & Initializable tag)
 
 actor Step is (RunnableStep & Resilient & Producer &
   Consumer & Initializable)
@@ -66,7 +66,7 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   let _filter_route_id: RouteId = GuidGenerator.u64()
 
-  let _routes: MapIs[CreditFlowConsumer, Route] = _routes.create()
+  let _routes: MapIs[Consumer, Route] = _routes.create()
   var _upstreams: Array[Producer] = _upstreams.create()
 
   // Lifecycle
@@ -115,7 +115,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
 
     match _default_target
-    | let r: CreditFlowConsumerStep =>
+    | let r: ConsumerStep =>
       _routes(r) = _route_builder(this, r, _metrics_reporter)
     end
 
@@ -355,7 +355,7 @@ actor Step is (RunnableStep & Resilient & Producer &
   be dispose() =>
     None
 
-  fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
+  fun ref route_to(c: Consumer): (Route | None) =>
     try
       _routes(c)
     else
@@ -379,12 +379,12 @@ actor Step is (RunnableStep & Resilient & Producer &
       _upstreams.delete(i)
     end
 
-  be mute(c: CreditFlowConsumer) =>
+  be mute(c: Consumer) =>
     for u in _upstreams.values() do
       u.mute(c)
     end
 
-  be unmute(c: CreditFlowConsumer) =>
+  be unmute(c: Consumer) =>
     for u in _upstreams.values() do
       u.unmute(c)
     end

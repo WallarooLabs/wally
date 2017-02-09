@@ -30,13 +30,11 @@ trait RouteLogic
 
 class _RouteLogic is RouteLogic
   let _step: Producer ref
-  let _consumer: CreditFlowConsumer
+  let _consumer: Consumer
   var _step_type: String = ""
   var _route_type: String = ""
 
-  new create(step: Producer ref, consumer: CreditFlowConsumer,
-    r_type: String)
-  =>
+  new create(step: Producer ref, consumer: Consumer, r_type: String) =>
     _step = step
     _consumer = consumer
     _route_type = r_type

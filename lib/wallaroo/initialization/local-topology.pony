@@ -66,7 +66,7 @@ class LocalTopology
     metrics_conn: MetricsSink, alfred: Alfred,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
-    data_routes: Map[U128, CreditFlowConsumerStep tag],
+    data_routes: Map[U128, ConsumerStep tag],
     default_router: (Router val | None)) ?
   =>
     let subpartition =
@@ -358,12 +358,12 @@ actor LocalTopologyInitializer
 
         // For passing into partition builders so they can add state steps
         // to our data routes
-        let data_routes_ref = Map[U128, CreditFlowConsumerStep tag]
+        let data_routes_ref = Map[U128, ConsumerStep tag]
 
-        // Keep track of all CreditFlowConsumerSteps by id so we can create a
+        // Keep track of all ConsumerSteps by id so we can create a
         // DataRouter for the data channel boundary
-        var data_routes: Map[U128, CreditFlowConsumerStep tag] trn =
-          recover Map[U128, CreditFlowConsumerStep tag] end
+        var data_routes: Map[U128, ConsumerStep tag] trn =
+          recover Map[U128, ConsumerStep tag] end
 
         let tcp_sinks_trn: Array[TCPSink] trn = recover Array[TCPSink] end
 
@@ -383,8 +383,8 @@ actor LocalTopologyInitializer
         // Keep track of steps we've built that we'll use for the OmniRouter.
         // Unlike data_routes, these will not include state steps, which will
         // never be direct targets for state computation outputs.
-        let built_stateless_steps: Map[U128, CreditFlowConsumerStep] trn =
-          recover Map[U128, CreditFlowConsumerStep] end
+        let built_stateless_steps: Map[U128, ConsumerStep] trn =
+          recover Map[U128, ConsumerStep] end
 
         // TODO: Replace this when we move past the temporary POC based default
         // target strategy. There can currently only be one partition default

@@ -58,7 +58,7 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
 interface StateAddresses
   fun apply(key: Any val): (Step tag | ProxyRouter val | None)
   fun register_routes(router: Router val, route_builder: RouteBuilder val)
-  fun steps(): Array[CreditFlowConsumerStep] val
+  fun steps(): Array[ConsumerStep] val
 
 class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
   let _addresses: Map[Key, (Step | ProxyRouter val)] val
@@ -86,12 +86,12 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
       end
     end
 
-  fun steps(): Array[CreditFlowConsumerStep] val =>
-    let ss: Array[CreditFlowConsumerStep] trn =
-      recover Array[CreditFlowConsumerStep] end
+  fun steps(): Array[ConsumerStep] val =>
+    let ss: Array[ConsumerStep] trn =
+      recover Array[ConsumerStep] end
     for s in _addresses.values() do
       match s
-      | let cfcs: CreditFlowConsumerStep =>
+      | let cfcs: ConsumerStep =>
         ss.push(cfcs)
       end
     end
@@ -104,7 +104,7 @@ trait StateSubpartition
     auth: AmbientAuth, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
-    data_routes: Map[U128, CreditFlowConsumerStep tag],
+    data_routes: Map[U128, ConsumerStep tag],
     default_router: (Router val | None) = None): PartitionRouter val
 
 class KeyedStateSubpartition[PIn: Any val,
@@ -131,7 +131,7 @@ class KeyedStateSubpartition[PIn: Any val,
     auth: AmbientAuth, alfred: Alfred,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
-    data_routes: Map[U128, CreditFlowConsumerStep tag],
+    data_routes: Map[U128, ConsumerStep tag],
     default_router: (Router val | None) = None):
     LocalPartitionRouter[PIn, Key] val
   =>

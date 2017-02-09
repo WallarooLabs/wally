@@ -32,9 +32,9 @@ actor Main
     // its a behind the scenes thing
     // maybe "MySourceBuilder" is a behind the scenes thing
     let builder = MySourceBuilder(MyHandler, runner)
-    let consumers: Array[CreditFlowConsumer] trn = recover trn Array[CreditFlowConsumer] end
+    let consumers: Array[Consumer] trn = recover trn Array[Consumer] end
     consumers.push(sink)
-    let c: Array[CreditFlowConsumer] val = consume consumers
+    let c: Array[Consumer] val = consume consumers
     let listener = TCPSourceListener(consume builder,
       c,
       "127.0.0.1", "7000")

@@ -14,11 +14,11 @@ class TypedRoute[In: Any val] is Route
   let _route_id: U64 = 1 + GuidGenerator.u64() // route 0 is used for filtered messages
   var _step_type: String = ""
   let _step: Producer ref
-  let _consumer: CreditFlowConsumerStep
+  let _consumer: ConsumerStep
   let _metrics_reporter: MetricsReporter
   var _route: RouteLogic = _EmptyRouteLogic
 
-  new create(step: Producer ref, consumer: CreditFlowConsumerStep,
+  new create(step: Producer ref, consumer: ConsumerStep,
     metrics_reporter: MetricsReporter ref)
   =>
     _step = step

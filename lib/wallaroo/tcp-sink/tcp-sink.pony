@@ -20,7 +20,7 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSink is (CreditFlowConsumer & RunnableStep & Initializable)
+actor TCPSink is (Consumer & RunnableStep & Initializable)
   """
   # TCPSink
 

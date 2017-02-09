@@ -175,7 +175,7 @@ class EgressBuilder
   fun apply(worker_name: String, reporter: MetricsReporter ref,
     auth: AmbientAuth,
     proxies: Map[String, OutgoingBoundary] val =
-      recover Map[String, OutgoingBoundary] end): CreditFlowConsumerStep tag ?
+      recover Map[String, OutgoingBoundary] end): ConsumerStep tag ?
   =>
     match _addr
     | let a: Array[String] val =>
