@@ -1,5 +1,4 @@
 trait tag Producer
-  // from CreditFlowProducer
   be mute(c: Consumer)
   be unmute(c: Consumer)
   fun ref route_to(c: Consumer): (Route | None)
