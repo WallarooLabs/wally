@@ -23,17 +23,19 @@ actor Connections
   let _data_conns: Map[String, OutgoingBoundary] = _data_conns.create()
   var _phone_home: (TCPConnection | None) = None
   let _metrics_conn: MetricsSink
+  let _metrics_host: String
+  let _metrics_service: String
   let _init_d_host: String
   let _init_d_service: String
   let _listeners: Array[TCPListener] = Array[TCPListener]
   let _guid_gen: GuidGenerator = GuidGenerator
   let _connection_addresses_file: String
 
-  new create(app_name: String, worker_name: String, env: Env,
-    auth: AmbientAuth, c_host: String, c_service: String, d_host: String,
-    d_service: String, ph_host: String, ph_service: String,
-    metrics_conn: MetricsSink, is_initializer: Bool,
-    connection_addresses_file: String)
+  new create(app_name: String, worker_name: String,
+    env: Env, auth: AmbientAuth, c_host: String, c_service: String,
+    d_host: String, d_service: String, ph_host: String, ph_service: String,
+    metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
+    is_initializer: Bool, connection_addresses_file: String)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -41,6 +43,8 @@ actor Connections
     _auth = auth
     _is_initializer = is_initializer
     _metrics_conn = metrics_conn
+    _metrics_host = metrics_host
+    _metrics_service = metrics_service
     _init_d_host = d_host
     _init_d_service = d_service
     _connection_addresses_file = connection_addresses_file
@@ -250,7 +254,7 @@ actor Connections
     service: String)
   =>
     let control_notifier: TCPConnectionNotify iso =
-      ControlSenderConnectNotifier(_env)
+      ControlSenderConnectNotifier(_env, _auth)
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
     _control_conns(target_name) = control_conn
@@ -283,6 +287,16 @@ actor Connections
       else
         @printf[I32](("Could not register step id for boundary to " + worker + "\n").cstring())
       end
+    end
+
+  be inform_joining_worker(conn: TCPConnection, worker: String) =>
+    try
+      let inform_msg = ChannelMsgEncoder.inform_joining_worker(_app_name,
+        _metrics_host, _metrics_service, _auth)
+      conn.writev(inform_msg)
+      @printf[I32]("Worker %s joined the cluster\n".cstring(), worker.cstring())
+    else
+      Fail()
     end
 
   be ack_watermark_to_boundary(receiver_name: String, seq_id: U64) =>

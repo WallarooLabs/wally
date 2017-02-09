@@ -20,6 +20,9 @@ primitive StartupHelp
         e.g. -r /tmp/data (no trailing slash)]
       --alfred-file-length/-l [Optionally sets initial file length for alfred
         backend file]
+      
+      --join/-j [When a new worker is joining a running cluster, pass the
+        control channel address of any worker as the value for this parameter]
       -----------------------------------------------------------------------------------
       """
     )
