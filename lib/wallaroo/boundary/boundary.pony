@@ -1,10 +1,8 @@
-use "assert"
 use "buffered"
 use "collections"
 use "net"
 use "time"
 use "sendence/bytes"
-use "sendence/guid"
 use "sendence/wall-clock"
 use "wallaroo/fail"
 use "wallaroo/initialization"
@@ -13,7 +11,6 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/routing"
-use "wallaroo/tcp-sink"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -35,7 +32,6 @@ class OutgoingBoundaryBuilder
 
 actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   // Steplike
-  // let _encoder: EncoderWrapper val
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
 
@@ -95,7 +91,6 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
-    // _encoder = encoder_wrapper
     _auth = auth
     _notify = BoundaryNotify(_auth)
     _worker_name = worker_name
@@ -278,7 +273,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   be dispose() =>
     """
-    Gracefully shuts down the sink. Allows all pending writes
+    Gracefully shuts down the outgoing boundary. Allows all pending writes
     to be sent but any writes that arrive after this will be
     silently discarded and not acknowleged.
     """
