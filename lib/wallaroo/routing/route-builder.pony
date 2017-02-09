@@ -3,11 +3,11 @@ use "wallaroo/metrics"
 use "wallaroo/topology"
 
 trait RouteBuilder
-  fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
+  fun apply(step: Producer ref, consumer: ConsumerStep,
     metrics_reporter: MetricsReporter ref): Route
 
 primitive TypedRouteBuilder[In: Any val] is RouteBuilder
-  fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
+  fun apply(step: Producer ref, consumer: ConsumerStep,
     metrics_reporter: MetricsReporter ref): Route
   =>
     match consumer
@@ -18,7 +18,7 @@ primitive TypedRouteBuilder[In: Any val] is RouteBuilder
     end
 
 primitive EmptyRouteBuilder is RouteBuilder
-  fun apply(step: Producer ref, consumer: CreditFlowConsumerStep,
+  fun apply(step: Producer ref, consumer: ConsumerStep,
     metrics_reporter: MetricsReporter ref): Route
   =>
     EmptyRoute

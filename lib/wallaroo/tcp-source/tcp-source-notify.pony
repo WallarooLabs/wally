@@ -8,7 +8,7 @@ interface TCPSourceNotify
   // on startup. It probably makes more sense to make this
   // available via the source builder that Listener gets
   // and it can then make routes available
-  fun ref routes(): Array[CreditFlowConsumerStep] val
+  fun ref routes(): Array[ConsumerStep] val
 
   fun ref accepted(conn: TCPSource ref) =>
     """

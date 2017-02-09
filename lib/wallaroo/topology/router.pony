@@ -12,7 +12,7 @@ interface Router
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
-  fun routes(): Array[CreditFlowConsumerStep] val
+  fun routes(): Array[ConsumerStep] val
 
 interface RouterBuilder
   fun apply(): Router val
@@ -26,13 +26,13 @@ class EmptyRouter
   =>
     (true, true, latest_ts)
 
-  fun routes(): Array[CreditFlowConsumerStep] val =>
-    recover val Array[CreditFlowConsumerStep] end
+  fun routes(): Array[ConsumerStep] val =>
+    recover val Array[ConsumerStep] end
 
 class DirectRouter
-  let _target: CreditFlowConsumerStep tag
+  let _target: ConsumerStep tag
 
-  new val create(target: CreditFlowConsumerStep tag) =>
+  new val create(target: ConsumerStep tag) =>
     _target = target
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -64,7 +64,7 @@ class DirectRouter
     end
 
 
-  fun routes(): Array[CreditFlowConsumerStep] val =>
+  fun routes(): Array[ConsumerStep] val =>
     recover val [_target] end
 
   fun has_sink(): Bool =>
@@ -77,11 +77,11 @@ class DirectRouter
 
 class ProxyRouter
   let _worker_name: String
-  let _target: CreditFlowConsumerStep tag
+  let _target: ConsumerStep tag
   let _target_proxy_address: ProxyAddress val
   let _auth: AmbientAuth
 
-  new val create(worker_name: String, target: CreditFlowConsumerStep tag,
+  new val create(worker_name: String, target: ConsumerStep tag,
     target_proxy_address: ProxyAddress val, auth: AmbientAuth)
   =>
     _worker_name = worker_name
@@ -127,7 +127,7 @@ class ProxyRouter
       ProxyAddress(_target_proxy_address.worker, target_id),
       _auth)
 
-  fun routes(): Array[CreditFlowConsumerStep] val =>
+  fun routes(): Array[ConsumerStep] val =>
     recover val [_target] end
 
 trait OmniRouter
@@ -151,12 +151,12 @@ class EmptyOmniRouter is OmniRouter
 
 class StepIdRouter is OmniRouter
   let _worker_name: String
-  let _data_routes: Map[U128, CreditFlowConsumerStep tag] val
+  let _data_routes: Map[U128, ConsumerStep tag] val
   let _step_map: Map[U128, (ProxyAddress val | U128)] val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
 
   new val create(worker_name: String,
-    data_routes: Map[U128, CreditFlowConsumerStep tag] val,
+    data_routes: Map[U128, ConsumerStep tag] val,
     step_map: Map[U128, (ProxyAddress val | U128)] val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val)
   =>
@@ -251,14 +251,14 @@ class StepIdRouter is OmniRouter
     end
 
 class DataRouter
-  let _data_routes: Map[U128, CreditFlowConsumerStep tag] val
+  let _data_routes: Map[U128, ConsumerStep tag] val
   let _target_ids_to_route_ids: Map[U128, RouteId] =
     _target_ids_to_route_ids.create()
   let _route_ids_to_target_ids: Map[RouteId, U128] =
     _route_ids_to_target_ids.create()
 
-  new val create(data_routes: Map[U128, CreditFlowConsumerStep tag] val =
-      recover Map[U128, CreditFlowConsumerStep tag] end)
+  new val create(data_routes: Map[U128, ConsumerStep tag] val =
+      recover Map[U128, ConsumerStep tag] end)
   =>
     _data_routes = data_routes
     var route_id: RouteId = 0
@@ -354,19 +354,9 @@ class DataRouter
     end
     ids
 
-  fun routes(): Array[CreditFlowConsumerStep] val =>
+  fun routes(): Array[ConsumerStep] val =>
     // TODO: CREDITFLOW - real implmentation?
-    recover val Array[CreditFlowConsumerStep] end
-
-  // fun routes(): Array[CreditFlowConsumer tag] val =>
-  //   let rs: Array[CreditFlowConsumer tag] trn =
-  //     recover Array[CreditFlowConsumer tag] end
-
-  //   for (k, v) in _routes.pairs() do
-  //     rs.push(v)
-  //   end
-
-  //   consume rs
+    recover val Array[ConsumerStep] end
 
 trait PartitionRouter is Router
   fun local_map(): Map[U128, Step] val
@@ -493,10 +483,10 @@ class LocalPartitionRouter[In: Any val,
       end
     end
 
-  fun routes(): Array[CreditFlowConsumerStep] val =>
+  fun routes(): Array[ConsumerStep] val =>
     // TODO: CREDITFLOW we need to handle proxies once we have boundary actors
-    let cs: Array[CreditFlowConsumerStep] trn =
-      recover Array[CreditFlowConsumerStep] end
+    let cs: Array[ConsumerStep] trn =
+      recover Array[ConsumerStep] end
 
     for s in _partition_routes.values() do
       match s

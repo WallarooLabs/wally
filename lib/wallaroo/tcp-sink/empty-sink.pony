@@ -4,7 +4,7 @@ use "wallaroo/initialization"
 use "wallaroo/routing"
 use "wallaroo/topology"
 
-actor EmptySink is CreditFlowConsumerStep
+actor EmptySink is ConsumerStep
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
     frac_ids: None, seq_id: SeqId, route_id: RouteId,

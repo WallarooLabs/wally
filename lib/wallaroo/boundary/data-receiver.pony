@@ -16,7 +16,7 @@ actor DataReceiver is Producer
   var _sender_step_id: U128 = 0
   let _connections: Connections
   var _router: DataRouter val =
-    DataRouter(recover Map[U128, CreditFlowConsumerStep tag] end)
+    DataRouter(recover Map[U128, ConsumerStep tag] end)
   var _last_id_seen: U64 = 0
   var _last_id_acked: U64 = 0
   var _connected: Bool = false
@@ -234,7 +234,7 @@ actor DataReceiver is Producer
   be dispose() =>
     _timers.dispose()
 
-  fun ref route_to(c: CreditFlowConsumer): (Route | None) =>
+  fun ref route_to(c: Consumer): (Route | None) =>
     None
 
   fun ref next_sequence_id(): U64 =>
@@ -243,13 +243,13 @@ actor DataReceiver is Producer
   fun ref current_sequence_id(): U64 =>
     0
 
-  be mute(c: CreditFlowConsumer) =>
+  be mute(c: Consumer) =>
     match _latest_conn
     | let conn: TCPConnection =>
       conn.mute(c)
     end
 
-  be unmute(c: CreditFlowConsumer) =>
+  be unmute(c: Consumer) =>
     match _latest_conn
     | let conn: TCPConnection =>
       conn.unmute(c)
