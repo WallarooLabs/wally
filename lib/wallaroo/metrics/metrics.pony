@@ -105,8 +105,8 @@ class MetricsReporter
     // TODO: Figure out how to switch to a map without a performance penalty
     // such as: `MapIs[(String, String, U16, String), _MetricsReporter]`
     // NOTE: Previous attempt to switch to the tuple map resulted in a
-    // negative performance impact so that is why the following string concat is
-    // still being used.
+    // negative performance impact so that is why the following string
+    // concat is still being used.
     let metric_name: String val = ifdef "detailed-metrics" then
       let str_size = _worker_name.size() + pipeline.size() + name.size() +
         prefix.size() + 6
