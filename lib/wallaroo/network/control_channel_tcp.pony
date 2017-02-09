@@ -3,8 +3,10 @@ use "collections"
 use "time"
 use "files"
 use "sendence/bytes"
+use "sendence/hub"
 use "wallaroo/initialization"
 use "wallaroo/messages"
+use "wallaroo/metrics"
 use "wallaroo/topology"
 use "wallaroo/resilience"
 
@@ -184,6 +186,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32]("Received CreateDataReceivers on Control Channel\n".cstring())
         end
         _local_topology_initializer.create_data_receivers(m.workers)
+      | let m: JoinClusterMsg val =>
+        _connections.inform_joining_worker(conn, m.worker_name)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")
       else
@@ -206,13 +210,44 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
 
 class ControlSenderConnectNotifier is TCPConnectionNotify
   let _env: Env
+  let _auth: AmbientAuth
+  var _header: Bool = true
 
-  new iso create(env: Env)
+  new iso create(env: Env, auth: AmbientAuth)
   =>
     _env = env
+    _auth = auth
+
+  fun ref connected(conn: TCPConnection ref) =>
+    conn.expect(4)
+    _header = true
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
   =>
-    _env.out.print("Control sender channel received data.")
+    if _header then
+      try
+        let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
+        conn.expect(expect)
+        _header = false
+      else
+        _env.err.print("Error reading header on control channel")
+      end
+    else
+      let msg = ChannelMsgDecoder(consume data, _auth)
+      match msg
+      | let m: InformJoiningWorkerMsg val =>
+        let metrics_conn = MetricsSink(m.metrics_host, m.metrics_service)
+
+        let connect_msg = HubProtocol.connect()
+        let metrics_join_msg = HubProtocol.join("metrics:" + m.metrics_app_name)
+        metrics_conn.writev(connect_msg)
+        metrics_conn.writev(metrics_join_msg)
+        @printf[I32]("Received cluster information!\n".cstring())
+      else
+        _env.err.print("Incoming Channel Message type not handled by control channel.")
+      end
+      conn.expect(4)
+      _header = true
+    end
     true
