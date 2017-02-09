@@ -43,7 +43,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   var _initializer: (LocalTopologyInitializer | None) = None
   var _reported_initialized: Bool = false
 
-  // CreditFlow
+  // Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
 

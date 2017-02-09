@@ -49,7 +49,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
 
-  // CreditFlow
+  // Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
 
