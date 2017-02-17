@@ -37,8 +37,6 @@ class CPPComputation is Computation[CPPData val, CPPData val]
       @printf[I32]("result is not a DataP".cstring())
       None
     end
-    //SUPER-EVIL-DANGER-ZONE
-    input.delete_obj()
     ret
 
   fun name(): String =>
@@ -73,8 +71,6 @@ class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState
         @printf[I32]("returning the same object is not allowed".cstring())
       end
     end
-    //SUPER-EVIL-DANGER-ZONE
-    input.delete_obj()
     result
 
   fun name(): String =>
