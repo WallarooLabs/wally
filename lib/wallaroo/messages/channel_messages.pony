@@ -107,6 +107,25 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReplayMsg(delivery_bytes), auth)
 
+  fun join_cluster(worker_name: String, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    """
+    This message is sent from a worker requesting to join a running cluster to
+    any existing worker in the cluster.
+    """
+    _encode(JoinClusterMsg(worker_name), auth)
+
+  // TODO: Update this once new workers become first class citizens
+  fun inform_joining_worker(metric_app_name: String, metric_host: String,
+    metric_service: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    This message is sent as a response to a JoinCluster message. Currently it
+    only informs the new worker of metrics-related info
+    """
+    _encode(InformJoiningWorkerMsg(metric_app_name, metric_host, metric_service), auth)
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg val =>
     try
@@ -346,3 +365,28 @@ class RequestReplayMsg is DeliveryMsg
       @printf[I32]("RequestReplayMsg was not directed to an OutgoingBoundary!\n".cstring())
     end
     false
+
+class JoinClusterMsg is ChannelMsg
+  """  
+  This message is sent from a worker requesting to join a running cluster to
+  any existing worker in the cluster.
+  """
+  let worker_name: String
+
+  new val create(w: String) =>
+    worker_name = w
+
+class InformJoiningWorkerMsg is ChannelMsg
+  """  
+  This message is sent as a response to a JoinCluster message. Currently it
+  only informs the new worker of metrics-related info
+  """
+  let metrics_app_name: String
+  let metrics_host: String
+  let metrics_service: String
+
+  new val create(app: String, host: String, service: String) =>
+    metrics_app_name = app
+    metrics_host = host
+    metrics_service = service
+
