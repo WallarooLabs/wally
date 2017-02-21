@@ -5,6 +5,7 @@ use "net"
 use "promises"
 use "serialise"
 use "sendence/dag"
+use "sendence/equality"
 use "sendence/guid"
 use "sendence/messages"
 use "sendence/queue"
@@ -99,6 +100,49 @@ class LocalTopology
 
   fun proxy_ids(): Map[String, U128] val => _proxy_ids
 
+  fun update_proxy_address_for_state_key[Key: (Hashable val & Equatable[Key] val)](
+    state_name: String, key: Key, pa: ProxyAddress val): LocalTopology val ?
+  =>
+    let new_subpartition = _state_builders(state_name).update_key[Key](key, pa)
+    let new_state_builders: Map[String, StateSubpartition val] trn =
+      recover Map[String, StateSubpartition val] end
+    for (k, v) in _state_builders.pairs() do
+      new_state_builders(k) = v
+    end
+    new_state_builders(state_name) = new_subpartition
+    LocalTopology(_app_name, _worker_name, _graph, _step_map,
+      consume new_state_builders, _pre_state_data, _proxy_ids, default_target,
+      default_state_name, default_target_id, worker_names)
+
+  fun add_worker_name(w: String): LocalTopology val =>
+    let new_worker_names: Array[String] trn = recover Array[String] end
+    for n in worker_names.values() do
+      new_worker_names.push(n)
+    end
+    new_worker_names.push(w)
+    LocalTopology(_app_name, _worker_name, _graph, _step_map,
+      _state_builders, _pre_state_data, _proxy_ids, default_target,
+      default_state_name, default_target_id, consume new_worker_names)
+
+  fun eq(that: box->LocalTopology): Bool =>
+    // This assumes that _graph, _pre_state_data, default_target,
+    // default_state_name, and default_target_id never change over time
+    (_app_name == that._app_name) and
+      (_worker_name == that._worker_name) and
+      (_graph is that._graph) and
+      MapEquality2[U128, ProxyAddress val, U128](_step_map, that._step_map)
+        and
+      MapEquality[String, StateSubpartition val](_state_builders,
+        that._state_builders) and
+      (_pre_state_data is that._pre_state_data) and
+      MapEquality[String, U128](_proxy_ids, that._proxy_ids) and
+      (default_target is that.default_target) and
+      (default_state_name == that.default_state_name) and
+      (default_target_id == that.default_target_id) and
+      ArrayEquality[String](worker_names, that.worker_names)
+
+  fun ne(that: box->LocalTopology): Bool => not eq(that)
+
 actor LocalTopologyInitializer
   let _application: Application val
   let _input_addrs: Array[Array[String]] val
@@ -157,6 +201,16 @@ actor LocalTopologyInitializer
 
   be update_topology(t: LocalTopology val) =>
     _topology = t
+
+  be add_worker_name(w: String) =>
+    match _topology
+    | let t: LocalTopology val =>
+      _topology = t.add_worker_name(w)
+      _save_local_topology()
+      _save_worker_names()
+    else
+      Fail()
+    end
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     _outgoing_boundaries = bs
@@ -263,25 +317,65 @@ actor LocalTopologyInitializer
       conns.recover_connections(this)
     end
 
-  fun ref _save_worker_names(worker_names_filepath: FilePath,
-    worker_names: Array[String] val)
+  fun ref _save_worker_names()
   =>
     """
     Save the list of worker names to a file.
     """
-    let file = File(worker_names_filepath)
-    for worker_name in worker_names.values() do
-      file.print(worker_name)
-      @printf[I32](("LocalTopology._save_worker_names: " + worker_name +
-      "\n").cstring())
+    try
+      match _topology
+      | let t: LocalTopology val =>
+        @printf[I32](("Saving worker names to file: " + _worker_names_file +
+          "\n").cstring())
+        let worker_names_filepath = FilePath(_auth, _worker_names_file)
+        let file = File(worker_names_filepath)
+        // Clear file
+        file.set_length(0)
+        for worker_name in t.worker_names.values() do
+          file.print(worker_name)
+          @printf[I32](("LocalTopology._save_worker_names: " + worker_name +
+          "\n").cstring())
+        end
+        if not _is_initializer then
+          file.print("initializer")
+          @printf[I32](("LocalTopology._save_worker_names: " + "initializer" +
+          "\n").cstring())
+        end
+        file.sync()
+        file.dispose()
+      else
+        Fail()
+      end
+    else
+      Fail()
     end
-    if not _is_initializer then
-      file.print("initializer")
-      @printf[I32](("LocalTopology._save_worker_names: " + "initializer" +
-      "\n").cstring())
+
+  fun ref _save_local_topology() =>
+    match _topology
+    | let t: LocalTopology val =>
+      @printf[I32]("Saving topology!\n".cstring())
+      try
+        let local_topology_file = FilePath(_auth, _local_topology_file)
+        // TODO: Back up old file before clearing it?
+        let file = File(local_topology_file)
+        // Clear contents of file.
+        file.set_length(0)
+        let wb = Writer
+        let serialised_topology: Array[U8] val =
+          Serialised(SerialiseAuth(_auth), t).output(
+            OutputSerialisedAuth(_auth))
+        wb.write(serialised_topology)
+        file.writev(recover val wb.done() end)
+        file.sync()
+        file.dispose()
+      else
+        @printf[I32]("Error saving topology!\n".cstring())
+        Fail()
+      end
+    else
+      @printf[I32]("Error saving topology!\n".cstring())
+      Fail()
     end
-    file.sync()
-    file.dispose()
 
   be initialize(worker_initializer: (WorkerInitializer | None) = None,
     recovering: Bool = false)
@@ -320,26 +414,8 @@ actor LocalTopologyInitializer
       match _topology
       | let t: LocalTopology val =>
         ifdef "resilience" then
-          @printf[I32]("Saving topology!\n".cstring())
-          try
-            let local_topology_file = FilePath(_auth, _local_topology_file)
-            let file = File(local_topology_file)
-            let wb = Writer
-            let serialised_topology: Array[U8] val =
-              Serialised(SerialiseAuth(_auth), _topology).output(
-                OutputSerialisedAuth(_auth))
-            wb.write(serialised_topology)
-            file.writev(recover val wb.done() end)
-          else
-            @printf[I32]("Error saving topology!\n".cstring())
-          end
-          // save list of worker names to file
-          @printf[I32](("Saving worker names to file: " + _worker_names_file +
-            "\n").cstring())
-          let worker_names_filepath = FilePath(_auth, _worker_names_file)
-          _save_worker_names(worker_names_filepath, t.worker_names)
-
-
+          _save_local_topology()
+          _save_worker_names()
         end
 
         if t.is_empty() then
@@ -1016,6 +1092,20 @@ actor LocalTopologyInitializer
 
     else
       _env.err.print("Error initializing local topology")
+    end
+
+  be update_state_step_entry[Key: (Hashable val & Equatable[Key] val)](
+    state_name: String, key: Key, pa: ProxyAddress val) =>
+    try
+      match _topology
+      | let t: LocalTopology val =>
+        _topology = t.update_proxy_address_for_state_key[Key](state_name,
+        key, pa)
+        // TODO: We should find a way to batch changes before writing out.
+        _save_local_topology()
+      end
+    else
+      Fail()
     end
 
   be report_created(initializable: Initializable tag) =>
