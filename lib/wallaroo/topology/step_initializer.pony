@@ -8,8 +8,7 @@ use "wallaroo/routing"
 use "wallaroo/tcp_source"
 use "wallaroo/tcp_sink"
 
-type StepInitializer is (StepBuilder | //PartitionedStateStepBuilder |
-  SourceData | EgressBuilder)
+type StepInitializer is (StepBuilder | SourceData | EgressBuilder)
 
 class StepBuilder
   let _app_name: String

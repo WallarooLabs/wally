@@ -1,6 +1,7 @@
 use "collections"
 use "files"
 use "net"
+use "sendence/equality"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/initialization"
@@ -32,8 +33,10 @@ primitive SingleStepPartitionFunction[In: Any val] is
   PartitionFunction[In, U8]
   fun apply(input: In): U8 => 0
 
-interface PartitionAddresses
+interface PartitionAddresses is Equatable[PartitionAddresses]
   fun apply(key: Any val): (ProxyAddress val | None)
+  fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
+    pa: ProxyAddress val): PartitionAddresses val ?
 
 class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
   let _addresses: Map[Key, ProxyAddress val] val
@@ -54,6 +57,34 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
     end
 
   fun pairs(): Iterator[(Key, ProxyAddress val)] => _addresses.pairs()
+
+  fun update_key[K: (Hashable val & Equatable[K] val)](key: K,
+    pa: ProxyAddress val): PartitionAddresses val ?
+  =>
+    let new_addresses: Map[Key, ProxyAddress val] trn =
+      recover Map[Key, ProxyAddress val] end
+    // TODO: This would be much more efficient with a persistent map, since
+    // we wouldn't have to copy everything to make a small change.
+    for (k, v) in _addresses.pairs() do
+      new_addresses(k) = v
+    end
+    match key
+    | let new_key: Key =>
+      new_addresses(new_key) = pa
+    else
+      error
+    end
+    KeyedPartitionAddresses[Key](consume new_addresses)
+  
+  fun eq(that: box->PartitionAddresses): Bool =>
+    match that
+    | let that_keyed: box->KeyedPartitionAddresses[Key] =>
+      MapEquality[Key, ProxyAddress val](_addresses, that_keyed._addresses)
+    else
+      false
+    end
+  
+  fun ne(that: box->PartitionAddresses): Bool => not eq(that)
 
 interface StateAddresses
   fun apply(key: Any val): (Step tag | ProxyRouter val | None)
@@ -98,7 +129,7 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
 
     consume ss
 
-trait StateSubpartition
+trait StateSubpartition is Equatable[StateSubpartition]
   fun build(app_name: String, worker_name: String,
     metrics_conn: MetricsSink,
     auth: AmbientAuth, alfred: Alfred,
@@ -106,6 +137,8 @@ trait StateSubpartition
     initializables: SetIs[Initializable tag],
     data_routes: Map[U128, ConsumerStep tag],
     default_router: (Router val | None) = None): PartitionRouter val
+  fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
+    pa: ProxyAddress val): StateSubpartition val ?
 
 class KeyedStateSubpartition[PIn: Any val,
   Key: (Hashable val & Equatable[Key] val)] is StateSubpartition
@@ -174,9 +207,42 @@ class KeyedStateSubpartition[PIn: Any val,
     end
 
     @printf[I32](("Spinning up " + partition_count.string() + " state partitions for " + _pipeline_name + " pipeline\n").cstring())
-
+ 
     LocalPartitionRouter[PIn, Key](consume m, _id_map, consume routes,
       _partition_function, default_router)
+
+  fun update_key[K: (Hashable val & Equatable[K] val)](k: K,
+    pa: ProxyAddress val): StateSubpartition val ?
+  =>
+    match k
+    | let key: Key =>
+      match _partition_addresses.update_key[Key](key, pa)
+      | let kpa: KeyedPartitionAddresses[Key] val =>
+        KeyedStateSubpartition[PIn, Key](kpa, _id_map, _runner_builder,
+          _partition_function, _pipeline_name)
+      else
+        error
+      end
+    else
+      error
+    end
+
+  fun eq(that: box->StateSubpartition): Bool =>
+    match that
+    | let kss: box->KeyedStateSubpartition[PIn, Key] =>
+      // TODO: Add RunnerBuilder equality check assumes that
+      // runner builder would not change over time, which currently
+      // is true.
+      (_partition_addresses == kss._partition_addresses) and
+        (MapEquality[Key, U128](_id_map, kss._id_map)) and
+        (_partition_function is kss._partition_function) and
+        (_pipeline_name == kss._pipeline_name) and
+        (_runner_builder is kss._runner_builder)
+    else
+      false
+    end
+
+  fun ne(that: box->StateSubpartition): Bool => not eq(that)
 
 primitive PartitionFileReader
   fun apply(filename: String, auth: AmbientAuth):

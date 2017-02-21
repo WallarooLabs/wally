@@ -7,4 +7,9 @@ class ProxyAddress
     step_id = s_id
 
   fun string(): String =>
-    "[[" + worker + ": " + step_id.string() + "]]" 
+    "[[" + worker + ": " + step_id.string() + "]]"
+
+  fun eq(that: box->ProxyAddress): Bool =>
+    (worker == that.worker) and (step_id == that.step_id)
+
+  fun ne(that: box->ProxyAddress): Bool => not eq(that)
