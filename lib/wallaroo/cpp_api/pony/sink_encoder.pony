@@ -32,11 +32,11 @@ class CPPSinkEncoder is SinkEncoder[CPPData val]
     @w_serializable_serialize_get_size(_sink_encoder)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    @w_serializable_serialize(_sink_encoder, bytes, USize(0))
+    @w_serializable_serialize(_sink_encoder, bytes)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
     _sink_encoder = recover
-      @w_user_serializable_deserialize(bytes, USize(0))
+      @w_user_serializable_deserialize(bytes)
     end
 
   fun _final() =>

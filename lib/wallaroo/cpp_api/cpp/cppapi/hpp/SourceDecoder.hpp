@@ -11,7 +11,7 @@ class SourceDecoder: public ManagedObject
 public:
   virtual std::size_t header_length() = 0;
   virtual std::size_t payload_length(char *bytes_) = 0;
-  virtual Data *decode(char *bytes_, size_t sz_) = 0;
+  virtual Data *decode(char *bytes_) = 0;
 };
 }
 

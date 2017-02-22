@@ -20,11 +20,11 @@ class CPPPartitionFunction
     @w_serializable_serialize_get_size(_partition_function)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    @w_serializable_serialize(_partition_function, bytes, USize(0))
+    @w_serializable_serialize(_partition_function, bytes)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
     _partition_function = recover
-      @w_user_serializable_deserialize(bytes, USize(0))
+      @w_user_serializable_deserialize(bytes)
     end
 
   fun _final() =>
@@ -43,11 +43,11 @@ class CPPPartitionFunctionU64
     @w_serializable_serialize_get_size(_partition_function)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    @w_serializable_serialize(_partition_function, bytes, USize(0))
+    @w_serializable_serialize(_partition_function, bytes)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
     _partition_function = recover
-      @w_user_serializable_deserialize(bytes, USize(0))
+      @w_user_serializable_deserialize(bytes)
     end
 
   fun _final() =>

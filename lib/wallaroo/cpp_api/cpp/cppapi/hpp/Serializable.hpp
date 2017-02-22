@@ -9,7 +9,7 @@ class Serializable
 {
 public:
   virtual void deserialize (char* bytes_) {}
-  virtual void serialize (char* bytes_, size_t nsz_) {}
+  virtual void serialize (char* bytes_) {}
   virtual size_t serialize_get_size () { return 0; }
 };
 }

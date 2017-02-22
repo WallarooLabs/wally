@@ -9,8 +9,8 @@ namespace wallaroo
 {
 class SinkEncoder: public ManagedObject {
 public:
-  virtual size_t get_size(EncodableData *data_) = 0;
-  virtual void encode(EncodableData *data_, char *bytes_) = 0;
+  virtual size_t get_size(Data *data_) = 0;
+  virtual void encode(Data *data_, char *bytes_) = 0;
 };
 }
 
