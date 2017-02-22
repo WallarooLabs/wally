@@ -1,4 +1,6 @@
 #include "ApiHooks.hpp"
+#include "Application.hpp"
+#include "ComputationBuilder.hpp"
 #include "Computation.hpp"
 #include "Data.hpp"
 #include "Key.hpp"
@@ -65,20 +67,19 @@ extern size_t w_serializable_serialize_get_size(Serializable* serializable_)
   return serializable_->serialize_get_size();
 }
 
-extern void w_serializable_serialize(Serializable* serializable_, char* bytes_,
-  size_t sz_)
+extern void w_serializable_serialize(Serializable* serializable_, char* bytes_)
 {
-  serializable_->serialize(bytes_, sz_);
+  serializable_->serialize(bytes_);
 }
 
 extern size_t w_sink_encoder_get_size(SinkEncoder *sink_encoder_,
-  EncodableData *data_)
+  Data *data_)
 {
   return sink_encoder_->get_size(data_);
 }
 
 extern void w_sink_encoder_encode(SinkEncoder *sink_encoder_,
-  EncodableData *data_, char *bytes_)
+  Data *data_, char *bytes_)
 {
   sink_encoder_->encode(data_, bytes_);
 }
@@ -95,9 +96,9 @@ extern size_t w_source_decoder_payload_length(SourceDecoder *source_decoder_,
 }
 
 extern Data *w_source_decoder_decode(SourceDecoder *source_decoder_,
-  char *bytes_, size_t sz_)
+  char *bytes_)
 {
-  return source_decoder_->decode(bytes_, sz_);
+  return source_decoder_->decode(bytes_);
 }
 
 extern const char *w_state_change_get_name(StateChange *state_change_)
@@ -202,4 +203,48 @@ extern void w_managed_object_delete(ManagedObject const *obj_)
   delete obj_;
 }
 
+  extern void *w_computation_builder_build_computation(ComputationBuilder *computation_builder_)
+  {
+    return computation_builder_->build();
+  }
+
+  extern void *w_partition_get_partition_function(wallaroo::Partition *partition_)
+  {
+    return partition_->get_partition_function();
+  }
+
+  extern size_t w_partition_get_number_of_keys(wallaroo::Partition *partition_)
+  {
+    return partition_->get_number_of_keys();
+  }
+
+  extern void *w_partition_get_key(wallaroo::Partition *partition_, size_t idx_)
+  {
+    return partition_->get_key(idx_);
+  }
+
+  extern void *w_partition_get_partition_function_u64(wallaroo::PartitionU64 *partition_)
+  {
+    return partition_->get_partition_function();
+  }
+
+  extern size_t w_partition_get_number_of_keys_u64(wallaroo::PartitionU64 *partition_)
+  {
+    return partition_->get_number_of_keys();
+  }
+
+  extern uint64_t w_partition_get_key_u64(wallaroo::PartitionU64 *partition_, size_t idx_)
+  {
+    return partition_->get_key(idx_);
+  }
+
+  const char *w_state_builder_get_name(StateBuilder *state_builder_)
+  {
+    return state_builder_->name();
+  }
+
+  extern void *w_state_builder_build_state(StateBuilder *state_builder_)
+  {
+    return state_builder_->build();
+  }
 }

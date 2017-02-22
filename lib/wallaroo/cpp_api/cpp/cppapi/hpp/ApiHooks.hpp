@@ -33,20 +33,18 @@ extern StateChangeBuilder *w_state_computation_get_state_change_builder(
   StateComputation *state_computation_, uint64_t idx_);
 
 extern size_t w_serializable_serialize_get_size(Serializable* serializable_);
-extern void w_serializable_serialize(Serializable* serializable_, char* bytes_,
-  size_t sz_);
-extern Serializable* w_serializable_deserialize (char* bytes_, size_t sz_);
+extern void w_serializable_serialize(Serializable* serializable_, char* bytes_);
+extern Serializable* w_serializable_deserialize (char* bytes_);
 
 extern size_t w_sink_encoder_get_size(SinkEncoder *sink_encoder_,
-  EncodableData *data_);
+  Data *data_);
 extern void w_sink_encoder_encode(SinkEncoder *sink_encoder_,
-  EncodableData *data_, char *bytes);
+  Data *data_, char *bytes);
 
 extern size_t w_source_decoder_header_length(SourceDecoder *source_decoder_);
 extern size_t w_source_decoder_payload_length(SourceDecoder *source_decoder_,
   char *bytes_);
-extern Data *w_source_decoder_decode(SourceDecoder *source_decoder_, char *bytes_,
-  size_t sz_);
+extern Data *w_source_decoder_decode(SourceDecoder *source_decoder_, char *bytes_);
 
 extern const char *w_state_change_get_name(StateChange *state_change_);
 extern uint64_t w_state_change_get_id(StateChange *state_change_);

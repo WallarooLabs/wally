@@ -20,11 +20,11 @@ class CPPStateChangeBuilder is StateChangeBuilder[CPPState]
     @w_serializable_serialize_get_size(_state_change_builder)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    @w_serializable_serialize(_state_change_builder, bytes, USize(0))
+    @w_serializable_serialize(_state_change_builder, bytes)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
     _state_change_builder = recover
-      @w_user_serializable_deserialize(bytes, USize(0))
+      @w_user_serializable_deserialize(bytes)
     end
 
   fun _final() =>

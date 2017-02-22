@@ -102,10 +102,10 @@ class CPPStateComputation is StateComputation[CPPData val, CPPData val, CPPState
     @w_serializable_serialize_get_size(_computation)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    @w_serializable_serialize(_computation, bytes, USize(0))
+    @w_serializable_serialize(_computation, bytes)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _computation = recover @w_user_serializable_deserialize(bytes, USize(0)) end
+    _computation = recover @w_user_serializable_deserialize(bytes) end
 
   fun _final() =>
     @w_managed_object_delete(_computation)

@@ -12,7 +12,7 @@
 #include <vector>
 #include <iostream>
 
-class Numbers: public wallaroo::EncodableData
+class Numbers: public wallaroo::Data
 {
 private:
   std::vector<uint32_t> numbers;
@@ -25,13 +25,13 @@ public:
   uint32_t sum();
 
   virtual void deserialize (char* bytes);
-  virtual void serialize (char* bytes, size_t nsz_);
+  virtual void serialize (char* bytes);
   virtual size_t serialize_get_size ();
-  virtual size_t encode_get_size();
-  virtual void encode(char *bytes);
+  size_t encode_get_size();
+  void encode(char *bytes);
 };
 
-class Total: public wallaroo::EncodableData
+class Total: public wallaroo::Data
 {
 private:
   uint64_t _total;
@@ -39,7 +39,7 @@ public:
   Total(Total& t);
   Total(uint64_t total);
   virtual void deserialize (char* bytes);
-  virtual void serialize (char* bytes, size_t nsz_);
+  virtual void serialize (char* bytes);
   virtual size_t serialize_get_size () { return 10; }
   virtual size_t encode_get_size() { return 8; }
   virtual void encode(char *bytes);
@@ -51,17 +51,17 @@ class CounterSourceDecoder: public wallaroo::SourceDecoder
 public:
   virtual size_t header_length();
   virtual size_t payload_length(char *bytes);
-  virtual Numbers *decode(char *bytes, size_t sz_);
+  virtual Numbers *decode(char *bytes);
 };
 
 class CounterSinkEncoder: public wallaroo::SinkEncoder
 {
 public:
-  virtual size_t get_size(wallaroo::EncodableData *data);
-  virtual void encode(wallaroo::EncodableData *data, char *bytes);
+  virtual size_t get_size(wallaroo::Data *data);
+  virtual void encode(wallaroo::Data *data, char *bytes);
 
   virtual void deserialize (char* bytes) {};
-  virtual void serialize (char* bytes, size_t nsz_) { bytes[0] = 0; bytes[1] = 4; }
+  virtual void serialize (char* bytes) { bytes[0] = 0; bytes[1] = 4; }
   virtual size_t serialize_get_size () { return 2; }
 };
 
@@ -73,6 +73,13 @@ public:
   CounterState();
   void add(uint64_t value);
   uint64_t get_counter();
+};
+
+class CounterStateBuilder: public wallaroo::StateBuilder
+{
+public:
+  const char *name();
+  wallaroo::State *build();
 };
 
 class CounterAdd: public wallaroo::StateChange
@@ -98,7 +105,7 @@ class CounterAddBuilder: public wallaroo::StateChangeBuilder
 public:
   virtual wallaroo::StateChange *build(uint64_t idx_);
   virtual void deserialize (char* bytes);
-  virtual void serialize (char* bytes, size_t nsz_);
+  virtual void serialize (char* bytes);
   virtual size_t serialize_get_size ();
 };
 
@@ -117,7 +124,7 @@ public:
   virtual size_t get_number_of_state_change_builders();
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_);
   virtual void deserialize (char* bytes) {};
-  virtual void serialize (char* bytes, size_t nsz_) { bytes[0] = 0; bytes[1] = 2; }
+  virtual void serialize (char* bytes) { bytes[0] = 0; bytes[1] = 2; }
   virtual size_t serialize_get_size () { return 2; }
 };
 
@@ -129,7 +136,7 @@ public:
   virtual size_t get_number_of_state_change_builders();
   virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_);
   virtual void deserialize (char* bytes) {};
-  virtual void serialize (char* bytes, size_t nsz_) { bytes[0] = 0; bytes[1] = 1; }
+  virtual void serialize (char* bytes) { bytes[0] = 0; bytes[1] = 1; }
   virtual size_t serialize_get_size () { return 2; }
 };
 
@@ -144,7 +151,7 @@ public:
   virtual bool eq(wallaroo::Key *other_);
   size_t get_value();
   virtual void deserialize (char* bytes_);
-  virtual void serialize (char* bytes_, size_t nsz_);
+  virtual void serialize (char* bytes_);
   virtual size_t serialize_get_size () { return 6; }
 };
 

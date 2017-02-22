@@ -6,7 +6,7 @@ use @w_source_decoder_payload_length[USize](source_decoder: SourceDecoderP,
   data: Pointer[U8] tag)
 
 use @w_source_decoder_decode[DataP](source_decoder: SourceDecoderP,
-  data: Pointer[U8] tag, size: USize)
+  data: Pointer[U8] tag)
 
 type SourceDecoderP is Pointer[U8] val
 
@@ -25,8 +25,7 @@ class CPPSourceDecoder is FramedSourceHandler[CPPData val]
     @w_source_decoder_payload_length(_source_decoder, data.cpointer())
 
   fun decode(data: Array[U8] val): CPPData val ? =>
-    match @w_source_decoder_decode(_source_decoder, data.cpointer(),
-      data.size())
+    match @w_source_decoder_decode(_source_decoder, data.cpointer())
     | let result: DataP if (not result.is_null()) =>
       recover CPPData(result) end
     else
@@ -37,11 +36,11 @@ class CPPSourceDecoder is FramedSourceHandler[CPPData val]
     @w_serializable_serialize_get_size(_source_decoder)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    @w_serializable_serialize(_source_decoder, bytes, USize(0))
+    @w_serializable_serialize(_source_decoder, bytes)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
     _source_decoder = recover
-      @w_user_serializable_deserialize(bytes, USize(0))
+      @w_user_serializable_deserialize(bytes)
     end
 
   fun _final() =>

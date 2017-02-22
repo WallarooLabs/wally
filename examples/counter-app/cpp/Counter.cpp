@@ -50,7 +50,12 @@ extern "C"
     return new CounterState();
   }
 
-  extern wallaroo::Serializable *w_user_serializable_deserialize(char *bytes_, size_t sz_)
+  extern wallaroo::StateBuilder *get_counter_state_builder()
+  {
+    return new CounterStateBuilder();
+  }
+
+  extern wallaroo::Serializable *w_user_serializable_deserialize(char *bytes_)
   {
     uint16_t data_type = (((uint16_t)bytes_[0]) << 8) + (uint16_t)bytes_[1];
 
@@ -104,7 +109,7 @@ size_t CounterSourceDecoder::payload_length(char *bytes)
   return ((size_t)(bytes[0]) << 8) + (size_t)(bytes[1]);
 }
 
-Numbers *CounterSourceDecoder::decode(char *bytes, size_t sz_)
+Numbers *CounterSourceDecoder::decode(char *bytes)
 {
   // std::cerr << "decoding in the source!" << std::endl;
   Numbers *n = new Numbers();
@@ -149,7 +154,7 @@ void Numbers::deserialize (char* bytes)
   }
 }
 
-void Numbers::serialize (char* bytes, size_t nsz_)
+void Numbers::serialize (char* bytes)
 {
   // type
   bytes[0] = 0;
@@ -159,7 +164,7 @@ void Numbers::serialize (char* bytes, size_t nsz_)
   int count = numbers.size();
   bytes[2] = (count >> 8) & 0xFF;
   bytes[3] = count & 0xFF;
-  
+
   for(int i = 0; i < count; i++)
   {
     uint32_t n = numbers[i];
@@ -213,7 +218,7 @@ void Numbers::encode(char *bytes)
   int count = numbers.size();
   bytes[2] = (count >> 8) & 0xFF;
   bytes[3] = count & 0xFF;
-  
+
   for(int i = 0; i < count; i++)
   {
     uint32_t n = numbers[i];
@@ -245,7 +250,7 @@ void Total::deserialize(char *bytes)
     ((uint64_t)bytes[7]);
 }
 
-void Total::serialize (char* bytes, size_t nsz_)
+void Total::serialize (char* bytes)
 {
   bytes[0] = 0;
   bytes[1] = 1;
@@ -271,15 +276,17 @@ void Total::encode(char *bytes)
   bytes[7] = (char)(_total) & 0xFF;
 }
 
-size_t CounterSinkEncoder::get_size(wallaroo::EncodableData *data)
+size_t CounterSinkEncoder::get_size(wallaroo::Data *data)
 {
-  return data->encode_get_size();
+  Numbers *numbers = static_cast<Numbers *>(data);
+  return numbers->encode_get_size();
 }
 
-void CounterSinkEncoder::encode(wallaroo::EncodableData *data, char *bytes)
+void CounterSinkEncoder::encode(wallaroo::Data *data, char *bytes)
 {
   // std::cerr << "encoding in the sink!" << std::endl;
-  data->encode(bytes);
+  Numbers *numbers = static_cast<Numbers *>(data);
+  numbers->encode(bytes);
 }
 
 CounterState::CounterState(): _counter(0)
@@ -294,6 +301,16 @@ void CounterState::add(uint64_t value)
 uint64_t CounterState::get_counter()
 {
   return _counter;
+}
+
+const char *CounterStateBuilder::name()
+{
+  return "counter state";
+}
+
+State *CounterStateBuilder::build()
+{
+  return get_counter_state();
 }
 
 CounterAdd::CounterAdd(uint64_t id): _id(id), _value(0)
@@ -362,7 +379,8 @@ void CounterAddBuilder::deserialize (char* bytes)
 {
 }
 
-void CounterAddBuilder::serialize (char* bytes, size_t nsz_) {
+void CounterAddBuilder::serialize (char* bytes)
+{
   bytes[0] = 0;
   bytes[1] = 5;
 }
@@ -391,7 +409,7 @@ const char *CounterComputation::name()
 void *CounterComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
 {
   // std::cerr << "inside counter computation!" << std::endl;
-  
+
   uint32_t sum = ((Numbers *) input_)->sum();
 
   uint64_t old_value = ((CounterState *) state_)->get_counter();
@@ -469,7 +487,7 @@ void CounterPartitionKey::deserialize(char *bytes_)
     (size_t)(bytes_[3]);
 }
 
-void CounterPartitionKey::serialize(char* bytes_, size_t nsz_)
+void CounterPartitionKey::serialize(char* bytes_)
 {
   bytes_[0] = 0x00;
   bytes_[1] = 0x06;
@@ -479,7 +497,7 @@ void CounterPartitionKey::serialize(char* bytes_, size_t nsz_)
   bytes_[5] = _value & 0xFF;
 }
 
-void serialize(char *bytes, size_t nsz_)
+void serialize(char *bytes)
 {
 }
 

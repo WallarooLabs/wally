@@ -24,10 +24,10 @@ class CPPKey is (Hashable & Equatable[CPPKey])
     @w_serializable_serialize_get_size(_key)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    @w_serializable_serialize(_key, bytes, USize(0))
+    @w_serializable_serialize(_key, bytes)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _key = recover @w_user_serializable_deserialize(bytes, USize(0)) end
+    _key = recover @w_user_serializable_deserialize(bytes) end
 
   fun _final() =>
     @w_managed_object_delete(_key)

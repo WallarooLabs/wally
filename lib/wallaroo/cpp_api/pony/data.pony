@@ -13,11 +13,11 @@ class CPPData
     @w_serializable_serialize_get_size(_data)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    let s = @w_serializable_serialize(_data, bytes, USize(0))
+    let s = @w_serializable_serialize(_data, bytes)
     s
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
-    _data = recover @w_user_serializable_deserialize(bytes, USize(0)) end
+    _data = recover @w_user_serializable_deserialize(bytes) end
 
   fun _final() =>
     @w_managed_object_delete(_data)
