@@ -63,8 +63,7 @@ primitive FallorMsgDecoder
 
     consume arr
 
-  fun with_timestamp(data: Array[U8] val): Array[String] val ?
-  =>
+  fun with_timestamp(data: Array[U8] val): Array[String] val ? =>
     let arr: Array[String] iso = recover Array[String] end
     let rb = Reader
     rb.append(data)
