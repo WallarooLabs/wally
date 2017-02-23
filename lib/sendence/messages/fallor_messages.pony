@@ -1,6 +1,5 @@
 use "buffered"
 use "net"
-use "debug"
 
 primitive FallorMsgEncoder
   fun apply(data: (String | Seq[String] val), wb: Writer = Writer):
@@ -70,16 +69,5 @@ primitive FallorMsgDecoder
     var bytes_left = rb.u32_be()
     let timestamp = rb.u64_be()
     arr.push(timestamp.string())
-    while bytes_left > 0 do
-      var next_total_size = rb.u32_be()
-      var next_bytes_left = next_total_size
-      while next_bytes_left > 0 do
-        let s_len = rb.u32_be()
-        next_bytes_left = next_bytes_left - 4
-        let next_str = String.from_array(rb.block(s_len.usize()))
-        arr.push(next_str)
-        next_bytes_left = next_bytes_left - s_len
-      end
-      bytes_left = bytes_left - (next_total_size + 4)
-    end
+    arr.push(String.from_array(rb.block(bytes_left.usize())))
     consume arr
