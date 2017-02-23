@@ -8,6 +8,7 @@ actor Main is TestList
 
   fun tag tests(test: PonyTest) =>
     test(_TestFallorMsgEncoder)
+    test(_TestFallorTimestampRaw)
 
 class iso _TestFallorMsgEncoder is UnitTest
   fun name(): String => "buffy:FallorMsgEncoder"
@@ -39,3 +40,25 @@ class iso _TestFallorMsgEncoder is UnitTest
     h.assert_eq[String](msgs(1), "there")
     h.assert_eq[String](msgs(2), "man")
     h.assert_eq[String](msgs(3), "!")
+
+class iso _TestFallorTimestampRaw is UnitTest
+  fun name(): String => "buffy:FallorTimestampRaw"
+
+  fun apply(h: TestHelper) ? =>
+    let text: String val = "Hello world"
+    let at: U64 = 1234567890
+    let msg: Array[U8] val = recover val
+      let a': Array[U8] = Array[U8]
+      a'.append(text)
+    end
+    let byteseqs = FallorMsgEncoder.timestamp_raw(at, consume msg)
+    // Decoder expects a single stream of bytes, so we need to join
+    // the byteseqs into a single Array[U8]
+    let encoded: Array[U8] iso = recover Array[U8] end
+    for seq in byteseqs.values() do
+      encoded.append(seq)
+    end
+    let tup = FallorMsgDecoder.with_timestamp(consume encoded)
+    h.assert_eq[USize](tup.size(), 2)
+    h.assert_eq[String](tup(0), at.string())
+    h.assert_eq[String](tup(1), text)
