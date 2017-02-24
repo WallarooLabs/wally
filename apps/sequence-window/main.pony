@@ -195,9 +195,7 @@ primitive WindowEncoder
     ifdef debug then
       @printf[I32]("output: %s\n".cstring(), s.cstring())
     end
-    try
-      wb.write(Bytes.length_encode(s)(0))
-    end
+    wb.writev(Bytes.length_encode(s))
     wb.done()
 
 class Ring
