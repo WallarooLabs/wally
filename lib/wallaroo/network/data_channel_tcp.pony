@@ -9,6 +9,7 @@ use "wallaroo/boundary"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
+use "wallaroo/initialization"
 
 class DataChannelListenNotifier is TCPListenNotify
   let _name: String
@@ -20,12 +21,13 @@ class DataChannelListenNotifier is TCPListenNotify
   let _connections: Connections
   let _receivers: Map[String, DataReceiver] val
   let _metrics_reporter: MetricsReporter
+  let _local_topology_initializer: LocalTopologyInitializer tag
 
   new iso create(name: String, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     receivers: Map[String, DataReceiver] val,
     metrics_reporter: MetricsReporter iso,
-    recovery_file: FilePath)
+    recovery_file: FilePath, local_topology_initializer: LocalTopologyInitializer tag)
   =>
     _name = name
     _auth = auth
@@ -34,6 +36,7 @@ class DataChannelListenNotifier is TCPListenNotify
     _receivers = receivers
     _metrics_reporter = consume metrics_reporter
     _recovery_file = recovery_file
+    _local_topology_initializer = local_topology_initializer
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -68,7 +71,7 @@ class DataChannelListenNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
     DataChannelConnectNotifier(_receivers, _connections, _auth,
-    _metrics_reporter.clone())
+    _metrics_reporter.clone(), _local_topology_initializer)
 
 
 class DataChannelConnectNotifier is TCPConnectionNotify
@@ -78,15 +81,17 @@ class DataChannelConnectNotifier is TCPConnectionNotify
   var _header: Bool = true
   let _timers: Timers = Timers
   let _metrics_reporter: MetricsReporter
+  let _local_topology_initializer: LocalTopologyInitializer tag
 
   new iso create(receivers: Map[String, DataReceiver] val,
     connections: Connections, auth: AmbientAuth,
-    metrics_reporter: MetricsReporter iso)
+    metrics_reporter: MetricsReporter iso, local_topology_initializer: LocalTopologyInitializer tag)
   =>
     _receivers = receivers
     _connections = connections
     _auth = auth
     _metrics_reporter = consume metrics_reporter
+    _local_topology_initializer = local_topology_initializer
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
@@ -132,6 +137,17 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         else
           @printf[I32]("Missing DataReceiver!\n".cstring())
         end
+      | let sm: StepMigrationMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received StepMigrationMsg on Data Channel\n".cstring())
+        end
+        //try
+          //TODO: create new step with target id, in partition with state name
+          //      and key, migrate state to it, then update routing everywhere
+          None
+        //else
+        //  @printf[I32]("Missing DataReceiver!\n".cstring())
+        //end
       | let aw: AckWatermarkMsg val =>
         ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())

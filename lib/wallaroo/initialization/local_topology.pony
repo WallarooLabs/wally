@@ -244,7 +244,7 @@ actor LocalTopologyInitializer
             DataChannelListenNotifier(_worker_name, _auth, conns,
               _is_initializer, data_receivers,
               MetricsReporter(_application.name(), _worker_name, _metrics_conn),
-              data_channel_filepath)
+              data_channel_filepath, this)
 
           ifdef "resilience" then
             conns.make_and_register_recoverable_listener(
@@ -257,7 +257,7 @@ actor LocalTopologyInitializer
           match worker_initializer
             | let wi: WorkerInitializer =>
               conns.create_initializer_data_channel(data_receivers, wi,
-              data_channel_filepath)
+              data_channel_filepath, this)
           end
         end
       else
@@ -294,7 +294,7 @@ actor LocalTopologyInitializer
             DataChannelListenNotifier(_worker_name, _auth, conns,
               _is_initializer, data_receivers,
               MetricsReporter(_application.name(), _worker_name, _metrics_conn),
-              data_channel_filepath)
+              data_channel_filepath, this)
 
           ifdef "resilience" then
             conns.make_and_register_recoverable_listener(
@@ -307,7 +307,7 @@ actor LocalTopologyInitializer
           match worker_initializer
           | let wi: WorkerInitializer =>
             conns.create_initializer_data_channel(data_receivers, wi,
-            data_channel_filepath)
+            data_channel_filepath, this)
           end
         end
       else
@@ -495,7 +495,7 @@ actor LocalTopologyInitializer
           default_target_state_step_id = state_builder.id()
 
           let state_step = state_builder(EmptyRouter, _metrics_conn,
-            _alfred)
+            _alfred, _auth)
           state_step.update_route_builder(state_builder.forward_route_builder())
 
           default_target_state_step = state_step
@@ -610,7 +610,7 @@ actor LocalTopologyInitializer
                       let default_pre_state_id = dsinit.id()
                       let default_pre_state_step =
                         dsinit(default_state_router,
-                          _metrics_conn, _alfred)
+                          _metrics_conn, _alfred, _auth)
                       default_target = default_pre_state_step
                       _initializables.set(default_pre_state_step)
                       built_stateless_steps(default_pre_state_id) =
@@ -660,7 +660,7 @@ actor LocalTopologyInitializer
                   end
 
                 let next_step = builder(partition_router, _metrics_conn,
-                  _alfred, state_comp_target_router)
+                  _alfred, _auth, state_comp_target_router)
 
                 data_routes(next_id) = next_step
                 _initializables.set(next_step)
@@ -693,7 +693,8 @@ actor LocalTopologyInitializer
 
                 // Check if this is a default target.  If so, route it
                 // to the appropriate default state step.
-                let next_step = builder(out_router, _metrics_conn, _alfred)
+                let next_step = builder(out_router, _metrics_conn, _alfred,
+                _auth)
 
                 data_routes(next_id) = next_step
                 _initializables.set(next_step)
@@ -735,7 +736,7 @@ actor LocalTopologyInitializer
                 end
 
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
-                let state_step = builder(EmptyRouter, _metrics_conn, _alfred)
+                let state_step = builder(EmptyRouter, _metrics_conn, _alfred, _auth)
                 data_routes(next_id) = state_step
                 _initializables.set(state_step)
 
@@ -766,7 +767,7 @@ actor LocalTopologyInitializer
                       end
 
                     let pre_state_step = b(state_step_router, _metrics_conn,
-                      _alfred, state_comp_target)
+                      _alfred, _auth, state_comp_target)
                     data_routes(b.id()) = pre_state_step
                     _initializables.set(pre_state_step)
 
@@ -852,8 +853,7 @@ actor LocalTopologyInitializer
 
                     let default_pre_state_id = dsinit.id()
                     let default_pre_state_step =
-                      dsinit(default_state_router,
-                        _metrics_conn, _alfred)
+                      dsinit(default_state_router, _metrics_conn, _alfred, _auth)
                     default_target = default_pre_state_step
                     _initializables.set(default_pre_state_step)
                     built_stateless_steps(default_pre_state_id) =
@@ -954,7 +954,7 @@ actor LocalTopologyInitializer
                     out_router,
                     source_data.route_builder(),
                     _outgoing_boundaries, sinks_for_source,
-                    _alfred, default_target, default_in_route_builder,
+                    _alfred, _auth, default_target, default_in_route_builder,
                     state_comp_target_router,
                     source_data.address()(0),
                     source_data.address()(1)

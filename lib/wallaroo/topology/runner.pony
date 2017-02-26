@@ -2,9 +2,11 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
+use "serialise"
 use "sendence/guid"
 use "sendence/wall_clock"
 use "sendence/weighted"
+use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
@@ -25,6 +27,8 @@ interface Runner
   fun state_name(): String
   fun clone_router_and_set_input_type(r: Router val,
     default_r: (Router val | None) = None): Router val
+  fun ref serialize_state(): Array[U8] val
+  fun ref replace_serialized_state(s: Array[U8] val)
 
 trait ReplayableRunner
   fun ref replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
@@ -33,6 +37,7 @@ trait ReplayableRunner
 
 trait RunnerBuilder
   fun apply(alfred: Alfred tag,
+    auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
@@ -88,6 +93,7 @@ class RunnerSequenceBuilder is RunnerBuilder
       end
 
   fun apply(alfred: Alfred tag,
+    auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
@@ -103,7 +109,7 @@ class RunnerSequenceBuilder is RunnerBuilder
         end
       match next_builder
       | let rb: RunnerBuilder val =>
-        latest_runner = rb(alfred,
+        latest_runner = rb(alfred, auth,
           consume latest_runner, router, pre_state_target_id')
       end
       remaining = remaining - 1
@@ -173,6 +179,7 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
     _id = if id' == 0 then GuidGenerator.u128() else id' end
 
   fun apply(alfred: Alfred tag,
+    auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
@@ -227,6 +234,7 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
     _in_route_builder = in_route_builder'
 
   fun apply(alfred: Alfred tag,
+    auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
@@ -278,11 +286,12 @@ class StateRunnerBuilder[State: Any #read] is RunnerBuilder
     _id = GuidGenerator.u128()
 
   fun apply(alfred: Alfred tag,
+    auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
-    let sr = StateRunner[State](_state_builder, alfred)
+    let sr = StateRunner[State](_state_builder, alfred, auth)
     for scb in _state_change_builders.values() do
       sr.register_state_change(scb)
     end
@@ -338,11 +347,12 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
     _default_state_name = default_state_name'
 
   fun apply(alfred: Alfred tag,
+    auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
-    _state_runner_builder(alfred,
+    _state_runner_builder(alfred, auth,
       consume next_runner, router)
 
   fun name(): String => _state_name
@@ -484,6 +494,10 @@ class ComputationRunner[In: Any val, Out: Any val]
     default_r: (Router val | None) = None): Router val
   =>
     _next.clone_router_and_set_input_type(r)
+  fun ref serialize_state(): Array[U8] val =>
+    Fail()
+    recover val Array[U8] end
+  fun ref replace_serialized_state(s: Array[U8] val) => Fail()
 
 class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _target_id: U128
@@ -551,23 +565,29 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     default_r: (Router val | None) = None): Router val
   =>
     r
+  fun ref serialize_state(): Array[U8] val =>
+    Fail()
+    recover val Array[U8] end
+  fun ref replace_serialized_state(s: Array[U8] val) => Fail()
 
 class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
-  let _state: State
+  var _state: State
   //TODO: this needs to be per-computation, rather than per-runner
   let _state_change_repository: StateChangeRepository[State] ref
   let _alfred: Alfred
   let _wb: Writer = Writer
   let _rb: Reader = Reader
+  let _auth: AmbientAuth
   var _id: (U128 | None)
 
   new iso create(state_builder: {(): State} val,
-      alfred: Alfred)
+      alfred: Alfred, auth: AmbientAuth)
   =>
     _state = state_builder()
     _state_change_repository = StateChangeRepository[State]
     _alfred = alfred
     _id = None
+    _auth = auth
 
   fun ref set_step_id(id: U128) =>
     _id = id
@@ -667,6 +687,29 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   =>
     r
 
+  fun ref serialize_state(): Array[U8] val =>
+    try
+      Serialised(SerialiseAuth(_auth), _state).output(OutputSerialisedAuth(_auth))
+    else
+      Fail()
+      recover val Array[U8] end
+    end
+
+  fun ref replace_serialized_state(s: Array[U8] val) =>
+    try
+      match Serialised.input(InputSerialisedAuth(_auth), s)(
+        DeserialiseAuth(_auth))
+      | let s': State =>
+        _state = s'
+      else
+        Fail()
+      end
+    else
+      Fail()
+    end
+
+
+
 class iso RouterRunner
   fun ref run[Out: Any val](metric_name: String, pipeline_time_spent: U64,
     output: Out, producer: Producer ref, router: Router val,
@@ -690,4 +733,7 @@ class iso RouterRunner
     default_r: (Router val | None) = None): Router val
   =>
     r
-
+  fun ref serialize_state(): Array[U8] val =>
+    Fail()
+    recover val Array[U8] end
+  fun ref replace_serialized_state(s: Array[U8] val) => Fail()

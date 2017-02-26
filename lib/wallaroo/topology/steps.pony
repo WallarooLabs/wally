@@ -28,8 +28,10 @@ trait tag RunnableStep
     data: D, origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-
+  
   be request_ack()
+
+  be receive_state(state: Array[U8] val)
 
 interface Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer)
@@ -388,3 +390,16 @@ actor Step is (RunnableStep & Resilient & Producer &
     for u in _upstreams.values() do
       u.unmute(c)
     end
+
+  // Grow-to-fit
+  be receive_state(state: Array[U8] val) =>
+    @printf[I32]("Received new state\n".cstring())
+    _runner.replace_serialized_state(state)
+
+  be send_state_to_neighbour(neighbour: Step) =>
+    neighbour.receive_state(_runner.serialize_state())
+    
+  be send_state(boundary: OutgoingBoundary) =>
+    let state: Array[U8] val = _runner.serialize_state()
+    //TODO: get state name, partition key
+    boundary.migrate_step(_id, _runner.name(), "", state)

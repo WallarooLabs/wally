@@ -3,6 +3,7 @@ use "wallaroo/boundary"
 use "wallaroo/initialization"
 use "wallaroo/routing"
 use "wallaroo/topology"
+use "wallaroo/fail"
 
 actor EmptySink is ConsumerStep
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -44,3 +45,5 @@ actor EmptySink is ConsumerStep
 
   be request_ack() =>
     None
+
+  be receive_state(state: Array[U8] val) => Fail()

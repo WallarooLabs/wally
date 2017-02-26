@@ -14,6 +14,7 @@ class TCPSourceListenerBuilder
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _tcp_sinks: Array[TCPSink] val
   let _alfred: Alfred
+  let _auth: AmbientAuth
   let _default_target: (Step | None)
   let _target_router: Router val
   let _host: String
@@ -25,6 +26,7 @@ class TCPSourceListenerBuilder
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
+    auth: AmbientAuth,
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder val | None) = None,
     target_router: Router val = EmptyRouter,
@@ -38,6 +40,7 @@ class TCPSourceListenerBuilder
     _outgoing_boundaries = outgoing_boundaries
     _tcp_sinks = tcp_sinks
     _alfred = alfred
+    _auth = auth
     _default_target = default_target
     _target_router = target_router
     _host = host
@@ -46,7 +49,7 @@ class TCPSourceListenerBuilder
 
   fun apply(): TCPSourceListener =>
     TCPSourceListener(_source_builder, _router, _route_builder,
-      _outgoing_boundaries, _tcp_sinks, _alfred, _default_target,
+      _outgoing_boundaries, _tcp_sinks, _alfred, _auth, _default_target,
       _default_in_route_builder, _target_router, _host, _service
       where metrics_reporter = _metrics_reporter.clone())
 
@@ -76,6 +79,7 @@ actor TCPSourceListener
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
+    auth: AmbientAuth,
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder val | None) = None,
     target_router: Router val = EmptyRouter,
@@ -86,7 +90,7 @@ actor TCPSourceListener
     """
     Listens for both IPv4 and IPv6 connections.
     """
-    _notify = SourceListenerNotify(source_builder, alfred, target_router)
+    _notify = SourceListenerNotify(source_builder, alfred, auth, target_router)
     _router = router
     _route_builder = route_builder
     _default_in_route_builder = default_in_route_builder

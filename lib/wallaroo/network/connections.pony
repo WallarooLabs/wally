@@ -99,13 +99,14 @@ actor Connections
 
   be create_initializer_data_channel(
     data_receivers: Map[String, DataReceiver] val,
-    worker_initializer: WorkerInitializer, data_channel_file: FilePath)
+    worker_initializer: WorkerInitializer, data_channel_file: FilePath,
+    local_topology_initializer: LocalTopologyInitializer tag)
   =>
     let data_notifier: TCPListenNotify iso =
       DataChannelListenNotifier(_worker_name, _auth, this,
         _is_initializer, data_receivers,
         MetricsReporter(_app_name, _worker_name, _metrics_conn),
-        data_channel_file)
+        data_channel_file, local_topology_initializer)
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     register_listener(TCPListener(_auth, consume data_notifier,

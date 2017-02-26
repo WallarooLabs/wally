@@ -146,6 +146,14 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
     @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
 
+  be migrate_step(step_id: U128, state_name: String, key: String, state:Array[U8] val) =>
+    try
+      let outgoing_msg = ChannelMsgEncoder.migrate_step(step_id, state_name, key, state, _auth)
+      _writev(outgoing_msg)
+    else
+      Fail()
+    end
+ 
   be register_step_id(step_id: U128) =>
     _step_id = step_id
 
@@ -224,6 +232,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
+
+  be receive_state(state: Array[U8] val) => Fail()
 
   fun ref receive_ack(seq_id: SeqId) =>
     ifdef debug then
