@@ -27,6 +27,11 @@ primitive ChannelMsgEncoder
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, metric_name), auth, wb)
 
+  fun migrate_step(step_id: U128, state_name: String, key: String,
+    state:Array[U8] val, auth: AmbientAuth) : Array[ByteSeq] val ?
+  =>
+    _encode(StepMigrationMsg(step_id, state_name, key, state), auth)
+
   fun delivery[D: Any val](target_id: U128,
     from_worker_name: String, msg_data: D,
     metric_name: String, auth: AmbientAuth,
@@ -223,6 +228,18 @@ class ReplayCompleteMsg is ChannelMsg
     _sender_name = from
 
   fun sender_name(): String => _sender_name
+
+class StepMigrationMsg is ChannelMsg
+  let state_name: String
+  let key: String
+  let step_id: U128
+  let state: Array[U8] val
+
+  new val create(step_id': U128, state_name': String, key': String, state': Array[U8] val) =>
+    state_name = state_name'
+    key = key'
+    step_id = step_id'
+    state = state'
 
 class AckWatermarkMsg is ChannelMsg
   let sender_name: String

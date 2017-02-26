@@ -26,7 +26,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
-  new iso create(pipeline_name: String, handler: FramedSourceHandler[In] val,
+  new iso create(pipeline_name: String, auth: AmbientAuth, handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
     metrics_reporter: MetricsReporter iso, alfred: Alfred tag,
     target_router: Router val, pre_state_target_id: (U128 | None) = None)
@@ -35,7 +35,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     // TODO: Figure out how to name sources
     _source_name = pipeline_name + " source"
     _handler = handler
-    _runner = runner_builder(alfred, None,
+    _runner = runner_builder(alfred, auth, None,
       target_router, pre_state_target_id)
     _router = _runner.clone_router_and_set_input_type(router)
     _metrics_reporter = consume metrics_reporter

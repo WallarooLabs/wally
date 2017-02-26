@@ -182,7 +182,7 @@ class KeyedStateSubpartition[PIn: Any val,
 	//@printf[I32]("%s == %s ?\n".cstring(), pa.worker.cstring(), worker_name.cstring())
         if pa.worker == worker_name then
           let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
-          let next_state_step = Step(_runner_builder(where alfred = alfred),
+          let next_state_step = Step(_runner_builder(where alfred = alfred, auth=auth),
             consume reporter, id, _runner_builder.route_builder(),
               alfred)
 

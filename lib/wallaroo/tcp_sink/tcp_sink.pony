@@ -187,7 +187,9 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
     No-op: TCPSink has no router
     """
     None
-
+  
+  be receive_state(state: Array[U8] val) => Fail()
+   
   be dispose() =>
     """
     Gracefully shuts down the sink. Allows all pending writes

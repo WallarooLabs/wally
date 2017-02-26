@@ -535,6 +535,13 @@ class DataRouter is Equatable[DataRouter]
       //   that._route_ids_to_target_ids)
 
 trait PartitionRouter is (Router & Equatable[PartitionRouter])
+  fun migrate_state(target_id: U128, s: Array[U8] val) =>
+    try
+      let target = _data_routes(target_id)
+      target.receive_state(s)
+    else
+      Fail()
+    end
   fun local_map(): Map[U128, Step] val
   fun register_routes(router: Router val, route_builder: RouteBuilder val)
   fun update_route[K: (Hashable val & Equatable[K] val)](

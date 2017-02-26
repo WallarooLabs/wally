@@ -255,6 +255,9 @@ actor DataReceiver is Producer
       conn.unmute(c)
     end
 
+  be migrate_state(step_id: U128, s: Array[U8] val) =>
+    _router.migrate_state(step_id, s)
+
 trait _TimerInit
   fun apply(d: DataReceiver ref)
 
