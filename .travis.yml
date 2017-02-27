@@ -86,13 +86,25 @@ install:
     cd pony-stable;
     sudo make install;
   - cd $INSTALL_STARTED_AT
-
+  - if [ "${TRAVIS_OS_NAME}" = "osx" ];
+    then
+      brew install elixir;
+      mix local.hex --force;
+      mix local.rebar --force;
+    fi;
+  - if [ "${TRAVIS_OS_NAME}" = "linux" ];
+    then
+      wget https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb;
+      sudo dpkg -i erlang-solutions_1.0_all.deb;
+      sudo apt-get update;
+      sudo apt-get -fy install esl-erlang;
+      kiex install 1.2.6;
+      kiex use 1.2.6;
+      source $HOME/.kiex/elixirs/elixir-1.2.6.env;
+      mix local.hex --force;
+      mix local.rebar --force;
+    fi;
 script:
-  - cd lib/wallaroo;
-    stable env ponyc;
-    ./wallaroo;
-  - cd -;
-  - cd lib/sendence/;
-    stable env ponyc;
-    ./sendence;
-  - cd -;
+  - make test
+
+
