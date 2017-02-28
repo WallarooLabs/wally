@@ -132,7 +132,7 @@ actor Startup
       if is_joining then
         let j_addr = j_arg as Array[String]
         let control_notifier: TCPConnectionNotify iso =
-          ControlSenderConnectNotifier(env, auth)
+          ControlSenderConnectNotifier(env, auth, worker_name)
         let control_conn: TCPConnection =
           TCPConnection(auth, consume control_notifier, j_addr(0), j_addr(1))
         let cluster_join_msg = ChannelMsgEncoder.join_cluster(worker_name,
@@ -188,7 +188,9 @@ actor Startup
             m_addr(1))
 
         let connect_msg = HubProtocol.connect()
-        let metrics_join_msg = HubProtocol.join("metrics:" + application.name())
+        let metrics_join_msg = HubProtocol.join_metrics(
+          "metrics:" + application.name(),
+          worker_name)
         metrics_conn.writev(connect_msg)
         metrics_conn.writev(metrics_join_msg)
 

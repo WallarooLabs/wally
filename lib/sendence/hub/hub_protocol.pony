@@ -8,6 +8,18 @@ primitive HubProtocol
     wb.u8(HubMsgTypes.connect())
     wb.done()
 
+  fun join_metrics(topic: String, worker_name: String,
+    wb: Writer = Writer): Array[ByteSeq] val
+  =>
+    let size = (1 + 4 + topic.size() + 4 + worker_name.size()).u32()
+    wb.u32_be(size)
+    wb.u8(HubMsgTypes.join())
+    wb.u32_be(topic.size().u32())
+    wb.write(topic.array())
+    wb.u32_be(worker_name.size().u32())
+    wb.write(worker_name.array())
+    wb.done()
+
   fun join(topic: String, wb: Writer = Writer): Array[ByteSeq] val =>
     let size = (1 + 4 + topic.size()).u32()
     wb.u32_be(size)
