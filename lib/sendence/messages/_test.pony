@@ -11,7 +11,7 @@ actor Main is TestList
     test(_TestFallorTimestampRaw)
 
 class iso _TestFallorMsgEncoder is UnitTest
-  fun name(): String => "buffy:FallorMsgEncoder"
+  fun name(): String => "messages/_TestFallorMsgEncoder"
 
   fun apply(h: TestHelper) ? =>
     let test: Array[String] val = recover val ["hi", "there", "man", "!"] end
@@ -42,7 +42,7 @@ class iso _TestFallorMsgEncoder is UnitTest
     h.assert_eq[String](msgs(3), "!")
 
 class iso _TestFallorTimestampRaw is UnitTest
-  fun name(): String => "buffy:FallorTimestampRaw"
+  fun name(): String => "messages/_TestFallorTimestampRaw"
 
   fun apply(h: TestHelper) ? =>
     let text: String val = "Hello world"

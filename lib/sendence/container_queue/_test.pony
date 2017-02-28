@@ -30,7 +30,7 @@ class CountBuilder
     Count(d)
 
 class iso _TestContainerQueue is UnitTest
-  fun name(): String => "sendence:ContainerQueue"
+  fun name(): String => "container_queue/ContainerQueue"
 
   fun apply(h: TestHelper) ? =>
     let q1 = ContainerQueue[(String, USize), Count](CountBuilder)

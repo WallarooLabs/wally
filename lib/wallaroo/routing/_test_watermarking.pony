@@ -36,7 +36,7 @@ class iso _TestProposeWatermarkFullyAcked is UnitTest
   all routes are fully acked
   """
   fun name(): String =>
-    "resilience/ProposeWatermarkFullyAcked"
+    "watermarking/ProposeWatermarkFullyAcked"
 
   fun ref apply(h: TestHelper) =>
     let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
@@ -60,7 +60,7 @@ class iso _TestProposeWatermarkFullyAckedFilterLast is UnitTest
   all routes are fully acked
   """
   fun name(): String =>
-    "resilience/ProposeWatermarkFullyAckedFilterLast"
+    "watermarking/ProposeWatermarkFullyAckedFilterLast"
 
   fun ref apply(h: TestHelper) =>
     let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
@@ -85,7 +85,7 @@ class iso _TestProposeWatermarkOnlyFilter is UnitTest
   all routes are fully acked
   """
   fun name(): String =>
-    "resilience/ProposeWatermarkOnlyFilter"
+    "watermarking/ProposeWatermarkOnlyFilter"
 
   fun ref apply(h: TestHelper) =>
     let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
@@ -105,7 +105,7 @@ class iso _TestProposeWatermarkFullyAckedNoneFiltered is UnitTest
   all routes are fully acked and none were filtered
   """
   fun name(): String =>
-    "resilience/ProposeWatermarkFullyAckedNoneFiltered"
+    "watermarking/ProposeWatermarkFullyAckedNoneFiltered"
 
   fun ref apply(h: TestHelper) =>
     let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
@@ -133,7 +133,7 @@ class iso _TestProposeWatermark1 is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "resilience/ProposeWatermark1"
+    "watermarking/ProposeWatermark1"
 
   fun ref apply(h: TestHelper) =>
     let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
@@ -168,7 +168,7 @@ class iso _TestProposeWatermark2 is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "resilience/ProposeWatermark2"
+    "watermarking/ProposeWatermark2"
 
   fun ref apply(h: TestHelper) =>
     let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
@@ -204,7 +204,7 @@ class iso _TestProposeWatermark3 is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "resilience/ProposeWatermark3"
+    "watermarking/ProposeWatermark3"
 
   fun ref apply(h: TestHelper) =>
     let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
@@ -241,7 +241,7 @@ class iso _TestProposeWatermark4 is UnitTest
   Should be 3
   """
   fun name(): String =>
-    "resilience/ProposeWatermark4"
+    "watermarking/ProposeWatermark4"
 
   fun ref apply(h: TestHelper) =>
     let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
@@ -274,7 +274,7 @@ class iso _TestProposeWatermark5 is UnitTest
   Should be 0
   """
   fun name(): String =>
-    "resilience/ProposeWatermark5"
+    "watermarking/ProposeWatermark5"
 
   fun ref apply(h: TestHelper) =>
     let filter_route: _FilterRoute ref  = recover ref _FilterRoute end
@@ -306,7 +306,7 @@ class iso _TestDataReceiverProposeWatermarkFullyAcked is UnitTest
   all routes are fully acked
   """
   fun name(): String =>
-    "resilience/DataReceiverProposeWatermarkFullyAcked"
+    "watermarking/DataReceiverProposeWatermarkFullyAcked"
 
   fun ref apply(h: TestHelper) =>
     let routes: DataReceiverRoutes = DataReceiverRoutes
@@ -335,7 +335,7 @@ class iso _TestDataReceiverProposeWatermark1 is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "resilience/DataReceiverProposeWatermark1"
+    "watermarking/DataReceiverProposeWatermark1"
 
   fun ref apply(h: TestHelper) =>
     let routes: DataReceiverRoutes = DataReceiverRoutes
@@ -372,7 +372,7 @@ class iso _TestDataReceiverProposeWatermark2 is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "resilience/DataReceiverProposeWatermark2"
+    "watermarking/DataReceiverProposeWatermark2"
 
   fun ref apply(h: TestHelper) =>
     let routes: DataReceiverRoutes = DataReceiverRoutes
@@ -410,7 +410,7 @@ class iso _TestDataReceiverProposeWatermark3 is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "resilience/DataReceiverProposeWatermark3"
+    "watermarking/DataReceiverProposeWatermark3"
 
   fun ref apply(h: TestHelper) =>
     let routes: DataReceiverRoutes = DataReceiverRoutes
@@ -448,7 +448,7 @@ class iso _TestDataReceiverProposeWatermark4 is UnitTest
   Should be 3
   """
   fun name(): String =>
-    "resilience/DataReceiverProposeWatermark4"
+    "watermarking/DataReceiverProposeWatermark4"
 
   fun ref apply(h: TestHelper) =>
     let routes: DataReceiverRoutes = DataReceiverRoutes
@@ -480,7 +480,7 @@ class iso _TestDataReceiverProposeWatermark5 is UnitTest
   Should be 0
   """
   fun name(): String =>
-    "resilience/DataReceiverProposeWatermark5"
+    "watermarking/DataReceiverProposeWatermark5"
 
   fun ref apply(h: TestHelper) =>
     let routes: DataReceiverRoutes = DataReceiverRoutes
@@ -506,15 +506,13 @@ class iso _TestDataReceiverProposeWatermark5 is UnitTest
 ///
 ///
 
-
-
 class iso _TestOutgoingToIncomingEmptyIndexFor is UnitTest
   """
   Trying to get an index of a non-existent item should
   throw an error
   """
   fun name(): String =>
-    "resilience/_TestOutgoingToIncomingEmptyIndexFor"
+    "watermarking/OutgoingToIncomingEmptyIndexFor"
 
   fun ref apply(h: TestHelper) =>
     let t = _OutgoingToIncoming
@@ -526,7 +524,7 @@ class iso _TestOutgoingToIncomingEmptyIndexFor is UnitTest
 
 class iso _TestOutgoingToIncomingIndexFor1 is UnitTest
   fun name(): String =>
-    "resilience/_TestOutgoingToIncomingIndexFor1"
+    "watermarking/OutgoingToIncomingIndexFor1"
 
   fun ref apply(h: TestHelper) =>
     let t = _OutgoingToIncoming
@@ -552,7 +550,7 @@ class iso _TestOutgoingToIncomingIndexFor1 is UnitTest
 
 class iso _TestOutgoingToIncomingIndexFor2 is UnitTest
   fun name(): String =>
-    "resilience/_TestOutgoingToIncomingIndexFor2"
+    "watermarking/OutgoingToIncomingIndexFor2"
 
   fun ref apply(h: TestHelper) =>
     let t = _OutgoingToIncoming
@@ -577,7 +575,7 @@ class iso _TestOutgoingToIncomingIndexFor2 is UnitTest
 
 class iso _TestOriginHighsBelow1 is UnitTest
   fun name(): String =>
-    "resilience/_TestOriginHighsBelow1"
+    "watermarking/OriginHighsBelow1"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
@@ -614,7 +612,7 @@ class iso _TestOriginHighsBelow1 is UnitTest
 
 class iso _TestOriginHighsBelow2 is UnitTest
   fun name(): String =>
-    "resilience/_TestOriginHighsBelow2"
+    "watermarking/OriginHighsBelow2"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
@@ -649,7 +647,7 @@ class iso _TestOriginHighsBelow2 is UnitTest
 
 class iso _TestOutgoingToIncomingEviction is UnitTest
   fun name(): String =>
-    "resilience/_TestOutgoingToIncomingEviction"
+    "watermarking/OutgoingToIncomingEviction"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
@@ -685,7 +683,7 @@ class iso _TestOutgoingToIncomingEviction is UnitTest
 
 class iso _TestOutgoingToIncomingBadEviction is UnitTest
   fun name(): String =>
-    "resilience/_TestOutgoingToIncomingBadEviction"
+    "watermarking/OutgoingToIncomingBadEviction"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer

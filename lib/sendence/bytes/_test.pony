@@ -10,7 +10,7 @@ actor Main is TestList
     test(_TestBytes)
 
 class iso _TestBytes is UnitTest
-  fun name(): String => "buffy:Bytes"
+  fun name(): String => "bytes/_TestBytes"
 
   fun apply(h: TestHelper) ? =>
     let n1: U16 = 43156

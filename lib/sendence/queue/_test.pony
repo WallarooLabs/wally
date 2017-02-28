@@ -11,7 +11,7 @@ actor Main is TestList
     test(_TestQueue)
 
 class iso _TestQueue is UnitTest
-  fun name(): String => "sendence:Queue"
+  fun name(): String => "queue/Queue"
 
   fun apply(h: TestHelper) ? =>
     let q1 = Queue[U64]

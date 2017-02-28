@@ -11,7 +11,7 @@ actor Main is TestList
     test(_TestWeighted)
 
 class iso _TestWeighted is UnitTest
-  fun name(): String => "sendence:Weighted"
+  fun name(): String => "weighted/Weighted"
 
   fun apply(h: TestHelper) ? =>
     let items: Array[(USize, USize)] trn = recover Array[(USize, USize)] end
