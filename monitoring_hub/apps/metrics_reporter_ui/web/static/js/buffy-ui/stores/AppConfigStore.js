@@ -6,7 +6,8 @@ import {fromJS, List, Map} from "immutable";
 const emptyAppConfig = Map({
 	metrics: Map().set("computation", List())
 				  .set("node-ingress-egress", List())
-				  .set("start-to-end", List())
+				  .set("start-to-end", List()),
+	workers: List()
 });
 
 class AppConfigStore extends ReduceStore {
@@ -28,7 +29,7 @@ class AppConfigStore extends ReduceStore {
 			return this.getState().get(appName);
 		} else {
 			let appConfig = emptyAppConfig.set("app_name", appName);
-			return appConfig; 
+			return appConfig;
 		}
 	}
 	updateAppConfig(state, appConfig) {
