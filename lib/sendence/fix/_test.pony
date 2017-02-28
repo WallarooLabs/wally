@@ -27,7 +27,7 @@ class _TestFixTradeParsing is UnitTest
       , "20151204-14:30:00.000"
       )
 
-  fun name(): String => "fix/trade-parsing"
+  fun name(): String => "fix/FixTradeParsing"
 
   fun apply(h: TestHelper) =>
     let p = FixParser
@@ -47,7 +47,7 @@ class _TestFixNbboParsing is UnitTest
   let expected: FixNbboMessage val =
     FixNbboMessage("TSLA", "20151204-14:30:00.000", 16.40, 16.60)
 
-  fun name(): String => "fix/nbbo-parsing"
+  fun name(): String => "fix/FixNbboParsing"
 
   fun apply(h: TestHelper) =>
     let p = FixParser

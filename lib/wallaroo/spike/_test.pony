@@ -28,7 +28,7 @@ actor Main is TestList
 
 class iso _TestDropsConnectionWhenConnectingWhenSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestSpikeDropsConnectionWhenConnecting"
+    "spike/DropsConnectionWhenConnectingWhenSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, true)
@@ -46,7 +46,7 @@ class iso _TestDropsConnectionWhenConnectingWhenSpiked is UnitTest
 
 class iso _TestDoesntDropConnectionWhenConnectingWhenNotSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenConnectingWhenNotSpiked"
+    "spike/DoesntDropConnectionWhenConnectingWhenNotSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -111,7 +111,7 @@ class ConnectingNotify is WallarooOutgoingNetworkActorNotify
 
 class iso _TestDropsConnectionWhenConnectedWhenSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDropsConnectionWhenConnectedWhenSpiked"
+    "spike/DropsConnectionWhenConnectedWhenSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, true)
@@ -129,7 +129,7 @@ class iso _TestDropsConnectionWhenConnectedWhenSpiked is UnitTest
 
 class iso _TestDoesntDropConnectionWhenConnectedWhenNotSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenConnectedWhenNotSpiked"
+    "spike/DoesntDropConnectionWhenConnectedWhenNotSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -189,7 +189,7 @@ class ConnectedNotify is WallarooOutgoingNetworkActorNotify
 
 class iso _TestDoesntDropConnectionWhenConnectFailedWhenSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenConnectFailed"
+    "spike/DoesntDropConnectionWhenConnectFailed"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -205,7 +205,7 @@ class iso _TestDoesntDropConnectionWhenConnectFailedWhenSpiked is UnitTest
 
 class iso _TestDoesntDropConnectionWhenConnectFailedWhenNotSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenConnectFailedWhenNotSpiked"
+    "spike/DoesntDropConnectionWhenConnectFailedWhenNotSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -264,7 +264,7 @@ class ConnectFailedNotify is WallarooOutgoingNetworkActorNotify
 
 class iso _TestDoesntDropConnectionWhenClosedWhenSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenConnectFailed"
+    "spike/DoesntDropConnectionWhenConnectFailed"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -280,7 +280,7 @@ class iso _TestDoesntDropConnectionWhenClosedWhenSpiked is UnitTest
 
 class iso _TestDoesntDropConnectionWhenClosedWhenNotSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenClosedWhenNotSpiked"
+    "spike/DoesntDropConnectionWhenClosedWhenNotSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -339,7 +339,7 @@ class ClosedNotify is WallarooOutgoingNetworkActorNotify
 
 class iso _TestDropsConnectionWhenSentvWhenSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDropsConnectionWhenSentvWhenSpiked"
+    "spike/DropsConnectionWhenSentvWhenSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, true)
@@ -357,7 +357,7 @@ class iso _TestDropsConnectionWhenSentvWhenSpiked is UnitTest
 
 class iso _TestDoesntDropConnectionWhenSentvWhenNotSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenSentvWhenNotSpiked"
+    "spike/DoesntDropConnectionWhenSentvWhenNotSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -422,7 +422,7 @@ class SentvNotify is WallarooOutgoingNetworkActorNotify
 
 class iso _TestDropsConnectionWhenReceivedWhenSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDropsConnectionWhenReceivedWhenSpiked"
+    "spike/DropsConnectionWhenReceivedWhenSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, true)
@@ -442,7 +442,7 @@ class iso _TestDropsConnectionWhenReceivedWhenSpiked is UnitTest
 
 class iso _TestDoesntDropConnectionWhenReceivedWhenNotSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenReceivedWhenNotSpiked"
+    "spike/DoesntDropConnectionWhenReceivedWhenNotSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -511,7 +511,7 @@ class ReceivedNotify is WallarooOutgoingNetworkActorNotify
 
 class iso _TestDoesntDropConnectionWhenExpectWhenSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenExpectWhenSpiked"
+    "spike/DoesntDropConnectionWhenExpectWhenSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -528,7 +528,7 @@ class iso _TestDoesntDropConnectionWhenExpectWhenSpiked is UnitTest
 
 class iso _TestDoesntDropConnectionWhenExpectWhenNotSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenExpectWhenNotSpiked"
+    "spike/DoesntDropConnectionWhenExpectWhenNotSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -593,7 +593,7 @@ class ExpectNotify is WallarooOutgoingNetworkActorNotify
 
 class iso _TestDoesntDropConnectionWhenThrottledWhenSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenThrottledWhenSpiked"
+    "spike/DoesntDropConnectionWhenThrottledWhenSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -609,7 +609,7 @@ class iso _TestDoesntDropConnectionWhenThrottledWhenSpiked is UnitTest
 
 class iso _TestDoesntDropConnectionWhenThrottledWhenNotSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenThrottledWhenNotSpiked"
+    "spike/DoesntDropConnectionWhenThrottledWhenNotSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -668,7 +668,7 @@ class ThrottledNotify is WallarooOutgoingNetworkActorNotify
 
 class iso _TestDoesntDropConnectionWhenUnthrottledWhenSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenUnthrottledWhenSpiked"
+    "spike/DoesntDropConnectionWhenUnthrottledWhenSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
@@ -684,7 +684,7 @@ class iso _TestDoesntDropConnectionWhenUnthrottledWhenSpiked is UnitTest
 
 class iso _TestDoesntDropConnectionWhenUnthrottledWhenNotSpiked is UnitTest
   fun name(): String =>
-    "spike/_TestDoesntDropConnectionWhenUnthrottledWhenNotSpiked"
+    "spike/DoesntDropConnectionWhenUnthrottledWhenNotSpiked"
 
   fun ref apply(h: TestHelper) =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)

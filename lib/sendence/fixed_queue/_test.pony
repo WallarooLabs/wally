@@ -12,7 +12,7 @@ actor Main is TestList
     test(_TestNoneFixedQueue)
 
 class iso _TestFixedQueue is UnitTest
-  fun name(): String => "sendence:FixedQueue"
+  fun name(): String => "fixed_queue/FixedQueue"
 
   fun apply(h: TestHelper) ? =>
     let q1 = FixedQueue[U64](64)
@@ -127,7 +127,7 @@ class iso _TestFixedQueue is UnitTest
     true
 
 class iso _TestNoneFixedQueue is UnitTest
-  fun name(): String => "sendence:NoneFixedQueue"
+  fun name(): String => "fixed_queue/NoneFixedQueue"
 
   fun apply(h: TestHelper) ? =>
     let q1 = NoneFixedQueue[U64](64)
