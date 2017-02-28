@@ -3,10 +3,13 @@ defmodule MetricsReporterUI.MetricsChannel do
   require Logger
 
   alias MonitoringHubUtils.MessageLog
+  alias MonitoringHubUtils.Stores.AppConfigStore
   alias MetricsReporterUI.{AppConfigBroadcaster, ThroughputsBroadcaster, ThroughputStatsBroadcaster, LatencyStatsBroadcaster}
 
-  def join("metrics:" <> app_name, _message, socket) do
+  def join("metrics:" <> app_name, join_message, socket) do
+    %{"worker_name" => worker_name} = join_message
     _response = AppConfigBroadcaster.start_link app_name
+    {:ok, _response} = AppConfigStore.add_worker_to_app_config(app_name, worker_name)
     {:ok, socket}
   end
 

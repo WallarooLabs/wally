@@ -33,6 +33,9 @@ export default class AppNav extends React.Component {
 				<LinkContainer to={appPath  + "/dashboard"}>
 					<MenuItem>Dashboard</MenuItem>
 				</LinkContainer>
+				<LinkContainer to={appPath  + "/workers-dashboard"}>
+					<MenuItem>Workers Dashboard</MenuItem>
+				</LinkContainer>
 				<MenuItem divider />
 				<MenuItem header>Overall (Start -> End)</MenuItem>
 				<MenuItem divider />

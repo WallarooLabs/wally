@@ -32,6 +32,10 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 		GenServer.call(__MODULE__, {:add_metrics_channel_to_app_config, [app_name: app_name, category: category, channel: channel]})
 	end
 
+	def add_worker_to_app_config(app_name, worker_name) do
+		GenServer.call(__MODULE__, {:add_worker_to_app_config, [app_name: app_name, worker_name: worker_name]})
+	end
+
 	## Server callbacks
 	def init([]) do
 		tid = :ets.new(:app_config_store, [:named_table, :set])
@@ -89,6 +93,23 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 		end
 	end
 
+	def handle_call({:add_worker_to_app_config, [app_name: app_name, worker_name: worker_name]},
+	    _from, %{tid: tid} = state) do
+		app_config = case :ets.lookup(tid, app_name) do
+			[{^app_name, config}] ->
+				config
+			[] ->
+				do_create_initial_app_config(app_name)
+		end
+		new_app_config = do_add_worker_name_to_app_config(app_config, worker_name)
+		if (app_config == new_app_config) do
+			{:reply, {:ok, app_config}, state}
+		else
+			true = :ets.insert(tid, {app_name, new_app_config})
+			{:reply, {:ok, new_app_config}, state}
+		end
+	end
+
 	def handle_call(:get_app_names, _from, %{tid: tid} = state) do
 		app_names = get_table_keys(tid)
 		{:reply, {:ok, app_names}, state}
@@ -101,7 +122,17 @@ defmodule MonitoringHubUtils.Stores.AppConfigStore do
 				"node-ingress-egress" => [],
 				"computation" => [],
 				"pipeline" => []
-				}}
+				},
+			"workers" => []}
+	end
+
+	defp do_add_worker_name_to_app_config(app_config, worker_name) do
+		update_in(app_config, ["workers"], fn worker_list ->
+			worker_list ++ [worker_name]
+				|> Enum.sort
+				|> Enum.uniq
+		end)
+
 	end
 
 	defp do_add_metrics_channel_to_app_config(app_config, category, channel) do
