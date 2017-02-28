@@ -255,7 +255,7 @@ actor Connections
     service: String)
   =>
     let control_notifier: TCPConnectionNotify iso =
-      ControlSenderConnectNotifier(_env, _auth)
+      ControlSenderConnectNotifier(_env, _auth, target_name)
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
     _control_conns(target_name) = control_conn

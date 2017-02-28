@@ -211,12 +211,14 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
 class ControlSenderConnectNotifier is TCPConnectionNotify
   let _env: Env
   let _auth: AmbientAuth
+  let _worker_name: String
   var _header: Bool = true
 
-  new iso create(env: Env, auth: AmbientAuth)
+  new iso create(env: Env, auth: AmbientAuth, worker_name: String)
   =>
     _env = env
     _auth = auth
+    _worker_name = worker_name
 
   fun ref connected(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -240,7 +242,8 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
         let metrics_conn = MetricsSink(m.metrics_host, m.metrics_service)
 
         let connect_msg = HubProtocol.connect()
-        let metrics_join_msg = HubProtocol.join("metrics:" + m.metrics_app_name)
+        let metrics_join_msg = HubProtocol.join_metrics(
+          "metrics:" + m.metrics_app_name, _worker_name)
         metrics_conn.writev(connect_msg)
         metrics_conn.writev(metrics_join_msg)
         @printf[I32]("Received cluster information!\n".cstring())
