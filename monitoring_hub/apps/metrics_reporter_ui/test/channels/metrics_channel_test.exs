@@ -44,66 +44,9 @@ defmodule MetricsReporterUI.MetricsChannelTest do
     source_sink_metrics = Map.put(metrics, "category", "source-sink")
     ingress_egress_metrics = Map.put(metrics, "category", "ingress-egress")
 
-    {:ok, socket: socket, step_metrics: step_metrics, 
+    {:ok, socket: socket, step_metrics: step_metrics,
       throughput_msg: throughput_msg, latency_bins_msg: latency_bins_msg,
       source_sink_metrics: source_sink_metrics, ingress_egress_metrics: ingress_egress_metrics}
-  end
-
-  test "'step-metrics' replies with status ok", %{socket: socket, 
-    step_metrics: step_metrics, throughput_msg: throughput_msg,
-    latency_bins_msg: latency_bins_msg} do
-    ref = push socket, "step-metrics", [step_metrics]
-    assert_reply ref, :ok
-
-    throughput_log_name = "app_name:test::category:step::throughput:NODE1"
-    :ok = MonitoringHubUtils.MessageLog.Supervisor.lookup_or_create(throughput_log_name)
-    throughput_msgs = MonitoringHubUtils.MessageLog.get_logs(throughput_log_name)
-
-    assert Enum.find_value(throughput_msgs, fn msg -> msg == throughput_msg end)
-
-    latency_bins_log_name = "app_name:test::category:step::latency-bins:NODE1"
-    :ok = MonitoringHubUtils.MessageLog.Supervisor.lookup_or_create(latency_bins_log_name)
-    latency_bins_msgs = MonitoringHubUtils.MessageLog.get_logs(latency_bins_log_name)
-
-    assert Enum.find_value(latency_bins_msgs, fn msg -> msg == latency_bins_msg end)
-  end
-
-  test "'source-sink-metrics' replies with status ok", %{socket: socket, 
-    source_sink_metrics: source_sink_metrics, throughput_msg: throughput_msg,
-    latency_bins_msg: latency_bins_msg} do
-    ref = push socket, "source-sink-metrics", [source_sink_metrics]
-    assert_reply ref, :ok
-
-    throughput_log_name = "app_name:test::category:source-sink::throughput:NODE1"
-    :ok = MonitoringHubUtils.MessageLog.Supervisor.lookup_or_create(throughput_log_name)
-    throughput_msgs = MonitoringHubUtils.MessageLog.get_logs(throughput_log_name)
-
-    assert Enum.find_value(throughput_msgs, fn msg -> msg == throughput_msg end)
-
-    latency_bins_log_name = "app_name:test::category:source-sink::latency-bins:NODE1"
-    :ok = MonitoringHubUtils.MessageLog.Supervisor.lookup_or_create(latency_bins_log_name)
-    latency_bins_msgs = MonitoringHubUtils.MessageLog.get_logs(latency_bins_log_name)
-
-    assert Enum.find_value(latency_bins_msgs, fn msg -> msg == latency_bins_msg end)
-  end
-
-  test "'ingress-egress-metrics' replies with status ok", %{socket: socket,
-    ingress_egress_metrics: ingress_egress_metrics, throughput_msg: throughput_msg,
-    latency_bins_msg: latency_bins_msg} do
-    ref = push socket, "ingress-egress-metrics", [ingress_egress_metrics]
-    assert_reply ref, :ok
-
-    throughput_log_name = "app_name:test::category:ingress-egress::throughput:NODE1"
-    :ok = MonitoringHubUtils.MessageLog.Supervisor.lookup_or_create(throughput_log_name)
-    throughput_msgs = MonitoringHubUtils.MessageLog.get_logs(throughput_log_name)
-
-    assert Enum.find_value(throughput_msgs, fn msg -> msg == throughput_msg end)
-
-    latency_bins_log_name = "app_name:test::category:ingress-egress::latency-bins:NODE1"
-    :ok = MonitoringHubUtils.MessageLog.Supervisor.lookup_or_create(latency_bins_log_name)
-    latency_bins_msgs = MonitoringHubUtils.MessageLog.get_logs(latency_bins_log_name)
-
-    assert Enum.find_value(latency_bins_msgs, fn msg -> msg == latency_bins_msg end)
   end
 
   defp generate_timestamp do

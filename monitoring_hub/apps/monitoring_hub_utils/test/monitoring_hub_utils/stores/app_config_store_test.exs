@@ -11,7 +11,9 @@ defmodule MonitoringHubUtils.Stores.AppConfigStoreTest do
   		"computation" => [],
   		"node-ingress-egress" => [],
   		"pipeline" => []
-  		}}
+  		},
+      "workers" => []
+    }
   	{:ok, empty_app_config: empty_app_config}
   end
 
@@ -41,7 +43,7 @@ defmodule MonitoringHubUtils.Stores.AppConfigStoreTest do
   		|> update_in(["metrics", "computation"], fn _ -> ["computation:step1"] end)
     {:ok, ^existing_app_config} = AppConfigStore.store_app_config "existing-app-config", existing_app_config
     {:ok, retrieved_exisiting_app_config} = AppConfigStore.get_or_create_app_config "existing-app-config"
-    
+
     new_app_config = Map.put(empty_app_config, "app_name", "new-app-config")
     {:ok, created_app_config} = AppConfigStore.get_or_create_app_config "new-app-config"
   	assert retrieved_exisiting_app_config == existing_app_config
