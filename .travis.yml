@@ -106,5 +106,3 @@ install:
     fi;
 script:
   - make test
-
-
