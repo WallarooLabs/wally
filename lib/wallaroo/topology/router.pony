@@ -1,5 +1,6 @@
 use "collections"
 use "net"
+use "sendence/equality"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/messages"
@@ -75,7 +76,7 @@ class DirectRouter
       false
     end
 
-class ProxyRouter
+class ProxyRouter is Equatable[ProxyRouter]
   let _worker_name: String
   let _target: ConsumerStep tag
   let _target_proxy_address: ProxyAddress val
@@ -130,15 +131,28 @@ class ProxyRouter
   fun routes(): Array[ConsumerStep] val =>
     recover val [_target] end
 
-trait OmniRouter
+  fun update_proxy_address(pa: ProxyAddress val): ProxyRouter val =>
+    ProxyRouter(_worker_name, _target, pa, _auth)
+
+  fun eq(that: box->ProxyRouter): Bool =>
+    (_worker_name == that._worker_name) and
+      (_target is that._target) and
+      (_target_proxy_address == that._target_proxy_address)
+
+trait OmniRouter is Equatable[OmniRouter]
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+  fun val add_boundary(w: String, boundary: OutgoingBoundary): OmniRouter val
+  fun val update_route_to_proxy(id: U128,
+    pa: ProxyAddress val): OmniRouter val
+  fun val update_route_to_step(id: U128,
+    step: ConsumerStep tag): OmniRouter val
 
-class EmptyOmniRouter is OmniRouter
+class val EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
@@ -148,6 +162,24 @@ class EmptyOmniRouter is OmniRouter
   =>
     @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n".cstring())
     (true, true, latest_ts)
+
+  fun val add_boundary(w: String,
+    boundary: OutgoingBoundary): OmniRouter val
+  =>
+    this
+
+  fun val update_route_to_proxy(id: U128, pa: ProxyAddress val):
+    OmniRouter val
+  =>
+    this
+
+  fun val update_route_to_step(id: U128,
+    step: ConsumerStep tag): OmniRouter val
+  =>
+    this
+
+  fun eq(that: box->OmniRouter): Bool =>
+    false
 
 class StepIdRouter is OmniRouter
   let _worker_name: String
@@ -250,25 +282,111 @@ class StepIdRouter is OmniRouter
       end
     end
 
-class DataRouter
+    fun val add_boundary(w: String,
+      boundary: OutgoingBoundary): OmniRouter val
+    =>
+      // TODO: Using persistent maps for our fields would make this more
+      // efficient
+      let new_outgoing_boundaries: Map[String, OutgoingBoundary] trn =
+        recover Map[String, OutgoingBoundary] end
+      for (k, v) in _outgoing_boundaries.pairs() do
+        new_outgoing_boundaries(k) = v
+      end
+      new_outgoing_boundaries(w) = boundary
+      StepIdRouter(_worker_name, _data_routes, _step_map,
+        consume new_outgoing_boundaries)
+
+    fun val update_route_to_proxy(id: U128,
+      pa: ProxyAddress val): OmniRouter val
+    =>
+      // TODO: Using persistent maps for our fields would make this more
+      // efficient
+      let new_data_routes: Map[U128, ConsumerStep tag] trn =
+        recover Map[U128, ConsumerStep tag] end
+      let new_step_map: Map[U128, (ProxyAddress val | U128)] trn =
+        recover Map[U128, (ProxyAddress val | U128)] end
+      for (k, v) in _data_routes.pairs() do
+        if k != id then new_data_routes(k) = v end
+      end
+
+      for (k, v) in _step_map.pairs() do
+        new_step_map(k) = v
+      end
+      new_step_map(id) = pa
+
+      StepIdRouter(_worker_name, consume new_data_routes, consume new_step_map,
+        _outgoing_boundaries)
+
+    fun val update_route_to_step(id: U128,
+      step: ConsumerStep tag): OmniRouter val
+    =>
+      // TODO: Using persistent maps for our fields would make this more
+      // efficient
+      let new_data_routes: Map[U128, ConsumerStep tag] trn =
+        recover Map[U128, ConsumerStep tag] end
+      let new_step_map: Map[U128, (ProxyAddress val | U128)] trn =
+        recover Map[U128, (ProxyAddress val | U128)] end
+      for (k, v) in _data_routes.pairs() do
+        if k != id then new_data_routes(k) = v end
+      end
+      new_data_routes(id) = step
+
+      for (k, v) in _step_map.pairs() do
+        new_step_map(k) = v
+      end
+      new_step_map(id) = ProxyAddress(_worker_name, id)
+
+      StepIdRouter(_worker_name, consume new_data_routes, consume new_step_map,
+        _outgoing_boundaries)
+
+  fun eq(that: box->OmniRouter): Bool =>
+    match that
+    | let o: box->StepIdRouter =>
+      (_worker_name == o._worker_name) and
+        MapTagEquality[U128, ConsumerStep tag](_data_routes,
+          o._data_routes) and
+        MapEquality2[U128, ProxyAddress val, U128](_step_map, o._step_map) and
+        MapTagEquality[String, OutgoingBoundary](_outgoing_boundaries,
+          o._outgoing_boundaries)
+    else
+      false
+    end
+
+class DataRouter is Equatable[DataRouter]
   let _data_routes: Map[U128, ConsumerStep tag] val
-  let _target_ids_to_route_ids: Map[U128, RouteId] =
-    _target_ids_to_route_ids.create()
-  let _route_ids_to_target_ids: Map[RouteId, U128] =
-    _route_ids_to_target_ids.create()
+  let _target_ids_to_route_ids: Map[U128, RouteId] val
+  let _route_ids_to_target_ids: Map[RouteId, U128] val
 
   new val create(data_routes: Map[U128, ConsumerStep tag] val =
       recover Map[U128, ConsumerStep tag] end)
   =>
     _data_routes = data_routes
     var route_id: RouteId = 0
+    let keys: Array[U128] = keys.create()
+    let tid_map: Map[U128, RouteId] trn =
+      recover Map[U128, RouteId] end
+    let rid_map: Map[RouteId, U128] trn =
+      recover Map[RouteId, U128] end
     for step_id in _data_routes.keys() do
+      keys.push(step_id)
+    end
+    for key in Sort[Array[U128], U128](keys).values() do
       route_id = route_id + 1
-      _target_ids_to_route_ids(step_id) = route_id
+      tid_map(key) = route_id
     end
-    for (t_id, r_id) in _target_ids_to_route_ids.pairs() do
-      _route_ids_to_target_ids(r_id) = t_id
+    for (t_id, r_id) in tid_map.pairs() do
+      rid_map(r_id) = t_id
     end
+    _target_ids_to_route_ids = consume tid_map
+    _route_ids_to_target_ids = consume rid_map
+
+  new val with_route_ids(data_routes: Map[U128, ConsumerStep tag] val,
+    target_ids_to_route_ids: Map[U128, RouteId] val,
+    route_ids_to_target_ids: Map[RouteId, U128] val)
+  =>
+    _data_routes = data_routes
+    _target_ids_to_route_ids = target_ids_to_route_ids
+    _route_ids_to_target_ids = route_ids_to_target_ids
 
   fun route(d_msg: DeliveryMsg val, pipeline_time_spent: U64,
     origin: DataReceiver ref, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
@@ -358,9 +476,69 @@ class DataRouter
     // TODO: CREDITFLOW - real implmentation?
     recover val Array[ConsumerStep] end
 
-trait PartitionRouter is Router
+  fun remove_route(id: U128): DataRouter val =>
+    // TODO: Using persistent maps for our fields would make this much more
+    // efficient
+    let new_data_routes: Map[U128, ConsumerStep tag] trn =
+      recover Map[U128, ConsumerStep tag] end
+    for (k, v) in _data_routes.pairs() do
+      if k != id then new_data_routes(k) = v end
+    end
+    let new_tid_map: Map[U128, RouteId] trn =
+      recover Map[U128, RouteId] end
+    for (k, v) in _target_ids_to_route_ids.pairs() do
+      if k != id then new_tid_map(k) = v end
+    end
+    let new_rid_map: Map[RouteId, U128] trn =
+      recover Map[RouteId, U128] end
+    for (k, v) in _route_ids_to_target_ids.pairs() do
+      if v != id then new_rid_map(k) = v end
+    end
+    DataRouter.with_route_ids(consume new_data_routes,
+      consume new_tid_map, consume new_rid_map)
+
+  fun add_route(id: U128, target: ConsumerStep tag): DataRouter val =>
+    // TODO: Using persistent maps for our fields would make this much more
+    // efficient
+    let new_data_routes: Map[U128, ConsumerStep tag] trn =
+      recover Map[U128, ConsumerStep tag] end
+    for (k, v) in _data_routes.pairs() do
+      new_data_routes(k) = v
+    end
+    new_data_routes(id) = target
+
+    let new_tid_map: Map[U128, RouteId] trn =
+      recover Map[U128, RouteId] end
+    var highest_route_id: RouteId = 0
+    for (k, v) in _target_ids_to_route_ids.pairs() do
+      new_tid_map(k) = v
+      if v > highest_route_id then highest_route_id = v end
+    end
+    let new_route_id = highest_route_id + 1
+    new_tid_map(id) = new_route_id
+
+    let new_rid_map: Map[RouteId, U128] trn =
+      recover Map[RouteId, U128] end
+    for (k, v) in _route_ids_to_target_ids.pairs() do
+      new_rid_map(k) = v
+    end
+    new_rid_map(new_route_id) = id
+
+    DataRouter.with_route_ids(consume new_data_routes,
+      consume new_tid_map, consume new_rid_map)
+
+  fun eq(that: box->DataRouter): Bool =>
+    MapTagEquality[U128, ConsumerStep tag](_data_routes, that._data_routes) and
+      MapEquality[U128, RouteId](_target_ids_to_route_ids,
+        that._target_ids_to_route_ids) //and
+      // MapEquality[RouteId, U128](_route_ids_to_target_ids,
+      //   that._route_ids_to_target_ids)
+
+trait PartitionRouter is (Router & Equatable[PartitionRouter])
   fun local_map(): Map[U128, Step] val
   fun register_routes(router: Router val, route_builder: RouteBuilder val)
+  fun update_route[K: (Hashable val & Equatable[K] val)](
+    raw_k: K, target: (Step | ProxyRouter val)): PartitionRouter val ?
 
 trait AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)] is
   PartitionRouter
@@ -498,3 +676,88 @@ class LocalPartitionRouter[In: Any val,
     consume cs
 
   fun local_map(): Map[U128, Step] val => _local_map
+
+  fun update_route[K: (Hashable val & Equatable[K] val)](
+    raw_k: K, target: (Step | ProxyRouter val)): PartitionRouter val ?
+  =>
+    // TODO: Using persistent maps for our fields would make this much more
+    // efficient
+    match raw_k
+    | let key: Key =>
+      let target_id = _step_ids(key)
+      let new_local_map: Map[U128, Step] trn = recover Map[U128, Step] end
+      let new_partition_routes: Map[Key, (Step | ProxyRouter val)] trn =
+        recover Map[Key, (Step | ProxyRouter val)] end
+      match target
+      | let step: Step =>
+        for (id, s) in _local_map.pairs() do
+          new_local_map(id) = s
+        end
+        new_local_map(target_id) = step
+        for (k, t) in _partition_routes.pairs() do
+          if k == key then
+            new_partition_routes(k) = target
+          else
+            new_partition_routes(k) = t
+          end
+        end
+        LocalPartitionRouter[In, Key](consume new_local_map, _step_ids,
+          consume new_partition_routes, _partition_function, _default_router)
+      | let proxy_router: ProxyRouter val =>
+        for (id, s) in _local_map.pairs() do
+          if id != target_id then new_local_map(id) = s end
+        end
+        for (k, t) in _partition_routes.pairs() do
+          if k == key then
+            new_partition_routes(k) = target
+          else
+            new_partition_routes(k) = t
+          end
+        end
+        LocalPartitionRouter[In, Key](consume new_local_map, _step_ids,
+          consume new_partition_routes, _partition_function, _default_router)
+      else
+        error
+      end
+    else
+      error
+    end
+
+  fun eq(that: box->PartitionRouter): Bool =>
+    match that
+    | let o: box->LocalPartitionRouter[In, Key] =>
+      MapTagEquality[U128, Step](_local_map, o._local_map) and
+        MapEquality[Key, U128](_step_ids, o._step_ids) and
+        _partition_routes_eq(o._partition_routes) and
+        (_partition_function is o._partition_function) and
+        (_default_router is o._default_router)
+    else
+      false
+    end
+
+  fun _partition_routes_eq(
+    opr: Map[Key, (Step | ProxyRouter val)] val): Bool
+  =>
+    try
+      // These equality checks depend on the identity of Step or ProxyRouter
+      // val which means we don't expect them to be created independently
+      if _partition_routes.size() != opr.size() then return false end
+      for (k, v) in _partition_routes.pairs() do
+        match v
+        | let s: Step =>
+          if opr(k) isnt v then return false end
+        | let pr: ProxyRouter val =>
+          match opr(k)
+          | let pr2: ProxyRouter val =>
+            pr == pr2
+          else
+            false
+          end
+        else
+          false
+        end
+      end
+      true
+    else
+      false
+    end

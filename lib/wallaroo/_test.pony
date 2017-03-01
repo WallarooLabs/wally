@@ -9,6 +9,7 @@ use "ponytest"
 use initialization = "initialization"
 use routing = "routing"
 use spike = "spike"
+use topology = "topology"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -21,3 +22,4 @@ actor Main is TestList
     initialization.Main.make().tests(test)
     routing.Main.make().tests(test)
     spike.Main.make().tests(test)
+    topology.Main.make().tests(test)
