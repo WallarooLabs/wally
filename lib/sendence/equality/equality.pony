@@ -41,6 +41,18 @@ primitive MapEquality3[K: (Hashable #read & Equatable[K] #read),
       false
     end
 
+primitive MapTagEquality[K: (Hashable #read & Equatable[K] #read), V: Any tag]
+  fun apply(m1: box->Map[K, V], m2: box->Map[K, V]): Bool =>
+    if m1.size() != m2.size() then return false end
+    try
+      for (k, v) in m1.pairs() do
+        if m2(k) isnt v then return false end
+      end
+      true
+    else
+      false
+    end
+
 primitive ArrayEquality[V: Equatable[V] #read]
   fun apply(a1: box->Array[V], a2: box->Array[V]): Bool =>
     if a1.size() != a2.size() then return false end
