@@ -139,6 +139,7 @@ trait StateSubpartition is Equatable[StateSubpartition]
     default_router: (Router val | None) = None): PartitionRouter val
   fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
     pa: ProxyAddress val): StateSubpartition val ?
+  fun runner_builder(): RunnerBuilder val
 
 class KeyedStateSubpartition[PIn: Any val,
   Key: (Hashable val & Equatable[Key] val)] is StateSubpartition
@@ -149,7 +150,7 @@ class KeyedStateSubpartition[PIn: Any val,
   let _runner_builder: RunnerBuilder val
 
   new val create(partition_addresses': KeyedPartitionAddresses[Key] val,
-    id_map': Map[Key, U128] val, runner_builder: RunnerBuilder val,
+    id_map': Map[Key, U128] val, runner_builder': RunnerBuilder val,
     partition_function': PartitionFunction[PIn, Key] val,
     pipeline_name': String)
   =>
@@ -157,7 +158,10 @@ class KeyedStateSubpartition[PIn: Any val,
     _id_map = id_map'
     _partition_function = partition_function'
     _pipeline_name = pipeline_name'
-    _runner_builder = runner_builder
+    _runner_builder = runner_builder'
+
+  fun runner_builder(): RunnerBuilder val =>
+    _runner_builder
 
   fun build(app_name: String, worker_name: String,
     metrics_conn: MetricsSink,

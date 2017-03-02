@@ -27,8 +27,8 @@ interface Runner
   fun state_name(): String
   fun clone_router_and_set_input_type(r: Router val,
     default_r: (Router val | None) = None): Router val
-  fun ref serialize_state(): Array[U8] val
-  fun ref replace_serialized_state(s: Array[U8] val)
+  fun ref serialize_state(): ByteSeq val
+  fun ref replace_serialized_state(s: ByteSeq val)
 
 trait ReplayableRunner
   fun ref replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
@@ -494,10 +494,11 @@ class ComputationRunner[In: Any val, Out: Any val]
     default_r: (Router val | None) = None): Router val
   =>
     _next.clone_router_and_set_input_type(r)
-  fun ref serialize_state(): Array[U8] val =>
+  fun ref serialize_state(): ByteSeq val =>
     Fail()
     recover val Array[U8] end
-  fun ref replace_serialized_state(s: Array[U8] val) => Fail()
+
+  fun ref replace_serialized_state(s: ByteSeq val) => Fail()
 
 class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _target_id: U128
@@ -565,10 +566,11 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     default_r: (Router val | None) = None): Router val
   =>
     r
-  fun ref serialize_state(): Array[U8] val =>
+  fun ref serialize_state(): ByteSeq val =>
     Fail()
     recover val Array[U8] end
-  fun ref replace_serialized_state(s: Array[U8] val) => Fail()
+    
+  fun ref replace_serialized_state(s: ByteSeq val) => Fail()
 
 class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   var _state: State
@@ -687,7 +689,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
   =>
     r
 
-  fun ref serialize_state(): Array[U8] val =>
+  fun ref serialize_state(): ByteSeq val =>
     try
       Serialised(SerialiseAuth(_auth), _state).output(OutputSerialisedAuth(_auth))
     else
@@ -695,9 +697,9 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
       recover val Array[U8] end
     end
 
-  fun ref replace_serialized_state(s: Array[U8] val) =>
+  fun ref replace_serialized_state(s: ByteSeq val) =>
     try
-      match Serialised.input(InputSerialisedAuth(_auth), s)(
+      match Serialised.input(InputSerialisedAuth(_auth), s as Array[U8] val)(
         DeserialiseAuth(_auth))
       | let s': State =>
         _state = s'
@@ -733,7 +735,8 @@ class iso RouterRunner
     default_r: (Router val | None) = None): Router val
   =>
     r
-  fun ref serialize_state(): Array[U8] val =>
+  fun ref serialize_state(): ByteSeq val =>
     Fail()
     recover val Array[U8] end
-  fun ref replace_serialized_state(s: Array[U8] val) => Fail()
+
+  fun ref replace_serialized_state(s: ByteSeq val) => Fail()
