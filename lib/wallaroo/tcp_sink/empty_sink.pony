@@ -46,4 +46,4 @@ actor EmptySink is ConsumerStep
   be request_ack() =>
     None
 
-  be receive_state(state: Array[U8] val) => Fail()
+  be receive_state(state: ByteSeq val) => Fail()

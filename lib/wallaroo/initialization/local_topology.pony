@@ -62,6 +62,8 @@ class LocalTopology
     //resilience
     worker_names = worker_names'
 
+  fun state_builders(): Map[String, StateSubpartition val] val => _state_builders
+  
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
     metrics_conn: MetricsSink, alfred: Alfred,
@@ -1103,6 +1105,26 @@ actor LocalTopologyInitializer
         key, pa)
         // TODO: We should find a way to batch changes before writing out.
         _save_local_topology()
+      end
+    else
+      Fail()
+    end
+
+  be receive_immigrant_step(step_id: U128, state: ByteSeq val,
+    state_name: String, key: ByteSeq val)
+  =>
+    try
+      match _topology
+      | let t: LocalTopology val => 
+        let subpartition = t.state_builders()(state_name)
+        let runner_builder = subpartition.runner_builder()
+        let reporter = MetricsReporter(t.name(), t.worker_name(), _metrics_conn)
+        let step = Step(runner_builder(where alfred = _alfred, auth = _auth),
+            consume reporter, step_id, runner_builder.route_builder(), _alfred)
+        step.receive_state(state)
+        //TODO: update routing
+      else
+        Fail()
       end
     else
       Fail()

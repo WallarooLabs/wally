@@ -31,7 +31,7 @@ trait tag RunnableStep
   
   be request_ack()
 
-  be receive_state(state: Array[U8] val)
+  be receive_state(state: ByteSeq val)
 
 interface Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer)
@@ -392,7 +392,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
 
   // Grow-to-fit
-  be receive_state(state: Array[U8] val) =>
+  be receive_state(state: ByteSeq val) =>
     @printf[I32]("Received new state\n".cstring())
     _runner.replace_serialized_state(state)
 
@@ -400,6 +400,6 @@ actor Step is (RunnableStep & Resilient & Producer &
     neighbour.receive_state(_runner.serialize_state())
     
   be send_state(boundary: OutgoingBoundary) =>
-    let state: Array[U8] val = _runner.serialize_state()
+    let state: ByteSeq val = _runner.serialize_state()
     //TODO: get state name, partition key
     boundary.migrate_step(_id, _runner.name(), "", state)
