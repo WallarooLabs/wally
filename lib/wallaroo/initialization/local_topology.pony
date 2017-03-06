@@ -11,6 +11,7 @@ use "sendence/messages"
 use "sendence/queue"
 use "wallaroo"
 use "wallaroo/boundary"
+use "wallaroo/cluster_manager"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -179,11 +180,15 @@ actor LocalTopologyInitializer
   let tcpsl_builders: Array[TCPSourceListenerBuilder val] =
     recover iso Array[TCPSourceListenerBuilder val] end
 
+  // Cluster Management
+  var _cluster_manager: (ClusterManager | None) = None
+
   new create(app: Application val, worker_name: String, worker_count: USize,
     env: Env, auth: AmbientAuth, connections: (Connections | None),
     metrics_conn: MetricsSink, is_initializer: Bool, alfred: Alfred tag,
     input_addrs: Array[Array[String]] val, local_topology_file: String,
-    data_channel_file: String, worker_names_file: String)
+    data_channel_file: String, worker_names_file: String,
+    cluster_manager: (ClusterManager | None) = None)
   =>
     _application = app
     _worker_name = worker_name
@@ -198,6 +203,7 @@ actor LocalTopologyInitializer
     _local_topology_file = local_topology_file
     _data_channel_file = data_channel_file
     _worker_names_file = worker_names_file
+    _cluster_manager = cluster_manager
 
   be update_topology(t: LocalTopology val) =>
     _topology = t
@@ -1229,3 +1235,11 @@ actor LocalTopologyInitializer
       out_id = out.id
     end
     out_id
+
+  be request_new_worker() =>
+    try
+      (_cluster_manager as ClusterManager).request_new_worker()
+    else
+      @printf[I32](("Attempting to request a new worker but cluster manager is"
+        + " None").cstring())
+    end

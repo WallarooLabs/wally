@@ -2,9 +2,11 @@ use "buffered"
 use "collections"
 use "files"
 use "net"
+use "net/http"
 use "options"
 use "time"
 use "sendence/hub"
+use "wallaroo/cluster_manager"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
@@ -30,16 +32,19 @@ actor Startup
     var d_arg: (Array[String] | None) = None
     var p_arg: (Array[String] | None) = None
     var j_arg: (Array[String] | None) = None
+    var a_arg: (String | None) = None
     var i_addrs_write: Array[Array[String]] trn =
       recover Array[Array[String]] end
     var worker_count: USize = 1
     var is_initializer = false
     var is_multi_worker = true
     var is_joining = false
+    var is_swarm_managed = false
     var worker_initializer: (WorkerInitializer | None) = None
     var application_initializer: (ApplicationInitializer | None) = None
     var worker_name = ""
     var resilience_dir = "/tmp"
+    var swarm_manager_addr = ""
     var alfred_file_length: (USize | None) = None
     try
       var options = Options(env.args, false)
@@ -67,6 +72,8 @@ actor Startup
         // All this does is give the new worker metrics info so it can
         // register with the UI (a "nominal join").
         .add("join", "j", StringArgument)
+        .add("swarm-managed", "s", None)
+        .add("swarm-manager-address", "a", StringArgument)
 
       for option in options do
         match option
@@ -97,6 +104,25 @@ actor Startup
         | ("join", let arg: String) =>
           j_arg = arg.split(":")
           is_joining = true
+        | ("swarm-managed", None) => is_swarm_managed = true
+        | ("swarm-manager-address", let arg: String) => a_arg = arg
+        end
+      end
+
+      if is_swarm_managed then
+        if a_arg is None then
+          env.out.print("You must supply '--swarm-manager-address' if " +
+            "passing '--swarm-managed'")
+          error
+        else
+          let swarm_manager_url = URL.build(a_arg as String, false)
+          if swarm_manager_url.is_valid() then
+            swarm_manager_addr = a_arg as String
+          else
+            env.out.print("You must provide a valid URL to " +
+              "'--swarm-manager-address'")
+            error
+          end
         end
       end
 
@@ -269,10 +295,20 @@ actor Startup
           metrics_conn, m_addr(0), m_addr(1), is_initializer,
           connection_addresses_file)
 
-        let local_topology_initializer = LocalTopologyInitializer(
-          application, worker_name, worker_count, env, auth, connections,
-          metrics_conn, is_initializer, alfred, input_addrs,
-          local_topology_file, data_channel_file, worker_names_file)
+        let  local_topology_initializer = if is_swarm_managed then
+          let cluster_manager: DockerSwarmClusterManager =
+            DockerSwarmClusterManager(auth, swarm_manager_addr, c_service)
+          LocalTopologyInitializer(
+            application, worker_name, worker_count, env, auth, connections,
+            metrics_conn, is_initializer, alfred, input_addrs,
+            local_topology_file, data_channel_file, worker_names_file,
+            cluster_manager)
+        else
+          LocalTopologyInitializer(
+            application, worker_name, worker_count, env, auth, connections,
+            metrics_conn, is_initializer, alfred, input_addrs,
+            local_topology_file, data_channel_file, worker_names_file)
+        end
 
         if is_initializer then
           env.out.print("Running as Initializer...")

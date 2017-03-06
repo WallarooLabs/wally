@@ -6,6 +6,7 @@ This package represents the unit test suite for Wallaroo.
 All tests can be run by compiling and running this package.
 """
 use "ponytest"
+use cluster_manager = "cluster_manager"
 use initialization = "initialization"
 use routing = "routing"
 use spike = "spike"
@@ -19,6 +20,7 @@ actor Main is TestList
     None
 
   fun tag tests(test: PonyTest) =>
+    cluster_manager.Main.make().tests(test)
     initialization.Main.make().tests(test)
     routing.Main.make().tests(test)
     spike.Main.make().tests(test)
