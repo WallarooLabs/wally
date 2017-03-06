@@ -27,6 +27,8 @@ interface Runner
   fun state_name(): String
   fun clone_router_and_set_input_type(r: Router val,
     default_r: (Router val | None) = None): Router val
+
+interface SerializableStateRunner
   fun ref serialize_state(): ByteSeq val
   fun ref replace_serialized_state(s: ByteSeq val)
 
@@ -494,11 +496,6 @@ class ComputationRunner[In: Any val, Out: Any val]
     default_r: (Router val | None) = None): Router val
   =>
     _next.clone_router_and_set_input_type(r)
-  fun ref serialize_state(): ByteSeq val =>
-    Fail()
-    recover val Array[U8] end
-
-  fun ref replace_serialized_state(s: ByteSeq val) => Fail()
 
 class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   let _target_id: U128
@@ -566,13 +563,8 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     default_r: (Router val | None) = None): Router val
   =>
     r
-  fun ref serialize_state(): ByteSeq val =>
-    Fail()
-    recover val Array[U8] end
-    
-  fun ref replace_serialized_state(s: ByteSeq val) => Fail()
 
-class StateRunner[State: Any #read] is (Runner & ReplayableRunner)
+class StateRunner[State: Any #read] is (Runner & ReplayableRunner & SerializableStateRunner)
   var _state: State
   //TODO: this needs to be per-computation, rather than per-runner
   let _state_change_repository: StateChangeRepository[State] ref
@@ -735,8 +727,3 @@ class iso RouterRunner
     default_r: (Router val | None) = None): Router val
   =>
     r
-  fun ref serialize_state(): ByteSeq val =>
-    Fail()
-    recover val Array[U8] end
-
-  fun ref replace_serialized_state(s: ByteSeq val) => Fail()
