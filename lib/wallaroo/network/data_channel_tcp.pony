@@ -141,13 +141,8 @@ class DataChannelConnectNotifier is TCPConnectionNotify
         ifdef "trace" then
           @printf[I32]("Received StepMigrationMsg on Data Channel\n".cstring())
         end
-        //try
-          //TODO: create new step with target id, in partition with state name
-          //      and key, migrate state to it, then update routing everywhere
-          None
-        //else
-        //  @printf[I32]("Missing DataReceiver!\n".cstring())
-        //end
+        _local_topology_initializer.receive_immigrant_step(sm.step_id,
+          sm.state, sm.state_name, sm.key)
       | let aw: AckWatermarkMsg val =>
         ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
