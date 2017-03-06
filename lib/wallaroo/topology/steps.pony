@@ -393,13 +393,30 @@ actor Step is (RunnableStep & Resilient & Producer &
 
   // Grow-to-fit
   be receive_state(state: ByteSeq val) =>
-    @printf[I32]("Received new state\n".cstring())
-    _runner.replace_serialized_state(state)
+    ifdef "trace" then
+      @printf[I32]("Received new state\n".cstring())
+    end
+    match _runner
+    | let r: SerializableStateRunner =>
+      r.replace_serialized_state(state)
+    else
+      Fail()
+    end
 
   be send_state_to_neighbour(neighbour: Step) =>
-    neighbour.receive_state(_runner.serialize_state())
+    match _runner
+    | let r: SerializableStateRunner =>
+      neighbour.receive_state(r.serialize_state())
+    else
+      Fail()
+    end
     
   be send_state(boundary: OutgoingBoundary) =>
-    let state: ByteSeq val = _runner.serialize_state()
-    //TODO: get state name, partition key
-    boundary.migrate_step(_id, _runner.name(), "", state)
+    match _runner
+    | let r: SerializableStateRunner =>
+      let state: ByteSeq val = r.serialize_state()
+      //TODO: get state name, partition key
+      boundary.migrate_step(_id, _runner.name(), "", state)
+    else
+      Fail()
+    end
