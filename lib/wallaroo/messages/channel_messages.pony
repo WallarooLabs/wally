@@ -27,7 +27,7 @@ primitive ChannelMsgEncoder
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, metric_name), auth, wb)
 
-  fun migrate_step(step_id: U128, state_name: String, key: String,
+  fun migrate_step(step_id: U128, state_name: String, key: Any val,
     state:ByteSeq val, auth: AmbientAuth) : Array[ByteSeq] val ?
   =>
     _encode(StepMigrationMsg(step_id, state_name, key, state), auth)
@@ -231,11 +231,11 @@ class ReplayCompleteMsg is ChannelMsg
 
 class StepMigrationMsg is ChannelMsg
   let state_name: String
-  let key: String
+  let key: Any val 
   let step_id: U128
   let state: ByteSeq val
 
-  new val create(step_id': U128, state_name': String, key': String, state': ByteSeq val) =>
+  new val create(step_id': U128, state_name': String, key': Any val, state': ByteSeq val) =>
     state_name = state_name'
     key = key'
     step_id = step_id'

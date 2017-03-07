@@ -574,6 +574,25 @@ class LocalPartitionRouter[In: Any val,
     _partition_function = partition_function
     _default_router = default_router
 
+  fun migrate_step[K: (Hashable val & Equatable[K] val)](
+    boundary: OutgoingBoundary, state_name: String,  k: K)
+  =>
+    match k
+    | let key: Key =>
+      try
+        match _partition_routes(key)
+        | let s: Step => s.send_state(boundary, state_name, k)
+        //TODO: update routing with a Proxy to the new location
+        else
+          Fail()
+        end
+      else
+        Fail()
+      end
+    else
+      Fail()
+    end
+
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
