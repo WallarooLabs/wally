@@ -1111,7 +1111,7 @@ actor LocalTopologyInitializer
     end
 
   be receive_immigrant_step(step_id: U128, state: ByteSeq val,
-    state_name: String, key: ByteSeq val)
+    state_name: String, key: Any val)
   =>
     try
       match _topology
