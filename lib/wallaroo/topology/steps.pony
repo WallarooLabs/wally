@@ -472,38 +472,13 @@ actor Step is (RunnableStep & Resilient & Producer &
       Fail()
     end
 
-  be send_state(boundary: OutgoingBoundary, state_name: String, key: Any val) =>
-      //We will never unmute this, given that it's going to be destroyed
-      mute(this)
-      let timers = Timers
-      let timer = Timer(MigrationNotify(this, boundary, state_name, key), 2_000_000_000, 2_000_000_000)
-      timers(consume timer)
-
-  be resume_migration(boundary: OutgoingBoundary, state_name: String,
-    key: Any val)
+  be send_state[K: (Hashable val & Equatable[K] val)](
+    boundary: OutgoingBoundary, state_name: String, key: K)
   =>
     match _runner
     | let r: SerializableStateRunner =>
       let state: ByteSeq val = r.serialize_state()
-      boundary.migrate_step(_id, state_name, key, state)
+      boundary.migrate_step[K](_id, state_name, key, state)
     else
       Fail()
     end
-
-	class MigrationNotify is TimerNotify
-		let _boundary: OutgoingBoundary
-		let _state_name: String
-    let _key: Any val
-    let _step: Step
-
-		new iso create(step: Step, boundary: OutgoingBoundary, state_name: String,
-      key: Any val)
-    =>
-      _boundary = boundary
-      _state_name = state_name
-      _key = key
-      _step = step
-
-		fun ref apply(timer: Timer, count: U64): Bool =>
-      _step.resume_migration(_boundary, _state_name, _key)
-      false

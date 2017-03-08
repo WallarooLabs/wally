@@ -3,7 +3,9 @@ use "net"
 use "sendence/equality"
 use "wallaroo/boundary"
 use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/messages"
+use "wallaroo/rebalancing"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
 
@@ -591,6 +593,9 @@ trait PartitionRouter is (Router & Equatable[PartitionRouter])
   fun register_routes(router: Router val, route_builder: RouteBuilder val)
   fun update_route[K: (Hashable val & Equatable[K] val)](
     raw_k: K, target: (Step | ProxyRouter val)): PartitionRouter val ?
+  fun rebalance_steps(boundary: OutgoingBoundary, target_worker: String,
+    worker_count: USize, state_name: String, router_registry: RouterRegistry)
+  fun size(): USize
 
 trait AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)] is
   PartitionRouter
@@ -618,6 +623,9 @@ class LocalPartitionRouter[In: Any val,
     _partition_function = partition_function
     _default_router = default_router
 
+  fun size(): USize =>
+    _partition_routes.size()
+
   fun migrate_step[K: (Hashable val & Equatable[K] val)](
     boundary: OutgoingBoundary, state_name: String,  k: K)
   =>
@@ -625,8 +633,7 @@ class LocalPartitionRouter[In: Any val,
     | let key: Key =>
       try
         match _partition_routes(key)
-        | let s: Step => s.send_state(boundary, state_name, k)
-        //TODO: update routing with a Proxy to the new location
+        | let s: Step => s.send_state[Key](boundary, state_name, key)
         else
           Fail()
         end
@@ -800,6 +807,30 @@ class LocalPartitionRouter[In: Any val,
       end
     else
       error
+    end
+
+  fun rebalance_steps(boundary: OutgoingBoundary, target_worker: String,
+    worker_count: USize, state_name: String, router_registry: RouterRegistry)
+  =>
+    try
+      var left_to_send = PartitionRebalancer.step_count_to_send(size(),
+        _local_map.size(), worker_count - 1)
+      for (key, target) in _partition_routes.pairs() do
+        if left_to_send == 0 then break end
+        match target
+        | let s: Step =>
+          s.send_state[Key](boundary, state_name, key)
+          let step_id = _step_ids(key)
+          router_registry.move_stateful_step_to_proxy[Key](step_id,
+            ProxyAddress(target_worker, step_id), key, state_name)
+          left_to_send = left_to_send - 1
+        end
+      end
+      ifdef debug then
+        Invariant(left_to_send == 0)
+      end
+    else
+      Fail()
     end
 
   fun eq(that: box->PartitionRouter): Bool =>

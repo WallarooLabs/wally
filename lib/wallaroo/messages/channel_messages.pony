@@ -27,10 +27,12 @@ primitive ChannelMsgEncoder
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, metric_name), auth, wb)
 
-  fun migrate_step(step_id: U128, state_name: String, key: Any val,
-    state:ByteSeq val, auth: AmbientAuth) : Array[ByteSeq] val ?
+  fun migrate_step[K: (Hashable val & Equatable[K] val)](step_id: U128,
+    state_name: String, key: K, state: ByteSeq val, worker: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(StepMigrationMsg(step_id, state_name, key, state), auth)
+    _encode(KeyedStepMigrationMsg[K](step_id, state_name, key, state, worker),
+      auth)
 
   fun delivery[D: Any val](target_id: U128,
     from_worker_name: String, msg_data: D,
@@ -131,8 +133,8 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoiningWorkerMsg(metric_app_name, metric_host, metric_service), auth)
 
-  fun new_stateful_step[K: (Hashable val & Equatable[K] val)](id: U128,
-    worker_name: String, key: K, state_name: String,
+  fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
+    id: U128, worker_name: String, key: K, state_name: String,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
@@ -140,7 +142,8 @@ primitive ChannelMsgEncoder
     has been created on this worker and that partition routers should be
     updated.
     """
-    _encode(KeyedNewStatefulStepMsg[K](id, worker_name, key, state_name), auth)
+    _encode(KeyedAnnounceNewStatefulStepMsg[K](id, worker_name, key,
+      state_name), auth)
 
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg val =>
@@ -240,17 +243,39 @@ class ReplayCompleteMsg is ChannelMsg
 
   fun sender_name(): String => _sender_name
 
-class StepMigrationMsg is ChannelMsg
-  let state_name: String
-  let key: Any val
-  let step_id: U128
-  let state: ByteSeq val
+trait StepMigrationMsg
+  fun state_name(): String
+  fun step_id(): U128
+  fun state(): ByteSeq val
+  fun worker(): String
+  fun update_router_registry(router_registry: RouterRegistry,
+    target: ConsumerStep)
 
-  new val create(step_id': U128, state_name': String, key': Any val, state': ByteSeq val) =>
-    state_name = state_name'
-    key = key'
-    step_id = step_id'
-    state = state'
+class KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is ChannelMsg
+  let _state_name: String
+  let _key: K
+  let _step_id: U128
+  let _state: ByteSeq val
+  let _worker: String
+
+  new val create(step_id': U128, state_name': String, key': K,
+    state': ByteSeq val, worker': String)
+  =>
+    _state_name = state_name'
+    _key = key'
+    _step_id = step_id'
+    _state = state'
+    _worker = worker'
+
+  fun state_name(): String => _state_name
+  fun step_id(): U128 => _step_id
+  fun state(): ByteSeq val => _state
+  fun worker(): String => _worker
+  fun update_router_registry(router_registry: RouterRegistry,
+    target: ConsumerStep)
+  =>
+    router_registry.move_proxy_to_stateful_step[K](_step_id, target, _key,
+      _state_name, _worker)
 
 class AckWatermarkMsg is ChannelMsg
   let sender_name: String
@@ -418,11 +443,11 @@ class InformJoiningWorkerMsg is ChannelMsg
     metrics_host = host
     metrics_service = service
 
-trait NewStatefulStepMsg is ChannelMsg
+trait AnnounceNewStatefulStepMsg is ChannelMsg
   fun update_registry(r: RouterRegistry)
 
-class KeyedNewStatefulStepMsg[K: (Hashable val & Equatable[K] val)] is
-  NewStatefulStepMsg
+class KeyedAnnounceNewStatefulStepMsg[K: (Hashable val & Equatable[K] val)] is
+  AnnounceNewStatefulStepMsg
   """
   This message is sent to notify another worker that a new stateful step has
   been created on this worker and that partition routers should be updated.
