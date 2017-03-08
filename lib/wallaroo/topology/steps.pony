@@ -471,8 +471,10 @@ actor Step is (RunnableStep & Resilient & Producer &
     else
       Fail()
     end
-    
-  be send_state[K: (Hashable val & Equatable[K] val)](boundary: OutgoingBoundary, state_name: String, key: K) =>
+
+  be send_state[K: (Hashable val & Equatable[K] val)](
+    boundary: OutgoingBoundary, state_name: String, key: K)
+  =>
     match _runner
     | let r: SerializableStateRunner =>
       let state: ByteSeq val = r.serialize_state()

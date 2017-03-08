@@ -289,6 +289,25 @@ class StepMigrationCompleteMsg is ChannelMsg
   =>
     step_id = step_id'
 
+  new val create(step_id': U128, state_name': String, key': K,
+    state': ByteSeq val, worker': String)
+  =>
+    _state_name = state_name'
+    _key = key'
+    _step_id = step_id'
+    _state = state'
+    _worker = worker'
+
+  fun state_name(): String => _state_name
+  fun step_id(): U128 => _step_id
+  fun state(): ByteSeq val => _state
+  fun worker(): String => _worker
+  fun update_router_registry(router_registry: RouterRegistry,
+    target: ConsumerStep)
+  =>
+    router_registry.move_proxy_to_stateful_step[K](_step_id, target, _key,
+      _state_name, _worker)
+
 class AckWatermarkMsg is ChannelMsg
   let sender_name: String
   let sender_step_id: U128
