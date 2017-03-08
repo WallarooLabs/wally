@@ -1127,20 +1127,19 @@ actor LocalTopologyInitializer
       Fail()
     end
 
-  be receive_immigrant_step(step_id: U128, state: ByteSeq val,
-    state_name: String, key: Any val)
-  =>
+  be receive_immigrant_step(msg: StepMigrationMsg val) =>
     try
       match _topology
       | let t: LocalTopology val =>
-        let subpartition = t.state_builders()(state_name)
+        let subpartition = t.state_builders()(msg.state_name())
         let runner_builder = subpartition.runner_builder()
-        let reporter = MetricsReporter(t.name(), t.worker_name(), _metrics_conn)
+        let reporter = MetricsReporter(t.name(), t.worker_name(),
+          _metrics_conn)
         let step = Step(runner_builder(where alfred = _alfred, auth = _auth),
-            consume reporter, step_id, runner_builder.route_builder(), _alfred,
-            _outgoing_boundaries)
-        step.receive_state(state)
-        //TODO: update routing
+            consume reporter, msg.step_id(), runner_builder.route_builder(),
+            _alfred, _outgoing_boundaries)
+        step.receive_state(msg.state())
+        msg.update_router_registry(_router_registry, step)
       else
         Fail()
       end

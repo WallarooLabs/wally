@@ -472,12 +472,13 @@ actor Step is (RunnableStep & Resilient & Producer &
       Fail()
     end
 
-  be send_state(boundary: OutgoingBoundary, state_name: String, key: Any val) =>
+  be send_state[K: (Hashable val & Equatable[K] val)](
+    boundary: OutgoingBoundary, state_name: String, key: K)
+  =>
     match _runner
     | let r: SerializableStateRunner =>
       let state: ByteSeq val = r.serialize_state()
-      //TODO: get state name, partition key
-      boundary.migrate_step(_id, state_name, key, state)
+      boundary.migrate_step[K](_id, state_name, key, state)
     else
       Fail()
     end

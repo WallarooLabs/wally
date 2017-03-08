@@ -193,7 +193,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _local_topology_initializer.create_data_receivers(m.workers)
       | let m: JoinClusterMsg val =>
         _connections.inform_joining_worker(conn, m.worker_name)
-      | let m: NewStatefulStepMsg val =>
+      | let m: AnnounceNewStatefulStepMsg val =>
         m.update_registry(_router_registry)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")

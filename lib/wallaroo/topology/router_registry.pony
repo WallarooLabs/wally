@@ -24,6 +24,9 @@ actor RouterRegistry
     _auth = auth
     _connections = c
 
+  fun _worker_count(): USize =>
+    _outgoing_boundaries.size() + 1
+
   be set_data_router(dr: DataRouter val) =>
     _data_router = dr
 
@@ -67,6 +70,20 @@ actor RouterRegistry
     match _data_router
     | let data_router: DataRouter val =>
       data_receiver.update_router(data_router)
+    else
+      Fail()
+    end
+
+  be migrate_partition_steps(state_name: String, target_worker: String) =>
+    """
+    Called to initiate migrating partition steps to a target worker in order
+    to rebalance.
+    """
+    try
+      let boundary = _outgoing_boundaries(target_worker)
+      let partition_router = _partition_routers(state_name)
+      partition_router.rebalance_steps(boundary, target_worker,
+        _worker_count(), state_name, this)
     else
       Fail()
     end
@@ -167,15 +184,18 @@ actor RouterRegistry
   /////
   // Step moved onto this worker
   /////
-  be move_proxy_to_step(id: U128, target: ConsumerStep) =>
+  be move_proxy_to_step(id: U128, target: ConsumerStep,
+    source_worker: String)
+  =>
     """
     Called when a stateless step has been migrated to this worker from another
     worker
     """
-    _move_proxy_to_step(id, target)
+    _move_proxy_to_step(id, target, source_worker)
 
   be move_proxy_to_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, target: ConsumerStep, key: K, state_name: String)
+    id: U128, target: ConsumerStep, key: K, state_name: String,
+    source_worker: String)
   =>
     """
     Called when a stateful step has been migrated to this worker from another
@@ -195,10 +215,13 @@ actor RouterRegistry
     else
       Fail()
     end
-    _move_proxy_to_step(id, target)
-    _connections.notify_cluster_of_new_stateful_step[K](id, key, state_name)
+    _move_proxy_to_step(id, target, source_worker)
+    _connections.notify_cluster_of_new_stateful_step[K](id, key, state_name,
+      recover [source_worker] end)
 
-  fun ref _move_proxy_to_step(id: U128, target: ConsumerStep) =>
+  fun ref _move_proxy_to_step(id: U128, target: ConsumerStep,
+    source_worker: String)
+  =>
     """
     Called when a step has been migrated to this worker from another worker
     """

@@ -132,13 +132,17 @@ actor Connections
     end
 
   be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, key: K, state_name: String)
+    id: U128, key: K, state_name: String, exclusions: Array[String] val =
+    recover Array[String] end)
   =>
     try
-      let new_step_msg = ChannelMsgEncoder.new_stateful_step[K](id,
+      let new_step_msg = ChannelMsgEncoder.announce_new_stateful_step[K](id,
         _worker_name, key, state_name, _auth)
-      for ch in _control_conns.values() do
-        ch.writev(new_step_msg)
+      for (target, ch) in _control_conns.pairs() do
+        // Only send to workers that don't already know about this step
+        if not exclusions.contains(target) then
+          ch.writev(new_step_msg)
+        end
       end
     else
       Fail()
