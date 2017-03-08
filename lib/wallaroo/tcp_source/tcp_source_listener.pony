@@ -9,6 +9,7 @@ use "wallaroo/topology"
 class TCPSourceListenerBuilder
   let _source_builder: SourceBuilder val
   let _router: Router val
+  let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder val
   let _default_in_route_builder: (RouteBuilder val | None)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
@@ -22,7 +23,7 @@ class TCPSourceListenerBuilder
   let _metrics_reporter: MetricsReporter
 
   new val create(source_builder: SourceBuilder val, router: Router val,
-    route_builder: RouteBuilder val,
+    router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
@@ -35,6 +36,7 @@ class TCPSourceListenerBuilder
   =>
     _source_builder = source_builder
     _router = router
+    _router_registry = router_registry
     _route_builder = route_builder
     _default_in_route_builder = default_in_route_builder
     _outgoing_boundaries = outgoing_boundaries
@@ -48,10 +50,10 @@ class TCPSourceListenerBuilder
     _metrics_reporter = consume metrics_reporter
 
   fun apply(): TCPSourceListener =>
-    TCPSourceListener(_source_builder, _router, _route_builder,
-      _outgoing_boundaries, _tcp_sinks, _alfred, _auth, _default_target,
-      _default_in_route_builder, _target_router, _host, _service
-      where metrics_reporter = _metrics_reporter.clone())
+    TCPSourceListener(_source_builder, _router, _router_registry,
+      _route_builder, _outgoing_boundaries, _tcp_sinks, _alfred, _auth,
+      _default_target, _default_in_route_builder, _target_router, _host,
+      _service where metrics_reporter = _metrics_reporter.clone())
 
 actor TCPSourceListener
   """
@@ -60,6 +62,7 @@ actor TCPSourceListener
 
   let _notify: TCPSourceListenerNotify
   let _router: Router val
+  let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder val
   let _default_in_route_builder: (RouteBuilder val | None)
   let _outgoing_boundaries: Map[String, OutgoingBoundary] val
@@ -75,7 +78,7 @@ actor TCPSourceListener
   let _metrics_reporter: MetricsReporter
 
   new create(source_builder: SourceBuilder val, router: Router val,
-    route_builder: RouteBuilder val,
+    router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     tcp_sinks: Array[TCPSink] val,
     alfred: Alfred tag,
@@ -92,6 +95,7 @@ actor TCPSourceListener
     """
     _notify = SourceListenerNotify(source_builder, alfred, auth, target_router)
     _router = router
+    _router_registry = router_registry
     _route_builder = route_builder
     _default_in_route_builder = default_in_route_builder
     _outgoing_boundaries = outgoing_boundaries
@@ -164,10 +168,13 @@ actor TCPSourceListener
     Spawn a new connection.
     """
     try
-      TCPSource._accept(this, _notify.connected(this), _router.routes(),
+      let source = TCPSource._accept(this, _notify.connected(this), _router.routes(),
         _route_builder, _outgoing_boundaries, _tcp_sinks, ns, _default_target,
         _default_in_route_builder, _init_size, _max_size,
         _metrics_reporter.clone())
+      // TODO: We need to figure out how to unregister this when the
+      // connection dies
+      _router_registry.register_partition_router_step(source)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)

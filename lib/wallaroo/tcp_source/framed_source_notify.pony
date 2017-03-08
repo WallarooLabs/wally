@@ -21,7 +21,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _source_name: String
   let _handler: FramedSourceHandler[In] val
   let _runner: Runner
-  let _router: Router val
+  var _router: Router val
   let _omni_router: OmniRouter val = EmptyOmniRouter
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
@@ -113,6 +113,9 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
         false
       end
     end
+
+  fun ref update_router(router: Router val) =>
+    _router = router
 
   fun ref accepted(conn: TCPSource ref) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())

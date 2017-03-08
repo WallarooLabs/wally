@@ -131,6 +131,19 @@ actor Connections
       @printf[I32](("No outgoing boundary to worker " + worker + "\n").cstring())
     end
 
+  be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
+    id: U128, key: K, state_name: String)
+  =>
+    try
+      let new_step_msg = ChannelMsgEncoder.new_stateful_step[K](id,
+        _worker_name, key, state_name, _auth)
+      for ch in _control_conns.values() do
+        ch.writev(new_step_msg)
+      end
+    else
+      Fail()
+    end
+
   be send_phone_home(msg: Array[ByteSeq] val) =>
     match _phone_home
     | let tcp: TCPConnection =>

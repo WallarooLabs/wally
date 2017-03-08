@@ -75,7 +75,7 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
       error
     end
     KeyedPartitionAddresses[Key](consume new_addresses)
-  
+
   fun eq(that: box->PartitionAddresses): Bool =>
     match that
     | let that_keyed: box->KeyedPartitionAddresses[Key] =>
@@ -83,7 +83,7 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
     else
       false
     end
-  
+
   fun ne(that: box->PartitionAddresses): Bool => not eq(that)
 
 interface StateAddresses
@@ -188,7 +188,7 @@ class KeyedStateSubpartition[PIn: Any val,
           let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
           let next_state_step = Step(_runner_builder(where alfred = alfred, auth=auth),
             consume reporter, id, _runner_builder.route_builder(),
-              alfred)
+              alfred, outgoing_boundaries)
 
           initializables.set(next_state_step)
           data_routes(id) = next_state_step
@@ -211,7 +211,7 @@ class KeyedStateSubpartition[PIn: Any val,
     end
 
     @printf[I32](("Spinning up " + partition_count.string() + " state partitions for " + _pipeline_name + " pipeline\n").cstring())
- 
+
     LocalPartitionRouter[PIn, Key](consume m, _id_map, consume routes,
       _partition_function, default_router)
 
