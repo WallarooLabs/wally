@@ -249,7 +249,7 @@ primitive _DefaultRouterGenerator
 primitive _StepGenerator
   fun apply(alfred: Alfred): Step =>
     Step(RouterRunner, MetricsReporter("", "", MetricsSink("", "")),
-      1, EmptyRouteBuilder, alfred)
+      1, EmptyRouteBuilder, alfred, recover Map[String, OutgoingBoundary] end)
 
 primitive _BoundaryGenerator
   fun apply(worker_name: String, auth: AmbientAuth): OutgoingBoundary =>

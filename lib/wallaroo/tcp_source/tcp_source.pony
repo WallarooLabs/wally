@@ -18,7 +18,7 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is Producer
+actor TCPSource is (Producer & PartitionRoutable)
   """
   # TCPSource
 
@@ -28,7 +28,8 @@ actor TCPSource is Producer
   // Credit Flow
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder val
-  let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _outgoing_boundaries: Map[String, OutgoingBoundary] =
+    _outgoing_boundaries.create()
   let _tcp_sinks: Array[TCPSink] val
   var _unregistered: Bool = false
 
@@ -88,7 +89,9 @@ actor TCPSource is Producer
     _max_size = max_size
 
     _route_builder = route_builder
-    _outgoing_boundaries = outgoing_boundaries
+    for (state_name, boundary) in outgoing_boundaries.pairs() do
+      _outgoing_boundaries(state_name) = boundary
+    end
     _tcp_sinks = tcp_sinks
 
     //TODO: either only accept when we are done recovering or don't start
@@ -122,6 +125,25 @@ actor TCPSource is Producer
 
     for r in _routes.values() do
       r.application_initialized("TCPSource")
+    end
+
+  be update_router(router: Router val) =>
+    _notify.update_router(router)
+
+  be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
+    for (state_name, boundary) in boundaries.pairs() do
+      if not _outgoing_boundaries.contains(state_name) then
+        _outgoing_boundaries(state_name) = boundary
+        _routes(boundary) =
+          _route_builder(this, boundary, _metrics_reporter)
+      end
+    end
+
+  be remove_route_for(step: ConsumerStep) =>
+    try
+      _routes.remove(step)
+    else
+      Fail()
     end
 
   //////////////

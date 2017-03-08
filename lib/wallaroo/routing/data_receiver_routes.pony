@@ -13,6 +13,16 @@ class DataReceiverRoutes
 
     _routes(route_id) = _Route
 
+  fun contains(route_id: RouteId): Bool =>
+    _routes.contains(route_id)
+
+  fun is_fully_acked(): Bool =>
+    if not _filter_route.is_fully_acked() then return false end
+    for (_, route) in _routes.pairs() do
+      if not route.is_fully_acked() then return false end
+    end
+    true
+
   fun ref send(route_id: RouteId, seq_id: SeqId)
   =>
     ifdef debug then

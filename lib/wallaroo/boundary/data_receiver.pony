@@ -2,6 +2,7 @@ use "collections"
 use "net"
 use "time"
 use "wallaroo/fail"
+use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/network"
 use "wallaroo/resilience"
@@ -152,10 +153,18 @@ actor DataReceiver is Producer
     // of a DataReceiver, so we would only need this if that were to change.
     //_router.unregister_producer(this, 0)
 
+    // We currently assume stop the world and finishing all in-flight
+    // processing before any route migration.
+    ifdef debug then
+      Invariant(_resilience_routes.is_fully_acked())
+    end
+
     _router = router
     _router.register_producer(this)
     for id in _router.route_ids().values() do
-      _resilience_routes.add_route(id)
+      if not _resilience_routes.contains(id) then
+        _resilience_routes.add_route(id)
+      end
     end
 
   be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,

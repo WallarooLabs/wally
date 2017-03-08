@@ -10,6 +10,8 @@ interface TCPSourceNotify
   // and it can then make routes available
   fun ref routes(): Array[ConsumerStep] val
 
+  fun ref update_router(router: Router val)
+
   fun ref accepted(conn: TCPSource ref) =>
     """
     Called when a TCPSource is accepted by a TCPSourceListener.

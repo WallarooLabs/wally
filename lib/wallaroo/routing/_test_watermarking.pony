@@ -720,3 +720,6 @@ actor _TestProducer is Producer
 
   fun ref _flush(low_watermark: SeqId) =>
     None
+
+  fun ref update_router(router: Router val) =>
+    None

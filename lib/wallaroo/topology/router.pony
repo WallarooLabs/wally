@@ -14,6 +14,7 @@ interface Router
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   fun routes(): Array[ConsumerStep] val
+  fun routes_not_in(router: Router val): Array[ConsumerStep] val
 
 interface RouterBuilder
   fun apply(): Router val
@@ -28,7 +29,10 @@ class EmptyRouter
     (true, true, latest_ts)
 
   fun routes(): Array[ConsumerStep] val =>
-    recover val Array[ConsumerStep] end
+    recover Array[ConsumerStep] end
+
+  fun routes_not_in(router: Router val): Array[ConsumerStep] val =>
+    recover Array[ConsumerStep] end
 
 class DirectRouter
   let _target: ConsumerStep tag
@@ -66,7 +70,14 @@ class DirectRouter
 
 
   fun routes(): Array[ConsumerStep] val =>
-    recover val [_target] end
+    recover [_target] end
+
+  fun routes_not_in(router: Router val): Array[ConsumerStep] val =>
+    if router.routes().contains(_target) then
+      recover Array[ConsumerStep] end
+    else
+      recover [_target] end
+    end
 
   fun has_sink(): Bool =>
     match _target
@@ -131,6 +142,13 @@ class ProxyRouter is Equatable[ProxyRouter]
   fun routes(): Array[ConsumerStep] val =>
     recover val [_target] end
 
+  fun routes_not_in(router: Router val): Array[ConsumerStep] val =>
+    if router.routes().contains(_target) then
+      recover Array[ConsumerStep] end
+    else
+      recover [_target] end
+    end
+
   fun update_proxy_address(pa: ProxyAddress val): ProxyRouter val =>
     ProxyRouter(_worker_name, _target, pa, _auth)
 
@@ -151,6 +169,8 @@ trait OmniRouter is Equatable[OmniRouter]
     pa: ProxyAddress val): OmniRouter val
   fun val update_route_to_step(id: U128,
     step: ConsumerStep tag): OmniRouter val
+  fun routes(): Array[ConsumerStep] val
+  fun routes_not_in(router: OmniRouter val): Array[ConsumerStep] val
 
 class val EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
@@ -177,6 +197,12 @@ class val EmptyOmniRouter is OmniRouter
     step: ConsumerStep tag): OmniRouter val
   =>
     this
+
+  fun routes(): Array[ConsumerStep] val =>
+    recover Array[ConsumerStep] end
+
+  fun routes_not_in(router: OmniRouter val): Array[ConsumerStep] val =>
+    recover Array[ConsumerStep] end
 
   fun eq(that: box->OmniRouter): Bool =>
     false
@@ -339,6 +365,21 @@ class StepIdRouter is OmniRouter
       StepIdRouter(_worker_name, consume new_data_routes, consume new_step_map,
         _outgoing_boundaries)
 
+  fun routes(): Array[ConsumerStep] val =>
+    let diff: Array[ConsumerStep] trn = recover Array[ConsumerStep] end
+    for r in _data_routes.values() do
+      diff.push(r)
+    end
+    consume diff
+
+  fun routes_not_in(router: OmniRouter val): Array[ConsumerStep] val =>
+    let diff: Array[ConsumerStep] trn = recover Array[ConsumerStep] end
+    let other_routes = router.routes()
+    for r in _data_routes.values() do
+      if not other_routes.contains(r) then diff.push(r) end
+    end
+    consume diff
+
   fun eq(that: box->OmniRouter): Bool =>
     match that
     | let o: box->StepIdRouter =>
@@ -387,6 +428,9 @@ class DataRouter is Equatable[DataRouter]
     _data_routes = data_routes
     _target_ids_to_route_ids = target_ids_to_route_ids
     _route_ids_to_target_ids = route_ids_to_target_ids
+
+  fun step_for_id(id: U128): ConsumerStep tag ? =>
+    _data_routes(id)
 
   fun route(d_msg: DeliveryMsg val, pipeline_time_spent: U64,
     origin: DataReceiver ref, seq_id: SeqId, latest_ts: U64, metrics_id: U16,
@@ -701,6 +745,14 @@ class LocalPartitionRouter[In: Any val,
     end
 
     consume cs
+
+  fun routes_not_in(router: Router val): Array[ConsumerStep] val =>
+    let diff: Array[ConsumerStep] trn = recover Array[ConsumerStep] end
+    let other_routes = router.routes()
+    for r in routes().values() do
+      if not other_routes.contains(r) then diff.push(r) end
+    end
+    consume diff
 
   fun local_map(): Map[U128, Step] val => _local_map
 

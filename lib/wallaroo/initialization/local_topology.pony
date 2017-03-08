@@ -64,7 +64,7 @@ class LocalTopology
     worker_names = worker_names'
 
   fun state_builders(): Map[String, StateSubpartition val] val => _state_builders
-  
+
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
     metrics_conn: MetricsSink, alfred: Alfred,
@@ -154,6 +154,7 @@ actor LocalTopologyInitializer
   let _env: Env
   let _auth: AmbientAuth
   let _connections: (Connections | None)
+  let _router_registry: RouterRegistry
   let _metrics_conn: MetricsSink
   let _alfred : Alfred tag
   var _is_initializer: Bool
@@ -187,7 +188,8 @@ actor LocalTopologyInitializer
 
   new create(app: Application val, worker_name: String, worker_count: USize,
     env: Env, auth: AmbientAuth, connections: (Connections | None),
-    metrics_conn: MetricsSink, is_initializer: Bool, alfred: Alfred tag,
+    router_registry: RouterRegistry, metrics_conn: MetricsSink,
+    is_initializer: Bool, alfred: Alfred tag,
     input_addrs: Array[Array[String]] val, local_topology_file: String,
     data_channel_file: String, worker_names_file: String,
     cluster_manager: (ClusterManager | None) = None)
@@ -198,6 +200,7 @@ actor LocalTopologyInitializer
     _env = env
     _auth = auth
     _connections = connections
+    _router_registry = router_registry
     _metrics_conn = metrics_conn
     _is_initializer = is_initializer
     _alfred = alfred
@@ -503,7 +506,7 @@ actor LocalTopologyInitializer
           default_target_state_step_id = state_builder.id()
 
           let state_step = state_builder(EmptyRouter, _metrics_conn,
-            _alfred, _auth)
+            _alfred, _auth, _outgoing_boundaries)
           state_step.update_route_builder(state_builder.forward_route_builder())
 
           default_target_state_step = state_step
@@ -618,7 +621,7 @@ actor LocalTopologyInitializer
                       let default_pre_state_id = dsinit.id()
                       let default_pre_state_step =
                         dsinit(default_state_router,
-                          _metrics_conn, _alfred, _auth)
+                          _metrics_conn, _alfred, _auth, _outgoing_boundaries)
                       default_target = default_pre_state_step
                       _initializables.set(default_pre_state_step)
                       built_stateless_steps(default_pre_state_id) =
@@ -668,7 +671,9 @@ actor LocalTopologyInitializer
                   end
 
                 let next_step = builder(partition_router, _metrics_conn,
-                  _alfred, _auth, state_comp_target_router)
+                  _alfred, _auth, _outgoing_boundaries,
+                  state_comp_target_router)
+                _router_registry.register_partition_router_step(next_step)
 
                 data_routes(next_id) = next_step
                 _initializables.set(next_step)
@@ -702,7 +707,7 @@ actor LocalTopologyInitializer
                 // Check if this is a default target.  If so, route it
                 // to the appropriate default state step.
                 let next_step = builder(out_router, _metrics_conn, _alfred,
-                _auth)
+                _auth, _outgoing_boundaries)
 
                 data_routes(next_id) = next_step
                 _initializables.set(next_step)
@@ -744,7 +749,7 @@ actor LocalTopologyInitializer
                 end
 
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
-                let state_step = builder(EmptyRouter, _metrics_conn, _alfred, _auth)
+                let state_step = builder(EmptyRouter, _metrics_conn, _alfred, _auth, _outgoing_boundaries)
                 data_routes(next_id) = state_step
                 _initializables.set(state_step)
 
@@ -775,7 +780,7 @@ actor LocalTopologyInitializer
                       end
 
                     let pre_state_step = b(state_step_router, _metrics_conn,
-                      _alfred, _auth, state_comp_target)
+                      _alfred, _auth, _outgoing_boundaries, state_comp_target)
                     data_routes(b.id()) = pre_state_step
                     _initializables.set(pre_state_step)
 
@@ -861,7 +866,7 @@ actor LocalTopologyInitializer
 
                     let default_pre_state_id = dsinit.id()
                     let default_pre_state_step =
-                      dsinit(default_state_router, _metrics_conn, _alfred, _auth)
+                      dsinit(default_state_router, _metrics_conn, _alfred, _auth, _outgoing_boundaries)
                     default_target = default_pre_state_step
                     _initializables.set(default_pre_state_step)
                     built_stateless_steps(default_pre_state_id) =
@@ -959,7 +964,7 @@ actor LocalTopologyInitializer
                     source_data.builder()(source_data.runner_builder(),
                       out_router, _metrics_conn,
                       source_data.pre_state_target_id(), t.worker_name()),
-                    out_router,
+                    out_router, _router_registry,
                     source_data.route_builder(),
                     _outgoing_boundaries, sinks_for_source,
                     _alfred, _auth, default_target, default_in_route_builder,
@@ -1030,6 +1035,7 @@ actor LocalTopologyInitializer
               let target_router = built_routers(tid)
               match partition_router
               | let pr: PartitionRouter val =>
+                _router_registry.set_partition_router(psd.state_name(), pr)
                 pr.register_routes(target_router, psd.forward_route_builder())
                 @printf[I32](("Registered routes on state steps for " + psd.pre_state_name() + "\n").cstring())
               else
@@ -1046,7 +1052,9 @@ actor LocalTopologyInitializer
         end
 
         let data_router = DataRouter(consume data_routes)
+        _router_registry.set_data_router(data_router)
         for receiver in _data_receivers.values() do
+          _router_registry.register_data_receiver(receiver)
           receiver.update_router(data_router)
         end
 
@@ -1074,8 +1082,11 @@ actor LocalTopologyInitializer
           end
         end
 
+        _router_registry.register_boundaries(_outgoing_boundaries)
+
         let omni_router = StepIdRouter(_worker_name,
           consume built_stateless_steps, t.step_map(), _outgoing_boundaries)
+        _router_registry.set_omni_router(omni_router)
 
         // Initialize all our initializables to get backpressure started
         _tcp_sinks = consume tcp_sinks_trn
@@ -1121,12 +1132,13 @@ actor LocalTopologyInitializer
   =>
     try
       match _topology
-      | let t: LocalTopology val => 
+      | let t: LocalTopology val =>
         let subpartition = t.state_builders()(state_name)
         let runner_builder = subpartition.runner_builder()
         let reporter = MetricsReporter(t.name(), t.worker_name(), _metrics_conn)
         let step = Step(runner_builder(where alfred = _alfred, auth = _auth),
-            consume reporter, step_id, runner_builder.route_builder(), _alfred)
+            consume reporter, step_id, runner_builder.route_builder(), _alfred,
+            _outgoing_boundaries)
         step.receive_state(state)
         //TODO: update routing
       else
@@ -1145,6 +1157,10 @@ actor LocalTopologyInitializer
           @printf[I32]("Phase I: Application is created!\n".cstring())
           for i in _initializables.values() do
             i.application_created(this, o_router)
+            match i
+            | let o: OmniRoutable =>
+              _router_registry.register_omni_router_step(o)
+            end
           end
         end
       else

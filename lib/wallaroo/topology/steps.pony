@@ -28,7 +28,7 @@ trait tag RunnableStep
     data: D, origin: Producer, msg_uid: U128,
     frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  
+
   be request_ack()
 
   be receive_state(state: ByteSeq val)
@@ -44,7 +44,7 @@ interface Initializable
 type ConsumerStep is (RunnableStep & Consumer & Initializable tag)
 
 actor Step is (RunnableStep & Resilient & Producer &
-  Consumer & Initializable)
+  Consumer & Initializable & PartitionRoutable & OmniRoutable)
   """
   # Step
 
@@ -80,8 +80,12 @@ actor Step is (RunnableStep & Resilient & Producer &
   // TODO: This needs to be merged with credit flow producer routes
   let _resilience_routes: Routes = Routes
 
+  let _outgoing_boundaries: Map[String, OutgoingBoundary] =
+    _outgoing_boundaries.create()
+
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
     id: U128, route_builder: RouteBuilder val, alfred: Alfred,
+    outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router: Router val = EmptyRouter, default_target: (Step | None) = None,
     omni_router: OmniRouter val = EmptyOmniRouter)
   =>
@@ -97,6 +101,9 @@ actor Step is (RunnableStep & Resilient & Producer &
     _alfred.register_origin(this, id)
     _id = id
     _default_target = default_target
+    for (state_name, boundary) in _outgoing_boundaries.pairs() do
+      _outgoing_boundaries(state_name) = boundary
+    end
 
   //
   // Application startup lifecycle event
@@ -114,6 +121,11 @@ actor Step is (RunnableStep & Resilient & Producer &
     for consumer in _router.routes().values() do
       _routes(consumer) =
         _route_builder(this, consumer, _metrics_reporter)
+    end
+
+    for boundary in _outgoing_boundaries.values() do
+      _routes(boundary) =
+        _route_builder(this, boundary, _metrics_reporter)
     end
 
     match _default_target
@@ -173,11 +185,60 @@ actor Step is (RunnableStep & Resilient & Producer &
       end
     end
 
-  // TODO: This needs to dispose of the old routes and replace with new routes
-  be update_router(router: Router val) => _router = router
+  be update_router(router: Router val) =>
+    try
+      let old_router = _router
+      _router = router
+      for outdated_consumer in old_router.routes_not_in(_router).values() do
+        let outdated_route = _routes(outdated_consumer)
+        _resilience_routes.remove_route(outdated_route)
+      end
+      for consumer in _router.routes().values() do
+        if not _routes.contains(consumer) then
+          let new_route = _route_builder(this, consumer, _metrics_reporter)
+          _resilience_routes.add_route(new_route)
+          _routes(consumer) = new_route
+        end
+      end
+    else
+      Fail()
+    end
 
   be update_omni_router(omni_router: OmniRouter val) =>
-    _omni_router = omni_router
+    try
+      let old_router = _omni_router
+      _omni_router = omni_router
+      for outdated_consumer in old_router.routes_not_in(_omni_router).values() do
+        let outdated_route = _routes(outdated_consumer)
+        _resilience_routes.remove_route(outdated_route)
+      end
+      for consumer in _router.routes().values() do
+        if not _routes.contains(consumer) then
+          let new_route = _route_builder(this, consumer, _metrics_reporter)
+          _resilience_routes.add_route(new_route)
+          _routes(consumer) = new_route
+        end
+      end
+    else
+      Fail()
+    end
+
+  be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
+    for (state_name, boundary) in boundaries.pairs() do
+      if not _outgoing_boundaries.contains(state_name) then
+        _outgoing_boundaries(state_name) = boundary
+        let new_route = _route_builder(this, boundary, _metrics_reporter)
+        _resilience_routes.add_route(new_route)
+        _routes(boundary) = new_route
+      end
+    end
+
+  be remove_route_for(step: ConsumerStep) =>
+    try
+      _routes.remove(step)
+    else
+      Fail()
+    end
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_origin: Producer, msg_uid: U128,
@@ -410,7 +471,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     else
       Fail()
     end
-    
+
   be send_state(boundary: OutgoingBoundary, state_name: String, key: Any val) =>
     match _runner
     | let r: SerializableStateRunner =>
