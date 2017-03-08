@@ -252,7 +252,7 @@ actor LocalTopologyInitializer
       c.create_control_connection(w, control_addr._1, control_addr._2)
       c.create_data_connection(w, data_addr._1, data_addr._2)
       c.create_boundary_to_new_worker(w, this)
-      _router_registry.add_data_receiver(w, DataReceiver(_auth, _worker_name,
+      _router_registry.add_data_receiver(DataReceiver(_auth, _worker_name,
         w, c, _alfred))
       @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
         w.cstring())
@@ -1129,8 +1129,8 @@ actor LocalTopologyInitializer
 
         let data_router = DataRouter(consume data_routes)
         _router_registry.set_data_router(data_router)
-        for (sender, receiver) in _data_receivers.pairs() do
-          _router_registry.register_data_receiver(sender, receiver)
+        for receiver in _data_receivers.values() do
+          _router_registry.register_data_receiver(receiver)
           receiver.update_router(data_router)
         end
 
@@ -1247,8 +1247,8 @@ actor LocalTopologyInitializer
 
         let data_router = DataRouter(consume data_routes)
         _router_registry.set_data_router(data_router)
-        for (w, receiver) in _data_receivers.pairs() do
-          _router_registry.register_data_receiver(w, receiver)
+        for receiver in _data_receivers.values() do
+          _router_registry.register_data_receiver(receiver)
           receiver.update_router(data_router)
         end
 

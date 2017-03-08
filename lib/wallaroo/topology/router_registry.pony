@@ -15,7 +15,7 @@ actor RouterRegistry
     _partition_routers.create()
   var _omni_router: (OmniRouter val | None) = None
   let _sources: SetIs[TCPSource] = _sources.create()
-  let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
+  let _data_receivers: SetIs[DataReceiver] = _data_receivers.create()
   let _data_channel_listeners: SetIs[DataChannelListener] =
     _data_channel_listeners.create()
   let _data_channels: SetIs[DataChannel] = _data_channels.create()
@@ -47,8 +47,8 @@ actor RouterRegistry
   be set_omni_router(o: OmniRouter val) =>
     _omni_router = o
 
-  be register_data_receiver(sender: String, dr: DataReceiver) =>
-    _data_receivers(sender) = dr
+  be register_data_receiver(dr: DataReceiver) =>
+    _data_receivers.set(dr)
 
   be register_source(tcp_source: TCPSource) =>
     _sources.set(tcp_source)
@@ -87,25 +87,11 @@ actor RouterRegistry
       routable.add_boundaries(new_boundaries_sendable)
     end
 
-  be add_data_receiver(sender_name: String, data_receiver: DataReceiver) =>
-    // TODO: Persistent map would be much more efficient here.
-    _data_receivers(sender_name) = data_receiver
-    let data_receivers: Map[String, DataReceiver] trn =
-      recover Map[String, DataReceiver] end
-    for (s, dr) in _data_receivers.pairs() do
-      data_receivers(s) = dr
-    end
-    let data_receivers_sendable: Map[String, DataReceiver] val =
-      consume data_receivers
+  be add_data_receiver(data_receiver: DataReceiver) =>
+    _data_receivers.set(data_receiver)
     match _data_router
     | let data_router: DataRouter val =>
       data_receiver.update_router(data_router)
-      for data_channel_listener in _data_channel_listeners.values() do
-        data_channel_listener.update_data_receivers(data_receivers_sendable)
-      end
-      for data_channel in _data_channels.values() do
-        data_channel.update_data_receivers(data_receivers_sendable)
-      end
     else
       Fail()
     end
@@ -259,18 +245,15 @@ actor RouterRegistry
   /////
   // Step moved onto this worker
   /////
-  be move_proxy_to_step(id: U128, target: ConsumerStep,
-    source_worker: String)
-  =>
+  be move_proxy_to_step(id: U128, target: ConsumerStep) =>
     """
     Called when a stateless step has been migrated to this worker from another
     worker
     """
-    _move_proxy_to_step(id, target, source_worker)
+    _move_proxy_to_step(id, target)
 
   be move_proxy_to_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, target: ConsumerStep, key: K, state_name: String,
-    source_worker: String)
+    id: U128, target: ConsumerStep, key: K, state_name: String)
   =>
     """
     Called when a stateful step has been migrated to this worker from another
@@ -290,13 +273,10 @@ actor RouterRegistry
     else
       Fail()
     end
-    _move_proxy_to_step(id, target, source_worker)
-    _connections.notify_cluster_of_new_stateful_step[K](id, key, state_name,
-      recover [source_worker] end)
+    _move_proxy_to_step(id, target)
+    _connections.notify_cluster_of_new_stateful_step[K](id, key, state_name)
 
-  fun ref _move_proxy_to_step(id: U128, target: ConsumerStep,
-    source_worker: String)
-  =>
+  fun ref _move_proxy_to_step(id: U128, target: ConsumerStep) =>
     """
     Called when a step has been migrated to this worker from another worker
     """
