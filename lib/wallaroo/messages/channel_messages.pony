@@ -291,7 +291,7 @@ class KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is ChannelMsg
     target: ConsumerStep)
   =>
     router_registry.move_proxy_to_stateful_step[K](_step_id, target, _key,
-      _state_name)
+      _state_name, _worker)
 
 class MuteRequestMsg is ChannelMsg
 class UnmuteRequestMsg is ChannelMsg

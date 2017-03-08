@@ -245,15 +245,18 @@ actor RouterRegistry
   /////
   // Step moved onto this worker
   /////
-  be move_proxy_to_step(id: U128, target: ConsumerStep) =>
+  be move_proxy_to_step(id: U128, target: ConsumerStep,
+    source_worker: String)
+  =>
     """
     Called when a stateless step has been migrated to this worker from another
     worker
     """
-    _move_proxy_to_step(id, target)
+    _move_proxy_to_step(id, target, source_worker)
 
   be move_proxy_to_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, target: ConsumerStep, key: K, state_name: String)
+    id: U128, target: ConsumerStep, key: K, state_name: String,
+    source_worker: String)
   =>
     """
     Called when a stateful step has been migrated to this worker from another
@@ -273,10 +276,13 @@ actor RouterRegistry
     else
       Fail()
     end
-    _move_proxy_to_step(id, target)
-    _connections.notify_cluster_of_new_stateful_step[K](id, key, state_name)
+    _move_proxy_to_step(id, target, source_worker)
+    _connections.notify_cluster_of_new_stateful_step[K](id, key, state_name,
+      recover [source_worker] end)
 
-  fun ref _move_proxy_to_step(id: U128, target: ConsumerStep) =>
+  fun ref _move_proxy_to_step(id: U128, target: ConsumerStep,
+    source_worker: String)
+  =>
     """
     Called when a step has been migrated to this worker from another worker
     """
