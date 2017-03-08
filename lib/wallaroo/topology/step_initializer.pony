@@ -61,7 +61,7 @@ class StepBuilder
     _runner_builder.clone_router_and_set_input_type(r, default_r)
 
   fun apply(next: Router val, metrics_conn: MetricsSink, alfred: Alfred,
-    auth: AmbientAuth,
+    auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router: Router val = EmptyRouter,
     omni_router: OmniRouter val = EmptyOmniRouter,
     default_target: (Step | None) = None): Step tag
@@ -70,8 +70,8 @@ class StepBuilder
       pre_state_target_id' = pre_state_target_id())
     let step = Step(consume runner,
       MetricsReporter(_app_name, _worker_name, metrics_conn), _id,
-      _runner_builder.route_builder(), alfred, router, default_target,
-      omni_router)
+      _runner_builder.route_builder(), alfred, outgoing_boundaries,
+      router, default_target, omni_router)
     step.update_router(next)
     step
 

@@ -21,13 +21,14 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _local_topology_initializer: LocalTopologyInitializer
   let _connections: Connections
   let _alfred: Alfred tag
+  let _router_registry: RouterRegistry
   let _recovery_file: FilePath
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     initializer: (WorkerInitializer | None) = None,
     local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag,
-    recovery_file: FilePath)
+    router_registry: RouterRegistry, recovery_file: FilePath)
   =>
     _env = env
     _auth = auth
@@ -37,6 +38,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _local_topology_initializer = local_topology_initializer
     _connections = connections
     _alfred = alfred
+    _router_registry = router_registry
     _recovery_file = recovery_file
 
   fun ref listening(listen: TCPListener ref) =>
@@ -75,7 +77,7 @@ class ControlChannelListenNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _env, _auth, _connections,
-      _initializer, _local_topology_initializer, _alfred)
+      _initializer, _local_topology_initializer, _alfred, _router_registry)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
   let _env: Env
@@ -85,11 +87,13 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _initializer: (WorkerInitializer | None)
   let _local_topology_initializer: LocalTopologyInitializer
   let _alfred: Alfred tag
+  let _router_registry: RouterRegistry
   var _header: Bool = true
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, initializer: (WorkerInitializer | None),
-    local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag)
+    local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag,
+    router_registry: RouterRegistry)
   =>
     _env = env
     _auth = auth
@@ -98,6 +102,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _initializer = initializer
     _local_topology_initializer = local_topology_initializer
     _alfred = alfred
+    _router_registry = router_registry
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -188,6 +193,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _local_topology_initializer.create_data_receivers(m.workers)
       | let m: JoinClusterMsg val =>
         _connections.inform_joining_worker(conn, m.worker_name)
+      | let m: NewStatefulStepMsg val =>
+        m.update_registry(_router_registry)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")
       else

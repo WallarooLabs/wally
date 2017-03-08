@@ -131,6 +131,17 @@ primitive ChannelMsgEncoder
     """
     _encode(InformJoiningWorkerMsg(metric_app_name, metric_host, metric_service), auth)
 
+  fun new_stateful_step[K: (Hashable val & Equatable[K] val)](id: U128,
+    worker_name: String, key: K, state_name: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    This message is sent to notify another worker that a new stateful step
+    has been created on this worker and that partition routers should be
+    updated.
+    """
+    _encode(KeyedNewStatefulStepMsg[K](id, worker_name, key, state_name), auth)
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg val =>
     try
@@ -231,7 +242,7 @@ class ReplayCompleteMsg is ChannelMsg
 
 class StepMigrationMsg is ChannelMsg
   let state_name: String
-  let key: Any val 
+  let key: Any val
   let step_id: U128
   let state: ByteSeq val
 
@@ -384,7 +395,7 @@ class RequestReplayMsg is DeliveryMsg
     false
 
 class JoinClusterMsg is ChannelMsg
-  """  
+  """
   This message is sent from a worker requesting to join a running cluster to
   any existing worker in the cluster.
   """
@@ -394,7 +405,7 @@ class JoinClusterMsg is ChannelMsg
     worker_name = w
 
 class InformJoiningWorkerMsg is ChannelMsg
-  """  
+  """
   This message is sent as a response to a JoinCluster message. Currently it
   only informs the new worker of metrics-related info
   """
@@ -407,3 +418,26 @@ class InformJoiningWorkerMsg is ChannelMsg
     metrics_host = host
     metrics_service = service
 
+trait NewStatefulStepMsg is ChannelMsg
+  fun update_registry(r: RouterRegistry)
+
+class KeyedNewStatefulStepMsg[K: (Hashable val & Equatable[K] val)] is
+  NewStatefulStepMsg
+  """
+  This message is sent to notify another worker that a new stateful step has
+  been created on this worker and that partition routers should be updated.
+  """
+  let _step_id: U128
+  let _worker_name: String
+  let _key: K
+  let _state_name: String
+
+  new val create(id: U128, worker: String, k: K, s_name: String) =>
+    _step_id = id
+    _worker_name = worker
+    _key = k
+    _state_name = s_name
+
+  fun update_registry(r: RouterRegistry) =>
+    r.add_state_proxy[K](_step_id, ProxyAddress(_worker_name, _step_id), _key,
+      _state_name)

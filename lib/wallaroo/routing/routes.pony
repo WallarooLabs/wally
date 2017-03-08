@@ -37,6 +37,26 @@ class Routes
 
     _routes(route.id()) = _Route
 
+  fun ref remove_route(route: Route) =>
+    try
+      let old_route = _routes(route.id())
+      ifdef debug then
+        // We currently assume stop the world and finishing all in-flight
+        // processing before any route migration.
+        Invariant(old_route.is_fully_acked())
+      end
+      _routes.remove(route.id())
+    else
+      Fail()
+    end
+
+  fun is_fully_acked(): Bool =>
+    if not _filter_route.is_fully_acked() then return false end
+    for (_, route) in _routes.pairs() do
+      if not route.is_fully_acked() then return false end
+    end
+    true
+
   fun ref send(producer: Producer ref, o_route_id: RouteId, o_seq_id: SeqId,
     i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
   =>

@@ -297,18 +297,20 @@ actor Startup
           metrics_conn, m_addr(0), m_addr(1), is_initializer,
           connection_addresses_file)
 
+        let router_registry = RouterRegistry(auth, connections)
+
         let  local_topology_initializer = if is_swarm_managed then
           let cluster_manager: DockerSwarmClusterManager =
             DockerSwarmClusterManager(auth, swarm_manager_addr, c_service)
           LocalTopologyInitializer(
             application, worker_name, worker_count, env, auth, connections,
-            metrics_conn, is_initializer, alfred, input_addrs,
+            router_registry, metrics_conn, is_initializer, alfred, input_addrs,
             local_topology_file, data_channel_file, worker_names_file,
             cluster_manager)
         else
           LocalTopologyInitializer(
             application, worker_name, worker_count, env, auth, connections,
-            metrics_conn, is_initializer, alfred, input_addrs,
+            router_registry, metrics_conn, is_initializer, alfred, input_addrs,
             local_topology_file, data_channel_file, worker_names_file)
         end
 
@@ -330,7 +332,7 @@ actor Startup
         let control_notifier: TCPListenNotify iso =
           ControlChannelListenNotifier(worker_name, env, auth, connections,
           is_initializer, worker_initializer, local_topology_initializer,
-          alfred, control_channel_filepath)
+          alfred, router_registry, control_channel_filepath)
 
         ifdef "resilience" then
           if is_initializer then
