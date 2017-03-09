@@ -415,8 +415,33 @@ actor Step is (RunnableStep & Resilient & Producer &
     match _runner
     | let r: SerializableStateRunner =>
       let state: ByteSeq val = r.serialize_state()
-      //TODO: get state name, partition key
-      boundary.migrate_step(_id, state_name, key, state)
+      //We will never unmute this, given that it's going to be destroyed
+      mute(this)
+      let timers = Timers
+      let timer = Timer(MigrationNotify(_id, boundary, state_name, key, state), 2_000_000_000, 2_000_000_000)
+      let t = timer
+      timers(consume timer)
+      timers.cancel(t)
     else
       Fail()
     end
+
+	class MigrationNotify is TimerNotify
+		let _boundary: OutgoingBoundary
+		let _state_name: String
+    let _key: Any val
+    let _id: U128
+    let _state: ByteSeq val
+
+		new iso create(id: U128, boundary: OutgoingBoundary, state_name: String,
+      key: Any val, state: ByteSeq val)
+    =>
+      _id = id
+      _boundary = boundary
+      _state_name = state_name
+      _key = key
+      _state = state
+
+		fun ref apply(timer: Timer, count: U64): Bool =>
+      _boundary.migrate_step(_id, _state_name, _key, _state)
+      true
