@@ -412,16 +412,19 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
     
   be send_state(boundary: OutgoingBoundary, state_name: String, key: Any val) =>
-    match _runner
-    | let r: SerializableStateRunner =>
-      let state: ByteSeq val = r.serialize_state()
       //We will never unmute this, given that it's going to be destroyed
       mute(this)
       let timers = Timers
-      let timer = Timer(MigrationNotify(_id, boundary, state_name, key, state), 2_000_000_000, 2_000_000_000)
-      let t = timer
+      let timer = Timer(MigrationNotify(this, boundary, state_name, key), 2_000_000_000, 2_000_000_000)
       timers(consume timer)
-      timers.cancel(t)
+
+  be resume_migration(boundary: OutgoingBoundary, state_name: String,
+    key: Any val)
+  =>
+    match _runner
+    | let r: SerializableStateRunner =>
+      let state: ByteSeq val = r.serialize_state()
+      boundary.migrate_step(_id, state_name, key, state)
     else
       Fail()
     end
@@ -430,18 +433,16 @@ actor Step is (RunnableStep & Resilient & Producer &
 		let _boundary: OutgoingBoundary
 		let _state_name: String
     let _key: Any val
-    let _id: U128
-    let _state: ByteSeq val
+    let _step: Step
 
-		new iso create(id: U128, boundary: OutgoingBoundary, state_name: String,
-      key: Any val, state: ByteSeq val)
+		new iso create(step: Step, boundary: OutgoingBoundary, state_name: String,
+      key: Any val)
     =>
-      _id = id
       _boundary = boundary
       _state_name = state_name
       _key = key
-      _state = state
+      _step = step
 
 		fun ref apply(timer: Timer, count: U64): Bool =>
-      _boundary.migrate_step(_id, _state_name, _key, _state)
-      true
+      _step.resume_migration(_boundary, _state_name, _key)
+      false
