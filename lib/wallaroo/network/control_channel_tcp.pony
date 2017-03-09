@@ -214,6 +214,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: JoiningWorkerInitializedMsg val =>
         _local_topology_initializer.add_new_worker(m.worker_name,
           m.control_addr, m.data_addr)
+      | let m: StepMigrationCompleteMsg val =>
+        _router_registry.migration_complete(m.step_id)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")
       else

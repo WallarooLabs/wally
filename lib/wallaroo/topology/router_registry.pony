@@ -19,6 +19,7 @@ actor RouterRegistry
   let _data_channel_listeners: SetIs[DataChannelListener] =
     _data_channel_listeners.create()
   let _data_channels: SetIs[DataChannel] = _data_channels.create()
+  let _sources: SetIs[TCPSource] = _sources.create()
   // All steps that have a PartitionRouter
   let _partition_router_steps: SetIs[PartitionRoutable] =
     _partition_router_steps.create()
@@ -60,6 +61,10 @@ actor RouterRegistry
   be register_data_channel(dc: DataChannel) =>
     // TODO: These need to be unregistered if they close
     _data_channels.set(dc)
+
+  be register_source(tcp_source: TCPSource) =>
+    _sources.set(tcp_source)
+    _partition_router_steps.set(tcp_source)
 
   be register_partition_router_step(pr: PartitionRoutable) =>
     _partition_router_steps.set(pr)
