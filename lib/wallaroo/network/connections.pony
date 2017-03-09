@@ -144,6 +144,10 @@ actor Connections
           ch.writev(new_step_msg)
         end
       end
+      let migration_complete_msg = ChannelMsgEncoder.migration_complete(id, _auth)
+      for origin in exclusions.values() do
+        _control_conns(origin).writev(migration_complete_msg)
+      end
     else
       Fail()
     end

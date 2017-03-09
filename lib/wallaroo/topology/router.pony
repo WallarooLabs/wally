@@ -821,6 +821,7 @@ class LocalPartitionRouter[In: Any val,
         | let s: Step =>
           s.send_state[Key](boundary, state_name, key)
           let step_id = _step_ids(key)
+          router_registry.add_to_waiting_list(step_id)
           router_registry.move_stateful_step_to_proxy[Key](step_id,
             ProxyAddress(target_worker, step_id), key, state_name)
           left_to_send = left_to_send - 1

@@ -1,8 +1,10 @@
 use "collections"
+use "time"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/network"
 use "wallaroo/routing"
+use "wallaroo/tcp_source"
 
 actor RouterRegistry
   let _auth: AmbientAuth
@@ -12,6 +14,7 @@ actor RouterRegistry
     _partition_routers.create()
   var _omni_router: (OmniRouter val | None) = None
   let _data_receivers: SetIs[DataReceiver] = _data_receivers.create()
+  let _sources: SetIs[TCPSource] = _sources.create()
   // All steps that have a PartitionRouter
   let _partition_router_steps: SetIs[PartitionRoutable] =
     _partition_router_steps.create()
@@ -19,6 +22,10 @@ actor RouterRegistry
   let _omni_router_steps: SetIs[OmniRoutable] = _omni_router_steps.create()
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
+  let _waiting_list: SetIs[U128] = _waiting_list.create()
+  let _stop_waiting_list: SetIs[String] = _stop_waiting_list.create()
+  let _resume_waiting_list: SetIs[String] = _resume_waiting_list.create()
+  let _dummy_consumer: DummyConsumer = DummyConsumer
 
   new create(auth: AmbientAuth, c: Connections) =>
     _auth = auth
@@ -38,6 +45,10 @@ actor RouterRegistry
 
   be register_data_receiver(dr: DataReceiver) =>
     _data_receivers.set(dr)
+
+  be register_source(tcp_source: TCPSource) =>
+    _sources.set(tcp_source)
+    _partition_router_steps.set(tcp_source)
 
   be register_partition_router_step(pr: PartitionRoutable) =>
     _partition_router_steps.set(pr)
@@ -74,7 +85,46 @@ actor RouterRegistry
       Fail()
     end
 
-  be migrate_partition_steps(state_name: String, target_worker: String) =>
+  be migrate_onto_new_worker(target_worker: String) =>
+    //TODO: synchronisation between all workers in the world
+    for source in _sources.values() do
+      source.mute(_dummy_consumer)
+    end
+    for dr in _data_receivers.values() do
+      dr.mute(_dummy_consumer)
+    end
+    let timers = Timers
+    let timer = Timer(ResumeNotify(this, target_worker), 2_000_000_000, 2_000_000_000)
+    timers(consume timer)
+
+  be resume_migration(target_worker: String) =>
+    for state_name in _partition_routers.keys() do
+      _migrate_partition_steps(state_name, target_worker)
+    end
+    if _waiting_list.size() == 0 then
+      //no steps have been migrated
+      _resume_the_world()
+    end
+    
+  fun _resume_the_world() =>
+    //TODO: synchronisation between all workers in the world
+    for source in _sources.values() do
+      source.unmute(_dummy_consumer)
+    end
+    for dr in _data_receivers.values() do
+      dr.unmute(_dummy_consumer)
+    end
+
+  be migration_complete(step_id: U128) =>
+    _waiting_list.unset(step_id)
+    if _waiting_list.size() == 0 then
+      _resume_the_world()
+    end
+
+  be add_to_waiting_list(step_id: U128) =>
+    _waiting_list.set(step_id)
+
+  fun _migrate_partition_steps(state_name: String, target_worker: String) =>
     """
     Called to initiate migrating partition steps to a target worker in order
     to rebalance.
@@ -246,3 +296,15 @@ actor RouterRegistry
     else
       Fail()
     end
+
+class ResumeNotify is TimerNotify
+  let _registry: RouterRegistry
+  let _target_worker: String
+
+	new iso create(registry: RouterRegistry, target_worker: String) =>
+    _registry = registry
+    _target_worker = target_worker
+
+	fun ref apply(timer: Timer, count: U64): Bool =>
+    _registry.resume_migration(_target_worker)
+    false

@@ -174,7 +174,7 @@ actor TCPSourceListener
         _metrics_reporter.clone())
       // TODO: We need to figure out how to unregister this when the
       // connection dies
-      _router_registry.register_partition_router_step(source)
+      _router_registry.register_source(source)
       _count = _count + 1
     else
       @pony_os_socket_close[None](ns)
