@@ -12,6 +12,7 @@ use "sendence/queue"
 use "wallaroo"
 use "wallaroo/boundary"
 use "wallaroo/cluster_manager"
+use "wallaroo/data_channel"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -117,15 +118,41 @@ class LocalTopology
       consume new_state_builders, _pre_state_data, _proxy_ids, default_target,
       default_state_name, default_target_id, worker_names)
 
-  fun add_worker_name(w: String): LocalTopology val =>
-    let new_worker_names: Array[String] trn = recover Array[String] end
-    for n in worker_names.values() do
-      new_worker_names.push(n)
+  fun val add_worker_name(w: String): LocalTopology val =>
+    if not worker_names.contains(w) then
+      let new_worker_names: Array[String] trn = recover Array[String] end
+      for n in worker_names.values() do
+        new_worker_names.push(n)
+      end
+      new_worker_names.push(w)
+      LocalTopology(_app_name, _worker_name, _graph, _step_map,
+        _state_builders, _pre_state_data, _proxy_ids, default_target,
+        default_state_name, default_target_id, consume new_worker_names)
+    else
+      this
     end
-    new_worker_names.push(w)
-    LocalTopology(_app_name, _worker_name, _graph, _step_map,
-      _state_builders, _pre_state_data, _proxy_ids, default_target,
-      default_state_name, default_target_id, consume new_worker_names)
+
+  fun val for_new_worker(new_worker: String): LocalTopology val ? =>
+    let w_names =
+      if not worker_names.contains(new_worker) then
+        add_worker_name(new_worker).worker_names
+      else
+        worker_names
+      end
+
+    let g = Dag[StepInitializer val]
+    // Pick up sinks, which are shared across workers
+    for node in _graph.nodes() do
+      match node.value
+      | let egress: EgressBuilder val =>
+        g.add_node(egress, node.id)
+      end
+    end
+
+    LocalTopology(_app_name, new_worker, g.clone(),
+      _step_map, _state_builders, _pre_state_data, _proxy_ids,
+      default_target, default_state_name, default_target_id,
+      w_names)
 
   fun eq(that: box->LocalTopology): Bool =>
     // This assumes that _graph, _pre_state_data, default_target,
@@ -169,6 +196,7 @@ actor LocalTopologyInitializer
   var _topology_initialized: Bool = false
   var _recovered_worker_names: Array[String] val = recover val Array[String] end
   var _recovering: Bool = false
+  let _is_joining: Bool
 
   // Lifecycle
   var _omni_router: (OmniRouter val | None) = None
@@ -192,7 +220,8 @@ actor LocalTopologyInitializer
     is_initializer: Bool, alfred: Alfred tag,
     input_addrs: Array[Array[String]] val, local_topology_file: String,
     data_channel_file: String, worker_names_file: String,
-    cluster_manager: (ClusterManager | None) = None)
+    cluster_manager: (ClusterManager | None) = None,
+    is_joining: Bool = false)
   =>
     _application = app
     _worker_name = worker_name
@@ -209,19 +238,53 @@ actor LocalTopologyInitializer
     _data_channel_file = data_channel_file
     _worker_names_file = worker_names_file
     _cluster_manager = cluster_manager
+    _is_joining = is_joining
 
   be update_topology(t: LocalTopology val) =>
     _topology = t
 
-  be add_worker_name(w: String) =>
-    match _topology
-    | let t: LocalTopology val =>
-      _topology = t.add_worker_name(w)
-      _save_local_topology()
-      _save_worker_names()
+  be add_new_worker(w: String, control_addr: (String, String),
+    data_addr: (String, String))
+  =>
+    _add_worker_name(w)
+    match _connections
+    | let c: Connections =>
+      c.create_control_connection(w, control_addr._1, control_addr._2)
+      c.create_data_connection(w, data_addr._1, data_addr._2)
+      c.create_boundary_to_new_worker(w, this)
+      _router_registry.add_data_receiver(w, DataReceiver(_auth, _worker_name,
+        w, c, _alfred))
+      @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
+        w.cstring())
     else
       Fail()
     end
+
+  be add_boundary_to_new_worker(w: String, boundary: OutgoingBoundary) =>
+    _add_boundary(w, boundary)
+    _router_registry.register_boundaries(_outgoing_boundaries)
+
+  fun ref _add_worker_name(w: String) =>
+    match _topology
+    | let t: LocalTopology val =>
+      _topology = t.add_worker_name(w)
+      ifdef "resilience" then
+        _save_local_topology()
+        _save_worker_names()
+      end
+    else
+      Fail()
+    end
+
+  fun ref _add_boundary(target_worker: String, boundary: OutgoingBoundary) =>
+    let bs: Map[String, OutgoingBoundary] trn =
+      recover Map[String, OutgoingBoundary] end
+    for (w, b) in _outgoing_boundaries.pairs() do
+      bs(w) = b
+    end
+    bs(target_worker) = boundary
+    _initializables.set(boundary)
+    _router_registry
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     _outgoing_boundaries = bs
@@ -231,7 +294,7 @@ actor LocalTopologyInitializer
 
   be create_data_receivers(ws: Array[String] val,
     worker_initializer: (WorkerInitializer | None) = None) =>
-    if _worker_count == 1 then Fail() end
+    if (not _is_joining) and (_worker_count == 1) then Fail() end
 
     match _connections
     | let conns: Connections =>
@@ -251,24 +314,28 @@ actor LocalTopologyInitializer
       try
         let data_channel_filepath = FilePath(_auth, _data_channel_file)
         if not _is_initializer then
-          let data_notifier: TCPListenNotify iso =
+          let data_notifier: DataChannelListenNotify iso =
             DataChannelListenNotifier(_worker_name, _auth, conns,
-              _is_initializer, data_receivers,
-              MetricsReporter(_application.name(), _worker_name, _metrics_conn),
+              _is_initializer,
+              MetricsReporter(_application.name(), _worker_name,
+                _metrics_conn),
               data_channel_filepath, this)
 
           ifdef "resilience" then
-            conns.make_and_register_recoverable_listener(
-              _auth, consume data_notifier, data_channel_filepath)
+            conns.make_and_register_recoverable_data_channel_listener(
+              _auth, consume data_notifier, data_receivers,
+              _router_registry, data_channel_filepath)
           else
-            conns.register_listener(TCPListener(_auth,
-              consume data_notifier))
+            let dch_listener = DataChannelListener(_auth,
+              consume data_notifier, data_receivers, _router_registry)
+            _router_registry.register_data_channel_listener(dch_listener)
+            conns.register_listener(dch_listener)
           end
         else
           match worker_initializer
             | let wi: WorkerInitializer =>
-              conns.create_initializer_data_channel(data_receivers, wi,
-              data_channel_filepath, this)
+              conns.create_initializer_data_channel(data_receivers,
+                _router_registry, wi, data_channel_filepath, this)
           end
         end
       else
@@ -301,24 +368,28 @@ actor LocalTopologyInitializer
       try
         let data_channel_filepath = FilePath(_auth, _data_channel_file)
         if not _is_initializer then
-          let data_notifier: TCPListenNotify iso =
+          let data_notifier: DataChannelListenNotify iso =
             DataChannelListenNotifier(_worker_name, _auth, conns,
-              _is_initializer, data_receivers,
-              MetricsReporter(_application.name(), _worker_name, _metrics_conn),
+              _is_initializer,
+              MetricsReporter(_application.name(), _worker_name,
+                _metrics_conn),
               data_channel_filepath, this)
 
           ifdef "resilience" then
-            conns.make_and_register_recoverable_listener(
-              _auth, consume data_notifier, data_channel_filepath)
+            conns.make_and_register_recoverable_data_channel_listener(
+              _auth, consume data_notifier, data_receivers, _router_registry,
+              data_channel_filepath)
           else
-            conns.register_listener(TCPListener(_auth,
-              consume data_notifier))
+            let dch_listener = DataChannelListener(_auth,
+              consume data_notifier, data_receivers, _router_registry)
+            _router_registry.register_data_channel_listener(dch_listener)
+            conns.register_listener(dch_listener)
           end
         else
           match worker_initializer
           | let wi: WorkerInitializer =>
-            conns.create_initializer_data_channel(data_receivers, wi,
-            data_channel_filepath, this)
+            conns.create_initializer_data_channel(data_receivers,
+              _router_registry, wi, data_channel_filepath, this)
           end
         end
       else
@@ -391,8 +462,13 @@ actor LocalTopologyInitializer
   be initialize(worker_initializer: (WorkerInitializer | None) = None,
     recovering: Bool = false)
   =>
+    if _is_joining then
+      _initialize_joining_worker()
+      return
+    end
+
     @printf[I32]("---------------------------------------------------------\n".cstring())
-    @printf[I32]("|^|^|^Initializing Local Topology^|^|^|\n\n".cstring())
+    @printf[I32]("|v|v|v|Initializing Local Topology|v|v|v|\n\n".cstring())
     _worker_initializer = worker_initializer
     try
       if (_worker_count > 1) and (_outgoing_boundaries.size() == 0) then
@@ -1053,8 +1129,8 @@ actor LocalTopologyInitializer
 
         let data_router = DataRouter(consume data_routes)
         _router_registry.set_data_router(data_router)
-        for receiver in _data_receivers.values() do
-          _router_registry.register_data_receiver(receiver)
+        for (sender, receiver) in _data_receivers.pairs() do
+          _router_registry.register_data_receiver(sender, receiver)
           receiver.update_router(data_router)
         end
 
@@ -1106,11 +1182,110 @@ actor LocalTopologyInitializer
         @printf[I32]("Local Topology Initializer: No local topology to initialize\n".cstring())
       end
 
-      @printf[I32]("\n|^|^|^Finished Initializing Local Topology^|^|^|\n".cstring())
+      @printf[I32]("\n|^|^|^|Finished Initializing Local Topology|^|^|^|\n".cstring())
       @printf[I32]("---------------------------------------------------------\n".cstring())
 
     else
-      _env.err.print("Error initializing local topology")
+      @printf[I32]("Error initializing local topology\n".cstring())
+      Fail()
+    end
+
+  fun ref _initialize_joining_worker() =>
+    @printf[I32]("---------------------------------------------------------\n".cstring())
+    @printf[I32]("|v|v|v|Initializing Joining Worker Local Topology|v|v|v|\n\n".cstring())
+    try
+      let built_routers = Map[U128, Router val]
+      let data_routes: Map[U128, ConsumerStep tag] trn =
+        recover Map[U128, ConsumerStep tag] end
+      let built_stateless_steps: Map[U128, ConsumerStep] trn =
+        recover Map[U128, ConsumerStep] end
+
+      match _topology
+      | let t: LocalTopology val =>
+        // Create sinks
+        for node in t.graph().nodes() do
+          match node.value
+          | let egress_builder: EgressBuilder val =>
+            let next_id = egress_builder.id()
+            if not built_routers.contains(next_id) then
+              let sink_reporter = MetricsReporter(t.name(),
+                t.worker_name(), _metrics_conn)
+
+              // Create a sink or OutgoingBoundary proxy. If the latter,
+              // egress_builder finds it from _outgoing_boundaries
+              let sink = egress_builder(_worker_name,
+                consume sink_reporter, _auth, _outgoing_boundaries)
+
+              if not _initializables.contains(sink) then
+                _initializables.set(sink)
+              end
+
+              let sink_router =
+                match sink
+                | let ob: OutgoingBoundary =>
+                  match egress_builder.target_address()
+                  | let pa: ProxyAddress val =>
+                    ProxyRouter(_worker_name, ob, pa, _auth)
+                  else
+                    @printf[I32]("No ProxyAddress for proxy!\n".cstring())
+                    error
+                  end
+                else
+                  DirectRouter(sink)
+                end
+
+              data_routes(next_id) = sink
+              built_routers(next_id) = sink_router
+              built_stateless_steps(next_id) = sink
+            end
+          else
+            @printf[I32](("Joining worker only currently supports sinks for " +
+              "initial topology\n").cstring())
+            Fail()
+          end
+        end
+
+        let data_router = DataRouter(consume data_routes)
+        _router_registry.set_data_router(data_router)
+        for (w, receiver) in _data_receivers.pairs() do
+          _router_registry.register_data_receiver(w, receiver)
+          receiver.update_router(data_router)
+        end
+
+        _router_registry.register_boundaries(_outgoing_boundaries)
+
+        let omni_router = StepIdRouter(_worker_name,
+          consume built_stateless_steps, t.step_map(), _outgoing_boundaries)
+        _router_registry.set_omni_router(omni_router)
+        _omni_router = omni_router
+
+        // TODO: Create partition routers. Currently, a joining worker can only
+        // host state steps that take computations that send results directly to
+        // sinks. If we want a joining worker with an app that uses multiple
+        // state partitions in a pipeline, we need to create those partition
+        // routers here and register them with the registry
+
+        ifdef "resilience" then
+          _save_local_topology()
+          _save_worker_names()
+        end
+
+        match _connections
+        | let c: Connections =>
+          c.inform_cluster_of_join()
+        else
+          Fail()
+        end
+
+        @printf[I32]("\n|^|^|^|Finished Initializing Joining Worker Local Topology|^|^|^|\n".cstring())
+        @printf[I32]("---------------------------------------------------------\n".cstring())
+
+        @printf[I32]("***Successfully joined cluster!***\n".cstring())
+      else
+        Fail()
+      end
+    else
+      Fail()
     end
 
   be update_state_step_entry[Key: (Hashable val & Equatable[Key] val)](
@@ -1224,6 +1399,19 @@ actor LocalTopologyInitializer
           end
         end
       end
+    end
+
+  be inform_joining_worker(conn: TCPConnection, worker_name: String) =>
+    match _topology
+    | let t: LocalTopology val =>
+      match _connections
+      | let c: Connections =>
+        c.inform_joining_worker(conn, worker_name, t)
+      else
+        Fail()
+      end
+    else
+      Fail()
     end
 
   fun ref _spin_up_source_listeners() =>

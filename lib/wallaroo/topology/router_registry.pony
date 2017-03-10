@@ -1,6 +1,7 @@
 use "collections"
 use "time"
 use "wallaroo/boundary"
+use "wallaroo/data_channel"
 use "wallaroo/fail"
 use "wallaroo/network"
 use "wallaroo/routing"
@@ -13,8 +14,11 @@ actor RouterRegistry
   let _partition_routers: Map[String, PartitionRouter val] =
     _partition_routers.create()
   var _omni_router: (OmniRouter val | None) = None
-  let _data_receivers: SetIs[DataReceiver] = _data_receivers.create()
   let _sources: SetIs[TCPSource] = _sources.create()
+  let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
+  let _data_channel_listeners: SetIs[DataChannelListener] =
+    _data_channel_listeners.create()
+  let _data_channels: SetIs[DataChannel] = _data_channels.create()
   // All steps that have a PartitionRouter
   let _partition_router_steps: SetIs[PartitionRoutable] =
     _partition_router_steps.create()
@@ -43,12 +47,19 @@ actor RouterRegistry
   be set_omni_router(o: OmniRouter val) =>
     _omni_router = o
 
-  be register_data_receiver(dr: DataReceiver) =>
-    _data_receivers.set(dr)
+  be register_data_receiver(sender: String, dr: DataReceiver) =>
+    _data_receivers(sender) = dr
 
   be register_source(tcp_source: TCPSource) =>
     _sources.set(tcp_source)
     _partition_router_steps.set(tcp_source)
+
+  be register_data_channel_listener(dchl: DataChannelListener) =>
+    _data_channel_listeners.set(dchl)
+
+  be register_data_channel(dc: DataChannel) =>
+    // TODO: These need to be unregistered if they close
+    _data_channels.set(dc)
 
   be register_partition_router_step(pr: PartitionRoutable) =>
     _partition_router_steps.set(pr)
@@ -76,11 +87,25 @@ actor RouterRegistry
       routable.add_boundaries(new_boundaries_sendable)
     end
 
-  be add_data_receiver(data_receiver: DataReceiver) =>
-    _data_receivers.set(data_receiver)
+  be add_data_receiver(sender_name: String, data_receiver: DataReceiver) =>
+    // TODO: Persistent map would be much more efficient here.
+    _data_receivers(sender_name) = data_receiver
+    let data_receivers: Map[String, DataReceiver] trn =
+      recover Map[String, DataReceiver] end
+    for (s, dr) in _data_receivers.pairs() do
+      data_receivers(s) = dr
+    end
+    let data_receivers_sendable: Map[String, DataReceiver] val =
+      consume data_receivers
     match _data_router
     | let data_router: DataRouter val =>
       data_receiver.update_router(data_router)
+      for data_channel_listener in _data_channel_listeners.values() do
+        data_channel_listener.update_data_receivers(data_receivers_sendable)
+      end
+      for data_channel in _data_channels.values() do
+        data_channel.update_data_receivers(data_receivers_sendable)
+      end
     else
       Fail()
     end

@@ -4,6 +4,7 @@ use "time"
 use "files"
 use "sendence/bytes"
 use "sendence/hub"
+use "wallaroo"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -23,12 +24,14 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _alfred: Alfred tag
   let _router_registry: RouterRegistry
   let _recovery_file: FilePath
+  let _joining_existing_cluster: Bool
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     initializer: (WorkerInitializer | None) = None,
     local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag,
-    router_registry: RouterRegistry, recovery_file: FilePath)
+    router_registry: RouterRegistry, recovery_file: FilePath,
+    joining: Bool = false)
   =>
     _env = env
     _auth = auth
@@ -40,6 +43,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _alfred = alfred
     _router_registry = router_registry
     _recovery_file = recovery_file
+    _joining_existing_cluster = joining
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -48,10 +52,16 @@ class ControlChannelListenNotifier is TCPListenNotify
         if _recovery_file.exists() then
           @printf[I32]("Recovery file exists for control channel\n".cstring())
         end
-        if not (_is_initializer or _recovery_file.exists()) then
+        if _joining_existing_cluster then
           let message = ChannelMsgEncoder.identify_control_port(_name,
             _service, _auth)
-          _connections.send_control("initializer", message)
+          _connections.send_control_to_cluster(message)
+        else
+          if not (_is_initializer or _recovery_file.exists()) then
+            let message = ChannelMsgEncoder.identify_control_port(_name,
+              _service, _auth)
+            _connections.send_control("initializer", message)
+          end
         end
         let f = File(_recovery_file)
         f.print(_host)
@@ -64,6 +74,10 @@ class ControlChannelListenNotifier is TCPListenNotify
             _service, _auth)
           _connections.send_control("initializer", message)
         end
+      end
+
+      if not _is_initializer then
+        _connections.register_my_control_addr(_host, _service)
       end
       _env.out.print(_name + " control: listening on " + _host + ":" + _service)
     else
@@ -176,7 +190,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         ifdef "trace" then
           @printf[I32]("Received CreateConnectionsMsg on Control Channel\n".cstring())
         end
-        _connections.create_connections(m.addresses,
+        _connections.create_connections(m.control_addrs, m.data_addrs,
           _local_topology_initializer)
       | let m: ConnectionsReadyMsg val =>
         ifdef "trace" then
@@ -192,11 +206,14 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
         _local_topology_initializer.create_data_receivers(m.workers)
       | let m: JoinClusterMsg val =>
-        _connections.inform_joining_worker(conn, m.worker_name)
+        _local_topology_initializer.inform_joining_worker(conn, m.worker_name)
       | let m: AnnounceNewStatefulStepMsg val =>
         m.update_registry(_router_registry)
       | let m: StepMigrationCompleteMsg val =>
         _router_registry.migration_complete(m.step_id)
+      | let m: JoiningWorkerInitializedMsg val =>
+        _local_topology_initializer.add_new_worker(m.worker_name,
+          m.control_addr, m.data_addr)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")
       else
@@ -236,6 +253,30 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
   =>
+    true
+
+class JoiningControlSenderConnectNotifier is TCPConnectionNotify
+  let _env: Env
+  let _auth: AmbientAuth
+  let _worker_name: String
+  let _startup: Startup
+  var _header: Bool = true
+
+  new iso create(env: Env, auth: AmbientAuth, worker_name: String,
+    startup: Startup)
+  =>
+    _env = env
+    _auth = auth
+    _worker_name = worker_name
+    _startup = startup
+
+  fun ref connected(conn: TCPConnection ref) =>
+    conn.expect(4)
+    _header = true
+
+  fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
+    n: USize): Bool
+  =>
     if _header then
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
@@ -248,14 +289,8 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
       let msg = ChannelMsgDecoder(consume data, _auth)
       match msg
       | let m: InformJoiningWorkerMsg val =>
-        let metrics_conn = MetricsSink(m.metrics_host, m.metrics_service)
-
-        let connect_msg = HubProtocol.connect()
-        let metrics_join_msg = HubProtocol.join_metrics(
-          "metrics:" + m.metrics_app_name, _worker_name)
-        metrics_conn.writev(connect_msg)
-        metrics_conn.writev(metrics_join_msg)
-        @printf[I32]("Received cluster information!\n".cstring())
+        @printf[I32]("***Received cluster information!***\n".cstring())
+        _startup.complete_join(m)
       else
         _env.err.print("Incoming Channel Message type not handled by control channel.")
       end

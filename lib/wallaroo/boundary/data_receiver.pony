@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "time"
+use "wallaroo/data_channel"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
@@ -33,7 +34,7 @@ actor DataReceiver is Producer
 
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
-  var _latest_conn: (TCPConnection | None) = None
+  var _latest_conn: (DataChannel | None) = None
   var _replay_pending: Bool = false
 
   let _resilience_routes: DataReceiverRoutes = DataReceiverRoutes
@@ -52,7 +53,7 @@ actor DataReceiver is Producer
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
 
-  be data_connect(sender_step_id: U128, conn: TCPConnection) =>
+  be data_connect(sender_step_id: U128, conn: DataChannel) =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
     if _replay_pending then
@@ -82,7 +83,7 @@ actor DataReceiver is Producer
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, watermark, _auth)
         match _latest_conn
-        | let conn: TCPConnection =>
+        | let conn: DataChannel =>
           conn.writev(ack_msg)
         else
           Fail()
@@ -98,7 +99,7 @@ actor DataReceiver is Producer
   be request_replay() =>
     try
       match _latest_conn
-      | let conn: TCPConnection =>
+      | let conn: DataChannel =>
         @printf[I32](("data receiver for worker %s requesting replay from " +
                       "sender %s\n").cstring(), _worker_name.cstring(),
                       _sender_name.cstring())
@@ -230,7 +231,7 @@ actor DataReceiver is Producer
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, _last_id_seen, _auth)
         match _latest_conn
-        | let conn: TCPConnection =>
+        | let conn: DataChannel =>
           conn.writev(ack_msg)
         else
           Fail()
@@ -254,13 +255,13 @@ actor DataReceiver is Producer
 
   be mute(c: Consumer) =>
     match _latest_conn
-    | let conn: TCPConnection =>
+    | let conn: DataChannel =>
       conn.mute(c)
     end
 
   be unmute(c: Consumer) =>
     match _latest_conn
-    | let conn: TCPConnection =>
+    | let conn: DataChannel =>
       conn.unmute(c)
     end
 
