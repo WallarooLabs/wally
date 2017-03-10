@@ -65,7 +65,7 @@ actor ApplicationInitializer
     worker_names: Array[String] val, alfred: Alfred tag)
   =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
-    @printf[I32]("^^^^^^Initializing Topologies for Workers^^^^^^^\n\n".cstring())
+    @printf[I32]("vvvvvv|Initializing Topologies for Workers|vvvvvv\n\n".cstring())
     try
       let all_workers_trn: Array[String] trn = recover Array[String] end
       all_workers_trn.push("initializer")
@@ -808,7 +808,7 @@ actor ApplicationInitializer
           @printf[I32]("Error distributing local topologies!\n".cstring())
         end
       end
-      @printf[I32]("\n^^^^^^Finished Initializing Topologies for Workers^^^^^^^\n".cstring())
+      @printf[I32]("\n^^^^^^|Finished Initializing Topologies for Workers|^^^^^^^\n".cstring())
       @printf[I32]("---------------------------------------------------------\n".cstring())
     else
       @printf[I32]("Error initializating application!\n".cstring())
