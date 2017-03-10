@@ -74,10 +74,11 @@ primitive ChannelMsgEncoder
     _encode(TopologyReadyMsg(worker_name), auth)
 
   fun create_connections(
-    addresses: Map[String, Map[String, (String, String)]] val,
+    c_addrs: Map[String, (String, String)] val,
+    d_addrs: Map[String, (String, String)] val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(CreateConnectionsMsg(addresses), auth)
+    _encode(CreateConnectionsMsg(c_addrs, d_addrs), auth)
 
   fun connections_ready(worker_name: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -124,14 +125,22 @@ primitive ChannelMsgEncoder
     _encode(JoinClusterMsg(worker_name), auth)
 
   // TODO: Update this once new workers become first class citizens
-  fun inform_joining_worker(metric_app_name: String, metric_host: String,
-    metric_service: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  fun inform_joining_worker(metric_app_name: String,
+    l_topology: LocalTopology val, metric_host: String,
+    metric_service: String, control_addrs: Map[String, (String, String)] val,
+    data_addrs: Map[String, (String, String)] val,
+    worker_names: Array[String] val, auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     """
     This message is sent as a response to a JoinCluster message. Currently it
     only informs the new worker of metrics-related info
     """
-    _encode(InformJoiningWorkerMsg(metric_app_name, metric_host, metric_service), auth)
+    _encode(InformJoiningWorkerMsg(metric_app_name, l_topology, metric_host, metric_service, control_addrs, data_addrs, worker_names), auth)
+
+  fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
+    d_addr: (String, String), auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr), auth)
 
   fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
     id: U128, worker_name: String, key: K, state_name: String,
@@ -210,10 +219,14 @@ class TopologyReadyMsg is ChannelMsg
     worker_name = name
 
 class CreateConnectionsMsg is ChannelMsg
-  let addresses: Map[String, Map[String, (String, String)]] val
+  let control_addrs: Map[String, (String, String)] val
+  let data_addrs: Map[String, (String, String)] val
 
-  new val create(addrs: Map[String, Map[String, (String, String)]] val) =>
-    addresses = addrs
+  new val create(c_addrs: Map[String, (String, String)] val,
+    d_addrs: Map[String, (String, String)] val)
+  =>
+    control_addrs = c_addrs
+    data_addrs = d_addrs
 
 class ConnectionsReadyMsg is ChannelMsg
   let worker_name: String
@@ -434,14 +447,39 @@ class InformJoiningWorkerMsg is ChannelMsg
   This message is sent as a response to a JoinCluster message. Currently it
   only informs the new worker of metrics-related info
   """
+  let local_topology: LocalTopology val
   let metrics_app_name: String
   let metrics_host: String
   let metrics_service: String
+  let control_addrs: Map[String, (String, String)] val
+  let data_addrs: Map[String, (String, String)] val
+  let worker_names: Array[String] val
 
-  new val create(app: String, host: String, service: String) =>
+  new val create(app: String, l_topology: LocalTopology val,
+    m_host: String, m_service: String,
+    c_addrs: Map[String, (String, String)] val,
+    d_addrs: Map[String, (String, String)] val,
+    w_names: Array[String] val)
+  =>
+    local_topology = l_topology
     metrics_app_name = app
-    metrics_host = host
-    metrics_service = service
+    metrics_host = m_host
+    metrics_service = m_service
+    control_addrs = c_addrs
+    data_addrs = d_addrs
+    worker_names = w_names
+
+class JoiningWorkerInitializedMsg is ChannelMsg
+  let worker_name: String
+  let control_addr: (String, String)
+  let data_addr: (String, String)
+
+  new val create(name: String, c_addr: (String, String),
+    d_addr: (String, String))
+  =>
+    worker_name = name
+    control_addr = c_addr
+    data_addr = d_addr
 
 trait AnnounceNewStatefulStepMsg is ChannelMsg
   fun update_registry(r: RouterRegistry)
