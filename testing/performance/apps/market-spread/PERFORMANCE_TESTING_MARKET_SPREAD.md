@@ -84,19 +84,19 @@ docker stop mui && docker start mui
 To build Market Spread:
 ```
 cd ~/buffy
-make arch=amd64 build-apps-market-spread
+make arch=amd64 build-testing-performance-apps-market-spread
 ```
 
 To build Giles Sender:
 ```
 cd ~/buffy
-make build-giles-sender arch=amd64
+make arch=amd64 build-giles-sender 
 ```
 
 To build Giles Receiver:
 ```
 cd ~/buffy
-make build-giles-receiver arch=amd64
+make arch=amd64 build-giles-receiver 
 ```
 
 ### SINGLE WORKER market spread:
@@ -110,7 +110,7 @@ sudo cset proc -s user -e numactl -- -C 14,17 chrt -f 80 ~/buffy/giles/receiver/
 ```
 
 ```
-cd ~/buffy/apps/market-spread
+cd ~/buffy/testing/performance/apps/market-spread
 sudo cset proc -s user -e numactl -- -C 1-8,17 chrt -f 80 ./market-spread -i 127.0.0.1:7000,127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads 8 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501
 ```
 
