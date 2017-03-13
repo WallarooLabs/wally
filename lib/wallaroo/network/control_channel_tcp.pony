@@ -92,14 +92,15 @@ class ControlChannelListenNotifier is TCPListenNotify
         end
       end
 
-      _env.out.print(_name + " control: listening on " + _host + ":" + _service)
+      @printf[I32]((_name + " control: listening on " + _host + ":" +
+        _service + "\n").cstring())
     else
-      _env.out.print(_name + "control : couldn't get local address")
+      @printf[I32]((_name + "control : couldn't get local address\n").cstring())
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
-    _env.out.print(_name + "control : couldn't listen")
+    @printf[I32]((_name + "control : couldn't listen\n").cstring())
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
