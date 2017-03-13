@@ -40,13 +40,15 @@ actor Connections
   let _is_joining: Bool
   let _spike_seed: U64
   let _spike_drop: Bool
+  let _spike_prob: U64
 
   new create(app_name: String, worker_name: String,
     env: Env, auth: AmbientAuth, c_host: String, c_service: String,
     d_host: String, d_service: String, ph_host: String, ph_service: String,
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
-    is_joining: Bool, spike_seed: U64 = 0, spike_drop: Bool = false)
+    is_joining: Bool, spike_seed: U64 = 0, spike_drop: Bool = false,
+    spike_prob: U64 = 1)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -62,6 +64,7 @@ actor Connections
     _is_joining = is_joining
     _spike_seed = spike_seed
     _spike_drop = spike_drop
+    _spike_prob = spike_prob
 
     if _is_initializer then
       _my_control_addr = (c_host, c_service)
@@ -286,7 +289,8 @@ actor Connections
         _worker_name, MetricsReporter(_app_name,
         _worker_name, _metrics_conn),
         host, service
-        where spike_seed = _spike_seed, spike_drop = _spike_drop)
+        where spike_seed = _spike_seed, spike_drop = _spike_drop,
+        spike_prob = _spike_prob)
       boundary.register_step_id(_guid_gen.u128())
       boundary.quick_initialize(local_topology_initializer)
       local_topology_initializer.add_boundary_to_new_worker(target, boundary)
@@ -478,7 +482,8 @@ actor Connections
       _worker_name, MetricsReporter(_app_name,
       _worker_name, _metrics_conn),
       host, service
-      where spike_seed = _spike_seed, spike_drop = _spike_drop)
+      where spike_seed = _spike_seed, spike_drop = _spike_drop,
+      spike_prob = _spike_prob)
     outgoing_boundary.register_step_id(_guid_gen.u128())
     _data_conns(target_name) = outgoing_boundary
 

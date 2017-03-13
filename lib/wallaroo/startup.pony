@@ -53,6 +53,7 @@ actor Startup
   var _joining_listener: (TCPListener | None) = None
   var _spike_seed: U64 = 0
   var _spike_drop: Bool = false
+  var _spike_prob: U64 = 1
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
@@ -102,6 +103,7 @@ actor Startup
         .add("swarm-manager-address", "a", StringArgument)
         .add("spike-seed","", I64Argument)
         .add("spike-drop","", None)
+        .add("spike-prob", "", I64Argument)
 
       for option in options do
         match option
@@ -138,6 +140,7 @@ actor Startup
         | ("swarm-manager-address", let arg: String) => _a_arg = arg
         | ("spike-seed", let arg: I64) => _spike_seed = arg.u64()
         | ("spike-drop", None) => _spike_drop = true
+        | ("spike-prob", let arg: I64) => _spike_prob = arg.u64()
         end
       end
 
@@ -206,6 +209,8 @@ actor Startup
         @printf[I32](("|||Spike seed: " + _spike_seed.string() +
           "|||\n").cstring())
         @printf[I32](("|||Spike drop: " + _spike_drop.string() +
+          "|||\n").cstring())
+        @printf[I32](("|||Spike prob: " + _spike_prob.string() +
           "|||\n").cstring())
       end
 
@@ -364,7 +369,8 @@ actor Startup
       let connections = Connections(_application.name(), _worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
         metrics_conn, m_addr(0), m_addr(1), _is_initializer,
-        _connection_addresses_file, _is_joining, _spike_seed, _spike_drop)
+        _connection_addresses_file, _is_joining, _spike_seed, _spike_drop,
+        _spike_prob)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections)
 
@@ -498,7 +504,8 @@ actor Startup
       let connections = Connections(_application.name(), _worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
         metrics_conn, m.metrics_host, m.metrics_service, _is_initializer,
-        _connection_addresses_file, _is_joining, _spike_seed, _spike_drop)
+        _connection_addresses_file, _is_joining, _spike_seed, _spike_drop,
+        _spike_prob)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections)
 
