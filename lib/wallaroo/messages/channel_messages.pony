@@ -34,6 +34,15 @@ primitive ChannelMsgEncoder
     _encode(KeyedStepMigrationMsg[K](step_id, state_name, key, state, worker),
       auth)
 
+  fun migration_complete(step_id: U128, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(StepMigrationCompleteMsg(step_id), auth)
+
+  fun mute_request(originating_worker: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(MuteRequestMsg(originating_worker), auth)
+
+  fun unmute_request(originating_worker: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(UnmuteRequestMsg(originating_worker), auth)
+
   fun delivery[D: Any val](target_id: U128,
     from_worker_name: String, msg_data: D,
     metric_name: String, auth: AmbientAuth,
@@ -289,6 +298,22 @@ class KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is ChannelMsg
   =>
     router_registry.move_proxy_to_stateful_step[K](_step_id, target, _key,
       _state_name, _worker)
+
+class MuteRequestMsg is ChannelMsg
+  let originating_worker: String
+  new val create(worker: String) =>
+    originating_worker = worker
+
+class UnmuteRequestMsg is ChannelMsg
+  let originating_worker: String
+  new val create(worker: String) =>
+    originating_worker = worker
+
+class StepMigrationCompleteMsg is ChannelMsg
+  let step_id: U128
+  new val create(step_id': U128)
+  =>
+    step_id = step_id'
 
 class AckWatermarkMsg is ChannelMsg
   let sender_name: String

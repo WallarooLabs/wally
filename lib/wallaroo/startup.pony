@@ -335,7 +335,7 @@ actor Startup
         metrics_conn, m_addr(0), m_addr(1), _is_initializer,
         _connection_addresses_file, _is_joining)
 
-      let router_registry = RouterRegistry(auth, connections)
+      let router_registry = RouterRegistry(auth, connections, _worker_name)
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
@@ -449,7 +449,7 @@ actor Startup
         metrics_conn, m.metrics_host, m.metrics_service, _is_initializer,
         _connection_addresses_file, _is_joining)
 
-      let router_registry = RouterRegistry(auth, connections)
+      let router_registry = RouterRegistry(auth, connections, _worker_name)
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
