@@ -25,8 +25,8 @@ The gist of the test is simple: We run `sequence-window` with `Spike` on the `in
 ### Running the Test:
 
 1. start giles-receiver:  `../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555`
-1. start initializer-worker: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -w 2 -n worker1 -t --spike-drop --spike-seed 1`
-1. start second worker: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -w 2 -n worker2`
+1. start initializer-worker: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t --spike-drop --spike-seed 1 --spike-prob 5`
+1. start second worker: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker2`
 1. start giles-sender and send the first 1000 integers, slowly: `../../../../giles/sender/sender -b 127.0.0.1:7000 -s 10 -i 100_000_000 -u --ponythreads=1 -y -g 12 -w -m 1000`
 1. If you built the application in Debug mode, then each worker will have printed to its stdout the values in its sequence window at each step, and you can verify that the sequence at the second worker has reached `[994, 996, 998, 1000]` as we expect it to if it reconnects successfully.
 1. Terminate all of the processes
