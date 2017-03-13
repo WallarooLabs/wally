@@ -32,7 +32,7 @@ class Histogram
     end
     s
 
-  fun ref counts(): Array[U64] ref => _counts
+  fun counts(): this->Array[U64] ref => _counts
 
   fun min(): U64 => _min
 

@@ -151,17 +151,15 @@ actor MetricsSink
       _pending.push((data, 0))
     end
 
-  be send_metrics(metrics: Array[(String, String, String, String, U16,
-    Histogram iso, U64, U64, String, String)] iso)
-  =>
+  be send_metrics(metrics: MetricDataList val) =>
     try
       let payload_wb: Writer = Writer
-      while metrics.size() > 0 do
+      for i in Range(0,metrics.size()) do
         (let metric_name, let category, let pipeline, let worker_name, let id,
           let histogram, let period, let period_ends_at, let topic, let event) =
-          metrics.shift()
+          metrics(i)
         HubProtocol.metrics(metric_name, category, pipeline,
-          worker_name, id, consume histogram, period, period_ends_at, payload_wb)
+          worker_name, id, histogram, period, period_ends_at, payload_wb)
         HubProtocol.payload(event, topic, payload_wb.done(), _wb)
       end
       _writev(_wb.done())

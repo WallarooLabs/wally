@@ -79,7 +79,7 @@ primitive HubProtocol
     consume encoded
 
   fun metrics(name: String, category: String, pipeline_name: String,
-    worker_name: String, id: U16, histogram: Histogram,
+    worker_name: String, id: U16, histogram: Histogram val,
     period: U64, period_ends_at: U64, wb: Writer)
   =>
     let name_size = name.size().u32()
