@@ -227,6 +227,34 @@ actor Connections
           ch.writev(new_step_msg)
         end
       end
+      let migration_complete_msg = ChannelMsgEncoder.migration_complete(id, _auth)
+      for origin in exclusions.values() do
+        _control_conns(origin).writev(migration_complete_msg)
+      end
+    else
+      Fail()
+    end
+
+  be stop_the_world() =>
+    try
+      let mute_request_msg = ChannelMsgEncoder.mute_request(_worker_name, _auth)
+      for (target, ch) in _control_conns.pairs() do
+        if target != _worker_name then
+          ch.writev(mute_request_msg)
+        end
+      end
+    else
+      Fail()
+    end
+
+  be resume_the_world() =>
+    try
+      let unmute_request_msg = ChannelMsgEncoder.unmute_request(_worker_name, _auth)
+      for (target, ch) in _control_conns.pairs() do
+        if target != _worker_name then
+          ch.writev(unmute_request_msg)
+        end
+      end
     else
       Fail()
     end
