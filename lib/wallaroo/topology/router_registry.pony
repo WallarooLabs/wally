@@ -29,7 +29,6 @@ actor RouterRegistry
     _outgoing_boundaries.create()
   let _waiting_list: SetIs[U128] = _waiting_list.create()
   let _stop_waiting_list: SetIs[String] = _stop_waiting_list.create()
-  let _resume_waiting_list: SetIs[String] = _resume_waiting_list.create()
   let _dummy_consumer: DummyConsumer = DummyConsumer
 
   new create(auth: AmbientAuth, c: Connections) =>
@@ -102,13 +101,7 @@ actor RouterRegistry
     end
 
   be migrate_onto_new_worker(target_worker: String) =>
-    //TODO: synchronisation between all workers in the world
-    for source in _sources.values() do
-      source.mute(_dummy_consumer)
-    end
-    for dr in _data_receivers.values() do
-      dr.mute(_dummy_consumer)
-    end
+    _stop_the_world()
     let timers = Timers
     let timer = Timer(ResumeNotify(this, target_worker), 2_000_000_000, 2_000_000_000)
     timers(consume timer)
@@ -122,8 +115,33 @@ actor RouterRegistry
       _resume_the_world()
     end
     
+  be remote_mute_request(originating_worker: String) =>
+    _stop_waiting_list.set(originating_worker)
+    _stop_all_local() 
+
+  be remote_unmute_request(originating_worker: String) =>
+    _stop_waiting_list.unset(originating_worker)
+    if _stop_waiting_list.size() == 0 then
+      _resume_all_local() 
+    end
+
+  fun _stop_the_world() =>
+    _connections.stop_the_world()
+    _stop_all_local()
+
+  fun _stop_all_local() =>
+    for source in _sources.values() do
+      source.mute(_dummy_consumer)
+    end
+    for dr in _data_receivers.values() do
+      dr.mute(_dummy_consumer)
+    end
+
   fun _resume_the_world() =>
-    //TODO: synchronisation between all workers in the world
+    _connections.resume_the_world()
+    _resume_all_local()
+
+  fun _resume_all_local() =>
     for source in _sources.values() do
       source.unmute(_dummy_consumer)
     end

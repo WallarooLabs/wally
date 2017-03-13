@@ -216,6 +216,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           m.control_addr, m.data_addr)
       | let m: StepMigrationCompleteMsg val =>
         _router_registry.migration_complete(m.step_id)
+      | let m: MuteRequestMsg val =>
+        _router_registry.remote_mute_request(m.originating_worker)
+      | let m: UnmuteRequestMsg val =>
+        _router_registry.remote_unmute_request(m.originating_worker)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")
       else

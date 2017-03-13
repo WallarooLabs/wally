@@ -235,6 +235,30 @@ actor Connections
       Fail()
     end
 
+  be stop_the_world() =>
+    try
+      let mute_request_msg = ChannelMsgEncoder.mute_request(_worker_name, _auth)
+      for (target, ch) in _control_conns.pairs() do
+        if target != _worker_name then
+          ch.writev(mute_request_msg)
+        end
+      end
+    else
+      Fail()
+    end
+
+  be resume_the_world() =>
+    try
+      let unmute_request_msg = ChannelMsgEncoder.unmute_request(_worker_name, _auth)
+      for (target, ch) in _control_conns.pairs() do
+        if target != _worker_name then
+          ch.writev(unmute_request_msg)
+        end
+      end
+    else
+      Fail()
+    end
+
   be send_phone_home(msg: Array[ByteSeq] val) =>
     match _phone_home
     | let tcp: TCPConnection =>
