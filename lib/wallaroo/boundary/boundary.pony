@@ -12,6 +12,7 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/routing"
 use "wallaroo/topology"
+use "wallaroo/spike"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
@@ -83,16 +84,28 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   // Origin (Resilience)
   let _terminus_route: TerminusRoute = TerminusRoute
 
+  // Spike (Fault injection)
+  let _spike_config: SpikeConfig val
+
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
-    from: String = "", init_size: USize = 64, max_size: USize = 16384)
+    from: String = "", init_size: USize = 64, max_size: USize = 16384,
+    spike_seed: U64 = 0, spike_drop: Bool = false)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
     _auth = auth
-    _notify = BoundaryNotify(_auth)
+
+    _spike_config = SpikeConfig(spike_drop, spike_seed)
+    ifdef "spike" then
+      var notify = recover iso BoundaryNotify(_auth) end
+      _notify = SpikeWrapper(consume notify, _spike_config)
+    else
+      _notify = BoundaryNotify(_auth)
+    end
+
     _worker_name = worker_name
     _host = host
     _service = service

@@ -51,6 +51,8 @@ actor Startup
   var _alfred: (Alfred | None) = None
   var _alfred_file_length: (USize | None) = None
   var _joining_listener: (TCPListener | None) = None
+  var _spike_seed: U64 = 0
+  var _spike_drop: Bool = false
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
@@ -63,6 +65,9 @@ actor Startup
     end
     ifdef "trace" then
       @printf[I32]("****TRACE is active****\n".cstring())
+    end
+    ifdef "spike" then
+      @printf[I32]("****SPIKE is active****\n".cstring())
     end
 
     try
@@ -95,6 +100,8 @@ actor Startup
         .add("join", "j", StringArgument)
         .add("swarm-managed", "s", None)
         .add("swarm-manager-address", "a", StringArgument)
+        .add("spike-seed","", I64Argument)
+        .add("spike-drop","", None)
 
       for option in options do
         match option
@@ -129,6 +136,8 @@ actor Startup
           _is_joining = true
         | ("swarm-managed", None) => _is_swarm_managed = true
         | ("swarm-manager-address", let arg: String) => _a_arg = arg
+        | ("spike-seed", let arg: I64) => _spike_seed = arg.u64()
+        | ("spike-drop", None) => _spike_drop = true
         end
       end
 
@@ -190,6 +199,13 @@ actor Startup
 
       ifdef "resilience" then
         @printf[I32](("|||Resilience directory: " + _resilience_dir +
+          "|||\n").cstring())
+      end
+
+      ifdef "spike" then
+        @printf[I32](("|||Spike seed: " + _spike_seed.string() +
+          "|||\n").cstring())
+        @printf[I32](("|||Spike drop: " + _spike_drop.string() +
           "|||\n").cstring())
       end
 
@@ -348,7 +364,7 @@ actor Startup
       let connections = Connections(_application.name(), _worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
         metrics_conn, m_addr(0), m_addr(1), _is_initializer,
-        _connection_addresses_file, _is_joining)
+        _connection_addresses_file, _is_joining, _spike_seed, _spike_drop)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections)
 
@@ -482,7 +498,7 @@ actor Startup
       let connections = Connections(_application.name(), _worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
         metrics_conn, m.metrics_host, m.metrics_service, _is_initializer,
-        _connection_addresses_file, _is_joining)
+        _connection_addresses_file, _is_joining, _spike_seed, _spike_drop)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections)
 
