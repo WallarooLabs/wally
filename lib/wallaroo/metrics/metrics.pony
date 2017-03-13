@@ -6,6 +6,12 @@ use "time"
 use "sendence/hub"
 use "sendence/wall_clock"
 
+type MetricData is
+  (String, String, String, String, U16,
+    Histogram val, U64, U64, String, String)
+
+type MetricDataList is Array[MetricData]
+
 type MetricsCategory is
   (ComputationCategory | StartToEndCategory | NodeIngressEgressCategory)
 
@@ -78,6 +84,7 @@ class MetricsReporter
   var _period_ends_at: U64 = 0
   let _period: U64
   let _wb: Writer = Writer
+  let _metrics_monitor: MetricsMonitor
 
   let _step_metrics_map: Map[String, _MetricsReporter] =
     _step_metrics_map.create()
@@ -90,14 +97,21 @@ class MetricsReporter
 
   new iso create(app_name: String, worker_name: String,
     metrics_conn: MetricsSink,
-    period: U64 = 2_000_000_000)
+    period: U64 = 2_000_000_000,
+    metrics_monitor: MetricsMonitor iso =
+      recover DefaultMetricsMonitor end)
   =>
     _app_name = app_name
     _worker_name = worker_name
     _metrics_conn = metrics_conn
     _period = period
     let now = WallClock.nanoseconds()
+    _metrics_monitor = consume metrics_monitor
     _period_ends_at = _next_period_endtime(now, period)
+
+  fun clone(): MetricsReporter iso^ =>
+    MetricsReporter(_app_name, _worker_name, _metrics_conn,
+      _period, _metrics_monitor.clone())
 
   fun ref step_metric(pipeline: String, name: String, id: U16, start_ts: U64,
     end_ts: U64, prefix: String = "")
@@ -175,8 +189,7 @@ class MetricsReporter
     let now = WallClock.nanoseconds()
 
     if now > _period_ends_at then
-      let metrics = recover iso Array[(String, String, String, String, U16,
-        Histogram iso, U64, U64, String, String)] end
+      let metrics = recover trn MetricDataList end
       for mr in _step_metrics_map.values() do
         let h = mr.reset_histogram()
         let metric_name = mr.metric_name()
@@ -186,7 +199,8 @@ class MetricsReporter
         let pipeline = mr.pipeline()
         let worker_name = mr.worker_name()
         metrics.push((metric_name, category, pipeline,
-          worker_name, id, consume h, _period, _period_ends_at, topic, "metrics"))
+          worker_name, id, consume h, _period, _period_ends_at,
+          topic, "metrics"))
       end
       for mr in _pipeline_metrics_map.values() do
         let h = mr.reset_histogram()
@@ -197,7 +211,8 @@ class MetricsReporter
         let pipeline = mr.pipeline()
         let worker_name = mr.worker_name()
         metrics.push((metric_name, category, pipeline,
-          worker_name, id, consume h, _period, _period_ends_at, topic, "metrics"))
+          worker_name, id, consume h, _period, _period_ends_at,
+          topic, "metrics"))
       end
       for mr in _worker_metrics_map.values() do
         let h = mr.reset_histogram()
@@ -208,11 +223,11 @@ class MetricsReporter
         let pipeline = mr.pipeline()
         let worker_name = mr.worker_name()
         metrics.push((metric_name, category, pipeline,
-          worker_name, id, consume h, _period, _period_ends_at, topic, "metrics"))
+          worker_name, id, consume h, _period, _period_ends_at,
+          topic, "metrics"))
       end
-      _metrics_conn.send_metrics(consume metrics)
+       let metrics_ro = consume val metrics
+       _metrics_monitor.on_send(metrics_ro)
+      _metrics_conn.send_metrics(metrics_ro)
       _period_ends_at = _next_period_endtime(now, _period)
     end
-
-  fun clone(): MetricsReporter iso^ =>
-    MetricsReporter(_app_name, _worker_name, _metrics_conn)

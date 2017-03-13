@@ -533,6 +533,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
+    let wrapper_creation_start_ts = Time.nanos()
     (let is_finished, let keep_sending, let last_ts) =
       match data
       | let input: In =>
@@ -545,7 +546,7 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
             StateComputationWrapper[In, Out, State] val](
             metric_name, pipeline_time_spent, processor, producer,
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-            latest_ts, metrics_id, worker_ingress_ts)
+            latest_ts, metrics_id + 1, worker_ingress_ts)
         else
           (true, true, latest_ts)
         end
@@ -553,7 +554,10 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
         @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
         (true, true, latest_ts)
       end
-
+    let wrapper_creation_end_ts = Time.nanos()
+    metrics_reporter.step_metric(metric_name, _name, metrics_id,
+      wrapper_creation_start_ts, wrapper_creation_end_ts
+      where prefix = "Pre:")
     (is_finished, keep_sending, last_ts)
 
   fun name(): String => _name

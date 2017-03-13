@@ -9,3 +9,4 @@ actor Main is TestList
 
   fun tag tests(test: PonyTest) =>
     TestDockerSwarmClusterManager.make().tests(test)
+    TestThroughputBasedClusterGrowthTrigger.make().tests(test)

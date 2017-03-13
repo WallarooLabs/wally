@@ -17,13 +17,15 @@ class _SourceBuilder[In: Any val]
   let _router: Router val
   let _metrics_conn: MetricsSink
   let _pre_state_target_id: (U128 | None)
+  let _metrics_reporter: MetricsReporter
 
   new val create(app_name: String, worker_name: String,
     name': String,
     runner_builder: RunnerBuilder val,
     handler: FramedSourceHandler[In] val,
     router: Router val, metrics_conn: MetricsSink,
-    pre_state_target_id: (U128 | None) = None)
+    pre_state_target_id: (U128 | None) = None,
+    metrics_reporter: MetricsReporter iso)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -33,22 +35,22 @@ class _SourceBuilder[In: Any val]
     _router = router
     _metrics_conn = metrics_conn
     _pre_state_target_id = pre_state_target_id
+    _metrics_reporter = consume metrics_reporter
 
   fun name(): String => _name
 
   fun apply(alfred: Alfred tag, auth: AmbientAuth, target_router: Router val):
     TCPSourceNotify iso^
   =>
-    let reporter = MetricsReporter(_app_name, _worker_name, _metrics_conn)
-
     FramedSourceNotify[In](_name, auth, _handler, _runner_builder, _router,
-      consume reporter, alfred, target_router, _pre_state_target_id)
+      _metrics_reporter.clone(), alfred, target_router, _pre_state_target_id)
 
 interface SourceBuilderBuilder
   fun name(): String
   fun apply(runner_builder: RunnerBuilder val, router: Router val,
     metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
-    worker_name: String):
+    worker_name: String,
+    metrics_reporter: MetricsReporter iso):
       SourceBuilder val
 
 class TypedSourceBuilderBuilder[In: Any val]
@@ -67,12 +69,12 @@ class TypedSourceBuilderBuilder[In: Any val]
 
   fun apply(runner_builder: RunnerBuilder val, router: Router val,
     metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
-    worker_name: String):
+    worker_name: String, metrics_reporter: MetricsReporter iso):
       SourceBuilder val
   =>
     _SourceBuilder[In](_app_name, worker_name,
       _name, runner_builder, _handler, router,
-      metrics_conn, pre_state_target_id)
+      metrics_conn, pre_state_target_id, consume metrics_reporter)
 
 interface TCPSourceListenerNotify
   """
