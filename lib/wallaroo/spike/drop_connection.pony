@@ -68,6 +68,6 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
 
   fun ref drop(conn: WallarooOutgoingNetworkActor ref) =>
     ifdef "trace" then
-      @printf[I32]("SPIKE: Dropping connection!\n".cstring())
+      @printf[I32]("<<<<<<SPIKE: DROPPING CONNECTION!>>>>>>\n".cstring())
     end
     conn.close()
