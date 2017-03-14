@@ -98,13 +98,13 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     ifdef "spike" then
       match spike_config
       | let sc: SpikeConfig =>
-        var notify = recover iso BoundaryNotify(_auth) end
+        var notify = recover iso BoundaryNotify(_auth, this) end
         _notify = SpikeWrapper(consume notify, sc)
       else
-        _notify = BoundaryNotify(_auth)
+        _notify = BoundaryNotify(_auth, this)
       end
     else
-      _notify = BoundaryNotify(_auth)
+      _notify = BoundaryNotify(_auth, this)
     end
 
     _worker_name = worker_name
@@ -849,9 +849,11 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
   var _header: Bool = true
+  let _outgoing_boundary: OutgoingBoundary tag
 
-  new create(auth: AmbientAuth) =>
+  new create(auth: AmbientAuth, outgoing_boundary: OutgoingBoundary tag) =>
     _auth = auth
+    _outgoing_boundary = outgoing_boundary
 
   fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
     times: USize): Bool
@@ -907,6 +909,8 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
+    // TODO: Make this less naive so it doesn't run into a bad loop
+    _outgoing_boundary.reconnect()
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connect_failed\n\n".cstring())
