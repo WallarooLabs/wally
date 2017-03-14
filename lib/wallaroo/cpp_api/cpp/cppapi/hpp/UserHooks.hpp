@@ -2,6 +2,7 @@
 #define __USERHOOKS_HPP__
 
 #include "Serializable.hpp"
+#include "Application.hpp"
 
 extern "C" {
 extern wallaroo::Serializable* w_user_data_deserialize (char* bytes_);

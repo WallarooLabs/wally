@@ -37,6 +37,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}")
 message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
 set(HEADER_FILES
+        hpp/Application.hpp
 	hpp/ApiHooks.hpp
 	hpp/Buffers.hpp
         hpp/Computation.hpp
@@ -58,6 +59,7 @@ set(HEADER_FILES
 
 
 set(SOURCE_FILES
+        cpp/Application.cpp
 	cpp/Logger.cpp
 	cpp/Buffer.cpp
 	cpp/RawBuffer.cpp

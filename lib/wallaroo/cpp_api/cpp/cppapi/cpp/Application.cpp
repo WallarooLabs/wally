@@ -50,6 +50,9 @@ Application::~Application()
 
 Application *Application::create_application(const char *name_)
 {
+  pony_CPPApplicationBuilder_create_application(
+    m_application_builder,
+    (void *) name_);
   return this;
 }
 
