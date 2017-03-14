@@ -13,6 +13,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
+use "wallaroo/spike"
 use "wallaroo/topology"
 
 actor Startup
@@ -51,9 +52,10 @@ actor Startup
   var _alfred: (Alfred | None) = None
   var _alfred_file_length: (USize | None) = None
   var _joining_listener: (TCPListener | None) = None
-  var _spike_seed: U64 = 0
+  var _spike_seed: (U64 | None) = None
   var _spike_drop: Bool = false
-  var _spike_prob: U64 = 1
+  var _spike_prob: (U64 | None) = None
+  var _spike_config: (SpikeConfig | None) = None
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
@@ -101,8 +103,8 @@ actor Startup
         .add("join", "j", StringArgument)
         .add("swarm-managed", "s", None)
         .add("swarm-manager-address", "a", StringArgument)
-        .add("spike-seed","", I64Argument)
-        .add("spike-drop","", None)
+        .add("spike-seed", "", I64Argument)
+        .add("spike-drop", "", None)
         .add("spike-prob", "", I64Argument)
 
       for option in options do
@@ -206,11 +208,14 @@ actor Startup
       end
 
       ifdef "spike" then
-        @printf[I32](("|||Spike seed: " + _spike_seed.string() +
+        _spike_config = SpikeConfig(_spike_drop, _spike_prob, _spike_seed)
+        let sc = _spike_config as SpikeConfig
+
+        @printf[I32](("|||Spike seed: " + sc.seed.string() +
           "|||\n").cstring())
-        @printf[I32](("|||Spike drop: " + _spike_drop.string() +
+        @printf[I32](("|||Spike drop: " + sc.drop.string() +
           "|||\n").cstring())
-        @printf[I32](("|||Spike prob: " + _spike_prob.string() +
+        @printf[I32](("|||Spike prob: " + sc.prob.string() +
           "|||\n").cstring())
       end
 
@@ -369,8 +374,7 @@ actor Startup
       let connections = Connections(_application.name(), _worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
         metrics_conn, m_addr(0), m_addr(1), _is_initializer,
-        _connection_addresses_file, _is_joining, _spike_seed, _spike_drop,
-        _spike_prob)
+        _connection_addresses_file, _is_joining, _spike_config)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections)
 
@@ -504,8 +508,7 @@ actor Startup
       let connections = Connections(_application.name(), _worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
         metrics_conn, m.metrics_host, m.metrics_service, _is_initializer,
-        _connection_addresses_file, _is_joining, _spike_seed, _spike_drop,
-        _spike_prob)
+        _connection_addresses_file, _is_joining, _spike_config)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections)
 

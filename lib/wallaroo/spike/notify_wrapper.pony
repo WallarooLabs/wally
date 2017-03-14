@@ -1,18 +1,27 @@
+use "assert"
 use "time"
 use "wallaroo/network"
 
-class SpikeConfig
+class val SpikeConfig
   let drop: Bool
   let seed: U64
   let prob: U64
 
-  new val create(drop': Bool, prob': U64 = 10, seed': U64 = Time.millis()) =>
+  new val create(drop': Bool, prob': (U64 | None) = 10,
+    seed': (U64 | None) = None) ?
+  =>
     drop = drop'
-    seed = seed'
-    if prob' > 100 then
-      prob = 100
+    match prob'
+    | let arg: U64 =>
+      Fact(arg <= 100, "prob' must be between 0 and 100")
+      prob = arg
     else
-      prob = prob'
+      prob = 10
+    end
+    match seed'
+    | let arg: U64 => seed = arg
+    else
+      seed = Time.millis()
     end
 
 primitive SpikeWrapper
