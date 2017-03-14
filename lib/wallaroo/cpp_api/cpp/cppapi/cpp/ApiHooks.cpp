@@ -13,6 +13,7 @@
 #include "StateChange.hpp"
 #include "StateChangeRepository.hpp"
 #include "StateChangeBuilder.hpp"
+#include "UserHooks.hpp"
 
 using namespace wallaroo;
 
@@ -246,5 +247,13 @@ extern void w_managed_object_delete(ManagedObject const *obj_)
   extern void *w_state_builder_build_state(StateBuilder *state_builder_)
   {
     return state_builder_->build();
+  }
+
+  extern bool w_wrapper_main(int argc, char **argv, void *application_builder_)
+  {
+    Application *application = new Application(application_builder_);
+    bool res = w_main(argc, argv, application);
+    delete application;
+    return res;
   }
 }
