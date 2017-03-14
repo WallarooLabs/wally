@@ -6,7 +6,9 @@
 #include "WallarooCppApi/PartitionFunction.hpp"
 #include "WallarooCppApi/State.hpp"
 #include "WallarooCppApi/StateChange.hpp"
+#include "WallarooCppApi/StateBuilder.hpp"
 #include "WallarooCppApi/Computation.hpp"
+#include "WallarooCppApi/ComputationBuilder.hpp"
 #include "WallarooCppApi/SourceDecoder.hpp"
 #include "WallarooCppApi/SinkEncoder.hpp"
 #include <vector>
@@ -109,6 +111,12 @@ public:
   virtual size_t serialize_get_size ();
 };
 
+class SimpleComputationBuilder: public wallaroo::ComputationBuilder
+{
+public:
+  virtual wallaroo::Computation *build();
+};
+
 class SimpleComputation: public wallaroo::Computation
 {
 public:
@@ -126,41 +134,6 @@ public:
   virtual void deserialize (char* bytes) {};
   virtual void serialize (char* bytes) { bytes[0] = 0; bytes[1] = 2; }
   virtual size_t serialize_get_size () { return 2; }
-};
-
-class DummyComputation: public wallaroo::StateComputation
-{
-public:
-  virtual const char *name();
-  virtual void *compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void* state_change_Respository_helper_, wallaroo::State *state_, void *none);
-  virtual size_t get_number_of_state_change_builders();
-  virtual wallaroo::StateChangeBuilder *get_state_change_builder(size_t idx_);
-  virtual void deserialize (char* bytes) {};
-  virtual void serialize (char* bytes) { bytes[0] = 0; bytes[1] = 1; }
-  virtual size_t serialize_get_size () { return 2; }
-};
-
-class CounterPartitionKey: public wallaroo::Key
-{
-private:
-  size_t _value;
-public:
-  CounterPartitionKey(size_t value_);
-  virtual ~CounterPartitionKey() {}
-  virtual uint64_t hash();
-  virtual bool eq(wallaroo::Key *other_);
-  size_t get_value();
-  virtual void deserialize (char* bytes_);
-  virtual void serialize (char* bytes_);
-  virtual size_t serialize_get_size () { return 6; }
-};
-
-class CounterPartitionFunction: public wallaroo::PartitionFunction
-{
-public:
-  CounterPartitionFunction() {}
-  virtual ~CounterPartitionFunction() {}
-  virtual wallaroo::Key *partition(wallaroo::Data *data_);
 };
 
 #endif

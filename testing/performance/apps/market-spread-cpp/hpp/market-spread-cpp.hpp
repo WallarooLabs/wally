@@ -4,8 +4,10 @@
 #include "WallarooCppApi/Data.hpp"
 #include "WallarooCppApi/Computation.hpp"
 #include "WallarooCppApi/SourceDecoder.hpp"
+#include "WallarooCppApi/Partition.hpp"
 #include "WallarooCppApi/PartitionFunction.hpp"
 #include "WallarooCppApi/State.hpp"
+#include "WallarooCppApi/StateBuilder.hpp"
 #include "WallarooCppApi/StateChange.hpp"
 #include "WallarooCppApi/StateChangeBuilder.hpp"
 #include "WallarooCppApi/SinkEncoder.hpp"
@@ -64,7 +66,7 @@ class OrderSourceDecoder: public wallaroo::SourceDecoder
 public:
   virtual size_t header_length();
   virtual size_t payload_length(char *bytes);
-  virtual wallaroo::Data *decode(char *bytes, size_t sz_);
+  virtual wallaroo::Data *decode(char *bytes);
 };
 
 class NbboSourceDecoder: public wallaroo::SourceDecoder
@@ -72,7 +74,7 @@ class NbboSourceDecoder: public wallaroo::SourceDecoder
 public:
   virtual size_t header_length();
   virtual size_t payload_length(char *bytes);
-  virtual wallaroo::Data *decode(char *bytes, size_t sz_);
+  virtual wallaroo::Data *decode(char *bytes);
 };
 
 class PartitionableMessage: public wallaroo::Data
@@ -120,6 +122,13 @@ public:
   double mid() {return (_bid_price + _offer_price) / 2.0; }
 };
 
+class SymbolDataBuilder: public wallaroo::StateBuilder
+{
+public:
+  const char *name();
+  wallaroo::State *build();
+};
+
 class SymbolData: public wallaroo::State
 {
 public:
@@ -130,9 +139,18 @@ public:
   SymbolData(): should_reject_trades(true), last_bid(0), last_offer(0) {}
 };
 
+class SymbolDataPartition: public PartitionU64
+{
+public:
+  virtual PartitionFunctionU64 *get_partition_function();
+  virtual size_t get_number_of_keys();
+  virtual uint64_t get_key(size_t idx_);
+};
+
 class SymbolDataStateChange: public wallaroo::StateChange
 {
 private:
+  uint64_t _id;
   bool _should_reject_trades;
   double _last_bid;
   double _last_offer;
@@ -142,6 +160,7 @@ public:
 
   virtual const char *name();
   virtual void apply(wallaroo::State *state_);
+  virtual uint64_t id() { return _id; }
 
   virtual size_t get_log_entry_size() { return 0; }
   virtual void to_log_entry(char *bytes_) { }
@@ -216,7 +235,7 @@ class UpdateNbbo: public wallaroo::StateComputation
 };
 
 
-class OrderResult: public wallaroo::EncodableData
+class OrderResult: public wallaroo::Data
 {
 public:
   OrderMessage *order_message;
@@ -226,15 +245,15 @@ public:
   OrderResult(OrderMessage *order_message_, double bid_, double offer_, uint64_t timestamp_);
   ~OrderResult();
 
-  virtual size_t encode_get_size();
-  virtual void encode(char *bytes);
+  size_t encode_get_size();
+  void encode(char *bytes);
 };
 
 class OrderResultSinkEncoder: public wallaroo::SinkEncoder
 {
 public:
-  virtual size_t get_size(wallaroo::EncodableData *data);
-  virtual void encode(wallaroo::EncodableData *data, char *bytes);
+  virtual size_t get_size(wallaroo::Data *data);
+  virtual void encode(wallaroo::Data *data, char *bytes);
 };
 
 #endif // __MARKET_SPREAD_CPP_H__

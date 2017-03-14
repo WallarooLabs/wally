@@ -9,17 +9,6 @@
 
 extern "C"
 {
-  extern CounterPartitionKey* get_partition_key(size_t idx)
-  {
-    wallaroo::Logger::getLogger()->warn("Partition Key");
-    return new CounterPartitionKey(idx);
-  }
-
-  extern CounterPartitionFunction* get_partition_function(size_t idx)
-  {
-    return new CounterPartitionFunction();
-  }
-
   extern CounterSourceDecoder* get_source_decoder()
   {
     return new CounterSourceDecoder();
@@ -40,17 +29,12 @@ extern "C"
     return new CounterComputation();
   }
 
-  extern DummyComputation *get_dummy_computation()
-  {
-    return new DummyComputation();
-  }
-
-  extern CounterState *get_state()
+  extern CounterState *get_counter_state()
   {
     return new CounterState();
   }
 
-  extern wallaroo::StateBuilder *get_counter_state_builder()
+  extern CounterStateBuilder *get_counter_state_builder()
   {
     return new CounterStateBuilder();
   }
@@ -67,8 +51,6 @@ extern "C"
       total->deserialize(bytes_ + 2);
       return total;
     }
-    case 1:
-      return new DummyComputation();
     case 2:
       return new CounterComputation();
     case 3:
@@ -86,14 +68,22 @@ extern "C"
     {
       return new CounterAddBuilder();
     }
-    case 6:
-    {
-      CounterPartitionKey *cpk = new CounterPartitionKey(0);
-      cpk->deserialize(bytes_ + 2);
-      return cpk;
-    }
     }
     return nullptr;
+  }
+
+  extern bool w_main(int argc, char **argv, Application *application_builder_)
+  {
+    application_builder_->create_application("Number Counter Application")
+      ->new_pipeline("Number Counter", new CounterSourceDecoder())
+      ->to(new SimpleComputationBuilder())
+      ->to_stateful(
+        new CounterComputation(),
+        new CounterStateBuilder(),
+        "counter state"
+        )
+      ->to_sink(new CounterSinkEncoder);
+    return true;
   }
 }
 
@@ -278,15 +268,15 @@ void Total::encode(char *bytes)
 
 size_t CounterSinkEncoder::get_size(wallaroo::Data *data)
 {
-  Numbers *numbers = static_cast<Numbers *>(data);
-  return numbers->encode_get_size();
+  Total *total = static_cast<Total *>(data);
+  return total->encode_get_size();
 }
 
 void CounterSinkEncoder::encode(wallaroo::Data *data, char *bytes)
 {
   // std::cerr << "encoding in the sink!" << std::endl;
-  Numbers *numbers = static_cast<Numbers *>(data);
-  numbers->encode(bytes);
+  Total *total = static_cast<Total *>(data);
+  total->encode(bytes);
 }
 
 CounterState::CounterState(): _counter(0)
@@ -389,6 +379,11 @@ size_t CounterAddBuilder::serialize_get_size () {
   return 2;
 }
 
+wallaroo::Computation *SimpleComputationBuilder::build()
+{
+  return new SimpleComputation();
+}
+
 const char *SimpleComputation::name()
 {
   return "simple computation";
@@ -436,73 +431,4 @@ size_t CounterComputation::get_number_of_state_change_builders()
 wallaroo::StateChangeBuilder *CounterComputation::get_state_change_builder(size_t idx_)
 {
   return new CounterAddBuilder();
-}
-
-const char *DummyComputation::name()
-{
-  return "dummy computation";
-}
-
-void *DummyComputation::compute(wallaroo::Data *input_, wallaroo::StateChangeRepository *state_change_repository_, void *state_change_repository_helper_, wallaroo::State *state_, void *none)
-{
-  // std::cerr << "inside dummy computation!" << std::endl;
-  Total *total = new Total(*((Total *) input_));
-
-  return w_stateful_computation_get_return(state_change_repository_helper_, total, none);
-}
-
-size_t DummyComputation::get_number_of_state_change_builders(){
-  return 0;
-}
-
-wallaroo::StateChangeBuilder *DummyComputation::get_state_change_builder(size_t idx_)
-{
-  return nullptr;
-}
-
-CounterPartitionKey::CounterPartitionKey(size_t value_): _value(value_)
-{
-}
-
-uint64_t CounterPartitionKey::hash()
-{
-  return (uint64_t)get_value();
-}
-
-bool CounterPartitionKey::eq(wallaroo::Key *other_)
-{
-  return get_value() == ((CounterPartitionKey *)other_)->get_value();
-}
-
-size_t CounterPartitionKey::get_value()
-{
-  return _value;
-}
-
-void CounterPartitionKey::deserialize(char *bytes_)
-{
-  _value = ((size_t)(bytes_[0]) << 24) +
-    ((size_t)(bytes_[1]) << 16) +
-    ((size_t)(bytes_[2]) << 8) +
-    (size_t)(bytes_[3]);
-}
-
-void CounterPartitionKey::serialize(char* bytes_)
-{
-  bytes_[0] = 0x00;
-  bytes_[1] = 0x06;
-  bytes_[2] = (_value >> 24) & 0xFF;
-  bytes_[3] = (_value >> 16) & 0xFF;
-  bytes_[4] = (_value >> 8) & 0xFF;
-  bytes_[5] = _value & 0xFF;
-}
-
-void serialize(char *bytes)
-{
-}
-
-wallaroo::Key *CounterPartitionFunction::partition(wallaroo::Data *data)
-{
-  Numbers *numbers = (Numbers *)data;
-  return new CounterPartitionKey((numbers->get_numbers().size()) % 2);
 }

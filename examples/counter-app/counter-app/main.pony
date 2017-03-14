@@ -29,112 +29,13 @@ To send a message:
 `echo -n '\0\012\0\02\0\0\03\01\0\0\0\03' | nc 127.0.0.1 7010`
 """
 
+use "wallaroo/cpp_api/pony"
+
 use "lib:wallaroo"
-use "lib:counter-app"
 use "lib:c++"
 
-use "buffered"
-use "wallaroo"
-use "wallaroo/topology"
-use "wallaroo/tcp_source"
-use "wallaroo/cpp_api/pony"
-use "debug"
-
-use @get_partition_key[KeyP](idx: USize)
-use @get_partition_function[PartitionFunctionP]()
-use @get_source_decoder[SourceDecoderP]()
-use @get_sink_encoder[SinkEncoderP]()
-use @get_computation[ComputationP]()
-use @get_state_computation[ComputationP]()
-use @get_dummy_computation[ComputationP]()
-use @get_state[StateP]()
-
-primitive StateComputationFactory
-  fun apply(): CPPStateComputation val =>
-    Debug("Building state computation")
-    recover CPPStateComputation(recover CPPManagedObject(@get_state_computation()) end) end
-
-primitive DummyComputationFactory
-  fun apply(): CPPStateComputation val =>
-    Debug("Building dummy computation")
-    recover CPPStateComputation(recover CPPManagedObject(@get_dummy_computation()) end) end
-
-primitive ComputationFactory0
-  fun apply(): CPPComputation val =>
-    Debug("Building computation")
-    recover CPPComputation(recover CPPManagedObject(@get_computation()) end) end
-
-primitive ComputationFactory1
-  fun apply(): CPPComputation val =>
-    Debug("Building computation")
-    recover CPPComputation(recover CPPManagedObject(@get_computation()) end) end
-
-primitive ComputationFactory2
-  fun apply(): CPPComputation val =>
-    Debug("Building computation")
-    recover CPPComputation(recover CPPManagedObject(@get_computation()) end) end
-
-primitive AccumulatorStateBuilder
-  fun name(): String => "accumulator state builder"
-  fun apply(): CPPState =>
-    Debug("Building state")
-    CPPState(CPPManagedObject(@get_state()))
-
-primitive SimplePartitionFunction
-  fun apply(input: CPPData val): U64
-  =>
-    input.partition_index()
+use "lib:counter"
 
 actor Main
   new create(env: Env) =>
-    let action: String = try
-      env.args(1)
-    else
-      ""
-    end
-
-    if action == "spewer" then
-      env.err.print("Entering spewer mode")
-      SpewerApp(env)
-    elseif action == "listener" then
-      env.err.print("Entering listener mode")
-    else
-      env.err.print("Entering topology mode")
-      try
-        let partition_function = recover val CPPPartitionFunction(recover CPPManagedObject(@get_partition_function()) end) end
-        let partition_keys: Array[CPPKey val] val = recover [as CPPKey val:
-          recover CPPKey(recover CPPManagedObject(@get_partition_key(0)) end) end,
-          recover CPPKey(recover CPPManagedObject(@get_partition_key(1)) end) end
-          ] end
-        let data_partition = Partition[CPPData val, CPPKey val](
-          partition_function, partition_keys)
-        let application = recover val
-          Application("Passthrough Topology")
-            .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end
-              where coalescing = false)
-            // .new_pipeline[CPPData val, CPPData val]("source decoder", recover CPPSourceDecoder(recover CPPManagedObject(@get_source_decoder()) end) end)
-            .to_state_partition[CPPData val, CPPKey val, CPPData val, CPPState](
-              StateComputationFactory(),
-              AccumulatorStateBuilder, "accumulator-builder", data_partition where multi_worker = true)
-            //
-            // MULTIWORKER
-            //
-            // .to[CPPData val](ComputationFactory0)
-            // .to[CPPData val](ComputationFactory1)
-            // .to[CPPData val](ComputationFactory2)
-            // .to_stateful[CPPData val, CPPState](
-            //   StateComputationFactory(),
-            //   AccumulatorStateBuilder, "accumulator-builder")
-            //
-            // DUMMY COMPUTATION
-            //
-            // .to_stateful[CPPData val, CPPState](
-            //   DummyComputationFactory(),
-            //   AccumulatorStateBuilder, "accumulator-builder")
-            .to_sink(recover CPPSinkEncoder(recover CPPManagedObject(@get_sink_encoder()) end) end, recover [0] end)
-        end
-        Startup(env, application, None)
-      else
-        env.out.print("Could not build topology")
-      end
-    end
+    WallarooMain(env)

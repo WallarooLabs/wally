@@ -1,5 +1,7 @@
-#include "market-spread-cpp.hpp"
+#include "WallarooCppApi/Application.hpp"
 #include "WallarooCppApi/ApiHooks.hpp"
+
+#include "market-spread-cpp.hpp"
 
 #include <iostream>
 #include <cstring>
@@ -89,6 +91,30 @@ extern "C"
   extern wallaroo::Serializable *w_user_serializable_deserialize(char *bytes_, size_t sz_)
   {
     return nullptr;
+  }
+
+  extern bool w_main(int argc, char **argv, Application *application_builder_)
+  {
+    application_builder_->create_application("Market Spread Application")
+      ->new_pipeline("Order", new OrderSourceDecoder())
+        ->to_state_partition_u64(
+          new CheckOrder(),
+          new SymbolDataBuilder(),
+          "order",
+          new SymbolDataPartition(),
+          false
+          )
+        ->to_sink(new OrderResultSinkEncoder())
+      ->new_pipeline("NBBO", new NbboSourceDecoder())
+        ->to_state_partition_u64(
+          new UpdateNbbo(),
+          new SymbolDataBuilder(),
+          "nbbo",
+          new SymbolDataPartition(),
+          false
+          )
+      ->done();
+    return true;
   }
 }
 
@@ -202,7 +228,7 @@ size_t OrderSourceDecoder::payload_length(char *bytes)
   return reader.u32_be();
 }
 
-wallaroo::Data *OrderSourceDecoder::decode(char *bytes, size_t sz_)
+wallaroo::Data *OrderSourceDecoder::decode(char *bytes)
 {
   Reader reader((unsigned char*) bytes);
 
@@ -241,7 +267,7 @@ size_t NbboSourceDecoder::payload_length(char *bytes)
   return reader.u32_be();
 }
 
-wallaroo::Data *NbboSourceDecoder::decode(char *bytes, size_t sz_)
+wallaroo::Data *NbboSourceDecoder::decode(char *bytes)
 {
   Reader reader((unsigned char*) bytes);
 
@@ -310,7 +336,83 @@ uint64_t NbboMessage::get_partition()
   return partition_from_symbol(_symbol);
 }
 
-SymbolDataStateChange::SymbolDataStateChange(uint64_t id_): StateChange(id_), _should_reject_trades(false), _last_bid(0), _last_offer(0)
+const char *SymbolDataBuilder::name()
+{
+  return "symbol data builder";
+}
+
+wallaroo::State *SymbolDataBuilder::build()
+{
+  return new SymbolData();
+}
+
+wallaroo::PartitionFunctionU64 *SymbolDataPartition::get_partition_function()
+{
+  return new SymbolPartitionFunction();
+}
+
+const char *known_symbols[] = {
+  "AA","BAC","AAPL","FCX","SUNE","FB","RAD","INTC","GE","WMB","S","ATML",
+  "YHOO","F","T","MU","PFE","CSCO","MEG","HUN","GILD","MSFT","SIRI","SD",
+  "C","NRF","TWTR","ABT","VSTM","NLY","AMAT","X","NFLX","SDRL","CHK",
+  "KO","JCP","MRK","WFC","XOM","KMI","EBAY","MYL","ZNGA","FTR","MS",
+  "DOW","ATVI","ORCL","JPM","FOXA","HPQ","JBLU","RF","CELG","HST",
+  "QCOM","AKS","EXEL","ABBV","CY","VZ","GRPN","HAL","GPRO","CAT","OPK",
+  "AAL","JNJ","XRX","GM","MHR","DNR","PIR","MRO","NKE","MDLZ","V","HLT",
+  "TXN","SWN","AGN","EMC","CVX","BMY","SLB","SBUX","NVAX","ZIOP","NE",
+  "COP","EXC","OAS","VVUS","BSX","SE","NRG","MDT","WFM","ARIA","WFT",
+  "MO","PG","CSX","MGM","SCHW","NVDA","KEY","RAI","AMGN","HTZ","ZTS",
+  "USB","WLL","MAS","LLY","WPX","CNW","WMT","ASNA","LUV","GLW","BAX",
+  "HCA","NEM","HRTX","BEE","ETN","DD","XPO","HBAN","VLO","DIS","NRZ",
+  "NOV","MET","MNKD","MDP","DAL","XON","AEO","THC","AGNC","ESV","FITB",
+  "ESRX","BKD","GNW","KN","GIS","AIG","SYMC","OLN","NBR","CPN","TWO",
+  "SPLS","AMZN","UAL","MRVL","BTU","ODP","AMD","GLNG","APC","HL","PPL",
+  "HK","LNG","CVS","CYH","CCL","HD","AET","CVC","MNK","FOX","CRC",
+  "TSLA","UNH","VIAB","P","AMBA","SWFT","CNX","BWC","SRC","WETF","CNP",
+  "ENDP","JBL","YUM","MAT","PAH","FINL","BK","ARWR","SO","MTG","BIIB",
+  "CBS","ARNA","WYNN","TAP","CLR","LOW","NYMT","AXTA","BMRN","ILMN",
+  "MCD","NAVI","FNFG","AVP","ON","DVN","DHR","OREX","CFG","DHI","IBM",
+  "HCP","UA","KR","AES","STWD","BRCM","APA","STI","MDVN","EOG","QRVO",
+  "CBI","CL","ALLY","CALM","SN","FEYE","VRTX","KBH","ADXS","HCBK","OXY",
+  "TROX","NBL","MON","PM","MA","HDS","EMR","CLF","AVGO","INCY","M","PEP",
+  "WU","KERX","CRM","BCEI","PEG","NUE","UNP","SWKS","SPW","COG","BURL",
+  "MOS","CIM","CLNY","BBT","UTX","LVS","DE","ACN","DO","LYB","MPC","SNDK",
+  "AGEN","GGP","RRC","CNC","PLUG","JOY","HP","CA","LUK","AMTD","GERN",
+  "PSX","LULU","SYY","HON","PTEN","NWSA","MCK","SVU","DSW","MMM","CTL",
+  "BMR","PHM","CIE","BRCD","ATW","BBBY","BBY","HRB","ISIS","NWL","ADM",
+  "HOLX","MM","GS","AXP","BA","FAST","KND","NKTR","ACHN","REGN","WEN",
+  "CLDX","BHI","HFC","GNTX","GCA","CPE","ALL","ALTR","QEP","NSAM",
+  "ITCI","ALNY","SPF","INSM","PPHM","NYCB","NFX","TMO","TGT","GOOG",
+  "SIAL","GPS","MYGN","MDRX","TTPH","NI","IVR","SLH"
+};
+
+size_t SymbolDataPartition::get_number_of_keys()
+{
+  return sizeof(known_symbols) / (sizeof(char *));
+}
+
+uint64_t SymbolDataPartition::get_key(size_t idx_)
+{
+  const char *symbol = known_symbols[idx_];
+
+  uint64_t key = 0;
+
+  for (int i = strlen(symbol); i < 4; ++i)
+  {
+    key <<= 8;
+    key += ' ';
+  }
+
+  for (int i = 0; i < strlen(symbol); ++i)
+  {
+    key <<= 8;
+    key += symbol[i];
+  }
+
+  return key;
+}
+
+SymbolDataStateChange::SymbolDataStateChange(uint64_t id_): _id(id_), _should_reject_trades(false), _last_bid(0), _last_offer(0)
 {
 }
 
@@ -456,19 +558,24 @@ void OrderResult::encode(char *bytes)
   writer.u64_be(timestamp);
 }
 
-size_t OrderResultSinkEncoder::get_size(wallaroo::EncodableData *data)
+size_t OrderResultSinkEncoder::get_size(wallaroo::Data *data)
 {
   //Header (size == 55 bytes)
-  return data->encode_get_size();
+
+  OrderResult *result = static_cast<OrderResult *>(data);
+
+  return result->encode_get_size();
 }
 
-void OrderResultSinkEncoder::encode(wallaroo::EncodableData *data, char *bytes)
+void OrderResultSinkEncoder::encode(wallaroo::Data *data, char *bytes)
 {
   Writer writer((unsigned char *) bytes);
 
-  uint32_t message_size = data->encode_get_size();
+  OrderResult *result = static_cast<OrderResult *>(data);
+
+  uint32_t message_size = result->encode_get_size();
 
   writer.u32_be(message_size);
 
-  data->encode(bytes + 4);
+  result->encode(bytes + 4);
 }
