@@ -11,6 +11,7 @@ use "wallaroo/resilience"
 
 actor WorkerInitializer
   let _auth: AmbientAuth
+  let _worker_name: String
   let _expected: USize
   let _connections: Connections
   let _application_initializer: ApplicationInitializer
@@ -30,12 +31,13 @@ actor WorkerInitializer
   let _control_addrs: Map[String, (String, String)] = _control_addrs.create()
   let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
 
-  new create(auth: AmbientAuth, workers: USize, connections: Connections,
-    application_initializer: ApplicationInitializer,
+  new create(auth: AmbientAuth, worker_name: String, workers: USize,
+    connections: Connections, application_initializer: ApplicationInitializer,
     local_topology_initializer: LocalTopologyInitializer,
     data_addr: Array[String] val, metrics_conn: MetricsSink)
   =>
     _auth = auth
+    _worker_name = worker_name
     _expected = workers
     _connections = connections
     _initializer_data_addr = data_addr
@@ -48,8 +50,10 @@ actor WorkerInitializer
 
     if _expected == 1 then
       _topology_ready = true
-      _application_initializer.initialize(this, _expected,
-        recover Array[String] end)
+      let workers: Array[String] val = recover [_worker_name] end
+      _application_initializer.initialize(this, _expected, workers)
+      _local_topology_initializer.create_data_receivers(
+        recover Array[String] end, this)
     end
 
   be identify_control_address(worker: String, host: String, service: String) =>

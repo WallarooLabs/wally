@@ -187,9 +187,9 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
     No-op: TCPSink has no router
     """
     None
-  
+
   be receive_state(state: ByteSeq val) => Fail()
-   
+
   be dispose() =>
     """
     Gracefully shuts down the sink. Allows all pending writes
@@ -231,11 +231,15 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
   //
   // CREDIT FLOW
   be register_producer(producer: Producer) =>
-    ifdef debug then
-      Invariant(not _upstreams.contains(producer))
+    //TODO: Do we need this invariant? Joining worker somehow registers
+    // the same thing multiple times. Can we replace _upstreams with a
+    // set?
+    // ifdef debug then
+    //   Invariant(not _upstreams.contains(producer))
+    // end
+    if not _upstreams.contains(producer) then
+      _upstreams.push(producer)
     end
-
-    _upstreams.push(producer)
 
   be unregister_producer(producer: Producer) =>
     ifdef debug then

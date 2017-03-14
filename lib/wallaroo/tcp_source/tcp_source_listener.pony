@@ -50,22 +50,24 @@ class TCPSourceListenerBuilder
     _metrics_reporter = consume metrics_reporter
 
   fun apply(): TCPSourceListener =>
-    TCPSourceListener(_source_builder, _router, _router_registry,
+    let tcp_l = TCPSourceListener(_source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundaries, _tcp_sinks, _alfred, _auth,
       _default_target, _default_in_route_builder, _target_router, _host,
       _service where metrics_reporter = _metrics_reporter.clone())
+    _router_registry.register_partition_router_step(tcp_l)
+    tcp_l
 
-actor TCPSourceListener
+actor TCPSourceListener is PartitionRoutable
   """
   # TCPSourceListener
   """
 
-  let _notify: TCPSourceListenerNotify
+  var _notify: TCPSourceListenerNotify
   let _router: Router val
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder val
   let _default_in_route_builder: (RouteBuilder val | None)
-  let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  var _outgoing_boundaries: Map[String, OutgoingBoundary] val
   let _tcp_sinks: Array[TCPSink] val
   let _default_target: (Step | None)
   var _fd: U32
@@ -111,6 +113,26 @@ actor TCPSourceListener
     _fd = @pony_asio_event_fd(_event)
     _notify_listening()
     @printf[I32]((source_builder.name() + " source listening on " + host + ":" + service + "\n").cstring())
+
+  be update_router(router: Router val) =>
+    _notify.update_router(router)
+
+  be remove_route_for(moving_step: ConsumerStep) =>
+    None
+
+  be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
+    let new_boundaries: Map[String, OutgoingBoundary] trn =
+      recover Map[String, OutgoingBoundary] end
+    // TODO: A persistent map on the field would be much more efficient here
+    for (state_name, boundary) in _outgoing_boundaries.pairs() do
+      new_boundaries(state_name) = boundary
+    end
+    for (state_name, boundary) in boundaries.pairs() do
+      if not new_boundaries.contains(state_name) then
+        new_boundaries(state_name) = boundary
+      end
+    end
+    _outgoing_boundaries = consume new_boundaries
 
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """

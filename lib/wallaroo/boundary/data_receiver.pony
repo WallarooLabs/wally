@@ -181,15 +181,6 @@ actor DataReceiver is Producer
       _last_id_seen = seq_id
       _router.route(d, pipeline_time_spent, this, seq_id, latest_ts,
         metrics_id, worker_ingress_ts)
-
-      // ifdef "resilience" then
-      //   if (_estimated_boundary_queue_size > _request_threshold) and
-      //     ((_ack_counter - _last_request) > _request_pause)
-      //   then
-      //     _request_ack()
-      //   end
-      // end
-
       _maybe_ack()
     end
 

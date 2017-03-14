@@ -199,7 +199,10 @@ actor DataChannel
     `unmute` is called.
     """
     _muted_downstream.set(d)
-    _muted = true
+    if not _muted then
+      @printf[I32]("Muting DataChannel\n".cstring())
+      _muted = true
+    end
 
   be unmute(d: Any tag) =>
     """
@@ -208,6 +211,7 @@ actor DataChannel
     _muted_downstream.unset(d)
 
     if _muted_downstream.size() == 0 then
+      @printf[I32]("Unmuting DataChannel\n".cstring())
       _muted = false
       _pending_reads()
     end

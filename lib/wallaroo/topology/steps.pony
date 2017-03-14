@@ -154,8 +154,6 @@ actor Step is (RunnableStep & Resilient & Producer &
   fun ref report_route_ready_to_work(r: RouteLogic) =>
     if not _ready_to_work_routes.contains(r) then
       _ready_to_work_routes.set(r)
-      // @printf[I32]("Reporting. routes: %d, ready: %d\n".cstring(),
-        // _routes.size(), _ready_to_work_routes.size())
 
       if _ready_to_work_routes.size() == _routes.size() then
         match _initializer
@@ -179,7 +177,10 @@ actor Step is (RunnableStep & Resilient & Producer &
   be register_routes(router: Router val, route_builder: RouteBuilder val) =>
     for consumer in router.routes().values() do
       let next_route = route_builder(this, consumer, _metrics_reporter)
-      _routes(consumer) = next_route
+      if not _routes.contains(consumer) then
+        _routes(consumer) = next_route
+        _resilience_routes.add_route(next_route)
+      end
       if _initialized then
         Fail()
       end
@@ -208,16 +209,10 @@ actor Step is (RunnableStep & Resilient & Producer &
     try
       let old_router = _omni_router
       _omni_router = omni_router
-      for outdated_consumer in old_router.routes_not_in(_omni_router).values() do
+      for outdated_consumer in old_router.routes_not_in(_omni_router).values()
+      do
         let outdated_route = _routes(outdated_consumer)
         _resilience_routes.remove_route(outdated_route)
-      end
-      for consumer in _router.routes().values() do
-        if not _routes.contains(consumer) then
-          let new_route = _route_builder(this, consumer, _metrics_reporter)
-          _resilience_routes.add_route(new_route)
-          _routes(consumer) = new_route
-        end
       end
     else
       Fail()
@@ -237,7 +232,7 @@ actor Step is (RunnableStep & Resilient & Producer &
     try
       _routes.remove(step)
     else
-      Fail()
+      @printf[I32]("Tried to remove route for step but there was no route to remove\n".cstring())
     end
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -426,11 +421,15 @@ actor Step is (RunnableStep & Resilient & Producer &
     end
 
   be register_producer(producer: Producer) =>
-    ifdef debug then
-      Invariant(not _upstreams.contains(producer))
+    //TODO: Do we need this invariant? Joining worker somehow registers
+    // the same thing multiple times. Can we replace _upstreams with a
+    // set?
+    // ifdef debug then
+    //   Invariant(not _upstreams.contains(producer))
+    // end
+    if not _upstreams.contains(producer) then
+      _upstreams.push(producer)
     end
-
-    _upstreams.push(producer)
 
   be unregister_producer(producer: Producer) =>
     ifdef debug then
