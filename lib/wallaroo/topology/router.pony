@@ -117,7 +117,7 @@ class ProxyRouter is Equatable[ProxyRouter]
     match might_be_route
     | let r: Route =>
       ifdef "trace" then
-        @printf[I32]("DirectRouter found Route\n".cstring())
+        @printf[I32]("ProxyRouter found Route\n".cstring())
       end
       let delivery_msg = ForwardMsg[D](
         _target_proxy_address.step_id,
@@ -131,7 +131,7 @@ class ProxyRouter is Equatable[ProxyRouter]
 
       (false, keep_sending, latest_ts)
     else
-      // TODO: What do we do if we get None?
+      Fail()
       (true, true, latest_ts)
     end
 
@@ -256,6 +256,7 @@ class StepIdRouter is OmniRouter
         (false, keep_sending, latest_ts)
       else
         // No route for this target
+        Fail()
         (true, true, latest_ts)
       end
     else
@@ -287,6 +288,7 @@ class StepIdRouter is OmniRouter
               ifdef debug then
                 @printf[I32]("OmniRouter had no Route\n".cstring())
               end
+              Fail()
               (true, true, latest_ts)
             end
           else
@@ -294,11 +296,13 @@ class StepIdRouter is OmniRouter
             ifdef debug then
               @printf[I32]("OmniRouter has no reference to OutgoingBoundary\n".cstring())
             end
+            Fail()
             (true, true, latest_ts)
           end
         | let sink_id: U128 =>
           (true, true, latest_ts)
         else
+          Fail()
           (true, true, latest_ts)
         end
       else
@@ -306,6 +310,7 @@ class StepIdRouter is OmniRouter
         ifdef debug then
           @printf[I32]("OmniRouter: target id does not refer to valid step id\n".cstring())
         end
+        Fail()
         (true, true, latest_ts)
       end
     end
@@ -815,17 +820,22 @@ class LocalPartitionRouter[In: Any val,
     try
       var left_to_send = PartitionRebalancer.step_count_to_send(size(),
         _local_map.size(), worker_count - 1)
-      for (key, target) in _partition_routes.pairs() do
-        if left_to_send == 0 then break end
-        match target
-        | let s: Step =>
-          s.send_state[Key](boundary, state_name, key)
-          let step_id = _step_ids(key)
-          router_registry.add_to_waiting_list(step_id)
-          router_registry.move_stateful_step_to_proxy[Key](step_id,
-            ProxyAddress(target_worker, step_id), key, state_name)
-          left_to_send = left_to_send - 1
+      if left_to_send > 0 then
+        for (key, target) in _partition_routes.pairs() do
+          if left_to_send == 0 then break end
+          match target
+          | let s: Step =>
+            s.send_state[Key](boundary, state_name, key)
+            let step_id = _step_ids(key)
+            router_registry.add_to_step_waiting_list(step_id)
+            router_registry.move_stateful_step_to_proxy[Key](step_id,
+              ProxyAddress(target_worker, step_id), key, state_name)
+            left_to_send = left_to_send - 1
+          end
         end
+      else
+        // There is nothing to send over. Can we immediately resume processing?
+        router_registry.try_to_resume_processing_immediately()
       end
       ifdef debug then
         Invariant(left_to_send == 0)

@@ -138,6 +138,29 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
+  be quick_initialize(initializer: LocalTopologyInitializer) =>
+    """
+    Called when initializing as part of joining a running cluster.
+    """
+    try
+      _initializer = initializer
+      _reported_initialized = true
+      _connect_count = @pony_os_connect_tcp[U32](this,
+        _host.cstring(), _service.cstring(),
+        _from.cstring())
+      _notify_connecting()
+
+      if _step_id == 0 then
+        Fail()
+      end
+
+      let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
+        _auth)
+      _writev(connect_msg)
+    else
+      Fail()
+    end
+
   be reconnect() =>
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
@@ -153,6 +176,15 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
       let outgoing_msg = ChannelMsgEncoder.migrate_step[K](step_id,
         state_name, key, state, _worker_name, _auth)
       _writev(outgoing_msg)
+    else
+      Fail()
+    end
+
+  be send_migration_batch_complete() =>
+    try
+      let migration_batch_complete_msg =
+        ChannelMsgEncoder.migration_batch_complete(_worker_name, _auth)
+      _writev(migration_batch_complete_msg)
     else
       Fail()
     end

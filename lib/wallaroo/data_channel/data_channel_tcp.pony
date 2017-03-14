@@ -82,10 +82,11 @@ class DataChannelListenNotifier is DataChannelListenNotify
 
   fun ref connected(
     listen: DataChannelListener ref,
-    data_receivers: Map[String, DataReceiver] val): DataChannelNotify iso^
+    data_receivers: Map[String, DataReceiver] val,
+    router_registry: RouterRegistry): DataChannelNotify iso^
   =>
     DataChannelConnectNotifier(data_receivers, _connections, _auth,
-    _metrics_reporter.clone(), _local_topology_initializer)
+    _metrics_reporter.clone(), _local_topology_initializer, router_registry)
 
 class DataChannelConnectNotifier is DataChannelNotify
   var _receivers: Map[String, DataReceiver] val
@@ -95,24 +96,34 @@ class DataChannelConnectNotifier is DataChannelNotify
   let _timers: Timers = Timers
   let _metrics_reporter: MetricsReporter
   let _local_topology_initializer: LocalTopologyInitializer tag
+  let _router_registry: RouterRegistry
 
   new iso create(receivers: Map[String, DataReceiver] val,
     connections: Connections, auth: AmbientAuth,
-    metrics_reporter: MetricsReporter iso, local_topology_initializer: LocalTopologyInitializer tag)
+    metrics_reporter: MetricsReporter iso,
+    local_topology_initializer: LocalTopologyInitializer tag,
+    router_registry: RouterRegistry)
   =>
     _receivers = receivers
     _connections = connections
     _auth = auth
     _metrics_reporter = consume metrics_reporter
     _local_topology_initializer = local_topology_initializer
+    _router_registry = router_registry
 
   fun ref update_data_receivers(drs: Map[String, DataReceiver] val) =>
+    ifdef "trace" then
+      @printf[I32]("Updating data receivers on data channel\n".cstring())
+    end
     _receivers = drs
 
   fun ref received(conn: DataChannel ref, data: Array[U8] iso,
     n: USize): Bool
   =>
     if _header then
+      ifdef "trace" then
+        @printf[I32]("Rcvd msg header on data channel\n".cstring())
+      end
       try
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
@@ -142,7 +153,10 @@ class DataChannelConnectNotifier is DataChannelNotify
               data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
               my_latest_ts)
         else
-          @printf[I32]("Missing DataReceiver!\n".cstring())
+          @printf[I32](
+            "Missing DataReceiver for %s! Couldn't forward DataMsg\n"
+              .cstring(),
+            data_msg.delivery_msg.sender_name().cstring())
         end
       | let dc: DataConnectMsg val =>
         ifdef "trace" then
@@ -151,13 +165,21 @@ class DataChannelConnectNotifier is DataChannelNotify
         try
           _receivers(dc.sender_name).data_connect(dc.sender_step_id, conn)
         else
-          @printf[I32]("Missing DataReceiver!\n".cstring())
+          @printf[I32]("Missing DataReceiver for %s!\n".cstring(),
+            dc.sender_name.cstring())
         end
       | let sm: StepMigrationMsg val =>
         ifdef "trace" then
           @printf[I32]("Received StepMigrationMsg on Data Channel\n".cstring())
         end
         _local_topology_initializer.receive_immigrant_step(sm)
+      | let m: MigrationBatchCompleteMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
+        end
+        // Go through router_registry to make sure pending messages on
+        // registry are processed first
+        _router_registry.ack_migration_batch_complete(m.sender_name)
       | let aw: AckWatermarkMsg val =>
         ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())

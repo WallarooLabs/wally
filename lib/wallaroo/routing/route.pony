@@ -83,6 +83,7 @@ class EmptyRoute is Route
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
+    Fail()
     true
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
@@ -91,4 +92,5 @@ class EmptyRoute is Route
     i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
     worker_ingress_ts: U64): Bool
   =>
+    Fail()
     true

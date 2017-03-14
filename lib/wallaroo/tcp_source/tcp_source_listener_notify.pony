@@ -3,12 +3,13 @@ use "wallaroo/metrics"
 use "wallaroo/topology"
 use "wallaroo/resilience"
 
-interface SourceBuilder
+trait SourceBuilder
   fun name(): String
   fun apply(alfred: Alfred tag, auth: AmbientAuth, target_router: Router val):
     TCPSourceNotify iso^
+  fun val update_router(router: Router val): SourceBuilder val
 
-class _SourceBuilder[In: Any val]
+class _SourceBuilder[In: Any val] is SourceBuilder
   let _app_name: String
   let _worker_name: String
   let _name: String
@@ -43,6 +44,10 @@ class _SourceBuilder[In: Any val]
 
     FramedSourceNotify[In](_name, auth, _handler, _runner_builder, _router,
       consume reporter, alfred, target_router, _pre_state_target_id)
+
+  fun val update_router(router: Router val): SourceBuilder val =>
+    _SourceBuilder[In](_app_name, _worker_name, _name, _runner_builder,
+      _handler, router, _metrics_conn, _pre_state_target_id)
 
 interface SourceBuilderBuilder
   fun name(): String
@@ -96,8 +101,10 @@ interface TCPSourceListenerNotify
     newly established connection to the server.
     """
 
+  fun ref update_router(router: Router val)
+
 class SourceListenerNotify is TCPSourceListenerNotify
-  let _source_builder: SourceBuilder val
+  var _source_builder: SourceBuilder val
   let _alfred: Alfred tag
   let _target_router: Router val
   let _auth: AmbientAuth
@@ -114,6 +121,9 @@ class SourceListenerNotify is TCPSourceListenerNotify
 
   fun ref connected(listen: TCPSourceListener ref): TCPSourceNotify iso^ =>
     _source_builder(_alfred, _auth, _target_router)
+
+  fun ref update_router(router: Router val) =>
+    _source_builder = _source_builder.update_router(router)
 
   // TODO: implement listening and especially not_listening
 

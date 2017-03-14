@@ -24,7 +24,7 @@ class Routes
 
   fun print_flushing() =>
     if _flushing then
-      @printf[I32]("Still Flushing!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n".cstring())
+      @printf[I32]("Still Flushing!\n".cstring())
     end
 
   fun ref add_route(route: Route) =>

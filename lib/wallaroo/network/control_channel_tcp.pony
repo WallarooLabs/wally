@@ -210,15 +210,22 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: AnnounceNewStatefulStepMsg val =>
         m.update_registry(_router_registry)
       | let m: StepMigrationCompleteMsg val =>
-        _router_registry.migration_complete(m.step_id)
+        _router_registry.step_migration_complete(m.step_id)
       | let m: JoiningWorkerInitializedMsg val =>
         _local_topology_initializer.add_new_worker(m.worker_name,
           m.control_addr, m.data_addr)
-      | let m: StepMigrationCompleteMsg val =>
-        _router_registry.migration_complete(m.step_id)
+      | let m: AckMigrationBatchCompleteMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received AckMigrationBatchCompleteMsg on Control Channel\n".cstring())
+        end
+        _router_registry.process_migrating_target_ack(m.sender_name)
       | let m: MuteRequestMsg val =>
+        @printf[I32]("Control Ch: Received Mute Request from %s\n".cstring(),
+          m.originating_worker.cstring())
         _router_registry.remote_mute_request(m.originating_worker)
       | let m: UnmuteRequestMsg val =>
+        @printf[I32]("Control Ch: Received Unmute Request from %s\n".cstring(),
+          m.originating_worker.cstring())
         _router_registry.remote_unmute_request(m.originating_worker)
       | let m: UnknownChannelMsg val =>
         _env.err.print("Unknown channel message type.")

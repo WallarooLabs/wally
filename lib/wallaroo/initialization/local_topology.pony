@@ -214,6 +214,8 @@ actor LocalTopologyInitializer
   // Cluster Management
   var _cluster_manager: (ClusterManager | None) = None
 
+  var _t: USize = 0
+
   new create(app: Application val, worker_name: String, worker_count: USize,
     env: Env, auth: AmbientAuth, connections: (Connections | None),
     router_registry: RouterRegistry, metrics_conn: MetricsSink,
@@ -263,6 +265,10 @@ actor LocalTopologyInitializer
   be add_boundary_to_new_worker(w: String, boundary: OutgoingBoundary) =>
     _add_boundary(w, boundary)
     _router_registry.register_boundaries(_outgoing_boundaries)
+    // TODO: This is currently the hook to say "new worker has joined, let's
+    // start migrating state steps to it." This seems like a surprising place
+    // for this to happen though.
+    _router_registry.migrate_onto_new_worker(w)
 
   fun ref _add_worker_name(w: String) =>
     match _topology
@@ -283,8 +289,8 @@ actor LocalTopologyInitializer
       bs(w) = b
     end
     bs(target_worker) = boundary
+    _outgoing_boundaries = consume bs
     _initializables.set(boundary)
-    _router_registry
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     _outgoing_boundaries = bs
@@ -293,9 +299,8 @@ actor LocalTopologyInitializer
     end
 
   be create_data_receivers(ws: Array[String] val,
-    worker_initializer: (WorkerInitializer | None) = None) =>
-    if (not _is_joining) and (_worker_count == 1) then Fail() end
-
+    worker_initializer: (WorkerInitializer | None) = None)
+  =>
     match _connections
     | let conns: Connections =>
       let drs: Map[String, DataReceiver] trn =
@@ -338,9 +343,22 @@ actor LocalTopologyInitializer
                 _router_registry, wi, data_channel_filepath, this)
           end
         end
+        for (sender, data_receiver) in data_receivers.pairs() do
+          _router_registry.add_data_receiver(sender, data_receiver)
+        end
       else
         @printf[I32]("FAIL: cannot create data channel\n".cstring())
       end
+    else
+      Fail()
+    end
+
+  be create_connections(control_addrs: Map[String, (String, String)] val,
+    data_addrs: Map[String, (String, String)] val)
+  =>
+    match _connections
+    | let conns: Connections =>
+      conns.create_connections(control_addrs, data_addrs, this)
     else
       Fail()
     end
@@ -500,6 +518,8 @@ actor LocalTopologyInitializer
 
       match _topology
       | let t: LocalTopology val =>
+        _router_registry.set_pre_state_data(t.pre_state_data())
+
         ifdef "resilience" then
           _save_local_topology()
           _save_worker_names()
@@ -1202,6 +1222,7 @@ actor LocalTopologyInitializer
 
       match _topology
       | let t: LocalTopology val =>
+        _router_registry.set_pre_state_data(t.pre_state_data())
         // Create sinks
         for node in t.graph().nodes() do
           match node.value
@@ -1247,8 +1268,7 @@ actor LocalTopologyInitializer
 
         let data_router = DataRouter(consume data_routes)
         _router_registry.set_data_router(data_router)
-        for (w, receiver) in _data_receivers.pairs() do
-          _router_registry.register_data_receiver(w, receiver)
+        for receiver in _data_receivers.values() do
           receiver.update_router(data_router)
         end
 
@@ -1259,23 +1279,23 @@ actor LocalTopologyInitializer
         _router_registry.set_omni_router(omni_router)
         _omni_router = omni_router
 
-        // TODO: Create partition routers. Currently, a joining worker can only
-        // host state steps that take computations that send results directly to
-        // sinks. If we want a joining worker with an app that uses multiple
-        // state partitions in a pipeline, we need to create those partition
-        // routers here and register them with the registry
+        for (state_name, subpartition) in t.state_builders().pairs() do
+          let partition_router = subpartition.build(_application.name(),
+            _worker_name, _metrics_conn, _auth, _alfred, _outgoing_boundaries,
+            _initializables, recover Map[U128, ConsumerStep] end
+            where default_router = None)
+          _router_registry.set_partition_router(state_name, partition_router)
+        end
 
         ifdef "resilience" then
           _save_local_topology()
           _save_worker_names()
         end
 
-        match _connections
-        | let c: Connections =>
-          c.inform_cluster_of_join()
-        else
-          Fail()
-        end
+        // Call this on router registry instead of Connections directly
+        // to make sure that other messages on registry queues are
+        // processed first
+        _router_registry.inform_cluster_of_join()
 
         @printf[I32]("\n|^|^|^|Finished Initializing Joining Worker Local Topology|^|^|^|\n".cstring())
         @printf[I32]("---------------------------------------------------------\n".cstring())

@@ -34,7 +34,29 @@ primitive ChannelMsgEncoder
     _encode(KeyedStepMigrationMsg[K](step_id, state_name, key, state, worker),
       auth)
 
-  fun migration_complete(step_id: U128, auth: AmbientAuth): Array[ByteSeq] val ? =>
+  fun migration_batch_complete(sender: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    Sent to signal to joining worker that a batch of steps has finished
+    emigrating from this step.
+    """
+    _encode(MigrationBatchCompleteMsg(sender), auth)
+
+  fun ack_migration_batch_complete(worker: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    Sent to ack that a batch of steps has finished immigrating to this step
+    """
+    _encode(AckMigrationBatchCompleteMsg(worker), auth)
+
+  fun step_migration_complete(step_id: U128,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    """
+    Sent when the migration of step step_id is complete
+    """
     _encode(StepMigrationCompleteMsg(step_id), auth)
 
   fun mute_request(originating_worker: String, auth: AmbientAuth): Array[ByteSeq] val ? =>
@@ -265,7 +287,7 @@ class ReplayCompleteMsg is ChannelMsg
 
   fun sender_name(): String => _sender_name
 
-trait StepMigrationMsg
+trait StepMigrationMsg is ChannelMsg
   fun state_name(): String
   fun step_id(): U128
   fun state(): ByteSeq val
@@ -273,7 +295,8 @@ trait StepMigrationMsg
   fun update_router_registry(router_registry: RouterRegistry,
     target: ConsumerStep)
 
-class KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is ChannelMsg
+class KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is
+  StepMigrationMsg
   let _state_name: String
   let _key: K
   let _step_id: U128
@@ -298,6 +321,18 @@ class KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is ChannelMsg
   =>
     router_registry.move_proxy_to_stateful_step[K](_step_id, target, _key,
       _state_name, _worker)
+
+class MigrationBatchCompleteMsg is ChannelMsg
+  let sender_name: String
+
+  new val create(sender: String) =>
+    sender_name = sender
+
+class AckMigrationBatchCompleteMsg is ChannelMsg
+  let sender_name: String
+
+  new val create(sender: String) =>
+    sender_name = sender
 
 class MuteRequestMsg is ChannelMsg
   let originating_worker: String

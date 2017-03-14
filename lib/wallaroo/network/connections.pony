@@ -227,7 +227,8 @@ actor Connections
           ch.writev(new_step_msg)
         end
       end
-      let migration_complete_msg = ChannelMsgEncoder.migration_complete(id, _auth)
+      let migration_complete_msg =
+        ChannelMsgEncoder.step_migration_complete(id, _auth)
       for origin in exclusions.values() do
         _control_conns(origin).writev(migration_complete_msg)
       end
@@ -235,19 +236,24 @@ actor Connections
       Fail()
     end
 
-  be stop_the_world() =>
+  be stop_the_world(exclusions: Array[String] val) =>
     try
-      let mute_request_msg = ChannelMsgEncoder.mute_request(_worker_name, _auth)
+      let mute_request_msg =
+        ChannelMsgEncoder.mute_request(_worker_name, _auth)
       for (target, ch) in _control_conns.pairs() do
-        if target != _worker_name then
+        if
+          (target != _worker_name) and
+          (not exclusions.contains(target,
+            {(a: String, b: String): Bool => a == b}))
+        then
           ch.writev(mute_request_msg)
         end
       end
-    else
+   else
       Fail()
     end
 
-  be resume_the_world() =>
+  be request_cluster_unmute() =>
     try
       let unmute_request_msg = ChannelMsgEncoder.unmute_request(_worker_name, _auth)
       for (target, ch) in _control_conns.pairs() do
@@ -276,6 +282,8 @@ actor Connections
         _worker_name, MetricsReporter(_app_name,
         _worker_name, _metrics_conn),
         host, service)
+      boundary.register_step_id(_guid_gen.u128())
+      boundary.quick_initialize(local_topology_initializer)
       local_topology_initializer.add_boundary_to_new_worker(target, boundary)
     else
       @printf[I32]("Can't find data address for worker\n".cstring())
@@ -508,6 +516,19 @@ actor Connections
       let msg = ChannelMsgEncoder.joining_worker_initialized(_worker_name,
         _my_control_addr, _my_data_addr, _auth)
       _send_control_to_cluster(msg)
+    else
+      Fail()
+    end
+
+  be ack_migration_batch_complete(ack_target: String) =>
+    """
+    Called when this worker has just joined and it needs to ack to sender_name
+    that immigration of a batch is complete
+    """
+    try
+      let ack_migration_batch_complete_msg =
+        ChannelMsgEncoder.ack_migration_batch_complete(_worker_name, _auth)
+      _control_conns(ack_target).writev(ack_migration_batch_complete_msg)
     else
       Fail()
     end
