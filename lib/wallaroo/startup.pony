@@ -377,26 +377,27 @@ actor Startup
         _connection_addresses_file, _is_joining, _spike_config)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections)
+      let alfred = _alfred as Alfred
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
           DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
+          router_registry, metrics_conn, _is_initializer, alfred, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file,
           cluster_manager)
       else
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
+          router_registry, metrics_conn, _is_initializer, alfred, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file)
       end
 
       if _is_initializer then
         _env.out.print("Running as Initializer...")
         _application_initializer = ApplicationInitializer(auth,
-          local_topology_initializer, input_addrs, o_addr, _alfred as Alfred)
+          local_topology_initializer, input_addrs, o_addr, alfred)
         match _application_initializer
         | let ai: ApplicationInitializer =>
           _worker_initializer = WorkerInitializer(auth, _worker_name,
@@ -411,8 +412,8 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_worker_name, _env, auth, connections,
         _is_initializer, _worker_initializer, local_topology_initializer,
-        _alfred as Alfred, router_registry, control_channel_filepath,
-        my_d_host, my_d_service)
+        alfred, router_registry, control_channel_filepath, my_d_host,
+        my_d_service)
 
       ifdef "resilience" then
         if _is_initializer then
@@ -511,19 +512,20 @@ actor Startup
         _connection_addresses_file, _is_joining, _spike_config)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections)
+      let alfred = _alfred as Alfred
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
           DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
+          router_registry, metrics_conn, _is_initializer, alfred, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file,
           cluster_manager, _is_joining)
       else
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
+          router_registry, metrics_conn, _is_initializer, alfred, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file
           where is_joining = _is_joining)
       end
@@ -566,8 +568,8 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_worker_name, _env, auth, connections,
         _is_initializer, _worker_initializer, local_topology_initializer,
-        _alfred as Alfred, router_registry, control_channel_filepath,
-        my_d_host, my_d_service)
+        alfred, router_registry, control_channel_filepath, my_d_host,
+        my_d_service)
 
       ifdef "resilience" then
         connections.make_and_register_recoverable_listener(
