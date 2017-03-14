@@ -308,7 +308,8 @@ actor Connections
       out_bs(target) = boundary
     end
 
-    @printf[I32](("Preparing to update " + _data_conns.size().string() + " boundaries\n").cstring())
+    @printf[I32](("Preparing to update " + _data_conns.size().string() +
+      " boundaries\n").cstring())
 
     local_topology_initializer.update_boundaries(consume out_bs)
     // TODO: This should be somewhere else. It's not clear why updating
