@@ -353,6 +353,10 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
       Invariant(not _upstreams.contains(producer))
     end
 
+    if _mute_outstanding then
+      producer.mute(this)
+    end
+
     _upstreams.push(producer)
 
   be unregister_producer(producer: Producer) =>
@@ -671,6 +675,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     else
       // The socket has been closed from the other side.
       _shutdown_peer = true
+      _maybe_mute_or_unmute_upstreams()
       close()
     end
 
@@ -750,6 +755,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
         end
       else
         // Non-graceful shutdown on error.
+        _maybe_mute_or_unmute_upstreams()
         _hard_close()
       end
     end
