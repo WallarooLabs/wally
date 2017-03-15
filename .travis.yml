@@ -19,10 +19,10 @@ matrix:
   include:
     - os: osx
       env:
-        - LLVM_VERSION="3.9.1"
-        - LLVM_CONFIG="llvm-config-3.9"
-        - CC1=clang-3.9
-        - CXX1=clang++-3.9
+        - LLVM_VERSION="3.8.1"
+        - LLVM_CONFIG="llvm-config-3.8"
+        - CC1=clang-3.8
+        - CXX1=clang++-3.8
         - lto=no
     - os: linux
       addons:
@@ -54,11 +54,7 @@ install:
       brew update;
       brew install gmp; brew link --overwrite gmp;
       brew install pcre2 libressl;
-      brew install llvm; brew link --overwrite --force llvm;
-      mkdir /tmp/llvmsym;
-      ln -s `which llvm-config` /tmp/llvmsym/llvm-config-3.9;
-      ln -s `which clang++` /tmp/llvmsym/clang++-3.9;
-      export PATH=/tmp/llvmsym:$PATH;
+      brew install llvm@3.8;
     fi;
   - if [ "${TRAVIS_OS_NAME}" = "linux" ];
     then
