@@ -53,7 +53,7 @@ actor WorkerInitializer
       let workers: Array[String] val = recover [_worker_name] end
       _application_initializer.initialize(this, _expected, workers)
       _local_topology_initializer.create_data_receivers(
-        recover Array[String] end, this)
+        recover Array[String] end, "", "", this)
     end
 
   be identify_control_address(worker: String, host: String, service: String) =>
@@ -154,7 +154,9 @@ actor WorkerInitializer
         _connections.send_control(key, create_data_receivers_msg)
       end
 
-      _local_topology_initializer.create_data_receivers(workers, this)
+      // Pass in empty host and service because data listener is created
+      // in a special manner in .create_data_receiver() for initializer
+      _local_topology_initializer.create_data_receivers(workers, "", "", this)
     else
       @printf[I32]("Failed to create message to create data receivers\n".cstring())
     end

@@ -494,6 +494,7 @@ actor Connections
       c_addrs(w) = addr
     end
     c_addrs(_worker_name) = _my_control_addr
+
     let d_addrs: Map[String, (String, String)] trn =
       recover Map[String, (String, String)] end
     for (w, addr) in _data_addrs.pairs() do
@@ -502,9 +503,10 @@ actor Connections
     d_addrs(_worker_name) = _my_data_addr
 
     try
-      let inform_msg = ChannelMsgEncoder.inform_joining_worker(_app_name,
-        local_topology.for_new_worker(worker), _metrics_host, _metrics_service,
-        consume c_addrs, consume d_addrs, local_topology.worker_names, _auth)
+      let inform_msg = ChannelMsgEncoder.inform_joining_worker(_worker_name,
+        _app_name, local_topology.for_new_worker(worker), _metrics_host,
+        _metrics_service, consume c_addrs, consume d_addrs,
+        local_topology.worker_names, _auth)
       conn.writev(inform_msg)
       @printf[I32]("***Worker %s attempting to join the cluster. Sent necessary information.***\n".cstring(), worker.cstring())
     else

@@ -5,6 +5,7 @@ use "files"
 use "sendence/bytes"
 use "sendence/hub"
 use "wallaroo"
+use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -17,6 +18,8 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _name: String
   var _host: String = ""
   var _service: String = ""
+  var _d_host: String
+  var _d_service: String
   let _is_initializer: Bool
   let _initializer: (WorkerInitializer | None)
   let _local_topology_initializer: LocalTopologyInitializer
@@ -31,11 +34,14 @@ class ControlChannelListenNotifier is TCPListenNotify
     initializer: (WorkerInitializer | None) = None,
     local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag,
     router_registry: RouterRegistry, recovery_file: FilePath,
+    data_host: String, data_service: String,
     joining: Bool = false)
   =>
     _env = env
     _auth = auth
     _name = name
+    _d_host = data_host
+    _d_service = data_service
     _is_initializer = is_initializer
     _initializer = initializer
     _local_topology_initializer = local_topology_initializer
@@ -43,6 +49,8 @@ class ControlChannelListenNotifier is TCPListenNotify
     _alfred = alfred
     _router_registry = router_registry
     _recovery_file = recovery_file
+    _d_host = data_host
+    _d_service = data_service
     _joining_existing_cluster = joining
 
   fun ref listening(listen: TCPListener ref) =>
@@ -53,6 +61,8 @@ class ControlChannelListenNotifier is TCPListenNotify
           @printf[I32]("Recovery file exists for control channel\n".cstring())
         end
         if _joining_existing_cluster then
+          //TODO: Do we actually need to do this? Isn't this sent as
+          // part of joining worker initialized message?
           let message = ChannelMsgEncoder.identify_control_port(_name,
             _service, _auth)
           _connections.send_control_to_cluster(message)
@@ -91,7 +101,8 @@ class ControlChannelListenNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _env, _auth, _connections,
-      _initializer, _local_topology_initializer, _alfred, _router_registry)
+      _initializer, _local_topology_initializer, _alfred, _router_registry,
+      _d_host, _d_service)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
   let _env: Env
@@ -102,12 +113,14 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _local_topology_initializer: LocalTopologyInitializer
   let _alfred: Alfred tag
   let _router_registry: RouterRegistry
+  let _d_host: String
+  let _d_service: String
   var _header: Bool = true
 
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, initializer: (WorkerInitializer | None),
     local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag,
-    router_registry: RouterRegistry)
+    router_registry: RouterRegistry, data_host: String, data_service: String)
   =>
     _env = env
     _auth = auth
@@ -117,6 +130,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _local_topology_initializer = local_topology_initializer
     _alfred = alfred
     _router_registry = router_registry
+    _d_host = data_host
+    _d_service = data_service
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -204,7 +219,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         ifdef "trace" then
           @printf[I32]("Received CreateDataReceivers on Control Channel\n".cstring())
         end
-        _local_topology_initializer.create_data_receivers(m.workers)
+        _local_topology_initializer.create_data_receivers(m.workers,
+          _d_host, _d_service)
       | let m: JoinClusterMsg val =>
         _local_topology_initializer.inform_joining_worker(conn, m.worker_name)
       | let m: AnnounceNewStatefulStepMsg val =>
@@ -212,8 +228,13 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: StepMigrationCompleteMsg val =>
         _router_registry.step_migration_complete(m.step_id)
       | let m: JoiningWorkerInitializedMsg val =>
-        _local_topology_initializer.add_new_worker(m.worker_name,
-          m.control_addr, m.data_addr)
+        try
+          (let joining_host, _) = conn.remote_address().name()
+          _local_topology_initializer.add_new_worker(m.worker_name,
+            joining_host, m.control_addr, m.data_addr)
+        else
+          Fail()
+        end
       | let m: AckMigrationBatchCompleteMsg val =>
         ifdef "trace" then
           @printf[I32]("Received AckMigrationBatchCompleteMsg on Control Channel\n".cstring())
@@ -302,8 +323,16 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
       let msg = ChannelMsgDecoder(consume data, _auth)
       match msg
       | let m: InformJoiningWorkerMsg val =>
-        @printf[I32]("***Received cluster information!***\n".cstring())
-        _startup.complete_join(m)
+        try
+          // We need to get the host here because the sender didn't know
+          // how its host string appears externally. We'll use it to
+          // make sure we have the correct addresses in Connections
+          (let remote_host, _) = conn.remote_address().name()
+          @printf[I32]("***Received cluster information!***\n".cstring())
+          _startup.complete_join(remote_host, m)
+        else
+          Fail()
+        end
       else
         _env.err.print("Incoming Channel Message type not handled by control channel.")
       end

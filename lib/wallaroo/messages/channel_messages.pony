@@ -156,7 +156,7 @@ primitive ChannelMsgEncoder
     _encode(JoinClusterMsg(worker_name), auth)
 
   // TODO: Update this once new workers become first class citizens
-  fun inform_joining_worker(metric_app_name: String,
+  fun inform_joining_worker(worker_name: String, metric_app_name: String,
     l_topology: LocalTopology val, metric_host: String,
     metric_service: String, control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
@@ -166,7 +166,9 @@ primitive ChannelMsgEncoder
     This message is sent as a response to a JoinCluster message. Currently it
     only informs the new worker of metrics-related info
     """
-    _encode(InformJoiningWorkerMsg(metric_app_name, l_topology, metric_host, metric_service, control_addrs, data_addrs, worker_names), auth)
+    _encode(InformJoiningWorkerMsg(worker_name, metric_app_name, l_topology,
+      metric_host, metric_service, control_addrs, data_addrs, worker_names),
+      auth)
 
   fun joining_worker_initialized(worker_name: String, c_addr: (String, String),
     d_addr: (String, String), auth: AmbientAuth): Array[ByteSeq] val ?
@@ -507,6 +509,7 @@ class InformJoiningWorkerMsg is ChannelMsg
   This message is sent as a response to a JoinCluster message. Currently it
   only informs the new worker of metrics-related info
   """
+  let sender_name: String
   let local_topology: LocalTopology val
   let metrics_app_name: String
   let metrics_host: String
@@ -515,12 +518,13 @@ class InformJoiningWorkerMsg is ChannelMsg
   let data_addrs: Map[String, (String, String)] val
   let worker_names: Array[String] val
 
-  new val create(app: String, l_topology: LocalTopology val,
+  new val create(sender: String, app: String, l_topology: LocalTopology val,
     m_host: String, m_service: String,
     c_addrs: Map[String, (String, String)] val,
     d_addrs: Map[String, (String, String)] val,
     w_names: Array[String] val)
   =>
+    sender_name = sender
     local_topology = l_topology
     metrics_app_name = app
     metrics_host = m_host
@@ -529,6 +533,7 @@ class InformJoiningWorkerMsg is ChannelMsg
     data_addrs = d_addrs
     worker_names = w_names
 
+// TODO: Don't send host over since we need to determine that on receipt
 class JoiningWorkerInitializedMsg is ChannelMsg
   let worker_name: String
   let control_addr: (String, String)

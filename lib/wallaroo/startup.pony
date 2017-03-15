@@ -23,6 +23,8 @@ actor Startup
   var _o_arg: (Array[String] | None) = None
   var _c_arg: (Array[String] | None) = None
   var _d_arg: (Array[String] | None) = None
+  var _my_c_addr: Array[String] = ["", "0"]
+  var _my_d_addr: Array[String] = ["", "0"]
   var _p_arg: (Array[String] | None) = None
   var _j_arg: (Array[String] | None) = None
   var _a_arg: (String | None) = None
@@ -74,6 +76,8 @@ actor Startup
         .add("out", "o", StringArgument)
         .add("control", "c", StringArgument)
         .add("data", "d", StringArgument)
+        .add("my-control", "x", StringArgument)
+        .add("my-data", "y", StringArgument)
         .add("phone-home", "p", StringArgument)
         .add("file", "f", StringArgument)
         // worker count includes the initial "leader" since there is no
@@ -104,6 +108,8 @@ actor Startup
         | ("out", let arg: String) => _o_arg = arg.split(":")
         | ("control", let arg: String) => _c_arg = arg.split(":")
         | ("data", let arg: String) => _d_arg = arg.split(":")
+        | ("my-control", let arg: String) => _my_c_addr = arg.split(":")
+        | ("my-data", let arg: String) => _my_d_addr = arg.split(":")
         | ("phone-home", let arg: String) => _p_arg = arg.split(":")
         | ("worker-count", let arg: I64) =>
           _worker_count = arg.usize()
@@ -249,6 +255,11 @@ actor Startup
       let d_host = d_addr(0)
       let d_service = d_addr(1)
 
+      let my_c_host = _my_c_addr(0)
+      let my_c_service = _my_c_addr(1)
+      let my_d_host = _my_d_addr(0)
+      let my_d_service = _my_d_addr(1)
+
       let o_addr_ref = _o_arg as Array[String]
       let o_addr_trn: Array[String] trn = recover Array[String] end
       o_addr_trn.push(o_addr_ref(0))
@@ -374,7 +385,8 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_worker_name, _env, auth, connections,
         _is_initializer, _worker_initializer, local_topology_initializer,
-        _alfred as Alfred, router_registry, control_channel_filepath)
+        _alfred as Alfred, router_registry, control_channel_filepath,
+        my_d_host, my_d_service)
 
       ifdef "resilience" then
         if _is_initializer then
@@ -383,7 +395,8 @@ actor Startup
             c_host, c_service)
         else
           connections.make_and_register_recoverable_listener(
-            auth, consume control_notifier, control_channel_filepath)
+            auth, consume control_notifier, control_channel_filepath,
+            my_c_host, my_c_service)
         end
       else
         if _is_initializer then
@@ -391,7 +404,8 @@ actor Startup
             TCPListener(auth, consume control_notifier, c_host, c_service))
         else
           connections.register_listener(
-            TCPListener(auth, consume control_notifier))
+            TCPListener(auth, consume control_notifier, my_c_host,
+              my_c_service))
         end
       end
 
@@ -430,7 +444,7 @@ actor Startup
       StartupHelp(_env)
     end
 
-  be complete_join(m: InformJoiningWorkerMsg val) =>
+  be complete_join(info_sending_host: String, m: InformJoiningWorkerMsg val) =>
     try
       let auth = _env.root as AmbientAuth
 
@@ -445,8 +459,25 @@ actor Startup
       metrics_conn.writev(connect_msg)
       metrics_conn.writev(metrics_join_msg)
 
-      (let c_host, let c_service) = m.control_addrs("initializer")
-      (let d_host, let d_service) = m.data_addrs("initializer")
+      // TODO: Are we creating connections to all addresses or just
+      // initializer?
+      (let c_host, let c_service) =
+        if m.sender_name == "initializer" then
+          (info_sending_host, m.control_addrs("initializer")._2)
+        else
+          m.control_addrs("initializer")
+        end
+      (let d_host, let d_service) =
+        if m.sender_name == "initializer" then
+          (info_sending_host, m.data_addrs("initializer")._2)
+        else
+          m.data_addrs("initializer")
+        end
+
+      let my_c_host = _my_c_addr(0)
+      let my_c_service = _my_c_addr(1)
+      let my_d_host = _my_d_addr(0)
+      let my_d_service = _my_d_addr(1)
 
       let connections = Connections(_application.name(), _worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
@@ -473,26 +504,53 @@ actor Startup
 
       router_registry.set_data_router(DataRouter)
       local_topology_initializer.update_topology(m.local_topology)
-      local_topology_initializer.create_data_receivers(m.worker_names)
+      local_topology_initializer.create_data_receivers(m.worker_names,
+        my_d_host, my_d_service)
+
+      // Prepare control and data addresses, but sub in correct host for
+      // the worker that sent inform message (since it didn't know its
+      // host string as seen externally)
+      let control_addrs: Map[String, (String, String)] trn =
+        recover Map[String, (String, String)] end
+      let data_addrs: Map[String, (String, String)] trn =
+        recover Map[String, (String, String)] end
+      for (worker, addr) in m.control_addrs.pairs() do
+        if m.sender_name == worker then
+          control_addrs(worker) = (info_sending_host, addr._2)
+        else
+          control_addrs(worker) = addr
+        end
+      end
+      for (worker, addr) in m.data_addrs.pairs() do
+        if m.sender_name == worker then
+          data_addrs(worker) = (info_sending_host, addr._2)
+        else
+          data_addrs(worker) = addr
+        end
+      end
+
       // Call this on local topology initializer instead of Connections
       // directly to make sure messages are processed in the create
       // initialization order
-      local_topology_initializer.create_connections(m.control_addrs,
-        m.data_addrs)
+      local_topology_initializer.create_connections(consume control_addrs,
+        consume data_addrs)
 
       let control_channel_filepath: FilePath = FilePath(auth,
         _control_channel_file)
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_worker_name, _env, auth, connections,
         _is_initializer, _worker_initializer, local_topology_initializer,
-        _alfred as Alfred, router_registry, control_channel_filepath)
+        _alfred as Alfred, router_registry, control_channel_filepath,
+        my_d_host, my_d_service)
 
       ifdef "resilience" then
         connections.make_and_register_recoverable_listener(
-          auth, consume control_notifier, control_channel_filepath)
+          auth, consume control_notifier, control_channel_filepath,
+          my_c_host, my_c_service)
       else
         connections.register_listener(
-          TCPListener(auth, consume control_notifier))
+          TCPListener(auth, consume control_notifier, my_c_host,
+            my_c_service))
       end
 
       // Dispose of temporary listener

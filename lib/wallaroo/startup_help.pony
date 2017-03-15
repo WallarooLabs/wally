@@ -6,8 +6,10 @@ primitive StartupHelp
       -----------------------------------------------------------------------------------
       --in/-i *[Comma-separated list of input addresses sources listen on]
       --out/-o *[Sets address for sink outputs]
-      --control/-c *[Sets address for control channel]
-      --data/-d *[Sets address for data channel]
+      --control/-c *[Sets address for initializer control channel]
+      --data/-d *[Sets address for initializer data channel]
+      --my-control [Optionally sets address for my control channel]
+      --my-data [Optionally sets address for my data channel]
       --phone-home/-p [Sets address for phone home connection]
       --worker-count/-w *[Sets total number of workers, including topology
         initializer]

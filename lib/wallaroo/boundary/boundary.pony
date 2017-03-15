@@ -118,7 +118,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
       _from.cstring())
     _notify_connecting()
 
-    @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
+    @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" + _service +
+      "\n").cstring())
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     try
@@ -140,7 +141,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   be quick_initialize(initializer: LocalTopologyInitializer) =>
     """
-    Called when initializing as part of joining a running cluster.
+    Called when initializing as part of a new worker joining a running cluster.
     """
     try
       _initializer = initializer
@@ -149,6 +150,9 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
         _host.cstring(), _service.cstring(),
         _from.cstring())
       _notify_connecting()
+
+      @printf[I32](("Connecting OutgoingBoundary to " + _host + ":" +
+        _service + "\n").cstring())
 
       if _step_id == 0 then
         Fail()
@@ -880,7 +884,7 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
     end
 
   fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32) =>
-    @printf[I32]("BoundaryNotify: connecting\n\n".cstring())
+    @printf[I32]("BoundaryNotify: attempting to connect...\n\n".cstring())
 
   fun ref connected(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connected\n\n".cstring())
