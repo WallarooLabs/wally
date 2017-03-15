@@ -48,7 +48,8 @@ class _SourceBuilder[In: Any val] is SourceBuilder
 
   fun val update_router(router: Router val): SourceBuilder val =>
     _SourceBuilder[In](_app_name, _worker_name, _name, _runner_builder,
-      _handler, router, _metrics_conn, _pre_state_target_id)
+      _handler, router, _metrics_conn, _pre_state_target_id,
+      _metrics_reporter.clone())
 
 interface SourceBuilderBuilder
   fun name(): String
