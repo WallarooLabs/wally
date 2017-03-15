@@ -245,14 +245,14 @@ actor LocalTopologyInitializer
   be update_topology(t: LocalTopology val) =>
     _topology = t
 
-  be add_new_worker(w: String, control_addr: (String, String),
-    data_addr: (String, String))
+  be add_new_worker(w: String, joining_host: String,
+    control_addr: (String, String), data_addr: (String, String))
   =>
     _add_worker_name(w)
     match _connections
     | let c: Connections =>
-      c.create_control_connection(w, control_addr._1, control_addr._2)
-      c.create_data_connection(w, data_addr._1, data_addr._2)
+      c.create_control_connection(w, joining_host, control_addr._2)
+      c.create_data_connection(w, joining_host, data_addr._2)
       c.create_boundary_to_new_worker(w, this)
       _router_registry.add_data_receiver(w, DataReceiver(_auth, _worker_name,
         w, c, _alfred))
@@ -299,6 +299,7 @@ actor LocalTopologyInitializer
     end
 
   be create_data_receivers(ws: Array[String] val,
+    host: String, service: String,
     worker_initializer: (WorkerInitializer | None) = None)
   =>
     match _connections
@@ -329,10 +330,12 @@ actor LocalTopologyInitializer
           ifdef "resilience" then
             conns.make_and_register_recoverable_data_channel_listener(
               _auth, consume data_notifier, data_receivers,
-              _router_registry, data_channel_filepath)
+              _router_registry, data_channel_filepath,
+              host, service)
           else
             let dch_listener = DataChannelListener(_auth,
-              consume data_notifier, data_receivers, _router_registry)
+              consume data_notifier, data_receivers, _router_registry,
+              host, service)
             _router_registry.register_data_channel_listener(dch_listener)
             conns.register_listener(dch_listener)
           end

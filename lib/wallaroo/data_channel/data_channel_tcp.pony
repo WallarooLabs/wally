@@ -49,6 +49,8 @@ class DataChannelListenNotifier is DataChannelListenNotify
           @printf[I32]("Recovery file exists for data channel\n".cstring())
         end
         if _joining_existing_cluster then
+          //TODO: Do we actually need to do this? Isn't this sent as
+          // part of joining worker initialized message?
           let message = ChannelMsgEncoder.identify_data_port(_name, _service,
             _auth)
           _connections.send_control_to_cluster(message)
