@@ -54,7 +54,8 @@ actor Startup
   var _joining_listener: (TCPListener | None) = None
   var _spike_seed: (U64 | None) = None
   var _spike_drop: Bool = false
-  var _spike_prob: (U64 | None) = None
+  var _spike_prob: (F64 | None) = None
+  var _spike_margin: (USize | None) = None
   var _spike_config: (SpikeConfig | None) = None
 
   new create(env: Env, application: Application val,
@@ -105,7 +106,8 @@ actor Startup
         .add("swarm-manager-address", "a", StringArgument)
         .add("spike-seed", "", I64Argument)
         .add("spike-drop", "", None)
-        .add("spike-prob", "", I64Argument)
+        .add("spike-prob", "", F64Argument)
+        .add("spike-margin", "", I64Argument)
 
       for option in options do
         match option
@@ -142,7 +144,8 @@ actor Startup
         | ("swarm-manager-address", let arg: String) => _a_arg = arg
         | ("spike-seed", let arg: I64) => _spike_seed = arg.u64()
         | ("spike-drop", None) => _spike_drop = true
-        | ("spike-prob", let arg: I64) => _spike_prob = arg.u64()
+        | ("spike-prob", let arg: F64) => _spike_prob = arg
+        | ("spike-margin", let arg: I64) => _spike_margin = arg.usize()
         end
       end
 
@@ -208,7 +211,8 @@ actor Startup
       end
 
       ifdef "spike" then
-        _spike_config = SpikeConfig(_spike_drop, _spike_prob, _spike_seed)
+        _spike_config = SpikeConfig(_spike_drop, _spike_prob, _spike_margin,
+          _spike_seed)
         let sc = _spike_config as SpikeConfig
 
         @printf[I32](("|||Spike seed: " + sc.seed.string() +
@@ -216,6 +220,8 @@ actor Startup
         @printf[I32](("|||Spike drop: " + sc.drop.string() +
           "|||\n").cstring())
         @printf[I32](("|||Spike prob: " + sc.prob.string() +
+          "|||\n").cstring())
+        @printf[I32](("|||Spike margin: " + sc.margin.string() +
           "|||\n").cstring())
       end
 

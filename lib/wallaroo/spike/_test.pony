@@ -25,17 +25,19 @@ actor Main is TestList
     test(_TestDoesntDropConnectionWhenThrottledWhenNotSpiked)
     test(_TestDoesntDropConnectionWhenUnthrottledWhenSpiked)
     test(_TestDoesntDropConnectionWhenUnthrottledWhenNotSpiked)
+    test(_TestDropsConnectionWhenSpikedWithMargin)
 
 class iso _TestDropsConnectionWhenConnectingWhenSpiked is UnitTest
   fun name(): String =>
     "spike/DropsConnectionWhenConnectingWhenSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, true)
     let connection_count = U32(1)
 
     let notify = ConnectingNotify(h, connection, connection_count)
-    let spike = recover ref DropConnection(1, 100, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
+      margin'=0), consume notify) end
 
     h.expect_action("connecting")
     h.expect_action("closed")
@@ -48,12 +50,13 @@ class iso _TestDoesntDropConnectionWhenConnectingWhenNotSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenConnectingWhenNotSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
     let connection_count = U32(1)
 
     let notify = ConnectingNotify(h, connection, connection_count)
-    let spike = recover ref DropConnection(1, 0, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
+    margin'=0), consume notify) end
 
     h.expect_action("connecting")
 
@@ -113,12 +116,13 @@ class iso _TestDropsConnectionWhenConnectedWhenSpiked is UnitTest
   fun name(): String =>
     "spike/DropsConnectionWhenConnectedWhenSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, true)
     let connection_count = U32(1)
 
     let notify = ConnectedNotify(h, connection)
-    let spike = recover ref DropConnection(1, 100, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
+    margin'=0), consume notify) end
 
     h.expect_action("connected")
     h.expect_action("closed")
@@ -131,12 +135,13 @@ class iso _TestDoesntDropConnectionWhenConnectedWhenNotSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenConnectedWhenNotSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
     let connection_count = U32(1)
 
     let notify = ConnectedNotify(h, connection)
-    let spike = recover ref DropConnection(1, 0, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
+    margin'=0), consume notify) end
 
     h.expect_action("connected")
 
@@ -191,11 +196,12 @@ class iso _TestDoesntDropConnectionWhenConnectFailedWhenSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenConnectFailed"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
 
     let notify = ConnectFailedNotify(h, connection)
-    let spike = recover ref DropConnection(1, 100, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
+    margin'=0), consume notify) end
 
     h.expect_action("connect_failed")
 
@@ -207,11 +213,12 @@ class iso _TestDoesntDropConnectionWhenConnectFailedWhenNotSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenConnectFailedWhenNotSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
 
     let notify = ConnectFailedNotify(h, connection)
-    let spike = recover ref DropConnection(1, 0, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
+    margin'=0), consume notify) end
 
     h.expect_action("connect_failed")
 
@@ -266,11 +273,12 @@ class iso _TestDoesntDropConnectionWhenClosedWhenSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenConnectFailed"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
 
     let notify = ClosedNotify(h, connection)
-    let spike = recover ref DropConnection(1, 100, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
+    margin'=0), consume notify) end
 
     h.expect_action("closed")
 
@@ -282,11 +290,12 @@ class iso _TestDoesntDropConnectionWhenClosedWhenNotSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenClosedWhenNotSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
 
     let notify = ClosedNotify(h, connection)
-    let spike = recover ref DropConnection(1, 0, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
+      margin'=0), consume notify) end
 
     h.expect_action("closed")
 
@@ -341,12 +350,13 @@ class iso _TestDropsConnectionWhenSentvWhenSpiked is UnitTest
   fun name(): String =>
     "spike/DropsConnectionWhenSentvWhenSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, true)
     let data = recover val ["Hello", "Willow"] end
 
     let notify = SentvNotify(h, connection, data)
-    let spike = recover ref DropConnection(1, 100, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
+      margin'=0), consume notify) end
 
     h.expect_action("sentv")
     h.expect_action("closed")
@@ -359,12 +369,13 @@ class iso _TestDoesntDropConnectionWhenSentvWhenNotSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenSentvWhenNotSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
     let data = recover val ["Goodbye", "Angel"] end
 
     let notify = SentvNotify(h, connection, data)
-    let spike = recover ref DropConnection(1, 0, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
+      margin'=0), consume notify) end
 
     h.expect_action("sentv")
 
@@ -424,14 +435,15 @@ class iso _TestDropsConnectionWhenReceivedWhenSpiked is UnitTest
   fun name(): String =>
     "spike/DropsConnectionWhenReceivedWhenSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, true)
     let expected_data = recover val [as U8: 1, 2, 3, 4, 5, 10] end
     let send_data = recover iso [as U8: 1, 2, 3, 4, 5, 10] end
     let times = USize(3)
 
     let notify = ReceivedNotify(h, connection, expected_data, times)
-    let spike = recover ref DropConnection(1, 100, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
+      margin'=0), consume notify) end
 
     h.expect_action("received")
     h.expect_action("closed")
@@ -444,14 +456,15 @@ class iso _TestDoesntDropConnectionWhenReceivedWhenNotSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenReceivedWhenNotSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
     let expected_data = recover val [as U8: 1, 2, 3, 4, 5, 10] end
     let send_data = recover iso [as U8: 1, 2, 3, 4, 5, 10] end
     let times = USize(3)
 
     let notify = ReceivedNotify(h, connection, expected_data, times)
-    let spike = recover ref DropConnection(1, 0, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
+      margin'=0), consume notify) end
 
     h.expect_action("received")
 
@@ -513,12 +526,13 @@ class iso _TestDoesntDropConnectionWhenExpectWhenSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenExpectWhenSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
     let qty = USize(13)
 
     let notify = ExpectNotify(h, connection, qty)
-    let spike = recover ref DropConnection(1, 100, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
+      margin'=0), consume notify) end
 
     h.expect_action("expect")
 
@@ -530,12 +544,13 @@ class iso _TestDoesntDropConnectionWhenExpectWhenNotSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenExpectWhenNotSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
     let qty = USize(18)
 
     let notify = ExpectNotify(h, connection, qty)
-    let spike = recover ref DropConnection(1, 0, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
+      margin'=0), consume notify) end
 
     h.expect_action("expect")
 
@@ -595,11 +610,12 @@ class iso _TestDoesntDropConnectionWhenThrottledWhenSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenThrottledWhenSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
 
     let notify = ThrottledNotify(h, connection)
-    let spike = recover ref DropConnection(1, 100, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
+      margin'=0), consume notify) end
 
     h.expect_action("throttled")
 
@@ -611,11 +627,12 @@ class iso _TestDoesntDropConnectionWhenThrottledWhenNotSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenThrottledWhenNotSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
 
     let notify = ThrottledNotify(h, connection)
-    let spike = recover ref DropConnection(1, 0, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
+      margin'=0), consume notify) end
 
     h.expect_action("throttled")
 
@@ -670,11 +687,12 @@ class iso _TestDoesntDropConnectionWhenUnthrottledWhenSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenUnthrottledWhenSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
 
     let notify = UnthrottledNotify(h, connection)
-    let spike = recover ref DropConnection(1, 100, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
+      margin'=0), consume notify) end
 
     h.expect_action("unthrottled")
 
@@ -686,11 +704,12 @@ class iso _TestDoesntDropConnectionWhenUnthrottledWhenNotSpiked is UnitTest
   fun name(): String =>
     "spike/DoesntDropConnectionWhenUnthrottledWhenNotSpiked"
 
-  fun ref apply(h: TestHelper) =>
+  fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
 
     let notify = UnthrottledNotify(h, connection)
-    let spike = recover ref DropConnection(1, 0, consume notify) end
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
+      margin'=0), consume notify) end
 
     h.expect_action("unthrottled")
 
@@ -740,6 +759,30 @@ class UnthrottledNotify is WallarooOutgoingNetworkActorNotify
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     _h.complete_action("unthrottled")
     _h.assert_true(conn is _conn)
+
+class iso _TestDropsConnectionWhenSpikedWithMargin is UnitTest
+  fun name(): String =>
+    "spike/DropsConnectionWhenSpikedWithMargin"
+
+  fun ref apply(h: TestHelper) ? =>
+    let connection = NullWallarooOutgoingNetworkActor(h, true)
+    let connection_count = U32(1)
+
+    let notify = ConnectedNotify(h, connection)
+    let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
+    margin'=3), consume notify) end
+    // if margin = 3, the 4th action should drop
+    h.expect_action("connected")
+    h.expect_action("connected")
+    h.expect_action("connected")
+    h.expect_action("closed")
+
+    spike.connected(connection)
+    spike.connected(connection)
+    spike.connected(connection)
+    spike.connected(connection)
+
+    h.long_test(1)
 
 class NullWallarooOutgoingNetworkActor is WallarooOutgoingNetworkActor
   let _h: TestHelper
