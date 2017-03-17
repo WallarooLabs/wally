@@ -184,8 +184,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
       _host.cstring(), _service.cstring(),
       _from.cstring())
     _notify_connecting()
-
-    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
+    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" +
+      _service + "\n").cstring())
 
   be migrate_step[K: (Hashable val & Equatable[K] val)](step_id: U128,
     state_name: String, key: K, state: ByteSeq val)
@@ -856,10 +856,14 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
   var _header: Bool = true
   let _outgoing_boundary: OutgoingBoundary tag
+  let _timers: Timers = Timers
+  let _reconnect_delay: U64
 
-  new create(auth: AmbientAuth, outgoing_boundary: OutgoingBoundary tag) =>
+  new create(auth: AmbientAuth, outgoing_boundary: OutgoingBoundary tag,
+    reconnect_delay: U64 = 2_000_000_000) =>
     _auth = auth
     _outgoing_boundary = outgoing_boundary
+    _reconnect_delay = reconnect_delay
 
   fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
     times: USize): Bool
@@ -915,7 +919,6 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
-    // TODO: Make this less naive so it doesn't run into a bad loop
     _outgoing_boundary.reconnect()
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
@@ -934,3 +937,14 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
+
+class _ReconnectTimerNotify is TimerNotify
+  let _ob: OutgoingBoundary
+
+  new iso create(outgoing_boundary: OutgoingBoundary tag) =>
+    _ob = outgoing_boundary
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    @printf[I32]("Attempting to reconnect to downstream...\n".cstring())
+    _ob.reconnect()
+    false
