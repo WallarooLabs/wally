@@ -28,14 +28,9 @@ class Routes
     end
 
   fun ref add_route(route: Route) =>
-    // This is our wedge into current routes until John
-    // and I can work out the abstractions
-    // Its used from Step
-    ifdef debug then
-      Invariant(not _routes.contains(route.id()))
+    if not _routes.contains(route.id()) then
+        _routes(route.id()) = _Route
     end
-
-    _routes(route.id()) = _Route
 
   fun ref remove_route(route: Route) =>
     try
