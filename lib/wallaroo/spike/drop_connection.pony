@@ -6,7 +6,7 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
   let _rand: Random
   let _prob: F64
   let _margin: USize
-  var _count_since_last_dropped: USize = 0
+  var _count_since_last_dropped: USize
 
   new iso create(config: SpikeConfig,
     letter: WallarooOutgoingNetworkActorNotify iso)
@@ -14,6 +14,8 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
     _rand = MT(config.seed)
     _prob = config.prob
     _margin = config.margin
+    // allow first hit of spike returning true on probability to drop
+    _count_since_last_dropped = config.margin
     _letter = consume letter
 
   fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32) =>
