@@ -11,6 +11,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/routing"
+use "wallaroo/spike"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -85,14 +86,27 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
-    from: String = "", init_size: USize = 64, max_size: USize = 16384)
+    from: String = "", init_size: USize = 64, max_size: USize = 16384,
+    spike_config: (SpikeConfig | None) = None)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
     _auth = auth
-    _notify = BoundaryNotify(_auth)
+
+    ifdef "spike" then
+      match spike_config
+      | let sc: SpikeConfig =>
+        var notify = recover iso BoundaryNotify(_auth, this) end
+        _notify = SpikeWrapper(consume notify, sc)
+      else
+        _notify = BoundaryNotify(_auth, this)
+      end
+    else
+      _notify = BoundaryNotify(_auth, this)
+    end
+
     _worker_name = worker_name
     _host = host
     _service = service
@@ -170,8 +184,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
       _host.cstring(), _service.cstring(),
       _from.cstring())
     _notify_connecting()
-
-    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
+    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" +
+      _service + "\n").cstring())
 
   be migrate_step[K: (Hashable val & Equatable[K] val)](step_id: U128,
     state_name: String, key: K, state: ByteSeq val)
@@ -337,6 +351,10 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   be register_producer(producer: Producer) =>
     ifdef debug then
       Invariant(not _upstreams.contains(producer))
+    end
+
+    if _mute_outstanding then
+      producer.mute(this)
     end
 
     _upstreams.push(producer)
@@ -657,6 +675,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     else
       // The socket has been closed from the other side.
       _shutdown_peer = true
+      _maybe_mute_or_unmute_upstreams()
       close()
     end
 
@@ -736,6 +755,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
         end
       else
         // Non-graceful shutdown on error.
+        _maybe_mute_or_unmute_upstreams()
         _hard_close()
       end
     end
@@ -835,9 +855,15 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
   var _header: Bool = true
+  let _outgoing_boundary: OutgoingBoundary tag
+  let _timers: Timers = Timers
+  let _reconnect_delay: U64
 
-  new create(auth: AmbientAuth) =>
+  new create(auth: AmbientAuth, outgoing_boundary: OutgoingBoundary tag,
+    reconnect_delay: U64 = 2_000_000_000) =>
     _auth = auth
+    _outgoing_boundary = outgoing_boundary
+    _reconnect_delay = reconnect_delay
 
   fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
     times: USize): Bool
@@ -893,6 +919,7 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
+    _outgoing_boundary.reconnect()
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connect_failed\n\n".cstring())
@@ -910,3 +937,14 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
+
+class _ReconnectTimerNotify is TimerNotify
+  let _ob: OutgoingBoundary
+
+  new iso create(outgoing_boundary: OutgoingBoundary tag) =>
+    _ob = outgoing_boundary
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    @printf[I32]("Attempting to reconnect to downstream...\n".cstring())
+    _ob.reconnect()
+    false

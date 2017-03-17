@@ -11,6 +11,7 @@ use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/spike"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -38,13 +39,14 @@ actor Connections
   let _guid_gen: GuidGenerator = GuidGenerator
   let _connection_addresses_file: String
   let _is_joining: Bool
+  let _spike_config: (SpikeConfig | None)
 
   new create(app_name: String, worker_name: String,
     env: Env, auth: AmbientAuth, c_host: String, c_service: String,
     d_host: String, d_service: String, ph_host: String, ph_service: String,
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
-    is_joining: Bool)
+    is_joining: Bool, spike_config: (SpikeConfig | None) = None)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -58,6 +60,7 @@ actor Connections
     _init_d_service = d_service
     _connection_addresses_file = connection_addresses_file
     _is_joining = is_joining
+    _spike_config = spike_config
 
     if _is_initializer then
       _my_control_addr = (c_host, c_service)
@@ -281,7 +284,7 @@ actor Connections
       let boundary = OutgoingBoundary(_auth,
         _worker_name, MetricsReporter(_app_name,
         _worker_name, _metrics_conn),
-        host, service)
+        host, service where spike_config = _spike_config)
       boundary.register_step_id(_guid_gen.u128())
       boundary.quick_initialize(local_topology_initializer)
       local_topology_initializer.add_boundary_to_new_worker(target, boundary)
@@ -305,7 +308,8 @@ actor Connections
       out_bs(target) = boundary
     end
 
-    @printf[I32](("Preparing to update " + _data_conns.size().string() + " boundaries\n").cstring())
+    @printf[I32](("Preparing to update " + _data_conns.size().string() +
+      " boundaries\n").cstring())
 
     local_topology_initializer.update_boundaries(consume out_bs)
     // TODO: This should be somewhere else. It's not clear why updating
@@ -472,7 +476,8 @@ actor Connections
     let outgoing_boundary = OutgoingBoundary(_auth,
       _worker_name, MetricsReporter(_app_name,
       _worker_name, _metrics_conn),
-      host, service)
+      host, service
+      where spike_config = _spike_config)
     outgoing_boundary.register_step_id(_guid_gen.u128())
     _data_conns(target_name) = outgoing_boundary
 

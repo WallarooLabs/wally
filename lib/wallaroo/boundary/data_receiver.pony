@@ -55,10 +55,8 @@ actor DataReceiver is Producer
 
   be data_connect(sender_step_id: U128, conn: DataChannel) =>
     _sender_step_id = sender_step_id
-    _latest_conn = conn
-    if _replay_pending then
-      request_replay()
-    end
+    let old_conn = _latest_conn = conn
+    request_replay()
 
   fun ref init_timer() =>
     ifdef "resilience" then

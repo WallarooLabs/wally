@@ -13,6 +13,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/resilience"
+use "wallaroo/spike"
 use "wallaroo/topology"
 
 actor Startup
@@ -51,6 +52,11 @@ actor Startup
   var _alfred: (Alfred | None) = None
   var _alfred_file_length: (USize | None) = None
   var _joining_listener: (TCPListener | None) = None
+  var _spike_seed: (U64 | None) = None
+  var _spike_drop: Bool = false
+  var _spike_prob: (F64 | None) = None
+  var _spike_margin: (USize | None) = None
+  var _spike_config: (SpikeConfig | None) = None
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
@@ -63,6 +69,9 @@ actor Startup
     end
     ifdef "trace" then
       @printf[I32]("****TRACE is active****\n".cstring())
+    end
+    ifdef "spike" then
+      @printf[I32]("****SPIKE is active****\n".cstring())
     end
 
     try
@@ -95,6 +104,10 @@ actor Startup
         .add("join", "j", StringArgument)
         .add("swarm-managed", "s", None)
         .add("swarm-manager-address", "a", StringArgument)
+        .add("spike-seed", "", I64Argument)
+        .add("spike-drop", "", None)
+        .add("spike-prob", "", F64Argument)
+        .add("spike-margin", "", I64Argument)
 
       for option in options do
         match option
@@ -129,6 +142,10 @@ actor Startup
           _is_joining = true
         | ("swarm-managed", None) => _is_swarm_managed = true
         | ("swarm-manager-address", let arg: String) => _a_arg = arg
+        | ("spike-seed", let arg: I64) => _spike_seed = arg.u64()
+        | ("spike-drop", None) => _spike_drop = true
+        | ("spike-prob", let arg: F64) => _spike_prob = arg
+        | ("spike-margin", let arg: I64) => _spike_margin = arg.usize()
         end
       end
 
@@ -190,6 +207,21 @@ actor Startup
 
       ifdef "resilience" then
         @printf[I32](("|||Resilience directory: " + _resilience_dir +
+          "|||\n").cstring())
+      end
+
+      ifdef "spike" then
+        _spike_config = SpikeConfig(_spike_drop, _spike_prob, _spike_margin,
+          _spike_seed)
+        let sc = _spike_config as SpikeConfig
+
+        @printf[I32](("|||Spike seed: " + sc.seed.string() +
+          "|||\n").cstring())
+        @printf[I32](("|||Spike drop: " + sc.drop.string() +
+          "|||\n").cstring())
+        @printf[I32](("|||Spike prob: " + sc.prob.string() +
+          "|||\n").cstring())
+        @printf[I32](("|||Spike margin: " + sc.margin.string() +
           "|||\n").cstring())
       end
 
@@ -348,29 +380,30 @@ actor Startup
       let connections = Connections(_application.name(), _worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
         metrics_conn, m_addr(0), m_addr(1), _is_initializer,
-        _connection_addresses_file, _is_joining)
+        _connection_addresses_file, _is_joining, _spike_config)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections)
+      let alfred = _alfred as Alfred
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
           DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
+          router_registry, metrics_conn, _is_initializer, alfred, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file,
           cluster_manager)
       else
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
+          router_registry, metrics_conn, _is_initializer, alfred, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file)
       end
 
       if _is_initializer then
         _env.out.print("Running as Initializer...")
         _application_initializer = ApplicationInitializer(auth,
-          local_topology_initializer, input_addrs, o_addr, _alfred as Alfred)
+          local_topology_initializer, input_addrs, o_addr, alfred)
         match _application_initializer
         | let ai: ApplicationInitializer =>
           _worker_initializer = WorkerInitializer(auth, _worker_name,
@@ -385,8 +418,8 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_worker_name, _env, auth, connections,
         _is_initializer, _worker_initializer, local_topology_initializer,
-        _alfred as Alfred, router_registry, control_channel_filepath,
-        my_d_host, my_d_service)
+        alfred, router_registry, control_channel_filepath, my_d_host,
+        my_d_service)
 
       ifdef "resilience" then
         if _is_initializer then
@@ -482,22 +515,23 @@ actor Startup
       let connections = Connections(_application.name(), _worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
         metrics_conn, m.metrics_host, m.metrics_service, _is_initializer,
-        _connection_addresses_file, _is_joining)
+        _connection_addresses_file, _is_joining, _spike_config)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections)
+      let alfred = _alfred as Alfred
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
           DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
+          router_registry, metrics_conn, _is_initializer, alfred, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file,
           cluster_manager, _is_joining)
       else
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
+          router_registry, metrics_conn, _is_initializer, alfred, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file
           where is_joining = _is_joining)
       end
@@ -540,8 +574,8 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_worker_name, _env, auth, connections,
         _is_initializer, _worker_initializer, local_topology_initializer,
-        _alfred as Alfred, router_registry, control_channel_filepath,
-        my_d_host, my_d_service)
+        alfred, router_registry, control_channel_filepath, my_d_host,
+        my_d_service)
 
       ifdef "resilience" then
         connections.make_and_register_recoverable_listener(
