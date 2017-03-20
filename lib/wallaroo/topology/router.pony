@@ -459,19 +459,13 @@ class DataRouter is Equatable[DataRouter]
         ifdef "resilience" then
           origin.bookkeeping(route_id, seq_id)
         end
-        false
       else
         // This shouldn't happen. If we have a route, we should have a route
         // id.
         Fail()
-        false
       end
     else
-      ifdef debug then
-        @printf[I32]("DataRouter failed to find route\n".cstring())
-      end
       Fail()
-      true
     end
 
   fun replay_route(r_msg: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
@@ -821,17 +815,26 @@ class LocalPartitionRouter[In: Any val,
       var left_to_send = PartitionRebalancer.step_count_to_send(size(),
         _local_map.size(), worker_count - 1)
       if left_to_send > 0 then
+        let steps_to_migrate = Array[(Key, U128, Step)]
         for (key, target) in _partition_routes.pairs() do
           if left_to_send == 0 then break end
           match target
           | let s: Step =>
-            s.send_state[Key](boundary, state_name, key)
             let step_id = _step_ids(key)
-            router_registry.add_to_step_waiting_list(step_id)
-            router_registry.move_stateful_step_to_proxy[Key](step_id,
-              ProxyAddress(target_worker, step_id), key, state_name)
+            steps_to_migrate.push((key, step_id, s))
             left_to_send = left_to_send - 1
           end
+        end
+        if left_to_send > 0 then Fail() end
+        @printf[I32]("^^Migrating %lu steps to %s\n".cstring(),
+          steps_to_migrate.size(), target_worker.cstring())
+        for (_, step_id, _) in steps_to_migrate.values() do
+          router_registry.add_to_step_waiting_list(step_id)
+        end
+        for (key, step_id, step) in steps_to_migrate.values() do
+          step.send_state[Key](boundary, state_name, key)
+          router_registry.move_stateful_step_to_proxy[Key](step_id,
+            ProxyAddress(target_worker, step_id), key, state_name)
         end
       else
         // There is nothing to send over. Can we immediately resume processing?

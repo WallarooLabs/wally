@@ -27,6 +27,7 @@ primitive StartupHelp
         control channel address of any worker as the value for this parameter]
       --swarm-managed/-s [Sets this worker as managed by Docker Swarm]
       --swarm-manager-address/-a [Sets the Docker Swarm Manager address]
+      --stop-world/-u [Sets pause before state migration after stop the world]
       -----------------------------------------------------------------------------------
       """
     )
