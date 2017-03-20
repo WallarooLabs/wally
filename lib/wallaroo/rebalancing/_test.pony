@@ -58,6 +58,25 @@ class iso _TestRebalancerStepsFromOne is UnitTest
        total_steps_count_5, my_steps_count_5, current_workers_count_5)
     h.assert_eq[USize](expected_step_count_to_send_5, step_count_to_send_5)
 
+class iso _TestRebalancerStepsFrom3Workers is UnitTest
+  fun name(): String =>
+    "rebalancing/RebalancerStepsFrom3Workers"
+
+  fun ref apply(h: TestHelper) =>
+    // The tolerance is how far we allow a worker's step count to be off from
+    // the ideal (where the ideal is the total partition size divided by the
+    // number of workers).
+    let tolerance: F64 = 2.0
+    h.assert_eq[Bool](true, _From3Workers(5, tolerance))
+    h.assert_eq[Bool](true, _From3Workers(10, tolerance))
+    h.assert_eq[Bool](true, _From3Workers(11, tolerance))
+    h.assert_eq[Bool](true, _From3Workers(349, tolerance))
+    h.assert_eq[Bool](true, _From3Workers(350, tolerance))
+    h.assert_eq[Bool](true, _From3Workers(750, tolerance))
+    h.assert_eq[Bool](true, _From3Workers(2111, tolerance))
+    h.assert_eq[Bool](true, _From3Workers(5050, tolerance))
+    h.assert_eq[Bool](true, _From3Workers(103_340, tolerance))
+
 class iso _TestRebalancerStepsForNewWorker is UnitTest
   """
   Test that PartitionRebalancer correctly rebalances across all workers
@@ -96,6 +115,27 @@ class iso _TestRebalancerStepsForNewWorker is UnitTest
     h.assert_eq[Bool](true, _WorkerIterations(2123, tolerance))
     h.assert_eq[Bool](true, _WorkerIterations(5500, tolerance))
     h.assert_eq[Bool](true, _WorkerIterations(105_500, tolerance))
+
+primitive _From3Workers
+  fun apply(partition_size: USize, tolerance: F64): Bool =>
+    let current_workers_count: USize = 3
+    let base_share = partition_size / 3
+    let extra = partition_size - (base_share * 3)
+    var w1_count: USize = base_share + extra
+    var w2_count: USize = base_share
+    var w3_count: USize = base_share
+
+    let w1_to_send = PartitionRebalancer.step_count_to_send(partition_size,
+      w1_count, current_workers_count)
+    let w2_to_send = PartitionRebalancer.step_count_to_send(partition_size,
+      w2_count, current_workers_count)
+    let w3_to_send = PartitionRebalancer.step_count_to_send(partition_size,
+      w3_count, current_workers_count)
+    let w4_count: USize = w1_to_send + w2_to_send + w3_to_send
+    let w4_ideal: F64 =
+      partition_size.f64() / (current_workers_count + 1).f64()
+    let diff = w4_count.f64() - w4_ideal
+    not ((diff <= tolerance) and (diff >= -tolerance))
 
 primitive _WorkerIterations
   fun apply(partition_size: USize, tolerance: F64): Bool =>

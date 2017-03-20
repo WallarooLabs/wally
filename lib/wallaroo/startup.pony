@@ -52,6 +52,8 @@ actor Startup
   var _alfred_file_length: (USize | None) = None
   var _joining_listener: (TCPListener | None) = None
 
+  var _stop_the_world_pause: U64 = 2_000_000_000
+
   new create(env: Env, application: Application val,
     app_name: (String | None))
   =>
@@ -95,6 +97,7 @@ actor Startup
         .add("join", "j", StringArgument)
         .add("swarm-managed", "s", None)
         .add("swarm-manager-address", "a", StringArgument)
+        .add("stop-pause", "u", I64Argument)
 
       for option in options do
         match option
@@ -129,6 +132,8 @@ actor Startup
           _is_joining = true
         | ("swarm-managed", None) => _is_swarm_managed = true
         | ("swarm-manager-address", let arg: String) => _a_arg = arg
+        | ("stop-pause", let arg: I64) =>
+          _stop_the_world_pause = arg.u64()
         end
       end
 
@@ -350,7 +355,8 @@ actor Startup
         metrics_conn, m_addr(0), m_addr(1), _is_initializer,
         _connection_addresses_file, _is_joining)
 
-      let router_registry = RouterRegistry(auth, _worker_name, connections)
+      let router_registry = RouterRegistry(auth, _worker_name, connections,
+        _stop_the_world_pause)
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
@@ -484,7 +490,8 @@ actor Startup
         metrics_conn, m.metrics_host, m.metrics_service, _is_initializer,
         _connection_addresses_file, _is_joining)
 
-      let router_registry = RouterRegistry(auth, _worker_name, connections)
+      let router_registry = RouterRegistry(auth, _worker_name, connections,
+        _stop_the_world_pause)
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =

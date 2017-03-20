@@ -782,7 +782,7 @@ actor ApplicationInitializer
               sendable_step_map, state_subpartitions, sendable_pre_state_data,
               consume p_ids, default_target, application.default_state_name,
               application.default_target_id,
-              worker_names)
+              all_workers)
           else
             @printf[I32]("Problem cloning graph\n".cstring())
             error

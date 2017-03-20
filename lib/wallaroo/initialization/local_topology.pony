@@ -1338,8 +1338,8 @@ actor LocalTopologyInitializer
         let reporter = MetricsReporter(t.name(), t.worker_name(),
           _metrics_conn)
         let step = Step(runner_builder(where alfred = _alfred, auth = _auth),
-            consume reporter, msg.step_id(), runner_builder.route_builder(),
-            _alfred, _outgoing_boundaries)
+          consume reporter, msg.step_id(), runner_builder.route_builder(),
+          _alfred, _outgoing_boundaries)
         step.receive_state(msg.state())
         msg.update_router_registry(_router_registry, step)
       else

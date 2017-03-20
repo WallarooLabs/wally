@@ -30,7 +30,6 @@ actor DataReceiver is Producer
   var _request_threshold: USize = 8_000
   var _request_pause: USize = 4_000
   var _last_request: USize = 0
-  var _estimated_boundary_queue_size: USize = 0
 
   // TODO: Test replacing this with state machine class
   // to avoid matching on every ack
@@ -88,8 +87,6 @@ actor DataReceiver is Producer
         else
           Fail()
         end
-        _estimated_boundary_queue_size =
-          _estimated_boundary_queue_size - (watermark - _last_id_acked).usize()
         _last_id_acked = watermark
       end
     else
@@ -172,7 +169,6 @@ actor DataReceiver is Producer
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _timer_init(this)
-    _estimated_boundary_queue_size = _estimated_boundary_queue_size + 1
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
     end
@@ -216,8 +212,6 @@ actor DataReceiver is Producer
           @printf[I32]("DataReceiver acking seq_id %lu\n".cstring(),
             _last_id_seen)
         end
-        _estimated_boundary_queue_size = _estimated_boundary_queue_size -
-          (_last_id_seen - _last_id_acked).usize()
         _last_id_acked = _last_id_seen
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, _last_id_seen, _auth)

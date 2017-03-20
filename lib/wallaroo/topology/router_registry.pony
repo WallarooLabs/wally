@@ -46,10 +46,15 @@ actor RouterRegistry
   // TODO: Probably change mute()/unmute() interface so we don't need this
   let _dummy_consumer: DummyConsumer = DummyConsumer
 
-  new create(auth: AmbientAuth, worker_name: String, c: Connections) =>
+  var _stop_the_world_pause: U64
+
+  new create(auth: AmbientAuth, worker_name: String, c: Connections,
+    stop_the_world_pause: U64)
+  =>
     _auth = auth
     _worker_name = worker_name
     _connections = c
+    _stop_the_world_pause = stop_the_world_pause
 
   fun _worker_count(): USize =>
     _outgoing_boundaries.size() + 1
@@ -156,7 +161,8 @@ actor RouterRegistry
     _migrating = true
     _stop_the_world(new_worker)
     let timers = Timers
-    let timer = Timer(ResumeNotify(this, new_worker), 2_000_000_000, 2_000_000_000)
+    let timer = Timer(PauseBeforeMigrationNotify(this, new_worker),
+      _stop_the_world_pause)
     timers(consume timer)
 
   fun ref _stop_the_world(new_worker: String) =>
@@ -168,6 +174,9 @@ actor RouterRegistry
     _migration_target_ack_list.set(new_worker)
     _mute_request(_worker_name)
     _connections.stop_the_world(recover [new_worker] end)
+
+  be resume_the_world() =>
+    _resume_the_world()
 
   fun ref _resume_the_world() =>
     """
@@ -248,16 +257,7 @@ actor RouterRegistry
     """
     @printf[I32]("--Processing migration batch complete ack from %s\n".cstring(), target.cstring())
     _migration_target_ack_list.unset(target)
-    @printf[I32]("After removing %s from list, %lu remain.\n".cstring(),
-      target.cstring(), _migration_target_ack_list.size())
-    for t in _migration_target_ack_list.values() do
-      @printf[I32]("--%s\n".cstring(), t.cstring())
-      if t == target then
-        @printf[I32]("-- Got a match! \n".cstring())
-      else
-        @printf[I32]("-- Got a no match! \n".cstring())
-      end
-    end
+
     if _migration_target_ack_list.size() == 0 then
       @printf[I32]("--All new workers have acked migration batch complete\n".cstring(), target.cstring())
       _connections.request_cluster_unmute()
@@ -268,24 +268,18 @@ actor RouterRegistry
     """
     Mute all sources and data channel.
     """
-    @printf[I32]("Muting all local sources and data channel.\n".cstring())
+    @printf[I32]("Muting any local sources.\n".cstring())
     for source in _sources.values() do
       source.mute(_dummy_consumer)
-    end
-    for dr in _data_receivers.values() do
-      dr.mute(_dummy_consumer)
     end
 
   fun _resume_all_local() =>
     """
     Unmute all sources and data channel.
     """
-    @printf[I32]("Unmuting all local sources and data channel.\n".cstring())
+    @printf[I32]("Unmuting any local sources.\n".cstring())
     for source in _sources.values() do
       source.unmute(_dummy_consumer)
-    end
-    for dr in _data_receivers.values() do
-      dr.unmute(_dummy_consumer)
     end
 
   be try_to_resume_processing_immediately() =>
@@ -498,7 +492,7 @@ actor RouterRegistry
       Fail()
     end
 
-class ResumeNotify is TimerNotify
+class PauseBeforeMigrationNotify is TimerNotify
   let _registry: RouterRegistry
   let _target_worker: String
 
