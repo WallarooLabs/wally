@@ -100,7 +100,7 @@ extern "C"
         ->to_state_partition_u64(
           new CheckOrder(),
           new SymbolDataBuilder(),
-          "order",
+          "symbol-data",
           new SymbolDataPartition(),
           false
           )
@@ -109,7 +109,7 @@ extern "C"
         ->to_state_partition_u64(
           new UpdateNbbo(),
           new SymbolDataBuilder(),
-          "nbbo",
+          "symbol-data",
           new SymbolDataPartition(),
           false
           )
