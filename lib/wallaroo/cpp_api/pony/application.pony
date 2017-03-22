@@ -2,6 +2,7 @@ use "collections"
 
 use "wallaroo"
 use "wallaroo/topology"
+use "wallaroo/fail"
 
 use @w_computation_builder_build_computation[ComputationP](fn: ComputationBuilderP)
 use @w_state_builder_get_name[Pointer[U8]](sb: StateBuilderP)
@@ -143,7 +144,7 @@ class CPPApplicationBuilder
         multi_worker)
     end
 
-  fun ref to_sink(sink_encoder': SinkEncoderP): Bool =>
+  fun ref to_sink(sink_encoder': SinkEncoderP) =>
     try
       match _pipeline_builder
       | let pb: PipelineBuilder[CPPData val, CPPData val, CPPData val] =>
@@ -151,20 +152,18 @@ class CPPApplicationBuilder
         pb.to_sink(sink_encoder, recover [0] end)
         _pipeline_builder = None
       end
-      true
     else
-      false
+      Fail()
     end
 
-  fun ref done(): Bool =>
+  fun ref done() =>
     try
       match _pipeline_builder
       | let pb: PipelineBuilder[CPPData val, CPPData val, CPPData val] =>
         pb.done()
       end
-      true
     else
-      false
+      Fail()
     end
 
   fun ref build(): Application ? =>
