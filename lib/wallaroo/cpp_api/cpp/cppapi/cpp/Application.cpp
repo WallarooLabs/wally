@@ -12,31 +12,31 @@ using namespace wallaroo;
 
 extern "C"
 {
-  void* pony_CPPApplicationBuilder_create_application(void* self, void* name_);
-  void* pony_CPPApplicationBuilder_new_pipeline(void* self, void* name_, void* source_decoder_);
-  void* pony_CPPApplicationBuilder_to(void* self, void *computation_builder);
-  void* pony_CPPApplicationBuilder_to_stateful(
+  void pony_CPPApplicationBuilder_create_application(void* self, void* name_);
+  void pony_CPPApplicationBuilder_new_pipeline(void* self, void* name_, void* source_decoder_);
+  void pony_CPPApplicationBuilder_to(void* self, void *computation_builder);
+  void pony_CPPApplicationBuilder_to_stateful(
     void* self,
     void *computation,
     void *state_builder_,
     void *state_name);
-  void* pony_CPPApplicationBuilder_to_state_partition(
+  void pony_CPPApplicationBuilder_to_state_partition(
     void* self,
     void *computation,
     void *state_builder_,
     void *state_name,
     void *partition,
     bool multi_worker);
-  void* pony_CPPApplicationBuilder_to_state_partition_u64(
+  void pony_CPPApplicationBuilder_to_state_partition_u64(
     void* self,
     void *computation,
     void *state_builder_,
     void *state_name,
     void *partition,
     bool multi_worker);
-  void* pony_CPPApplicationBuilder_to_sink(void* self, void *sink_encoder);
-  void* pony_CPPApplicationBuilder_build(void* self);
-  void* pony_CPPApplicationBuilder_done(void* self);
+  void pony_CPPApplicationBuilder_to_sink(void* self, void *sink_encoder);
+  void pony_CPPApplicationBuilder_build(void* self);
+  void pony_CPPApplicationBuilder_done(void* self);
 }
 
 Application::Application(void *application_builder_):
