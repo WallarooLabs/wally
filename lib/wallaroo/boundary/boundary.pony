@@ -23,12 +23,36 @@ use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
 class OutgoingBoundaryBuilder
-  fun apply(auth: AmbientAuth, worker_name: String,
-    reporter: MetricsReporter iso, host: String, service: String):
-      OutgoingBoundary
+  let _auth: AmbientAuth
+  let _worker_name: String
+  let _reporter: MetricsReporter val
+  let _host: String
+  let _service: String
+
+  new val create(auth: AmbientAuth, name: String, r: MetricsReporter iso,
+    h: String, s: String)
   =>
-    OutgoingBoundary(auth, worker_name, consume reporter, host,
-      service)
+    _auth = auth
+    _worker_name = name
+    _reporter = consume r
+    _host = h
+    _service = s
+
+  fun apply(step_id: U128): OutgoingBoundary =>
+    let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
+      _host, _service)
+    boundary.register_step_id(step_id)
+
+  fun build_and_initialize(step_id: U128,
+    local_topology_initializer: LocalTopologyInitializer): OutgoingBoundary
+  =>
+    """
+    Called when creating a boundary post cluster initialization
+    """
+    let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
+      _host, _service)
+    boundary.register_step_id(step_id)
+    boundary.quick_initialize(local_topology_initializer)
 
 actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   // Steplike

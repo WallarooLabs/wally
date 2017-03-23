@@ -185,10 +185,12 @@ actor LocalTopologyInitializer
   let _metrics_conn: MetricsSink
   let _alfred : Alfred tag
   var _is_initializer: Bool
+  var _outgoing_boundary_builders:
+    Map[String, OutgoingBoundaryBuilder val] val =
+      recover Map[String, OutgoingBoundaryBuilder val] end
   var _outgoing_boundaries: Map[String, OutgoingBoundary] val =
     recover Map[String, OutgoingBoundary] end
   var _topology: (LocalTopology val | None) = None
-  let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
   let _local_topology_file: String
   var _worker_initializer: (WorkerInitializer | None) = None
   let _data_channel_file: String
@@ -197,6 +199,8 @@ actor LocalTopologyInitializer
   var _recovered_worker_names: Array[String] val = recover val Array[String] end
   var _recovering: Bool = false
   let _is_joining: Bool
+
+  let _guid: GuidGenerator = GuidGenerator
 
   // Lifecycle
   var _omni_router: (OmniRouter val | None) = None
@@ -252,19 +256,22 @@ actor LocalTopologyInitializer
     match _connections
     | let c: Connections =>
       c.create_control_connection(w, joining_host, control_addr._2)
-      c.create_data_connection(w, joining_host, data_addr._2)
-      c.create_boundary_to_new_worker(w, this)
-      _router_registry.add_data_receiver(w, DataReceiver(_auth, _worker_name,
-        w, c, _alfred))
+      c.create_data_connection_to_joining_worker(w, joining_host, data_addr._2,
+        this)
+      let new_boundary_id = _guid.u128()
+      c.create_boundary_to_new_worker(w, new_boundary_id, this)
       @printf[I32]("***New worker %s added to cluster!***\n".cstring(),
         w.cstring())
     else
       Fail()
     end
 
-  be add_boundary_to_new_worker(w: String, boundary: OutgoingBoundary) =>
-    _add_boundary(w, boundary)
-    _router_registry.register_boundaries(_outgoing_boundaries)
+  be add_boundary_to_new_worker(w: String, boundary: OutgoingBoundary,
+    builder: OutgoingBoundaryBuilder val)
+  =>
+    _add_boundary(w, boundary, builder)
+    _router_registry.register_boundaries(_outgoing_boundaries,
+      _outgoing_boundary_builders)
     // TODO: This is currently the hook to say "new worker has joined, let's
     // start migrating state steps to it." This seems like a surprising place
     // for this to happen though.
@@ -282,41 +289,53 @@ actor LocalTopologyInitializer
       Fail()
     end
 
-  fun ref _add_boundary(target_worker: String, boundary: OutgoingBoundary) =>
+  fun ref _add_boundary(target_worker: String, boundary: OutgoingBoundary,
+    builder: OutgoingBoundaryBuilder val)
+  =>
+    // Boundaries
     let bs: Map[String, OutgoingBoundary] trn =
       recover Map[String, OutgoingBoundary] end
     for (w, b) in _outgoing_boundaries.pairs() do
       bs(w) = b
     end
     bs(target_worker) = boundary
+
+    // Boundary builders
+    let bbs: Map[String, OutgoingBoundaryBuilder val] trn =
+      recover Map[String, OutgoingBoundaryBuilder val] end
+    for (w, b) in _outgoing_boundary_builders.pairs() do
+      bbs(w) = b
+    end
+    bbs(target_worker) = builder
+
     _outgoing_boundaries = consume bs
+    _outgoing_boundary_builders = consume bbs
     _initializables.set(boundary)
 
-  be update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
+  be update_boundaries(bs: Map[String, OutgoingBoundary] val,
+    bbs: Map[String, OutgoingBoundaryBuilder val] val)
+  =>
+    // This should only be called during initialization
+    if (_outgoing_boundaries.size() > 0) or
+       (_outgoing_boundary_builders.size() > 0)
+    then
+      Fail()
+    end
+
     _outgoing_boundaries = bs
+    _outgoing_boundary_builders = bbs
+    // TODO: This no longer captures all boundaries because of boundary per
+    // source. Does this matter without backpressure?
     for boundary in bs.values() do
       _initializables.set(boundary)
     end
 
-  be create_data_receivers(ws: Array[String] val,
+  be create_data_channel_listener(ws: Array[String] val,
     host: String, service: String,
     worker_initializer: (WorkerInitializer | None) = None)
   =>
     match _connections
     | let conns: Connections =>
-      let drs: Map[String, DataReceiver] trn =
-        recover Map[String, DataReceiver] end
-
-      for w in ws.values() do
-        if w != _worker_name then
-          let data_receiver = DataReceiver(_auth, _worker_name, w, conns,
-            _alfred)
-          drs(w) = data_receiver
-          _data_receivers(w) = data_receiver
-        end
-      end
-
-      let data_receivers: Map[String, DataReceiver] val = consume drs
       try
         let data_channel_filepath = FilePath(_auth, _data_channel_file)
         if not _is_initializer then
@@ -329,12 +348,11 @@ actor LocalTopologyInitializer
 
           ifdef "resilience" then
             conns.make_and_register_recoverable_data_channel_listener(
-              _auth, consume data_notifier, data_receivers,
-              _router_registry, data_channel_filepath,
-              host, service)
+              _auth, consume data_notifier, _router_registry,
+              data_channel_filepath, host, service)
           else
             let dch_listener = DataChannelListener(_auth,
-              consume data_notifier, data_receivers, _router_registry,
+              consume data_notifier, _router_registry,
               host, service)
             _router_registry.register_data_channel_listener(dch_listener)
             conns.register_listener(dch_listener)
@@ -342,12 +360,9 @@ actor LocalTopologyInitializer
         else
           match worker_initializer
             | let wi: WorkerInitializer =>
-              conns.create_initializer_data_channel(data_receivers,
+              conns.create_initializer_data_channel_listener(
                 _router_registry, wi, data_channel_filepath, this)
           end
-        end
-        for (sender, data_receiver) in data_receivers.pairs() do
-          _router_registry.add_data_receiver(sender, data_receiver)
         end
       else
         @printf[I32]("FAIL: cannot create data channel\n".cstring())
@@ -366,6 +381,18 @@ actor LocalTopologyInitializer
       Fail()
     end
 
+  be quick_initialize_data_connections() =>
+    """
+    Called as part of joining worker's initialization
+    """
+    match _connections
+    | let conns: Connections =>
+      conns.quick_initialize_data_connections(this)
+    else
+      Fail()
+    end
+
+
   be recover_and_initialize(ws: Array[String] val,
     worker_initializer: (WorkerInitializer | None) = None)
   =>
@@ -373,19 +400,7 @@ actor LocalTopologyInitializer
     | let conns: Connections =>
       _recovering = true
       _recovered_worker_names = ws
-      let drs: Map[String, DataReceiver] trn =
-        recover Map[String, DataReceiver] end
 
-      for w in ws.values() do
-        if w != _worker_name then
-          let data_receiver = DataReceiver(_auth, _worker_name, w, conns,
-            _alfred)
-          drs(w) = data_receiver
-          _data_receivers(w) = data_receiver
-        end
-      end
-
-      let data_receivers: Map[String, DataReceiver] val = consume drs
       try
         let data_channel_filepath = FilePath(_auth, _data_channel_file)
         if not _is_initializer then
@@ -398,18 +413,18 @@ actor LocalTopologyInitializer
 
           ifdef "resilience" then
             conns.make_and_register_recoverable_data_channel_listener(
-              _auth, consume data_notifier, data_receivers, _router_registry,
+              _auth, consume data_notifier, _router_registry,
               data_channel_filepath)
           else
             let dch_listener = DataChannelListener(_auth,
-              consume data_notifier, data_receivers, _router_registry)
+              consume data_notifier, _router_registry)
             _router_registry.register_data_channel_listener(dch_listener)
             conns.register_listener(dch_listener)
           end
         else
           match worker_initializer
           | let wi: WorkerInitializer =>
-            conns.create_initializer_data_channel(data_receivers,
+            conns.create_initializer_data_channel_listener(
               _router_registry, wi, data_channel_filepath, this)
           end
         end
@@ -1069,9 +1084,9 @@ actor LocalTopologyInitializer
                       source_reporter.clone()),
                     out_router, _router_registry,
                     source_data.route_builder(),
-                    _outgoing_boundaries, sinks_for_source,
-                    _alfred, _auth, default_target, default_in_route_builder,
-                    state_comp_target_router,
+                    _outgoing_boundary_builders, sinks_for_source,
+                    _alfred, _auth, this, default_target,
+                    default_in_route_builder, state_comp_target_router,
                     source_data.address()(0),
                     source_data.address()(1)
                     where metrics_reporter = consume source_reporter)
@@ -1156,10 +1171,6 @@ actor LocalTopologyInitializer
 
         let data_router = DataRouter(consume data_routes)
         _router_registry.set_data_router(data_router)
-        for (sender, receiver) in _data_receivers.pairs() do
-          _router_registry.register_data_receiver(sender, receiver)
-          receiver.update_router(data_router)
-        end
 
         if not _is_initializer then
           // Inform the initializer that we're done initializing our local
@@ -1185,7 +1196,8 @@ actor LocalTopologyInitializer
           end
         end
 
-        _router_registry.register_boundaries(_outgoing_boundaries)
+        _router_registry.register_boundaries(_outgoing_boundaries,
+          _outgoing_boundary_builders)
 
         let omni_router = StepIdRouter(_worker_name,
           consume built_stateless_steps, t.step_map(), _outgoing_boundaries)
@@ -1275,11 +1287,9 @@ actor LocalTopologyInitializer
 
         let data_router = DataRouter(consume data_routes)
         _router_registry.set_data_router(data_router)
-        for receiver in _data_receivers.values() do
-          receiver.update_router(data_router)
-        end
 
-        _router_registry.register_boundaries(_outgoing_boundaries)
+        _router_registry.register_boundaries(_outgoing_boundaries,
+          _outgoing_boundary_builders)
 
         let omni_router = StepIdRouter(_worker_name,
           consume built_stateless_steps, t.step_map(), _outgoing_boundaries)
@@ -1359,8 +1369,8 @@ actor LocalTopologyInitializer
           for i in _initializables.values() do
             i.application_created(this, o_router)
             match i
-            | let o: OmniRoutable =>
-              _router_registry.register_omni_router_step(o)
+            | let s: Step =>
+              _router_registry.register_omni_router_step(s)
             end
           end
         end

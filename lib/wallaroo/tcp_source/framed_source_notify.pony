@@ -1,6 +1,8 @@
+use "collections"
 use "time"
 use "sendence/guid"
 use "sendence/wall_clock"
+use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -99,11 +101,6 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
         _metrics_reporter.worker_metric(_pipeline_name, time_spent)
       end
 
-      // We have a full queue at a route, so we need to stop reading.
-      // if not keep_sending then
-      //   conn._mute()
-      // end
-
       conn.expect(_header_size)
       _header = true
 
@@ -116,6 +113,16 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
 
   fun ref update_router(router: Router val) =>
     _router = router
+
+  fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>
+    match _router
+    | let p_router: PartitionRouter val =>
+      _router = p_router.update_boundaries(obs)
+    else
+      ifdef debug then
+        @printf[I32]("FramedSourceNotify doesn't have PartitionRouter. Updating boundaries is a noop\n".cstring())
+      end
+    end
 
   fun ref accepted(conn: TCPSource ref) =>
     @printf[I32]((_source_name + ": accepted a connection\n").cstring())

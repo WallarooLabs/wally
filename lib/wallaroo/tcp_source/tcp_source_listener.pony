@@ -1,5 +1,6 @@
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/resilience"
 use "wallaroo/routing"
@@ -12,8 +13,9 @@ class TCPSourceListenerBuilder
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder val
   let _default_in_route_builder: (RouteBuilder val | None)
-  let _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val
   let _tcp_sinks: Array[TCPSink] val
+  let _local_topology_initializer: LocalTopologyInitializer
   let _alfred: Alfred
   let _auth: AmbientAuth
   let _default_target: (Step | None)
@@ -24,10 +26,9 @@ class TCPSourceListenerBuilder
 
   new val create(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val,
-    alfred: Alfred tag,
-    auth: AmbientAuth,
+    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
+    tcp_sinks: Array[TCPSink] val, alfred: Alfred tag, auth: AmbientAuth,
+    local_topology_initializer: LocalTopologyInitializer,
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder val | None) = None,
     target_router: Router val = EmptyRouter,
@@ -39,8 +40,9 @@ class TCPSourceListenerBuilder
     _router_registry = router_registry
     _route_builder = route_builder
     _default_in_route_builder = default_in_route_builder
-    _outgoing_boundaries = outgoing_boundaries
+    _outgoing_boundary_builders = outgoing_boundary_builders
     _tcp_sinks = tcp_sinks
+    _local_topology_initializer = local_topology_initializer
     _alfred = alfred
     _auth = auth
     _default_target = default_target
@@ -51,13 +53,14 @@ class TCPSourceListenerBuilder
 
   fun apply(): TCPSourceListener =>
     let tcp_l = TCPSourceListener(_source_builder, _router, _router_registry,
-      _route_builder, _outgoing_boundaries, _tcp_sinks, _alfred, _auth,
+      _route_builder, _outgoing_boundary_builders, _tcp_sinks,
+      _alfred, _auth, _local_topology_initializer,
       _default_target, _default_in_route_builder, _target_router, _host,
       _service where metrics_reporter = _metrics_reporter.clone())
-    _router_registry.register_partition_router_step(tcp_l)
+    _router_registry.register_source_listener(tcp_l)
     tcp_l
 
-actor TCPSourceListener is PartitionRoutable
+actor TCPSourceListener
   """
   # TCPSourceListener
   """
@@ -67,8 +70,9 @@ actor TCPSourceListener is PartitionRoutable
   let _router_registry: RouterRegistry
   let _route_builder: RouteBuilder val
   let _default_in_route_builder: (RouteBuilder val | None)
-  var _outgoing_boundaries: Map[String, OutgoingBoundary] val
+  var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val
   let _tcp_sinks: Array[TCPSink] val
+  let _local_topology_initializer: LocalTopologyInitializer
   let _default_target: (Step | None)
   var _fd: U32
   var _event: AsioEventID = AsioEvent.none()
@@ -81,10 +85,9 @@ actor TCPSourceListener is PartitionRoutable
 
   new create(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    tcp_sinks: Array[TCPSink] val,
-    alfred: Alfred tag,
-    auth: AmbientAuth,
+    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
+    tcp_sinks: Array[TCPSink] val, alfred: Alfred tag, auth: AmbientAuth,
+    local_topology_initializer: LocalTopologyInitializer,
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder val | None) = None,
     target_router: Router val = EmptyRouter,
@@ -100,8 +103,9 @@ actor TCPSourceListener is PartitionRoutable
     _router_registry = router_registry
     _route_builder = route_builder
     _default_in_route_builder = default_in_route_builder
-    _outgoing_boundaries = outgoing_boundaries
+    _outgoing_boundary_builders = outgoing_boundary_builders
     _tcp_sinks = tcp_sinks
+    _local_topology_initializer = local_topology_initializer
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.cstring(), service.cstring())
     _limit = limit
@@ -114,25 +118,27 @@ actor TCPSourceListener is PartitionRoutable
     _notify_listening()
     @printf[I32]((source_builder.name() + " source listening on " + host + ":" + service + "\n").cstring())
 
-  be update_router(router: Router val) =>
+  be update_router(router: PartitionRouter val) =>
     _notify.update_router(router)
 
   be remove_route_for(moving_step: ConsumerStep) =>
     None
 
-  be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
-    let new_boundaries: Map[String, OutgoingBoundary] trn =
-      recover Map[String, OutgoingBoundary] end
+  be add_boundary_builders(
+    boundary_builders: Map[String, OutgoingBoundaryBuilder val] val)
+  =>
+    let new_builders: Map[String, OutgoingBoundaryBuilder val] trn =
+      recover Map[String, OutgoingBoundaryBuilder val] end
     // TODO: A persistent map on the field would be much more efficient here
-    for (state_name, boundary) in _outgoing_boundaries.pairs() do
-      new_boundaries(state_name) = boundary
+    for (target_worker_name, builder) in _outgoing_boundary_builders.pairs() do
+      new_builders(target_worker_name) = builder
     end
-    for (state_name, boundary) in boundaries.pairs() do
-      if not new_boundaries.contains(state_name) then
-        new_boundaries(state_name) = boundary
+    for (target_worker_name, builder) in boundary_builders.pairs() do
+      if not new_builders.contains(target_worker_name) then
+        new_builders(target_worker_name) = builder
       end
     end
-    _outgoing_boundaries = consume new_boundaries
+    _outgoing_boundary_builders = consume new_builders
 
   be _event_notify(event: AsioEventID, flags: U32, arg: U32) =>
     """
@@ -190,8 +196,9 @@ actor TCPSourceListener is PartitionRoutable
     Spawn a new connection.
     """
     try
-      let source = TCPSource._accept(this, _notify.connected(this), _router.routes(),
-        _route_builder, _outgoing_boundaries, _tcp_sinks, ns, _default_target,
+      let source = TCPSource._accept(this, _notify.connected(this),
+        _router.routes(), _route_builder, _outgoing_boundary_builders,
+        _tcp_sinks, _local_topology_initializer, ns, _default_target,
         _default_in_route_builder, _init_size, _max_size,
         _metrics_reporter.clone())
       // TODO: We need to figure out how to unregister this when the

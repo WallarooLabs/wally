@@ -356,7 +356,7 @@ actor Startup
         _connection_addresses_file, _is_joining)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections,
-        _stop_the_world_pause)
+        _alfred as Alfred, _stop_the_world_pause)
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
@@ -491,7 +491,7 @@ actor Startup
         _connection_addresses_file, _is_joining)
 
       let router_registry = RouterRegistry(auth, _worker_name, connections,
-        _stop_the_world_pause)
+        _alfred as Alfred, _stop_the_world_pause)
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
@@ -511,7 +511,7 @@ actor Startup
 
       router_registry.set_data_router(DataRouter)
       local_topology_initializer.update_topology(m.local_topology)
-      local_topology_initializer.create_data_receivers(m.worker_names,
+      local_topology_initializer.create_data_channel_listener(m.worker_names,
         my_d_host, my_d_service)
 
       // Prepare control and data addresses, but sub in correct host for
@@ -541,6 +541,7 @@ actor Startup
       // initialization order
       local_topology_initializer.create_connections(consume control_addrs,
         consume data_addrs)
+      local_topology_initializer.quick_initialize_data_connections()
 
       let control_channel_filepath: FilePath = FilePath(auth,
         _control_channel_file)

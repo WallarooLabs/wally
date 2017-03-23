@@ -52,7 +52,7 @@ actor WorkerInitializer
       _topology_ready = true
       let workers: Array[String] val = recover [_worker_name] end
       _application_initializer.initialize(this, _expected, workers)
-      _local_topology_initializer.create_data_receivers(
+      _local_topology_initializer.create_data_channel_listener(
         recover Array[String] end, "", "", this)
     end
 
@@ -66,7 +66,7 @@ actor WorkerInitializer
       if _control_identified == _expected then
         @printf[I32]("All worker channels identified\n".cstring())
 
-        _create_data_receivers()
+        _create_data_channel_listeners()
       end
     end
 
@@ -137,7 +137,7 @@ actor WorkerInitializer
   // be register_proxy(worker: String, proxy: Step tag) =>
   //   _connections.register_proxy(worker, proxy)
 
-  fun _create_data_receivers() =>
+  fun _create_data_channel_listeners() =>
     let ws: Array[String] trn = recover Array[String] end
 
     ws.push("initializer")
@@ -148,15 +148,16 @@ actor WorkerInitializer
     let workers: Array[String] val = consume ws
 
     try
-      let create_data_receivers_msg = ChannelMsgEncoder.create_data_receivers(
-        workers, _auth)
+      let create_data_channel_listener_msg =
+        ChannelMsgEncoder.create_data_channel_listener(workers, _auth)
       for key in _control_addrs.keys() do
-        _connections.send_control(key, create_data_receivers_msg)
+        _connections.send_control(key, create_data_channel_listener_msg)
       end
 
       // Pass in empty host and service because data listener is created
       // in a special manner in .create_data_receiver() for initializer
-      _local_topology_initializer.create_data_receivers(workers, "", "", this)
+      _local_topology_initializer.create_data_channel_listener(workers, "", "",
+        this)
     else
       @printf[I32]("Failed to create message to create data receivers\n".cstring())
     end

@@ -17,12 +17,10 @@ actor DataChannelListener
   var _init_size: USize
   var _max_size: USize
 
-  var _data_receivers: Map[String, DataReceiver] val
   let _router_registry: RouterRegistry
 
   new create(auth: DataChannelListenerAuth,
     notify: DataChannelListenNotify iso,
-    data_receivers: Map[String, DataReceiver] val,
     router_registry: RouterRegistry,
     host: String = "", service: String = "0", limit: USize = 0,
     init_size: USize = 64, max_size: USize = 16384)
@@ -30,7 +28,6 @@ actor DataChannelListener
     """
     Listens for both IPv4 and IPv6 connections.
     """
-    _data_receivers = data_receivers
     _router_registry = router_registry
     _limit = limit
     _notify = consume notify
@@ -40,9 +37,6 @@ actor DataChannelListener
     _max_size = max_size
     _fd = @pony_asio_event_fd(_event)
     _notify_listening()
-
-  be update_data_receivers(drs: Map[String, DataReceiver] val) =>
-    _data_receivers = drs
 
   be set_notify(notify: DataChannelListenNotify iso) =>
     """
@@ -148,8 +142,7 @@ actor DataChannelListener
     """
     try
       let data_channel = DataChannel._accept(this, _notify.connected(this,
-        _data_receivers, _router_registry), ns,
-        _init_size, _max_size)
+        _router_registry), ns, _init_size, _max_size)
       _router_registry.register_data_channel(data_channel)
       _count = _count + 1
     else

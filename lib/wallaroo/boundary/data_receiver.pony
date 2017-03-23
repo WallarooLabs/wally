@@ -42,19 +42,25 @@ actor DataReceiver is Producer
   var _timer_init: _TimerInit = _UninitializedTimerInit
   let _timers: Timers = Timers
 
+  let _router_registry: RouterRegistry
+
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
-    connections: Connections, alfred: Alfred)
+    connections: Connections, router_registry: RouterRegistry, alfred: Alfred)
   =>
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
     _connections = connections
+    _router_registry = router_registry
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
 
   be data_connect(sender_step_id: U128, conn: DataChannel) =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
+    // Now that we have a sender_step_id, we're ready to register with
+    // the registry
+    _router_registry.add_data_receiver(_sender_name, _sender_step_id, this)
     if _replay_pending then
       request_replay()
     end
@@ -150,12 +156,6 @@ actor DataReceiver is Producer
     // Currently, this behavior should only be called once in the lifecycle
     // of a DataReceiver, so we would only need this if that were to change.
     //_router.unregister_producer(this, 0)
-
-    // We currently assume stop the world and finishing all in-flight
-    // processing before any route migration.
-    ifdef debug then
-      Invariant(_resilience_routes.is_fully_acked())
-    end
 
     _router = router
     _router.register_producer(this)

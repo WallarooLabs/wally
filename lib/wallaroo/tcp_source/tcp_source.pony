@@ -2,8 +2,10 @@ use "buffered"
 use "collections"
 use "net"
 use "time"
+use "sendence/guid"
 use "wallaroo/boundary"
 use "wallaroo/fail"
+use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/routing"
@@ -18,19 +20,21 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSource is (Producer & PartitionRoutable)
+actor TCPSource is Producer
   """
   # TCPSource
 
   ## Future work
   * Switch to requesting credits via promise
   """
+  let _guid: GuidGenerator = GuidGenerator
   // Credit Flow
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
   let _tcp_sinks: Array[TCPSink] val
+  let _local_topology_initializer: LocalTopologyInitializer
   var _unregistered: Bool = false
 
   let _metrics_reporter: MetricsReporter
@@ -61,8 +65,9 @@ actor TCPSource is (Producer & PartitionRoutable)
 
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[ConsumerStep] val, route_builder: RouteBuilder val,
-    outgoing_boundaries: Map[String, OutgoingBoundary] val,
+    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
     tcp_sinks: Array[TCPSink] val,
+    local_topology_initializer: LocalTopologyInitializer,
     fd: U32, default_target: (ConsumerStep | None) = None,
     forward_route_builder: (RouteBuilder val | None) = None,
     init_size: USize = 64, max_size: USize = 16384,
@@ -88,11 +93,14 @@ actor TCPSource is (Producer & PartitionRoutable)
     _next_size = init_size
     _max_size = max_size
 
-    _route_builder = route_builder
-    for (state_name, boundary) in outgoing_boundaries.pairs() do
-      _outgoing_boundaries(state_name) = boundary
-    end
     _tcp_sinks = tcp_sinks
+    _local_topology_initializer = local_topology_initializer
+
+    _route_builder = route_builder
+    for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
+      _outgoing_boundaries(target_worker_name) = builder.build_and_initialize(
+        _guid.u128(), _local_topology_initializer)
+    end
 
     //TODO: either only accept when we are done recovering or don't start
     //listening until we are done recovering
@@ -107,6 +115,8 @@ actor TCPSource is (Producer & PartitionRoutable)
       _routes(boundary) =
         _route_builder(this, boundary, _metrics_reporter)
     end
+
+    _notify.update_boundaries(_outgoing_boundaries)
 
     match default_target
     | let r: ConsumerStep =>
@@ -127,17 +137,28 @@ actor TCPSource is (Producer & PartitionRoutable)
       r.application_initialized("TCPSource")
     end
 
-  be update_router(router: Router val) =>
-    _notify.update_router(router)
+  be update_router(router: PartitionRouter val) =>
+    let new_router = router.update_boundaries(_outgoing_boundaries)
+    _notify.update_router(new_router)
 
-  be add_boundaries(boundaries: Map[String, OutgoingBoundary] val) =>
-    for (state_name, boundary) in boundaries.pairs() do
-      if not _outgoing_boundaries.contains(state_name) then
-        _outgoing_boundaries(state_name) = boundary
+  be add_boundary_builders(
+    boundary_builders: Map[String, OutgoingBoundaryBuilder val] val)
+  =>
+    """
+    Build a new boundary for each builder that corresponds to a worker we
+    don't yet have a boundary to. Each TCPSource has its own
+    OutgoingBoundary to each worker to allow for higher throughput.
+    """
+    for (target_worker_name, builder) in boundary_builders.pairs() do
+      if not _outgoing_boundaries.contains(target_worker_name) then
+        let boundary = builder.build_and_initialize(_guid.u128(),
+          _local_topology_initializer)
+        _outgoing_boundaries(target_worker_name) = boundary
         _routes(boundary) =
           _route_builder(this, boundary, _metrics_reporter)
       end
     end
+    _notify.update_boundaries(_outgoing_boundaries)
 
   be remove_route_for(step: ConsumerStep) =>
     try

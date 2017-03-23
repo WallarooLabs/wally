@@ -56,16 +56,6 @@ trait tag Producer
 
     _x_resilience_routes().receive_ack(this, route_id, seq_id)
 
-trait tag Routable
-  be remove_route_for(moving_step: ConsumerStep)
-  be add_boundaries(boundary: Map[String, OutgoingBoundary] val)
-
-trait tag PartitionRoutable is Routable
-  be update_router(router: Router val)
-
-trait tag OmniRoutable is Routable
-  be update_omni_router(router: OmniRouter val)
-
 primitive HashProducer
   fun hash(o: Producer): U64 =>
     o.hash()
