@@ -5,6 +5,7 @@ use "files"
 use "sendence/bytes"
 use "sendence/wall_clock"
 use "wallaroo/boundary"
+use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -84,14 +85,12 @@ class DataChannelListenNotifier is DataChannelListenNotify
 
   fun ref connected(
     listen: DataChannelListener ref,
-    data_receivers: Map[String, DataReceiver] val,
     router_registry: RouterRegistry): DataChannelNotify iso^
   =>
-    DataChannelConnectNotifier(data_receivers, _connections, _auth,
+    DataChannelConnectNotifier(_connections, _auth,
     _metrics_reporter.clone(), _local_topology_initializer, router_registry)
 
 class DataChannelConnectNotifier is DataChannelNotify
-  var _receivers: Map[String, DataReceiver] val
   let _connections: Connections
   let _auth: AmbientAuth
   var _header: Bool = true
@@ -100,24 +99,35 @@ class DataChannelConnectNotifier is DataChannelNotify
   let _local_topology_initializer: LocalTopologyInitializer tag
   let _router_registry: RouterRegistry
 
-  new iso create(receivers: Map[String, DataReceiver] val,
-    connections: Connections, auth: AmbientAuth,
+  // Initial state is an empty DataReceiver wrapper that should never
+  // be used (we fail if it is).
+  var _receiver: _DataReceiverWrapper = _InitDataReceiver
+
+  new iso create(connections: Connections, auth: AmbientAuth,
     metrics_reporter: MetricsReporter iso,
     local_topology_initializer: LocalTopologyInitializer tag,
     router_registry: RouterRegistry)
   =>
-    _receivers = receivers
     _connections = connections
     _auth = auth
     _metrics_reporter = consume metrics_reporter
     _local_topology_initializer = local_topology_initializer
     _router_registry = router_registry
 
-  fun ref update_data_receivers(drs: Map[String, DataReceiver] val) =>
-    ifdef "trace" then
-      @printf[I32]("Updating data receivers on data channel\n".cstring())
-    end
-    _receivers = drs
+  fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
+    conn: DataChannel ref)
+  =>
+    """
+    Each abstract data channel (a connection from an OutgoingBoundary)
+    corresponds to a single DataReceiver. On reconnect, we want a new
+    DataChannel for that boundary to use the same DataReceiver. This is
+    called once we have found (or initially created) the DataReceiver for
+    the DataChannel corresponding to this notify.
+    """
+    // State change to our real DataReceiver.
+    _receiver = _DataReceiver(dr)
+    _receiver.data_connect(sender_boundary_id, conn)
+    conn._unmute(this)
 
   fun ref received(conn: DataChannel ref, data: Array[U8] iso,
     n: USize): Bool
@@ -145,31 +155,23 @@ class DataChannelConnectNotifier is DataChannelNotify
         ifdef "trace" then
           @printf[I32]("Received DataMsg on Data Channel\n".cstring())
         end
-        try
-          _metrics_reporter.step_metric(data_msg.metric_name,
-            "Before receive on data channel (network time)", data_msg.metrics_id,
-            data_msg.latest_ts, ingest_ts)
-          _receivers(data_msg.delivery_msg.sender_name())
-            .received(data_msg.delivery_msg,
-              data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
-              data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
-              my_latest_ts)
-        else
-          @printf[I32](
-            "Missing DataReceiver for %s! Couldn't forward DataMsg\n"
-              .cstring(),
-            data_msg.delivery_msg.sender_name().cstring())
-        end
+        _metrics_reporter.step_metric(data_msg.metric_name,
+          "Before receive on data channel (network time)", data_msg.metrics_id,
+          data_msg.latest_ts, ingest_ts)
+        _receiver.received(data_msg.delivery_msg,
+            data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
+            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
+            my_latest_ts)
       | let dc: DataConnectMsg val =>
         ifdef "trace" then
           @printf[I32]("Received DataConnectMsg on Data Channel\n".cstring())
         end
-        try
-          _receivers(dc.sender_name).data_connect(dc.sender_step_id, conn)
-        else
-          @printf[I32]("Missing DataReceiver for %s!\n".cstring(),
-            dc.sender_name.cstring())
-        end
+        // Before we can begin processing messages on this data channel, we
+        // need to determine which DataReceiver we'll be forwarding data
+        // messages to.
+        conn._mute(this)
+        _router_registry.request_data_receiver(dc.sender_name,
+          dc.sender_boundary_id, conn)
       | let sm: StepMigrationMsg val =>
         ifdef "trace" then
           @printf[I32]("Received StepMigrationMsg on Data Channel\n".cstring())
@@ -186,7 +188,8 @@ class DataChannelConnectNotifier is DataChannelNotify
         ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
         end
-        _connections.ack_watermark_to_boundary(aw.sender_name, aw.seq_id)
+        Fail()
+        // _connections.ack_watermark_to_boundary(aw.sender_name, aw.seq_id)
       | let r: ReplayMsg val =>
         ifdef "trace" then
           @printf[I32]("Received ReplayMsg on Data Channel\n".cstring())
@@ -194,24 +197,20 @@ class DataChannelConnectNotifier is DataChannelNotify
         try
           let data_msg = r.data_msg(_auth)
           _metrics_reporter.step_metric(data_msg.metric_name,
-            "Before replay receive on data channel (network time)", data_msg.metrics_id,
-            data_msg.latest_ts, ingest_ts)
-          _receivers(data_msg.delivery_msg.sender_name())
-            .replay_received(data_msg.delivery_msg,
+            "Before replay receive on data channel (network time)",
+            data_msg.metrics_id, data_msg.latest_ts, ingest_ts)
+          _receiver.replay_received(data_msg.delivery_msg,
             data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
-            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1, my_latest_ts)
+            data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
+            my_latest_ts)
         else
-          @printf[I32]("Missing DataReceiver!\n".cstring())
+          Fail()
         end
       | let c: ReplayCompleteMsg val =>
         ifdef "trace" then
           @printf[I32]("Received ReplayCompleteMsg on Data Channel\n".cstring())
         end
-        try
-          _receivers(c.sender_name()).upstream_replay_finished()
-        else
-          @printf[I32]("Missing DataReceiver!\n".cstring())
-        end
+        _receiver.upstream_replay_finished()
       | let m: SpinUpLocalTopologyMsg val =>
         @printf[I32]("Received spin up local topology message!\n".cstring())
       | let m: RequestReplayMsg val =>
@@ -247,3 +246,52 @@ class DataChannelConnectNotifier is DataChannelNotify
     @printf[I32]("DataChannelConnectNotifier : server closed\n".cstring())
     //TODO: Initiate reconnect to downstream node here. We need to
     //      create a new connection in OutgoingBoundary
+
+trait _DataReceiverWrapper
+  fun data_connect(sender_step_id: U128, conn: DataChannel)
+  fun received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
+    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun upstream_replay_finished()
+
+class _InitDataReceiver is _DataReceiverWrapper
+  fun data_connect(sender_step_id: U128, conn: DataChannel) =>
+    Fail()
+
+  fun received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    Fail()
+
+  fun replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
+    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    Fail()
+
+  fun upstream_replay_finished() =>
+    Fail()
+
+class _DataReceiver is _DataReceiverWrapper
+  let data_receiver: DataReceiver
+
+  new create(dr: DataReceiver) =>
+    data_receiver = dr
+
+  fun data_connect(sender_step_id: U128, conn: DataChannel) =>
+    data_receiver.data_connect(sender_step_id, conn)
+
+  fun received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    data_receiver.received(d, pipeline_time_spent, seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
+
+  fun replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
+    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  =>
+    data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
+      metrics_id, worker_ingress_ts)
+
+  fun upstream_replay_finished() =>
+    data_receiver.upstream_replay_finished()

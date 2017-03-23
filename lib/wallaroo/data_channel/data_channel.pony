@@ -121,8 +121,15 @@ actor DataChannel
     _notify.accepted(this)
     _queue_read()
 
-  be update_data_receivers(drs: Map[String, DataReceiver] val) =>
-    _notify.update_data_receivers(drs)
+  be identify_data_receiver(dr: DataReceiver, sender_step_id: U128) =>
+    """
+    Each abstract data channel (a connection from an OutgoingBoundary)
+    corresponds to a single DataReceiver. On reconnect, we want a new
+    DataChannel for that boundary to use the same DataReceiver. This is
+    called once we have found (or initially created) the DataReceiver for
+    this DataChannel.
+    """
+    _notify.identify_data_receiver(dr, sender_step_id, this)
 
   be write(data: ByteSeq) =>
     """
@@ -198,6 +205,9 @@ actor DataChannel
     Temporarily suspend reading off this DataChannel until such time as
     `unmute` is called.
     """
+    _mute(d)
+
+  fun ref _mute(d: Any tag) =>
     _muted_downstream.set(d)
     if not _muted then
       @printf[I32]("Muting DataChannel\n".cstring())
@@ -208,6 +218,9 @@ actor DataChannel
     """
     Start reading off this DataChannel again after having been muted.
     """
+    _unmute(d)
+
+  fun ref _unmute(d: Any tag) =>
     _muted_downstream.unset(d)
 
     if _muted_downstream.size() == 0 then

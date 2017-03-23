@@ -25,6 +25,8 @@ actor Connections
   let _control_addrs: Map[String, (String, String)] = _control_addrs.create()
   let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
   let _control_conns: Map[String, TCPConnection] = _control_conns.create()
+  let _data_conn_builders: Map[String, OutgoingBoundaryBuilder val] =
+    _data_conn_builders.create()
   let _data_conns: Map[String, OutgoingBoundary] = _data_conns.create()
   var _phone_home: (TCPConnection | None) = None
   let _metrics_conn: MetricsSink
@@ -126,7 +128,6 @@ actor Connections
 
   be make_and_register_recoverable_data_channel_listener(auth: TCPListenerAuth,
     notifier: DataChannelListenNotify iso,
-    data_receivers: Map[String, DataReceiver] val,
     router_registry: RouterRegistry,
     recovery_addr_file: FilePath val,
     host: String val = "", port: String val = "0")
@@ -143,8 +144,7 @@ actor Connections
 
         @printf[I32]("Restarting a data channel listener ...\n\n".cstring())
         let dch_listener = DataChannelListener(auth, consume notifier,
-          data_receivers, router_registry, consume host',
-          consume port')
+          router_registry, consume host', consume port')
         router_registry.register_data_channel_listener(dch_listener)
         _data_channel_listeners.push(dch_listener)
       else
@@ -152,13 +152,12 @@ actor Connections
       end
     else
       let dch_listener = DataChannelListener(auth, consume notifier,
-        data_receivers, router_registry, host, port)
+        router_registry, host, port)
       router_registry.register_data_channel_listener(dch_listener)
       _data_channel_listeners.push(dch_listener)
     end
 
-  be create_initializer_data_channel(
-    data_receivers: Map[String, DataReceiver] val,
+  be create_initializer_data_channel_listener(
     router_registry: RouterRegistry,
     worker_initializer: WorkerInitializer, data_channel_file: FilePath,
     local_topology_initializer: LocalTopologyInitializer tag)
@@ -171,8 +170,7 @@ actor Connections
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     let dch_listener = DataChannelListener(_auth, consume data_notifier,
-      data_receivers, router_registry,
-      _init_d_host, _init_d_service, 0, 1_048_576, 1_048_576)
+      router_registry, _init_d_host, _init_d_service, 0, 1_048_576, 1_048_576)
     router_registry.register_data_channel_listener(dch_listener)
     register_listener(dch_listener)
 
@@ -273,18 +271,19 @@ actor Connections
       _env.err.print("There is no phone home connection to send on!")
     end
 
-  be create_boundary_to_new_worker(target: String,
+  be create_boundary_to_new_worker(target: String, boundary_id: U128,
     local_topology_initializer: LocalTopologyInitializer)
   =>
     try
       (let host, let service) = _data_addrs(target)
-      let boundary = OutgoingBoundary(_auth,
-        _worker_name, MetricsReporter(_app_name,
-        _worker_name, _metrics_conn),
-        host, service)
-      boundary.register_step_id(_guid_gen.u128())
-      boundary.quick_initialize(local_topology_initializer)
-      local_topology_initializer.add_boundary_to_new_worker(target, boundary)
+      let reporter = MetricsReporter(_app_name,
+        _worker_name, _metrics_conn)
+      let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
+        consume reporter, host, service)
+      let boundary = builder.build_and_initialize(boundary_id,
+        local_topology_initializer)
+      local_topology_initializer.add_boundary_to_new_worker(target, boundary,
+        builder)
     else
       @printf[I32]("Can't find data address for worker\n".cstring())
       Fail()
@@ -305,9 +304,17 @@ actor Connections
       out_bs(target) = boundary
     end
 
+    let out_bbs: Map[String, OutgoingBoundaryBuilder val] trn =
+      recover Map[String, OutgoingBoundaryBuilder val] end
+
+    for (target, builder) in _data_conn_builders.pairs() do
+      out_bbs(target) = builder
+    end
+
     @printf[I32](("Preparing to update " + _data_conns.size().string() + " boundaries\n").cstring())
 
-    local_topology_initializer.update_boundaries(consume out_bs)
+    local_topology_initializer.update_boundaries(consume out_bs,
+      consume out_bbs)
     // TODO: This should be somewhere else. It's not clear why updating
     // boundaries should trigger initialization, but this is the point
     // at which initialization is possible for a joining or recovering
@@ -380,6 +387,11 @@ actor Connections
       _env.out.print(_worker_name + ": Interconnections with other workers created.")
     else
       _env.out.print("Problem creating interconnections with other workers")
+    end
+
+  be quick_initialize_data_connections(lti: LocalTopologyInitializer) =>
+    for boundary in _data_conns.values() do
+      boundary.quick_initialize(lti)
     end
 
   be recover_connections(local_topology_initializer: LocalTopologyInitializer)
@@ -469,11 +481,21 @@ actor Connections
     service: String)
   =>
     _data_addrs(target_name) = (host, service)
-    let outgoing_boundary = OutgoingBoundary(_auth,
-      _worker_name, MetricsReporter(_app_name,
-      _worker_name, _metrics_conn),
-      host, service)
-    outgoing_boundary.register_step_id(_guid_gen.u128())
+    let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
+      MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service)
+    let outgoing_boundary = boundary_builder(_guid_gen.u128())
+    _data_conn_builders(target_name) = boundary_builder
+    _data_conns(target_name) = outgoing_boundary
+
+  be create_data_connection_to_joining_worker(target_name: String,
+    host: String, service: String, lti: LocalTopologyInitializer)
+  =>
+    _data_addrs(target_name) = (host, service)
+    let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
+      MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service)
+    let outgoing_boundary =
+      boundary_builder.build_and_initialize(_guid_gen.u128(), lti)
+    _data_conn_builders(target_name) = boundary_builder
     _data_conns(target_name) = outgoing_boundary
 
   be update_boundary_ids(boundary_ids: Map[String, U128] val) =>
@@ -534,14 +556,6 @@ actor Connections
     else
       Fail()
     end
-
-  be ack_watermark_to_boundary(receiver_name: String, seq_id: U64) =>
-    None
-/*    try
-      _data_conns(receiver_name).ack(seq_id)
-    else
-      @printf[I32](("No outgoing boundary to worker " + receiver_name + "\n").cstring())
-    end*/
 
   be request_replay(receiver_name: String) =>
     try

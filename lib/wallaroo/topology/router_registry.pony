@@ -4,28 +4,51 @@ use "wallaroo/boundary"
 use "wallaroo/data_channel"
 use "wallaroo/fail"
 use "wallaroo/network"
+use "wallaroo/resilience"
 use "wallaroo/routing"
 use "wallaroo/tcp_source"
 
+class _BoundaryId is Equatable[_BoundaryId]
+  let name: String
+  let step_id: U128
+
+  new create(n: String, s_id: U128) =>
+    name = n
+    step_id = s_id
+
+  fun eq(that: box->_BoundaryId): Bool =>
+    (name == that.name) and (step_id == that.step_id)
+
+  fun hash(): U64 =>
+    (digestof this).hash()
+
 actor RouterRegistry
   let _auth: AmbientAuth
+  let _alfred: Alfred
   let _worker_name: String
   let _connections: Connections
-  var _data_router: (DataRouter val | None) = None
+  var _data_router: DataRouter val =
+    DataRouter(recover Map[U128, ConsumerStep tag] end)
   var _pre_state_data: (Array[PreStateData val] val | None) = None
   let _partition_routers: Map[String, PartitionRouter val] =
     _partition_routers.create()
   var _omni_router: (OmniRouter val | None) = None
-  let _data_receivers: Map[String, DataReceiver] = _data_receivers.create()
+  let _data_receivers: Map[_BoundaryId, DataReceiver] =
+    _data_receivers.create()
   let _sources: SetIs[TCPSource] = _sources.create()
+  let _source_listeners: SetIs[TCPSourceListener] = _source_listeners.create()
   let _data_channel_listeners: SetIs[DataChannelListener] =
     _data_channel_listeners.create()
   let _data_channels: SetIs[DataChannel] = _data_channels.create()
   // All steps that have a PartitionRouter
-  let _partition_router_steps: SetIs[PartitionRoutable] =
-    _partition_router_steps.create()
+  let _partition_router_steps: SetIs[Step] = _partition_router_steps.create()
   // All steps that have an OmniRouter
-  let _omni_router_steps: SetIs[OmniRoutable] = _omni_router_steps.create()
+  let _omni_router_steps: SetIs[Step] = _omni_router_steps.create()
+  // Boundary builders are used by new TCPSources to create their own
+  // individual boundaries to other workers (to allow for increased
+  // throughput).
+  let _outgoing_boundaries_builders: Map[String, OutgoingBoundaryBuilder val] =
+    _outgoing_boundaries_builders.create()
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
 
@@ -49,11 +72,12 @@ actor RouterRegistry
   var _stop_the_world_pause: U64
 
   new create(auth: AmbientAuth, worker_name: String, c: Connections,
-    stop_the_world_pause: U64)
+    alfred: Alfred, stop_the_world_pause: U64)
   =>
     _auth = auth
     _worker_name = worker_name
     _connections = c
+    _alfred = alfred
     _stop_the_world_pause = stop_the_world_pause
 
   fun _worker_count(): USize =>
@@ -72,12 +96,16 @@ actor RouterRegistry
   be set_omni_router(o: OmniRouter val) =>
     _omni_router = o
 
-  be register_data_receiver(sender: String, dr: DataReceiver) =>
-    _data_receivers(sender) = dr
+  be register_data_receiver(sender: String, sender_boundary_id: U128,
+    dr: DataReceiver)
+  =>
+    _data_receivers(_BoundaryId(sender, sender_boundary_id)) = dr
 
   be register_source(tcp_source: TCPSource) =>
     _sources.set(tcp_source)
-    _partition_router_steps.set(tcp_source)
+
+  be register_source_listener(tcp_source_listener: TCPSourceListener) =>
+    _source_listeners.set(tcp_source_listener)
 
   be register_data_channel_listener(dchl: DataChannelListener) =>
     _data_channel_listeners.set(dchl)
@@ -86,64 +114,106 @@ actor RouterRegistry
     // TODO: These need to be unregistered if they close
     _data_channels.set(dc)
 
-  be register_partition_router_step(pr: PartitionRoutable) =>
-    _partition_router_steps.set(pr)
+  be register_partition_router_step(s: Step) =>
+    _partition_router_steps.set(s)
 
-  be register_omni_router_step(o: OmniRoutable) =>
-    _omni_router_steps.set(o)
+  be register_omni_router_step(s: Step) =>
+    _omni_router_steps.set(s)
 
-  be register_boundaries(ob: Map[String, OutgoingBoundary] val) =>
+  be register_boundaries(bs: Map[String, OutgoingBoundary] val,
+    bbs: Map[String, OutgoingBoundaryBuilder val] val)
+  =>
+    // Boundaries
     let new_boundaries: Map[String, OutgoingBoundary] trn =
       recover Map[String, OutgoingBoundary] end
-    for (worker, boundary) in ob.pairs() do
+    for (worker, boundary) in bs.pairs() do
       if not _outgoing_boundaries.contains(worker) then
         _outgoing_boundaries(worker) = boundary
         new_boundaries(worker) = boundary
       end
     end
-
     let new_boundaries_sendable: Map[String, OutgoingBoundary] val =
       consume new_boundaries
-    for routable in _partition_router_steps.values() do
-      routable.add_boundaries(new_boundaries_sendable)
+
+    for step in _partition_router_steps.values() do
+      step.add_boundaries(new_boundaries_sendable)
     end
-    for routable in _omni_router_steps.values() do
-      routable.add_boundaries(new_boundaries_sendable)
+    for step in _omni_router_steps.values() do
+      step.add_boundaries(new_boundaries_sendable)
     end
 
-  be add_data_receiver(sender_name: String, data_receiver: DataReceiver) =>
-    // TODO: Persistent map would be much more efficient here.
-    _data_receivers(sender_name) = data_receiver
-    let data_receivers: Map[String, DataReceiver] trn =
-      recover Map[String, DataReceiver] end
-    for (s, dr) in _data_receivers.pairs() do
-      data_receivers(s) = dr
-    end
-    let data_receivers_sendable: Map[String, DataReceiver] val =
-      consume data_receivers
-    match _data_router
-    | let data_router: DataRouter val =>
-      data_receiver.update_router(data_router)
-      for data_channel_listener in _data_channel_listeners.values() do
-        data_channel_listener.update_data_receivers(data_receivers_sendable)
+    // Boundary builders
+    let new_boundary_builders: Map[String, OutgoingBoundaryBuilder val] trn =
+      recover Map[String, OutgoingBoundaryBuilder val] end
+    for (worker, builder) in bbs.pairs() do
+      // Boundary builders should always be registered after the canonical
+      // boundary for each builder. The canonical is used on all Steps.
+      // Sources use the builders to create a new boundary per source
+      // connection.
+      if not _outgoing_boundaries.contains(worker) then
+        Fail()
       end
-      for data_channel in _data_channels.values() do
-        data_channel.update_data_receivers(data_receivers_sendable)
+      if not _outgoing_boundaries_builders.contains(worker) then
+        new_boundary_builders(worker) = builder
       end
-    else
-      // This branch should only be taken on initialization
-      None
     end
+
+    let new_boundary_builders_sendable:
+      Map[String, OutgoingBoundaryBuilder val] val =
+        consume new_boundary_builders
+
+    for source_listener in _source_listeners.values() do
+      source_listener.add_boundary_builders(new_boundary_builders_sendable)
+    end
+
+    for source in _sources.values() do
+      source.add_boundary_builders(new_boundary_builders_sendable)
+    end
+
+  be request_data_receiver(sender_name: String, sender_boundary_id: U128,
+    conn: DataChannel)
+  =>
+    """
+    Called when a DataChannel is first created and needs to know the
+    DataReceiver corresponding to the relevant OutgoingBoundary. If this
+    is the first time that OutgoingBoundary has connected to this worker,
+    then we create a new DataReceiver here.
+    """
+    let boundary_id = _BoundaryId(sender_name, sender_boundary_id)
+    let dr =
+      try
+        _data_receivers(boundary_id)
+      else
+        let new_dr = DataReceiver(_auth, _worker_name, sender_name,
+          _connections, this, _alfred)
+        new_dr.update_router(_data_router)
+        _data_receivers(boundary_id) = new_dr
+        new_dr
+      end
+    conn.identify_data_receiver(dr, sender_boundary_id)
+
+  be add_data_receiver(sender_name: String, sender_boundary_id: U128,
+    data_receiver: DataReceiver)
+  =>
+    _data_receivers(_BoundaryId(sender_name, sender_boundary_id)) =
+      data_receiver
+    data_receiver.update_router(_data_router)
 
   fun _distribute_data_router() =>
-    match _data_router
-    | let data_router: DataRouter val =>
-      for data_receiver in _data_receivers.values() do
-        data_receiver.update_router(data_router)
-      end
-    else
-      Fail()
+    for data_receiver in _data_receivers.values() do
+      data_receiver.update_router(_data_router)
     end
+
+  fun _distribute_partition_router(partition_router: PartitionRouter val) =>
+      for step in _partition_router_steps.values() do
+        step.update_router(partition_router)
+      end
+      for source in _sources.values() do
+        source.update_router(partition_router)
+      end
+      for source_listener in _source_listeners.values() do
+        source_listener.update_router(partition_router)
+      end
 
   be inform_cluster_of_join() =>
     _connections.inform_cluster_of_join()
@@ -313,6 +383,7 @@ actor RouterRegistry
   be add_to_step_waiting_list(step_id: U128) =>
     _step_waiting_list.set(step_id)
 
+
   /////
   // Step moved off this worker or new step added to another worker
   /////
@@ -359,27 +430,20 @@ actor RouterRegistry
       let partition_router =
         _partition_routers(state_name).update_route[K](key, proxy_router)
       _partition_routers(state_name) = partition_router
-      for routable in _partition_router_steps.values() do
-        routable.update_router(partition_router)
-      end
+      _distribute_partition_router(partition_router)
     else
       Fail()
     end
 
   fun ref _remove_step_from_data_router(id: U128) =>
     try
-      match _data_router
-      | let dr: DataRouter val =>
-        let moving_step = dr.step_for_id(id)
+      let moving_step = _data_router.step_for_id(id)
 
-        let new_data_router = dr.remove_route(id)
-        for data_receiver in _data_receivers.values() do
-          data_receiver.update_router(new_data_router)
-        end
-        _data_router = new_data_router
-      else
-        Fail()
+      let new_data_router = _data_router.remove_route(id)
+      for data_receiver in _data_receivers.values() do
+        data_receiver.update_router(new_data_router)
       end
+      _data_router = new_data_router
     else
       Fail()
     end
@@ -390,8 +454,8 @@ actor RouterRegistry
     match _omni_router
     | let o: OmniRouter val =>
       let new_omni_router = o.update_route_to_proxy(id, proxy_address)
-      for routable in _omni_router_steps.values() do
-        routable.update_omni_router(new_omni_router)
+      for step in _omni_router_steps.values() do
+        step.update_omni_router(new_omni_router)
       end
       _omni_router = new_omni_router
     else
@@ -429,9 +493,7 @@ actor RouterRegistry
         end
         let partition_router =
           _partition_routers(state_name).update_route[K](key, step)
-        for routable in _partition_router_steps.values() do
-          routable.update_router(partition_router)
-        end
+        _distribute_partition_router(partition_router)
         // Add routes to state computation targets to state step
         match _pre_state_data
         | let psds: Array[PreStateData val] val =>
@@ -439,14 +501,9 @@ actor RouterRegistry
             if psd.state_name() == state_name then
               match psd.target_id()
               | let tid: U128 =>
-                match _data_router
-                | let dr: DataRouter val =>
-                  let target_router = DirectRouter(dr.step_for_id(tid))
-                  step.register_routes(target_router,
-                    psd.forward_route_builder())
-                else
-                  Fail()
-                end
+                let target_router = DirectRouter(_data_router.step_for_id(tid))
+                step.register_routes(target_router,
+                  psd.forward_route_builder())
               end
             end
           end
@@ -470,22 +527,17 @@ actor RouterRegistry
     """
     Called when a step has been migrated to this worker from another worker
     """
-    match _data_router
-    | let dr: DataRouter val =>
-      let new_data_router = dr.add_route(id, target)
-      for data_receiver in _data_receivers.values() do
-        data_receiver.update_router(new_data_router)
-      end
-      _data_router = new_data_router
-    else
-      Fail()
+    let new_data_router = _data_router.add_route(id, target)
+    for data_receiver in _data_receivers.values() do
+      data_receiver.update_router(new_data_router)
     end
+    _data_router = new_data_router
 
     match _omni_router
     | let o: OmniRouter val =>
       let new_omni_router = o.update_route_to_step(id, target)
-      for routable in _omni_router_steps.values() do
-        routable.update_omni_router(new_omni_router)
+      for step in _omni_router_steps.values() do
+        step.update_omni_router(new_omni_router)
       end
       _omni_router = new_omni_router
     else

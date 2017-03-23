@@ -215,11 +215,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         | let wi: WorkerInitializer =>
           wi.connections_ready(m.worker_name)
         end
-      | let m: CreateDataReceivers val =>
+      | let m: CreateDataChannelListener val =>
         ifdef "trace" then
-          @printf[I32]("Received CreateDataReceivers on Control Channel\n".cstring())
+          @printf[I32]("Received CreateDataChannelListener on Control Channel\n".cstring())
         end
-        _local_topology_initializer.create_data_receivers(m.workers,
+        _local_topology_initializer.create_data_channel_listener(m.workers,
           _d_host, _d_service)
       | let m: JoinClusterMsg val =>
         _local_topology_initializer.inform_joining_worker(conn, m.worker_name)

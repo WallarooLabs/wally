@@ -116,10 +116,10 @@ primitive ChannelMsgEncoder
   =>
     _encode(ConnectionsReadyMsg(worker_name), auth)
 
-  fun create_data_receivers(workers: Array[String] val, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+  fun create_data_channel_listener(workers: Array[String] val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(CreateDataReceivers(workers), auth)
+    _encode(CreateDataChannelListener(workers), auth)
 
   fun data_connect(sender_name: String, sender_step_id: U128,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -267,7 +267,7 @@ class ConnectionsReadyMsg is ChannelMsg
   new val create(name: String) =>
     worker_name = name
 
-class CreateDataReceivers is ChannelMsg
+class CreateDataChannelListener is ChannelMsg
   let workers: Array[String] val
 
   new val create(ws: Array[String] val) =>
@@ -275,11 +275,11 @@ class CreateDataReceivers is ChannelMsg
 
 class DataConnectMsg is ChannelMsg
   let sender_name: String
-  let sender_step_id: U128
+  let sender_boundary_id: U128
 
-  new val create(sender_name': String, sender_step_id': U128) =>
+  new val create(sender_name': String, sender_boundary_id': U128) =>
     sender_name = sender_name'
-    sender_step_id = sender_step_id'
+    sender_boundary_id = sender_boundary_id'
 
 class ReplayCompleteMsg is ChannelMsg
   let _sender_name: String

@@ -8,6 +8,10 @@ nc -l 127.0.0.1 5555 >> /dev/null
 2) metrics sink (if not using Monitoring Hub):
 nc -l 127.0.0.1 5001 >> /dev/null
 
+or
+
+giles/receiver/receiver --ponythreads=1 --ponynoblock -w -l 127.0.0.1:5555
+
 350 Symbols
 
 3a) market spread app (1 worker):

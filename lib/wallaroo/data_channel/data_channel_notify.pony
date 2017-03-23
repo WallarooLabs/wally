@@ -8,7 +8,15 @@ interface DataChannelNotify
   For an example of using this class please see the documentation for the
   `DataChannel` and `DataChannelListener` actors.
   """
-  fun ref update_data_receivers(drs: Map[String, DataReceiver] val)
+  fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
+    conn: DataChannel ref)
+    """
+    Each abstract data channel (a connection from an OutgoingBoundary)
+    corresponds to a single DataReceiver. On reconnect, we want a new
+    DataChannel for that boundary to use the same DataReceiver. This is
+    called once we have found (or initially created) the DataReceiver for
+    the DataChannel corresponding to this notify.
+    """
 
   fun ref accepted(conn: DataChannel ref) =>
     """

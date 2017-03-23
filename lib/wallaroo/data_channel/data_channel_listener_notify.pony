@@ -28,7 +28,6 @@ interface DataChannelListenNotify
     None
 
   fun ref connected(listen: DataChannelListener ref,
-    drs: Map[String, DataReceiver] val,
     router_registry: RouterRegistry): DataChannelNotify iso^ ?
     """
     Create a new DataChannelNotify to attach to a new DataChannel for a

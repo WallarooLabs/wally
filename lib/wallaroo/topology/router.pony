@@ -91,11 +91,11 @@ class DirectRouter
 
 class ProxyRouter is Equatable[ProxyRouter]
   let _worker_name: String
-  let _target: ConsumerStep tag
+  let _target: OutgoingBoundary
   let _target_proxy_address: ProxyAddress val
   let _auth: AmbientAuth
 
-  new val create(worker_name: String, target: ConsumerStep tag,
+  new val create(worker_name: String, target: OutgoingBoundary,
     target_proxy_address: ProxyAddress val, auth: AmbientAuth)
   =>
     _worker_name = worker_name
@@ -136,23 +136,45 @@ class ProxyRouter is Equatable[ProxyRouter]
     end
 
   fun copy_with_new_target_id(target_id: U128): ProxyRouter val =>
-    ProxyRouter(_worker_name,
-      _target,
-      ProxyAddress(_target_proxy_address.worker, target_id),
-      _auth)
+    ProxyRouter(_worker_name, _target,
+      ProxyAddress(_target_proxy_address.worker, target_id), _auth)
 
   fun routes(): Array[ConsumerStep] val =>
-    recover val [_target] end
+    try
+      recover [_target as ConsumerStep] end
+    else
+      Fail()
+      recover Array[ConsumerStep] end
+    end
 
   fun routes_not_in(router: Router val): Array[ConsumerStep] val =>
     if router.routes().contains(_target) then
       recover Array[ConsumerStep] end
     else
-      recover [_target] end
+      try
+        recover [_target as ConsumerStep] end
+      else
+        Fail()
+        recover Array[ConsumerStep] end
+      end
     end
 
   fun update_proxy_address(pa: ProxyAddress val): ProxyRouter val =>
     ProxyRouter(_worker_name, _target, pa, _auth)
+
+  fun val update_boundary(ob: box->Map[String, OutgoingBoundary]):
+    ProxyRouter val
+  =>
+    try
+      let new_target = ob(_target_proxy_address.worker)
+      if new_target isnt _target then
+        ProxyRouter(_worker_name, new_target, _target_proxy_address, _auth)
+      else
+        this
+      end
+    else
+      this
+    end
 
   fun eq(that: box->ProxyRouter): Bool =>
     (_worker_name == that._worker_name) and
@@ -595,6 +617,8 @@ trait PartitionRouter is (Router & Equatable[PartitionRouter])
   fun rebalance_steps(boundary: OutgoingBoundary, target_worker: String,
     worker_count: USize, state_name: String, router_registry: RouterRegistry)
   fun size(): USize
+  fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
+    PartitionRouter val
 
 trait AugmentablePartitionRouter[Key: (Hashable val & Equatable[Key] val)] is
   PartitionRouter
@@ -807,6 +831,22 @@ class LocalPartitionRouter[In: Any val,
     else
       error
     end
+
+  fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
+    PartitionRouter val
+  =>
+    let new_partition_routes: Map[Key, (Step | ProxyRouter val)] trn =
+      recover Map[Key, (Step | ProxyRouter val)] end
+    for (k, target) in _partition_routes.pairs() do
+      match target
+      | let pr: ProxyRouter val =>
+        new_partition_routes(k) = pr.update_boundary(ob)
+      else
+        new_partition_routes(k) = target
+      end
+    end
+    LocalPartitionRouter[In, Key](_local_map, _step_ids,
+      consume new_partition_routes, _partition_function, _default_router)
 
   fun rebalance_steps(boundary: OutgoingBoundary, target_worker: String,
     worker_count: USize, state_name: String, router_registry: RouterRegistry)
