@@ -439,11 +439,6 @@ actor LocalTopologyInitializer
           @printf[I32](("LocalTopology._save_worker_names: " + worker_name +
           "\n").cstring())
         end
-        if not _is_initializer then
-          file.print("initializer")
-          @printf[I32](("LocalTopology._save_worker_names: " + "initializer" +
-          "\n").cstring())
-        end
         file.sync()
         file.dispose()
       else
