@@ -103,6 +103,7 @@ actor RouterRegistry
 
   be register_source(tcp_source: TCPSource) =>
     _sources.set(tcp_source)
+    if not _migrating then tcp_source.unmute(_dummy_consumer) end
 
   be register_source_listener(tcp_source_listener: TCPSourceListener) =>
     _source_listeners.set(tcp_source_listener)
