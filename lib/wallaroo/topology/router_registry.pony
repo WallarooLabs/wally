@@ -1,4 +1,5 @@
 use "collections"
+use "net"
 use "time"
 use "wallaroo/boundary"
 use "wallaroo/data_channel"
@@ -39,6 +40,8 @@ actor RouterRegistry
   let _source_listeners: SetIs[TCPSourceListener] = _source_listeners.create()
   let _data_channel_listeners: SetIs[DataChannelListener] =
     _data_channel_listeners.create()
+  let _control_channel_listeners: SetIs[TCPListener] =
+    _control_channel_listeners.create()
   let _data_channels: SetIs[DataChannel] = _data_channels.create()
   // All steps that have a PartitionRouter
   let _partition_router_steps: SetIs[Step] = _partition_router_steps.create()
@@ -70,6 +73,8 @@ actor RouterRegistry
   let _dummy_consumer: DummyConsumer = DummyConsumer
 
   var _stop_the_world_pause: U64
+
+  var _waiting_to_finish_join: Bool = false
 
   new create(auth: AmbientAuth, worker_name: String, c: Connections,
     alfred: Alfred, stop_the_world_pause: U64)
@@ -110,6 +115,21 @@ actor RouterRegistry
 
   be register_data_channel_listener(dchl: DataChannelListener) =>
     _data_channel_listeners.set(dchl)
+    if _waiting_to_finish_join and
+      (_control_channel_listeners.size() != 0)
+    then
+      _inform_cluster_of_join()
+      _waiting_to_finish_join = false
+    end
+
+  be register_control_channel_listener(cchl: TCPListener) =>
+    _control_channel_listeners.set(cchl)
+    if _waiting_to_finish_join and
+      (_data_channel_listeners.size() != 0)
+    then
+      _inform_cluster_of_join()
+      _waiting_to_finish_join = false
+    end
 
   be register_data_channel(dc: DataChannel) =>
     // TODO: These need to be unregistered if they close
@@ -217,8 +237,16 @@ actor RouterRegistry
       end
 
   be inform_cluster_of_join() =>
-    _connections.inform_cluster_of_join()
+    _inform_cluster_of_join()
 
+  fun ref _inform_cluster_of_join() =>
+    if (_data_channel_listeners.size() != 0) and
+       (_control_channel_listeners.size() != 0)
+    then
+      _connections.inform_cluster_of_join()
+    else
+      _waiting_to_finish_join = true
+    end
 
   //////////////
   // NEW WORKER PARTITION MIGRATION
