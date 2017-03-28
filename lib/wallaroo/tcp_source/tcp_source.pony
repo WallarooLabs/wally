@@ -56,7 +56,8 @@ actor TCPSource is Producer
   var _read_len: USize = 0
   var _reading: Bool = false
   var _shutdown: Bool = false
-  var _muted: Bool = false
+  // Start muted. Wait for unmute to begin processing
+  var _muted: Bool = true
   var _expect_read_buf: Reader = Reader
   let _muted_downstream: SetIs[Any tag] = _muted_downstream.create()
 
