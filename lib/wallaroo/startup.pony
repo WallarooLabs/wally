@@ -536,13 +536,6 @@ actor Startup
         end
       end
 
-      // Call this on local topology initializer instead of Connections
-      // directly to make sure messages are processed in the create
-      // initialization order
-      local_topology_initializer.create_connections(consume control_addrs,
-        consume data_addrs)
-      local_topology_initializer.quick_initialize_data_connections()
-
       let control_channel_filepath: FilePath = FilePath(auth,
         _control_channel_file)
       let control_notifier: TCPListenNotify iso =
@@ -560,6 +553,13 @@ actor Startup
           TCPListener(auth, consume control_notifier, my_c_host,
             my_c_service))
       end
+
+      // Call this on local topology initializer instead of Connections
+      // directly to make sure messages are processed in the create
+      // initialization order
+      local_topology_initializer.create_connections(consume control_addrs,
+        consume data_addrs)
+      local_topology_initializer.quick_initialize_data_connections()
 
       // Dispose of temporary listener
       match _joining_listener

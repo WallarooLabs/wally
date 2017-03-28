@@ -145,7 +145,6 @@ actor Connections
         @printf[I32]("Restarting a data channel listener ...\n\n".cstring())
         let dch_listener = DataChannelListener(auth, consume notifier,
           router_registry, consume host', consume port')
-        router_registry.register_data_channel_listener(dch_listener)
         _data_channel_listeners.push(dch_listener)
       else
         @printf[I32]("could not recover host and port from file (replace with Fail())\n".cstring())
@@ -153,7 +152,6 @@ actor Connections
     else
       let dch_listener = DataChannelListener(auth, consume notifier,
         router_registry, host, port)
-      router_registry.register_data_channel_listener(dch_listener)
       _data_channel_listeners.push(dch_listener)
     end
 
@@ -166,12 +164,11 @@ actor Connections
       DataChannelListenNotifier(_worker_name, _auth, this,
         _is_initializer,
         MetricsReporter(_app_name, _worker_name, _metrics_conn),
-        data_channel_file, local_topology_initializer)
+        data_channel_file, local_topology_initializer, router_registry)
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     let dch_listener = DataChannelListener(_auth, consume data_notifier,
       router_registry, _init_d_host, _init_d_service, 0, 1_048_576, 1_048_576)
-    router_registry.register_data_channel_listener(dch_listener)
     register_listener(dch_listener)
 
     worker_initializer.identify_data_address("initializer", _init_d_host,
@@ -537,11 +534,23 @@ actor Connections
 
   be inform_cluster_of_join() =>
     try
+      if not _has_registered_my_addrs() then
+        @printf[I32]("Cannot inform cluster of join: my addresses have not yet been registered. Is there something else listening on ports I was assigned?\n".cstring())
+        Fail()
+      end
       let msg = ChannelMsgEncoder.joining_worker_initialized(_worker_name,
         _my_control_addr, _my_data_addr, _auth)
       _send_control_to_cluster(msg)
     else
       Fail()
+    end
+
+  fun _has_registered_my_addrs(): Bool =>
+    match _my_control_addr
+    | (_, "") => false
+    | (_, "") => false
+    else
+      true
     end
 
   be ack_migration_batch_complete(ack_target: String) =>

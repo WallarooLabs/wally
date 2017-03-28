@@ -344,7 +344,7 @@ actor LocalTopologyInitializer
               _is_initializer,
               MetricsReporter(_application.name(), _worker_name,
                 _metrics_conn),
-              data_channel_filepath, this)
+              data_channel_filepath, this, _router_registry)
 
           ifdef "resilience" then
             conns.make_and_register_recoverable_data_channel_listener(
@@ -354,7 +354,6 @@ actor LocalTopologyInitializer
             let dch_listener = DataChannelListener(_auth,
               consume data_notifier, _router_registry,
               host, service)
-            _router_registry.register_data_channel_listener(dch_listener)
             conns.register_listener(dch_listener)
           end
         else
@@ -409,7 +408,7 @@ actor LocalTopologyInitializer
               _is_initializer,
               MetricsReporter(_application.name(), _worker_name,
                 _metrics_conn),
-              data_channel_filepath, this)
+              data_channel_filepath, this, _router_registry)
 
           ifdef "resilience" then
             conns.make_and_register_recoverable_data_channel_listener(
@@ -418,7 +417,6 @@ actor LocalTopologyInitializer
           else
             let dch_listener = DataChannelListener(_auth,
               consume data_notifier, _router_registry)
-            _router_registry.register_data_channel_listener(dch_listener)
             conns.register_listener(dch_listener)
           end
         else

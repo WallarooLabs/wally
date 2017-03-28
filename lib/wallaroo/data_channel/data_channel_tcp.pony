@@ -22,6 +22,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
   let _connections: Connections
   let _metrics_reporter: MetricsReporter
   let _local_topology_initializer: LocalTopologyInitializer tag
+  let _router_registry: RouterRegistry
   let _joining_existing_cluster: Bool
 
   new iso create(name: String, auth: AmbientAuth,
@@ -29,6 +30,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
     metrics_reporter: MetricsReporter iso,
     recovery_file: FilePath,
     local_topology_initializer: LocalTopologyInitializer tag,
+    router_registry: RouterRegistry,
     joining: Bool = false)
   =>
     _name = name
@@ -38,11 +40,18 @@ class DataChannelListenNotifier is DataChannelListenNotify
     _metrics_reporter = consume metrics_reporter
     _recovery_file = recovery_file
     _local_topology_initializer = local_topology_initializer
+    _router_registry = router_registry
     _joining_existing_cluster = joining
 
   fun ref listening(listen: DataChannelListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
+
+      if not _is_initializer then
+        _connections.register_my_data_addr(_host, _service)
+      end
+      _router_registry.register_data_channel_listener(listen)
+
       @printf[I32]((_name + " data channel: listening on " + _host + ":" +
         _service + "\n").cstring())
       ifdef "resilience" then
@@ -73,10 +82,6 @@ class DataChannelListenNotifier is DataChannelListenNotify
             _auth)
           _connections.send_control("initializer", message)
         end
-      end
-
-      if not _is_initializer then
-        _connections.register_my_data_addr(_host, _service)
       end
     else
       @printf[I32]((_name + "data : couldn't get local address").cstring())

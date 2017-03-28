@@ -56,6 +56,12 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
+
+      if not _is_initializer then
+        _connections.register_my_control_addr(_host, _service)
+      end
+      _router_registry.register_control_channel_listener(listen)
+
       ifdef "resilience" then
         if _recovery_file.exists() then
           @printf[I32]("Recovery file exists for control channel\n".cstring())
@@ -86,9 +92,6 @@ class ControlChannelListenNotifier is TCPListenNotify
         end
       end
 
-      if not _is_initializer then
-        _connections.register_my_control_addr(_host, _service)
-      end
       _env.out.print(_name + " control: listening on " + _host + ":" + _service)
     else
       _env.out.print(_name + "control : couldn't get local address")
