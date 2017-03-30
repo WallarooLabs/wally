@@ -85,6 +85,7 @@ install:
     cd /tmp;
     git clone https://github.com/jemc/pony-stable.git;
     cd pony-stable;
+    git checkout 0054b429a54818d187100ed40f5525ec7931b31b;
     sudo make install;
   - cd $INSTALL_STARTED_AT
   - if [ "${TRAVIS_OS_NAME}" = "osx" ];
