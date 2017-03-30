@@ -49,6 +49,10 @@ install:
   # return to our starting directory, then our `script` step will fail because
   # its in the wrong directory.
   - export INSTALL_STARTED_AT=`pwd`
+  - if [ "${TRAVIS_OS_NAME}" = "linux" ];
+    then
+      sudo apt-get -fy install cpuset;
+    fi;
   - if [ "${TRAVIS_OS_NAME}" = "osx" ];
     then
       brew update;
