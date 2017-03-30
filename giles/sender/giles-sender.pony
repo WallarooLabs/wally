@@ -1,16 +1,17 @@
 """
 Giles Sender
 """
+use "buffered"
 use "collections"
+use "debug"
 use "files"
 use "net"
-use "buffered"
 use "options"
+use "random"
 use "time"
+use "sendence/bytes"
 use "sendence/messages"
 use "sendence/tcp"
-use "sendence/bytes"
-use "debug"
 
 // documentation
 // more tests
@@ -28,6 +29,7 @@ actor Main
     var write_to_file: Bool = true
     var binary_integer: Bool = false
     var start_from: U64 = 0
+    var vary_by: U64 = 0
 
     if run_tests then
       TestMain(env)
@@ -39,8 +41,6 @@ actor Main
       var f_arg: (String | None) = None
       var g_arg: (USize | None) = None
       var z_arg: (Bool | None) = None
-      var j_arg: (USize | None) = None
-      var k_arg: (USize | None) = None
 
       try
         var options = Options(env.args)
@@ -60,8 +60,7 @@ actor Main
           .add("variable-size", "z", None)
           .add("msg-size", "g", I64Argument)
           .add("no-write", "w", None)
-          .add("variable-rate-batch-size-increase", "j", I64Argument)
-          .add("variable-rate-start-after", "k", I64Argument)
+          .add("vary-by", "j", I64Argument)
 
         for option in options do
           match option
@@ -93,10 +92,8 @@ actor Main
             g_arg = arg.usize()
           | ("no-write", None) =>
             write_to_file = false
-          | ("variable-rate-batch-size-increase", let arg: I64) =>
-            j_arg = arg.usize()
-          | ("variable-rate-start-after", let arg: I64) =>
-            k_arg = arg.usize()
+          | ("vary-by", let arg: I64) =>
+            vary_by = arg.u64()
           end
         end
 
@@ -160,15 +157,6 @@ actor Main
           end
         end
 
-        if ((j_arg isnt None) and (k_arg is None)) or
-          ((j_arg is None) and (k_arg isnt None))
-        then
-          env.err.print(
-            "--variable-rate-batch-size-increase  and " +
-            "--variable-rate-start-afterrequires require each other")
-          required_args_are_present = false
-        end
-
         if required_args_are_present then
           let messages_to_send = m_arg as USize
           let to_buffy_addr = b_arg as Array[String]
@@ -210,20 +198,6 @@ actor Main
               end
             end
 
-          let variable_rate_batch_size_increase =
-            match j_arg
-            | let j: USize => j
-            else
-              0
-            end
-
-          let variable_rate_start_after =
-            match k_arg
-            | let k: USize => k
-            else
-              0
-            end
-
           let sa = SendingActor(
             messages_to_send,
             to_buffy_socket,
@@ -235,8 +209,7 @@ actor Main
             binary_fmt,
             variable_size,
             write_to_file,
-            variable_rate_start_after,
-            variable_rate_batch_size_increase)
+            vary_by)
 
           coordinator.sending_actor(sa)
         end
@@ -472,9 +445,8 @@ actor SendingActor
   let _interval: U64
   let _wb: Writer
   var _write_to_file: Bool = true
-  var _batch_size_changed: Bool = false
-  var _increase_batch_size_after: USize
-  var _batch_size_increase_amount: USize
+  var _vary_by: U64
+  let _rng: MT
 
   new create(messages_to_send: USize,
     to_buffy_socket: TCPConnection,
@@ -486,8 +458,7 @@ actor SendingActor
     binary_fmt: Bool,
     variable_size: Bool,
     write_to_file: Bool,
-    variable_rate_start_after: USize,
-    variable_rate_batch_size_increase: USize)
+    vary_by: U64)
   =>
     _messages_to_send = messages_to_send
     _to_buffy_socket = to_buffy_socket
@@ -501,8 +472,8 @@ actor SendingActor
     _variable_size = variable_size
     _write_to_file = write_to_file
     _wb = Writer
-    _increase_batch_size_after = variable_rate_start_after
-    _batch_size_increase_amount = variable_rate_batch_size_increase
+    _vary_by = vary_by
+    _rng = MT(Time.millis())
 
   be go() =>
     let t = Timer(SendBatch(this), 0, _interval)
@@ -514,17 +485,9 @@ actor SendingActor
   be send_batch() =>
     if _paused or _finished then return end
 
-    if ((_increase_batch_size_after > 0) and
-      (_batch_size_changed == false)) and
-      (_messages_sent >= _increase_batch_size_after)
-    then
-      _batch_size = _batch_size + _batch_size_increase_amount
-      _batch_size_changed = true
-    end
-
     var current_batch_size =
       if (_messages_to_send - _messages_sent) > _batch_size then
-        _batch_size
+        _batch_size + (_rng.int(_vary_by)).usize()
       else
         _messages_to_send - _messages_sent
       end
