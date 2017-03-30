@@ -447,6 +447,8 @@ actor SendingActor
   var _write_to_file: Bool = true
   var _vary_by: U64
   let _rng: MT
+  var _drunk_walk: USize = 0
+  var _walks_remaining: USize = 1000
 
   new create(messages_to_send: USize,
     to_buffy_socket: TCPConnection,
@@ -485,9 +487,18 @@ actor SendingActor
   be send_batch() =>
     if _paused or _finished then return end
 
+    if _walks_remaining == 0 then
+      _drunk_walk = (_rng.int(_vary_by)).usize()
+      _walks_remaining = 1000
+    else
+      _walks_remaining = _walks_remaining - 1
+    end
+
+    let this_batch = _batch_size + _drunk_walk
+
     var current_batch_size =
-      if (_messages_to_send - _messages_sent) > _batch_size then
-        _batch_size + (_rng.int(_vary_by)).usize()
+      if (_messages_to_send - _messages_sent) > this_batch then
+        this_batch
       else
         _messages_to_send - _messages_sent
       end
