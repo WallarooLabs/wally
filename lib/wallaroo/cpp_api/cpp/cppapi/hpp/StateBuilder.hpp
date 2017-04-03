@@ -5,7 +5,7 @@
 
 namespace wallaroo
 {
-  class StateBuilder
+  class StateBuilder: public ManagedObject
   {
   public:
     virtual const char *name() = 0;
