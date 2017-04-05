@@ -19,7 +19,7 @@ To do this, we can use `spike`, a compile-time fault injection component of Wall
 In addition to `Spike`, we also need a boundary in our application.
 Luckily, `sequence-window` already has a boundary when run with two workers, so that's taken care of.
 
-The gist of the test is simple: We run `sequence-window` with `Spike` on the `initializer` worker (the sending side of the boundary), and observe that once the connection is dropped, a reconnect behaviour follows, is successful, and the data resumes to both processes of the application.
+The gist of the test is simple: We run `sequence-window` with `Spike` on the `initializer` worker, and observe that once the connection is dropped, a reconnect behaviour follows, is successful, and the data resumes to both processes of the application.
 
 
 ### Setting Up for the Test:
@@ -30,10 +30,10 @@ The gist of the test is simple: We run `sequence-window` with `Spike` on the `in
 ### Running the Test:
 
 1. start giles-receiver:  `../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock --ponypinasio -l 127.0.0.1:5555`
-1. start initializer-worker: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t --spike-drop --spike-prob 5`
+1. start initializer-worker: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t --spike-drop --spike-prob 0.001 --spike-margin 1000`
 1. start second worker: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 -d 127.0.0.1:12501 -r res-data -w 2 -n worker2`
-1. start giles-sender and send the first 1000 integers, slowly: `../../../../giles/sender/sender -b 127.0.0.1:7000 -s 10 -i 100_000_000 -u --ponythreads=1 -y -g 12 -w -m 1000`
-1. If you built the application in Debug mode, then each worker will have printed to its stdout the values in its sequence window at each step, and you can verify that the sequence at the second worker has reached `[994, 996, 998, 1000]` as we expect it to if it reconnects successfully.
+1. start giles-sender and send 10000 integers: `../../../../giles/sender/sender -b 127.0.0.1:7000 -s 10 -i 5_000_000 -u --ponythreads=1 -y -g 12 -w -m 10000`
+1. wait for giles-sender to complete
 1. Terminate all of the processes
 
 ### Analysing the Test Results:
@@ -45,4 +45,3 @@ The gist of the test is simple: We run `sequence-window` with `Spike` on the `in
 #### Manualy
 
 1. Decode the giles-receiver output with fallor and visually inspect the output sequences to comply with the expectation described above.
-
