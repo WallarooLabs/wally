@@ -1,6 +1,7 @@
 use "buffered"
 use "collections"
 use "files"
+use "itertools"
 use "net"
 use "net/http"
 use "options"
@@ -292,60 +293,70 @@ actor Startup
 
       // check to see if we can recover
       ifdef "resilience" then
+        // Use Set to make the logic explicit and clear
+        let existing_files: Set[String] = Set[String]
+
         let event_log_filepath: FilePath = FilePath(auth, _event_log_file)
+        if event_log_filepath.exists() then
+          existing_files.set(event_log_filepath.path)
+        end
+
         let local_topology_filepath: FilePath = FilePath(auth,
           _local_topology_file)
+        if local_topology_filepath.exists() then
+          existing_files.set(local_topology_filepath.path)
+        end
+
         let data_channel_filepath: FilePath = FilePath(auth,
           _data_channel_file)
+        if data_channel_filepath.exists() then
+          existing_files.set(data_channel_filepath.path)
+        end
+
         let control_channel_filepath: FilePath = FilePath(auth,
           _control_channel_file)
+        if control_channel_filepath.exists() then
+          existing_files.set(control_channel_filepath.path)
+        end
+
         let worker_names_filepath: FilePath = FilePath(auth,
           _worker_names_file)
+        if worker_names_filepath.exists() then
+          existing_files.set(worker_names_filepath.path)
+        end
+
         let connection_addresses_filepath: FilePath = FilePath(auth,
           _connection_addresses_file)
+        if connection_addresses_filepath.exists() then
+          existing_files.set(connection_addresses_filepath.path)
+        end
+
+        let required_files: Set[String] = Set[String]
+        required_files.set(event_log_filepath.path)
+        required_files.set(local_topology_filepath.path)
+        required_files.set(control_channel_filepath.path)
+        required_files.set(worker_names_filepath.path)
         if not _is_initializer then
-          if event_log_filepath.exists() or
-            local_topology_filepath.exists() or
-            data_channel_filepath.exists() or
-            control_channel_filepath.exists() or
-            worker_names_filepath.exists() or
-            connection_addresses_filepath.exists()
-          then
-            if not (event_log_filepath.exists() and
-              local_topology_filepath.exists() and
-              data_channel_filepath.exists() and
-              control_channel_filepath.exists() and
-              worker_names_filepath.exists() and
-              connection_addresses_filepath.exists())
-            then
-              @printf[I32](("Some of the resilience recovery files are" +
-                " missing but others exist! Cannot continue!\n").cstring())
-              Fail()
-            else
-              @printf[I32]("Recovering from recovery files!\n".cstring())
-              // we are recovering because all files exist
-              is_recovering = true
-            end
-          end
-        else
-          if event_log_filepath.exists() or
-            local_topology_filepath.exists() or
-            control_channel_filepath.exists() or
-            worker_names_filepath.exists()
-          then
-            if not (event_log_filepath.exists() and
-              local_topology_filepath.exists() and
-              control_channel_filepath.exists() and
-              worker_names_filepath.exists())
-            then
-              @printf[I32](("Some of the resilience recovery files are" +
-                " missing but others exist! Cannot continue!\n").cstring())
-              Fail()
-            else
-              @printf[I32]("Recovering from recovery files!\n".cstring())
-              // we are recovering because all files exist
-              is_recovering = true
-            end
+          required_files.set(data_channel_filepath.path)
+          required_files.set(connection_addresses_filepath.path)
+        end
+
+        // Only validate _all_ files exist if _any_ files exist.
+        if existing_files.size() > 0 then
+          // If any recovery file exists, but not all, then fail
+          if (required_files.op_and(existing_files)) != required_files then
+            @printf[I32](("Some resilience recovery files are missing! "
+              + "Cannot continue!\n").cstring())
+              let files_missing = required_files.without(existing_files)
+              let files_missing_str: String val = "\n    ".join(
+                Iter[String](files_missing.values()).collect(Array[String]))
+              @printf[I32]("The missing files are:\n    %s\n".cstring(),
+                files_missing_str.cstring())
+            Fail()
+          else
+            @printf[I32]("Recovering from recovery files!\n".cstring())
+            // we are recovering because all files exist
+            is_recovering = true
           end
         end
       end
