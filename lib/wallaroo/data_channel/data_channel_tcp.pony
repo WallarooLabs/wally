@@ -46,6 +46,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
   fun ref listening(listen: DataChannelListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
+      if _host == "::1" then _host = "127.0.0.1" end
 
       if not _is_initializer then
         _connections.register_my_data_addr(_host, _service)

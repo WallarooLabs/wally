@@ -739,6 +739,13 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
       @pony_os_nodelay[None](_fd, state)
     end
 
+  fun ref receive_connect_ack(seq_id: SeqId) =>
+    """
+    For WallarooOutgoingNetworkActor only.
+    This would be needed if we used a handshake to connect downstream.
+    """
+    None
+
   fun ref receive_ack(seq_id: SeqId) =>
     """
     For WallarooOutgoingNetworkActor only.

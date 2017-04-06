@@ -248,6 +248,16 @@ actor RouterRegistry
       _waiting_to_finish_join = true
     end
 
+  be inform_worker_of_boundary_count(target_worker: String) =>
+    // There is one boundary per source plus the canonical boundary
+    let count = _sources.size() + 1
+    _connections.inform_worker_of_boundary_count(target_worker, count)
+
+  be reconnect_source_boundaries(target_worker: String) =>
+    for source in _sources.values() do
+      source.reconnect_boundary(target_worker)
+    end
+
   //////////////
   // NEW WORKER PARTITION MIGRATION
   //////////////

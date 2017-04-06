@@ -161,6 +161,13 @@ actor TCPSource is Producer
     end
     _notify.update_boundaries(_outgoing_boundaries)
 
+  be reconnect_boundary(target_worker_name: String) =>
+    try
+      _outgoing_boundaries(target_worker_name).reconnect()
+    else
+      Fail()
+    end
+
   be remove_route_for(step: ConsumerStep) =>
     try
       _routes.remove(step)
@@ -211,10 +218,10 @@ actor TCPSource is Producer
       None
     end
 
-  fun ref next_sequence_id(): U64 =>
+  fun ref next_sequence_id(): SeqId =>
     _seq_id = _seq_id + 1
 
-  fun ref current_sequence_id(): U64 =>
+  fun ref current_sequence_id(): SeqId =>
     _seq_id
 
   //

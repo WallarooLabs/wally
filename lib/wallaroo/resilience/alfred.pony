@@ -237,6 +237,7 @@ actor Alfred
       _replay_complete_markers.create()
     var num_encoded: USize = 0
     var _flush_waiting: USize = 0
+    var _initialized: Bool = false
 
     new create(env: Env, filename: (String val | None) = None,
       logging_batch_size: USize = 10,
@@ -260,16 +261,23 @@ actor Alfred
 
     be start(initializer: LocalTopologyInitializer) =>
       _backend.start()
+      for b in _incoming_boundaries.values() do
+        b.initialize()
+      end
+      _initialized = true
       initializer.report_alfred_ready_to_work()
 
     be register_incoming_boundary(boundary: DataReceiver tag) =>
       _incoming_boundaries.push(boundary)
+      if _initialized then
+        boundary.initialize()
+      end
 
     be log_replay_finished() =>
       //signal all buffers that event log replay is finished
       for boundary in _incoming_boundaries.values() do
         _replay_complete_markers.update((digestof boundary),false)
-        boundary.request_replay()
+        // !!boundary.request_replay()
       end
 
     be upstream_replay_finished(boundary: DataReceiver tag) =>

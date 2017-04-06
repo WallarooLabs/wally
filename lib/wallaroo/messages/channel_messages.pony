@@ -21,7 +21,7 @@ primitive ChannelMsgEncoder
     wb.done()
 
   fun data_channel(delivery_msg: ReplayableDeliveryMsg val,
-    pipeline_time_spent: U64, seq_id: U64, wb: Writer, auth: AmbientAuth,
+    pipeline_time_spent: U64, seq_id: SeqId, wb: Writer, auth: AmbientAuth,
     latest_ts: U64, metrics_id: U16, metric_name: String): Array[ByteSeq] val ?
   =>
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
@@ -126,6 +126,11 @@ primitive ChannelMsgEncoder
   =>
     _encode(DataConnectMsg(sender_name, sender_step_id), auth)
 
+  fun ack_data_connect(last_id_seen: SeqId, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(AckDataConnectMsg(last_id_seen), auth)
+
   fun request_replay(sender_name: String, target_id: U128, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
@@ -136,7 +141,7 @@ primitive ChannelMsgEncoder
   =>
     _encode(ReplayCompleteMsg(sender_name), auth)
 
-  fun ack_watermark(sender_name: String, sender_step_id: U128, seq_id: U64,
+  fun ack_watermark(sender_name: String, sender_step_id: U128, seq_id: SeqId,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(AckWatermarkMsg(sender_name, sender_step_id, seq_id), auth)
@@ -174,6 +179,11 @@ primitive ChannelMsgEncoder
     d_addr: (String, String), auth: AmbientAuth): Array[ByteSeq] val ?
   =>
     _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr), auth)
+
+  fun replay_boundary_count(count: USize, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(ReplayBoundaryCountMsg(count), auth)
 
   fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
     id: U128, worker_name: String, key: K, state_name: String,
@@ -281,6 +291,12 @@ class DataConnectMsg is ChannelMsg
     sender_name = sender_name'
     sender_boundary_id = sender_boundary_id'
 
+class AckDataConnectMsg is ChannelMsg
+  let last_id_seen: SeqId
+
+  new val create(last_id_seen': SeqId) =>
+    last_id_seen = last_id_seen'
+
 class ReplayCompleteMsg is ChannelMsg
   let _sender_name: String
 
@@ -355,23 +371,25 @@ class StepMigrationCompleteMsg is ChannelMsg
 class AckWatermarkMsg is ChannelMsg
   let sender_name: String
   let sender_step_id: U128
-  let seq_id: U64
+  let seq_id: SeqId
 
-  new val create(sender_name': String, sender_step_id': U128, seq_id': U64) =>
+  new val create(sender_name': String, sender_step_id': U128,
+    seq_id': SeqId)
+  =>
     sender_name = sender_name'
     sender_step_id = sender_step_id'
     seq_id = seq_id'
 
 class DataMsg is ChannelMsg
   let pipeline_time_spent: U64
-  let seq_id: U64
+  let seq_id: SeqId
   let delivery_msg: ReplayableDeliveryMsg val
   let latest_ts: U64
   let metrics_id: U16
   let metric_name: String
 
   new val create(msg: ReplayableDeliveryMsg val, pipeline_time_spent': U64,
-    seq_id': U64, latest_ts': U64, metrics_id': U16, metric_name': String)
+    seq_id': SeqId, latest_ts': U64, metrics_id': U16, metric_name': String)
   =>
     seq_id = seq_id'
     pipeline_time_spent = pipeline_time_spent'

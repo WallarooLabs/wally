@@ -709,10 +709,10 @@ actor _TestProducer is Producer
   fun ref route_to(c: Consumer): (Route | None) =>
     None
 
-  fun ref next_sequence_id(): U64 =>
+  fun ref next_sequence_id(): SeqId =>
     0
 
-  fun ref current_sequence_id(): U64 =>
+  fun ref current_sequence_id(): SeqId =>
     0
 
   fun ref _x_resilience_routes(): Routes =>

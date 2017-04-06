@@ -1414,6 +1414,9 @@ actor LocalTopologyInitializer
       for w in _recovered_worker_names.values() do
         if w != _worker_name then
           try
+            ifdef "trace" then
+              @printf[I32]("Sending ReconnectDataPortMsg\n".cstring())
+            end
             let message = ChannelMsgEncoder.reconnect_data_port(_worker_name,
               _auth)
             match _connections

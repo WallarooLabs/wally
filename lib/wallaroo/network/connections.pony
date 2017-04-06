@@ -139,10 +139,10 @@ actor Connections
     if recovery_addr_file.exists() then
       try
         let file = File(recovery_addr_file)
-        let host' = file.line()
-        let port' = file.line()
+        var host': String = file.line()
+        let port': String = file.line()
 
-        @printf[I32]("Restarting a data channel listener ...\n\n".cstring())
+        @printf[I32]("Restarting a data channel listener on %s:%s...\n\n".cstring(), host'.cstring(), port'.cstring())
         let dch_listener = DataChannelListener(auth, consume notifier,
           router_registry, consume host', consume port')
         _data_channel_listeners.push(dch_listener)
@@ -541,6 +541,14 @@ actor Connections
       let msg = ChannelMsgEncoder.joining_worker_initialized(_worker_name,
         _my_control_addr, _my_data_addr, _auth)
       _send_control_to_cluster(msg)
+    else
+      Fail()
+    end
+
+  be inform_worker_of_boundary_count(target_worker: String, count: USize) =>
+    try
+      let msg = ChannelMsgEncoder.replay_boundary_count(count, _auth)
+      _send_control(target_worker, msg)
     else
       Fail()
     end

@@ -14,6 +14,12 @@ interface WallarooOutgoingNetworkActor
     if called in the `sent` notifier callback.
     """
 
+  fun ref receive_connect_ack(seq_id: SeqId)
+    """
+    Called when processing an acknowledgment of successful connection to a
+    DataReceiver
+    """
+
   fun ref receive_ack(seq_id: SeqId)
     """
     Called when processing an acknowledgment of a message sent over the

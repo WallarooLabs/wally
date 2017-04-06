@@ -19,8 +19,8 @@ actor DataReceiver is Producer
   let _connections: Connections
   var _router: DataRouter val =
     DataRouter(recover Map[U128, ConsumerStep tag] end)
-  var _last_id_seen: U64 = 0
-  var _last_id_acked: U64 = 0
+  var _last_id_seen: SeqId = 0
+  var _last_id_acked: SeqId = 0
   var _connected: Bool = false
   var _reconnecting: Bool = false
   let _alfred: Alfred
@@ -44,6 +44,8 @@ actor DataReceiver is Producer
 
   let _router_registry: RouterRegistry
 
+  var _initialized: Bool = false
+
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
     connections: Connections, router_registry: RouterRegistry, alfred: Alfred)
   =>
@@ -55,14 +57,41 @@ actor DataReceiver is Producer
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
 
+  be initialize() =>
+    """
+    Called by Alfred to indicate that any log replay is finished and we
+    are ready to accept messages
+    """
+    _initialized = true
+    // If we've already received a DataConnect, then send ack
+    match _latest_conn
+    | let conn: DataChannel =>
+      _ack_data_connect()
+    end
+
   be data_connect(sender_step_id: U128, conn: DataChannel) =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
+    // If we're not yet initialized, we need to wait to ack
+    if _initialized then _ack_data_connect() end
     // Now that we have a sender_step_id, we're ready to register with
     // the registry
     _router_registry.add_data_receiver(_sender_name, _sender_step_id, this)
-    if _replay_pending then
-      request_replay()
+
+  fun _ack_data_connect() =>
+    try
+      let ack_msg = ChannelMsgEncoder.ack_data_connect(_last_id_seen, _auth)
+      _write_on_conn(ack_msg)
+    else
+      Fail()
+    end
+
+  fun _write_on_conn(data: Array[ByteSeq] val) =>
+    match _latest_conn
+    | let conn: DataChannel =>
+      conn.writev(data)
+    else
+      Fail()
     end
 
   fun ref init_timer() =>
@@ -87,12 +116,7 @@ actor DataReceiver is Producer
 
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, watermark, _auth)
-        match _latest_conn
-        | let conn: DataChannel =>
-          conn.writev(ack_msg)
-        else
-          Fail()
-        end
+        _write_on_conn(ack_msg)
         _last_id_acked = watermark
       end
     else
@@ -121,7 +145,7 @@ actor DataReceiver is Producer
   be upstream_replay_finished() =>
     _alfred.upstream_replay_finished(this)
 
-  fun ref _flush(low_watermark: U64) =>
+  fun ref _flush(low_watermark: SeqId) =>
     """This is not a real Origin, so it doesn't write any State"""
     None
 
@@ -165,7 +189,7 @@ actor DataReceiver is Producer
       end
     end
 
-  be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: U64,
+  be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: SeqId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _timer_init(this)
@@ -190,7 +214,7 @@ actor DataReceiver is Producer
     _last_request = _ack_counter
 
   be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
-    seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+    seq_id: SeqId, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     if seq_id >= _last_id_seen then
       _last_id_seen = seq_id
@@ -215,12 +239,7 @@ actor DataReceiver is Producer
         _last_id_acked = _last_id_seen
         let ack_msg = ChannelMsgEncoder.ack_watermark(_worker_name,
           _sender_step_id, _last_id_seen, _auth)
-        match _latest_conn
-        | let conn: DataChannel =>
-          conn.writev(ack_msg)
-        else
-          Fail()
-        end
+        _write_on_conn(ack_msg)
       end
     else
       @printf[I32]("Error creating ack watermark message\n".cstring())
@@ -232,10 +251,10 @@ actor DataReceiver is Producer
   fun ref route_to(c: Consumer): (Route | None) =>
     None
 
-  fun ref next_sequence_id(): U64 =>
+  fun ref next_sequence_id(): SeqId =>
     0
 
-  fun ref current_sequence_id(): U64 =>
+  fun ref current_sequence_id(): SeqId =>
     0
 
   be mute(c: Consumer) =>

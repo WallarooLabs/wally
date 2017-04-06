@@ -6,8 +6,8 @@ trait tag Producer
   be mute(c: Consumer)
   be unmute(c: Consumer)
   fun ref route_to(c: Consumer): (Route | None)
-  fun ref next_sequence_id(): U64
-  fun ref current_sequence_id(): U64
+  fun ref next_sequence_id(): SeqId
+  fun ref current_sequence_id(): SeqId
 
   // from Origin
   fun tag hash(): U64 =>
