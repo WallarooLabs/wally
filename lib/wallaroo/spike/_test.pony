@@ -755,6 +755,9 @@ class NullWallarooOutgoingNetworkActor is WallarooOutgoingNetworkActor
   fun ref expect(qty: USize = 0) =>
     None
 
+  fun ref receive_connect_ack(seq_id: SeqId) =>
+    None
+
   fun ref receive_ack(seq_id: SeqId) =>
     None
 

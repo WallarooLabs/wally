@@ -285,10 +285,10 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
       _metrics_reporter.worker_metric(metric_name, time_spent)
     end
 
-  fun ref next_sequence_id(): U64 =>
+  fun ref next_sequence_id(): SeqId =>
     _seq_id = _seq_id + 1
 
-  fun ref current_sequence_id(): U64 =>
+  fun ref current_sequence_id(): SeqId =>
     _seq_id
 
   ///////////
@@ -326,8 +326,8 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
     end
     false
 
-  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    i_origin: Producer, msg_uid: U128,
+  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
+    data: D, i_origin: Producer, msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>

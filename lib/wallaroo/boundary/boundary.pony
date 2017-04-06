@@ -91,6 +91,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   var _expect_read_buf: Reader = Reader
 
   // Connection, Acking and Replay
+  var _connection_initialized: Bool = false
   var _replaying: Bool = false
   let _auth: AmbientAuth
   let _worker_name: String
@@ -99,10 +100,10 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   let _service: String
   let _from: String
   let _queue: Array[Array[ByteSeq] val] = _queue.create()
-  var _lowest_queue_id: U64 = 0
+  var _lowest_queue_id: SeqId = 0
   // TODO: this should go away and TerminusRoute entirely takes
   // over seq_id generation whether there is resilience or not.
-  var _seq_id: U64 = 1
+  var _seq_id: SeqId = 1
 
   // Origin (Resilience)
   let _terminus_route: TerminusRoute = TerminusRoute
@@ -256,8 +257,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
       end
 
     let new_metrics_id = ifdef "detailed-metrics" then
-        _metrics_reporter.step_metric(metric_name, "Before receive at boundary",
-          metrics_id, latest_ts, my_latest_ts)
+        _metrics_reporter.step_metric(metric_name,
+          "Before receive at boundary", metrics_id, latest_ts, my_latest_ts)
         metrics_id + 2
       else
         metrics_id
@@ -274,9 +275,11 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
         pipeline_time_spent + (Time.nanos() - worker_ingress_ts),
         seq_id, _wb, _auth, WallClock.nanoseconds(),
         new_metrics_id, metric_name)
-        _add_to_upstream_backup(outgoing_msg)
+      _add_to_upstream_backup(outgoing_msg)
 
-      _writev(outgoing_msg)
+      if _connection_initialized then
+        _writev(outgoing_msg)
+      end
 
       let end_ts = Time.nanos()
 
@@ -315,6 +318,23 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
     ifdef "resilience" then
       _terminus_route.receive_ack(seq_id)
+    end
+
+  fun ref receive_connect_ack(last_id_seen: SeqId) =>
+    _replay_from(last_id_seen)
+    _connection_initialized = true
+
+  fun ref _replay_from(idx: SeqId) =>
+    var cur_id = _lowest_queue_id
+    for msg in _queue.values() do
+      if cur_id >= idx then
+        try
+          _writev(ChannelMsgEncoder.replay(msg, _auth))
+        else
+          Fail()
+        end
+      end
+      cur_id = cur_id + 1
     end
 
   be replay_msgs() =>
@@ -418,8 +438,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
             _fd = fd
             _event = event
 
-            // clear anything pending to be sent because on recovery we're going to
-            // have to replay from our queue when requested
+            // clear anything pending to be sent because on recovery we're
+            // going to have to replay from our queue when requested
             _pending_writev.clear()
             _pending.clear()
             _pending_writev_total = 0
@@ -427,8 +447,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
             _connected = true
             _writeable = true
 
-            // set replaying to true since we might need to replay to downstream
-            // refore resuming
+            // set replaying to true since we might need to replay to
+            // downstream refore resuming
             _replaying = true
 
             _closed = false
@@ -438,8 +458,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
             _notify.connected(this)
 
             try
-              let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
-                _auth)
+              let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
+                _step_id, _auth)
               _writev(connect_msg)
             else
               @printf[I32]("error creating data connect message on reconnect\n".cstring())
@@ -611,6 +631,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     _fd = -1
 
     _notify.closed(this)
+    _connection_initialized = false
 
   fun ref _pending_reads() =>
     """
@@ -879,22 +900,26 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
         @printf[I32]("Rcvd msg at OutgoingBoundary\n".cstring())
       end
       match ChannelMsgDecoder(consume data, _auth)
+      | let ac: AckDataConnectMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received AckDataConnectMsg at Boundary\n".cstring())
+        end
+        conn.receive_connect_ack(ac.last_id_seen)
       | let aw: AckWatermarkMsg val =>
         ifdef "trace" then
-          @printf[I32]("Received AckWatermarkMsg on Data Channel\n".cstring())
+          @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
         end
         conn.receive_ack(aw.seq_id)
       | let m: RequestReplayMsg val =>
         ifdef "trace" then
-          @printf[I32]("Received RequestReplayMsg on Data Channel\n".cstring())
+          @printf[I32]("Received RequestReplayMsg at Boundary\n".cstring())
         end
         match conn
         | let c: OutgoingBoundary =>
           c.replay_msgs()
         end
       else
-        @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring()
-)
+        @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring())
       end
 
       conn.expect(4)

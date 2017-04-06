@@ -56,6 +56,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref listening(listen: TCPListener ref) =>
     try
       (_host, _service) = listen.local_address().name()
+      if _host == "::1" then _host = "127.0.0.1" end
 
       if not _is_initializer then
         _connections.register_my_control_addr(_host, _service)
@@ -185,6 +186,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32]("Received ReconnectDataPortMsg on Control Channel\n".cstring())
         end
         _connections.reconnect_data_connection(m.worker_name)
+        _router_registry.inform_worker_of_boundary_count(m.worker_name)
+        _router_registry.reconnect_source_boundaries(m.worker_name)
       | let m: SpinUpLocalTopologyMsg val =>
         ifdef "trace" then
           @printf[I32]("Received SpinUpLocalTopologyMsg on Control Channel\n".cstring())
