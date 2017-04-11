@@ -187,13 +187,6 @@ actor Startup
       _connection_addresses_file = _resilience_dir + "/" + name + "-" +
         _worker_name + ".connection-addresses"
 
-      _alfred = ifdef "resilience" then
-          Alfred(_env, _event_log_file
-            where backend_file_length = _alfred_file_length)
-        else
-          Alfred(_env, None)
-        end
-
       ifdef "resilience" then
         @printf[I32](("|||Resilience directory: " + _resilience_dir +
           "|||\n").cstring())
@@ -360,6 +353,13 @@ actor Startup
           end
         end
       end
+
+      _alfred = ifdef "resilience" then
+          Alfred(_env, _event_log_file
+            where backend_file_length = _alfred_file_length)
+        else
+          Alfred(_env, None)
+        end
 
       let connections = Connections(_application.name(), _worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
