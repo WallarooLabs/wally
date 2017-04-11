@@ -59,8 +59,7 @@ actor DataReceiver is Producer
 
   be initialize() =>
     """
-    Called by Alfred to indicate that any log replay is finished and we
-    are ready to accept messages
+    Called to indicate that we are ready to accept messages
     """
     _initialized = true
     // If we've already received a DataConnect, then send ack
@@ -121,25 +120,6 @@ actor DataReceiver is Producer
       end
     else
       @printf[I32]("Error creating ack watermark message\n".cstring())
-    end
-
-  be request_replay() =>
-    try
-      match _latest_conn
-      | let conn: DataChannel =>
-        @printf[I32](("data receiver for worker %s requesting replay from " +
-                      "sender %s\n").cstring(), _worker_name.cstring(),
-                      _sender_name.cstring())
-        let request_msg = ChannelMsgEncoder.request_replay(_worker_name,
-          _sender_step_id, _auth)
-        conn.writev(request_msg)
-        _replay_pending = false
-      else
-        _replay_pending = true
-      end
-
-    else
-      @printf[I32]("Error creating request replay message\n".cstring())
     end
 
   be upstream_replay_finished() =>

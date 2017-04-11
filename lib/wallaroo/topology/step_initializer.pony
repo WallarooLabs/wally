@@ -3,6 +3,7 @@ use "net"
 use "wallaroo/boundary"
 use "wallaroo/metrics"
 use "wallaroo/network"
+use "wallaroo/recovery"
 use "wallaroo/resilience"
 use "wallaroo/routing"
 use "wallaroo/tcp_source"
@@ -61,6 +62,7 @@ class StepBuilder
     _runner_builder.clone_router_and_set_input_type(r, default_r)
 
   fun apply(next: Router val, metrics_conn: MetricsSink, alfred: Alfred,
+    recovery_replayer: RecoveryReplayer,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router: Router val = EmptyRouter,
     omni_router: OmniRouter val = EmptyOmniRouter,
@@ -70,8 +72,8 @@ class StepBuilder
       pre_state_target_id' = pre_state_target_id())
     let step = Step(consume runner,
       MetricsReporter(_app_name, _worker_name, metrics_conn), _id,
-      _runner_builder.route_builder(), alfred, outgoing_boundaries,
-      router, default_target, omni_router)
+      _runner_builder.route_builder(), alfred, recovery_replayer,
+      outgoing_boundaries, router, default_target, omni_router)
     step.update_router(next)
     step
 

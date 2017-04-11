@@ -10,6 +10,7 @@ use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
+use "wallaroo/recovery"
 use "wallaroo/resilience"
 
 class ControlChannelListenNotifier is TCPListenNotify
@@ -25,6 +26,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _local_topology_initializer: LocalTopologyInitializer
   let _connections: Connections
   let _alfred: Alfred tag
+  let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
   let _recovery_file: FilePath
   let _joining_existing_cluster: Bool
@@ -33,8 +35,8 @@ class ControlChannelListenNotifier is TCPListenNotify
     connections: Connections, is_initializer: Bool,
     initializer: (WorkerInitializer | None) = None,
     local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag,
-    router_registry: RouterRegistry, recovery_file: FilePath,
-    data_host: String, data_service: String,
+    recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
+    recovery_file: FilePath, data_host: String, data_service: String,
     joining: Bool = false)
   =>
     _env = env
@@ -47,6 +49,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _local_topology_initializer = local_topology_initializer
     _connections = connections
     _alfred = alfred
+    _recovery_replayer = recovery_replayer
     _router_registry = router_registry
     _recovery_file = recovery_file
     _d_host = data_host
@@ -105,8 +108,8 @@ class ControlChannelListenNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _env, _auth, _connections,
-      _initializer, _local_topology_initializer, _alfred, _router_registry,
-      _d_host, _d_service)
+      _initializer, _local_topology_initializer, _alfred, _recovery_replayer,
+      _router_registry, _d_host, _d_service)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
   let _env: Env
@@ -116,6 +119,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _initializer: (WorkerInitializer | None)
   let _local_topology_initializer: LocalTopologyInitializer
   let _alfred: Alfred tag
+  let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
   let _d_host: String
   let _d_service: String
@@ -124,7 +128,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   new iso create(name: String, env: Env, auth: AmbientAuth,
     connections: Connections, initializer: (WorkerInitializer | None),
     local_topology_initializer: LocalTopologyInitializer, alfred: Alfred tag,
-    router_registry: RouterRegistry, data_host: String, data_service: String)
+    recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
+    data_host: String, data_service: String)
   =>
     _env = env
     _auth = auth
@@ -133,6 +138,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _initializer = initializer
     _local_topology_initializer = local_topology_initializer
     _alfred = alfred
+    _recovery_replayer = recovery_replayer
     _router_registry = router_registry
     _d_host = data_host
     _d_service = data_service
@@ -181,13 +187,22 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           end
           _connections.create_data_connection(m.worker_name, host, m.service)
         end
+      | let m: RequestBoundaryCountMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received RequestBoundaryCountMsg on Control Channel\n".cstring())
+        end
+        _router_registry.inform_worker_of_boundary_count(m.sender_name)
       | let m: ReconnectDataPortMsg val =>
+        // Sending worker is telling us we need to reconnect all boundaries
+        // to that worker
         ifdef "trace" then
           @printf[I32]("Received ReconnectDataPortMsg on Control Channel\n".cstring())
         end
         _connections.reconnect_data_connection(m.worker_name)
-        _router_registry.inform_worker_of_boundary_count(m.worker_name)
         _router_registry.reconnect_source_boundaries(m.worker_name)
+      | let m: ReplayBoundaryCountMsg val =>
+        _recovery_replayer.add_expected_boundary_count(m.sender_name,
+          m.boundary_count)
       | let m: SpinUpLocalTopologyMsg val =>
         ifdef "trace" then
           @printf[I32]("Received SpinUpLocalTopologyMsg on Control Channel\n".cstring())

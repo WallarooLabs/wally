@@ -101,11 +101,6 @@ actor RouterRegistry
   be set_omni_router(o: OmniRouter val) =>
     _omni_router = o
 
-  be register_data_receiver(sender: String, sender_boundary_id: U128,
-    dr: DataReceiver)
-  =>
-    _data_receivers(_BoundaryId(sender, sender_boundary_id)) = dr
-
   be register_source(tcp_source: TCPSource) =>
     _sources.set(tcp_source)
     if not _migrating then tcp_source.unmute(_dummy_consumer) end
@@ -252,6 +247,11 @@ actor RouterRegistry
     // There is one boundary per source plus the canonical boundary
     let count = _sources.size() + 1
     _connections.inform_worker_of_boundary_count(target_worker, count)
+
+  be initialize_data_receivers() =>
+    for dr in _data_receivers.values() do
+      dr.initialize()
+    end
 
   be reconnect_source_boundaries(target_worker: String) =>
     for source in _sources.values() do

@@ -14,7 +14,6 @@ trait tag Resilient
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
     payload: ByteSeq)
   be replay_finished()
-  be start_without_replay()
 
 //TODO: explain in comment
 type LogEntry is (Bool, U128, U128, None, U64, U64, Array[ByteSeq] iso)
@@ -164,7 +163,6 @@ class FileBackend is Backend
     else
       @printf[I32]("RESILIENCE: Nothing to replay from recovery log file.\n"
         .cstring())
-      _alfred.start_without_replay()
     end
 
   fun ref write() ?
@@ -267,6 +265,9 @@ actor Alfred
       _initialized = true
       initializer.report_alfred_ready_to_work()
 
+    // be start_log_replay() =>
+    //   _backend.start()
+
     be register_incoming_boundary(boundary: DataReceiver tag) =>
       _incoming_boundaries.push(boundary)
       if _initialized then
@@ -277,7 +278,6 @@ actor Alfred
       //signal all buffers that event log replay is finished
       for boundary in _incoming_boundaries.values() do
         _replay_complete_markers.update((digestof boundary),false)
-        // !!boundary.request_replay()
       end
 
     be upstream_replay_finished(boundary: DataReceiver tag) =>
@@ -296,15 +296,10 @@ actor Alfred
         _replay_finished()
       end
 
+    // TODO: Remove this
     fun _replay_finished() =>
       for b in _origins.values() do
         b.replay_finished()
-      end
-
-    be start_without_replay() =>
-      //signal all buffers that there is no event log replay
-      for b in _origins.values() do
-        b.start_without_replay()
       end
 
     be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None,

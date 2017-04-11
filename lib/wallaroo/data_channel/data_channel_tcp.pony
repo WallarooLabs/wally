@@ -219,10 +219,6 @@ class DataChannelConnectNotifier is DataChannelNotify
         _receiver.upstream_replay_finished()
       | let m: SpinUpLocalTopologyMsg val =>
         @printf[I32]("Received spin up local topology message!\n".cstring())
-      | let m: RequestReplayMsg val =>
-        ifdef "trace" then
-          @printf[I32]("Received RequestReplayMsg on Data Channel\n".cstring())
-        end
       | let m: UnknownChannelMsg val =>
         @printf[I32]("Unknown Wallaroo data message type: UnknownChannelMsg.\n"
           .cstring())

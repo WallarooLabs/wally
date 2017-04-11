@@ -3,6 +3,8 @@ use "ponytest"
 use "sendence/equality"
 use "wallaroo/boundary"
 use "wallaroo/metrics"
+use "wallaroo/network"
+use "wallaroo/recovery"
 use "wallaroo/resilience"
 use "wallaroo/routing"
 
@@ -26,12 +28,13 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
     "topology/LocalPartitionRouterEquality"
 
   fun ref apply(h: TestHelper) ? =>
-    let alfred = Alfred(h.env)
     let auth = h.env.root as AmbientAuth
+    let alfred = Alfred(h.env)
+    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth, alfred)
 
-    let step1 = _StepGenerator(alfred)
-    let step2 = _StepGenerator(alfred)
-    let step3 = _StepGenerator(alfred)
+    let step1 = _StepGenerator(alfred, recovery_replayer)
+    let step2 = _StepGenerator(alfred, recovery_replayer)
+    let step3 = _StepGenerator(alfred, recovery_replayer)
     let boundary2 = _BoundaryGenerator("w1", auth)
     let boundary3 = _BoundaryGenerator("w1", auth)
 
@@ -84,9 +87,10 @@ class iso _TestOmniRouterEquality is UnitTest
   fun ref apply(h: TestHelper) ? =>
     let alfred = Alfred(h.env)
     let auth = h.env.root as AmbientAuth
+    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth, alfred)
 
-    let step1 = _StepGenerator(alfred)
-    let step2 = _StepGenerator(alfred)
+    let step1 = _StepGenerator(alfred, recovery_replayer)
+    let step2 = _StepGenerator(alfred, recovery_replayer)
 
     let boundary2 = _BoundaryGenerator("w1", auth)
     let boundary3 = _BoundaryGenerator("w1", auth)
@@ -146,9 +150,10 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
   fun ref apply(h: TestHelper) ? =>
     let alfred = Alfred(h.env)
     let auth = h.env.root as AmbientAuth
+    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth, alfred)
 
-    let step1 = _StepGenerator(alfred)
-    let step2 = _StepGenerator(alfred)
+    let step1 = _StepGenerator(alfred, recovery_replayer)
+    let step2 = _StepGenerator(alfred, recovery_replayer)
 
     let base_routes: Map[U128, ConsumerStep tag] trn =
       recover Map[U128, ConsumerStep tag] end
@@ -180,9 +185,10 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
   fun ref apply(h: TestHelper) ? =>
     let alfred = Alfred(h.env)
     let auth = h.env.root as AmbientAuth
+    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth, alfred)
 
-    let step1 = _StepGenerator(alfred)
-    let step2 = _StepGenerator(alfred)
+    let step1 = _StepGenerator(alfred, recovery_replayer)
+    let step2 = _StepGenerator(alfred, recovery_replayer)
 
     let base_routes: Map[U128, ConsumerStep tag] trn =
       recover Map[U128, ConsumerStep tag] end
@@ -247,11 +253,33 @@ primitive _DefaultRouterGenerator
     None
 
 primitive _StepGenerator
-  fun apply(alfred: Alfred): Step =>
+  fun apply(alfred: Alfred, recovery_replayer: RecoveryReplayer): Step =>
     Step(RouterRunner, MetricsReporter("", "", MetricsSink("", "")),
-      1, EmptyRouteBuilder, alfred, recover Map[String, OutgoingBoundary] end)
+      1, EmptyRouteBuilder, alfred, recovery_replayer,
+      recover Map[String, OutgoingBoundary] end)
 
 primitive _BoundaryGenerator
   fun apply(worker_name: String, auth: AmbientAuth): OutgoingBoundary =>
     OutgoingBoundary(auth, worker_name,
       MetricsReporter("", "", MetricsSink("", "")), "", "")
+
+primitive _RouterRegistryGenerator
+  fun apply(env: Env, auth: AmbientAuth, alfred: Alfred): RouterRegistry =>
+    RouterRegistry(auth, "", _ConnectionsGenerator(env, auth), alfred, 0)
+
+primitive _ConnectionsGenerator
+  fun apply(env: Env, auth: AmbientAuth): Connections =>
+    Connections("", "", env, auth, "", "", "", "", "", "", MetricsSink("", ""),
+      "", "", false, "", false)
+
+primitive _RecoveryReplayerGenerator
+  fun apply(env: Env, auth: AmbientAuth, alfred: Alfred): RecoveryReplayer =>
+    RecoveryReplayer(auth, "", _RouterRegistryGenerator(env, auth, alfred),
+    _Cluster)
+
+actor _Cluster is Cluster
+  be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
+    id: U128, key: K, state_name: String, exclusions: Array[String] val =
+    recover Array[String] end)
+  =>
+    None

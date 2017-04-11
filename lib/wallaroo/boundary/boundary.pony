@@ -325,35 +325,15 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     _connection_initialized = true
 
   fun ref _replay_from(idx: SeqId) =>
-    var cur_id = _lowest_queue_id
-    for msg in _queue.values() do
-      if cur_id >= idx then
-        try
-          _writev(ChannelMsgEncoder.replay(msg, _auth))
-        else
-          Fail()
-        end
-      end
-      cur_id = cur_id + 1
-    end
-
-  be replay_msgs() =>
-    @printf[I32](("Replaying messages to " + _host + ":" + _service + "\n"
-      ).cstring())
-    for msg in _queue.values() do
-      try
-        _writev(ChannelMsgEncoder.replay(msg, _auth))
-      else
-        Fail()
-      end
-    end
     try
-      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _auth))
-
-      @printf[I32](("Done replaying messages to " + _host + ":" + _service +
-        "\n").cstring())
-      _replaying = false
-      _maybe_mute_or_unmute_upstreams()
+      var cur_id = _lowest_queue_id
+      for msg in _queue.values() do
+        if cur_id >= idx then
+          _writev(ChannelMsgEncoder.replay(msg, _auth))
+        end
+        cur_id = cur_id + 1
+      end
+      _writev(ChannelMsgEncoder.replay_complete(_worker_name, _step_id, _auth))
     else
       Fail()
     end
@@ -910,14 +890,6 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
           @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
         end
         conn.receive_ack(aw.seq_id)
-      | let m: RequestReplayMsg val =>
-        ifdef "trace" then
-          @printf[I32]("Received RequestReplayMsg at Boundary\n".cstring())
-        end
-        match conn
-        | let c: OutgoingBoundary =>
-          c.replay_msgs()
-        end
       else
         @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring())
       end
