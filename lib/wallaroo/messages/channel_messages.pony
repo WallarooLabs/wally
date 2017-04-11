@@ -131,15 +131,10 @@ primitive ChannelMsgEncoder
   =>
     _encode(AckDataConnectMsg(last_id_seen), auth)
 
-  fun request_replay(sender_name: String, target_id: U128, auth: AmbientAuth):
-    Array[ByteSeq] val ?
+  fun replay_complete(sender_name: String, boundary_id: U128,
+    auth: AmbientAuth): Array[ByteSeq] val ?
   =>
-    _encode(RequestReplayMsg(sender_name, target_id), auth)
-
-  fun replay_complete(sender_name: String, auth: AmbientAuth):
-    Array[ByteSeq] val ?
-  =>
-    _encode(ReplayCompleteMsg(sender_name), auth)
+    _encode(ReplayCompleteMsg(sender_name, boundary_id), auth)
 
   fun ack_watermark(sender_name: String, sender_step_id: U128, seq_id: SeqId,
     auth: AmbientAuth): Array[ByteSeq] val ?
@@ -180,10 +175,15 @@ primitive ChannelMsgEncoder
   =>
     _encode(JoiningWorkerInitializedMsg(worker_name, c_addr, d_addr), auth)
 
-  fun replay_boundary_count(count: USize, auth: AmbientAuth):
+  fun request_boundary_count(sender: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
-    _encode(ReplayBoundaryCountMsg(count), auth)
+    _encode(RequestBoundaryCountMsg(sender), auth)
+
+  fun replay_boundary_count(sender: String, count: USize, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(ReplayBoundaryCountMsg(sender, count), auth)
 
   fun announce_new_stateful_step[K: (Hashable val & Equatable[K] val)](
     id: U128, worker_name: String, key: K, state_name: String,
@@ -297,13 +297,27 @@ class AckDataConnectMsg is ChannelMsg
   new val create(last_id_seen': SeqId) =>
     last_id_seen = last_id_seen'
 
-class ReplayCompleteMsg is ChannelMsg
-  let _sender_name: String
+class RequestBoundaryCountMsg is ChannelMsg
+  let sender_name: String
 
   new val create(from: String) =>
-    _sender_name = from
+    sender_name = from
 
-  fun sender_name(): String => _sender_name
+class ReplayBoundaryCountMsg is ChannelMsg
+  let sender_name: String
+  let boundary_count: USize
+
+  new val create(from: String, count: USize) =>
+    sender_name = from
+    boundary_count = count
+
+class ReplayCompleteMsg is ChannelMsg
+  let sender_name: String
+  let boundary_id: U128
+
+  new val create(from: String, b_id: U128) =>
+    sender_name = from
+    boundary_id = b_id
 
 trait StepMigrationMsg is ChannelMsg
   fun state_name(): String
@@ -487,29 +501,6 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, origin,
       _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
-    false
-
-class RequestReplayMsg is DeliveryMsg
-  let _sender_name: String
-  let _target_id: U128
-
-  new val create(sender_name': String, target_id': U128) =>
-    _sender_name = sender_name'
-    _target_id = target_id'
-
-  fun target_id(): U128 => _target_id
-  fun sender_name(): String => _sender_name
-
-  fun deliver(pipeline_time_spent: U64, target_step: RunnableStep tag, origin: Producer,
-    seq_id: SeqId = 0, route_id: RouteId = 0, latest_ts: U64 = 0,
-    metrics_id: U16 = 0, worker_ingress_ts: U64): Bool
-  =>
-    match target_step
-    | let ob: OutgoingBoundary =>
-      ob.replay_msgs()
-    else
-      @printf[I32]("RequestReplayMsg was not directed to an OutgoingBoundary!\n".cstring())
-    end
     false
 
 class JoinClusterMsg is ChannelMsg

@@ -13,6 +13,7 @@ use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
+use "wallaroo/recovery"
 use "wallaroo/resilience"
 use "wallaroo/topology"
 
@@ -369,19 +370,23 @@ actor Startup
       let router_registry = RouterRegistry(auth, _worker_name, connections,
         _alfred as Alfred, _stop_the_world_pause)
 
+      let recovery_replayer = RecoveryReplayer(auth, _worker_name,
+        router_registry, connections, is_recovering)
+
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
           DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
-          _local_topology_file, _data_channel_file, _worker_names_file,
-          cluster_manager)
+          router_registry, metrics_conn, _is_initializer, _alfred as Alfred,
+          recovery_replayer, input_addrs, _local_topology_file,
+          _data_channel_file, _worker_names_file, cluster_manager)
       else
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
-          _local_topology_file, _data_channel_file, _worker_names_file)
+          router_registry, metrics_conn, _is_initializer, _alfred as Alfred,
+          recovery_replayer, input_addrs, _local_topology_file,
+          _data_channel_file, _worker_names_file)
       end
 
       if _is_initializer then
@@ -402,8 +407,8 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_worker_name, _env, auth, connections,
         _is_initializer, _worker_initializer, local_topology_initializer,
-        _alfred as Alfred, router_registry, control_channel_filepath,
-        my_d_host, my_d_service)
+        _alfred as Alfred, recovery_replayer, router_registry,
+        control_channel_filepath, my_d_host, my_d_service)
 
       ifdef "resilience" then
         if _is_initializer then
@@ -504,19 +509,23 @@ actor Startup
       let router_registry = RouterRegistry(auth, _worker_name, connections,
         _alfred as Alfred, _stop_the_world_pause)
 
+      let recovery_replayer = RecoveryReplayer(auth, _worker_name, router_registry, connections)
+
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
           DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
-          _local_topology_file, _data_channel_file, _worker_names_file,
-          cluster_manager, _is_joining)
+          router_registry, metrics_conn, _is_initializer, _alfred as Alfred,
+          recovery_replayer, input_addrs, _local_topology_file,
+          _data_channel_file, _worker_names_file, cluster_manager
+          where is_joining = _is_joining)
       else
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred, input_addrs,
-          _local_topology_file, _data_channel_file, _worker_names_file
+          router_registry, metrics_conn, _is_initializer, _alfred as Alfred,
+          recovery_replayer, input_addrs, _local_topology_file,
+          _data_channel_file, _worker_names_file
           where is_joining = _is_joining)
       end
 
@@ -552,8 +561,8 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_worker_name, _env, auth, connections,
         _is_initializer, _worker_initializer, local_topology_initializer,
-        _alfred as Alfred, router_registry, control_channel_filepath,
-        my_d_host, my_d_service)
+        _alfred as Alfred, recovery_replayer, router_registry,
+        control_channel_filepath, my_d_host, my_d_service)
 
       ifdef "resilience" then
         connections.make_and_register_recoverable_listener(

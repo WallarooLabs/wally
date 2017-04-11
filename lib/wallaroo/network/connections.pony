@@ -14,7 +14,7 @@ use "wallaroo/metrics"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
-actor Connections
+actor Connections is Cluster
   let _app_name: String
   let _worker_name: String
   let _env: Env
@@ -465,7 +465,8 @@ actor Connections
         outgoing_boundary.reconnect()
       end
     else
-      @printf[I32]("Target: %s not found in data connection map!\n".cstring(), target_name.cstring())
+      @printf[I32]("Target: %s not found in data connection map!\n".cstring(),
+        target_name.cstring())
       Fail()
     end
 
@@ -547,7 +548,8 @@ actor Connections
 
   be inform_worker_of_boundary_count(target_worker: String, count: USize) =>
     try
-      let msg = ChannelMsgEncoder.replay_boundary_count(count, _auth)
+      let msg = ChannelMsgEncoder.replay_boundary_count(_worker_name, count,
+        _auth)
       _send_control(target_worker, msg)
     else
       Fail()
@@ -572,13 +574,6 @@ actor Connections
       _control_conns(ack_target).writev(ack_migration_batch_complete_msg)
     else
       Fail()
-    end
-
-  be request_replay(receiver_name: String) =>
-    try
-      _data_conns(receiver_name).replay_msgs()
-    else
-      @printf[I32](("No outgoing boundary to worker " + receiver_name + "\n").cstring())
     end
 
   be shutdown() =>

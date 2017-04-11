@@ -3,10 +3,12 @@ use "collections"
 use "sendence/bytes"
 use "sendence/hub"
 use "wallaroo/"
+use "wallaroo/metrics"
+use "wallaroo/network"
+use "wallaroo/recovery"
+use "wallaroo/resilience"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
-use "wallaroo/resilience"
-use "wallaroo/metrics"
 
 actor Main
 	let _app_name: String = "Migration Demo"
@@ -18,13 +20,17 @@ actor Main
 		let alfred = Alfred(env)
 		MetricsReporter(_app_name, _worker_name, MetricsSink("localhost", "5001"))
     try
+      let auth = env.root as AmbientAuth
+      let recovery_replayer =
+        RecoveryReplayer(auth, "", _RouterRegistryGenerator(env, auth, alfred))
+
       //CREATE TWO STEPS
-      let step_a = Step(runner_builder(alfred, env.root as AmbientAuth), 
+      let step_a = Step(runner_builder(alfred, env.root as AmbientAuth),
         MetricsReporter(_app_name, _worker_name, MetricsSink("localhost", "5001")),
-        1001, runner_builder.route_builder(), alfred)
+        1001, runner_builder.route_builder(), alfred, recovery_replayer)
       let step_b = Step(runner_builder(alfred, env.root as AmbientAuth),
         MetricsReporter(_app_name, _worker_name, MetricsSink("localhost", "5001")),
-        1001, runner_builder.route_builder(), alfred)
+        1001, runner_builder.route_builder(), alfred, recovery_replayer)
       @printf[I32]("steps created\n".cstring())
       for i in Range(0,100000000) do
         n = i.u128()
@@ -40,7 +46,7 @@ actor Main
 
       //MIGRATE STATE
       step_a.send_state_to_neighbour(step_b)
-      
+
       //SEND TO STEP B
       for i in Range(0,100000000) do
         n = i.u128()
@@ -78,7 +84,7 @@ class CountStateChange is StateChange[CountState]
   fun apply(state: CountState) =>
     state.count = _count
 
-	
+
   fun write_log_entry(out_writer: Writer) => None
 
   fun ref read_log_entry(in_reader: Reader) => None
@@ -120,3 +126,13 @@ primitive CountComputation is StateComputation[U64, U64, CountState]
 
 class CountState
   var count: U64 = 0
+
+
+primitive _RouterRegistryGenerator
+  fun apply(env: Env, auth: AmbientAuth, alfred: Alfred): RouterRegistry =>
+    RouterRegistry(auth, "", _ConnectionsGenerator(env, auth), alfred, 0)
+
+primitive _ConnectionsGenerator
+  fun apply(env: Env, auth: AmbientAuth): Connections =>
+    Connections("", "", env, auth, "", "", "", "", "", "", MetricsSink("", ""),
+      "", "", false, "", false)

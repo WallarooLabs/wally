@@ -11,6 +11,7 @@ use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/network"
+use "wallaroo/recovery"
 use "wallaroo/resilience"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
@@ -74,6 +75,7 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
   var _initializer: (LocalTopologyInitializer | None) = None
   var _initialized: Bool = false
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
+  let _recovery_replayer: RecoveryReplayer
 
   // Resilience routes
   // TODO: This needs to be merged with credit flow producer routes
@@ -84,6 +86,7 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
     id: U128, route_builder: RouteBuilder val, alfred: Alfred,
+    recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router: Router val = EmptyRouter, default_target: (Step | None) = None,
     omni_router: OmniRouter val = EmptyOmniRouter)
@@ -98,6 +101,8 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
     _route_builder = route_builder
     _alfred = alfred
     _alfred.register_origin(this, id)
+    _recovery_replayer = recovery_replayer
+    _recovery_replayer.register_step(this)
     _id = id
     _default_target = default_target
     for (state_name, boundary) in _outgoing_boundaries.pairs() do
@@ -299,29 +304,7 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
     for e in _deduplication_list.values() do
       //TODO: Bloom filter maybe?
       if e._2 == msg_uid then
-        // No frac_ids yet
         return true
-        // match (e._3, frac_ids)
-        // | (let efa: Array[U64] val, let efb: Array[U64] val) =>
-        //   if efa.size() == efb.size() then
-        //     var found = true
-        //     for i in Range(0,efa.size()) do
-        //       try
-        //         if efa(i) != efb(i) then
-        //           found = false
-        //           break
-        //         end
-        //       else
-        //         found = false
-        //         break
-        //       end
-        //     end
-        //     if found then
-        //       return true
-        //     end
-        //   end
-        // | (None,None) => return true
-        // end
       end
     end
     false
@@ -403,10 +386,11 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
       end
     end
 
-  be replay_finished() =>
+  be clear_deduplication_list() =>
     _deduplication_list.clear()
 
-  be start_without_replay() =>
+  // TODO: Remove this
+  be replay_finished() =>
     _deduplication_list.clear()
 
   be dispose() =>
