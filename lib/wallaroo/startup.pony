@@ -15,7 +15,6 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
-use "wallaroo/resilience"
 use "wallaroo/topology"
 
 actor Startup
@@ -51,8 +50,8 @@ actor Startup
   var _control_channel_file: String = ""
   var _worker_names_file: String = ""
   var _connection_addresses_file: String = ""
-  var _alfred: (Alfred | None) = None
-  var _alfred_file_length: (USize | None) = None
+  var _event_log: (EventLog | None) = None
+  var _event_log_file_length: (USize | None) = None
   var _joining_listener: (TCPListener | None) = None
 
   var _stop_the_world_pause: U64 = 2_000_000_000
@@ -91,7 +90,7 @@ actor Startup
         .add("topology-initializer", "t", None)
         .add("name", "n", StringArgument)
         .add("resilience-dir", "r", StringArgument)
-        .add("alfred-file-length", "l", I64Argument)
+        .add("event_log-file-length", "l", I64Argument)
         // pass in control address of any worker as the value of this parameter
         // to join a running cluster
         // TODO: Actually make a joining worker a first class citizen.
@@ -128,8 +127,8 @@ actor Startup
           else
             _resilience_dir = arg
           end
-        | ("alfred-file-length", let arg: I64) =>
-          _alfred_file_length = arg.usize()
+        | ("event_log-file-length", let arg: I64) =>
+          _event_log_file_length = arg.usize()
         | ("join", let arg: String) =>
           _j_arg = arg.split(":")
           _is_joining = true
@@ -356,11 +355,11 @@ actor Startup
         end
       end
 
-      _alfred = ifdef "resilience" then
-          Alfred(_env, _event_log_file
-            where backend_file_length = _alfred_file_length)
+      _event_log = ifdef "resilience" then
+          EventLog(_env, _event_log_file
+            where backend_file_length = _event_log_file_length)
         else
-          Alfred(_env, None)
+          EventLog(_env, None)
         end
 
       let connections = Connections(_application.name(), _worker_name, _env,
@@ -369,13 +368,16 @@ actor Startup
         _connection_addresses_file, _is_joining)
 
       let data_receivers = DataReceivers(auth, _worker_name, connections,
-        _alfred as Alfred)
+        is_recovering)
 
       let router_registry = RouterRegistry(auth, _worker_name, data_receivers,
-        connections, _alfred as Alfred, _stop_the_world_pause)
+        connections, _stop_the_world_pause)
 
       let recovery_replayer = RecoveryReplayer(auth, _worker_name,
         data_receivers, router_registry, connections, is_recovering)
+
+      let recovery = Recovery(_worker_name, _event_log as EventLog,
+        recovery_replayer)
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
@@ -383,21 +385,21 @@ actor Startup
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
           router_registry, metrics_conn, _is_initializer, data_receivers,
-          _alfred as Alfred, recovery_replayer, input_addrs,
+          _event_log as EventLog, recovery, recovery_replayer, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file,
           cluster_manager)
       else
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
           router_registry, metrics_conn, _is_initializer, data_receivers,
-          _alfred as Alfred, recovery_replayer, input_addrs,
+          _event_log as EventLog, recovery, recovery_replayer, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file)
       end
 
       if _is_initializer then
         _env.out.print("Running as Initializer...")
         _application_initializer = ApplicationInitializer(auth,
-          local_topology_initializer, input_addrs, o_addr, _alfred as Alfred)
+          local_topology_initializer, input_addrs, o_addr)
         match _application_initializer
         | let ai: ApplicationInitializer =>
           _worker_initializer = WorkerInitializer(auth, _worker_name,
@@ -412,7 +414,7 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_worker_name, _env, auth, connections,
         _is_initializer, _worker_initializer, local_topology_initializer,
-        _alfred as Alfred, recovery_replayer, router_registry,
+        recovery_replayer, router_registry,
         control_channel_filepath, my_d_host, my_d_service)
 
       ifdef "resilience" then
@@ -511,14 +513,16 @@ actor Startup
         metrics_conn, m.metrics_host, m.metrics_service, _is_initializer,
         _connection_addresses_file, _is_joining)
 
-      let data_receivers = DataReceivers(auth, _worker_name, connections,
-        _alfred as Alfred)
+      let data_receivers = DataReceivers(auth, _worker_name, connections)
 
       let router_registry = RouterRegistry(auth, _worker_name, data_receivers,
-        connections, _alfred as Alfred, _stop_the_world_pause)
+        connections, _stop_the_world_pause)
 
       let recovery_replayer = RecoveryReplayer(auth, _worker_name,
         data_receivers, router_registry, connections)
+
+      let recovery = Recovery(_worker_name, _event_log as EventLog,
+        recovery_replayer)
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
@@ -526,14 +530,14 @@ actor Startup
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
           router_registry, metrics_conn, _is_initializer, data_receivers,
-          _alfred as Alfred, recovery_replayer, input_addrs,
+          _event_log as EventLog, recovery, recovery_replayer, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file,
           cluster_manager where is_joining = _is_joining)
       else
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
           router_registry, metrics_conn, _is_initializer, data_receivers,
-          _alfred as Alfred, recovery_replayer, input_addrs,
+          _event_log as EventLog, recovery, recovery_replayer, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file
           where is_joining = _is_joining)
       end
@@ -570,8 +574,8 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_worker_name, _env, auth, connections,
         _is_initializer, _worker_initializer, local_topology_initializer,
-        _alfred as Alfred, recovery_replayer, router_registry,
-        control_channel_filepath, my_d_host, my_d_service)
+        recovery_replayer, router_registry, control_channel_filepath,
+        my_d_host, my_d_service)
 
       ifdef "resilience" then
         connections.make_and_register_recoverable_listener(

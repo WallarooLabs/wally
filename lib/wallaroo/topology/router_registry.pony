@@ -5,14 +5,13 @@ use "wallaroo/boundary"
 use "wallaroo/data_channel"
 use "wallaroo/fail"
 use "wallaroo/network"
-use "wallaroo/resilience"
+use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/tcp_source"
 
 actor RouterRegistry
   let _auth: AmbientAuth
   let _data_receivers: DataReceivers
-  let _alfred: Alfred
   let _worker_name: String
   let _connections: Connections
   var _data_router: DataRouter val =
@@ -63,14 +62,12 @@ actor RouterRegistry
   var _waiting_to_finish_join: Bool = false
 
   new create(auth: AmbientAuth, worker_name: String,
-    data_receivers: DataReceivers, c: Connections, alfred: Alfred,
-    stop_the_world_pause: U64)
+    data_receivers: DataReceivers, c: Connections, stop_the_world_pause: U64)
   =>
     _auth = auth
     _worker_name = worker_name
     _data_receivers = data_receivers
     _connections = c
-    _alfred = alfred
     _stop_the_world_pause = stop_the_world_pause
 
   fun _worker_count(): USize =>

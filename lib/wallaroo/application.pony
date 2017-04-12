@@ -7,7 +7,7 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
-use "wallaroo/resilience"
+use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
 

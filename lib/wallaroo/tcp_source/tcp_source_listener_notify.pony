@@ -1,11 +1,11 @@
 use "net"
 use "wallaroo/metrics"
 use "wallaroo/topology"
-use "wallaroo/resilience"
+use "wallaroo/recovery"
 
 trait SourceBuilder
   fun name(): String
-  fun apply(alfred: Alfred tag, auth: AmbientAuth, target_router: Router val):
+  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router val):
     TCPSourceNotify iso^
   fun val update_router(router: Router val): SourceBuilder val
 
@@ -40,11 +40,11 @@ class _SourceBuilder[In: Any val] is SourceBuilder
 
   fun name(): String => _name
 
-  fun apply(alfred: Alfred tag, auth: AmbientAuth, target_router: Router val):
+  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router val):
     TCPSourceNotify iso^
   =>
     FramedSourceNotify[In](_name, auth, _handler, _runner_builder, _router,
-      _metrics_reporter.clone(), alfred, target_router, _pre_state_target_id)
+      _metrics_reporter.clone(), event_log, target_router, _pre_state_target_id)
 
   fun val update_router(router: Router val): SourceBuilder val =>
     _SourceBuilder[In](_app_name, _worker_name, _name, _runner_builder,
@@ -108,14 +108,14 @@ interface TCPSourceListenerNotify
 
 class SourceListenerNotify is TCPSourceListenerNotify
   var _source_builder: SourceBuilder val
-  let _alfred: Alfred tag
+  let _event_log: EventLog
   let _target_router: Router val
   let _auth: AmbientAuth
 
-  new iso create(builder: SourceBuilder val, alfred: Alfred tag, auth: AmbientAuth,
+  new iso create(builder: SourceBuilder val, event_log: EventLog, auth: AmbientAuth,
     target_router: Router val) =>
     _source_builder = builder
-    _alfred = alfred
+    _event_log = event_log
     _target_router = target_router
     _auth = auth
 
@@ -123,7 +123,7 @@ class SourceListenerNotify is TCPSourceListenerNotify
     @printf[I32]((_source_builder.name() + " source is listening\n").cstring())
 
   fun ref connected(listen: TCPSourceListener ref): TCPSourceNotify iso^ =>
-    _source_builder(_alfred, _auth, _target_router)
+    _source_builder(_event_log, _auth, _target_router)
 
   fun ref update_router(router: Router val) =>
     _source_builder = _source_builder.update_router(router)

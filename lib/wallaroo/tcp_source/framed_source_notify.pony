@@ -6,7 +6,7 @@ use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
-use "wallaroo/resilience"
+use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
 
@@ -31,14 +31,14 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   new iso create(pipeline_name: String, auth: AmbientAuth,
     handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
-    metrics_reporter: MetricsReporter iso, alfred: Alfred tag,
+    metrics_reporter: MetricsReporter iso, event_log: EventLog,
     target_router: Router val, pre_state_target_id: (U128 | None) = None)
   =>
     _pipeline_name = pipeline_name
     // TODO: Figure out how to name sources
     _source_name = pipeline_name + " source"
     _handler = handler
-    _runner = runner_builder(alfred, auth, None,
+    _runner = runner_builder(event_log, auth, None,
       target_router, pre_state_target_id)
     _router = _runner.clone_router_and_set_input_type(router)
     _metrics_reporter = consume metrics_reporter

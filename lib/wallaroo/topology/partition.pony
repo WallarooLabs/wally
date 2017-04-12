@@ -8,7 +8,6 @@ use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
-use "wallaroo/resilience"
 use "wallaroo/routing"
 
 type WeightedKey[Key: (Hashable val & Equatable[Key])] is
@@ -133,7 +132,7 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
 trait StateSubpartition is Equatable[StateSubpartition]
   fun build(app_name: String, worker_name: String,
     metrics_conn: MetricsSink,
-    auth: AmbientAuth, alfred: Alfred,
+    auth: AmbientAuth, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
@@ -167,7 +166,7 @@ class KeyedStateSubpartition[PIn: Any val,
 
   fun build(app_name: String, worker_name: String,
     metrics_conn: MetricsSink,
-    auth: AmbientAuth, alfred: Alfred,
+    auth: AmbientAuth, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
@@ -188,9 +187,9 @@ class KeyedStateSubpartition[PIn: Any val,
       | let pa: ProxyAddress val =>
         if pa.worker == worker_name then
           let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
-          let next_state_step = Step(_runner_builder(where alfred = alfred, auth=auth),
+          let next_state_step = Step(_runner_builder(where event_log = event_log, auth=auth),
             consume reporter, id, _runner_builder.route_builder(),
-              alfred, recovery_replayer, outgoing_boundaries)
+              event_log, recovery_replayer, outgoing_boundaries)
 
           initializables.set(next_state_step)
           data_routes(id) = next_state_step

@@ -322,7 +322,11 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   fun ref receive_connect_ack(last_id_seen: SeqId) =>
     _replay_from(last_id_seen)
+
+  fun ref start_normal_sending() =>
     _connection_initialized = true
+    _replaying = false
+    _maybe_mute_or_unmute_upstreams()
 
   fun ref _replay_from(idx: SeqId) =>
     try
@@ -885,6 +889,12 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
           @printf[I32]("Received AckDataConnectMsg at Boundary\n".cstring())
         end
         conn.receive_connect_ack(ac.last_id_seen)
+      | let sn: StartNormalDataSendingMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received StartNormalDataSendingMsg at Boundary\n"
+            .cstring())
+        end
+        conn.start_normal_sending()
       | let aw: AckWatermarkMsg val =>
         ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())

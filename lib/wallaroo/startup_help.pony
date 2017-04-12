@@ -20,7 +20,7 @@ primitive StartupHelp
         initializing process (that status is meaningless after init is done)]
       --resilience-dir/-r [Sets directory to write resilience files to,
         e.g. -r /tmp/data (no trailing slash)]
-      --alfred-file-length/-l [Optionally sets initial file length for alfred
+      --event_log-file-length/-l [Optionally sets initial file length for event_log
         backend file]
 
       --join/-j [When a new worker is joining a running cluster, pass the

@@ -6,7 +6,6 @@ use "wallaroo/"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
-use "wallaroo/resilience"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -17,20 +16,20 @@ actor Main
   new create(env: Env) =>
     let runner_builder = _RunnerBuilderGenerator()
 
-		let alfred = Alfred(env)
+		let event_log = EventLog(env)
 		MetricsReporter(_app_name, _worker_name, MetricsSink("localhost", "5001"))
     try
       let auth = env.root as AmbientAuth
       let recovery_replayer =
-        RecoveryReplayer(auth, "", _RouterRegistryGenerator(env, auth, alfred))
+        RecoveryReplayer(auth, "", _RouterRegistryGenerator(env, auth))
 
       //CREATE TWO STEPS
-      let step_a = Step(runner_builder(alfred, env.root as AmbientAuth),
+      let step_a = Step(runner_builder(event_log, env.root as AmbientAuth),
         MetricsReporter(_app_name, _worker_name, MetricsSink("localhost", "5001")),
-        1001, runner_builder.route_builder(), alfred, recovery_replayer)
-      let step_b = Step(runner_builder(alfred, env.root as AmbientAuth),
+        1001, runner_builder.route_builder(), event_log, recovery_replayer)
+      let step_b = Step(runner_builder(event_log, env.root as AmbientAuth),
         MetricsReporter(_app_name, _worker_name, MetricsSink("localhost", "5001")),
-        1001, runner_builder.route_builder(), alfred, recovery_replayer)
+        1001, runner_builder.route_builder(), event_log, recovery_replayer)
       @printf[I32]("steps created\n".cstring())
       for i in Range(0,100000000) do
         n = i.u128()
@@ -129,8 +128,8 @@ class CountState
 
 
 primitive _RouterRegistryGenerator
-  fun apply(env: Env, auth: AmbientAuth, alfred: Alfred): RouterRegistry =>
-    RouterRegistry(auth, "", _ConnectionsGenerator(env, auth), alfred, 0)
+  fun apply(env: Env, auth: AmbientAuth): RouterRegistry =>
+    RouterRegistry(auth, "", _ConnectionsGenerator(env, auth), 0)
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>

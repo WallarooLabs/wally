@@ -6,7 +6,7 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/network"
-use "wallaroo/resilience"
+use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
 
@@ -23,7 +23,6 @@ actor DataReceiver is Producer
   var _last_id_acked: SeqId = 0
   var _connected: Bool = false
   var _reconnecting: Bool = false
-  let _alfred: Alfred
   var _ack_counter: USize = 0
   // TODO: Get this information via data_connect()
   var _boundary_queue_max: USize = 16_000
@@ -42,39 +41,48 @@ actor DataReceiver is Producer
   var _timer_init: _TimerInit = _UninitializedTimerInit
   let _timers: Timers = Timers
 
-  var _initialized: Bool = false
+  var _processing_phase: _DataReceiverProcessingPhase = _DataReceiverNotProcessingPhase
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
-    connections: Connections, alfred: Alfred)
+    connections: Connections, initialized: Bool = false)
   =>
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
     _connections = connections
-    _alfred = alfred
-    _alfred.register_incoming_boundary(this)
+    if initialized then
+      _processing_phase = _DataReceiverAcceptingMessagesPhase(this)
+    end
 
-  be initialize() =>
-    """
-    Called to indicate that we are ready to accept messages
-    """
-    _initialized = true
+  be start_replay_processing() =>
+    _processing_phase = _DataReceiverAcceptingReplaysPhase(this)
     // If we've already received a DataConnect, then send ack
     match _latest_conn
     | let conn: DataChannel =>
       _ack_data_connect()
     end
 
+  be start_normal_message_processing() =>
+    _processing_phase = _DataReceiverAcceptingMessagesPhase(this)
+    _inform_boundary_to_send_normal_messages()
+
   be data_connect(sender_step_id: U128, conn: DataChannel) =>
     _sender_step_id = sender_step_id
     _latest_conn = conn
-    // If we're not yet initialized, we need to wait to ack
-    if _initialized then _ack_data_connect() end
+    _processing_phase.data_connect()
 
   fun _ack_data_connect() =>
     try
       let ack_msg = ChannelMsgEncoder.ack_data_connect(_last_id_seen, _auth)
       _write_on_conn(ack_msg)
+    else
+      Fail()
+    end
+
+  fun _inform_boundary_to_send_normal_messages() =>
+    try
+      let start_msg = ChannelMsgEncoder.start_normal_data_sending(_auth)
+      _write_on_conn(start_msg)
     else
       Fail()
     end
@@ -115,9 +123,6 @@ actor DataReceiver is Producer
     else
       @printf[I32]("Error creating ack watermark message\n".cstring())
     end
-
-  be upstream_replay_finished() =>
-    _alfred.upstream_replay_finished(this)
 
   fun ref _flush(low_watermark: SeqId) =>
     """This is not a real Origin, so it doesn't write any State"""
@@ -242,6 +247,32 @@ actor DataReceiver is Producer
     | let conn: DataChannel =>
       conn.unmute(c)
     end
+
+
+trait _DataReceiverProcessingPhase
+  fun data_connect() =>
+    None
+
+class _DataReceiverNotProcessingPhase is _DataReceiverProcessingPhase
+
+class _DataReceiverAcceptingReplaysPhase is _DataReceiverProcessingPhase
+  let _data_receiver: DataReceiver ref
+
+  new create(dr: DataReceiver ref) =>
+    _data_receiver = dr
+
+  fun data_connect() =>
+    _data_receiver._ack_data_connect()
+
+class _DataReceiverAcceptingMessagesPhase is _DataReceiverProcessingPhase
+  let _data_receiver: DataReceiver ref
+
+  new create(dr: DataReceiver ref) =>
+    _data_receiver = dr
+
+  fun data_connect() =>
+    _data_receiver._ack_data_connect()
+    _data_receiver._inform_boundary_to_send_normal_messages()
 
 trait _TimerInit
   fun apply(d: DataReceiver ref)

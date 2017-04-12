@@ -7,7 +7,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/topology"
-use "wallaroo/resilience"
+use "wallaroo/recovery"
 
 actor WorkerInitializer
   let _auth: AmbientAuth

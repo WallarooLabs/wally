@@ -746,6 +746,9 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
     """
     None
 
+  fun ref start_normal_sending() =>
+    None
+
   fun ref receive_ack(seq_id: SeqId) =>
     """
     For WallarooOutgoingNetworkActor only.

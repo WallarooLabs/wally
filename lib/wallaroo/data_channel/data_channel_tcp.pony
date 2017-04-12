@@ -74,7 +74,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
           if not (_is_initializer or _recovery_file.exists()) then
             let message = ChannelMsgEncoder.identify_data_port(_name, _service,
               _auth)
-            _connections.send_control("initializer", message)
+            _connections.send_control_to_cluster(message)
           end
         end
         let f = File(_recovery_file)
@@ -225,11 +225,11 @@ class DataChannelConnectNotifier is DataChannelNotify
         end
       | let c: ReplayCompleteMsg val =>
         ifdef "trace" then
-          @printf[I32]("Received ReplayCompleteMsg on Data Channel\n".cstring())
+          @printf[I32]("Received ReplayCompleteMsg on Data Channel\n"
+            .cstring())
         end
         _recovery_replayer.add_boundary_replay_complete(c.sender_name,
           c.boundary_id)
-        _receiver.upstream_replay_finished()
       | let m: SpinUpLocalTopologyMsg val =>
         @printf[I32]("Received spin up local topology message!\n".cstring())
       | let m: UnknownChannelMsg val =>
@@ -268,7 +268,6 @@ trait _DataReceiverWrapper
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   fun replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-  fun upstream_replay_finished()
 
 class _InitDataReceiver is _DataReceiverWrapper
   fun data_connect(sender_step_id: U128, conn: DataChannel) =>
@@ -307,6 +306,3 @@ class _DataReceiver is _DataReceiverWrapper
   =>
     data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
-
-  fun upstream_replay_finished() =>
-    data_receiver.upstream_replay_finished()
