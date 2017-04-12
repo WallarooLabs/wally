@@ -42,18 +42,15 @@ actor DataReceiver is Producer
   var _timer_init: _TimerInit = _UninitializedTimerInit
   let _timers: Timers = Timers
 
-  let _router_registry: RouterRegistry
-
   var _initialized: Bool = false
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
-    connections: Connections, router_registry: RouterRegistry, alfred: Alfred)
+    connections: Connections, alfred: Alfred)
   =>
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
     _connections = connections
-    _router_registry = router_registry
     _alfred = alfred
     _alfred.register_incoming_boundary(this)
 
@@ -73,9 +70,6 @@ actor DataReceiver is Producer
     _latest_conn = conn
     // If we're not yet initialized, we need to wait to ack
     if _initialized then _ack_data_connect() end
-    // Now that we have a sender_step_id, we're ready to register with
-    // the registry
-    _router_registry.add_data_receiver(_sender_name, _sender_step_id, this)
 
   fun _ack_data_connect() =>
     try

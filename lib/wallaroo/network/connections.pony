@@ -11,6 +11,7 @@ use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/recovery"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -156,6 +157,8 @@ actor Connections is Cluster
     end
 
   be create_initializer_data_channel_listener(
+    data_receivers: DataReceivers,
+    recovery_replayer: RecoveryReplayer,
     router_registry: RouterRegistry,
     worker_initializer: WorkerInitializer, data_channel_file: FilePath,
     local_topology_initializer: LocalTopologyInitializer tag)
@@ -164,7 +167,8 @@ actor Connections is Cluster
       DataChannelListenNotifier(_worker_name, _auth, this,
         _is_initializer,
         MetricsReporter(_app_name, _worker_name, _metrics_conn),
-        data_channel_file, local_topology_initializer, router_registry)
+        data_channel_file, local_topology_initializer, data_receivers,
+        recovery_replayer, router_registry)
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
     let dch_listener = DataChannelListener(_auth, consume data_notifier,

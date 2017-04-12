@@ -7,6 +7,7 @@ use "net/http"
 use "options"
 use "time"
 use "sendence/hub"
+use "wallaroo/boundary"
 use "wallaroo/cluster_manager"
 use "wallaroo/fail"
 use "wallaroo/initialization"
@@ -367,26 +368,30 @@ actor Startup
         metrics_conn, m_addr(0), m_addr(1), _is_initializer,
         _connection_addresses_file, _is_joining)
 
-      let router_registry = RouterRegistry(auth, _worker_name, connections,
-        _alfred as Alfred, _stop_the_world_pause)
+      let data_receivers = DataReceivers(auth, _worker_name, connections,
+        _alfred as Alfred)
+
+      let router_registry = RouterRegistry(auth, _worker_name, data_receivers,
+        connections, _alfred as Alfred, _stop_the_world_pause)
 
       let recovery_replayer = RecoveryReplayer(auth, _worker_name,
-        router_registry, connections, is_recovering)
+        data_receivers, router_registry, connections, is_recovering)
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
           DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred,
-          recovery_replayer, input_addrs, _local_topology_file,
-          _data_channel_file, _worker_names_file, cluster_manager)
+          router_registry, metrics_conn, _is_initializer, data_receivers,
+          _alfred as Alfred, recovery_replayer, input_addrs,
+          _local_topology_file, _data_channel_file, _worker_names_file,
+          cluster_manager)
       else
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred,
-          recovery_replayer, input_addrs, _local_topology_file,
-          _data_channel_file, _worker_names_file)
+          router_registry, metrics_conn, _is_initializer, data_receivers,
+          _alfred as Alfred, recovery_replayer, input_addrs,
+          _local_topology_file, _data_channel_file, _worker_names_file)
       end
 
       if _is_initializer then
@@ -506,26 +511,30 @@ actor Startup
         metrics_conn, m.metrics_host, m.metrics_service, _is_initializer,
         _connection_addresses_file, _is_joining)
 
-      let router_registry = RouterRegistry(auth, _worker_name, connections,
-        _alfred as Alfred, _stop_the_world_pause)
+      let data_receivers = DataReceivers(auth, _worker_name, connections,
+        _alfred as Alfred)
 
-      let recovery_replayer = RecoveryReplayer(auth, _worker_name, router_registry, connections)
+      let router_registry = RouterRegistry(auth, _worker_name, data_receivers,
+        connections, _alfred as Alfred, _stop_the_world_pause)
+
+      let recovery_replayer = RecoveryReplayer(auth, _worker_name,
+        data_receivers, router_registry, connections)
 
       let local_topology_initializer = if _is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
           DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred,
-          recovery_replayer, input_addrs, _local_topology_file,
-          _data_channel_file, _worker_names_file, cluster_manager
-          where is_joining = _is_joining)
+          router_registry, metrics_conn, _is_initializer, data_receivers,
+          _alfred as Alfred, recovery_replayer, input_addrs,
+          _local_topology_file, _data_channel_file, _worker_names_file,
+          cluster_manager where is_joining = _is_joining)
       else
         LocalTopologyInitializer(
           _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, _alfred as Alfred,
-          recovery_replayer, input_addrs, _local_topology_file,
-          _data_channel_file, _worker_names_file
+          router_registry, metrics_conn, _is_initializer, data_receivers,
+          _alfred as Alfred, recovery_replayer, input_addrs,
+          _local_topology_file, _data_channel_file, _worker_names_file
           where is_joining = _is_joining)
       end
 

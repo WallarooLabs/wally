@@ -1,5 +1,6 @@
 use "collections"
 use "sendence/collection_helpers"
+use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
@@ -37,20 +38,23 @@ actor RecoveryReplayer
   // their deduplication lists
   let _steps: SetIs[Step] = _steps.create()
 
+  let _data_receivers: DataReceivers
   let _router_registry: RouterRegistry
   let _cluster: Cluster
 
   new create(auth: AmbientAuth, worker_name: String,
-    router_registry: RouterRegistry, cluster: Cluster,
-    is_recovering: Bool = false)
+    data_receivers: DataReceivers, router_registry: RouterRegistry,
+    cluster: Cluster, is_recovering: Bool = false)
   =>
     _worker_name = worker_name
     _auth = auth
+    _data_receivers = data_receivers
     _router_registry = router_registry
     _cluster = cluster
     if not is_recovering then
       _replay_phase = _NotRecoveryReplaying(this)
     end
+    _data_receivers.subscribe(this)
 
   be register_step(step: Step) =>
     _steps.set(step)
@@ -62,9 +66,11 @@ actor RecoveryReplayer
       Fail()
     end
 
-  be add_reconnected_boundary(worker: String, boundary_id: U128) =>
+  be data_receiver_added(worker: String, boundary_step_id: U128,
+    dr: DataReceiver)
+  =>
     try
-      _replay_phase.add_reconnected_boundary(worker, boundary_id)
+      _replay_phase.add_reconnected_boundary(worker, boundary_step_id)
     else
       Fail()
     end
@@ -109,7 +115,7 @@ actor RecoveryReplayer
   fun ref _start_replay_phase(expected_boundaries: Map[String, USize] box) =>
     _replay_phase = _Replay(expected_boundaries, this)
     // Initializing data receivers will trigger replay over the boundaries
-    _router_registry.initialize_data_receivers()
+    _data_receivers.initialize_data_receivers()
 
   fun ref _end_replay_phase() =>
     _replay_phase = _NotRecoveryReplaying(this)
@@ -131,8 +137,6 @@ interface _RecoveryReplayer
   fun ref _clear_deduplication_lists()
 
 trait _ReplayPhase
-  fun ref add_workers(workers: Array[String] val) ? =>
-    error
   fun ref add_expected_boundary_count(worker: String, count: USize) ? =>
     error
   fun ref add_reconnected_boundary(worker: String, boundary_id: U128) ? =>
@@ -147,6 +151,9 @@ class _NotRecoveryReplaying is _ReplayPhase
 
   new create(replayer: _RecoveryReplayer ref) =>
     _replayer = replayer
+
+  fun ref add_reconnected_boundary(worker: String, boundary_id: U128) =>
+    None
 
   fun ref add_boundary_replay_complete(worker: String, boundary_id: U128) =>
     // If we experience a replay outside recovery, then we can immediately

@@ -185,6 +185,7 @@ actor LocalTopologyInitializer
   let _connections: (Connections | None)
   let _router_registry: RouterRegistry
   let _metrics_conn: MetricsSink
+  let _data_receivers: DataReceivers
   let _alfred : Alfred tag
   let _recovery_replayer: RecoveryReplayer
   var _is_initializer: Bool
@@ -226,8 +227,8 @@ actor LocalTopologyInitializer
   new create(app: Application val, worker_name: String, worker_count: USize,
     env: Env, auth: AmbientAuth, connections: (Connections | None),
     router_registry: RouterRegistry, metrics_conn: MetricsSink,
-    is_initializer: Bool, alfred: Alfred tag,
-    recovery_replayer: RecoveryReplayer,
+    is_initializer: Bool, data_receivers: DataReceivers,
+    alfred: Alfred tag, recovery_replayer: RecoveryReplayer,
     input_addrs: Array[Array[String]] val, local_topology_file: String,
     data_channel_file: String, worker_names_file: String,
     cluster_manager: (ClusterManager | None) = None,
@@ -242,6 +243,7 @@ actor LocalTopologyInitializer
     _router_registry = router_registry
     _metrics_conn = metrics_conn
     _is_initializer = is_initializer
+    _data_receivers = data_receivers
     _alfred = alfred
     _recovery_replayer = recovery_replayer
     _input_addrs = input_addrs
@@ -349,7 +351,8 @@ actor LocalTopologyInitializer
               _is_initializer,
               MetricsReporter(_application.name(), _worker_name,
                 _metrics_conn),
-              data_channel_filepath, this, _router_registry)
+              data_channel_filepath, this, _data_receivers, _recovery_replayer,
+              _router_registry)
 
           ifdef "resilience" then
             conns.make_and_register_recoverable_data_channel_listener(
@@ -365,7 +368,8 @@ actor LocalTopologyInitializer
           match worker_initializer
             | let wi: WorkerInitializer =>
               conns.create_initializer_data_channel_listener(
-                _router_registry, wi, data_channel_filepath, this)
+                _data_receivers, _recovery_replayer, _router_registry, wi,
+                data_channel_filepath, this)
           end
         end
       else
@@ -413,7 +417,8 @@ actor LocalTopologyInitializer
               _is_initializer,
               MetricsReporter(_application.name(), _worker_name,
                 _metrics_conn),
-              data_channel_filepath, this, _router_registry)
+              data_channel_filepath, this, _data_receivers, _recovery_replayer,
+              _router_registry)
 
           ifdef "resilience" then
             conns.make_and_register_recoverable_data_channel_listener(
@@ -428,7 +433,8 @@ actor LocalTopologyInitializer
           match worker_initializer
           | let wi: WorkerInitializer =>
             conns.create_initializer_data_channel_listener(
-              _router_registry, wi, data_channel_filepath, this)
+              _data_receivers, _recovery_replayer, _router_registry, wi,
+              data_channel_filepath, this)
           end
         end
       else

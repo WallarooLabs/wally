@@ -226,153 +226,155 @@ class FileBackend is Backend
 
 
 actor Alfred
-    let _origins: Map[U128, (Resilient & Producer)] = _origins.create()
-    let _logging_batch_size: USize
-    let _backend: Backend ref
-    let _incoming_boundaries: Array[DataReceiver tag] ref =
-      _incoming_boundaries.create(1)
-    let _replay_complete_markers: Map[U64, Bool] =
-      _replay_complete_markers.create()
-    var num_encoded: USize = 0
-    var _flush_waiting: USize = 0
-    var _initialized: Bool = false
+  let _origins: Map[U128, (Resilient & Producer)] = _origins.create()
+  let _logging_batch_size: USize
+  let _backend: Backend ref
+  let _incoming_boundaries: Array[DataReceiver tag] ref =
+    _incoming_boundaries.create(1)
+  let _replay_complete_markers: Map[U64, Bool] =
+    _replay_complete_markers.create()
+  var num_encoded: USize = 0
+  var _flush_waiting: USize = 0
+  var _initialized: Bool = false
 
-    new create(env: Env, filename: (String val | None) = None,
-      logging_batch_size: USize = 10,
-      backend_file_length: (USize | None) = None)
-    =>
-      _logging_batch_size = logging_batch_size
-      _backend =
-      recover iso
-        match filename
-        | let f: String val =>
-          try
-            FileBackend(FilePath(env.root as AmbientAuth, f), this,
-              backend_file_length)
-          else
-            DummyBackend
-          end
+  new create(env: Env, filename: (String val | None) = None,
+    logging_batch_size: USize = 10,
+    backend_file_length: (USize | None) = None)
+  =>
+    _logging_batch_size = logging_batch_size
+    _backend =
+    recover iso
+      match filename
+      | let f: String val =>
+        try
+          FileBackend(FilePath(env.root as AmbientAuth, f), this,
+            backend_file_length)
         else
           DummyBackend
         end
-      end
-
-    be start(initializer: LocalTopologyInitializer) =>
-      _backend.start()
-      for b in _incoming_boundaries.values() do
-        b.initialize()
-      end
-      _initialized = true
-      initializer.report_alfred_ready_to_work()
-
-    // be start_log_replay() =>
-    //   _backend.start()
-
-    be register_incoming_boundary(boundary: DataReceiver tag) =>
-      _incoming_boundaries.push(boundary)
-      if _initialized then
-        boundary.initialize()
-      end
-
-    be log_replay_finished() =>
-      //signal all buffers that event log replay is finished
-      for boundary in _incoming_boundaries.values() do
-        _replay_complete_markers.update((digestof boundary),false)
-      end
-
-    be upstream_replay_finished(boundary: DataReceiver tag) =>
-      _replay_complete_markers.update((digestof boundary), true)
-      var finished = true
-      for b in _incoming_boundaries.values() do
-        try
-          if not _replay_complete_markers((digestof b)) then
-            finished = false
-          end
-        else
-          @printf[I32]("A boundary just disappeared!".cstring())
-        end
-      end
-      if finished then
-        _replay_finished()
-      end
-
-    // TODO: Remove this
-    fun _replay_finished() =>
-      for b in _origins.values() do
-        b.replay_finished()
-      end
-
-    be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None,
-      statechange_id: U64, payload: ByteSeq val)
-    =>
-      try
-        _origins(origin_id).replay_log_entry(uid, frac_ids, statechange_id,
-          payload)
       else
-        //TODO: explode here
-        @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
-        Fail()
+        DummyBackend
       end
+    end
 
-    be register_origin(origin: (Resilient & Producer), id: U128) =>
-      _origins(id) = origin
+  be start(initializer: LocalTopologyInitializer) =>
+    _backend.start()
+    //!!
+    for b in _incoming_boundaries.values() do
+      b.initialize()
+    end
+    _initialized = true
+    initializer.report_alfred_ready_to_work()
 
-    be queue_log_entry(origin_id: U128, uid: U128,
-      frac_ids: None, statechange_id: U64, seq_id: U64,
-      payload: Array[ByteSeq] iso)
-    =>
-      ifdef "resilience" then
-        // add to backend buffer after encoding
-        // encode right away to amortize encoding cost per entry when received
-        // as opposed to when writing a batch to disk
-        _backend.encode_entry((false, origin_id, uid, frac_ids, statechange_id,
-          seq_id, consume payload))
+  // be start_log_replay() =>
+  //   _backend.start()
 
-        num_encoded = num_encoded + 1
+  be register_incoming_boundary(boundary: DataReceiver tag) =>
+    _incoming_boundaries.push(boundary)
+    //!!
+    if _initialized then
+      boundary.initialize()
+    end
 
-        if num_encoded == _logging_batch_size then
-          //write buffer to disk
-          write_log()
+  be log_replay_finished() =>
+    //signal all buffers that event log replay is finished
+    for boundary in _incoming_boundaries.values() do
+      _replay_complete_markers.update((digestof boundary),false)
+    end
+
+  be upstream_replay_finished(boundary: DataReceiver tag) =>
+    _replay_complete_markers.update((digestof boundary), true)
+    var finished = true
+    for b in _incoming_boundaries.values() do
+      try
+        if not _replay_complete_markers((digestof b)) then
+          finished = false
         end
       else
-        None
+        @printf[I32]("A boundary just disappeared!".cstring())
       end
+    end
+    if finished then
+      _replay_finished()
+    end
 
-    fun ref write_log() =>
-      try
-        num_encoded = 0
+  // TODO: Remove this
+  fun _replay_finished() =>
+    for b in _origins.values() do
+      b.replay_finished()
+    end
 
-        // write buffer to disk
-        _backend.write()
-      else
-        @printf[I32]("error writing log entries to disk!\n".cstring())
-        Fail()
-      end
+  be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None,
+    statechange_id: U64, payload: ByteSeq val)
+  =>
+    try
+      _origins(origin_id).replay_log_entry(uid, frac_ids, statechange_id,
+        payload)
+    else
+      //TODO: explode here
+      @printf[I32]("FATAL: Unable to replay event log, because a replay buffer has disappeared".cstring())
+      Fail()
+    end
 
-    be flush_buffer(origin_id: U128, low_watermark:U64) =>
-      ifdef "trace" then
-        @printf[I32]("flush_buffer for id: %d\n\n".cstring(), origin_id)
-      end
+  be register_origin(origin: (Resilient & Producer), id: U128) =>
+    _origins(id) = origin
 
-      try
-        // Add low watermark ack to buffer
-        _backend.encode_entry((true, origin_id, 0, None, 0, low_watermark
-                         , recover Array[ByteSeq] end))
+  be queue_log_entry(origin_id: U128, uid: U128,
+    frac_ids: None, statechange_id: U64, seq_id: U64,
+    payload: Array[ByteSeq] iso)
+  =>
+    ifdef "resilience" then
+      // add to backend buffer after encoding
+      // encode right away to amortize encoding cost per entry when received
+      // as opposed to when writing a batch to disk
+      _backend.encode_entry((false, origin_id, uid, frac_ids, statechange_id,
+        seq_id, consume payload))
 
-        num_encoded = num_encoded + 1
-        _flush_waiting = _flush_waiting + 1
+      num_encoded = num_encoded + 1
+
+      if num_encoded == _logging_batch_size then
         //write buffer to disk
         write_log()
-
-        // if (_flush_waiting % 50) == 0 then
-        //   //sync any written data to disk
-        //   _backend.sync()
-        //   _backend.datasync()
-        // end
-
-        _origins(origin_id).log_flushed(low_watermark)
-      else
-        @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
-        Fail()
       end
+    else
+      None
+    end
+
+  fun ref write_log() =>
+    try
+      num_encoded = 0
+
+      // write buffer to disk
+      _backend.write()
+    else
+      @printf[I32]("error writing log entries to disk!\n".cstring())
+      Fail()
+    end
+
+  be flush_buffer(origin_id: U128, low_watermark:U64) =>
+    ifdef "trace" then
+      @printf[I32]("flush_buffer for id: %d\n\n".cstring(), origin_id)
+    end
+
+    try
+      // Add low watermark ack to buffer
+      _backend.encode_entry((true, origin_id, 0, None, 0, low_watermark
+                       , recover Array[ByteSeq] end))
+
+      num_encoded = num_encoded + 1
+      _flush_waiting = _flush_waiting + 1
+      //write buffer to disk
+      write_log()
+
+      // if (_flush_waiting % 50) == 0 then
+      //   //sync any written data to disk
+      //   _backend.sync()
+      //   _backend.datasync()
+      // end
+
+      _origins(origin_id).log_flushed(low_watermark)
+    else
+      @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
+      Fail()
+    end
 

@@ -9,6 +9,7 @@ use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
+use "wallaroo/recovery"
 use "wallaroo/topology"
 use "wallaroo/initialization"
 
@@ -22,6 +23,8 @@ class DataChannelListenNotifier is DataChannelListenNotify
   let _connections: Connections
   let _metrics_reporter: MetricsReporter
   let _local_topology_initializer: LocalTopologyInitializer tag
+  let _data_receivers: DataReceivers
+  let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
   let _joining_existing_cluster: Bool
 
@@ -30,8 +33,8 @@ class DataChannelListenNotifier is DataChannelListenNotify
     metrics_reporter: MetricsReporter iso,
     recovery_file: FilePath,
     local_topology_initializer: LocalTopologyInitializer tag,
-    router_registry: RouterRegistry,
-    joining: Bool = false)
+    data_receivers: DataReceivers, recovery_replayer: RecoveryReplayer,
+    router_registry: RouterRegistry, joining: Bool = false)
   =>
     _name = name
     _auth = auth
@@ -40,6 +43,8 @@ class DataChannelListenNotifier is DataChannelListenNotify
     _metrics_reporter = consume metrics_reporter
     _recovery_file = recovery_file
     _local_topology_initializer = local_topology_initializer
+    _data_receivers = data_receivers
+    _recovery_replayer = recovery_replayer
     _router_registry = router_registry
     _joining_existing_cluster = joining
 
@@ -94,7 +99,8 @@ class DataChannelListenNotifier is DataChannelListenNotify
     router_registry: RouterRegistry): DataChannelNotify iso^
   =>
     DataChannelConnectNotifier(_connections, _auth,
-    _metrics_reporter.clone(), _local_topology_initializer, router_registry)
+    _metrics_reporter.clone(), _local_topology_initializer, _data_receivers,
+    _recovery_replayer, router_registry)
 
 class DataChannelConnectNotifier is DataChannelNotify
   let _connections: Connections
@@ -103,6 +109,8 @@ class DataChannelConnectNotifier is DataChannelNotify
   let _timers: Timers = Timers
   let _metrics_reporter: MetricsReporter
   let _local_topology_initializer: LocalTopologyInitializer tag
+  let _data_receivers: DataReceivers
+  let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
 
   // Initial state is an empty DataReceiver wrapper that should never
@@ -112,12 +120,15 @@ class DataChannelConnectNotifier is DataChannelNotify
   new iso create(connections: Connections, auth: AmbientAuth,
     metrics_reporter: MetricsReporter iso,
     local_topology_initializer: LocalTopologyInitializer tag,
+    data_receivers: DataReceivers, recovery_replayer: RecoveryReplayer,
     router_registry: RouterRegistry)
   =>
     _connections = connections
     _auth = auth
     _metrics_reporter = consume metrics_reporter
     _local_topology_initializer = local_topology_initializer
+    _data_receivers = data_receivers
+    _recovery_replayer = recovery_replayer
     _router_registry = router_registry
 
   fun ref identify_data_receiver(dr: DataReceiver, sender_boundary_id: U128,
@@ -176,7 +187,7 @@ class DataChannelConnectNotifier is DataChannelNotify
         // need to determine which DataReceiver we'll be forwarding data
         // messages to.
         conn._mute(this)
-        _router_registry.request_data_receiver(dc.sender_name,
+        _data_receivers.request_data_receiver(dc.sender_name,
           dc.sender_boundary_id, conn)
       | let sm: StepMigrationMsg val =>
         ifdef "trace" then
@@ -216,6 +227,8 @@ class DataChannelConnectNotifier is DataChannelNotify
         ifdef "trace" then
           @printf[I32]("Received ReplayCompleteMsg on Data Channel\n".cstring())
         end
+        _recovery_replayer.add_boundary_replay_complete(c.sender_name,
+          c.boundary_id)
         _receiver.upstream_replay_finished()
       | let m: SpinUpLocalTopologyMsg val =>
         @printf[I32]("Received spin up local topology message!\n".cstring())
