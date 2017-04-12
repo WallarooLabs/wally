@@ -5,7 +5,6 @@ use "wallaroo/boundary"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
-use "wallaroo/resilience"
 use "wallaroo/routing"
 
 actor Main is TestList
@@ -29,12 +28,12 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
 
   fun ref apply(h: TestHelper) ? =>
     let auth = h.env.root as AmbientAuth
-    let alfred = Alfred(h.env)
-    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth, alfred)
+    let event_log = EventLog(h.env)
+    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
-    let step1 = _StepGenerator(alfred, recovery_replayer)
-    let step2 = _StepGenerator(alfred, recovery_replayer)
-    let step3 = _StepGenerator(alfred, recovery_replayer)
+    let step1 = _StepGenerator(event_log, recovery_replayer)
+    let step2 = _StepGenerator(event_log, recovery_replayer)
+    let step3 = _StepGenerator(event_log, recovery_replayer)
     let boundary2 = _BoundaryGenerator("w1", auth)
     let boundary3 = _BoundaryGenerator("w1", auth)
 
@@ -54,9 +53,9 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
     let new_proxy_router = ProxyRouter("w1", boundary2,
       ProxyAddress("w2", 1), auth)
 
-    let base_partition_routes = _BasePartitionRoutesGenerator(alfred, auth,
+    let base_partition_routes = _BasePartitionRoutesGenerator(event_log, auth,
       step1, boundary2, boundary3)
-    let target_partition_routes = _TargetPartitionRoutesGenerator(alfred, auth,
+    let target_partition_routes = _TargetPartitionRoutesGenerator(event_log, auth,
       new_proxy_router, boundary2, boundary3)
 
     var base_router: PartitionRouter val =
@@ -85,12 +84,12 @@ class iso _TestOmniRouterEquality is UnitTest
     "topology/OmniRouterEquality"
 
   fun ref apply(h: TestHelper) ? =>
-    let alfred = Alfred(h.env)
+    let event_log = EventLog(h.env)
     let auth = h.env.root as AmbientAuth
-    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth, alfred)
+    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
-    let step1 = _StepGenerator(alfred, recovery_replayer)
-    let step2 = _StepGenerator(alfred, recovery_replayer)
+    let step1 = _StepGenerator(event_log, recovery_replayer)
+    let step2 = _StepGenerator(event_log, recovery_replayer)
 
     let boundary2 = _BoundaryGenerator("w1", auth)
     let boundary3 = _BoundaryGenerator("w1", auth)
@@ -148,12 +147,12 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     "topology/DataRouterEqualityAfterRemove"
 
   fun ref apply(h: TestHelper) ? =>
-    let alfred = Alfred(h.env)
+    let event_log = EventLog(h.env)
     let auth = h.env.root as AmbientAuth
-    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth, alfred)
+    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
-    let step1 = _StepGenerator(alfred, recovery_replayer)
-    let step2 = _StepGenerator(alfred, recovery_replayer)
+    let step1 = _StepGenerator(event_log, recovery_replayer)
+    let step2 = _StepGenerator(event_log, recovery_replayer)
 
     let base_routes: Map[U128, ConsumerStep tag] trn =
       recover Map[U128, ConsumerStep tag] end
@@ -183,12 +182,12 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     "topology/_TestDataRouterEqualityAfterAdd"
 
   fun ref apply(h: TestHelper) ? =>
-    let alfred = Alfred(h.env)
+    let event_log = EventLog(h.env)
     let auth = h.env.root as AmbientAuth
-    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth, alfred)
+    let recovery_replayer = _RecoveryReplayerGenerator(h.env, auth)
 
-    let step1 = _StepGenerator(alfred, recovery_replayer)
-    let step2 = _StepGenerator(alfred, recovery_replayer)
+    let step1 = _StepGenerator(event_log, recovery_replayer)
+    let step2 = _StepGenerator(event_log, recovery_replayer)
 
     let base_routes: Map[U128, ConsumerStep tag] trn =
       recover Map[U128, ConsumerStep tag] end
@@ -209,7 +208,7 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     h.assert_eq[Bool](true, base_router == target_router)
 
 primitive _BasePartitionRoutesGenerator
-  fun apply(alfred: Alfred, auth: AmbientAuth, step1: Step,
+  fun apply(event_log: EventLog, auth: AmbientAuth, step1: Step,
     boundary2: OutgoingBoundary, boundary3: OutgoingBoundary):
     Map[String, (Step | ProxyRouter val)] val
   =>
@@ -223,7 +222,7 @@ primitive _BasePartitionRoutesGenerator
     consume m
 
 primitive _TargetPartitionRoutesGenerator
-  fun apply(alfred: Alfred, auth: AmbientAuth,
+  fun apply(event_log: EventLog, auth: AmbientAuth,
     new_proxy_router: ProxyRouter val, boundary2: OutgoingBoundary,
     boundary3: OutgoingBoundary): Map[String, (Step | ProxyRouter val)] val
   =>
@@ -253,9 +252,9 @@ primitive _DefaultRouterGenerator
     None
 
 primitive _StepGenerator
-  fun apply(alfred: Alfred, recovery_replayer: RecoveryReplayer): Step =>
+  fun apply(event_log: EventLog, recovery_replayer: RecoveryReplayer): Step =>
     Step(RouterRunner, MetricsReporter("", "", MetricsSink("", "")),
-      1, EmptyRouteBuilder, alfred, recovery_replayer,
+      1, EmptyRouteBuilder, event_log, recovery_replayer,
       recover Map[String, OutgoingBoundary] end)
 
 primitive _BoundaryGenerator
@@ -264,13 +263,13 @@ primitive _BoundaryGenerator
       MetricsReporter("", "", MetricsSink("", "")), "", "")
 
 primitive _RouterRegistryGenerator
-  fun apply(env: Env, auth: AmbientAuth, alfred: Alfred): RouterRegistry =>
-    RouterRegistry(auth, "", _DataReceiversGenerator(env, auth, alfred),
-      _ConnectionsGenerator(env, auth), alfred, 0)
+  fun apply(env: Env, auth: AmbientAuth): RouterRegistry =>
+    RouterRegistry(auth, "", _DataReceiversGenerator(env, auth),
+      _ConnectionsGenerator(env, auth), 0)
 
 primitive _DataReceiversGenerator
-  fun apply(env: Env, auth: AmbientAuth, alfred: Alfred): DataReceivers =>
-    DataReceivers(auth, "", _ConnectionsGenerator(env, auth), alfred)
+  fun apply(env: Env, auth: AmbientAuth): DataReceivers =>
+    DataReceivers(auth, "", _ConnectionsGenerator(env, auth))
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
@@ -278,9 +277,9 @@ primitive _ConnectionsGenerator
       "", "", false, "", false)
 
 primitive _RecoveryReplayerGenerator
-  fun apply(env: Env, auth: AmbientAuth, alfred: Alfred): RecoveryReplayer =>
-    RecoveryReplayer(auth, "", _DataReceiversGenerator(env, auth, alfred),
-      _RouterRegistryGenerator(env, auth, alfred), _Cluster)
+  fun apply(env: Env, auth: AmbientAuth): RecoveryReplayer =>
+    RecoveryReplayer(auth, "", _DataReceiversGenerator(env, auth),
+      _RouterRegistryGenerator(env, auth), _Cluster)
 
 actor _Cluster is Cluster
   be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](

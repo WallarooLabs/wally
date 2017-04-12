@@ -20,6 +20,12 @@ interface WallarooOutgoingNetworkActor
     DataReceiver
     """
 
+  fun ref start_normal_sending()
+    """
+    Called when we are ready to begin sending messages normally (after
+    replay is complete)
+    """
+
   fun ref receive_ack(seq_id: SeqId)
     """
     Called when processing an acknowledgment of a message sent over the

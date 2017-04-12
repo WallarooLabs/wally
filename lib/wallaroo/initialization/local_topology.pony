@@ -18,7 +18,6 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
-use "wallaroo/resilience"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
@@ -69,7 +68,7 @@ class LocalTopology
 
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
-    metrics_conn: MetricsSink, alfred: Alfred,
+    metrics_conn: MetricsSink, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable tag],
@@ -87,7 +86,7 @@ class LocalTopology
     if not state_map.contains(state_name) then
       @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
       state_map(state_name) = subpartition.build(_app_name, _worker_name,
-         metrics_conn, auth, alfred, recovery_replayer, outgoing_boundaries,
+         metrics_conn, auth, event_log, recovery_replayer, outgoing_boundaries,
          initializables, data_routes, default_router)
     end
 
@@ -186,7 +185,8 @@ actor LocalTopologyInitializer
   let _router_registry: RouterRegistry
   let _metrics_conn: MetricsSink
   let _data_receivers: DataReceivers
-  let _alfred : Alfred tag
+  let _event_log: EventLog
+  let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   var _is_initializer: Bool
   var _outgoing_boundary_builders:
@@ -215,7 +215,7 @@ actor LocalTopologyInitializer
   let _initializables: SetIs[Initializable tag] = _initializables.create()
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
-  // once Alfred signals we're ready
+  // once EventLog signals we're ready
   let tcpsl_builders: Array[TCPSourceListenerBuilder val] =
     recover iso Array[TCPSourceListenerBuilder val] end
 
@@ -228,10 +228,10 @@ actor LocalTopologyInitializer
     env: Env, auth: AmbientAuth, connections: (Connections | None),
     router_registry: RouterRegistry, metrics_conn: MetricsSink,
     is_initializer: Bool, data_receivers: DataReceivers,
-    alfred: Alfred tag, recovery_replayer: RecoveryReplayer,
-    input_addrs: Array[Array[String]] val, local_topology_file: String,
-    data_channel_file: String, worker_names_file: String,
-    cluster_manager: (ClusterManager | None) = None,
+    event_log: EventLog, recovery: Recovery,
+    recovery_replayer: RecoveryReplayer, input_addrs: Array[Array[String]] val,
+    local_topology_file: String, data_channel_file: String,
+    worker_names_file: String, cluster_manager: (ClusterManager | None) = None,
     is_joining: Bool = false)
   =>
     _application = app
@@ -244,7 +244,8 @@ actor LocalTopologyInitializer
     _metrics_conn = metrics_conn
     _is_initializer = is_initializer
     _data_receivers = data_receivers
-    _alfred = alfred
+    _event_log = event_log
+    _recovery = recovery
     _recovery_replayer = recovery_replayer
     _input_addrs = input_addrs
     _local_topology_file = local_topology_file
@@ -624,7 +625,7 @@ actor LocalTopologyInitializer
           default_target_state_step_id = state_builder.id()
 
           let state_step = state_builder(EmptyRouter, _metrics_conn,
-            _alfred, _recovery_replayer, _auth, _outgoing_boundaries)
+            _event_log, _recovery_replayer, _auth, _outgoing_boundaries)
           state_step.update_route_builder(state_builder.forward_route_builder())
 
           default_target_state_step = state_step
@@ -739,7 +740,7 @@ actor LocalTopologyInitializer
                       let default_pre_state_id = dsinit.id()
                       let default_pre_state_step =
                         dsinit(default_state_router,
-                          _metrics_conn, _alfred, _recovery_replayer, _auth,
+                          _metrics_conn, _event_log, _recovery_replayer, _auth,
                           _outgoing_boundaries)
                       default_target = default_pre_state_step
                       _initializables.set(default_pre_state_step)
@@ -760,7 +761,7 @@ actor LocalTopologyInitializer
                 // Create the state partition if it doesn't exist
                 if builder.state_name() != "" then
                   t.update_state_map(builder.state_name(), state_map,
-                    _metrics_conn, _alfred, _recovery_replayer, _auth,
+                    _metrics_conn, _event_log, _recovery_replayer, _auth,
                     _outgoing_boundaries, _initializables,
                     data_routes_ref, default_router)
                 end
@@ -790,7 +791,7 @@ actor LocalTopologyInitializer
                   end
 
                 let next_step = builder(partition_router, _metrics_conn,
-                  _alfred, _recovery_replayer, _auth, _outgoing_boundaries,
+                  _event_log, _recovery_replayer, _auth, _outgoing_boundaries,
                   state_comp_target_router)
                 _router_registry.register_partition_router_step(next_step)
 
@@ -825,7 +826,7 @@ actor LocalTopologyInitializer
 
                 // Check if this is a default target.  If so, route it
                 // to the appropriate default state step.
-                let next_step = builder(out_router, _metrics_conn, _alfred,
+                let next_step = builder(out_router, _metrics_conn, _event_log,
                 _recovery_replayer, _auth, _outgoing_boundaries)
 
                 data_routes(next_id) = next_step
@@ -868,7 +869,7 @@ actor LocalTopologyInitializer
                 end
 
                 @printf[I32](("----Spinning up state for " + builder.name() + "----\n").cstring())
-                let state_step = builder(EmptyRouter, _metrics_conn, _alfred,
+                let state_step = builder(EmptyRouter, _metrics_conn, _event_log,
                   _recovery_replayer, _auth, _outgoing_boundaries)
                 data_routes(next_id) = state_step
                 _initializables.set(state_step)
@@ -900,7 +901,7 @@ actor LocalTopologyInitializer
                       end
 
                     let pre_state_step = b(state_step_router, _metrics_conn,
-                      _alfred, _recovery_replayer, _auth, _outgoing_boundaries,
+                      _event_log, _recovery_replayer, _auth, _outgoing_boundaries,
                       state_comp_target)
                     data_routes(b.id()) = pre_state_step
                     _initializables.set(pre_state_step)
@@ -987,7 +988,7 @@ actor LocalTopologyInitializer
 
                     let default_pre_state_id = dsinit.id()
                     let default_pre_state_step =
-                      dsinit(default_state_router, _metrics_conn, _alfred,
+                      dsinit(default_state_router, _metrics_conn, _event_log,
                         _recovery_replayer, _auth, _outgoing_boundaries)
                     default_target = default_pre_state_step
                     _initializables.set(default_pre_state_step)
@@ -1008,7 +1009,7 @@ actor LocalTopologyInitializer
               // Create the state partition if it doesn't exist
               if source_data.state_name() != "" then
                 t.update_state_map(source_data.state_name(), state_map,
-                  _metrics_conn, _alfred, _recovery_replayer, _auth,
+                  _metrics_conn, _event_log, _recovery_replayer, _auth,
                   _outgoing_boundaries, _initializables,
                   data_routes_ref, default_router)
               end
@@ -1090,7 +1091,7 @@ actor LocalTopologyInitializer
                     out_router, _router_registry,
                     source_data.route_builder(),
                     _outgoing_boundary_builders, sinks_for_source,
-                    _alfred, _auth, this, default_target,
+                    _event_log, _auth, this, default_target,
                     default_in_route_builder, state_comp_target_router,
                     source_data.address()(0),
                     source_data.address()(1)
@@ -1144,7 +1145,7 @@ actor LocalTopologyInitializer
             else
               if psd.state_name() != "" then
                 t.update_state_map(psd.state_name(), state_map,
-                  _metrics_conn, _alfred, _recovery_replayer, _auth,
+                  _metrics_conn, _event_log, _recovery_replayer, _auth,
                   _outgoing_boundaries, _initializables,
                   data_routes_ref, None)
               end
@@ -1303,7 +1304,7 @@ actor LocalTopologyInitializer
 
         for (state_name, subpartition) in t.state_builders().pairs() do
           let partition_router = subpartition.build(_application.name(),
-            _worker_name, _metrics_conn, _auth, _alfred, _recovery_replayer,
+            _worker_name, _metrics_conn, _auth, _event_log, _recovery_replayer,
             _outgoing_boundaries, _initializables,
             recover Map[U128, ConsumerStep] end where default_router = None)
           _router_registry.set_partition_router(state_name, partition_router)
@@ -1352,9 +1353,9 @@ actor LocalTopologyInitializer
         let runner_builder = subpartition.runner_builder()
         let reporter = MetricsReporter(t.name(), t.worker_name(),
           _metrics_conn)
-        let step = Step(runner_builder(where alfred = _alfred, auth = _auth),
+        let step = Step(runner_builder(where event_log = _event_log, auth = _auth),
           consume reporter, msg.step_id(), runner_builder.route_builder(),
-          _alfred, _recovery_replayer, _outgoing_boundaries)
+          _event_log, _recovery_replayer, _outgoing_boundaries)
         step.receive_state(msg.state())
         msg.update_router_registry(_router_registry, step)
       else
@@ -1370,7 +1371,8 @@ actor LocalTopologyInitializer
       | let o_router: OmniRouter val =>
         _created.set(initializable)
         if _created.size() == _initializables.size() then
-          @printf[I32]("Phase I: Application is created!\n".cstring())
+          @printf[I32]("|~~ INIT PHASE I: Application is created! ~~|\n"
+            .cstring())
           for i in _initializables.values() do
             i.application_created(this, o_router)
             match i
@@ -1391,7 +1393,8 @@ actor LocalTopologyInitializer
     if not _initialized.contains(initializable) then
       _initialized.set(initializable)
       if _initialized.size() == _initializables.size() then
-        @printf[I32]("Phase II: Application is initialized!\n".cstring())
+        @printf[I32]("|~~ INIT PHASE II: Application is initialized! ~~|\n"
+          .cstring())
         for i in _initializables.values() do
           i.application_initialized(this)
         end
@@ -1405,47 +1408,33 @@ actor LocalTopologyInitializer
     if not _ready_to_work.contains(initializable) then
       _ready_to_work.set(initializable)
       if _ready_to_work.size() == _initializables.size() then
-        _alfred.start(this)
+        if _recovering then
+          match _topology
+          | let t: LocalTopology val =>
+            _recovery.start_recovery(this, t.worker_names)
+          else
+            Fail()
+          end
+        else
+          _event_log.start_logging(this)
+        end
       end
     else
       @printf[I32]("The same Initializable reported being ready to work twice\n".cstring())
       Fail()
     end
 
-  be report_alfred_ready_to_work() =>
+  be report_event_log_ready_to_work() =>
     _application_ready_to_work()
 
   fun ref _application_ready_to_work() =>
-    @printf[I32]("Phase III: Application is ready to work!\n".cstring())
-    // TODO: THis should also depend on Alfred having completed reading
+    @printf[I32]("|~~ INIT PHASE III: Application is ready to work! ~~|\n"
+      .cstring())
+    // TODO: THis should also depend on EventLog having completed reading
     _spin_up_source_listeners()
     for i in _initializables.values() do
       i.application_ready_to_work(this)
     end
-
-    // !! This is no longer the place for this REMOVE
-    // if _recovering then
-    //   @printf[I32]("tell upstream boundaries we're ready for reconnection\n".cstring())
-    //   // tell upstream boundaries we're ready for reconnection
-    //   for w in _recovered_worker_names.values() do
-    //     if w != _worker_name then
-    //       try
-    //         ifdef "trace" then
-    //           @printf[I32]("Sending ReconnectDataPortMsg\n".cstring())
-    //         end
-    //         let message = ChannelMsgEncoder.reconnect_data_port(_worker_name,
-    //           _auth)
-    //         match _connections
-    //         | let conns: Connections =>
-    //           conns.send_control(w, message)
-    //         end
-    //       else
-    //         @printf[I32]("Couldn't create/sent reconnect data port message\n".cstring())
-    //         Fail()
-    //       end
-    //     end
-    //   end
-    // end
 
   be inform_joining_worker(conn: TCPConnection, worker_name: String) =>
     match _topology

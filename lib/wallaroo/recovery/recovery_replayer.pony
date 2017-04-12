@@ -5,28 +5,21 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/network"
-use "wallaroo/resilience"
 use "wallaroo/topology"
 
 
 actor RecoveryReplayer
   """
-  Responsible for coordinating recovery replay protocol:
-
-  1. After log replay is complete, we can begin the recovery replay process.
-  2. Recovering worker contacts running workers to indicate it is preparing to
-     accept replay messages.
-  3. Runnings workers send a count of their boundaries to recovering worker.
-  4. The recovering worker requests that incoming boundaries connect.
-  4. When all expected boundaries are connected, the recovering worker
-     requests replay from all incoming boundaries.
-  4. Every incoming boundary replays its queue.
-  5. After recovering worker receives a “replay complete” message from all
-     distinct boundaries from every running worker (this can be inferred based
-     on the boundary counts and the boundary id/worker name data in replay
-     complete messages), the recovering worker informs the cluster that they
-     can begin sending normal messages.
-  6. Recovering worker is now also free to clear deduplication lists.
+  Phases (if on a recovering worker):
+    1) _NotRecoveryReplaying: Wait for start_recovery_replay() to be called
+    2) _WaitingForBoundaryCounts: Wait for every running worker to inform this
+       worker of how many boundaries they have incoming to us. We use these
+       counts to determine when every incoming boundary has reconnected.
+    3) _WaitForReconnections: Wait for every incoming boundary to reconnect.
+    4) _Replay: Wait for every boundary to send a message indicating replay
+       is finished, at which point we can clear deduplication lists and
+       inform other workers that they are free to send normal messages.
+    5) _NotRecoveryReplaying: Finished replay
 
   ASSUMPTION: Recovery replay can happen at most once in the lifecycle of a
     worker.
@@ -41,6 +34,7 @@ actor RecoveryReplayer
   let _data_receivers: DataReceivers
   let _router_registry: RouterRegistry
   let _cluster: Cluster
+  var _recovery: (Recovery | None) = None
 
   new create(auth: AmbientAuth, worker_name: String,
     data_receivers: DataReceivers, router_registry: RouterRegistry,
@@ -63,6 +57,7 @@ actor RecoveryReplayer
     try
       _replay_phase.add_expected_boundary_count(worker, count)
     else
+      _print_replay_phase_error()
       Fail()
     end
 
@@ -72,6 +67,7 @@ actor RecoveryReplayer
     try
       _replay_phase.add_reconnected_boundary(worker, boundary_step_id)
     else
+      _print_replay_phase_error()
       Fail()
     end
 
@@ -79,18 +75,27 @@ actor RecoveryReplayer
     try
       _replay_phase.add_boundary_replay_complete(worker, boundary_id)
     else
+      _print_replay_phase_error()
       Fail()
     end
+
+  fun _print_replay_phase_error() =>
+    @printf[I32]("Error calling method on %s\n".cstring(),
+      _replay_phase.name().cstring())
 
   //////////////////////////
   // Managing Replay Phases
   //////////////////////////
-  be start_recovery_replay(workers: Array[String] val) =>
+  be start_recovery_replay(workers: Array[String] val,
+    recovery: Recovery)
+  =>
+    @printf[I32]("|~~ - - Replay Phase 1: Wait for Boundary Counts - - ~~|\n"
+      .cstring())
+    _recovery = recovery
     let expected_workers: SetIs[String] = expected_workers.create()
     for w in workers.values() do
-      expected_workers.set(w)
+      if w != _worker_name then expected_workers.set(w) end
     end
-    if workers.size() != expected_workers.size() then Fail() end
     _replay_phase = _WaitingForBoundaryCounts(expected_workers, this)
 
     try
@@ -103,6 +108,8 @@ actor RecoveryReplayer
   fun ref _wait_for_reconnections(expected_boundaries: Map[String, USize] box,
     reconnected_boundaries: Map[String, SetIs[U128]])
   =>
+    @printf[I32]("|~~ - - Replay Phase 2: Wait for Reconnections - - ~~|\n"
+      .cstring())
     _replay_phase = _WaitForReconnections(expected_boundaries,
       reconnected_boundaries, this)
     try
@@ -113,13 +120,21 @@ actor RecoveryReplayer
     end
 
   fun ref _start_replay_phase(expected_boundaries: Map[String, USize] box) =>
-    _replay_phase = _Replay(expected_boundaries, this)
+    @printf[I32]("|~~ - - Replay Phase 3: Message Replay - - ~~|\n".cstring())
+    _replay_phase = _Replay(expected_boundaries, this, _data_receivers)
     // Initializing data receivers will trigger replay over the boundaries
-    _data_receivers.initialize_data_receivers()
+    _data_receivers.start_replay_processing()
 
   fun ref _end_replay_phase() =>
+    @printf[I32]("|~~ - - Replay COMPLETE - - ~~|\n".cstring())
     _replay_phase = _NotRecoveryReplaying(this)
     _clear_deduplication_lists()
+    match _recovery
+    | let r: Recovery =>
+      r.recovery_replay_finished()
+    else
+      Fail()
+    end
 
   fun ref _clear_deduplication_lists() =>
     for s in _steps.values() do
@@ -137,6 +152,7 @@ interface _RecoveryReplayer
   fun ref _clear_deduplication_lists()
 
 trait _ReplayPhase
+  fun name(): String
   fun ref add_expected_boundary_count(worker: String, count: USize) ? =>
     error
   fun ref add_reconnected_boundary(worker: String, boundary_id: U128) ? =>
@@ -145,12 +161,15 @@ trait _ReplayPhase
     error
 
 class _EmptyReplayPhase is _ReplayPhase
+  fun name(): String => "Empty Replay Phase"
 
 class _NotRecoveryReplaying is _ReplayPhase
   let _replayer: _RecoveryReplayer ref
 
   new create(replayer: _RecoveryReplayer ref) =>
     _replayer = replayer
+
+  fun name(): String => "Not Recovery Replaying Phase"
 
   fun ref add_reconnected_boundary(worker: String, boundary_id: U128) =>
     None
@@ -172,6 +191,8 @@ class _WaitingForBoundaryCounts is _ReplayPhase
   =>
     _expected_workers = expected_workers
     _replayer = replayer
+
+  fun name(): String => "Waiting for Boundary Counts Phase"
 
   fun ref add_expected_boundary_count(worker: String, count: USize) =>
     ifdef debug then
@@ -201,6 +222,8 @@ class _WaitForReconnections is _ReplayPhase
     _reconnected_boundaries = reconnected_boundaries
     _replayer = replayer
 
+  fun name(): String => "Wait for Reconnections Phase"
+
   fun ref add_reconnected_boundary(worker: String, boundary_id: U128) ? =>
     _reconnected_boundaries(worker).set(boundary_id)
     if _all_boundaries_reconnected() then
@@ -214,16 +237,24 @@ class _Replay is _ReplayPhase
   let _expected_boundaries: Map[String, USize] box
   var _replay_completes: Map[String, SetIs[U128]] = _replay_completes.create()
   let _replayer: _RecoveryReplayer ref
+  let _data_receivers: DataReceivers
 
   new create(expected_boundaries: Map[String, USize] box,
-    replayer: _RecoveryReplayer ref)
+    replayer: _RecoveryReplayer ref, data_receivers: DataReceivers)
   =>
     _expected_boundaries = expected_boundaries
+    for w in _expected_boundaries.keys() do
+      _replay_completes(w) = SetIs[U128]
+    end
     _replayer = replayer
+    _data_receivers = data_receivers
+
+  fun name(): String => "Replay Phase"
 
   fun ref add_boundary_replay_complete(worker: String, boundary_id: U128) ? =>
     _replay_completes(worker).set(boundary_id)
     if _all_replays_complete(_replay_completes) then
+      _data_receivers.start_normal_message_processing()
       _replayer._end_replay_phase()
     end
 

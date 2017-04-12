@@ -2,7 +2,7 @@ use "collections"
 use "wallaroo/boundary"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
-use "wallaroo/resilience"
+use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
 use "wallaroo/topology"
@@ -16,7 +16,7 @@ class TCPSourceListenerBuilder
   let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val
   let _tcp_sinks: Array[TCPSink] val
   let _local_topology_initializer: LocalTopologyInitializer
-  let _alfred: Alfred
+  let _event_log: EventLog
   let _auth: AmbientAuth
   let _default_target: (Step | None)
   let _target_router: Router val
@@ -27,7 +27,7 @@ class TCPSourceListenerBuilder
   new val create(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
-    tcp_sinks: Array[TCPSink] val, alfred: Alfred tag, auth: AmbientAuth,
+    tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
     local_topology_initializer: LocalTopologyInitializer,
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder val | None) = None,
@@ -43,7 +43,7 @@ class TCPSourceListenerBuilder
     _outgoing_boundary_builders = outgoing_boundary_builders
     _tcp_sinks = tcp_sinks
     _local_topology_initializer = local_topology_initializer
-    _alfred = alfred
+    _event_log = event_log
     _auth = auth
     _default_target = default_target
     _target_router = target_router
@@ -54,7 +54,7 @@ class TCPSourceListenerBuilder
   fun apply(): TCPSourceListener =>
     let tcp_l = TCPSourceListener(_source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders, _tcp_sinks,
-      _alfred, _auth, _local_topology_initializer,
+      _event_log, _auth, _local_topology_initializer,
       _default_target, _default_in_route_builder, _target_router, _host,
       _service where metrics_reporter = _metrics_reporter.clone())
     _router_registry.register_source_listener(tcp_l)
@@ -86,7 +86,7 @@ actor TCPSourceListener
   new create(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
-    tcp_sinks: Array[TCPSink] val, alfred: Alfred tag, auth: AmbientAuth,
+    tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
     local_topology_initializer: LocalTopologyInitializer,
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder val | None) = None,
@@ -98,7 +98,7 @@ actor TCPSourceListener
     """
     Listens for both IPv4 and IPv6 connections.
     """
-    _notify = SourceListenerNotify(source_builder, alfred, auth, target_router)
+    _notify = SourceListenerNotify(source_builder, event_log, auth, target_router)
     _router = router
     _router_registry = router_registry
     _route_builder = route_builder

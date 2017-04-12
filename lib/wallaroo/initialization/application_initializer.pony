@@ -9,7 +9,7 @@ use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
-use "wallaroo/resilience"
+use "wallaroo/recovery"
 
 actor ApplicationInitializer
   let _auth: AmbientAuth
@@ -17,19 +17,17 @@ actor ApplicationInitializer
   let _local_topology_initializer: LocalTopologyInitializer
   let _input_addrs: Array[Array[String]] val
   let _output_addr: Array[String] val
-  let _alfred: Alfred tag
   var _application: (Application val | None) = None
 
   new create(auth: AmbientAuth,
     local_topology_initializer: LocalTopologyInitializer,
     input_addrs: Array[Array[String]] val,
-    output_addr: Array[String] val, alfred: Alfred tag)
+    output_addr: Array[String] val)
   =>
     _auth = auth
     _local_topology_initializer = local_topology_initializer
     _input_addrs = input_addrs
     _output_addr = output_addr
-    _alfred = alfred
 
   be update_application(app: Application val) =>
     _application = app
@@ -41,7 +39,7 @@ actor ApplicationInitializer
     | let a: Application val =>
       @printf[I32]("Initializing application\n".cstring())
       _automate_initialization(a, worker_initializer, worker_count,
-        worker_names, _alfred)
+        worker_names)
     else
       @printf[I32]("No application provided!\n".cstring())
     end
@@ -62,7 +60,7 @@ actor ApplicationInitializer
 
   fun ref _automate_initialization(application: Application val,
     worker_initializer: (WorkerInitializer | None), worker_count: USize,
-    worker_names: Array[String] val, alfred: Alfred tag)
+    worker_names: Array[String] val)
   =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("vvvvvv|Initializing Topologies for Workers|vvvvvv\n\n".cstring())

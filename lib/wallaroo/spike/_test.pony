@@ -758,6 +758,9 @@ class NullWallarooOutgoingNetworkActor is WallarooOutgoingNetworkActor
   fun ref receive_connect_ack(seq_id: SeqId) =>
     None
 
+  fun ref start_normal_sending() =>
+    None
+
   fun ref receive_ack(seq_id: SeqId) =>
     None
 

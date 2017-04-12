@@ -10,7 +10,7 @@ use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
-use "wallaroo/resilience"
+use "wallaroo/recovery"
 use "wallaroo/routing"
 
 
@@ -38,7 +38,7 @@ trait ReplayableRunner
   fun ref set_step_id(id: U128)
 
 trait RunnerBuilder
-  fun apply(alfred: Alfred tag,
+  fun apply(event_log: EventLog,
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
@@ -94,7 +94,7 @@ class RunnerSequenceBuilder is RunnerBuilder
         ""
       end
 
-  fun apply(alfred: Alfred tag,
+  fun apply(event_log: EventLog,
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
@@ -111,7 +111,7 @@ class RunnerSequenceBuilder is RunnerBuilder
         end
       match next_builder
       | let rb: RunnerBuilder val =>
-        latest_runner = rb(alfred, auth,
+        latest_runner = rb(event_log, auth,
           consume latest_runner, router, pre_state_target_id')
       end
       remaining = remaining - 1
@@ -180,7 +180,7 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
     _route_builder = route_builder'
     _id = if id' == 0 then GuidGenerator.u128() else id' end
 
-  fun apply(alfred: Alfred tag,
+  fun apply(event_log: EventLog,
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
@@ -235,7 +235,7 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
     _forward_route_builder = forward_route_builder'
     _in_route_builder = in_route_builder'
 
-  fun apply(alfred: Alfred tag,
+  fun apply(event_log: EventLog,
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
@@ -287,13 +287,13 @@ class StateRunnerBuilder[State: Any #read] is RunnerBuilder
     _route_builder = route_builder'
     _id = GuidGenerator.u128()
 
-  fun apply(alfred: Alfred tag,
+  fun apply(event_log: EventLog,
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
-    let sr = StateRunner[State](_state_builder, alfred, auth)
+    let sr = StateRunner[State](_state_builder, event_log, auth)
     for scb in _state_change_builders.values() do
       sr.register_state_change(scb)
     end
@@ -348,13 +348,13 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
     _multi_worker = multi_worker
     _default_state_name = default_state_name'
 
-  fun apply(alfred: Alfred tag,
+  fun apply(event_log: EventLog,
     auth: AmbientAuth,
     next_runner: (Runner iso | None) = None,
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
-    _state_runner_builder(alfred, auth,
+    _state_runner_builder(event_log, auth,
       consume next_runner, router)
 
   fun name(): String => _state_name
@@ -572,18 +572,18 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner & Serializable
   var _state: State
   //TODO: this needs to be per-computation, rather than per-runner
   let _state_change_repository: StateChangeRepository[State] ref
-  let _alfred: Alfred
+  let _event_log: EventLog
   let _wb: Writer = Writer
   let _rb: Reader = Reader
   let _auth: AmbientAuth
   var _id: (U128 | None)
 
   new iso create(state_builder: {(): State} val,
-      alfred: Alfred, auth: AmbientAuth)
+      event_log: EventLog, auth: AmbientAuth)
   =>
     _state = state_builder()
     _state_change_repository = StateChangeRepository[State]
-    _alfred = alfred
+    _event_log = event_log
     _id = None
     _auth = auth
 
@@ -656,7 +656,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner & Serializable
           match _id
           | let buffer_id: U128 =>
 
-            _alfred.queue_log_entry(buffer_id, i_msg_uid, None,
+            _event_log.queue_log_entry(buffer_id, i_msg_uid, None,
               sc.id(), producer.current_sequence_id(), consume payload)
           else
             @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())

@@ -12,7 +12,6 @@ use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
-use "wallaroo/resilience"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
 
@@ -62,7 +61,7 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
   // (origin, msg_uid, frac_ids, seq_id, route_id)
   let _deduplication_list: Array[(Producer, U128, (Array[U64] val | None),
     SeqId, RouteId)] = _deduplication_list.create()
-  let _alfred: Alfred
+  let _event_log: EventLog
   var _id: U128
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
@@ -85,7 +84,7 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
     _outgoing_boundaries.create()
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
-    id: U128, route_builder: RouteBuilder val, alfred: Alfred,
+    id: U128, route_builder: RouteBuilder val, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     router: Router val = EmptyRouter, default_target: (Step | None) = None,
@@ -99,8 +98,8 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
     _router = _runner.clone_router_and_set_input_type(router)
     _omni_router = omni_router
     _route_builder = route_builder
-    _alfred = alfred
-    _alfred.register_origin(this, id)
+    _event_log = event_log
+    _event_log.register_origin(this, id)
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
     _id = id
@@ -370,7 +369,7 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
     ifdef "trace" then
       @printf[I32]("flushing at and below: %llu\n".cstring(), low_watermark)
     end
-    _alfred.flush_buffer(_id, low_watermark)
+    _event_log.flush_buffer(_id, low_watermark)
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val)
   =>
@@ -454,7 +453,9 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
       Fail()
     end
 
-  be send_state[K: (Hashable val & Equatable[K] val)](boundary: OutgoingBoundary, state_name: String, key: K) =>
+  be send_state[K: (Hashable val & Equatable[K] val)](
+    boundary: OutgoingBoundary, state_name: String, key: K)
+  =>
     match _runner
     | let r: SerializableStateRunner =>
       let state: ByteSeq val = r.serialize_state()

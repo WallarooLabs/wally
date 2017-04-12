@@ -555,6 +555,8 @@ actor Connections is Cluster
       let msg = ChannelMsgEncoder.replay_boundary_count(_worker_name, count,
         _auth)
       _send_control(target_worker, msg)
+      @printf[I32]("Informed %s that I have %lu boundaries to it\n".cstring(),
+        target_worker.cstring(), count)
     else
       Fail()
     end

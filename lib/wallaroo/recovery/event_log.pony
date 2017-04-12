@@ -25,7 +25,7 @@ type ReplayEntry is (U128, U128, None, U64, U64, ByteSeq val)
 trait Backend
   fun ref sync() ?
   fun ref datasync() ?
-  fun ref start()
+  fun ref start_log_replay()
   fun ref write() ?
   fun ref encode_entry(entry: LogEntry)
 
@@ -33,7 +33,7 @@ class DummyBackend is Backend
   new create() => None
   fun ref sync() => None
   fun ref datasync() => None
-  fun ref start() => None
+  fun ref start_log_replay() => None
   fun ref write() => None
   fun ref encode_entry(entry: LogEntry) => None
 
@@ -50,26 +50,26 @@ class FileBackend is Backend
 
   let _file: File iso
   let _filepath: FilePath
-  let _alfred: Alfred tag
+  let _event_log: EventLog
   let _writer: Writer iso
-  var _replay_on_start: Bool
+  var _replay_log_exists: Bool
 
-  new create(filepath: FilePath, alfred: Alfred,
+  new create(filepath: FilePath, event_log: EventLog,
     file_length: (USize | None) = None) =>
     _writer = recover iso Writer end
     _filepath = filepath
-    _replay_on_start = _filepath.exists()
+    _replay_log_exists = _filepath.exists()
     _file = recover iso File(filepath) end
     match file_length
     | let len: USize => _file.set_length(len)
     end
-    _alfred = alfred
+    _event_log = event_log
 
-  fun ref start() =>
-    if _replay_on_start then
+  fun ref start_log_replay() =>
+    if _replay_log_exists then
       @printf[I32]("RESILIENCE: Replaying from recovery log file.\n".cstring())
 
-      //replay log to Alfred
+      //replay log to EventLog
       try
         let r = Reader
 
@@ -143,7 +143,7 @@ class FileBackend is Backend
           // only replay if at or below watermark
           if entry._5 <= watermarks.get_or_else(entry._1, 0) then
             num_replayed = num_replayed + 1
-            _alfred.replay_log_entry(entry._1, entry._2, entry._3, entry._4
+            _event_log.replay_log_entry(entry._1, entry._2, entry._3, entry._4
                                     , entry._6)
           else
             num_skipped = num_skipped + 1
@@ -156,13 +156,14 @@ class FileBackend is Backend
           .cstring(), num_skipped)
 
         _file.seek_end(0)
-        _alfred.log_replay_finished()
+        _event_log.log_replay_finished()
       else
         @printf[I32]("Cannot recover state from eventlog\n".cstring())
       end
     else
-      @printf[I32]("RESILIENCE: Nothing to replay from recovery log file.\n"
+      @printf[I32]("RESILIENCE: Could not find log file to replay.\n"
         .cstring())
+      Fail()
     end
 
   fun ref write() ?
@@ -175,8 +176,7 @@ class FileBackend is Backend
   =>
     (let is_watermark: Bool, let origin_id: U128, let uid: U128,
      let frac_ids: None, let statechange_id: U64, let seq_id: U64,
-     let payload: Array[ByteSeq] val)
-    = consume entry
+     let payload: Array[ByteSeq] val) = consume entry
 
     ifdef "trace" then
       if is_watermark then
@@ -191,7 +191,6 @@ class FileBackend is Backend
     _writer.u64_be(seq_id)
 
     if not is_watermark then
-
       _writer.u128_be(uid)
 
       //we have no frac_ids
@@ -224,18 +223,17 @@ class FileBackend is Backend
       error
     end
 
-
-actor Alfred
+actor EventLog
   let _origins: Map[U128, (Resilient & Producer)] = _origins.create()
   let _logging_batch_size: USize
   let _backend: Backend ref
-  let _incoming_boundaries: Array[DataReceiver tag] ref =
-    _incoming_boundaries.create(1)
   let _replay_complete_markers: Map[U64, Bool] =
     _replay_complete_markers.create()
   var num_encoded: USize = 0
   var _flush_waiting: USize = 0
   var _initialized: Bool = false
+
+  var _recovery: (Recovery | None) = None
 
   new create(env: Env, filename: (String val | None) = None,
     logging_batch_size: USize = 10,
@@ -257,51 +255,20 @@ actor Alfred
       end
     end
 
-  be start(initializer: LocalTopologyInitializer) =>
-    _backend.start()
-    //!!
-    for b in _incoming_boundaries.values() do
-      b.initialize()
-    end
+  be start_logging(initializer: LocalTopologyInitializer) =>
     _initialized = true
-    initializer.report_alfred_ready_to_work()
+    initializer.report_event_log_ready_to_work()
 
-  // be start_log_replay() =>
-  //   _backend.start()
-
-  be register_incoming_boundary(boundary: DataReceiver tag) =>
-    _incoming_boundaries.push(boundary)
-    //!!
-    if _initialized then
-      boundary.initialize()
-    end
+  be start_log_replay(recovery: Recovery) =>
+    _recovery = recovery
+    _backend.start_log_replay()
 
   be log_replay_finished() =>
-    //signal all buffers that event log replay is finished
-    for boundary in _incoming_boundaries.values() do
-      _replay_complete_markers.update((digestof boundary),false)
-    end
-
-  be upstream_replay_finished(boundary: DataReceiver tag) =>
-    _replay_complete_markers.update((digestof boundary), true)
-    var finished = true
-    for b in _incoming_boundaries.values() do
-      try
-        if not _replay_complete_markers((digestof b)) then
-          finished = false
-        end
-      else
-        @printf[I32]("A boundary just disappeared!".cstring())
-      end
-    end
-    if finished then
-      _replay_finished()
-    end
-
-  // TODO: Remove this
-  fun _replay_finished() =>
-    for b in _origins.values() do
-      b.replay_finished()
+    match _recovery
+    | let r: Recovery =>
+      r.log_replay_finished()
+    else
+      Fail()
     end
 
   be replay_log_entry(origin_id: U128, uid: U128, frac_ids: None,
