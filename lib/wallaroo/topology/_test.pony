@@ -265,7 +265,12 @@ primitive _BoundaryGenerator
 
 primitive _RouterRegistryGenerator
   fun apply(env: Env, auth: AmbientAuth, alfred: Alfred): RouterRegistry =>
-    RouterRegistry(auth, "", _ConnectionsGenerator(env, auth), alfred, 0)
+    RouterRegistry(auth, "", _DataReceiversGenerator(env, auth, alfred),
+      _ConnectionsGenerator(env, auth), alfred, 0)
+
+primitive _DataReceiversGenerator
+  fun apply(env: Env, auth: AmbientAuth, alfred: Alfred): DataReceivers =>
+    DataReceivers(auth, "", _ConnectionsGenerator(env, auth), alfred)
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
@@ -274,8 +279,8 @@ primitive _ConnectionsGenerator
 
 primitive _RecoveryReplayerGenerator
   fun apply(env: Env, auth: AmbientAuth, alfred: Alfred): RecoveryReplayer =>
-    RecoveryReplayer(auth, "", _RouterRegistryGenerator(env, auth, alfred),
-    _Cluster)
+    RecoveryReplayer(auth, "", _DataReceiversGenerator(env, auth, alfred),
+      _RouterRegistryGenerator(env, auth, alfred), _Cluster)
 
 actor _Cluster is Cluster
   be notify_cluster_of_new_stateful_step[K: (Hashable val & Equatable[K] val)](
