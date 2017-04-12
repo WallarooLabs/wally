@@ -326,9 +326,10 @@ actor WithoutDagonCoordinator
   be to_buffy_socket(sock: TCPConnection, state: WorkerState) =>
     _to_buffy_socket = (sock, state)
     if state is Failed then
-      _env.err.print("Unable to open buffy socket")
+      _env.err.print("Unable to connect")
       sock.dispose()
     elseif state is Ready then
+      _env.out.print("Connected")
       _go_if_ready()
     end
 
