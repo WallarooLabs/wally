@@ -274,14 +274,7 @@ actor Startup
       // TODO::joining
       let connect_auth = TCPConnectAuth(auth)
       let metrics_conn = MetricsSink(m_addr(0),
-          m_addr(1))
-
-      let connect_msg = HubProtocol.connect()
-      let metrics_join_msg = HubProtocol.join_metrics(
-        "metrics:" + _application.name(),
-        _worker_name)
-      metrics_conn.writev(connect_msg)
-      metrics_conn.writev(metrics_join_msg)
+          m_addr(1), _application.name(), _worker_name)
 
       var is_recovering: Bool = false
 
@@ -480,13 +473,8 @@ actor Startup
       let input_addrs: Array[Array[String]] val =
         (_i_addrs_write = recover Array[Array[String]] end)
 
-      let metrics_conn = MetricsSink(m.metrics_host, m.metrics_service)
-
-      let connect_msg = HubProtocol.connect()
-      let metrics_join_msg = HubProtocol.join_metrics(
-        "metrics:" + m.metrics_app_name, _worker_name)
-      metrics_conn.writev(connect_msg)
-      metrics_conn.writev(metrics_join_msg)
+      let metrics_conn = MetricsSink(m.metrics_host, m.metrics_service,
+        _application.name(), _worker_name)
 
       // TODO: Are we creating connections to all addresses or just
       // initializer?
