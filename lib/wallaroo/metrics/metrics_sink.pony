@@ -1,6 +1,7 @@
 use "buffered"
 use "collections"
 use "net"
+use "time"
 use "sendence/hub"
 use "wallaroo/fail"
 
@@ -39,6 +40,9 @@ actor MetricsSink
   var _shutdown: Bool = false
   var _shutdown_peer: Bool = false
   var _in_sent: Bool = false
+  var _host: String
+  var _service: String
+  var _from: String
 
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
@@ -55,8 +59,13 @@ actor MetricsSink
 
   var _muted: Bool = false
 
-  new create(host: String, service: String, from: String = "", init_size: USize = 64,
-    max_size: USize = 16384)
+  var _reconnect_pause: U64
+  var _application_name: String
+  var _worker_name: String
+
+  new create(host: String, service: String, application_name: String,
+    worker_name: String, from: String = "", init_size: USize = 64,
+    max_size: USize = 16384, reconnect_pause: U64 = 10000000000)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
@@ -65,14 +74,21 @@ actor MetricsSink
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
-    _notify = MetricsSinkNotify("metrics")
+    _application_name = application_name
+    _worker_name = worker_name
+    _notify = MetricsSinkNotify(this, "metrics", _application_name, _worker_name)
+    _reconnect_pause = reconnect_pause
+    _host = host
+    _service = service
+    _from = from
     _connect_count = @pony_os_connect_tcp[U32](this,
       host.cstring(), service.cstring(),
       from.cstring())
     _notify_connecting()
 
-  new ip4(host: String, service: String, from: String = "", init_size: USize = 64,
-    max_size: USize = 16384)
+  new ip4(host: String, service: String, application_name: String,
+    worker_name: String, from: String = "", init_size: USize = 64,
+    max_size: USize = 16384, reconnect_pause: U64 = 10000000000)
   =>
     """
     Connect via IPv4.
@@ -80,14 +96,21 @@ actor MetricsSink
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
-    _notify = MetricsSinkNotify("metrics")
+    _application_name = application_name
+    _worker_name = worker_name
+    _notify = MetricsSinkNotify(this, "metrics", _application_name, _worker_name)
+    _reconnect_pause = reconnect_pause
+    _host = host
+    _service = service
+    _from = from
     _connect_count = @pony_os_connect_tcp4[U32](this,
       host.cstring(), service.cstring(),
       from.cstring())
     _notify_connecting()
 
-  new ip6(host: String, service: String, from: String = "", init_size: USize = 64,
-    max_size: USize = 16384)
+  new ip6(host: String, service: String, application_name: String,
+    worker_name: String, from: String = "", init_size: USize = 64,
+    max_size: USize = 16384, reconnect_pause: U64 = 10000000000)
   =>
     """
     Connect via IPv6.
@@ -95,21 +118,35 @@ actor MetricsSink
     _read_buf = recover Array[U8].undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
-    _notify = MetricsSinkNotify("metrics")
+    _application_name = application_name
+    _worker_name = worker_name
+    _notify = MetricsSinkNotify(this, "metrics", _application_name, _worker_name)
+    _reconnect_pause = reconnect_pause
+    _host = host
+    _service = service
+    _from = from
     _connect_count = @pony_os_connect_tcp6[U32](this,
       host.cstring(), service.cstring(),
       from.cstring())
     _notify_connecting()
 
-  new _accept(listen: TCPListener, fd: U32,
-    init_size: USize = 64, max_size: USize = 16384)
+  new _accept(host: String, service: String, application_name: String,
+    worker_name: String, from: String = "",
+    listen: TCPListener, fd: U32, init_size: USize = 64,
+    max_size: USize = 16384, reconnect_pause: U64 = 10000000000)
   =>
     """
     A new connection accepted on a server.
     """
     _listen = listen
-    _notify = MetricsSinkNotify("metrics")
+    _application_name = application_name
+    _worker_name = worker_name
+    _notify = MetricsSinkNotify(this, "metrics", _application_name, _worker_name)
     _connect_count = 0
+    _reconnect_pause = reconnect_pause
+    _host = host
+    _service = service
+    _from = from
     _fd = fd
     ifdef linux then
       _event = @pony_asio_event_create(this, fd,
@@ -315,8 +352,38 @@ actor MetricsSink
             _notify.connected(this)
             _queue_read()
 
-            // Don't call _complete_writes, as Windows will see this as a
-            // closed connection.
+            ifdef not windows then
+              if _pending_writes() then
+                //sent all data; release backpressure
+                _release_backpressure()
+              end
+            end
+          else
+            // The connection failed, unsubscribe the event and close.
+            @pony_asio_event_unsubscribe(event)
+            @pony_os_socket_close[None](fd)
+            _notify_connecting()
+          end
+        elseif not _connected and _closed then
+          @printf[I32]("Reconnection asio event\n".cstring())
+          if @pony_os_connected[Bool](fd) then
+            // The connection was successful, make it ours.
+            _fd = fd
+            _event = event
+
+            _pending_writev.clear()
+            _pending.clear()
+            _pending_writev_total = 0
+
+            _connected = true
+            _writeable = true
+
+            _closed = false
+            _shutdown = false
+            _shutdown_peer = false
+
+            _notify.connected(this)
+
             ifdef not windows then
               if _pending_writes() then
                 //sent all data; release backpressure
@@ -414,6 +481,7 @@ actor MetricsSink
         // IOCP reported a failed write on this chunk. Non-graceful shutdown.
         try _pending.shift() end
         _hard_close()
+        _schedule_reconnect()
         return
       end
 
@@ -508,6 +576,7 @@ actor MetricsSink
         else
           // Non-graceful shutdown on error.
           _hard_close()
+          _schedule_reconnect()
         end
       end
     end
@@ -568,6 +637,7 @@ actor MetricsSink
           _read_buf.size() - _read_len) ?
       else
         _hard_close()
+        _schedule_reconnect()
       end
     end
 
@@ -652,6 +722,7 @@ actor MetricsSink
     else
       _notify.connect_failed(this)
       _hard_close()
+      _schedule_reconnect()
     end
 
   fun ref close() =>
@@ -661,7 +732,7 @@ actor MetricsSink
     length read.  If the connection is muted, perform a hard close and
     shut down immediately.
     """
-     ifdef windows then
+    ifdef windows then
       _close()
     else
       if _muted then
@@ -670,6 +741,7 @@ actor MetricsSink
        _close()
      end
     end
+    _schedule_reconnect()
 
   fun ref _close() =>
     _closed = true
@@ -749,6 +821,22 @@ actor MetricsSink
 
     _notify.closed(this)
 
+  fun ref _schedule_reconnect() =>
+    if (_host != "") and (_service != "") then
+      @printf[I32]("RE-Connecting MetricsSink to %s:%s\n".cstring(),
+                   _host.cstring(), _service.cstring())
+      let timers = Timers
+      let timer = Timer(PauseBeforeReconnect(this), _reconnect_pause)
+      timers(consume timer)
+    end
+
+  be reconnect() =>
+    if not _connected then
+      _connect_count = @pony_os_connect_tcp[U32](this,
+        _host.cstring(), _service.cstring(),
+        _from.cstring())
+    end
+  
   fun ref _apply_backpressure() =>
     ifdef not windows then
       _writeable = false
@@ -759,7 +847,6 @@ actor MetricsSink
         @pony_asio_event_resubscribe_write(_event)
       end
     end
-
     _notify.throttled(this)
 
   fun ref _release_backpressure() =>
@@ -860,13 +947,26 @@ interface _MetricsSinkNotify
 
 class MetricsSinkNotify is _MetricsSinkNotify
   let _name: String
+  let _application_name: String
+  let _worker_name: String
+  let _metrics_conn: MetricsSink tag
 
-  new iso create(name: String) =>
+  new iso create(metrics_conn: MetricsSink tag, name: String, application_name: String, worker_name: String) =>
     _name = name
+    _application_name = application_name
+    _worker_name = worker_name
+    _metrics_conn = metrics_conn
 
   fun ref connected(sock: MetricsSink ref) =>
     @printf[None]("%s outgoing connected\n".cstring(),
       _name.cstring())
+		let connect_msg = HubProtocol.connect()
+		let metrics_join_msg = HubProtocol.join_metrics(
+			"metrics:" + _application_name,
+			_worker_name)
+    _metrics_conn.writev(connect_msg)
+    _metrics_conn.writev(metrics_join_msg)
+
 
   fun ref throttled(sock: MetricsSink ref) =>
     @printf[None]("%s outgoing throttled\n".cstring(),
@@ -876,4 +976,13 @@ class MetricsSinkNotify is _MetricsSinkNotify
     @printf[None]("%s outgoing no longer throttled\n".cstring(),
       _name.cstring())
 
+class PauseBeforeReconnect is TimerNotify
+  let _metrics_sink: MetricsSink
+
+  new iso create(metrics_sink: MetricsSink) =>
+    _metrics_sink = metrics_sink
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _metrics_sink.reconnect()
+    false
 

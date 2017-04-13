@@ -253,14 +253,14 @@ primitive _DefaultRouterGenerator
 
 primitive _StepGenerator
   fun apply(event_log: EventLog, recovery_replayer: RecoveryReplayer): Step =>
-    Step(RouterRunner, MetricsReporter("", "", MetricsSink("", "")),
+    Step(RouterRunner, MetricsReporter("", "", MetricsSink("", "", "", "")),
       1, EmptyRouteBuilder, event_log, recovery_replayer,
       recover Map[String, OutgoingBoundary] end)
 
 primitive _BoundaryGenerator
   fun apply(worker_name: String, auth: AmbientAuth): OutgoingBoundary =>
     OutgoingBoundary(auth, worker_name,
-      MetricsReporter("", "", MetricsSink("", "")), "", "")
+      MetricsReporter("", "", MetricsSink("", "", "", "")), "", "")
 
 primitive _RouterRegistryGenerator
   fun apply(env: Env, auth: AmbientAuth): RouterRegistry =>
@@ -273,8 +273,8 @@ primitive _DataReceiversGenerator
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
-    Connections("", "", env, auth, "", "", "", "", "", "", MetricsSink("", ""),
-      "", "", false, "", false)
+    Connections("", "", env, auth, "", "", "", "", "", "",
+      MetricsSink("", "", "", ""), "", "", false, "", false)
 
 primitive _RecoveryReplayerGenerator
   fun apply(env: Env, auth: AmbientAuth): RecoveryReplayer =>
