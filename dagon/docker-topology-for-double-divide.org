@@ -19,7 +19,7 @@
 #+LaTeX_HEADER: \let\description\compactdesc
 #+LaTeX_HEADER: \let\enumerate\compactenum
 #+LaTeX_CLASS_OPTIONS: [captions=tableheading]
-#+LATEX: 
+#+LATEX:
 #+LATEX: \listoffigures
 
 
@@ -1160,7 +1160,7 @@ our topology will connect back to Dagon through the tunnel.
 #  -R <remote port>:localhost:<local port> ubuntu@<leader-node-ip>
 ssh  -i ~/.ssh/ec2/us-east-1.pem -f -N -T -R8080:localhost:8080 ubuntu@52.87.211.240
 #+END_SRC
-Open a new shell window and continue there. 
+Open a new shell window and continue there.
 
 ** Build and Publish Containers
 Point your =DOCKER_HOST= env variable to the AWS swarm on port 2378.
@@ -1189,7 +1189,7 @@ cd buffy/dagon
 stable env ponyc
 #+END_SRC
 
-** Login 
+** Login
 Login to the Sendence Docker image registry.
 #+BEGIN_SRC sh
 docker login docker.sendence.com:5043
@@ -1371,7 +1371,7 @@ cp /vagrant/docker-double-divide-aws-*.ini ./
 
 
 * Dipin's AWS Setup
-We are mostly working with spot EC2 instances. 
+We are mostly working with spot EC2 instances.
 
 Do not run "make destroy" after your EC2 spot instances have been
 killed by AWS. This would boot new nodes and immediately destroy
@@ -1499,8 +1499,9 @@ cd ..
 
 Build and install =stable=.
 #+BEGIN_SRC sh
-git clone https://github.com/jemc/pony-stable
+git clone https://github.com/ponylang/pony-stable
 cd pony-stable
+git checkout 0054b429a54818d187100ed40f5525ec7931b31b;
 make
 sudo make install
 #+END_SRC
@@ -1682,7 +1683,7 @@ docker --host=tcp://<leader host or external ip>:2378 run -u 0 \
  -e "constraint:node==<leader internal hostname>“ -v /usr/bin:/usr/bin:ro  \
  -v /var/run/docker.sock:/var/run/docker.sock  -v /bin:/bin:ro  \
  -v /lib:/lib:ro  -v /lib64:/lib64:ro  -v /usr:/usr:ro  -v /tmp:/tmp  \
- -w /tmp  --net=buffy-swarm  docker.sendence.com:5043/sendence/dagon.amd64:<docker tag>  
+ -w /tmp  --net=buffy-swarm  docker.sendence.com:5043/sendence/dagon.amd64:<docker tag>
  dagon.amd64  --docker=tcp://<leader internal ip>:2378  -t 10  \
  --filepath=/tmp/docker-double-divide-aws-swarm.ini  --phone-home=dagon:8080
 #+END_SRC
@@ -1731,7 +1732,7 @@ PLAY RECAP *********************************************************************
 
 Login to the leader node:
 #+BEGIN_SRC sh
-ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@54.87.214.83 
+ssh -i ~/.ssh/ec2/us-east-1.pem ubuntu@54.87.214.83
 #+END_SRC
 
 Create the Docker network:

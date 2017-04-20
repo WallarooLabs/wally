@@ -3,7 +3,7 @@
 A process used to send external messages to Dagon.
 
 ##Build
-You will need [pony-stable](https://github.com/jemc/pony-stable)
+You will need [pony-stable](https://github.com/ponylang/pony-stable)
 to build the project. Compile and install it, then run these
 commands.
 

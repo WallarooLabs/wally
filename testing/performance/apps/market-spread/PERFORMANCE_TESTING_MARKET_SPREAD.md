@@ -204,8 +204,9 @@ sudo make install LLVM_CONFIG=~/clang+llvm-3.8.1-x86_64-linux-gnu-ubuntu-16.04/b
 
 ```bash
 cd ~/
-git clone https://github.com/jemc/pony-stable.git
+git clone https://github.com/ponylang/pony-stable
 cd pony-stable
+git checkout 0054b429a54818d187100ed40f5525ec7931b31b;
 sudo make install
 ```
 

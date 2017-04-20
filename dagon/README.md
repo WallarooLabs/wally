@@ -3,7 +3,7 @@
 A topology overlord. Boots components for you.
 
 ## Build
-You will need [pony-stable](https://github.com/jemc/pony-stable)
+You will need [pony-stable](https://github.com/ponylang/pony-stable)
 to build the project. Compile and install it, then run these
 commands.
 
