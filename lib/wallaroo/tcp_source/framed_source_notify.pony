@@ -59,6 +59,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     else
       let ingest_ts = Time.nanos()
       let pipeline_time_spent: U64 = 0
+      var latest_metrics_id: U16 = 1
 
       ifdef "trace" then
         @printf[I32](("Rcvd msg at " + _pipeline_name + " source\n").cstring())
@@ -76,12 +77,17 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
               end
               error
             end
+          let decode_end_ts = Time.nanos()
+          _metrics_reporter.step_metric(_pipeline_name, "Decode Time in TCP Source",
+            latest_metrics_id, ingest_ts, decode_end_ts)
+          latest_metrics_id = latest_metrics_id + 1
+
           ifdef "trace" then
             @printf[I32](("Msg decoded at " + _pipeline_name + " source\n").cstring())
           end
           _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
-            conn, _router, _omni_router,
-            conn, _guid_gen.u128(), None, 0, 0, ingest_ts, 1, ingest_ts, _metrics_reporter)
+            conn, _router, _omni_router, conn, _guid_gen.u128(), None, 0, 0,
+            decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
         else
           Fail()
           (true, true, ingest_ts)
