@@ -754,9 +754,9 @@ class MultiFileBinaryDataSource is Iterator[Array[U8 val] val]
     end
 
   fun ref next(): Array[U8 val] val ? =>
-    match _cur_source
-    | let f: BinaryFileDataSource =>
-      if f.has_next() then
+    if has_next() then
+      match _cur_source
+      | let f: BinaryFileDataSource =>
         f.next()
       else
         error
@@ -811,9 +811,9 @@ class MultiFileVariableBinaryDataSource is Iterator[Array[U8 val] val]
     end
 
   fun ref next(): Array[U8 val] val ? =>
-    match _cur_source
-    | let f: VariableLengthBinaryFileDataSource =>
-      if f.has_next() then
+    if has_next() then
+      match _cur_source
+      | let f: VariableLengthBinaryFileDataSource =>
         f.next()
       else
         error
