@@ -39,10 +39,6 @@ class StateChangeRepository[State: Any #read]
     _state_changes(index.usize())
 
   fun ref lookup_by_name(name: String): StateChange[State] ref ? =>
-    ifdef debug then
-      Invariant(_named_lookup.contains(name))
-    end
-
     _state_changes(_named_lookup(name).usize())
 
   fun size() : USize =>
