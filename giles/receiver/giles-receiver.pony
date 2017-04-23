@@ -95,19 +95,21 @@ actor Main
         if required_args_are_present then
           let listener_addr = l_arg as Array[String]
 
-          let store = Store(env.root as AmbientAuth)
-          let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
+          let store = Store(env.root as AmbientAuth, e_arg)
+          let coordinator = CoordinatorFactory(env, store, n_arg, p_arg, e_arg,
+            use_metrics)
 
           SignalHandler(TermHandler(coordinator), Sig.term())
           SignalHandler(TermHandler(coordinator), Sig.int())
 
           let tcp_auth = TCPListenAuth(env.root as AmbientAuth)
           let from_buffy_listener = TCPListener(tcp_auth,
-            FromBuffyListenerNotify(coordinator, store, env.err, e_arg,
-              use_metrics, no_write),
+            FromBuffyListenerNotify(coordinator, store, env.err, no_write),
             listener_addr(0),
             listener_addr(1))
 
+        else
+          error
         end
       else
         env.err.print(
@@ -125,19 +127,14 @@ class FromBuffyListenerNotify is TCPListenNotify
   let _coordinator: Coordinator
   let _store: Store
   let _stderr: StdStream
-  let _expected: (USize | None)
-  let _use_metrics: Bool
   let _no_write: Bool
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream, expected: (USize | None) = None,
-    use_metrics: Bool, no_write: Bool)
+    store: Store, stderr: StdStream, no_write: Bool)
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
-    _expected = expected
-    _use_metrics = use_metrics
     _no_write = no_write
 
   fun ref not_listening(listen: TCPListener ref) =>
@@ -147,54 +144,29 @@ class FromBuffyListenerNotify is TCPListenNotify
     _coordinator.from_buffy_listener(listen, Ready)
 
   fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    FromBuffyNotify(_coordinator, _store, _stderr, _expected, _use_metrics,
-      _no_write)
+    FromBuffyNotify(_coordinator, _store, _stderr, _no_write)
 
 class FromBuffyNotify is TCPConnectionNotify
   let _coordinator: Coordinator
   let _store: Store
   let _stderr: StdStream
   var _header: Bool = true
-  var _count: USize = 0
-  var _remaining: USize = 0
-  var _expected: USize = 0
-  var _expect_termination: Bool = false
-  let _metrics: Metrics tag = Metrics
-  let _use_metrics: Bool
   let _no_write: Bool
   var _closed: Bool = false
 
   new iso create(coordinator: Coordinator,
-    store: Store, stderr: StdStream,
-    expected: (USize | None),
-    use_metrics: Bool, no_write: Bool)
+    store: Store, stderr: StdStream, no_write: Bool)
   =>
     _coordinator = coordinator
     _store = store
     _stderr = stderr
-    _use_metrics = use_metrics
     _no_write = no_write
-    try
-      if (expected as USize) > 0 then
-        _expected = expected as USize
-        _remaining = _expected
-        _expect_termination = true
-      end
-    end
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
   =>
     if _header then
       try
-        _count = _count + 1
-        if (_count == 1) and _use_metrics then
-          _metrics.set_start(Time.nanos())
-        end
-        if _expect_termination then
-          _remaining = _remaining - 1
-        end
-
         let expect = Bytes.to_u32(data(0), data(1), data(2), data(3)).usize()
 
         conn.expect(expect)
@@ -206,20 +178,9 @@ class FromBuffyNotify is TCPConnectionNotify
       if not _no_write then
         _store.received(consume data, Time.wall_to_nanos(Time.now()))
       end
-      if _expect_termination and (_remaining <= 0) then
-        if not _closed then
-          _stderr.print(_count.string() + " expected messages received. " +
-            "Terminating...")
-          if _use_metrics then
-            _metrics.set_end(Time.nanos(), _expected)
-          end
-          _coordinator.finished()
-        end
-        _closed = true
-      else
-        conn.expect(4)
-        _header = true
-      end
+      _coordinator.received_message()
+      conn.expect(4)
+      _header = true
     end
     true
 
@@ -281,12 +242,15 @@ primitive CoordinatorFactory
   fun apply(env: Env,
     store: Store,
     node_id: (String | None),
-    to_dagon_addr: (Array[String] | None)): Coordinator ?
+    to_dagon_addr: (Array[String] | None),
+    expected: (USize | None),
+    use_metrics: Bool): Coordinator ?
   =>
     if (node_id isnt None) and (to_dagon_addr isnt None) then
       let n = node_id as String
       let ph = to_dagon_addr as Array[String]
-      let coordinator = WithDagonCoordinator(env, store, n)
+      let coordinator = WithDagonCoordinator(env, store, n, expected,
+        use_metrics)
 
       let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
       let to_dagon_socket = TCPConnection(tcp_auth,
@@ -296,11 +260,12 @@ primitive CoordinatorFactory
 
       coordinator
     else
-      WithoutDagonCoordinator(env, store)
+      WithoutDagonCoordinator(env, store, expected, use_metrics)
     end
 
 interface tag Coordinator
   be finished()
+  be received_message()
   be from_buffy_listener(listener: TCPListener, state: WorkerState)
   be connection_added(connection: TCPConnection)
 
@@ -315,18 +280,48 @@ actor WithoutDagonCoordinator is Coordinator
   let _store: Store
   var _from_buffy_listener: ((TCPListener | None), WorkerState) = (None, Waiting)
   let _connections: Array[TCPConnection] = Array[TCPConnection]
+  let _expected: USize
+  var _count: USize = 0
+  var _finished: Bool = false
+  let _metrics: Metrics tag = Metrics
+  let _use_metrics: Bool
 
-  new create(env: Env, store: Store) =>
+  new create(env: Env, store: Store, expected: (USize | None),
+    use_metrics: Bool)
+  =>
     _env = env
     _store = store
+    _expected = try (expected as USize) else USize.max_value() end
+    _use_metrics = use_metrics
 
   be finished() =>
+    _do_finished()
+
+  fun ref _do_finished() =>
+    _finished = true
     try
       let x = _from_buffy_listener._1 as TCPListener
       x.dispose()
     end
     for c in _connections.values() do c.dispose() end
     _store.dump()
+
+  be received_message() =>
+    if _finished then
+      return
+    end
+    if _use_metrics and (_count == 0)then
+      _metrics.set_start(Time.nanos())
+    end
+    _count = _count + 1
+    if _count >= _expected then
+      _env.err.print(_count.string() + " expected messages received. " +
+            "Terminating...")
+      if _use_metrics then
+        _metrics.set_end(Time.nanos(), _expected)
+      end
+      _do_finished()
+    end
 
   be from_buffy_listener(listener: TCPListener, state: WorkerState) =>
     _from_buffy_listener = (listener, state)
@@ -347,13 +342,26 @@ actor WithDagonCoordinator is Coordinator
   var _to_dagon_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
   let _node_id: String
   let _connections: Array[TCPConnection] = Array[TCPConnection]
+  let _expected: USize
+  var _count: USize = 0
+  var _finished: Bool = false
+  let _metrics: Metrics tag = Metrics
+  let _use_metrics: Bool
 
-  new create(env: Env, store: Store, node_id: String) =>
+  new create(env: Env, store: Store, node_id: String, expected: (USize | None),
+    use_metrics: Bool)
+  =>
     _env = env
     _store = store
     _node_id = node_id
+    _expected = try (expected as USize) else USize.max_value() end
+    _use_metrics = use_metrics
 
   be finished() =>
+    _do_finished()
+
+  fun ref _do_finished() =>
+    _finished = true
     try
       let x = _from_buffy_listener._1 as TCPListener
       x.dispose()
@@ -364,6 +372,20 @@ actor WithDagonCoordinator is Coordinator
       let x = _to_dagon_socket._1 as TCPConnection
       x.writev(ExternalMsgEncoder.done_shutdown(_node_id))
       x.dispose()
+    end
+
+  be received_message() =>
+    if _use_metrics and (_count == 0)then
+      _metrics.set_start(Time.nanos())
+    end
+    _count = _count + 1
+    if _count >= _expected then
+      _env.err.print(_count.string() + " expected messages received. " +
+            "Terminating...")
+      if _use_metrics then
+        _metrics.set_end(Time.nanos(), _expected)
+      end
+      _do_finished()
     end
 
   be from_buffy_listener(listener: TCPListener, state: WorkerState) =>
@@ -405,8 +427,9 @@ actor WithDagonCoordinator is Coordinator
 actor Store
   let _received_file: (File | None)
   var _count: USize = 0
+  let _expected: USize
 
-  new create(auth: AmbientAuth) =>
+  new create(auth: AmbientAuth, expected: (USize | None)) =>
     _received_file =
       try
         let f = File(FilePath(auth, "received.txt"))
@@ -415,11 +438,15 @@ actor Store
       else
         None
       end
+    _expected = try (expected as USize) else USize.max_value() end
 
   be received(msg: Array[U8] iso, at: U64) =>
-    match _received_file
-      | let file: File => file.writev(
-          FallorMsgEncoder.timestamp_raw(at, consume msg))
+    if _count < _expected then
+      match _received_file
+        | let file: File => file.writev(
+            FallorMsgEncoder.timestamp_raw(at, consume msg))
+      end
+      _count = _count + 1
     end
 
   be dump() =>
