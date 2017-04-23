@@ -28,7 +28,8 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
-  new iso create(pipeline_name: String, auth: AmbientAuth, handler: FramedSourceHandler[In] val,
+  new iso create(pipeline_name: String, auth: AmbientAuth,
+    handler: FramedSourceHandler[In] val,
     runner_builder: RunnerBuilder val, router: Router val,
     metrics_reporter: MetricsReporter iso, alfred: Alfred tag,
     target_router: Router val, pre_state_target_id: (U128 | None) = None)
@@ -78,12 +79,14 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
               error
             end
           let decode_end_ts = Time.nanos()
-          _metrics_reporter.step_metric(_pipeline_name, "Decode Time in TCP Source",
-            latest_metrics_id, ingest_ts, decode_end_ts)
+          _metrics_reporter.step_metric(_pipeline_name,
+            "Decode Time in TCP Source", latest_metrics_id, ingest_ts,
+            decode_end_ts)
           latest_metrics_id = latest_metrics_id + 1
 
           ifdef "trace" then
-            @printf[I32](("Msg decoded at " + _pipeline_name + " source\n").cstring())
+            @printf[I32](("Msg decoded at " + _pipeline_name +
+              " source\n").cstring())
           end
           _runner.run[In](_pipeline_name, pipeline_time_spent, decoded,
             conn, _router, _omni_router, conn, _guid_gen.u128(), None, 0, 0,
@@ -103,7 +106,8 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
             last_ts, end_ts)
         end
 
-        _metrics_reporter.pipeline_metric(_pipeline_name, time_spent + pipeline_time_spent)
+        _metrics_reporter.pipeline_metric(_pipeline_name, time_spent +
+          pipeline_time_spent)
         _metrics_reporter.worker_metric(_pipeline_name, time_spent)
       end
 
@@ -126,7 +130,8 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       _router = p_router.update_boundaries(obs)
     else
       ifdef debug then
-        @printf[I32]("FramedSourceNotify doesn't have PartitionRouter. Updating boundaries is a noop\n".cstring())
+        @printf[I32](("FramedSourceNotify doesn't have PartitionRouter." +
+          " Updating boundaries is a noop\n").cstring())
       end
     end
 
