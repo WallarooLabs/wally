@@ -48,6 +48,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
   let _encoder: EncoderWrapper val
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter
+  var _initializer: (LocalTopologyInitializer | None) = None
 
   // Consumer
   var _upstreams: Array[Producer] = _upstreams.create()
@@ -113,7 +114,11 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
   be application_created(initializer: LocalTopologyInitializer,
     omni_router: OmniRouter val)
   =>
+  if _connected then
     initializer.report_initialized(this)
+  else
+    _initializer = initializer
+  end
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     initializer.report_ready_to_work(this)
@@ -271,6 +276,12 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
             _event = event
             _connected = true
             _writeable = true
+
+            match _initializer
+            | let initializer: LocalTopologyInitializer =>
+              initializer.report_initialized(this)
+              _initializer = None
+            end
 
             _notify.connected(this)
 
