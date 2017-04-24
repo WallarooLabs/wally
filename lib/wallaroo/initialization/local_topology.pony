@@ -1049,12 +1049,9 @@ actor LocalTopologyInitializer
                   end
                 end
 
-              let metrics_monitor: ThroughputBasedClusterGrowthTrigger iso =
-                recover ThroughputBasedClusterGrowthTrigger(this, 10_000) end
               let source_reporter = MetricsReporter(t.name(),
                 t.worker_name(),
-                _metrics_conn
-                where metrics_monitor = consume metrics_monitor)
+                _metrics_conn)
 
               // Get all the sinks so far, which should include any sinks
               // prestate on this source might target
