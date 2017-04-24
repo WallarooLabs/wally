@@ -228,7 +228,7 @@ size_t OrderSourceDecoder::payload_length(char *bytes)
   return reader.u32_be();
 }
 
-wallaroo::Data *OrderSourceDecoder::decode(char *bytes)
+wallaroo::Data *OrderSourceDecoder::decode(char *bytes, size_t sz)
 {
   Reader reader((unsigned char*) bytes);
 
@@ -267,7 +267,7 @@ size_t NbboSourceDecoder::payload_length(char *bytes)
   return reader.u32_be();
 }
 
-wallaroo::Data *NbboSourceDecoder::decode(char *bytes)
+wallaroo::Data *NbboSourceDecoder::decode(char *bytes, size_t sz)
 {
   Reader reader((unsigned char*) bytes);
 

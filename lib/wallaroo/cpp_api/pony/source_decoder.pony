@@ -6,7 +6,7 @@ use @w_source_decoder_payload_length[USize](source_decoder: SourceDecoderP,
   data: Pointer[U8] tag)
 
 use @w_source_decoder_decode[DataP](source_decoder: SourceDecoderP,
-  data: Pointer[U8] tag)
+  data: Pointer[U8] tag, size: USize)
 
 type SourceDecoderP is Pointer[U8] val
 
@@ -25,7 +25,8 @@ class CPPSourceDecoder is FramedSourceHandler[CPPData val]
     @w_source_decoder_payload_length(_source_decoder, data.cpointer())
 
   fun decode(data: Array[U8] val): CPPData val ? =>
-    match @w_source_decoder_decode(_source_decoder, data.cpointer())
+    match @w_source_decoder_decode(_source_decoder, data.cpointer(),
+      data.size())
     | let result: DataP if (not result.is_null()) =>
       recover CPPData(result) end
     else

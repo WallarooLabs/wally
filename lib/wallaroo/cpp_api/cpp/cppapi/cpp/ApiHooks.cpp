@@ -97,9 +97,9 @@ extern size_t w_source_decoder_payload_length(SourceDecoder *source_decoder_,
 }
 
 extern Data *w_source_decoder_decode(SourceDecoder *source_decoder_,
-  char *bytes_)
+  char *bytes_, size_t sz_)
 {
-  return source_decoder_->decode(bytes_);
+  return source_decoder_->decode(bytes_, sz_);
 }
 
 extern const char *w_state_change_get_name(StateChange *state_change_)
