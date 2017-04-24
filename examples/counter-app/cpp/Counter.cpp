@@ -99,7 +99,7 @@ size_t CounterSourceDecoder::payload_length(char *bytes)
   return ((size_t)(bytes[0]) << 8) + (size_t)(bytes[1]);
 }
 
-Numbers *CounterSourceDecoder::decode(char *bytes)
+Numbers *CounterSourceDecoder::decode(char *bytes, size_t sz)
 {
   // std::cerr << "decoding in the source!" << std::endl;
   Numbers *n = new Numbers();

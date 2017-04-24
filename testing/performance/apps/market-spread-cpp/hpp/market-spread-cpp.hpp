@@ -66,7 +66,7 @@ class OrderSourceDecoder: public wallaroo::SourceDecoder
 public:
   virtual size_t header_length();
   virtual size_t payload_length(char *bytes);
-  virtual wallaroo::Data *decode(char *bytes);
+  virtual wallaroo::Data *decode(char *bytes, size_t sz);
 };
 
 class NbboSourceDecoder: public wallaroo::SourceDecoder
@@ -74,7 +74,7 @@ class NbboSourceDecoder: public wallaroo::SourceDecoder
 public:
   virtual size_t header_length();
   virtual size_t payload_length(char *bytes);
-  virtual wallaroo::Data *decode(char *bytes);
+  virtual wallaroo::Data *decode(char *bytes, size_t sz);
 };
 
 class PartitionableMessage: public wallaroo::Data

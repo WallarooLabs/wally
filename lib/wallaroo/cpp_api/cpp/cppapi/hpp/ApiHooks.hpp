@@ -44,7 +44,8 @@ extern void w_sink_encoder_encode(SinkEncoder *sink_encoder_,
 extern size_t w_source_decoder_header_length(SourceDecoder *source_decoder_);
 extern size_t w_source_decoder_payload_length(SourceDecoder *source_decoder_,
   char *bytes_);
-extern Data *w_source_decoder_decode(SourceDecoder *source_decoder_, char *bytes_);
+extern Data *w_source_decoder_decode(SourceDecoder *source_decoder_,
+  char *bytes_, size_t sz_);
 
 extern const char *w_state_change_get_name(StateChange *state_change_);
 extern uint64_t w_state_change_get_id(StateChange *state_change_);
