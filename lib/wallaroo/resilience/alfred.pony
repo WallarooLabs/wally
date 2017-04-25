@@ -7,7 +7,6 @@ use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/routing"
 use "wallaroo/initialization"
-use "debug"
 
 //TODO: origin needs to get its own file
 trait tag Resilient
@@ -264,6 +263,7 @@ actor Alfred
 
     be register_incoming_boundary(boundary: DataReceiver tag) =>
       _incoming_boundaries.push(boundary)
+      boundary.request_replay()
 
     be log_replay_finished() =>
       //signal all buffers that event log replay is finished

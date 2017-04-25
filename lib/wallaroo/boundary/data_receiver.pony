@@ -61,9 +61,7 @@ actor DataReceiver is Producer
     // Now that we have a sender_step_id, we're ready to register with
     // the registry
     _router_registry.add_data_receiver(_sender_name, _sender_step_id, this)
-    if _replay_pending then
-      request_replay()
-    end
+    request_replay()
 
   fun ref init_timer() =>
     ifdef "resilience" then
@@ -172,7 +170,7 @@ actor DataReceiver is Producer
     ifdef "trace" then
       @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
     end
-    if seq_id >= _last_id_seen then
+    if seq_id > _last_id_seen then
       _ack_counter = _ack_counter + 1
       _last_id_seen = seq_id
       _router.route(d, pipeline_time_spent, this, seq_id, latest_ts,
@@ -192,7 +190,7 @@ actor DataReceiver is Producer
   be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    if seq_id >= _last_id_seen then
+    if seq_id > _last_id_seen then
       _last_id_seen = seq_id
       _router.replay_route(r, pipeline_time_spent, this, seq_id, latest_ts,
         metrics_id, worker_ingress_ts)

@@ -11,6 +11,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/routing"
+use "wallaroo/spike"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -28,19 +29,21 @@ class OutgoingBoundaryBuilder
   let _reporter: MetricsReporter val
   let _host: String
   let _service: String
+  let _spike_config: (SpikeConfig | None)
 
   new val create(auth: AmbientAuth, name: String, r: MetricsReporter iso,
-    h: String, s: String)
+    h: String, s: String, sc: (SpikeConfig | None) = None)
   =>
     _auth = auth
     _worker_name = name
     _reporter = consume r
     _host = h
     _service = s
+    _spike_config = sc
 
   fun apply(step_id: U128): OutgoingBoundary =>
     let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
-      _host, _service)
+      _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
 
   fun build_and_initialize(step_id: U128,
@@ -50,7 +53,7 @@ class OutgoingBoundaryBuilder
     Called when creating a boundary post cluster initialization
     """
     let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
-      _host, _service)
+      _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
     boundary.quick_initialize(local_topology_initializer)
 
@@ -109,14 +112,27 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
-    from: String = "", init_size: USize = 64, max_size: USize = 16384)
+    from: String = "", init_size: USize = 64, max_size: USize = 16384,
+    spike_config: (SpikeConfig | None) = None)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
     _auth = auth
-    _notify = BoundaryNotify(_auth)
+
+    ifdef "spike" then
+      match spike_config
+      | let sc: SpikeConfig =>
+        var notify = recover iso BoundaryNotify(_auth, this) end
+        _notify = SpikeWrapper(consume notify, sc)
+      else
+        _notify = BoundaryNotify(_auth, this)
+      end
+    else
+      _notify = BoundaryNotify(_auth, this)
+    end
+
     _worker_name = worker_name
     _host = host
     _service = service
@@ -194,8 +210,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
       _host.cstring(), _service.cstring(),
       _from.cstring())
     _notify_connecting()
-
-    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
+    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" +
+      _service + "\n").cstring())
 
   be migrate_step[K: (Hashable val & Equatable[K] val)](step_id: U128,
     state_name: String, key: K, state: ByteSeq val)
@@ -318,8 +334,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     end
 
   be replay_msgs() =>
-    @printf[I32](("Replaying messages to " + _host + ":" + _service + "\n"
-      ).cstring())
+    @printf[I32](("Replaying messages to " + _host + ":" + _service +
+      "\n").cstring())
     for msg in _queue.values() do
       try
         _writev(ChannelMsgEncoder.replay(msg, _auth))
@@ -351,6 +367,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     silently discarded and not acknowleged.
     """
     close()
+    _notify.dispose()
 
   be request_ack() =>
     // TODO: How do we propagate this down?
@@ -361,6 +378,10 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   be register_producer(producer: Producer) =>
     ifdef debug then
       Invariant(not _upstreams.contains(producer))
+    end
+
+    if _mute_outstanding then
+      producer.mute(this)
     end
 
     _upstreams.push(producer)
@@ -418,8 +439,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
             _fd = fd
             _event = event
 
-            // clear anything pending to be sent because on recovery we're going to
-            // have to replay from our queue when requested
+            // clear anything pending to be sent because on recovery we're going
+            // to have to replay from our queue when requested
             _pending_writev.clear()
             _pending.clear()
             _pending_writev_total = 0
@@ -428,7 +449,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
             _writeable = true
 
             // set replaying to true since we might need to replay to downstream
-            // refore resuming
+            // before resuming
             _replaying = true
 
             _closed = false
@@ -438,11 +459,12 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
             _notify.connected(this)
 
             try
-              let connect_msg = ChannelMsgEncoder.data_connect(_worker_name, _step_id,
-                _auth)
+              let connect_msg = ChannelMsgEncoder.data_connect(_worker_name,
+                _step_id, _auth)
               _writev(connect_msg)
             else
-              @printf[I32]("error creating data connect message on reconnect\n".cstring())
+              @printf[I32]("error creating data connect message on reconnect\n"
+                .cstring())
             end
 
             ifdef not windows then
@@ -681,6 +703,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     else
       // The socket has been closed from the other side.
       _shutdown_peer = true
+      _maybe_mute_or_unmute_upstreams()
       close()
     end
 
@@ -760,6 +783,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
         end
       else
         // Non-graceful shutdown on error.
+        _maybe_mute_or_unmute_upstreams()
         _hard_close()
       end
     end
@@ -859,9 +883,19 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
   var _header: Bool = true
+  let _outgoing_boundary: OutgoingBoundary tag
+  let _timers: Timers = Timers
+  let _reconnect_closed_delay: U64
+  let _reconnect_failed_delay: U64
 
-  new create(auth: AmbientAuth) =>
+  new create(auth: AmbientAuth, outgoing_boundary: OutgoingBoundary tag,
+    reconnect_closed_delay: U64 = 50_000_000, reconnect_failed_delay: U64 =
+      2_000_000_000)
+    =>
     _auth = auth
+    _outgoing_boundary = outgoing_boundary
+    _reconnect_closed_delay = reconnect_closed_delay
+    _reconnect_failed_delay = reconnect_failed_delay
 
   fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
     times: USize): Bool
@@ -893,8 +927,8 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
           c.replay_msgs()
         end
       else
-        @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring()
-)
+        @printf[I32](("Unknown Wallaroo data message type received at " +
+          "OutgoingBoundary.\n").cstring())
       end
 
       conn.expect(4)
@@ -917,9 +951,15 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
+    let t = Timer(_ReconnectTimerNotify(_outgoing_boundary),
+      _reconnect_closed_delay, 0)
+    _timers(consume t)
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connect_failed\n\n".cstring())
+    let t = Timer(_ReconnectTimerNotify(_outgoing_boundary),
+      _reconnect_failed_delay, 0)
+    _timers(consume t)
 
   fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
     data: ByteSeqIter): ByteSeqIter
@@ -934,3 +974,20 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
+
+  fun dispose() =>
+    ifdef "trace" then
+      @printf[I32]("Disposing any active reconnect timers...".cstring())
+    end
+    _timers.dispose()
+
+class _ReconnectTimerNotify is TimerNotify
+  let _ob: OutgoingBoundary
+
+  new iso create(outgoing_boundary: OutgoingBoundary tag) =>
+    _ob = outgoing_boundary
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    @printf[I32]("Attempting to reconnect to downstream...\n".cstring())
+    _ob.reconnect()
+    false
