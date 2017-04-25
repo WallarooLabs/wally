@@ -13,10 +13,10 @@ as that the highest value matches the expected value provided to the validator.
 """
 
 use "assert"
-use "buffered"
 use "collections"
 use "files"
 use "options"
+use "sendence/bytes"
 use "sendence/messages"
 use "ring"
 use "window_codecs"
@@ -26,16 +26,19 @@ actor Main
     let options = Options(env.args)
     var input_file_path = "received.txt"
     var expected: U64 = 1000
+    var at_least_once: Bool = false
 
     options
       .add("input", "i", StringArgument)
       .add("expected", "e", I64Argument)
+      .add("at-least-once", "a", None)
       .add("help", "h", None)
 
       for option in options do
         match option
         | ("input", let arg: String) => input_file_path = arg
         | ("expected", let arg: I64) => expected = arg.u64()
+        | ("at-least-once", None) => at_least_once = true
         | ("help", None) =>
           env.out.print(
             """
@@ -43,6 +46,7 @@ actor Main
             -----------------------------------------------------------------------------------
             --input/-i [Sets file to read from (default: received.txt)]
             --expected/-e [Sets the expected number of messages to validate (default: 1000)]
+            --at-least-once/-a [Sets at-least-once mode (default: exactly-once)]
             -----------------------------------------------------------------------------------
             """
           )
@@ -54,34 +58,23 @@ actor Main
       let auth = env.root as AmbientAuth
       let fp = FilePath(auth, input_file_path)
       Fact(fp.exists(), "Input file '" + fp.path + "' does not exist.")
-      let input_file = File(fp)
-      // TODO: Don't read entire file into memory at once
-      let input: Array[U8] val = input_file.read(input_file.size())
+      let input = ReceiverFileDataSource(fp)
+      let validator = WindowValidator(expected, at_least_once)
 
-
-      let rb = Reader
-      rb.append(input)
-
-      let validator = WindowValidator(expected)
-      var bytes_left = input.size()
-      while bytes_left > 0 do
-        // Msg size, msg size u32, and timestamp together make up next payload
-        // size
-        let next_payload_size = rb.peek_u32_be() + 12
+      for bytes in input do
         let fields =
           try
-            FallorMsgDecoder.with_timestamp(rb.block(next_payload_size.usize()))
+            FallorMsgDecoder.with_timestamp(bytes)
           else
             env.err.print("Problem decoding!")
             error
           end
-        bytes_left = bytes_left - next_payload_size.usize()
+        let ts = fields(0)
         let v = WindowU64Decoder(fields(1))
-        validator(consume v)
+        validator(consume v, consume ts)
       end
       validator.finalize()
       env.out.print("Validation successful!")
-      input_file.dispose()
     else
       env.err.print("Error validating file.")
     end
@@ -110,11 +103,14 @@ class WindowValidator
   var count_1: U64 = 0
   var counter: USize = 0
   let expect: U64
+  let at_least_once: Bool
+  let test_upper_bound: U64 = I64.max_value().u64()
 
-  new create(expected: U64) =>
+  new create(expected: U64, at_least_once_mode: Bool = false) =>
     expect = expected
+    at_least_once = at_least_once_mode
 
-  fun ref apply(values: Array[U64] val) ? =>
+  fun ref apply(values: Array[U64] val, ts: String) ? =>
     """
     Test size, no-nonlead-zeroes, parity, and sequentiality.
     """
@@ -129,20 +125,26 @@ class WindowValidator
     end
 
 
-    Fact(test_size(values), "Size test failed on " + val_string + " after " +
-      counter.string() + " values")
+    Fact(test_size(values), "Size test failed at " + ts + " on " + val_string
+      + " after " + counter.string() + " values")
 
-    Fact(test_no_nonlead_zeroes(values), "No non-leading zeroes test failed on "
+    Fact(test_no_nonlead_zeroes(values), "No non-leading zeroes test failed at "
+      + ts + " on " + val_string + " after " + counter.string() + " values")
+
+    Fact(test_parity(values), "Parity test failed at " + ts + " on "
       + val_string + " after " + counter.string() + " values")
 
-    Fact(test_parity(values), "Parity test failed on " + val_string + " after "
-      + counter.string() + " values")
+    Fact(test_testable_range(values), "Testable range test failed at " + ts +
+      " on " + val_string + " after " + counter.string() + " values")
 
     let cat = get_category(values)
 
-    Fact(test_sequentiality(values, cat), "Sequentiality test failed. Expected "
-      + ring_0.string(where fill = "0") + " but got " + val_string + " after " +
-      counter.string() + " values")
+    Fact(test_sequentiality(values, cat), "Sequentiality test failed at " +
+      ts + ". Expected " + ring_0.string(where fill = "0") + " but got " +
+      val_string + " after " + counter.string() + " values")
+
+    Fact(test_increments(values), "Increments test failed at " + ts +
+      " on " + val_string + " after " + counter.string() + " values")
 
   fun finalize() ? =>
     """
@@ -233,7 +235,7 @@ class WindowValidator
   try
     for x in Range[USize](0,3) do
       if values(x) != 0 then
-        if (values(x) % 2) != (values(x+1) % 2) then
+        if (values(x) % 2) != (values(x + 1) % 2) then
           return false
         end
       end
@@ -243,37 +245,93 @@ class WindowValidator
   end
   true
 
+  fun test_increments(values: Array[U64] val): Bool =>
+  """
+  Test that values are incrementing correctly, except for leading zeroes.
+  """
+    // diff may be 0, 1, or 2, and only 2 after 1 or 2
+    try
+      var previous: U64 = values(0)
+      for pos in Range[USize](1,4) do
+        let cur = values(pos)
+        let diff = cur - previous
+        if (diff == 0) or (diff == 1) then
+          if previous != 0 then
+            return false
+          else
+            previous = cur
+          end
+        elseif diff != 2 then
+          return false
+        else
+          previous = cur
+        end
+      end
+    else
+      return false
+    end
+    true
+
+  fun test_testable_range(values: Array[U64] val): Bool =>
+    """
+    Return true if the maximum value in the sequence is in the testable range.
+    """
+    try
+      if (values(0) >= 0) and (values(3) <= test_upper_bound) then
+        return true
+      end
+    end
+    false
+
   fun ref test_sequentiality(values: Array[U64] val, cat: Bool): Bool =>
     """
     Returns true if the new values follow sequentially from the previously
     seen window in the relevant category.
     e.g. if the values are [2,4,6,8], we expect the previous sequence to be
     [0,2,4,6].
+    If at_least_once is true, going back is allowed, so long as the new message
+    is still internally sequential.
     """
     var out: Bool = true
-    if cat then // mod2=0
+
+    // increment the correct ring and counter
+    let r = if cat then // mod2=0
       count_0 = count_0 + 1
-      ring_0.push(count_0*2)
-      for x in Range[USize](0,4) do
-        try
-          if values(x) != ring_0(3-x) then
-            out = false
+      ring_0.push(count_0 * 2)
+      ring_0
+    else // mod2=1
+      count_1 = count_1 + 1
+      ring_1.push((count_1 * 2) - 1)
+      ring_1
+    end
+
+    try
+      if at_least_once then
+        let last = values(3)
+        if last < r(0) then
+          let ilast = last.i64()
+          for i in Range[I64](ilast - 6, ilast + 2, 2) do
+            let i':U64 = if i < 0 then 0 else i.u64() end
+            r.push(i')
           end
-        else
-          out = false
+          if cat then
+            count_0 = last/2
+          else
+            count_1 = last/2
+          end
         end
       end
     else
-      count_1 = count_1 + 1
-      ring_1.push((count_1*2)-1)
-      for x in Range[USize](0,4) do
-        try
-          if values(x) != ring_1(3-x) then
-            out = false
-          end
-        else
+      out = false
+    end
+
+    for x in Range[USize](0,4) do
+      try
+        if values(x) != r(3 - x) then
           out = false
         end
+      else
+        out = false
       end
     end
     out
@@ -287,4 +345,31 @@ class WindowValidator
       true
     else
       false
+    end
+
+class ReceiverFileDataSource is Iterator[Array[U8] val]
+  let _file: File
+
+  new create(path: FilePath val) =>
+    _file = File(path)
+
+  fun ref has_next(): Bool =>
+    if _file.position() < _file.size() then
+      true
+    else
+      false
+    end
+
+  fun ref next(): Array[U8] val =>
+    // 4 bytes LENGTH HEADER + 8 byte U64 giles receiver timestamp
+    let h = _file.read(12)
+    try
+      let expect: USize = Bytes.to_u32(h(0), h(1), h(2), h(3)).usize()
+      h.append(_file.read(expect))
+      h
+    else
+      ifdef debug then
+        @printf[I32]("Failed to convert message header!\n".cstring())
+      end
+      recover Array[U8] end
     end
