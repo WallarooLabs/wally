@@ -541,7 +541,8 @@ class PauseBeforeMigrationNotify is TimerNotify
     false
 
 // TODO: Replace using this with the badly named SetIs once we address a bug
-// in SetIs where unsetting doesn't reduce set size for type SetIs[String]
+// in SetIs where unsetting doesn't reduce set size for type SetIs[String].
+// This bug does not exist on the latest Pony compiler, only our fork.
 class _StringSet
   let _map: Map[String, String] = _map.create()
 
