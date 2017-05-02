@@ -117,7 +117,7 @@ extern PyObject *source_decoder_decode(PyObject *source_decoder, char *bytes, si
 
 extern PyObject *instantiate_python_class(PyObject *class)
 {
-  return PyObject_CallFunctionObjArgs(class);
+  return PyObject_CallFunctionObjArgs(class, NULL);
 }
 
 extern PyObject *get_name(PyObject *pObject)
