@@ -2,14 +2,12 @@ import struct
 
 import wallaroo
 
-def test_python():
-    return "hello python"
-
 
 def application_setup(args):
     ab = wallaroo.ApplicationBuilder("Sequence Window")
     ab.new_pipeline("Sequence Window", Decoder())
-    ab.to_stateful(ObserveNewValue(), SequenceWindowStateBuilder(), "Sequence Window")
+    ab.to_stateful(ObserveNewValue(), SequenceWindowStateBuilder(),
+                   "Sequence Window")
     ab.to_sink(Encoder())
     return ab.build()
 
@@ -21,7 +19,7 @@ class SequenceWindowStateBuilder(object):
 
 class SequenceWindow(object):
     def __init__(self):
-        self.window = [0,0,0,0]
+        self.window = [0, 0, 0, 0]
 
     def update(self, value):
         self.window.append(value)
