@@ -17,12 +17,12 @@ This will be our base directory in what follows. If you haven't already
 cloned this repo, do so by running:
 
 ```
-git clone https://github.com/sendence/wallaroo-documentation
+git clone https://github.com/sendence/wallaroo
 ```
 
 Note: You need to login to GitHub for credentials
 
-This will create a subdirectory called `wallaroo-documentation`.
+This will create a subdirectory called `wallaroo`.
 
 If you haven't already, you now need to set up your environment for Wallaroo. Follow the instructions [here](setup.md).
 
@@ -56,8 +56,7 @@ There are two support applications we are going to need to compile that are kept
 Open a new terminal and run the following to clone the repo:
 
 ```bash
-cd ~/wallaroo-tutorial
-git clone https://github.com/sendence/wallaroo
+cd ~/wallaroo
 git checkout 3af6c610ca4c4c07c75eba68b24447d2b65950c2
 ```
 
@@ -87,10 +86,10 @@ You should see the `Listening for data` that indicates that Giles receiver is ru
 
 ## Compile the Celsius Converter App
 
-The example application we'll be running can be found [here](https://github.com/Sendence/wallaroo-documentation/blob/master/examples/celsius/celsius.pony). From the `~/wallaroo-tutorial` directory, run the following command:
+The example application we'll be running can be found [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/celsius/celsius.pony). From the `~/wallaroo-tutorial` directory, run the following command:
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo-documentation/examples/celsius
+cd ~/wallaroo-tutorial/wallaroo/book/examples/celsius
 ```
 
 Now compile the Celsius Converter app:
@@ -129,7 +128,7 @@ You will now be able to start the `sender` with the following command:
 
 ```bash
 ./sender -b 127.0.0.1:7000 -m 10000000 -y -s 300 \
--f ~/wallaroo-tutorial/wallaroo-documentation/examples/celsius/generator/celsius.msg \
+-f ~/wallaroo-tutorial/wallaroo/book/examples/celsius/generator/celsius.msg \
 -r -w -g 8
 ```
 

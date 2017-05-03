@@ -26,7 +26,7 @@ fun decode(data: Array[U8] val): In ?
 
 `decode()` takes the bytes of your Payload field and transforms them to a value of type `In`.
 
-Here's an example taken from our [Alphabet Popularity Contest app](https://github.com/Sendence/wallaroo-documentation/tree/master/examples/alphabet). We're using a 32-bit payload length header using big-endian encoding. We use the `Bytes` library to convert the four bytes in our header array into a `U32` and then convert that to a `USize` via the `usize()` method:
+Here's an example taken from our [Alphabet Popularity Contest app](https://github.com/Sendence/wallaroo/tree/master/book/examples/alphabet). We're using a 32-bit payload length header using big-endian encoding. We use the `Bytes` library to convert the four bytes in our header array into a `U32` and then convert that to a `USize` via the `usize()` method:
 
 ```pony
 primitive VotesDecoder is FramedSourceHandler[Votes val]
@@ -78,7 +78,7 @@ If your application uses a TCP sink to send outputs to an external system, then 
 fun apply(o: Out, wb: Writer = Writer): Array[ByteSeq] val
 ```
 
-Wallaroo provides you with a `Writer` which you will use to buffer data to be sent out. Here's an example from the [Alphabet Popularity Contest app](https://github.com/Sendence/wallaroo-documentation/tree/master/examples/alphabet): 
+Wallaroo provides you with a `Writer` which you will use to buffer data to be sent out. Here's an example from the [Alphabet Popularity Contest app](https://github.com/Sendence/wallaroo/tree/master/book/examples/alphabet): 
 
 ```pony
 primitive LetterTotalEncoder
