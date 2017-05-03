@@ -135,6 +135,6 @@ import struct
 import wallaroo
 ```
 
-The complete alphabet example is available [here](https://github.com/Sendence/wallaroo-documentation/tree/master/examples/alphabet-python).
+The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/alphabet-python).
 
 To learn how to write a stateful application with partitioning, continue to [Writing Your Own Partitioned Stateful Application](writing-your-own-partitioned-stateful-application.md).
