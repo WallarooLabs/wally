@@ -1,0 +1,8 @@
+{
+  "deps": [
+    { "type": "github",
+      "repo": "sendence/wallaroo",
+      "subdir": "lib"
+    }
+  ]
+}
