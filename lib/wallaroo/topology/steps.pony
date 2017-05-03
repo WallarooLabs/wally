@@ -43,7 +43,7 @@ interface Initializable
 
 type ConsumerStep is (RunnableStep & Consumer & Initializable tag)
 
-actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
+actor Step is (RunnableStep & Producer & Consumer & Initializable)
   """
   # Step
 
@@ -99,7 +99,6 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
     _omni_router = omni_router
     _route_builder = route_builder
     _event_log = event_log
-    _event_log.register_origin(this, id)
     _recovery_replayer = recovery_replayer
     _recovery_replayer.register_step(this)
     _id = id
@@ -107,6 +106,7 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
     for (state_name, boundary) in _outgoing_boundaries.pairs() do
       _outgoing_boundaries(state_name) = boundary
     end
+    _event_log.register_origin(this, id)
 
   //
   // Application startup lifecycle event
@@ -386,10 +386,6 @@ actor Step is (RunnableStep & Resilient & Producer & Consumer & Initializable)
     end
 
   be clear_deduplication_list() =>
-    _deduplication_list.clear()
-
-  // TODO: Remove this
-  be replay_finished() =>
     _deduplication_list.clear()
 
   be dispose() =>

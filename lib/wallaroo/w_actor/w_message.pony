@@ -1,4 +1,3 @@
-
 class WMessage
   let sender: WActorId
   let receiver: WActorId

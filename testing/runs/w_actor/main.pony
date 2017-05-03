@@ -26,7 +26,7 @@ actor Main
     let actor_count: USize = 10
     try
       let actor_system = create_actors(actor_count, seed)
-      ActorSystemStartup(env, actor_system, "Toy Model App")
+      ActorSystemStartup(env, actor_system, "toy-model-app", actor_count)
     else
       Fail()
     end
@@ -83,7 +83,8 @@ class SetActorProbabilityMsg is AMsg
   new val create(prob': F64) =>
     prob = prob'
 
-  fun string(): String => "SetActorProbabilityMsg"
+  fun string(): String =>
+    "SetActorProbabilityMsg"
 
 class SetNumberOfMessagesToSendMsg is AMsg
   let n: USize
@@ -91,7 +92,8 @@ class SetNumberOfMessagesToSendMsg is AMsg
   new val create(n': USize) =>
     n = n'
 
-  fun string(): String => "SetNumberOfMessagesToSendMsg"
+  fun string(): String =>
+    "SetNumberOfMessagesToSendMsg"
 
 class ChangeMessageTypesToSendMsg is AMsg
   let types: Array[AMsgBuilder val] val
@@ -99,11 +101,11 @@ class ChangeMessageTypesToSendMsg is AMsg
   new val create(types': Array[AMsgBuilder val] val) =>
     types = types'
 
-  fun string(): String => "ChangeMessageTypesToSendMsg"
+  fun string(): String =>
+    "ChangeMessageTypesToSendMsg"
 
 class A is WActor
   let _id: U64
-  let _helper: WActorHelper
   var _emission_prob: F64 = 0.5
   var _n_messages: USize = 1
   let _all_message_types: Array[AMsgBuilder val] val
@@ -112,9 +114,8 @@ class A is WActor
 
   new create(wh: WActorHelper, role: String, id: U128, seed: U64) =>
     _id = (id >> 96).u64()
-    _helper = wh
     if role != "" then
-      _helper.register_as_role(role)
+      wh.register_as_role(role)
     end
     _all_message_types =
       try
@@ -129,7 +130,7 @@ class A is WActor
     _message_types_to_send = _all_message_types
     _rand = Rand(seed)
 
-  fun ref receive(sender: WActorId, payload: Any val) =>
+  fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
     match payload
     | let m: SetActorProbabilityMsg val =>
       ifdef debug then
@@ -138,8 +139,10 @@ class A is WActor
       end
       _emission_prob = m.prob
     | let m: SetNumberOfMessagesToSendMsg val =>
-      // @printf[I32]("Received %s to %lu msgs\n".cstring(),
-        // m.string().cstring(), m.n)
+      ifdef debug then
+        @printf[I32]("Received %s to %lu msgs\n".cstring(),
+          m.string().cstring(), m.n)
+      end
       _n_messages = m.n
     | let m: ChangeMessageTypesToSendMsg val =>
       ifdef debug then
@@ -150,38 +153,39 @@ class A is WActor
       @printf[I32]("Unknown message type received at w_actor\n".cstring())
     end
 
-  fun ref process(data: Any val) =>
+  fun ref process(data: Any val, h: WActorHelper) =>
     match data
     | let a: Act val =>
       try
-        emit_messages()
+        emit_messages(h)
       else
         Fail()
       end
     end
 
-  fun ref emit_messages() ? =>
-    let known_actors = _helper.known_actors()
+  fun ref emit_messages(h: WActorHelper) ? =>
+    let known_actors = h.known_actors()
     for i in Range(1, _n_messages + 1) do
       let should_emit = (known_actors.size() > 0) and
         (_rand.test_odds(_emission_prob))
       if should_emit then
         let message = create_message()
-        let target = select_actor()
-        _helper.send_to(target, message)
+        let target = select_actor(h)
+        h.send_to(target, message)
         ifdef debug then
-          @printf[I32]("Actor %lu emitted a message on iteration %d out of %d. Message is of type %s.\n".cstring(), _id, i, _n_messages,
-            message.string().cstring())
+          @printf[I32]("Actor %lu emitted a message on iteration %d out of %d. Message is of type %s.\n"
+            .cstring(), _id, i, _n_messages, message.string().cstring())
         end
       else
         ifdef debug then
-          @printf[I32]("Actor %lu did not emit any message on iteration %d out of %d\n".cstring(), _id, i, _n_messages)
+          @printf[I32]("Actor %lu did not emit any message on iteration %d out of %d\n"
+            .cstring(), _id, i, _n_messages)
         end
       end
     end
 
-  fun ref select_actor(): WActorId ? =>
-    _rand.pick[WActorId](_helper.known_actors())
+  fun ref select_actor(h: WActorHelper): WActorId ? =>
+    _rand.pick[WActorId](h.known_actors())
 
   fun ref create_message(): AMsg val ? =>
     match _rand.pick[AMsgBuilder val](_message_types_to_send)

@@ -89,6 +89,13 @@ actor RecoveryReplayer
   be start_recovery_replay(workers: Array[String] val,
     recovery: Recovery)
   =>
+    if single_worker(workers) then
+      @printf[I32]("|~~ - - Skipping Replay: Only One Worker - - ~~|\n"
+        .cstring())
+      _replay_phase = _NotRecoveryReplaying(this)
+      recovery.recovery_replay_finished()
+      return
+    end
     @printf[I32]("|~~ - - Replay Phase 1: Wait for Boundary Counts - - ~~|\n"
       .cstring())
     _recovery = recovery
@@ -103,6 +110,19 @@ actor RecoveryReplayer
       _cluster.send_control_to_cluster(msg)
     else
       Fail()
+    end
+
+  fun single_worker(workers: Array[String] val): Bool =>
+    match workers.size()
+    | 0 => true
+    | 1 =>
+      try
+        workers(0) == _worker_name
+      else
+        true
+      end
+    else
+      false
     end
 
   fun ref _wait_for_reconnections(expected_boundaries: Map[String, USize] box,

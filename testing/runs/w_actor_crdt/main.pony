@@ -24,7 +24,6 @@ use "wallaroo/w_actor"
 primitive Roles
   fun counter(): String => "counter"
   fun accumulator(): String => "accumulator"
-  fun sync(): String => "sync"
 
 actor Main
   new create(env: Env) =>
@@ -32,7 +31,7 @@ actor Main
     let actor_count: USize = 10
     let iterations: USize = 100
     let actor_system = create_actors(actor_count, iterations, seed)
-    ActorSystemStartup(env, actor_system, "Toy Model CRDT App")
+    ActorSystemStartup(env, actor_system, "toy-model-CRDT-app", actor_count)
 
   fun ref create_actors(n: USize, iterations: USize, init_seed: U64):
     ActorSystem val
@@ -42,8 +41,7 @@ actor Main
       let actor_system = ActorSystem("Toy Model CRDT App", rand.u64())
       actor_system.add_actor(ABuilder(Roles.accumulator(),
         rand.u64()))
-      actor_system.add_actor(SyncBuilder(iterations, n - 2))
-      for i in Range(0, n - 2) do
+      for i in Range(0, n - 1) do
         let next_seed = rand.u64()
         let next = ABuilder(Roles.counter(), next_seed)
         actor_system.add_actor(next)
@@ -88,7 +86,6 @@ class GCounter
   fun ref string(): String => "GCounter(" + value().string() + ")"
 
 class A is WActor
-  let _helper: WActorHelper
   var _round: USize = 0
   let _id: U64
   let _role: String
@@ -98,34 +95,27 @@ class A is WActor
   var _waiting: USize = 0
   var _started: Bool = false
 
-  new create(wh: WActorHelper, role': String, id': U64, seed: U64) =>
-    _helper = wh
+  new create(h: WActorHelper, role': String, id': U64, seed: U64) =>
     _role = role'
-    _helper.register_as_role(_role)
+    h.register_as_role(_role)
     _id = id'
     _g_counter = GCounter(_id)
     _rand = Rand(seed)
 
-  fun ref receive(sender: WActorId, payload: Any val) =>
+  fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
     match payload
     | ActMsg =>
-      act()
+      act(h)
     | let m: IncrementsMsg =>
       _pending_increments = _pending_increments + m.count
-      _helper.send_to(sender, AckMsg)
     | let m: GossipMsg =>
       _g_counter.merge(m.data)
-    | let ack: AckMsg =>
-      _waiting = _waiting - 1
-      if (_waiting == 0) then
-        _helper.send_to_role(Roles.sync(), AckMsg)
-      end
     | let m: FinishMsg =>
       for i in Range(0, _pending_increments) do
         _g_counter.increment()
       end
       if _role == Roles.counter() then
-        _helper.send_to_role(Roles.accumulator(),
+        h.send_to_role(Roles.accumulator(),
           FinishGossipMsg(_g_counter.data))
       end
     | let m: FinishGossipMsg =>
@@ -136,83 +126,44 @@ class A is WActor
       @printf[I32]("Unknown message type received at w_actor\n".cstring())
     end
 
-  fun ref process(data: Any val) =>
+  fun ref process(data: Any val, h: WActorHelper) =>
     match data
     | Act =>
-      if not _started then
-        _helper.send_to_role(Roles.sync(), AckMsg)
-        _started = true
+      act(h)
+      if _role == Roles.accumulator() then
+        @printf[I32]("Accumulator Act report: %s\n".cstring(),
+          _g_counter.string().cstring())
       end
     end
 
-  fun ref act() =>
+  fun ref act(h: WActorHelper) =>
     if _role == Roles.accumulator() then
       @printf[I32]("Round %lu: %s\n".cstring(),
         _round, _g_counter.string().cstring())
+    else
+      for i in Range(0, _pending_increments) do
+        _g_counter.increment()
+      end
+      _pending_increments = 0
+      emit_messages(h)
     end
-    _round = _round + 1
-    // @printf[I32]("%lu: Incrementing %lu\n".cstring(), _id, _pending_increments)
-    for i in Range(0, _pending_increments) do
-      _g_counter.increment()
-    end
-    _pending_increments = 0
-    emit_messages()
 
-  fun ref emit_messages() =>
+    _round = _round + 1
+
+  fun ref emit_messages(h: WActorHelper) =>
     let inc_msg_count = _rand.usize_between(1, 4)
     _waiting = _waiting + inc_msg_count
     for i in Range(0, inc_msg_count) do
       let msg = IncrementsMsg(_rand.usize_between(1, 3))
-      _helper.send_to_role(Roles.counter(), msg)
+      h.send_to_role(Roles.counter(), msg)
     end
 
     let gossip_msg_count = _rand.usize_between(1, 4)
     let gossip_msg = GossipMsg(_g_counter.data)
     for i in Range(0, gossip_msg_count) do
-      _helper.send_to_role(Roles.counter(), gossip_msg)
+      h.send_to_role(Roles.counter(), gossip_msg)
     end
-    _helper.send_to_role(Roles.accumulator(), gossip_msg)
-
-class Sync is WActor
-  let _helper: WActorHelper
-  let _actor_count: USize
-  var _iterations: USize = 0
-  let _expected_iterations: USize
-  var _acked: USize = 0
-  let _actors: SetIs[WActorId] = _actors.create()
-
-  new create(h: WActorHelper, actor_count': USize,
-    expected_iterations': USize)
-  =>
-    _helper = h
-    _helper.register_as_role(Roles.sync())
-    _actor_count = actor_count'
-    _expected_iterations = expected_iterations'
-
-  fun ref receive(sender: WActorId, payload: Any val) =>
-    _actors.set(sender)
-    match payload
-    | AckMsg =>
-      _acked = _acked + 1
-      if (_acked == _actor_count) then
-        if _iterations < _expected_iterations then
-          for a in _actors.values() do
-            _helper.send_to(a, ActMsg)
-          end
-          _acked = 0
-          _iterations = _iterations + 1
-        elseif _iterations == _expected_iterations then
-          for a in _actors.values() do
-            _helper.send_to(a, FinishMsg)
-          end
-          _acked = 0
-          _iterations = _iterations + 1
-        end
-      end
-    end
-
-  fun ref process(data: Any val) =>
-    None
+    h.send_to_role(Roles.accumulator(), gossip_msg)
 
 trait AMsg
 
@@ -230,7 +181,6 @@ class val IncrementsMsg is AMsg
   let count: USize
   new val create(c: USize) => count = c
 
-primitive AckMsg is AMsg
 primitive ActMsg is AMsg
 primitive FinishMsg is AMsg
 
@@ -253,17 +203,6 @@ class ABuilder
   fun apply(id: U128, wh: WActorHelper): WActor =>
     let short_id = (id >> 96).u64()
     A(wh, _role, short_id, _seed)
-
-class SyncBuilder
-  let _iterations: USize
-  let _actor_count: USize
-
-  new val create(iterations: USize, actor_count: USize) =>
-    _iterations = iterations
-    _actor_count = actor_count
-
-  fun apply(id: U128, wh: WActorHelper): WActor =>
-    Sync(wh, _actor_count, _iterations)
 
 class val PMap[K: (Hashable val & Equatable[K] val), V: Any val]
   let _s: Map[K, V] val
