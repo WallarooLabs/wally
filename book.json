@@ -1,0 +1,10 @@
+{
+    "plugins": [
+        "highlight",
+        "footnote-string-to-number"
+    ],
+
+    "structure": {
+        "readme": "intro.md"
+    }
+}
