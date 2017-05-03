@@ -20,21 +20,17 @@ actor Main
     error
 
   new create(env: Env) =>
-    env.out.print("out")
-    env.out.print(Dianoga.test())
-    env.out.print(Dianoga.test_c())
-    Dianoga.start_python()
-    // env.out.print(Dianoga.test_python())
+    Machida.start_python()
 
     try
       let module_name = find_python_module(env.args)
-      let module = Dianoga.load_module(module_name)
-      let application_setup = Dianoga.application_setup(module, env.args)
+      let module = Machida.load_module(module_name)
+      let application_setup = Machida.application_setup(module, env.args)
 
       try
         let application = recover val
           let app = Application("")
-          Dianoga.apply_application_setup(app, application_setup)
+          Machida.apply_application_setup(app, application_setup)
           app
         end
         Startup(env, application, None)

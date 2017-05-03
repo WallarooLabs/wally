@@ -69,7 +69,7 @@ class PyData
     _data
 
   fun _final() =>
-    Dianoga.dec_ref(_data)
+    Machida.dec_ref(_data)
 
 class PyState
   var _state: Pointer[U8] val
@@ -81,7 +81,7 @@ class PyState
     _state
 
   fun _final() =>
-    Dianoga.dec_ref(_state)
+    Machida.dec_ref(_state)
 
 class PyStateBuilder
   var _state_builder: Pointer[U8] val
@@ -90,13 +90,13 @@ class PyStateBuilder
     _state_builder = state_builder
 
   fun name(): String =>
-    Dianoga.get_name(_state_builder)
+    Machida.get_name(_state_builder)
 
   fun apply(): PyState =>
     PyState(@state_builder_build_state(_state_builder))
 
   fun _final() =>
-    Dianoga.dec_ref(_state_builder)
+    Machida.dec_ref(_state_builder)
 
 class PyPartitionFunctionU64
   var _partition_function: Pointer[U8] val
@@ -105,10 +105,10 @@ class PyPartitionFunctionU64
     _partition_function = partition_function
 
   fun apply(data: PyData val): U64 =>
-    Dianoga.partition_function_partition_u64(_partition_function, data.obj())
+    Machida.partition_function_partition_u64(_partition_function, data.obj())
 
   fun _final() =>
-    Dianoga.dec_ref(_partition_function)
+    Machida.dec_ref(_partition_function)
 
 class PyKey is (Hashable & Equatable[PyKey])
   var _key: Pointer[U8] val
@@ -120,13 +120,13 @@ class PyKey is (Hashable & Equatable[PyKey])
     _key
 
   fun hash(): U64 =>
-    Dianoga.key_hash(obj())
+    Machida.key_hash(obj())
 
   fun eq(other: PyKey box): Bool =>
-    Dianoga.key_eq(obj(), other.obj())
+    Machida.key_eq(obj(), other.obj())
 
   fun _final() =>
-    Dianoga.dec_ref(_key)
+    Machida.dec_ref(_key)
 
 class PyPartitionFunction
   var _partition_function: Pointer[U8] val
@@ -136,11 +136,11 @@ class PyPartitionFunction
 
   fun apply(data: PyData val): PyKey val =>
     recover
-      PyKey(Dianoga.partition_function_partition(_partition_function, data.obj()))
+      PyKey(Machida.partition_function_partition(_partition_function, data.obj()))
     end
 
   fun _final() =>
-    Dianoga.dec_ref(_partition_function)
+    Machida.dec_ref(_partition_function)
 
 class PyFramedSourceHandler is FramedSourceHandler[PyData val]
   var _source_decoder: Pointer[U8] val
@@ -148,21 +148,21 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
 
   new create(source_decoder: Pointer[U8] val) =>
     _source_decoder = source_decoder
-    _header_length = Dianoga.source_decoder_header_length(_source_decoder)
+    _header_length = Machida.source_decoder_header_length(_source_decoder)
 
   fun header_length(): USize =>
     _header_length
 
   fun payload_length(data: Array[U8] iso): USize =>
-    Dianoga.source_decoder_payload_length(_source_decoder, data.cpointer(), data.size())
+    Machida.source_decoder_payload_length(_source_decoder, data.cpointer(), data.size())
 
   fun decode(data: Array[U8] val): PyData val =>
     recover
-      PyData(Dianoga.source_decoder_decode(_source_decoder, data.cpointer(), data.size()))
+      PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(), data.size()))
     end
 
   fun _final() =>
-    Dianoga.dec_ref(_source_decoder)
+    Machida.dec_ref(_source_decoder)
 
 class PyComputation is Computation[PyData val, PyData val]
   var _computation: Pointer[U8] val
@@ -170,10 +170,10 @@ class PyComputation is Computation[PyData val, PyData val]
 
   new create(computation: Pointer[U8] val) =>
     _computation = computation
-    _name = Dianoga.get_name(_computation)
+    _name = Machida.get_name(_computation)
 
   fun apply(input: PyData val): (PyData val | None) =>
-    let r: Pointer[U8] val = Dianoga.computation_compute(_computation, input.obj())
+    let r: Pointer[U8] val = Machida.computation_compute(_computation, input.obj())
 
     if not r.is_null() then
       recover
@@ -187,7 +187,7 @@ class PyComputation is Computation[PyData val, PyData val]
     _name
 
   fun _final() =>
-    Dianoga.dec_ref(_computation)
+    Machida.dec_ref(_computation)
 
 class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
   var _computation: Pointer[U8] val
@@ -195,13 +195,13 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
 
   new create(computation: Pointer[U8] val) =>
     _computation = computation
-    _name = Dianoga.get_name(_computation)
+    _name = Machida.get_name(_computation)
 
   fun apply(input: PyData val,
     sc_repo: StateChangeRepository[PyState], state: PyState):
     ((PyData val | None), None)
   =>
-    let data = Dianoga.stateful_computation_compute(_computation, input.obj(), state.obj())
+    let data = Machida.stateful_computation_compute(_computation, input.obj(), state.obj())
     let d = recover if data.is_null() then
         None
       else
@@ -217,7 +217,7 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
     recover val Array[StateChangeBuilder[PyState] val] end
 
   fun _final() =>
-    Dianoga.dec_ref(_computation)
+    Machida.dec_ref(_computation)
 
 class PyEncoder is SinkEncoder[PyData val]
   var _sink_encoder: Pointer[U8] val
@@ -226,19 +226,19 @@ class PyEncoder is SinkEncoder[PyData val]
     _sink_encoder = sink_encoder
 
   fun apply(data: PyData val, wb: Writer): Array[ByteSeq] val =>
-    let byte_buffer = Dianoga.sink_encoder_encode(_sink_encoder, data.obj())
+    let byte_buffer = Machida.sink_encoder_encode(_sink_encoder, data.obj())
     let arr = recover val
       // create a temporary Array[U8] wrapper for the C array, then clone it
       Array[U8].from_cpointer(@PyString_AsString(byte_buffer), @PyString_Size(byte_buffer)).clone()
     end
-    Dianoga.dec_ref(byte_buffer)
+    Machida.dec_ref(byte_buffer)
     wb.write(arr)
     wb.done()
 
   fun _final() =>
-    Dianoga.dec_ref(_sink_encoder)
+    Machida.dec_ref(_sink_encoder)
 
-primitive Dianoga
+primitive Machida
   fun print_errors() =>
     let er = @PyErr_Occurred[Pointer[U8]]()
     if not er.is_null() then
@@ -246,7 +246,7 @@ primitive Dianoga
     end
 
   fun test(): String =>
-    "hello from dianoga"
+    "hello from machida"
 
   fun test_c(): String =>
     recover
@@ -267,7 +267,7 @@ primitive Dianoga
     r
 
   fun application_setup(module: ModuleP, args: Array[String] val): Pointer[U8] val =>
-    let pyargs = Dianoga.pony_array_string_to_py_list_string(args)
+    let pyargs = Machida.pony_array_string_to_py_list_string(args)
     let r = @application_setup(module, pyargs)
     print_errors()
     r
@@ -290,7 +290,7 @@ primitive Dianoga
         end
         let decoder = recover val
           let d = @PyTuple_GetItem(item, 2)
-          Dianoga.inc_ref(d)
+          Machida.inc_ref(d)
           PyFramedSourceHandler(d)
         end
         Debug("!!! decoder header_length = " + decoder.header_length().string())
@@ -298,7 +298,7 @@ primitive Dianoga
       | "to" =>
         Debug("  adding a computation to the pipeline")
         let computation_class = @PyTuple_GetItem(item, 1)
-        Dianoga.inc_ref(computation_class)
+        Machida.inc_ref(computation_class)
         let builder = recover val
           {()(computation_class): PyComputation iso^ =>
             recover
@@ -311,13 +311,13 @@ primitive Dianoga
       | "to_stateful" =>
         Debug("  adding a state computation to the pipeline")
         let state_computationp = @PyTuple_GetItem(item, 1)
-        Dianoga.inc_ref(state_computationp)
+        Machida.inc_ref(state_computationp)
         let state_computation = recover val
           PyStateComputation(state_computationp)
         end
 
         let state_builderp = @PyTuple_GetItem(item, 2)
-        Dianoga.inc_ref(state_builderp)
+        Machida.inc_ref(state_builderp)
         let state_builder = recover val
           PyStateBuilder(state_builderp)
         end
@@ -330,13 +330,13 @@ primitive Dianoga
       | "to_state_partition_u64" =>
         Debug("  adding a u64 partitioned state computation to the pipeline")
         let state_computationp = @PyTuple_GetItem(item, 1)
-        Dianoga.inc_ref(state_computationp)
+        Machida.inc_ref(state_computationp)
         let state_computation = recover val
           PyStateComputation(state_computationp)
         end
 
         let state_builderp = @PyTuple_GetItem(item, 2)
-        Dianoga.inc_ref(state_builderp)
+        Machida.inc_ref(state_builderp)
         let state_builder = recover val
           PyStateBuilder(state_builderp)
         end
@@ -346,12 +346,12 @@ primitive Dianoga
         end
 
         let partition_functionp = @PyTuple_GetItem(item, 4)
-        Dianoga.inc_ref(partition_functionp)
+        Machida.inc_ref(partition_functionp)
         let partition_function = recover val
           PyPartitionFunctionU64(partition_functionp)
         end
 
-        let partition_values = Dianoga.py_list_int_to_pony_array_u64(@PyTuple_GetItem(item, 5))
+        let partition_values = Machida.py_list_int_to_pony_array_u64(@PyTuple_GetItem(item, 5))
 
         let partition = Partition[PyData val, U64](partition_function, partition_values)
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
@@ -359,13 +359,13 @@ primitive Dianoga
       | "to_state_partition" =>
         Debug("  adding a partitioned state computation to the pipeline")
         let state_computationp = @PyTuple_GetItem(item, 1)
-        Dianoga.inc_ref(state_computationp)
+        Machida.inc_ref(state_computationp)
         let state_computation = recover val
           PyStateComputation(state_computationp)
         end
 
         let state_builderp = @PyTuple_GetItem(item, 2)
-        Dianoga.inc_ref(state_builderp)
+        Machida.inc_ref(state_builderp)
         let state_builder = recover val
           PyStateBuilder(state_builderp)
         end
@@ -375,12 +375,12 @@ primitive Dianoga
         end
 
         let partition_functionp = @PyTuple_GetItem(item, 4)
-        Dianoga.inc_ref(partition_functionp)
+        Machida.inc_ref(partition_functionp)
         let partition_function = recover val
           PyPartitionFunction(partition_functionp)
         end
 
-        let partition_values = Dianoga.py_list_int_to_pony_array_pykey(@PyTuple_GetItem(item, 5))
+        let partition_values = Machida.py_list_int_to_pony_array_pykey(@PyTuple_GetItem(item, 5))
 
         let partition = Partition[PyData val, PyKey val](partition_function, partition_values)
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
@@ -388,7 +388,7 @@ primitive Dianoga
       | "to_sink" =>
         Debug("  adding a sink to the pipeline")
         let encoderp = @PyTuple_GetItem(item, 1)
-        Dianoga.inc_ref(encoderp)
+        Machida.inc_ref(encoderp)
         let encoder = recover val
           PyEncoder(encoderp)
         end
@@ -403,7 +403,7 @@ primitive Dianoga
       end
     end
 
-    Dianoga.dec_ref(application_setup_data)
+    Machida.dec_ref(application_setup_data)
 
   fun source_decoder_header_length(source_decoder: Pointer[U8] val): USize =>
     let r = @source_decoder_header_length(source_decoder)
@@ -473,7 +473,7 @@ primitive Dianoga
 
     for i in Range(0, size) do
       let obj = @PyList_GetItem(py_array, i)
-      Dianoga.inc_ref(obj)
+      Machida.inc_ref(obj)
       arr.push(recover val PyKey(obj) end)
     end
 

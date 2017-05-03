@@ -1,6 +1,6 @@
 # Wallaroo Python API
 
-Dianoga allows developers to create Wallaroo application in Pony.
+Machida allows developers to create Wallaroo application in Pony.
 
 ## Overview
 

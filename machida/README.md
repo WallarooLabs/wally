@@ -1,15 +1,8 @@
-# Dianoga
+# Machida
 
-This is meant to be a proof-of-concept program that lets a user define
-a Wallaroo application in Python.
+Machie is a Wallaroo-Python Runtime that enables a Wallaroo application to be written in Python.
 
 ## Build
-
-Go to the `dianoga` directory.
-
-```
-cd horse-snake/dianoga
-```
 
 Create the `build` directory if it doesn't already exist.
 
@@ -22,7 +15,7 @@ Build the program.
 ```
 clang -g -o build/python-wallaroo.o -c cpp/python-wallaroo.c
 ar rvs build/libpython-wallaroo.a build/python-wallaroo.o
-ponyc --debug --output=build --path=build --path=../../lib/ .
+ponyc --debug --output=build --path=build --path=../lib/ .
 ```
 
 ## Run Reverse Word (stateless computation)
@@ -42,7 +35,7 @@ nc -l 127.0.0.1 7002
 Run an application.
 
 ```
-build/dianoga --wallaroo-module reverse_word -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1
+build/machida --wallaroo-module reverse_word -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1
 ```
 
 Send some messages
@@ -72,7 +65,7 @@ nc -l 127.0.0.1 7002 > alphabet.out
 Run an application.
 
 ```
-build/dianoga --wallaroo-module alphabet -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1
+build/machida --wallaroo-module alphabet -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1
 ```
 
 Send some messages
@@ -106,7 +99,7 @@ nc -l 127.0.0.1 7002 > marketspread.out
 Run an application.
 
 ```
-build/dianoga --wallaroo-module market_spread \
+build/machida --wallaroo-module market_spread \
 -i 127.0.0.1:7010,127.0.0.1:7011 -o 127.0.0.1:7002 -m 127.0.0.1:8000 \
 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1
 ```

@@ -4,33 +4,6 @@
     #include <python2.7/Python.h>
 #endif
 
-extern char *test_c()
-{
-  return "hello from c";
-}
-
-extern char *test_python()
-{
-  PyObject *pName, *pModule, *pFunc, *pValue;
-
-  pName = PyString_FromString("mypy");
-  /* Error checking of pName left out */
-
-  pModule = PyImport_Import(pName);
-  Py_DECREF(pName);
-
-  pFunc = PyObject_GetAttrString(pModule, "test_python");
-  pValue = PyObject_CallFunctionObjArgs(pFunc, NULL);
-  Py_DECREF(pFunc);
-
-  char * ret = PyString_AsString(pValue);
-  Py_DECREF(pValue);
-
-  Py_Finalize();
-
-  return ret;
-}
-
 extern PyObject *load_module(char *module_name)
 {
   PyObject *pName, *pModule;
