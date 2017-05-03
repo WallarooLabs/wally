@@ -66,11 +66,12 @@ class ObserveNewValue(object):
     def compute(self, data, state):
         print "Observe New Value"
         state.update(data)
-        return state.get_window()
+        # Return a shallow copy of the current window
+        return list(state.get_window())
 
 
 class Encoder(object):
     def encode(self, data):
         print "Encoder:encode: ", data
-        # data is a list or integers
+        # data is a list of integers
         return bytearray(str(data) + "\n", "utf-8")
