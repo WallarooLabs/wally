@@ -37,7 +37,8 @@ class SequenceWindow(object):
             self.window.pop(0)
 
     def get_window(self):
-        return self.window
+        # Return a shallow copy of the current window
+        return list(self.window)
 
 
 class Decoder(object):
@@ -66,8 +67,7 @@ class ObserveNewValue(object):
     def compute(self, data, state):
         print "Observe New Value"
         state.update(data)
-        # Return a shallow copy of the current window
-        return list(state.get_window())
+        return state.get_window()
 
 
 class Encoder(object):
