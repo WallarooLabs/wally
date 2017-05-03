@@ -6,7 +6,7 @@ In this section, we will go over how to write a stateful application with the Wa
 
 Our stateful application is going to be a vote counter, called Alphabet. It receives as its input a message containing an alphabet character and a number of votes, which it then increments in its internal state. After each update, it sends the new updated vote count or that character to its output.
 
-As with the Reverse Word example, we will list the components required:  
+As with the Reverse Word example, we will list the components required:
 
 * Input decoding
 * Output encoding
@@ -30,7 +30,7 @@ class AddVotes(object):
 
 ### State and StateBuilder
 
-The state for this appliation is two-tiered. There is a a vote count for each character:  
+The state for this appliation is two-tiered. There is a a vote count for each character:
 
 ```python
 class Votes(object):
@@ -39,7 +39,7 @@ class Votes(object):
         self.votes = votes
 ```
 
-And a state map:  
+And a state map:
 
 ```python
 class AllVotes(object):
@@ -59,10 +59,10 @@ class AllVotes(object):
         return Votes(letter, vbl.votes)
 ```
 
-This map is the `state` object that `AddVotes.compute` above takes.  
+This map is the `state` object that `AddVotes.compute` above takes.
 An important thing to note here is that `get_votes` returns a _new_ `Votes` instance. This is important, as this is the value that is returned eventually passed to `Encoder.encode`, and if we passed a reference to a mutable object here, there is no guarantee that `Encoder.encode` will execute before another update to this object.
 
-Lastly, a stateful application's pipeline is going to need a `StateBuilder`, so let's create one:  
+Lastly, a stateful application's pipeline is going to need a `StateBuilder`, so let's create one:
 
 ```python
 class LetterStateBuilder(object):
@@ -71,7 +71,7 @@ class LetterStateBuilder(object):
 ```
 
 ### Encoder
-The encoder is going to receive a `Votes` instance and encode into a bytearray with the letter, followed by the vote count as a big-endian 32-bit unsigned integer:  
+The encoder is going to receive a `Votes` instance and encode into a string with the letter, followed by the vote count as a big-endian 32-bit unsigned integer:
 
 ```python
 class Encoder(object):
@@ -79,7 +79,7 @@ class Encoder(object):
         # data is a Votes
         letter = data.letter
         votes = data.votes
-        return bytearray(letter, "utf-8") + struct.pack(">I", votes)
+        return struct.pack(">1sI", letter, votes)
 ```
 
 ### Decoder
@@ -102,7 +102,7 @@ class Decoder(object):
 
 ### Application Setup
 Finally, let's set up our application topology:
-  
+
 ```python
 def application_setup(args):
     ab = wallaroo.ApplicationBuilder("alphabet")
@@ -112,14 +112,14 @@ def application_setup(args):
     return ab.build()
 ```
 
-The only difference between this setup and the stateless Reverse Word's one is that while in Reverse Word we used:  
+The only difference between this setup and the stateless Reverse Word's one is that while in Reverse Word we used:
 
 ```python
 ab.to(Reverse)
 ```
 
 here we use:
-  
+
 ```python
 ab.to_stateful(AddVotes(), LetterStateBuilder(), "letter state")
 ```
@@ -128,7 +128,7 @@ That is, while the stateless computation constructor took only a computation cla
 
 ### Miscellaneous
 
-This module needs its imports:  
+This module needs its imports:
 ```python
 import struct
 

@@ -46,9 +46,8 @@ use @py_decref[None](o: Pointer[U8] box)
 
 use @Py_Initialize[None]()
 use @PyTuple_GetItem[Pointer[U8] val](t: Pointer[U8] val, idx: USize)
-use @PyByteArray_AsString[Pointer[U8]](ba: Pointer[U8] box)
-use @PyByteArray_Size[USize](ba: Pointer[U8] box)
-use @PyString_AsString[Pointer[U8]](ba: Pointer[U8] box)
+use @PyString_Size[USize](str: Pointer[U8] box)
+use @PyString_AsString[Pointer[U8]](str: Pointer[U8] box)
 use @PyString_FromStringAndSize[Pointer[U8]](str: Pointer[U8] tag, size: USize)
 use @PyList_New[Pointer[U8] val](size: USize)
 use @PyList_Size[USize](l: Pointer[U8] box)
@@ -230,7 +229,7 @@ class PyEncoder is SinkEncoder[PyData val]
     let byte_buffer = Dianoga.sink_encoder_encode(_sink_encoder, data.obj())
     let arr = recover val
       // create a temporary Array[U8] wrapper for the C array, then clone it
-      Array[U8].from_cpointer(@PyByteArray_AsString(byte_buffer), @PyByteArray_Size(byte_buffer)).clone()
+      Array[U8].from_cpointer(@PyString_AsString(byte_buffer), @PyString_Size(byte_buffer)).clone()
     end
     Dianoga.dec_ref(byte_buffer)
     wb.write(arr)

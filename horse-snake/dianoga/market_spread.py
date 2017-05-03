@@ -128,7 +128,7 @@ class OrderResultEncoder(object):
             data.offer,
             data.timestamp)
 
-        return bytearray(p)
+        return p
 
 class MarketDataMessage(object):
     def __init__(self, symbol, transact_time, bid, offer):
