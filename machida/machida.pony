@@ -239,10 +239,13 @@ class PyEncoder is SinkEncoder[PyData val]
     Machida.dec_ref(_sink_encoder)
 
 primitive Machida
-  fun print_errors() =>
+  fun print_errors(): Bool =>
     let er = @PyErr_Occurred[Pointer[U8]]()
     if not er.is_null() then
       @PyErr_Print[None]()
+      true
+    else
+      false
     end
 
   fun test(): String =>
@@ -266,17 +269,35 @@ primitive Machida
     print_errors()
     r
 
-  fun application_setup(module: ModuleP, args: Array[String] val): Pointer[U8] val =>
+  fun application_setup(module: ModuleP, args: Array[String] val): Pointer[U8] val ? =>
     let pyargs = Machida.pony_array_string_to_py_list_string(args)
     let r = @application_setup(module, pyargs)
-    print_errors()
+    if print_errors() then
+      error
+    end
     r
 
-  fun apply_application_setup(app: Application,
-    application_setup_data: Pointer[U8] val)
+  fun apply_application_setup(application_setup_data: Pointer[U8] val):
+    Application
   ? =>
     let application_setup_item_count = @list_item_count(application_setup_data)
-    var latest: (Application | PipelineBuilder[PyData val, PyData val, PyData val]) = app
+
+    var app: (None | Application) = None
+
+    for idx in Range(0, application_setup_item_count) do
+      let item = @get_application_setup_item(application_setup_data, idx)
+      let action_p = @get_application_setup_action(item)
+      let action = String.copy_cstring(action_p)
+      if action == "name" then
+        let name = recover val
+          String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(item, 1)))
+        end
+        app = Application(name)
+        break
+      end
+    end
+
+    var latest: (Application | PipelineBuilder[PyData val, PyData val, PyData val]) = (app as Application)
     for idx in Range(0, application_setup_item_count) do
       let item = @get_application_setup_item(application_setup_data, idx)
       let action_p = @get_application_setup_action(item)
@@ -404,6 +425,7 @@ primitive Machida
     end
 
     Machida.dec_ref(application_setup_data)
+    app as Application
 
   fun source_decoder_header_length(source_decoder: Pointer[U8] val): USize =>
     let r = @source_decoder_header_length(source_decoder)
