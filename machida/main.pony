@@ -25,13 +25,12 @@ actor Main
     try
       let module_name = find_python_module(env.args)
       let module = Machida.load_module(module_name)
-      let application_setup = Machida.application_setup(module, env.args)
 
       try
+        let application_setup = Machida.application_setup(module, env.args)
+
         let application = recover val
-          let app = Application("")
-          Machida.apply_application_setup(app, application_setup)
-          app
+          Machida.apply_application_setup(application_setup)
         end
         Startup(env, application, None)
       else
