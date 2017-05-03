@@ -70,7 +70,7 @@ Build the `machida` binary
 ```bash
 clang -g -o build/python-wallaroo.o -c cpp/python-wallaroo.c
 ar rvs build/libpython-wallaroo.a build/python-wallaroo.o
-ponyc --debug --output=build --path=build --path=../../lib/ .
+ponyc --debug --output=build --path=build --path=../lib/ .
 ```
 
 Once built, the `machida` binary will work with any `.py` file, so it is not necessary to repeat this step for every new application built with the Wallaroo Python API.
@@ -93,11 +93,12 @@ Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate
 
 ### A Note on PATH and PYTHONPATH
 
-Since the Python runtime is embedded, finding paths to modules can get complicated. To make our life easier, we're going to add the location of the `machida` binary to the `PATH` environment variable, and then we're going to add two paths to the `PYTHONPATH` environment variable:
+Since the Python runtime is embedded, finding paths to modules can get complicated. To make our lives easier, we're going to add the location of the `machida` binary to the `PATH` environment variable, and then we're going to add two paths to the `PYTHONPATH` environment variable:
 1. `.`, or the current directory from which the binary is executed
-2. the absolute path of the `machida` directory in the wallaroo repository.
+2. the path of the `machida` directory in the wallaroo repository.
 
 If you just want to run the examples, the following shell commands will set this up for you:
+
 ```bash
 export PYTHONPATH="$PYTHONPATH:.:../../../../machida"
 export PATH="$PATH:../../../../machida/build"
@@ -105,35 +106,8 @@ export PATH="$PATH:../../../../machida/build"
 
 If you would like to skip this step in the future, you can replace the relative paths with the absolute paths in your environment and add these exports to your `.bashrc` file.
 
-### Running a Simple Stateless Application
+## Next Steps
 
-Let's start by running one of the example applications that uses the Python API, `reverse`: a simple stateless computation that reverses words.
-
-Go to the [the Reverse example](/book/examples/python/reverse/)'s directory.
-
-Set up a listener in one shell
-
-```bash
-nc -l 127.0.0.1 7002
-```
-
-In another shell, set up your paths according as described in [the previous section](#a-note-on-path-and-pythonpath)
-
-Run `machida` with `--wallaroo-module reverse`.
-
-```bash
-machida -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 \
--c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1 \
---wallaroo-module reverse
-```
-
-Then in yet another shell, send some messages
-
-```bash
-../../giles/sender/sender --buffy 127.0.0.1:7010 --file ./words.txt \
---batch-size 5 --interval 100_000_000 --messages 150 --repeat --ponythreads=1
-```
-
-Observe the reversed values in the output!
+To try running an example, go to [the Reverse example application](/book/examples/python/reverse/) and follow its [instructions](/book/examples/python/reverse/README.md).
 
 To learn how to write your own Wallaroo Python application, continue to [Writing Your Own Application](writing-your-own-application.md)
