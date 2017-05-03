@@ -2,12 +2,12 @@
 
 Welcome to the developer's guide for Sendence Wallaroo. This document is available in a variety of formats including:
 
-- [On the web](https://sendence.gitbooks.io/wallaroo-doc-beta/content/)
-- [PDF](https://www.gitbook.com/download/pdf/book/sendence/wallaroo-doc-beta)
-- [ePub](https://www.gitbook.com/download/epub/book/sendence/wallaroo-doc-beta)
-- [Mobi](https://www.gitbook.com/download/mobi/book/sendence/wallaroo-doc-beta)
+- [On the web](https://sendence.gitbooks.io/wallaroo/content/)
+- [PDF](https://www.gitbook.com/download/pdf/book/sendence/wallaroo)
+- [ePub](https://www.gitbook.com/download/epub/book/sendence/wallaroo)
+- [Mobi](https://www.gitbook.com/download/mobi/book/sendence/wallaroo)
 
-You can open issues and submit pull requests against [our GitHub repo](https://github.com/Sendence/wallaroo-documentation).
+You can open issues and submit pull requests against [our GitHub repo](https://github.com/Sendence/wallaroo).
 
 ## About Wallaroo
 

@@ -98,6 +98,6 @@ import struct
 import wallaroo
 ```
 
-The complete alphabet example is available [here](https://github.com/Sendence/wallaroo-documentation/tree/master/examples/alphabet-partitioned-python).
+The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/alphabet-partitioned-python).
 
 For further reading, please refer to the [Wallaroo Python API Classes](api.md).

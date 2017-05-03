@@ -121,6 +121,6 @@ import struct
 import wallaroo
 ```
 
-The complete example is available [here](https://github.com/Sendence/wallaroo-documentation/tree/master/examples/reverse-python).
+The complete example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/reverse-python).
 
 To learn how to write a stateful application, continue to [Writing Your Own Stateful Appliaction](writing-your-own-stateful-application.md).
