@@ -13,7 +13,9 @@ You should have already completed the [setup instructions](/book/getting-started
 * Wallaroo Python API
 * Giles Sender
 
-### clang
+#### clang
+
+* On MacOS: you should already have as part of `XCode`. No further steps are needed.
 
 * on Ubuntu Trusty
   ```bash
@@ -26,19 +28,34 @@ You should have already completed the [setup instructions](/book/getting-started
   sudo apt-get install clang
   ```
 
-### Python-dev
+#### Python-dev
+
+* On MacOS: if you installed Python with Homebrew, you should already have the python development headers. No further steps are needed.
+
+* On Ubuntu:
+  ```bash
+  sudo apt-get install python-dev
+  ```
+
+#### Giles sender
+
+Build the sender we will be using to send framed data to Wallaroo.
 
 ```bash
-sudo apt-get install python-dev
+cd ~/wallaroo/giles/sender
+stable fetch && stable env ponyc
 ```
 
-### Wallaroo
+#### Wallaroo-Python
 
-If you don't already have it installed, clone the Wallaroo clone the Wallaroo repository. The remaining directions assume you have cloned Wallaroo into your home directory.
+The following instructions require you to have already completed the [Wallaroo setup for your operating environment](/book/getting-started/setup.md). If you haven't done it yet, please do this before proceeding.
+
+
+##### Building the Wallaroo-Python Runtime
+
+Navigate to the `dianoga` directory in your `wallaroo` repository
 
 ```bash
-cd ~/
-git clone https://github.com/sendence/wallaroo.git
 cd wallaroo/horse-snake/dianoga
 ```
 
@@ -48,7 +65,7 @@ Create the `build` directory if it doesn't already exist.
 mkdir build
 ```
 
-Build the `dianoga`
+Build the `dianoga` binary
 
 ```bash
 clang -g -o build/python-wallaroo.o -c cpp/python-wallaroo.c
@@ -57,15 +74,6 @@ ponyc --debug --output=build --path=build --path=../../lib/ .
 ```
 
 Once built, the `./build/dianoga` binary will work with any `.py` file, so it is not necessary to repeat this step for every new application built with the Wallaroo Python API.
-
-### Giles sender
-
-Build the sender we will be using to send framed data to Wallaroo.
-
-```bash
-cd ~/wallaroo/giles/sender
-stable fetch && stable env ponyc
-```
 
 ## Running a Wallaroo Python Application
 
@@ -104,13 +112,16 @@ nc -l 127.0.0.1 7002
 Run `dianoga` with `--wallaroo-module reverse_word`.
 
 ```bash
-build/dianoga -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1 --wallaroo-module reverse_word
+build/dianoga -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 \
+-c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1 \
+--wallaroo-module reverse_word
 ```
 
 Send some messages
 
 ```bash
-../../giles/sender/sender --buffy 127.0.0.1:7010 --file ./words.txt --batch-size 5 --interval 100_000_000 --messages 150 --repeat --ponythreads=1
+../../giles/sender/sender --buffy 127.0.0.1:7010 --file ./words.txt \
+--batch-size 5 --interval 100_000_000 --messages 150 --repeat --ponythreads=1
 ```
 
 Observe the reversed values in the output!
