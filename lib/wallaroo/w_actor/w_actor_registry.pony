@@ -3,6 +3,7 @@ use "time"
 use "sendence/rand"
 use "wallaroo/fail"
 use "wallaroo/invariant"
+use "wallaroo/recovery"
 
 class WActorRegistry
   let _actors: Map[WActorId, WActorWrapper tag] = _actors.create()
@@ -12,8 +13,7 @@ class WActorRegistry
   new create(seed: U64 = Time.micros()) =>
     _rand = Rand(seed)
 
-  fun ref register_actor(id: WActorId, w_actor: WActorWrapper tag)
-  =>
+  fun ref register_actor(id: WActorId, w_actor: WActorWrapper tag) =>
     _actors(id) = w_actor
 
   fun ref register_as_role(role: String, w_actor: WActorId) =>
@@ -27,6 +27,24 @@ class WActorRegistry
       end
     else
       Fail()
+    end
+
+  fun ref forget_actor(id: WActorId) =>
+    try
+      _actors.remove(id)
+      for (k, v) in _roles.pairs() do
+        try
+          let idx = v.actors().find(id)
+          v.actors().remove(idx, 1)
+        end
+        if v.empty() then
+          _roles.remove(k)
+        end
+      end
+    else
+      ifdef debug then
+        @printf[I32]("Tried to forget unknown actor\n".cstring())
+      end
     end
 
   fun ref send_to(target: WActorId, msg: WMessage val) ? =>
@@ -52,8 +70,42 @@ class WActorRegistry
     consume kas
 
 actor CentralWActorRegistry
+  let _auth: AmbientAuth
+  let _initializer: WActorInitializer
+  let _event_log: EventLog
   let _actors: Map[WActorId, WActorWrapper tag] = _actors.create()
   let _roles: Map[String, SetIs[WActorId]] = _roles.create()
+  let _rand: Rand
+
+  new create(auth: AmbientAuth, init: WActorInitializer, event_log: EventLog,
+    seed: U64)
+  =>
+    _auth = auth
+    _initializer = init
+    _event_log = event_log
+    _rand = Rand(seed)
+
+  be create_actor(builder: WActorWrapperBuilder) =>
+    let new_actor = builder(this, _auth, _event_log, _rand.u64())
+    _initializer.add_actor(builder)
+
+  be forget_actor(id: WActorId) =>
+    try
+      _actors.remove(id)
+      for (r, s) in _roles.pairs() do
+        s.unset(id)
+        if s.size() == 0 then
+          _roles.remove(r)
+        end
+      end
+      for a in _actors.values() do
+        a.forget_actor(id)
+      end
+    else
+      ifdef debug then
+        @printf[I32]("Tried to forget unknown actor\n".cstring())
+      end
+    end
 
   be register_actor(id: WActorId, w_actor: WActorWrapper tag) =>
     _actors(id) = w_actor
@@ -70,10 +122,6 @@ actor CentralWActorRegistry
   // TODO: Using a String to identify a role seems like a brittle approach
   be register_as_role(role: String, w_actor: WActorId) =>
     try
-      // ifdef debug then
-      //   Invariant(_actors.contains(w_actor))
-      // end
-
       if _roles.contains(role) then
         _roles(role).set(w_actor)
       else
@@ -110,6 +158,10 @@ class Role
 
   fun name(): String =>
     _name
+
+  fun empty(): Bool => _actors.size() == 0
+
+  fun ref actors(): Array[WActorId] => _actors
 
   fun ref register_actor(w_actor: WActorId) =>
     if not _actors.contains(w_actor) then

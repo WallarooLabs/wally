@@ -26,27 +26,25 @@ actor ActorSystemStartup
   var _is_multi_worker: Bool = true
   var _is_joining: Bool = false
   var _is_swarm_managed: Bool = false
-  var _worker_name: String = ""
+  var _worker_name: String = "unnamed"
   var _resilience_dir: String = "/tmp"
   var _swarm_manager_addr: String = ""
   var _event_log_file: String = ""
-  var _actor_system_file: String = ""
-  var _event_log: (EventLog | None) = None
+  var _local_actor_system_file: String = ""
   var _event_log_file_length: (USize | None) = None
-//   var _joining_listener: (TCPListener | None) = None
+  // DEMO fields
+  var _iterations: USize = 100
 
-  ////////////////
-  // Demo fields
-  ////////////////
-  let _expected_iterations: USize
-  var _iteration: USize = 0
-  var _serialized: Array[U8] iso = recover Array[U8] end
-  var _received_serialized: USize = 0
-  let _actor_count: USize
-  let _central_registry: CentralWActorRegistry = CentralWActorRegistry
-  let _actors: Array[WActorWrapper tag] = _actors.create()
+  // TODO: remove DEMO param actor_count
+  new create(env: Env, system: ActorSystem val, app_name: (String | None),
+    actor_count: USize)
+  =>
+    @printf[I32]("#########################################\n".cstring())
+    @printf[I32]("#*# Wallaroo Actor System Application #*#\n".cstring())
+    @printf[I32]("#########################################\n\n".cstring())
+    @printf[I32]("#*# %s starting up! #*#\n\n".cstring(),
+      _worker_name.cstring())
 
-  new create(env: Env, system: ActorSystem val, app_name: (String | None)) =>
     _env = env
     _system = system
     _app_name = app_name
@@ -77,6 +75,8 @@ actor ActorSystemStartup
         .add("join", "j", StringArgument)
         .add("swarm-managed", "s", None)
         .add("swarm-manager-address", "a", StringArgument)
+        // DEMO params
+        .add("iterations", "i", I64Argument)
 
       for option in options do
         match option
@@ -92,76 +92,96 @@ actor ActorSystemStartup
           end
         | ("event-log-file-length", let arg: I64) =>
           _event_log_file_length = arg.usize()
+        // DEMO params
+        | ("iterations", let arg: I64) => _iterations = arg.usize()
         end
       end
-    end
 
-    // Currently only support one worker
-    _worker_count = 1
+      // Currently only support one worker
+      _worker_count = 1
 
-    //////////////////
-    // DEMO SETUP
-    //////////////////
-    let seed: U64 = 123456
-    _actor_count = 10
-    _expected_iterations = 100
-    @printf[I32]("WActor Test\n".cstring())
-    initialize(seed, env)
+      let name = match _app_name
+        | let n: String => n
+        else
+          ""
+        end
 
-  fun ref initialize(seed: U64, env: Env) =>
-    try
-      let rand = Rand(seed)
-      let auth = env.root as AmbientAuth
-      for builder in _system.actor_builders().values() do
-        _actors.push(builder(_central_registry, auth, rand.u64()))
+      //////////////////
+      // RESILIENCE
+      //////////////////
+      _event_log_file = _resilience_dir + "/" + name + "-" +
+        _worker_name + ".evlog"
+      _local_actor_system_file = _resilience_dir + "/" + name + "-" +
+        _worker_name + ".local-actor-system"
+
+      ifdef "resilience" then
+        @printf[I32](("||| Resilience directory: " + _resilience_dir +
+          " |||\n").cstring())
       end
-      let timers = Timers
-      let t = Timer(MainNotify(this, _expected_iterations), 1_000_000_000)
-      timers(consume t)
+
+      var is_recovering: Bool = false
+
+      // check to see if we can recover
+      ifdef "resilience" then
+        // Use Set to make the logic explicit and clear
+        let existing_files: Set[String] = Set[String]
+
+        let event_log_filepath: FilePath = FilePath(auth, _event_log_file)
+        if event_log_filepath.exists() then
+          existing_files.set(event_log_filepath.path)
+        end
+
+        let local_actor_system_filepath: FilePath = FilePath(auth,
+          _local_actor_system_file)
+        if local_actor_system_filepath.exists() then
+          existing_files.set(local_actor_system_filepath.path)
+        end
+
+        let required_files: Set[String] = Set[String]
+        required_files.set(event_log_filepath.path)
+        required_files.set(local_actor_system_filepath.path)
+
+        // Only validate _all_ files exist if _any_ files exist.
+        if existing_files.size() > 0 then
+          // If any recovery file exists, but not all, then fail
+          if (required_files.op_and(existing_files)) != required_files then
+            @printf[I32](("Some resilience recovery files are missing! "
+              + "Cannot continue!\n").cstring())
+              let files_missing = required_files.without(existing_files)
+              let files_missing_str: String val = "\n    ".join(
+                Iter[String](files_missing.values()).collect(Array[String]))
+              @printf[I32]("The missing files are:\n    %s\n".cstring(),
+                files_missing_str.cstring())
+            Fail()
+          else
+            @printf[I32]("||| Recovering from recovery files! |||\n".cstring())
+            // we are recovering because all files exist
+            is_recovering = true
+          end
+        end
+      end
+
+      //////////////////////////
+      // Actor System Startup
+      //////////////////////////
+      let event_log = ifdef "resilience" then
+          EventLog(_env, _event_log_file
+            where backend_file_length = _event_log_file_length,
+              logging_batch_size = 1)
+        else
+          EventLog(_env, None)
+        end
+
+      let recovery = Recovery(_worker_name, event_log)
+
+      let seed: U64 = 123456
+
+      let local_system = LocalActorSystem(_system.name(),
+        _system.actor_builders())
+      let initializer = WActorInitializer(local_system, auth, event_log,
+        _local_actor_system_file, actor_count, _iterations, recovery,
+        recover [_worker_name] end, seed)
+      initializer.initialize(is_recovering)
     else
       Fail()
     end
-
-  be act() =>
-    for w_actor in _actors.values() do
-      w_actor.process(Act)
-      w_actor.pickle(this)
-    end
-    _iteration = _iteration + 1
-
-  be finish() =>
-    for w_actor in _actors.values() do
-      w_actor.process(Finish)
-    end
-
-  be add_serialized(ser: Array[U8] val) =>
-    for byte in ser.values() do
-      _serialized.push(byte)
-    end
-    _received_serialized = _received_serialized + 1
-    if _received_serialized == _actor_count then
-      let last = (_serialized = recover Array[U8] end)
-      let digest = Pickle.md5_digest(String.from_iso_array(consume last))
-      @printf[I32]("Digest for iteration %lu: %s\n".cstring(), _iteration,
-        digest.cstring())
-      _received_serialized = 0
-      if _iteration < _expected_iterations then
-        act()
-      else
-        finish()
-      end
-    end
-
-class MainNotify is TimerNotify
-  let _main: ActorSystemStartup
-  let _n: USize
-
-  new iso create(main: ActorSystemStartup, n: USize) =>
-    _main = main
-    _n = n
-
-  fun ref apply(timer: Timer, count: U64): Bool =>
-    _main.act()
-    false
-
-

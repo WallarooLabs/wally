@@ -3,17 +3,17 @@ use "collections"
 use "files"
 use "wallaroo/boundary"
 use "wallaroo/fail"
+use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/routing"
-use "wallaroo/initialization"
+use "wallaroo/w_actor"
 use "debug"
 
-//TODO: origin needs to get its own file
-trait tag Resilient
+interface tag Resilient
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
     payload: ByteSeq)
-  be replay_finished()
+  be log_flushed(low_watermark: SeqId)
 
 //TODO: explain in comment
 type LogEntry is (Bool, U128, U128, None, U64, U64, Array[ByteSeq] iso)
@@ -224,7 +224,7 @@ class FileBackend is Backend
     end
 
 actor EventLog
-  let _origins: Map[U128, (Resilient & Producer)] = _origins.create()
+  let _origins: Map[U128, Resilient] = _origins.create()
   let _logging_batch_size: USize
   let _backend: Backend ref
   let _replay_complete_markers: Map[U64, Bool] =
@@ -255,9 +255,12 @@ actor EventLog
       end
     end
 
-  be start_logging(initializer: LocalTopologyInitializer) =>
+  be start_pipeline_logging(initializer: LocalTopologyInitializer) =>
     _initialized = true
     initializer.report_event_log_ready_to_work()
+
+  be start_actor_system_logging(initializer: WActorInitializer) =>
+    _initialized = true
 
   be start_log_replay(recovery: Recovery) =>
     _recovery = recovery
@@ -283,7 +286,7 @@ actor EventLog
       Fail()
     end
 
-  be register_origin(origin: (Resilient & Producer), id: U128) =>
+  be register_origin(origin: Resilient, id: U128) =>
     _origins(id) = origin
 
   be queue_log_entry(origin_id: U128, uid: U128,

@@ -1416,7 +1416,7 @@ actor LocalTopologyInitializer
             Fail()
           end
         else
-          _event_log.start_logging(this)
+          _event_log.start_pipeline_logging(this)
         end
       end
     else

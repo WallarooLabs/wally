@@ -17,13 +17,17 @@ trait tag Producer
 
   fun ref _flush(low_watermark: SeqId)
 
+  be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
+    payload: ByteSeq)
+  =>
+    None
+
   be log_flushed(low_watermark: SeqId) =>
     """
     We will be called back here once the eventlogs have been flushed for a
     particular origin. We can now send the low watermark upstream to this
     origin.
     """
-
     _x_resilience_routes().flushed(low_watermark)
 
   fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId,
