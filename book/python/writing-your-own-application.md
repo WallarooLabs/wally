@@ -55,7 +55,7 @@ class Decoder(object):
 
 This one is different. Wallaroo handles _streams of bytes_, and in order to do that efficiently, it uses a method called message framing. This means that Wallaroo requires input data to follow a special structure, as well as for the application to provide the mechanism with which to decode this data.
 
-To read more about this, please refer to the [Framed Source Handling](/intro/framed-source-handling.md) section.
+To read more about this, please refer to the [Framed Source Handling](/book/intro/framed-source-handling.md) section.
 
 For our application purposes, we will simply define the structure and how it is going to get parsed:  
 

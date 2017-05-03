@@ -2,7 +2,7 @@
 
 ## Setting up Wallaroo
 
-If you have not already done so, please follow the [directions for setting up Wallaroo](/getting-started/setup.md).
+If you have not already done so, please follow the [directions for setting up Wallaroo](/book/getting-started/setup.md).
 
 ## Additional Requirements
 
