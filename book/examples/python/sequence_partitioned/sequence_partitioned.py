@@ -2,17 +2,15 @@ import struct
 
 import wallaroo
 
-def test_python():
-    return "hello python"
-
 
 def application_setup(args):
     print "args = {}".format(args)
-    sequence_partitions = [0,1]
+    sequence_partitions = [0, 1]
     ab = wallaroo.ApplicationBuilder("Sequence Window")
     ab.new_pipeline("Sequence Window", Decoder())
-    ab.to_state_partition(ObserveNewValue(), SequenceWindowStateBuilder(), "Sequence Window",
-                          SequencePartitionFunction(), sequence_partitions)
+    ab.to_state_partition(ObserveNewValue(), SequenceWindowStateBuilder(),
+                          "Sequence Window", SequencePartitionFunction(),
+                          sequence_partitions)
     ab.to_sink(Encoder())
     return ab.build()
 
@@ -29,7 +27,7 @@ class SequenceWindowStateBuilder(object):
 
 class SequenceWindow(object):
     def __init__(self):
-        self.window = [0,0,0,0]
+        self.window = [0, 0, 0, 0]
 
     def update(self, value):
         self.window.append(value)
