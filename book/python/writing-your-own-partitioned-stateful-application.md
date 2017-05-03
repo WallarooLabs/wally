@@ -4,7 +4,7 @@ In this section, we will go over how to write a partitioned stateful application
 
 ## Partitioning
 
-Partitioning is a key aspect of how work is distributed in Wallaroo. From the application's point of view, what is required are:  
+Partitioning is a key aspect of how work is distributed in Wallaroo. From the application's point of view, what is required are:
 
 * a list of partition keys
 * a partitioning function
@@ -18,7 +18,7 @@ Our partitioned application is going to be very similar to the Alphabet applicat
 
 ### Partition
 
-If we were to use partitioning in the alphabet application from the previous section, and we wanted to partition by key, then one way we could go about it is:  
+If we were to use partitioning in the alphabet application from the previous section, and we wanted to partition by key, then one way we could go about it is:
 The partition key list:
 
 ```python
@@ -58,7 +58,7 @@ class TotalVotes(object):
         return Votes(self.letter, self.votes)
 ```
 
-And since we changed the name of the state class from `AllVotes` to `TotalVotes`, the State Builder needs to be updated to reflect this:  
+And since we changed the name of the state class from `AllVotes` to `TotalVotes`, the State Builder needs to be updated to reflect this:
 
 ```python
 class LetterStateBuilder(object):
@@ -77,7 +77,7 @@ ab.to_state_partition(AddVotes(), LetterStateBuilder(), "letter state",
                       LetterPartitionFunction(), letter_partitions)
 ```
 
-So the new `application_setup` is going to look like  
+So the new `application_setup` is going to look like
 ```python
 def application_setup(args):
     letter_partitions = list(string.ascii_lowercase)
@@ -91,13 +91,15 @@ def application_setup(args):
 
 ### Miscellaneous
 
-The imports used in this module are 
+The imports used in this module are
 ```python
 import string
 import struct
 import wallaroo
 ```
 
-The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/alphabet-partitioned-python).
+## Next Steps
+
+The complete alphabet example is available [here](/book/examples/python/alphabet_partitioned/). To run it, follow the [Alphabet_partitioned application instructions](/book/examples/python/alphabet_partitioned/README.md)
 
 For further reading, please refer to the [Wallaroo Python API Classes](api.md).

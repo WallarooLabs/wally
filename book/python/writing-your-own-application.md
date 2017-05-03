@@ -1,10 +1,10 @@
 # Writing Your Own Wallaroo Python Application
 
-In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the stateless `reverse_word.py` application from the [Building a Python Application](building.md) section, then move on to an application that maintains and modifies state and, finally, a stateful application that also uses partitioning to divide its work.
+In this section, we will go over the components that are required in order to write a Wallaroo Python application. We will start with the stateless `reverse.py` application from the [examples](/book/examples/python/reverse/README.md) section, then move on to an application that maintains and modifies state and, finally, a stateful application that also uses partitioning to divide its work.
 
 ## A Stateless Application - Reverse Words
 
-The `reverse_word.py` application is going to receive text as its input, reverse it, and then send out the reversed text to its sink. In order to do this, our application needs to provide the following functions:
+The `reverse.py` application is going to receive text as its input, reverse it, and then send out the reversed text to its sink. In order to do this, our application needs to provide the following functions:
 
 * Input decoding - how to translate the incoming bytestream into a Python string
 * Computation - this is where the input string is going to get reversed
@@ -27,18 +27,18 @@ A Computation has no state, so it only needs to define its name, and how to conv
 
 ### Sink Encoder
 
-Next, we are going to define how the output gets constructed for the output. It is important to remember that Wallaroo sends its output over the network, so data going through the sink needs to be a stream of bytes.
+Next, we are going to define how the output gets constructed for the sink. It is important to remember that Wallaroo sends its output over the network, so data going through the sink needs to be of type `bytes`. In Python2, this is the same as `str`.
 
 ```python
 class Encoder(object):
     def encode(self, data):
-        # data is already string, so let's just add a newline to the end
+        # data is already a string, so let's just add a newline to the end
         return data + "\n"
 ```
 
 ### SourceDecoder
 
-Now, we also need to decode the incoming bytestream of the source.
+Now, we also need to decode the incoming bytes of the source.
 
 ```python
 class Decoder(object):
@@ -54,39 +54,38 @@ class Decoder(object):
 
 This one is different. Wallaroo handles _streams of bytes_, and in order to do that efficiently, it uses a method called message framing. This means that Wallaroo requires input data to follow a special structure, as well as for the application to provide the mechanism with which to decode this data.
 
-To read more about this, please refer to the [Framed Source Handling](/book/intro/framed-source-handling.md) section.
+To read more about this, please refer to the [Creating A Decoder](/book/core-concepts/decoders-and-encoders.md#creating-a-decoder) section.
 
 For our application purposes, we will simply define the structure and how it is going to get parsed:
 
-1. input messages have the following structure: `HEADER_LENGTH``MSG_LENGTH``MSG`
-1. Wallaroo requires three methods to parse this type of message:
-  1. `header_length()`, which returns the number of bytes used for `HEADER_LENGTH` in the message. This value tells Wallaroo how many bytes to read from the stream as `MSG_LENGTH`.
-  1. `payload_length(bytestream)`, which reads a `MSG_LENGTH` bytestream of size `HEADER_LENGTH` and computes the size of `MSG`. It then returns that size as an integer to Wallaroo, which will then read that many bytes of the stream.
-  1. `decode(bytestream)`, which receives the remainder of the message, `MSG`, and decodes it into a python object.
+1. input messages have the following structure: A fixed length `PYALOAD_SIZE` followed by `PAYLOAD`
+2. Wallaroo requires three methods to parse this type of message:
+  1. `header_length()`, which returns the number of bytes used for the `PAYLOAD_SIZE` in the message. This value tells Wallaroo how many bytes to read from the stream as `HEADER`.
+  2. `payload_length(bs)`, which reads `PAYLOAD_SIZE` bytestring of the size returned by `header_length()` and computes the size of `PAYLOAD`. It then returns that size as an integer to Wallaroo, which will then read that many bytes from the stream.
+  3. `decode(bs)`, which receives the remainder of the message, `MSG`, and decodes it into a python object.
 
 In our case:
 
-* `HEADER_LENGTH` is 4 bytes for an unsigned 32-bit integer.
-* `MSG_LENGTH` is a big-endian unsigned 32-bit integer, so we use `struct.unpack('>I', bs)` to read it as an integer.
-* `MSG` is text, so we decode as such, using `'utf-8'` encoding.
+* `PAYLOAD_SIZE` is a big-endian unsigned 32-bit integer, so we return `4` from `header_length()` and use `struct.unpack('>I', bs)` to read it as an integer.
+* `PAYLOAD` is text, so we decode as such, using `'utf-8'` encoding.
 
 ### Application Setup
 
 So now that we have input decoding, computation, and output decoding defined, how do we build it all into an application?
 For this, two things are needed:
 1. an entry point for Wallaroo to create the application. This is the function `application_setup` that you need to define.
-1. the actual topology `application_setup` is going to return for Wallaroo to create the application.A
+2. the actual topology `application_setup` is going to return for Wallaroo to create the application.
 
 #### Application Builder and Pipelines
 
-An application is constructed of pipelines who, in turn, are constructed of a sequence of a source, steps, and optionally a sink. Our reverse application only has one pipeline, so only need to create one:
+An application is constructed of pipelines which, in turn, are constructed from a sequence of a source, steps, and optionally a sink. Our reverse application only has one pipeline, so we only need to create one:
 
 ```python
 ab = wallaroo.ApplicationBuilder("Reverse word")
 ab.new_pipeline("reverse", Decoder())
 ```
 
-Since each pipeline must have a source, it must then also have a source decoder. So `new_pipeline` takes a name and a `Decoder` instance as its arguments.
+Since each pipeline must have a source, it must also have a source decoder. So `new_pipeline` takes a name and a `Decoder` instance as its arguments.
 
 Next, we add the computation step:
 ```python
@@ -120,11 +119,9 @@ import struct
 import wallaroo
 ```
 
-The complete example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/reverse-python).
+## Running `reverse.py`
 
-## Running `reverse_word.py`
-
-
+The complete example is available [here](/book/examples/python/reverse/). To run it, follow the [Reverse application instructions](/book/examples/python/reverse/README.md)
 
 ## Next Steps
 

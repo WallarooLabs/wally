@@ -124,7 +124,7 @@ here we use:
 ab.to_stateful(AddVotes(), LetterStateBuilder(), "letter state")
 ```
 
-That is, while the stateless computation constructor took only a computation class as its argument, the stateful computation constructor takes a computation _instance_, as well as a state-builder _instance_, along with the name of that state.
+That is, while the stateless computation constructor `to` took only a computation class as its argument, the stateful computation constructor `to_stateful` takes a computation _instance_, as well as a state-builder _instance_, along with the name of that state.
 
 ### Miscellaneous
 
@@ -135,6 +135,8 @@ import struct
 import wallaroo
 ```
 
-The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/alphabet-python).
+## Next Steps
+
+The complete alphabet example is available [here](/book/examples/python/alphabet/). To run it, follow the [Alphabet application instructions](/book/examples/python/alphabet/README.md)
 
 To learn how to write a stateful application with partitioning, continue to [Writing Your Own Partitioned Stateful Application](writing-your-own-partitioned-stateful-application.md).
