@@ -73,13 +73,13 @@ ar rvs build/libpython-wallaroo.a build/python-wallaroo.o
 ponyc --debug --output=build --path=build --path=../../lib/ .
 ```
 
-Once built, the `./build/machida` binary will work with any `.py` file, so it is not necessary to repeat this step for every new application built with the Wallaroo Python API.
+Once built, the `machida` binary will work with any `.py` file, so it is not necessary to repeat this step for every new application built with the Wallaroo Python API.
 
 ## Running a Wallaroo Python Application
 
 ### A Note on How Wallaroo Handles a Python Application
 
-Wallaroo uses an embedded Python runtime wrapped with a C API around it that lets Wallaroo execute Python code and read Python variables. So when `./build/machida --wallaroo-module my_application` is run, `machida` (the binary we previously compiled), loads up the `my_application.py` module inside of its embedded Python runtime and executes its `application_setup()` function to retrieve the application topology it needs to construct in order to run the application.
+Wallaroo uses an embedded Python runtime wrapped with a C API around it that lets Wallaroo execute Python code and read Python variables. So when `machida --wallaroo-module my_application` is run, `machida` (the binary we previously compiled), loads up the `my_application.py` module inside of its embedded Python runtime and executes its `application_setup()` function to retrieve the application topology it needs to construct in order to run the application.
 
 Generally, in order to build a Wallaroo Python application, the following steps should be followed:
 
@@ -91,33 +91,43 @@ Generally, in order to build a Wallaroo Python application, the following steps 
 
 Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate topology, and enters a `ready` state where it awaits incoming data to process.
 
-### Running a Simple Stateless Application
+### A Note on PATH and PYTHONPATH
 
-Let's start by running one of the example applications that uses the Python API, `reverse_word`: a simple stateless computation that reverses words.
+Since the Python runtime is embedded, finding paths to modules can get complicated. To make our life easier, we're going to add the location of the `machida` binary to the `PATH` environment variable, and then we're going to add two paths to the `PYTHONPATH` environment variable:
+1. `.`, or the current directory from which the binary is executed
+2. the absolute path of the `machida` directory in the wallaroo repository.
 
-Go to the `machida` directory.
-
-Export the current directory as `PYTHONPATH`.
-
+If you just want to run the examples, the following shell commands will set this up for you:
 ```bash
-export PYTHONPATH=.
+export PYTHONPATH="$PYTHONPATH:.:../../../../machida"
+export PATH="$PATH:../../../../machida/build"
 ```
 
-Set up a listener.
+If you would like to skip this step in the future, you can replace the relative paths with the absolute paths in your environment and add these exports to your `.bashrc` file.
+
+### Running a Simple Stateless Application
+
+Let's start by running one of the example applications that uses the Python API, `reverse`: a simple stateless computation that reverses words.
+
+Go to the [the Reverse example](/book/examples/python/reverse/)'s directory.
+
+Set up a listener in one shell
 
 ```bash
 nc -l 127.0.0.1 7002
 ```
 
-Run `machida` with `--wallaroo-module reverse_word`.
+In another shell, set up your paths according as described in [the previous section](#a-note-on-path-and-pythonpath)
+
+Run `machida` with `--wallaroo-module reverse`.
 
 ```bash
 machida -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 \
 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1 \
---wallaroo-module reverse_word
+--wallaroo-module reverse
 ```
 
-Send some messages
+Then in yet another shell, send some messages
 
 ```bash
 ../../giles/sender/sender --buffy 127.0.0.1:7010 --file ./words.txt \
