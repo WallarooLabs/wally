@@ -10,13 +10,15 @@ All project names are pulled from characters from the TV show _Buffy the Vampire
 
 ## Important Document Highlights
 
+The Wallaroo book source is available in the [book](book/) directory. Due to how GitBook works, a couple files for the book also exist in the top level of this repo: `Summary.md`, `intro.md`, and `cover.jpg`.
+
 Before commiting any code, be sure to read the [contributing](CONTRIBUTING.md) documentation.
 
 Check out the [build](BUILD.md) documentation for important information on how we stay up to date with the latest Pony compiler changes.
 
 For information about using LLDB to debug Pony programs, please see the [Pony LLDB Cheatsheet](https://www.ponylang.org/reference/pony-lldb-cheatsheet/).
 
-Additional documentation, including onboarding is in the [doc](doc/) directory.
+Additional documentation, including developer onboarding is in the [doc](doc/) directory.
  
 ## Components
 
