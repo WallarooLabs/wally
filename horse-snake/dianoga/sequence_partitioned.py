@@ -74,4 +74,4 @@ class Encoder(object):
     def encode(self, data):
         print "Encoder:encode: ", data
         # data is a list of integers
-        return bytearray(str(data) + "\n", "utf-8")
+        return str(data) + "\n"

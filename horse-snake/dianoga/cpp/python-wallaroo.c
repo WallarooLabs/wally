@@ -89,7 +89,7 @@ extern size_t source_decoder_payload_length(PyObject *source_decoder, char *byte
   PyObject *pFunc, *pValue, *pBytes;
 
   pFunc = PyObject_GetAttrString(source_decoder, "payload_length");
-  pBytes = PyByteArray_FromStringAndSize(bytes, size);
+  pBytes = PyBytes_FromStringAndSize(bytes, size);
   pValue = PyObject_CallFunctionObjArgs(pFunc, pBytes, NULL);
 
   size_t sz = PyInt_AsSsize_t(pValue);
@@ -106,7 +106,7 @@ extern PyObject *source_decoder_decode(PyObject *source_decoder, char *bytes, si
   PyObject *pFunc, *pBytes, *pValue;
 
   pFunc = PyObject_GetAttrString(source_decoder, "decode");
-  pBytes = PyByteArray_FromStringAndSize(bytes, size);
+  pBytes = PyBytes_FromStringAndSize(bytes, size);
   pValue = PyObject_CallFunctionObjArgs(pFunc, pBytes, NULL);
 
   Py_DECREF(pFunc);

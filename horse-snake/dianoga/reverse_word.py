@@ -20,13 +20,13 @@ class Decoder(object):
         print "header_length"
         return 4
 
-    def payload_length(self, bytes):
-        print "payload_length " + bytes
-        return struct.unpack(">I", bytes)[0]
+    def payload_length(self, bs):
+        print "payload_length " + bs
+        return struct.unpack(">I", bs)[0]
 
-    def decode(self, bytes):
-        print "decode " + bytes
-        return bytes.decode("utf-8")
+    def decode(self, bs):
+        print "decode " + bs
+        return bs.decode("utf-8")
 
 
 class Reverse(object):
@@ -42,4 +42,4 @@ class Encoder(object):
     def encode(self, data):
         # data is a string
         print "encode " + data
-        return bytearray(data + "\n", "utf-8")
+        return data + "\n"

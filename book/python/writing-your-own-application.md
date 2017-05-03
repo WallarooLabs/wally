@@ -4,7 +4,7 @@ In this section, we will go over the components that are required in order to wr
 
 ## A Stateless Application - Reverse Words
 
-The `reverse_word.py` application is going to receive text as its input, reverse it, and then send out the reversed text to its sink. In order to do this, our application needs to provide the following functions:  
+The `reverse_word.py` application is going to receive text as its input, reverse it, and then send out the reversed text to its sink. In order to do this, our application needs to provide the following functions:
 
 * Input decoding - how to translate the incoming bytestream into a Python string
 * Computation - this is where the input string is going to get reversed
@@ -32,9 +32,8 @@ Next, we are going to define how the output gets constructed for the output. It 
 ```python
 class Encoder(object):
     def encode(self, data):
-        # data is already string, so let's just add a newline to the end and
-        # turn it into a bytearray.
-        return bytearray(data + "\n", "utf-8")
+        # data is already string, so let's just add a newline to the end
+        return data + "\n"
 ```
 
 ### SourceDecoder
@@ -57,7 +56,7 @@ This one is different. Wallaroo handles _streams of bytes_, and in order to do t
 
 To read more about this, please refer to the [Framed Source Handling](/book/intro/framed-source-handling.md) section.
 
-For our application purposes, we will simply define the structure and how it is going to get parsed:  
+For our application purposes, we will simply define the structure and how it is going to get parsed:
 
 1. input messages have the following structure: `HEADER_LENGTH``MSG_LENGTH``MSG`
 1. Wallaroo requires three methods to parse this type of message:
@@ -74,7 +73,7 @@ In our case:
 ### Application Setup
 
 So now that we have input decoding, computation, and output decoding defined, how do we build it all into an application?
-For this, two things are needed:  
+For this, two things are needed:
 1. an entry point for Wallaroo to create the application. This is the function `application_setup` that you need to define.
 1. the actual topology `application_setup` is going to return for Wallaroo to create the application.A
 
