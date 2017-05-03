@@ -122,4 +122,10 @@ import wallaroo
 
 The complete example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/reverse-python).
 
+## Running `reverse_word.py`
+
+
+
+## Next Steps
+
 To learn how to write a stateful application, continue to [Writing Your Own Stateful Appliaction](writing-your-own-stateful-application.md).

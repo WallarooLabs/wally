@@ -3,10 +3,6 @@ import struct
 import wallaroo
 
 
-def test_python():
-    return "hello python"
-
-
 def application_setup(args):
     ab = wallaroo.ApplicationBuilder("Reverse Word")
     ab.new_pipeline("reverse", Decoder())
@@ -21,11 +17,11 @@ class Decoder(object):
         return 4
 
     def payload_length(self, bs):
-        print "payload_length " + bs
+        print "payload_length", bs
         return struct.unpack(">I", bs)[0]
 
     def decode(self, bs):
-        print "decode " + bs
+        print "decode", bs
         return bs.decode("utf-8")
 
 
@@ -34,12 +30,12 @@ class Reverse(object):
         return "reverse"
 
     def compute(self, data):
-        print "compute " + data
+        print "compute", data
         return data[::-1]
 
 
 class Encoder(object):
     def encode(self, data):
         # data is a string
-        print "encode " + data
+        print "encode", data
         return data + "\n"
