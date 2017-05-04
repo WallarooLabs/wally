@@ -24,14 +24,22 @@ ar rvs build/libpython-wallaroo.a build/python-wallaroo.o
 ponyc --debug --output=build --path=build --path=../lib/ .
 ```
 
-## Run Reverse Word (stateless computation)
+## Next Steps
+
+### The Wallaroo Python API
+
+You can read up on the [Wallaroo Python API](/book/python/api.md).
+
+### Run Some Applications
+
+#### Run Reverse Word (stateless computation)
 
 See [Reverse application instructions](/book/examples/python/reverse/README.md).
 
-## Run Alphabet (stateful computation)
+#### Run Alphabet (stateful computation)
 
 See [Alphabet application instructions](/book/examples/python/alphabet/README.md).
 
-## Run Marketspread (stateful computation)
+#### Run Marketspread (stateful computation)
 
 See [Market Spread application instructions](/book/examples/python/market_spread/README.md)
