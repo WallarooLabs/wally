@@ -149,7 +149,7 @@ docker pull sendence/wallaroo-metrics-ui:pre-0.0.1
 To start the Metrics UI you will run:
 
 ```
-docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 sendence/wallaroo-metrics-ui
+docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 sendence/wallaroo-metrics-ui:pre-0.0.1
 ```
 
 If you are running locally, open [http://localhost:4000](http://localhost:4000)

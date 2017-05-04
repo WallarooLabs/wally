@@ -43,7 +43,7 @@ Build the sender we will be using to send framed data to Wallaroo.
 
 ```bash
 cd ~/wallaroo/giles/sender
-stable fetch && stable env ponyc
+stable env ponyc
 ```
 
 #### Wallaroo-Python
