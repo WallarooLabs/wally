@@ -12,8 +12,8 @@ use "wallaroo/topology"
 
 
 interface FramedSourceHandler[In: Any val]
-  fun header_length(): USize
-  fun payload_length(data: Array[U8] iso): USize ?
+  fun header_length(): USize => 0
+  fun payload_length(data: Array[U8] iso): USize ? => 0
   fun decode(data: Array[U8] val): In ?
 
 class FramedSourceNotify[In: Any val] is TCPSourceNotify
@@ -48,7 +48,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     _router.routes()
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
-    if _header then
+    if _header and (_header_size > 0) then
       // TODO: we need to provide a good error handling route for crap
       try
         let payload_size: USize = _handler.payload_length(consume data)
@@ -112,7 +112,9 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
       end
 
       conn.expect(_header_size)
-      _header = true
+      if _header_size > 0 then
+        _header = true
+      end
 
       ifdef linux then
         true
