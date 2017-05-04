@@ -9,8 +9,8 @@ We'll be sending our Celsius values into Wallaroo as a stream of bytes over TCP.
 To start the Metrics UI run:
 
 ```bash
-docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \ 
-sendence/wallaroo-metrics-ui
+docker run -d --name mui -p 0.0.0.0:4000:4000 -p 0.0.0.0:5001:5001 \
+  sendence/wallaroo-metrics-ui
 ```
 
 You can verify it started up correctly by visiting [http://localhost:4000](http://localhost:4000). 
@@ -25,6 +25,12 @@ When it's time to stop the UI, run:
 
 ```bash
 docker stop mui
+```
+
+If you need to start the UI after stopping it, run:
+
+```bash
+docker start mui
 ```
 
 ## Clone the Wallaroo repo
@@ -57,14 +63,14 @@ This will create a binary called `receiver`
 You will now be able to start the `receiver` with the following command:
 
 ```bash
-./receiver -l 127.0.0.1:5555
+./receiver -l 127.0.0.1:5555 --ponythreads=1
 ```
 
 You should see the `Listening for data` that indicates that Giles receiver is running.
 
 ## Compile the Celsius Converter App
 
-The example application we'll be running can be found [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/celsius/celsius.pony). From the `~/wallaroo-tutorial` directory, run the following command:
+We'll be running the [celsius converter application](https://github.com/Sendence/wallaroo/tree/master/book/examples/celsius/celsius.pony).
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/book/examples/celsius
@@ -84,7 +90,7 @@ Now that we have our Celsius Converter application compiled, and the metrics UI 
 
 ```bash
 ./celsius -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
--c 127.0.0.1:6000 -d 127.0.0.1:6001
+-c 127.0.0.1:6000 -d 127.0.0.1:6001 --ponythreads=1
 ```
 
 This tells Wallaroo that it should listen on port 7000 for incoming data, write outgoing data to port 5555, and send metrics data to port 5001.
@@ -107,7 +113,7 @@ You will now be able to start the `sender` with the following command:
 ```bash
 ./sender -b 127.0.0.1:7000 -m 10000000 -y -s 300 \
 -f ~/wallaroo-tutorial/wallaroo/book/examples/celsius/generator/celsius.msg \
--r -w -g 8
+-r -w -g 8 --ponythreads=1
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.
