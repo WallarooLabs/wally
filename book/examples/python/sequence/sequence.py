@@ -27,7 +27,7 @@ class SequenceWindow(object):
             self.window.pop(0)
 
     def get_window(self):
-        # create a shallow copy of the current window
+        # Return a shallow copy of the current window
         return list(self.window)
 
 
