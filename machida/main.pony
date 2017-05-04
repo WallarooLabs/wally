@@ -1,4 +1,5 @@
 use "collections"
+use "options"
 use "debug"
 
 use "wallaroo"
@@ -10,32 +11,41 @@ use "lib:python-wallaroo"
 
 actor Main
   fun find_python_module(args: Array[String] val): String ? =>
-    var i: USize = 0
-    while i < args.size() do
-      if "--wallaroo-module" == args(i) then
-        return args(i + 1)
+    let options = Options(args)
+    options.add("application-module", "", StringArgument)
+
+    var module_name: (None | String) = None
+
+    for option in options do
+      match option
+      | ("application-module", let arg: String) => module_name = arg
       end
-      i = i + 1
     end
-    error
+
+    module_name as String
 
   new create(env: Env) =>
     Machida.start_python()
 
     try
       let module_name = find_python_module(env.args)
-      let module = Machida.load_module(module_name)
 
       try
-        let application_setup = Machida.application_setup(module, env.args)
+        let module = Machida.load_module(module_name)
 
-        let application = recover val
-          Machida.apply_application_setup(application_setup)
+        try
+          let application_setup = Machida.application_setup(module, env.args)
+          let application = recover val
+            Machida.apply_application_setup(application_setup)
+          end
+          Startup(env, application, None)
+        else
+          env.err.print("Something went wrong while building the application")
         end
-        Startup(env, application, None)
       else
-        env.err.print("Something went wrong while building the application")
+        env.err.print("Could not load module '" + module_name + "'")
       end
     else
-      env.err.print("could not find wallaroo module")
+      env.err.print(
+        "Please use `--application-module=MODULE_NAME` to specify an application module")
     end
