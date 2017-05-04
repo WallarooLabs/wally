@@ -79,7 +79,7 @@ cd ~/wallaroo-tutorial/wallaroo/book/examples/celsius
 Now compile the Celsius Converter app:
 
 ```bash
-stable fetch && stable env ponyc
+stable env ponyc
 ```
 
 This will create a binary called `celsius`.

@@ -19,7 +19,7 @@ following compiler argument:
 This means the full command to compile with resilience will be:
 
 ```
-stable fetch && stable env ponyc -D resilience
+stable env ponyc -D resilience
 ```
 
 When running a resilience-enabled Wallaroo app, you can optionally specify the 
