@@ -4,28 +4,6 @@ In this section, we're going to show you how to quickly get a Wallaroo applicati
 
 We'll be sending our Celsius values into Wallaroo as a stream of bytes over TCP. The outputs of our application will be converted to a stream of bytes and sent over TCP to a data receiver.
 
-## Set up Environment for Wallaroo
-
-Create a directory called `~/wallaroo-tutorial` and navigate there by running
-
-```
-mkdir ~/wallaroo-tutorial
-cd ~/wallaroo-tutorial
-```
-
-This will be our base directory in what follows. If you haven't already
-cloned this repo, do so by running:
-
-```
-git clone https://github.com/sendence/wallaroo
-```
-
-Note: You need to login to GitHub for credentials
-
-This will create a subdirectory called `wallaroo`.
-
-If you haven't already, you now need to set up your environment for Wallaroo. Follow the instructions [here](setup.md).
-
 ## Start the Metrics UI
 
 To start the Metrics UI run:
