@@ -264,9 +264,11 @@ primitive Machida
       String.copy_cstring(@test_python())
     end
 
-  fun load_module(module_name: String): ModuleP =>
+  fun load_module(module_name: String): ModuleP ? =>
     let r = @load_module(module_name.cstring())
-    print_errors()
+    if print_errors() then
+      error
+    end
     r
 
   fun application_setup(module: ModuleP, args: Array[String] val): Pointer[U8] val ? =>
