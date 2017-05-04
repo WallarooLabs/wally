@@ -41,7 +41,7 @@ Open a new terminal and run the following to clone the repo:
 
 ```bash
 cd ~/wallaroo
-git checkout 0.0.1-rc1
+git checkout 0.0.1-rc2
 ```
 
 Later in the process we will build each of the applications:
