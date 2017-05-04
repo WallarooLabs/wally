@@ -1,8 +1,7 @@
 {
   "deps": [
-    { "type": "github",
-      "repo": "sendence/wallaroo",
-      "subdir": "lib"
-    }
+      { "type": "local",
+        "local-path": "../../../lib/"
+      }
   ]
 }
