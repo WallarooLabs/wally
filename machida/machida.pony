@@ -18,25 +18,34 @@ use @list_item_count[USize](list: Pointer[U8] val)
 
 use @instantiate_python_class[Pointer[U8] val](klass: Pointer[U8] val)
 
-use @get_application_setup_item[Pointer[U8] val](list: Pointer[U8] val, idx: USize)
+use @get_application_setup_item[Pointer[U8] val](list: Pointer[U8] val,
+  idx: USize)
 use @get_application_setup_action[Pointer[U8] val](item: Pointer[U8] val)
-// use @get_application_setup_args[Pointer[U8] val](item: Pointer[U8] val)
 
 use @get_name[Pointer[U8] val](o: Pointer[U8] val)
-use @computation_compute[Pointer[U8] val](c: Pointer[U8] val, d: Pointer[U8] val)
+
+use @computation_compute[Pointer[U8] val](c: Pointer[U8] val,
+  d: Pointer[U8] val)
 
 use @state_builder_build_state[Pointer[U8] val](sb: Pointer[U8] val)
-use @stateful_computation_compute[Pointer[U8] val](c: Pointer[U8] val, d: Pointer[U8] val, s: Pointer[U8] val)
+
+use @stateful_computation_compute[Pointer[U8] val](c: Pointer[U8] val,
+  d: Pointer[U8] val, s: Pointer[U8] val)
 
 use @source_decoder_header_length[USize](source_decoder: Pointer[U8] val)
-use @source_decoder_payload_length[USize](source_decoder: Pointer[U8] val, data: Pointer[U8] tag, size: USize)
-use @source_decoder_decode[Pointer[U8] val](source_decoder: Pointer[U8] val, data: Pointer[U8] tag, size: USize)
+use @source_decoder_payload_length[USize](source_decoder: Pointer[U8] val,
+  data: Pointer[U8] tag, size: USize)
+use @source_decoder_decode[Pointer[U8] val](source_decoder: Pointer[U8] val,
+  data: Pointer[U8] tag, size: USize)
 
-use @sink_encoder_encode[Pointer[U8] val](sink_encoder: Pointer[U8] val, data: Pointer[U8] val)
+use @sink_encoder_encode[Pointer[U8] val](sink_encoder: Pointer[U8] val,
+  data: Pointer[U8] val)
 
-use @partition_function_partition_u64[U64](partition_function: Pointer[U8] val, data: Pointer[U8] val)
+use @partition_function_partition_u64[U64](partition_function: Pointer[U8] val,
+  data: Pointer[U8] val)
 
-use @partition_function_partition[Pointer[U8] val](partition_function: Pointer[U8] val, data: Pointer[U8] val)
+use @partition_function_partition[Pointer[U8] val](
+  partition_function: Pointer[U8] val, data: Pointer[U8] val)
 
 use @key_hash[U64](key: Pointer[U8] val)
 use @key_eq[I32](key: Pointer[U8] val, other: Pointer[U8] val)
@@ -136,7 +145,8 @@ class PyPartitionFunction
 
   fun apply(data: PyData val): PyKey val =>
     recover
-      PyKey(Machida.partition_function_partition(_partition_function, data.obj()))
+      PyKey(Machida.partition_function_partition(_partition_function,
+        data.obj()))
     end
 
   fun _final() =>
@@ -154,11 +164,13 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
     _header_length
 
   fun payload_length(data: Array[U8] iso): USize =>
-    Machida.source_decoder_payload_length(_source_decoder, data.cpointer(), data.size())
+    Machida.source_decoder_payload_length(_source_decoder, data.cpointer(),
+      data.size())
 
   fun decode(data: Array[U8] val): PyData val =>
     recover
-      PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(), data.size()))
+      PyData(Machida.source_decoder_decode(_source_decoder, data.cpointer(),
+        data.size()))
     end
 
   fun _final() =>
@@ -173,7 +185,8 @@ class PyComputation is Computation[PyData val, PyData val]
     _name = Machida.get_name(_computation)
 
   fun apply(input: PyData val): (PyData val | None) =>
-    let r: Pointer[U8] val = Machida.computation_compute(_computation, input.obj())
+    let r: Pointer[U8] val = Machida.computation_compute(_computation,
+      input.obj())
 
     if not r.is_null() then
       recover
@@ -201,7 +214,8 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
     sc_repo: StateChangeRepository[PyState], state: PyState):
     ((PyData val | None), None)
   =>
-    let data = Machida.stateful_computation_compute(_computation, input.obj(), state.obj())
+    let data = Machida.stateful_computation_compute(_computation, input.obj(),
+      state.obj())
     let d = recover if data.is_null() then
         None
       else
@@ -229,7 +243,8 @@ class PyEncoder is SinkEncoder[PyData val]
     let byte_buffer = Machida.sink_encoder_encode(_sink_encoder, data.obj())
     let arr = recover val
       // create a temporary Array[U8] wrapper for the C array, then clone it
-      Array[U8].from_cpointer(@PyString_AsString(byte_buffer), @PyString_Size(byte_buffer)).clone()
+      Array[U8].from_cpointer(@PyString_AsString(byte_buffer),
+        @PyString_Size(byte_buffer)).clone()
     end
     Machida.dec_ref(byte_buffer)
     wb.write(arr)
@@ -269,7 +284,9 @@ primitive Machida
     print_errors()
     r
 
-  fun application_setup(module: ModuleP, args: Array[String] val): Pointer[U8] val ? =>
+  fun application_setup(module: ModuleP, args: Array[String] val):
+    Pointer[U8] val ?
+  =>
     let pyargs = Machida.pony_array_string_to_py_list_string(args)
     let r = @application_setup(module, pyargs)
     if print_errors() then
@@ -278,8 +295,8 @@ primitive Machida
     r
 
   fun apply_application_setup(application_setup_data: Pointer[U8] val):
-    Application
-  ? =>
+    Application ?
+  =>
     let application_setup_item_count = @list_item_count(application_setup_data)
 
     var app: (None | Application) = None
@@ -297,7 +314,9 @@ primitive Machida
       end
     end
 
-    var latest: (Application | PipelineBuilder[PyData val, PyData val, PyData val]) = (app as Application)
+    var latest: (Application | PipelineBuilder[PyData val, PyData val,
+      PyData val]) = (app as Application)
+
     for idx in Range(0, application_setup_item_count) do
       let item = @get_application_setup_item(application_setup_data, idx)
       let action_p = @get_application_setup_action(item)
@@ -314,8 +333,11 @@ primitive Machida
           Machida.inc_ref(d)
           PyFramedSourceHandler(d)
         end
-        Debug("!!! decoder header_length = " + decoder.header_length().string())
-        latest = (latest as Application).new_pipeline[PyData val, PyData val](name, decoder)
+        Debug("!!! decoder header_length = " +
+          decoder.header_length().string())
+
+        latest = (latest as Application).new_pipeline[PyData val, PyData val](
+          name, decoder)
       | "to" =>
         Debug("  adding a computation to the pipeline")
         let computation_class = @PyTuple_GetItem(item, 1)
@@ -347,7 +369,8 @@ primitive Machida
           String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(item, 3)))
         end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
-        latest = pb.to_stateful[PyData val, PyState](state_computation, state_builder, state_name)
+        latest = pb.to_stateful[PyData val, PyState](state_computation,
+          state_builder, state_name)
       | "to_state_partition_u64" =>
         Debug("  adding a u64 partitioned state computation to the pipeline")
         let state_computationp = @PyTuple_GetItem(item, 1)
@@ -372,11 +395,14 @@ primitive Machida
           PyPartitionFunctionU64(partition_functionp)
         end
 
-        let partition_values = Machida.py_list_int_to_pony_array_u64(@PyTuple_GetItem(item, 5))
+        let partition_values = Machida.py_list_int_to_pony_array_u64(
+          @PyTuple_GetItem(item, 5))
 
-        let partition = Partition[PyData val, U64](partition_function, partition_values)
+        let partition = Partition[PyData val, U64](partition_function,
+          partition_values)
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
-        latest = pb.to_state_partition[PyData val, U64, PyData val, PyState](state_computation, state_builder, state_name, partition)
+        latest = pb.to_state_partition[PyData val, U64, PyData val, PyState](
+          state_computation, state_builder, state_name, partition)
       | "to_state_partition" =>
         Debug("  adding a partitioned state computation to the pipeline")
         let state_computationp = @PyTuple_GetItem(item, 1)
@@ -401,11 +427,14 @@ primitive Machida
           PyPartitionFunction(partition_functionp)
         end
 
-        let partition_values = Machida.py_list_int_to_pony_array_pykey(@PyTuple_GetItem(item, 5))
+        let partition_values = Machida.py_list_int_to_pony_array_pykey(
+          @PyTuple_GetItem(item, 5))
 
-        let partition = Partition[PyData val, PyKey val](partition_function, partition_values)
+        let partition = Partition[PyData val, PyKey val](partition_function,
+          partition_values)
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
-        latest = pb.to_state_partition[PyData val, PyKey val, PyData val, PyState](state_computation, state_builder, state_name, partition)
+        latest = pb.to_state_partition[PyData val, PyKey val, PyData val, PyState](
+          state_computation, state_builder, state_name, partition)
       | "to_sink" =>
         Debug("  adding a sink to the pipeline")
         let encoderp = @PyTuple_GetItem(item, 1)
@@ -432,37 +461,51 @@ primitive Machida
     print_errors()
     r
 
-  fun source_decoder_payload_length(source_decoder: Pointer[U8] val, data: Pointer[U8] tag, size: USize): USize =>
+  fun source_decoder_payload_length(source_decoder: Pointer[U8] val,
+    data: Pointer[U8] tag, size: USize): USize
+  =>
     let r = @source_decoder_payload_length(source_decoder, data, size)
     print_errors()
     r
 
-  fun source_decoder_decode(source_decoder: Pointer[U8] val, data: Pointer[U8] tag, size: USize): Pointer[U8] val =>
+  fun source_decoder_decode(source_decoder: Pointer[U8] val,
+    data: Pointer[U8] tag, size: USize): Pointer[U8] val
+  =>
     let r = @source_decoder_decode(source_decoder, data, size)
     print_errors()
     r
 
-  fun sink_encoder_encode(sink_encoder: Pointer[U8] val, data: Pointer[U8] val): Pointer[U8] val =>
+  fun sink_encoder_encode(sink_encoder: Pointer[U8] val, data: Pointer[U8] val):
+    Pointer[U8] val
+  =>
     let r = @sink_encoder_encode(sink_encoder, data)
     print_errors()
     r
 
-  fun computation_compute(computation: Pointer[U8] val, data: Pointer[U8] val): Pointer[U8] val =>
+  fun computation_compute(computation: Pointer[U8] val, data: Pointer[U8] val):
+    Pointer[U8] val
+  =>
     let r = @computation_compute(computation, data)
     print_errors()
     r
 
-  fun stateful_computation_compute(computation: Pointer[U8] val, data: Pointer[U8] val, state: Pointer[U8] val): Pointer[U8] val =>
+  fun stateful_computation_compute(computation: Pointer[U8] val,
+    data: Pointer[U8] val, state: Pointer[U8] val): Pointer[U8] val
+  =>
     let r = @stateful_computation_compute(computation, data, state)
     print_errors()
     r
 
-  fun partition_function_partition_u64(partition_function: Pointer[U8] val, data: Pointer[U8] val): U64 =>
+  fun partition_function_partition_u64(partition_function: Pointer[U8] val,
+    data: Pointer[U8] val): U64
+  =>
     let r = @partition_function_partition_u64(partition_function, data)
     print_errors()
     r
 
-  fun py_list_int_to_pony_array_u64(py_array: Pointer[U8] val): Array[U64] val =>
+  fun py_list_int_to_pony_array_u64(py_array: Pointer[U8] val):
+    Array[U64] val
+  =>
     let size = @PyList_Size(py_array)
     let arr = recover iso Array[U64](size) end
 
@@ -484,12 +527,16 @@ primitive Machida
     print_errors()
     r
 
-  fun partition_function_partition(partition_function: Pointer[U8] val, data: Pointer[U8] val): Pointer[U8] val =>
+  fun partition_function_partition(partition_function: Pointer[U8] val,
+    data: Pointer[U8] val): Pointer[U8] val
+  =>
     let r = @partition_function_partition(partition_function, data)
     print_errors()
     r
 
-  fun py_list_int_to_pony_array_pykey(py_array: Pointer[U8] val): Array[PyKey val] val =>
+  fun py_list_int_to_pony_array_pykey(py_array: Pointer[U8] val):
+    Array[PyKey val] val
+  =>
     let size = @PyList_Size(py_array)
     let arr = recover iso Array[PyKey val](size) end
 
@@ -501,7 +548,9 @@ primitive Machida
 
     consume arr
 
-  fun pony_array_string_to_py_list_string(args: Array[String] val): Pointer[U8] val =>
+  fun pony_array_string_to_py_list_string(args: Array[String] val):
+    Pointer[U8] val
+  =>
     let l = @PyList_New(args.size())
     for (i, v) in args.pairs() do
       @PyList_SetItem(l, i, @PyString_FromStringAndSize(v.cstring(), v.size()))
