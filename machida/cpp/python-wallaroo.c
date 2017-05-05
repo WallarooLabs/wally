@@ -41,7 +41,9 @@ extern PyObject *get_application_setup_item(PyObject *list, size_t idx)
 extern char *get_application_setup_action(PyObject *item)
 {
   PyObject *action = PyTuple_GetItem(item, 0);
-  return PyString_AsString(action);
+  char * rtn = PyString_AsString(action);
+  Py_DECREF(action);
+  return rtn;
 }
 
 extern size_t source_decoder_header_length(PyObject *source_decoder)
@@ -195,5 +197,7 @@ extern long partition_function_partition_u64(PyObject *partition_function, PyObj
   pValue = PyObject_CallFunctionObjArgs(pFunc, data, NULL);
   Py_DECREF(pFunc);
 
-  return PyInt_AsLong(pValue);
+  long rtn = PyInt_AsLong(pValue);
+  Py_DECREF(pValue);
+  return rtn;
 }
