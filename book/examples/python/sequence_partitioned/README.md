@@ -23,6 +23,12 @@ Apart from that, the applications are the same
 
 ## Running Sequence - Partitioned
 
+In a shell, start up the Metrics UI if you don't already have it running:
+
+```bash
+docker start mui
+```
+
 In a shell, set up a listener:
 
 ```bash

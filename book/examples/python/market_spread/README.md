@@ -1,5 +1,11 @@
 # Market Spread
 
+In a shell, start up the Metrics UI if you don't already have it running:
+
+```bash
+docker start mui
+```
+
 Set up a listener.
 
 ```bash

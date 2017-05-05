@@ -1,7 +1,12 @@
 # Alphabet Partioned
 
-In a shell, set up a listener:
+In a shell, start up the Metrics UI if you don't already have it running:
 
+```bash
+docker start mui
+```
+
+In another shell, set up a listener:
 ```bash
 nc -l 127.0.0.1 7002 > alphabet.out
 ```
