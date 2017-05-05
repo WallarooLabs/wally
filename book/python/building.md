@@ -33,6 +33,7 @@ You should have already completed the [setup instructions](/book/getting-started
 * On MacOS: if you installed Python with Homebrew, you should already have the python development headers. No further steps are needed.
 
 * On Ubuntu:
+
   ```bash
   sudo apt-get install python-dev
   ```
