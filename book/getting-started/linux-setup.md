@@ -100,7 +100,7 @@ sudo apt-get install -y build-essential git zlib1g-dev \
 sudo apt-get install -y libpcre2-dev
 ```
 
-#### Trust Ubuntu:
+#### Trusty Ubuntu:
 
 *Note:* some older versions of Ubuntu do not supply a prce2
 package. If you get an error that no package exists (`E: Package
