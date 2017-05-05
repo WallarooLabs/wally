@@ -280,8 +280,7 @@ primitive FixNbboFrameHandler is FramedSourceHandler[FixNbboMessage val]
     end
 
 primitive SymbolPartitionFunction
-  fun apply(input: Symboly val): String
-  =>
+  fun apply(input: Symboly val): String =>
     input.symbol()
 
 class OrderResult
