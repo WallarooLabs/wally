@@ -51,8 +51,7 @@ class Decoder(object):
         return struct.unpack(">I", bs)[0]
 
     def decode(self, bs):
-        letter = chr(bs[0])
-        vote_count = struct.unpack(">I", bs[1:])[0]
+        (letter, vote_count) = struct.unpack(">1sI", bs)
         return Votes(letter, vote_count)
 
 
@@ -70,4 +69,4 @@ class Encoder(object):
         # data is a Votes
         letter = data.letter
         votes = data.votes
-        return bytearray(letter, "utf-8") + struct.pack(">I", votes)
+        return struct.pack(">1sI", data.letter, data.votes)
