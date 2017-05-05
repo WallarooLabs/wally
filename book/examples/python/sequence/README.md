@@ -5,6 +5,12 @@ It receives integers from the natural sequence {1,2,3,4,...,n} as its input, and
 
 ## Running Sequence
 
+In a shell, start up the Metrics UI if you don't already have it running:
+
+```bash
+docker start mui
+```
+
 In a shell, set up a listener:
 
 ```bash
