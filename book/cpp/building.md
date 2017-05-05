@@ -20,7 +20,7 @@ package manager.
 
 In order to use the Wallaroo C++ API you must install the Wallaroo C++ API header files and library. At the terminal, go to the `wallaroo` repository directory and run the following commands:
 
-```
+```bash
 cd lib/wallaroo/cpp_api/cpp/cppapi/
 mkdir build
 cd build
@@ -35,7 +35,7 @@ This will build the C++ library and install the library and associated header fi
 
 Let's start by building one of the example applications that uses the C++ API, `counter-app`. Go to the `examples/counter-app` directory and run these commands:
 
-```
+```bash
 mkdir build
 clang++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
 ar rs build/libcounter.a build/Counter.o
