@@ -2,19 +2,19 @@
 
 Export the current directory as `PYTHONPATH`.
 
-```
+```bash
 export PYTHONPATH=.
 ```
 
 Set up a listener.
 
-```
+```bash
 nc -l 127.0.0.1 7002 2>&1 | tee alphabet.out
 ```
 
 Run `dianoga` with `--wallaroo-module alphabet_partitioned`.
 
-```
+```bash
 build/dianoga -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 \
 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1 \
 --wallaroo-module alphabet_partitioned
@@ -22,7 +22,7 @@ build/dianoga -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 \
 
 Send some messages
 
-```
+```bash
 ../../giles/sender/sender --buffy 127.0.0.1:7010 --file votes.msg \
 --batch-size 5 --interval 100_000_000 --messages 150 --binary \
 --variable-size --repeat --ponythreads=1
