@@ -54,7 +54,7 @@
 * [Wallaroo Command-Line Options](book/appendix/wallaroo-command-line-options.md)
 * [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
 * [Receiving Data over TCP with Giles Receiver](book/wallaroo-tools/giles-receiver.md)
-* [Monitoring Metrics with the Monitoring Hub](book/wallaroo-tools/metrics-ui.md)
+* [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)
 
 ---
 <!---
@@ -107,4 +107,3 @@
 * [Wallaroo Roadmap](roadmap.md)
 * [v1.0-201611101](v1.0-201611101.md)
 -->
-

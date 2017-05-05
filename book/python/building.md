@@ -33,6 +33,7 @@ You should have already completed the [setup instructions](/book/getting-started
 * On MacOS: if you installed Python with Homebrew, you should already have the python development headers. No further steps are needed.
 
 * On Ubuntu:
+
   ```bash
   sudo apt-get install python-dev
   ```
@@ -42,21 +43,16 @@ You should have already completed the [setup instructions](/book/getting-started
 Build the sender we will be using to send framed data to Wallaroo.
 
 ```bash
-cd ~/wallaroo/giles/sender
+cd ~/wallaroo-tutorial/wallaroo/giles/sender
 stable env ponyc
 ```
 
 #### Wallaroo-Python
 
-The following instructions require you to have already completed the [Wallaroo setup for your operating environment](/book/getting-started/setup.md). If you haven't done it yet, please do this before proceeding.
-
-
-##### Building the Wallaroo-Python Runtime
-
 Navigate to the `machida` directory in your `wallaroo` repository
 
 ```bash
-cd wallaroo/machida
+cd ~/wallaroo-tutorial/wallaroo/machida
 ```
 
 Create the `build` directory if it doesn't already exist.
@@ -79,7 +75,7 @@ Once built, the `machida` binary will work with any `.py` file, so it is not nec
 
 ### A Note on How Wallaroo Handles a Python Application
 
-Wallaroo uses an embedded Python runtime wrapped with a C API around it that lets Wallaroo execute Python code and read Python variables. So when `machida --wallaroo-module my_application` is run, `machida` (the binary we previously compiled), loads up the `my_application.py` module inside of its embedded Python runtime and executes its `application_setup()` function to retrieve the application topology it needs to construct in order to run the application.
+Wallaroo uses an embedded Python runtime wrapped with a C API around it that lets Wallaroo execute Python code and read Python variables. So when `machida --application-module my_application` is run, `machida` (the binary we previously compiled), loads up the `my_application.py` module inside of its embedded Python runtime and executes its `application_setup()` function to retrieve the application topology it needs to construct in order to run the application.
 
 Generally, in order to build a Wallaroo Python application, the following steps should be followed:
 
@@ -87,7 +83,7 @@ Generally, in order to build a Wallaroo Python application, the following steps 
 * `import wallaroo` in the python application's `.py` file
 * Create classes that provide the correct Wallaroo Python interfaces (more on this later)
 * Define an `application_setup` function that uses the `ApplicationBuilder` from the `wallaroo` module to construct the application topology.
-* Run `machida` with the application file as the `--wallaroo-module` argument
+* Run `machida` with the application file as the `--application-module` argument
 
 Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate topology, and enters a `ready` state where it awaits incoming data to process.
 

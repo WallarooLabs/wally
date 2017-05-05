@@ -77,10 +77,36 @@ sudo make install
 
 ## Install Docker
 
-You'll need Docker to run the Wallaroo metrics UI. There are [instructions](https://docs.docker.com/docker-for-mac/) for getting Docker up and running on MacOS on the [Docker website](https://docs.docker.com/docker-for-mac/).
+You'll need Docker to run the Wallaroo metrics UI. There are [instructions](https://docs.docker.com/docker-for-mac/) for getting Docker up and running on MacOS on the [Docker website](https://docs.docker.com/docker-for-mac/). Installing Docker will result in it running on your machine. After you reboot your machine, that will no longer be the case. In the future, you'll need to have Docker running in order to use a variety of commands in this book. We suggest that you [set up Docker to boot automatically](https://docs.docker.com/docker-for-mac/#general).
 
 ## Install the Metrics UI
 
-```
+```bash
 docker pull sendence/wallaroo-metrics-ui:pre-0.0.1
 ```
+
+## Set up Environment for the Wallaroo Tutorial
+
+Create a directory called `~/wallaroo-tutorial` and navigate there by running
+
+```bash
+cd ~/
+mkdir ~/wallaroo-tutorial
+cd ~/wallaroo-tutorial
+```
+
+This will be our base directory in what follows. If you haven't already
+cloned the Wallaroo repo, do so now:
+
+```bash
+git clone https://github.com/sendence/wallaroo
+git checkout 0.0.1-rc3
+```
+
+Note: You need to login to GitHub for credentials
+
+This will create a subdirectory called `wallaroo`.
+
+## Conclusion
+
+Awesome! All set. Time to try running your first application.

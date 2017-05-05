@@ -12,13 +12,13 @@ perspective, it's as though the worker never went down.
 In order to run Wallaroo with resilience, you need to compile your application with the 
 following compiler argument:
 
-```
+```bash
 -D resilience
 ```
 
 This means the full command to compile with resilience will be:
 
-```
+```bash
 stable env ponyc -D resilience
 ```
 

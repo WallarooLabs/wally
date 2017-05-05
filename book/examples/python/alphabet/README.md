@@ -1,5 +1,11 @@
 # Alphabet
 
+In a shell, start up the Metrics UI if you don't already have it running:
+
+```bash
+docker start mui
+```
+
 In a shell, set up a listener:
 
 ```bash
@@ -12,18 +18,18 @@ In another shell, export the current directory and `wallaroo.py` directories to 
 export PYTHONPATH="$PYTHONPATH:.:../../../../machida"
 ```
 
-Export the machida binary directory t `PATH`:
+Export the machida binary directory to `PATH`:
 
 ```bash
 export PATH="$PATH:../../../../machida/build"
 ```
 
-Run `machida` with `--wallaroo-module alphabet`.
+Run `machida` with `--application-module alphabet`.
 
 ```bash
-machida -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 \
--c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1 \
---wallaroo-module alphabet
+machida --application-module alphabet -i 127.0.0.1:7010 -o 127.0.0.1:7002 \
+  -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name \
+  --ponythreads=1
 ```
 
 In a third shell, send some messages
