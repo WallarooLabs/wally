@@ -33,22 +33,6 @@ If you need to start the UI after stopping it, run:
 docker start mui
 ```
 
-## Clone the Wallaroo repo
-
-There are two support applications we are going to need to compile that are kept in the [Wallaroo Github repository](https://github.com/sendence/wallaroo).
-
-Open a new terminal and run the following to clone the repo:
-
-```bash
-cd ~/wallaroo
-git checkout 0.0.1-rc2
-```
-
-Later in the process we will build each of the applications:
-
-- Giles Receiver
-- Giles Sender
-
 ## Run Giles Receiver
 
 We need to set up a data receiver where we can send the output stream from our app. Wallaroo ships with a tool called `Giles Receiver` designed to capture TCP output.
