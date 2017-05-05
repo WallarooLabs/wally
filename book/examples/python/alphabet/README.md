@@ -28,7 +28,7 @@ Run `machida` with `--application-module alphabet`.
 
 ```bash
 machida --application-module alphabet -i 127.0.0.1:7010 -o 127.0.0.1:7002 \
-  -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name \
+  -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name \
   --ponythreads=1
 ```
 
