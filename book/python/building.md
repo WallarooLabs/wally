@@ -56,7 +56,7 @@ The following instructions require you to have already completed the [Wallaroo s
 Navigate to the `machida` directory in your `wallaroo` repository
 
 ```bash
-cd wallaroo/machida
+cd ~/wallaroo-tutorial/wallaroo/machida
 ```
 
 Create the `build` directory if it doesn't already exist.
