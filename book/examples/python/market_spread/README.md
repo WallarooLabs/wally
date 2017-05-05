@@ -12,7 +12,7 @@ In another shell, export the current directory and `wallaroo.py` directories to 
 export PYTHONPATH="$PYTHONPATH:.:../../../../machida"
 ```
 
-Export the machida binary directory t `PATH`:
+Export the machida binary directory to `PATH`:
 
 ```bash
 export PATH="$PATH:../../../../machida/build"
