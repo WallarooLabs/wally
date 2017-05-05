@@ -18,12 +18,12 @@ Export the machida binary directory t `PATH`:
 export PATH="$PATH:../../../../machida/build"
 ```
 
-Run `machida` with `--wallaroo-module alphabet`.
+Run `machida` with `--application-module alphabet`.
 
 ```bash
 machida -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 \
 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name --ponythreads=1 \
---wallaroo-module alphabet
+--application-module alphabet
 ```
 
 In a third shell, send some messages

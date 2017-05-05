@@ -79,7 +79,7 @@ Once built, the `machida` binary will work with any `.py` file, so it is not nec
 
 ### A Note on How Wallaroo Handles a Python Application
 
-Wallaroo uses an embedded Python runtime wrapped with a C API around it that lets Wallaroo execute Python code and read Python variables. So when `machida --wallaroo-module my_application` is run, `machida` (the binary we previously compiled), loads up the `my_application.py` module inside of its embedded Python runtime and executes its `application_setup()` function to retrieve the application topology it needs to construct in order to run the application.
+Wallaroo uses an embedded Python runtime wrapped with a C API around it that lets Wallaroo execute Python code and read Python variables. So when `machida --application-module my_application` is run, `machida` (the binary we previously compiled), loads up the `my_application.py` module inside of its embedded Python runtime and executes its `application_setup()` function to retrieve the application topology it needs to construct in order to run the application.
 
 Generally, in order to build a Wallaroo Python application, the following steps should be followed:
 
@@ -87,7 +87,7 @@ Generally, in order to build a Wallaroo Python application, the following steps 
 * `import wallaroo` in the python application's `.py` file
 * Create classes that provide the correct Wallaroo Python interfaces (more on this later)
 * Define an `application_setup` function that uses the `ApplicationBuilder` from the `wallaroo` module to construct the application topology.
-* Run `machida` with the application file as the `--wallaroo-module` argument
+* Run `machida` with the application file as the `--application-module` argument
 
 Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate topology, and enters a `ready` state where it awaits incoming data to process.
 
