@@ -12,7 +12,7 @@ cd ~/wallaroo-tutorial
 ```
 
 This will be our base directory in what follows. If you haven't already
-cloned the Wallarroo repo, do so now:
+cloned the Wallaroo repo, do so now:
 
 ```bash
 git clone https://github.com/sendence/wallaroo
