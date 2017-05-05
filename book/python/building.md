@@ -43,7 +43,7 @@ You should have already completed the [setup instructions](/book/getting-started
 Build the sender we will be using to send framed data to Wallaroo.
 
 ```bash
-cd ~/wallaroo/giles/sender
+cd ~/wallaroo-tutorial/wallaroo/giles/sender
 stable env ponyc
 ```
 
