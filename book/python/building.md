@@ -49,11 +49,6 @@ stable env ponyc
 
 #### Wallaroo-Python
 
-The following instructions require you to have already completed the [Wallaroo setup for your operating environment](/book/getting-started/setup.md). If you haven't done it yet, please do this before proceeding.
-
-
-##### Building the Wallaroo-Python Runtime
-
 Navigate to the `machida` directory in your `wallaroo` repository
 
 ```bash
