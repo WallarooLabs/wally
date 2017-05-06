@@ -9,7 +9,7 @@ Giles components act as external testers for Wallaroo. Giles Sender is used to m
 - With a file name given as the `--file/-f` argument and binary format specified with `--binary/-y` and every message is 24 bytes, specified with `--msg-size/-g`, it will send every 24 bytes of the given file as a message. For example, `./giles/sender -b 127.0.0.1:8081 -m 100 -f binary-data-file.txt -y -g 24` will send every 24 bytes until it has sent 100 messages
 - With a file name given as the `--file/-f` argument and binary format specified with `--binary/-y` and variable message lengths specified with `--variable-size/-z`, it will read 4 bytes to get the message size, send that message and repeat. For example, `./giles/sender  127.0.0.1:8081 -m 100 -f binary-data-file.txt -y -z` will initially read a 4 byte header, send that message and repeat until it has sent 100 messages.
 
-### Getting Wallaroo
+### Building `giles/sender`
 
 If you do not already have the `wallaroo` repo, create a local copy:
 
@@ -17,12 +17,10 @@ If you do not already have the `wallaroo` repo, create a local copy:
 git clone https://github.com/sendence/wallaroo
 ```
 
-## Compiling
-
-To compile the `giles-sender` binary:
+Compile the `giles-sender` binary:
 
 ```bash
-cd wallaroo
+cd wallaroo/giles/sender
 stable env ponyc
 ```
 
@@ -34,9 +32,11 @@ stable env ponyc
 
 `--messages/-m` number of messages to send before terminating the sender.
 
+`--file/-f` a file with newline-separated values from which to read entries to send.
+
 `--batch-size/-s` specifies the number of messages sent at every interval.
 
-`--interval/-i` interval at which to send a batch of messages to Wallaroo. Defaults to `5_000_000`.
+`--interval/-i` interval at which to send a batch of messages to Wallaroo. Defaults to `5_000_000`. The value is in nanoseconds.
 
 `--repeat/-r` tells the sender to repeat reading the file/s as long as necessary to send the number of messages specified by `-m`.
 

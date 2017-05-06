@@ -11,3 +11,5 @@ To set up your environment for writing and running Wallaroo Python application, 
 To learn how to write your own application, refer to [Writing Your Own Application](writing-your-own-application.md).
 
 To read about the structure and requirements of each API class, refer to [Wallaroo Python API Classes](api.md).
+
+To read about the command-line arguments Wallaroo takes, refer to [Appendix: Wallaroo Command-Line Options](/book/appendix/wallaroo-command-line-options.md).

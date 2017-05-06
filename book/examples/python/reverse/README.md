@@ -31,8 +31,9 @@ export PATH="$PATH:../../../../machida/build"
 Run `machida` with `--application-module reverse`:
 
 ```bash
-machida --application-module reverse -i 127.0.0.1:7010 -o 127.0.0.1:7002 \
-  -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker-name \
+machida --application-module reverse --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+  --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
+  --worker-name worker-name \
   --ponythreads=1
 ```
 

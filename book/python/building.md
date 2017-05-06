@@ -107,3 +107,5 @@ If you would like to skip this step in the future, you can replace the relative 
 To try running an example, go to [the Reverse example application](https://github.com/Sendence/wallaroo/tree/master/book/examples/python/reverse/) and follow its [instructions](/book/examples/python/reverse/README.md).
 
 To learn how to write your own Wallaroo Python application, continue to [Writing Your Own Application](writing-your-own-application.md)
+
+To read about the Machida command line arguments, refer to [Appendix: Wallaroo Command-Line Options](/book/appendix/wallaroo-command-line-options.md).

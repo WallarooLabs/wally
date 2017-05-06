@@ -21,6 +21,7 @@ When running a Wallaroo application binary, we use some of the following command
         e.g. -r /tmp/data (no trailing slash)]
       --ponythreads [Number of application threads. Used as part of a high-performance configuration.]
       --ponypinasio [Used as part of a high-performance configuration.]
+      --ponynoblock [Used as part of a high-performance configuration.]
 ```
 
 Wallaroo currently supports one input stream per pipeline. We provide comma-separated IP addresses for TCP source listeners via the `--in` parameter. Currently, the order of these addresses corresponds to the order in which pipelines are defined in your application code.
@@ -71,7 +72,7 @@ NOTE: Currently, worker 1 is automatically assigned the name "initializer" no ma
 
 ### Resilience
 
-If [resilience is turned on](/book/core-concepts/resilience.md), you can optionally specify the target directory for resilience files via the `--resilience-dir` parameter (default is `/tmp`).
+If [resilience is turned on](/book/core-concepts/resilience.md), you can optionally specify the target directory for resilience files via the `--resilience-dir/-r` parameter (default is `/tmp`).
 
 ## Performance Flags
 
@@ -84,4 +85,4 @@ argument:
 
 If you do not specify the number of `ponythreads`, the process will try to use all available cores.
 
-There's an additional performance flag `--ponypinasio` that is used as part of a high-performance configuration. Documentation on how to configure for best performance is coming soon. 
+There are additional performance flags`--ponypinasio` and `--ponynoblock` that can be used as part of a high-performance configuration. Documentation on how to configure for best performance is coming soon.
