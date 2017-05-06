@@ -50,14 +50,15 @@ export PATH="$PATH:../../../../machida/build"
 Run `machida` with `--application-module sequence`:
 
 ```bash
-machida --application-module sequence_partitioned -i 127.0.0.1:7010 \
-  -o 127.0.0.1:7002 -m 127.0.0.1:5001 -c 127.0.0.1:6000 -d 127.0.0.1:6001 \
-  -n worker-name --ponythreads=1
+machida --application-module sequence_partitioned --in 127.0.0.1:7010 \
+  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
+  --data 127.0.0.1:6001 --worker-name worker-name --ponythreads=1
 ```
 
 In a third shell, send some messages:
 
 ```bash
-../../../../giles/sender/sender -b 127.0.0.1:7010 -s 10 -i 100_000_000 \
---ponythreads=1 -y -g 12 -w -u -m 100
+../../../../giles/sender/sender --buffy 127.0.0.1:7010 --batch-size 10 \
+  --interval 100_000_000 --ponythreads=1 --binary --msg-size 12 --no-write \
+  --u64 --messages 100
 ```
