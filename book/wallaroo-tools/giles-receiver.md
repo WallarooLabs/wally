@@ -8,7 +8,7 @@ Giles components act as external testers for Wallaroo. Giles Receiver is used to
 
 - With the `--no-write/-w` flag given as a commandline argument, it will drop all incoming binary data and not write to file. For example, `./giles/receiver -l 127.0.0.1:5555 -w` will receive and drop any data received on port 5555.
 
-### Getting Wallaroo
+### Building `giles/receiver`
 
 If you do not already have the `wallaroo` repo, create a local copy of the repo:
 
@@ -16,12 +16,10 @@ If you do not already have the `wallaroo` repo, create a local copy of the repo:
 git clone https://github.com/sendence/wallaroo
 ```
 
-## Compiling
-
-To compile the `giles-sender` binary:
+Compile the `giles-receiver` binary:
 
 ```bash
-cd wallaroo
+cd wallaroo/giles/receiver
 stable env ponyc
 ```
 
@@ -33,6 +31,35 @@ stable env ponyc
 
 `--no-write/-w` flag to drop receive and drop incoming data.
 
-`--phone-home/-p` Dagon address. Must be provided in the `127.0.0.1:8082` format.
+`--phone-home/-p` Dagon address. Must be provided in the `127.0.0.1:8082` format. This is only used when `giles/receiver` is run by Dagon.
 
-`--name/-n` Name to register itself with to Dagon.
+`--name/-n` Name to register itself with to Dagon. This is only used when `giles/receiver` is run by Dagon.
+
+## `giles/receiver` vs. netcat
+
+One question that comes up often is why not just use netcat for a output receiver. The reason is two-fold:
+
+1. If the giles sender and receiver are run on the same physical machine, then their _monotonic unadjusted clock_ is synchronised, and therefore the timestamps from `giles/sender` and `giles/receiver` can be used to compute total latencies, assuming one can relate a message in `giles/sender`'s `sent.txt` to a message in `giles/receiver`'s `received.txt`.
+2. While doing performance tuning, we noticed that netcat sometimes struggles to handle heavy loads. This is understandable, as it was never designed with that purpose. `giles/receiver`, on the other hand, is specifically designed to not be bottoleneck when it is used in performance tuning a Wallaroo application.
+
+## Output File Encoding
+
+Giles Receiver saves incoming messages in a binary format of the following specification:
+
+1. Message Length: A 32-bit (4-byte) unsigned integer specifying the length of the binary message.
+2. Timestamp: a 64-bit (8-byte) unsigned integer specificying the unadjusted monotonic time (in nanoseconds) at which the the message was received. This timestamp is specific to the machine that is performing this encoding and cannot be translated across machines.
+3. A binary blob length `Message Length`
+
+An example for such an entry, with a binary message of 10 bytes and the timestamp 10 is
+```
+'\x00\x00\x00\n\x00\x00\x00\x00\x00\x00\x00\nabcdefghij'
+```
+
+Note that you cannot trust newlines as separators in this encoding. As you can see in the encoded entry above, the character `'\n'` appears  in both the `message_length` entry `'\x00\x00\x00\n'` and in the `timestamp` entry `'\x00\x00\x00\x00\x00\x00\x00\n'`.
+So care must be taken when decoding giles-receiver output files to not assume that any character separator is safe for use. Instead, the recommended way to decode these files is to treat their contents as a bytestream, and decode them one message at at time in the following manner:
+
+1. Read the first 4 bytes and convert them from a big-endian 32-bit unsigned int to a number in your decoder.
+2. Read the next 8 bytes, and if you have a use for the monotonic unadjusted nanoseconds timestamp, convert it to a number from a big-endian 64-bit unsigned integer.
+3. Read `message_length` bytes and decode according to your application's `SinkEncoder` encoding scheme, if desired.
+4. Save or process the message
+5. GOTO 1
