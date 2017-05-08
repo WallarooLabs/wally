@@ -1,6 +1,9 @@
 # Reverse
 
-The reverse application receives strings as input and outputs the reversed strings.
+This is an example application that receives strings as input and outputs the
+reversed strings.
+
+You will need a working [Wallaroo Python API](/book/python/intro.md).
 
 ## Running Reverse
 

@@ -1,22 +1,25 @@
 # Sendence Wallaroo
 
-## Getting Started with Wallaroo
-* [What is Wallaroo?](book/getting-started/what-is-wallaroo.md)
-* [What to Expect](book/getting-started/what-to-expect.md)
-* [Setting up Your Environment](book/getting-started/setup.md)
-  * [MacOS Installation](book/getting-started/macos-setup.md)
-  * [Ubuntu Installation](book/getting-started/linux-setup.md)
-* [Run a Wallaroo Application](book/getting-started/run-a-application.md)
-* [Conclusion](book/getting-started/conclusion.md)
+* [Overview](book/overview.md)
+* [What is Wallaroo?](book/what-is-wallaroo.md)
 
 ## Core Concepts
+
 * [Introduction](book/core-concepts/intro.md)
 * [Introducing Wallaroo Core Concepts](book/core-concepts/core-concepts.md)
 * [State](book/core-concepts/state.md)
 * [Working with State](book/core-concepts/working-with-state.md)
 * [Decoders and Encoders](book/core-concepts/decoders-and-encoders.md)
 
-## Wallaroo C++ API
+## Developing with Wallaroo
+
+* [Setting up Your Environment](book/getting-started/setup.md)
+  * [MacOS Installation](book/getting-started/macos-setup.md)
+  * [Ubuntu Installation](book/getting-started/linux-setup.md)
+* [Run a Wallaroo Application](book/getting-started/run-a-application.md)
+* [Conclusion](book/getting-started/conclusion.md)
+
+### Wallaroo C++ API
 * [C++ API Introduction](book/cpp/intro.md)
 * [C++ Sample Application](book/cpp/sample-application.md)
 * [Building a C++ Application](book/cpp/building.md)
@@ -42,7 +45,7 @@
    * [State](book/cpp/api/state.md)
    * [UserFunctions](book/cpp/api/user-functions.md)
 
-## Wallaroo Python API
+### Wallaroo Python API
 * [Python API Introduction](book/python/intro.md)
 * [Building a Python Application](book/python/building.md)
 * [Writing Your Own Application](book/python/writing-your-own-application.md)
@@ -55,6 +58,10 @@
 * [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
 * [Receiving Data over TCP with Giles Receiver](book/wallaroo-tools/giles-receiver.md)
 * [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)
+* [Writing Your Own Data Feed](book/appendix/writing-your-own-feed.md)
+
+## Legal
+* [Terms and Conditions](book/legal/terms.md)
 
 ---
 <!---

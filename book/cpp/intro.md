@@ -10,7 +10,7 @@ function to handle deserialization, and writes a function that uses an
 application builder object to define the layout of the application.
 
 For a basic overview of what Wallaroo does, please read
-[What is Wallaroo?](/book/getting-started/what-is-wallaroo.md) and
+[What is Wallaroo?](/book/what-is-wallaroo.md) and
 [Core Concepts](/book/core-concepts/intro.md). These
 documents will help you understand the system at a high level so that
 you can see how the pieces of the C++ API fit into it.

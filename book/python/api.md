@@ -46,7 +46,7 @@ Since the application is run in an embedded Python runtime, it does not have sta
 
 ### wallaroo.ApplicationBuilder
 
-The `ApplicationBuilder` class in `wallaroo` is a utility for constructing application topology nested tuple object. It also provides some additional validation on the input parameters.
+The `ApplicationBuilder` class in `wallaroo` is a utility for constructing application topologies. It also provides some additional validation on the input parameters.
 
 #### `ApplicationBuilder` Methods
 

@@ -11,7 +11,7 @@ use "lib:python-wallaroo"
 
 actor Main
   fun find_python_module(args: Array[String] val): String ? =>
-    let options = Options(args)
+    let options = Options(args, false)
     options.add("application-module", "", StringArgument)
 
     var module_name: (None | String) = None

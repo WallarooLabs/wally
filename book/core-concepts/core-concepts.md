@@ -1,8 +1,6 @@
 # Wallaroo Core Concepts
 
-A Wallaroo application consists of one or more pipelines. A pipeline takes in data
-from an external system, performs a series of computations based on that data,
-and optionally produces outputs which are sent to an external system.
+A Wallaroo application consists of one or more pipelines. A pipeline takes in data from an external system, performs a series of computations based on that data, and optionally produces outputs which are sent to an external system.
 
 Here is a diagram illustrating a single, linear pipeline:
 
@@ -12,18 +10,9 @@ External   | Wallaroo                     Wallaroo|    External
    A       |                                      |       B
 ```
 
-An external data source sends data (say, over TCP) to an internal Wallaroo
-source. The Wallaroo source decodes that stream of bytes, transforming it
-into a stream of internal data types that are sent to a series of computations
-(C1, C2, and C3). Each computation takes an input and produces an output.
-Finally, C3 sends its output to a Wallaroo sink, which encodes that output
-as a series of bytes and sends it over TCP to an external system.
+An external data source sends data (say, over TCP) to an internal Wallaroo source. The Wallaroo source decodes that stream of bytes, transforming it into a stream of internal data types that are sent to a series of computations (C1, C2, and C3). Each computation takes an input and produces an output. Finally, C3 sends its output to a Wallaroo sink, which encodes that output as a series of bytes and sends it over TCP to an external system.
 
-A Wallaroo application can have multiple interacting pipelines. For example, an app
-could have one pipeline that takes data and updates state based on that data,
-and a second pipeline that takes data, does computations against the current
-state in the system, and produces output based on the state and data. The first
-of these has no sink, whereas the second does.
+A Wallaroo application can have multiple interacting pipelines. For example, an app could have one pipeline that takes data and updates state based on that data, and a second pipeline that takes data, does computations against the current state in the system, and produces output based on the state and data. The first of these has no sink, whereas the second does.
 
 ## Concepts
 
