@@ -27,13 +27,40 @@ stable env ponyc
 
 `giles/receiver` takes several command line arguments, below are a list with accompanying notes:
 
-`--listen/-l` address to listen on for incoming data from Wallaroo. Must be given in the `127.0.0.1:5555` format.
+* `--listen/-l` address to listen on for incoming data from Wallaroo. Must be given in the `127.0.0.1:5555` format.
+* `--no-write/-w` flag to drop receive and drop incoming data.
+* `--phone-home/-p` Dagon address. Must be provided in the `127.0.0.1:8082` format. This is only used when `giles/receiver` is run by Dagon.
+* `--name/-n` Name to register itself with to Dagon. This is only used when `giles/receiver` is run by Dagon.
 
-`--no-write/-w` flag to drop receive and drop incoming data.
+## Examples
 
-`--phone-home/-p` Dagon address. Must be provided in the `127.0.0.1:8082` format. This is only used when `giles/receiver` is run by Dagon.
+### Listen for Wallaroo output and save to `received.txt`
 
-`--name/-n` Name to register itself with to Dagon. This is only used when `giles/receiver` is run by Dagon.
+```bash
+receiver --listen 127.0.0.1:5555
+```
+
+### Listen for Wallaroo output, but don't save anything (e.g. "A Very Fast Sink Receiver")
+
+If you just want your application to run as fast as possible without spending any resources on _saving output data_, use
+
+```bash
+receiver --listen 127.0.0.1:5555 --no-write
+```
+
+## Pony Runtime Options
+
+The following pony runtime parameters may also be useful in some situations
+
+* `--ponythreads` limits the number of threads the pony runtime will use.
+* `--ponynoblock`
+* `--ponypinasio`
+
+A common usecase is limiting `giles/receiver` to one thread, noblock, and pinning asio:
+
+```bash
+receiver --listen 127.0.0.1:5555 --ponythreads=1 --ponynoblock --ponypinasio
+```
 
 ## `giles/receiver` vs. netcat
 
@@ -42,7 +69,7 @@ One question that comes up often is why not just use netcat for a output receive
 1. If the giles sender and receiver are run on the same physical machine, then their _monotonic unadjusted clock_ is synchronised, and therefore the timestamps from `giles/sender` and `giles/receiver` can be used to compute total latencies, assuming one can relate a message in `giles/sender`'s `sent.txt` to a message in `giles/receiver`'s `received.txt`.
 2. While doing performance tuning, we noticed that netcat sometimes struggles to handle heavy loads. This is understandable, as it was never designed with that purpose. `giles/receiver`, on the other hand, is specifically designed to not be bottoleneck when it is used in performance tuning a Wallaroo application.
 
-## Output File Encoding
+## Output File Format
 
 Giles Receiver saves incoming messages in a binary format of the following specification:
 
@@ -63,3 +90,5 @@ So care must be taken when decoding giles-receiver output files to not assume th
 3. Read `message_length` bytes and decode according to your application's `SinkEncoder` encoding scheme, if desired.
 4. Save or process the message
 5. GOTO 1
+
+For decoding the output, please see [Decoding Giles Receiver Output](/book/appendix/decoding-giles-receiver-output.md).
