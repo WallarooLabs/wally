@@ -8,6 +8,9 @@ Machida is a Wallaroo-Python Runtime that enables a Wallaroo application to be w
 - sendence-ponyc
 - giles-sender
 
+You will also need your environment to be [set up with a working
+Wallaroo](/book/getting-started/setup.md).
+
 ## Build
 
 Create the `build` directory if it doesn't already exist.

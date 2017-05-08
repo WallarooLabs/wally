@@ -1,5 +1,12 @@
 # Alphabet
 
+This is an example application that will count the number of "votes" sent for
+each letter of the alphabet.
+
+You will need a working [Wallaroo Python API](/book/python/intro.md).
+
+## Running Alphabet
+
 In a shell, start up the Metrics UI if you don't already have it running:
 
 ```bash

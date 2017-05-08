@@ -1,5 +1,19 @@
 # Market Spread
 
+Market Spread is an application designed to run alongside a trading system. Its goal is to monitor market data for irregularities around different symbols and potentially withdraw some trades that have been sent to market should certain anomalies occur. 
+
+When we break the application down into its key components we get:
+
+- A stream of market data, aka “NBBO Stream”
+- A stream of trades, aka “Order Stream”
+- State in the form of latest market conditions for various symbols
+- A calculation to possibly withdraw the trade based on state for that symbol
+
+You can read more about Market Spread in [What is Wallaroo](/book/getting-started/what-is-wallaroo.md)
+You will need a working [Wallaroo Python API](/book/python/intro.md).
+
+## Running Market Spread
+
 In a shell, start up the Metrics UI if you don't already have it running:
 
 ```bash
