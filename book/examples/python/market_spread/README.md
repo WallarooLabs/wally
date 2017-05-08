@@ -9,7 +9,7 @@ When we break the application down into its key components we get:
 - State in the form of latest market conditions for various symbols
 - A calculation to possibly withdraw the trade based on state for that symbol
 
-You can read more about Market Spread in [What is Wallaroo](/book/getting-started/what-is-wallaroo.md)
+You can read more about Market Spread in [What is Wallaroo](/book/what-is-wallaroo.md)
 You will need a working [Wallaroo Python API](/book/python/intro.md).
 
 ## Running Market Spread
