@@ -7,7 +7,7 @@ Welcome to the developer's guide for Sendence Wallaroo. This document is availab
 - [ePub](https://www.gitbook.com/download/epub/book/sendence/wallaroo)
 - [Mobi](https://www.gitbook.com/download/mobi/book/sendence/wallaroo)
 
-You can open issues and submit pull requests against [our GitHub repo](https://github.com/Sendence/wallaroo).
+You can open issues and submit pull requests against [our GitHub repo](https://github.com/Sendence/wallaroo). All materials herein are copyrighted 2017 All Rights Reserved by Sendence Solutions LLC and subject to our [Terms and Conditions](book/legal/terms.md).
 
 ## About Wallaroo
 

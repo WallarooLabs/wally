@@ -56,6 +56,9 @@
 * [Receiving Data over TCP with Giles Receiver](book/wallaroo-tools/giles-receiver.md)
 * [Monitoring Metrics with the Monitoring Hub](book/metrics/metrics-ui.md)
 
+## Legal
+* [Terms and Conditions](book/legal/terms.md)
+
 ---
 <!---
 
