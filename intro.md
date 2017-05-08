@@ -22,8 +22,8 @@ Developers only need to be concerned about domain logic of their particular appl
 This document is currently intended to provide the following:
 
 * An overview of the Wallaroo system
-* Information about the Pony and C++ APIs
-* Walkthroughs of applications created using the Pony and C++ APIs
+* Information about the C++ and Python APIs
+* Walkthroughs of applications created using the C++ and Python APIs
 
 ## Intended Audience
 
