@@ -1,4 +1,11 @@
-# Alphabet Partioned
+# Alphabet Partitioned
+
+This is an example application that will count the number of "votes" sent for
+each letter of the alphabet, using paritioning.
+
+You will need a working [Wallaroo Python API](/book/python/intro.md).
+
+## Running Alphabet Partitioned
 
 In a shell, start up the Metrics UI if you don't already have it running:
 

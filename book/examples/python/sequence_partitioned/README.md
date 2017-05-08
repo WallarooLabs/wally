@@ -3,6 +3,8 @@
 As with [Sequence window](/book/examples/python/sequence/), Sequence Window - Partitioned is a simple application that holds state in the form of a ring buffer.
 It receives integers from the natural sequence {1,2,3,4,...,n} as its input, and outputs a window of the last 4 values it has seen, in the order they were seen as a list, with the left-most value being the oldest.
 
+You will need a working [Wallaroo Python API](/book/python/intro.md).
+
 In the partitioned version of this application, states are partitioned using a modulo 2 operation
 
 ```python
