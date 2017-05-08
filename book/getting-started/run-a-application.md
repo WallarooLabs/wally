@@ -1,10 +1,10 @@
 # Run a Wallaroo Application
 
-In this section, we're going to run an example Wallaroo application. By the time you are finished, you'll have validated that your environment is set up and working correctly. 
+In this section, we're going to run an example Wallaroo application. By the time you are finished, you'll have validated that your environment is set up and working correctly.
 
 There's a couple Wallaroo support applications that you'll be interacting with for the first time:
 
-- Our Metrics UI that allows you to monitoring the performance and health of your applications.
+- Our Metrics UI that allows you to monitor the performance and health of your applications.
 - Giles receiver is designed to capture TCP output from Wallaroo applications.
 - Giles sender is used to send test data into Wallaroo applications over TCP.
 
@@ -60,15 +60,15 @@ You will now be able to start the `receiver` with the following command:
 
 You should see the `Listening for data` that indicates that Giles receiver is running.
 
-## Compile the Celsius Converter App
+## Compile the Celsius Conversion App
 
-We'll be running the [celsius converter application](https://github.com/Sendence/wallaroo/tree/master/book/examples/celsius/celsius.pony).
+We'll be running the [celsius conversion application](https://github.com/Sendence/wallaroo/tree/master/book/examples/celsius/celsius.pony).
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/book/examples/celsius
 ```
 
-Now compile the Celsius Converter app:
+Now compile the Celsius Conversion app:
 
 ```bash
 stable env ponyc
@@ -76,9 +76,9 @@ stable env ponyc
 
 This will create a binary called `celsius`.
 
-## Run the Celsius Converter App
+## Run the Celsius Conversion App
 
-Now that we have our Celsius Converter application compiled, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command from our original terminal:
+Now that we have our Celsius Conversion application compiled, and the metrics UI and something it can send output to up and running, we can run the application itself by executing the following command from our original terminal:
 
 ```bash
 ./celsius -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
@@ -112,4 +112,26 @@ If the sender is working correctly, you should see `Connected` printed to the sc
 
 ## Check Out Some Metrics
 
-Once the sender has successfully connected, if you [visit the Metrics UI](http://localhost:4000) you should be able to see updates as our Celsius Converter application processes incoming data.
+### First Look
+
+Once the sender has successfully connected, if you [visit the Metrics UI](http://localhost:4000) the landing page should show you that the Celsius Conversion application has successfully connected.
+
+![Landing Page](/book/metrics/images/landing-page.png)
+
+If your landing page resembles the one above, the Celsius Conversion application has successfully connected to the Metrics UI.
+
+Now, let's have a look at some metrics. By clicking on the Celsius Conversion App link, you'll be taken to the Application Dashboard page. On this page you should see metric stats for the following:
+
+- a single pipeline: `Celsius Conversion`
+- a single worker: `Initializer`
+- three computations: `Add32`, `Decode Time in TCP Source`, `Multiply by 1.8`
+
+![Application Dashboard Page](/book/metrics/images/application-dashboard-page.png)
+
+You'll see the metric stats update as data continues to be processed in our application.
+
+You can then click into one of the elements within a category, to get to a detailed metrics page for that element. If we were to click into the `Add32` computation, we'll be taken to this page:
+
+![Computation Detailed Metrics page](/book/metrics/images/computation-detailed-metrics-page.png)
+
+Feel free to click around and get a feel for how the Metrics UI is setup and how it is used to monitor a running Wallaroo application. If you'd like a deeper dive into the Metrics UI, have a look at our [Monitoring Metrics with the Monitoring Hub](/book/metrics/metrics-ui.md) section.
