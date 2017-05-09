@@ -1,9 +1,10 @@
 use "collections"
-use "options"
 use "random"
 use "time"
 use "buffered"
 use "files"
+
+use "sendence/options"
 
 actor Main
   let letters: Array[String] =

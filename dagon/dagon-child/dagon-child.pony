@@ -1,7 +1,7 @@
 use "net"
-use "options"
 use "time"
 use "sendence/messages"
+use "sendence/options"
 use "sendence/tcp"
 
 

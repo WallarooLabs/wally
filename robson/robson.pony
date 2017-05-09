@@ -2,9 +2,9 @@ use "buffered"
 use "collections"
 use "files"
 use "format"
-use "options"
 use "net"
 use "sendence/hub"
+use "sendence/options"
 use "sendence/wall_clock"
 
 actor Main
