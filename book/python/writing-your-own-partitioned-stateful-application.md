@@ -19,19 +19,22 @@ Our partitioned application is going to be very similar to the Alphabet applicat
 ### Partition
 
 If we were to use partitioning in the alphabet application from the previous section, and we wanted to partition by key, then one way we could go about it is:
-The partition key list:
+
+Create a partition key list:
 
 ```python
 letter_partitions = list(string.ascii_lowercase)
 ```
 
-And the partitioning function:
+And then a partitioning function which returns a key from the above list for input data:
 
 ```python
 class LetterPartitionFunction(object):
     def partition(self, data):
         return data.letter[0]
 ```
+
+Later when we build the application topology, we will pass both the keys and the function to the builder.
 
 ### State and StateBuilder
 
