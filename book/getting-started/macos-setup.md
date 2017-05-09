@@ -100,7 +100,7 @@ cloned the Wallaroo repo, do so now:
 
 ```bash
 git clone https://github.com/sendence/wallaroo
-git checkout 0.0.1-rc5
+git checkout 0.0.1-rc6
 ```
 
 Note: You need to login to GitHub for credentials
