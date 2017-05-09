@@ -20,15 +20,15 @@ This document is organized into a number of sections. We recommend that you star
 
 - "What is Wallaroo"
 - "Core Concepts"
-- "Getting Started" section of "Developing with Wallaroo"
+- "Developing with Wallaroo"
 
-Once you have finished the "Getting Started" section, you can then jump to documentation for the language you will be developing with.
+Once you have finished the "Developing with Wallaroo" section, you can then jump to documentation for the language you will be developing with.
 
 ### Core Concepts
 
 Covers the concepts you'll need to understand in order to build a Wallaroo application. As much as possible, we will avoid being language specific and try to keep it generic, but from time to time we will have some examples in Pony.
 
-### Getting Started
+### Developing with Wallaroo
 
 The "Getting Started" section is all about getting your development environment setup and then compiling and running a Wallaroo application. The tools you will install then are useful when developing a Wallaroo application regardless of which language you are using. You may have to install additional tools later to support your language of choice.
 
