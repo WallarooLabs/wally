@@ -42,7 +42,7 @@ Remember that multi-worker runs require that you distribute the same binary to a
 
 #### Example Single-Worker Run
 
-In order to run a single worker for a Wallaroo app, we need to specify the input address (`-i`), the target output address (`-o`), and the metrics target address (`-m`). For example, using the Celsius Converter application (after navigating to `examples/celsius` and compiling) we would run:
+In order to run a single worker for a Wallaroo app, we need to specify the input address (`-i`), the target output address (`-o`), and the metrics target address (`-m`). For example, using the Celsius Converter application (after navigating to `examples/pony/celsius` and compiling) we would run:
 
 ```bash
 ./celsius -i 127.0.0.1:6000 -o 127.0.0.1:5555 -m 127.0.0.1:5001

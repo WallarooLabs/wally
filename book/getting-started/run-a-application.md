@@ -62,10 +62,10 @@ You should see the `Listening for data` that indicates that Giles receiver is ru
 
 ## Compile the Celsius Conversion App
 
-We'll be running the [celsius conversion application](https://github.com/Sendence/wallaroo/tree/master/book/examples/celsius/celsius.pony).
+We'll be running the [celsius conversion application](https://github.com/Sendence/wallaroo/tree/master/book/examples/pony/celsius/celsius.pony).
 
 ```bash
-cd ~/wallaroo-tutorial/wallaroo/book/examples/celsius
+cd ~/wallaroo-tutorial/wallaroo/book/examples/pony/celsius
 ```
 
 Now compile the Celsius Conversion app:
