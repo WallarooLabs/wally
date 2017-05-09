@@ -33,3 +33,19 @@ Covers the concepts you'll need to understand in order to build a Wallaroo appli
 The "Getting Started" section is all about getting your development environment setup and then compiling and running a Wallaroo application. The tools you will install then are useful when developing a Wallaroo application regardless of which language you are using. You may have to install additional tools later to support your language of choice.
 
 By the time you are done with this, you will have touched many of the tools you'll use with Wallaroo as well has having run a Wallaroo application locally and shaken out any issues related to getting one setup. From there, you can proceed to documentation for your language of choice.
+
+### Wallaroo C++ API
+
+How to develop Wallaroo applications using C++.
+
+### Wallaroo Python API
+
+How to develop Wallaroo applications using Python.
+
+### Appendix
+
+Additional Wallaroo support documentation including detailed information about command-line options.
+
+### Legal
+
+Terms and conditions for Wallaroo's use.
