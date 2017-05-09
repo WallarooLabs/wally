@@ -1,6 +1,5 @@
 # Sendence Wallaroo
 
-* [Overview](book/overview.md)
 * [What is Wallaroo?](book/what-is-wallaroo.md)
 
 ## Core Concepts
@@ -9,6 +8,7 @@
 * [Introducing Wallaroo Core Concepts](book/core-concepts/core-concepts.md)
 * [State](book/core-concepts/state.md)
 * [Working with State](book/core-concepts/working-with-state.md)
+* [Partitioning](book/core-concepts/partitioning.md)
 * [Decoders and Encoders](book/core-concepts/decoders-and-encoders.md)
 
 ## Developing with Wallaroo
