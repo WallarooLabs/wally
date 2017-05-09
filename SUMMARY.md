@@ -1,6 +1,5 @@
 # Sendence Wallaroo
 
-* [Overview](book/overview.md)
 * [What is Wallaroo?](book/what-is-wallaroo.md)
 
 ## Core Concepts
