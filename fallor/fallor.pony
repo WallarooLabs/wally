@@ -1,9 +1,9 @@
 use "buffered"
 use "net"
-use "options"
 use "files"
 use "sendence/bytes"
 use "sendence/messages"
+use "sendence/options"
 
 actor Main
   new create(env: Env) =>

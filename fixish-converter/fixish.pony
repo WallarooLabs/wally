@@ -1,5 +1,5 @@
 use "net"
-use "options"
+use "sendence/options"
 use "files"
 use "sendence/messages"
 use "sendence/fix"

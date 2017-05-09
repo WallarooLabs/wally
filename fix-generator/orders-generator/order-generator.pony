@@ -1,4 +1,4 @@
-use "options"
+use "sendence/options"
 use "files"
 use "buffered"
 use "collections"

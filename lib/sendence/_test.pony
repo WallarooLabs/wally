@@ -13,6 +13,7 @@ use container_queue = "container_queue"
 use fix = "fix"
 use fixed_queue = "fixed_queue"
 use messages = "messages"
+use options = "options"
 use queue = "queue"
 use weighted = "weighted"
 
@@ -29,5 +30,6 @@ actor Main is TestList
     fix.Main.make().tests(test)
     fixed_queue.Main.make().tests(test)
     messages.Main.make().tests(test)
+    options.Main.make().tests(test)
     queue.Main.make().tests(test)
     weighted.Main.make().tests(test)

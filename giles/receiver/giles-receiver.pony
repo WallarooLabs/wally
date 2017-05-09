@@ -4,7 +4,7 @@ Giles receiver
 use "collections"
 use "files"
 use "net"
-use "options"
+use "sendence/options"
 use "signals"
 use "time"
 use "sendence/messages"

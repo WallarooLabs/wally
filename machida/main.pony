@@ -1,7 +1,7 @@
 use "collections"
-use "options"
 use "debug"
 
+use "sendence/options"
 use "wallaroo"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
@@ -10,31 +10,27 @@ use "lib:python2.7"
 use "lib:python-wallaroo"
 
 actor Main
-  fun find_python_module(args: Array[String] val): String ? =>
-    let options = Options(args, false)
-    options.add("application-module", "", StringArgument)
-
-    var module_name: (None | String) = None
-
-    for option in options do
-      match option
-      | ("application-module", let arg: String) => module_name = arg
-      end
-    end
-
-    module_name as String
-
   new create(env: Env) =>
     Machida.start_python()
 
     try
-      let module_name = find_python_module(env.args)
+      var module_name: String = ""
+
+      let options = Options(WallarooConfig.application_args(env.args), false)
+      options.add("application-module", "", StringArgument)
+
+      for option in options do
+        match option
+        | ("application-module", let arg: String) => module_name = arg
+        end
+      end
 
       try
         let module = Machida.load_module(module_name)
 
         try
-          let application_setup = Machida.application_setup(module, env.args)
+          let application_setup =
+            Machida.application_setup(module, options.remaining())
           let application = recover val
             Machida.apply_application_setup(application_setup)
           end
@@ -47,5 +43,6 @@ actor Main
       end
     else
       env.err.print(
-        "Please use `--application-module=MODULE_NAME` to specify an application module")
+        "Please use `--application-module=MODULE_NAME` to specify " +
+        "an application module")
     end

@@ -4,9 +4,9 @@ use "files"
 use "itertools"
 use "net"
 use "net/http"
-use "options"
 use "time"
 use "sendence/hub"
+use "sendence/options"
 use "wallaroo/boundary"
 use "wallaroo/cluster_manager"
 use "wallaroo/fail"
@@ -19,30 +19,16 @@ use "wallaroo/topology"
 
 actor Startup
   let _env: Env
+  var _startup_options: StartupOptions = StartupOptions
+
   let _application: Application val
   let _app_name: (String | None)
-  var _m_arg: (Array[String] | None) = None
-  var _o_arg: (Array[String] | None) = None
-  var _c_arg: (Array[String] | None) = None
-  var _d_arg: (Array[String] | None) = None
-  var _my_c_addr: Array[String] = ["", "0"]
-  var _my_d_addr: Array[String] = ["", "0"]
-  var _p_arg: (Array[String] | None) = None
-  var _j_arg: (Array[String] | None) = None
-  var _a_arg: (String | None) = None
-  var _i_addrs_write: Array[Array[String]] trn =
-    recover Array[Array[String]] end
+
   var _ph_host: String = ""
   var _ph_service: String = ""
-  var _worker_count: USize = 1
-  var _is_initializer: Bool = false
   var _is_multi_worker: Bool = true
-  var _is_joining: Bool = false
-  var _is_swarm_managed: Bool = false
   var _worker_initializer: (WorkerInitializer | None) = None
   var _application_initializer: (ApplicationInitializer | None) = None
-  var _worker_name: String = ""
-  var _resilience_dir: String = "/tmp"
   var _swarm_manager_addr: String = ""
   var _event_log_file: String = ""
   var _local_topology_file: String = ""
@@ -51,10 +37,7 @@ actor Startup
   var _worker_names_file: String = ""
   var _connection_addresses_file: String = ""
   var _event_log: (EventLog | None) = None
-  var _event_log_file_length: (USize | None) = None
   var _joining_listener: (TCPListener | None) = None
-
-  var _stop_the_world_pause: U64 = 2_000_000_000
 
   new create(env: Env, application: Application val,
     app_name: (String | None))
@@ -70,84 +53,19 @@ actor Startup
     end
 
     try
-      var options = Options(_env.args, false)
       let auth = _env.root as AmbientAuth
+      _startup_options = WallarooConfig.wallaroo_args(_env.args)
 
-      options
-        .add("expected", "e", I64Argument)
-        .add("metrics", "m", StringArgument)
-        .add("in", "i", StringArgument)
-        .add("out", "o", StringArgument)
-        .add("control", "c", StringArgument)
-        .add("data", "d", StringArgument)
-        .add("my-control", "x", StringArgument)
-        .add("my-data", "y", StringArgument)
-        .add("phone-home", "p", StringArgument)
-        .add("file", "f", StringArgument)
-        // worker count includes the initial "leader" since there is no
-        // persisting leader
-        .add("worker-count", "w", I64Argument)
-        .add("topology-initializer", "t", None)
-        .add("name", "n", StringArgument)
-        .add("resilience-dir", "r", StringArgument)
-        .add("event_log-file-length", "l", I64Argument)
-        // pass in control address of any worker as the value of this parameter
-        // to join a running cluster
-        // TODO: Actually make a joining worker a first class citizen.
-        // All this does is give the new worker metrics info so it can
-        // register with the UI (a "nominal join").
-        .add("join", "j", StringArgument)
-        .add("swarm-managed", "s", None)
-        .add("swarm-manager-address", "a", StringArgument)
-        .add("stop-pause", "u", I64Argument)
-
-      for option in options do
-        match option
-        | ("expected", let arg: I64) =>
-          @printf[I32]("--expected/-e is a deprecated parameter\n".cstring())
-        | ("metrics", let arg: String) => _m_arg = arg.split(":")
-        | ("in", let arg: String) =>
-          for addr in arg.split(",").values() do
-            _i_addrs_write.push(addr.split(":"))
-          end
-        | ("out", let arg: String) => _o_arg = arg.split(":")
-        | ("control", let arg: String) => _c_arg = arg.split(":")
-        | ("data", let arg: String) => _d_arg = arg.split(":")
-        | ("my-control", let arg: String) => _my_c_addr = arg.split(":")
-        | ("my-data", let arg: String) => _my_d_addr = arg.split(":")
-        | ("phone-home", let arg: String) => _p_arg = arg.split(":")
-        | ("worker-count", let arg: I64) =>
-          _worker_count = arg.usize()
-        | ("topology-initializer", None) => _is_initializer = true
-        | ("name", let arg: String) => _worker_name = arg
-        | ("resilience-dir", let arg: String) =>
-          if arg.substring(arg.size().isize() - 1) == "/" then
-            @printf[I32]("--resilience-dir must not end in /\n".cstring())
-            error
-          else
-            _resilience_dir = arg
-          end
-        | ("event_log-file-length", let arg: I64) =>
-          _event_log_file_length = arg.usize()
-        | ("join", let arg: String) =>
-          _j_arg = arg.split(":")
-          _is_joining = true
-        | ("swarm-managed", None) => _is_swarm_managed = true
-        | ("swarm-manager-address", let arg: String) => _a_arg = arg
-        | ("stop-pause", let arg: I64) =>
-          _stop_the_world_pause = arg.u64()
-        end
-      end
-
-      if _is_swarm_managed then
-        if _a_arg is None then
+      if _startup_options.is_swarm_managed then
+        if _startup_options.a_arg is None then
           @printf[I32](("You must supply '--swarm-manager-address' if " +
             "passing '--swarm-managed'\n").cstring())
           error
         else
-          let swarm_manager_url = URL.build(_a_arg as String, false)
+          let swarm_manager_url =
+            URL.build(_startup_options.a_arg as String, false)
           if swarm_manager_url.is_valid() then
-            _swarm_manager_addr = _a_arg as String
+            _swarm_manager_addr = _startup_options.a_arg as String
           else
             @printf[I32](("You must provide a valid URL to " +
               "'--swarm-manager-address'\n").cstring())
@@ -157,7 +75,7 @@ actor Startup
       end
 
       (_ph_host, _ph_service) =
-        match _p_arg
+        match _startup_options.p_arg
         | let addr: Array[String] =>
           try
             (addr(0), addr(1))
@@ -175,54 +93,58 @@ actor Startup
           ""
         end
 
-      _event_log_file = _resilience_dir + "/" + name + "-" +
-        _worker_name + ".evlog"
-      _local_topology_file = _resilience_dir + "/" + name + "-" +
-        _worker_name + ".local-topology"
-      _data_channel_file = _resilience_dir + "/" + name + "-" +
-        _worker_name + ".tcp-data"
-      _control_channel_file = _resilience_dir + "/" + name + "-" +
-        _worker_name + ".tcp-control"
-      _worker_names_file = _resilience_dir + "/" + name + "-" +
-        _worker_name + ".workers"
-      _connection_addresses_file = _resilience_dir + "/" + name + "-" +
-        _worker_name + ".connection-addresses"
+      _event_log_file = _startup_options.resilience_dir + "/" + name + "-" +
+        _startup_options.worker_name + ".evlog"
+      _local_topology_file = _startup_options.resilience_dir
+        + "/" + name + "-" + _startup_options.worker_name + ".local-topology"
+      _data_channel_file = _startup_options.resilience_dir + "/" + name + "-" +
+        _startup_options.worker_name + ".tcp-data"
+      _control_channel_file = _startup_options.resilience_dir + "/" + name +
+        "-" + _startup_options.worker_name + ".tcp-control"
+      _worker_names_file = _startup_options.resilience_dir + "/" + name + "-" +
+        _startup_options.worker_name + ".workers"
+      _connection_addresses_file = _startup_options.resilience_dir + "/" +
+        name + "-" + _startup_options.worker_name + ".connection-addresses"
 
       ifdef "resilience" then
-        @printf[I32](("|||Resilience directory: " + _resilience_dir +
-          "|||\n").cstring())
+        @printf[I32](("|||Resilience directory: " +
+          _startup_options.resilience_dir + "|||\n").cstring())
       end
 
-      if _is_joining then
+      if _startup_options.is_joining then
         @printf[I32]("New worker preparing to join cluster\n".cstring())
       else
-        if _worker_count == 1 then
+        if _startup_options.worker_count == 1 then
           @printf[I32]("Single worker topology\n".cstring())
-          _is_initializer = true
+          _startup_options.is_initializer = true
           _is_multi_worker = false
         else
-          @printf[I32]((_worker_count.string() + " worker topology\n").cstring())
+          @printf[I32]((_startup_options.worker_count.string() +
+            " worker topology\n").cstring())
         end
       end
 
-      if _is_initializer then _worker_name = "initializer" end
+      if _startup_options.is_initializer then
+        _startup_options.worker_name = "initializer"
+      end
 
       // TODO: When we add full cluster join functionality, we will probably
       // need to break out initialization branches into primitives.
       // Currently a joining worker only nominally becomes part of the cluster.
-      if _is_joining then
-        if _worker_name == "" then
-          @printf[I32]("You must specify a name for the worker via the -n parameter.\n".cstring())
+      if _startup_options.is_joining then
+        if _startup_options.worker_name == "" then
+          @printf[I32](("You must specify a name for the worker " +
+            "via the -n parameter.\n").cstring())
           error
         end
-        let j_addr = _j_arg as Array[String]
+        let j_addr = _startup_options.j_arg as Array[String]
         let control_notifier: TCPConnectionNotify iso =
-          JoiningControlSenderConnectNotifier(_env, auth, _worker_name,
-            this)
+          JoiningControlSenderConnectNotifier(_env, auth,
+            _startup_options.worker_name, this)
         let control_conn: TCPConnection =
           TCPConnection(auth, consume control_notifier, j_addr(0), j_addr(1))
-        let cluster_join_msg = ChannelMsgEncoder.join_cluster(_worker_name,
-          auth)
+        let cluster_join_msg =
+          ChannelMsgEncoder.join_cluster(_startup_options.worker_name, auth)
         control_conn.writev(cluster_join_msg)
         @printf[I32]("Attempting to join cluster...\n".cstring())
         // This only exists to keep joining worker alive while it waits for
@@ -242,12 +164,12 @@ actor Startup
       let auth = _env.root as AmbientAuth
 
       let input_addrs: Array[Array[String]] val =
-        (_i_addrs_write = recover Array[Array[String]] end)
-      let m_addr = _m_arg as Array[String]
-      let c_addr = _c_arg as Array[String]
+        (_startup_options.i_addrs_write = recover Array[Array[String]] end)
+      let m_addr = _startup_options.m_arg as Array[String]
+      let c_addr = _startup_options.c_arg as Array[String]
       let c_host = c_addr(0)
       let c_service = c_addr(1)
-      let d_addr_ref = _d_arg as Array[String]
+      let d_addr_ref = _startup_options.d_arg as Array[String]
       let d_addr_trn: Array[String] trn = recover Array[String] end
       d_addr_trn.push(d_addr_ref(0))
       d_addr_trn.push(d_addr_ref(1))
@@ -255,18 +177,18 @@ actor Startup
       let d_host = d_addr(0)
       let d_service = d_addr(1)
 
-      let my_c_host = _my_c_addr(0)
-      let my_c_service = _my_c_addr(1)
-      let my_d_host = _my_d_addr(0)
-      let my_d_service = _my_d_addr(1)
+      let my_c_host = _startup_options.my_c_addr(0)
+      let my_c_service = _startup_options.my_c_addr(1)
+      let my_d_host = _startup_options.my_d_addr(0)
+      let my_d_service = _startup_options.my_d_addr(1)
 
-      let o_addr_ref = _o_arg as Array[String]
+      let o_addr_ref = _startup_options.o_arg as Array[String]
       let o_addr_trn: Array[String] trn = recover Array[String] end
       o_addr_trn.push(o_addr_ref(0))
       o_addr_trn.push(o_addr_ref(1))
       let o_addr: Array[String] val = consume o_addr_trn
 
-      if _worker_name == "" then
+      if _startup_options.worker_name == "" then
         _env.out.print("You must specify a worker name via --worker-name/-n.")
         error
       end
@@ -274,7 +196,7 @@ actor Startup
       // TODO::joining
       let connect_auth = TCPConnectAuth(auth)
       let metrics_conn = MetricsSink(m_addr(0),
-          m_addr(1), _application.name(), _worker_name)
+          m_addr(1), _application.name(), _startup_options.worker_name)
 
       var is_recovering: Bool = false
 
@@ -323,7 +245,7 @@ actor Startup
         required_files.set(local_topology_filepath.path)
         required_files.set(control_channel_filepath.path)
         required_files.set(worker_names_filepath.path)
-        if not _is_initializer then
+        if not _startup_options.is_initializer then
           required_files.set(data_channel_filepath.path)
           required_files.set(connection_addresses_filepath.path)
         end
@@ -350,68 +272,79 @@ actor Startup
 
       _event_log = ifdef "resilience" then
           EventLog(_env, _event_log_file
-            where backend_file_length = _event_log_file_length)
+            where backend_file_length = _startup_options.event_log_file_length)
         else
           EventLog(_env, None)
         end
 
-      let connections = Connections(_application.name(), _worker_name, _env,
+      let connections = Connections(_application.name(),
+        _startup_options.worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
-        metrics_conn, m_addr(0), m_addr(1), _is_initializer,
-        _connection_addresses_file, _is_joining)
+        metrics_conn, m_addr(0), m_addr(1), _startup_options.is_initializer,
+        _connection_addresses_file, _startup_options.is_joining)
 
-      let data_receivers = DataReceivers(auth, _worker_name, connections,
-        is_recovering)
+      let data_receivers = DataReceivers(auth,
+        _startup_options.worker_name, connections, is_recovering)
 
-      let router_registry = RouterRegistry(auth, _worker_name, data_receivers,
-        connections, _stop_the_world_pause)
+      let router_registry = RouterRegistry(auth,
+        _startup_options.worker_name, data_receivers,
+        connections, _startup_options.stop_the_world_pause)
 
-      let recovery_replayer = RecoveryReplayer(auth, _worker_name,
-        data_receivers, router_registry, connections, is_recovering)
+      let recovery_replayer = RecoveryReplayer(auth,
+        _startup_options.worker_name, data_receivers, router_registry,
+        connections, is_recovering)
 
-      let recovery = Recovery(_worker_name, _event_log as EventLog,
-        recovery_replayer)
+      let recovery = Recovery(_startup_options.worker_name,
+        _event_log as EventLog, recovery_replayer)
 
-      let local_topology_initializer = if _is_swarm_managed then
-        let cluster_manager: DockerSwarmClusterManager =
-          DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
-        LocalTopologyInitializer(
-          _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, data_receivers,
-          _event_log as EventLog, recovery, recovery_replayer, input_addrs,
-          _local_topology_file, _data_channel_file, _worker_names_file,
-          cluster_manager)
-      else
-        LocalTopologyInitializer(
-          _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, data_receivers,
-          _event_log as EventLog, recovery, recovery_replayer, input_addrs,
-          _local_topology_file, _data_channel_file, _worker_names_file)
-      end
+      let local_topology_initializer =
+        if _startup_options.is_swarm_managed then
+          let cluster_manager: DockerSwarmClusterManager =
+            DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
+          LocalTopologyInitializer(
+            _application, _startup_options.worker_name,
+            _startup_options.worker_count, _env, auth, connections,
+            router_registry, metrics_conn, _startup_options.is_initializer,
+            data_receivers, _event_log as EventLog, recovery,
+            recovery_replayer, input_addrs, _local_topology_file,
+            _data_channel_file, _worker_names_file, cluster_manager)
+        else
+          LocalTopologyInitializer(
+            _application, _startup_options.worker_name,
+            _startup_options.worker_count, _env, auth, connections,
+            router_registry, metrics_conn, _startup_options.is_initializer,
+            data_receivers, _event_log as EventLog, recovery,
+            recovery_replayer, input_addrs, _local_topology_file,
+            _data_channel_file, _worker_names_file)
+        end
 
-      if _is_initializer then
+      if _startup_options.is_initializer then
         _env.out.print("Running as Initializer...")
         _application_initializer = ApplicationInitializer(auth,
           local_topology_initializer, input_addrs, o_addr)
         match _application_initializer
         | let ai: ApplicationInitializer =>
-          _worker_initializer = WorkerInitializer(auth, _worker_name,
-            _worker_count, connections, ai, local_topology_initializer, d_addr,
+          _worker_initializer = WorkerInitializer(auth,
+            _startup_options.worker_name,
+            _startup_options.worker_count, connections,
+            ai, local_topology_initializer, d_addr,
             metrics_conn)
         end
-        _worker_name = "initializer"
+        _startup_options.worker_name = "initializer"
       end
 
       let control_channel_filepath: FilePath = FilePath(auth,
         _control_channel_file)
       let control_notifier: TCPListenNotify iso =
-        ControlChannelListenNotifier(_worker_name, _env, auth, connections,
-        _is_initializer, _worker_initializer, local_topology_initializer,
-        recovery_replayer, router_registry,
-        control_channel_filepath, my_d_host, my_d_service)
+        ControlChannelListenNotifier(_startup_options.worker_name,
+          _env, auth, connections,
+          _startup_options.is_initializer, _worker_initializer,
+          local_topology_initializer,
+          recovery_replayer, router_registry,
+          control_channel_filepath, my_d_host, my_d_service)
 
       ifdef "resilience" then
-        if _is_initializer then
+        if _startup_options.is_initializer then
           connections.make_and_register_recoverable_listener(
             auth, consume control_notifier, control_channel_filepath,
             c_host, c_service)
@@ -421,7 +354,7 @@ actor Startup
             my_c_host, my_c_service)
         end
       else
-        if _is_initializer then
+        if _startup_options.is_initializer then
           connections.register_listener(
             TCPListener(auth, consume control_notifier, c_host, c_service))
         else
@@ -453,7 +386,7 @@ actor Startup
         end
       end
 
-      if _is_joining then
+      if _startup_options.is_joining then
         // Dispose of temporary listener
         match _joining_listener
         | let tcp_l: TCPListener =>
@@ -471,10 +404,10 @@ actor Startup
       let auth = _env.root as AmbientAuth
 
       let input_addrs: Array[Array[String]] val =
-        (_i_addrs_write = recover Array[Array[String]] end)
+        (_startup_options.i_addrs_write = recover Array[Array[String]] end)
 
       let metrics_conn = MetricsSink(m.metrics_host, m.metrics_service,
-        _application.name(), _worker_name)
+        _application.name(), _startup_options.worker_name)
 
       // TODO: Are we creating connections to all addresses or just
       // initializer?
@@ -491,43 +424,51 @@ actor Startup
           m.data_addrs("initializer")
         end
 
-      let my_c_host = _my_c_addr(0)
-      let my_c_service = _my_c_addr(1)
-      let my_d_host = _my_d_addr(0)
-      let my_d_service = _my_d_addr(1)
+      let my_c_host = _startup_options.my_c_addr(0)
+      let my_c_service = _startup_options.my_c_addr(1)
+      let my_d_host = _startup_options.my_d_addr(0)
+      let my_d_service = _startup_options.my_d_addr(1)
 
-      let connections = Connections(_application.name(), _worker_name, _env,
+      let connections = Connections(_application.name(),
+        _startup_options.worker_name, _env,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
-        metrics_conn, m.metrics_host, m.metrics_service, _is_initializer,
-        _connection_addresses_file, _is_joining)
+        metrics_conn, m.metrics_host, m.metrics_service,
+        _startup_options.is_initializer,
+        _connection_addresses_file, _startup_options.is_joining)
 
-      let data_receivers = DataReceivers(auth, _worker_name, connections)
+      let data_receivers = DataReceivers(auth, _startup_options.worker_name, connections)
 
-      let router_registry = RouterRegistry(auth, _worker_name, data_receivers,
-        connections, _stop_the_world_pause)
+      let router_registry = RouterRegistry(auth,
+        _startup_options.worker_name, data_receivers,
+        connections, _startup_options.stop_the_world_pause)
 
-      let recovery_replayer = RecoveryReplayer(auth, _worker_name,
+      let recovery_replayer = RecoveryReplayer(auth,
+        _startup_options.worker_name,
         data_receivers, router_registry, connections)
 
-      let recovery = Recovery(_worker_name, _event_log as EventLog,
-        recovery_replayer)
+      let recovery = Recovery(_startup_options.worker_name,
+        _event_log as EventLog, recovery_replayer)
 
-      let local_topology_initializer = if _is_swarm_managed then
+      let local_topology_initializer = if _startup_options.is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
           DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
         LocalTopologyInitializer(
-          _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, data_receivers,
+          _application, _startup_options.worker_name,
+          _startup_options.worker_count, _env, auth, connections,
+          router_registry, metrics_conn,
+          _startup_options.is_initializer, data_receivers,
           _event_log as EventLog, recovery, recovery_replayer, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file,
-          cluster_manager where is_joining = _is_joining)
+          cluster_manager where is_joining = _startup_options.is_joining)
       else
         LocalTopologyInitializer(
-          _application, _worker_name, _worker_count, _env, auth, connections,
-          router_registry, metrics_conn, _is_initializer, data_receivers,
+          _application, _startup_options.worker_name,
+          _startup_options.worker_count, _env, auth, connections,
+          router_registry, metrics_conn,
+          _startup_options.is_initializer, data_receivers,
           _event_log as EventLog, recovery, recovery_replayer, input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file
-          where is_joining = _is_joining)
+          where is_joining = _startup_options.is_joining)
       end
 
       router_registry.set_data_router(DataRouter)
@@ -560,10 +501,12 @@ actor Startup
       let control_channel_filepath: FilePath = FilePath(auth,
         _control_channel_file)
       let control_notifier: TCPListenNotify iso =
-        ControlChannelListenNotifier(_worker_name, _env, auth, connections,
-        _is_initializer, _worker_initializer, local_topology_initializer,
-        recovery_replayer, router_registry, control_channel_filepath,
-        my_d_host, my_d_service)
+        ControlChannelListenNotifier(_startup_options.worker_name,
+          _env, auth, connections,
+          _startup_options.is_initializer, _worker_initializer,
+          local_topology_initializer,
+          recovery_replayer, router_registry, control_channel_filepath,
+          my_d_host, my_d_service)
 
       ifdef "resilience" then
         connections.make_and_register_recoverable_listener(
@@ -609,4 +552,3 @@ actor Startup
     end
 
     ws
-
