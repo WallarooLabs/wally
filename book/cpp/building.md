@@ -33,14 +33,14 @@ This will build the C++ library and install the library and associated header fi
 
 ### Building a Wallaroo C++ Application
 
-Let's start by building one of the example applications that uses the C++ API, `counter-app`. Go to the `examples/counter-app` directory and run these commands:
+Let's start by building one of the example applications that uses the C++ API, `counter-app`. Go to the `book/examples/cpp-counter-app` directory and run these commands:
 
 ```bash
 mkdir build
 clang++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
 ar rs build/libcounter.a build/Counter.o
 ponyc --debug --export --output=build \
-  --path=../../lib:../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
+  --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
   counter-app
 ```
 
