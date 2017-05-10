@@ -7,26 +7,19 @@ You should have already completed the [setup instructions](/book/getting-started
 ### Requirements
 
 * git
-* clang >=3.5
+* clang >=3.5 (on MacOS) or gcc >=5 (on Linux)
 * python development libraries
 * Sendence Pony compiler
 * Wallaroo Python API
 * Giles Sender
 
-#### clang
+#### clang (MacOS)
 
-* On MacOS: you should already have as part of `XCode`. No further steps are needed.
+* You should already have `clang` as part of `XCode`. No further steps are needed.
 
-* on Ubuntu Trusty
-  ```bash
-  sudo apt-get install clang-3.5
-  sudo ln -s /usr/bin/clang-3.5 /usr/bin/clang
-  ```
+#### gcc (Linux)
 
-* on Ubuntu Xenial
-  ```bash
-  sudo apt-get install clang
-  ```
+* You should already have `gcc` after completing the [Wallaro Linux Setup](/book/getting-started/linux-setup.md).
 
 #### Python-dev
 
@@ -35,7 +28,7 @@ You should have already completed the [setup instructions](/book/getting-started
 * On Ubuntu:
 
   ```bash
-  sudo apt-get install python-dev
+  sudo apt-get install -y python-dev
   ```
 
 #### Giles sender
@@ -63,8 +56,18 @@ mkdir build
 
 Build the `machida` binary
 
+**On MacOS**:
+
 ```bash
 clang -g -o build/python-wallaroo.o -c cpp/python-wallaroo.c
+ar rvs build/libpython-wallaroo.a build/python-wallaroo.o
+ponyc --debug --output=build --path=build --path=../lib/ .
+```
+
+** On Linux**:
+
+```bash
+gcc -g -o build/python-wallaroo.o -c cpp/python-wallaroo.c
 ar rvs build/libpython-wallaroo.a build/python-wallaroo.o
 ponyc --debug --output=build --path=build --path=../lib/ .
 ```

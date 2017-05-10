@@ -3,7 +3,7 @@
 Machida is a Wallaroo-Python Runtime that enables a Wallaroo application to be written in Python.
 
 ## Requirements
-- clang
+- clang >=3.5 on MacOS or gcc >=5 on Linux
 - python-dev
 - sendence-ponyc
 - giles-sender
@@ -21,8 +21,18 @@ mkdir build
 
 Build the program.
 
-```
+**On MacOS**:
+
+```bash
 clang -g -o build/python-wallaroo.o -c cpp/python-wallaroo.c
+ar rvs build/libpython-wallaroo.a build/python-wallaroo.o
+ponyc --debug --output=build --path=build --path=../lib/ .
+```
+
+**On Linux**:
+
+```bash
+gcc -g -o build/python-wallaroo.o -c cpp/python-wallaroo.c
 ar rvs build/libpython-wallaroo.a build/python-wallaroo.o
 ponyc --debug --output=build --path=build --path=../lib/ .
 ```
