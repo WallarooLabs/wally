@@ -20,6 +20,8 @@ class ActorSystem
   let _seed: U64
   let _guid: GuidGenerator
   let _actor_builders: Array[WActorWrapperBuilder] = _actor_builders.create()
+  let _sources: Array[(WActorFramedSourceHandler, WActorRouter)] =
+    _sources.create()
 
   new create(name': String, seed': U64 = Time.micros()) =>
     _name = name'
@@ -38,18 +40,29 @@ class ActorSystem
       add_actor(b)
     end
 
+  fun ref add_source(handler: WActorFramedSourceHandler,
+    actor_router: WActorRouter)
+  =>
+    _sources.push((handler, actor_router))
+
   fun val actor_builders(): Array[WActorWrapperBuilder] val =>
     _actor_builders
+
+  fun val sources(): Array[(WActorFramedSourceHandler, WActorRouter)] val =>
+    _sources
 
 class val LocalActorSystem
   let _name: String
   let _actor_builders: Array[WActorWrapperBuilder] val
+  let _sources: Array[(WActorFramedSourceHandler, WActorRouter)] val
 
   new val create(name': String,
-    actor_builders': Array[WActorWrapperBuilder] val)
+    actor_builders': Array[WActorWrapperBuilder] val,
+    sources': Array[(WActorFramedSourceHandler, WActorRouter)] val)
   =>
     _name = name'
     _actor_builders = actor_builders'
+    _sources = sources'
 
   fun name(): String => _name
 
@@ -61,7 +74,10 @@ class val LocalActorSystem
       arr.push(a)
     end
     arr.push(builder)
-    LocalActorSystem(_name, consume arr)
+    LocalActorSystem(_name, consume arr, _sources)
 
   fun val actor_builders(): Array[WActorWrapperBuilder] val =>
     _actor_builders
+
+  fun val sources(): Array[(WActorFramedSourceHandler, WActorRouter)] val =>
+    _sources

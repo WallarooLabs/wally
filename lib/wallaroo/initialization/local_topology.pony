@@ -1091,11 +1091,11 @@ actor LocalTopologyInitializer
                     out_router, _router_registry,
                     source_data.route_builder(),
                     _outgoing_boundary_builders, sinks_for_source,
-                    _event_log, _auth, this, default_target,
-                    default_in_route_builder, state_comp_target_router,
+                    _event_log, _auth, this,  consume source_reporter,
+                    default_target, default_in_route_builder,
+                    state_comp_target_router,
                     source_data.address()(0),
-                    source_data.address()(1)
-                    where metrics_reporter = consume source_reporter)
+                    source_data.address()(1))
                 )
               else
                 @printf[I32]("Ill-formed source address\n".cstring())

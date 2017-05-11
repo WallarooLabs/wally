@@ -3,13 +3,13 @@ use "wallaroo/metrics"
 use "wallaroo/topology"
 use "wallaroo/recovery"
 
-trait SourceBuilder
+trait val SourceBuilder
   fun name(): String
   fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router val):
     TCPSourceNotify iso^
   fun val update_router(router: Router val): SourceBuilder val
 
-class _SourceBuilder[In: Any val] is SourceBuilder
+class val _SourceBuilder[In: Any val] is SourceBuilder
   let _app_name: String
   let _worker_name: String
   let _name: String
@@ -51,7 +51,7 @@ class _SourceBuilder[In: Any val] is SourceBuilder
       _handler, router, _metrics_conn, _pre_state_target_id,
       _metrics_reporter.clone())
 
-interface SourceBuilderBuilder
+interface val SourceBuilderBuilder
   fun name(): String
   fun apply(runner_builder: RunnerBuilder val, router: Router val,
     metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
@@ -59,7 +59,7 @@ interface SourceBuilderBuilder
     metrics_reporter: MetricsReporter iso):
       SourceBuilder val
 
-class TypedSourceBuilderBuilder[In: Any val]
+class val TypedSourceBuilderBuilder[In: Any val]
   let _app_name: String
   let _name: String
   let _handler: FramedSourceHandler[In] val

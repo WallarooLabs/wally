@@ -15,7 +15,7 @@ class TCPSourceListenerBuilder
   let _default_in_route_builder: (RouteBuilder val | None)
   let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val
   let _tcp_sinks: Array[TCPSink] val
-  let _local_topology_initializer: LocalTopologyInitializer
+  let _layout_initializer: LayoutInitializer
   let _event_log: EventLog
   let _auth: AmbientAuth
   let _default_target: (Step | None)
@@ -28,12 +28,12 @@ class TCPSourceListenerBuilder
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
     tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
-    local_topology_initializer: LocalTopologyInitializer,
+    layout_initializer: LayoutInitializer,
+    metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder val | None) = None,
     target_router: Router val = EmptyRouter,
-    host: String = "", service: String = "0",
-    metrics_reporter: MetricsReporter iso)
+    host: String = "", service: String = "0")
   =>
     _source_builder = source_builder
     _router = router
@@ -42,7 +42,7 @@ class TCPSourceListenerBuilder
     _default_in_route_builder = default_in_route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
     _tcp_sinks = tcp_sinks
-    _local_topology_initializer = local_topology_initializer
+    _layout_initializer = layout_initializer
     _event_log = event_log
     _auth = auth
     _default_target = default_target
@@ -54,9 +54,9 @@ class TCPSourceListenerBuilder
   fun apply(): TCPSourceListener =>
     let tcp_l = TCPSourceListener(_source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders, _tcp_sinks,
-      _event_log, _auth, _local_topology_initializer,
+      _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
       _default_target, _default_in_route_builder, _target_router, _host,
-      _service where metrics_reporter = _metrics_reporter.clone())
+      _service)
     _router_registry.register_source_listener(tcp_l)
     tcp_l
 
@@ -72,7 +72,7 @@ actor TCPSourceListener
   let _default_in_route_builder: (RouteBuilder val | None)
   var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val
   let _tcp_sinks: Array[TCPSink] val
-  let _local_topology_initializer: LocalTopologyInitializer
+  let _layout_initializer: LayoutInitializer
   let _default_target: (Step | None)
   var _fd: U32
   var _event: AsioEventID = AsioEvent.none()
@@ -87,13 +87,13 @@ actor TCPSourceListener
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
     tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
-    local_topology_initializer: LocalTopologyInitializer,
+    layout_initializer: LayoutInitializer,
+    metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder val | None) = None,
     target_router: Router val = EmptyRouter,
     host: String = "", service: String = "0", limit: USize = 0,
-    init_size: USize = 64, max_size: USize = 16384,
-    metrics_reporter: MetricsReporter iso)
+    init_size: USize = 64, max_size: USize = 16384)
   =>
     """
     Listens for both IPv4 and IPv6 connections.
@@ -105,7 +105,7 @@ actor TCPSourceListener
     _default_in_route_builder = default_in_route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
     _tcp_sinks = tcp_sinks
-    _local_topology_initializer = local_topology_initializer
+    _layout_initializer = layout_initializer
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.cstring(), service.cstring())
     _limit = limit
@@ -198,7 +198,7 @@ actor TCPSourceListener
     try
       let source = TCPSource._accept(this, _notify.connected(this),
         _router.routes(), _route_builder, _outgoing_boundary_builders,
-        _tcp_sinks, _local_topology_initializer, ns, _default_target,
+        _tcp_sinks, _layout_initializer, ns, _default_target,
         _default_in_route_builder, _init_size, _max_size,
         _metrics_reporter.clone())
       // TODO: We need to figure out how to unregister this when the

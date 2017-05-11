@@ -40,10 +40,13 @@ actor Main
         @printf[I32]("There must be at least 3 actors\n".cstring())
         Fail()
       end
-      let actor_system = ActorSystem("Toy Model", rand.u64())
-      actor_system.add_actor(ABuilder(ARoles.one(), Time.micros()))
-      actor_system.add_actor(ABuilder(ARoles.two(), Time.micros()))
-      actor_system.add_actor(ABuilder(ARoles.three(), Time.micros()))
+      let actor_system =
+        ActorSystem("Toy Model", rand.u64())
+          .> add_source(SimulationFramedSourceHandler, IngressWActorRouter)
+          .> add_actor(ABuilder(ARoles.one(), Time.micros()))
+          .> add_actor(ABuilder(ARoles.two(), Time.micros()))
+          .> add_actor(ABuilder(ARoles.three(), Time.micros()))
+
       for i in Range(0, n - 3) do
         let role = rand.pick[String](roles)
         let next_seed = rand.u64()
@@ -117,6 +120,7 @@ class A is WActor
     if role != "" then
       wh.register_as_role(role)
     end
+    wh.register_as_role(BasicRoles.ingress())
     _all_message_types =
       try
         let ts: Array[AMsgBuilder val] trn = recover Array[AMsgBuilder val] end

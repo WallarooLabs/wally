@@ -34,7 +34,7 @@ actor TCPSource is Producer
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
   let _tcp_sinks: Array[TCPSink] val
-  let _local_topology_initializer: LocalTopologyInitializer
+  let _layout_initializer: LayoutInitializer
   var _unregistered: Bool = false
 
   let _metrics_reporter: MetricsReporter
@@ -68,7 +68,7 @@ actor TCPSource is Producer
     routes: Array[ConsumerStep] val, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
     tcp_sinks: Array[TCPSink] val,
-    local_topology_initializer: LocalTopologyInitializer,
+    layout_initializer: LayoutInitializer,
     fd: U32, default_target: (ConsumerStep | None) = None,
     forward_route_builder: (RouteBuilder val | None) = None,
     init_size: USize = 64, max_size: USize = 16384,
@@ -95,12 +95,12 @@ actor TCPSource is Producer
     _max_size = max_size
 
     _tcp_sinks = tcp_sinks
-    _local_topology_initializer = local_topology_initializer
+    _layout_initializer = layout_initializer
 
     _route_builder = route_builder
     for (target_worker_name, builder) in outgoing_boundary_builders.pairs() do
       _outgoing_boundaries(target_worker_name) = builder.build_and_initialize(
-        _guid.u128(), _local_topology_initializer)
+        _guid.u128(), _layout_initializer)
     end
 
     //TODO: either only accept when we are done recovering or don't start
@@ -153,7 +153,7 @@ actor TCPSource is Producer
     for (target_worker_name, builder) in boundary_builders.pairs() do
       if not _outgoing_boundaries.contains(target_worker_name) then
         let boundary = builder.build_and_initialize(_guid.u128(),
-          _local_topology_initializer)
+          _layout_initializer)
         _outgoing_boundaries(target_worker_name) = boundary
         _routes(boundary) =
           _route_builder(this, boundary, _metrics_reporter)
