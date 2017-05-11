@@ -89,6 +89,25 @@ This tells Wallaroo that it should listen on port 7000 for incoming data, write 
 
 ## Let's Get Some Data: Running Giles Sender
 
+### Generating Some Data
+
+A data generator is bundled with the application. It needs to be built:
+
+```bash
+cd data_gen
+ponyc
+```
+
+Then you can generate a file with a fixed number of psuedo-random votes:
+
+```
+./data_gen --messages 10000
+```
+
+This will create a `celsius.msg` file in your current working directory.
+
+### Sending Data
+
 Giles Sender is used to mimic the behavior of an incoming data source.
 
 Open a new terminal and run the following to compile the sender:
@@ -103,9 +122,9 @@ This will create a binary called `sender`
 You will now be able to start the `sender` with the following command:
 
 ```bash
-./sender -b 127.0.0.1:7000 -m 10000000 -y -s 300 \
--f ~/wallaroo-tutorial/wallaroo/book/examples/celsius/generator/celsius.msg \
--r -w -g 8 --ponythreads=1
+./sender -b 127.0.0.1:7000 -m 100000 -y -s 300 \
+  -f ~/wallaroo-tutorial/wallaroo/book/examples/celsius/data_gen/celsius.msg \
+  -r -w -g 8 --ponythreads=1
 ```
 
 If the sender is working correctly, you should see `Connected` printed to the screen. If you see that, you can be assured that we are now sending data into our example application.

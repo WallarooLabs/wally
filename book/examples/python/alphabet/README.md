@@ -44,8 +44,26 @@ In a third shell, send some messages
 
 ```bash
 ../../../../giles/sender/sender --buffy 127.0.0.1:7010 --file votes.msg \
-  --batch-size 5 --interval 100_000_000 --messages 150 --binary \
-  --variable-size --repeat --ponythreads=1
+  --batch-size 50 --interval 10_000_000 --messages 1000000 --binary \
+  --msg-size 9 --repeat --ponythreads=1
 ```
 
 The messages have a 32-bit big-endian integer that represents the message length, followed by a byte that represents the character that is being voted on, followed by a 32-bit big-endian integer that represents the number of votes received for that letter.  The output is a byte representing the character that is being voted on, followed by the total number of votes for that character. You can view the output file with a tool like `hexdump`.
+
+## Reading the Output
+
+The output is binary data, formatted as a 4-byte message length header, followed by a character, followed by 4 byte 32-bit uint.
+
+You can read it with the following code stub:
+
+```python
+import struct
+
+
+with open('alphabet.out', 'rb') as f:
+    while True:
+        try:
+            print struct.unpack('>LsL', f.read(9))
+        except:
+            break
+```
