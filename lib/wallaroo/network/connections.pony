@@ -330,40 +330,10 @@ actor Connections is Cluster
     local_topology_initializer: LocalTopologyInitializer)
   =>
     try
-      let map: Map[String, Map[String, (String, String)]] trn =
-        recover Map[String, Map[String, (String, String)]] end
-      let control_map: Map[String, (String, String)] trn =
-        recover Map[String, (String, String)] end
-      for (key, value) in control_addrs.pairs() do
-        control_map(key) = value
-      end
-      let data_map: Map[String, (String, String)] trn =
-        recover Map[String, (String, String)] end
-      for (key, value) in data_addrs.pairs() do
-        data_map(key) = value
-      end
-
-      map("control") = consume control_map
-      map("data") = consume data_map
-      let addresses: Map[String, Map[String, (String, String)]] val =
-        consume map
-
       ifdef "resilience" then
-        @printf[I32]("Saving connection addresses!\n".cstring())
-        try
-          let connection_addresses_file = FilePath(_auth, _connection_addresses_file)
-          let file = File(connection_addresses_file)
-          let wb = Writer
-          let serialised_connection_addresses: Array[U8] val =
-            Serialised(SerialiseAuth(_auth), addresses).output(
-              OutputSerialisedAuth(_auth))
-          wb.write(serialised_connection_addresses)
-          file.writev(recover val wb.done() end)
-        else
-          @printf[I32]("Error saving connection addresses!\n".cstring())
-          Fail()
-        end
+        _save_connections(control_addrs, data_addrs)
       end
+
       for (target, address) in control_addrs.pairs() do
         if target != _worker_name then
           _create_control_connection(target, address._1, address._2)
@@ -385,9 +355,51 @@ actor Connections is Cluster
         _send_control("initializer", connections_ready_msg)
       end
 
-      _env.out.print(_worker_name + ": Interconnections with other workers created.")
+      @printf[I32]((_worker_name +
+        ": Interconnections with other workers created.\n").cstring())
     else
-      _env.out.print("Problem creating interconnections with other workers")
+      @printf[I32]("Problem creating interconnections with other workers\n"
+        .cstring())
+    end
+
+  be save_connections() =>
+    _save_connections(_control_addrs, _data_addrs)
+
+  fun _save_connections(control_addrs: Map[String, (String, String)] box,
+    data_addrs: Map[String, (String, String)] box)
+  =>
+    @printf[I32]("Saving connection addresses!\n".cstring())
+
+    let map: Map[String, Map[String, (String, String)]] trn =
+      recover Map[String, Map[String, (String, String)]] end
+    let control_map: Map[String, (String, String)] trn =
+      recover Map[String, (String, String)] end
+    for (key, value) in control_addrs.pairs() do
+      control_map(key) = value
+    end
+    let data_map: Map[String, (String, String)] trn =
+      recover Map[String, (String, String)] end
+    for (key, value) in data_addrs.pairs() do
+      data_map(key) = value
+    end
+
+    map("control") = consume control_map
+    map("data") = consume data_map
+    let addresses: Map[String, Map[String, (String, String)]] val =
+      consume map
+
+    try
+      let connection_addresses_file = FilePath(_auth, _connection_addresses_file)
+      let file = File(connection_addresses_file)
+      let wb = Writer
+      let serialised_connection_addresses: Array[U8] val =
+        Serialised(SerialiseAuth(_auth), addresses).output(
+          OutputSerialisedAuth(_auth))
+      wb.write(serialised_connection_addresses)
+      file.writev(recover val wb.done() end)
+    else
+      @printf[I32]("Error saving connection addresses!\n".cstring())
+      Fail()
     end
 
   be quick_initialize_data_connections(lti: LocalTopologyInitializer) =>
@@ -442,9 +454,11 @@ actor Connections is Cluster
 
       _update_boundaries(local_topology_initializer where recovering = true)
 
-      _env.out.print(_worker_name + ": Interconnections with other workers created.")
+      @printf[I32]((_worker_name +
+        ": Interconnections with other workers created.\n").cstring())
     else
-      _env.out.print("Problem creating interconnections with other workers")
+      @printf[I32](("Problem creating interconnections with other workers " +
+        "while recovering\n").cstring())
     end
 
   be create_control_connection(target_name: String, host: String,
@@ -605,5 +619,5 @@ actor Connections is Cluster
       phc.dispose()
     end
 
-    _env.out.print("Connections: Finished shutdown procedure.")
+    @printf[I32]("Connections: Finished shutdown procedure.\n".cstring())
 
