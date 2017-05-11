@@ -53,6 +53,10 @@ How to develop Wallaroo applications using C++.
 
 How to develop Wallaroo applications using Python.
 
+### Code Examples
+
+The [Wallaroo Examples](book/examples) section has examples for each of the languages currently supported by Wallaroo.
+
 ### Appendix
 
 Additional Wallaroo support documentation including detailed information about command-line options.
