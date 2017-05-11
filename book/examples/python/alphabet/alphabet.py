@@ -45,10 +45,10 @@ class Decoder(object):
         return 4
 
     def payload_length(self, bs):
-        return struct.unpack(">I", bs)[0]
+        return struct.unpack(">L", bs)[0]
 
     def decode(self, bs):
-        (letter, vote_count) = struct.unpack(">1sI", bs)
+        (letter, vote_count) = struct.unpack(">sL", bs)
         return Votes(letter, vote_count)
 
 
@@ -64,4 +64,4 @@ class AddVotes(object):
 class Encoder(object):
     def encode(self, data):
         # data is a Votes
-        return struct.pack(">1sI", data.letter, data.votes)
+        return struct.pack(">LsL", 5, data.letter, data.votes)
