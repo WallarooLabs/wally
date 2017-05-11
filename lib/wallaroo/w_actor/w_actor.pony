@@ -1,5 +1,8 @@
 use "wallaroo/fail"
 
+primitive BasicRoles
+  fun ingress(): String => "ingress"
+
 trait WActor
   fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper)
     """

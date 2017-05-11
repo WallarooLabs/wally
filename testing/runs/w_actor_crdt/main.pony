@@ -38,9 +38,11 @@ actor Main
   =>
     recover
       let rand = Rand(init_seed)
-      let actor_system = ActorSystem("Toy Model CRDT App", rand.u64())
-      actor_system.add_actor(ABuilder(Roles.accumulator(),
-        rand.u64()))
+      let actor_system =
+        ActorSystem("Toy Model CRDT App", rand.u64())
+          .> add_source(SimulationFramedSourceHandler, IngressWActorRouter)
+          .> add_actor(ABuilder(Roles.accumulator(), rand.u64()))
+
       for i in Range(0, n - 1) do
         let next_seed = rand.u64()
         let next = ABuilder(Roles.counter(), next_seed)
@@ -98,6 +100,7 @@ class A is WActor
   new create(h: WActorHelper, role': String, id': U64, seed: U64) =>
     _role = role'
     h.register_as_role(_role)
+    h.register_as_role(BasicRoles.ingress())
     _id = id'
     _g_counter = GCounter(_id)
     _rand = Rand(seed)

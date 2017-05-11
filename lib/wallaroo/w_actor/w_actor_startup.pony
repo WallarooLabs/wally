@@ -8,6 +8,7 @@ use "time"
 use "sendence/hub"
 use "sendence/options"
 use "sendence/rand"
+use "wallaroo/boundary"
 use "wallaroo/cluster_manager"
 use "wallaroo/fail"
 use "wallaroo/initialization"
@@ -20,7 +21,7 @@ use "wallaroo/topology"
 actor ActorSystemStartup
   let _env: Env
   let _system: ActorSystem val
-  let _app_name: (String | None)
+  let _app_name: String
   var _worker_count: USize = 1
   var _is_initializer: Bool = false
   var _is_multi_worker: Bool = true
@@ -32,11 +33,13 @@ actor ActorSystemStartup
   var _event_log_file: String = ""
   var _local_actor_system_file: String = ""
   var _event_log_file_length: (USize | None) = None
+  var _i_addrs_write: Array[Array[String]] trn =
+    recover Array[Array[String]] end
   // DEMO fields
   var _iterations: USize = 100
 
   // TODO: remove DEMO param actor_count
-  new create(env: Env, system: ActorSystem val, app_name: (String | None),
+  new create(env: Env, system: ActorSystem val, app_name: String,
     actor_count: USize)
   =>
     @printf[I32]("#########################################\n".cstring())
@@ -63,6 +66,7 @@ actor ActorSystemStartup
         // worker count includes the initial "leader" since there is no
         // persisting leader
         .add("worker-count", "w", I64Argument)
+        .add("in", "i", StringArgument)
         .add("topology-initializer", "t", None)
         .add("name", "n", StringArgument)
         .add("resilience-dir", "r", StringArgument)
@@ -76,11 +80,15 @@ actor ActorSystemStartup
         .add("swarm-managed", "s", None)
         .add("swarm-manager-address", "a", StringArgument)
         // DEMO params
-        .add("iterations", "i", I64Argument)
+        .add("iterations", "z", I64Argument)
 
       for option in options do
         match option
         | ("worker-count", let arg: I64) => _worker_count = arg.usize()
+        | ("in", let arg: String) =>
+          for addr in arg.split(",").values() do
+            _i_addrs_write.push(addr.split(":"))
+          end
         | ("topology-initializer", None) => _is_initializer = true
         | ("name", let arg: String) => _worker_name = arg
         | ("resilience-dir", let arg: String) =>
@@ -95,6 +103,15 @@ actor ActorSystemStartup
         // DEMO params
         | ("iterations", let arg: I64) => _iterations = arg.usize()
         end
+      end
+
+      try
+        let source_addr = _i_addrs_write(0)
+        let host = source_addr(0)
+        let service = source_addr(1)
+      else
+        @printf[I32]("You must provide a source address! (-in/-i)\n".cstring())
+        Fail()
       end
 
       // Currently only support one worker
@@ -176,12 +193,28 @@ actor ActorSystemStartup
 
       let seed: U64 = 123456
 
+      // TODO: Determine how these are going to be shared across
+      // Pipeline and RouterRegistry and stop using these empty versions.
+      let empty_connections = EmptyConnections(_env, auth)
+      let empty_router_registry = EmptyRouterRegistry(auth, empty_connections)
+
       let local_system = LocalActorSystem(_system.name(),
-        _system.actor_builders())
-      let initializer = WActorInitializer(local_system, auth, event_log,
-        _local_actor_system_file, actor_count, _iterations, recovery,
-        recover [_worker_name] end, seed)
+        _system.actor_builders(), _system.sources())
+      let initializer = WActorInitializer(_app_name, local_system, auth,
+        event_log, _i_addrs_write = recover Array[Array[String]] end,
+        _local_actor_system_file, actor_count, _iterations,
+        recovery, recover [_worker_name] end, seed,
+        empty_connections, empty_router_registry)
       initializer.initialize(is_recovering)
     else
       Fail()
     end
+
+primitive EmptyConnections
+  fun apply(env: Env, auth: AmbientAuth): Connections =>
+    Connections("", "", env, auth, "", "", "", "", "", "",
+      MetricsSink("", "", "", ""), "", "", false, "", false)
+
+primitive EmptyRouterRegistry
+  fun apply(auth: AmbientAuth, c: Connections): RouterRegistry =>
+    RouterRegistry(auth, "", DataReceivers(auth, "", c), c, 0)

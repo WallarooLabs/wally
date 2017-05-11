@@ -74,7 +74,8 @@ actor CentralWActorRegistry
   let _initializer: WActorInitializer
   let _event_log: EventLog
   let _actors: Map[WActorId, WActorWrapper tag] = _actors.create()
-  let _roles: Map[String, SetIs[WActorId]] = _roles.create()
+  let _role_sets: Map[String, SetIs[WActorId]] = _role_sets.create()
+  let _roles: Map[String, Role] = _roles.create()
   let _rand: Rand
 
   new create(auth: AmbientAuth, init: WActorInitializer, event_log: EventLog,
@@ -92,10 +93,19 @@ actor CentralWActorRegistry
   be forget_actor(id: WActorId) =>
     try
       _actors.remove(id)
-      for (r, s) in _roles.pairs() do
+      for (r, s) in _role_sets.pairs() do
         s.unset(id)
         if s.size() == 0 then
-          _roles.remove(r)
+          _role_sets.remove(r)
+        end
+      end
+      for (k, v) in _roles.pairs() do
+        try
+          let idx = v.actors().find(id)
+          v.actors().remove(idx, 1)
+        end
+        if v.empty() then
+          _roles.remove(k)
         end
       end
       for a in _actors.values() do
@@ -113,7 +123,7 @@ actor CentralWActorRegistry
       v.register_actor(id, w_actor)
       w_actor.register_actor(k, v)
     end
-    for (k, set) in _roles.pairs() do
+    for (k, set) in _role_sets.pairs() do
       for a in set.values() do
         w_actor.register_as_role(k, a)
       end
@@ -122,11 +132,19 @@ actor CentralWActorRegistry
   // TODO: Using a String to identify a role seems like a brittle approach
   be register_as_role(role: String, w_actor: WActorId) =>
     try
-      if _roles.contains(role) then
-        _roles(role).set(w_actor)
+      if _role_sets.contains(role) then
+        _role_sets(role).set(w_actor)
       else
         let new_role = SetIs[WActorId]
         new_role.set(w_actor)
+        _role_sets(role) = new_role
+      end
+
+      if _roles.contains(role) then
+        _roles(role).register_actor(w_actor)
+      else
+        let new_role = Role(role, _rand.u64())
+        new_role.register_actor(w_actor)
         _roles(role) = new_role
       end
 
@@ -145,6 +163,24 @@ actor CentralWActorRegistry
   be broadcast(data: Any val) =>
     for target in _actors.values() do
       target.process(data)
+    end
+
+  be broadcast_to_role(role: String, data: Any val) =>
+    try
+      for target_id in _role_sets(role).values() do
+        _actors(target_id).process(data)
+      end
+    else
+      @printf[I32]("Trying to broadcast to nonexistent role!\n".cstring())
+    end
+
+  be send_to_role(role: String, data: Any val) =>
+    try
+      let target_id = _roles(role).next()
+      let target = _actors(target_id)
+      target.process(data)
+    else
+      @printf[I32]("Trying to send to nonexistent role!\n".cstring())
     end
 
 class Role

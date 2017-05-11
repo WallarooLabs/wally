@@ -44,7 +44,7 @@ class OutgoingBoundaryBuilder
     boundary.register_step_id(step_id)
 
   fun build_and_initialize(step_id: U128,
-    local_topology_initializer: LocalTopologyInitializer): OutgoingBoundary
+    layout_initializer: LayoutInitializer): OutgoingBoundary
   =>
     """
     Called when creating a boundary post cluster initialization
@@ -52,7 +52,7 @@ class OutgoingBoundaryBuilder
     let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
       _host, _service)
     boundary.register_step_id(step_id)
-    boundary.quick_initialize(local_topology_initializer)
+    boundary.quick_initialize(layout_initializer)
 
 actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   // Steplike
@@ -60,7 +60,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   let _metrics_reporter: MetricsReporter
 
   // Lifecycle
-  var _initializer: (LocalTopologyInitializer | None) = None
+  var _initializer: (LayoutInitializer | None) = None
   var _reported_initialized: Bool = false
 
   // Consumer
@@ -164,7 +164,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  be quick_initialize(initializer: LocalTopologyInitializer) =>
+  be quick_initialize(initializer: LayoutInitializer) =>
     """
     Called when initializing as part of a new worker joining a running cluster.
     """
