@@ -33,11 +33,27 @@ This will build the C++ library and install the library and associated header fi
 
 ### Building a Wallaroo C++ Application
 
-Let's start by building one of the example applications that uses the C++ API, `counter-app`. Go to the `book/examples/cpp-counter-app` directory and run these commands:
+Let's start by building one of the example applications that uses the C++ API, `counter-app`. Go to the `book/examples/cpp/counter-app` directory and run these commands:
 
 ```bash
 mkdir build
+```
+
+**On MacOS**:
+
+```bash
 clang++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
+```
+
+**On Linux**:
+
+```bash
+g++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
+```
+
+Then on either platform, continue with:
+
+```bash
 ar rs build/libcounter.a build/Counter.o
 ponyc --debug --export --output=build \
   --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
@@ -47,7 +63,7 @@ ponyc --debug --export --output=build \
 Let's break down what each of these lines does:
 
 * `mkdir build` -- Create the directory where build artifacts will be placed.
-* `clang++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11
+* `clang++` or `g++` followed by ` --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11
   -Ihpp` -- Build the C++ application code.
 * `ar rs build/libcounter.a build/Counter.o` -- Create an archive from
   the compiled C++ application code.
