@@ -401,7 +401,6 @@ actor LocalTopologyInitializer
       Fail()
     end
 
-
   be recover_and_initialize(ws: Array[String] val,
     worker_initializer: (WorkerInitializer | None) = None)
   =>
@@ -503,6 +502,8 @@ actor LocalTopologyInitializer
   be initialize(worker_initializer: (WorkerInitializer | None) = None,
     recovering: Bool = false)
   =>
+    _recovering = recovering
+
     if _is_joining then
       _initialize_joining_worker()
       return

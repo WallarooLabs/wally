@@ -71,7 +71,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
             _auth)
           _connections.send_control_to_cluster(message)
         else
-          if not (_is_initializer or _recovery_file.exists()) then
+          if not _recovery_file.exists() then
             let message = ChannelMsgEncoder.identify_data_port(_name, _service,
               _auth)
             _connections.send_control_to_cluster(message)
@@ -83,11 +83,9 @@ class DataChannelListenNotifier is DataChannelListenNotify
         f.sync()
         f.dispose()
       else
-        if not _is_initializer then
-          let message = ChannelMsgEncoder.identify_data_port(_name, _service,
-            _auth)
-          _connections.send_control("initializer", message)
-        end
+        let message = ChannelMsgEncoder.identify_data_port(_name, _service,
+          _auth)
+        _connections.send_control("initializer", message)
       end
     else
       @printf[I32]((_name + "data : couldn't get local address").cstring())

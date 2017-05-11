@@ -50,8 +50,8 @@ actor WorkerInitializer
 
     if _expected == 1 then
       _topology_ready = true
-      let workers: Array[String] val = recover [_worker_name] end
-      _application_initializer.initialize(this, _expected, workers)
+      _application_initializer.initialize(this, _expected,
+        recover Array[String] end)
       _local_topology_initializer.create_data_channel_listener(
         recover Array[String] end, "", "", this)
     end
@@ -171,6 +171,7 @@ actor WorkerInitializer
         _connections.send_control(key, message)
       end
 
+      _connections.save_connections()
       _connections.update_boundaries(_local_topology_initializer)
     else
       @printf[I32]("Initializer: Error initializing interconnections\n".cstring())

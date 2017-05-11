@@ -375,6 +375,8 @@ actor Startup
           if _is_multi_worker then
             local_topology_initializer.recover_and_initialize(
               recovered_workers, _worker_initializer)
+          else
+            local_topology_initializer.initialize(where recovering = true)
           end
         end
       end

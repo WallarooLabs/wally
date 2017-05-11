@@ -74,11 +74,9 @@ class ControlChannelListenNotifier is TCPListenNotify
             _service, _auth)
           _connections.send_control_to_cluster(message)
         else
-          if not (_is_initializer) then
-            let message = ChannelMsgEncoder.identify_control_port(_name,
-              _service, _auth)
-            _connections.send_control_to_cluster(message)
-          end
+          let message = ChannelMsgEncoder.identify_control_port(_name,
+            _service, _auth)
+          _connections.send_control_to_cluster(message)
         end
         let f = File(_recovery_file)
         f.print(_host)
@@ -86,11 +84,9 @@ class ControlChannelListenNotifier is TCPListenNotify
         f.sync()
         f.dispose()
       else
-        if not _is_initializer then
-          let message = ChannelMsgEncoder.identify_control_port(_name,
-            _service, _auth)
-          _connections.send_control_to_cluster(message)
-        end
+        let message = ChannelMsgEncoder.identify_control_port(_name,
+          _service, _auth)
+        _connections.send_control_to_cluster(message)
       end
 
       _env.out.print(_name + " control: listening on " + _host + ":" + _service)
