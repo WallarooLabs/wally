@@ -48,7 +48,7 @@ clang++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
 **On Linux**:
 
 ```bash
-g++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
+gcc --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
 ```
 
 Then on either platform, continue with:
@@ -63,7 +63,7 @@ ponyc --debug --export --output=build \
 Let's break down what each of these lines does:
 
 * `mkdir build` -- Create the directory where build artifacts will be placed.
-* `clang++` or `g++` followed by ` --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11
+* `clang++` or `gcc` followed by ` --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11
   -Ihpp` -- Build the C++ application code.
 * `ar rs build/libcounter.a build/Counter.o` -- Create an archive from
   the compiled C++ application code.

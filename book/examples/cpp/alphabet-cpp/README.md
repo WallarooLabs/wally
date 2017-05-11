@@ -30,8 +30,32 @@ Then on either platform, continue with:
 ar rs build/libalphabet.a build/alphabet.o
 ponyc --debug --export --output=build \
   --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
-  alphabet-app
+    alphabet-app
 ```
 
 ## Running
 
+Start the Metrics UI if it isn't already running:
+    ```bash
+    docker start mui
+    ```
+
+In a separate shell each:
+
+1. Start a listener with Giles Receiver
+    ```bash
+    ../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
+      --ponypinasio -l 127.0.0.1:7002
+    ```
+2. Start the application
+    ```bash
+    ./build/alphabet-app --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+      --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
+      --worker-name worker-name   --ponythreads=1
+    ```
+3. Start sending data
+    ```bash
+     ../../../../giles/sender/sender --buffy 127.0.0.1:7010 --file votes.msg \
+       --batch-size 50 --interval 10_000_000 --binary --msg-size 9 --repeat \
+       --ponythreads=1 --messages 1000000
+    ```
