@@ -1,4 +1,5 @@
 import struct
+import pickle
 
 import wallaroo
 
@@ -9,6 +10,14 @@ def application_setup(args):
     ab.to_stateful(AddVotes(), LetterStateBuilder(), "letter state")
     ab.to_sink(Encoder())
     return ab.build()
+
+
+def serialize(o):
+    return pickle.dumps(o)
+
+
+def deserialize(bs):
+    return pickle.loads(bs)
 
 
 class LetterStateBuilder(object):
@@ -58,7 +67,7 @@ class AddVotes(object):
 
     def compute(self, data, state):
         state.update(data)
-        return state.get_votes(data.letter)
+        return (state.get_votes(data.letter), True)
 
 
 class Encoder(object):

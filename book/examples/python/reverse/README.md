@@ -21,14 +21,11 @@ nc -l 127.0.0.1 7002
 
 In another shell, export the current directory and `wallaroo.py` directories to `PYTHONPATH`:
 
-```bash
-export PYTHONPATH="$PYTHONPATH:.:../../../../machida"
-```
-
-Export the machida binary directory to `PATH`:
+In another shell, set up your environment variables if you haven't already done so. Assuming you installed Machida according to the tutorial instructions you would do:
 
 ```bash
-export PATH="$PATH:../../../../machida/build"
+export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 ```
 
 Run `machida` with `--application-module reverse`:
@@ -36,7 +33,7 @@ Run `machida` with `--application-module reverse`:
 ```bash
 machida --application-module reverse --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
   --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
-  --worker-name worker-name \
+  --name worker-name \
   --ponythreads=1
 ```
 

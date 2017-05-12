@@ -11,6 +11,11 @@ use "wallaroo/messages"
 use "serialise"
 use "wallaroo/fail"
 
+use @set_user_serialization_fns[None](module: Pointer[U8] tag)
+use @user_serialization_get_size[USize](o: Pointer[U8] tag)
+use @user_serialization[None](o: Pointer[U8] tag, bs: Pointer[U8] tag)
+use @user_deserialization[Pointer[U8] val](bs: Pointer[U8] tag)
+
 use @load_module[ModuleP](module_name: CString)
 
 use @application_setup[Pointer[U8] val](module: ModuleP, args: Pointer[U8] val)
@@ -51,6 +56,7 @@ use @partition_function_partition[Pointer[U8] val](
 use @key_hash[U64](key: Pointer[U8] val)
 use @key_eq[I32](key: Pointer[U8] val, other: Pointer[U8] val)
 
+use @py_bool_check[I32](b: Pointer[U8] box)
 use @py_incref[None](o: Pointer[U8] box)
 use @py_decref[None](o: Pointer[U8] box)
 
@@ -78,6 +84,15 @@ class PyData
   fun obj(): Pointer[U8] val =>
     _data
 
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_data)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_data, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _data = recover Machida.user_deserialization(bytes) end
+
   fun _final() =>
     Machida.dec_ref(_data)
 
@@ -89,6 +104,15 @@ class PyState is State
 
   fun obj(): Pointer[U8] val =>
     _state
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_state)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_state, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _state = recover Machida.user_deserialization(bytes) end
 
   fun _final() =>
     Machida.dec_ref(_state)
@@ -104,6 +128,15 @@ class PyStateBuilder
 
   fun apply(): PyState =>
     PyState(@state_builder_build_state(_state_builder))
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_state_builder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_state_builder, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _state_builder = recover Machida.user_deserialization(bytes) end
 
   fun _final() =>
     Machida.dec_ref(_state_builder)
@@ -134,6 +167,15 @@ class PyKey is (Hashable & Equatable[PyKey])
 
   fun eq(other: PyKey box): Bool =>
     Machida.key_eq(obj(), other.obj())
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_key)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_key, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _key = recover Machida.user_deserialization(bytes) end
 
   fun _final() =>
     Machida.dec_ref(_key)
@@ -174,6 +216,15 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
         data.size()))
     end
 
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_source_decoder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_source_decoder, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _source_decoder = recover Machida.user_deserialization(bytes) end
+
   fun _final() =>
     Machida.dec_ref(_source_decoder)
 
@@ -213,23 +264,38 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
 
   fun apply(input: PyData val,
     sc_repo: StateChangeRepository[PyState], state: PyState):
-    ((PyData val | None), None)
+    ((PyData val | None), (None | DirectStateChange))
   =>
-    let data = Machida.stateful_computation_compute(_computation, input.obj(),
-      state.obj())
+    (let data, let persist) = Machida.stateful_computation_compute(_computation,
+      input.obj(), state.obj())
     let d = recover if data.is_null() then
         None
       else
         recover val PyData(data) end
       end
     end
-    (d, None)
+
+    let p = if Machida.bool_check(persist) then
+      DirectStateChange
+    else
+      None
+    end
+    (d, p)
 
   fun name(): String =>
     _name
 
   fun state_change_builders(): Array[StateChangeBuilder[PyState] val] val =>
     recover val Array[StateChangeBuilder[PyState] val] end
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_computation)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_computation, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _computation = recover Machida.user_deserialization(bytes) end
 
   fun _final() =>
     Machida.dec_ref(_computation)
@@ -250,6 +316,15 @@ class PyEncoder is SinkEncoder[PyData val]
     Machida.dec_ref(byte_buffer)
     wb.write(arr)
     wb.done()
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_sink_encoder)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_sink_encoder, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _sink_encoder = recover Machida.user_deserialization(bytes) end
 
   fun _final() =>
     Machida.dec_ref(_sink_encoder)
@@ -470,11 +545,21 @@ primitive Machida
     r
 
   fun stateful_computation_compute(computation: Pointer[U8] val,
-    data: Pointer[U8] val, state: Pointer[U8] val): Pointer[U8] val
+    data: Pointer[U8] val, state: Pointer[U8] val): (Pointer[U8] val, Pointer[U8] val)
   =>
     let r = @stateful_computation_compute(computation, data, state)
     print_errors()
-    r
+    let msg = @PyTuple_GetItem(r, 0)
+    let persist = @PyTuple_GetItem(r, 1)
+
+    inc_ref(msg)
+    inc_ref(persist)
+
+    let rt = (msg, persist)
+
+    dec_ref(r)
+
+    rt
 
   fun partition_function_partition_u64(partition_function: Pointer[U8] val,
     data: Pointer[U8] val): U64
@@ -544,6 +629,26 @@ primitive Machida
     end
     dec_ref(ps)
     s
+
+  fun set_user_serialization_fns(m: Pointer[U8] val) =>
+    @set_user_serialization_fns(m)
+
+  fun user_serialization_get_size(o: Pointer[U8] tag): USize =>
+    let r = @user_serialization_get_size(o)
+    print_errors()
+    r
+
+  fun user_serialization(o: Pointer[U8] tag, bs: Pointer[U8] tag) =>
+    @user_serialization(o, bs)
+    print_errors()
+
+  fun user_deserialization(bs: Pointer[U8] tag): Pointer[U8] val =>
+    let r = @user_deserialization(bs)
+    print_errors()
+    r
+
+  fun bool_check(b: Pointer[U8] val): Bool =>
+    not (@py_bool_check(b) == 0)
 
   fun inc_ref(o: Pointer[U8] box) =>
     @py_incref(o)

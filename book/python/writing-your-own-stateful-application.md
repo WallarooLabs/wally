@@ -16,7 +16,7 @@ As with the Reverse Word example, we will list the components required:
 
 ### Computation
 
-The computation here is fairly straightforward: given a data object and a state object, update the state with the new data, and return the new state:
+The computation here is fairly straightforward: given a data object and a state object, update the state with the new data, and return some data that tells Wallaroo what to do next.
 
 ```python
 class AddVotes(object):
@@ -25,12 +25,23 @@ class AddVotes(object):
 
     def compute(self, data, state):
         state.update(data)
-        return state.get_votes(data.letter)
+        return (state.get_votes(data.letter), True)
 ```
+
+Let's dig into that tuple that we are returning:
+
+```python
+(state.get_votes(data.letter), True)
+```
+
+The first element, `state.get_votes(data.letter)` is a message that we will send on to our next step. In this case, we will be sending information about votes for this letter on to a sink. The second element. `True` is a to let Wallaroo know if we should store an update for our state. By returning true, we are instructing to Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Being able to recover from a crash is a good thing so, why wouldn't we always return `True`? There are two answers:
+
+1. Your computation might not have updated the state, in which case, saving its state for recovery is wasteful.
+2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
 
 ### State and StateBuilder
 
-The state for this appliation is two-tiered. There is a a vote count for each character:
+The state for this application is two-tiered. There is a vote count for each letter:
 
 ```python
 class Votes(object):
@@ -77,9 +88,7 @@ The encoder is going to receive a `Votes` instance and encode into a string with
 class Encoder(object):
     def encode(self, data):
         # data is a Votes
-        letter = data.letter
-        votes = data.votes
-        return struct.pack(">1sI", letter, votes)
+        return struct.pack(">LsL", 5, data.letter, data.votes)
 ```
 
 ### Decoder
@@ -92,15 +101,15 @@ class Decoder(object):
         return 4
 
     def payload_length(self, bs):
-        return struct.unpack(">I", bs)[0]
+        return struct.unpack(">L", bs)[0]
 
     def decode(self, bs):
-        letter = chr(bs[0])
-        vote_count = struct.unpack(">I", bs[1:])[0]
+        (letter, vote_count) = struct.unpack(">sL", bs)
         return Votes(letter, vote_count)
 ```
 
 ### Application Setup
+
 Finally, let's set up our application topology:
 
 ```python
@@ -131,6 +140,7 @@ That is, while the stateless computation constructor `to` took only a computatio
 This module needs its imports:
 ```python
 import struct
+import pickle
 
 import wallaroo
 ```
@@ -140,3 +150,5 @@ import wallaroo
 The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/python/alphabet/). To run it, follow the [Alphabet application instructions](/book/examples/python/alphabet/README.md)
 
 To learn how to write a stateful application with partitioning, continue to [Writing Your Own Partitioned Stateful Application](writing-your-own-partitioned-stateful-application.md).
+
+To learn how to make your application resilient and able to work across multiple workers, skip ahead to [Interworker Serialization and Resilience](interworker-serialization-and-resilience.md).

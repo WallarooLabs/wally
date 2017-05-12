@@ -1,3 +1,4 @@
+import pickle
 import struct
 
 import wallaroo
@@ -10,6 +11,14 @@ def application_setup(args):
                    "Sequence Window")
     ab.to_sink(Encoder())
     return ab.build()
+
+
+def serialize(o):
+    return pickle.dumps(o)
+
+
+def deserialize(bs):
+    return pickle.loads(bs)
 
 
 class SequenceWindowStateBuilder(object):
@@ -57,11 +66,12 @@ class ObserveNewValue(object):
     def compute(self, data, state):
         print "Observe New Value"
         state.update(data)
-        return state.get_window()
+        return (state.get_window(), True)
 
 
 class Encoder(object):
     def encode(self, data):
         print "Encoder:encode: ", data
         # data is a list of integers
-        return str(data) + "\n"
+        s = str(data)
+        return struct.pack('>L{}s'.format(len(s)), len(s), s)

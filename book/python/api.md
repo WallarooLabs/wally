@@ -80,7 +80,10 @@ Add a StateComputation _instance_, along with a [StateBuilder](#statebuilder) _i
 
 `state_builder` must be a [StateBuilder](#statebuilder).
 
-##### `to_state_partition(computation, state_builder, state_name, partition_function, partition_keys)`
+`state_name` must be a str. `state_name` is the name of the state object that we will run computations against. You can share the object across pipelines by using the same name. Using different names for different objects, keeps them separate and in this way, acts as a sort of namespace.
+
+
+##### `to_state_partition(computation, state_builder, state_partition_name, partition_function, partition_keys)`
 
 Add a partitioned StateComputation to the current pipeline.
 
@@ -88,17 +91,21 @@ Add a partitioned StateComputation to the current pipeline.
 
 `state_builder` must be [StateBuilder](#statebuilder).
 
+`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and in this way, acts as a sort of namespace.
+
 `partition_function` must be a [PartitionFunction](#partitionfunction).
 
-`partition_keys` must be a list of `str`.
+`partition_keys` must be a list of objects where all of the objects can be hashed with the `hash` function and be checked for equality with other objects.
 
-##### `to_state_partition_u64(computation, state_builder, state_name, partition_function, partition_keys)`
+##### `to_state_partition_u64(computation, state_builder, state_partition_name, partition_function, partition_keys)`
 
 Add a partitioned stateful computation to the current pipeline.
 
 `computation` must be a [StateComputation](#statecomputation).
 
 `state_builder` must be [StateBuilder](#statebuilder).
+
+`state_partition_name` must be a str. `state_partition_name` is the name of the collection of state object that we will run computations against. You can share state partitions across pipelines by using the same name. Using different names for different partitions, keeps them separate and in this way, acts as a sort of namespace.
 
 `partition_function` must be a [PartitionFunction](#partitionfunction).
 
@@ -304,7 +311,14 @@ Return the name of the computation as a string.
 
 ##### `compute(data, state)`
 
-Return the result of the computation. `data` is anything that was returned by the previous step in the pipeline, and `state` is provided by the [StateBuilder](#statebuilder) that was defined for this step in the pipeline definition.
+`data` is anything that was returned by the previous step in the pipeline, and `state` is provided by the [StateBuilder](#statebuilder) that was defined for this step in the pipeline definition.
+
+Returns a tuple. The first element is a message that we will send on to our next step. It should be a new object. The second element, is a boolean value instructing to Wallaroo to save our updated state so that in the event of a crash, we can recover to this point. Return `True` to save `state`. Return `False` to not save `state`.
+
+Why wouldn't we always return `True`? There are two answers:
+
+1. Your computation might not have updated the state, in which case, saving its state for recovery is wasteful.
+2. You might only want to save after some changes. Saving your state can be expensive for large objects. There's a tradeoff that can be made between performance and safety.
 
 #### Example StateComputation
 
@@ -320,5 +334,5 @@ class StateComputation(object):
             state.update(data)
         except TypeError:
             pass
-        return state.get_max()
+        return (state.get_max(), True)
 ```

@@ -30,12 +30,13 @@ actor Main
         let module = Machida.load_module(module_name)
 
         try
+          Machida.set_user_serialization_fns(module)
           let application_setup =
             Machida.application_setup(module, options.remaining())
           let application = recover val
             Machida.apply_application_setup(application_setup)
           end
-          Startup(env, application, None)
+          Startup(env, application, module_name)
         else
           @printf[I32]("Something went wrong while building the application\n"
             .cstring())
