@@ -534,7 +534,7 @@ sudo cset proc -s user -e numactl -- -C 6-12 chrt -f 80 \
 Giles sender:
 #+BEGIN_SRC sh
 sudo cset proc -s user -e numactl -- -C 13-15 chrt -f 80 \
- giles/sender/sender -b 127.0.0.1:7000 -m 1000000 \
+ giles/sender/sender -h 127.0.0.1:7000 -m 1000000 \
  --ponythreads 1 -s 500
 #+END_SRC
 
@@ -558,12 +558,12 @@ sudo cset proc -s user -e numactl -- -C 5-11 chrt -f 80 \
 Giles sender:
 #+BEGIN_SRC sh
 sudo cset proc -s user -e numactl -- -C 12-13 chrt -f 80 \
- giles/sender/sender -b 127.0.0.1:7000 -m 1000000 \
+ giles/sender/sender -h 127.0.0.1:7000 -m 1000000 \
  -f ./demos/marketspread/trades.msg -r \
  --ponythreads 1 -s 500
 
 sudo cset proc -s user -e numactl -- -C 14-15 chrt -f 80 \
- giles/sender/sender -b 127.0.0.1:7001 -m 1000000 \
+ giles/sender/sender -h 127.0.0.1:7001 -m 1000000 \
  -f ./demos/marketspread/nbbo.msg -r \
  --ponythreads 1 -s 500
 #+END_SRC

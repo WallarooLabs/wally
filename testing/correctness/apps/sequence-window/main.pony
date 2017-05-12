@@ -30,7 +30,7 @@ To run, use the following commands:
 ```
 4. Sender
 ```bash
-../../../../giles/sender/sender -b 127.0.0.1:7000 -s 100 -i 50_000_000 \
+../../../../giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 \
 --ponythreads=1 -y -g 12 -w -u -m 10000
 ```
 
@@ -41,7 +41,7 @@ Restart `sequence-window`, and wait for it to complete its recovery process.
 
 Send one more message with giles sender:
 ```bash
-../../../../giles/sender/sender -b 127.0.0.1:7000 -s 100 -i 50_000_000 \
+../../../../giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 \
 --ponythreads=1 -y -g -12 -w -u -m 2 -v 10000
 ```
 

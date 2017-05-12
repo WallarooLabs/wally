@@ -55,7 +55,7 @@ In a separate shell each:
     ```
 3. Start sending data
     ```bash
-     ../../../../giles/sender/sender --buffy 127.0.0.1:7010 --file votes.msg \
+     ../../../../giles/sender/sender --host 127.0.0.1:7010 --file votes.msg \
        --batch-size 50 --interval 10_000_000 --binary --msg-size 9 --repeat \
        --ponythreads=1 --messages 1000000
     ```

@@ -30,8 +30,8 @@ and that its Sink will send data to port 8082, then you would
 start Giles as follows:
 
 ```
-./giles/receiver -b 127.0.0.1:8082
-./giles/sender -b 127.0.0.1:8081 -m 100
+./giles/receiver -l 127.0.0.1:8082
+./giles/sender -h 127.0.0.1:8081 -m 100
 ```
 
 The sender also takes the following parameters:  
@@ -61,12 +61,12 @@ Currently the Giles sender sends messages in one of two way:
 
 - With no other commandline options given, it will send string
   representations of integers, starting with `1` and increasing by `1`
-  with each new message. For example, `./giles/sender -b 127.0.0.1:8081
+  with each new message. For example, `./giles/sender -h 127.0.0.1:8081
   -m 100` will send messages containing string representations of the
   numbers `1` through `100`.
 - With a file name given as the last argument it will send each line
   of the given file as a message. For example, `./giles/sender
-  -b 127.0.0.1:8081 -m 100 -f war-and-peace.txt` will send messages containing
+  -h 127.0.0.1:8081 -m 100 -f war-and-peace.txt` will send messages containing
   each of the first 100 lines of the file `war-and-peace.txt`.
 
 ## Human Readable Receiver Outputs

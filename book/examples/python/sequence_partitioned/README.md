@@ -60,7 +60,7 @@ machida --application-module sequence_partitioned --in 127.0.0.1:7010 \
 In a third shell, send some messages:
 
 ```bash
-../../../../giles/sender/sender --buffy 127.0.0.1:7010 --batch-size 10 \
+../../../../giles/sender/sender --host 127.0.0.1:7010 --batch-size 10 \
   --interval 100_000_000 --ponythreads=1 --binary --msg-size 12 --no-write \
   --u64 --messages 100
 ```
