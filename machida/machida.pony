@@ -1,14 +1,10 @@
 use "collections"
 use "buffered"
-use "debug"
 
 use "wallaroo"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/messages"
-
-use @test_c[Pointer[U8] val]()
-use @test_python[Pointer[U8] val]()
 
 use @load_module[ModuleP](module_name: CString)
 
@@ -263,21 +259,8 @@ primitive Machida
       false
     end
 
-  fun test(): String =>
-    "hello from machida"
-
-  fun test_c(): String =>
-    recover
-      String.copy_cstring(@test_c())
-    end
-
   fun start_python() =>
     @Py_Initialize()
-
-  fun test_python(): String =>
-    recover
-      String.copy_cstring(@test_python())
-    end
 
   fun load_module(module_name: String): ModuleP ? =>
     let r = @load_module(module_name.cstring())
@@ -323,10 +306,8 @@ primitive Machida
       let item = @get_application_setup_item(application_setup_data, idx)
       let action_p = @get_application_setup_action(item)
       let action = String.copy_cstring(action_p)
-      Debug("action = '" +  action + "'")
       match action
       | "new_pipeline" =>
-        Debug("  adding new pipeline")
         let name = recover val
           String.copy_cstring(@PyString_AsString(@PyTuple_GetItem(item, 1)))
         end
@@ -335,13 +316,10 @@ primitive Machida
           Machida.inc_ref(d)
           PyFramedSourceHandler(d)
         end
-        Debug("!!! decoder header_length = " +
-          decoder.header_length().string())
 
         latest = (latest as Application).new_pipeline[PyData val, PyData val](
           name, decoder)
       | "to" =>
-        Debug("  adding a computation to the pipeline")
         let computation_class = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(computation_class)
         let builder = recover val
@@ -354,7 +332,6 @@ primitive Machida
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to[PyData val](builder)
       | "to_stateful" =>
-        Debug("  adding a state computation to the pipeline")
         let state_computationp = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(state_computationp)
         let state_computation = recover val
@@ -374,7 +351,6 @@ primitive Machida
         latest = pb.to_stateful[PyData val, PyState](state_computation,
           state_builder, state_name)
       | "to_state_partition_u64" =>
-        Debug("  adding a u64 partitioned state computation to the pipeline")
         let state_computationp = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(state_computationp)
         let state_computation = recover val
@@ -406,7 +382,6 @@ primitive Machida
         latest = pb.to_state_partition[PyData val, U64, PyData val, PyState](
           state_computation, state_builder, state_name, partition)
       | "to_state_partition" =>
-        Debug("  adding a partitioned state computation to the pipeline")
         let state_computationp = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(state_computationp)
         let state_computation = recover val
@@ -438,7 +413,6 @@ primitive Machida
         latest = pb.to_state_partition[PyData val, PyKey val, PyData val, PyState](
           state_computation, state_builder, state_name, partition)
       | "to_sink" =>
-        Debug("  adding a sink to the pipeline")
         let encoderp = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(encoderp)
         let encoder = recover val
@@ -448,7 +422,6 @@ primitive Machida
         latest = pb.to_sink(encoder, recover [0] end)
         latest
       | "done" =>
-        Debug("  adding a null sink to the pipeline")
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.done()
         latest

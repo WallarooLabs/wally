@@ -14,17 +14,7 @@ sudo apt-get install git
 
 ## Install LLVM 3.9
 
-Visit [http://apt.llvm.org](http://apt.llvm.org) and select the correct apt mirror for you version of Ubuntu. 
-
-### Trusty Ubuntu: Add the LLVM apt repos to /etc/apt/sources.list
-
-Open `/etc/apt/sources.list` and add the following lines to the end of
-the file:
-
-```
-deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.9 main
-deb-src http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.9 main
-```
+Visit [http://apt.llvm.org](http://apt.llvm.org) and select the correct apt mirror for you version of Ubuntu.
 
 ### Xenial Ubuntu: Add the LLVM apt repos to /etc/apt/sources.list
 
@@ -34,6 +24,16 @@ the file:
 ```
 deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main
 deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-3.9 main
+```
+
+### Trusty Ubuntu: Add the LLVM apt repos to /etc/apt/sources.list
+
+Open `/etc/apt/sources.list` and add the following lines to the end of
+the file:
+
+```
+deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.9 main
+deb-src http://apt.llvm.org/trusty/ llvm-toolchain-trusty-3.9 main
 ```
 
 ### Add the LLVM repo as a trusted source
@@ -51,7 +51,14 @@ sudo apt-get update
 sudo apt-get install -y llvm-3.9
 ```
 
-## Install GCC 5
+## Install Pony compiler dependencies
+
+```bash
+sudo apt-get install -y build-essential zlib1g-dev \
+  libncurses5-dev libssl-dev
+```
+
+### Install GCC 5 or Higher
 
 You'll need to be using at least `gcc-5`. We rely on its atomics support. If you have at least `gcc-5` installed on your machine, you don't need to do anything. If you have gcc 4 or lower, you'll need to upgrade. You can check you `gcc` version by running:
 
@@ -79,19 +86,6 @@ sudo update-alternatives --install /usr/bin/gcc gcc \
   /usr/bin/gcc-5 60 --slave /usr/bin/g++ g++ /usr/bin/g++-5
 ```
 
-## Make sure apt is up to date
-
-```bash
-sudo apt-get update
-```
-
-## Install Pony compiler dependencies
-
-```bash
-sudo apt-get install -y build-essential git zlib1g-dev \
-  libncurses5-dev libssl-dev
-```
-
 ### Install prce2
 
 #### Xenial Ubuntu:
@@ -110,7 +104,7 @@ install from source like this:
 ```bash
 cd ~/
 wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2
-tar xvf pcre2-10.21.tar.bz2
+tar xjvf pcre2-10.21.tar.bz2
 cd pcre2-10.21
 ./configure --prefix=/usr
 make
@@ -123,9 +117,9 @@ Now you need to install the Sendence fork of the Pony compiler `ponyc`. Run:
 
 ```bash
 cd ~/
-git clone https://github.com/sendence/ponyc
-cd ponyc
-git checkout sendence-19.2.8
+wget https://github.com/Sendence/ponyc/archive/sendence-19.2.8.tar.gz
+tar xzfv sendence-19.2.8.tar.gz
+cd ponyc-sendence-19.2.8
 sudo make config=release install
 ```
 
@@ -178,7 +172,8 @@ cloned the Wallaroo repo, do so now:
 
 ```bash
 git clone https://github.com/sendence/wallaroo
-git checkout 0.0.1-rc6
+cd wallaroo
+git checkout 0.0.1-rc7
 ```
 
 Note: You need to login to GitHub for credentials

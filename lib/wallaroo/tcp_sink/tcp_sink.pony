@@ -80,13 +80,19 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
   var _shutdown: Bool = false
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
+  var _reconnect_pause: U64
+  var _host: String
+  var _service: String
+  var _from: String
+
   // Origin (Resilience)
   let _terminus_route: TerminusRoute = TerminusRoute
 
   new create(encoder_wrapper: EncoderWrapper val,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
     initial_msgs: Array[Array[ByteSeq] val] val,
-    from: String = "", init_size: USize = 64, max_size: USize = 16384)
+    from: String = "", init_size: USize = 64, max_size: USize = 16384,
+    reconnect_pause: U64 = 10_000_000_000)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
@@ -99,6 +105,10 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
     _max_size = max_size
     _notify = TCPSinkNotify
     _initial_msgs = initial_msgs
+    _reconnect_pause = reconnect_pause
+    _host = host
+    _service = service
+    _from = from
     _connect_count = @pony_os_connect_tcp[U32](this,
       host.cstring(), service.cstring(),
       from.cstring())
@@ -300,6 +310,38 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
             @pony_os_socket_close[None](fd)
             _notify_connecting()
           end
+        elseif not _connected and _closed then
+          @printf[I32]("Reconnection asio event\n".cstring())
+          if @pony_os_connected[Bool](fd) then
+            // The connection was successful, make it ours.
+            _fd = fd
+            _event = event
+
+            _pending_writev.clear()
+            _pending.clear()
+            _pending_writev_total = 0
+
+            _connected = true
+            _writeable = true
+
+            _closed = false
+            _shutdown = false
+            _shutdown_peer = false
+
+            _notify.connected(this)
+
+            ifdef not windows then
+              if _pending_writes() then
+                //sent all data; release backpressure
+                _release_backpressure()
+              end
+            end
+          else
+            // The connection failed, unsubscribe the event and close.
+            @pony_asio_event_unsubscribe(event)
+            @pony_os_socket_close[None](fd)
+            _notify_connecting()
+          end
         else
           // We're already connected, unsubscribe the event and close.
           @pony_asio_event_unsubscribe(event)
@@ -389,6 +431,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
     else
       _notify.connect_failed(this)
       _hard_close()
+      _schedule_reconnect()
     end
 
   fun ref close() =>
@@ -528,6 +571,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
       // The socket has been closed from the other side.
       _shutdown_peer = true
       close()
+      _schedule_reconnect()
     end
 
   fun ref _pending_writes(): Bool =>
@@ -541,6 +585,12 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
     var num_to_send: USize = 0
     var bytes_to_send: USize = 0
     var bytes_sent: USize = 0
+
+    // nothing to send
+    if _pending_writev_total == 0 then
+      return true
+    end
+
     while _writeable and (_pending_writev_total > 0) do
       try
         //determine number of bytes and buffers to send
@@ -604,6 +654,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
       else
         // Non-graceful shutdown on error.
         _hard_close()
+        _schedule_reconnect()
       end
     end
 
@@ -689,6 +740,22 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
 
     _pending_reads()
 
+  fun ref _schedule_reconnect() =>
+    if (_host != "") and (_service != "") then
+      @printf[I32]("RE-Connecting TCPSink to %s:%s\n".cstring(),
+                   _host.cstring(), _service.cstring())
+      let timers = Timers
+      let timer = Timer(PauseBeforeReconnectTCPSink(this), _reconnect_pause)
+      timers(consume timer)
+    end
+
+  be reconnect() =>
+    if not _connected then
+      _connect_count = @pony_os_connect_tcp[U32](this,
+        _host.cstring(), _service.cstring(),
+        _from.cstring())
+    end
+
   fun ref _apply_backpressure() =>
     _writeable = false
     ifdef linux then
@@ -769,7 +836,7 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
     @printf[I32]("TCPSink connection closed\n".cstring())
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
-    Fail()
+    @printf[I32]("TCPSink connection failed\n".cstring())
 
   fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
     data: ByteSeqIter): ByteSeqIter
@@ -790,3 +857,13 @@ class TCPSinkNotify is WallarooOutgoingNetworkActorNotify
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[None](("TCPSink is no longer experiencing" +
       " back pressure\n").cstring())
+
+class PauseBeforeReconnectTCPSink is TimerNotify
+  let _tcp_sink: TCPSink
+
+  new iso create(tcp_sink: TCPSink) =>
+    _tcp_sink = tcp_sink
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    _tcp_sink.reconnect()
+    false
