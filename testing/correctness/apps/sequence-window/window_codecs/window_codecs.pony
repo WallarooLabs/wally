@@ -18,11 +18,18 @@ primitive WindowEncoder
     wb.done()
 
 primitive WindowU64Decoder
-  fun apply(s: String val, delim: String val = "[,]"): Array[U64] val ? =>
+  """
+  Decode a text array of numbers in the format '[1,2,3]' or '[1, 2, 3]'
+  into an Array[U64].
+  """
+  fun apply(s: String val, delim: String val = "[, ]"): Array[U64] val ? =>
     let a = recover iso Array[U64] end
     let parts:Array[String] val = s.split(delim)
     for p in parts.slice(1,parts.size()-1).values() do
-      a.push(p.u64())
+      // skip empty strings
+      if p.size() > 0 then
+        a.push(p.u64())
+      end
     end
     consume a
 

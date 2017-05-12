@@ -39,6 +39,7 @@ Later when we build the application topology, we will pass both the keys and the
 ### State and StateBuilder
 
 Previously we had a state map called `AllVotes` that kept a `dict` of votes by letter:
+
 ```python
 class AllVotes(object):
     def __init__(self):
@@ -104,5 +105,7 @@ import wallaroo
 ## Next Steps
 
 The complete alphabet example is available [here](https://github.com/Sendence/wallaroo/tree/master/book/examples/python/alphabet_partitioned/). To run it, follow the [Alphabet_partitioned application instructions](/book/examples/python/alphabet_partitioned/README.md)
+
+To learn how to make your application resilient and able to work across multiple workers, please continue to [Interworker Serialization and Resilience](interworker-serialization-and-resilience.md).
 
 For further reading, please refer to the [Wallaroo Python API Classes](api.md).

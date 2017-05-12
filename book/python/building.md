@@ -42,34 +42,11 @@ stable env ponyc
 
 #### Wallaroo-Python
 
-Navigate to the `machida` directory in your `wallaroo` repository
+In order to build `machida` the Wallaroo Python runner, navigate to the `machida` directory in your `wallaroo` repository and execute `make build`.
 
 ```bash
 cd ~/wallaroo-tutorial/wallaroo/machida
-```
-
-Create the `build` directory if it doesn't already exist.
-
-```bash
-mkdir build
-```
-
-Build the `machida` binary
-
-**On MacOS**:
-
-```bash
-clang -g -o build/python-wallaroo.o -c cpp/python-wallaroo.c
-ar rvs build/libpython-wallaroo.a build/python-wallaroo.o
-ponyc --debug --output=build --path=build --path=../lib/ .
-```
-
-** On Linux**:
-
-```bash
-gcc -g -o build/python-wallaroo.o -c cpp/python-wallaroo.c
-ar rvs build/libpython-wallaroo.a build/python-wallaroo.o
-ponyc --debug --output=build --path=build --path=../lib/ .
+make build
 ```
 
 Once built, the `machida` binary will work with any `.py` file, so it is not necessary to repeat this step for every new application built with the Wallaroo Python API.
@@ -93,17 +70,18 @@ Once loaded, Wallaroo executes `application_setup()`, constructs the appropriate
 ### A Note on PATH and PYTHONPATH
 
 Since the Python runtime is embedded, finding paths to modules can get complicated. To make our lives easier, we're going to add the location of the `machida` binary to the `PATH` environment variable, and then we're going to add two paths to the `PYTHONPATH` environment variable:
-1. `.`, or the current directory from which the binary is executed
-2. the path of the `machida` directory in the wallaroo repository.
 
-If you just want to run the examples, the following shell commands will set this up for you:
+- `.`
+- the path of the `machida` directory in the wallaroo repository.
+
+Assuming you installed Machida according to the tutorial instructions you would do:
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:.:../../../../machida"
-export PATH="$PATH:../../../../machida/build"
+export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 ```
 
-If you would like to skip this step in the future, you can replace the relative paths with the absolute paths in your environment and add these exports to your `.bashrc` file.
+If you would like to skip this step in the future, you add these exports to your `.bashrc` file.
 
 ## Next Steps
 

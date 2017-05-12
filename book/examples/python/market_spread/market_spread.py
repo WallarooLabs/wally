@@ -1,3 +1,4 @@
+import pickle
 import struct
 import time
 
@@ -48,6 +49,14 @@ def application_setup(args):
     return ab.build()
 
 
+def serialize(o):
+    return pickle.dumps(o)
+
+
+def deserialize(bs):
+    return pickle.loads(bs)
+
+
 class MarketSpreadError(Exception):
     pass
 
@@ -77,9 +86,10 @@ class CheckOrder(object):
         if state.should_reject_trades:
             print "rejecting"
             ts = int(time.time() * 100000)
-            return OrderResult(data, state.last_bid,
-                               state.last_offer, ts)
-        return None
+            return (OrderResult(data, state.last_bid,
+                                state.last_offer, ts),
+                    False)
+        return (None, False)
 
 
 class Order(object):
@@ -205,4 +215,4 @@ class UpdateMarketData(object):
 
         if should_reject_trades:
             print "Should reject trades"
-        return None
+        return (None, True)

@@ -31,30 +31,34 @@ In a shell, start up the Metrics UI if you don't already have it running:
 docker start mui
 ```
 
-In a shell, set up a listener:
+In another shell, run Giles Receiver to listen for messages:
 
 ```bash
-nc -l 127.0.0.1 7002
+../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
+  --listen 127.0.0.1:7002
 ```
 
-In another shell, export the current directory and `wallaroo.py` directories to `PYTHONPATH`:
+In two other shells, export the current directories and machida directories to paths, then run the application main (initializer) worker and second worker:
+
+Initializer:
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:.:../../../../machida"
-```
-
-Export the machida binary directory to `PATH`:
-
-```bash
-export PATH="$PATH:../../../../machida/build"
-```
-
-Run `machida` with `--application-module sequence`:
-
-```bash
+export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 machida --application-module sequence_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --data 127.0.0.1:6001 --worker-name worker-name --ponythreads=1
+  --data 127.0.0.1:6001 --worker-count 2 --topology-initializer \
+  --ponythreads=1
+```
+
+Worker:
+
+```bash
+export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
+machida --application-module sequence_partitioned --in 127.0.0.1:7010 \
+  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
+  --data 127.0.0.1:6001 --worker-count 2 --name worker-2 --ponythreads=1
 ```
 
 In a third shell, send some messages:

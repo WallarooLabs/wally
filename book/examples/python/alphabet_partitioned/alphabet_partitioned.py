@@ -1,5 +1,6 @@
 import string
 import struct
+import pickle
 
 import wallaroo
 
@@ -12,6 +13,14 @@ def application_setup(args):
                           LetterPartitionFunction(), letter_partitions)
     ab.to_sink(Encoder())
     return ab.build()
+
+
+def serialize(o):
+    return pickle.dumps(o)
+
+
+def deserialize(bs):
+    return pickle.loads(bs)
 
 
 class LetterPartitionFunction(object):
@@ -61,7 +70,7 @@ class AddVotes(object):
 
     def compute(self, data, state):
         state.update(data)
-        return state.get_votes()
+        return (state.get_votes(), True)
 
 
 class Encoder(object):
@@ -69,4 +78,4 @@ class Encoder(object):
         # data is a Votes
         letter = data.letter
         votes = data.votes
-        return struct.pack(">1sI", data.letter, data.votes)
+        return struct.pack(">I1sI", 5, data.letter, data.votes)

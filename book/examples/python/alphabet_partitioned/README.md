@@ -13,55 +13,57 @@ In a shell, start up the Metrics UI if you don't already have it running:
 docker start mui
 ```
 
-In another shell, set up a listener:
+In another shell, run Giles Receiver to listen for messages:
+
 ```bash
-nc -l 127.0.0.1 7002 > alphabet.out
+../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
+  --listen 127.0.0.1:7002
 ```
 
-In another shell, export the current directory and `wallaroo.py` directories to `PYTHONPATH`:
+In two other shells, export the current directories and machida directories to paths, then run the application main (initializer) worker and second worker:
+
+Initializer:
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:.:../../../../machida"
-```
-
-Export the machida binary directory to `PATH`:
-
-```bash
-export PATH="$PATH:../../../../machida/build"
-```
-
-Run `machida` with `--application-module alphabet_partitioned`.
-
-```bash
+export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
 machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
   --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
-  --data 127.0.0.1:6001 --worker-name worker-name --ponythreads=1
+  --data 127.0.0.1:6001 --worker-count 2 --topology-initializer \
+  --ponythreads=1
 ```
 
-In a third shell, send some messages
+Worker:
 
 ```bash
-../../../../giles/sender/sender --host 127.0.0.1:7010 --file votes.msg \
-  --batch-size 50 --interval 10_000_000 --messages 1000000 --binary \
-  --msg-size 9 --repeat --ponythreads=1
+export PYTHONPATH="$PYTHONPATH:.:$HOME/wallaroo-tutorial/wallaroo/machida"
+export PATH="$PATH:$HOME/wallaroo-tutorial/wallaroo/machida/build"
+machida --application-module alphabet_partitioned --in 127.0.0.1:7010 \
+  --out 127.0.0.1:7002 --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 \
+  --data 127.0.0.1:6001 --worker-count 2 --name worker-2 --ponythreads=1
 ```
 
-The messages have a 32-bit big-endian integer that represents the message length, followed by a byte that represents the character that is being voted on, followed by a 32-bit big-endian integer that represents the number of votes received for that letter.  The output is a byte representing the character that is being voted on, followed by the total number of votes for that character. You can view the output file with a tool like `hexdump`.
+In a fourth shell, send some messages
 
-## Reading the Output
+```bash
+../../../../giles/sender/sender --host 127.0.0.1:7010 \
+  --file votes.msg --batch-size 50 --interval 10_000_000 \
+  --messages 1000000 --binary --msg-size 9 --repeat --ponythreads=1
+```
 
-The output is binary data, formatted as a 4-byte message length header, followed by a character, followed by 4 byte 32-bit uint.
+The messages have a 32-bit big-endian integer that represents the message length, followed by a byte that represents the character that is being voted on, followed by a 32-bit big-endian integer that represents the number of votes received for that letter.  The output is a byte representing the character that is being voted on, followed by the total number of votes for that character.
 
-You can read it with the following code stub:
+Using these instructions, the output will be received by Giles Receiver and [stored to a file](/book/wallaroo-tools/giles-receiver.md#output-file-format) when the Giles Receiver process is killed. You can read it with the following code stub:
 
 ```python
 import struct
 
 
-with open('alphabet.out', 'rb') as f:
+with open('received.txt', 'rb') as f:
     while True:
         try:
-            print struct.unpack('>LsL', f.read(9))
+           # Length, Timestamp, Character, Vote count
+            print struct.unpack('>LQ1sL', f.read(17))
         except:
             break
 ```
