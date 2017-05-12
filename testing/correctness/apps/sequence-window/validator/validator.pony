@@ -88,7 +88,9 @@ class WindowValidator
   1.1. size == 4
   1.2. no non-leading zeroes are present (and at least one value is non-zero)
   1.3. all non-zero values have the same parity
-  1.4. sequentiality: the current window follows from the previous window
+  1.4. Values in a window increment as expected (by 0,1, or 2, and always by 2
+    after a non-zero increment)
+  1.5. sequentiality: the current window follows from the previous window
     (e.g. [4,6,8,10] follows [2,4,6,8])
 
   2. For the two final windows, test:
@@ -124,7 +126,6 @@ class WindowValidator
       String.from_array(consume s)
     end
 
-
     Fact(test_size(values), "Size test failed at " + ts + " on " + val_string
       + " after " + counter.string() + " values")
 
@@ -139,12 +140,13 @@ class WindowValidator
 
     let cat = get_category(values)
 
-    Fact(test_sequentiality(values, cat), "Sequentiality test failed at " +
-      ts + ". Expected " + ring_0.string(where fill = "0") + " but got " +
-      val_string + " after " + counter.string() + " values")
-
     Fact(test_increments(values), "Increments test failed at " + ts +
       " on " + val_string + " after " + counter.string() + " values")
+
+    Fact(test_sequentiality(values, cat), "Sequentiality test failed at " +
+      ts + ". Expected " + (if cat then ring_0 else ring_1 end).string(
+        where fill = "0") + " but got " + val_string + " after " +
+      counter.string() + " values")
 
   fun finalize() ? =>
     """
@@ -292,8 +294,6 @@ class WindowValidator
     If at_least_once is true, going back is allowed, so long as the new message
     is still internally sequential.
     """
-    var out: Bool = true
-
     // increment the correct ring and counter
     let r = if cat then // mod2=0
       count_0 = count_0 + 1
@@ -317,24 +317,24 @@ class WindowValidator
           if cat then
             count_0 = last/2
           else
-            count_1 = last/2
+            count_1 = (last/2) + 1
           end
         end
       end
     else
-      out = false
+      return false
     end
 
     for x in Range[USize](0,4) do
       try
         if values(x) != r(3 - x) then
-          out = false
+          return false
         end
       else
-        out = false
+        return false
       end
     end
-    out
+    true
 
   fun get_category(ar: Array[U64] val): Bool ? =>
     """
