@@ -79,6 +79,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
   var _connected: Bool = false
   var _closed: Bool = false
   var _writeable: Bool = false
+  var _throttled: Bool = false
   var _event: AsioEventID = AsioEvent.none()
   embed _pending: List[(ByteSeq, USize)] = _pending.create()
   embed _pending_writev: Array[USize] = _pending_writev.create()
@@ -814,19 +815,25 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     _maybe_mute_or_unmute_upstreams()
 
   fun ref _apply_backpressure() =>
-    _writeable = false
-    ifdef linux then
-      // this is safe because asio thread isn't currently subscribed
-      // for a write event so will not be writing to the readable flag
-      AsioEvent.set_writeable(_event, false)
-      @pony_asio_event_resubscribe_write(_event)
+    if not _throttled then
+      _throttled = true
+      _writeable = false
+      ifdef linux then
+        // this is safe because asio thread isn't currently subscribed
+        // for a write event so will not be writing to the readable flag
+        AsioEvent.set_writeable(_event, false)
+        @pony_asio_event_resubscribe_write(_event)
+      end
+      _notify.throttled(this)
+      _maybe_mute_or_unmute_upstreams()
     end
-    _notify.throttled(this)
-    _maybe_mute_or_unmute_upstreams()
 
   fun ref _release_backpressure() =>
-    _notify.unthrottled(this)
-    _maybe_mute_or_unmute_upstreams()
+    if _throttled then
+      _throttled = false
+      _notify.unthrottled(this)
+      _maybe_mute_or_unmute_upstreams()
+    end
 
   fun ref _maybe_mute_or_unmute_upstreams() =>
     if _mute_outstanding then
