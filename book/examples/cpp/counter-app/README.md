@@ -72,7 +72,7 @@ In a separate shell each:
     ```
 3. Start sending data
     ```bash
-     ../../../../giles/sender/sender --buffy 127.0.0.1:7010 --file data_gen/numbers.msg \
+     ../../../../giles/sender/sender --host 127.0.0.1:7010 --file data_gen/numbers.msg \
        --batch-size 50 --interval 10_000_000 --binary --msg-size 44 --repeat \
        --ponythreads=1 --messages 1000000
     ```

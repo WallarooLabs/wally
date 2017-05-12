@@ -9,7 +9,7 @@ APP:
 
 
 SENDER:
-giles/sender/sender -b 127.0.0.1:7000 -m 50000000 -s 300 -i 5_000_000 -f apps/default-test/default.txt -r --ponythreads=1 -w
+giles/sender/sender -h 127.0.0.1:7000 -m 50000000 -s 300 -i 5_000_000 -f apps/default-test/default.txt -r --ponythreads=1 -w
 
 """
 use "buffered"

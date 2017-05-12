@@ -43,7 +43,7 @@ machida --application-module alphabet --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
 In a third shell, send some messages
 
 ```bash
-../../../../giles/sender/sender --buffy 127.0.0.1:7010 --file votes.msg \
+../../../../giles/sender/sender --host 127.0.0.1:7010 --file votes.msg \
   --batch-size 50 --interval 10_000_000 --messages 1000000 --binary \
   --msg-size 9 --repeat --ponythreads=1
 ```
