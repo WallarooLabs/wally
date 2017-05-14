@@ -6,6 +6,8 @@ In order to write a Wallaroo application in Python, the developer creates classe
 
 For a basic overview of what Wallaroo does, read [What is Wallaroo](/book/what-is-wallaroo.md) and [Core Concepts](/book/core-concepts/intro.md). These documents will help you understand the system at a high level so that you can see how the pieces of the Python API fit into it.
 
+**PLEASE NOTE** at this time, the Python API does not implement the full Wallaroo API. Over the coming weeks, it will be brought up to feature parity with other language APIs.
+
 ## Machida
 
 Machida is the program that runs Wallaroo applications written using the Wallaroo Python API. It takes a `.py` file as its `--application-module` argument and requires a method called `application_setup(...)` to be defined in it. This method returns the structure describing the Wallaroo application in terms of Python objects, which is then used to coordinate calling those objects’ methods with the appropriate arguments as the application is running.
