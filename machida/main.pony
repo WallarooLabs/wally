@@ -1,6 +1,4 @@
 use "collections"
-use "options"
-
 use "sendence/options"
 use "wallaroo"
 use "wallaroo/tcp_source"
