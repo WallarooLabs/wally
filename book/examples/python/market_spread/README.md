@@ -49,7 +49,7 @@ machida --application-module market_spread \
 Send some market data messages
 
 ```bash
-../../../../giles/sender/sender --buffy 127.0.0.1:7011 --file \
+../../../../giles/sender/sender --host 127.0.0.1:7011 --file \
   ../../../../demos/marketspread/350k-nbbo-fixish.msg --batch-size 20 \
   --interval 100_000_000 --messages 1000000 --binary --repeat --ponythreads=1 \
   --msg-size 46 --no-write
@@ -58,7 +58,7 @@ Send some market data messages
 and some orders messages
 
 ```bash
-../../../../giles/sender/sender --buffy 127.0.0.1:7010 --file \
+../../../../giles/sender/sender --host 127.0.0.1:7010 --file \
   ../../../../demos/marketspread/350k-orders-fixish.msg --batch-size 20 \
   --interval 100_000_000 --messages 1000000 --binary --repeat --ponythreads=1 \
   --msg-size 57 --no-write

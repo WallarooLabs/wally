@@ -34,7 +34,7 @@ actor Main
     if run_tests then
       TestMain(env)
     else
-      var b_arg: (Array[String] | None) = None
+      var h_arg: (Array[String] | None) = None
       var m_arg: (USize | None) = None
       var p_arg: (Array[String] | None) = None
       var n_arg: (String | None) = None
@@ -46,7 +46,7 @@ actor Main
         var options = Options(env.args)
 
         options
-          .add("buffy", "b", StringArgument)
+          .add("host", "h", StringArgument)
           .add("phone-home", "p", StringArgument)
           .add("name", "n", StringArgument)
           .add("messages", "m", I64Argument)
@@ -64,8 +64,8 @@ actor Main
 
         for option in options do
           match option
-          | ("buffy", let arg: String) =>
-            b_arg = arg.split(":")
+          | ("host", let arg: String) =>
+            h_arg = arg.split(":")
           | ("messages", let arg: I64) =>
             m_arg = arg.usize()
           | ("name", let arg: String) =>
@@ -97,13 +97,13 @@ actor Main
           end
         end
 
-        if b_arg is None then
-          env.err.print("Must supply required '--buffy' argument")
+        if h_arg is None then
+          env.err.print("Must supply required '--host' argument")
           required_args_are_present = false
         else
-          if (b_arg as Array[String]).size() != 2 then
+          if (h_arg as Array[String]).size() != 2 then
             env.err.print(
-              "'--buffy' argument should be in format: '127.0.0.1:8080")
+              "'--host' argument should be in format: '127.0.0.1:8080")
             required_args_are_present = false
           end
         end
@@ -159,16 +159,16 @@ actor Main
 
         if required_args_are_present then
           let messages_to_send = m_arg as USize
-          let to_buffy_addr = b_arg as Array[String]
+          let to_host_addr = h_arg as Array[String]
 
           let store = Store(env.root as AmbientAuth)
           let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
 
           let tcp_auth = TCPConnectAuth(env.root as AmbientAuth)
-          let to_buffy_socket = TCPConnection(tcp_auth,
-            ToBuffyNotify(coordinator),
-            to_buffy_addr(0),
-            to_buffy_addr(1))
+          let to_host_socket = TCPConnection(tcp_auth,
+            ToHostNotify(coordinator),
+            to_host_addr(0),
+            to_host_addr(1))
 
           let data_source =
             match f_arg
@@ -200,7 +200,7 @@ actor Main
 
           let sa = SendingActor(
             messages_to_send,
-            to_buffy_socket,
+            to_host_socket,
             store,
             coordinator,
             consume data_source,
@@ -218,20 +218,20 @@ actor Main
       end
     end
 
-class ToBuffyNotify is TCPConnectionNotify
+class ToHostNotify is TCPConnectionNotify
   let _coordinator: Coordinator
 
   new iso create(coordinator: Coordinator) =>
     _coordinator = coordinator
 
   fun ref connect_failed(sock: TCPConnection ref) =>
-    _coordinator.to_buffy_socket(sock, Failed)
+    _coordinator.to_host_socket(sock, Failed)
 
   fun ref connected(sock: TCPConnection ref) =>
     if sock.local_address() != sock.remote_address() then
       sock.set_nodelay(true)
     end
-    _coordinator.to_buffy_socket(sock, Ready)
+    _coordinator.to_host_socket(sock, Ready)
 
   fun ref throttled(sock: TCPConnection ref) =>
     _coordinator.pause_sending(true)
@@ -304,7 +304,7 @@ primitive CoordinatorFactory
 interface tag Coordinator
   be finished()
   be sending_actor(sa: SendingActor)
-  be to_buffy_socket(sock: TCPConnection, state: WorkerState)
+  be to_host_socket(sock: TCPConnection, state: WorkerState)
   be pause_sending(v: Bool)
 
 primitive Waiting
@@ -315,7 +315,7 @@ type WorkerState is (Waiting | Ready | Failed)
 
 actor WithoutDagonCoordinator
   let _env: Env
-  var _to_buffy_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
+  var _to_host_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
   var _sending_actor: (SendingActor | None) = None
   let _store: Store
 
@@ -323,8 +323,8 @@ actor WithoutDagonCoordinator
     _env = env
     _store = store
 
-  be to_buffy_socket(sock: TCPConnection, state: WorkerState) =>
-    _to_buffy_socket = (sock, state)
+  be to_host_socket(sock: TCPConnection, state: WorkerState) =>
+    _to_host_socket = (sock, state)
     if state is Failed then
       _env.err.print("Unable to connect")
       sock.dispose()
@@ -338,7 +338,7 @@ actor WithoutDagonCoordinator
 
   be finished() =>
     try
-      let x = _to_buffy_socket._1 as TCPConnection
+      let x = _to_host_socket._1 as TCPConnection
       x.dispose()
     end
     _store.dispose()
@@ -350,7 +350,7 @@ actor WithoutDagonCoordinator
     end
 
   fun _go_if_ready() =>
-    if _to_buffy_socket._2 is Ready then
+    if _to_host_socket._2 is Ready then
       try
         let y = _sending_actor as SendingActor
         y.go()
@@ -359,7 +359,7 @@ actor WithoutDagonCoordinator
 
 actor WithDagonCoordinator
   let _env: Env
-  var _to_buffy_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
+  var _to_host_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
   var _to_dagon_socket: ((TCPConnection | None), WorkerState) = (None, Waiting)
   var _sending_actor: (SendingActor | None) = None
   let _store: Store
@@ -376,10 +376,10 @@ actor WithDagonCoordinator
       y.go()
     end
 
-  be to_buffy_socket(sock: TCPConnection, state: WorkerState) =>
-    _to_buffy_socket = (sock, state)
+  be to_host_socket(sock: TCPConnection, state: WorkerState) =>
+    _to_host_socket = (sock, state)
     if state is Failed then
-      _env.err.print("Unable to open buffy socket")
+      _env.err.print("Unable to open host socket")
       sock.dispose()
     elseif state is Ready then
       _go_if_ready()
@@ -404,7 +404,7 @@ actor WithDagonCoordinator
       x.dispose()
     end
     try
-      let x = _to_buffy_socket._1 as TCPConnection
+      let x = _to_host_socket._1 as TCPConnection
       x.dispose()
     end
     _store.dispose()
@@ -416,7 +416,7 @@ actor WithDagonCoordinator
     end
 
   fun _go_if_ready() =>
-    if (_to_dagon_socket._2 is Ready) and (_to_buffy_socket._2 is Ready) then
+    if (_to_dagon_socket._2 is Ready) and (_to_host_socket._2 is Ready) then
       _send_ready()
     end
 
@@ -427,13 +427,13 @@ actor WithDagonCoordinator
     end
 
 //
-// SEND DATA INTO BUFFY
+// SEND DATA INTO WALLAROO
 //
 
 actor SendingActor
   let _messages_to_send: USize
   var _messages_sent: USize = USize(0)
-  let _to_buffy_socket: TCPConnection
+  let _to_host_socket: TCPConnection
   let _store: Store
   let _coordinator: Coordinator
   let _timers: Timers
@@ -452,7 +452,7 @@ actor SendingActor
   var _walks_remaining: USize = 1000
 
   new create(messages_to_send: USize,
-    to_buffy_socket: TCPConnection,
+    to_host_socket: TCPConnection,
     store: Store,
     coordinator: Coordinator,
     data_source: Iterator[ByteSeq] iso,
@@ -464,7 +464,7 @@ actor SendingActor
     vary_by: U64)
   =>
     _messages_to_send = messages_to_send
-    _to_buffy_socket = to_buffy_socket
+    _to_host_socket = to_host_socket
     _store = store
     _coordinator = coordinator
     _data_source = consume data_source
@@ -538,7 +538,7 @@ actor SendingActor
       end
 
       for i in _wb.done().values() do
-        _to_buffy_socket.write(i)
+        _to_host_socket.write(i)
       end
       if _write_to_file then
         _store.sentv(consume d', Time.wall_to_nanos(Time.now()))

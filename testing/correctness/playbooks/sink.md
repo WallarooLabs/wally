@@ -10,7 +10,7 @@ The purpose of these tests is to validate that the behaviour of the application 
 
 1. sink: `nc -l 127.0.0.1 5555`
 1. app: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -c 127.0.0.1:12500 -d 127.0.0.1:12501 -m 127.0.0.1:5001`
-1. sender: `sender -b 127.0.0.1:7000 -s 1 -i 1_000_000_000 -y -g 12 -w -u -m 100`
+1. sender: `sender -h 127.0.0.1:7000 -s 1 -i 1_000_000_000 -y -g 12 -w -u -m 100`
 1. terminate sink with `Ctrl-C`
 1. restart sink
 
@@ -30,7 +30,7 @@ The purpose of these tests is to validate that the behaviour of the application 
 ### Steps:
 
 1. app: `./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -c 127.0.0.1:12500 -d 127.0.0.1:12501 -m 127.0.0.1:5001`
-1. sender: `sender -b 127.0.0.1:7000 -s 1 -i 1_000_000_000 -y -g 12 -w -u -m 100`
+1. sender: `sender -h 127.0.0.1:7000 -s 1 -i 1_000_000_000 -y -g 12 -w -u -m 100`
 1. wait a few seconds
 1. sink: `nc -l 127.0.0.1 5555`
 
