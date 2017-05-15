@@ -72,7 +72,7 @@ actor WorkerInitializer
 
   be identify_data_address(worker: String, host: String, service: String) =>
     if (not _data_addrs.contains(worker)) and (not _topology_ready) then
-      @printf[I32]("Worker %s control channel identified\n".cstring(),
+      @printf[I32]("Worker %s data channel identified\n".cstring(),
         worker.cstring())
       _data_addrs(worker) = (host, service)
       _data_identified = _data_identified + 1

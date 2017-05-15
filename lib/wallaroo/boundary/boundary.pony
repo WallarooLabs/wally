@@ -11,6 +11,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/routing"
+use "wallaroo/spike"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
@@ -28,19 +29,21 @@ class OutgoingBoundaryBuilder
   let _reporter: MetricsReporter val
   let _host: String
   let _service: String
+  let _spike_config: (SpikeConfig | None)
 
   new val create(auth: AmbientAuth, name: String, r: MetricsReporter iso,
-    h: String, s: String)
+    h: String, s: String, spike_config: (SpikeConfig | None) = None)
   =>
     _auth = auth
     _worker_name = name
     _reporter = consume r
     _host = h
     _service = s
+    _spike_config = spike_config
 
   fun apply(step_id: U128): OutgoingBoundary =>
     let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
-      _host, _service)
+      _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
 
   fun build_and_initialize(step_id: U128,
@@ -50,7 +53,7 @@ class OutgoingBoundaryBuilder
     Called when creating a boundary post cluster initialization
     """
     let boundary = OutgoingBoundary(_auth, _worker_name, _reporter.clone(),
-      _host, _service)
+      _host, _service where spike_config = _spike_config)
     boundary.register_step_id(step_id)
     boundary.quick_initialize(layout_initializer)
 
@@ -111,14 +114,26 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   new create(auth: AmbientAuth, worker_name: String,
     metrics_reporter: MetricsReporter iso, host: String, service: String,
-    from: String = "", init_size: USize = 64, max_size: USize = 16384)
+    from: String = "", init_size: USize = 64, max_size: USize = 16384,
+    spike_config:(SpikeConfig | None) = None)
   =>
     """
     Connect via IPv4 or IPv6. If `from` is a non-empty string, the connection
     will be made from the specified interface.
     """
     _auth = auth
-    _notify = BoundaryNotify(_auth)
+    ifdef "spike" then
+      match spike_config
+      | let sc: SpikeConfig =>
+        var notify = recover iso BoundaryNotify(_auth) end
+        _notify = SpikeWrapper(consume notify, sc)
+      else
+        _notify = BoundaryNotify(_auth)
+      end
+    else
+      _notify = BoundaryNotify(_auth)
+    end
+
     _worker_name = worker_name
     _host = host
     _service = service
@@ -197,7 +212,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
       _from.cstring())
     _notify_connecting()
 
-    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service + "\n").cstring())
+    @printf[I32](("RE-Connecting OutgoingBoundary to " + _host + ":" + _service
+      + "\n").cstring())
 
   be migrate_step[K: (Hashable val & Equatable[K] val)](step_id: U128,
     state_name: String, key: K, state: ByteSeq val)
@@ -433,7 +449,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
             _writeable = true
 
             // set replaying to true since we might need to replay to
-            // downstream refore resuming
+            // downstream before resuming
             _replaying = true
 
             _closed = false
@@ -447,7 +463,8 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
                 _step_id, _auth)
               _writev(connect_msg)
             else
-              @printf[I32]("error creating data connect message on reconnect\n".cstring())
+              @printf[I32]("error creating data connect message on reconnect\n"
+                .cstring())
             end
 
             ifdef not windows then
@@ -909,7 +926,8 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
         end
         conn.receive_ack(aw.seq_id)
       else
-        @printf[I32]("Unknown Wallaroo data message type received at OutgoingBoundary.\n".cstring())
+        @printf[I32](("Unknown Wallaroo data message type received at " +
+          "OutgoingBoundary.\n").cstring())
       end
 
       conn.expect(4)

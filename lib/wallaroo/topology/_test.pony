@@ -273,7 +273,7 @@ primitive _DataReceiversGenerator
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
-    Connections("", "", env, auth, "", "", "", "", "", "",
+    Connections("", "", auth, "", "", "", "", "", "",
       MetricsSink("", "", "", ""), "", "", false, "", false)
 
 primitive _RecoveryReplayerGenerator

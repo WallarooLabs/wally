@@ -13,7 +13,6 @@ use "wallaroo/topology"
 use "wallaroo/recovery"
 
 class ControlChannelListenNotifier is TCPListenNotify
-  let _env: Env
   let _auth: AmbientAuth
   let _name: String
   var _host: String = ""
@@ -29,7 +28,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _recovery_file: FilePath
   let _joining_existing_cluster: Bool
 
-  new iso create(name: String, env: Env, auth: AmbientAuth,
+  new iso create(name: String, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     initializer: (WorkerInitializer | None) = None,
     local_topology_initializer: LocalTopologyInitializer,
@@ -37,7 +36,6 @@ class ControlChannelListenNotifier is TCPListenNotify
     recovery_file: FilePath, data_host: String, data_service: String,
     joining: Bool = false)
   =>
-    _env = env
     _auth = auth
     _name = name
     _d_host = data_host
@@ -89,23 +87,23 @@ class ControlChannelListenNotifier is TCPListenNotify
         _connections.send_control_to_cluster(message)
       end
 
-      _env.out.print(_name + " control: listening on " + _host + ":" + _service)
+      @printf[I32]((_name + " control: listening on " + _host + ":" + _service
+        + "\n").cstring())
     else
-      _env.out.print(_name + "control : couldn't get local address")
+      @printf[I32]((_name + "control : couldn't get local address\n").cstring())
       listen.close()
     end
 
   fun ref not_listening(listen: TCPListener ref) =>
-    _env.out.print(_name + "control : couldn't listen")
+    @printf[I32]((_name + "control : couldn't listen\n").cstring())
     listen.close()
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
-    ControlChannelConnectNotifier(_name, _env, _auth, _connections,
+    ControlChannelConnectNotifier(_name, _auth, _connections,
       _initializer, _local_topology_initializer, _recovery_replayer,
       _router_registry, _d_host, _d_service)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
-  let _env: Env
   let _auth: AmbientAuth
   let _name: String
   let _connections: Connections
@@ -117,13 +115,12 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _d_service: String
   var _header: Bool = true
 
-  new iso create(name: String, env: Env, auth: AmbientAuth,
+  new iso create(name: String, auth: AmbientAuth,
     connections: Connections, initializer: (WorkerInitializer | None),
     local_topology_initializer: LocalTopologyInitializer,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     data_host: String, data_service: String)
   =>
-    _env = env
     _auth = auth
     _name = name
     _connections = connections
@@ -146,7 +143,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        _env.err.print("Error reading header on control channel")
+        @printf[I32]("Error reading header on control channel\n".cstring())
       end
     else
       ifdef "trace" then
@@ -211,13 +208,15 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         _local_topology_initializer.initialize()
       | let m: TopologyReadyMsg val =>
         ifdef "trace" then
-          @printf[I32]("Received TopologyReadyMsg on Control Channel\n".cstring())
+          @printf[I32]("Received TopologyReadyMsg on Control Channel\n"
+            .cstring())
         end
         match _initializer
         | let i: WorkerInitializer =>
           ifdef debug then
             if m.worker_name == "initializer" then
-              @printf[I32]("Initializer shouldn't be sending itself a TopologyReady message!\n".cstring())
+              @printf[I32](("Initializer shouldn't be sending itself a " +
+                "TopologyReady message!\n").cstring())
             end
           end
           i.topology_ready(m.worker_name)
@@ -240,7 +239,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
       | let m: CreateDataChannelListener val =>
         ifdef "trace" then
-          @printf[I32]("Received CreateDataChannelListener on Control Channel\n".cstring())
+          @printf[I32](("Received CreateDataChannelListener on Control " +
+            "Channel\n").cstring())
         end
         _local_topology_initializer.create_data_channel_listener(m.workers,
           _d_host, _d_service)
@@ -260,7 +260,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
       | let m: AckMigrationBatchCompleteMsg val =>
         ifdef "trace" then
-          @printf[I32]("Received AckMigrationBatchCompleteMsg on Control Channel\n".cstring())
+          @printf[I32](("Received AckMigrationBatchCompleteMsg on Control " +
+            "Channel\n").cstring())
         end
         _router_registry.process_migrating_target_ack(m.sender_name)
       | let m: MuteRequestMsg val =>
@@ -272,9 +273,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           m.originating_worker.cstring())
         _router_registry.remote_unmute_request(m.originating_worker)
       | let m: UnknownChannelMsg val =>
-        _env.err.print("Unknown channel message type.")
+        @printf[I32]("Unknown channel message type.\n".cstring())
       else
-        _env.err.print("Incoming Channel Message type not handled by control channel.")
+        @printf[I32](("Incoming Channel Message type not handled by control " +
+          "channel.\n").cstring())
       end
 
       conn.expect(4)
@@ -283,23 +285,22 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     true
 
   fun ref connected(conn: TCPConnection ref) =>
-    _env.out.print(_name + " is connected.")
+    @printf[I32]((_name + " is connected.\n").cstring())
 
   fun ref connect_failed(conn: TCPConnection ref) =>
-    _env.out.print(_name + ": connection failed!")
+    @printf[I32]((_name + ": connection failed!\n").cstring())
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print("ControlChannelConnectNotifier :" + _name + ": server closed")
+    @printf[I32](("ControlChannelConnectNotifier :" + _name +
+      ": server closed\n").cstring())
 
 class ControlSenderConnectNotifier is TCPConnectionNotify
-  let _env: Env
   let _auth: AmbientAuth
   let _worker_name: String
   var _header: Bool = true
 
-  new iso create(env: Env, auth: AmbientAuth, worker_name: String)
+  new iso create(auth: AmbientAuth, worker_name: String)
   =>
-    _env = env
     _auth = auth
     _worker_name = worker_name
 
@@ -313,16 +314,14 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
     true
 
 class JoiningControlSenderConnectNotifier is TCPConnectionNotify
-  let _env: Env
   let _auth: AmbientAuth
   let _worker_name: String
   let _startup: Startup
   var _header: Bool = true
 
-  new iso create(env: Env, auth: AmbientAuth, worker_name: String,
+  new iso create(auth: AmbientAuth, worker_name: String,
     startup: Startup)
   =>
-    _env = env
     _auth = auth
     _worker_name = worker_name
     _startup = startup
@@ -340,7 +339,7 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        _env.err.print("Error reading header on control channel")
+        @printf[I32]("Error reading header on control channel\n".cstring())
       end
     else
       let msg = ChannelMsgDecoder(consume data, _auth)
@@ -357,7 +356,8 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
           Fail()
         end
       else
-        _env.err.print("Incoming Channel Message type not handled by control channel.")
+        @printf[I32](("Incoming Channel Message type not handled by control " +
+          "channel.\n").cstring())
       end
       conn.expect(4)
       _header = true

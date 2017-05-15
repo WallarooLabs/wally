@@ -3,14 +3,12 @@ use "sendence/messages"
 use "sendence/bytes"
 
 class HomeConnectNotify is TCPConnectionNotify
-  let _env: Env
   let _name: String
   let _connections: Connections
   var _header: Bool = true
   var _has_connected: Bool = false
 
-  new iso create(env: Env, name: String, connections: Connections) =>
-    _env = env
+  new iso create(name: String, connections: Connections) =>
     _name = name
     _connections = connections
 
@@ -29,18 +27,19 @@ class HomeConnectNotify is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        _env.err.print("Error reading header on phone home channel")
+        @printf[I32]("Error reading header on phone home channel\n".cstring())
       end
     else
       try
         let external_msg = ExternalMsgDecoder(consume data)
         match external_msg
         | let m: ExternalShutdownMsg val =>
-          _env.out.print("Received ExternalShutdownMsg")
+          @printf[I32]("Received ExternalShutdownMsg\n".cstring())
           _connections.shutdown()
         end
       else
-        _env.err.print("Phone home connection: error decoding phone home message")
+        @printf[I32](("Phone home connection: error decoding phone home " +
+          "message\n").cstring())
       end
 
       conn.expect(4)
@@ -49,4 +48,4 @@ class HomeConnectNotify is TCPConnectionNotify
     true
 
   fun ref closed(conn: TCPConnection ref) =>
-    _env.out.print("HomeConnectNotify: " + _name + ": server closed")
+    @printf[I32](("HomeConnectNotify: " + _name + ": server closed\n").cstring())
