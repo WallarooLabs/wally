@@ -189,7 +189,7 @@ actor Startup
       let o_addr: Array[String] val = consume o_addr_trn
 
       if _startup_options.worker_name == "" then
-        _env.out.print("You must specify a worker name via --worker-name/-n.")
+        _env.out.print("You must specify a worker name via --name/-n.")
         error
       end
 
