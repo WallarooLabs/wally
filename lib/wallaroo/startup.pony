@@ -15,6 +15,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
+use "wallaroo/spike"
 use "wallaroo/topology"
 
 actor Startup
@@ -50,6 +51,9 @@ actor Startup
     end
     ifdef "trace" then
       @printf[I32]("****TRACE is active****\n".cstring())
+    end
+    ifdef "spike" then
+      @printf[I32]("****SPIKE is active****\n".cstring())
     end
 
     try
@@ -139,7 +143,7 @@ actor Startup
         end
         let j_addr = _startup_options.j_arg as Array[String]
         let control_notifier: TCPConnectionNotify iso =
-          JoiningControlSenderConnectNotifier(_env, auth,
+          JoiningControlSenderConnectNotifier(auth,
             _startup_options.worker_name, this)
         let control_conn: TCPConnection =
           TCPConnection(auth, consume control_notifier, j_addr(0), j_addr(1))
@@ -278,10 +282,11 @@ actor Startup
         end
 
       let connections = Connections(_application.name(),
-        _startup_options.worker_name, _env,
+        _startup_options.worker_name,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
         metrics_conn, m_addr(0), m_addr(1), _startup_options.is_initializer,
-        _connection_addresses_file, _startup_options.is_joining)
+        _connection_addresses_file, _startup_options.is_joining,
+        _startup_options.spike_config)
 
       let data_receivers = DataReceivers(auth,
         _startup_options.worker_name, connections, is_recovering)
@@ -337,7 +342,7 @@ actor Startup
         _control_channel_file)
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
-          _env, auth, connections,
+          auth, connections,
           _startup_options.is_initializer, _worker_initializer,
           local_topology_initializer,
           recovery_replayer, router_registry,
@@ -432,11 +437,12 @@ actor Startup
       let my_d_service = _startup_options.my_d_addr(1)
 
       let connections = Connections(_application.name(),
-        _startup_options.worker_name, _env,
+        _startup_options.worker_name,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
         metrics_conn, m.metrics_host, m.metrics_service,
         _startup_options.is_initializer,
-        _connection_addresses_file, _startup_options.is_joining)
+        _connection_addresses_file, _startup_options.is_joining,
+        _startup_options.spike_config)
 
       let data_receivers = DataReceivers(auth, _startup_options.worker_name, connections)
 
@@ -504,7 +510,7 @@ actor Startup
         _control_channel_file)
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
-          _env, auth, connections,
+          auth, connections,
           _startup_options.is_initializer, _worker_initializer,
           local_topology_initializer,
           recovery_replayer, router_registry, control_channel_filepath,

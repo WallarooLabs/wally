@@ -12,13 +12,13 @@ use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/recovery"
+use "wallaroo/spike"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 actor Connections is Cluster
   let _app_name: String
   let _worker_name: String
-  let _env: Env
   let _auth: AmbientAuth
   let _is_initializer: Bool
   var _my_control_addr: (String, String) = ("", "")
@@ -41,17 +41,17 @@ actor Connections is Cluster
   let _guid_gen: GuidGenerator = GuidGenerator
   let _connection_addresses_file: String
   let _is_joining: Bool
+  let _spike_config: (SpikeConfig | None)
 
   new create(app_name: String, worker_name: String,
-    env: Env, auth: AmbientAuth, c_host: String, c_service: String,
+    auth: AmbientAuth, c_host: String, c_service: String,
     d_host: String, d_service: String, ph_host: String, ph_service: String,
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
-    is_joining: Bool)
+    is_joining: Bool, spike_config: (SpikeConfig | None) = None)
   =>
     _app_name = app_name
     _worker_name = worker_name
-    _env = env
     _auth = auth
     _is_initializer = is_initializer
     _metrics_conn = metrics_conn
@@ -61,6 +61,7 @@ actor Connections is Cluster
     _init_d_service = d_service
     _connection_addresses_file = connection_addresses_file
     _is_joining = is_joining
+    _spike_config = spike_config
 
     if _is_initializer then
       _my_control_addr = (c_host, c_service)
@@ -71,7 +72,7 @@ actor Connections is Cluster
 
     if (ph_host != "") and (ph_service != "") then
       let phone_home = TCPConnection(auth,
-        HomeConnectNotify(env, _worker_name, this), ph_host, ph_service)
+        HomeConnectNotify(_worker_name, this), ph_host, ph_service)
       _phone_home = phone_home
       if is_initializer then
         let ready_msg = ExternalMsgEncoder.ready(_worker_name)
@@ -269,7 +270,7 @@ actor Connections is Cluster
     | let tcp: TCPConnection =>
       tcp.writev(msg)
     else
-      _env.err.print("There is no phone home connection to send on!")
+      @printf[I32]("There is no phone home connection to send on!\n".cstring())
     end
 
   be create_boundary_to_new_worker(target: String, boundary_id: U128,
@@ -280,7 +281,7 @@ actor Connections is Cluster
       let reporter = MetricsReporter(_app_name,
         _worker_name, _metrics_conn)
       let builder = OutgoingBoundaryBuilder(_auth, _worker_name,
-        consume reporter, host, service)
+        consume reporter, host, service, _spike_config)
       let boundary = builder.build_and_initialize(boundary_id,
         local_topology_initializer)
       local_topology_initializer.add_boundary_to_new_worker(target, boundary,
@@ -312,7 +313,8 @@ actor Connections is Cluster
       out_bbs(target) = builder
     end
 
-    @printf[I32](("Preparing to update " + _data_conns.size().string() + " boundaries\n").cstring())
+    @printf[I32](("Preparing to update " + _data_conns.size().string() +
+      " boundaries\n").cstring())
 
     local_topology_initializer.update_boundaries(consume out_bs,
       consume out_bbs)
@@ -471,7 +473,7 @@ actor Connections is Cluster
   =>
     _control_addrs(target_name) = (host, service)
     let control_notifier: TCPConnectionNotify iso =
-      ControlSenderConnectNotifier(_env, _auth, target_name)
+      ControlSenderConnectNotifier(_auth, target_name)
     let control_conn: TCPConnection =
       TCPConnection(_auth, consume control_notifier, host, service)
     _control_conns(target_name) = control_conn
@@ -498,7 +500,8 @@ actor Connections is Cluster
   =>
     _data_addrs(target_name) = (host, service)
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
-      MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service)
+      MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
+      _spike_config)
     let outgoing_boundary = boundary_builder(_guid_gen.u128())
     _data_conn_builders(target_name) = boundary_builder
     _data_conns(target_name) = outgoing_boundary
@@ -508,7 +511,8 @@ actor Connections is Cluster
   =>
     _data_addrs(target_name) = (host, service)
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
-      MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service)
+      MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
+      _spike_config)
     let outgoing_boundary =
       boundary_builder.build_and_initialize(_guid_gen.u128(), lti)
     _data_conn_builders(target_name) = boundary_builder

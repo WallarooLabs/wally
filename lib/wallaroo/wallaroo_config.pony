@@ -1,4 +1,5 @@
 use "sendence/options"
+use "wallaroo/spike"
 
 class StartupOptions
   var m_arg: (Array[String] | None) = None
@@ -20,6 +21,7 @@ class StartupOptions
   var is_swarm_managed: Bool = false
   var a_arg: (String | None) = None
   var stop_the_world_pause: U64 = 2_000_000_000
+  var spike_config: (SpikeConfig | None) = None
 
 primitive WallarooConfig
   fun application_args(args: Array[String] val): Array[String] val ? =>
@@ -32,6 +34,11 @@ primitive WallarooConfig
 
   fun _parse(args: Array[String] val): (StartupOptions, Array[String] val) ? =>
     let so: StartupOptions ref = StartupOptions
+
+    var spike_seed: (U64 | None) = None
+    var spike_drop: Bool = false
+    var spike_prob: (F64 | None) = None
+    var spike_margin: (USize | None) = None
 
     var options = Options(args, false)
 
@@ -61,6 +68,10 @@ primitive WallarooConfig
       .add("swarm-managed", "s", None)
       .add("swarm-manager-address", "a", StringArgument)
       .add("stop-pause", "u", I64Argument)
+      .add("spike-seed", "", I64Argument)
+      .add("spike-drop", "", None)
+      .add("spike-prob", "", F64Argument)
+      .add("spike-margin", "", I64Argument)
 
     for option in options do
       match option
@@ -95,10 +106,28 @@ primitive WallarooConfig
       | ("swarm-manager-address", let arg: String) => so.a_arg = arg
       | ("stop-pause", let arg: I64) =>
         so.stop_the_world_pause = arg.u64()
+      | ("spike-seed", let arg: I64) => spike_seed = arg.u64()
+      | ("spike-drop", None) => spike_drop = true
+      | ("spike-prob", let arg: F64) => spike_prob = arg
+      | ("spike-margin", let arg: I64) => spike_margin = arg.usize()
       end
     end
 
-    var o = Options(options.remaining(), false)
+    ifdef "spike" then
+      so.spike_config = SpikeConfig(spike_drop, spike_prob, spike_margin,
+        spike_seed)
+      let sc = so.spike_config as SpikeConfig
 
+      @printf[I32](("|||Spike seed: " + sc.seed.string() +
+        "|||\n").cstring())
+      @printf[I32](("|||Spike drop: " + sc.drop.string() +
+        "|||\n").cstring())
+      @printf[I32](("|||Spike prob: " + sc.prob.string() +
+        "|||\n").cstring())
+      @printf[I32](("|||Spike margin: " + sc.margin.string() +
+        "|||\n").cstring())
+    end
+
+    var o = Options(options.remaining(), false)
 
     (so, options.remaining())
