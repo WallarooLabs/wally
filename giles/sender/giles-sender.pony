@@ -6,11 +6,11 @@ use "collections"
 use "debug"
 use "files"
 use "net"
-use "options"
 use "random"
 use "time"
 use "sendence/bytes"
 use "sendence/messages"
+use "sendence/options"
 use "sendence/tcp"
 
 // documentation
