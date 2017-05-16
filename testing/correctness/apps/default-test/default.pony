@@ -40,7 +40,7 @@ actor Main
       end
       Startup(env, application, None)//, 1)
     else
-      env.out.print("Couldn't build topology")
+      @printf[I32]("Couldn't build topology\n".cstring())
     end
 
 class val NormalStateBuilder

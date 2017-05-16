@@ -193,7 +193,8 @@ actor Startup
       let o_addr: Array[String] val = consume o_addr_trn
 
       if _startup_options.worker_name == "" then
-        _env.out.print("You must specify a worker name via --name/-n.")
+        @printf[I32](("You must specify a worker name via " +
+          "--name/-n.\n").cstring())
         error
       end
 
@@ -324,7 +325,7 @@ actor Startup
         end
 
       if _startup_options.is_initializer then
-        _env.out.print("Running as Initializer...")
+        @printf[I32]("Running as Initializer...\n".cstring())
         _application_initializer = ApplicationInitializer(auth,
           local_topology_initializer, input_addrs, o_addr)
         match _application_initializer

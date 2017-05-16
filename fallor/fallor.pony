@@ -21,15 +21,14 @@ actor Main
         | ("input", let arg: String) => input_file_path = arg
         | ("output", let arg: String) => output_file_path = arg
         | ("help", None) =>
-          env.out.print(
+          @printf[I32](
             """
             PARAMETERS:
             -----------------------------------------------------------------------------------
             --input/-i [Sets file to read from (default: received.txt)]
             --output/-o [Sets file to write to (default: fallor-readable.txt)]
             -----------------------------------------------------------------------------------
-            """
-          )
+            """.cstring())
           return
         end
       end
@@ -46,14 +45,14 @@ actor Main
           try
             FallorMsgDecoder.with_timestamp(bytes)
           else
-            env.err.print("Problem decoding!")
+            @printf[I32]("Problem decoding!\n".cstring())
             error
           end
         output_file.print(", ".join(fields))
       end
       output_file.dispose()
     else
-      env.err.print("Error reading and writing files.")
+      @printf[I32]("Error reading and writing files.\n".cstring())
     end
 
 class ReceiverFileDataSource is Iterator[Array[U8] val]

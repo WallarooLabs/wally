@@ -55,28 +55,31 @@ actor Main
         end
 
         if l_arg is None then
-          env.err.print("Must supply required '--listen' argument")
+          @printf[I32]("Must supply required '--listen' argument\n".cstring())
           required_args_are_present = false
         else
           if (l_arg as Array[String]).size() != 2 then
-            env.err.print(
-              "'--listen' argument should be in format: '127.0.0.1:8080")
+            @printf[I32](
+              "'--listen' argument should be in format: '127.0.0.1:8080\n"
+              .cstring())
             required_args_are_present = false
           end
         end
 
         if p_arg isnt None then
           if (p_arg as Array[String]).size() != 2 then
-            env.err.print(
-              "'--phone-home' argument should be in format: '127.0.0.1:8080")
+            @printf[I32](
+              "'--phone-home' argument should be in format: '127.0.0.1:8080\n"
+              .cstring())
             required_args_are_present = false
           end
         end
 
         if (p_arg isnt None) or (n_arg isnt None) then
           if (p_arg is None) or (n_arg is None) then
-            env.err.print(
-              "'--phone-home' must be used in conjunction with '--name'")
+            @printf[I32](
+              "'--phone-home' must be used in conjunction with '--name'\n"
+              .cstring())
             required_args_are_present = false
           end
         end
@@ -86,8 +89,9 @@ actor Main
             let e' = (e_arg as USize)
             if e' < 1 then error end
           else
-            env.err.print(
-              "'--expect' must be an integer greater than 0")
+            @printf[I32](
+              "'--expect' must be an integer greater than 0\n"
+              .cstring())
             required_args_are_present = false
           end
         end
@@ -112,7 +116,7 @@ actor Main
           error
         end
       else
-        env.err.print(
+        @printf[I32](
           """
           --phone-home/-p <address> [Sets the address for phone home]
           --name/-n <name> [Name of giles-receiver node]
@@ -172,7 +176,7 @@ class FromBuffyNotify is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        _stderr.print("Blew up reading header from Buffy")
+        @printf[I32]("Blew up reading header from Buffy\n".cstring())
       end
     else
       if not _no_write then
@@ -214,7 +218,7 @@ class ToDagonNotify is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        _stderr.print("Blew up reading header from Buffy")
+        @printf[I32]("Blew up reading header from Buffy\n".cstring())
       end
     else
       try
@@ -223,10 +227,10 @@ class ToDagonNotify is TCPConnectionNotify
         | let d: ExternalShutdownMsg val =>
           _coordinator.finished()
         else
-          _stderr.print("Unexpected data from Dagon")
+          @printf[I32]("Unexpected data from Dagon\n".cstring())
         end
       else
-        _stderr.print("Unable to decode message Dagon")
+        @printf[I32]("Unable to decode message Dagon\n".cstring())
       end
 
       conn.expect(4)
@@ -315,8 +319,8 @@ actor WithoutDagonCoordinator is Coordinator
     end
     _count = _count + 1
     if _count >= _expected then
-      _env.err.print(_count.string() + " expected messages received. " +
-            "Terminating...")
+      @printf[I32]((_count.string() + " expected messages received. " +
+            "Terminating...\n").cstring())
       if _use_metrics then
         _metrics.set_end(Time.nanos(), _expected)
       end
@@ -326,10 +330,10 @@ actor WithoutDagonCoordinator is Coordinator
   be from_buffy_listener(listener: TCPListener, state: WorkerState) =>
     _from_buffy_listener = (listener, state)
     if state is Failed then
-      _env.err.print("Unable to open listener")
+      @printf[I32]("Unable to open listener\n".cstring())
       listener.dispose()
     elseif state is Ready then
-      _env.out.print("Listening for data")
+      @printf[I32]("Listening for data\n".cstring())
     end
 
   be connection_added(c: TCPConnection) =>
@@ -380,8 +384,8 @@ actor WithDagonCoordinator is Coordinator
     end
     _count = _count + 1
     if _count >= _expected then
-      _env.err.print(_count.string() + " expected messages received. " +
-            "Terminating...")
+      @printf[I32]((_count.string() + " expected messages received. " +
+            "Terminating...\n").cstring())
       if _use_metrics then
         _metrics.set_end(Time.nanos(), _expected)
       end
@@ -391,17 +395,17 @@ actor WithDagonCoordinator is Coordinator
   be from_buffy_listener(listener: TCPListener, state: WorkerState) =>
     _from_buffy_listener = (listener, state)
     if state is Failed then
-      _env.err.print("Unable to open listener")
+      @printf[I32]("Unable to open listener\n".cstring())
       listener.dispose()
     elseif state is Ready then
-      _env.out.print("Listening for data")
+      @printf[I32]("Listening for data\n".cstring())
       _alert_ready_if_ready()
     end
 
   be to_dagon_socket(sock: TCPConnection, state: WorkerState) =>
     _to_dagon_socket = (sock, state)
     if state is Failed then
-      _env.err.print("Unable to open dagon socket")
+      @printf[I32]("Unable to open dagon socket\n".cstring())
       sock.dispose()
     elseif state is Ready then
       _alert_ready_if_ready()

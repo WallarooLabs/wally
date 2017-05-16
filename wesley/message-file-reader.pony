@@ -69,13 +69,15 @@ class TextMessageFileReader
                 end
               end
             else
-              env.err.print("Failed reading on line "
-                + cur_line_number.string() + ":")
-              env.err.print(
-                "---------------------------------------------------")
-              env.err.print(cur_line)
-              env.err.print(
-                "---------------------------------------------------")
+              @printf[I32](("Failed reading on line "
+                  + cur_line_number.string() + ":" + "\n").cstring())
+              @printf[I32](
+                "---------------------------------------------------\n"
+                .cstring())
+              @printf[I32]((cur_line + "\n").cstring())
+              @printf[I32](
+                "---------------------------------------------------\n"
+                .cstring())
               error
             end
         else  // no field separator, return the parser over the entire line
@@ -104,7 +106,7 @@ class ReceivedMessageFileReader
         try
           FallorMsgDecoder.with_timestamp(rb.block(next_payload_size.usize()))
         else
-          env.err.print("Problem decoding!")
+          @printf[I32]("Problem decoding!\n".cstring())
           error
         end
       bytes_left = bytes_left - next_payload_size.usize()

@@ -33,7 +33,8 @@ actor Main
       let file = File(FilePath(auth, file_path))
 
       if message_count == 0 then
-        env.out.print("Specify a message count (--message-count/-m)!")
+        @printf[I32]("Specify a message count (--message-count/-m)!\n"
+          .cstring())
         error
       end
 

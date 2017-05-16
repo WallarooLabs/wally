@@ -99,7 +99,7 @@ actor Main
       input_file.dispose()
       output_file.dispose()
     else
-      env.err.print("Error reading and writing files.")
+      @printf[I32]("Error reading and writing files.\n".cstring())
     end
 
   fun pad_symbol(symbol': String): String =>
@@ -116,12 +116,11 @@ actor Main
     symbol
 
   fun help() =>
-    _env.out.print(
+    @printf[I32](
       """
       PARAMETERS:
       -----------------------------------------------------------------------------------
       --input/-i [Sets file to read from]
       --output/-o [Sets file to write to]
       -----------------------------------------------------------------------------------
-      """
-    )
+      """.cstring())

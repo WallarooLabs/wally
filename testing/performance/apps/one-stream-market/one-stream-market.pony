@@ -93,7 +93,7 @@ actor Main
       end
       Startup(env, application, "market-spread")
     else
-      env.out.print("Couldn't build topology")
+      @printf[I32]("Couldn't build topology\n".cstring())
     end
 
 interface Symboly

@@ -17,13 +17,13 @@ actor SpewerApp
   new create(env: Env) =>
     _env = env
     let config = parse_config(env.args)
-    env.err.print("host: " + config.host)
-    env.err.print("port: " + config.port)
-    env.err.print("count: " + config.count.string())
+    @printf[I32](("host: " + config.host + "\n").cstring())
+    @printf[I32](("port: " + config.port + "\n").cstring())
+    @printf[I32](("count: " + config.count.string() + "\n").cstring())
     Spewer(config.host, config.port, config.count, env.out, this)
 
   be report_sum(sum: U64) =>
-    _env.err.print("final sum = " + sum.string())
+    @printf[I32](("final sum = " + sum.string() + "\n").cstring())
 
   fun parse_config(args: Array[String] val): SpewerConfig =>
     try

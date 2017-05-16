@@ -98,47 +98,52 @@ actor Main
         end
 
         if h_arg is None then
-          env.err.print("Must supply required '--host' argument")
+          @printf[I32]("Must supply required '--host' argument\n".cstring())
           required_args_are_present = false
         else
           if (h_arg as Array[String]).size() != 2 then
-            env.err.print(
-              "'--host' argument should be in format: '127.0.0.1:8080")
+            @printf[I32](
+              "'--host' argument should be in format: '127.0.0.1:8080\n"
+              .cstring())
             required_args_are_present = false
           end
         end
 
         if m_arg is None then
-          env.err.print("Must supply required '--messages' argument")
+          @printf[I32]("Must supply required '--messages' argument\n".cstring())
           required_args_are_present = false
         end
 
         if p_arg isnt None then
           if (p_arg as Array[String]).size() != 2 then
-            env.err.print(
-              "'--dagon' argument should be in format: '127.0.0.1:8080")
+            @printf[I32](
+              "'--dagon' argument should be in format: '127.0.0.1:8080\n"
+              .cstring())
             required_args_are_present = false
           end
         end
 
         if (p_arg isnt None) or (n_arg isnt None) then
           if (p_arg is None) or (n_arg is None) then
-            env.err.print(
-              "'--dagon' must be used in conjunction with '--name'")
+            @printf[I32](
+              "'--dagon' must be used in conjunction with '--name'\n"
+              .cstring())
             required_args_are_present = false
           end
         end
 
         if (g_arg isnt None) and variable_size then
-          env.err.print(
-            "--msg-size and --variable-size can't be used together")
+          @printf[I32](
+            "--msg-size and --variable-size can't be used together\n"
+            .cstring())
           required_args_are_present = false
         end
 
         if binary_fmt then
           if (variable_size == false) and (g_arg is None) then
-            env.err.print(
-              "--binary requires either --msg-size or --variable-size")
+            @printf[I32](
+              "--binary requires either --msg-size or --variable-size\n"
+              .cstring())
             required_args_are_present = false
           end
         end
@@ -150,7 +155,7 @@ actor Main
             for str in (consume fs).values() do
               let path = FilePath(env.root as AmbientAuth, str)
               if not path.exists() then
-                env.err.print("Error opening file '" + str + "'.")
+                @printf[I32](("Error opening file '" + str + "'.\n").cstring())
                 required_args_are_present = false
               end
             end
@@ -214,7 +219,7 @@ actor Main
           coordinator.sending_actor(sa)
         end
       else
-        env.err.print("FUBAR! FUBAR!")
+        @printf[I32]("FUBAR! FUBAR!\n".cstring())
       end
     end
 
@@ -267,10 +272,10 @@ class ToDagonNotify is TCPConnectionNotify
         | let m: ExternalStartMsg val =>
             _coordinator.go()
         else
-          _stderr.print("Unexpected message from Dagon")
+          @printf[I32]("Unexpected message from Dagon\n".cstring())
         end
       else
-        _stderr.print("Unable to decode message from Dagon")
+        @printf[I32]("Unable to decode message from Dagon\n".cstring())
       end
     end
     true
@@ -326,10 +331,10 @@ actor WithoutDagonCoordinator
   be to_host_socket(sock: TCPConnection, state: WorkerState) =>
     _to_host_socket = (sock, state)
     if state is Failed then
-      _env.err.print("Unable to connect")
+      @printf[I32]("Unable to connect\n".cstring())
       sock.dispose()
     elseif state is Ready then
-      _env.out.print("Connected")
+      @printf[I32]("Connected\n".cstring())
       _go_if_ready()
     end
 
@@ -379,7 +384,7 @@ actor WithDagonCoordinator
   be to_host_socket(sock: TCPConnection, state: WorkerState) =>
     _to_host_socket = (sock, state)
     if state is Failed then
-      _env.err.print("Unable to open host socket")
+      @printf[I32]("Unable to open host socket\n".cstring())
       sock.dispose()
     elseif state is Ready then
       _go_if_ready()
@@ -388,7 +393,7 @@ actor WithDagonCoordinator
   be to_dagon_socket(sock: TCPConnection, state: WorkerState) =>
     _to_dagon_socket = (sock, state)
     if state is Failed then
-      _env.err.print("Unable to open dagon socket")
+      @printf[I32]("Unable to open dagon socket\n".cstring())
       sock.dispose()
     elseif state is Ready then
       _go_if_ready()

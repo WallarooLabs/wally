@@ -9,15 +9,15 @@ primitive VerifierCLI[S: Message val, R: Message val]
   fun run(env: Env, test_name: String, result_mapper: ResultMapper[S, R], 
     sent_parser: SentParser[S], received_parser: ReceivedParser[R]) 
   =>
-    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
-    env.out.print(" Wesley: Starting " + test_name)
-    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
+    @printf[I32]("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n".cstring())
+    @printf[I32]((" Wesley: Starting " + test_name + "\n").cstring())
+    @printf[I32]("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n".cstring())
     match stateless_verifier_from_command_line(env, result_mapper, 
       sent_parser, received_parser)
     | let verifier: StatelessVerifier[S, R] => verify(env, verifier)
     | let setup_error: SetupError =>
       env.exitcode(setup_error.exitcode())
-      env.err.print(setup_error.message())
+      @printf[I32]((setup_error.message() + "\n").cstring())
     end
 
   fun run_with_initialization[I: Message val, 
@@ -28,15 +28,15 @@ primitive VerifierCLI[S: Message val, R: Message val]
     sent_parser: SentParser[S], 
     received_parser: ReceivedParser[R]) 
   =>
-    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
-    env.out.print(" Wesley: Starting " + test_name)
-    env.out.print("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww")
+    @printf[I32]("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n".cstring())
+    @printf[I32]((" Wesley: Starting " + test_name + "\n").cstring())
+    @printf[I32]("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n".cstring())
     match stateful_verifier_from_command_line[I, State](env, result_mapper, 
       initialization_parser, sent_parser, received_parser)
     | let verifier: StatefulVerifier[S, R, I, State] => verify(env, verifier)
     | let setup_error: SetupError =>
       env.exitcode(setup_error.exitcode())
-      env.err.print(setup_error.message())
+      @printf[I32]((setup_error.message() + "\n").cstring())
     end
 
   fun stateless_verifier_from_command_line(env: Env, 
@@ -228,7 +228,7 @@ primitive VerifierCLI[S: Message val, R: Message val]
 
   fun verify(env:Env, verifier: Verifier ref) =>
     let pass_fail = verifier.test()
-    env.err.print(pass_fail.exitmessage())
+    @printf[I32]((pass_fail.exitmessage() + "\n").cstring())
     env.exitcode(pass_fail.exitcode())
 
 interface SetupError
