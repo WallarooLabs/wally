@@ -1,4 +1,5 @@
 use "collections"
+use "signals"
 use "sendence/options"
 use "wallaroo"
 use "wallaroo/tcp_source"
@@ -12,6 +13,8 @@ actor Main
     Machida.start_python()
 
     try
+      SignalHandler(ShutdownHandler, Sig.int())
+
       var module_name: String = ""
 
       let options = Options(WallarooConfig.application_args(env.args), false)
