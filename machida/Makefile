@@ -16,16 +16,15 @@ RECURSE_SUBMAKEFILES := false
 # run from, so we get an absolute path based on $(buffy_path). This will work
 # whether make was run from the top level of Wallaroo or from within the
 # machida directory.
-MACHIDA_PATH := $(buffy_path)/machida
-MACHIDA_BUILD := $(MACHIDA_PATH)/build
-MACHIDA_CPP := $(MACHIDA_PATH)/cpp
-WALLAROO_LIB :=  $(buffy_path)/lib
+MACHIDA_PATH = $(buffy_path)/machida
+MACHIDA_BUILD = $(MACHIDA_PATH)/build
+MACHIDA_CPP = $(MACHIDA_PATH)/cpp
+WALLAROO_LIB =  $(buffy_path)/lib
 
 # Our top level Makefile has 3 rules that would have been generated for us if
 # we hadn't turned them off at the top of the Makefile. Here we recreate them
 # with our own custom rules. This allows the top level commands like
-# "make test" to work. From within our machida directory, currently this does
-# not work and needs to be fixed.
+# "make test" to work.
 build-machida-all = machida_clean machida_build
 test-machida-all = machida_clean machida_build machida_test
 clean-machida-all = machida_clean

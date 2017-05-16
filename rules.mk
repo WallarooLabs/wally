@@ -46,14 +46,37 @@ clean-buffyroot-all :=
 build-docker-buffyroot-all :=
 push-docker-buffyroot-all :=
 
-PONY_TARGET :=
-DOCKER_TARGET :=
-EXS_TARGET :=
-RECURSE_SUBMAKEFILES :=
-ponyc_docker_args :=
-monhub_docker_args :=
-quote :=
-ponyc_arch_args :=
+ifndef PONY_TARGET
+  PONY_TARGET :=
+endif
+
+ifndef DOCKER_TARGET
+  DOCKER_TARGET :=
+endif
+
+ifndef EXS_TARGET
+  EXS_TARGET :=
+endif
+
+ifndef RECURSE_SUBMAKEFILES
+  RECURSE_SUBMAKEFILES :=
+endif
+
+ifndef ponyc_docker_args
+  ponyc_docker_args :=
+endif
+
+ifndef monhub_docker_args
+  monhub_docker_args :=
+endif
+
+ifndef quote
+  quote :=
+endif
+
+ifndef ponyc_arch_args
+  ponyc_arch_args :=
+endif
 
 # function to lazily initialize a variable on first use and to only evaluate the expression once
 # see: http://www.oreilly.com/openbook/make3/book/ch10.pdf
