@@ -53,40 +53,45 @@ actor Main
         end
 
         if l_arg is None then
-          env.err.print("Must supply required '--listen' argument")
+          @printf[I32]("Must supply required '--listen' argument\n".cstring())
           required_args_are_present = false
         else
           if (l_arg as Array[String]).size() != 2 then
-            env.err.print(
-              "'--listen' argument should be in format: '127.0.0.1:8080'")
+            @printf[I32](
+              "'--listen' argument should be in format: '127.0.0.1:8080'\n"
+              .cstring())
             required_args_are_present = false
           end
         end
 
         if p_arg isnt None then
           if (p_arg as Array[String]).size() != 2 then
-            env.err.print(
-              "'--phone-home' argument should be in format: '127.0.0.1:8080'")
+            @printf[I32](
+              "'--phone-home' argument should be in format: '127.0.0.1:8080'\n"
+              .cstring())
               required_args_are_present = false
           end
         end
 
         if (p_arg isnt None) or (n_arg isnt None) then
           if (p_arg is None) or (n_arg is None) then
-            env.err.print(
-              "'--phone-home' must be used in conjuction with '--name'")
+            @printf[I32](
+              "'--phone-home' must be used in conjuction with '--name'\n"
+              .cstring())
             required_args_are_present = false
           end
         end
 
         if forward isnt false then
           if f_addr_arg is None then
-            env.err.print(
-              "'--forward-addr' must be used in conjucion with '--forward'")
+            @printf[I32](
+              "'--forward-addr' must be used in conjucion with '--forward'\n"
+              .cstring())
           else
             if (f_addr_arg as Array[String]).size() != 2 then
-              env.err.print(
-                "'--forward-addr' arg should be in format: '127.0.0.1:8080")
+              @printf[I32](
+                "'--forward-addr' arg should be in format: '127.0.0.1:8080\n"
+                .cstring())
             end
           end
         end
@@ -118,7 +123,7 @@ actor Main
             listener_addr(1))
         end
       else
-        env.err.print(
+        @printf[I32](
           """
           --phone-home/-p <address> [Sets the address for phone home]
           --name/-n <name> [Name of metrics-receiver node]
@@ -185,7 +190,7 @@ class FromWallarooNotify is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        _stderr.print("Blew up reading header from Wallaroo")
+        @printf[I32]("Blew up reading header from Wallaroo\n".cstring())
       end
     else
       var data_copy: Array[U8 val] val = consume data
@@ -229,7 +234,7 @@ class ToDagonNotify is TCPConnectionNotify
         conn.expect(expect)
         _header = false
       else
-        _stderr.print("Blew up reading header from Wallaroo")
+        @printf[I32]("Blew up reading header from Wallaroo\n".cstring())
       end
     else
       try
@@ -238,10 +243,10 @@ class ToDagonNotify is TCPConnectionNotify
         | let d: ExternalShutdownMsg val =>
           _coordinator.finished()
         else
-          _stderr.print("Unexpected data from Dagon")
+          @printf[I32]("Unexpected data from Dagon\n".cstring())
         end
       else
-        _stderr.print("Unable to decode message from Dagon")
+        @printf[I32]("Unable to decode message from Dagon\n".cstring())
       end
 
       conn.expect(4)
@@ -308,10 +313,10 @@ actor WithoutDagonCoordinator is Coordinator
   be from_wallaroo_listener(listener: TCPListener, state: WorkerState) =>
     _from_wallaroo_listener = (listener, state)
     if state is Failed then
-      _env.err.print("Unable to open listener")
+      @printf[I32]("Unable to open listener\n".cstring())
       listener.dispose()
     elseif state is Ready then
-      _env.out.print("Listening for data")
+      @printf[I32]("Listening for data\n".cstring())
     end
 
   be connection_added(c: TCPConnection) =>
@@ -347,17 +352,17 @@ actor WithDagonCoordinator is Coordinator
   be from_wallaroo_listener(listener: TCPListener, state: WorkerState) =>
     _from_wallaroo_listener = (listener, state)
     if state is Failed then
-      _env.err.print("Unable to open listener")
+      @printf[I32]("Unable to open listener\n".cstring())
       listener.dispose()
     elseif state is Ready then
-      _env.out.print("Listening for data")
-        _alert_ready_if_ready()
+      @printf[I32]("Listening for data\n".cstring())
+      _alert_ready_if_ready()
     end
 
   be to_dagon_socket(sock: TCPConnection, state: WorkerState) =>
     _to_dagon_socket = (sock, state)
     if state is Failed then
-      _env.err.print("Unable to open dagon socket")
+      @printf[I32]("Unable to open dagon socket\n".cstring())
       sock.dispose()
     elseif state is Ready then
       _alert_ready_if_ready()

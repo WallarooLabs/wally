@@ -122,7 +122,7 @@ actor Main
       end
       Startup(env, application, "celsius-conversion")
     else
-      env.out.print("Couldn't build topology")
+      @printf[I32]("Couldn't build topology\n".cstring())
     end
 ```
 

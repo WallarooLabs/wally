@@ -62,7 +62,7 @@ actor Main
     end
 
   fun help() =>
-    _env.out.print(
+    @printf[I32](
       """
       PARAMETERS:
       -----------------------------------------------------------------------------------
@@ -70,7 +70,7 @@ actor Main
       --symbols_file/-s [Sets file to read non rejected symbols from]
       --output/-o [Sets file to write to]
       -----------------------------------------------------------------------------------
-      """)
+      """.cstring())
 
   fun generate_instruments(instruments_file: File): Array[InstrumentData val] val =>
     let instruments = recover trn Array[InstrumentData val] end

@@ -71,7 +71,7 @@ actor Main
         instruments_skew_percent, rejection_percent_per_sec,
         output_folder, instruments, rejected_instruments)
 
-      env.out.print("Starting orders generation...")
+      @printf[I32]("Starting orders generation...\n".cstring())
       order_file_generator.write_to_files()
     end
 
@@ -154,7 +154,7 @@ actor OrderFileGenerator
         output_file.writev(_wb.done())
         output_file.dispose()
       end
-    _env.out.print("Finished writing generated orders to files")
+    @printf[I32]("Finished writing generated orders to files\n".cstring())
     end
 
   fun ref check_output_file_size(output_file: File): File ?  =>

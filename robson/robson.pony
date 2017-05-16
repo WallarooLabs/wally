@@ -24,7 +24,7 @@ actor Main
       | ("input", let arg: String) => input_file_path = arg
       | ("output", let arg: String) => output_file_path = arg
       | ("help", None) =>
-        env.out.print(
+        @printf[I32](
         """
         --input/-i <file path> [Input file path where metrics are stored]
         --output/-o <file path> [Output file path where report will be written]
@@ -35,7 +35,7 @@ actor Main
       end
     end
     if (input_file_path == "") or (output_file_path == "") then
-        env.err.print(
+        @printf[I32](
         """
         --input/-i <file path> [Input file path where metrics are stored]
         --output/-o <file path> [Output file path where report will be written]
@@ -78,8 +78,8 @@ actor MetricsCollector
     | ("node-ingress-egress") =>
       add_worker_metrics(metrics_msg)
     else
-      _env.out.print("Unable to save metrics for category: " +
-        metrics_msg.category)
+      @printf[I32](("Unable to save metrics for category: " +
+        metrics_msg.category + "\n").cstring())
     end
 
   fun ref add_overall_metrics(metrics_msg: HubMetricsMsg val) =>
@@ -139,11 +139,11 @@ actor MetricsCollector
       let print_timestamp = WallClock.milliseconds()
       output_file.print("Report generated at: " + print_timestamp.string())
       output_file.dispose()
-      _env.out.print("Output file disposed")
+      @printf[I32]("Output file disposed\n".cstring())
     end
 
   be collect_metrics() =>
-     _env.out.print("Collecting Metrics")
+     @printf[I32]("Collecting Metrics\n".cstring())
     try
       let auth = _env.root as AmbientAuth
 
@@ -160,22 +160,22 @@ actor MetricsCollector
           let hub_msg = HubProtocolDecoder(rb.block(next_payload_size))
           match hub_msg
           | HubJoinMsg =>
-            _env.out.print("Decoded HubJoinMsg")
+            @printf[I32]("Decoded HubJoinMsg\n".cstring())
           | HubConnectMsg =>
-            _env.out.print("Decoded HubConnectMsg")
+            @printf[I32]("Decoded HubConnectMsg\n".cstring())
           | HubOtherMsg =>
-            _env.out.print("Decoded HubOtherMsg")
+            @printf[I32]("Decoded HubOtherMsg\n".cstring())
           else
             add_metrics(hub_msg as HubMetricsMsg val)
           end
 
         else
-          _env.err.print("Problem decoding!")
+          @printf[I32]("Problem decoding!\n".cstring())
         end
         bytes_left = bytes_left - (next_payload_size + 4)
       end
       input_file.dispose()
-      _env.out.print("Input file disposed")
+      @printf[I32]("Input file disposed\n".cstring())
     end
     generate_overall_metrics_data()
     generate_computation_metrics_data()
@@ -183,7 +183,7 @@ actor MetricsCollector
     print_metrics()
 
   fun ref generate_metrics_data() =>
-    _env.out.print("Generate Metrics Data")
+    @printf[I32]("Generate Metrics Data\n".cstring())
     generate_overall_metrics_data()
     generate_computation_metrics_data()
     generate_worker_metrics_data()

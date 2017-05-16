@@ -20,7 +20,7 @@ class WallarooMain
 
       Startup(env, consume application, None)
     else
-      env.err.print("Could not build application")
+      @printf[I32]("Could not build application\n".cstring())
     end
 
   fun _extract_c_args(pony_args: Array[String] val): (U32, Pointer[Pointer[U8] tag] tag) =>

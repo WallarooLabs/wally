@@ -40,7 +40,7 @@ actor Main
         | ("expected", let arg: I64) => expected = arg.u64()
         | ("at-least-once", None) => at_least_once = true
         | ("help", None) =>
-          env.out.print(
+          @printf[I32](
             """
             PARAMETERS:
             -----------------------------------------------------------------------------------
@@ -66,7 +66,7 @@ actor Main
           try
             FallorMsgDecoder.with_timestamp(bytes)
           else
-            env.err.print("Problem decoding!")
+            @printf[I32]("Problem decoding!\n".cstring())
             error
           end
         let ts = fields(0)
@@ -74,9 +74,9 @@ actor Main
         validator(consume v, consume ts)
       end
       validator.finalize()
-      env.out.print("Validation successful!")
+      @printf[I32]("Validation successful!\n".cstring())
     else
-      env.err.print("Error validating file.")
+      @printf[I32]("Error validating file.\n".cstring())
     end
 
 class WindowValidator

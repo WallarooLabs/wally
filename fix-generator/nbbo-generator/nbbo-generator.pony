@@ -46,7 +46,7 @@ actor Main
         output_msgs_per_sec, messages_duration_secs,
         output_folder, instruments)
 
-      env.out.print("Starting nbbo generation...")
+      @printf[I32]("Starting nbbo generation...\n".cstring())
       nbbo_files_generator.write_to_files()
     end
 
@@ -131,7 +131,8 @@ actor NbboFilesGenerator
         output_file.writev(_wb.done())
         output_file.dispose()
       end
-      _env.out.print("Finished writing generated NBBO messages to files")
+      @printf[I32]("Finished writing generated NBBO messages to files\n"
+        .cstring())
     end
 
   be generate_for_sec(sec: U64) =>

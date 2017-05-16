@@ -87,7 +87,7 @@ actor Main
       end
       Startup(env, application, "sequence-window")
     else
-      env.out.print("Couldn't build topology")
+      @printf[I32]("Couldn't build topology\n".cstring())
     end
 
 primitive WindowPartitionFunction

@@ -37,13 +37,15 @@ actor Main
           end
           Startup(env, application, None)
         else
-          env.err.print("Something went wrong while building the application")
+          @printf[I32]("Something went wrong while building the application\n"
+            .cstring())
         end
       else
-        env.err.print("Could not load module '" + module_name + "'")
+        @printf[I32](("Could not load module '" + module_name + "'\n")
+          .cstring())
       end
     else
-      env.err.print(
+      @printf[I32]((
         "Please use `--application-module=MODULE_NAME` to specify " +
-        "an application module")
+        "an application module\n").cstring())
     end

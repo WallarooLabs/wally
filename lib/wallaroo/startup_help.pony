@@ -1,6 +1,6 @@
 primitive StartupHelp
   fun apply(env: Env) =>
-    env.out.print(
+    @printf[I32](
       """
       To run Wallaroo:
       -----------------------------------------------------------------------------------

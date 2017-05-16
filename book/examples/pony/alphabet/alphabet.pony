@@ -23,7 +23,7 @@ actor Main
       end
       Startup(env, application, "alphabet-contest")
     else
-      env.out.print("Couldn't build topology")
+      @printf[I32]("Couldn't build topology\n".cstring())
     end
 
 class val LetterStateBuilder
