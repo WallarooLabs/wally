@@ -1,4 +1,4 @@
-interface WallarooOutgoingNetworkActorNotify
+trait WallarooOutgoingNetworkActorNotify
   fun ref connecting(conn: WallarooOutgoingNetworkActor ref, count: U32)
     """
     Called if name resolution succeeded for a WallarooOutgoingNetworkActor
@@ -67,3 +67,9 @@ interface WallarooOutgoingNetworkActorNotify
     receiving this notification, you should feel free to start making calls to
     `write` and `writev` again.
     """
+
+  fun ref dispose() =>
+    """
+    Called when the parent actor's dispose is called.
+    """
+    None

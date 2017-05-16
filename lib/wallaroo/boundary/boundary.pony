@@ -125,13 +125,13 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     ifdef "spike" then
       match spike_config
       | let sc: SpikeConfig =>
-        var notify = recover iso BoundaryNotify(_auth) end
+        var notify = recover iso BoundaryNotify(_auth, this) end
         _notify = SpikeWrapper(consume notify, sc)
       else
-        _notify = BoundaryNotify(_auth)
+        _notify = BoundaryNotify(_auth, this)
       end
     else
-      _notify = BoundaryNotify(_auth)
+      _notify = BoundaryNotify(_auth, this)
     end
 
     _worker_name = worker_name
@@ -372,6 +372,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     silently discarded and not acknowleged.
     """
     close()
+    _notify.dispose()
 
   be request_ack() =>
     // TODO: How do we propagate this down?
@@ -889,9 +890,19 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 class BoundaryNotify is WallarooOutgoingNetworkActorNotify
   let _auth: AmbientAuth
   var _header: Bool = true
+  let _outgoing_boundary: OutgoingBoundary tag
+  let _timers: Timers = Timers
+  let _reconnect_closed_delay: U64
+  let _reconnect_failed_delay: U64
 
-  new create(auth: AmbientAuth) =>
+  new create(auth: AmbientAuth, outgoing_boundary: OutgoingBoundary tag,
+    reconnect_closed_delay: U64 = 100_000_000,
+    reconnect_failed_delay: U64 = 10_000_000_000)
+    =>
     _auth = auth
+    _outgoing_boundary = outgoing_boundary
+    _reconnect_closed_delay = reconnect_closed_delay
+    _reconnect_failed_delay = reconnect_failed_delay
 
   fun ref received(conn: WallarooOutgoingNetworkActor ref, data: Array[U8] iso,
     times: USize): Bool
@@ -950,9 +961,15 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref closed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: closed\n\n".cstring())
+    let t = Timer(_ReconnectTimerNotify(_outgoing_boundary),
+     _reconnect_closed_delay, 0)
+    _timers(consume t)
 
   fun ref connect_failed(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: connect_failed\n\n".cstring())
+    let t = Timer(_ReconnectTimerNotify(_outgoing_boundary),
+      _reconnect_failed_delay, 0)
+    _timers(consume t)
 
   fun ref sentv(conn: WallarooOutgoingNetworkActor ref,
     data: ByteSeqIter): ByteSeqIter
@@ -967,3 +984,20 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
 
   fun ref unthrottled(conn: WallarooOutgoingNetworkActor ref) =>
     @printf[I32]("BoundaryNotify: unthrottled\n\n".cstring())
+
+ fun dispose() =>
+    ifdef "trace" then
+      @printf[I32]("Disposing any active reconnect timers...".cstring())
+    end
+    _timers.dispose()
+
+class _ReconnectTimerNotify is TimerNotify
+  let _ob: OutgoingBoundary
+
+  new iso create(outgoing_boundary: OutgoingBoundary tag) =>
+    _ob = outgoing_boundary
+
+  fun ref apply(timer: Timer, count: U64): Bool =>
+    @printf[I32]("Attempting to reconnect to downstream...\n".cstring())
+    _ob.reconnect()
+    false
