@@ -46,6 +46,10 @@ clean-buffyroot-all :=
 build-docker-buffyroot-all :=
 push-docker-buffyroot-all :=
 
+ifndef TEST_TARGET
+  TEST_TARGET :=
+endif
+
 ifndef PONY_TARGET
   PONY_TARGET :=
 endif
@@ -368,7 +372,9 @@ define pony-test-goal
 test-pony-all: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+ifneq ($(TEST_TARGET),false)
 	cd $(abspath $(1:%/=%)) && ./$(notdir $(abspath $(1:%/=%)))
+endif
 .PHONY: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
 endef
 
@@ -416,7 +422,9 @@ define monhub-test-goal
 test-monhub-all: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all += test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
 test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))): build-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))
+ifneq ($(TEST_TARGET),false)
 	cd $(abspath $(1:%/=%)) && mix test
+endif
 .PHONY: test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1))) test-$(subst /,-,$(subst $(abs_buffy_dir)/,,$(abspath $1)))-all
 endef
 
@@ -669,6 +677,7 @@ endif
 $(eval $(call subdir-goal,$(PREV_PATH)))
 
 # reset variables before including sub-makefiles
+TEST_TARGET :=
 PONY_TARGET :=
 DOCKER_TARGET :=
 EXS_TARGET :=
