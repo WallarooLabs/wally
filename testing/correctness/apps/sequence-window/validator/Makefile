@@ -1,5 +1,8 @@
 rules_mk_path := ../../../../../rules.mk
 
+# uncomment to disable generate test related targets in this directory
+TEST_TARGET := false
+
 # uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
 #PONY_TARGET := false
 
