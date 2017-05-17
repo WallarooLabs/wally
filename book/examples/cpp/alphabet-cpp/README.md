@@ -16,19 +16,18 @@ mkdir build
 
 ```bash
 clang++ --debug -c -o build/alphabet.o cpp/alphabet.cpp -Wall -std=c++11 -Iinclude
+ar rs build/libalphabet.a build/alphabet.o
+ponyc --debug --export --output=build \
+  --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
+    alphabet-app
 ```
 
 **On Linux**:
 
 ```bash
 g++ --debug -c -o build/alphabet.o cpp/alphabet.cpp -Wall -std=c++11 -Iinclude
-```
-
-Then on either platform, continue with:
-
-```bash
 ar rs build/libalphabet.a build/alphabet.o
-ponyc --debug --export --output=build \
+ponyc --linker c++ --debug --export --output=build \
   --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
     alphabet-app
 ```

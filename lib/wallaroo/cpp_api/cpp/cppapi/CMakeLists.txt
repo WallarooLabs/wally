@@ -44,11 +44,11 @@ endif()
 #
 # 32/64 bits
 #
-IF("${CMAKE_SIZEOF_VOID_P}" EQUAL "8") 
+IF("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
   MESSAGE(STATUS "64 BIT System detected")
   SET(CMAKE_CXX_FLAGS -m64)
   SET(CMAKE_C_FLAGS -m64)
-ELSE("${CMAKE_SIZEOF_VOID_P}" EQUAL "8") 
+ELSE("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
   MESSAGE(STATUS "32 BIT System detected")
   SET(CMAKE_CXX_FLAGS -m32)
   SET(CMAKE_C_FLAGS -m32)
@@ -58,7 +58,7 @@ ENDIF("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
 
 #
 # additional flags
-# 
+#
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -ggdb -g3 -std=c++11 -fPIC")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}")
@@ -72,11 +72,9 @@ message("CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 set(HEADER_FILES
         hpp/Application.hpp
 	hpp/ApiHooks.hpp
-	hpp/Buffers.hpp
         hpp/Computation.hpp
 	hpp/Data.hpp
       	hpp/Key.hpp
-	hpp/Logger.hpp
 	hpp/ManagedObject.hpp
 	hpp/Serializable.hpp
 	hpp/SinkEncoder.hpp
@@ -93,10 +91,6 @@ set(HEADER_FILES
 
 set(SOURCE_FILES
         cpp/Application.cpp
-	cpp/Logger.cpp
-	cpp/Buffer.cpp
-	cpp/RawBuffer.cpp
-	cpp/ManagedBuffer.cpp
 	cpp/ManagedObject.cpp
 	cpp/Data.cpp
 	cpp/ApiHooks.cpp

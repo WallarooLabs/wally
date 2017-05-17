@@ -1,7 +1,6 @@
 #include "Counter.hpp"
 #include "WallarooCppApi/ApiHooks.hpp"
 #include "WallarooCppApi/UserHooks.hpp"
-#include "WallarooCppApi/Logger.hpp"
 
 #include <vector>
 #include <string.h>
