@@ -63,7 +63,7 @@ HOST = '127.0.0.1'
 PORT= 5555
 
 # Create a socket and connect to the Wallroo listening address
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((HOST, PORT))
 
 # Send some framed strings

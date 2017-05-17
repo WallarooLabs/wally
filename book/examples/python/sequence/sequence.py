@@ -28,16 +28,14 @@ class SequenceWindowStateBuilder(object):
 
 class SequenceWindow(object):
     def __init__(self):
-        self.window = [0, 0, 0, 0]
+        self.windows = [[0, 0, 0, 0], [0, 0, 0, 0]]
 
     def update(self, value):
-        self.window.append(value)
-        if len(self.window) > 4:
-            self.window.pop(0)
-
-    def get_window(self):
-        # Return a shallow copy of the current window
-        return list(self.window)
+        window = self.windows[value % 2]
+        window.append(value)
+        if len(window) > 4:
+            window.pop(0)
+        return list(window)
 
 
 class Decoder(object):
@@ -65,13 +63,12 @@ class ObserveNewValue(object):
 
     def compute(self, data, state):
         print "Observe New Value"
-        state.update(data)
-        return (state.get_window(), True)
+        window = state.update(data)
+        return (window, True)
 
 
 class Encoder(object):
     def encode(self, data):
-        print "Encoder:encode: ", data
         # data is a list of integers
         s = str(data)
         return struct.pack('>L{}s'.format(len(s)), len(s), s)

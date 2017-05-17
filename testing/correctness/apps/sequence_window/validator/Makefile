@@ -20,28 +20,23 @@ DOCKER_TARGET := false
 RECURSE_SUBMAKEFILES := false
 
 
-# Set up validator specific paths. We don't know what directory make was
-# run from, so we get an absolute path based on $(buffy_path). This will work
-# whether make was run from the top level of Wallaroo or from within the
-# validator directory.
 VALIDATOR_PATH = $(buffy_path)/testing/correctness/apps/sequence_window/validator
 VALIDATOR_EXAMPLES = $(VALIDATOR_PATH)/examples
+SEQUENCE_WINDOW_PATH = $(buffy_path)/testing/correctness/apps/sequence_window
+WALLAROO_LIB =  $(buffy_path)/lib
 
-# Our top level Makefile has 3 rules that would have been generated for us if
-# we hadn't turned them off at the top of the Makefile. Here we recreate them
-# with our own custom rules. This allows the top level commands like
-# "make test" to work.
-build-validator-all = validator_clean validator_build
-test-validator-all = validator_clean validator_build validator_test
-clean-validator-all = validator_clean
+build-testing-correctness-apps-sequence_window-validator-all = validator_clean validator_build
+test-testing-correctness-apps-sequence_window-validator-all = validator_clean validator_build validator_test
+clean-testing-correctness-apps-sequence_window-validator-all = validator_clean
 
 validator_clean:
-	$(QUIET)rm -rf $(VALIDATOR_PATH)/validator
-	$(QUIET)rm -rf $(VALIDATOR_PATH)/validator.o
+	$(QUIET)rm -f $(VALIDATOR_PATH)/validator
+	$(QUIET)rm -f $(VALIDATOR_PATH)/validator.o
 	$(QUIET)rm -fr $(VALIDATOR_EXAMPLES)/*.txt
 
 validator_build:
-	stable env ponyc
+	cd $(VALIDATOR_PATH) && \
+	stable env ponyc --path=$(WALLAROO_LIB) --path=$(SEQUENCE_WINDOW_PATH) $(SEQUENCE_WINDOW_PATH)/validator
 
 validator_test:
 	$(QUIET)python $(VALIDATOR_EXAMPLES)/data_gen.py
