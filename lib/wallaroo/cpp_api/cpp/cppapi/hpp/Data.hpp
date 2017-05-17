@@ -1,7 +1,6 @@
 #ifndef __DATA_HPP__
 #define __DATA_HPP__
 
-#include "Buffers.hpp"
 #include "ManagedObject.hpp"
 
 namespace wallaroo

@@ -16,19 +16,18 @@ mkdir build
 
 ```bash
 clang++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
+ar rs build/libcounter.a build/Counter.o
+ponyc --linker c++ --debug --export --output=build \
+  --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
+    counter-app
 ```
 
 **On Linux**:
 
 ```bash
 g++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
-```
-
-Then on either platform, continue with:
-
-```bash
 ar rs build/libcounter.a build/Counter.o
-ponyc --debug --export --output=build \
+ponyc --linker c++ --debug --export --output=build \
   --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
     counter-app
 ```
@@ -66,7 +65,7 @@ In a separate shell each:
     ```
 2. Start the application
     ```bash
-    ./build/alphabet-app --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
+    ./build/counter-app --in 127.0.0.1:7010 --out 127.0.0.1:7002 \
       --metrics 127.0.0.1:5001 --control 127.0.0.1:6000 --data 127.0.0.1:6001 \
       --worker-name worker-name   --ponythreads=1
     ```

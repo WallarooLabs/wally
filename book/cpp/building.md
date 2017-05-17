@@ -10,11 +10,15 @@ Installation of the Wallaroo C++ API requires some additional software:
 
 * `cmake` version 3.5.0 or higher -- This should be available from your
 package manager.
+* `libc++-dev`
 
-* `spdlog` version 0.12.0 -- available
-  [here](https://github.com/gabime/spdlog). Please follow the
-  installation instructions
-  [here](https://github.com/gabime/spdlog/wiki/9.-CMake).
+On Ubuntu you can install using:
+
+```bash
+sudo apt-get install libc++-dev
+``` 
+
+On OSX, it should already be installed.
 
 ## Building and Installing the Wallaroo C++ Library
 
@@ -33,6 +37,8 @@ This will build the C++ library and install the library and associated header fi
 
 ### Building a Wallaroo C++ Application
 
+Anytime you are on Linux and need to build a C++ application, you'll need to make sure that `ponyc` uses `c++` as the linker. You'll see this in our examples. Make sure you pass the `--linker c++` option to `ponyc`. This is only needed on Linux.
+
 Let's start by building one of the example applications that uses the C++ API, `counter-app`. Go to the `book/examples/cpp/counter-app` directory and run these commands:
 
 ```bash
@@ -43,19 +49,18 @@ mkdir build
 
 ```bash
 clang++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
+ar rs build/libcounter.a build/Counter.o
+ponyc --debug --export --output=build \
+  --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
+  counter-app
 ```
 
 **On Linux**:
 
 ```bash
 gcc --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
-```
-
-Then on either platform, continue with:
-
-```bash
 ar rs build/libcounter.a build/Counter.o
-ponyc --debug --export --output=build \
+ponyc --linker c++ --debug --export --output=build \
   --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
   counter-app
 ```
