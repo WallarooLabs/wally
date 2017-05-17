@@ -1,6 +1,8 @@
 use "buffered"
 use "time"
+use "wallaroo"
 use "wallaroo/routing"
+use "wallaroo/state"
 
 trait BasicComputation
   fun name(): String
@@ -9,18 +11,18 @@ interface Computation[In: Any val, Out: Any val] is BasicComputation
   fun apply(input: In): (Out | None)
   fun name(): String
 
-interface StateComputation[In: Any val, Out: Any val, State: Any #read] is BasicComputation
+interface StateComputation[In: Any val, Out: Any val, S: State ref] is BasicComputation
   // Return a tuple containing the result of the computation (which is None
   // if there is no value to forward) and a StateChange if there was one (or
   // None to indicate no state change).
-  fun apply(input: In, sc_repo: StateChangeRepository[State], state: State):
-    ((Out | None), (StateChange[State] ref | None))
+  fun apply(input: In, sc_repo: StateChangeRepository[S], state: S):
+    ((Out | None), (StateChange[S] ref | DirectStateChange | None))
 
   fun name(): String
 
-  fun state_change_builders(): Array[StateChangeBuilder[State] val] val
+  fun state_change_builders(): Array[StateChangeBuilder[S] val] val
 
-trait StateProcessor[State: Any #read] is BasicComputation
+trait StateProcessor[S: State ref] is BasicComputation
   fun name(): String
   // Return a tuple containing a Bool indicating whether the message was
   // finished processing here, a Bool indicating whether a route can still
@@ -28,24 +30,25 @@ trait StateProcessor[State: Any #read] is BasicComputation
   // no state change).
   // TODO: solve the situation where Out is None and we
   // still want the message passed along
-  fun apply(state: State, sc_repo: StateChangeRepository[State],
+  fun apply(state: S, sc_repo: StateChangeRepository[S],
     omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: SeqId,
       latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
-      (Bool, Bool, (StateChange[State] ref | None), U64, U64, U64)
+      (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
+        U64, U64)
 
 trait InputWrapper
   fun input(): Any val
 
-class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
-  is (StateProcessor[State] & InputWrapper)
-  let _state_comp: StateComputation[In, Out, State] val
+class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
+  is (StateProcessor[S] & InputWrapper)
+  let _state_comp: StateComputation[In, Out, S] val
   let _input: In
   let _target_id: U128
 
-  new val create(input': In, state_comp: StateComputation[In, Out, State] val,
+  new val create(input': In, state_comp: StateComputation[In, Out, S] val,
     target_id: U128) =>
     _state_comp = state_comp
     _input = input'
@@ -53,13 +56,14 @@ class StateComputationWrapper[In: Any val, Out: Any val, State: Any #read]
 
   fun input(): Any val => _input
 
-  fun apply(state: State, sc_repo: StateChangeRepository[State],
+  fun apply(state: S, sc_repo: StateChangeRepository[S],
     omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
       latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
-      (Bool, Bool, (StateChange[State] ref | None), U64, U64, U64)
+      (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
+        U64, U64)
   =>
     let computation_start = Time.nanos()
     let result = _state_comp(_input, sc_repo, state)
@@ -90,6 +94,6 @@ interface BasicComputationBuilder
 interface ComputationBuilder[In: Any val, Out: Any val]
   fun apply(): Computation[In, Out] val
 
-interface StateBuilder[State: Any #read]
-  fun apply(): State
+interface StateBuilder[S: State ref]
+  fun apply(): S
   fun name(): String

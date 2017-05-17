@@ -1,11 +1,14 @@
 use "buffered"
 use "collections"
+use "serialise"
 use "sendence/bytes"
 use "sendence/hub"
 use "wallaroo/"
+use "wallaroo/fail"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
+use "wallaroo/state"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -123,7 +126,7 @@ primitive CountComputation is StateComputation[U64, U64, CountState]
       scbs.push(recover val CountStateChangeBuilder end)
     end
 
-class CountState
+class CountState is State
   var count: U64 = 0
 
 

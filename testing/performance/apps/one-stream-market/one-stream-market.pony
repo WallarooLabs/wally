@@ -26,6 +26,7 @@ use "assert"
 use "buffered"
 use "collections"
 use "net"
+use "serialise"
 use "time"
 use "sendence/bytes"
 use "sendence/fix"
@@ -36,6 +37,7 @@ use "sendence/wall_clock"
 use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/metrics"
+use "wallaroo/state"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -103,7 +105,7 @@ class val SymbolDataBuilder
   fun apply(): SymbolData => SymbolData
   fun name(): String => "Market Data"
 
-class SymbolData
+class SymbolData is State
   var should_reject_trades: Bool = true
   var last_bid: F64 = 0
   var last_offer: F64 = 0

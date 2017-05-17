@@ -1,7 +1,10 @@
 use "buffered"
 use "collections"
+use "serialise"
 use "sendence/bytes"
 use "wallaroo/"
+use "wallaroo/fail"
+use "wallaroo/state"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -30,7 +33,7 @@ class val LetterStateBuilder
   fun apply(): LetterState => LetterState
   fun name(): String => "Letter State"
 
-class LetterState
+class LetterState is State
   var letter: String = " "
   var count: U32 = 0
 

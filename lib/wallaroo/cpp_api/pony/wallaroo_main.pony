@@ -6,9 +6,9 @@ use @w_wrapper_main[Bool](argc: U32, argv: Pointer[Pointer[U8] tag] tag,
 
 class WallarooMain
   new create(env: Env) =>
-
     try
       (let argc, let argv) = _extract_c_args(WallarooConfig.application_args(env.args))
+
       let application = recover
         let application_builder: CPPApplicationBuilder ref = CPPApplicationBuilder
         let res = @w_wrapper_main(argc, argv, application_builder)

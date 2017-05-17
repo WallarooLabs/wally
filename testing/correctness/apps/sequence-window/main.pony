@@ -59,8 +59,11 @@ validator/validator -i recived.txt -e 10002
 use "buffered"
 use "collections"
 use "ring"
+use "serialise"
 use "sendence/bytes"
 use "wallaroo/"
+use "wallaroo/fail"
+use "wallaroo/state"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 use "window_codecs"
@@ -99,7 +102,7 @@ class val WindowStateBuilder
   fun apply(): WindowState => WindowState
   fun name(): String => "Window State"
 
-class WindowState
+class WindowState is State
   var idx: USize = 0
   var ring: Ring[U64] = Ring[U64].from_array(recover [0,0,0,0] end, 4, 0)
 
@@ -130,7 +133,7 @@ class WindowStateChange is StateChange[WindowState]
   fun string(): String =>
     _window.string()
 
-  fun apply(state: WindowState ref) =>
+  fun apply(state: WindowState) =>
     for v in _window.ring.values() do
       state.push(v)
     end

@@ -114,8 +114,8 @@ actor WActorWithState is WActorWrapper
       let pickled = Pickle[WActor](_w_actor, _auth)
       let payload: Array[ByteSeq] iso =
         recover [pickled] end
-      _event_log.queue_log_entry(_id, _guid_gen.u128(), None, 0, _seq_id,
-        consume payload)
+      _event_log.queue_log_entry(_id, _guid_gen.u128(), None,
+        U64.max_value(), _seq_id, consume payload)
       _event_log.flush_buffer(_id, _seq_id)
     else
       Fail()

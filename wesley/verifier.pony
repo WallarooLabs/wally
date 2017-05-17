@@ -6,11 +6,11 @@ class StatelessVerifier[S: Message val, R: Message val]
   let _received_messages: Array[R]
   let _result_mapper: ResultMapper[S, R]
   let _expected_match_result: MatchStatus val
-  
-  new create(sent_messages: Array[S], 
-    received_messages: Array[R], 
-    result_mapper: ResultMapper[S, R], 
-    expected_match_result: MatchStatus val) 
+
+  new create(sent_messages: Array[S],
+    received_messages: Array[R],
+    result_mapper: ResultMapper[S, R],
+    expected_match_result: MatchStatus val)
   =>
     _sent_messages = sent_messages
     _received_messages = received_messages
@@ -27,19 +27,19 @@ class StatelessVerifier[S: Message val, R: Message val]
       Fail(_expected_match_result, actual_match_result, resultmessage)
     end
 
-class StatefulVerifier[S: Message val, R: Message val, 
-  I: Message val, State: Any ref]
+class StatefulVerifier[S: Message val, R: Message val,
+  I: Message val, St: Any ref]
   let _init_messages: Array[I]
   let _sent_messages: Array[S]
   let _received_messages: Array[R]
-  let _result_mapper: StatefulResultMapper[S, R, I, State]
+  let _result_mapper: StatefulResultMapper[S, R, I, St]
   let _expected_match_result: MatchStatus val
-  
+
   new create(init_messages: Array[I],
-    sent_messages: Array[S], 
-    received_messages: Array[R], 
-    result_mapper: StatefulResultMapper[S, R, I, State], 
-    expected_match_result: MatchStatus val) 
+    sent_messages: Array[S],
+    received_messages: Array[R],
+    result_mapper: StatefulResultMapper[S, R, I, St],
+    expected_match_result: MatchStatus val)
   =>
     _init_messages = init_messages
     _sent_messages = sent_messages
@@ -48,8 +48,8 @@ class StatefulVerifier[S: Message val, R: Message val,
     _expected_match_result = expected_match_result
 
   fun ref test(): PassFail val =>
-    let init_state: State = _result_mapper.init_transform(_init_messages)
-    let expected = _result_mapper.sent_transform(_sent_messages, 
+    let init_state: St = _result_mapper.init_transform(_init_messages)
+    let expected = _result_mapper.sent_transform(_sent_messages,
       init_state)
     let actual = _result_mapper.received_transform(_received_messages)
     (let actual_match_result, let resultmessage) = expected.compare(actual)
@@ -75,7 +75,7 @@ class ResultsList[V: (Equatable[V] #read & Stringable)] is CanonicalForm
         try
           for (i, v) in results.pairs() do
             if (v != rl.results(i)) then
-              let msg = v.string() + " expected, " + rl.results(i).string() 
+              let msg = v.string() + " expected, " + rl.results(i).string()
                 + " received."
               return (ResultsDoNotMatch, msg)
             end
@@ -94,9 +94,9 @@ trait ResultMapper[S: Message val, R: Message val]
   fun received_transform(received: Array[R]): CanonicalForm
 
 trait StatefulResultMapper[S: Message val, R: Message val,
-  I: Message val, State: Any ref]
-  fun init_transform(init: Array[I]): State
-  fun sent_transform(sent: Array[S], state: State): CanonicalForm
+  I: Message val, St: Any ref]
+  fun init_transform(init: Array[I]): St
+  fun sent_transform(sent: Array[S], state: St): CanonicalForm
   fun received_transform(received: Array[R]): CanonicalForm
 
 trait SentParser[S: Message val] is TextMessageFileParser
@@ -143,4 +143,4 @@ class Fail is PassFail
   fun exitcode(): I32 => 1
   fun exitmessage(): String =>
     _exitmessage
-    
+

@@ -19,8 +19,11 @@ giles/sender/sender -h 127.0.0.1:7010 -m 10000000 -s 300 -i 2_500_000 -f apps/co
 """
 
 use "buffered"
+use "serialise"
 use "sendence/bytes"
 use "wallaroo/"
+use "wallaroo/fail"
+use "wallaroo/state"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -119,7 +122,7 @@ primitive ComplexEncoder
     wb.i32_be(c.imaginary())
     wb.done()
 
-class Counter
+class Counter is State
   var _count: USize = 0
   var _reals: I32 = 0
 

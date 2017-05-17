@@ -1,4 +1,4 @@
-use "wallaroo/topology"
+use "wallaroo/state"
 
 export CPPStateChangeRepositoryHelper
 

@@ -6,13 +6,13 @@ primitive Usage
     .add(" SENT-FILE RECEIVED-FILE match|nomatch|TEST-INI-FILE")
 
 primitive VerifierCLI[S: Message val, R: Message val]
-  fun run(env: Env, test_name: String, result_mapper: ResultMapper[S, R], 
-    sent_parser: SentParser[S], received_parser: ReceivedParser[R]) 
+  fun run(env: Env, test_name: String, result_mapper: ResultMapper[S, R],
+    sent_parser: SentParser[S], received_parser: ReceivedParser[R])
   =>
     @printf[I32]("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n".cstring())
     @printf[I32]((" Wesley: Starting " + test_name + "\n").cstring())
     @printf[I32]("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n".cstring())
-    match stateless_verifier_from_command_line(env, result_mapper, 
+    match stateless_verifier_from_command_line(env, result_mapper,
       sent_parser, received_parser)
     | let verifier: StatelessVerifier[S, R] => verify(env, verifier)
     | let setup_error: SetupError =>
@@ -20,32 +20,32 @@ primitive VerifierCLI[S: Message val, R: Message val]
       @printf[I32]((setup_error.message() + "\n").cstring())
     end
 
-  fun run_with_initialization[I: Message val, 
-    State: Any ref](env: Env, 
+  fun run_with_initialization[I: Message val,
+    St: Any ref](env: Env,
     test_name: String,
-    result_mapper: StatefulResultMapper[S, R, I, State], 
+    result_mapper: StatefulResultMapper[S, R, I, St],
     initialization_parser: InitializationParser[I],
-    sent_parser: SentParser[S], 
-    received_parser: ReceivedParser[R]) 
+    sent_parser: SentParser[S],
+    received_parser: ReceivedParser[R])
   =>
     @printf[I32]("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n".cstring())
     @printf[I32]((" Wesley: Starting " + test_name + "\n").cstring())
     @printf[I32]("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n".cstring())
-    match stateful_verifier_from_command_line[I, State](env, result_mapper, 
+    match stateful_verifier_from_command_line[I, St](env, result_mapper,
       initialization_parser, sent_parser, received_parser)
-    | let verifier: StatefulVerifier[S, R, I, State] => verify(env, verifier)
+    | let verifier: StatefulVerifier[S, R, I, St] => verify(env, verifier)
     | let setup_error: SetupError =>
       env.exitcode(setup_error.exitcode())
       @printf[I32]((setup_error.message() + "\n").cstring())
     end
 
-  fun stateless_verifier_from_command_line(env: Env, 
-    result_mapper: ResultMapper[S, R], 
-    sent_parser: SentParser[S], 
+  fun stateless_verifier_from_command_line(env: Env,
+    result_mapper: ResultMapper[S, R],
+    sent_parser: SentParser[S],
     received_parser: ReceivedParser[R])
-    : (SetupError | StatelessVerifier[S, R]) 
+    : (SetupError | StatelessVerifier[S, R])
   =>
-    (let prog: String, let sent_file: String, let received_file: String, 
+    (let prog: String, let sent_file: String, let received_file: String,
       let expectation_str: String) = try
       _parse_args(env.args)
     else
@@ -60,7 +60,7 @@ primitive VerifierCLI[S: Message val, R: Message val]
       match _get_expected_match_status_from_string(expectation_str)
       | let m: MatchStatus val => m
       | let ini_file_name: String =>
-        let test_ini: IniMap = 
+        let test_ini: IniMap =
           _read_expected_match_status_file(expectation_str, env.root)
         try
           _get_expected_match_status_value(test_ini)
@@ -82,25 +82,25 @@ primitive VerifierCLI[S: Message val, R: Message val]
     end
 
     try
-      _read_received_message_file_with_parser(received_file, received_parser, 
+      _read_received_message_file_with_parser(received_file, received_parser,
         env.root, env)
     else
       return SetupErrorProblemReadingMessageFile(received_file)
     end
 
-    StatelessVerifier[S, R](sent_parser.sent_messages(), 
-      received_parser.received_messages(), result_mapper, 
+    StatelessVerifier[S, R](sent_parser.sent_messages(),
+      received_parser.received_messages(), result_mapper,
       expected_match_result)
 
-  fun stateful_verifier_from_command_line[I: Message val, 
-    State: Any ref](env: Env, 
-    result_mapper: StatefulResultMapper[S, R, I, State], 
-    init_parser: InitializationParser[I], sent_parser: SentParser[S], 
+  fun stateful_verifier_from_command_line[I: Message val,
+    St: Any ref](env: Env,
+    result_mapper: StatefulResultMapper[S, R, I, St],
+    init_parser: InitializationParser[I], sent_parser: SentParser[S],
     received_parser: ReceivedParser[R])
-    : (SetupError | StatefulVerifier[S, R, I, State]) 
+    : (SetupError | StatefulVerifier[S, R, I, St])
   =>
-    (let prog: String, let init_file: String, let sent_file: String, 
-      let received_file: String, let expectation_str: String) = 
+    (let prog: String, let init_file: String, let sent_file: String,
+      let received_file: String, let expectation_str: String) =
       try
         _parse_args_with_initialization(env.args)
       else
@@ -115,7 +115,7 @@ primitive VerifierCLI[S: Message val, R: Message val]
       match _get_expected_match_status_from_string(expectation_str)
       | let m: MatchStatus val => m
       | let ini_file_name: String =>
-        let test_ini: IniMap = 
+        let test_ini: IniMap =
           _read_expected_match_status_file(expectation_str, env.root)
         try
           _get_expected_match_status_value(test_ini)
@@ -150,10 +150,10 @@ primitive VerifierCLI[S: Message val, R: Message val]
       return SetupErrorProblemReadingMessageFile(received_file)
     end
 
-    StatefulVerifier[S, R, I, State](
+    StatefulVerifier[S, R, I, St](
       init_parser.initialization_messages(),
-      sent_parser.sent_messages(), 
-      received_parser.received_messages(), result_mapper, 
+      sent_parser.sent_messages(),
+      received_parser.received_messages(), result_mapper,
       expected_match_result)
 
   fun _parse_args(args: Array[String] val)
@@ -183,11 +183,11 @@ primitive VerifierCLI[S: Message val, R: Message val]
       expected_match_result_str
     end
 
-  fun _read_expected_match_status_file(file_name: String, 
+  fun _read_expected_match_status_file(file_name: String,
     root: (AmbientAuth | None)): IniMap ? =>
     var test_ini: IniMap = IniMap
     let caps = recover val FileCaps.set(FileRead).set(FileStat) end
-    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)) 
+    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps))
       as File do
       test_ini = IniParse(file.lines())
     end
@@ -203,23 +203,23 @@ primitive VerifierCLI[S: Message val, R: Message val]
       error
     end
 
-  fun _read_text_message_file_with_parser(file_name: String, 
+  fun _read_text_message_file_with_parser(file_name: String,
     parser: TextMessageFileParser, root: (AmbientAuth | None),
-    env: Env) ? 
+    env: Env) ?
   =>
     let caps = recover val FileCaps.set(FileRead).set(FileStat) end
-    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)) 
+    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps))
       as File do
       TextMessageFileReader(file.read_string(file.size()), parser, env)
     else
       error
     end
 
-  fun _read_received_message_file_with_parser(file_name: String, 
-    parser: MessageFileParser, root: (AmbientAuth | None), env: Env) ? 
+  fun _read_received_message_file_with_parser(file_name: String,
+    parser: MessageFileParser, root: (AmbientAuth | None), env: Env) ?
   =>
     let caps = recover val FileCaps.set(FileRead).set(FileStat) end
-    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps)) 
+    with file = OpenFile(FilePath(root as AmbientAuth, file_name, caps))
       as File do
       ReceivedMessageFileReader(file.read(file.size()), parser, env)
     else
@@ -260,7 +260,7 @@ class SetupErrorExpectedMatchInvalid
 class SetupErrorCouldNotFindMatchStatusInFile
   let _message: String val
   new create(file_name: String) =>
-    _message = "Error: Could not find section '[test_config]' with property" 
+    _message = "Error: Could not find section '[test_config]' with property"
       + "'expected_result' in file '".add(file_name).add("'.")
   fun exitcode(): I32 => 92
   fun message(): String => _message

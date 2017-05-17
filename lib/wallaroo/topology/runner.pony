@@ -6,12 +6,15 @@ use "serialise"
 use "sendence/guid"
 use "sendence/wall_clock"
 use "sendence/weighted"
+use "wallaroo/"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/recovery"
 use "wallaroo/routing"
+use "wallaroo/state"
+use "wallaroo/w_actor"
 
 
 interface Runner
@@ -204,9 +207,9 @@ interface DefaultStateable
   fun default_state_name(): String
 
 class PreStateRunnerBuilder[In: Any val, Out: Any val,
-  PIn: Any val, Key: (Hashable val & Equatable[Key] val), State: Any #read] is
+  PIn: Any val, Key: (Hashable val & Equatable[Key] val), S: State ref] is
     RunnerBuilder
-  let _state_comp: StateComputation[In, Out, State] val
+  let _state_comp: StateComputation[In, Out, S] val
   let _state_name: String
   let _default_state_name: String
   let _route_builder: RouteBuilder val
@@ -216,7 +219,7 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
   let _id: U128
   let _is_multi: Bool
 
-  new val create(state_comp: StateComputation[In, Out, State] val,
+  new val create(state_comp: StateComputation[In, Out, S] val,
     state_name': String,
     partition_function': PartitionFunction[PIn, Key] val,
     route_builder': RouteBuilder val,
@@ -243,9 +246,9 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
   =>
     match pre_state_target_id'
     | let t_id: U128 =>
-      PreStateRunner[In, Out, State](_state_comp, _state_name, t_id)
+      PreStateRunner[In, Out, S](_state_comp, _state_name, t_id)
     else
-      PreStateRunner[In, Out, State](_state_comp, _state_name, 0)
+      PreStateRunner[In, Out, S](_state_comp, _state_name, 0)
     end
 
   fun name(): String => _state_comp.name()
@@ -269,16 +272,16 @@ class PreStateRunnerBuilder[In: Any val, Out: Any val,
       r
     end
 
-class StateRunnerBuilder[State: Any #read] is RunnerBuilder
-  let _state_builder: StateBuilder[State] val
+class StateRunnerBuilder[S: State ref] is RunnerBuilder
+  let _state_builder: StateBuilder[S] val
   let _state_name: String
-  let _state_change_builders: Array[StateChangeBuilder[State] val] val
+  let _state_change_builders: Array[StateChangeBuilder[S] val] val
   let _route_builder: RouteBuilder val
   let _id: U128
 
-  new val create(state_builder: StateBuilder[State] val,
+  new val create(state_builder: StateBuilder[S] val,
     state_name': String,
-    state_change_builders: Array[StateChangeBuilder[State] val] val,
+    state_change_builders: Array[StateChangeBuilder[S] val] val,
     route_builder': RouteBuilder val = EmptyRouteBuilder)
   =>
     _state_builder = state_builder
@@ -293,7 +296,7 @@ class StateRunnerBuilder[State: Any #read] is RunnerBuilder
     router: (Router val | None) = None,
     pre_state_target_id': (U128 | None) = None): Runner iso^
   =>
-    let sr = StateRunner[State](_state_builder, event_log, auth)
+    let sr = StateRunner[S](_state_builder, event_log, auth)
     for scb in _state_change_builders.values() do
       sr.register_state_change(scb)
     end
@@ -317,11 +320,11 @@ trait PartitionBuilder
   fun is_multi(): Bool
   fun default_state_name(): String
 
-class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
+class PartitionedStateRunnerBuilder[PIn: Any val, S: State ref,
   Key: (Hashable val & Equatable[Key])] is (PartitionBuilder & RunnerBuilder)
   let _pipeline_name: String
   let _state_name: String
-  let _state_runner_builder: StateRunnerBuilder[State] val
+  let _state_runner_builder: StateRunnerBuilder[S] val
   let _step_id_map: Map[Key, U128] val
   let _partition: Partition[PIn, Key] val
   let _route_builder: RouteBuilder val
@@ -332,7 +335,7 @@ class PartitionedStateRunnerBuilder[PIn: Any val, State: Any #read,
 
   new val create(pipeline_name: String, state_name': String,
     step_id_map': Map[Key, U128] val, partition': Partition[PIn, Key] val,
-    state_runner_builder: StateRunnerBuilder[State] val,
+    state_runner_builder: StateRunnerBuilder[S] val,
     route_builder': RouteBuilder val,
     forward_route_builder': RouteBuilder val, id': U128 = 0,
     multi_worker: Bool = false, default_state_name': String = "")
@@ -497,14 +500,14 @@ class ComputationRunner[In: Any val, Out: Any val]
   =>
     _next.clone_router_and_set_input_type(r)
 
-class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
+class PreStateRunner[In: Any val, Out: Any val, S: State ref]
   let _target_id: U128
-  let _state_comp: StateComputation[In, Out, State] val
+  let _state_comp: StateComputation[In, Out, S] val
   let _name: String
   let _prep_name: String
   let _state_name: String
 
-  new iso create(state_comp: StateComputation[In, Out, State] val,
+  new iso create(state_comp: StateComputation[In, Out, S] val,
     state_name': String, target_id: U128)
   =>
     _target_id = target_id
@@ -539,11 +542,11 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
       | let input: In =>
         match router
         | let shared_state_router: Router val =>
-          let processor: StateComputationWrapper[In, Out, State] val =
-            StateComputationWrapper[In, Out, State](input, _state_comp,
+          let processor: StateComputationWrapper[In, Out, S] val =
+            StateComputationWrapper[In, Out, S](input, _state_comp,
               _target_id)
           shared_state_router.route[
-            StateComputationWrapper[In, Out, State] val](
+            StateComputationWrapper[In, Out, S] val](
             metric_name, pipeline_time_spent, processor, producer,
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
             latest_ts, metrics_id + 1, worker_ingress_ts)
@@ -568,21 +571,21 @@ class PreStateRunner[In: Any val, Out: Any val, State: Any #read]
   =>
     r
 
-class StateRunner[State: Any #read] is (Runner & ReplayableRunner & SerializableStateRunner)
-  var _state: State
+class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStateRunner)
+  var _state: S
   //TODO: this needs to be per-computation, rather than per-runner
-  let _state_change_repository: StateChangeRepository[State] ref
+  let _state_change_repository: StateChangeRepository[S] ref
   let _event_log: EventLog
   let _wb: Writer = Writer
   let _rb: Reader = Reader
   let _auth: AmbientAuth
   var _id: (U128 | None)
 
-  new iso create(state_builder: {(): State} val,
+  new iso create(state_builder: {(): S} val,
       event_log: EventLog, auth: AmbientAuth)
   =>
     _state = state_builder()
-    _state_change_repository = StateChangeRepository[State]
+    _state_change_repository = StateChangeRepository[S]
     _event_log = event_log
     _id = None
     _auth = auth
@@ -590,21 +593,25 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner & Serializable
   fun ref set_step_id(id: U128) =>
     _id = id
 
-  fun ref register_state_change(scb: StateChangeBuilder[State] val) : U64 =>
+  fun ref register_state_change(scb: StateChangeBuilder[S] val) : U64 =>
     _state_change_repository.make_and_register(scb)
 
   fun ref replay_log_entry(msg_uid: U128, frac_ids: None, statechange_id: U64,
     payload: ByteSeq val, origin: Producer)
   =>
-    try
-      let sc = _state_change_repository(statechange_id)
-      _rb.append(payload as Array[U8] val)
-      try
-        sc.read_log_entry(_rb)
-        sc.apply(_state)
-      end
+    if statechange_id == U64.max_value() then
+      replace_serialized_state(payload)
     else
-      @printf[I32]("FATAL: could not look up state_change with id %d".cstring(), statechange_id)
+      try
+        let sc = _state_change_repository(statechange_id)
+        _rb.append(payload as Array[U8] val)
+        try
+          sc.read_log_entry(_rb)
+          sc.apply(_state)
+        end
+      else
+        @printf[I32]("FATAL: could not look up state_change with id %d".cstring(), statechange_id)
+      end
     end
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
@@ -615,7 +622,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner & Serializable
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
     match data
-    | let sp: StateProcessor[State] val =>
+    | let sp: StateProcessor[S] val =>
       let new_metrics_id = ifdef "detailed-metrics" then
           // increment by 2 because we'll be reporting 2 step metrics below
           metrics_id + 2
@@ -647,7 +654,7 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner & Serializable
         sc_start_ts, sc_end_ts)
 
       match state_change
-      | let sc: StateChange[State] ref =>
+      | let sc: StateChange[S] ref =>
         ifdef "resilience" then
           sc.write_log_entry(_wb)
           //TODO: batching? race between queueing and watermark?
@@ -662,12 +669,21 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner & Serializable
             @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
           end
         end
-
         sc.apply(_state)
-        (is_finished, keep_sending, last_ts)
-      else
-        (is_finished, keep_sending, last_ts)
+      | let dsc: DirectStateChange =>
+        ifdef "resilience" then
+          // TODO: Replace this with calling provided serialization method
+          match _id
+          | let buffer_id: U128 =>
+            _state.write_log_entry(_wb, _auth)
+            let payload = _wb.done()
+            _event_log.queue_log_entry(buffer_id, i_msg_uid, None,
+              U64.max_value(), producer.current_sequence_id(), consume payload)
+          end
+        end
       end
+
+      (is_finished, keep_sending, last_ts)
     else
       @printf[I32]("StateRunner: Input was not a StateProcessor!\n".cstring())
       (true, true, latest_ts)
@@ -693,20 +709,18 @@ class StateRunner[State: Any #read] is (Runner & ReplayableRunner & Serializable
       recover val Array[U8] end
     end
 
-  fun ref replace_serialized_state(s: ByteSeq val) =>
+  fun ref replace_serialized_state(payload: ByteSeq val) =>
     try
-      match Serialised.input(InputSerialisedAuth(_auth), s as Array[U8] val)(
-        DeserialiseAuth(_auth))
-      | let s': State =>
-        _state = s'
+      _rb.append(payload as Array[U8] val)
+      match _state.read_log_entry(_rb, _auth)
+      | let s: S =>
+        _state = s
       else
         Fail()
       end
     else
       Fail()
     end
-
-
 
 class iso RouterRunner
   fun ref run[Out: Any val](metric_name: String, pipeline_time_spent: U64,

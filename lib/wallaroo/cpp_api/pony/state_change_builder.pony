@@ -1,4 +1,4 @@
-use "wallaroo/topology"
+use "wallaroo/state"
 
 use @w_state_change_builder_build[StateChangeP]
   (builder_function: Pointer[U8] val, id: U64)
