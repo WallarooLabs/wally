@@ -8,54 +8,41 @@ rules_mk_path := ../../../../rules.mk
 #TEST_TARGET := false
 
 # uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
-#PONY_TARGET := false
+PONY_TARGET := false
 
 # uncomment to disable generate exs related targets (build/test/clean) for elixir sources in this directory
-#EXS_TARGET := false
+EXS_TARGET := false
 
 # uncomment to disable generate docker related targets (build/push) for Dockerfile in this directory
-#DOCKER_TARGET := false
+DOCKER_TARGET := false
 
 # uncomment to disable generate recursing into Makefiles of subdirectories
-#RECURSE_SUBMAKEFILES := false
+RECURSE_SUBMAKEFILES := false
 
-
-build-testing-correctness-apps-sequence_window-all = sequence_window_clean sequence_window_build
-test-testing-correctness-apps-sequence_window-all = build-testing-correctness-apps-sequence_window-all build-testing-correctness-apps-sequence_window-validator-all sequence_window_test
-clean-testing-correctness-apps-sequence_window-all = sequence_window_clean
-build-testing-correctness-apps-sequence_window-recovery-spike = sequence_window_build_recovery_spike
-
-SEQUENCE_WINDOW_PATH = $(buffy_path)/testing/correctness/apps/sequence_window
-VALIDATOR_PATH = $(buffy_path)/testing/correctness/apps/sequence_window/validator
+PYTHON_PATH = $(buffy_path)/machida
+MACHIDA_BIN_PATH = $(buffy_path)/machida/build
 INTEGRATION_PATH = $(buffy_path)/testing/tools
 INTEGRATION_BIN_PATH = $(INTEGRATION_PATH)/integration
-WALLAROO_LIB =  $(buffy_path)/lib
+ALPHABET_PARTITIONED_PY_PATH = $(buffy_path)/book/examples/python/alphabet_partitioned
 
+build-book-examples-python-alphabet_partitioned-all = build-machida-all
+test-book-examples-python-alphabet_partitioned-all = build-book-examples-python-alphabet_partitioned-all alphabet_partitioned_py_test
+clean-book-examples-python-alphabet-partitioned-all = alphabet_partitioned_py_clean
 
-sequence_window_clean:
-	$(QUIET)rm -f $(SEQUENCE_WINDOW_PATH)/sequence_window
-	$(QUIET)rm -f $(SEQUENCE_WINDOW_PATH)/sequence_window.o
+alphabet_partitioned_py_clean:
+	$(QUIET)rm -f $(ALPHABET_PY_PATH)/_test.txt $(ALPHABET_PY_PATH)/_expected.json
 
-sequence_window_build:
-	cd $(SEQUENCE_WINDOW_PATH) && \
-	stable env ponyc --path=$(WALLAROO_LIB) --path=$(SEQUENCE_WINDOW_PATH) $(SEQUENCE_WINDOW_PATH) -D resilience -D spike -D spiketrace
-
-sequence_window_build_recovery_spike:
-	cd $(SEQUENCE_WINDOW_PATH) && \
-	stable env ponyc -D resilience -D spike -D spiketrace
-
-sequence_window_test:
-	export PATH="$(PATH):$(INTEGRATION_BIN_PATH)" && \
-	rm /tmp/sequence* && \
-	cd $(SEQUENCE_WINDOW_PATH) && \
-	integration_test --sequence-sender '(0,1000]' \
-	  --log-level error \
-		--command '$(SEQUENCE_WINDOW_PATH)/sequence_window' \
-		--validation-cmd '$(SEQUENCE_WINDOW_PATH)/validator/validator -e 1000 -a -i' \
-		--output 'received.txt' \
-		--giles-mode \
-		--workers 2 \
+alphabet_partitioned_py_test:
+	export PYTHONPATH=".:$(PYTHON_PATH):$(INTEGRATION_PATH)" && \
+	export PATH="$(PATH):$(MACHIDA_BIN_PATH):$(INTEGRATION_BIN_PATH)" && \
+	cd $(ALPHABET_PARTITIONED_PY_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
 		--batch-size 10 \
+		--output 'received.txt' \
+		--command 'machida --application-module alphabet_partitioned' \
 		--sink-expect 1000
 
 #########################################################################################
@@ -78,6 +65,4 @@ include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
 #,<TIMEOUT VALUE> \
 #,<WESLEY TEST COMMAND> \
 #,<INCLUDE IN CI>))
-
-# end of prevent rules from being evaluated/included multiple times
 endif

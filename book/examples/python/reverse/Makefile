@@ -8,55 +8,38 @@ rules_mk_path := ../../../../rules.mk
 #TEST_TARGET := false
 
 # uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
-#PONY_TARGET := false
+PONY_TARGET := false
 
 # uncomment to disable generate exs related targets (build/test/clean) for elixir sources in this directory
-#EXS_TARGET := false
+EXS_TARGET := false
 
 # uncomment to disable generate docker related targets (build/push) for Dockerfile in this directory
-#DOCKER_TARGET := false
+DOCKER_TARGET := false
 
 # uncomment to disable generate recursing into Makefiles of subdirectories
-#RECURSE_SUBMAKEFILES := false
+RECURSE_SUBMAKEFILES := false
 
-
-build-testing-correctness-apps-sequence_window-all = sequence_window_clean sequence_window_build
-test-testing-correctness-apps-sequence_window-all = build-testing-correctness-apps-sequence_window-all build-testing-correctness-apps-sequence_window-validator-all sequence_window_test
-clean-testing-correctness-apps-sequence_window-all = sequence_window_clean
-build-testing-correctness-apps-sequence_window-recovery-spike = sequence_window_build_recovery_spike
-
-SEQUENCE_WINDOW_PATH = $(buffy_path)/testing/correctness/apps/sequence_window
-VALIDATOR_PATH = $(buffy_path)/testing/correctness/apps/sequence_window/validator
+PYTHON_PATH = $(buffy_path)/machida
+MACHIDA_BIN_PATH = $(buffy_path)/machida/build
 INTEGRATION_PATH = $(buffy_path)/testing/tools
 INTEGRATION_BIN_PATH = $(INTEGRATION_PATH)/integration
-WALLAROO_LIB =  $(buffy_path)/lib
+REVERSE_PY_PATH = $(buffy_path)/book/examples/python/reverse
+
+build-book-examples-python-reverse-all = build-machida-all
+test-book-examples-python-reverse-all = build-book-examples-python-reverse-all reverse_py_test
+
+reverse_py_test:
+	export PYTHONPATH=".:$(PYTHON_PATH):$(INTEGRATION_PATH)" && \
+	export PATH="$(PATH):$(MACHIDA_BIN_PATH):$(INTEGRATION_BIN_PATH)" && \
+	cd $(REVERSE_PY_PATH) && \
+	integration_test --csv-sender '1234,5678,1212,1111' \
+	  --validation-cmp --sink-mode 'newlines' \
+	  --expected-csv '4321,8765,2121,1111' \
+		--log-level error \
+		--command 'machida --application-module reverse' \
+		--sink-expect 4
 
 
-sequence_window_clean:
-	$(QUIET)rm -f $(SEQUENCE_WINDOW_PATH)/sequence_window
-	$(QUIET)rm -f $(SEQUENCE_WINDOW_PATH)/sequence_window.o
-
-sequence_window_build:
-	cd $(SEQUENCE_WINDOW_PATH) && \
-	stable env ponyc --path=$(WALLAROO_LIB) --path=$(SEQUENCE_WINDOW_PATH) $(SEQUENCE_WINDOW_PATH) -D resilience -D spike -D spiketrace
-
-sequence_window_build_recovery_spike:
-	cd $(SEQUENCE_WINDOW_PATH) && \
-	stable env ponyc -D resilience -D spike -D spiketrace
-
-sequence_window_test:
-	export PATH="$(PATH):$(INTEGRATION_BIN_PATH)" && \
-	rm /tmp/sequence* && \
-	cd $(SEQUENCE_WINDOW_PATH) && \
-	integration_test --sequence-sender '(0,1000]' \
-	  --log-level error \
-		--command '$(SEQUENCE_WINDOW_PATH)/sequence_window' \
-		--validation-cmd '$(SEQUENCE_WINDOW_PATH)/validator/validator -e 1000 -a -i' \
-		--output 'received.txt' \
-		--giles-mode \
-		--workers 2 \
-		--batch-size 10 \
-		--sink-expect 1000
 
 #########################################################################################
 #### don't change after this line unless to disable standard rules generation makefile
@@ -78,6 +61,4 @@ include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
 #,<TIMEOUT VALUE> \
 #,<WESLEY TEST COMMAND> \
 #,<INCLUDE IN CI>))
-
-# end of prevent rules from being evaluated/included multiple times
 endif

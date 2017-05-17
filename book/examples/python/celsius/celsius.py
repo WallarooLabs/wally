@@ -17,7 +17,7 @@ class Decoder(object):
         return 4
 
     def payload_length(self, bs):
-        return struct.unpack(">L", bs)[0]
+        return struct.unpack(">I", bs)[0]
 
     def decode(self, bs):
         return struct.unpack('>f', bs)[0]
@@ -42,4 +42,4 @@ class Add(object):
 class Encoder(object):
     def encode(self, data):
         # data is a float
-        return struct.pack('>Lf', 4, data)
+        return struct.pack('>If', 4, data)

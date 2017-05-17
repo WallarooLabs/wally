@@ -114,5 +114,7 @@ install:
       mix local.hex --force;
       mix local.rebar --force;
     fi;
+  - echo "Installing pytest";
+    python2 -m pip install pytest==3.1.0
 script:
   - make test

@@ -77,6 +77,7 @@ actor Main
       @printf[I32]("Validation successful!\n".cstring())
     else
       @printf[I32]("Error validating file.\n".cstring())
+      @exit[None](U8(1))
     end
 
 class WindowValidator

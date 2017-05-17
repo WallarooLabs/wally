@@ -7,7 +7,7 @@ import struct
 def generate_messages(num_messages):
     with open('celsius.msg', 'wb') as f:
         for x in xrange(num_messages):
-            f.write(struct.pack('>Lf', 4, random.randrange(10000, _int=float)))
+            f.write(struct.pack('>If', 4, random.randrange(10000, _int=float)))
 
 
 if __name__ == '__main__':

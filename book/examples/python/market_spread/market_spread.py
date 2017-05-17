@@ -148,10 +148,7 @@ class OrderResult(object):
 
 class OrderResultEncoder(object):
     def encode(self, data):
-        # data is a string
-        msg_size = 1 + 4 + 6 + 4 + 8 + 8 + 8 + 8 + 8
-        p = struct.pack(">IHI6s4sddddQ",
-                        msg_size,
+        p = struct.pack(">HI6s4sddddQ",
                         data.order.side,
                         data.order.account,
                         data.order.order_id,
@@ -161,7 +158,8 @@ class OrderResultEncoder(object):
                         data.bid,
                         data.offer,
                         data.timestamp)
-        return p
+        out = struct.pack('>I{}s'.format(len(p)), len(p), p)
+        return out
 
 
 class MarketDataMessage(object):

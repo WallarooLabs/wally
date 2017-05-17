@@ -1,8 +1,4 @@
-# prevent rules from being evaluated/included multiple times
-ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
-$(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
-
-rules_mk_path := ../../../../rules.mk
+rules_mk_path := ../../../rules.mk
 
 # uncomment to disable generate test related targets in this directory
 #TEST_TARGET := false
@@ -18,6 +14,7 @@ rules_mk_path := ../../../../rules.mk
 
 # uncomment to disable generate recursing into Makefiles of subdirectories
 #RECURSE_SUBMAKEFILES := false
+
 
 
 #########################################################################################
@@ -42,4 +39,3 @@ include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
 #,<INCLUDE IN CI>))
 
 # end of prevent rules from being evaluated/included multiple times
-endif

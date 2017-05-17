@@ -8,55 +8,43 @@ rules_mk_path := ../../../../rules.mk
 #TEST_TARGET := false
 
 # uncomment to disable generate pony related targets (build/test/clean) for pony sources in this directory
-#PONY_TARGET := false
+PONY_TARGET := false
 
 # uncomment to disable generate exs related targets (build/test/clean) for elixir sources in this directory
-#EXS_TARGET := false
+EXS_TARGET := false
 
 # uncomment to disable generate docker related targets (build/push) for Dockerfile in this directory
-#DOCKER_TARGET := false
+DOCKER_TARGET := false
 
 # uncomment to disable generate recursing into Makefiles of subdirectories
-#RECURSE_SUBMAKEFILES := false
+RECURSE_SUBMAKEFILES := false
 
-
-build-testing-correctness-apps-sequence_window-all = sequence_window_clean sequence_window_build
-test-testing-correctness-apps-sequence_window-all = build-testing-correctness-apps-sequence_window-all build-testing-correctness-apps-sequence_window-validator-all sequence_window_test
-clean-testing-correctness-apps-sequence_window-all = sequence_window_clean
-build-testing-correctness-apps-sequence_window-recovery-spike = sequence_window_build_recovery_spike
-
-SEQUENCE_WINDOW_PATH = $(buffy_path)/testing/correctness/apps/sequence_window
+PYTHON_PATH = $(buffy_path)/machida
+MACHIDA_BIN_PATH = $(buffy_path)/machida/build
 VALIDATOR_PATH = $(buffy_path)/testing/correctness/apps/sequence_window/validator
 INTEGRATION_PATH = $(buffy_path)/testing/tools
 INTEGRATION_BIN_PATH = $(INTEGRATION_PATH)/integration
-WALLAROO_LIB =  $(buffy_path)/lib
+SEQUENCE_PATH = $(buffy_path)/book/examples/python/sequence
 
+build-book-examples-python-sequence-all = build-machida-all build-testing-correctness-apps-sequence_window-validator-all
+test-book-examples-python-sequence-all = build-book-examples-python-sequence-all sequence_py_test
+clean-book-examples-python-sequence-all = sequence_py_clean
 
-sequence_window_clean:
-	$(QUIET)rm -f $(SEQUENCE_WINDOW_PATH)/sequence_window
-	$(QUIET)rm -f $(SEQUENCE_WINDOW_PATH)/sequence_window.o
+sequence_py_clean:
+	$(QUIET)rm -f $(SEQUENCE_PATH)/received.txt
 
-sequence_window_build:
-	cd $(SEQUENCE_WINDOW_PATH) && \
-	stable env ponyc --path=$(WALLAROO_LIB) --path=$(SEQUENCE_WINDOW_PATH) $(SEQUENCE_WINDOW_PATH) -D resilience -D spike -D spiketrace
-
-sequence_window_build_recovery_spike:
-	cd $(SEQUENCE_WINDOW_PATH) && \
-	stable env ponyc -D resilience -D spike -D spiketrace
-
-sequence_window_test:
-	export PATH="$(PATH):$(INTEGRATION_BIN_PATH)" && \
-	rm /tmp/sequence* && \
-	cd $(SEQUENCE_WINDOW_PATH) && \
+sequence_py_test:
+	export PYTHONPATH=".:$(PYTHON_PATH):$(INTEGRATION_PATH)" && \
+	export PATH="$(PATH):$(MACHIDA_BIN_PATH):$(INTEGRATION_BIN_PATH)" && \
+	cd $(SEQUENCE_PATH) && \
 	integration_test --sequence-sender '(0,1000]' \
 	  --log-level error \
-		--command '$(SEQUENCE_WINDOW_PATH)/sequence_window' \
-		--validation-cmd '$(SEQUENCE_WINDOW_PATH)/validator/validator -e 1000 -a -i' \
+		--command 'machida --application-module sequence' \
+		--validation-cmd '$(VALIDATOR_PATH)/validator -e 1000 -a -i' \
 		--output 'received.txt' \
 		--giles-mode \
-		--workers 2 \
-		--batch-size 10 \
 		--sink-expect 1000
+
 
 #########################################################################################
 #### don't change after this line unless to disable standard rules generation makefile
