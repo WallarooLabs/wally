@@ -2,6 +2,7 @@ use "files"
 use "net"
 use "sendence/bytes"
 use "wallaroo"
+use "wallaroo/fail"
 
 class InitFileReader
   let _filename: String
@@ -44,6 +45,9 @@ class InitFileReader
 
 
 class InitFileNotify is TCPConnectionNotify
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    Fail()
+
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
   =>

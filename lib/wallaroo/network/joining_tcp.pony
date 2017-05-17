@@ -1,4 +1,5 @@
 use "net"
+use "wallaroo/fail"
 
 class iso JoiningListenNotifier is TCPListenNotify
   """
@@ -25,6 +26,9 @@ class iso JoiningListenNotifier is TCPListenNotify
 class JoiningConnectNotifier is TCPConnectionNotify
   fun ref connected(conn: TCPConnection ref) =>
     None
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    Fail()
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool

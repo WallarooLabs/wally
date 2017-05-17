@@ -65,7 +65,7 @@ class iso _TestFromArray is UnitTest
   fun name(): String => "ring/FromArray"
 
   fun apply(h: TestHelper) ? =>
-    let array: Array[U64] iso = recover [5,6,7,8] end
+    let array: Array[U64] iso = recover [5;6;7;8] end
     let size: USize = 4
     let count: USize = 8
     let ring = Ring[U64].from_array(consume array, size, count)
@@ -92,11 +92,11 @@ class iso _TestFromArray is UnitTest
     end
 
     // test case where size < array.size() is given
-    let size_lt_ring = Ring[U64].from_array(recover [1,2,3,4] end, 3, 4)
+    let size_lt_ring = Ring[U64].from_array(recover [1;2;3;4] end, 3, 4)
     h.assert_eq[USize](4, size_lt_ring.size())
 
     // Test where size > array.size
-    let size_gt_ring = Ring[U64].from_array(recover [1,2] end, 4, 2)
+    let size_gt_ring = Ring[U64].from_array(recover [1;2] end, 4, 2)
     h.assert_eq[USize](2, size_gt_ring.size())
     size_gt_ring.push(3)
     size_gt_ring.push(4)
@@ -179,8 +179,8 @@ class iso _TestKeys is UnitTest
   fun name(): String => "ring/Keys"
 
   fun apply(h: TestHelper) =>
-    let ring = Ring[U64].from_array(recover [2,3,4,5] end, 4, 5)
-    let keys: Array[USize] val = recover [0,1,2,3] end
+    let ring = Ring[U64].from_array(recover [2;3;4;5] end, 4, 5)
+    let keys: Array[USize] val = recover [0;1;2;3] end
     let k_keys = keys.keys()
     let r_keys = ring.keys()
     for x in Range[USize](0,4) do
@@ -191,8 +191,8 @@ class iso _TestValues is UnitTest
   fun name(): String => "ring/Values"
 
   fun apply(h: TestHelper) ? =>
-    let ring = Ring[U64].from_array(recover [5,2,3,4] end, 4, 5)
-    let values: Array[U64] val = recover [5,4,3,2] end
+    let ring = Ring[U64].from_array(recover [5;2;3;4] end, 4, 5)
+    let values: Array[U64] val = recover [5;4;3;2] end
     let r_vals = ring.values()
     let v_vals = values.values()
     for x in Range[USize](0,4) do
@@ -203,8 +203,8 @@ class iso _TestPairs is UnitTest
   fun name(): String => "ring/Pairs"
 
   fun apply(h: TestHelper) ? =>
-    let ring = Ring[U64].from_array(recover [5,2,3,4] end, 4, 5)
-    let values: Array[U64] val = recover [5,4,3,2] end
+    let ring = Ring[U64].from_array(recover [5;2;3;4] end, 4, 5)
+    let values: Array[U64] val = recover [5;4;3;2] end
     let r_pairs = ring.pairs()
     let v_pairs = values.pairs()
     for x in Range[USize](0,4) do

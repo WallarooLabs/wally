@@ -1,6 +1,7 @@
 use "net"
 use "sendence/messages"
 use "sendence/bytes"
+use "wallaroo/fail"
 
 class HomeConnectNotify is TCPConnectionNotify
   let _name: String
@@ -17,6 +18,9 @@ class HomeConnectNotify is TCPConnectionNotify
       conn.expect(4)
       _has_connected = true
     end
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    @printf[I32]("Unable to connect to phone home address\n".cstring())
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool

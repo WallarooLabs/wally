@@ -50,7 +50,7 @@ class iso _TestProposeWatermarkFullyAcked is UnitTest
     route1.receive_ack(SeqId(2))
     route2.receive_ack(SeqId(3))
 
-    let routes = [route1, route2]
+    let routes = [route1; route2]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](3, proposed)
 
@@ -75,7 +75,7 @@ class iso _TestProposeWatermarkFullyAckedFilterLast is UnitTest
     route1.receive_ack(SeqId(1))
     route2.receive_ack(SeqId(2))
 
-    let routes = [route1, route2]
+    let routes = [route1; route2]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](4, proposed)
 
@@ -95,7 +95,7 @@ class iso _TestProposeWatermarkOnlyFilter is UnitTest
     filter_route.filter(SeqId(3))
     filter_route.filter(SeqId(4))
 
-    let routes = [route1, route2]
+    let routes = [route1; route2]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](4, proposed)
 
@@ -118,7 +118,7 @@ class iso _TestProposeWatermarkFullyAckedNoneFiltered is UnitTest
     route1.receive_ack(SeqId(2))
     route2.receive_ack(SeqId(3))
 
-    let routes = [route1, route2]
+    let routes = [route1; route2]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](3, proposed)
 
@@ -153,7 +153,7 @@ class iso _TestProposeWatermark1 is UnitTest
     route3.send(SeqId(7))
     route3.receive_ack(SeqId(4))
 
-    let routes = [route1, route2, route3]
+    let routes = [route1; route2; route3]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](1, proposed)
 
@@ -189,7 +189,7 @@ class iso _TestProposeWatermark2 is UnitTest
     route3.send(SeqId(7))
     route3.receive_ack(SeqId(4))
 
-    let routes = [route1, route2, route3]
+    let routes = [route1; route2; route3]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](1, proposed)
 
@@ -226,7 +226,7 @@ class iso _TestProposeWatermark3 is UnitTest
     route3.send(SeqId(7))
     route3.receive_ack(SeqId(4))
 
-    let routes = [route1, route2, route3]
+    let routes = [route1; route2; route3]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](1, proposed)
 
@@ -259,7 +259,7 @@ class iso _TestProposeWatermark4 is UnitTest
     route2.send(SeqId(5))
     route2.receive_ack(SeqId(5))
 
-    let routes = [route1, route2, route3]
+    let routes = [route1; route2; route3]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](3, proposed)
 
@@ -294,7 +294,7 @@ class iso _TestProposeWatermark5 is UnitTest
 
     route3.send(SeqId(1))
 
-    let routes = [route1, route2, route3]
+    let routes = [route1; route2; route3]
     let proposed: U64 = _ProposeWatermark(filter_route, routes)
     h.assert_eq[U64](0, proposed)
 

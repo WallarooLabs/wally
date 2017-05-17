@@ -10,6 +10,7 @@ use "ini"
 use "process"
 use "sendence/tcp"
 use "regex"
+use "wallaroo/fail"
 
 
 primitive Booting is Stringable
@@ -307,6 +308,9 @@ class ConnectNotify is TCPConnectionNotify
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("dagon: connection accepted")
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    Fail()
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
@@ -721,12 +725,13 @@ actor ProcessManager
     Replace host name placeholders with final values
     """
     var updated_arg = recover val
-                        arg.clone().replace("<SELF>", hostname).replace("<NAME>", name)
+                        arg.clone().>replace("<SELF>", hostname).>replace("<NAME>", name)
                       end
     try
       let r = Regex("<([-\\w]+)>")
       updated_arg = if _use_docker then
-                      r.replace(updated_arg, ("${1}" + _name_postfix)
+                      r.replace(updated_arg,
+                        (recover val "${1}" + _name_postfix end)
                         where global = true)
                     else
                       r.replace(updated_arg, "127.0.0.1" where global = true)

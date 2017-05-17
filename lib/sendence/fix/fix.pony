@@ -118,10 +118,10 @@ class FixNbboMessage is (Equatable[FixNbboMessage] & Stringable)
 
   fun string(): String iso^ =>
     (_symbol.clone()
-      .append(_transact_time)
-      .append(_bid_px.string())
-      .append(_offer_px.string())
-      .append(_mid.string())).clone()
+      .>append(_transact_time)
+      .>append(_bid_px.string())
+      .>append(_offer_px.string())
+      .>append(_mid.string())).clone()
 
 class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
   let _side: Side val
@@ -168,13 +168,13 @@ class FixOrderMessage is (Equatable[FixOrderMessage] & Stringable)
     and (_transact_time == o._transact_time)
 
   fun string(): String iso^ =>
-    (_side.string().clone().append(", ")
-      .append(_account.string()).append(", ")
-      .append(_order_id).append(", ")
-      .append(_symbol).append(", ")
-      .append(_order_qty.string()).append(", ")
-      .append(_price.string()).append(", ")
-      .append(_transact_time)).clone()
+    (_side.string().clone().>append(", ")
+      .>append(_account.string()).>append(", ")
+      .>append(_order_id).>append(", ")
+      .>append(_symbol).>append(", ")
+      .>append(_order_qty.string()).>append(", ")
+      .>append(_price.string()).>append(", ")
+      .>append(_transact_time)).clone()
 
 primitive OtherFixMessage
 

@@ -105,7 +105,7 @@ class val WindowStateBuilder
 
 class WindowState is State
   var idx: USize = 0
-  var ring: Ring[U64] = Ring[U64].from_array(recover [0,0,0,0] end, 4, 0)
+  var ring: Ring[U64] = Ring[U64].from_array(recover [0;0;0;0] end, 4, 0)
 
   fun string(): String =>
     try
@@ -198,5 +198,5 @@ primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
   =>
     recover val
       let scbs = Array[StateChangeBuilder[WindowState] val]
-      scbs.push(recover val WindowStateChangeBuilder end)
+      scbs.>push(recover val WindowStateChangeBuilder end)
     end

@@ -11,6 +11,7 @@ use "sendence/messages"
 use "sendence/bytes"
 use "sendence/time"
 use "debug"
+use "wallaroo/fail"
 
 // tests
 // documentation
@@ -192,6 +193,9 @@ class FromBuffyNotify is TCPConnectionNotify
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
     _coordinator.connection_added(consume conn)
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    Fail()
 
 
 class ToDagonNotify is TCPConnectionNotify

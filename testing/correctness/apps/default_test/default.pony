@@ -118,7 +118,7 @@ primitive UpdateState is StateComputation[String, Result val, NormalState]
   =>
     recover val
       let scbs = Array[StateChangeBuilder[NormalState] val]
-      scbs.push(recover val NormalStateChangeBuilder end)
+      scbs.>push(recover val NormalStateChangeBuilder end)
     end
 
 class val DefaultStateBuilder
@@ -202,7 +202,7 @@ primitive UpdateDefaultState is StateComputation[String, Result val,
   =>
     recover val
       let scbs = Array[StateChangeBuilder[DefaultState] val]
-      scbs.push(recover val DefaultStateChangeBuilder end)
+      scbs.>push(recover val DefaultStateChangeBuilder end)
     end
 
 
@@ -254,4 +254,4 @@ class Symbols
   let symbols: Array[String] val
 
   new create() =>
-    symbols = recover ["A","B","C", "the", "statement", "Frederick"] end
+    symbols = recover ["A";"B";"C";"the";"statement";"Frederick"] end

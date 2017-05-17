@@ -10,7 +10,7 @@ class MT2 is Random
   let _state: Array[U64]
   var _index: USize
 
-  new create(seed: U64 = 5489) =>
+  new create(seed_a: U64 = 5489, seed_b: U64 = 0) =>
     """
     Create with the specified seed. Returned values are deterministic for a
     given seed.
@@ -18,7 +18,7 @@ class MT2 is Random
     _state = Array[U64](_n())
     _index = _n()
 
-    var x = seed
+    var x = seed_a
 
     _state.push(x)
     var i: USize = 1

@@ -381,6 +381,9 @@ class ControlSenderConnectNotifier is TCPConnectionNotify
     conn.expect(4)
     _header = true
 
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    @printf[I32]("Control Sender Connect Failed\n".cstring())
+
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool
   =>
@@ -402,6 +405,9 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
   fun ref connected(conn: TCPConnection ref) =>
     conn.expect(4)
     _header = true
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    Fail()
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool

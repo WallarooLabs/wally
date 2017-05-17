@@ -352,7 +352,7 @@ class iso _TestDropsConnectionWhenSentvWhenSpiked is UnitTest
 
   fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, true)
-    let data = recover val ["Hello", "Willow"] end
+    let data = recover val ["Hello"; "Willow"] end
 
     let notify = SentvNotify(h, connection, data)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=1,
@@ -371,7 +371,7 @@ class iso _TestDoesntDropConnectionWhenSentvWhenNotSpiked is UnitTest
 
   fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
-    let data = recover val ["Goodbye", "Angel"] end
+    let data = recover val ["Goodbye"; "Angel"] end
 
     let notify = SentvNotify(h, connection, data)
     let spike = recover ref DropConnection(SpikeConfig(where seed'=1, prob'=0,
@@ -437,8 +437,8 @@ class iso _TestDropsConnectionWhenReceivedWhenSpiked is UnitTest
 
   fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, true)
-    let expected_data = recover val [as U8: 1, 2, 3, 4, 5, 10] end
-    let send_data = recover iso [as U8: 1, 2, 3, 4, 5, 10] end
+    let expected_data = recover val [as U8: 1; 2; 3; 4; 5; 10] end
+    let send_data = recover iso [as U8: 1; 2; 3; 4; 5; 10] end
     let times = USize(3)
 
     let notify = ReceivedNotify(h, connection, expected_data, times)
@@ -458,8 +458,8 @@ class iso _TestDoesntDropConnectionWhenReceivedWhenNotSpiked is UnitTest
 
   fun ref apply(h: TestHelper) ? =>
     let connection = NullWallarooOutgoingNetworkActor(h, false)
-    let expected_data = recover val [as U8: 1, 2, 3, 4, 5, 10] end
-    let send_data = recover iso [as U8: 1, 2, 3, 4, 5, 10] end
+    let expected_data = recover val [as U8: 1; 2; 3; 4; 5; 10] end
+    let send_data = recover iso [as U8: 1; 2; 3; 4; 5; 10] end
     let times = USize(3)
 
     let notify = ReceivedNotify(h, connection, expected_data, times)

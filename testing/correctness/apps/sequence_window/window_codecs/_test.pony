@@ -44,7 +44,7 @@ class iso _TestWindowState is UnitTest
     // Encode
     let out_writer: Writer = Writer
     let index: USize = 15
-    let buf: Array[U64] iso = recover [12,13,14,11] end
+    let buf: Array[U64] iso = recover [12;13;14;11] end
     let size: USize = 4
     let count: USize = 15
 
@@ -67,7 +67,7 @@ class iso _TestWindowState is UnitTest
     h.assert_eq[USize](count, count')
     // we have to make another copy of the original buffer since we used it up
     let buf'': Array[U64] val = consume buf'
-    let buf_clone: Array[U64] val = recover [12,13,14,11] end
+    let buf_clone: Array[U64] val = recover [12;13;14;11] end
     for (i, v) in buf_clone.pairs() do
       h.assert_eq[U64](v, buf''(i))
     end
