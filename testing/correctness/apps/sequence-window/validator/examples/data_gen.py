@@ -1,4 +1,10 @@
+import os
 import struct
+
+
+# get local path
+BASE_PATH = os.path.dirname(os.path.realpath(__file__))
+
 
 class Ring(object):
     def __init__(self):
@@ -39,7 +45,8 @@ def inc(x):
 r0 = Ring()
 r1 = Ring()
 timestamp = 0
-with open('pass.txt', 'wb') as f:
+file_name = 'pass.txt'
+with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
     for x in xrange(1,1001):
         inc_and_write(x,f)
 
@@ -48,7 +55,8 @@ with open('pass.txt', 'wb') as f:
 r0 = Ring()
 r1 = Ring()
 timestamp = 0
-with open('fail_expect_max.txt', 'wb') as f:
+file_name = 'fail_expect_max.txt'
+with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
     for x in xrange(1,1003):
         inc_and_write(x,f)
 
@@ -57,7 +65,8 @@ with open('fail_expect_max.txt', 'wb') as f:
 r0 = Ring()
 r1 = Ring()
 timestamp = 0
-with open('fail_increments.txt', 'wb') as f:
+file_name = 'fail_increments.txt'
+with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
     for x in xrange(1,101):
         inc_and_write(x,f)
     for x in xrange(81, 1001):
@@ -68,7 +77,8 @@ with open('fail_increments.txt', 'wb') as f:
 r0 = Ring()
 r1 = Ring()
 timestamp = 0
-with open('fail_sequentiality.txt', 'wb') as f:
+file_name = 'fail_sequentiality.txt'
+with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
     for x in xrange(1,101):
         inc_and_write(x,f)
     for x in xrange(101,111):
@@ -81,7 +91,8 @@ with open('fail_sequentiality.txt', 'wb') as f:
 r0 = Ring()
 r1 = Ring()
 timestamp = 0
-with open('fail_size.txt', 'wb') as f:
+file_name = 'fail_size.txt'
+with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
     for x in xrange(1,101):
         inc_and_write(x,f)
     r0.r.insert(0, 92)
@@ -96,7 +107,8 @@ with open('fail_size.txt', 'wb') as f:
 r0 = Ring()
 r1 = Ring()
 timestamp = 0
-with open('fail_no_nonlead_zeroes.txt', 'wb') as f:
+file_name = 'fail_no_nonlead_zeroes.txt'
+with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
     for x in xrange(1,101):
         inc_and_write(x,f)
     r0.push(0)
@@ -108,7 +120,8 @@ with open('fail_no_nonlead_zeroes.txt', 'wb') as f:
 r0 = Ring()
 r1 = Ring()
 timestamp = 0
-with open('fail_parity.txt', 'wb') as f:
+file_name = 'fail_parity.txt'
+with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
     for x in xrange(1,101):
         inc_and_write(x,f)
     r0.push(101)  # push 101 to the even partition
@@ -120,7 +133,8 @@ with open('fail_parity.txt', 'wb') as f:
 r0 = Ring()
 r1 = Ring()
 timestamp = 0
-with open('fail_expected_difference.txt', 'wb') as f:
+file_name = 'fail_expected_difference.txt'
+with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
     for x in xrange(1,999):
         inc_and_write(x,f)
     inc_and_write(1000, f)
@@ -130,7 +144,8 @@ with open('fail_expected_difference.txt', 'wb') as f:
 r0 = Ring()
 r1 = Ring()
 timestamp = 0
-with open('pass_with_atleastonce.txt', 'wb') as f:
+file_name = 'pass_with_atleastonce.txt'
+with open(os.path.join(BASE_PATH, file_name), 'wb') as f:
     for x in xrange(1,501):
         inc_and_write(x,f)
     r0.r = [394,396,398,400]
