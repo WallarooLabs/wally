@@ -8,10 +8,10 @@ use "wallaroo/recovery"
 class WActorRegistry
   let _actors: Map[WActorId, WActorWrapper tag] = _actors.create()
   let _roles: Map[String, Role] = _roles.create()
-  let _rand: Rand
+  let _rand: EnhancedRandom
 
   new create(seed: U64 = Time.micros()) =>
-    _rand = Rand(seed)
+    _rand = EnhancedRandom(seed)
 
   fun ref register_actor(id: WActorId, w_actor: WActorWrapper tag) =>
     _actors(id) = w_actor
@@ -76,7 +76,7 @@ actor CentralWActorRegistry
   let _actors: Map[WActorId, WActorWrapper tag] = _actors.create()
   let _role_sets: Map[String, SetIs[WActorId]] = _role_sets.create()
   let _roles: Map[String, Role] = _roles.create()
-  let _rand: Rand
+  let _rand: EnhancedRandom
 
   new create(auth: AmbientAuth, init: WActorInitializer, event_log: EventLog,
     seed: U64)
@@ -84,7 +84,7 @@ actor CentralWActorRegistry
     _auth = auth
     _initializer = init
     _event_log = event_log
-    _rand = Rand(seed)
+    _rand = EnhancedRandom(seed)
 
   be create_actor(builder: WActorWrapperBuilder) =>
     let new_actor = builder(this, _auth, _event_log, _rand.u64())
@@ -186,11 +186,11 @@ actor CentralWActorRegistry
 class Role
   let _name: String
   let _actors: Array[WActorId] = _actors.create()
-  let _rand: Rand
+  let _rand: EnhancedRandom
 
   new create(name': String, seed: U64) =>
     _name = name'
-    _rand = Rand(seed)
+    _rand = EnhancedRandom(seed)
 
   fun name(): String =>
     _name
