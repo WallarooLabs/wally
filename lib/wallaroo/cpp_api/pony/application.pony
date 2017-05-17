@@ -1,5 +1,4 @@
 use "collections"
-
 use "wallaroo"
 use "wallaroo/topology"
 use "wallaroo/fail"

@@ -1,5 +1,6 @@
 use "collections"
 use "wallaroo/topology"
+use "wallaroo/state"
 use "wallaroo/fail"
 
 use @w_computation_compute[DataP](computation: ComputationP, input: DataP)

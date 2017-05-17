@@ -1,6 +1,8 @@
 use "buffered"
+use "serialise"
 use "sendence/bytes"
 use "wallaroo"
+use "wallaroo/fail"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 

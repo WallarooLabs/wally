@@ -13,8 +13,7 @@ class CPPData
     @w_serializable_serialize_get_size(_data)
 
   fun _serialise(bytes: Pointer[U8] tag) =>
-    let s = @w_serializable_serialize(_data, bytes)
-    s
+    @w_serializable_serialize(_data, bytes)
 
   fun ref _deserialise(bytes: Pointer[U8] tag) =>
     _data = recover @w_user_serializable_deserialize(bytes) end

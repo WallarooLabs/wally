@@ -4,7 +4,12 @@ use "buffered"
 use "wallaroo"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
+use "wallaroo/state"
 use "wallaroo/messages"
+
+// these are included because of sendence/wallaroo issue #814
+use "serialise"
+use "wallaroo/fail"
 
 use @load_module[ModuleP](module_name: CString)
 
@@ -76,7 +81,7 @@ class PyData
   fun _final() =>
     Machida.dec_ref(_data)
 
-class PyState
+class PyState is State
   var _state: Pointer[U8] val
 
   new create(state: Pointer[U8] val) =>

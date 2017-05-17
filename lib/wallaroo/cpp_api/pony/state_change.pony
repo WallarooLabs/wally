@@ -1,5 +1,5 @@
 use "buffered"
-use "wallaroo/topology"
+use "wallaroo/state"
 
 use @w_state_change_get_name[Pointer[U8]](state_change: StateChangeP)
 use @w_state_change_get_id[U64](state_change: StateChangeP)
