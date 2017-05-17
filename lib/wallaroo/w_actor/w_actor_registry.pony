@@ -4,6 +4,7 @@ use "sendence/rand"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/recovery"
+use "wallaroo/tcp_sink"
 
 class WActorRegistry
   let _actors: Map[WActorId, WActorWrapper tag] = _actors.create()
@@ -72,17 +73,19 @@ class WActorRegistry
 actor CentralWActorRegistry
   let _auth: AmbientAuth
   let _initializer: WActorInitializer
+  let _sinks: Array[TCPSink] val
   let _event_log: EventLog
   let _actors: Map[WActorId, WActorWrapper tag] = _actors.create()
   let _role_sets: Map[String, SetIs[WActorId]] = _role_sets.create()
   let _roles: Map[String, Role] = _roles.create()
   let _rand: EnhancedRandom
 
-  new create(auth: AmbientAuth, init: WActorInitializer, event_log: EventLog,
-    seed: U64)
+  new create(auth: AmbientAuth, init: WActorInitializer,
+    sinks: Array[TCPSink] val, event_log: EventLog, seed: U64)
   =>
     _auth = auth
     _initializer = init
+    _sinks = sinks
     _event_log = event_log
     _rand = EnhancedRandom(seed)
 
@@ -128,6 +131,7 @@ actor CentralWActorRegistry
         w_actor.register_as_role(k, a)
       end
     end
+    w_actor.register_sinks(_sinks)
 
   // TODO: Using a String to identify a role seems like a brittle approach
   be register_as_role(role: String, w_actor: WActorId) =>
