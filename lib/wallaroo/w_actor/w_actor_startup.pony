@@ -35,6 +35,8 @@ actor ActorSystemStartup
   var _event_log_file_length: (USize | None) = None
   var _i_addrs_write: Array[Array[String]] trn =
     recover Array[Array[String]] end
+  var _o_addrs_write: Array[Array[String]] trn =
+    recover Array[Array[String]] end
   // DEMO fields
   var _iterations: USize = 100
 
@@ -67,6 +69,7 @@ actor ActorSystemStartup
         // persisting leader
         .add("worker-count", "w", I64Argument)
         .add("in", "i", StringArgument)
+        .add("out", "o", StringArgument)
         .add("topology-initializer", "t", None)
         .add("name", "n", StringArgument)
         .add("resilience-dir", "r", StringArgument)
@@ -88,6 +91,10 @@ actor ActorSystemStartup
         | ("in", let arg: String) =>
           for addr in arg.split(",").values() do
             _i_addrs_write.push(addr.split(":"))
+          end
+        | ("out", let arg: String) =>
+          for addr in arg.split(",").values() do
+            _o_addrs_write.push(addr.split(":"))
           end
         | ("topology-initializer", None) => _is_initializer = true
         | ("name", let arg: String) => _worker_name = arg
@@ -199,9 +206,10 @@ actor ActorSystemStartup
       let empty_router_registry = EmptyRouterRegistry(auth, empty_connections)
 
       let local_system = LocalActorSystem(_system.name(),
-        _system.actor_builders(), _system.sources())
+        _system.actor_builders(), _system.sources(), _system.sinks())
       let initializer = WActorInitializer(_app_name, local_system, auth,
         event_log, _i_addrs_write = recover Array[Array[String]] end,
+        _o_addrs_write = recover Array[Array[String]] end,
         _local_actor_system_file, actor_count, _iterations,
         recovery, recover [_worker_name] end, seed,
         empty_connections, empty_router_registry)

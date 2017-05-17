@@ -139,11 +139,11 @@ class EgressBuilder
   let _pipeline_name: String
   let _id: U128
   let _addr: (Array[String] val | ProxyAddress val)
-  let _sink_builder: (TCPSinkBuilder val | None)
+  let _sink_builder: (TCPSinkBuilder | None)
 
   new val create(pipeline_name': String, id': U128,
     addr: (Array[String] val | ProxyAddress val),
-    sink_builder: (TCPSinkBuilder val | None) = None)
+    sink_builder: (TCPSinkBuilder | None) = None)
   =>
     _pipeline_name = pipeline_name'
     _name =
@@ -182,7 +182,7 @@ class EgressBuilder
     | let a: Array[String] val =>
       try
         match _sink_builder
-        | let tsb: TCPSinkBuilder val =>
+        | let tsb: TCPSinkBuilder =>
           @printf[I32](("Connecting to sink at " + a(0) + ":" + a(1) + "\n").cstring())
 
           tsb(reporter.clone(), a(0), a(1))

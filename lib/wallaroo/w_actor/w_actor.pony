@@ -24,6 +24,7 @@ interface val WActorBuilder
 trait WActorHelper
   fun ref send_to(target: WActorId, data: Any val)
   fun ref send_to_role(role: String, data: Any val)
+  fun ref send_to_sink[Out: Any val](sink_id: USize, output: Out)
   fun ref register_as_role(role: String)
   fun ref create_actor(builder: WActorBuilder)
   fun ref destroy_actor(id: WActorId)

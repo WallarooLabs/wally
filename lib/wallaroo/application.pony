@@ -99,7 +99,7 @@ trait BasicPipeline
   fun source_id(): USize
   fun source_builder(): SourceBuilderBuilder val
   fun source_route_builder(): RouteBuilder val
-  fun sink_builder(): (TCPSinkBuilder val | None)
+  fun sink_builder(): (TCPSinkBuilder | None)
   fun sink_target_ids(): Array[U64] val
   // TODO: Change this when we need more sinks per pipeline
   // ASSUMPTION: There is at most one sink per pipeline
@@ -116,7 +116,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
   let _source_builder: SourceBuilderBuilder val
   let _source_route_builder: RouteBuilder val
-  var _sink_builder: (TCPSinkBuilder val | None) = None
+  var _sink_builder: (TCPSinkBuilder | None) = None
   var _sink_id: (U128 | None) = None
   let _is_coalesced: Bool
 
@@ -136,7 +136,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 
   fun apply(i: USize): RunnerBuilder val ? => _runner_builders(i)
 
-  fun ref update_sink(sink_builder': TCPSinkBuilder val,
+  fun ref update_sink(sink_builder': TCPSinkBuilder,
     sink_ids: Array[U64] val)
   =>
     _sink_builder = sink_builder'
@@ -148,7 +148,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 
   fun source_route_builder(): RouteBuilder val => _source_route_builder
 
-  fun sink_builder(): (TCPSinkBuilder val | None) => _sink_builder
+  fun sink_builder(): (TCPSinkBuilder | None) => _sink_builder
 
   fun sink_target_ids(): Array[U64] val => _sink_target_ids
 
@@ -266,11 +266,11 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _a.add_pipeline(_p as BasicPipeline)
     _a
 
-  fun ref to_sink(encoder: SinkEncoder[Out] val,
+  fun ref to_sink(encoder: SinkEncoder[Out],
     sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val
       = recover Array[Array[ByteSeq] val] end): Application ?
   =>
-    let sink_builder: TCPSinkBuilder val =
+    let sink_builder: TCPSinkBuilder =
       TCPSinkBuilder(TypedEncoderWrapper[Out](encoder), initial_msgs)
     _p.update_sink(sink_builder, sink_ids)
     _p.update_sink_id()

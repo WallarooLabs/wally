@@ -1,11 +1,11 @@
 use "wallaroo/messages"
 use "wallaroo/metrics"
 
-class TCPSinkBuilder
-  let _encoder_wrapper: EncoderWrapper val
+class val TCPSinkBuilder
+  let _encoder_wrapper: EncoderWrapper
   let _initial_msgs: Array[Array[ByteSeq] val] val
 
-  new val create(encoder_wrapper: EncoderWrapper val,
+  new val create(encoder_wrapper: EncoderWrapper,
     initial_msgs: Array[Array[ByteSeq] val] val)
   =>
     _encoder_wrapper = encoder_wrapper

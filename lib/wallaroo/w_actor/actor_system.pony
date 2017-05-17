@@ -22,6 +22,7 @@ class ActorSystem
   let _actor_builders: Array[WActorWrapperBuilder] = _actor_builders.create()
   let _sources: Array[(WActorFramedSourceHandler, WActorRouter)] =
     _sources.create()
+  let _sinks: Array[TCPSinkBuilder] = _sinks.create()
 
   new create(name': String, seed': U64 = Time.micros()) =>
     _name = name'
@@ -45,24 +46,41 @@ class ActorSystem
   =>
     _sources.push((handler, actor_router))
 
+  // TODO: Figure out why this failed to get passed "Reachability"
+  // when compiling if you use .> but not if you use .
+  fun ref add_sink[Out: Any val](encoder: SinkEncoder[Out],
+    initial_msgs: Array[Array[ByteSeq] val] val
+      = recover Array[Array[ByteSeq] val] end): ActorSystem
+  =>
+    let builder = TCPSinkBuilder(TypedEncoderWrapper[Out](encoder),
+      initial_msgs)
+    _sinks.push(builder)
+    this
+
   fun val actor_builders(): Array[WActorWrapperBuilder] val =>
     _actor_builders
 
   fun val sources(): Array[(WActorFramedSourceHandler, WActorRouter)] val =>
     _sources
 
+  fun val sinks(): Array[TCPSinkBuilder] val =>
+    _sinks
+
 class val LocalActorSystem
   let _name: String
   let _actor_builders: Array[WActorWrapperBuilder] val
   let _sources: Array[(WActorFramedSourceHandler, WActorRouter)] val
+  let _sinks: Array[TCPSinkBuilder] val
 
   new val create(name': String,
     actor_builders': Array[WActorWrapperBuilder] val,
-    sources': Array[(WActorFramedSourceHandler, WActorRouter)] val)
+    sources': Array[(WActorFramedSourceHandler, WActorRouter)] val,
+    sinks': Array[TCPSinkBuilder] val)
   =>
     _name = name'
     _actor_builders = actor_builders'
     _sources = sources'
+    _sinks = sinks'
 
   fun name(): String => _name
 
@@ -74,10 +92,13 @@ class val LocalActorSystem
       arr.push(a)
     end
     arr.push(builder)
-    LocalActorSystem(_name, consume arr, _sources)
+    LocalActorSystem(_name, consume arr, _sources, _sinks)
 
-  fun val actor_builders(): Array[WActorWrapperBuilder] val =>
+  fun actor_builders(): Array[WActorWrapperBuilder] val =>
     _actor_builders
 
-  fun val sources(): Array[(WActorFramedSourceHandler, WActorRouter)] val =>
+  fun sources(): Array[(WActorFramedSourceHandler, WActorRouter)] val =>
     _sources
+
+  fun sinks(): Array[TCPSinkBuilder] val =>
+    _sinks

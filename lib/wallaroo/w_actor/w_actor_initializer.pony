@@ -23,8 +23,10 @@ actor WActorInitializer
   let _event_log: EventLog
   let _local_actor_system_file: String
   let _input_addrs: Array[Array[String]] val
+  let _output_addrs: Array[Array[String]] val
   let _recovery: Recovery
   var _central_registry: (CentralWActorRegistry | None) = None
+  let _sinks: Array[TCPSink] val
 
   ////////////////
   // Placeholders
@@ -45,6 +47,7 @@ actor WActorInitializer
 
   new create(app_name: String, s: LocalActorSystem, auth: AmbientAuth,
     event_log: EventLog, input_addrs: Array[Array[String]] val,
+    output_addrs: Array[Array[String]] val,
     local_actor_system_file: String, actor_count: USize,
     expected_iterations: USize, recovery: Recovery, workers: Array[String] val,
     seed: U64, empty_connections: Connections,
@@ -57,13 +60,33 @@ actor WActorInitializer
     _event_log = event_log
     _local_actor_system_file = local_actor_system_file
     _input_addrs = input_addrs
+    _output_addrs = output_addrs
     _expected_iterations = expected_iterations
     _actor_count = actor_count
     _recovery = recovery
     _rand = EnhancedRandom(seed)
     _empty_connections = empty_connections
     _empty_router_registry = empty_router_registry
-    _central_registry = CentralWActorRegistry(_auth, this, _event_log,
+    let sinks: Array[TCPSink] trn = recover Array[TCPSink] end
+    try
+      for (idx, sink_builder) in s.sinks().pairs() do
+        let empty_metrics_reporter =
+          MetricsReporter(_app_name, "", MetricsSink("", "", "", ""))
+
+        let sink_addr = _output_addrs(idx)
+        let host = sink_addr(0)
+        let service = sink_addr(1)
+
+        let next_sink = sink_builder(consume empty_metrics_reporter,
+          host, service)
+        sinks.push(next_sink)
+      end
+    else
+      @printf[I32]("Error creating sinks! Be sure you've provided as many sink addresses as you have defined sinks.\n".cstring())
+      Fail()
+    end
+    _sinks = consume sinks
+    _central_registry = CentralWActorRegistry(_auth, this, _sinks, _event_log,
       _rand.u64())
 
   fun ref _save_local_topology() =>
