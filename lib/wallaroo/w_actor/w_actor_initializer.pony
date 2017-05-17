@@ -41,7 +41,7 @@ actor WActorInitializer
   var _received_serialized: USize = 0
   let _actor_count: USize
   let _actors: Array[WActorWrapper tag] = _actors.create()
-  let _rand: Rand
+  let _rand: EnhancedRandom
 
   new create(app_name: String, s: LocalActorSystem, auth: AmbientAuth,
     event_log: EventLog, input_addrs: Array[Array[String]] val,
@@ -60,7 +60,7 @@ actor WActorInitializer
     _expected_iterations = expected_iterations
     _actor_count = actor_count
     _recovery = recovery
-    _rand = Rand(seed)
+    _rand = EnhancedRandom(seed)
     _empty_connections = empty_connections
     _empty_router_registry = empty_router_registry
     _central_registry = CentralWActorRegistry(_auth, this, _event_log,

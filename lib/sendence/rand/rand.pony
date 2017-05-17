@@ -2,7 +2,7 @@ use "collections"
 use "random"
 use "time"
 
-class Rand
+class EnhancedRandom
   let _rand: Random
   let _indices: Array[USize] = Array[USize]
 
