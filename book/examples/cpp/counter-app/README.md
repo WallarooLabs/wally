@@ -18,7 +18,7 @@ mkdir build
 clang++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
 ar rs build/libcounter.a build/Counter.o
 ponyc --linker c++ --debug --export --output=build \
-  --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
+  --path=../../../../lib:../../../../cpp_api/cpp/cppapi/build/build/lib:./build \
     counter-app
 ```
 
@@ -28,7 +28,7 @@ ponyc --linker c++ --debug --export --output=build \
 g++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
 ar rs build/libcounter.a build/Counter.o
 ponyc --linker c++ --debug --export --output=build \
-  --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
+  --path=../../../../lib:../../../../cpp_api/cpp/cppapi/build/build/lib:./build \
     counter-app
 ```
 

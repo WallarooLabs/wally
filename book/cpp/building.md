@@ -16,7 +16,7 @@ On Ubuntu you can install using:
 
 ```bash
 sudo apt-get install libc++-dev
-``` 
+```
 
 On OSX, it should already be installed.
 
@@ -25,7 +25,7 @@ On OSX, it should already be installed.
 In order to use the Wallaroo C++ API you must install the Wallaroo C++ API header files and library. At the terminal, go to the `wallaroo` repository directory and run the following commands:
 
 ```bash
-cd lib/wallaroo/cpp_api/cpp/cppapi/
+cd cpp_api/cpp/cppapi/
 mkdir build
 cd build
 cmake ..
@@ -51,7 +51,7 @@ mkdir build
 clang++ --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
 ar rs build/libcounter.a build/Counter.o
 ponyc --debug --export --output=build \
-  --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
+  --path=../../../../lib:../../../../cpp_api/cpp/cppapi/build/build/lib:../../../../cpp_api:./build \
   counter-app
 ```
 
@@ -61,7 +61,7 @@ ponyc --debug --export --output=build \
 gcc --debug -c -o build/Counter.o cpp/Counter.cpp -Wall -std=c++11 -Ihpp
 ar rs build/libcounter.a build/Counter.o
 ponyc --linker c++ --debug --export --output=build \
-  --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build \
+  --path=../../../../lib:../../../../cpp_api/cpp/cppapi/build/build/lib:../../../../cpp_api:./build \
   counter-app
 ```
 
@@ -74,8 +74,8 @@ Let's break down what each of these lines does:
   the compiled C++ application code.
 * `ponyc ...` -- Build the Wallaroo application. The `--path`
   arguments indicate the location of the Wallaroo Pony library
-  (`../../lib`), the location of the Pony C++ API library
-  (`../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib`), and the
+  (`../../../../lib`), the location of the Pony C++ API library
+  (`../../../../cpp_api/cpp/cppapi/build/build/lib`), the location on the Pony C++ API (`../../../../cpp_api`), and the
   location of the application library (`./build`). Note that this
   points to the local build of the C++ library; the installed location
   will vary from system to system (for example, in

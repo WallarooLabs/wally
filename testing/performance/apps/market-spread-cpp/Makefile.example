@@ -30,7 +30,7 @@ $(LIBMS): $(OBJ)
 	$(AR) $(ARFLAGS) $@ $^
 
 $(MSAPP): $(LIBMS) market-spread-cpp/market-spread-cpp.pony
-	$(PONYC) --debug --export --output=$(ODIR) --path=../../../../lib:../../../../lib/wallaroo/cpp_api/cpp/cppapi/build/build/lib:./build market-spread-cpp
+	$(PONYC) --debug --export --output=$(ODIR) --path=../../../../lib:../../../../cpp_api/cpp/cppapi/build/build/lib:./build market-spread-cpp
 
 .PHONY: clean
 
