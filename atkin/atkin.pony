@@ -1,0 +1,319 @@
+use "collections"
+use "buffered"
+use "random"
+
+use "sendence/rand"
+use "wallaroo"
+use "wallaroo/fail"
+use "wallaroo/messages"
+use "wallaroo/w_actor"
+use "wallaroo/tcp_source"
+
+use @load_module[ModuleP](module_name: CString)
+use @create_actor_system[Pointer[U8] val](module: ModuleP, args: Pointer[U8] val)
+use @list_item_count[USize](list: Pointer[U8] val)
+use @get_name[Pointer[U8] val](o: Pointer[U8] val)
+use @get_app_name[Pointer[U8] val](o: Pointer[U8] val)
+use @get_attribute[Pointer[U8] val](o: Pointer[U8] val, prop: CString)
+use @get_string_attribute[Pointer[U8] val](o: Pointer[U8] val, prop: CString)
+use @call_str_fn[Pointer[U8] ref](o: Pointer[U8] val, fn: CString,
+  args: Pointer[U8] val)
+use @call_str_fn_noargs[Pointer[U8] val](o: Pointer[U8] val, fn: CString)
+use @call_fn_noargs[Pointer[U8] val](o: Pointer[U8] val, fn: CString)
+use @call_fn_u128arg[Pointer[U8] val](o: Pointer[U8] val, fn: CString, id: U128)
+use @call_fn_sizet_noargs[USize](o: Pointer[U8] val, fn: CString)
+use @call_fn_sizet_bufferarg[USize](o: Pointer[U8] val, fn: CString,
+  data: Pointer[U8] tag, size: USize)
+use @call_fn_bufferarg[Pointer[U8] val](o: Pointer[U8] val, fn: CString,
+  data: Pointer[U8] tag, size: USize)
+use @get_actor_count[USize](m: ModuleP)
+use @call_fn[Pointer[U8] val](actr: Pointer[U8] val,
+  f_name: CString, args: Pointer[U8] tag)
+use @call_fn_with_id[Pointer[U8] val](actr: Pointer[U8] val,
+  f_name: CString, sender_id: U128 val, args: Pointer[U8] tag)
+use @get_none[Pointer[U8] val]()
+use @join_longs[U128](long_pair: Pointer[U8] tag)
+
+use @Py_Initialize[None]()
+use @PyTuple_GetItem[Pointer[U8] val](t: Pointer[U8] val, idx: USize)
+use @PyString_Size[USize](str: Pointer[U8] box)
+use @PyString_AsString[Pointer[U8]](str: Pointer[U8] box)
+use @PyString_FromStringAndSize[Pointer[U8]](str: Pointer[U8] tag, size: USize)
+use @PyList_New[Pointer[U8] val](size: USize)
+use @PyList_Size[USize](l: Pointer[U8] box)
+use @PyList_GetItem[Pointer[U8] val](l: Pointer[U8] box, i: USize)
+use @PyList_SetItem[I32](l: Pointer[U8] box, i: USize, item: Pointer[U8] box)
+use @PyInt_AsLong[I64](i: Pointer[U8] box)
+use @PyInt_AsSsize_t[USize](i: Pointer[U8] box)
+
+use @py_incref[None](o: Pointer[U8] box)
+use @py_decref[None](o: Pointer[U8] box)
+
+type CString is Pointer[U8] tag
+
+type ModuleP is Pointer[U8] val
+
+class PyData
+  var _data: Pointer[U8] val
+
+  new val create(data: Pointer[U8] val) =>
+    _data = data
+
+  fun obj(): Pointer[U8] val =>
+    _data
+
+  fun _final() =>
+    @py_decref(_data)
+
+
+class PySource is WActorFramedSourceHandler
+  let _source: Pointer[U8] val
+
+  new val create(source: Pointer[U8] val) =>
+    _source = source
+
+  fun header_length(): USize =>
+    let length = @call_fn_sizet_noargs(_source, "header_length".cstring())
+    if Atkin.print_errors() then
+      Fail()
+    end
+    length
+
+  fun payload_length(data: Array[U8] iso): USize =>
+    let length = @call_fn_sizet_bufferarg(_source,
+      "payload_length".cstring(), data.cpointer(), data.size())
+    if Atkin.print_errors() then
+      Fail()
+    end
+    length
+
+  fun decode(data: Array[U8] val): PyData val ? =>
+    let decoded = @call_fn_bufferarg(_source, "decode".cstring(),
+      data.cpointer(), data.size())
+    @py_incref(decoded)
+    if Atkin.print_errors() then
+      error
+    end
+    PyData(decoded) 
+
+  fun _final() =>
+    @py_decref(_source)
+
+class PySink
+  let _sink: Pointer[U8] val
+
+  new val create(sink: Pointer[U8] val) =>
+    _sink = sink
+
+  fun apply(f: (PyData val | None), wb: Writer): Array[ByteSeq] val =>
+    match f
+    | let p: PyData val =>
+      let arr = recover val
+        let data = @call_fn(_sink, "encode".cstring(), p.obj())
+        Array[U8].from_cpointer(@PyString_AsString(data), @PyString_Size(data)).clone()
+      end
+      wb.write(arr)
+    end
+    wb.done()
+
+  fun _final() =>
+    @py_decref(_sink)
+
+class PyActorBuilder
+  let _pyactor: Pointer[U8] val
+
+  new val create(pyactor: Pointer[U8] val) =>
+    _pyactor = pyactor
+
+  fun apply(id: U128, wh: WActorHelper): WActor =>
+    PyActor(_pyactor, wh, id)
+
+  fun _final() =>
+    @py_decref(_pyactor)
+
+class PyActor is WActor
+  let _actor: Pointer[U8] val
+  let _id: U128
+
+  new create(actr: Pointer[U8] val, h: WActorHelper, id': U128) =>
+    _actor = actr
+    _id = id'
+    let helper_calls = @call_fn_u128arg(_actor, "setup_wrapper".cstring(), id')
+    if Atkin.print_errors() then
+      Fail()
+    end
+    run_helper_calls(h, helper_calls)
+
+  fun ref run_helper_calls(helper: WActorHelper, helper_calls: Pointer[U8] val) =>
+    let call_count = @list_item_count(helper_calls)
+    for idx in Range(0, call_count) do
+      let call = @PyList_GetItem(helper_calls, idx)
+      if not call.is_null() then
+        let call_name = recover val
+          let s = @PyTuple_GetItem(call, 0)
+          let r = String.copy_cstring(@PyString_AsString(s))
+          r
+        end
+        let call_args = @PyTuple_GetItem(call, 1)
+        match call_name
+        | "send_to" =>
+          let long_pair = @PyTuple_GetItem(call_args, 0)
+          let actor_id = @join_longs(long_pair)
+          let msg = @PyTuple_GetItem(call_args, 1)
+          helper.send_to(actor_id, Atkin.wrap_pointer(msg))
+        | "send_to_role" =>
+          let role = recover val
+            let s = @PyTuple_GetItem(call_args, 0)
+            String.copy_cstring(@PyString_AsString(s))
+          end
+          let msg = @PyTuple_GetItem(call_args, 1)
+          helper.send_to_role(role, Atkin.wrap_pointer(msg))
+        //| "create_actor" =>
+        //| "destroy_actor" =>
+        //| "set_timer" =>
+        //| "cancel_timer" =>
+        | "send_to_sink" =>
+          let s = @PyTuple_GetItem(call_args, 0)
+          let sink = @PyInt_AsSsize_t(s)
+          let msg = @PyTuple_GetItem(call_args, 1)
+          helper.send_to_sink[(PyData val | None)](sink, Atkin.wrap_pointer(msg))
+        | "register_as_role" =>
+          let role = recover val
+            let s = @PyTuple_GetItem(call, 1)
+            String.copy_cstring(@PyString_AsString(s))
+          end
+          helper.register_as_role(role)
+        end
+      else
+        Fail()
+      end
+    end
+    @py_decref(helper_calls) 
+
+
+  fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
+    match payload
+    | let p: PyData val =>
+      let helper_calls = @call_fn_with_id(_actor, "receive_wrapper".cstring(),
+                                          sender, p.obj())
+      if Atkin.print_errors() then
+        Fail()
+      end
+      run_helper_calls(h, helper_calls)
+    else
+      Fail()
+    end
+
+  fun ref process(data: Any val, h: WActorHelper) =>
+    match data
+    | let d: PyData val =>
+      let helper_calls = @call_fn(_actor, "process_wrapper".cstring(), d.obj())
+      if Atkin.print_errors() then
+        Fail()
+      end
+      run_helper_calls(h, helper_calls)
+    | Act =>
+      let helper_calls = @call_fn_noargs(_actor, "process_wrapper".cstring())
+      if Atkin.print_errors() then
+        Fail()
+      end
+      run_helper_calls(h, helper_calls)
+    else
+      Fail()
+    end
+
+  fun _final() =>
+    @py_decref(_actor)
+
+primitive Atkin
+
+  fun print_errors(): Bool =>
+    let er = @PyErr_Occurred[Pointer[U8]]()
+    if not er.is_null() then
+      @PyErr_Print[None]()
+      true
+    else
+      false
+    end
+
+  fun load_module(module_name: String): ModuleP ? =>
+    let r = @load_module(module_name.cstring())
+    if print_errors() then
+      error
+    end
+    r
+
+  fun wrap_pointer(r: Pointer[U8] val): (PyData val | None val) =>
+    if not r.is_null() then
+      @py_incref(r)
+      PyData(r)
+    else
+      None
+    end
+
+  fun start_python() =>
+    @Py_Initialize()
+
+  fun pony_array_string_to_py_list_string(args: Array[String] val):
+    Pointer[U8] val
+  =>
+    let l = @PyList_New(args.size())
+    for (i, v) in args.pairs() do
+      @PyList_SetItem(l, i, @PyString_FromStringAndSize(v.cstring(), v.size()))
+    end
+    l
+
+  fun create_actor_system(module: ModuleP, args: Array[String] val,
+    init_seed: U64): ActorSystem val ?
+  =>
+    let pyargs = pony_array_string_to_py_list_string(args)
+    let pyactor_system = @create_actor_system(module, pyargs)
+    if print_errors() then
+      error
+    end
+    let actor_system = recover iso ActorSystem(
+      recover val String.copy_cstring(@get_name(pyactor_system)) end,
+      init_seed) end
+    let pysource_list = @get_attribute(pyactor_system, "sources".cstring())
+    if not pysource_list.is_null() then
+      let pysource_list_count = @list_item_count(pysource_list)
+      for idx in Range(0, pysource_list_count) do
+        let pysource = @PyList_GetItem(pysource_list, idx)
+        @py_incref(pysource)
+        let pysource_kind = String.copy_cstring(
+          @call_str_fn_noargs(pysource, "kind".cstring()))
+        if pysource_kind == "simulated" then
+          actor_system.add_source(SimulationFramedSourceHandler, IngressWActorRouter)
+        else
+          let source = PySource(pysource)
+          actor_system.add_source(source, IngressWActorRouter)
+        end
+      end
+      @py_decref(pysource_list)
+    end
+    let pysink_list = @get_attribute(pyactor_system, "sinks".cstring())
+    if not pysink_list.is_null() then
+      let pysink_list_count = @list_item_count(pysink_list)
+      for idx in Range(0, pysink_list_count) do
+        let pysink = @PyList_GetItem(pysink_list, idx)
+        @py_incref(pysink)
+        let sink = PySink(pysink)
+        actor_system.add_sink[(PyData val | None)](sink)
+      end
+      @py_decref(pysink_list)
+    end
+    let pyactor_list = @get_attribute(pyactor_system, "actors".cstring())
+    if not pyactor_list.is_null() then
+      let pyactor_list_count = @list_item_count(pyactor_list)
+      for idx in Range(0, pyactor_list_count) do
+        let pyactor = @PyList_GetItem(pyactor_list, idx)
+        @py_incref(pyactor)
+        let actor_builder = PyActorBuilder(pyactor)
+        actor_system.add_actor(actor_builder)
+      end
+      @py_decref(pyactor_list)
+    end
+    actor_system
+
+  fun startup(env: Env, module: ModuleP, actor_system: ActorSystem val) =>
+    ActorSystemStartup(env, actor_system, actor_system.name())
