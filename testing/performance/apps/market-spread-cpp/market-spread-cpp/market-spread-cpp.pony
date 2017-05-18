@@ -30,7 +30,7 @@ use "lib:wallaroo"
 use "lib:c++" if osx
 use "lib:stdc++" if linux
 
-use "lib:ms"
+use "lib:market-spread-cpp"
 
 actor Main
   new create(env: Env) =>
