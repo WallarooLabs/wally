@@ -49,10 +49,6 @@ install:
   # return to our starting directory, then our `script` step will fail because
   # its in the wrong directory.
   - export INSTALL_STARTED_AT=`pwd`
-  - if [ "${TRAVIS_OS_NAME}" = "linux" ];
-    then
-      sudo apt-get -fy install cpuset;
-    fi;
   - if [ "${TRAVIS_OS_NAME}" = "osx" ];
     then
       brew update;
@@ -67,6 +63,8 @@ install:
     fi;
   - if [ "${TRAVIS_OS_NAME}" = "linux" ];
     then
+      sudo apt-get -fy install cpuset;
+      sudo apt-get install libc++-dev;
       mkdir /tmp/dl;
       cd /tmp/dl;
       wget "http://llvm.org/releases/${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-debian8.tar.xz";
@@ -78,6 +76,10 @@ install:
       wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre2-10.21.tar.bz2;
       tar -xjvf pcre2-10.21.tar.bz2;
       cd pcre2-10.21 && ./configure --prefix=/usr && make && sudo make install;
+      cd  /tmp/dl;
+      wget https://cmake.org/files/v3.5/cmake-3.5.2-Linux-x86_64.tar.gz;
+      tar zxvf cmake-3.5.2-Linux-x86_64.tar.gz;
+      export PATH=/tmp/dl/cmake-3.5.2-Linux-x86_64/bin:$PATH;
     fi;
   - echo "Installing sendence/ponyc";
     cd /tmp;
