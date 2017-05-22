@@ -57,6 +57,7 @@ use @key_hash[U64](key: Pointer[U8] val)
 use @key_eq[I32](key: Pointer[U8] val, other: Pointer[U8] val)
 
 use @py_bool_check[I32](b: Pointer[U8] box)
+use @is_py_none[I32](o: Pointer[U8] box)
 use @py_incref[None](o: Pointer[U8] box)
 use @py_decref[None](o: Pointer[U8] box)
 
@@ -268,7 +269,8 @@ class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
   =>
     (let data, let persist) = Machida.stateful_computation_compute(_computation,
       input.obj(), state.obj())
-    let d = recover if data.is_null() then
+    let d = recover if Machida.is_py_none(data) then
+        Machida.dec_ref(data)
         None
       else
         recover val PyData(data) end
@@ -649,6 +651,9 @@ primitive Machida
 
   fun bool_check(b: Pointer[U8] val): Bool =>
     not (@py_bool_check(b) == 0)
+
+  fun is_py_none(o: Pointer[U8] box): Bool =>
+    not (@is_py_none(o) == 0)
 
   fun inc_ref(o: Pointer[U8] box) =>
     @py_incref(o)
