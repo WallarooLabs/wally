@@ -164,10 +164,7 @@ extern PyObject *stateful_computation_compute(PyObject *computation, PyObject *d
   pValue = PyObject_CallFunctionObjArgs(pFunc, data, state, NULL);
   Py_DECREF(pFunc);
 
-  if (pValue != Py_None)
-    return pValue;
-  else
-    return NULL;
+  return pValue;
 }
 
 extern long key_hash(PyObject *key)
@@ -267,4 +264,9 @@ extern void user_serialization(PyObject *o, char *bytes)
 extern int py_bool_check(PyObject *b)
 {
   return PyBool_Check(b);
+}
+
+extern int is_py_none(PyObject *o)
+{
+  return o == Py_None;
 }
