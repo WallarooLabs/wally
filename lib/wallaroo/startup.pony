@@ -455,6 +455,13 @@ actor Startup
         _startup_options.worker_name,
         data_receivers, router_registry, connections)
 
+      _event_log = ifdef "resilience" then
+          EventLog(_env, _event_log_file
+            where backend_file_length = _startup_options.event_log_file_length)
+        else
+          EventLog(_env, None)
+        end
+
       let recovery = Recovery(_startup_options.worker_name,
         _event_log as EventLog, recovery_replayer)
 
