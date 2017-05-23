@@ -5,7 +5,8 @@ class StartupOptions
   var m_arg: (Array[String] | None) = None
   var i_addrs_write: Array[Array[String]] trn =
     recover Array[Array[String]] end
-  var o_arg: (Array[String] | None) = None
+  var o_addrs_write: Array[Array[String]] trn =
+    recover Array[Array[String]] end
   var c_arg: (Array[String] | None) = None
   var d_arg: (Array[String] | None) = None
   var my_c_addr: Array[String] = ["", "0"]
@@ -80,7 +81,10 @@ primitive WallarooConfig
         for addr in arg.split(",").values() do
           so.i_addrs_write.push(addr.split(":"))
         end
-      | ("out", let arg: String) => so.o_arg = arg.split(":")
+      | ("out", let arg: String) =>
+        for addr in arg.split(",").values() do
+          so.o_addrs_write.push(addr.split(":"))
+        end
       | ("control", let arg: String) => so.c_arg = arg.split(":")
       | ("data", let arg: String) => so.d_arg = arg.split(":")
       | ("my-control", let arg: String) => so.my_c_addr = arg.split(":")
@@ -88,7 +92,8 @@ primitive WallarooConfig
       | ("phone-home", let arg: String) => so.p_arg = arg.split(":")
       | ("worker-count", let arg: I64) =>
         so.worker_count = arg.usize()
-      | ("topology-initializer", None) => so.is_initializer = true
+      | ("topology-initializer", None) =>
+        so.is_initializer = true
       | ("name", let arg: String) => so.worker_name = arg
       | ("resilience-dir", let arg: String) =>
         if arg.substring(arg.size().isize() - 1) == "/" then
@@ -111,6 +116,13 @@ primitive WallarooConfig
       | ("spike-prob", let arg: F64) => spike_prob = arg
       | ("spike-margin", let arg: I64) => spike_margin = arg.usize()
       end
+    end
+
+    if so.worker_count == 1 then
+      so.is_initializer = true
+    end
+    if so.is_initializer then
+      so.worker_name = "initializer"
     end
 
     ifdef "spike" then

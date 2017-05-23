@@ -313,6 +313,26 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
     _maybe_mute_or_unmute_upstreams()
 
+  be forward_actor_data(delivery_msg: ActorDeliveryMsg val) =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd actor data message at OutgoingBoundary\n".cstring())
+    end
+    try
+      let seq_id = _seq_id + 1
+
+      let outgoing_msg = ChannelMsgEncoder.data_channel_actor(delivery_msg,
+        seq_id, _wb, _auth)
+      _add_to_upstream_backup(outgoing_msg)
+
+      if _connection_initialized then
+        _writev(outgoing_msg)
+      end
+    else
+      Fail()
+    end
+
+    _maybe_mute_or_unmute_upstreams()
+
   be writev(data: Array[ByteSeq] val) =>
     _writev(data)
 

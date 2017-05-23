@@ -20,7 +20,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   var _d_host: String
   var _d_service: String
   let _is_initializer: Bool
-  let _initializer: (WorkerInitializer | None)
+  let _initializer: (ClusterInitializer | None)
   let _local_topology_initializer: LocalTopologyInitializer
   let _connections: Connections
   let _recovery_replayer: RecoveryReplayer
@@ -30,7 +30,7 @@ class ControlChannelListenNotifier is TCPListenNotify
 
   new iso create(name: String, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
-    initializer: (WorkerInitializer | None) = None,
+    initializer: (ClusterInitializer | None) = None,
     local_topology_initializer: LocalTopologyInitializer,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     recovery_file: FilePath, data_host: String, data_service: String,
@@ -107,7 +107,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
   let _name: String
   let _connections: Connections
-  let _initializer: (WorkerInitializer | None)
+  let _initializer: (ClusterInitializer | None)
   let _local_topology_initializer: LocalTopologyInitializer
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
@@ -116,7 +116,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   var _header: Bool = true
 
   new iso create(name: String, auth: AmbientAuth,
-    connections: Connections, initializer: (WorkerInitializer | None),
+    connections: Connections, initializer: (ClusterInitializer | None),
     local_topology_initializer: LocalTopologyInitializer,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     data_host: String, data_service: String)
@@ -159,7 +159,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         try
           (let host, _) = conn.remote_address().name()
           match _initializer
-          | let i: WorkerInitializer =>
+          | let i: ClusterInitializer =>
             i.identify_control_address(m.worker_name, host, m.service)
           end
           _connections.create_control_connection(m.worker_name, host, m.service)
@@ -172,7 +172,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         try
           (let host, _) = conn.remote_address().name()
           match _initializer
-          | let i: WorkerInitializer =>
+          | let i: ClusterInitializer =>
             i.identify_data_address(m.worker_name, host, m.service)
           end
           _connections.create_data_connection(m.worker_name, host, m.service)
@@ -212,7 +212,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             .cstring())
         end
         match _initializer
-        | let i: WorkerInitializer =>
+        | let i: ClusterInitializer =>
           ifdef debug then
             if m.worker_name == "initializer" then
               @printf[I32](("Initializer shouldn't be sending itself a " +
@@ -234,8 +234,8 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             .cstring())
         end
         match _initializer
-        | let wi: WorkerInitializer =>
-          wi.connections_ready(m.worker_name)
+        | let ci: ClusterInitializer =>
+          ci.connections_ready(m.worker_name)
         end
       | let m: CreateDataChannelListener val =>
         ifdef "trace" then

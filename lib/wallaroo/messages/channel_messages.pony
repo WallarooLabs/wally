@@ -6,6 +6,7 @@ use "wallaroo/boundary"
 use "wallaroo/initialization"
 use "wallaroo/routing"
 use "wallaroo/topology"
+use "wallaroo/w_actor"
 
 primitive ChannelMsgEncoder
   fun _encode(msg: ChannelMsg val, auth: AmbientAuth,
@@ -26,6 +27,11 @@ primitive ChannelMsgEncoder
   =>
     _encode(DataMsg(delivery_msg, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, metric_name), auth, wb)
+
+  fun data_channel_actor(delivery_msg: ActorDeliveryMsg val, seq_id: SeqId,
+    wb: Writer, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(ActorDataMsg(delivery_msg, seq_id), auth, wb)
 
   fun migrate_step[K: (Hashable val & Equatable[K] val)](step_id: U128,
     state_name: String, key: K, state: ByteSeq val, worker: String,
@@ -417,6 +423,14 @@ class DataMsg is ChannelMsg
     metrics_id = metrics_id'
     metric_name = metric_name'
 
+class ActorDataMsg is ChannelMsg
+  let seq_id: SeqId
+  let delivery_msg: ActorDeliveryMsg val
+
+  new val create(msg: ActorDeliveryMsg val, seq_id': SeqId) =>
+    seq_id = seq_id'
+    delivery_msg = msg
+
 class ReplayMsg is ChannelMsg
   let data_bytes: Array[ByteSeq] val
 
@@ -506,6 +520,35 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
     target_step.replay_run[D](_metric_name, pipeline_time_spent, _data, origin,
       _msg_uid, _frac_ids, seq_id, route_id, latest_ts, metrics_id,
       worker_ingress_ts)
+    false
+
+class val ActorDeliveryMsg is ChannelMsg
+  let _sender_name: String
+  let _target_id: WActorId
+  let _sender_id: (WActorId | None)
+  let _data: Any val
+
+  fun input(): Any val => _data
+
+  new val create(from: String, t_id: WActorId, m_data: Any val,
+    sender_id: (WActorId | None) = None)
+  =>
+    _target_id = t_id
+    _sender_name = from
+    _sender_id = sender_id
+    _data = m_data
+
+  fun target_id(): WActorId => _target_id
+  fun sender_name(): String => _sender_name
+
+  fun deliver(registry: CentralWActorRegistry): Bool
+  =>
+    match _sender_id
+    | let id: WActorId =>
+      registry.send_to(_target_id, WMessage(id, _target_id, _data))
+    else
+      registry.send_for_process(_target_id, _data)
+    end
     false
 
 class JoinClusterMsg is ChannelMsg

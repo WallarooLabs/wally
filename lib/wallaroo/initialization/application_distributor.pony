@@ -11,15 +11,15 @@ use "wallaroo/metrics"
 use "wallaroo/topology"
 use "wallaroo/recovery"
 
-actor ApplicationInitializer
+actor ApplicationDistributor is Distributor
   let _auth: AmbientAuth
   let _guid_gen: GuidGenerator = GuidGenerator
   let _local_topology_initializer: LocalTopologyInitializer
   let _input_addrs: Array[Array[String]] val
   let _output_addr: Array[String] val
-  var _application: (Application val | None) = None
+  let _application: Application val
 
-  new create(auth: AmbientAuth,
+  new create(auth: AmbientAuth, application: Application val,
     local_topology_initializer: LocalTopologyInitializer,
     input_addrs: Array[Array[String]] val,
     output_addr: Array[String] val)
@@ -28,38 +28,27 @@ actor ApplicationInitializer
     _local_topology_initializer = local_topology_initializer
     _input_addrs = input_addrs
     _output_addr = output_addr
+    _application = application
 
-  be update_application(app: Application val) =>
-    _application = app
-
-  be initialize(worker_initializer: (WorkerInitializer | None),
+  be distribute(cluster_initializer: (ClusterInitializer | None),
     worker_count: USize, worker_names: Array[String] val)
   =>
-    match _application
-    | let a: Application val =>
-      @printf[I32]("Initializing application\n".cstring())
-      _automate_initialization(a, worker_initializer, worker_count,
-        worker_names)
-    else
-      @printf[I32]("No application provided!\n".cstring())
-    end
+    @printf[I32]("Initializing application\n".cstring())
+    _automate_initialization(_application, cluster_initializer, worker_count,
+      worker_names)
 
   be topology_ready() =>
     @printf[I32]("Application has successfully initialized.\n".cstring())
-
-    match _application
-    | let app: Application val =>
-      for i in Range(0, _input_addrs.size()) do
-        try
-          let init_file = app.init_files(i)
-          let file = InitFileReader(init_file, _auth)
-          file.read_into(_input_addrs(i))
-        end
+    for i in Range(0, _input_addrs.size()) do
+      try
+        let init_file = _application.init_files(i)
+        let file = InitFileReader(init_file, _auth)
+        file.read_into(_input_addrs(i))
       end
     end
 
   fun ref _automate_initialization(application: Application val,
-    worker_initializer: (WorkerInitializer | None), worker_count: USize,
+    cluster_initializer: (ClusterInitializer | None), worker_count: USize,
     worker_names: Array[String] val)
   =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
@@ -791,7 +780,7 @@ actor ApplicationInitializer
         // to the list we'll use to distribute to the other workers
         if w == "initializer" then
           _local_topology_initializer.update_topology(local_topology)
-          _local_topology_initializer.initialize(worker_initializer)
+          _local_topology_initializer.initialize(cluster_initializer)
         else
           other_local_topologies(w) = local_topology
         end
@@ -799,9 +788,9 @@ actor ApplicationInitializer
 
       // Distribute the LocalTopologies to the other (non-initializer) workers
       if worker_count > 1 then
-        match worker_initializer
-        | let wi: WorkerInitializer =>
-          wi.distribute_local_topologies(consume other_local_topologies)
+        match cluster_initializer
+        | let ci: ClusterInitializer =>
+          ci.distribute_local_topologies(consume other_local_topologies)
         else
           @printf[I32]("Error distributing local topologies!\n".cstring())
         end

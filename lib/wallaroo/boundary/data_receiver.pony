@@ -181,6 +181,18 @@ actor DataReceiver is Producer
       _maybe_ack()
     end
 
+  be received_actor_data(d: ActorDeliveryMsg val, seq_id: SeqId) =>
+    _timer_init(this)
+    ifdef "trace" then
+      @printf[I32]("Rcvd actor msg at DataReceiver\n".cstring())
+    end
+    if seq_id > _last_id_seen then
+      _ack_counter = _ack_counter + 1
+      _last_id_seen = seq_id
+      _router.route_to_actor(d)
+      _maybe_ack()
+    end
+
   be request_ack() =>
     if _last_id_acked < _last_id_seen then
       _request_ack()

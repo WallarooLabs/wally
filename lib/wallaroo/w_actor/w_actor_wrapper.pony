@@ -1,5 +1,6 @@
 use "collections"
 use "sendence/guid"
+use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/recovery"
 use "wallaroo/routing"
@@ -27,6 +28,7 @@ trait WActorWrapper
   be pickle(m: SerializeTarget)
 
 actor WActorWithState is WActorWrapper
+  let _worker_name: String
   let _id: U128
   let _event_log: EventLog
   let _guid_gen: GuidGenerator = GuidGenerator
@@ -44,15 +46,20 @@ actor WActorWithState is WActorWrapper
 
   var _seq_id: SeqId = 0
 
-  new create(id: U128, w_actor_builder: WActorBuilder val, event_log: EventLog,
-    r: CentralWActorRegistry, seed: U64, auth: AmbientAuth)
+  new create(worker: String, id: U128, w_actor_builder: WActorBuilder val,
+    event_log: EventLog, r: CentralWActorRegistry,
+    actor_to_worker_map: Map[U128, String] val,
+    boundaries: Map[String, OutgoingBoundary] val, seed: U64,
+    auth: AmbientAuth)
   =>
+    _worker_name = worker
     _id = id
     _auth = auth
     _event_log = event_log
-    _actor_registry = WActorRegistry(seed)
+    _actor_registry = WActorRegistry(_worker_name, _auth, actor_to_worker_map,
+      boundaries, seed)
     _central_actor_registry = r
-    _w_actor_id = WActorId(this)
+    _w_actor_id = WActorId(id, this)
     _helper = LiveWActorHelper(this)
     _w_actor = w_actor_builder(id, _helper)
     _central_actor_registry.register_actor(_w_actor_id, this)
@@ -176,27 +183,41 @@ actor WActorWithState is WActorWrapper
     _actor_registry.known_actors()
 
 interface val WActorWrapperBuilder
-  fun apply(r: CentralWActorRegistry, auth: AmbientAuth, event_log: EventLog,
-    seed: U64): WActorWrapper tag
+  fun apply(worker: String, r: CentralWActorRegistry, auth: AmbientAuth,
+    event_log: EventLog, actor_to_worker_map: Map[U128, String] val,
+    boundaries: Map[String, OutgoingBoundary] val, seed: U64):
+    WActorWrapper tag
+  fun id(): U128
 
 class val StatefulWActorWrapperBuilder
   let _id: U128
   let _w_actor_builder: WActorBuilder val
 
-  new val create(id: U128, wab: WActorBuilder val) =>
-    _id = id
+  new val create(id': U128, wab: WActorBuilder val) =>
+    _id = id'
     _w_actor_builder = wab
 
-  fun apply(r: CentralWActorRegistry, auth: AmbientAuth, event_log: EventLog,
-    seed: U64): WActorWrapper tag
+  fun apply(worker: String, r: CentralWActorRegistry, auth: AmbientAuth,
+    event_log: EventLog, actor_to_worker_map: Map[U128, String] val,
+    boundaries: Map[String, OutgoingBoundary] val, seed: U64):
+    WActorWrapper tag
   =>
-    WActorWithState(_id, _w_actor_builder, event_log, r, seed, auth)
+    WActorWithState(worker, _id, _w_actor_builder, event_log, r,
+      actor_to_worker_map, boundaries, seed, auth)
+
+  fun id(): U128 =>
+    _id
 
 class val WActorId is Equatable[WActorId]
+  let _id: U128
   let _w_actor_hash: U64
 
-  new val create(w_actor: WActorWrapper tag) =>
+  new val create(id': U128, w_actor: WActorWrapper tag) =>
+    _id = id'
     _w_actor_hash = (digestof w_actor).hash()
+
+  fun id(): U128 =>
+    _id
 
   fun eq(that: box->WActorId): Bool =>
     _w_actor_hash is that._w_actor_hash

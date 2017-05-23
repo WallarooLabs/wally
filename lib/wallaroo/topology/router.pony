@@ -8,6 +8,7 @@ use "wallaroo/messages"
 use "wallaroo/rebalancing"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
+use "wallaroo/w_actor"
 
 interface Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -422,13 +423,35 @@ class StepIdRouter is OmniRouter
       false
     end
 
+trait val ActorSystemDataRouter is Equatable[ActorSystemDataRouter]
+  fun route(d_msg: ActorDeliveryMsg val)
+
+class val EmptyActorSystemDataRouter is ActorSystemDataRouter
+  fun route(d_msg: ActorDeliveryMsg val) =>
+    Fail()
+
+class val ActiveActorSystemDataRouter is ActorSystemDataRouter
+  let _registry: CentralWActorRegistry
+
+  new create(registry: CentralWActorRegistry) =>
+    _registry = registry
+
+  fun route(d_msg: ActorDeliveryMsg val)
+  =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at ActorSystemDataRouter\n".cstring())
+    end
+    d_msg.deliver(_registry)
+
 class DataRouter is Equatable[DataRouter]
   let _data_routes: Map[U128, ConsumerStep tag] val
   let _target_ids_to_route_ids: Map[U128, RouteId] val
   let _route_ids_to_target_ids: Map[RouteId, U128] val
+  let _actor_system_router: ActorSystemDataRouter
 
   new val create(data_routes: Map[U128, ConsumerStep tag] val =
-      recover Map[U128, ConsumerStep tag] end)
+      recover Map[U128, ConsumerStep tag] end,
+    actor_system_router: ActorSystemDataRouter = EmptyActorSystemDataRouter)
   =>
     _data_routes = data_routes
     var route_id: RouteId = 0
@@ -449,14 +472,17 @@ class DataRouter is Equatable[DataRouter]
     end
     _target_ids_to_route_ids = consume tid_map
     _route_ids_to_target_ids = consume rid_map
+    _actor_system_router = actor_system_router
 
   new val with_route_ids(data_routes: Map[U128, ConsumerStep tag] val,
     target_ids_to_route_ids: Map[U128, RouteId] val,
-    route_ids_to_target_ids: Map[RouteId, U128] val)
+    route_ids_to_target_ids: Map[RouteId, U128] val,
+    actor_system_router: ActorSystemDataRouter)
   =>
     _data_routes = data_routes
     _target_ids_to_route_ids = target_ids_to_route_ids
     _route_ids_to_target_ids = route_ids_to_target_ids
+    _actor_system_router = actor_system_router
 
   fun step_for_id(id: U128): ConsumerStep tag ? =>
     _data_routes(id)
@@ -512,6 +538,9 @@ class DataRouter is Equatable[DataRouter]
       true
     end
 
+  fun route_to_actor(d_msg: ActorDeliveryMsg) =>
+    _actor_system_router.route(d_msg)
+
   fun register_producer(producer: Producer) =>
     for step in _data_routes.values() do
       step.register_producer(producer)
@@ -562,7 +591,7 @@ class DataRouter is Equatable[DataRouter]
       if v != id then new_rid_map(k) = v end
     end
     DataRouter.with_route_ids(consume new_data_routes,
-      consume new_tid_map, consume new_rid_map)
+      consume new_tid_map, consume new_rid_map, _actor_system_router)
 
   fun add_route(id: U128, target: ConsumerStep tag): DataRouter val =>
     // TODO: Using persistent maps for our fields would make this much more
@@ -592,7 +621,7 @@ class DataRouter is Equatable[DataRouter]
     new_rid_map(new_route_id) = id
 
     DataRouter.with_route_ids(consume new_data_routes,
-      consume new_tid_map, consume new_rid_map)
+      consume new_tid_map, consume new_rid_map, _actor_system_router)
 
   fun eq(that: box->DataRouter): Bool =>
     MapTagEquality[U128, ConsumerStep tag](_data_routes, that._data_routes) and

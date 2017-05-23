@@ -28,8 +28,8 @@ actor Startup
   var _ph_host: String = ""
   var _ph_service: String = ""
   var _is_multi_worker: Bool = true
-  var _worker_initializer: (WorkerInitializer | None) = None
-  var _application_initializer: (ApplicationInitializer | None) = None
+  var _cluster_initializer: (ClusterInitializer | None) = None
+  var _application_distributor: (ApplicationDistributor | None) = None
   var _swarm_manager_addr: String = ""
   var _event_log_file: String = ""
   var _local_topology_file: String = ""
@@ -128,10 +128,6 @@ actor Startup
         end
       end
 
-      if _startup_options.is_initializer then
-        _startup_options.worker_name = "initializer"
-      end
-
       // TODO: When we add full cluster join functionality, we will probably
       // need to break out initialization branches into primitives.
       // Currently a joining worker only nominally becomes part of the cluster.
@@ -169,6 +165,8 @@ actor Startup
 
       let input_addrs: Array[Array[String]] val =
         (_startup_options.i_addrs_write = recover Array[Array[String]] end)
+      let output_addrs: Array[Array[String]] val =
+        (_startup_options.o_addrs_write = recover Array[Array[String]] end)
       let m_addr = _startup_options.m_arg as Array[String]
       let c_addr = _startup_options.c_arg as Array[String]
       let c_host = c_addr(0)
@@ -185,12 +183,6 @@ actor Startup
       let my_c_service = _startup_options.my_c_addr(1)
       let my_d_host = _startup_options.my_d_addr(0)
       let my_d_service = _startup_options.my_d_addr(1)
-
-      let o_addr_ref = _startup_options.o_arg as Array[String]
-      let o_addr_trn: Array[String] trn = recover Array[String] end
-      o_addr_trn.push(o_addr_ref(0))
-      o_addr_trn.push(o_addr_ref(1))
-      let o_addr: Array[String] val = consume o_addr_trn
 
       if _startup_options.worker_name == "" then
         @printf[I32](("You must specify a worker name via " +
@@ -326,17 +318,16 @@ actor Startup
 
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
-        _application_initializer = ApplicationInitializer(auth,
-          local_topology_initializer, input_addrs, o_addr)
-        match _application_initializer
-        | let ai: ApplicationInitializer =>
-          _worker_initializer = WorkerInitializer(auth,
+        _application_distributor = ApplicationDistributor(auth, _application,
+          local_topology_initializer, input_addrs, output_addrs(0))
+        match _application_distributor
+        | let ad: ApplicationDistributor =>
+          _cluster_initializer = ClusterInitializer(auth,
             _startup_options.worker_name,
             _startup_options.worker_count, connections,
-            ai, local_topology_initializer, d_addr,
+            ad, local_topology_initializer, d_addr,
             metrics_conn)
         end
-        _startup_options.worker_name = "initializer"
       end
 
       let control_channel_filepath: FilePath = FilePath(auth,
@@ -344,7 +335,7 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections,
-          _startup_options.is_initializer, _worker_initializer,
+          _startup_options.is_initializer, _cluster_initializer,
           local_topology_initializer,
           recovery_replayer, router_registry,
           control_channel_filepath, my_d_host, my_d_service)
@@ -380,7 +371,7 @@ actor Startup
             worker_names_filepath)
           if _is_multi_worker then
             local_topology_initializer.recover_and_initialize(
-              recovered_workers, _worker_initializer)
+              recovered_workers, _cluster_initializer)
           else
             local_topology_initializer.initialize(where recovering = true)
           end
@@ -388,9 +379,9 @@ actor Startup
       end
 
       if not is_recovering then
-        match _worker_initializer
-        | let w: WorkerInitializer =>
-          w.start(_application)
+        match _cluster_initializer
+        | let ci: ClusterInitializer =>
+          ci.start(_startup_options.worker_name)
         end
       end
 
@@ -413,10 +404,11 @@ actor Startup
 
       let input_addrs: Array[Array[String]] val =
         (_startup_options.i_addrs_write = recover Array[Array[String]] end)
+      let output_addrs: Array[Array[String]] val =
+        (_startup_options.o_addrs_write = recover Array[Array[String]] end)
 
-      let metrics_conn = ReconnectingMetricsSink(
-        m.metrics_host, m.metrics_service,
-        _application.name(), _startup_options.worker_name)
+      let metrics_conn = ReconnectingMetricsSink(m.metrics_host,
+        m.metrics_service, _application.name(), _startup_options.worker_name)
 
       // TODO: Are we creating connections to all addresses or just
       // initializer?
@@ -520,7 +512,7 @@ actor Startup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections,
-          _startup_options.is_initializer, _worker_initializer,
+          _startup_options.is_initializer, _cluster_initializer,
           local_topology_initializer,
           recovery_replayer, router_registry, control_channel_filepath,
           my_d_host, my_d_service)
