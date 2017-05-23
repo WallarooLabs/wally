@@ -8,14 +8,15 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/topology"
 use "wallaroo/recovery"
+use "wallaroo/w_actor"
 
-actor WorkerInitializer
+actor ClusterInitializer
   let _auth: AmbientAuth
   let _worker_name: String
   let _expected: USize
   let _connections: Connections
-  let _application_initializer: ApplicationInitializer
-  let _local_topology_initializer: LocalTopologyInitializer
+  let _distributor: Distributor
+  let _layout_initializer: LayoutInitializer
   let _initializer_data_addr: Array[String] val
   let _metrics_conn: MetricsSink
   let _connections_ready_workers: Set[String] = Set[String]
@@ -32,8 +33,8 @@ actor WorkerInitializer
   let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
 
   new create(auth: AmbientAuth, worker_name: String, workers: USize,
-    connections: Connections, application_initializer: ApplicationInitializer,
-    local_topology_initializer: LocalTopologyInitializer,
+    connections: Connections, distributor: Distributor,
+    layout_initializer: LayoutInitializer,
     data_addr: Array[String] val, metrics_conn: MetricsSink)
   =>
     _auth = auth
@@ -42,17 +43,14 @@ actor WorkerInitializer
     _connections = connections
     _initializer_data_addr = data_addr
     _metrics_conn = metrics_conn
-    _application_initializer = application_initializer
-    _local_topology_initializer = local_topology_initializer
+    _distributor = distributor
+    _layout_initializer = layout_initializer
 
-  be start(a: Application val) =>
-    _application_initializer.update_application(a)
-
+  be start(initializer_name: String) =>
     if _expected == 1 then
       _topology_ready = true
-      _application_initializer.initialize(this, _expected,
-        recover Array[String] end)
-      _local_topology_initializer.create_data_channel_listener(
+      _distributor.distribute(this, _expected, recover [initializer_name] end)
+      _layout_initializer.create_data_channel_listener(
         recover Array[String] end, "", "", this)
     end
 
@@ -108,8 +106,7 @@ actor WorkerInitializer
           names.push(name)
         end
 
-        _application_initializer.initialize(this, _expected,
-          consume names)
+        _distributor.distribute(this, _expected, consume names)
       end
     end
 
@@ -122,7 +119,7 @@ actor WorkerInitializer
       if _initialized == _expected then
         @printf[I32]("All %llu workers reporting Topology ready!\n".cstring(),
           _expected)
-        _application_initializer.topology_ready()
+        _distributor.topology_ready()
 
         let topology_ready_msg =
           ExternalMsgEncoder.topology_ready("initializer")
@@ -156,7 +153,7 @@ actor WorkerInitializer
 
       // Pass in empty host and service because data listener is created
       // in a special manner in .create_data_receiver() for initializer
-      _local_topology_initializer.create_data_channel_listener(workers, "", "",
+      _layout_initializer.create_data_channel_listener(workers, "", "",
         this)
     else
       @printf[I32]("Failed to create message to create data receivers\n".cstring())
@@ -172,7 +169,7 @@ actor WorkerInitializer
       end
 
       _connections.save_connections()
-      _connections.update_boundaries(_local_topology_initializer)
+      _connections.update_boundaries(_layout_initializer)
     else
       @printf[I32]("Initializer: Error initializing interconnections\n".cstring())
     end

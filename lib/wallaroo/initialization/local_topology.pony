@@ -174,7 +174,7 @@ class LocalTopology
 
   fun ne(that: box->LocalTopology): Bool => not eq(that)
 
-actor LocalTopologyInitializer
+actor LocalTopologyInitializer is LayoutInitializer
   let _application: Application val
   let _input_addrs: Array[Array[String]] val
   let _worker_name: String
@@ -196,7 +196,7 @@ actor LocalTopologyInitializer
     recover Map[String, OutgoingBoundary] end
   var _topology: (LocalTopology val | None) = None
   let _local_topology_file: String
-  var _worker_initializer: (WorkerInitializer | None) = None
+  var _cluster_initializer: (ClusterInitializer | None) = None
   let _data_channel_file: String
   let _worker_names_file: String
   var _topology_initialized: Bool = false
@@ -340,7 +340,7 @@ actor LocalTopologyInitializer
 
   be create_data_channel_listener(ws: Array[String] val,
     host: String, service: String,
-    worker_initializer: (WorkerInitializer | None) = None)
+    cluster_initializer: (ClusterInitializer | None) = None)
   =>
     match _connections
     | let conns: Connections =>
@@ -366,10 +366,10 @@ actor LocalTopologyInitializer
             conns.register_listener(dch_listener)
           end
         else
-          match worker_initializer
-            | let wi: WorkerInitializer =>
+          match cluster_initializer
+            | let ci: ClusterInitializer =>
               conns.create_initializer_data_channel_listener(
-                _data_receivers, _recovery_replayer, _router_registry, wi,
+                _data_receivers, _recovery_replayer, _router_registry, ci,
                 data_channel_filepath, this)
           end
         end
@@ -402,7 +402,7 @@ actor LocalTopologyInitializer
     end
 
   be recover_and_initialize(ws: Array[String] val,
-    worker_initializer: (WorkerInitializer | None) = None)
+    cluster_initializer: (ClusterInitializer | None) = None)
   =>
     match _connections
     | let conns: Connections =>
@@ -430,10 +430,10 @@ actor LocalTopologyInitializer
             conns.register_listener(dch_listener)
           end
         else
-          match worker_initializer
-          | let wi: WorkerInitializer =>
+          match cluster_initializer
+          | let ci: ClusterInitializer =>
             conns.create_initializer_data_channel_listener(
-              _data_receivers, _recovery_replayer, _router_registry, wi,
+              _data_receivers, _recovery_replayer, _router_registry, ci,
               data_channel_filepath, this)
           end
         end
@@ -499,7 +499,7 @@ actor LocalTopologyInitializer
       Fail()
     end
 
-  be initialize(worker_initializer: (WorkerInitializer | None) = None,
+  be initialize(cluster_initializer: (ClusterInitializer | None) = None,
     recovering: Bool = false)
   =>
     _recovering = recovering
@@ -511,7 +511,7 @@ actor LocalTopologyInitializer
 
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("|v|v|v|Initializing Local Topology|v|v|v|\n\n".cstring())
-    _worker_initializer = worker_initializer
+    _cluster_initializer = cluster_initializer
     try
       if (_worker_count > 1) and (_outgoing_boundaries.size() == 0) then
         @printf[I32]("Outgoing boundaries not set up!\n".cstring())
@@ -1182,7 +1182,7 @@ actor LocalTopologyInitializer
         if not _is_initializer then
           // Inform the initializer that we're done initializing our local
           // topology. If this is the initializer worker, we'll inform
-          // our WorkerInitializer actor once we've spun up the source
+          // our ClusterInitializer actor once we've spun up the source
           // listeners.
           let topology_ready_msg =
             try
@@ -1460,12 +1460,12 @@ actor LocalTopologyInitializer
     end
 
     if _is_initializer then
-      match _worker_initializer
-      | let wi: WorkerInitializer =>
-        wi.topology_ready("initializer")
+      match _cluster_initializer
+      | let ci: ClusterInitializer =>
+        ci.topology_ready("initializer")
         _is_initializer = false
       else
-        @printf[I32]("Need WorkerInitializer to inform that topology is ready\n".cstring())
+        @printf[I32]("Need ClusterInitializer to inform that topology is ready\n".cstring())
       end
     end
 

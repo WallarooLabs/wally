@@ -22,7 +22,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
   var _service: String = ""
   let _connections: Connections
   let _metrics_reporter: MetricsReporter
-  let _local_topology_initializer: LocalTopologyInitializer tag
+  let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
@@ -32,7 +32,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
     connections: Connections, is_initializer: Bool,
     metrics_reporter: MetricsReporter iso,
     recovery_file: FilePath,
-    local_topology_initializer: LocalTopologyInitializer tag,
+    layout_initializer: LayoutInitializer tag,
     data_receivers: DataReceivers, recovery_replayer: RecoveryReplayer,
     router_registry: RouterRegistry, joining: Bool = false)
   =>
@@ -42,7 +42,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
     _connections = connections
     _metrics_reporter = consume metrics_reporter
     _recovery_file = recovery_file
-    _local_topology_initializer = local_topology_initializer
+    _layout_initializer = layout_initializer
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
@@ -97,7 +97,7 @@ class DataChannelListenNotifier is DataChannelListenNotify
     router_registry: RouterRegistry): DataChannelNotify iso^
   =>
     DataChannelConnectNotifier(_connections, _auth,
-    _metrics_reporter.clone(), _local_topology_initializer, _data_receivers,
+    _metrics_reporter.clone(), _layout_initializer, _data_receivers,
     _recovery_replayer, router_registry)
 
 class DataChannelConnectNotifier is DataChannelNotify
@@ -106,7 +106,7 @@ class DataChannelConnectNotifier is DataChannelNotify
   var _header: Bool = true
   let _timers: Timers = Timers
   let _metrics_reporter: MetricsReporter
-  let _local_topology_initializer: LocalTopologyInitializer tag
+  let _layout_initializer: LayoutInitializer tag
   let _data_receivers: DataReceivers
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
@@ -117,14 +117,14 @@ class DataChannelConnectNotifier is DataChannelNotify
 
   new iso create(connections: Connections, auth: AmbientAuth,
     metrics_reporter: MetricsReporter iso,
-    local_topology_initializer: LocalTopologyInitializer tag,
+    layout_initializer: LayoutInitializer tag,
     data_receivers: DataReceivers, recovery_replayer: RecoveryReplayer,
     router_registry: RouterRegistry)
   =>
     _connections = connections
     _auth = auth
     _metrics_reporter = consume metrics_reporter
-    _local_topology_initializer = local_topology_initializer
+    _layout_initializer = layout_initializer
     _data_receivers = data_receivers
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
@@ -177,6 +177,11 @@ class DataChannelConnectNotifier is DataChannelNotify
             data_msg.pipeline_time_spent + (ingest_ts - data_msg.latest_ts),
             data_msg.seq_id, my_latest_ts, data_msg.metrics_id + 1,
             my_latest_ts)
+      | let data_msg: ActorDataMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received ActorDataMsg on Data Channel\n".cstring())
+        end
+        _receiver.received_actor_data(data_msg.delivery_msg, data_msg.seq_id)
       | let dc: DataConnectMsg val =>
         ifdef "trace" then
           @printf[I32]("Received DataConnectMsg on Data Channel\n".cstring())
@@ -191,7 +196,7 @@ class DataChannelConnectNotifier is DataChannelNotify
         ifdef "trace" then
           @printf[I32]("Received StepMigrationMsg on Data Channel\n".cstring())
         end
-        _local_topology_initializer.receive_immigrant_step(sm)
+        _layout_initializer.receive_immigrant_step(sm)
       | let m: MigrationBatchCompleteMsg val =>
         ifdef "trace" then
           @printf[I32]("Received MigrationBatchCompleteMsg on Data Channel\n".cstring())
@@ -266,6 +271,7 @@ trait _DataReceiverWrapper
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   fun replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
+  fun received_actor_data(d: ActorDeliveryMsg val, seq_id: U64)
 
 class _InitDataReceiver is _DataReceiverWrapper
   fun data_connect(sender_step_id: U128, conn: DataChannel) =>
@@ -279,6 +285,9 @@ class _InitDataReceiver is _DataReceiverWrapper
   fun replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
     seq_id: U64, latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
+    Fail()
+
+  fun received_actor_data(d: ActorDeliveryMsg val, seq_id: U64) =>
     Fail()
 
   fun upstream_replay_finished() =>
@@ -304,3 +313,6 @@ class _DataReceiver is _DataReceiverWrapper
   =>
     data_receiver.replay_received(r, pipeline_time_spent, seq_id, latest_ts,
       metrics_id, worker_ingress_ts)
+
+  fun received_actor_data(d: ActorDeliveryMsg val, seq_id: U64) =>
+    data_receiver.received_actor_data(d, seq_id)

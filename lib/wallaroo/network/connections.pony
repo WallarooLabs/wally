@@ -161,14 +161,14 @@ actor Connections is Cluster
     data_receivers: DataReceivers,
     recovery_replayer: RecoveryReplayer,
     router_registry: RouterRegistry,
-    worker_initializer: WorkerInitializer, data_channel_file: FilePath,
-    local_topology_initializer: LocalTopologyInitializer tag)
+    cluster_initializer: ClusterInitializer, data_channel_file: FilePath,
+    layout_initializer: LayoutInitializer tag)
   =>
     let data_notifier: DataChannelListenNotifier iso =
       DataChannelListenNotifier(_worker_name, _auth, this,
         _is_initializer,
         MetricsReporter(_app_name, _worker_name, _metrics_conn),
-        data_channel_file, local_topology_initializer, data_receivers,
+        data_channel_file, layout_initializer, data_receivers,
         recovery_replayer, router_registry)
     // TODO: we need to get the init and max sizes from OS max
     // buffer size
@@ -176,7 +176,7 @@ actor Connections is Cluster
       router_registry, _init_d_host, _init_d_service, 0, 1_048_576, 1_048_576)
     register_listener(dch_listener)
 
-    worker_initializer.identify_data_address("initializer", _init_d_host,
+    cluster_initializer.identify_data_address("initializer", _init_d_host,
       _init_d_service)
 
   be send_control(worker: String, data: Array[ByteSeq] val) =>
@@ -291,12 +291,12 @@ actor Connections is Cluster
       Fail()
     end
 
-  be update_boundaries(local_topology_initializer: LocalTopologyInitializer,
+  be update_boundaries(layout_initializer: LayoutInitializer,
     recovering: Bool = false)
   =>
-    _update_boundaries(local_topology_initializer, recovering)
+    _update_boundaries(layout_initializer, recovering)
 
-  fun _update_boundaries(local_topology_initializer: LocalTopologyInitializer,
+  fun _update_boundaries(layout_initializer: LayoutInitializer,
     recovering: Bool = false)
   =>
     let out_bs: Map[String, OutgoingBoundary] trn =
@@ -316,14 +316,14 @@ actor Connections is Cluster
     @printf[I32](("Preparing to update " + _data_conns.size().string() +
       " boundaries\n").cstring())
 
-    local_topology_initializer.update_boundaries(consume out_bs,
+    layout_initializer.update_boundaries(consume out_bs,
       consume out_bbs)
     // TODO: This should be somewhere else. It's not clear why updating
     // boundaries should trigger initialization, but this is the point
     // at which initialization is possible for a joining or recovering
     // worker
     if _is_joining or recovering then
-      local_topology_initializer.initialize(where recovering = recovering)
+      layout_initializer.initialize(where recovering = recovering)
     end
 
   be create_connections(

@@ -6,7 +6,10 @@ use "time"
 use "sendence/bytes"
 use "sendence/rand"
 use "wallaroo/boundary"
+use "wallaroo/data_channel"
 use "wallaroo/fail"
+use "wallaroo/initialization"
+use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
@@ -15,7 +18,8 @@ use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
-actor WActorInitializer
+actor WActorInitializer is LayoutInitializer
+  let _worker_name: String
   let _app_name: String
   var _system: (LocalActorSystem | None) = None
   let _auth: AmbientAuth
@@ -25,8 +29,18 @@ actor WActorInitializer
   let _input_addrs: Array[Array[String]] val
   let _output_addrs: Array[Array[String]] val
   let _recovery: Recovery
-  var _central_registry: (CentralWActorRegistry | None) = None
-  let _sinks: Array[TCPSink] val
+  let _recovery_replayer: RecoveryReplayer
+  let _data_channel_file: String
+  let _data_receivers: DataReceivers
+  let _metrics_conn: MetricsSink
+  let _central_registry: CentralWActorRegistry
+  var _sinks: Array[TCPSink] val = recover Array[TCPSink] end
+  var _outgoing_boundaries: Map[String, OutgoingBoundary] val =
+    recover Map[String, OutgoingBoundary] end
+  var _outgoing_boundary_builders:
+    Map[String, OutgoingBoundaryBuilder val] val =
+      recover Map[String, OutgoingBoundaryBuilder val] end
+  let _is_initializer: Bool
 
   ////////////////
   // Placeholders
@@ -45,16 +59,19 @@ actor WActorInitializer
   let _actors: Array[WActorWrapper tag] = _actors.create()
   let _rand: EnhancedRandom
 
-  new create(app_name: String, s: LocalActorSystem, auth: AmbientAuth,
-    event_log: EventLog, input_addrs: Array[Array[String]] val,
-    output_addrs: Array[Array[String]] val,
-    local_actor_system_file: String, actor_count: USize,
-    expected_iterations: USize, recovery: Recovery, workers: Array[String] val,
-    seed: U64, empty_connections: Connections,
-    empty_router_registry: RouterRegistry)
+  new create(worker_name: String, app_name: String,
+    auth: AmbientAuth, event_log: EventLog,
+    input_addrs: Array[Array[String]] val,
+    output_addrs: Array[Array[String]] val, local_actor_system_file: String,
+    actor_count: USize, expected_iterations: USize, recovery: Recovery,
+    recovery_replayer: RecoveryReplayer,
+    data_channel_file: String,
+    data_receivers: DataReceivers, metrics_conn: MetricsSink,
+    workers: Array[String] val, seed: U64, empty_connections: Connections,
+    empty_router_registry: RouterRegistry, is_initializer: Bool)
   =>
+    _worker_name = worker_name
     _app_name = app_name
-    _system = s
     _auth = auth
     _workers = workers
     _event_log = event_log
@@ -64,12 +81,25 @@ actor WActorInitializer
     _expected_iterations = expected_iterations
     _actor_count = actor_count
     _recovery = recovery
+    _recovery_replayer = recovery_replayer
+    _data_channel_file = data_channel_file
+    _data_receivers = data_receivers
+    _metrics_conn = metrics_conn
     _rand = EnhancedRandom(seed)
     _empty_connections = empty_connections
     _empty_router_registry = empty_router_registry
+    _central_registry = CentralWActorRegistry(_worker_name, _auth, this,
+      _sinks, _event_log, _rand.u64())
+    _is_initializer = is_initializer
+
+  be update_actor_to_worker_map(actor_to_worker_map: Map[U128, String] val) =>
+    _central_registry.update_actor_to_worker_map(actor_to_worker_map)
+
+  be update_local_actor_system(las: LocalActorSystem) =>
+    _system = las
     let sinks: Array[TCPSink] trn = recover Array[TCPSink] end
     try
-      for (idx, sink_builder) in s.sinks().pairs() do
+      for (idx, sink_builder) in las.sinks().pairs() do
         let empty_metrics_reporter =
           MetricsReporter(_app_name, "",
             ReconnectingMetricsSink("", "", "", ""))
@@ -87,8 +117,7 @@ actor WActorInitializer
       Fail()
     end
     _sinks = consume sinks
-    _central_registry = CentralWActorRegistry(_auth, this, _sinks, _event_log,
-      _rand.u64())
+    _central_registry.update_sinks(_sinks)
 
   fun ref _save_local_topology() =>
     @printf[I32]("||| -- Saving Actor System! -- |||\n".cstring())
@@ -117,7 +146,63 @@ actor WActorInitializer
       Fail()
     end
 
-  be initialize(is_recovering: Bool) =>
+  be create_data_channel_listener(ws: Array[String] val,
+    host: String, service: String,
+    cluster_initializer: (ClusterInitializer | None) = None)
+  =>
+    match _empty_connections
+    | let conns: Connections =>
+      try
+        let data_channel_filepath = FilePath(_auth, _data_channel_file)
+        if not _is_initializer then
+          let data_notifier: DataChannelListenNotify iso =
+            DataChannelListenNotifier(_worker_name, _auth, conns,
+              _is_initializer,
+              MetricsReporter(_app_name, _worker_name, _metrics_conn),
+              data_channel_filepath, this, _data_receivers, _recovery_replayer,
+              _empty_router_registry)
+
+          ifdef "resilience" then
+            conns.make_and_register_recoverable_data_channel_listener(
+              _auth, consume data_notifier, _empty_router_registry,
+              data_channel_filepath, host, service)
+          else
+            let dch_listener = DataChannelListener(_auth,
+              consume data_notifier, _empty_router_registry,
+              host, service)
+            conns.register_listener(dch_listener)
+          end
+        else
+          match cluster_initializer
+            | let ci: ClusterInitializer =>
+              conns.create_initializer_data_channel_listener(
+                _data_receivers, _recovery_replayer, _empty_router_registry,
+                ci, data_channel_filepath, this)
+          end
+        end
+      else
+        @printf[I32]("FAIL: cannot create data channel\n".cstring())
+      end
+    else
+      Fail()
+    end
+
+  be update_boundaries(bs: Map[String, OutgoingBoundary] val,
+    bbs: Map[String, OutgoingBoundaryBuilder val] val)
+  =>
+    // This should only be called during initialization
+    if (_outgoing_boundaries.size() > 0) or
+       (_outgoing_boundary_builders.size() > 0)
+    then
+      Fail()
+    end
+
+    _outgoing_boundaries = bs
+    _outgoing_boundary_builders = bbs
+
+  be initialize(cluster_initializer: (ClusterInitializer | None) = None,
+    recovering: Bool = false)
+  =>
     try
       ifdef "resilience" then
         let local_actor_system_file = FilePath(_auth, _local_actor_system_file)
@@ -146,6 +231,9 @@ actor WActorInitializer
       | let las: LocalActorSystem =>
         match _central_registry
         | let cr: CentralWActorRegistry =>
+          let data_receivers = DataReceivers(_auth, _worker_name,
+            _empty_connections, recovering)
+
           try
             for (idx, source) in las.sources().pairs() do
               let source_notify = WActorSourceNotify(_auth,
@@ -175,7 +263,8 @@ actor WActorInitializer
           end
 
           for builder in las.actor_builders().values() do
-            _actors.push(builder(cr, _auth, _event_log, _rand.u64()))
+            _actors.push(builder(_worker_name, cr, _auth, _event_log,
+              las.actor_to_worker_map(), _outgoing_boundaries, _rand.u64()))
           end
         else
           Fail()
@@ -184,7 +273,7 @@ actor WActorInitializer
         Fail()
       end
 
-      if is_recovering then
+      if recovering then
         _recovery.start_recovery(this, _workers)
       else
         kick_off_demo()
@@ -204,7 +293,7 @@ actor WActorInitializer
   be add_actor(b: WActorWrapperBuilder) =>
     match _system
     | let las: LocalActorSystem =>
-      _system = las.add_actor(b)
+      _system = las.add_actor(b, _worker_name)
     end
 
   be act() =>
@@ -244,6 +333,9 @@ actor WActorInitializer
         finish()
       end
     end
+
+  be receive_immigrant_step(msg: StepMigrationMsg val) =>
+    None
 
 class val ActorSystemSourceBuilder is SourceBuilder
   let _app_name: String
