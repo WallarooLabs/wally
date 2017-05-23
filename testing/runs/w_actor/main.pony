@@ -35,7 +35,7 @@ actor Main
     recover
       let roles: Array[String] val = recover [ARoles.one(), ARoles.two(),
         ARoles.three()] end
-      let rand = Rand(init_seed)
+      let rand = EnhancedRandom(init_seed)
       if n < 3 then
         @printf[I32]("There must be at least 3 actors\n".cstring())
         Fail()
@@ -113,7 +113,7 @@ class A is WActor
   var _n_messages: USize = 1
   let _all_message_types: Array[AMsgBuilder val] val
   var _message_types_to_send: Array[AMsgBuilder val] val
-  let _rand: Rand
+  let _rand: EnhancedRandom
 
   new create(wh: WActorHelper, role: String, id: U128, seed: U64) =>
     _id = (id >> 96).u64()
@@ -132,7 +132,7 @@ class A is WActor
         recover Array[AMsgBuilder val] end
       end
     _message_types_to_send = _all_message_types
-    _rand = Rand(seed)
+    _rand = EnhancedRandom(seed)
 
   fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
     match payload

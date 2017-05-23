@@ -37,7 +37,7 @@ actor Main
     ActorSystem val
   =>
     recover
-      let rand = Rand(init_seed)
+      let rand = EnhancedRandom(init_seed)
       let actor_system =
         ActorSystem("Toy Model CRDT App", rand.u64())
           .> add_source(SimulationFramedSourceHandler, IngressWActorRouter)
@@ -93,7 +93,7 @@ class A is WActor
   let _role: String
   var _pending_increments: USize = 0
   let _g_counter: GCounter
-  let _rand: Rand
+  let _rand: EnhancedRandom
   var _waiting: USize = 0
   var _started: Bool = false
 
@@ -103,7 +103,7 @@ class A is WActor
     h.register_as_role(BasicRoles.ingress())
     _id = id'
     _g_counter = GCounter(_id)
-    _rand = Rand(seed)
+    _rand = EnhancedRandom(seed)
 
   fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
     match payload

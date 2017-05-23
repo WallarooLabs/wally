@@ -688,4 +688,4 @@ ifneq ($(RECURSE_SUBMAKEFILES),false)
   $(eval $(call make-goal,$(PREV_PATH)))
 endif
 
-
+include $(buffy_dir)/Makefile
