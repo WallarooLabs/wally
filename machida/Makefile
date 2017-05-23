@@ -36,7 +36,7 @@ machida_build:
 	mkdir -p $(MACHIDA_BUILD)
 	cc -g -o $(MACHIDA_BUILD)/python-wallaroo.o -c $(MACHIDA_CPP)/python-wallaroo.c
 	ar rvs $(MACHIDA_BUILD)/libpython-wallaroo.a $(MACHIDA_BUILD)/python-wallaroo.o
-	ponyc --debug --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD) --path=$(WALLAROO_LIB) $(MACHIDA_PATH)
+	ponyc --define resilience --debug --output=$(MACHIDA_BUILD) --path=$(MACHIDA_BUILD) --path=$(WALLAROO_LIB) $(MACHIDA_PATH)
 
 machida_test:
 	$(QUIET)echo "machida tests"
@@ -62,4 +62,3 @@ include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
 #,<TIMEOUT VALUE> \
 #,<WESLEY TEST COMMAND> \
 #,<INCLUDE IN CI>))
-
