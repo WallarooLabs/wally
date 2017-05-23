@@ -16,7 +16,7 @@ class _BoundaryId is Equatable[_BoundaryId]
     (name == that.name) and (step_id == that.step_id)
 
   fun hash(): U64 =>
-    (digestof this).hash()
+    name.hash() xor step_id.hash()
 
 interface DataReceiversSubscriber
   be data_receiver_added(sender_name: String, boundary_step_id: U128,
