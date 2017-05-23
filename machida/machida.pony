@@ -151,6 +151,15 @@ class PyPartitionFunctionU64
   fun apply(data: PyData val): U64 =>
     Machida.partition_function_partition_u64(_partition_function, data.obj())
 
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_partition_function)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_partition_function, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _partition_function = recover Machida.user_deserialization(bytes) end
+
   fun _final() =>
     Machida.dec_ref(_partition_function)
 
@@ -192,6 +201,15 @@ class PyPartitionFunction
       PyKey(Machida.partition_function_partition(_partition_function,
         data.obj()))
     end
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_partition_function)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_partition_function, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _partition_function = recover Machida.user_deserialization(bytes) end
 
   fun _final() =>
     Machida.dec_ref(_partition_function)
