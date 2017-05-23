@@ -211,8 +211,10 @@ extern void set_user_serialization_fns(PyObject *module)
   }
   else
   {
-    g_user_deserialization_fn = NULL;
-    g_user_serialization_fn = NULL;
+    PyObject *wallaroo = PyObject_GetAttrString(module, "wallaroo");
+    g_user_deserialization_fn = PyObject_GetAttrString(wallaroo, "deserialize");
+    g_user_serialization_fn = PyObject_GetAttrString(wallaroo, "serialize");
+    Py_DECREF(wallaroo);
   }
 }
 

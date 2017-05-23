@@ -15,3 +15,4 @@
 
 - ctrl-c now exits a running Machida process
 - Added a Makefile to simplify building Machida
+- Added default serialization

@@ -1,4 +1,13 @@
 import inspect
+import pickle
+
+
+def serialize(o):
+    return pickle.dumps(o)
+
+
+def deserialize(bs):
+    return pickle.loads(bs)
 
 
 class WallarooParameterError(Exception):

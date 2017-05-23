@@ -252,6 +252,15 @@ class PyComputation is Computation[PyData val, PyData val]
   fun name(): String =>
     _name
 
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_computation)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_computation, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _computation = recover Machida.user_deserialization(bytes) end
+
   fun _final() =>
     Machida.dec_ref(_computation)
 
