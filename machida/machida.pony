@@ -229,6 +229,29 @@ class PyFramedSourceHandler is FramedSourceHandler[PyData val]
   fun _final() =>
     Machida.dec_ref(_source_decoder)
 
+class PyComputationBuilder
+  var _computation_class: Pointer[U8] val
+
+  new create(computation_class: Pointer[U8] val) =>
+    _computation_class = computation_class
+
+  fun apply(): PyComputation iso^ =>
+    recover
+      PyComputation(@instantiate_python_class(_computation_class))
+    end
+
+  fun _serialise_space(): USize =>
+    Machida.user_serialization_get_size(_computation_class)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Machida.user_serialization(_computation_class, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _computation_class = recover Machida.user_deserialization(bytes) end
+
+  fun _final() =>
+    Machida.dec_ref(_computation_class)
+
 class PyComputation is Computation[PyData val, PyData val]
   var _computation: Pointer[U8] val
   let _name: String
@@ -413,13 +436,7 @@ primitive Machida
       | "to" =>
         let computation_class = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(computation_class)
-        let builder = recover val
-          {()(computation_class): PyComputation iso^ =>
-            recover
-              PyComputation(@instantiate_python_class(computation_class))
-            end
-          }
-        end
+        let builder = recover val PyComputationBuilder(computation_class) end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to[PyData val](builder)
       | "to_stateful" =>
