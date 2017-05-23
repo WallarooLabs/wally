@@ -56,6 +56,7 @@ validator/validator -i recived.txt -e 10002
 ```
 """
 
+use "assert"
 use "buffered"
 use "collections"
 use "ring"
@@ -117,6 +118,25 @@ class WindowState is State
     ring.push(u)
     idx = idx + 1
 
+    ifdef "validate" then
+      try
+        // Test validity of updated window
+        let values = to_array()
+        Fact(TestIncrements(values), "Increments test failed on " +
+          string())
+      else
+        Fail()
+      end
+    end
+
+  fun to_array(): Array[U64] val =>
+    let ar: Array[U64] iso = recover Array[U64](4) end
+    for v in ring.values() do
+      ar.push(v)
+    end
+    ar.reverse_in_place()
+    consume ar
+
 class WindowStateChange is StateChange[WindowState]
   var _id: U64
   var _window: WindowState = WindowState
@@ -134,9 +154,8 @@ class WindowStateChange is StateChange[WindowState]
     _window.string()
 
   fun apply(state: WindowState) =>
-    for v in _window.ring.values() do
-      state.push(v)
-    end
+    (let buf, let size', let count') = _window.ring.raw()
+    state.ring = Ring[U64].from_array(consume buf, size', count')
     state.idx = _window.idx
 
   fun write_log_entry(out_writer: Writer) =>
