@@ -1,3 +1,7 @@
+# prevent rules from being evaluated/included multiple times
+ifndef $(abspath $(lastword $(MAKEFILE_LIST)))_MK
+$(abspath $(lastword $(MAKEFILE_LIST)))_MK := 1
+
 rules_mk_path := ../../rules.mk
 
 # uncomment to disable generate test related targets in this directory
@@ -37,4 +41,7 @@ include $($(MY_NAME)_PATH:%/=%)/$(rules_mk_path)
 #,<TIMEOUT VALUE> \
 #,<WESLEY TEST COMMAND> \
 #,<INCLUDE IN CI>))
+
+# end of prevent rules from being evaluated/included multiple times
+endif
 
