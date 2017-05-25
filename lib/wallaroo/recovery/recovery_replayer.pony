@@ -80,8 +80,9 @@ actor RecoveryReplayer
     end
 
   fun _print_replay_phase_error() =>
-    @printf[I32]("Error calling method on %s\n".cstring(),
+    @printf[I32]("Recovery error while calling method on %s\n".cstring(),
       _replay_phase.name().cstring())
+    @printf[I32]("Try restarting the process.\n".cstring())
 
   //////////////////////////
   // Managing Replay Phases
