@@ -660,20 +660,33 @@ actor LocalTopologyInitializer
 
         // Hold non_partitions until the end because we need to build state
         // comp targets first. (Holding to the end means processing first,
-        // since we're pushing onto a stack)
+        // since we're pushing onto a stack). On the other hand, we
+        // put all source data nodes on the bottom of the stack since
+        // sources should be processed last.
         let non_partitions = Array[DagNode[StepInitializer val] val]
+        let source_data_nodes = Array[DagNode[StepInitializer val] val]
         for node in graph.nodes() do
-          if node.is_sink() and node.value.is_prestate() then
-            @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
-            frontier.push(node)
+          match node.value
+          | let sd: SourceData val =>
+            source_data_nodes.push(node)
           else
-            non_partitions.push(node)
+            if node.is_sink() and node.value.is_prestate() then
+              @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
+              frontier.push(node)
+            else
+              non_partitions.push(node)
+            end
           end
         end
 
         for node in non_partitions.values() do
           @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
           frontier.push(node)
+        end
+
+        for node in source_data_nodes.values() do
+          @printf[I32](("Adding " + node.value.name() + " node to end of frontier\n").cstring())
+          frontier.unshift(node)
         end
 
         /////////

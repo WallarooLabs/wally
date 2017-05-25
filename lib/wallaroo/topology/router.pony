@@ -724,7 +724,7 @@ class LocalPartitionRouter[In: Any val,
               latest_ts, metrics_id, worker_ingress_ts)
           else
             ifdef debug then
-              @printf[I32](("LocalPartitionRouter.route: No entry for this" +
+              @printf[I32](("LocalPartitionRouter.route: No entry for this " +
                 "key and no default\n\n").cstring())
             end
             (true, true, latest_ts)
