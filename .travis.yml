@@ -11,6 +11,8 @@ notifications:
 branches:
   only:
     - master
+    - release
+    - /^rc-.*$/
 
 dist: trusty
 sudo: required
