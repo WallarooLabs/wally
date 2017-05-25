@@ -11,6 +11,7 @@ notifications:
 branches:
   only:
     - master
+    - rc14-work
 
 dist: trusty
 sudo: required
