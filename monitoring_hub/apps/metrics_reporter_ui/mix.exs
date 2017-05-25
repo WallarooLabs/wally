@@ -38,7 +38,7 @@ defmodule MetricsReporterUI.Mixfile do
      {:phoenix_live_reload, "~> 1.0", only: :dev},
      {:gettext, "~> 0.9"},
      {:cowboy, "~> 1.0"},
-     {:exrm, "~> 1.0.0"},
+     {:exrm, "~> 1.0.8"},
      {:phoenix_tcp, git: "https://github.com/Sendence/phoenix_tcp.git", branch: "add-hub-protocol"},
      {:monitoring_hub_utils, in_umbrella: true},
      {:metrics_reporter, in_umbrella: true}]
