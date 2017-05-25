@@ -107,7 +107,7 @@ install:
       wget https://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb;
       sudo dpkg -i erlang-solutions_1.0_all.deb;
       sudo apt-get update;
-      sudo apt-get -fy install esl-erlang;
+      sudo apt-get -fy install esl-erlang=1:18.3;
       kiex install 1.2.6;
       kiex use 1.2.6;
       source $HOME/.kiex/elixirs/elixir-1.2.6.env;
