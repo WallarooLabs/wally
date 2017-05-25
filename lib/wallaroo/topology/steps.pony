@@ -51,7 +51,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
   * Switch to requesting credits via promise
   """
   let _runner: Runner
-  var _router: Router val
+  var _router: Router val = EmptyRouter
   // For use if this is a state step, otherwise EmptyOmniRouter
   var _omni_router: OmniRouter val
   var _route_builder: RouteBuilder val
@@ -95,7 +95,6 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     | let r: ReplayableRunner => r.set_step_id(id)
     end
     _metrics_reporter = consume metrics_reporter
-    _router = _runner.clone_router_and_set_input_type(router)
     _omni_router = omni_router
     _route_builder = route_builder
     _event_log = event_log
@@ -107,6 +106,9 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
       _outgoing_boundaries(state_name) = boundary
     end
     _event_log.register_origin(this, id)
+
+    let initial_router = _runner.clone_router_and_set_input_type(router)
+    _update_router(initial_router)
 
   //
   // Application startup lifecycle event
@@ -190,6 +192,9 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     end
 
   be update_router(router: Router val) =>
+    _update_router(router)
+
+  fun ref _update_router(router: Router val) =>
     try
       let old_router = _router
       _router = router
