@@ -131,43 +131,6 @@ actor MetricsSink
       from.cstring())
     _notify_connecting()
 
-  new _accept(host: String, service: String, application_name: String,
-    worker_name: String, from: String = "",
-    listen: TCPListener, fd: U32, init_size: USize = 64,
-    max_size: USize = 16384, reconnect_pause: U64 = 10000000000)
-  =>
-    """
-    A new connection accepted on a server.
-    """
-    _listen = listen
-    _application_name = application_name
-    _worker_name = worker_name
-    _notify = MetricsSinkNotify(this, "metrics", _application_name, _worker_name)
-    _connect_count = 0
-    _reconnect_pause = reconnect_pause
-    _host = host
-    _service = service
-    _from = from
-    _fd = fd
-    ifdef linux then
-      _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write_oneshot(), 0, true, true)
-    else
-      _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write(), 0, true, false)
-    end
-    _connected = true
-    ifdef linux then
-      AsioEvent.set_writeable(_event, true)
-    end
-    _writeable = true
-    _read_buf = recover Array[U8].undefined(init_size) end
-    _next_size = init_size
-    _max_size = max_size
-
-    _notify.accepted(this)
-    _queue_read()
-
   be write(data: ByteSeq) =>
     """
     Write a single sequence of bytes.
