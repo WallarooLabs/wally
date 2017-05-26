@@ -11,6 +11,10 @@ def application_setup(args):
     ab.new_pipeline("alphabet", Decoder())
     ab.to_state_partition(AddVotes(), LetterStateBuilder(), "letter state",
                           LetterPartitionFunction(), letter_partitions)
+    ab.to_state_partition(AddVotes(), LetterStateBuilder(), "letter state2",
+                          LetterPartitionFunction(), letter_partitions)
+    ab.to_state_partition(AddVotes(), LetterStateBuilder(), "letter state3",
+                          LetterPartitionFunction(), letter_partitions)
     ab.to_sink(Encoder())
     return ab.build()
 
@@ -78,4 +82,6 @@ class Encoder(object):
         # data is a Votes
         letter = data.letter
         votes = data.votes
-        return struct.pack(">I1sI", 5, data.letter, data.votes)
+        print "letter is " + str(letter)
+        print "votes is " + str(votes)
+        return struct.pack(">LsQ", 5, data.letter, data.votes)
