@@ -29,6 +29,15 @@ actor Main
             .to_state_partition[LetterTotal val, String, LetterTotal val,
               LetterState](AddVotes2, LetterStateBuilder, "letter-state-2",
               letter_partition2 where multi_worker = true)
+            .to_state_partition[LetterTotal val, String, LetterTotal val,
+              LetterState](AddVotes2, LetterStateBuilder, "letter-state-3",
+              letter_partition2 where multi_worker = true)
+            .to_state_partition[LetterTotal val, String, LetterTotal val,
+              LetterState](AddVotes2, LetterStateBuilder, "letter-state-4",
+              letter_partition2 where multi_worker = true)
+            .to_state_partition[LetterTotal val, String, LetterTotal val,
+              LetterState](AddVotes2, LetterStateBuilder, "letter-state-5",
+              letter_partition2 where multi_worker = true)
             .to_sink(LetterTotalEncoder, recover [0] end)
           .new_pipeline[Votes val, LetterTotal val]("Alphabet Votes X",
             VotesDecoder)
