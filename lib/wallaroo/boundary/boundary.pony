@@ -495,19 +495,21 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
       end
     else
       // At this point, it's our event.
-      if AsioEvent.writeable(flags) then
-        _writeable = true
-        ifdef not windows then
-          if _pending_writes() then
-            //sent all data; release backpressure
-            _release_backpressure()
+      if _connected and not _shutdown_peer then
+        if AsioEvent.writeable(flags) then
+          _writeable = true
+          ifdef not windows then
+            if _pending_writes() then
+              //sent all data; release backpressure
+              _release_backpressure()
+            end
           end
         end
-      end
 
-      if AsioEvent.readable(flags) then
-        _readable = true
-        _pending_reads()
+        if AsioEvent.readable(flags) then
+          _readable = true
+          _pending_reads()
+        end
       end
 
       if AsioEvent.disposable(flags) then
@@ -706,7 +708,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     else
       // The socket has been closed from the other side.
       _shutdown_peer = true
-      close()
+      _hard_close()
     end
 
   be _read_again() =>
@@ -726,7 +728,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     var num_to_send: USize = 0
     var bytes_to_send: USize = 0
     var bytes_sent: USize = 0
-    while _writeable and (_pending_writev_total > 0) do
+    while _writeable and not _shutdown_peer and (_pending_writev_total > 0) do
       try
         //determine number of bytes and buffers to send
         if (_pending_writev.size()/2) < writev_batch_size then

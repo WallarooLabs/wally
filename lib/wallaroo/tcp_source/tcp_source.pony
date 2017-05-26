@@ -264,9 +264,11 @@ actor TCPSource is Producer
         end
       end
     else
-      if AsioEvent.readable(flags) then
-        _readable = true
-        _pending_reads()
+      if _connected and not _shutdown_peer then
+        if AsioEvent.readable(flags) then
+          _readable = true
+          _pending_reads()
+        end
       end
 
       if AsioEvent.disposable(flags) then
@@ -450,7 +452,7 @@ actor TCPSource is Producer
     else
       // The socket has been closed from the other side.
       _shutdown_peer = true
-      close()
+      _hard_close()
     end
 
     _reading = false

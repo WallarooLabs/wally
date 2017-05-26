@@ -4,6 +4,8 @@
 
 ### Wallaroo
 
+- Fix segfault that occurs when a network connection is abruptly disconnected
+
 ### Python API
 
 - Added support for multi-worker applications
