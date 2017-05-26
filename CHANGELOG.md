@@ -5,6 +5,7 @@
 ### Wallaroo
 
 - Fix segfault that occurs when a network connection is abruptly disconnected
+- foo
 
 ### Python API
 
