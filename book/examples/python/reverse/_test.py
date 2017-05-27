@@ -47,3 +47,45 @@ def test_flow():
     result = app[2][1]().compute(data)
     output = app[3][1].encode(result)
     assert(output == (msg[::-1] + '\n'))
+
+
+def test_integration():
+    from wallaroo.integration import (HeaderGeneratorReader,
+                                      ListGenerator,
+                                      Metrics,
+                                      Runner,
+                                      Sender,
+                                      Sink,
+                                      time,
+                                      Validator)
+    input_set = ['one', 'two', 'three', 'four', 'five', 'six', 'seven',
+                 'eight', 'nine', 'ten']
+    expected_output = [w[::-1] for w in input_set]
+
+    host = '127.0.0.1'
+    sink_port = 7002
+    metrics_port = 5001
+    sender_port = 7010
+    sink = Sink(host, sink_port)
+    metrics = Metrics(host, metrics_port)
+    #reader = HeaderGeneratorReader(SequenceGenerator(1000))
+    reader = HeaderGeneratorReader(ListGenerator(input_set))
+    sender = Sender(host, sender_port, reader, batch_size=4)
+    sink.start()
+    metrics.start()
+    # TODO: Runner to run machida application
+    # TODO: for now, run the machida application manually. You've got 3 seconds! GO!
+    time.sleep(3)
+    sender.start()
+    sender.join()
+    # TODO: Runner to terminate machida application
+    time.sleep(1)
+    sink.stop()
+    metrics.stop()
+    # TODO: decode output and validate against expected
+    decoded = []
+    for item in sink.data:
+        for line in item.splitlines():
+            if line:
+                decoded.append(line)
+    assert(expected_output == decoded)
