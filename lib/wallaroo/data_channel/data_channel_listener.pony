@@ -72,6 +72,8 @@ actor DataChannelListener
 
     if AsioEvent.disposable(flags) then
       @pony_asio_event_destroy(_event)
+      _writeable = false
+      _readable = false
       _event = AsioEvent.none()
     end
 
