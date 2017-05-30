@@ -710,20 +710,7 @@ actor LocalTopologyInitializer
           // We are only ready to build a node if all of its outputs
           // have been built (though currently, because there are no
           // splits (II), there will only be at most one output per node)
-          var ready = true
-          for out in next_node.outs() do
-            if not built_routers.contains(out.id) then ready = false end
-          end
-          match next_node.value
-          | let s_builder: StepBuilder val =>
-            match s_builder.pre_state_target_id()
-            | let psid: U128 =>
-              if not built_routers.contains(psid) then
-                ready = false
-              end
-            end
-          end
-          if ready then
+          if _is_ready_for_building(next_node, built_routers) then
             @printf[I32](("Handling " + next_node.value.name() + " node\n").cstring())
             let next_initializer: StepInitializer val = next_node.value
 
@@ -1481,6 +1468,21 @@ actor LocalTopologyInitializer
         @printf[I32]("Need WorkerInitializer to inform that topology is ready\n".cstring())
       end
     end
+
+  fun _is_ready_for_building(node: DagNode[StepInitializer val] val,
+    built_routers: Map[U128, Router val]): Bool
+  =>
+    var is_ready = true
+    for out in node.outs() do
+      if not built_routers.contains(out.id) then is_ready = false end
+    end
+    match node.value.pre_state_target_id()
+    | let id: U128 =>
+      if not built_routers.contains(id) then
+        is_ready = false
+      end
+    end
+    is_ready
 
   fun _get_output_node_id(node: DagNode[StepInitializer val] val,
     default_target_id: U128, default_target_state_step_id: U128):
