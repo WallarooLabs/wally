@@ -36,7 +36,7 @@ If we could break the state into pieces and tell Wallaroo about those pieces the
 Wallaroo supports parallel execution by way of _state partitioning_. The state is broken up into distinct parts, and Wallaroo manages access to each part so that they can be accessed in parallel.
 To do this, a _partition function_ is used to determine which _state part_ a particular data should be applied to. Once the _part_ is determined, the data and the associated _state part_ are given to a Computation to perform the update logic.
 
-### Paritioned State
+### Partitioned State
 
 In order to take advantage of state partitioning, state objects need to be broken down. In the stock example there is already a class that represents an individual stock, so it can be used as the partitioned state.
 
