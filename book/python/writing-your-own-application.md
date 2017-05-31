@@ -19,11 +19,14 @@ class Reverse(object):
     def name(self):
         return "reverse"
 
-    def compute(self, bs):
+    def compute(self, data):
+        print "compute", data
         return data[::-1]
 ```
 
 A Computation has no state, so it only needs to define its name, and how to convert input data into output data. In this case, string reversal is performed with a slice notation.
+
+Note that there is a `print` statement in the `compute` method (and in other methods in this document). They are here to help show the user what is happening at different points as the application executes. This is only for demonstration purposes and is not recommended in actual applications.
 
 ### Sink Encoder
 
@@ -32,7 +35,8 @@ Next, we are going to define how the output gets constructed for the sink. It is
 ```python
 class Encoder(object):
     def encode(self, data):
-        # data is already a string, so let's just add a newline to the end
+        # data is a string
+        print "encode", data
         return data + "\n"
 ```
 
@@ -43,12 +47,15 @@ Now, we also need to decode the incoming bytes of the source.
 ```python
 class Decoder(object):
     def header_length(self):
+        print "header_length"
         return 4
 
     def payload_length(self, bs):
+        print "payload_length", bs
         return struct.unpack(">I", bs)[0]
 
     def decode(self, bs):
+        print "decode", bs
         return bs.decode("utf-8")
 ```
 
@@ -81,7 +88,7 @@ For this, two things are needed:
 An application is constructed of pipelines which, in turn, are constructed from a sequence of a source, steps, and optionally a sink. Our reverse application only has one pipeline, so we only need to create one:
 
 ```python
-ab = wallaroo.ApplicationBuilder("Reverse word")
+ab = wallaroo.ApplicationBuilder("Reverse Word")
 ab.new_pipeline("reverse", Decoder())
 ```
 

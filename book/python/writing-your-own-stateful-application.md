@@ -88,7 +88,7 @@ The encoder is going to receive a `Votes` instance and encode into a string with
 class Encoder(object):
     def encode(self, data):
         # data is a Votes
-        return struct.pack(">LsL", 5, data.letter, data.votes)
+        return struct.pack(">LsQ", 5, data.letter, data.votes)
 ```
 
 ### Decoder
