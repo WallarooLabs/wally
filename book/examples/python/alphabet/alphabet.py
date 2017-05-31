@@ -73,4 +73,4 @@ class AddVotes(object):
 class Encoder(object):
     def encode(self, data):
         # data is a Votes
-        return struct.pack(">LsQ", 5, data.letter, data.votes)
+        return struct.pack(">LsQ", 9, data.letter, data.votes)
