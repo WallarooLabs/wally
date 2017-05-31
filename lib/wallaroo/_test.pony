@@ -7,6 +7,7 @@ All tests can be run by compiling and running this package.
 """
 use "ponytest"
 use cluster_manager = "cluster_manager"
+use data_channel = "data_channel"
 use initialization = "initialization"
 use rebalancing = "rebalancing"
 use routing = "routing"
@@ -22,6 +23,7 @@ actor Main is TestList
 
   fun tag tests(test: PonyTest) =>
     cluster_manager.Main.make().tests(test)
+    data_channel.Main.make().tests(test)
     initialization.Main.make().tests(test)
     rebalancing.Main.make().tests(test)
     routing.Main.make().tests(test)

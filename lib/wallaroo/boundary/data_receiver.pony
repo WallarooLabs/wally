@@ -16,7 +16,6 @@ actor DataReceiver is Producer
   let _worker_name: String
   var _sender_name: String
   var _sender_step_id: U128 = 0
-  let _connections: Connections
   var _router: DataRouter val =
     DataRouter(recover Map[U128, ConsumerStep tag] end)
   var _last_id_seen: SeqId = 0
@@ -44,12 +43,11 @@ actor DataReceiver is Producer
   var _processing_phase: _DataReceiverProcessingPhase = _DataReceiverNotProcessingPhase
 
   new create(auth: AmbientAuth, worker_name: String, sender_name: String,
-    connections: Connections, initialized: Bool = false)
+    initialized: Bool = false)
   =>
     _auth = auth
     _worker_name = worker_name
     _sender_name = sender_name
-    _connections = connections
     if initialized then
       _processing_phase = _DataReceiverAcceptingMessagesPhase(this)
     end

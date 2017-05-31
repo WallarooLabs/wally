@@ -71,7 +71,8 @@ actor WActorInitializer
     try
       for (idx, sink_builder) in s.sinks().pairs() do
         let empty_metrics_reporter =
-          MetricsReporter(_app_name, "", MetricsSink("", "", "", ""))
+          MetricsReporter(_app_name, "",
+            ReconnectingMetricsSink("", "", "", ""))
 
         let sink_addr = _output_addrs(idx)
         let host = sink_addr(0)
@@ -154,7 +155,8 @@ actor WActorInitializer
                 source._1, source._2, cr)
 
               let empty_metrics_reporter =
-                MetricsReporter(_app_name, "", MetricsSink("", "", "", ""))
+                MetricsReporter(_app_name, "",
+                  ReconnectingMetricsSink("", "", "", ""))
 
               let source_addr = _input_addrs(idx)
               let host = source_addr(0)
