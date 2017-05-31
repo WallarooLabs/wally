@@ -25,7 +25,6 @@ interface DataReceiversSubscriber
 actor DataReceivers
   let _auth: AmbientAuth
   let _worker_name: String
-  let _connections: Connections
 
   var _initialized: Bool = false
 
@@ -36,11 +35,10 @@ actor DataReceivers
   let _subscribers: SetIs[DataReceiversSubscriber tag] = _subscribers.create()
 
   new create(auth: AmbientAuth, worker_name: String,
-    connections: Connections, is_recovering: Bool = false)
+    is_recovering: Bool = false)
   =>
     _auth = auth
     _worker_name = worker_name
-    _connections = connections
     if not is_recovering then
       _initialized = true
     end
@@ -68,7 +66,7 @@ actor DataReceivers
         _data_receivers(boundary_id)
       else
         let new_dr = DataReceiver(_auth, _worker_name, sender_name,
-          _connections, _initialized)
+          _initialized)
         new_dr.update_router(_data_router)
         _data_receivers(boundary_id) = new_dr
         new_dr

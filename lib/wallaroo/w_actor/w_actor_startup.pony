@@ -221,8 +221,8 @@ actor ActorSystemStartup
 primitive EmptyConnections
   fun apply(env: Env, auth: AmbientAuth): Connections =>
     Connections("", "", auth, "", "", "", "", "", "",
-      MetricsSink("", "", "", ""), "", "", false, "", false)
+      ReconnectingMetricsSink("", "", "", ""), "", "", false, "", false)
 
 primitive EmptyRouterRegistry
   fun apply(auth: AmbientAuth, c: Connections): RouterRegistry =>
-    RouterRegistry(auth, "", DataReceivers(auth, "", c), c, 0)
+    RouterRegistry(auth, "", DataReceivers(auth, ""), c, 0)

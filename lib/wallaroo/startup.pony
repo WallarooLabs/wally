@@ -200,7 +200,7 @@ actor Startup
 
       // TODO::joining
       let connect_auth = TCPConnectAuth(auth)
-      let metrics_conn = MetricsSink(m_addr(0),
+      let metrics_conn = ReconnectingMetricsSink(m_addr(0),
           m_addr(1), _application.name(), _startup_options.worker_name)
 
       var is_recovering: Bool = false
@@ -290,7 +290,7 @@ actor Startup
         _startup_options.spike_config)
 
       let data_receivers = DataReceivers(auth,
-        _startup_options.worker_name, connections, is_recovering)
+        _startup_options.worker_name, is_recovering)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
@@ -414,7 +414,8 @@ actor Startup
       let input_addrs: Array[Array[String]] val =
         (_startup_options.i_addrs_write = recover Array[Array[String]] end)
 
-      let metrics_conn = MetricsSink(m.metrics_host, m.metrics_service,
+      let metrics_conn = ReconnectingMetricsSink(
+        m.metrics_host, m.metrics_service,
         _application.name(), _startup_options.worker_name)
 
       // TODO: Are we creating connections to all addresses or just
@@ -445,7 +446,7 @@ actor Startup
         _connection_addresses_file, _startup_options.is_joining,
         _startup_options.spike_config)
 
-      let data_receivers = DataReceivers(auth, _startup_options.worker_name, connections)
+      let data_receivers = DataReceivers(auth, _startup_options.worker_name)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,

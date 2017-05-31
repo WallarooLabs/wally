@@ -253,14 +253,14 @@ primitive _DefaultRouterGenerator
 
 primitive _StepGenerator
   fun apply(event_log: EventLog, recovery_replayer: RecoveryReplayer): Step =>
-    Step(RouterRunner, MetricsReporter("", "", MetricsSink("", "", "", "")),
+    Step(RouterRunner, MetricsReporter("", "", _NullMetricsSink),
       1, EmptyRouteBuilder, event_log, recovery_replayer,
       recover Map[String, OutgoingBoundary] end)
 
 primitive _BoundaryGenerator
   fun apply(worker_name: String, auth: AmbientAuth): OutgoingBoundary =>
     OutgoingBoundary(auth, worker_name,
-      MetricsReporter("", "", MetricsSink("", "", "", "")), "", "")
+      MetricsReporter("", "", _NullMetricsSink), "", "")
 
 primitive _RouterRegistryGenerator
   fun apply(env: Env, auth: AmbientAuth): RouterRegistry =>
@@ -269,12 +269,12 @@ primitive _RouterRegistryGenerator
 
 primitive _DataReceiversGenerator
   fun apply(env: Env, auth: AmbientAuth): DataReceivers =>
-    DataReceivers(auth, "", _ConnectionsGenerator(env, auth))
+    DataReceivers(auth, "")
 
 primitive _ConnectionsGenerator
   fun apply(env: Env, auth: AmbientAuth): Connections =>
     Connections("", "", auth, "", "", "", "", "", "",
-      MetricsSink("", "", "", ""), "", "", false, "", false)
+      _NullMetricsSink, "", "", false, "", false)
 
 primitive _RecoveryReplayerGenerator
   fun apply(env: Env, auth: AmbientAuth): RecoveryReplayer =>
@@ -286,4 +286,14 @@ actor _Cluster is Cluster
     id: U128, key: K, state_name: String, exclusions: Array[String] val =
     recover Array[String] end)
   =>
+    None
+
+actor _NullMetricsSink
+  be send_metrics(metrics: MetricDataList val) =>
+    None
+
+  fun ref set_nodelay(state: Bool) =>
+    None
+
+  be writev(data: ByteSeqIter) =>
     None
