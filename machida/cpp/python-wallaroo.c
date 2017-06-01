@@ -238,29 +238,40 @@ extern void *user_deserialization(char *bytes)
 extern size_t user_serialization_get_size(PyObject *o)
 {
   PyObject *user_bytes = PyObject_CallFunctionObjArgs(g_user_serialization_fn, o, NULL);
-  size_t size = PyString_Size(user_bytes);
-  Py_DECREF(user_bytes);
 
-  // return the size of the buffer plus the 4 bytes needed to record that size.
-  return 4 + size;
+  // This will be null if there was an exception.
+  if (user_bytes)
+  {
+    size_t size = PyString_Size(user_bytes);
+    Py_DECREF(user_bytes);
+
+    // return the size of the buffer plus the 4 bytes needed to record that size.
+    return 4 + size;
+  }
+
+  return 0;
 }
 
 extern void user_serialization(PyObject *o, char *bytes)
 {
   PyObject *user_bytes = PyObject_CallFunctionObjArgs(g_user_serialization_fn, o, NULL);
 
-  size_t size = PyString_Size(user_bytes);
+  // This will be null if there was an exception.
+  if (user_bytes)
+  {
+    size_t size = PyString_Size(user_bytes);
 
-  unsigned char *ubytes = (unsigned char *) bytes;
+    unsigned char *ubytes = (unsigned char *) bytes;
 
-  ubytes[0] = (unsigned char)(size >> 24);
-  ubytes[1] = (unsigned char)(size >> 16);
-  ubytes[2] = (unsigned char)(size >> 8);
-  ubytes[3] = (unsigned char)(size);
+    ubytes[0] = (unsigned char)(size >> 24);
+    ubytes[1] = (unsigned char)(size >> 16);
+    ubytes[2] = (unsigned char)(size >> 8);
+    ubytes[3] = (unsigned char)(size);
 
-  memcpy(bytes + 4, PyString_AsString(user_bytes), size);
+    memcpy(bytes + 4, PyString_AsString(user_bytes), size);
 
-  Py_DECREF(user_bytes);
+    Py_DECREF(user_bytes);
+  }
 }
 
 extern int py_bool_check(PyObject *b)
