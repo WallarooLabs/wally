@@ -168,14 +168,11 @@ class A is WActor
     end
 
   fun ref emit_messages(h: WActorHelper) ? =>
-    let known_actors = h.known_actors()
     for i in Range(1, _n_messages + 1) do
-      let should_emit = (known_actors.size() > 0) and
-        (_rand.test_odds(_emission_prob))
-      if should_emit then
+      if _rand.test_odds(_emission_prob) then
         let message = create_message()
-        let target = select_actor(h)
-        h.send_to(target, message)
+        let role = select_role(h)
+        h.send_to_role(role, message)
         ifdef debug then
           @printf[I32]("Actor %lu emitted a message on iteration %d out of %d. Message is of type %s.\n"
             .cstring(), _id, i, _n_messages, message.string().cstring())
@@ -188,8 +185,8 @@ class A is WActor
       end
     end
 
-  fun ref select_actor(h: WActorHelper): WActorId ? =>
-    _rand.pick[WActorId](h.known_actors())
+  fun ref select_role(h: WActorHelper): String ? =>
+    _rand.pick[String]([ARoles.one(), ARoles.two(), ARoles.three()])
 
   fun ref create_message(): AMsg val ? =>
     match _rand.pick[AMsgBuilder val](_message_types_to_send)

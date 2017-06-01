@@ -224,6 +224,27 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
+      | let m: RegisterActorForWorkerMsg val =>
+        ifdef "trace" then
+          @printf[I32](("Received RegisterActorForWorkerMsg on Control" +
+            "Channel\n").cstring())
+        end
+        _router_registry.register_actor_for_worker(m.id, m.worker)
+      | let m: RegisterAsRoleMsg val =>
+        ifdef "trace" then
+          @printf[I32](("Received RegisterAsRoleMsg on Control" +
+            "Channel\n").cstring())
+        end
+        _router_registry.register_as_role(m.role, m.id)
+      | let m: BroadcastToActorsMsg val =>
+        ifdef "trace" then
+          @printf[I32](("Received BroadcastToActorsMsg on Control" +
+            "Channel\n").cstring())
+        end
+        // TODO: If we actually want to use broadcast_to_actors, this will
+        // create a bottleneck through the router registry and the central
+        // actor registry.
+        _router_registry.broadcast_to_actors(m.data)
       | let m: TopologyReadyMsg val =>
         ifdef "trace" then
           @printf[I32]("Received TopologyReadyMsg on Control Channel\n"

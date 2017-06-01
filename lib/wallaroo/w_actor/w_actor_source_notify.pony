@@ -56,7 +56,7 @@ class WActorSourceNotify is TCPSourceNotify
       true
     else
       ifdef "trace" then
-        @printf[I32](("Rcvd msg at " + _source_name).cstring())
+        @printf[I32](("Rcvd msg at " + _source_name + "\n").cstring())
       end
 
       try
@@ -71,7 +71,7 @@ class WActorSourceNotify is TCPSourceNotify
             error
           end
         ifdef "trace" then
-          @printf[I32](("Msg decoded at " + _source_name).cstring())
+          @printf[I32](("Msg decoded at " + _source_name + "\n").cstring())
         end
         match _helper
         | let h: WActorSourceHelper =>

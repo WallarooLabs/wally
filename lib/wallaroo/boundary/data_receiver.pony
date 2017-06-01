@@ -171,7 +171,7 @@ actor DataReceiver is Producer
   =>
     _timer_init(this)
     ifdef "trace" then
-      @printf[I32]("Rcvd msg at DataReceiver\n".cstring())
+      @printf[I32]("Rcvd pipeline msg at DataReceiver\n".cstring())
     end
     if seq_id > _last_id_seen then
       _ack_counter = _ack_counter + 1

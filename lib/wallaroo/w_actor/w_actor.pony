@@ -28,7 +28,6 @@ trait WActorHelper
   fun ref register_as_role(role: String)
   fun ref create_actor(builder: WActorBuilder)
   fun ref destroy_actor(id: WActorId)
-  fun known_actors(): Array[WActorId] val
   fun ref set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   fun ref cancel_timer(t: WActorTimer)

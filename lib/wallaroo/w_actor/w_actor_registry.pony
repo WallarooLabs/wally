@@ -5,20 +5,23 @@ use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
+use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/tcp_sink"
+use "wallaroo/topology"
 
 class WActorRegistry
   let _worker_name: String
   let _auth: AmbientAuth
-  let _actor_to_worker_map: Map[U128, String] = _actor_to_worker_map.create()
+  var _actor_to_worker_map: Map[U128, String] = _actor_to_worker_map.create()
+  let _connections: Connections
   let _actors: Map[WActorId, WActorWrapper tag] = _actors.create()
   let _roles: Map[String, Role] = _roles.create()
   var _boundaries: Map[String, OutgoingBoundary] val
   let _rand: EnhancedRandom
 
   new create(worker: String, auth: AmbientAuth,
-    actor_to_worker: Map[U128, String] val,
+    actor_to_worker: Map[U128, String] val, connections: Connections,
     boundaries: Map[String, OutgoingBoundary] val, seed: U64 = Time.micros())
   =>
     _worker_name = worker
@@ -26,14 +29,29 @@ class WActorRegistry
     for (k, v) in actor_to_worker.pairs() do
       _actor_to_worker_map(k) = v
     end
+    _connections = connections
     _boundaries = boundaries
     _rand = EnhancedRandom(seed)
 
   fun ref update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     _boundaries = bs
 
+  fun ref register_actor_for_worker(id: WActorId, worker: String) =>
+    _register_actor_for_worker(id, worker)
+
+  fun ref _register_actor_for_worker(id: WActorId, worker: String) =>
+    //TODO: Use persistent map to improve perf
+    let new_actor_to_worker: Map[U128, String] trn =
+      recover Map[U128, String] end
+    for (k, v) in _actor_to_worker_map.pairs() do
+      new_actor_to_worker(k) = v
+    end
+    new_actor_to_worker(id.id()) = worker
+    _actor_to_worker_map = consume new_actor_to_worker
+
   fun ref register_actor(id: WActorId, w_actor: WActorWrapper tag) =>
     _actors(id) = w_actor
+    _register_actor_for_worker(id, _worker_name)
 
   fun ref register_as_role(role: String, w_actor: WActorId) =>
     try
@@ -83,18 +101,6 @@ class WActorRegistry
     let wrapped = WMessage(sender, target, data)
     send_to(target, wrapped)
 
-  fun broadcast(data: Any val) =>
-    for target in _actors.values() do
-      target.process(data)
-    end
-
-  fun known_actors(): Array[WActorId] val =>
-    let kas: Array[WActorId] trn = recover Array[WActorId] end
-    for a in _actors.keys() do
-      kas.push(a)
-    end
-    consume kas
-
 actor CentralWActorRegistry
   let _worker_name: String
   let _auth: AmbientAuth
@@ -108,14 +114,17 @@ actor CentralWActorRegistry
     recover Map[U128, String] end
   var _boundaries: Map[String, OutgoingBoundary] val =
     recover Map[String, OutgoingBoundary] end
+  let _connections: Connections
   let _rand: EnhancedRandom
 
   new create(worker: String, auth: AmbientAuth, init: WActorInitializer,
-    sinks: Array[TCPSink] val, event_log: EventLog, seed: U64)
+    connections: Connections, sinks: Array[TCPSink] val, event_log: EventLog,
+    seed: U64)
   =>
     _worker_name = worker
     _auth = auth
     _initializer = init
+    _connections = connections
     _sinks = sinks
     _event_log = event_log
     _rand = EnhancedRandom(seed)
@@ -140,7 +149,7 @@ actor CentralWActorRegistry
     _actor_to_worker_map = consume new_actor_to_worker
 
     let new_actor = builder(_worker_name, this, _auth, _event_log,
-      _actor_to_worker_map, _boundaries, _rand.u64())
+      _actor_to_worker_map, _connections, _boundaries, _rand.u64())
     _initializer.add_actor(builder)
 
   be forget_actor(id: WActorId) =>
@@ -170,6 +179,19 @@ actor CentralWActorRegistry
       end
     end
 
+  be register_actor_for_worker(id: WActorId, worker: String) =>
+    _register_actor_for_worker(id, worker)
+
+  fun ref _register_actor_for_worker(id: WActorId, worker: String) =>
+    //TODO: Use persistent map to improve perf
+    let new_actor_to_worker: Map[U128, String] trn =
+      recover Map[U128, String] end
+    for (k, v) in _actor_to_worker_map.pairs() do
+      new_actor_to_worker(k) = v
+    end
+    new_actor_to_worker(id.id()) = worker
+    _actor_to_worker_map = consume new_actor_to_worker
+
   be register_actor(id: WActorId, w_actor: WActorWrapper tag) =>
     _actors(id) = w_actor
     for (k, v) in _actors.pairs() do
@@ -182,9 +204,20 @@ actor CentralWActorRegistry
       end
     end
     w_actor.register_sinks(_sinks)
+    _register_actor_for_worker(id, _worker_name)
+
+    // Notify cluster
+    try
+      let msg = ChannelMsgEncoder.register_actor_for_worker(id, _worker_name,
+        _auth)
+      _connections.send_control_to_cluster(msg)
+    else
+      Fail()
+    end
 
   // TODO: Using a String to identify a role seems like a brittle approach
-  be register_as_role(role: String, w_actor: WActorId) =>
+  be register_as_role(role: String, w_actor: WActorId, external: Bool = false)
+  =>
     try
       if _role_sets.contains(role) then
         _role_sets(role).set(w_actor)
@@ -205,6 +238,12 @@ actor CentralWActorRegistry
       for a in _actors.values() do
         a.register_as_role(role, w_actor)
       end
+
+      if not external then
+        // Notify cluster
+        let msg = ChannelMsgEncoder.register_as_role(role, w_actor, _auth)
+        _connections.send_control_to_cluster(msg)
+      end
     else
       Fail()
     end
@@ -214,15 +253,30 @@ actor CentralWActorRegistry
       a.tick()
     end
 
-  be broadcast(data: Any val) =>
-    for target in _actors.values() do
-      target.process(data)
+  be distribute_data_router(r: RouterRegistry) =>
+    let asr = ActiveActorSystemDataRouter(this)
+    let data_router = DataRouter(where actor_system_router = asr)
+    r.set_data_router(data_router)
+
+  be broadcast(data: Any val, external: Bool = false) =>
+    for target_id in _actors.keys() do
+      _send_for_process(target_id, data)
+    end
+
+
+    if not external then
+      try
+        let msg = ChannelMsgEncoder.broadcast_to_actors(data, _auth)
+        _connections.send_control_to_cluster(msg)
+      else
+        Fail()
+      end
     end
 
   be broadcast_to_role(role: String, data: Any val) =>
     try
       for target_id in _role_sets(role).values() do
-        _actors(target_id).process(data)
+        _send_for_process(target_id, data)
       end
     else
       @printf[I32]("Trying to broadcast to nonexistent role %s!\n".cstring(),
@@ -230,13 +284,25 @@ actor CentralWActorRegistry
     end
 
   be send_for_process(target_id: WActorId, data: Any val) =>
+    _send_for_process(target_id, data)
+
+  fun ref _send_for_process(target_id: WActorId, data: Any val) =>
     try
-      _actors(target_id).process(data)
+      let target_worker = _actor_to_worker_map(target_id.id())
+      if target_worker == _worker_name then
+        _actors(target_id).process(data)
+      else
+        let a_msg = ActorDeliveryMsg(_worker_name, target_id, data, None)
+        _boundaries(target_worker).forward_actor_data(a_msg)
+      end
     else
       Fail()
     end
 
   be send_to(target_id: WActorId, msg: WMessage val) =>
+    _send_to(target_id, msg)
+
+  fun ref _send_to(target_id: WActorId, msg: WMessage val) =>
     try
       let target_worker = _actor_to_worker_map(target_id.id())
       if target_worker == _worker_name then
@@ -253,8 +319,7 @@ actor CentralWActorRegistry
   be send_to_role(role: String, data: Any val) =>
     try
       let target_id = _roles(role).next()
-      let target = _actors(target_id)
-      target.process(data)
+      _send_for_process(target_id, data)
     else
       @printf[I32]("Trying to send to nonexistent role!\n".cstring())
     end

@@ -191,11 +191,9 @@ actor ActorSystemStartup
           EventLog(_env, None)
         end
 
-      let recovery = Recovery(_startup_options.worker_name, event_log)
-
       let seed: U64 = 123456
 
-      let empty_metrics_conn = MetricsSink("", "", "", "")
+      let empty_metrics_conn = ReconnectingMetricsSink("", "", "", "")
       let connections = Connections(_app_name, _startup_options.worker_name,
         auth, _startup_options.c_host, _startup_options.c_service,
         _startup_options.d_host, _startup_options.d_service, _ph_host,
@@ -206,7 +204,7 @@ actor ActorSystemStartup
       let w_name = _startup_options.worker_name
 
       let data_receivers = DataReceivers(auth, _startup_options.worker_name,
-        connections, is_recovering)
+        is_recovering)
 
       let router_registry = RouterRegistry(auth, _startup_options.worker_name,
         data_receivers, connections, _startup_options.stop_the_world_pause)
@@ -215,13 +213,15 @@ actor ActorSystemStartup
         _startup_options.worker_name, data_receivers, router_registry,
         connections, is_recovering)
 
+      let recovery = Recovery(_startup_options.worker_name, event_log,
+        recovery_replayer)
+
       let initializer = WActorInitializer(_startup_options.worker_name,
         _app_name, auth, event_log, _startup_options.input_addrs,
         _startup_options.output_addrs, _local_actor_system_file, actor_count,
         _iterations, recovery, recovery_replayer, _data_channel_file,
-        data_receivers, empty_metrics_conn, seed, connections,
-        router_registry, _startup_options.is_initializer)
-
+        _worker_names_file, data_receivers, empty_metrics_conn, seed,
+        connections, router_registry, _startup_options.is_initializer)
 
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
