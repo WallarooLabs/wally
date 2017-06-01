@@ -264,7 +264,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     let msg_uid = delivery_msg.msg_uid()
 
     ifdef "trace" then
-      @printf[I32]("Rcvd message at OutgoingBoundary\n".cstring())
+      @printf[I32]("Rcvd pipeline message at OutgoingBoundary\n".cstring())
     end
 
     let my_latest_ts = ifdef "detailed-metrics" then
@@ -315,10 +315,10 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   be forward_actor_data(delivery_msg: ActorDeliveryMsg val) =>
     ifdef "trace" then
-      @printf[I32]("Rcvd actor data message at OutgoingBoundary\n".cstring())
+      @printf[I32]("Rcvd actor message at OutgoingBoundary\n".cstring())
     end
     try
-      let seq_id = _seq_id + 1
+      let seq_id = (_seq_id = _seq_id + 1)
 
       let outgoing_msg = ChannelMsgEncoder.data_channel_actor(delivery_msg,
         seq_id, _wb, _auth)

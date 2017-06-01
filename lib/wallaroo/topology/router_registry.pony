@@ -8,6 +8,7 @@ use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/tcp_source"
+use "wallaroo/w_actor"
 
 actor RouterRegistry
   let _auth: AmbientAuth
@@ -20,6 +21,7 @@ actor RouterRegistry
   let _partition_routers: Map[String, PartitionRouter val] =
     _partition_routers.create()
   var _omni_router: (OmniRouter val | None) = None
+  var _actor_data_router: ActorSystemDataRouter = EmptyActorSystemDataRouter
 
   let _sources: SetIs[TCPSource] = _sources.create()
   let _source_listeners: SetIs[TCPSourceListener] = _source_listeners.create()
@@ -75,6 +77,7 @@ actor RouterRegistry
 
   be set_data_router(dr: DataRouter val) =>
     _data_router = dr
+    _actor_data_router = dr.actor_system_data_router()
     _distribute_data_router()
 
   be set_pre_state_data(psd: Array[PreStateData val] val) =>
@@ -85,6 +88,9 @@ actor RouterRegistry
 
   be set_omni_router(o: OmniRouter val) =>
     _omni_router = o
+
+  be update_actor_data_router(adr: ActorSystemDataRouter) =>
+    _actor_data_router = adr
 
   be register_source(tcp_source: TCPSource) =>
     _sources.set(tcp_source)
@@ -170,6 +176,15 @@ actor RouterRegistry
     for source in _sources.values() do
       source.add_boundary_builders(new_boundary_builders_sendable)
     end
+
+  be register_actor_for_worker(id: WActorId, worker: String) =>
+    _actor_data_router.register_actor_for_worker(id, worker)
+
+  be register_as_role(role: String, w_actor: WActorId) =>
+    _actor_data_router.register_as_role(role, w_actor)
+
+  be broadcast_to_actors(data: Any val) =>
+    _actor_data_router.broadcast_to_actors(data)
 
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)

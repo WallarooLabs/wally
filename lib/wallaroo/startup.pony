@@ -367,7 +367,9 @@ actor Startup
       if not is_recovering then
         match _cluster_initializer
         | let ci: ClusterInitializer =>
-          ci.start(_startup_options.worker_name)
+          // TODO: Pass in initializer name once we've refactored
+          // to expect it at .start() for pipeline apps.
+          ci.start()
         end
       end
 
@@ -388,11 +390,6 @@ actor Startup
     try
       let auth = _env.root as AmbientAuth
 
-      let input_addrs: Array[Array[String]] val =
-        (_startup_options.i_addrs_write = recover Array[Array[String]] end)
-      let output_addrs: Array[Array[String]] val =
-        (_startup_options.o_addrs_write = recover Array[Array[String]] end)
-
       let metrics_conn = ReconnectingMetricsSink(m.metrics_host,
         m.metrics_service, _application.name(), _startup_options.worker_name)
 
@@ -404,6 +401,7 @@ actor Startup
         else
           m.control_addrs("initializer")
         end
+
       (let d_host, let d_service) =
         if m.sender_name == "initializer" then
           (info_sending_host, m.data_addrs("initializer")._2)

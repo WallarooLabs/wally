@@ -211,6 +211,26 @@ primitive ChannelMsgEncoder
     _encode(KeyedAnnounceNewStatefulStepMsg[K](id, worker_name, key,
       state_name), auth)
 
+  fun register_actor_for_worker(id: WActorId, worker: String,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(RegisterActorForWorkerMsg(id, worker), auth)
+
+  fun register_as_role(role: String, w_actor: WActorId, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(RegisterAsRoleMsg(role, w_actor), auth)
+
+  fun broadcast_to_role(role: String, data: Any val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(BroadcastToRoleMsg(role, data), auth)
+
+  fun broadcast_to_actors(data: Any val, auth: AmbientAuth):
+    Array[ByteSeq] val ?
+  =>
+    _encode(BroadcastToActorsMsg(data), auth)
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg val =>
     try
@@ -340,6 +360,36 @@ class ReplayCompleteMsg is ChannelMsg
   new val create(from: String, b_id: U128) =>
     sender_name = from
     boundary_id = b_id
+
+class val RegisterActorForWorkerMsg is ChannelMsg
+  let id: WActorId
+  let worker: String
+
+  new val create(i: WActorId, w: String) =>
+    id = i
+    worker = w
+
+class val RegisterAsRoleMsg is ChannelMsg
+  let role: String
+  let id: WActorId
+
+  new val create(role': String, id': WActorId) =>
+    role = role'
+    id = id'
+
+class val BroadcastToRoleMsg is ChannelMsg
+  let role: String
+  let data: Any val
+
+  new val create(role': String, data': Any val) =>
+    role = role'
+    data = data'
+
+class val BroadcastToActorsMsg is ChannelMsg
+  let data: Any val
+
+  new val create(data': Any val) =>
+    data = data'
 
 trait StepMigrationMsg is ChannelMsg
   fun state_name(): String

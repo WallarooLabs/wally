@@ -2,6 +2,7 @@ use "collections"
 use "sendence/guid"
 use "wallaroo/boundary"
 use "wallaroo/fail"
+use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
@@ -23,7 +24,6 @@ trait WActorWrapper
   fun ref _set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   fun ref _cancel_timer(t: WActorTimer)
-  fun _known_actors(): Array[WActorId] val
   // Temporary for demonstration
   be pickle(m: SerializeTarget)
 
@@ -48,7 +48,7 @@ actor WActorWithState is WActorWrapper
 
   new create(worker: String, id: U128, w_actor_builder: WActorBuilder val,
     event_log: EventLog, r: CentralWActorRegistry,
-    actor_to_worker_map: Map[U128, String] val,
+    actor_to_worker_map: Map[U128, String] val, connections: Connections,
     boundaries: Map[String, OutgoingBoundary] val, seed: U64,
     auth: AmbientAuth)
   =>
@@ -57,7 +57,7 @@ actor WActorWithState is WActorWrapper
     _auth = auth
     _event_log = event_log
     _actor_registry = WActorRegistry(_worker_name, _auth, actor_to_worker_map,
-      boundaries, seed)
+      connections, boundaries, seed)
     _central_actor_registry = r
     _w_actor_id = WActorId(id, this)
     _helper = LiveWActorHelper(this)
@@ -179,14 +179,11 @@ actor WActorWithState is WActorWrapper
   fun ref _cancel_timer(t: WActorTimer) =>
     _timers.cancel_timer(t)
 
-  fun _known_actors(): Array[WActorId] val =>
-    _actor_registry.known_actors()
-
 interface val WActorWrapperBuilder
   fun apply(worker: String, r: CentralWActorRegistry, auth: AmbientAuth,
     event_log: EventLog, actor_to_worker_map: Map[U128, String] val,
-    boundaries: Map[String, OutgoingBoundary] val, seed: U64):
-    WActorWrapper tag
+    connections: Connections, boundaries: Map[String, OutgoingBoundary] val,
+    seed: U64): WActorWrapper tag
   fun id(): U128
 
 class val StatefulWActorWrapperBuilder
@@ -199,11 +196,11 @@ class val StatefulWActorWrapperBuilder
 
   fun apply(worker: String, r: CentralWActorRegistry, auth: AmbientAuth,
     event_log: EventLog, actor_to_worker_map: Map[U128, String] val,
-    boundaries: Map[String, OutgoingBoundary] val, seed: U64):
-    WActorWrapper tag
+    connections: Connections, boundaries: Map[String, OutgoingBoundary] val,
+    seed: U64): WActorWrapper tag
   =>
     WActorWithState(worker, _id, _w_actor_builder, event_log, r,
-      actor_to_worker_map, boundaries, seed, auth)
+      actor_to_worker_map, connections, boundaries, seed, auth)
 
   fun id(): U128 =>
     _id
@@ -253,9 +250,6 @@ class LiveWActorHelper is WActorHelper
   fun ref destroy_actor(id: WActorId) =>
     _w_actor.forget_actor(id)
 
-  fun known_actors(): Array[WActorId] val =>
-    _w_actor._known_actors()
-
   fun ref set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   =>
@@ -282,9 +276,6 @@ class EmptyWActorHelper is WActorHelper
 
   fun ref destroy_actor(id: WActorId) =>
     None
-
-  fun known_actors(): Array[WActorId] val =>
-    recover Array[WActorId] end
 
   fun ref set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer

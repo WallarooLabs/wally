@@ -31,11 +31,12 @@ actor ApplicationDistributor is Distributor
     _application = application
 
   be distribute(cluster_initializer: (ClusterInitializer | None),
-    worker_count: USize, worker_names: Array[String] val)
+    worker_count: USize, worker_names: Array[String] val,
+    initializer_name: String)
   =>
     @printf[I32]("Initializing application\n".cstring())
-    _automate_initialization(_application, cluster_initializer, worker_count,
-      worker_names)
+    _distribute(_application, cluster_initializer, worker_count,
+      worker_names, initializer_name)
 
   be topology_ready() =>
     @printf[I32]("Application has successfully initialized.\n".cstring())
@@ -47,15 +48,16 @@ actor ApplicationDistributor is Distributor
       end
     end
 
-  fun ref _automate_initialization(application: Application val,
+  fun ref _distribute(application: Application val,
     cluster_initializer: (ClusterInitializer | None), worker_count: USize,
-    worker_names: Array[String] val)
+    worker_names: Array[String] val, initializer_name: String)
   =>
     @printf[I32]("---------------------------------------------------------\n".cstring())
     @printf[I32]("vvvvvv|Initializing Topologies for Workers|vvvvvv\n\n".cstring())
+
     try
       let all_workers_trn: Array[String] trn = recover Array[String] end
-      all_workers_trn.push("initializer")
+      all_workers_trn.push(initializer_name)
       for w in worker_names.values() do all_workers_trn.push(w) end
       let all_workers: Array[String] val = consume all_workers_trn
 
@@ -92,7 +94,7 @@ actor ApplicationDistributor is Distributor
         recover Map[String, Dag[StepInitializer val] trn] end
 
       // Initialize values for local graphs
-      local_graphs("initializer") = Dag[StepInitializer val]
+      local_graphs(initializer_name) = Dag[StepInitializer val]
       for name in worker_names.values() do
         local_graphs(name) = Dag[StepInitializer val]
       end
@@ -228,7 +230,7 @@ actor ApplicationDistributor is Distributor
               end
               all_workers
             else
-              "initializer"
+              initializer_name
             end
           else
             None
@@ -257,7 +259,7 @@ actor ApplicationDistributor is Distributor
                     error
                   end
                 | let ws: Array[String] val =>
-                  local_graphs("initializer").add_node(egress_builder,
+                  local_graphs(initializer_name).add_node(egress_builder,
                     sid)
                   for w in ws.values() do
                     try
@@ -292,7 +294,7 @@ actor ApplicationDistributor is Distributor
             end
           if state_builder.default_state_name() != "" then
             pipeline_default_state_name = state_builder.default_state_name()
-            pipeline_default_target_worker = "initializer"
+            pipeline_default_target_worker = initializer_name
           end
         end
 
@@ -304,7 +306,7 @@ actor ApplicationDistributor is Distributor
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
 
         try
-          local_graphs("initializer").add_node(source_initializer,
+          local_graphs(initializer_name).add_node(source_initializer,
             source_node_id)
         else
           @printf[I32]("problem adding node to initializer graph\n".cstring())
@@ -395,12 +397,13 @@ actor ApplicationDistributor is Distributor
 
           let worker =
             if boundaries_idx == 0 then
-              "initializer"
+              initializer_name
             else
               try
                 worker_names(boundaries_idx - 1)
               else
-                @printf[I32]("No worker found for idx!\n".cstring())
+                @printf[I32]("No worker found for idx %lu!\n".cstring(),
+                  boundaries_idx)
                 error
               end
             end
@@ -414,8 +417,8 @@ actor ApplicationDistributor is Distributor
 
           let local_proxy_ids = Map[String, U128]
           proxy_ids(worker) = local_proxy_ids
-          if worker != "initializer" then
-            local_proxy_ids("initializer") = _guid_gen.u128()
+          if worker != initializer_name then
+            local_proxy_ids(initializer_name) = _guid_gen.u128()
           end
           for w in worker_names.values() do
             if worker != w then
@@ -472,7 +475,7 @@ actor ApplicationDistributor is Distributor
                           error
                         end
                       | let ws: Array[String] val =>
-                        local_graphs("initializer").add_node(egress_builder,
+                        local_graphs(initializer_name).add_node(egress_builder,
                           sid)
                         for w in ws.values() do
                           try
@@ -778,7 +781,7 @@ actor ApplicationDistributor is Distributor
         // If this is the "initializer"'s (i.e. our) turn, then
         // immediately (asynchronously) begin initializing it. If not, add it
         // to the list we'll use to distribute to the other workers
-        if w == "initializer" then
+        if w == initializer_name then
           _local_topology_initializer.update_topology(local_topology)
           _local_topology_initializer.initialize(cluster_initializer)
         else
@@ -798,5 +801,5 @@ actor ApplicationDistributor is Distributor
       @printf[I32]("\n^^^^^^|Finished Initializing Topologies for Workers|^^^^^^^\n".cstring())
       @printf[I32]("---------------------------------------------------------\n".cstring())
     else
-      @printf[I32]("Error initializating application!\n".cstring())
+      @printf[I32]("Error initializing application!\n".cstring())
     end

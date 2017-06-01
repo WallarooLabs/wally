@@ -40,13 +40,9 @@ actor ActorSystemDistributor is Distributor
     None
 
   be distribute(cluster_initializer: (ClusterInitializer | None),
-    worker_count: USize, workers: Array[String] val)
+    worker_count: USize, workers: Array[String] val,
+    initializer_name: String)
   =>
-    @printf[I32]("!!Worker count: %lu\n".cstring(), worker_count)
-    @printf[I32]("!!Workers:\n".cstring())
-    for w in workers.values() do
-      @printf[I32]("!!--%s\n".cstring(), w.cstring())
-    end
     try
       /*
       Try to evenly distribute the actors across the workers. As long as
@@ -67,11 +63,7 @@ actor ActorSystemDistributor is Distributor
         recover Array[WActorWrapperBuilder] end
       while actor_idx < actor_count do
         let next_actor = actor_builders(actor_idx)
-        try
-          actor_to_worker_map(next_actor.id()) = workers(worker_idx)
-        else
-          Fail()
-        end
+        actor_to_worker_map(next_actor.id()) = workers(worker_idx)
         cur_actors.push(next_actor)
         actor_idx = actor_idx + 1
         cur_worker_share = cur_worker_share + 1
@@ -87,6 +79,12 @@ actor ActorSystemDistributor is Distributor
             cur_worker_share = 0
             shares.push(cur_actors = recover Array[WActorWrapperBuilder] end)
           end
+        end
+      end
+      if worker_idx < (worker_count - 1) then
+        while worker_idx < worker_count do
+          shares.push(recover Array[WActorWrapperBuilder] end)
+          worker_idx = worker_idx + 1
         end
       end
       let sendable_actor_to_worker_map: Map[U128, String] val =

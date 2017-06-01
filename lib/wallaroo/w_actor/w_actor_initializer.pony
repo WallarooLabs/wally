@@ -30,6 +30,7 @@ actor WActorInitializer is LayoutInitializer
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   let _data_channel_file: String
+  let _worker_names_file: String
   let _data_receivers: DataReceivers
   let _metrics_conn: MetricsSink
   let _central_registry: CentralWActorRegistry
@@ -64,7 +65,7 @@ actor WActorInitializer is LayoutInitializer
     output_addrs: Array[Array[String]] val, local_actor_system_file: String,
     actor_count: USize, expected_iterations: USize, recovery: Recovery,
     recovery_replayer: RecoveryReplayer,
-    data_channel_file: String,
+    data_channel_file: String, worker_names_file: String,
     data_receivers: DataReceivers, metrics_conn: MetricsSink,
     seed: U64, connections: Connections,
     router_registry: RouterRegistry, is_initializer: Bool)
@@ -81,13 +82,14 @@ actor WActorInitializer is LayoutInitializer
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _data_channel_file = data_channel_file
+    _worker_names_file = worker_names_file
     _data_receivers = data_receivers
     _metrics_conn = metrics_conn
     _rand = EnhancedRandom(seed)
     _connections = connections
     _router_registry = router_registry
     _central_registry = CentralWActorRegistry(_worker_name, _auth, this,
-      _sinks, _event_log, _rand.u64())
+      _connections, _sinks, _event_log, _rand.u64())
     _is_initializer = is_initializer
 
   be update_actor_to_worker_map(actor_to_worker_map: Map[U128, String] val) =>
@@ -117,7 +119,35 @@ actor WActorInitializer is LayoutInitializer
     _sinks = consume sinks
     _central_registry.update_sinks(_sinks)
 
-  fun ref _save_local_topology() =>
+  fun ref _save_worker_names()
+  =>
+    """
+    Save the list of worker names to a file.
+    """
+    try
+      match _system
+      | let las: LocalActorSystem val =>
+        @printf[I32](("Saving worker names to file: " + _worker_names_file +
+          "\n").cstring())
+        let worker_names_filepath = FilePath(_auth, _worker_names_file)
+        let file = File(worker_names_filepath)
+        // Clear file
+        file.set_length(0)
+        for worker_name in las.worker_names().values() do
+          file.print(worker_name)
+          @printf[I32](("LocalActorSystem._save_worker_names: " + worker_name +
+          "\n").cstring())
+        end
+        file.sync()
+        file.dispose()
+      else
+        Fail()
+      end
+    else
+      Fail()
+    end
+
+  fun ref _save_local_actor_system() =>
     @printf[I32]("||| -- Saving Actor System! -- |||\n".cstring())
     match _system
     | let las: LocalActorSystem =>
@@ -197,6 +227,7 @@ actor WActorInitializer is LayoutInitializer
 
     _outgoing_boundaries = bs
     _outgoing_boundary_builders = bbs
+    _central_registry.update_boundaries(bs)
 
   be recover_and_initialize(ws: Array[String] val,
     cluster_initializer: (ClusterInitializer | None) = None)
@@ -264,16 +295,14 @@ actor WActorInitializer is LayoutInitializer
       end
 
       ifdef "resilience" then
-        _save_local_topology()
+        _save_local_actor_system()
+        _save_worker_names()
       end
 
       match _system
       | let las: LocalActorSystem =>
         match _central_registry
         | let cr: CentralWActorRegistry =>
-          let data_receivers = DataReceivers(_auth, _worker_name,
-            _connections, recovering)
-
           try
             for (idx, source) in las.sources().pairs() do
               let source_notify = WActorSourceNotify(_auth,
@@ -302,9 +331,16 @@ actor WActorInitializer is LayoutInitializer
             Fail()
           end
 
+          _central_registry.distribute_data_router(_router_registry)
+
+          _connections.quick_initialize_data_connections(this)
+
+          @printf[I32]("\n#*# Spinning up %lu Wallaroo actors #*#\n\n"
+            .cstring(), las.actor_builders().size())
           for builder in las.actor_builders().values() do
             _actors.push(builder(_worker_name, cr, _auth, _event_log,
-              las.actor_to_worker_map(), _outgoing_boundaries, _rand.u64()))
+              las.actor_to_worker_map(), _connections, _outgoing_boundaries,
+              _rand.u64()))
           end
 
           if recovering then

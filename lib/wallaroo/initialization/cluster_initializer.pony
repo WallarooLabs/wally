@@ -27,6 +27,7 @@ actor ClusterInitializer
   var _interconnected: USize = 1
   var _initialized: USize = 0
   var _topology_ready: Bool = false
+  var _initializer_name: String = "initializer"
 
   let _worker_names: Array[String] = Array[String]
   let _control_addrs: Map[String, (String, String)] = _control_addrs.create()
@@ -46,11 +47,19 @@ actor ClusterInitializer
     _distributor = distributor
     _layout_initializer = layout_initializer
 
-  be start(initializer_name: String) =>
-    _worker_names.push(initializer_name)
+  be start(initializer_name: String = "") =>
+    // TODO: Pipeline initialization needs to be updated so that we
+    // expect the initializer name to be added here.  There are going to
+    // be multiple places it's added manually that need to be changed.
+    if initializer_name != "" then
+      _initializer_name = initializer_name
+      _worker_names.push(_initializer_name)
+    end
     if _expected == 1 then
       _topology_ready = true
-      _distributor.distribute(this, _expected, recover [initializer_name] end)
+      _distributor.distribute(this, _expected, recover [_initializer_name] end,
+        _initializer_name)
+      _connections.save_connections()
       _layout_initializer.create_data_channel_listener(
         recover Array[String] end, "", "", this)
     end
@@ -107,7 +116,8 @@ actor ClusterInitializer
           names.push(name)
         end
 
-        _distributor.distribute(this, _expected, consume names)
+        _distributor.distribute(this, _expected, consume names,
+          _initializer_name)
       end
     end
 
@@ -123,7 +133,7 @@ actor ClusterInitializer
         _distributor.topology_ready()
 
         let topology_ready_msg =
-          ExternalMsgEncoder.topology_ready("initializer")
+          ExternalMsgEncoder.topology_ready(_initializer_name)
         _connections.send_phone_home(topology_ready_msg)
 
         _topology_ready = true
@@ -138,7 +148,9 @@ actor ClusterInitializer
   fun _create_data_channel_listeners() =>
     let ws: Array[String] trn = recover Array[String] end
 
-    ws.push("initializer")
+    if not _worker_names.contains(_initializer_name) then
+      ws.push(_initializer_name)
+    end
     for w in _worker_names.values() do
       ws.push(w)
     end

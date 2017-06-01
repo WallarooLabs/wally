@@ -425,15 +425,28 @@ class StepIdRouter is OmniRouter
 
 trait val ActorSystemDataRouter is Equatable[ActorSystemDataRouter]
   fun route(d_msg: ActorDeliveryMsg val)
+  fun register_actor_for_worker(id: WActorId, worker: String)
+  fun register_as_role(role: String, w_actor: WActorId)
+  fun broadcast_to_actors(data: Any val)
 
 class val EmptyActorSystemDataRouter is ActorSystemDataRouter
   fun route(d_msg: ActorDeliveryMsg val) =>
     Fail()
 
+  fun register_actor_for_worker(id: WActorId, worker: String) =>
+    Fail()
+
+  fun register_as_role(role: String, w_actor: WActorId) =>
+    Fail()
+
+  fun broadcast_to_actors(data: Any val) =>
+    Fail()
+
+
 class val ActiveActorSystemDataRouter is ActorSystemDataRouter
   let _registry: CentralWActorRegistry
 
-  new create(registry: CentralWActorRegistry) =>
+  new val create(registry: CentralWActorRegistry) =>
     _registry = registry
 
   fun route(d_msg: ActorDeliveryMsg val)
@@ -442,6 +455,15 @@ class val ActiveActorSystemDataRouter is ActorSystemDataRouter
       @printf[I32]("Rcvd msg at ActorSystemDataRouter\n".cstring())
     end
     d_msg.deliver(_registry)
+
+  fun register_actor_for_worker(id: WActorId, worker: String) =>
+    _registry.register_actor_for_worker(id, worker)
+
+  fun register_as_role(role: String, w_actor: WActorId) =>
+    _registry.register_as_role(role, w_actor where external = true)
+
+  fun broadcast_to_actors(data: Any val) =>
+    _registry.broadcast(data where external = true)
 
 class DataRouter is Equatable[DataRouter]
   let _data_routes: Map[U128, ConsumerStep tag] val
@@ -483,6 +505,9 @@ class DataRouter is Equatable[DataRouter]
     _target_ids_to_route_ids = target_ids_to_route_ids
     _route_ids_to_target_ids = route_ids_to_target_ids
     _actor_system_router = actor_system_router
+
+  fun actor_system_data_router(): ActorSystemDataRouter =>
+    _actor_system_router
 
   fun step_for_id(id: U128): ConsumerStep tag ? =>
     _data_routes(id)
