@@ -23,7 +23,6 @@ actor WActorInitializer is LayoutInitializer
   let _app_name: String
   var _system: (LocalActorSystem | None) = None
   let _auth: AmbientAuth
-  let _workers: Array[String] val
   let _event_log: EventLog
   let _local_actor_system_file: String
   let _input_addrs: Array[Array[String]] val
@@ -41,12 +40,12 @@ actor WActorInitializer is LayoutInitializer
     Map[String, OutgoingBoundaryBuilder val] val =
       recover Map[String, OutgoingBoundaryBuilder val] end
   let _is_initializer: Bool
+  let _connections: Connections
+  let _router_registry: RouterRegistry
 
-  ////////////////
-  // Placeholders
-  ////////////////
-  let _empty_connections: Connections
-  let _empty_router_registry: RouterRegistry
+  var _recovered_worker_names: Array[String] val = recover val Array[String] end
+  var _recovering: Bool = false
+
 
   ////////////////
   // Demo fields
@@ -67,13 +66,12 @@ actor WActorInitializer is LayoutInitializer
     recovery_replayer: RecoveryReplayer,
     data_channel_file: String,
     data_receivers: DataReceivers, metrics_conn: MetricsSink,
-    workers: Array[String] val, seed: U64, empty_connections: Connections,
-    empty_router_registry: RouterRegistry, is_initializer: Bool)
+    seed: U64, connections: Connections,
+    router_registry: RouterRegistry, is_initializer: Bool)
   =>
     _worker_name = worker_name
     _app_name = app_name
     _auth = auth
-    _workers = workers
     _event_log = event_log
     _local_actor_system_file = local_actor_system_file
     _input_addrs = input_addrs
@@ -86,8 +84,8 @@ actor WActorInitializer is LayoutInitializer
     _data_receivers = data_receivers
     _metrics_conn = metrics_conn
     _rand = EnhancedRandom(seed)
-    _empty_connections = empty_connections
-    _empty_router_registry = empty_router_registry
+    _connections = connections
+    _router_registry = router_registry
     _central_registry = CentralWActorRegistry(_worker_name, _auth, this,
       _sinks, _event_log, _rand.u64())
     _is_initializer = is_initializer
@@ -150,7 +148,7 @@ actor WActorInitializer is LayoutInitializer
     host: String, service: String,
     cluster_initializer: (ClusterInitializer | None) = None)
   =>
-    match _empty_connections
+    match _connections
     | let conns: Connections =>
       try
         let data_channel_filepath = FilePath(_auth, _data_channel_file)
@@ -160,15 +158,15 @@ actor WActorInitializer is LayoutInitializer
               _is_initializer,
               MetricsReporter(_app_name, _worker_name, _metrics_conn),
               data_channel_filepath, this, _data_receivers, _recovery_replayer,
-              _empty_router_registry)
+              _router_registry)
 
           ifdef "resilience" then
             conns.make_and_register_recoverable_data_channel_listener(
-              _auth, consume data_notifier, _empty_router_registry,
+              _auth, consume data_notifier, _router_registry,
               data_channel_filepath, host, service)
           else
             let dch_listener = DataChannelListener(_auth,
-              consume data_notifier, _empty_router_registry,
+              consume data_notifier, _router_registry,
               host, service)
             conns.register_listener(dch_listener)
           end
@@ -176,7 +174,7 @@ actor WActorInitializer is LayoutInitializer
           match cluster_initializer
             | let ci: ClusterInitializer =>
               conns.create_initializer_data_channel_listener(
-                _data_receivers, _recovery_replayer, _empty_router_registry,
+                _data_receivers, _recovery_replayer, _router_registry,
                 ci, data_channel_filepath, this)
           end
         end
@@ -199,6 +197,48 @@ actor WActorInitializer is LayoutInitializer
 
     _outgoing_boundaries = bs
     _outgoing_boundary_builders = bbs
+
+  be recover_and_initialize(ws: Array[String] val,
+    cluster_initializer: (ClusterInitializer | None) = None)
+  =>
+    match _connections
+    | let conns: Connections =>
+      _recovering = true
+      _recovered_worker_names = ws
+
+      try
+        let data_channel_filepath = FilePath(_auth, _data_channel_file)
+        if not _is_initializer then
+          let data_notifier: DataChannelListenNotify iso =
+            DataChannelListenNotifier(_worker_name, _auth, conns,
+              _is_initializer,
+              MetricsReporter(_app_name, _worker_name, _metrics_conn),
+              data_channel_filepath, this, _data_receivers, _recovery_replayer,
+              _router_registry)
+
+          ifdef "resilience" then
+            conns.make_and_register_recoverable_data_channel_listener(
+              _auth, consume data_notifier, _router_registry,
+              data_channel_filepath)
+          else
+            let dch_listener = DataChannelListener(_auth,
+              consume data_notifier, _router_registry)
+            conns.register_listener(dch_listener)
+          end
+        else
+          match cluster_initializer
+          | let ci: ClusterInitializer =>
+            conns.create_initializer_data_channel_listener(
+              _data_receivers, _recovery_replayer, _router_registry, ci,
+              data_channel_filepath, this)
+          end
+        end
+      else
+        @printf[I32]("FAIL: cannot create data channel\n".cstring())
+      end
+
+      conns.recover_connections(this)
+    end
 
   be initialize(cluster_initializer: (ClusterInitializer | None) = None,
     recovering: Bool = false)
@@ -232,7 +272,7 @@ actor WActorInitializer is LayoutInitializer
         match _central_registry
         | let cr: CentralWActorRegistry =>
           let data_receivers = DataReceivers(_auth, _worker_name,
-            _empty_connections, recovering)
+            _connections, recovering)
 
           try
             for (idx, source) in las.sources().pairs() do
@@ -251,7 +291,7 @@ actor WActorInitializer is LayoutInitializer
               let service = source_addr(1)
 
               TCPSourceListener(source_builder,
-                EmptyRouter, _empty_router_registry, EmptyRouteBuilder,
+                EmptyRouter, _router_registry, EmptyRouteBuilder,
                 recover Map[String, OutgoingBoundaryBuilder val] end,
                 recover Array[TCPSink] end, _event_log, _auth,
                 this, consume empty_metrics_reporter where host = host,
@@ -266,17 +306,17 @@ actor WActorInitializer is LayoutInitializer
             _actors.push(builder(_worker_name, cr, _auth, _event_log,
               las.actor_to_worker_map(), _outgoing_boundaries, _rand.u64()))
           end
+
+          if recovering then
+            _recovery.start_recovery(this, las.worker_names())
+          else
+            kick_off_demo()
+          end
         else
           Fail()
         end
       else
         Fail()
-      end
-
-      if recovering then
-        _recovery.start_recovery(this, _workers)
-      else
-        kick_off_demo()
       end
     else
       Fail()

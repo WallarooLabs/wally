@@ -11,6 +11,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 use "wallaroo/recovery"
+use "wallaroo/w_actor"
 
 class ControlChannelListenNotifier is TCPListenNotify
   let _auth: AmbientAuth
@@ -21,7 +22,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   var _d_service: String
   let _is_initializer: Bool
   let _initializer: (ClusterInitializer | None)
-  let _local_topology_initializer: LocalTopologyInitializer
+  let _layout_initializer: LayoutInitializer
   let _connections: Connections
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
@@ -31,7 +32,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   new iso create(name: String, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     initializer: (ClusterInitializer | None) = None,
-    local_topology_initializer: LocalTopologyInitializer,
+    layout_initializer: LayoutInitializer,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     recovery_file: FilePath, data_host: String, data_service: String,
     joining: Bool = false)
@@ -42,7 +43,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _d_service = data_service
     _is_initializer = is_initializer
     _initializer = initializer
-    _local_topology_initializer = local_topology_initializer
+    _layout_initializer = layout_initializer
     _connections = connections
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
@@ -100,7 +101,7 @@ class ControlChannelListenNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _auth, _connections,
-      _initializer, _local_topology_initializer, _recovery_replayer,
+      _initializer, _layout_initializer, _recovery_replayer,
       _router_registry, _d_host, _d_service)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
@@ -108,7 +109,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _name: String
   let _connections: Connections
   let _initializer: (ClusterInitializer | None)
-  let _local_topology_initializer: LocalTopologyInitializer
+  let _layout_initializer: LayoutInitializer
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
   let _d_host: String
@@ -117,7 +118,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
 
   new iso create(name: String, auth: AmbientAuth,
     connections: Connections, initializer: (ClusterInitializer | None),
-    local_topology_initializer: LocalTopologyInitializer,
+    layout_initializer: LayoutInitializer,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     data_host: String, data_service: String)
   =>
@@ -125,7 +126,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _name = name
     _connections = connections
     _initializer = initializer
-    _local_topology_initializer = local_topology_initializer
+    _layout_initializer = layout_initializer
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
     _d_host = data_host
@@ -204,8 +205,25 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32]("Received SpinUpLocalTopologyMsg on Control Channel\n"
             .cstring())
         end
-        _local_topology_initializer.update_topology(m.local_topology)
-        _local_topology_initializer.initialize()
+        match _layout_initializer
+        | let lti: LocalTopologyInitializer =>
+          lti.update_topology(m.local_topology)
+          lti.initialize()
+        else
+          Fail()
+        end
+      | let m: SpinUpLocalActorSystemMsg val =>
+        ifdef "trace" then
+          @printf[I32](("Received SpinUpLocalActorSystemMsg on Control" +
+            "Channel\n").cstring())
+        end
+        match _layout_initializer
+        | let wai: WActorInitializer =>
+          wai.update_local_actor_system(m.local_actor_system)
+          wai.initialize()
+        else
+          Fail()
+        end
       | let m: TopologyReadyMsg val =>
         ifdef "trace" then
           @printf[I32]("Received TopologyReadyMsg on Control Channel\n"
@@ -227,7 +245,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             .cstring())
         end
         _connections.create_connections(m.control_addrs, m.data_addrs,
-          _local_topology_initializer)
+          _layout_initializer)
       | let m: ConnectionsReadyMsg val =>
         ifdef "trace" then
           @printf[I32]("Received ConnectionsReadyMsg on Control Channel\n"
@@ -242,10 +260,15 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           @printf[I32](("Received CreateDataChannelListener on Control " +
             "Channel\n").cstring())
         end
-        _local_topology_initializer.create_data_channel_listener(m.workers,
+        _layout_initializer.create_data_channel_listener(m.workers,
           _d_host, _d_service)
       | let m: JoinClusterMsg val =>
-        _local_topology_initializer.inform_joining_worker(conn, m.worker_name)
+        match _layout_initializer
+        | let lti: LocalTopologyInitializer =>
+          lti.inform_joining_worker(conn, m.worker_name)
+        else
+          Fail()
+        end
       | let m: AnnounceNewStatefulStepMsg val =>
         m.update_registry(_router_registry)
       | let m: StepMigrationCompleteMsg val =>
@@ -253,8 +276,13 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       | let m: JoiningWorkerInitializedMsg val =>
         try
           (let joining_host, _) = conn.remote_address().name()
-          _local_topology_initializer.add_new_worker(m.worker_name,
-            joining_host, m.control_addr, m.data_addr)
+          match _layout_initializer
+          | let lti: LocalTopologyInitializer =>
+            lti.add_new_worker(m.worker_name, joining_host, m.control_addr,
+              m.data_addr)
+          else
+            Fail()
+          end
         else
           Fail()
         end

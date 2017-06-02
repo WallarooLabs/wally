@@ -41,6 +41,9 @@ actor ActorSystemStartup
   // DEMO fields
   var _iterations: USize = 100
 
+  var _ph_host: String = ""
+  var _ph_service: String = ""
+
   // TODO: remove DEMO param actor_count
   new create(env: Env, system: ActorSystem val, app_name: String,
     actor_count: USize)
@@ -70,21 +73,12 @@ actor ActorSystemStartup
       end
 
       try
-        let source_addr = _startup_options.i_addrs_write(0)
-        let host = source_addr(0)
-        let service = source_addr(1)
+        let host = _startup_options.input_addrs(0)(0)
+        let service = _startup_options.input_addrs(0)(1)
       else
         @printf[I32]("You must provide a source address! (-in/-i)\n".cstring())
         Fail()
       end
-
-      let d_addr_ref = _startup_options.d_arg as Array[String]
-      let d_addr_trn: Array[String] trn = recover Array[String] end
-      d_addr_trn.push(d_addr_ref(0))
-      d_addr_trn.push(d_addr_ref(1))
-      let d_addr: Array[String] val = consume d_addr_trn
-      let d_host = d_addr(0)
-      let d_service = d_addr(1)
 
       let name = match _app_name
         | let n: String => n
@@ -201,49 +195,91 @@ actor ActorSystemStartup
 
       let seed: U64 = 123456
 
-      // TODO: Determine how these are going to be shared across
-      // Pipeline and RouterRegistry and stop using these empty versions.
-      let empty_connections = EmptyConnections(_env, auth)
       let empty_metrics_conn = MetricsSink("", "", "", "")
-
-      let input_addrs: Array[Array[String]] val =
-        _startup_options.i_addrs_write = recover Array[Array[String]] end
-
-      let output_addrs: Array[Array[String]] val =
-        _o_addrs_write = recover Array[Array[String]] end
+      let connections = Connections(_app_name, _startup_options.worker_name,
+        auth, _startup_options.c_host, _startup_options.c_service,
+        _startup_options.d_host, _startup_options.d_service, _ph_host,
+        _ph_service, empty_metrics_conn, "", "",
+        _startup_options.is_initializer, _connection_addresses_file,
+        _is_joining, _startup_options.spike_config)
 
       let w_name = _startup_options.worker_name
-      let workers: Array[String] val =
-        recover [w_name] end
 
       let data_receivers = DataReceivers(auth, _startup_options.worker_name,
-        empty_connections, is_recovering)
+        connections, is_recovering)
 
       let router_registry = RouterRegistry(auth, _startup_options.worker_name,
-        data_receivers, empty_connections,
-        _startup_options.stop_the_world_pause)
+        data_receivers, connections, _startup_options.stop_the_world_pause)
 
       let recovery_replayer = RecoveryReplayer(auth,
         _startup_options.worker_name, data_receivers, router_registry,
-        empty_connections, is_recovering)
+        connections, is_recovering)
 
       let initializer = WActorInitializer(_startup_options.worker_name,
-        _app_name, auth, event_log, input_addrs, output_addrs,
-        _local_actor_system_file, actor_count, _iterations,
-        recovery, recovery_replayer, _data_channel_file, data_receivers,
-        empty_metrics_conn, workers, seed, empty_connections, router_registry,
-        _startup_options.is_initializer)
+        _app_name, auth, event_log, _startup_options.input_addrs,
+        _startup_options.output_addrs, _local_actor_system_file, actor_count,
+        _iterations, recovery, recovery_replayer, _data_channel_file,
+        data_receivers, empty_metrics_conn, seed, connections,
+        router_registry, _startup_options.is_initializer)
 
 
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
         let distributor =
-          ActorSystemDistributor(auth, _system, initializer, input_addrs,
-            output_addrs, is_recovering)
+          ActorSystemDistributor(auth, _system, initializer, connections,
+            _startup_options.input_addrs, _startup_options.output_addrs,
+            is_recovering)
         _cluster_initializer = ClusterInitializer(auth,
           _startup_options.worker_name, _startup_options.worker_count,
-          empty_connections, distributor, initializer, d_addr,
+          connections, distributor, initializer, _startup_options.d_addr,
           empty_metrics_conn)
+      end
+
+      let control_channel_filepath: FilePath = FilePath(auth,
+        _control_channel_file)
+      let control_notifier: TCPListenNotify iso =
+        ControlChannelListenNotifier(_startup_options.worker_name,
+          auth, connections, _startup_options.is_initializer,
+          _cluster_initializer, initializer, recovery_replayer,
+          router_registry, control_channel_filepath,
+          _startup_options.my_d_host, _startup_options.my_d_service)
+
+      ifdef "resilience" then
+        if _startup_options.is_initializer then
+          connections.make_and_register_recoverable_listener(
+            auth, consume control_notifier, control_channel_filepath,
+            _startup_options.c_host, _startup_options.c_service)
+        else
+          connections.make_and_register_recoverable_listener(
+            auth, consume control_notifier, control_channel_filepath,
+            _startup_options.my_c_host, _startup_options.my_c_service)
+        end
+      else
+        if _startup_options.is_initializer then
+          connections.register_listener(
+            TCPListener(auth, consume control_notifier,
+              _startup_options.c_host, _startup_options.c_service))
+        else
+          connections.register_listener(
+            TCPListener(auth, consume control_notifier,
+              _startup_options.my_c_host, _startup_options.my_c_service))
+        end
+      end
+
+      ifdef "resilience" then
+        if is_recovering then
+          // need to do this before recreating the data connection as at
+          // that point replay starts
+          let worker_names_filepath: FilePath = FilePath(auth,
+            _worker_names_file)
+          let recovered_workers = _recover_worker_names(worker_names_filepath)
+          if _is_multi_worker then
+            initializer.recover_and_initialize(recovered_workers,
+              _cluster_initializer)
+          else
+            initializer.initialize(where recovering = true)
+          end
+        end
       end
 
       if not is_recovering then
@@ -255,6 +291,23 @@ actor ActorSystemStartup
     else
       Fail()
     end
+
+  fun ref _recover_worker_names(worker_names_filepath: FilePath):
+    Array[String] val
+  =>
+    """
+    Read in a list of the names of all workers after recovery.
+    """
+    let ws: Array[String] trn = recover Array[String] end
+
+    let file = File(worker_names_filepath)
+    for worker_name in file.lines() do
+      ws.push(worker_name)
+      @printf[I32]("recover_worker_names: %s\n".cstring(),
+        worker_name.cstring())
+    end
+
+    ws
 
 primitive EmptyConnections
   fun apply(env: Env, auth: AmbientAuth): Connections =>

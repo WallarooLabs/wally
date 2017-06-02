@@ -72,18 +72,21 @@ class val LocalActorSystem
   let _sources: Array[(WActorFramedSourceHandler, WActorRouter)] val
   let _sinks: Array[TCPSinkBuilder] val
   let _actor_to_worker_map: Map[U128, String] val
+  let _worker_names: Array[String] val
 
   new val create(name': String,
     actor_builders': Array[WActorWrapperBuilder] val,
     sources': Array[(WActorFramedSourceHandler, WActorRouter)] val,
     sinks': Array[TCPSinkBuilder] val,
-    actor_to_worker_map': Map[U128, String] val)
+    actor_to_worker_map': Map[U128, String] val,
+    worker_names': Array[String] val)
   =>
     _name = name'
     _actor_builders = actor_builders'
     _sources = sources'
     _sinks = sinks'
     _actor_to_worker_map = actor_to_worker_map'
+    _worker_names = worker_names'
 
   fun name(): String => _name
 
@@ -105,7 +108,7 @@ class val LocalActorSystem
     end
     new_actor_to_worker(builder.id()) = worker
     LocalActorSystem(_name, consume arr, _sources, _sinks,
-      consume new_actor_to_worker)
+      consume new_actor_to_worker, _worker_names)
 
   fun actor_builders(): Array[WActorWrapperBuilder] val =>
     _actor_builders
@@ -118,3 +121,6 @@ class val LocalActorSystem
 
   fun actor_to_worker_map(): Map[U128, String] val =>
     _actor_to_worker_map
+
+  fun worker_names(): Array[String] val =>
+    _worker_names

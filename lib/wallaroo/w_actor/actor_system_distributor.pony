@@ -9,6 +9,7 @@ use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/network"
 use "wallaroo/topology"
 use "wallaroo/recovery"
 
@@ -16,19 +17,21 @@ actor ActorSystemDistributor is Distributor
   let _auth: AmbientAuth
   let _guid_gen: GuidGenerator = GuidGenerator
   let _w_actor_initializer: WActorInitializer
+  let _connections: Connections
   let _input_addrs: Array[Array[String]] val
   let _output_addrs: Array[Array[String]] val
   var _system: ActorSystem val
   let _is_recovering: Bool
 
   new create(auth: AmbientAuth, actor_system: ActorSystem val,
-    w_actor_initializer: WActorInitializer,
+    w_actor_initializer: WActorInitializer, connections: Connections,
     input_addrs: Array[Array[String]] val,
     output_addrs: Array[Array[String]] val, is_recovering: Bool)
   =>
     _auth = auth
     _system = actor_system
     _w_actor_initializer = w_actor_initializer
+    _connections = connections
     _input_addrs = input_addrs
     _output_addrs = output_addrs
     _is_recovering = is_recovering
@@ -39,6 +42,11 @@ actor ActorSystemDistributor is Distributor
   be distribute(cluster_initializer: (ClusterInitializer | None),
     worker_count: USize, workers: Array[String] val)
   =>
+    @printf[I32]("!!Worker count: %lu\n".cstring(), worker_count)
+    @printf[I32]("!!Workers:\n".cstring())
+    for w in workers.values() do
+      @printf[I32]("!!--%s\n".cstring(), w.cstring())
+    end
     try
       /*
       Try to evenly distribute the actors across the workers. As long as
@@ -59,7 +67,11 @@ actor ActorSystemDistributor is Distributor
         recover Array[WActorWrapperBuilder] end
       while actor_idx < actor_count do
         let next_actor = actor_builders(actor_idx)
-        actor_to_worker_map(next_actor.id()) = workers(worker_idx)
+        try
+          actor_to_worker_map(next_actor.id()) = workers(worker_idx)
+        else
+          Fail()
+        end
         cur_actors.push(next_actor)
         actor_idx = actor_idx + 1
         cur_worker_share = cur_worker_share + 1
@@ -84,13 +96,16 @@ actor ActorSystemDistributor is Distributor
       for w_idx in Range(1, worker_count) do
         let worker_name = workers(w_idx)
         let ls = LocalActorSystem(_system.name(), shares(w_idx),
-          _system.sources(), _system.sinks(), sendable_actor_to_worker_map)
-        // !! Distribute to worker
+          _system.sources(), _system.sinks(), sendable_actor_to_worker_map,
+          workers)
+        let msg = ChannelMsgEncoder.spin_up_local_actor_system(ls, _auth)
+        _connections.send_control(worker_name, msg)
       end
 
       // Create our local system and initialize
       let local_system = LocalActorSystem(_system.name(), shares(0),
-        _system.sources(), _system.sinks(), sendable_actor_to_worker_map)
+        _system.sources(), _system.sinks(), sendable_actor_to_worker_map,
+        workers)
       _w_actor_initializer.update_local_actor_system(local_system)
       _w_actor_initializer.update_actor_to_worker_map(
         sendable_actor_to_worker_map)

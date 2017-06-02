@@ -329,7 +329,7 @@ actor Connections is Cluster
   be create_connections(
     control_addrs: Map[String, (String, String)] val,
     data_addrs: Map[String, (String, String)] val,
-    local_topology_initializer: LocalTopologyInitializer)
+    layout_initializer: LayoutInitializer)
   =>
     try
       ifdef "resilience" then
@@ -348,7 +348,7 @@ actor Connections is Cluster
         end
       end
 
-      _update_boundaries(local_topology_initializer)
+      _update_boundaries(layout_initializer)
 
       if not _is_joining then
         let connections_ready_msg = ChannelMsgEncoder.connections_ready(
@@ -404,12 +404,12 @@ actor Connections is Cluster
       Fail()
     end
 
-  be quick_initialize_data_connections(lti: LocalTopologyInitializer) =>
+  be quick_initialize_data_connections(li: LayoutInitializer) =>
     for boundary in _data_conns.values() do
-      boundary.quick_initialize(lti)
+      boundary.quick_initialize(li)
     end
 
-  be recover_connections(local_topology_initializer: LocalTopologyInitializer)
+  be recover_connections(layout_initializer: LayoutInitializer)
   =>
     var addresses: Map[String, Map[String, (String, String)]] val =
       recover val Map[String, Map[String, (String, String)]] end
@@ -454,7 +454,7 @@ actor Connections is Cluster
         end
       end
 
-      _update_boundaries(local_topology_initializer where recovering = true)
+      _update_boundaries(layout_initializer where recovering = true)
 
       @printf[I32]((_worker_name +
         ": Interconnections with other workers created.\n").cstring())
@@ -507,14 +507,14 @@ actor Connections is Cluster
     _data_conns(target_name) = outgoing_boundary
 
   be create_data_connection_to_joining_worker(target_name: String,
-    host: String, service: String, lti: LocalTopologyInitializer)
+    host: String, service: String, li: LayoutInitializer)
   =>
     _data_addrs(target_name) = (host, service)
     let boundary_builder = OutgoingBoundaryBuilder(_auth, _worker_name,
       MetricsReporter(_app_name, _worker_name, _metrics_conn), host, service,
       _spike_config)
     let outgoing_boundary =
-      boundary_builder.build_and_initialize(_guid_gen.u128(), lti)
+      boundary_builder.build_and_initialize(_guid_gen.u128(), li)
     _data_conn_builders(target_name) = boundary_builder
     _data_conns(target_name) = outgoing_boundary
 
