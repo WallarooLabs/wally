@@ -273,8 +273,8 @@ actor Startup
         _startup_options.worker_name, data_receivers, router_registry,
         connections, is_recovering)
 
-      let recovery = Recovery(_startup_options.worker_name,
-        _event_log as EventLog, recovery_replayer)
+      let recovery = Recovery(auth, _startup_options.worker_name,
+        _event_log as EventLog, recovery_replayer, connections)
 
       let local_topology_initializer =
         if _startup_options.is_swarm_managed then
@@ -320,7 +320,7 @@ actor Startup
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections,
           _startup_options.is_initializer, _cluster_initializer,
-          local_topology_initializer,
+          local_topology_initializer, recovery,
           recovery_replayer, router_registry,
           control_channel_filepath, _startup_options.my_d_host,
           _startup_options.my_d_service)
@@ -434,8 +434,8 @@ actor Startup
           EventLog(_env, None)
         end
 
-      let recovery = Recovery(_startup_options.worker_name,
-        _event_log as EventLog, recovery_replayer)
+      let recovery = Recovery(auth, _startup_options.worker_name,
+        _event_log as EventLog, recovery_replayer, connections)
 
       let local_topology_initializer = if _startup_options.is_swarm_managed then
         let cluster_manager: DockerSwarmClusterManager =
@@ -494,7 +494,7 @@ actor Startup
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections,
           _startup_options.is_initializer, _cluster_initializer,
-          local_topology_initializer,
+          local_topology_initializer, recovery,
           recovery_replayer, router_registry, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service)
 

@@ -1,9 +1,9 @@
 class WMessage
-  let sender: WActorId
-  let receiver: WActorId
+  let sender: U128
+  let receiver: U128
   let payload: Any val
 
-  new val create(s: WActorId, r: WActorId, p: Any val) =>
+  new val create(s: U128, r: U128, p: Any val) =>
     sender = s
     receiver = r
     payload = p

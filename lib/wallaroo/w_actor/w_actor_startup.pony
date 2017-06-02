@@ -213,8 +213,8 @@ actor ActorSystemStartup
         _startup_options.worker_name, data_receivers, router_registry,
         connections, is_recovering)
 
-      let recovery = Recovery(_startup_options.worker_name, event_log,
-        recovery_replayer)
+      let recovery = Recovery(auth, _startup_options.worker_name, event_log,
+        recovery_replayer, connections)
 
       let initializer = WActorInitializer(_startup_options.worker_name,
         _app_name, auth, event_log, _startup_options.input_addrs,
@@ -240,7 +240,7 @@ actor ActorSystemStartup
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections, _startup_options.is_initializer,
-          _cluster_initializer, initializer, recovery_replayer,
+          _cluster_initializer, initializer, recovery, recovery_replayer,
           router_registry, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service)
 

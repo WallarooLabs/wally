@@ -3,6 +3,7 @@ use "collections"
 use "files"
 use "net"
 use "serialise"
+use "time"
 use "sendence/guid"
 use "sendence/messages"
 use "wallaroo/boundary"
@@ -196,6 +197,20 @@ actor Connections is Cluster
   fun _send_control_to_cluster(data: Array[ByteSeq] val) =>
     for worker in _control_conns.keys() do
       _send_control(worker, data)
+    end
+
+  be send_control_to_random(data: Array[ByteSeq] val) =>
+    _send_control_to_random(data)
+
+  fun _send_control_to_random(data: Array[ByteSeq] val) =>
+    let target_idx: USize = Time.nanos().usize() % _control_conns.size()
+    var count: USize = 0
+    for worker in _control_conns.keys() do
+      if target_idx == count then
+        _send_control(worker, data)
+        break
+      end
+      count = count + 1
     end
 
   be send_data(worker: String, data: Array[ByteSeq] val) =>

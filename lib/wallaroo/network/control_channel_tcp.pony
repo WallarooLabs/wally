@@ -24,6 +24,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _initializer: (ClusterInitializer | None)
   let _layout_initializer: LayoutInitializer
   let _connections: Connections
+  let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
   let _recovery_file: FilePath
@@ -32,7 +33,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   new iso create(name: String, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
     initializer: (ClusterInitializer | None) = None,
-    layout_initializer: LayoutInitializer,
+    layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     recovery_file: FilePath, data_host: String, data_service: String,
     joining: Bool = false)
@@ -45,6 +46,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _initializer = initializer
     _layout_initializer = layout_initializer
     _connections = connections
+    _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
     _recovery_file = recovery_file
@@ -101,7 +103,7 @@ class ControlChannelListenNotifier is TCPListenNotify
 
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _auth, _connections,
-      _initializer, _layout_initializer, _recovery_replayer,
+      _initializer, _layout_initializer, _recovery, _recovery_replayer,
       _router_registry, _d_host, _d_service)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
@@ -110,6 +112,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _connections: Connections
   let _initializer: (ClusterInitializer | None)
   let _layout_initializer: LayoutInitializer
+  let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
   let _d_host: String
@@ -118,7 +121,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
 
   new iso create(name: String, auth: AmbientAuth,
     connections: Connections, initializer: (ClusterInitializer | None),
-    layout_initializer: LayoutInitializer,
+    layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     data_host: String, data_service: String)
   =>
@@ -127,6 +130,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _connections = connections
     _initializer = initializer
     _layout_initializer = layout_initializer
+    _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
     _d_host = data_host
@@ -245,6 +249,21 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         // create a bottleneck through the router registry and the central
         // actor registry.
         _router_registry.broadcast_to_actors(m.data)
+      | let m: WActorRegistryDigestMsg val =>
+        ifdef "trace" then
+          @printf[I32](("Received WActorRegistryDigestMsg on Control" +
+            "Channel\n").cstring())
+        end
+        _router_registry.process_digest(m.digest)
+        // Assumption: We only receive this digest message during
+        // registry recovery phase of Recovery
+        _recovery.w_actor_registry_recovery_finished()
+      | let m: RequestWActorRegistryDigestMsg val =>
+        ifdef "trace" then
+          @printf[I32](("Received RequestWActorRegistryDigestMsg on Control" +
+            "Channel\n").cstring())
+        end
+        _router_registry.send_digest_to(m.sender)
       | let m: TopologyReadyMsg val =>
         ifdef "trace" then
           @printf[I32]("Received TopologyReadyMsg on Control Channel\n"

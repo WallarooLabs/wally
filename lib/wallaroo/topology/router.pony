@@ -425,23 +425,30 @@ class StepIdRouter is OmniRouter
 
 trait val ActorSystemDataRouter is Equatable[ActorSystemDataRouter]
   fun route(d_msg: ActorDeliveryMsg val)
-  fun register_actor_for_worker(id: WActorId, worker: String)
-  fun register_as_role(role: String, w_actor: WActorId)
+  fun register_actor_for_worker(id: U128, worker: String)
+  fun register_as_role(role: String, w_actor: U128)
   fun broadcast_to_actors(data: Any val)
+  fun send_digest_to(worker: String)
+  fun process_digest(digest: WActorRegistryDigest)
 
 class val EmptyActorSystemDataRouter is ActorSystemDataRouter
   fun route(d_msg: ActorDeliveryMsg val) =>
     Fail()
 
-  fun register_actor_for_worker(id: WActorId, worker: String) =>
+  fun register_actor_for_worker(id: U128, worker: String) =>
     Fail()
 
-  fun register_as_role(role: String, w_actor: WActorId) =>
+  fun register_as_role(role: String, w_actor: U128) =>
     Fail()
 
   fun broadcast_to_actors(data: Any val) =>
     Fail()
 
+  fun send_digest_to(worker: String) =>
+    Fail()
+
+  fun process_digest(digest: WActorRegistryDigest) =>
+    Fail()
 
 class val ActiveActorSystemDataRouter is ActorSystemDataRouter
   let _registry: CentralWActorRegistry
@@ -456,14 +463,20 @@ class val ActiveActorSystemDataRouter is ActorSystemDataRouter
     end
     d_msg.deliver(_registry)
 
-  fun register_actor_for_worker(id: WActorId, worker: String) =>
+  fun register_actor_for_worker(id: U128, worker: String) =>
     _registry.register_actor_for_worker(id, worker)
 
-  fun register_as_role(role: String, w_actor: WActorId) =>
+  fun register_as_role(role: String, w_actor: U128) =>
     _registry.register_as_role(role, w_actor where external = true)
 
   fun broadcast_to_actors(data: Any val) =>
     _registry.broadcast(data where external = true)
+
+  fun send_digest_to(worker: String) =>
+    _registry.send_digest(worker)
+
+  fun process_digest(digest: WActorRegistryDigest) =>
+    _registry.process_digest(digest)
 
 class DataRouter is Equatable[DataRouter]
   let _data_routes: Map[U128, ConsumerStep tag] val

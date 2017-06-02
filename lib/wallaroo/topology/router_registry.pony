@@ -177,14 +177,20 @@ actor RouterRegistry
       source.add_boundary_builders(new_boundary_builders_sendable)
     end
 
-  be register_actor_for_worker(id: WActorId, worker: String) =>
+  be register_actor_for_worker(id: U128, worker: String) =>
     _actor_data_router.register_actor_for_worker(id, worker)
 
-  be register_as_role(role: String, w_actor: WActorId) =>
+  be register_as_role(role: String, w_actor: U128) =>
     _actor_data_router.register_as_role(role, w_actor)
 
   be broadcast_to_actors(data: Any val) =>
     _actor_data_router.broadcast_to_actors(data)
+
+  be process_digest(digest: WActorRegistryDigest) =>
+    _actor_data_router.process_digest(digest)
+
+  be send_digest_to(worker: String) =>
+    _actor_data_router.send_digest_to(worker)
 
   fun _distribute_data_router() =>
     _data_receivers.update_data_router(_data_router)

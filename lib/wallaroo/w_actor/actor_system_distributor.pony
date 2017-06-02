@@ -95,7 +95,7 @@ actor ActorSystemDistributor is Distributor
         let worker_name = workers(w_idx)
         let ls = LocalActorSystem(_system.name(), shares(w_idx),
           _system.sources(), _system.sinks(), sendable_actor_to_worker_map,
-          workers)
+          workers, recover Map[String, Role box] end)
         let msg = ChannelMsgEncoder.spin_up_local_actor_system(ls, _auth)
         _connections.send_control(worker_name, msg)
       end
@@ -103,7 +103,7 @@ actor ActorSystemDistributor is Distributor
       // Create our local system and initialize
       let local_system = LocalActorSystem(_system.name(), shares(0),
         _system.sources(), _system.sinks(), sendable_actor_to_worker_map,
-        workers)
+        workers, recover Map[String, Role box] end)
       _w_actor_initializer.update_local_actor_system(local_system)
       _w_actor_initializer.update_actor_to_worker_map(
         sendable_actor_to_worker_map)

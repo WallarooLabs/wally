@@ -105,7 +105,7 @@ class A is WActor
     _g_counter = GCounter(_id)
     _rand = EnhancedRandom(seed)
 
-  fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
+  fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
     match payload
     | ActMsg =>
       act(h)

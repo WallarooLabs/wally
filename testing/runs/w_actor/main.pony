@@ -134,7 +134,7 @@ class A is WActor
     _message_types_to_send = _all_message_types
     _rand = EnhancedRandom(seed)
 
-  fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
+  fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
     match payload
     | let m: SetActorProbabilityMsg val =>
       ifdef debug then

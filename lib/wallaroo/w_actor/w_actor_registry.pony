@@ -15,7 +15,7 @@ class WActorRegistry
   let _auth: AmbientAuth
   var _actor_to_worker_map: Map[U128, String] = _actor_to_worker_map.create()
   let _connections: Connections
-  let _actors: Map[WActorId, WActorWrapper tag] = _actors.create()
+  let _actors: Map[U128, WActorWrapper tag] = _actors.create()
   let _roles: Map[String, Role] = _roles.create()
   var _boundaries: Map[String, OutgoingBoundary] val
   let _rand: EnhancedRandom
@@ -36,29 +36,26 @@ class WActorRegistry
   fun ref update_boundaries(bs: Map[String, OutgoingBoundary] val) =>
     _boundaries = bs
 
-  fun ref register_actor_for_worker(id: WActorId, worker: String) =>
-    _register_actor_for_worker(id, worker)
-
-  fun ref _register_actor_for_worker(id: WActorId, worker: String) =>
+  fun ref register_actor_for_worker(id: U128, worker: String) =>
     //TODO: Use persistent map to improve perf
     let new_actor_to_worker: Map[U128, String] trn =
       recover Map[U128, String] end
     for (k, v) in _actor_to_worker_map.pairs() do
       new_actor_to_worker(k) = v
     end
-    new_actor_to_worker(id.id()) = worker
+    new_actor_to_worker(id) = worker
     _actor_to_worker_map = consume new_actor_to_worker
 
-  fun ref register_actor(id: WActorId, w_actor: WActorWrapper tag) =>
+  fun ref register_actor(id: U128, w_actor: WActorWrapper tag) =>
     _actors(id) = w_actor
-    _register_actor_for_worker(id, _worker_name)
+    register_actor_for_worker(id, _worker_name)
 
-  fun ref register_as_role(role: String, w_actor: WActorId) =>
+  fun ref register_as_role(role: String, w_actor: U128) =>
     try
       if _roles.contains(role) then
         _roles(role).register_actor(w_actor)
       else
-        let new_role = Role(role, _rand.u64())
+        let new_role = Role(role)
         new_role.register_actor(w_actor)
         _roles(role) = new_role
       end
@@ -66,13 +63,12 @@ class WActorRegistry
       Fail()
     end
 
-  fun ref forget_actor(id: WActorId) =>
+  fun ref forget_actor(id: U128) =>
     try
       _actors.remove(id)
       for (k, v) in _roles.pairs() do
         try
-          let idx = v.actors().find(id)
-          v.actors().remove(idx, 1)
+          v.remove_actor(id)
         end
         if v.empty() then
           _roles.remove(k)
@@ -84,8 +80,8 @@ class WActorRegistry
       end
     end
 
-  fun ref send_to(target_id: WActorId, msg: WMessage val) ? =>
-    let target_worker = _actor_to_worker_map(target_id.id())
+  fun ref send_to(target_id: U128, msg: WMessage val) ? =>
+    let target_worker = _actor_to_worker_map(target_id)
     if target_worker == _worker_name then
       _actors(target_id).receive(msg)
     else
@@ -94,10 +90,10 @@ class WActorRegistry
       _boundaries(target_worker).forward_actor_data(a_msg)
     end
 
-  fun ref send_to_role(role: String, sender: WActorId,
+  fun ref send_to_role(role: String, sender: U128,
     data: Any val) ?
   =>
-    let target = _roles(role).next()
+    let target = _roles(role).next(_rand)
     let wrapped = WMessage(sender, target, data)
     send_to(target, wrapped)
 
@@ -107,8 +103,8 @@ actor CentralWActorRegistry
   let _initializer: WActorInitializer
   var _sinks: Array[TCPSink] val
   let _event_log: EventLog
-  let _actors: Map[WActorId, WActorWrapper tag] = _actors.create()
-  let _role_sets: Map[String, SetIs[WActorId]] = _role_sets.create()
+  let _actors: Map[U128, WActorWrapper tag] = _actors.create()
+  let _role_sets: Map[String, SetIs[U128]] = _role_sets.create()
   let _roles: Map[String, Role] = _roles.create()
   var _actor_to_worker_map: Map[U128, String] val =
     recover Map[U128, String] end
@@ -152,7 +148,7 @@ actor CentralWActorRegistry
       _actor_to_worker_map, _connections, _boundaries, _rand.u64())
     _initializer.add_actor(builder)
 
-  be forget_actor(id: WActorId) =>
+  be forget_actor(id: U128) =>
     try
       _actors.remove(id)
       for (r, s) in _role_sets.pairs() do
@@ -163,8 +159,7 @@ actor CentralWActorRegistry
       end
       for (k, v) in _roles.pairs() do
         try
-          let idx = v.actors().find(id)
-          v.actors().remove(idx, 1)
+          v.remove_actor(id)
         end
         if v.empty() then
           _roles.remove(k)
@@ -179,70 +174,104 @@ actor CentralWActorRegistry
       end
     end
 
-  be register_actor_for_worker(id: WActorId, worker: String) =>
+  be register_actor_for_worker(id: U128, worker: String) =>
     _register_actor_for_worker(id, worker)
 
-  fun ref _register_actor_for_worker(id: WActorId, worker: String) =>
-    //TODO: Use persistent map to improve perf
-    let new_actor_to_worker: Map[U128, String] trn =
-      recover Map[U128, String] end
-    for (k, v) in _actor_to_worker_map.pairs() do
-      new_actor_to_worker(k) = v
-    end
-    new_actor_to_worker(id.id()) = worker
-    _actor_to_worker_map = consume new_actor_to_worker
-
-  be register_actor(id: WActorId, w_actor: WActorWrapper tag) =>
-    _actors(id) = w_actor
-    for (k, v) in _actors.pairs() do
-      v.register_actor(id, w_actor)
-      w_actor.register_actor(k, v)
-    end
-    for (k, set) in _role_sets.pairs() do
-      for a in set.values() do
-        w_actor.register_as_role(k, a)
-      end
-    end
-    w_actor.register_sinks(_sinks)
-    _register_actor_for_worker(id, _worker_name)
-
-    // Notify cluster
+  fun ref _register_actor_for_worker(id: U128, worker: String) =>
     try
-      let msg = ChannelMsgEncoder.register_actor_for_worker(id, _worker_name,
-        _auth)
-      _connections.send_control_to_cluster(msg)
+      if not (_actor_to_worker_map.contains(id) and
+        (_actor_to_worker_map(id) == worker))
+      then
+        //TODO: Use persistent map to improve perf
+        let new_actor_to_worker: Map[U128, String] trn =
+          recover Map[U128, String] end
+        for (k, v) in _actor_to_worker_map.pairs() do
+          new_actor_to_worker(k) = v
+        end
+        new_actor_to_worker(id) = worker
+        _actor_to_worker_map = consume new_actor_to_worker
+        for w_actor in _actors.values() do
+          w_actor.register_actor_for_worker(id, worker)
+        end
+      end
     else
       Fail()
     end
 
+
+  be register_actor(id: U128, w_actor: WActorWrapper tag) =>
+    if not _actors.contains(id) then
+      _actors(id) = w_actor
+      for (k, v) in _actors.pairs() do
+        v.register_actor(id, w_actor)
+        w_actor.register_actor(k, v)
+      end
+      for (k, set) in _role_sets.pairs() do
+        for a in set.values() do
+          w_actor.register_as_role(k, a)
+        end
+      end
+      w_actor.register_sinks(_sinks)
+      _register_actor_for_worker(id, _worker_name)
+
+      ifdef "trace" then
+        @printf[I32]("Registering WActor %s\n".cstring(),
+          id.string().cstring())
+      end
+
+      // Notify cluster
+      try
+        let msg = ChannelMsgEncoder.register_actor_for_worker(id, _worker_name,
+          _auth)
+        _connections.send_control_to_cluster(msg)
+      else
+        Fail()
+      end
+    end
+
   // TODO: Using a String to identify a role seems like a brittle approach
-  be register_as_role(role: String, w_actor: WActorId, external: Bool = false)
+  be register_as_role(role: String, w_actor: U128, external: Bool = false)
+  =>
+    _register_as_role(role, w_actor, external)
+
+  fun ref _register_as_role(role: String, w_actor: U128,
+    external: Bool = false)
   =>
     try
-      if _role_sets.contains(role) then
-        _role_sets(role).set(w_actor)
-      else
-        let new_role = SetIs[WActorId]
-        new_role.set(w_actor)
-        _role_sets(role) = new_role
-      end
+      if not(_role_sets.contains(role) and _role_sets(role).contains(w_actor))
+      then
+        if _role_sets.contains(role) then
+          _role_sets(role).set(w_actor)
+        else
+          let new_role = SetIs[U128]
+          new_role.set(w_actor)
+          _role_sets(role) = new_role
+        end
 
-      if _roles.contains(role) then
-        _roles(role).register_actor(w_actor)
-      else
-        let new_role = Role(role, _rand.u64())
-        new_role.register_actor(w_actor)
-        _roles(role) = new_role
-      end
+        if _roles.contains(role) then
+          _roles(role).register_actor(w_actor)
+        else
+          let new_role = Role(role)
+          new_role.register_actor(w_actor)
+          _roles(role) = new_role
+        end
 
-      for a in _actors.values() do
-        a.register_as_role(role, w_actor)
-      end
+        for a in _actors.values() do
+          a.register_as_role(role, w_actor)
+        end
 
-      if not external then
-        // Notify cluster
-        let msg = ChannelMsgEncoder.register_as_role(role, w_actor, _auth)
-        _connections.send_control_to_cluster(msg)
+        _initializer.register_as_role(role, w_actor)
+
+        if not external then
+          // Notify cluster
+          let msg = ChannelMsgEncoder.register_as_role(role, w_actor, _auth)
+          _connections.send_control_to_cluster(msg)
+        end
+
+        ifdef "trace" then
+          @printf[I32]("Registering WActor %s as role %s\n".cstring(),
+            w_actor.string().cstring(), role.cstring())
+        end
       end
     else
       Fail()
@@ -263,7 +292,6 @@ actor CentralWActorRegistry
       _send_for_process(target_id, data)
     end
 
-
     if not external then
       try
         let msg = ChannelMsgEncoder.broadcast_to_actors(data, _auth)
@@ -283,12 +311,12 @@ actor CentralWActorRegistry
         role.cstring())
     end
 
-  be send_for_process(target_id: WActorId, data: Any val) =>
+  be send_for_process(target_id: U128, data: Any val) =>
     _send_for_process(target_id, data)
 
-  fun ref _send_for_process(target_id: WActorId, data: Any val) =>
+  fun ref _send_for_process(target_id: U128, data: Any val) =>
     try
-      let target_worker = _actor_to_worker_map(target_id.id())
+      let target_worker = _actor_to_worker_map(target_id)
       if target_worker == _worker_name then
         _actors(target_id).process(data)
       else
@@ -299,12 +327,12 @@ actor CentralWActorRegistry
       Fail()
     end
 
-  be send_to(target_id: WActorId, msg: WMessage val) =>
+  be send_to(target_id: U128, msg: WMessage val) =>
     _send_to(target_id, msg)
 
-  fun ref _send_to(target_id: WActorId, msg: WMessage val) =>
+  fun ref _send_to(target_id: U128, msg: WMessage val) =>
     try
-      let target_worker = _actor_to_worker_map(target_id.id())
+      let target_worker = _actor_to_worker_map(target_id)
       if target_worker == _worker_name then
         _actors(target_id).receive(msg)
       else
@@ -318,32 +346,85 @@ actor CentralWActorRegistry
 
   be send_to_role(role: String, data: Any val) =>
     try
-      let target_id = _roles(role).next()
+      let target_id = _roles(role).next(_rand)
       _send_for_process(target_id, data)
     else
       @printf[I32]("Trying to send to nonexistent role!\n".cstring())
     end
 
+  be process_digest(digest: WActorRegistryDigest) =>
+    for (id, worker) in digest.actor_to_worker_map.pairs() do
+      _register_actor_for_worker(id, worker)
+    end
+    for (role, ids) in digest.role_sets.pairs() do
+      for id in ids.values() do
+        _register_as_role(role, id)
+      end
+    end
+
+  be send_digest(worker: String) =>
+    let role_sets: Map[String, SetIs[U128]] trn =
+      recover Map[String, SetIs[U128]] end
+    for (k, v) in _role_sets.pairs() do
+      let next_set = recover SetIs[U128] end
+      for id in v.values() do
+        next_set.set(id)
+      end
+      role_sets(k) = consume next_set
+    end
+    let actor_to_worker_map: Map[U128, String] trn =
+      recover Map[U128, String] end
+    for (k, v) in _actor_to_worker_map.pairs() do
+      actor_to_worker_map(k) = v
+    end
+    let digest = WActorRegistryDigest(consume role_sets,
+      consume actor_to_worker_map)
+    try
+      let msg = ChannelMsgEncoder.w_actor_registry_digest(digest, _auth)
+      _connections.send_control(worker, msg)
+    else
+      Fail()
+    end
+
 class Role
   let _name: String
-  let _actors: Array[WActorId] = _actors.create()
-  let _rand: EnhancedRandom
+  let _actors: Array[U128] = _actors.create()
 
-  new create(name': String, seed: U64) =>
+  new create(name': String) =>
     _name = name'
-    _rand = EnhancedRandom(seed)
 
   fun name(): String =>
     _name
 
   fun empty(): Bool => _actors.size() == 0
 
-  fun ref actors(): Array[WActorId] => _actors
+  fun actors(): Array[U128] box => _actors
 
-  fun ref register_actor(w_actor: WActorId) =>
+  fun ref remove_actor(id: U128) ? =>
+    let idx = _actors.find(id)
+    _actors.remove(idx, 1)
+
+  fun ref register_actor(w_actor: U128) =>
     if not _actors.contains(w_actor) then
       _actors.push(w_actor)
     end
 
-  fun ref next(): WActorId ? =>
-    _rand.pick[WActorId](_actors)
+  fun ref next(rand: EnhancedRandom): U128 ? =>
+    rand.pick[U128](_actors)
+
+  fun clone(): Role =>
+    let new_role: Role trn = recover Role(_name) end
+    for a in _actors.values() do
+      new_role.register_actor(a)
+    end
+    consume new_role
+
+class val WActorRegistryDigest
+  let role_sets: Map[String, SetIs[U128]] val
+  var actor_to_worker_map: Map[U128, String] val
+
+  new val create(role_sets': Map[String, SetIs[U128]] val,
+    actor_to_worker_map': Map[U128, String] val)
+  =>
+    role_sets = role_sets'
+    actor_to_worker_map = actor_to_worker_map'
