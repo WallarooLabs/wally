@@ -100,6 +100,11 @@ primitive ChannelMsgEncoder
   =>
     _encode(SpinUpLocalTopologyMsg(local_topology), auth)
 
+  fun spin_up_local_actor_system(local_actor_system: LocalActorSystem val,
+    auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(SpinUpLocalActorSystemMsg(local_actor_system), auth)
+
   fun spin_up_step(step_id: U64, step_builder: StepBuilder val,
     auth: AmbientAuth): Array[ByteSeq] val ?
   =>
@@ -255,6 +260,12 @@ class SpinUpLocalTopologyMsg is ChannelMsg
 
   new val create(lt: LocalTopology val) =>
     local_topology = lt
+
+class SpinUpLocalActorSystemMsg is ChannelMsg
+  let local_actor_system: LocalActorSystem val
+
+  new val create(las: LocalActorSystem val) =>
+    local_actor_system = las
 
 class SpinUpStepMsg is ChannelMsg
   let step_id: U64

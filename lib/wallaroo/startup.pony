@@ -162,27 +162,7 @@ actor Startup
   be initialize() =>
     try
       let auth = _env.root as AmbientAuth
-
-      let input_addrs: Array[Array[String]] val =
-        (_startup_options.i_addrs_write = recover Array[Array[String]] end)
-      let output_addrs: Array[Array[String]] val =
-        (_startup_options.o_addrs_write = recover Array[Array[String]] end)
       let m_addr = _startup_options.m_arg as Array[String]
-      let c_addr = _startup_options.c_arg as Array[String]
-      let c_host = c_addr(0)
-      let c_service = c_addr(1)
-      let d_addr_ref = _startup_options.d_arg as Array[String]
-      let d_addr_trn: Array[String] trn = recover Array[String] end
-      d_addr_trn.push(d_addr_ref(0))
-      d_addr_trn.push(d_addr_ref(1))
-      let d_addr: Array[String] val = consume d_addr_trn
-      let d_host = d_addr(0)
-      let d_service = d_addr(1)
-
-      let my_c_host = _startup_options.my_c_addr(0)
-      let my_c_service = _startup_options.my_c_addr(1)
-      let my_d_host = _startup_options.my_d_addr(0)
-      let my_d_service = _startup_options.my_d_addr(1)
 
       if _startup_options.worker_name == "" then
         @printf[I32](("You must specify a worker name via " +
@@ -276,10 +256,11 @@ actor Startup
 
       let connections = Connections(_application.name(),
         _startup_options.worker_name,
-        auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
-        metrics_conn, m_addr(0), m_addr(1), _startup_options.is_initializer,
-        _connection_addresses_file, _startup_options.is_joining,
-        _startup_options.spike_config)
+        auth, _startup_options.c_host, _startup_options.c_service,
+        _startup_options.d_host, _startup_options.d_service, _ph_host,
+        _ph_service, metrics_conn, m_addr(0), m_addr(1), _startup_options.
+        is_initializer, _connection_addresses_file,
+        _startup_options.is_joining, _startup_options.spike_config)
 
       let data_receivers = DataReceivers(auth,
         _startup_options.worker_name, is_recovering)
@@ -298,34 +279,37 @@ actor Startup
       let local_topology_initializer =
         if _startup_options.is_swarm_managed then
           let cluster_manager: DockerSwarmClusterManager =
-            DockerSwarmClusterManager(auth, _swarm_manager_addr, c_service)
+            DockerSwarmClusterManager(auth, _swarm_manager_addr,
+              _startup_options.c_service)
           LocalTopologyInitializer(
             _application, _startup_options.worker_name,
             _startup_options.worker_count, _env, auth, connections,
             router_registry, metrics_conn, _startup_options.is_initializer,
             data_receivers, _event_log as EventLog, recovery,
-            recovery_replayer, input_addrs, _local_topology_file,
-            _data_channel_file, _worker_names_file, cluster_manager)
+            recovery_replayer, _startup_options.input_addrs,
+            _local_topology_file, _data_channel_file, _worker_names_file,
+            cluster_manager)
         else
           LocalTopologyInitializer(
             _application, _startup_options.worker_name,
             _startup_options.worker_count, _env, auth, connections,
             router_registry, metrics_conn, _startup_options.is_initializer,
             data_receivers, _event_log as EventLog, recovery,
-            recovery_replayer, input_addrs, _local_topology_file,
-            _data_channel_file, _worker_names_file)
+            recovery_replayer, _startup_options.input_addrs,
+            _local_topology_file, _data_channel_file, _worker_names_file)
         end
 
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
         _application_distributor = ApplicationDistributor(auth, _application,
-          local_topology_initializer, input_addrs, output_addrs(0))
+          local_topology_initializer, _startup_options.input_addrs,
+          _startup_options.output_addrs(0))
         match _application_distributor
         | let ad: ApplicationDistributor =>
           _cluster_initializer = ClusterInitializer(auth,
             _startup_options.worker_name,
             _startup_options.worker_count, connections,
-            ad, local_topology_initializer, d_addr,
+            ad, local_topology_initializer, _startup_options.d_addr,
             metrics_conn)
         end
       end
@@ -338,26 +322,28 @@ actor Startup
           _startup_options.is_initializer, _cluster_initializer,
           local_topology_initializer,
           recovery_replayer, router_registry,
-          control_channel_filepath, my_d_host, my_d_service)
+          control_channel_filepath, _startup_options.my_d_host,
+          _startup_options.my_d_service)
 
       ifdef "resilience" then
         if _startup_options.is_initializer then
           connections.make_and_register_recoverable_listener(
             auth, consume control_notifier, control_channel_filepath,
-            c_host, c_service)
+            _startup_options.c_host, _startup_options.c_service)
         else
           connections.make_and_register_recoverable_listener(
             auth, consume control_notifier, control_channel_filepath,
-            my_c_host, my_c_service)
+            _startup_options.my_c_host, _startup_options.my_c_service)
         end
       else
         if _startup_options.is_initializer then
           connections.register_listener(
-            TCPListener(auth, consume control_notifier, c_host, c_service))
+            TCPListener(auth, consume control_notifier,
+              _startup_options.c_host, _startup_options.c_service))
         else
           connections.register_listener(
-            TCPListener(auth, consume control_notifier, my_c_host,
-              my_c_service))
+            TCPListener(auth, consume control_notifier,
+              _startup_options.my_c_host, _startup_options.my_c_service))
         end
       end
 
@@ -425,11 +411,6 @@ actor Startup
           m.data_addrs("initializer")
         end
 
-      let my_c_host = _startup_options.my_c_addr(0)
-      let my_c_service = _startup_options.my_c_addr(1)
-      let my_d_host = _startup_options.my_d_addr(0)
-      let my_d_service = _startup_options.my_d_addr(1)
-
       let connections = Connections(_application.name(),
         _startup_options.worker_name,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
@@ -466,7 +447,8 @@ actor Startup
           _startup_options.worker_count, _env, auth, connections,
           router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers,
-          _event_log as EventLog, recovery, recovery_replayer, input_addrs,
+          _event_log as EventLog, recovery, recovery_replayer,
+          _startup_options.input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file,
           cluster_manager where is_joining = _startup_options.is_joining)
       else
@@ -475,7 +457,8 @@ actor Startup
           _startup_options.worker_count, _env, auth, connections,
           router_registry, metrics_conn,
           _startup_options.is_initializer, data_receivers,
-          _event_log as EventLog, recovery, recovery_replayer, input_addrs,
+          _event_log as EventLog, recovery, recovery_replayer,
+          _startup_options.input_addrs,
           _local_topology_file, _data_channel_file, _worker_names_file
           where is_joining = _startup_options.is_joining)
       end
@@ -483,7 +466,7 @@ actor Startup
       router_registry.set_data_router(DataRouter)
       local_topology_initializer.update_topology(m.local_topology)
       local_topology_initializer.create_data_channel_listener(m.worker_names,
-        my_d_host, my_d_service)
+        _startup_options.my_d_host, _startup_options.my_d_service)
 
       // Prepare control and data addresses, but sub in correct host for
       // the worker that sent inform message (since it didn't know its
@@ -515,16 +498,16 @@ actor Startup
           _startup_options.is_initializer, _cluster_initializer,
           local_topology_initializer,
           recovery_replayer, router_registry, control_channel_filepath,
-          my_d_host, my_d_service)
+          _startup_options.my_d_host, _startup_options.my_d_service)
 
       ifdef "resilience" then
         connections.make_and_register_recoverable_listener(
           auth, consume control_notifier, control_channel_filepath,
-          my_c_host, my_c_service)
+          _startup_options.my_c_host, _startup_options.my_c_service)
       else
         connections.register_listener(
-          TCPListener(auth, consume control_notifier, my_c_host,
-            my_c_service))
+          TCPListener(auth, consume control_notifier,
+            _startup_options.my_c_host, _startup_options.my_c_service))
       end
 
       // Call this on local topology initializer instead of Connections

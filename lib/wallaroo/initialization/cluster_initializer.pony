@@ -47,6 +47,7 @@ actor ClusterInitializer
     _layout_initializer = layout_initializer
 
   be start(initializer_name: String) =>
+    _worker_names.push(initializer_name)
     if _expected == 1 then
       _topology_ready = true
       _distributor.distribute(this, _expected, recover [initializer_name] end)
