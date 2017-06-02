@@ -119,6 +119,15 @@ actor WActorInitializer is LayoutInitializer
     _sinks = consume sinks
     _central_registry.update_sinks(_sinks)
 
+  be register_as_role(role: String, id: U128) =>
+    match _system
+    | let las: LocalActorSystem =>
+      _system = las.register_as_role(role, id)
+      _save_local_actor_system()
+    else
+      Fail()
+    end
+
   fun ref _save_worker_names()
   =>
     """
@@ -303,6 +312,8 @@ actor WActorInitializer is LayoutInitializer
       | let las: LocalActorSystem =>
         match _central_registry
         | let cr: CentralWActorRegistry =>
+          las.register_roles_in_registry(cr)
+
           try
             for (idx, source) in las.sources().pairs() do
               let source_notify = WActorSourceNotify(_auth,
@@ -321,10 +332,9 @@ actor WActorInitializer is LayoutInitializer
 
               TCPSourceListener(source_builder,
                 EmptyRouter, _router_registry, EmptyRouteBuilder,
-                recover Map[String, OutgoingBoundaryBuilder val] end,
-                recover Array[TCPSink] end, _event_log, _auth,
-                this, consume empty_metrics_reporter where host = host,
-                service = service)
+                _outgoing_boundary_builders, recover Array[TCPSink] end,
+                _event_log, _auth, this, consume empty_metrics_reporter
+                where host = host, service = service)
             end
           else
             @printf[I32]("Error creating sources! Be sure you've provided as many source addresses as you have defined sources.\n".cstring())
@@ -343,6 +353,9 @@ actor WActorInitializer is LayoutInitializer
               _rand.u64()))
           end
 
+          _router_registry.register_boundaries(_outgoing_boundaries,
+            _outgoing_boundary_builders)
+
           if recovering then
             _recovery.start_recovery(this, las.worker_names())
           else
@@ -359,9 +372,15 @@ actor WActorInitializer is LayoutInitializer
     end
 
   be kick_off_demo() =>
-    @printf[I32]("\n#########################\n".cstring())
-    @printf[I32]("#*# Kicking off demo! #*#\n".cstring())
-    @printf[I32]("#########################\n".cstring())
+    if not _recovering then
+      @printf[I32]("\n#########################\n".cstring())
+      @printf[I32]("#*# Kicking off demo! #*#\n".cstring())
+      @printf[I32]("#########################\n".cstring())
+    else
+      @printf[I32]("\n###################################\n".cstring())
+      @printf[I32]("#*# Recovered: continuing demo! #*#\n".cstring())
+      @printf[I32]("###################################\n".cstring())
+    end
     let timers = Timers
     let t = Timer(MainNotify(this, _expected_iterations), 1_000_000_000)
     timers(consume t)

@@ -89,7 +89,7 @@ class DropConnection is WallarooOutgoingNetworkActorNotify
 
   fun ref drop(conn: WallarooOutgoingNetworkActor ref) =>
     ifdef debug then
-      @printf[I32]("\n<<<<<<SPIKE: DROPPING CONNECTION!>>>>>>\n\n".cstring())
+      @printf[I32]("\n((((((SPIKE: DROPPING CONNECTION!))))))\n\n".cstring())
     end
     // reset count, return true
     _count_since_last_dropped = 0

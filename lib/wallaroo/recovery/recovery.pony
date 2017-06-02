@@ -1,5 +1,7 @@
 use "wallaroo/fail"
 use "wallaroo/initialization"
+use "wallaroo/messages"
+use "wallaroo/network"
 use "wallaroo/w_actor"
 
 actor Recovery
@@ -7,25 +9,32 @@ actor Recovery
   Phases:
     1) _NotRecovering: Waiting for start_recovery() to be called
     2) _LogReplay: Wait for EventLog to finish replaying the event logs
-    3) _BoundaryMsgReplay: Wait for RecoveryReplayer to manage message replay
+    3) _WActorRegistryRecovery: For ActorSystem, wait to receive
+       WActorRegistryDigest. For Pipeline, skip this phase.
+    4) _BoundaryMsgReplay: Wait for RecoveryReplayer to manage message replay
        from incoming boundaries.
-    4) _NotRecovering: Finished recovery
+    5) _NotRecovering: Finished recovery
   """
+  let _auth: AmbientAuth
   let _worker_name: String
   var _recovery_phase: _RecoveryPhase = _NotRecovering
   var _workers: Array[String] val = recover Array[String] end
 
   let _event_log: EventLog
   let _recovery_replayer: (RecoveryReplayer | None)
+  let _connections: Connections
   var _initializer: (LocalTopologyInitializer | WActorInitializer | None) =
     None
 
-  new create(worker_name: String, event_log: EventLog,
-    recovery_replayer: (RecoveryReplayer | None) = None)
+  new create(auth: AmbientAuth, worker_name: String, event_log: EventLog,
+    recovery_replayer: (RecoveryReplayer | None) = None,
+    connections: Connections)
   =>
+    _auth = auth
     _worker_name = worker_name
     _event_log = event_log
     _recovery_replayer = recovery_replayer
+    _connections = connections
 
   be start_recovery(
     initializer: (LocalTopologyInitializer | WActorInitializer),
@@ -51,6 +60,13 @@ actor Recovery
       Fail()
     end
 
+  be w_actor_registry_recovery_finished() =>
+    try
+      _recovery_phase.w_actor_registry_recovery_finished()
+    else
+      Fail()
+    end
+
   be recovery_replay_finished() =>
     try
       _recovery_phase.msg_replay_finished()
@@ -59,7 +75,7 @@ actor Recovery
     end
 
   fun ref _start_log_replay(workers: Array[String] val) =>
-    @printf[I32]("|~~ - Recovery Phase A: Log Replay - ~~|\n".cstring())
+    @printf[I32]("|~~ - Recovery Phase: Log Replay - ~~|\n".cstring())
     _recovery_phase = _LogReplay(workers, this)
     try
       _recovery_phase.start_log_replay(_event_log)
@@ -67,8 +83,32 @@ actor Recovery
       Fail()
     end
 
+  fun ref _end_log_replay(workers: Array[String] val) =>
+    match _initializer
+    | let lti: LocalTopologyInitializer =>
+      _start_msg_replay(workers)
+    | let wai: WActorInitializer =>
+      _start_w_actor_registry_recovery(workers)
+    else
+      Fail()
+    end
+
+  fun ref _start_w_actor_registry_recovery(workers: Array[String] val) =>
+    @printf[I32]("|~~ - Recovery Phase: WActor Registry Recovery - ~~|\n"
+      .cstring())
+    _recovery_phase = _WActorRegistryRecovery(_worker_name, workers, this,
+      _auth, _connections)
+    try
+      _recovery_phase.start_w_actor_registry_recovery()
+    else
+      Fail()
+    end
+
+  fun ref _end_w_actor_registry_recovery(workers: Array[String] val) =>
+    _start_msg_replay(workers)
+
   fun ref _start_msg_replay(workers: Array[String] val) =>
-    @printf[I32]("|~~ - Recovery Phase B: Recovery Message Replay - ~~|\n"
+    @printf[I32]("|~~ - Recovery Phase: Recovery Message Replay - ~~|\n"
       .cstring())
     _recovery_phase = _BoundaryMsgReplay(workers, _recovery_replayer, this)
     try
@@ -97,6 +137,10 @@ trait _RecoveryPhase
     error
   fun ref log_replay_finished() ? =>
     error
+  fun ref start_w_actor_registry_recovery() ? =>
+    error
+  fun ref w_actor_registry_recovery_finished() ? =>
+    error
   fun ref start_msg_replay() ? =>
     error
   fun ref msg_replay_finished() ? =>
@@ -118,7 +162,35 @@ class _LogReplay is _RecoveryPhase
     event_log.start_log_replay(_recovery)
 
   fun ref log_replay_finished() =>
-    _recovery._start_msg_replay(_workers)
+    _recovery._end_log_replay(_workers)
+
+class _WActorRegistryRecovery is _RecoveryPhase
+  let _auth: AmbientAuth
+  let _worker_name: String
+  let _workers: Array[String] val
+  let _recovery: Recovery ref
+  let _connections: Connections
+
+  new create(name: String, workers: Array[String] val, recovery: Recovery ref,
+    auth: AmbientAuth, connections: Connections)
+  =>
+    _auth = auth
+    _worker_name = name
+    _workers = workers
+    _recovery = recovery
+    _connections = connections
+
+  fun ref start_w_actor_registry_recovery() =>
+    try
+      let msg = ChannelMsgEncoder.request_w_actor_registry_digest(_worker_name,
+        _auth)
+      _connections.send_control_to_random(msg)
+    else
+      Fail()
+    end
+
+  fun ref w_actor_registry_recovery_finished() =>
+    _recovery._end_w_actor_registry_recovery(_workers)
 
 class _BoundaryMsgReplay is _RecoveryPhase
   let _workers: Array[String] val

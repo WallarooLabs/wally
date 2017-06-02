@@ -11,14 +11,15 @@ use "wallaroo/topology"
 trait WActorWrapper
   be receive(msg: WMessage val)
   be process(data: Any val)
-  be register_actor(id: WActorId, w_actor: WActorWrapper tag)
-  be register_as_role(role: String, w_actor: WActorId)
+  be register_actor(id: U128, w_actor: WActorWrapper tag)
+  be register_actor_for_worker(id: U128, worker: String)
+  be register_as_role(role: String, w_actor: U128)
   be register_sinks(s: Array[TCPSink] val)
   be tick()
   be create_actor(builder: WActorBuilder)
-  be forget_actor(id: WActorId)
+  be forget_actor(id: U128)
   fun ref _register_as_role(role: String)
-  fun ref _send_to(target: WActorId, data: Any val)
+  fun ref _send_to(target: U128, data: Any val)
   fun ref _send_to_role(role: String, data: Any val)
   fun ref _send_to_sink[Out: Any val](sink_id: USize, output: Out)
   fun ref _set_timer(duration: U128, callback: {()},
@@ -37,7 +38,7 @@ actor WActorWithState is WActorWrapper
   let _central_actor_registry: CentralWActorRegistry
   var _sinks: Array[TCPSink] val = recover Array[TCPSink] end
   var _w_actor: WActor = EmptyWActor
-  var _w_actor_id: WActorId
+  var _w_actor_id: U128
   var _helper: WActorHelper = EmptyWActorHelper
   let _timers: WActorTimers = WActorTimers
 
@@ -59,7 +60,7 @@ actor WActorWithState is WActorWrapper
     _actor_registry = WActorRegistry(_worker_name, _auth, actor_to_worker_map,
       connections, boundaries, seed)
     _central_actor_registry = r
-    _w_actor_id = WActorId(id, this)
+    _w_actor_id = id
     _helper = LiveWActorHelper(this)
     _w_actor = w_actor_builder(id, _helper)
     _central_actor_registry.register_actor(_w_actor_id, this)
@@ -69,6 +70,10 @@ actor WActorWithState is WActorWrapper
     """
     Called when receiving a message from another WActor
     """
+    ifdef "trace" then
+      @printf[I32]("receive() called at WActor %s\n".cstring(),
+        _id.string().cstring())
+    end
     _w_actor.receive(msg.sender, msg.payload, _helper)
     _seq_id = _seq_id + 1
     _save_state()
@@ -77,14 +82,21 @@ actor WActorWithState is WActorWrapper
     """
     Called when receiving data from a Wallaroo pipeline
     """
+    ifdef "trace" then
+      @printf[I32]("process() called at WActor %s\n".cstring(),
+        _id.string().cstring())
+    end
     _w_actor.process(data, _helper)
     _seq_id = _seq_id + 1
     _save_state()
 
-  be register_actor(id: WActorId, w_actor: WActorWrapper tag) =>
+  be register_actor(id: U128, w_actor: WActorWrapper tag) =>
     _actor_registry.register_actor(id, w_actor)
 
-  be register_as_role(role: String, w_actor: WActorId) =>
+  be register_actor_for_worker(id: U128, worker: String) =>
+    _actor_registry.register_actor_for_worker(id, worker)
+
+  be register_as_role(role: String, w_actor: U128) =>
     _actor_registry.register_as_role(role, w_actor)
 
   be register_sinks(s: Array[TCPSink] val) =>
@@ -112,7 +124,7 @@ actor WActorWithState is WActorWrapper
       builder)
     _central_actor_registry.create_actor(new_builder)
 
-  be forget_actor(id: WActorId) =>
+  be forget_actor(id: U128) =>
     _central_actor_registry.forget_actor(id)
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
@@ -142,7 +154,7 @@ actor WActorWithState is WActorWrapper
   fun ref _register_as_role(role: String) =>
     _central_actor_registry.register_as_role(role, _w_actor_id)
 
-  fun ref _send_to(target: WActorId, data: Any val) =>
+  fun ref _send_to(target: U128, data: Any val) =>
     try
       let wrapped = WMessage(_w_actor_id, target, data)
       _actor_registry.send_to(target, wrapped)
@@ -205,23 +217,6 @@ class val StatefulWActorWrapperBuilder
   fun id(): U128 =>
     _id
 
-class val WActorId is Equatable[WActorId]
-  let _id: U128
-  let _w_actor_hash: U64
-
-  new val create(id': U128, w_actor: WActorWrapper tag) =>
-    _id = id'
-    _w_actor_hash = (digestof w_actor).hash()
-
-  fun id(): U128 =>
-    _id
-
-  fun eq(that: box->WActorId): Bool =>
-    _w_actor_hash is that._w_actor_hash
-
-  fun hash(): U64 =>
-    _w_actor_hash.hash()
-
 //Temporary for demo
 interface tag SerializeTarget
   be add_serialized(s: ByteSeq val)
@@ -232,7 +227,7 @@ class LiveWActorHelper is WActorHelper
   new create(w_actor: WActorWrapper ref) =>
     _w_actor = w_actor
 
-  fun ref send_to(target: WActorId, data: Any val) =>
+  fun ref send_to(target: U128, data: Any val) =>
     _w_actor._send_to(target, data)
 
   fun ref send_to_role(role: String, data: Any val) =>
@@ -247,7 +242,7 @@ class LiveWActorHelper is WActorHelper
   fun ref create_actor(builder: WActorBuilder) =>
     _w_actor.create_actor(builder)
 
-  fun ref destroy_actor(id: WActorId) =>
+  fun ref destroy_actor(id: U128) =>
     _w_actor.forget_actor(id)
 
   fun ref set_timer(duration: U128, callback: {()},
@@ -259,7 +254,7 @@ class LiveWActorHelper is WActorHelper
     _w_actor._cancel_timer(t)
 
 class EmptyWActorHelper is WActorHelper
-  fun ref send_to(target: WActorId, data: Any val) =>
+  fun ref send_to(target: U128, data: Any val) =>
     None
 
   fun ref send_to_role(role: String, data: Any val) =>
@@ -274,7 +269,7 @@ class EmptyWActorHelper is WActorHelper
   fun ref create_actor(builder: WActorBuilder) =>
     None
 
-  fun ref destroy_actor(id: WActorId) =>
+  fun ref destroy_actor(id: U128) =>
     None
 
   fun ref set_timer(duration: U128, callback: {()},

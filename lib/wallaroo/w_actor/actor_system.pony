@@ -73,13 +73,15 @@ class val LocalActorSystem
   let _sinks: Array[TCPSinkBuilder] val
   let _actor_to_worker_map: Map[U128, String] val
   let _worker_names: Array[String] val
+  let _roles: Map[String, Role box] val
 
   new val create(name': String,
     actor_builders': Array[WActorWrapperBuilder] val,
     sources': Array[(WActorFramedSourceHandler, WActorRouter)] val,
     sinks': Array[TCPSinkBuilder] val,
     actor_to_worker_map': Map[U128, String] val,
-    worker_names': Array[String] val)
+    worker_names': Array[String] val,
+    roles': Map[String, Role box] val)
   =>
     _name = name'
     _actor_builders = actor_builders'
@@ -87,6 +89,7 @@ class val LocalActorSystem
     _sinks = sinks'
     _actor_to_worker_map = actor_to_worker_map'
     _worker_names = worker_names'
+    _roles = roles'
 
   fun name(): String => _name
 
@@ -108,7 +111,34 @@ class val LocalActorSystem
     end
     new_actor_to_worker(builder.id()) = worker
     LocalActorSystem(_name, consume arr, _sources, _sinks,
-      consume new_actor_to_worker, _worker_names)
+      consume new_actor_to_worker, _worker_names, _roles)
+
+  fun register_as_role(role: String, id: U128): LocalActorSystem =>
+    //TODO: Use persistent map to improve perf
+    let new_roles: Map[String, Role box] trn =
+      recover Map[String, Role box] end
+    for (k, v) in _roles.pairs() do
+      if k == role then
+        let old_role_actors = v.actors()
+        let new_role: Role trn = recover Role(role) end
+        for a in old_role_actors.values() do
+          new_role.register_actor(a)
+        end
+        new_role.register_actor(id)
+        new_roles(k) = consume new_role
+      else
+        new_roles(k) = v
+      end
+    end
+    LocalActorSystem(_name, _actor_builders, _sources, _sinks,
+      _actor_to_worker_map, _worker_names, consume new_roles)
+
+  fun register_roles_in_registry(cr: CentralWActorRegistry) =>
+    for (n, role) in _roles.pairs() do
+      for id in role.actors().values() do
+        cr.register_as_role(n, id)
+      end
+    end
 
   fun actor_builders(): Array[WActorWrapperBuilder] val =>
     _actor_builders
@@ -124,3 +154,6 @@ class val LocalActorSystem
 
   fun worker_names(): Array[String] val =>
     _worker_names
+
+  fun roles(): Map[String, Role box] val =>
+    _roles

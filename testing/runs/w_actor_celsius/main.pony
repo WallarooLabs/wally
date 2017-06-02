@@ -81,7 +81,7 @@ class Celsius is WActor
   new create(h: WActorHelper) =>
     h.register_as_role(BasicRoles.ingress())
 
-  fun ref receive(sender: WActorId, payload: Any val, h: WActorHelper) =>
+  fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
     None
 
   fun ref process(data: Any val, h: WActorHelper) =>
