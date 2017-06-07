@@ -101,7 +101,7 @@ ponyc
 Then you can generate a file with a fixed number of psuedo-random votes:
 
 ```
-./data_gen --messages 10000
+./data_gen --message-count 10000
 ```
 
 This will create a `celsius.msg` file in your current working directory.
