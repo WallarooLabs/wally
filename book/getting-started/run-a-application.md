@@ -123,7 +123,7 @@ You will now be able to start the `sender` with the following command:
 
 ```bash
 ./sender -h 127.0.0.1:7000 -m 100000 -y -s 300 \
-  -f ~/wallaroo-tutorial/wallaroo/book/examples/celsius/data_gen/celsius.msg \
+  -f ~/wallaroo-tutorial/wallaroo/book/examples/pony/celsius/data_gen/celsius.msg \
   -r -w -g 8 --ponythreads=1
 ```
 
