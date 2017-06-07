@@ -95,7 +95,7 @@ A data generator is bundled with the application. It needs to be built:
 
 ```bash
 cd data_gen
-ponyc
+stable env ponyc
 ```
 
 Then you can generate a file with a fixed number of psuedo-random votes:
