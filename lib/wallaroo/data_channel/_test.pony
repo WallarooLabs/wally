@@ -42,10 +42,10 @@ class _TestDataChannel is DataChannelListenNotify
     try
       let auth = h.env.root as AmbientAuth
       let conns = Connections("app_name", "worker_name", auth,
-        "127.0.0.1", "8001",
-        "127.0.0.1", "8002",
-        "127.0.0.1", "8003",
-        _NullMetricsSink, "127.0.0.1", "8004",
+        "127.0.0.1", "0",
+        "127.0.0.1", "0",
+        "127.0.0.1", "0",
+        _NullMetricsSink, "127.0.0.1", "0",
         true, "/tmp/foo_connections.txt", false)
       let dr = DataReceivers(auth, "worker_name")
       let rr = RouterRegistry(auth, "worker_name", dr, conns, 1)
@@ -409,8 +409,6 @@ class iso _TestDataChannelThrottle is UnitTest
 
     _TestDataChannel(h)(_TestDataChannelThrottleSendNotify(h),
       _TestDataChannelThrottleReceiveNotify(h))
-
-    h.long_test(10_000_000_000)
 
 class _TestDataChannelThrottleReceiveNotify is DataChannelNotify
   """
