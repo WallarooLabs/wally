@@ -92,6 +92,10 @@ class DataChannelListenNotifier is DataChannelListenNotify
       listen.close()
     end
 
+  fun ref not_listening(listen: DataChannelListener ref) =>
+    @printf[I32]((_name + "data : unable to listen").cstring())
+    Fail()
+
   fun ref connected(
     listen: DataChannelListener ref,
     router_registry: RouterRegistry): DataChannelNotify iso^
