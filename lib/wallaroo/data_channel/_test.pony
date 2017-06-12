@@ -260,8 +260,6 @@ class iso _TestDataChannelMute is UnitTest
     _TestDataChannel(h)(_TestDataChannelMuteSendNotify(h),
       _TestDataChannelMuteReceiveNotify(h))
 
-    h.long_test(2_000_000_000)
-
   fun timed_out(h: TestHelper) =>
     h.complete(true)
 
@@ -351,8 +349,6 @@ class iso _TestDataChannelUnmute is UnitTest
 
     _TestDataChannel(h)(_TestDataChannelMuteSendNotify(h),
       _TestDataChannelUnmuteReceiveNotify(h))
-
-    h.long_test(2_000_000_000)
 
 class _TestDataChannelUnmuteReceiveNotify is DataChannelNotify
   """
@@ -464,7 +460,7 @@ class _TestDataChannelThrottleSendNotify is DataChannelNotify
   fun ref throttled(conn: DataChannel ref) =>
     _throttled_yet = true
     _h.complete_action("sender throttled")
-    _h.complete(true)
+    _h.dispose_when_done(conn)
 
   fun ref sent(conn: DataChannel ref, data: ByteSeq): ByteSeq =>
     if not _throttled_yet then
