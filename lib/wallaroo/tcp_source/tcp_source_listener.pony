@@ -115,8 +115,9 @@ actor TCPSourceListener
     _init_size = init_size
     _max_size = max_size
     _fd = @pony_asio_event_fd(_event)
+     @printf[I32]((source_builder.name() + " source attempting to listen on "
+      + host + ":" + service + "\n").cstring())
     _notify_listening()
-    @printf[I32]((source_builder.name() + " source listening on " + host + ":" + service + "\n").cstring())
 
   be update_router(router: PartitionRouter val) =>
     _notify.update_router(router)
