@@ -303,7 +303,7 @@ actor Startup
         @printf[I32]("Running as Initializer...\n".cstring())
         _application_distributor = ApplicationDistributor(auth, _application,
           local_topology_initializer, _startup_options.input_addrs,
-          _startup_options.output_addrs(0))
+          _startup_options.output_addrs)
         match _application_distributor
         | let ad: ApplicationDistributor =>
           _cluster_initializer = ClusterInitializer(auth,
