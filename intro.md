@@ -7,7 +7,7 @@ Welcome to the developer's guide for Sendence Wallaroo. This document is availab
 - [ePub](https://www.gitbook.com/download/epub/book/sendence/wallaroo)
 - [Mobi](https://www.gitbook.com/download/mobi/book/sendence/wallaroo)
 
-You can open issues and submit pull requests against [our GitHub repo](https://github.com/Sendence/wallaroo). 
+You can open issues and submit pull requests against [our GitHub repo](https://github.com/Sendence/wallaroo).
 
 All material and documentation herein is copyrighted (c) 2017 by Sendence Solutions LLC. Furthermore, by accessing any of Sendence's sites or documentation in any format (PDF, WORD, etc.) you acknowledge that you have read and agree to our [Terms and Conditions](/book/legal/terms.md).
 
@@ -23,8 +23,7 @@ The language specific portions of the document, for example, the C++ guide, assu
 
 ## Supported development environments
 
-It is currently possible to develop Wallaroo applications on MacOS or Linux. This guide has installation instructions for MacOS and Ubuntu Linux. It's assumed if you are using a different Linux distribution that you are able to translate the Ubuntu instructions to your distribution of choice.
-
+It is currently possible to develop Wallaroo applications on MacOS, Linux or Windows. This guide has installation instructions for MacOS, Ubuntu Linux, and Windows 10 Pro via Bash/WSL. It's assumed if you are using a different Linux distribution that you are able to translate the Ubuntu instructions to your distribution of choice.
 ## What to Expect
 
 This document is organized into a number of sections. We recommend that you start in a linear fashion through this book. To that end, please consider reading in order:

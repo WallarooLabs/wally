@@ -16,6 +16,7 @@
 * [Setting up Your Environment](book/getting-started/setup.md)
   * [MacOS Installation](book/getting-started/macos-setup.md)
   * [Ubuntu Installation](book/getting-started/linux-setup.md)
+  * [Windows Installation](book/getting-started/windows-setup.md)
 * [Run a Wallaroo Application](book/getting-started/run-a-application.md)
 * [Conclusion](book/getting-started/conclusion.md)
 
@@ -51,7 +52,7 @@
 * [Writing Your Own Application](book/python/writing-your-own-application.md)
 * [Writing Your Own Stateful Application](book/python/writing-your-own-stateful-application.md)
 * [Writing Your Own Partitioned Stateful Application](book/python/writing-your-own-partitioned-stateful-application.md).
-* [Interworker Serialization and Resilience](book/python/interworker-serialization-and-resilience.md)  
+* [Interworker Serialization and Resilience](book/python/interworker-serialization-and-resilience.md)
 * [Wallaroo Python API](book/python/api.md)
 
 ## Appendix
