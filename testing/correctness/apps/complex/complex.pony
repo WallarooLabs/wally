@@ -1,21 +1,23 @@
 """
 Setting up a complex app run (in order):
-1) reports sink:
+1) reports sinks:
 nc -l 127.0.0.1 7002 >> /dev/null
-
-2) metrics sink:
 nc -l 127.0.0.1 7003 >> /dev/null
 
+2) metrics sink:
+nc -l 127.0.0.1 8000 >> /dev/null
+
 3a) single worker complex app:
-./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n worker-name
+./complex -i 127.0.0.1:7010,127.0.0.1:7011 -o 127.0.0.1:7002,127.0.0.1:7003 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -n worker-name
 
 3b) multi-worker complex app:
-./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -t -n worker1
-./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -n worker2
-./complex -i 127.0.0.1:7010 -o 127.0.0.1:7002 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -n worker3
+./complex -i 127.0.0.1:7010,127.0.0.1:7011 -o 127.0.0.1:7002,127.0.0.1:7003 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -t -n worker1
+./complex -i 127.0.0.1:7010,127.0.0.1:7011 -o 127.0.0.1:7002,127.0.0.1:7003 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -n worker2
+./complex -i 127.0.0.1:7010,127.0.0.1:7011 -o 127.0.0.1:7002,127.0.0.1:7003 -m 127.0.0.1:8000 -c 127.0.0.1:6000 -d 127.0.0.1:6001 -e 10000000 -w 3 -n worker3
 
 4) complex numbers:
 giles/sender/sender -h 127.0.0.1:7010 -m 10000000 -s 300 -i 2_500_000 -f apps/complex/complex_numbers.msg -r --ponythreads=1 -y -g 12
+giles/sender/sender -h 127.0.0.1:7011 -m 10000000 -s 300 -i 2_500_000 -f apps/complex/complex_numbers.msg -r --ponythreads=1 -y -g 12
 """
 
 use "buffered"
@@ -33,19 +35,23 @@ actor Main
       let application = recover val
         Application("Complex Numbers App")
           .new_pipeline[Complex val, Complex val]("Complex Numbers", ComplexDecoder where coalescing = false)
-          .to[Complex val]({(): Computation[Complex val, Complex val] iso^
-            => Conjugate })
-          .to[Complex val]({(): Computation[Complex val, Complex val] iso^
-            => Scale(5) })
-          .to_stateful[Complex val, Counter](UpdateCounter,
-            CounterBuilder, "counter-builder")
-          .to[Complex val]({(): Computation[Complex val, Complex val] iso^
-            => Scale(10) })
-          .to[Complex val]({(): Computation[Complex val, Complex val] iso^
-            => Conjugate })
-          .to_sink(ComplexEncoder, recover [0] end)
+            .to[Complex val]({(): Computation[Complex val, Complex val] iso^
+              => Conjugate })
+            .to[Complex val]({(): Computation[Complex val, Complex val] iso^
+              => Scale(5) })
+            .to_stateful[Complex val, Counter](UpdateCounter,
+              CounterBuilder, "counter-builder")
+            .to[Complex val]({(): Computation[Complex val, Complex val] iso^
+              => Scale(10) })
+            .to[Complex val]({(): Computation[Complex val, Complex val] iso^
+              => Conjugate })
+            .to_sink(ComplexEncoder, recover [0] end)
+          .new_pipeline[Complex val, Complex val]("Complex Numbers Second", ComplexDecoder)
+            .to[Complex val]({(): Computation[Complex val, Complex val] iso^
+              => Conjugate })
+            .to_sink(ComplexEncoder, recover [0] end)
       end
-      Startup(env, application, None)//, 1)
+      Startup(env, application, None)
     else
       @printf[I32]("Couldn't build topology\n".cstring())
     end
@@ -66,8 +72,6 @@ class Complex
 
   fun minus(c: Complex val): Complex val =>
     Complex(_real - c._real, _imaginary - c._imaginary)
-
-  // fun times(c: Complex val): Complex val =>
 
   fun mul(u: I32): Complex val =>
     Complex(u * _real, u * _imaginary)

@@ -16,18 +16,18 @@ actor ApplicationDistributor is Distributor
   let _guid_gen: GuidGenerator = GuidGenerator
   let _local_topology_initializer: LocalTopologyInitializer
   let _input_addrs: Array[Array[String]] val
-  let _output_addr: Array[String] val
+  let _output_addrs: Array[Array[String]] val
   let _application: Application val
 
   new create(auth: AmbientAuth, application: Application val,
     local_topology_initializer: LocalTopologyInitializer,
     input_addrs: Array[Array[String]] val,
-    output_addr: Array[String] val)
+    output_addrs: Array[Array[String]] val)
   =>
     _auth = auth
     _local_topology_initializer = local_topology_initializer
     _input_addrs = input_addrs
-    _output_addr = output_addr
+    _output_addrs = output_addrs
     _application = application
 
   be distribute(cluster_initializer: (ClusterInitializer | None),
@@ -146,8 +146,9 @@ actor ApplicationDistributor is Distributor
 
         let sink_addr_trn: Array[String] trn = recover Array[String] end
         try
-          sink_addr_trn.push(_output_addr(0))
-          sink_addr_trn.push(_output_addr(1))
+          let output_addr = _output_addrs(pipeline_id)
+          sink_addr_trn.push(output_addr(0))
+          sink_addr_trn.push(output_addr(1))
         else
           @printf[I32]("No output address!\n".cstring())
           error
