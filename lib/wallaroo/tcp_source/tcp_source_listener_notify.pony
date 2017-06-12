@@ -1,4 +1,5 @@
 use "net"
+use "wallaroo/fail"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 use "wallaroo/recovery"
@@ -122,12 +123,13 @@ class SourceListenerNotify is TCPSourceListenerNotify
   fun ref listening(listen: TCPSourceListener ref) =>
     @printf[I32]((_source_builder.name() + " source is listening\n").cstring())
 
+  fun ref not_listening(listen: TCPSourceListener ref) =>
+    @printf[I32](
+      (_source_builder.name() + " source is unable to listen\n").cstring())
+    Fail()
+
   fun ref connected(listen: TCPSourceListener ref): TCPSourceNotify iso^ =>
     _source_builder(_event_log, _auth, _target_router)
 
   fun ref update_router(router: Router val) =>
     _source_builder = _source_builder.update_router(router)
-
-  // TODO: implement listening and especially not_listening
-
-
