@@ -1374,6 +1374,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         if _created.size() == _initializables.size() then
           @printf[I32]("|~~ INIT PHASE I: Application is created! ~~|\n"
             .cstring())
+          _spin_up_source_listeners()
           for i in _initializables.values() do
             i.application_created(this, o_router)
             match i
@@ -1419,6 +1420,7 @@ actor LocalTopologyInitializer is LayoutInitializer
         else
           _event_log.start_pipeline_logging(this)
         end
+        _router_registry.application_ready_to_work()
       end
     else
       @printf[I32]("The same Initializable reported being ready to work twice\n".cstring())
@@ -1432,9 +1434,27 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("|~~ INIT PHASE III: Application is ready to work! ~~|\n"
       .cstring())
     // TODO: THis should also depend on EventLog having completed reading
-    _spin_up_source_listeners()
     for i in _initializables.values() do
       i.application_ready_to_work(this)
+    end
+
+    if _is_initializer then
+      match _cluster_initializer
+      | let ci: ClusterInitializer =>
+        ci.topology_ready("initializer")
+        _is_initializer = false
+      else
+        @printf[I32]("Need ClusterInitializer to inform that topology is ready\n".cstring())
+      end
+    end
+
+  fun ref _spin_up_source_listeners() =>
+    if not _topology_initialized then
+      @printf[I32]("ERROR: Tried to spin up source listeners before topology was initialized!\n".cstring())
+    else
+      for builder in tcpsl_builders.values() do
+        builder()
+      end
     end
 
   be inform_joining_worker(conn: TCPConnection, worker_name: String) =>
@@ -1448,25 +1468,6 @@ actor LocalTopologyInitializer is LayoutInitializer
       end
     else
       Fail()
-    end
-
-  fun ref _spin_up_source_listeners() =>
-    if not _topology_initialized then
-      @printf[I32]("ERROR: Tried to spin up source listeners before topology was initialized!\n".cstring())
-    else
-      for builder in tcpsl_builders.values() do
-        builder()
-      end
-    end
-
-    if _is_initializer then
-      match _cluster_initializer
-      | let ci: ClusterInitializer =>
-        ci.topology_ready("initializer")
-        _is_initializer = false
-      else
-        @printf[I32]("Need ClusterInitializer to inform that topology is ready\n".cstring())
-      end
     end
 
   fun _is_ready_for_building(node: DagNode[StepInitializer val] val,

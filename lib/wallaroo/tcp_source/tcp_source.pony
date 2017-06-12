@@ -138,6 +138,8 @@ actor TCPSource is Producer
       r.application_initialized("TCPSource")
     end
 
+    _mute()
+
   be update_router(router: PartitionRouter val) =>
     let new_router = router.update_boundaries(_outgoing_boundaries)
     _notify.update_router(new_router)
@@ -484,13 +486,13 @@ actor TCPSource is Producer
 
   fun ref _mute() =>
     ifdef "credit_trace" then
-      @printf[I32]("MUTE\n".cstring())
+      @printf[I32]("MUTE SOURCE\n".cstring())
     end
     _muted = true
 
   fun ref _unmute() =>
     ifdef "credit_trace" then
-      @printf[I32]("UNMUTE\n".cstring())
+      @printf[I32]("UNMUTE SOURCE\n".cstring())
     end
     _muted = false
     if not _reading then
