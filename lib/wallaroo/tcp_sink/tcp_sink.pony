@@ -110,32 +110,36 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
     _host = host
     _service = service
     _from = from
-    _connect_count = @pony_os_connect_tcp[U32](this,
-      host.cstring(), service.cstring(),
-      from.cstring())
-    _notify_connecting()
+    _connect_count = 0
+    _mute_upstreams()
 
   //
   // Application Lifecycle events
   //
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
+    _initializer = initializer
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
     omni_router: OmniRouter val)
   =>
-  if _connected then
+    _mute_upstreams()
     initializer.report_initialized(this)
-  else
-    _initializer = initializer
-  end
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
-    initializer.report_ready_to_work(this)
+    _initial_connect()
 
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
+
+  fun ref _initial_connect() =>
+    @printf[I32]("TCPSink initializing connection to %s:%s\n".cstring(),
+      _host.cstring(), _service.cstring())
+    _connect_count = @pony_os_connect_tcp[U32](this,
+      _host.cstring(), _service.cstring(),
+      _from.cstring())
+    _notify_connecting()
 
   // open question: how do we reconnect if our external system goes away?
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -290,8 +294,10 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
 
             match _initializer
             | let initializer: LocalTopologyInitializer =>
-              initializer.report_initialized(this)
+              initializer.report_ready_to_work(this)
               _initializer = None
+            else
+              Fail()
             end
 
             _notify.connected(this)
@@ -305,6 +311,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
                 _release_backpressure()
               end
             end
+            _maybe_mute_or_unmute_upstreams()
           else
             // The connection failed, unsubscribe the event and close.
             @pony_asio_event_unsubscribe(event)

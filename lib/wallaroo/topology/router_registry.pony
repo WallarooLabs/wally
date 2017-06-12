@@ -23,6 +23,8 @@ actor RouterRegistry
   var _omni_router: (OmniRouter val | None) = None
   var _actor_data_router: ActorSystemDataRouter = EmptyActorSystemDataRouter
 
+  var _application_ready_to_work: Bool = false
+
   let _sources: SetIs[TCPSource] = _sources.create()
   let _source_listeners: SetIs[TCPSourceListener] = _source_listeners.create()
   let _data_channel_listeners: SetIs[DataChannelListener] =
@@ -75,6 +77,9 @@ actor RouterRegistry
   fun _worker_count(): USize =>
     _outgoing_boundaries.size() + 1
 
+  be application_ready_to_work() =>
+    _application_ready_to_work = true
+
   be set_data_router(dr: DataRouter val) =>
     _data_router = dr
     _actor_data_router = dr.actor_system_data_router()
@@ -94,7 +99,9 @@ actor RouterRegistry
 
   be register_source(tcp_source: TCPSource) =>
     _sources.set(tcp_source)
-    if not _migrating then tcp_source.unmute(_dummy_consumer) end
+    if not _migrating and _application_ready_to_work then
+      tcp_source.unmute(_dummy_consumer)
+    end
 
   be register_source_listener(tcp_source_listener: TCPSourceListener) =>
     _source_listeners.set(tcp_source_listener)

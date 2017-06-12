@@ -131,7 +131,7 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
     else
       ifdef debug then
         @printf[I32](("FramedSourceNotify doesn't have PartitionRouter." +
-          " Updating boundaries is a noop\n").cstring())
+          " Updating boundaries is a noop for this kind of Source.\n").cstring())
       end
     end
 
