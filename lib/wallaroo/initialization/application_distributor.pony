@@ -146,7 +146,7 @@ actor ApplicationDistributor is Distributor
 
         let sink_addr_trn: Array[String] trn = recover Array[String] end
         try
-          let output_addr = _output_addrs(pipeline_id)
+          let output_addr = _output_addrs(pipeline.sink_addr_idx())
           sink_addr_trn.push(output_addr(0))
           sink_addr_trn.push(output_addr(1))
         else
