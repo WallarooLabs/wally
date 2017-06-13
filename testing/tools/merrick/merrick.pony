@@ -14,123 +14,118 @@ use "debug"
 actor Main
   new create(env: Env) =>
     var required_args_are_present = true
-    var run_tests = env.args.size() == 1
     var forward: Bool = false
 
-    if run_tests then
-      TestMain(env)
-    else
-      var p_arg: (Array[String] | None) = None
-      var l_arg: (Array[String] | None) = None
-      var n_arg: (String | None) = None
-      var e_arg: (USize | None) = None
-      var o_arg = "recevied-metrics.txt"
-      var f_addr_arg: (Array[String] | None) = None
+    var p_arg: (Array[String] | None) = None
+    var l_arg: (Array[String] | None) = None
+    var n_arg: (String | None) = None
+    var e_arg: (USize | None) = None
+    var o_arg = "recevied-metrics.txt"
+    var f_addr_arg: (Array[String] | None) = None
 
-      try
-        var options = Options(env.args)
+    try
+      var options = Options(env.args)
 
-        options
-          .add("phone-home", "d", StringArgument)
-          .add("name", "n", StringArgument)
-          .add("listen", "l", StringArgument)
-          .add("output-file", "o", StringArgument)
-          .add("forward", "f", None)
-          .add("forward-addr", "m", StringArgument)
+      options
+        .add("phone-home", "d", StringArgument)
+        .add("name", "n", StringArgument)
+        .add("listen", "l", StringArgument)
+        .add("output-file", "o", StringArgument)
+        .add("forward", "f", None)
+        .add("forward-addr", "m", StringArgument)
 
-        for option in options do
-          match option
-          | ("name", let arg: String) => n_arg = arg
-          | ("phone-home", let arg: String) => p_arg = arg.split(":")
-          | ("listen", let arg: String) => l_arg = arg.split(":")
-          | ("output-file", let arg: String) => o_arg = arg
-          | ("forward", None) => forward = true
-          | ("forward-addr", let arg: String) => f_addr_arg = arg.split(":")
-          | let err: ParseError =>
-            err.report(env.err)
-            required_args_are_present = false
-          end
-        end
-
-        if l_arg is None then
-          @printf[I32]("Must supply required '--listen' argument\n".cstring())
+      for option in options do
+        match option
+        | ("name", let arg: String) => n_arg = arg
+        | ("phone-home", let arg: String) => p_arg = arg.split(":")
+        | ("listen", let arg: String) => l_arg = arg.split(":")
+        | ("output-file", let arg: String) => o_arg = arg
+        | ("forward", None) => forward = true
+        | ("forward-addr", let arg: String) => f_addr_arg = arg.split(":")
+        | let err: ParseError =>
+          err.report(env.err)
           required_args_are_present = false
-        else
-          if (l_arg as Array[String]).size() != 2 then
-            @printf[I32](
-              "'--listen' argument should be in format: '127.0.0.1:8080'\n"
-              .cstring())
-            required_args_are_present = false
-          end
         end
-
-        if p_arg isnt None then
-          if (p_arg as Array[String]).size() != 2 then
-            @printf[I32](
-              "'--phone-home' argument should be in format: '127.0.0.1:8080'\n"
-              .cstring())
-              required_args_are_present = false
-          end
-        end
-
-        if (p_arg isnt None) or (n_arg isnt None) then
-          if (p_arg is None) or (n_arg is None) then
-            @printf[I32](
-              "'--phone-home' must be used in conjuction with '--name'\n"
-              .cstring())
-            required_args_are_present = false
-          end
-        end
-
-        if forward isnt false then
-          if f_addr_arg is None then
-            @printf[I32](
-              "'--forward-addr' must be used in conjucion with '--forward'\n"
-              .cstring())
-          else
-            if (f_addr_arg as Array[String]).size() != 2 then
-              @printf[I32](
-                "'--forward-addr' arg should be in format: '127.0.0.1:8080\n"
-                .cstring())
-            end
-          end
-        end
-
-        if required_args_are_present then
-          let listener_addr = l_arg as Array[String]
-
-          let store = Store(env.root as AmbientAuth, o_arg)
-          let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
-
-          SignalHandler(TermHandler(coordinator), Sig.term())
-          SignalHandler(TermHandler(coordinator), Sig.int())
-
-          let tcp_listen_auth = TCPListenAuth(env.root as AmbientAuth)
-          let tcp_connect_auth = TCPConnectAuth(env.root as AmbientAuth)
-          var forwarding_actor: (MsgForwarder | None) = None
-          if forward then
-            let forward_addr = f_addr_arg as Array[String]
-            let forward_conn = TCPConnection(tcp_connect_auth,
-              ForwarderNotify(),
-              forward_addr(0),
-              forward_addr(1))
-            forwarding_actor = MsgForwarder(forward_conn)
-          end
-          let from_wallaroo_listener = TCPListener(tcp_listen_auth,
-            FromWallarooListenerNotify(coordinator, store, env.err,
-              forward, forwarding_actor),
-            listener_addr(0),
-            listener_addr(1))
-        end
-      else
-        @printf[I32](
-          """
-          --phone-home/-p <address> [Sets the address for phone home]
-          --name/-n <name> [Name of metrics-receiver node]
-          --listen/-l <address> [Address metrics-receiver node is listening on]
-          """
-          )
       end
+
+      if l_arg is None then
+        @printf[I32]("Must supply required '--listen' argument\n".cstring())
+        required_args_are_present = false
+      else
+        if (l_arg as Array[String]).size() != 2 then
+          @printf[I32](
+            "'--listen' argument should be in format: '127.0.0.1:8080'\n"
+            .cstring())
+          required_args_are_present = false
+        end
+      end
+
+      if p_arg isnt None then
+        if (p_arg as Array[String]).size() != 2 then
+          @printf[I32](
+            "'--phone-home' argument should be in format: '127.0.0.1:8080'\n"
+            .cstring())
+            required_args_are_present = false
+        end
+      end
+
+      if (p_arg isnt None) or (n_arg isnt None) then
+        if (p_arg is None) or (n_arg is None) then
+          @printf[I32](
+            "'--phone-home' must be used in conjuction with '--name'\n"
+            .cstring())
+          required_args_are_present = false
+        end
+      end
+
+      if forward isnt false then
+        if f_addr_arg is None then
+          @printf[I32](
+            "'--forward-addr' must be used in conjucion with '--forward'\n"
+            .cstring())
+        else
+          if (f_addr_arg as Array[String]).size() != 2 then
+            @printf[I32](
+              "'--forward-addr' arg should be in format: '127.0.0.1:8080\n"
+              .cstring())
+          end
+        end
+      end
+
+      if required_args_are_present then
+        let listener_addr = l_arg as Array[String]
+
+        let store = Store(env.root as AmbientAuth, o_arg)
+        let coordinator = CoordinatorFactory(env, store, n_arg, p_arg)
+
+        SignalHandler(TermHandler(coordinator), Sig.term())
+        SignalHandler(TermHandler(coordinator), Sig.int())
+
+        let tcp_listen_auth = TCPListenAuth(env.root as AmbientAuth)
+        let tcp_connect_auth = TCPConnectAuth(env.root as AmbientAuth)
+        var forwarding_actor: (MsgForwarder | None) = None
+        if forward then
+          let forward_addr = f_addr_arg as Array[String]
+          let forward_conn = TCPConnection(tcp_connect_auth,
+            ForwarderNotify(),
+            forward_addr(0),
+            forward_addr(1))
+          forwarding_actor = MsgForwarder(forward_conn)
+        end
+        let from_wallaroo_listener = TCPListener(tcp_listen_auth,
+          FromWallarooListenerNotify(coordinator, store, env.err,
+            forward, forwarding_actor),
+          listener_addr(0),
+          listener_addr(1))
+      end
+    else
+      @printf[I32](
+        """
+        --phone-home/-p <address> [Sets the address for phone home]
+        --name/-n <name> [Name of metrics-receiver node]
+        --listen/-l <address> [Address metrics-receiver node is listening on]
+        """
+        )
     end
 
 class FromWallarooListenerNotify is TCPListenNotify
