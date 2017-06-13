@@ -24,7 +24,7 @@ RECURSE_SUBMAKEFILES := false
 # run from, so we get an absolute path based on $(buffy_path). This will work
 # whether make was run from the top level of Wallaroo or from within the
 # validator directory.
-VALIDATOR_PATH = $(buffy_path)/testing/correctness/apps/sequence-window/validator
+VALIDATOR_PATH = $(buffy_path)/testing/correctness/apps/sequence_window/validator
 VALIDATOR_EXAMPLES = $(VALIDATOR_PATH)/examples
 
 # Our top level Makefile has 3 rules that would have been generated for us if

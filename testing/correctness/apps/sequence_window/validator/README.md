@@ -1,6 +1,6 @@
 # Validator
 
-Validator validates the output of a sequence-window run, as recorded by giles-receiver.
+Validator validates the output of a sequence_window run, as recorded by giles-receiver.
 It handles decoding the output file and performs the following tests:
 1. For each observed window, test:
   1. size == 4
