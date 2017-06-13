@@ -12,6 +12,7 @@ use "sendence/bytes"
 use "sendence/messages"
 use "sendence/options"
 use "sendence/tcp"
+use "sendence/wall_clock"
 
 // documentation
 // more tests
@@ -546,7 +547,7 @@ actor SendingActor
         _to_host_socket.write(i)
       end
       if _write_to_file then
-        _store.sentv(consume d', Time.wall_to_nanos(Time.now()))
+        _store.sentv(consume d', WallClock.nanoseconds())
       end
     else
       _finished = true

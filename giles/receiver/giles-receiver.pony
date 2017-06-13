@@ -9,6 +9,7 @@ use "signals"
 use "time"
 use "sendence/messages"
 use "sendence/bytes"
+use "sendence/wall_clock"
 use "debug"
 
 // tests
@@ -180,7 +181,7 @@ class FromBuffyNotify is TCPConnectionNotify
       end
     else
       if not _no_write then
-        _store.received(consume data, Time.wall_to_nanos(Time.now()))
+        _store.received(consume data, WallClock.nanoseconds())
       end
       _coordinator.received_message()
       conn.expect(4)
