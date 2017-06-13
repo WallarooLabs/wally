@@ -24,6 +24,7 @@ class Application
   var default_target: (Array[RunnerBuilder val] val | None) = None
   var default_state_name: String = ""
   var default_target_id: U128 = 0
+  var sink_count: USize = 0
 
   new create(name': String) =>
     _name = name'
@@ -82,6 +83,9 @@ class Application
   =>
     _state_builders(state_name) = state_partition
 
+  fun ref increment_sink_count() =>
+    sink_count = sink_count + 1
+
   fun state_builder(state_name: String): PartitionBuilder val ? =>
     _state_builders(state_name)
   fun state_builders(): Map[String, PartitionBuilder val] val =>
@@ -104,6 +108,8 @@ trait BasicPipeline
   // TODO: Change this when we need more sinks per pipeline
   // ASSUMPTION: There is at most one sink per pipeline
   fun sink_id(): (U128 | None)
+  // The index into the list of provided sink addresses
+  fun sink_addr_idx(): USize
   fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder val ?
   fun size(): USize
@@ -119,6 +125,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _sink_builder: (TCPSinkBuilder | None) = None
   var _sink_id: (U128 | None) = None
   let _is_coalesced: Bool
+  var _sink_addr_idx: USize = 0
 
   new create(app_name: String, p_id: USize, n: String,
     d: FramedSourceHandler[In] val, coalescing: Bool)
@@ -142,6 +149,9 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _sink_builder = sink_builder'
     _sink_target_ids = sink_ids
 
+  fun ref update_sink_addr_idx(idx: USize) =>
+    _sink_addr_idx = idx
+
   fun source_id(): USize => _pipeline_id
 
   fun source_builder(): SourceBuilderBuilder val => _source_builder
@@ -155,6 +165,9 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   // TODO: Change this when we need more sinks per pipeline
   // ASSUMPTION: There is at most one sink per pipeline
   fun sink_id(): (U128 | None) => _sink_id
+
+  // The index into the list of provided sink addresses
+  fun sink_addr_idx(): USize => _sink_addr_idx
 
   fun ref update_sink_id() =>
     _sink_id = GuidGenerator.u128()
@@ -272,6 +285,8 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   =>
     let sink_builder: TCPSinkBuilder =
       TCPSinkBuilder(TypedEncoderWrapper[Out](encoder), initial_msgs)
+    _a.increment_sink_count()
+    _p.update_sink_addr_idx(_a.sink_count - 1)
     _p.update_sink(sink_builder, sink_ids)
     _p.update_sink_id()
     _a.add_pipeline(_p as BasicPipeline)
