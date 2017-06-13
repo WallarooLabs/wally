@@ -18,19 +18,19 @@ To run, use the following commands:
 ```
 2. Initializer worker
 ```bash
-./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+./sequence_window_simple_state -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 \
 -d 127.0.0.1:12501 -r res-data -w 2 -n worker1 -t
 ```
 3. Second worker
 ```bash
-./sequence-window -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+./sequence_window_simple_state -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
 --ponythreads=4 --ponypinasio --ponynoblock -c 127.0.0.1:12500 \
 -d 127.0.0.1:12501 -r res-data -w 2 -n worker2
 ```
 4. Sender
 ```bash
-../../../../giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 \
+../../../../giles/sender/sender -b 127.0.0.1:7000 -s 100 -i 50_000_000 \
 --ponythreads=1 -y -g 12 -w -u -m 10000
 ```
 
@@ -41,7 +41,7 @@ Restart `sequence-window`, and wait for it to complete its recovery process.
 
 Send one more message with giles sender:
 ```bash
-../../../../giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 \
+../../../../giles/sender/sender -b 127.0.0.1:7000 -s 100 -i 50_000_000 \
 --ponythreads=1 -y -g -12 -w -u -m 2 -v 10000
 ```
 
@@ -56,7 +56,6 @@ validator/validator -i recived.txt -e 10002
 ```
 """
 
-use "assert"
 use "buffered"
 use "collections"
 use "ring"
@@ -91,7 +90,7 @@ actor Main
       end
       Startup(env, application, "sequence-window")
     else
-      @printf[I32]("Couldn't build topology\n".cstring())
+      env.out.print("Couldn't build topology")
     end
 
 primitive WindowPartitionFunction
@@ -118,85 +117,18 @@ class WindowState is State
     ring.push(u)
     idx = idx + 1
 
-    ifdef "validate" then
-      try
-        // Test validity of updated window
-        let values = to_array()
-        Fact(TestIncrements(values), "Increments test failed on " +
-          string())
-      else
-        Fail()
-      end
-    end
-
-  fun to_array(): Array[U64] val =>
-    let ar: Array[U64] iso = recover Array[U64](4) end
-    for v in ring.values() do
-      ar.push(v)
-    end
-    ar.reverse_in_place()
-    consume ar
-
-class WindowStateChange is StateChange[WindowState]
-  var _id: U64
-  var _window: WindowState = WindowState
-
-  new create(id': U64) =>
-    _id = id'
-
-  fun name(): String => "UpdateWindow"
-  fun id(): U64 => _id
-
-  fun ref update(u: U64 val) =>
-    _window.push(u)
-
-  fun string(): String =>
-    _window.string()
-
-  fun apply(state: WindowState) =>
-    (let buf, let size', let count') = _window.ring.raw()
-    state.ring = Ring[U64].from_array(consume buf, size', count')
-    state.idx = _window.idx
-
-  fun write_log_entry(out_writer: Writer) =>
-    (let buf, let s, let c) = _window.ring.raw()
-    WindowStateEncoder(_window.idx, consume buf, s, c, out_writer)
-
-  fun ref read_log_entry(in_reader: Reader) ? =>
-    (let index, let buf, let size, let count) = WindowStateDecoder(
-      in_reader)
-    _window = WindowState
-    _window.idx = index
-    _window.ring = Ring[U64].from_array(consume buf, size, count)
-
-class WindowStateChangeBuilder is StateChangeBuilder[WindowState]
-  fun apply(id: U64): StateChange[WindowState] =>
-    WindowStateChange(id)
-
 primitive ObserveNewValue is StateComputation[U64 val, String val, WindowState]
   fun name(): String => "Observe new value"
 
   fun apply(u: U64 val,
     sc_repo: StateChangeRepository[WindowState],
-    state: WindowState): (String val, StateChange[WindowState] ref)
+    state: WindowState): (String val, DirectStateChange)
   =>
-    let state_change: WindowStateChange ref =
-      try
-        sc_repo.lookup_by_name("UpdateWindow") as WindowStateChange
-      else
-        WindowStateChange(0)
-      end
+    state.push(u)
 
-    state_change.update(u)
-
-    // TODO: This is ugly since this is where we need to simulate the state
-    // change in order to produce a result
-    (state_change.string(), state_change)
+    (state.string(), DirectStateChange)
 
   fun state_change_builders():
     Array[StateChangeBuilder[WindowState] val] val
   =>
-    recover val
-      let scbs = Array[StateChangeBuilder[WindowState] val]
-      scbs.push(recover val WindowStateChangeBuilder end)
-    end
+    recover Array[StateChangeBuilder[WindowState] val] end

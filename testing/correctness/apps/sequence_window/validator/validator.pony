@@ -1,5 +1,5 @@
 """
-Validator validates the received.txt file from a sequence-window run, as saved
+Validator validates the received.txt file from a sequence_window run, as saved
 by giles-receiver.
 
 It ensures that there are two types of sequences: mod2=1 and mod2=0, and that
@@ -81,7 +81,7 @@ actor Main
 
 class WindowValidator
   """
-  To test the output of Sequence-Window, we need to validate that the correct
+  To test the output of sequence_window, we need to validate that the correct
   sequence of windows follows throughout.
 
   1. For each observed window, test:
