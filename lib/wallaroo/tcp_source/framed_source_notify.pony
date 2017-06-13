@@ -92,7 +92,11 @@ class FramedSourceNotify[In: Any val] is TCPSourceNotify
             conn, _router, _omni_router, conn, _guid_gen.u128(), None, 0, 0,
             decode_end_ts, latest_metrics_id, ingest_ts, _metrics_reporter)
         else
-          Fail()
+          @printf[I32](("Unable to decode message at " + _pipeline_name +
+            " source\n").cstring())
+          ifdef debug then
+            Fail()
+          end
           (true, true, ingest_ts)
         end
 

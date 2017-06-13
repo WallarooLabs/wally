@@ -6,6 +6,7 @@
 
 - Fix segfault that occurs when a network connection is abruptly disconnected
 - Support more than 1 sink per application
+- Don't FAIL application when TCPSource receives undecodable message
 
 ### Python API
 
