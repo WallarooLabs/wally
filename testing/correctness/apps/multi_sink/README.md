@@ -6,49 +6,57 @@ The pipeline is duplicated to test multi-sink functionality.
 
 ## Running Multi-Sink Celsius
 
-
 1. Start two listeners
-    ```bash
-    nc -l 127.0.0.1 7002 > multi_sink_1.out
-    nc -l 127.0.0.1 7003 > multi_sink_2.out
-    ```
+
+```bash
+nc -l 127.0.0.1 7002 > multi_sink_1.out
+nc -l 127.0.0.1 7003 > multi_sink_2.out
+```
+
 2. Single Worker: Start the application
-    ```bash
-    ./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-      127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
-      --control 127.0.0.1:12500 --data 127.0.0.1:12501
-    ```
+
+```bash
+./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
+  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:12500 --data 127.0.0.1:12501
+```
+
 3. Two Workers: Start the application
-    ```bash
-    ./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-      127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
-      --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 2 -t
 
-    ./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-      127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
-      --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 2 -n worker2
-    ```
+```bash
+./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
+  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 2 -t
+
+./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
+  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 2 -n worker2
+```
+
 4. Three Workers: Start the application
-    ```bash
-    ./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-      127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
-      --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 3 -t
 
-    ./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-      127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
-      --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 3 -n worker2
+```bash
+./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
+  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 3 -t
 
-    ./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
-      127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
-      --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 3 -n worker3
-    ```
+./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
+  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 3 -n worker2
+
+./multi_sink --in 127.0.0.1:7010,127.0.0.1:7011 --out \
+  127.0.0.1:7002,127.0.0.1:7003 --metrics 127.0.0.1:5001 \
+  --control 127.0.0.1:12500 --data 127.0.0.1:12501 -w 3 -n worker3
+```
+
 3. Start two senders
-    ```bash
-    ../../../../giles/sender/sender --host 127.0.0.1:7010 --file celsius.msg \
-      --batch-size 5 --interval 100_000_000 --messages 150 --binary \
-      --variable-size --repeat --ponythreads=1 --no-write
 
-    ../../../../giles/sender/sender --host 127.0.0.1:7011 --file celsius.msg \
-      --batch-size 5 --interval 100_000_000 --messages 150 --binary \
-      --variable-size --repeat --ponythreads=1 --no-write
-    ```
+```bash
+../../../../giles/sender/sender --host 127.0.0.1:7010 --file celsius.msg \
+  --batch-size 5 --interval 100_000_000 --messages 150 --binary \
+  --variable-size --repeat --ponythreads=1 --no-write
+
+../../../../giles/sender/sender --host 127.0.0.1:7011 --file celsius.msg \
+  --batch-size 5 --interval 100_000_000 --messages 150 --binary \
+  --variable-size --repeat --ponythreads=1 --no-write
+```
