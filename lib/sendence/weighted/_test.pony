@@ -1,13 +1,13 @@
-use "ponytest"
+use "sendence/connemara"
 use "collections"
 use "debug"
 
 actor Main is TestList
-  new create(env: Env) => PonyTest(env, this)
+  new create(env: Env) => Connemara(env, this)
 
   new make() => None
 
-  fun tag tests(test: PonyTest) =>
+  fun tag tests(test: Connemara) =>
     test(_TestWeighted)
 
 class iso _TestWeighted is UnitTest

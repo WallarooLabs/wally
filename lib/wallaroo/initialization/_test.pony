@@ -1,5 +1,5 @@
 use "collections"
-use "ponytest"
+use "sendence/connemara"
 use "sendence/dag"
 use "wallaroo/routing"
 use "wallaroo/topology"
@@ -8,7 +8,7 @@ actor Main is TestList
   new make() =>
     None
 
-  fun tag tests(test: PonyTest) =>
+  fun tag tests(test: Connemara) =>
     test(_TestLocalTopologyEquality)
 
 class iso _TestLocalTopologyEquality is UnitTest

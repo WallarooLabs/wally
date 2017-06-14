@@ -1,4 +1,4 @@
-use "ponytest"
+use "sendence/connemara"
 
 use "wallaroo/topology"
 
@@ -6,7 +6,7 @@ actor TestWatermarking is TestList
   new make() =>
     None
 
-  fun tag tests(test: PonyTest) =>
+  fun tag tests(test: Connemara) =>
     test(_TestProposeWatermarkFullyAcked)
     test(_TestProposeWatermarkFullyAckedFilterLast)
     test(_TestProposeWatermarkOnlyFilter)

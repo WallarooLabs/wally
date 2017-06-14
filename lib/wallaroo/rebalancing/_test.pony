@@ -1,11 +1,11 @@
 use "collections"
-use "ponytest"
+use "sendence/connemara"
 
 actor Main is TestList
   new make() =>
     None
 
-  fun tag tests(test: PonyTest) =>
+  fun tag tests(test: Connemara) =>
     test(_TestRebalancerStepsFromOne)
     test(_TestRebalancerStepsForNewWorker)
 

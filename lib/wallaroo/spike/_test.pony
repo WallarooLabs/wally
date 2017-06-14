@@ -1,4 +1,4 @@
-use "ponytest"
+use "sendence/connemara"
 use "wallaroo/network"
 use "wallaroo/routing"
 
@@ -6,7 +6,7 @@ actor Main is TestList
   new make() =>
     None
 
-  fun tag tests(test: PonyTest) =>
+  fun tag tests(test: Connemara) =>
     test(_TestDropsConnectionWhenConnectingWhenSpiked)
     test(_TestDoesntDropConnectionWhenConnectingWhenNotSpiked)
     test(_TestDropsConnectionWhenConnectedWhenSpiked)

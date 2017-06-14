@@ -1,11 +1,11 @@
-use "ponytest"
+use "sendence/connemara"
 use "json"
 
 actor TestDockerSwarmClusterManager is TestList
   new make() =>
     None
 
-  fun tag tests(test: PonyTest) =>
+  fun tag tests(test: Connemara) =>
     test(_TestJsonRequestBuilder)
     test(_TestAPIServiceParser)
     test(_TestDockerSwarmAPIURLBuilder)
