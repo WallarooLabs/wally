@@ -5,7 +5,7 @@ This package represents the unit test suite for Wallaroo.
 
 All tests can be run by compiling and running this package.
 """
-use "ponytest"
+use "sendence/connemara"
 use cluster_manager = "cluster_manager"
 use data_channel = "data_channel"
 use initialization = "initialization"
@@ -16,12 +16,12 @@ use topology = "topology"
 
 actor Main is TestList
   new create(env: Env) =>
-    PonyTest(env, this)
+    Connemara(env, this)
 
   new make() =>
     None
 
-  fun tag tests(test: PonyTest) =>
+  fun tag tests(test: Connemara) =>
     cluster_manager.Main.make().tests(test)
     data_channel.Main.make().tests(test)
     initialization.Main.make().tests(test)

@@ -7,7 +7,7 @@ just Wallaroo.
 
 All tests can be run by compiling and running this package.
 """
-use "ponytest"
+use "sendence/connemara"
 use bytes = "bytes"
 use container_queue = "container_queue"
 use fix = "fix"
@@ -18,12 +18,12 @@ use weighted = "weighted"
 
 actor Main is TestList
   new create(env: Env) =>
-    PonyTest(env, this)
+    Connemara(env, this)
 
   new make() =>
     None
 
-  fun tag tests(test: PonyTest) =>
+  fun tag tests(test: Connemara) =>
     bytes.Main.make().tests(test)
     container_queue.Main.make().tests(test)
     fix.Main.make().tests(test)

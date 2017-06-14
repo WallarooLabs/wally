@@ -1,5 +1,5 @@
 use "collections"
-use "ponytest"
+use "sendence/connemara"
 use "sendence/equality"
 use "wallaroo/boundary"
 use "wallaroo/metrics"
@@ -11,7 +11,7 @@ actor Main is TestList
   new make() =>
     None
 
-  fun tag tests(test: PonyTest) =>
+  fun tag tests(test: Connemara) =>
     test(_TestLocalPartitionRouterEquality)
     test(_TestOmniRouterEquality)
     test(_TestDataRouterEqualityAfterRemove)

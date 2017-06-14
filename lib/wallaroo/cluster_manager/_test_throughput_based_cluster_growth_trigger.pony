@@ -1,12 +1,12 @@
 use "collections"
-use "ponytest"
+use "sendence/connemara"
 use "wallaroo/metrics"
 
 actor TestThroughputBasedClusterGrowthTrigger is TestList
   new make() =>
     None
 
-  fun tag tests(test: PonyTest) =>
+  fun tag tests(test: Connemara) =>
     test(_TestWhenAboveThreshold)
     test(_TestWhenBelowThreshold)
     test(_TestOnlyTriggersOnce)
