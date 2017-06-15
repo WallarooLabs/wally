@@ -1,7 +1,7 @@
 use "collections"
 use "time"
 use "sendence/guid"
-use "sendence/wall_clock"
+use "sendence/time"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/messages"

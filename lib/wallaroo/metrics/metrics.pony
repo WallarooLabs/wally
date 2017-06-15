@@ -4,7 +4,7 @@ use "json"
 use "net"
 use "time"
 use "sendence/hub"
-use "sendence/wall_clock"
+use "sendence/time"
 
 type MetricData is
   (String, String, String, String, U16,
