@@ -9,7 +9,7 @@ use "signals"
 use "time"
 use "sendence/messages"
 use "sendence/bytes"
-use "sendence/wall_clock"
+use "sendence/time"
 use "debug"
 
 // tests

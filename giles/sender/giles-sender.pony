@@ -12,7 +12,7 @@ use "sendence/bytes"
 use "sendence/messages"
 use "sendence/options"
 use "sendence/tcp"
-use "sendence/wall_clock"
+use "sendence/time"
 
 // documentation
 // more tests
