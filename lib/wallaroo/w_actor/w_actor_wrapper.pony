@@ -25,8 +25,6 @@ trait WActorWrapper
   fun ref _set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   fun ref _cancel_timer(t: WActorTimer)
-  // Temporary for demonstration
-  be pickle(m: SerializeTarget)
 
 actor WActorWithState is WActorWrapper
   let _worker_name: String
@@ -108,16 +106,6 @@ actor WActorWithState is WActorWrapper
     This won't scale if there are lots of w_actors
     """
     _timers.tick()
-
-  // Temporary for demonstration
-  be pickle(m: SerializeTarget) =>
-    try
-      let serialized = Pickle[WActor](_w_actor, _auth)
-      m.add_serialized(serialized)
-    else
-      @printf[I32]("Did you save a reference to WActorHelper on a WActor definition? That will cause serialization to fail.\n".cstring())
-      Fail()
-    end
 
   be create_actor(builder: WActorBuilder) =>
     let new_builder = StatefulWActorWrapperBuilder(_guid_gen.u128(),
@@ -216,10 +204,6 @@ class val StatefulWActorWrapperBuilder
 
   fun id(): U128 =>
     _id
-
-//Temporary for demo
-interface tag SerializeTarget
-  be add_serialized(s: ByteSeq val)
 
 class LiveWActorHelper is WActorHelper
   let _w_actor: WActorWrapper ref

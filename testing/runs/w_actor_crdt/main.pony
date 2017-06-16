@@ -1,3 +1,46 @@
+"""
+CRDT WActor App
+
+1) reports sink:
+
+```
+nc -l 127.0.0.1 5555 >> /dev/null
+```
+
+2) metrics sink:
+
+```
+nc -l 127.0.0.1 5001 >> /dev/null
+```
+
+3a) 1 worker:
+
+```
+./w_actor_crdt -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+-c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 --ponynoblock
+```
+
+3b) 2 workers:
+
+```
+./w_actor_crdt -i 127.0.0.1:7000 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+  -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n node-name --ponythreads=4 \
+  --ponynoblock -w 2 -t
+
+./w_actor_crdt -i 127.0.0.1:7001 -o 127.0.0.1:5555 -m 127.0.0.1:5001 \
+  -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 \
+  --ponynoblock -w 2
+```
+127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
+
+4) sender
+
+```
+giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 \
+--ponythreads=1 -y -g 12 -w -u -m 10000
+```
+
+"""
 use "assert"
 use "buffered"
 use "collections"
@@ -31,7 +74,7 @@ actor Main
     let actor_count: USize = 10
     let iterations: USize = 100
     let actor_system = create_actors(actor_count, iterations, seed)
-    ActorSystemStartup(env, actor_system, "toy-model-CRDT-app", actor_count)
+    ActorSystemStartup(env, actor_system, "toy-model-CRDT-app")
 
   fun ref create_actors(n: USize, iterations: USize, init_seed: U64):
     ActorSystem val

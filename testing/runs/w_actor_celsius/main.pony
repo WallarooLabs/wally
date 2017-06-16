@@ -63,10 +63,8 @@ use "wallaroo/w_actor"
 actor Main
   new create(env: Env) =>
     let seed: U64 = 12345
-    let actor_count: USize = 1
     let actor_system = create_actors(seed)
-    ActorSystemStartup(env, actor_system, "actor-system-celsius-app",
-      actor_count)
+    ActorSystemStartup(env, actor_system, "actor-system-celsius-app")
 
   fun ref create_actors(init_seed: U64): ActorSystem val
   =>

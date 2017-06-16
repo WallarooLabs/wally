@@ -55,7 +55,6 @@ actor WActorInitializer is LayoutInitializer
   var _iteration: USize = 0
   var _serialized: Array[U8] iso = recover Array[U8] end
   var _received_serialized: USize = 0
-  let _actor_count: USize
   let _actors: Array[WActorWrapper tag] = _actors.create()
   let _rand: EnhancedRandom
 
@@ -63,7 +62,7 @@ actor WActorInitializer is LayoutInitializer
     auth: AmbientAuth, event_log: EventLog,
     input_addrs: Array[Array[String]] val,
     output_addrs: Array[Array[String]] val, local_actor_system_file: String,
-    actor_count: USize, expected_iterations: USize, recovery: Recovery,
+    expected_iterations: USize, recovery: Recovery,
     recovery_replayer: RecoveryReplayer,
     data_channel_file: String, worker_names_file: String,
     data_receivers: DataReceivers, metrics_conn: MetricsSink,
@@ -78,7 +77,6 @@ actor WActorInitializer is LayoutInitializer
     _input_addrs = input_addrs
     _output_addrs = output_addrs
     _expected_iterations = expected_iterations
-    _actor_count = actor_count
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _data_channel_file = data_channel_file
@@ -359,7 +357,7 @@ actor WActorInitializer is LayoutInitializer
           if recovering then
             _recovery.start_recovery(this, las.worker_names())
           else
-            kick_off_demo()
+            start_app()
           end
         else
           Fail()
@@ -371,62 +369,21 @@ actor WActorInitializer is LayoutInitializer
       Fail()
     end
 
-  be kick_off_demo() =>
+  be start_app() =>
     if not _recovering then
-      @printf[I32]("\n#########################\n".cstring())
-      @printf[I32]("#*# Kicking off demo! #*#\n".cstring())
-      @printf[I32]("#########################\n".cstring())
+      @printf[I32]("\n#################################\n".cstring())
+      @printf[I32]("#*# Starting ActorSystem App! #*#\n".cstring())
+      @printf[I32]("#################################\n".cstring())
     else
-      @printf[I32]("\n###################################\n".cstring())
-      @printf[I32]("#*# Recovered: continuing demo! #*#\n".cstring())
-      @printf[I32]("###################################\n".cstring())
+      @printf[I32]("\n##################################\n".cstring())
+      @printf[I32]("#*# Recovered ActorSystem App! #*#\n".cstring())
+      @printf[I32]("##################################\n".cstring())
     end
-    let timers = Timers
-    let t = Timer(MainNotify(this, _expected_iterations), 1_000_000_000)
-    timers(consume t)
 
   be add_actor(b: WActorWrapperBuilder) =>
     match _system
     | let las: LocalActorSystem =>
       _system = las.add_actor(b, _worker_name)
-    end
-
-  be act() =>
-    for w_actor in _actors.values() do
-      w_actor.process(Act)
-      w_actor.pickle(this)
-    end
-    _iteration = _iteration + 1
-
-  be finish() =>
-    for w_actor in _actors.values() do
-      w_actor.process(Finish)
-    end
-
-  be add_serialized(ser: ByteSeq val) =>
-    match ser
-    | let s: String =>
-      for byte in s.values() do
-        _serialized.push(byte)
-      end
-    | let arr: Array[U8] val =>
-      for byte in arr.values() do
-        _serialized.push(byte)
-      end
-    end
-    _received_serialized = _received_serialized + 1
-    if _received_serialized == _actor_count then
-      // TODO: Remove when not needed for DEMO
-      // let last = (_serialized = recover Array[U8] end)
-      // let digest = Pickle.md5_digest(String.from_iso_array(consume last))
-      // @printf[I32]("Digest for iteration %lu: %s\n".cstring(), _iteration,
-      //   digest.cstring())
-      _received_serialized = 0
-      if _iteration < _expected_iterations then
-        act()
-      else
-        finish()
-      end
     end
 
   be receive_immigrant_step(msg: StepMigrationMsg val) =>
@@ -457,18 +414,3 @@ class val ActorSystemSourceBuilder is SourceBuilder
 
   fun val update_router(router: Router val): SourceBuilder =>
     this
-
-class MainNotify is TimerNotify
-  let _main: WActorInitializer
-  let _n: USize
-
-  new iso create(main: WActorInitializer, n: USize) =>
-    _main = main
-    _n = n
-
-  fun ref apply(timer: Timer, count: U64): Bool =>
-    // If we need to simulate the DCM Toy Model for some
-    // reason in future demo runs, we still want this.
-    // TODO: Remove this comment and associated code in this file.
-    // _main.act()
-    false

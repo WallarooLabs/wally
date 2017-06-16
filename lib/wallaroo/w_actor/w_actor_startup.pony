@@ -44,10 +44,7 @@ actor ActorSystemStartup
   var _ph_host: String = ""
   var _ph_service: String = ""
 
-  // TODO: remove DEMO param actor_count
-  new create(env: Env, system: ActorSystem val, app_name: String,
-    actor_count: USize)
-  =>
+  new create(env: Env, system: ActorSystem val, app_name: String) =>
     _env = env
     _system = system
     _app_name = app_name
@@ -209,6 +206,10 @@ actor ActorSystemStartup
       let router_registry = RouterRegistry(auth, _startup_options.worker_name,
         data_receivers, connections, _startup_options.stop_the_world_pause)
 
+      //TODO: Remove this once we have application lifecycle implemented
+      //for ActorSystem
+      router_registry.application_ready_to_work()
+
       let recovery_replayer = RecoveryReplayer(auth,
         _startup_options.worker_name, data_receivers, router_registry,
         connections, is_recovering)
@@ -218,7 +219,7 @@ actor ActorSystemStartup
 
       let initializer = WActorInitializer(_startup_options.worker_name,
         _app_name, auth, event_log, _startup_options.input_addrs,
-        _startup_options.output_addrs, _local_actor_system_file, actor_count,
+        _startup_options.output_addrs, _local_actor_system_file,
         _iterations, recovery, recovery_replayer, _data_channel_file,
         _worker_names_file, data_receivers, empty_metrics_conn, seed,
         connections, router_registry, _startup_options.is_initializer)
