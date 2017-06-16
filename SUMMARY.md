@@ -55,6 +55,11 @@
 * [Interworker Serialization and Resilience](book/python/interworker-serialization-and-resilience.md)
 * [Wallaroo Python API](book/python/api.md)
 
+### Debugging Python Wallaroo Applications
+* [Debugging](book/python/debugging.md)
+* [Remote Debugging Setup for Windows](book/python/windows-remote-debugging-setup.md)
+   * [Remote Debugging Using Wing IDE](book/python/wing-remote-debugging.md)
+
 ## Appendix
 * [Wallaroo Command-Line Options](book/appendix/wallaroo-command-line-options.md)
 * [Sending Data over TCP with Giles Sender](book/wallaroo-tools/giles-sender.md)
