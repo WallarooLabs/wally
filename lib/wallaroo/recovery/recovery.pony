@@ -89,6 +89,7 @@ actor Recovery
       _start_msg_replay(workers)
     | let wai: WActorInitializer =>
       _start_w_actor_registry_recovery(workers)
+      wai.start_app()
     else
       Fail()
     end
@@ -125,7 +126,6 @@ actor Recovery
       _event_log.start_pipeline_logging(lti)
     | let wai: WActorInitializer =>
       _event_log.start_actor_system_logging(wai)
-      wai.kick_off_demo()
     else
       Fail()
     end
