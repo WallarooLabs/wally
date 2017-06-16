@@ -14,16 +14,6 @@ Machida is the program that runs Wallaroo applications written using the Wallaro
 
 Machida runs Wallaroo Python applications using an embedded CPython interpreter. You should be able to use any Python modules that you would normally use when creating a Python application.
 
-You can debug your application using the `pdb` module by first importing the module and then calling its `set_trace()` function. For example:
-
-```
-import pdb
-# ...
-def application_setup(arg):
-    pdb.set_trace()
-        # ...
-```
-
 ## Next Steps
 
 To set up your environment for writing and running Wallaroo Python application, refer to [Building a Python Application](building.md).
