@@ -105,10 +105,10 @@ class PySource is WActorFramedSourceHandler
   fun decode(data: Array[U8] val): PyData val ? =>
     let decoded = @call_fn_bufferarg(_source, "decode".cstring(),
       data.cpointer(), data.size())
-    @py_incref(decoded)
     if Atkin.print_errors() then
       error
     end
+    @py_incref(decoded)
     PyData(decoded) 
 
   fun _serialise_space(): USize =>
@@ -135,6 +135,9 @@ class PySink
     | let p: PyData val =>
       let arr = recover val
         let data = @call_fn(_sink, "encode".cstring(), p.obj())
+        if Atkin.print_errors() then
+          Fail()
+        end
         Array[U8].from_cpointer(@PyString_AsString(data), @PyString_Size(data)).clone()
       end
       wb.write(arr)
