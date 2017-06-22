@@ -21,7 +21,7 @@ def split_longs(u128):
     return (l, r)
 
 
-class WActor:
+class WActor(object):
     def __init__(self):
         self._call_log = []
 
