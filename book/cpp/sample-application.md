@@ -218,14 +218,14 @@ void *AddVotes::compute(
   void *state_change_handle = w_state_change_repository_lookup_by_name(
     state_change_repository_helper_, state_change_repository_, AddVotesStateChange::s_name);
 
-  AddVotesStateChange *add_votes_state_change = 
+  AddVotesStateChange *add_votes_state_change =
     static_cast<AddVotesStateChange*>(
       w_state_change_get_state_change_object(
         state_change_repository_helper_, state_change_handle));
 
   add_votes_state_change->update(*votes);
 
-  LetterTotal *letter_total = 
+  LetterTotal *letter_total =
     new LetterTotal(letter_state->m_letter, letter_state->m_count);
 
   return w_stateful_computation_get_return(
@@ -255,7 +255,7 @@ size_t AddVotes::serialize_get_size ()
 
 The `name` method returns the name of the state computation.
 
-The `compute` method does the actual work. It gets the state change handle (this is required by Wallaroo) by calling `w_state_change_repository_lookup_by_name`. It then uses this to get the state change object by calling `w_state_change_get_state_change_object`. It updates the state change object using the `Votes` message data and creates a new outgoing `LetterTotal` message object. Note that the `LetterTotal` object adds the count from the `Votes` data to the count in the state data, because the state object does not get updated until after the `compute` message is run. Finally, the `compute` uses the `w_stateful_computation_get_return` function to generate the return value using the outgoing `LetterTotal` message data and the state change handle.
+The `compute` method does the actual work. It gets the state change handle (this is required by Wallaroo) by calling `w_state_change_repository_lookup_by_name` (if no state change handle can be found then it returns a pointer to `None`, which can be tested by comparing it to the `none` pointer that is passed into the method). It then uses this to get the state change object by calling `w_state_change_get_state_change_object`. It updates the state change object using the `Votes` message data and creates a new outgoing `LetterTotal` message object. Note that the `LetterTotal` object adds the count from the `Votes` data to the count in the state data, because the state object does not get updated until after the `compute` message is run. Finally, the `compute` uses the `w_stateful_computation_get_return` function to generate the return value using the outgoing `LetterTotal` message data and the state change handle.
 
 State functions have zero or more state change builders associated with them. Each state change builder can build a state change, which represents a way of updating the state object. Wallaroo uses the `get_number_of_state_change_builders` method to determine how many state change builders are associated with the computation, and then calls the `get_state_change_builder` method to get each state change builder. In our case there is only one state change builder.
 
@@ -350,7 +350,7 @@ uint64_t AddVotesStateChange::id()
 ```
 
 Our state change object has an `update` method that is used to set the data that will be used to update the state. After the computation completes, Wallaroo calls the `apply` method to apply the stored
-change to the state. 
+change to the state.
 
 State change objects are not created directly by the developer, instead a state change builder object creates the state change object at some point. Our application's state change builder looks like this:
 
