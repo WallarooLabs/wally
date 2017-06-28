@@ -97,6 +97,22 @@ class WActorRegistry
     let wrapped = WMessage(sender, target, data)
     send_to(target, wrapped)
 
+  fun ref roles_for(w_actor: U128): Array[String] =>
+    let roles = Array[String]
+    for (r_name, role) in _roles.pairs() do
+      if role.contains(w_actor) then
+        roles.push(r_name)
+      end
+    end
+    roles
+
+  fun ref actors_in_role(role: String): Array[U128] =>
+    try
+      _roles(role).local_actors()
+    else
+      Array[U128]
+    end
+
 actor CentralWActorRegistry
   let _worker_name: String
   let _auth: AmbientAuth
@@ -396,9 +412,17 @@ class Role
   fun name(): String =>
     _name
 
-  fun empty(): Bool => _actors.size() == 0
+  fun empty(): Bool =>
+    _actors.size() == 0
 
-  fun actors(): Array[U128] box => _actors
+  fun actors(): Array[U128] box =>
+    _actors
+
+  fun ref local_actors(): Array[U128] =>
+    _actors
+
+  fun contains(w_actor: U128): Bool =>
+    _actors.contains(w_actor)
 
   fun ref remove_actor(id: U128) ? =>
     let idx = _actors.find(id)

@@ -26,6 +26,8 @@ trait WActorHelper
   fun ref send_to_role(role: String, data: Any val)
   fun ref send_to_sink[Out: Any val](sink_id: USize, output: Out)
   fun ref register_as_role(role: String)
+  fun ref roles_for(w_actor: U128): Array[String]
+  fun ref actors_in_role(role: String): Array[U128]
   fun ref create_actor(builder: WActorBuilder)
   fun ref destroy_actor(id: U128)
   fun ref set_timer(duration: U128, callback: {()},

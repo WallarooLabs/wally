@@ -22,6 +22,8 @@ trait WActorWrapper
   fun ref _send_to(target: U128, data: Any val)
   fun ref _send_to_role(role: String, data: Any val)
   fun ref _send_to_sink[Out: Any val](sink_id: USize, output: Out)
+  fun ref _roles_for(w_actor: U128): Array[String]
+  fun ref _actors_in_role(role: String): Array[U128]
   fun ref _set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   fun ref _cancel_timer(t: WActorTimer)
@@ -169,6 +171,12 @@ actor WActorWithState is WActorWrapper
       Fail()
     end
 
+  fun ref _roles_for(w_actor: U128): Array[String] =>
+    _actor_registry.roles_for(w_actor)
+
+  fun ref _actors_in_role(role: String): Array[U128] =>
+    _actor_registry.actors_in_role(role)
+
   fun ref _set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   =>
@@ -223,6 +231,12 @@ class LiveWActorHelper is WActorHelper
   fun ref register_as_role(role: String) =>
     _w_actor._register_as_role(role)
 
+  fun ref roles_for(w_actor: U128): Array[String] =>
+    _w_actor._roles_for(w_actor)
+
+  fun ref actors_in_role(role: String): Array[U128] =>
+    _w_actor._actors_in_role(role)
+
   fun ref create_actor(builder: WActorBuilder) =>
     _w_actor.create_actor(builder)
 
@@ -249,6 +263,12 @@ class EmptyWActorHelper is WActorHelper
 
   fun ref register_as_role(role: String) =>
     None
+
+  fun ref roles_for(w_actor: U128): Array[String] =>
+    Array[String]
+
+  fun ref actors_in_role(role: String): Array[U128] =>
+    Array[U128]
 
   fun ref create_actor(builder: WActorBuilder) =>
     None
