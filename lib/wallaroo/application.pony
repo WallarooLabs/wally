@@ -30,7 +30,7 @@ class Application
     _name = name'
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
-    pipeline_name: String, decoder: FramedSourceHandler[In] val,
+    pipeline_name: String,
     init_file: (InitFile val | None) = None, coalescing: Bool = true):
       PipelineBuilder[In, Out, In]
   =>
@@ -40,7 +40,7 @@ class Application
       add_init_file(pipeline_id, f)
     end
     let pipeline = Pipeline[In, Out](_name, pipeline_id, pipeline_name,
-      decoder, coalescing)
+      coalescing)
     PipelineBuilder[In, Out, In](this, pipeline)
 
   // TODO: Replace this with a better approach.  This is a shortcut to get
@@ -101,7 +101,7 @@ class Application
 trait BasicPipeline
   fun name(): String
   fun source_id(): USize
-  fun source_builder(): SourceBuilderBuilder val
+  fun source_builder(): SourceBuilderBuilder val ?
   fun source_route_builder(): RouteBuilder val
   fun sink_builder(): (TCPSinkBuilder | None)
   fun sink_target_ids(): Array[U64] val
@@ -117,10 +117,11 @@ trait BasicPipeline
 class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _pipeline_id: USize
   let _name: String
-  let _decoder: FramedSourceHandler[In] val
+  let _app_name: String
+  var _decoder: (FramedSourceHandler[In] val | None) = None
   let _runner_builders: Array[RunnerBuilder val]
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
-  let _source_builder: SourceBuilderBuilder val
+  var _source_builder: (SourceBuilderBuilder val | None) = None
   let _source_route_builder: RouteBuilder val
   var _sink_builder: (TCPSinkBuilder | None) = None
   var _sink_id: (U128 | None) = None
@@ -128,15 +129,18 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _sink_addr_idx: USize = 0
 
   new create(app_name: String, p_id: USize, n: String,
-    d: FramedSourceHandler[In] val, coalescing: Bool)
+    coalescing: Bool)
   =>
     _pipeline_id = p_id
-    _decoder = d
     _runner_builders = Array[RunnerBuilder val]
     _name = n
-    _source_builder = TypedSourceBuilderBuilder[In](app_name, _name, _decoder)
+    _app_name = app_name
     _source_route_builder = TypedRouteBuilder[In]
     _is_coalesced = coalescing
+
+  fun ref add_decoder(d: FramedSourceHandler[In] val) =>
+    _decoder = d
+    _source_builder = TypedSourceBuilderBuilder[In](_app_name, _name, d)
 
   fun ref add_runner_builder(p: RunnerBuilder val) =>
     _runner_builders.push(p)
@@ -154,7 +158,8 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 
   fun source_id(): USize => _pipeline_id
 
-  fun source_builder(): SourceBuilderBuilder val => _source_builder
+  fun source_builder(): SourceBuilderBuilder ? =>
+    _source_builder as SourceBuilderBuilder val
 
   fun source_route_builder(): RouteBuilder val => _source_route_builder
 
@@ -185,6 +190,10 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   new create(a: Application, p: Pipeline[In, Out]) =>
     _a = a
     _p = p
+
+  fun ref from(d: FramedSourceHandler[In] val): PipelineBuilder[In, Out, Last] =>
+    _p.add_decoder(d)
+    PipelineBuilder[In, Out, Last](_a, _p)
 
   fun ref to[Next: Any val](
     comp_builder: ComputationBuilder[Last, Next] val,
