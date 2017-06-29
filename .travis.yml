@@ -98,9 +98,18 @@ install:
   - cd $INSTALL_STARTED_AT
   - if [ "${TRAVIS_OS_NAME}" = "osx" ];
     then
-      brew install elixir;
+      brew install erlang@18;
+      brew link erlang@18 --force;
+      cd /tmp;
+      mkdir elixir-1.2.6;
+      wget https://github.com/elixir-lang/elixir/releases/download/v1.2.6/Precompiled.zip;
+      tar -xvf Precompiled.zip -C elixir-1.2.6;
+      ln -s /tmp/elixir-1.2.6/bin/elixir /usr/local/bin/elixir;
+      ln -s /tmp/elixir-1.2.6/bin/mix /usr/local/bin/mix;
+      ln -s /tmp/elixir-1.2.6/bin/iex /usr/local/bin/iex;
       mix local.hex --force;
       mix local.rebar --force;
+      cd $INSTALL_STARTED_AT;
     fi;
   - if [ "${TRAVIS_OS_NAME}" = "linux" ];
     then
