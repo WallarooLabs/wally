@@ -46,7 +46,7 @@ sequence_window_build_recovery_spike:
 
 sequence_window_test:
 	export PATH="$(PATH):$(INTEGRATION_BIN_PATH)" && \
-	rm /tmp/sequence* && \
+	rm -f /tmp/sequence* && \
 	cd $(SEQUENCE_WINDOW_PATH) && \
 	integration_test --sequence-sender '(0,1000]' \
 	  --log-level error \
