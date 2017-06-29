@@ -157,8 +157,13 @@ class TCPReceiver(StoppableThread):
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.clients = []
         self.err = None
+        self.event = threading.Event()
 
-    def get_connection_info(self):
+    def get_connection_info(self, timeout=10):
+        is_connected = self.event.wait(timeout)
+        if not is_connected:
+            raise TimeoutError("{} Couldn't get connection info after {}"
+                               " seconds".format(self.__base_name__, timeout))
         return self.sock.getsockname()
 
     def run(self):
@@ -166,6 +171,7 @@ class TCPReceiver(StoppableThread):
             self.sock.bind((self.host, self.port))
             self.sock.listen(self.max_connections)
             self.host, self.port = self.sock.getsockname()
+            self.event.set()
             while not self.stopped():
                 (clientsocket, address) = self.sock.accept()
                 cl = SingleSocketReceiver(clientsocket, self.data, self.mode,
