@@ -44,6 +44,7 @@ actor Connections is Cluster
   let _connection_addresses_file: String
   let _is_joining: Bool
   let _spike_config: (SpikeConfig | None)
+  let _event_log: EventLog
 
   new create(app_name: String, worker_name: String,
     auth: AmbientAuth, c_host: String, c_service: String,
@@ -51,7 +52,8 @@ actor Connections is Cluster
     external_host: String, external_service: String,
     metrics_conn: MetricsSink, metrics_host: String, metrics_service: String,
     is_initializer: Bool, connection_addresses_file: String,
-    is_joining: Bool, spike_config: (SpikeConfig | None) = None)
+    is_joining: Bool, spike_config: (SpikeConfig | None) = None,
+    event_log: EventLog)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -65,6 +67,7 @@ actor Connections is Cluster
     _connection_addresses_file = connection_addresses_file
     _is_joining = is_joining
     _spike_config = spike_config
+    _event_log = event_log
 
     if _is_initializer then
       _my_control_addr = (c_host, c_service)
@@ -258,7 +261,8 @@ actor Connections is Cluster
       Fail()
     end
 
-  be stop_the_world(exclusions: Array[String] val) =>
+  be stop_the_world(exclusions: Array[String] val = recover Array[String] end)
+  =>
     try
       let mute_request_msg =
         ChannelMsgEncoder.mute_request(_worker_name, _auth)
@@ -642,3 +646,24 @@ actor Connections is Cluster
 
     @printf[I32]("Connections: Finished shutdown procedure.\n".cstring())
 
+  be rotate_log_files(worker_name: String) =>
+    """
+    Instruct a worker to rotate its log files.
+    If worker_name isn't given, do nothing.
+    """
+    _rotate_log_files(worker_name)
+
+  fun _rotate_log_files(worker_name: String) =>
+    if worker_name == _worker_name then
+      _event_log.start_rotation()
+    elseif _control_conns.contains(worker_name) then
+      try
+        let rotate_log_files_msg = ChannelMsgEncoder.rotate_log_files(_auth)
+        _send_control(worker_name, rotate_log_files_msg)
+      else
+        Fail()
+      end
+    else
+      @printf[I32](("WARNING: LogRotation requested for non-existent worker: " +
+        "%s\n").cstring(), worker_name.cstring())
+    end

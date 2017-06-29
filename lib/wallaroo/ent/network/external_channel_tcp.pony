@@ -82,6 +82,12 @@ class ExternalChannelConnectNotifier is TCPConnectionNotify
           end
           @printf[I32]("$$$ ExternalPrint: %s $$$\n".cstring(),
             m.message.cstring())
+        | let m: ExternalRotateLogFilesMsg =>
+          ifdef "trace" then
+            @printf[I32](("Received ExternalRotateLogFilesMsg on External " +
+              "Channel\n").cstring())
+          end
+          _connections.rotate_log_files(m.node_name)
         else
           @printf[I32](("Incoming External Message type not handled by " +
             "external channel.\n").cstring())

@@ -11,6 +11,7 @@ use cluster_manager = "ent/cluster_manager"
 use data_channel = "data_channel"
 use initialization = "initialization"
 use rebalancing = "rebalancing"
+use recovery = "recovery"
 use spike = "spike"
 use topology = "topology"
 use watermarking = "ent/watermarking"
@@ -28,6 +29,7 @@ actor Main is TestList
     data_channel.Main.make().tests(test)
     initialization.Main.make().tests(test)
     rebalancing.Main.make().tests(test)
+    recovery.Main.make().tests(test)
     spike.Main.make().tests(test)
     topology.Main.make().tests(test)
     watermarking.Main.make().tests(test)

@@ -12,6 +12,8 @@ primitive _Unknown                              fun apply(): U16 => 8
 primitive _StartGilesSenders                    fun apply(): U16 => 9
 primitive _GilesSendersStarted                  fun apply(): U16 => 10
 primitive _Print                                fun apply(): U16 => 11
+primitive _RotateLog                            fun apply(): U16 => 12
+
 
 primitive ExternalMsgEncoder
   fun _encode(id: U16, s: String, wb: Writer): Array[ByteSeq] val =>
@@ -71,6 +73,11 @@ primitive ExternalMsgEncoder
     Array[ByteSeq] val
   =>
     _encode(_Print(), message, wb)
+
+  fun rotate_log(worker_name: String, wb: Writer = Writer):
+    Array[ByteSeq] val
+  =>
+    _encode(_RotateLog(), worker_name, wb)
 
 class BufferedExternalMsgEncoder
   let _buffer: Writer
@@ -137,6 +144,8 @@ primitive ExternalMsgDecoder
       ExternalGilesSendersStartedMsg
     | (_Print(), let s: String) =>
       ExternalPrintMsg(s)
+    | (_RotateLog(), let s: String) =>
+      ExternalRotateLogFilesMsg(s)
     else
       error
     end
@@ -197,3 +206,9 @@ class val ExternalPrintMsg is ExternalMsg
 
   new val create(m: String) =>
     message = m
+
+class val ExternalRotateLogFilesMsg is ExternalMsg
+  let node_name: String
+
+  new val create(n: String) =>
+    node_name = n

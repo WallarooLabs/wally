@@ -252,6 +252,9 @@ primitive ChannelMsgEncoder
   =>
     _encode(WActorRegistryDigestMsg(digest), auth)
 
+  fun rotate_log_files(auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(RotateLogFilesMsg, auth)
+
 primitive ChannelMsgDecoder
   fun apply(data: Array[U8] val, auth: AmbientAuth): ChannelMsg =>
     try
@@ -740,3 +743,8 @@ class val KeyedAnnounceNewStatefulStepMsg[
   fun update_registry(r: RouterRegistry) =>
     r.add_state_proxy[K](_step_id, ProxyAddress(_worker_name, _step_id), _key,
       _state_name)
+
+primitive RotateLogFilesMsg is ChannelMsg
+  """
+  This message is sent to a worker instructing it to rotate its log files.
+  """

@@ -1,278 +1,88 @@
 use "buffered"
 use "collections"
 use "files"
-use "wallaroo/boundary"
-use "wallaroo/ent/data_receiver"
 use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
-use "wallaroo/invariant"
 use "wallaroo/messages"
-use "wallaroo/routing"
 use "wallaroo/ent/w_actor"
-use "debug"
+use "wallaroo/topology"
 
 interface tag Resilient
   be replay_log_entry(uid: U128, frac_ids: FractionalMessageId,
     statechange_id: U64, payload: ByteSeq)
   be log_flushed(low_watermark: SeqId)
 
-//TODO: explain in comment
-type LogEntry is (Bool, U128, U128, FractionalMessageId, U64, U64,
-  Array[ByteSeq] iso)
+class val EventLogConfig
+  let log_dir: (FilePath | AmbientAuth | None)
+  let filename: (String val | None)
+  let logging_batch_size: USize
+  let backend_file_length: (USize | None)
+  let log_rotation: Bool
+  let suffix: String
 
-// used to hold a receovered log entry that might need to be replayed on
-// recovery
-type ReplayEntry is (U128, U128, FractionalMessageId, U64, U64, ByteSeq val)
-
-trait Backend
-  fun ref sync() ?
-  fun ref datasync() ?
-  fun ref start_log_replay()
-  fun ref write() ?
-  fun ref encode_entry(entry: LogEntry)
-
-class DummyBackend is Backend
-  let _event_log: EventLog
-  new create(event_log: EventLog) =>
-    _event_log = event_log
-  fun ref sync() => None
-  fun ref datasync() => None
-  fun ref start_log_replay() =>
-    _event_log.log_replay_finished()
-  fun ref write() => None
-  fun ref encode_entry(entry: LogEntry) => None
-
-class FileBackend is Backend
-  //a record looks like this:
-  // - is_watermark boolean
-  // - origin id
-  // - seq id (low watermark record ends here)
-  // - uid
-  // - size of fractional id list
-  // - fractional id list (may be empty)
-  // - statechange id
-  // - payload
-
-  let _file: File iso
-  let _filepath: FilePath
-  let _event_log: EventLog
-  let _writer: Writer iso
-  var _replay_log_exists: Bool
-
-  new create(filepath: FilePath, event_log: EventLog,
-    file_length: (USize | None) = None) =>
-    _writer = recover iso Writer end
-    _filepath = filepath
-    _replay_log_exists = _filepath.exists()
-    _file = recover iso File(filepath) end
-    match file_length
-    | let len: USize => _file.set_length(len)
-    end
-    _event_log = event_log
-
-  fun ref start_log_replay() =>
-    if _replay_log_exists then
-        @printf[I32]("RESILIENCE: Replaying from recovery log file.\n".cstring())
-
-        //replay log to EventLog
-        try
-          let r = Reader
-
-          //seek beginning of file
-          _file.seek_start(0)
-          var size = _file.size()
-
-          var num_replayed: USize = 0
-          var num_skipped: USize = 0
-
-          // array to hold recovered data temporarily until we've sent it
-          // off to be replayed
-          var replay_buffer: Array[ReplayEntry val] ref =
-            replay_buffer.create()
-
-          let watermarks: Map[U128, U64] = watermarks.create()
-
-          //start iterating until we reach original EOF
-          while _file.position() < size do
-            r.append(_file.read(25))
-            let is_watermark = r.bool()
-            let origin_id = r.u128_be()
-            let seq_id = r.u64_be()
-            if is_watermark then
-              // save last watermark read from file
-              watermarks(origin_id) = seq_id
-            else
-              r.append(_file.read(24))
-              let uid = r.u128_be()
-              let fractional_size = r.u64_be()
-              let frac_ids = recover val
-                if fractional_size > 0 then
-                  let bytes_to_read = fractional_size.usize() * 4
-                  r.append(_file.read(bytes_to_read))
-                  let l = Array[U32]
-                  for i in Range(0,fractional_size.usize()) do
-                    l.push(r.u32_be())
-                  end
-                  l
-                else
-                  //None is faster if we have no frac_ids, which will
-                  // probably be true most of the time
-                  None
-                end
-              end
-              r.append(_file.read(16))
-              let statechange_id = r.u64_be()
-              let payload_length = r.u64_be()
-              let payload = recover val
-                if payload_length > 0 then
-                  _file.read(payload_length.usize())
-                else
-                  Array[U8]
-                end
-              end
-
-              // put entry into temporary recovered buffer
-              replay_buffer.push((origin_id, uid, frac_ids,
-                statechange_id, seq_id, payload))
-            end
-
-            // clear read buffer to free file data read so far
-            if r.size() > 0 then
-              Fail()
-            end
-            r.clear()
-          end
-
-        // iterate through recovered buffer and replay entries at or below
-        // watermark
-        for entry in replay_buffer.values() do
-          // only replay if at or below watermark
-          if entry._5 <= watermarks.get_or_else(entry._1, 0) then
-            num_replayed = num_replayed + 1
-            _event_log.replay_log_entry(entry._1, entry._2, entry._3,
-              entry._4, entry._6)
-          else
-            num_skipped = num_skipped + 1
-          end
-
-          @printf[I32]("RESILIENCE: Replayed %d entries from recovery log file.\n"
-            .cstring(), num_replayed)
-          @printf[I32]("RESILIENCE: Skipped %d entries from recovery log file.\n"
-            .cstring(), num_skipped)
-
-          _file.seek_end(0)
-        end
-        _event_log.log_replay_finished()
-      else
-        @printf[I32]("Cannot recover state from eventlog\n".cstring())
-      end
-    else
-      @printf[I32]("RESILIENCE: Could not find log file to replay.\n"
-        .cstring())
-      Fail()
-    end
-
-  fun ref write() ?
+  new val create(log_dir': (FilePath | AmbientAuth | None) = None,
+    filename': (String val | None) = None,
+    logging_batch_size': USize = 10,
+    backend_file_length': (USize | None) = None,
+    log_rotation': Bool = false,
+    suffix': String = ".evlog")
   =>
-    if not _file.writev(recover val _writer.done() end) then
-      error
-    end
-
-  fun ref encode_entry(entry: LogEntry)
-  =>
-    (let is_watermark: Bool, let origin_id: U128,
-     let uid: U128, let frac_ids: FractionalMessageId,
-     let statechange_id: U64, let seq_id: U64,
-     let payload: Array[ByteSeq] val) = consume entry
-
-    ifdef "trace" then
-      if is_watermark then
-        @printf[I32]("Writing Watermark: %d\n".cstring(), seq_id)
-      else
-        @printf[I32]("Writing Message: %d\n".cstring(), seq_id)
-      end
-    end
-
-    _writer.bool(is_watermark)
-    _writer.u128_be(origin_id)
-    _writer.u64_be(seq_id)
-
-    if not is_watermark then
-      _writer.u128_be(uid)
-
-      match frac_ids
-      | None =>
-        _writer.u64_be(0)
-      | let x: Array[U32] val =>
-        let fractional_size = x.size().u64()
-        _writer.u64_be(fractional_size)
-
-        for frac_id in x.values() do
-          _writer.u32_be(frac_id)
-        end
-      else
-        Fail()
-      end
-
-      _writer.u64_be(statechange_id)
-      var payload_size: USize = 0
-      for p in payload.values() do
-        payload_size = payload_size + p.size()
-      end
-      _writer.u64_be(payload_size.u64())
-    end
-
-    // write data to write buffer
-    _writer.writev(payload)
-
-  fun ref sync() ? =>
-    _file.sync()
-    match _file.errno()
-    | FileOK => None
-    else
-      error
-    end
-
-  fun ref datasync() ? =>
-    _file.datasync()
-    match _file.errno()
-    | FileOK => None
-    else
-      error
-    end
+    filename = filename'
+    log_dir = log_dir'
+    logging_batch_size = logging_batch_size'
+    backend_file_length = backend_file_length'
+    log_rotation = log_rotation'
+    suffix = suffix'
 
 actor EventLog
   let _origins: Map[U128, Resilient] = _origins.create()
-  let _logging_batch_size: USize
-  let _backend: Backend ref
+  let _backend: Backend
   let _replay_complete_markers: Map[U64, Bool] =
     _replay_complete_markers.create()
+  let _config: EventLogConfig
   var num_encoded: USize = 0
   var _flush_waiting: USize = 0
   var _initialized: Bool = false
-
   var _recovery: (Recovery | None) = None
+  var _steps_to_snapshot: SetIs[U128] = _steps_to_snapshot.create()
+  var _router_registry: (RouterRegistry | None) = None
+  var _rotating: Bool = false
 
-  new create(env: Env, filename: (String val | None) = None,
-    logging_batch_size: USize = 10,
-    backend_file_length: (USize | None) = None)
-  =>
-    _logging_batch_size = logging_batch_size
-    _backend =
-    recover iso
-      match filename
+  new create(event_log_config: EventLogConfig = EventLogConfig()) =>
+    _config = event_log_config
+    _backend = match _config.filename
       | let f: String val =>
         try
-          FileBackend(FilePath(env.root as AmbientAuth, f), this,
-            backend_file_length)
+          if _config.log_rotation then
+            match _config.log_dir
+            | let ld: FilePath =>
+              RotatingFileBackend(ld, f, _config.suffix, this,
+                _config.backend_file_length)
+            else
+              Fail()
+              DummyBackend
+            end
+          else
+            match _config.log_dir
+            | let ld: FilePath =>
+              FileBackend(FilePath(ld, f), this)
+            | let ld: AmbientAuth =>
+              FileBackend(FilePath(ld, f), this)
+            else
+              Fail()
+              DummyBackend
+            end
+          end
         else
-          DummyBackend(this)
+          DummyBackend
         end
       else
-        DummyBackend(this)
+        DummyBackend
       end
-    end
+
+  be set_router_registry(router_registry: RouterRegistry) =>
+    _router_registry = router_registry
 
   be start_pipeline_logging(initializer: LocalTopologyInitializer) =>
     _initialized = true
@@ -321,7 +131,7 @@ actor EventLog
 
       num_encoded = num_encoded + 1
 
-      if num_encoded == _logging_batch_size then
+      if num_encoded == _config.logging_batch_size then
         //write buffer to disk
         write_log()
       end
@@ -364,5 +174,74 @@ actor EventLog
       _origins(origin_id).log_flushed(low_watermark)
     else
       @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
+      Fail()
+    end
+
+  be snapshot_state(origin_id: U128, uid: U128,
+    statechange_id: U64, seq_id: U64,
+    payload: Array[ByteSeq] iso)
+  =>
+    ifdef "trace" then
+      @printf[I32]("Snapshotting state for step %lu\n".cstring(), origin_id)
+    end
+    if _steps_to_snapshot.contains(origin_id) then
+      _steps_to_snapshot.unset(origin_id)
+    else
+      @printf[I32](("Error writing snapshot to logfile. StepId not in set of " +
+        "expected steps!\n").cstring())
+      Fail()
+    end
+    queue_log_entry(origin_id, uid, None, statechange_id, seq_id,
+      consume payload)
+    if _steps_to_snapshot.size() == 0 then
+      rotation_complete()
+    end
+
+  be start_rotation() =>
+    if not _rotating then
+      _rotating = true
+      match _router_registry
+      | let r: RouterRegistry =>
+        r.rotate_log_file()
+      else
+        Fail()
+      end
+    end
+
+  be rotate_file(steps: Map[U128, Step] val) =>
+    @printf[I32]("Snapshotting %d steps to new log file.\n".cstring(),
+      steps.size())
+    match _router_registry
+    | None =>
+      Fail()
+    end
+    _rotate_file()
+    _steps_to_snapshot = _steps_to_snapshot.create()
+    for v in steps.keys() do
+      _steps_to_snapshot.set(v)
+    end
+    for s in steps.values() do
+      s.snapshot_state()
+    end
+
+  fun ref _rotate_file() =>
+    try
+      match _backend
+      | let b: RotatingFileBackend => b.rotate_file()
+      else
+        @printf[I32](("Unsupported operation requested on log Backend: " +
+                      "'rotate_file'. Request ignored.\n").cstring())
+      end
+    else
+      @printf[I32]("Error rotating log file!\n".cstring())
+      Fail()
+    end
+
+  fun ref rotation_complete() =>
+    @printf[I32]("Steps snapshotting to new log file complete.\n".cstring())
+    _rotating = false
+    match _router_registry
+    | let r: RouterRegistry => r.rotation_complete()
+    else
       Fail()
     end

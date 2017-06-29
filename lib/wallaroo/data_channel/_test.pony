@@ -32,6 +32,7 @@ use "wallaroo/boundary"
 use "wallaroo/ent/data_receiver"
 use "wallaroo/metrics"
 use "wallaroo/ent/network"
+use "wallaroo/recovery"
 use "wallaroo/topology"
 
 actor Main is TestList
@@ -71,13 +72,15 @@ class _TestDataChannel is DataChannelListenNotify
 
     try
       let auth = h.env.root as AmbientAuth
+      let event_log = EventLog()
       let conns = Connections("app_name", "worker_name", auth,
         "127.0.0.1", "0",
         "127.0.0.1", "0",
         "", "",
         "", "",
         _NullMetricsSink, "127.0.0.1", "0",
-        true, "/tmp/foo_connections.txt", false)
+        true, "/tmp/foo_connections.txt", false
+        where event_log = event_log)
       let dr = DataReceivers(auth, "worker_name")
       let rr = RouterRegistry(auth, "worker_name", dr, conns, 1)
       h.dispose_when_done(DataChannelListener(auth, consume this, rr))

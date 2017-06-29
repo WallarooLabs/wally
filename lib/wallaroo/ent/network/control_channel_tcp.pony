@@ -31,6 +31,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _broadcast_variables: (BroadcastVariables | None)
   let _recovery_file: FilePath
   let _joining_existing_cluster: Bool
+  let _event_log: EventLog
 
   new iso create(name: String, auth: AmbientAuth,
     connections: Connections, is_initializer: Bool,
@@ -39,7 +40,8 @@ class ControlChannelListenNotifier is TCPListenNotify
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     recovery_file: FilePath, data_host: String, data_service: String,
     joining: Bool = false,
-    broadcast_variables: (BroadcastVariables | None) = None)
+    broadcast_variables: (BroadcastVariables | None) = None,
+    event_log: EventLog)
   =>
     _auth = auth
     _name = name
@@ -57,6 +59,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _d_host = data_host
     _d_service = data_service
     _joining_existing_cluster = joining
+    _event_log = event_log
 
   fun ref listening(listen: TCPListener ref) =>
     try
@@ -103,7 +106,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _auth, _connections,
       _initializer, _layout_initializer, _recovery, _recovery_replayer,
-      _router_registry, _broadcast_variables, _d_host, _d_service)
+      _router_registry, _broadcast_variables, _d_host, _d_service, _event_log)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
@@ -117,6 +120,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _broadcast_variables: (BroadcastVariables | None)
   let _d_host: String
   let _d_service: String
+  let _event_log: EventLog
   var _header: Bool = true
 
   new iso create(name: String, auth: AmbientAuth,
@@ -124,7 +128,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     broadcast_variables: (BroadcastVariables | None),
-    data_host: String, data_service: String)
+    data_host: String, data_service: String, event_log: EventLog)
   =>
     _auth = auth
     _name = name
@@ -137,6 +141,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _broadcast_variables = broadcast_variables
     _d_host = data_host
     _d_service = data_service
+    _event_log = event_log
 
   fun ref accepted(conn: TCPConnection ref) =>
     conn.expect(4)
@@ -359,6 +364,10 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         @printf[I32]("Control Ch: Received Unmute Request from %s\n".cstring(),
           m.originating_worker.cstring())
         _router_registry.remote_unmute_request(m.originating_worker)
+      | let m: RotateLogFilesMsg =>
+        @printf[I32]("Control Ch: Received Rotate Log Files request\n"
+          .cstring())
+        _event_log.start_rotation()
       | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())
       else

@@ -34,7 +34,9 @@ actor Startup
   var _cluster_initializer: (ClusterInitializer | None) = None
   var _application_distributor: (ApplicationDistributor | None) = None
   var _swarm_manager_addr: String = ""
-  var _event_log_file: String = ""
+  var _event_log_dir_filepath: (FilePath | None) = None
+  var _event_log_file_basename: String = ""
+  var _event_log_file_suffix: String = ""
   var _local_topology_file: String = ""
   var _data_channel_file: String = ""
   var _control_channel_file: String = ""
@@ -113,8 +115,9 @@ actor Startup
           ""
         end
 
-      _event_log_file = _startup_options.resilience_dir + "/" + name + "-" +
-        _startup_options.worker_name + ".evlog"
+      _event_log_dir_filepath = FilePath(auth, _startup_options.resilience_dir)
+      _event_log_file_basename = name + "-" + _startup_options.worker_name
+      _event_log_file_suffix = ".evlog"
       _local_topology_file = _startup_options.resilience_dir
         + "/" + name + "-" + _startup_options.worker_name + ".local-topology"
       _data_channel_file = _startup_options.resilience_dir + "/" + name + "-" +
@@ -126,13 +129,18 @@ actor Startup
       _connection_addresses_file = _startup_options.resilience_dir + "/" +
         name + "-" + _startup_options.worker_name + ".connection-addresses"
 
-      @printf[I32](("|||Resilience directory: " +
+      @printf[I32](("||| Resilience directory: " +
         _startup_options.resilience_dir + "|||\n").cstring())
 
       if not FilePath(auth, _startup_options.resilience_dir).exists() then
         @printf[I32](("Resilience directory: " +
           _startup_options.resilience_dir + " doesn't exist\n").cstring())
         error
+      end
+
+      ifdef "resilience" then
+        @printf[I32](("||| Log-rotation: " +
+          _startup_options.log_rotation.string() + "|||\n").cstring())
       end
 
       if _startup_options.is_joining then
@@ -196,14 +204,20 @@ actor Startup
           m_addr(1), _application.name(), _startup_options.worker_name)
 
       var is_recovering: Bool = false
+      let event_log_dir_filepath = _event_log_dir_filepath as FilePath
 
       // check to see if we can recover
       // Use Set to make the logic explicit and clear
       let existing_files: Set[String] = Set[String]
 
-      let event_log_filepath: FilePath = FilePath(auth, _event_log_file)
-      if event_log_filepath.exists() then
-        existing_files.set(event_log_filepath.path)
+      let event_log_filepath = try
+        let elf: FilePath = LastLogFilePath(_event_log_file_basename,
+          _event_log_file_suffix, event_log_dir_filepath)
+        existing_files.set(elf.path)
+        elf
+      else
+        FilePath(event_log_dir_filepath,
+          _event_log_file_basename + _event_log_file_suffix)
       end
 
       let local_topology_filepath: FilePath = FilePath(auth,
@@ -268,11 +282,21 @@ actor Startup
       end
 
       _event_log = ifdef "resilience" then
-          EventLog(_env, _event_log_file
-            where backend_file_length = _startup_options.event_log_file_length)
+        if _startup_options.log_rotation then
+          EventLog(EventLogConfig(event_log_dir_filepath,
+            _event_log_file_basename
+            where backend_file_length' = _startup_options.event_log_file_length,
+            suffix' = _event_log_file_suffix, log_rotation' = true))
         else
-          EventLog(_env, None)
+          EventLog(EventLogConfig(event_log_dir_filepath,
+            _event_log_file_basename + _event_log_file_suffix
+            where backend_file_length' =
+              _startup_options.event_log_file_length))
         end
+      else
+        EventLog()
+      end
+      let event_log = _event_log as EventLog
 
       let connections = Connections(_application.name(),
         _startup_options.worker_name, auth,
@@ -281,7 +305,7 @@ actor Startup
         _ph_host, _ph_service, _external_host, _external_service,
         metrics_conn, m_addr(0), m_addr(1), _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
-        _startup_options.spike_config)
+        _startup_options.spike_config, event_log)
 
       let data_receivers = DataReceivers(auth,
         _startup_options.worker_name, is_recovering)
@@ -289,13 +313,15 @@ actor Startup
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
         connections, _startup_options.stop_the_world_pause)
+      router_registry.set_event_log(event_log)
+      event_log.set_router_registry(router_registry)
 
       let recovery_replayer = RecoveryReplayer(auth,
         _startup_options.worker_name, data_receivers, router_registry,
         connections, is_recovering)
 
       let recovery = Recovery(auth, _startup_options.worker_name,
-        _event_log as EventLog, recovery_replayer, connections)
+        event_log, recovery_replayer, connections)
 
       let local_topology_initializer =
         if _startup_options.is_swarm_managed then
@@ -306,8 +332,7 @@ actor Startup
             _application, _startup_options.worker_name,
             _startup_options.worker_count, _env, auth, connections,
             router_registry, metrics_conn, _startup_options.is_initializer,
-            data_receivers, _event_log as EventLog, recovery,
-            recovery_replayer,
+            data_receivers, event_log, recovery, recovery_replayer,
             _local_topology_file, _data_channel_file, _worker_names_file,
             cluster_manager)
         else
@@ -315,8 +340,7 @@ actor Startup
             _application, _startup_options.worker_name,
             _startup_options.worker_count, _env, auth, connections,
             router_registry, metrics_conn, _startup_options.is_initializer,
-            data_receivers, _event_log as EventLog, recovery,
-            recovery_replayer,
+            data_receivers, event_log, recovery, recovery_replayer,
             _local_topology_file, _data_channel_file, _worker_names_file)
         end
 
@@ -341,7 +365,8 @@ actor Startup
           local_topology_initializer, recovery,
           recovery_replayer, router_registry,
           control_channel_filepath, _startup_options.my_d_host,
-          _startup_options.my_d_service)
+          _startup_options.my_d_service
+          where event_log = event_log)
 
       if _startup_options.is_initializer then
         connections.make_and_register_recoverable_listener(
@@ -411,6 +436,26 @@ actor Startup
           m.data_addrs("initializer")
         end
 
+      let data_receivers = DataReceivers(auth, _startup_options.worker_name)
+
+      let event_log_dir_filepath = _event_log_dir_filepath as FilePath
+      _event_log = ifdef "resilience" then
+        if _startup_options.log_rotation then
+          EventLog(EventLogConfig(event_log_dir_filepath,
+            _event_log_file_basename
+            where backend_file_length' = _startup_options.event_log_file_length,
+            suffix' = _event_log_file_suffix, log_rotation' = true))
+        else
+          EventLog(EventLogConfig(event_log_dir_filepath,
+            _event_log_file_basename + _event_log_file_suffix
+            where backend_file_length' =
+              _startup_options.event_log_file_length))
+        end
+      else
+        EventLog()
+      end
+      let event_log = _event_log as EventLog
+
       let connections = Connections(_application.name(),
         _startup_options.worker_name,
         auth, c_host, c_service, d_host, d_service, _ph_host, _ph_service,
@@ -418,27 +463,20 @@ actor Startup
         metrics_conn, m.metrics_host, m.metrics_service,
         _startup_options.is_initializer,
         _connection_addresses_file, _startup_options.is_joining,
-        _startup_options.spike_config)
-
-      let data_receivers = DataReceivers(auth, _startup_options.worker_name)
+        _startup_options.spike_config, event_log)
 
       let router_registry = RouterRegistry(auth,
         _startup_options.worker_name, data_receivers,
         connections, _startup_options.stop_the_world_pause)
+      router_registry.set_event_log(event_log)
+      event_log.set_router_registry(router_registry)
 
       let recovery_replayer = RecoveryReplayer(auth,
         _startup_options.worker_name,
         data_receivers, router_registry, connections)
 
-      _event_log = ifdef "resilience" then
-          EventLog(_env, _event_log_file
-            where backend_file_length = _startup_options.event_log_file_length)
-        else
-          EventLog(_env, None)
-        end
-
       let recovery = Recovery(auth, _startup_options.worker_name,
-        _event_log as EventLog, recovery_replayer, connections)
+        event_log, recovery_replayer, connections)
 
       let local_topology_initializer =
         if _startup_options.is_swarm_managed then
@@ -449,7 +487,7 @@ actor Startup
             _startup_options.worker_count, _env, auth, connections,
             router_registry, metrics_conn,
             _startup_options.is_initializer, data_receivers,
-            _event_log as EventLog, recovery, recovery_replayer,
+            event_log, recovery, recovery_replayer,
             _local_topology_file, _data_channel_file, _worker_names_file,
             cluster_manager where is_joining = _startup_options.is_joining)
         else
@@ -458,7 +496,7 @@ actor Startup
             _startup_options.worker_count, _env, auth, connections,
             router_registry, metrics_conn,
             _startup_options.is_initializer, data_receivers,
-            _event_log as EventLog, recovery, recovery_replayer,
+            event_log, recovery, recovery_replayer,
             _local_topology_file, _data_channel_file, _worker_names_file
             where is_joining = _startup_options.is_joining)
         end
@@ -496,7 +534,8 @@ actor Startup
           _startup_options.is_initializer, _cluster_initializer,
           local_topology_initializer, recovery,
           recovery_replayer, router_registry, control_channel_filepath,
-          _startup_options.my_d_host, _startup_options.my_d_service)
+          _startup_options.my_d_host, _startup_options.my_d_service
+          where event_log = event_log)
 
       connections.make_and_register_recoverable_listener(
         auth, consume control_notifier, control_channel_filepath,

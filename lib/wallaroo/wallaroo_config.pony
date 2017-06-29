@@ -22,6 +22,7 @@ class StartupOptions
   var is_initializer: Bool = false
   var worker_name: String = ""
   var resilience_dir: String = "/tmp"
+  var log_rotation: Bool = false
   var event_log_file_length: (USize | None) = None
   var j_arg: (Array[String] | None) = None
   var is_joining: Bool = false
@@ -72,7 +73,8 @@ primitive WallarooConfig
       .add("topology-initializer", "t", None)
       .add("name", "n", StringArgument)
       .add("resilience-dir", "r", StringArgument)
-      .add("event_log-file-length", "l", I64Argument)
+      .add("log-rotation", "", None)
+      .add("event-log-file-size", "l", I64Argument)
       // pass in control address of any worker as the value of this parameter
       // to join a running cluster
       .add("join", "j", StringArgument)
@@ -135,7 +137,8 @@ primitive WallarooConfig
         else
           so.resilience_dir = arg
         end
-      | ("event_log-file-length", let arg: I64) =>
+      | ("log-rotation", let arg: None) => so.log_rotation = true
+      | ("event-log-file-size", let arg: I64) =>
         so.event_log_file_length = arg.usize()
       | ("join", let arg: String) =>
         so.j_arg = arg.split(":")
