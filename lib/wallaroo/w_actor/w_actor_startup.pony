@@ -233,7 +233,7 @@ actor ActorSystemStartup
         _cluster_initializer = ClusterInitializer(auth,
           _startup_options.worker_name, _startup_options.worker_count,
           connections, distributor, initializer, _startup_options.d_addr,
-          empty_metrics_conn)
+          empty_metrics_conn, is_recovering)
       end
 
       let control_channel_filepath: FilePath = FilePath(auth,
