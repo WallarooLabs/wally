@@ -221,6 +221,9 @@ primitive ChannelMsgEncoder
   =>
     _encode(RegisterAsRoleMsg(role, w_actor), auth)
 
+  fun forget_actor(id: U128, auth: AmbientAuth): Array[ByteSeq] val ? =>
+    _encode(ForgetActorMsg(id), auth)
+
   fun broadcast_to_role(role: String, data: Any val, auth: AmbientAuth):
     Array[ByteSeq] val ?
   =>
@@ -378,6 +381,12 @@ class val RegisterActorForWorkerMsg is ChannelMsg
   new val create(i: U128, w: String) =>
     id = i
     worker = w
+
+class val ForgetActorMsg is ChannelMsg
+  let id: U128
+
+  new val create(i: U128) =>
+    id = i
 
 class val RegisterAsRoleMsg is ChannelMsg
   let role: String

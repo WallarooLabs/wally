@@ -427,6 +427,7 @@ trait val ActorSystemDataRouter is Equatable[ActorSystemDataRouter]
   fun route(d_msg: ActorDeliveryMsg val)
   fun register_actor_for_worker(id: U128, worker: String)
   fun register_as_role(role: String, w_actor: U128)
+  fun forget_external_actor(id: U128)
   fun broadcast_to_actors(data: Any val)
   fun send_digest_to(worker: String)
   fun process_digest(digest: WActorRegistryDigest)
@@ -439,6 +440,9 @@ class val EmptyActorSystemDataRouter is ActorSystemDataRouter
     Fail()
 
   fun register_as_role(role: String, w_actor: U128) =>
+    Fail()
+
+  fun forget_external_actor(id: U128) =>
     Fail()
 
   fun broadcast_to_actors(data: Any val) =>
@@ -468,6 +472,9 @@ class val ActiveActorSystemDataRouter is ActorSystemDataRouter
 
   fun register_as_role(role: String, w_actor: U128) =>
     _registry.register_as_role(role, w_actor where external = true)
+
+  fun forget_external_actor(id: U128) =>
+    _registry.forget_external_actor(id)
 
   fun broadcast_to_actors(data: Any val) =>
     _registry.broadcast(data where external = true)

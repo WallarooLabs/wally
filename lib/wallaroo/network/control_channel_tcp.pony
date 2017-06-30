@@ -234,6 +234,11 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
             "Channel\n").cstring())
         end
         _router_registry.register_actor_for_worker(m.id, m.worker)
+      | let m: ForgetActorMsg val =>
+        ifdef "trace" then
+          @printf[I32]("Received ForgetActor on Control Channel\n".cstring())
+        end
+        _router_registry.forget_external_actor(m.id)
       | let m: RegisterAsRoleMsg val =>
         ifdef "trace" then
           @printf[I32](("Received RegisterAsRoleMsg on Control" +
