@@ -36,8 +36,8 @@ class WActorSourceNotify is TCPSourceNotify
     _header_size = _handler.header_length()
     _helper = WActorSourceHelper(this)
 
-  fun ref send_to_role(role: String, data: Any val) =>
-    _central_actor_registry.send_to_role(role, data)
+  fun ref process_by_role(role: String, data: Any val) =>
+    _central_actor_registry.process_by_role(role, data)
 
   fun ref broadcast_to_role(role: String, data: Any val) =>
     _central_actor_registry.broadcast_to_role(role, data)
@@ -129,7 +129,7 @@ class WActorSourceHelper
     _notify = notify
 
   fun ref send_to_role(role: String, data: Any val) =>
-    _notify.send_to_role(role, data)
+    _notify.process_by_role(role, data)
 
   fun ref broadcast_to_role(role: String, data: Any val) =>
     _notify.broadcast_to_role(role, data)

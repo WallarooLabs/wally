@@ -18,12 +18,18 @@ trait WActorWrapper
   be tick()
   be create_actor(builder: WActorBuilder)
   be forget_actor(id: U128)
+  be forward_to(target: U128, sender: U128, data: Any val)
+  be forward_to_role(role: String, sender: U128, data: Any val)
+  be forget_external_actor(id: U128)
   fun ref _register_as_role(role: String)
   fun ref _send_to(target: U128, data: Any val)
   fun ref _send_to_role(role: String, data: Any val)
   fun ref _send_to_sink[Out: Any val](sink_id: USize, output: Out)
   fun ref _roles_for(w_actor: U128): Array[String]
   fun ref _actors_in_role(role: String): Array[U128]
+  fun ref _create_actor(builder: WActorBuilder)
+  fun ref _update_actor_being_created(new_actor: WActorWrapper tag)
+  fun ref _forget_actor(id: U128)
   fun ref _set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   fun ref _cancel_timer(t: WActorTimer)
@@ -47,6 +53,14 @@ actor WActorWithState is WActorWrapper
 
   var _seq_id: SeqId = 0
 
+  // Used to indicate if we have created a new w_actor in the middle of
+  // processing/receiving a message from outside this w_actor. We need to
+  // treat that as a special case or else there's a race condition in
+  // sending messages to any role that's exclusively inhabited by the
+  // new w_actor.
+  var _creating_actor: Bool = false
+  var _actor_being_created: WActorWrapper tag
+
   new create(worker: String, id: U128, w_actor_builder: WActorBuilder val,
     event_log: EventLog, r: CentralWActorRegistry,
     actor_to_worker_map: Map[U128, String] val, connections: Connections,
@@ -57,9 +71,11 @@ actor WActorWithState is WActorWrapper
     _id = id
     _auth = auth
     _event_log = event_log
-    _actor_registry = WActorRegistry(_worker_name, _auth, actor_to_worker_map,
-      connections, boundaries, seed)
     _central_actor_registry = r
+    _actor_being_created = this
+    _actor_registry = WActorRegistry(_worker_name, _auth, _event_log,
+      _central_actor_registry, actor_to_worker_map, connections, boundaries,
+      seed)
     _w_actor_id = id
     _helper = LiveWActorHelper(this)
     _w_actor = w_actor_builder(id, _helper)
@@ -70,6 +86,7 @@ actor WActorWithState is WActorWrapper
     """
     Called when receiving a message from another WActor
     """
+    _creating_actor = false
     ifdef "trace" then
       @printf[I32]("receive() called at WActor %s\n".cstring(),
         _id.string().cstring())
@@ -82,6 +99,7 @@ actor WActorWithState is WActorWrapper
     """
     Called when receiving data from a Wallaroo pipeline
     """
+    _creating_actor = false
     ifdef "trace" then
       @printf[I32]("process() called at WActor %s\n".cstring(),
         _id.string().cstring())
@@ -110,12 +128,39 @@ actor WActorWithState is WActorWrapper
     _timers.tick()
 
   be create_actor(builder: WActorBuilder) =>
-    let new_builder = StatefulWActorWrapperBuilder(_guid_gen.u128(),
-      builder)
-    _central_actor_registry.create_actor(new_builder)
+    _create_actor(builder)
+
+  fun ref _create_actor(builder: WActorBuilder) =>
+    _actor_registry.create_actor(builder, this)
+    _creating_actor = true
+
+  fun ref _update_actor_being_created(new_actor: WActorWrapper tag) =>
+    _actor_being_created = new_actor
 
   be forget_actor(id: U128) =>
+    _forget_actor(id)
+
+  fun ref _forget_actor(id: U128) =>
+    _actor_registry.forget_actor(id)
     _central_actor_registry.forget_actor(id)
+
+  be forget_external_actor(id: U128) =>
+    _actor_registry.remove_actor_from_worker_map(id)
+
+  be forward_to(target: U128, sender: U128, data: Any val) =>
+    try
+      let wrapped = WMessage(sender, target, data)
+      _actor_registry.send_to(target, wrapped)
+    else
+      Fail()
+    end
+
+  be forward_to_role(role: String, sender: U128, data: Any val) =>
+    try
+      _actor_registry.send_to_role(role, sender, data)
+    else
+      _central_actor_registry.send_to_role(role, sender, data)
+    end
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
     payload: ByteSeq)
@@ -156,7 +201,19 @@ actor WActorWithState is WActorWrapper
     try
       _actor_registry.send_to_role(role, _w_actor_id, data)
     else
-      Fail()
+      if _creating_actor then
+        // TODO: This still leaves a potential race condition in place. If you
+        // create two or more actors per one external message, this will
+        // forward through the last one you created.  If the first one
+        // failed to register itself ast his role at the central actor
+        // registry before the later one forwards the message to that
+        // registry, then we might fail due to no one inhabiting the role.
+        // My tests do not show this actually happening so far.
+        // See issue #974.
+        _actor_being_created.forward_to_role(role, _w_actor_id, data)
+      else
+        _central_actor_registry.send_to_role(role, _w_actor_id, data)
+      end
     end
 
   fun ref _send_to_sink[Out: Any val](sink_id: USize, output: Out) =>
@@ -238,10 +295,10 @@ class LiveWActorHelper is WActorHelper
     _w_actor._actors_in_role(role)
 
   fun ref create_actor(builder: WActorBuilder) =>
-    _w_actor.create_actor(builder)
+    _w_actor._create_actor(builder)
 
   fun ref destroy_actor(id: U128) =>
-    _w_actor.forget_actor(id)
+    _w_actor._forget_actor(id)
 
   fun ref set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer

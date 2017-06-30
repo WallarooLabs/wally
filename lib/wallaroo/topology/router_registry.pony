@@ -190,6 +190,9 @@ actor RouterRegistry
   be register_as_role(role: String, w_actor: U128) =>
     _actor_data_router.register_as_role(role, w_actor)
 
+  be forget_external_actor(id: U128) =>
+    _actor_data_router.forget_external_actor(id)
+
   be broadcast_to_actors(data: Any val) =>
     _actor_data_router.broadcast_to_actors(data)
 

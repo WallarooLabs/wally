@@ -1,5 +1,6 @@
 use "collections"
 use "time"
+use "sendence/guid"
 use "sendence/rand"
 use "wallaroo/boundary"
 use "wallaroo/fail"
@@ -13,19 +14,26 @@ use "wallaroo/topology"
 class WActorRegistry
   let _worker_name: String
   let _auth: AmbientAuth
+  let _event_log: EventLog
   var _actor_to_worker_map: Map[U128, String] = _actor_to_worker_map.create()
   let _connections: Connections
   let _actors: Map[U128, WActorWrapper tag] = _actors.create()
   let _roles: Map[String, Role] = _roles.create()
   var _boundaries: Map[String, OutgoingBoundary] val
-  let _rand: EnhancedRandom
 
-  new create(worker: String, auth: AmbientAuth,
+  let _central_actor_registry: CentralWActorRegistry
+  let _rand: EnhancedRandom
+  let _guid_gen: GuidGenerator = GuidGenerator
+
+  new create(worker: String, auth: AmbientAuth, event_log: EventLog,
+    central_actor_registry: CentralWActorRegistry,
     actor_to_worker: Map[U128, String] val, connections: Connections,
     boundaries: Map[String, OutgoingBoundary] val, seed: U64 = Time.micros())
   =>
     _worker_name = worker
     _auth = auth
+    _event_log = event_log
+    _central_actor_registry = central_actor_registry
     for (k, v) in actor_to_worker.pairs() do
       _actor_to_worker_map(k) = v
     end
@@ -63,6 +71,25 @@ class WActorRegistry
       Fail()
     end
 
+  fun ref create_actor(builder: WActorBuilder, w_actor: WActorWrapper ref) =>
+    let new_id = _guid_gen.u128()
+    let new_builder = StatefulWActorWrapperBuilder(new_id, builder)
+
+    //TODO: Use persistent map to improve perf
+    let new_actor_to_worker: Map[U128, String] trn =
+      recover Map[U128, String] end
+    for (k, v) in _actor_to_worker_map.pairs() do
+      new_actor_to_worker(k) = v
+    end
+
+    let new_actor = new_builder(_worker_name, _central_actor_registry, _auth,
+      _event_log, consume new_actor_to_worker, _connections, _boundaries,
+      _rand.u64())
+    w_actor._update_actor_being_created(new_actor)
+
+    register_actor(new_id, new_actor)
+    _central_actor_registry.create_actor(new_actor, new_builder)
+
   fun ref forget_actor(id: U128) =>
     try
       _actors.remove(id)
@@ -74,10 +101,21 @@ class WActorRegistry
           _roles.remove(k)
         end
       end
+      remove_actor_from_worker_map(id)
     else
       ifdef debug then
         @printf[I32]("Tried to forget unknown actor\n".cstring())
       end
+    end
+
+  fun ref remove_actor_from_worker_map(id: U128) =>
+    try
+      _actor_to_worker_map.remove(id)
+    else
+      @printf[I32]("Tried to destroy unknown actor.\n".cstring())
+    end
+    for w_actor in _actors.values() do
+      w_actor.forget_external_actor(id)
     end
 
   fun ref send_to(target_id: U128, msg: WMessage val) ? =>
@@ -150,19 +188,9 @@ actor CentralWActorRegistry
   be update_actor_to_worker_map(actor_to_worker_map: Map[U128, String] val) =>
     _actor_to_worker_map = actor_to_worker_map
 
-  be create_actor(builder: WActorWrapperBuilder) =>
-    //TODO: Use persistent map to improve perf
-    let new_actor_to_worker: Map[U128, String] trn =
-      recover Map[U128, String] end
-    for (k, v) in _actor_to_worker_map.pairs() do
-      new_actor_to_worker(k) = v
-    end
-    new_actor_to_worker(builder.id()) = _worker_name
-    _actor_to_worker_map = consume new_actor_to_worker
-
-    let new_actor = builder(_worker_name, this, _auth, _event_log,
-      _actor_to_worker_map, _connections, _boundaries, _rand.u64())
+  be create_actor(w_actor: WActorWrapper tag, builder: WActorWrapperBuilder) =>
     _initializer.add_actor(builder)
+    _register_actor(builder.id(), w_actor)
 
   be forget_actor(id: U128) =>
     try
@@ -184,10 +212,36 @@ actor CentralWActorRegistry
       for a in _actors.values() do
         a.forget_actor(id)
       end
+      _remove_actor_from_worker_map(id)
+
+      // Notify cluster
+      try
+        let msg = ChannelMsgEncoder.forget_actor(id, _auth)
+        _connections.send_control_to_cluster(msg)
+      else
+        Fail()
+      end
     else
       ifdef debug then
         @printf[I32]("Tried to forget unknown actor\n".cstring())
       end
+    end
+
+  be forget_external_actor(id: U128) =>
+    _remove_actor_from_worker_map(id)
+
+  fun ref _remove_actor_from_worker_map(id: U128) =>
+    //TODO: Use persistent map to improve perf
+    let new_actor_to_worker: Map[U128, String] trn =
+      recover Map[U128, String] end
+    for (k, v) in _actor_to_worker_map.pairs() do
+      if k != id then
+        new_actor_to_worker(k) = v
+      end
+    end
+    _actor_to_worker_map = consume new_actor_to_worker
+    for w_actor in _actors.values() do
+      w_actor.forget_external_actor(id)
     end
 
   be register_actor_for_worker(id: U128, worker: String) =>
@@ -214,8 +268,10 @@ actor CentralWActorRegistry
       Fail()
     end
 
-
   be register_actor(id: U128, w_actor: WActorWrapper tag) =>
+    _register_actor(id, w_actor)
+
+  fun ref _register_actor(id: U128, w_actor: WActorWrapper tag) =>
     if not _actors.contains(id) then
       _actors(id) = w_actor
       for (k, v) in _actors.pairs() do
@@ -360,12 +416,21 @@ actor CentralWActorRegistry
       Fail()
     end
 
-  be send_to_role(role: String, data: Any val) =>
+  be process_by_role(role: String, data: Any val) =>
     try
       let target_id = _roles(role).next(_rand)
       _send_for_process(target_id, data)
     else
       @printf[I32]("Trying to send to nonexistent role!\n".cstring())
+    end
+
+  be send_to_role(role: String, sender: U128, data: Any val) =>
+    try
+      let target = _roles(role).next(_rand)
+      let wrapped = WMessage(sender, target, data)
+      send_to(target, wrapped)
+    else
+      Fail()
     end
 
   be process_digest(digest: WActorRegistryDigest) =>

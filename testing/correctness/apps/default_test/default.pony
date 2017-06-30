@@ -109,7 +109,7 @@ primitive UpdateState is StateComputation[String, Result val, NormalState]
     state_change.update(new_count, msg)
 
    let res = Result(new_count, msg)
-   // @printf[I32](("N>>>>R: [" + res.count.string() + " | " + res.defaulted_string + " | " + res.letter_count.string() + " |\n").cstring())
+   // @printf[I32](("N>R: [" + res.count.string() + " | " + res.defaulted_string + " | " + res.letter_count.string() + " |\n").cstring())
 
     (res, state_change)
 
@@ -193,7 +193,7 @@ primitive UpdateDefaultState is StateComputation[String, Result val,
     state_change.update(new_count, last_string, new_letter_count)
 
     let res = Result(new_count, last_string, new_letter_count)
-    // @printf[I32](("D>>>>R: [" + res.count.string() + " | " + res.defaulted_string + " | " + res.letter_count.string() + " |\n").cstring())
+    // @printf[I32](("D>R: [" + res.count.string() + " | " + res.defaulted_string + " | " + res.letter_count.string() + " |\n").cstring())
 
     (res, state_change)
 

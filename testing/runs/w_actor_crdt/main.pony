@@ -31,7 +31,6 @@ nc -l 127.0.0.1 5001 >> /dev/null
   -c 127.0.0.1:6000 -d 127.0.0.1:6001 -n worker2 --ponythreads=4 \
   --ponynoblock -w 2
 ```
-127.0.0.1:6001 -n worker2 --ponythreads=4 --ponynoblock -w 2
 
 4) sender
 
