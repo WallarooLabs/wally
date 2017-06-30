@@ -36,7 +36,8 @@ actor ClusterInitializer
   new create(auth: AmbientAuth, worker_name: String, workers: USize,
     connections: Connections, distributor: Distributor,
     layout_initializer: LayoutInitializer,
-    data_addr: Array[String] val, metrics_conn: MetricsSink)
+    data_addr: Array[String] val, metrics_conn: MetricsSink,
+    is_recovering: Bool)
   =>
     _auth = auth
     _worker_name = worker_name
@@ -46,6 +47,7 @@ actor ClusterInitializer
     _metrics_conn = metrics_conn
     _distributor = distributor
     _layout_initializer = layout_initializer
+    if is_recovering then _topology_ready = true end
 
   be start(initializer_name: String = "") =>
     // TODO: Pipeline initialization needs to be updated so that we

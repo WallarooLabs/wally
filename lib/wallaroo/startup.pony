@@ -310,7 +310,7 @@ actor Startup
             _startup_options.worker_name,
             _startup_options.worker_count, connections,
             ad, local_topology_initializer, _startup_options.d_addr,
-            metrics_conn)
+            metrics_conn, is_recovering)
         end
       end
 
