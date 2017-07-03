@@ -9,6 +9,11 @@ use "wallaroo/messages"
 use "wallaroo/w_actor"
 use "wallaroo/tcp_source"
 
+use @set_user_serialization_fns[None](module: Pointer[U8] tag)
+use @user_serialization_get_size[USize](o: Pointer[U8] tag)
+use @user_serialization[None](o: Pointer[U8] tag, bs: Pointer[U8] tag)
+use @user_deserialization[Pointer[U8] val](bs: Pointer[U8] tag)
+
 use @load_module[ModuleP](module_name: CString)
 use @create_actor_system[Pointer[U8] val](module: ModuleP, args: Pointer[U8] val)
 use @list_item_count[USize](list: Pointer[U8] val)
@@ -53,6 +58,7 @@ type CString is Pointer[U8] tag
 
 type ModuleP is Pointer[U8] val
 
+
 class PyData
   var _data: Pointer[U8] val
 
@@ -62,12 +68,21 @@ class PyData
   fun obj(): Pointer[U8] val =>
     _data
 
+  fun _serialise_space(): USize =>
+    Atkin.user_serialization_get_size(_data)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Atkin.user_serialization(_data, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _data = recover Atkin.user_deserialization(bytes) end
+
   fun _final() =>
     @py_decref(_data)
 
 
 class PySource is WActorFramedSourceHandler
-  let _source: Pointer[U8] val
+  var _source: Pointer[U8] val
 
   new val create(source: Pointer[U8] val) =>
     _source = source
@@ -96,11 +111,21 @@ class PySource is WActorFramedSourceHandler
     end
     PyData(decoded) 
 
+  fun _serialise_space(): USize =>
+    Atkin.user_serialization_get_size(_source)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Atkin.user_serialization(_source, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _source = recover Atkin.user_deserialization(bytes) end
+
   fun _final() =>
     @py_decref(_source)
 
+
 class PySink
-  let _sink: Pointer[U8] val
+  var _sink: Pointer[U8] val
 
   new val create(sink: Pointer[U8] val) =>
     _sink = sink
@@ -116,11 +141,21 @@ class PySink
     end
     wb.done()
 
+  fun _serialise_space(): USize =>
+    Atkin.user_serialization_get_size(_sink)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Atkin.user_serialization(_sink, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _sink = recover Atkin.user_deserialization(bytes) end
+
   fun _final() =>
     @py_decref(_sink)
 
+
 class PyActorBuilder
-  let _pyactor: Pointer[U8] val
+  var _pyactor: Pointer[U8] val
 
   new val create(pyactor: Pointer[U8] val) =>
     _pyactor = pyactor
@@ -128,11 +163,20 @@ class PyActorBuilder
   fun apply(id: U128, wh: WActorHelper): WActor =>
     PyActor(_pyactor, wh, id)
 
+  fun _serialise_space(): USize =>
+    Atkin.user_serialization_get_size(_pyactor)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Atkin.user_serialization(_pyactor, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _pyactor = recover Atkin.user_deserialization(bytes) end
+
   fun _final() =>
     @py_decref(_pyactor)
 
 class PyActor is WActor
-  let _actor: Pointer[U8] val
+  var _actor: Pointer[U8] val
   let _id: U128
 
   new create(actr: Pointer[U8] val, h: WActorHelper, id': U128) =>
@@ -190,7 +234,6 @@ class PyActor is WActor
     end
     @py_decref(helper_calls) 
 
-
   fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
     match payload
     | let p: PyData val =>
@@ -222,8 +265,18 @@ class PyActor is WActor
       Fail()
     end
 
+  fun _serialise_space(): USize =>
+    Atkin.user_serialization_get_size(_actor)
+
+  fun _serialise(bytes: Pointer[U8] tag) =>
+    Atkin.user_serialization(_actor, bytes)
+
+  fun ref _deserialise(bytes: Pointer[U8] tag) =>
+    _actor = recover Atkin.user_deserialization(bytes) end
+
   fun _final() =>
     @py_decref(_actor)
+
 
 primitive Atkin
 
@@ -262,6 +315,29 @@ primitive Atkin
       @PyList_SetItem(l, i, @PyString_FromStringAndSize(v.cstring(), v.size()))
     end
     l
+
+  fun set_user_serialization_fns(m: Pointer[U8] val) =>
+    @set_user_serialization_fns(m)
+
+  fun user_serialization_get_size(o: Pointer[U8] tag): USize =>
+    let r = @user_serialization_get_size(o)
+    if (print_errors()) then
+      @printf[U32]("Serialization failed".cstring())
+    end
+    r
+
+  fun user_serialization(o: Pointer[U8] tag, bs: Pointer[U8] tag) =>
+    @user_serialization(o, bs)
+    if (print_errors()) then
+      @printf[U32]("Serialization failed".cstring())
+    end
+
+  fun user_deserialization(bs: Pointer[U8] tag): Pointer[U8] val =>
+    let r = @user_deserialization(bs)
+    if (print_errors()) then
+      @printf[U32]("Deserialization failed".cstring())
+    end
+    r
 
   fun create_actor_system(module: ModuleP, args: Array[String] val,
     init_seed: U64): ActorSystem val ?
@@ -317,3 +393,4 @@ primitive Atkin
 
   fun startup(env: Env, module: ModuleP, actor_system: ActorSystem val) =>
     ActorSystemStartup(env, actor_system, actor_system.name())
+

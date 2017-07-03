@@ -5,6 +5,9 @@
 #endif
 
 
+PyObject *g_user_deserialization_fn;
+PyObject *g_user_serialization_fn;
+
 extern void py_incref(PyObject *o)
 {
   Py_INCREF(o);
@@ -240,3 +243,76 @@ extern __uint128_t join_longs(PyObject *long_pair)
   s += r;
   return s;
 }
+
+extern void set_user_serialization_fns(PyObject *module)
+{
+  if (PyObject_HasAttrString(module, "deserialize") && PyObject_HasAttrString(module, "serialize"))
+  {
+    g_user_deserialization_fn = PyObject_GetAttrString(module, "deserialize");
+    g_user_serialization_fn = PyObject_GetAttrString(module, "serialize");
+  }
+  else
+  {
+    PyObject *wactor = PyObject_GetAttrString(module, "wactor");
+    g_user_deserialization_fn = PyObject_GetAttrString(wactor, "deserialize");
+    g_user_serialization_fn = PyObject_GetAttrString(wactor, "serialize");
+    Py_DECREF(wactor);
+  }
+}
+
+extern void *user_deserialization(char *bytes)
+{
+  unsigned char *ubytes = (unsigned char *)bytes;
+  // extract size
+  size_t size = (((size_t)ubytes[0]) << 24)
+    + (((size_t)ubytes[1]) << 16)
+    + (((size_t)ubytes[2]) << 8)
+    + ((size_t)ubytes[3]);
+
+  PyObject *py_bytes = PyBytes_FromStringAndSize(bytes + 4, size);
+  PyObject *ret = PyObject_CallFunctionObjArgs(g_user_deserialization_fn, py_bytes, NULL);
+
+  Py_DECREF(py_bytes);
+
+  return ret;
+}
+
+extern size_t user_serialization_get_size(PyObject *o)
+{
+  PyObject *user_bytes = PyObject_CallFunctionObjArgs(g_user_serialization_fn, o, NULL);
+
+  // This will be null if there was an exception.
+  if (user_bytes)
+  {
+    size_t size = PyString_Size(user_bytes);
+    Py_DECREF(user_bytes);
+
+    // return the size of the buffer plus the 4 bytes needed to record that size.
+    return 4 + size;
+  }
+
+  return 0;
+}
+
+extern void user_serialization(PyObject *o, char *bytes)
+{
+  PyObject *user_bytes = PyObject_CallFunctionObjArgs(g_user_serialization_fn, o, NULL);
+
+  // This will be null if there was an exception.
+  if (user_bytes)
+  {
+    size_t size = PyString_Size(user_bytes);
+
+    unsigned char *ubytes = (unsigned char *) bytes;
+
+    ubytes[0] = (unsigned char)(size >> 24);
+    ubytes[1] = (unsigned char)(size >> 16);
+    ubytes[2] = (unsigned char)(size >> 8);
+    ubytes[3] = (unsigned char)(size);
+
+    memcpy(bytes + 4, PyString_AsString(user_bytes), size);
+
+    Py_DECREF(user_bytes);
+  }
+}
+
