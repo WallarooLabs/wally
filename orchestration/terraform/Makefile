@@ -477,10 +477,10 @@ create-vpc: check-cluster-name init-vpc-terraform # confirm VPC is created
           $(shell aws ec2 --region $(region) describe-availability-zones \
           --query 'AvailabilityZones[*].ZoneName' --output text | awk \
           'function f(v) {return v == 0 ? 2: (v < 0 ? -v : v)} {print \
-          "-var aws_availability_zone_1=" $$(f(NF - 0)) \
-          " -var aws_availability_zone_2=" $$(f(NF - 2)) \
-          " -var aws_availability_zone_3=" $$(f(NF - 3)) \
-          " -var aws_availability_zone_4=" $$(f(NF - 4))}')
+          "-var aws_availability_zone_1=" $$(f(NF - 1)) \
+          " -var aws_availability_zone_2=" $$(f(NF - 3)) \
+          " -var aws_availability_zone_3=" $$(f(NF - 4)) \
+          " -var aws_availability_zone_4=" $$(f(NF - 5))}')
 	@echo "\033[36m==> Successfully confirmed VPC is created in region \
 '$(region)' at provider '$(provider)'!\033[0m"
 
