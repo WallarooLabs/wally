@@ -1,3 +1,12 @@
+import pickle
+
+def serialize(o):
+    return pickle.dumps(o)
+
+
+def deserialize(bs):
+    return pickle.loads(bs)
+
 
 
 def join_longs(left, right):

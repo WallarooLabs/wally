@@ -30,6 +30,7 @@ actor Main
         let module = Atkin.load_module(module_name)
 
         try
+          Atkin.set_user_serialization_fns(module)
           let actor_system = Atkin.create_actor_system(module,
             options.remaining(), seed)
           Atkin.startup(env, module, actor_system)
