@@ -1,11 +1,14 @@
 ---
-- name: check whether docker exists
-  shell: command -v docker >/dev/null 2>&1
-  ignore_errors: True
-  register: result
+- include: setup-RedHat.yml
+  when: ansible_os_family == 'RedHat'
 
-- include: install.yml
-  when: result | failed
+- include: setup-Debian.yml
+  when: ansible_os_family == 'Debian'
+
+- name: Install Docker.
+  apt:
+    name: '{{ docker_package }}'
+    state: present
 
 - name: install docker-py
   pip: >-
@@ -28,12 +31,11 @@
     name: '{{ item }}'
   with_items: '{{ docker_users or [] }}'
 
-- name: enable docker service
-  service:
-    name: docker
-    enabled: yes
-
-- name: start docker
+- name: Ensure Docker is started and enabled at boot.
   service:
     name: docker
     state: started
+    enabled: yes
+
+- include: docker-compose.yml
+  when: docker_install_compose

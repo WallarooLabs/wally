@@ -1,5 +1,0 @@
----
-- name: install docker by pacman
-  pacman:
-    name: '{{ docker_package }}'
-    state: present
