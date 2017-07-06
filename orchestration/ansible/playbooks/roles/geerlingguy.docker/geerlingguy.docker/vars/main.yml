@@ -1,0 +1,8 @@
+---
+# Edition can be one of: 'ce' (Community Edition) or 'ee' (Enterprise Edition).
+docker_edition: 'ce'
+docker_version: '17.06.0~ce-0~ubuntu'
+docker_package: "docker-{{ docker_edition }}={{ docker_version }}"
+
+# Docker Compose options.
+docker_install_compose: false
