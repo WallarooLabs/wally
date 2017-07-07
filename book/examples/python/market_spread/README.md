@@ -1,6 +1,6 @@
 # Market Spread
 
-Market Spread is an application designed to run alongside a trading system. Its goal is to monitor market data for irregularities around different symbols and potentially withdraw some trades that have been sent to market should certain anomalies occur. 
+Market Spread is an application designed to run alongside a trading system. Its goal is to monitor market data for irregularities around different symbols and potentially withdraw some trades that have been sent to market should certain anomalies occur.
 
 When we break the application down into its key components we get:
 
@@ -45,7 +45,7 @@ Send some market data messages
 
 ```bash
 ../../../../giles/sender/sender --host 127.0.0.1:7011 --file \
-  ../../../../demos/marketspread/350k-nbbo-fixish.msg --batch-size 20 \
+  ../../../../testing/data/market_spread/nbbo/350-symbols_nbbo-fixish.msg --batch-size 20 \
   --interval 100_000_000 --messages 1000000 --binary --repeat --ponythreads=1 \
   --msg-size 46 --no-write
 ```
@@ -54,7 +54,7 @@ and some orders messages
 
 ```bash
 ../../../../giles/sender/sender --host 127.0.0.1:7010 --file \
-  ../../../../demos/marketspread/350k-orders-fixish.msg --batch-size 20 \
+  ../../../../testing/data/market_spread/orders/350-symbols_orders-fixish.msg --batch-size 20 \
   --interval 100_000_000 --messages 1000000 --binary --repeat --ponythreads=1 \
   --msg-size 57 --no-write
 ```
