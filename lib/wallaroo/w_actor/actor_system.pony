@@ -23,6 +23,8 @@ class ActorSystem
   let _sources: Array[(WActorFramedSourceHandler, WActorRouter)] =
     _sources.create()
   let _sinks: Array[TCPSinkBuilder] = _sinks.create()
+  let _broadcast_variables: Map[String, Any val] =
+    _broadcast_variables.create()
 
   new create(name': String, seed': U64 = Time.micros()) =>
     _name = name'
@@ -57,6 +59,9 @@ class ActorSystem
     _sinks.push(builder)
     this
 
+  fun ref set_broadcast_default(k: String, v: Any val) =>
+    _broadcast_variables(k) = v
+
   fun val actor_builders(): Array[WActorWrapperBuilder] val =>
     _actor_builders
 
@@ -66,6 +71,9 @@ class ActorSystem
   fun val sinks(): Array[TCPSinkBuilder] val =>
     _sinks
 
+  fun val broadcast_variables(): Map[String, Any val] val =>
+    _broadcast_variables
+
 class val LocalActorSystem
   let _name: String
   let _actor_builders: Array[WActorWrapperBuilder] val
@@ -74,6 +82,7 @@ class val LocalActorSystem
   let _actor_to_worker_map: Map[U128, String] val
   let _worker_names: Array[String] val
   let _roles: Map[String, Role box] val
+  let _broadcast_variables: Map[String, Any val] val
 
   new val create(name': String,
     actor_builders': Array[WActorWrapperBuilder] val,
@@ -81,7 +90,8 @@ class val LocalActorSystem
     sinks': Array[TCPSinkBuilder] val,
     actor_to_worker_map': Map[U128, String] val,
     worker_names': Array[String] val,
-    roles': Map[String, Role box] val)
+    roles': Map[String, Role box] val,
+    broadcast_variables': Map[String, Any val] val)
   =>
     _name = name'
     _actor_builders = actor_builders'
@@ -90,6 +100,7 @@ class val LocalActorSystem
     _actor_to_worker_map = actor_to_worker_map'
     _worker_names = worker_names'
     _roles = roles'
+    _broadcast_variables = broadcast_variables'
 
   fun name(): String => _name
 
@@ -111,7 +122,8 @@ class val LocalActorSystem
     end
     new_actor_to_worker(builder.id()) = worker
     LocalActorSystem(_name, consume arr, _sources, _sinks,
-      consume new_actor_to_worker, _worker_names, _roles)
+      consume new_actor_to_worker, _worker_names, _roles,
+      _broadcast_variables)
 
   fun register_as_role(role: String, id: U128): LocalActorSystem =>
     //TODO: Use persistent map to improve perf
@@ -131,7 +143,8 @@ class val LocalActorSystem
       end
     end
     LocalActorSystem(_name, _actor_builders, _sources, _sinks,
-      _actor_to_worker_map, _worker_names, consume new_roles)
+      _actor_to_worker_map, _worker_names, consume new_roles,
+      _broadcast_variables)
 
   fun register_roles_in_registry(cr: CentralWActorRegistry) =>
     for (n, role) in _roles.pairs() do
@@ -157,3 +170,6 @@ class val LocalActorSystem
 
   fun roles(): Map[String, Role box] val =>
     _roles
+
+  fun val broadcast_variables(): Map[String, Any val] val =>
+    _broadcast_variables

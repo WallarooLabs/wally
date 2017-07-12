@@ -9,6 +9,7 @@ use "sendence/hub"
 use "sendence/options"
 use "sendence/rand"
 use "wallaroo"
+use "wallaroo/broadcast"
 use "wallaroo/boundary"
 use "wallaroo/cluster_manager"
 use "wallaroo/fail"
@@ -217,12 +218,17 @@ actor ActorSystemStartup
       let recovery = Recovery(auth, _startup_options.worker_name, event_log,
         recovery_replayer, connections)
 
+      let broadcast_variables = BroadcastVariables(
+        _startup_options.worker_name, auth, connections,
+        system.broadcast_variables())
+
       let initializer = WActorInitializer(_startup_options.worker_name,
         _app_name, auth, event_log, _startup_options.input_addrs,
         _startup_options.output_addrs, _local_actor_system_file,
         _iterations, recovery, recovery_replayer, _data_channel_file,
         _worker_names_file, data_receivers, empty_metrics_conn, seed,
-        connections, router_registry, _startup_options.is_initializer)
+        connections, router_registry, broadcast_variables,
+        _startup_options.is_initializer)
 
       if _startup_options.is_initializer then
         @printf[I32]("Running as Initializer...\n".cstring())
@@ -243,7 +249,8 @@ actor ActorSystemStartup
           auth, connections, _startup_options.is_initializer,
           _cluster_initializer, initializer, recovery, recovery_replayer,
           router_registry, control_channel_filepath,
-          _startup_options.my_d_host, _startup_options.my_d_service)
+          _startup_options.my_d_host, _startup_options.my_d_service
+          where broadcast_variables = broadcast_variables)
 
       ifdef "resilience" then
         if _startup_options.is_initializer then

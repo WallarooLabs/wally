@@ -1,6 +1,7 @@
 use "collections"
 use "sendence/guid"
 use "wallaroo/boundary"
+use "wallaroo/broadcast"
 use "wallaroo/fail"
 use "wallaroo/network"
 use "wallaroo/recovery"
@@ -21,6 +22,7 @@ trait WActorWrapper
   be forward_to(target: U128, sender: U128, data: Any val)
   be forward_to_role(role: String, sender: U128, data: Any val)
   be forget_external_actor(id: U128)
+  be broadcast_variable_update(k: String, v: Any val)
   fun ref _register_as_role(role: String)
   fun ref _send_to(target: U128, data: Any val)
   fun ref _send_to_role(role: String, data: Any val)
@@ -30,6 +32,9 @@ trait WActorWrapper
   fun ref _create_actor(builder: WActorBuilder)
   fun ref _update_actor_being_created(new_actor: WActorWrapper tag)
   fun ref _forget_actor(id: U128)
+  fun ref _subscribe_to_broadcast_variable(k: String)
+  fun ref _read_broadcast_variable(k: String): (Any val | None)
+  fun ref _update_broadcast_variable(k: String, v: Any val)
   fun ref _set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   fun ref _cancel_timer(t: WActorTimer)
@@ -48,6 +53,10 @@ actor WActorWithState is WActorWrapper
   var _helper: WActorHelper = EmptyWActorHelper
   let _timers: WActorTimers = WActorTimers
 
+  let _broadcast_variables: BroadcastVariables
+  let _broadcast_variable_map: Map[String, Any val] =
+    _broadcast_variable_map.create()
+
   // TODO: Find a way to eliminate this
   let _dummy_actor_producer: _DummyActorProducer = _DummyActorProducer
 
@@ -64,6 +73,7 @@ actor WActorWithState is WActorWrapper
   new create(worker: String, id: U128, w_actor_builder: WActorBuilder val,
     event_log: EventLog, r: CentralWActorRegistry,
     actor_to_worker_map: Map[U128, String] val, connections: Connections,
+    broadcast_variables: BroadcastVariables,
     boundaries: Map[String, OutgoingBoundary] val, seed: U64,
     auth: AmbientAuth)
   =>
@@ -74,9 +84,10 @@ actor WActorWithState is WActorWrapper
     _central_actor_registry = r
     _actor_being_created = this
     _actor_registry = WActorRegistry(_worker_name, _auth, _event_log,
-      _central_actor_registry, actor_to_worker_map, connections, boundaries,
-      seed)
+      _central_actor_registry, actor_to_worker_map, connections,
+      broadcast_variables, boundaries, seed)
     _w_actor_id = id
+    _broadcast_variables = broadcast_variables
     _helper = LiveWActorHelper(this)
     _w_actor = w_actor_builder(id, _helper)
     _central_actor_registry.register_actor(_w_actor_id, this)
@@ -129,6 +140,9 @@ actor WActorWithState is WActorWrapper
 
   be create_actor(builder: WActorBuilder) =>
     _create_actor(builder)
+
+  be broadcast_variable_update(k: String, v: Any val) =>
+    _broadcast_variable_map(k) = v
 
   fun ref _create_actor(builder: WActorBuilder) =>
     _actor_registry.create_actor(builder, this)
@@ -234,6 +248,20 @@ actor WActorWithState is WActorWrapper
   fun ref _actors_in_role(role: String): Array[U128] =>
     _actor_registry.actors_in_role(role)
 
+  fun ref _subscribe_to_broadcast_variable(k: String) =>
+    _broadcast_variables.subscribe_to(k, this)
+
+  fun ref _read_broadcast_variable(k: String): (Any val | None) =>
+    try
+      _broadcast_variable_map(k)
+    else
+      None
+    end
+
+  fun ref _update_broadcast_variable(k: String, v: Any val) =>
+    _broadcast_variable_map(k) = v
+    _broadcast_variables.update(k, v, this)
+
   fun ref _set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   =>
@@ -247,7 +275,8 @@ actor WActorWithState is WActorWrapper
 interface val WActorWrapperBuilder
   fun apply(worker: String, r: CentralWActorRegistry, auth: AmbientAuth,
     event_log: EventLog, actor_to_worker_map: Map[U128, String] val,
-    connections: Connections, boundaries: Map[String, OutgoingBoundary] val,
+    connections: Connections, broadcast_variables: BroadcastVariables,
+    boundaries: Map[String, OutgoingBoundary] val,
     seed: U64): WActorWrapper tag
   fun id(): U128
 
@@ -261,11 +290,13 @@ class val StatefulWActorWrapperBuilder
 
   fun apply(worker: String, r: CentralWActorRegistry, auth: AmbientAuth,
     event_log: EventLog, actor_to_worker_map: Map[U128, String] val,
-    connections: Connections, boundaries: Map[String, OutgoingBoundary] val,
+    connections: Connections, broadcast_variables: BroadcastVariables,
+    boundaries: Map[String, OutgoingBoundary] val,
     seed: U64): WActorWrapper tag
   =>
     WActorWithState(worker, _id, _w_actor_builder, event_log, r,
-      actor_to_worker_map, connections, boundaries, seed, auth)
+      actor_to_worker_map, connections, broadcast_variables, boundaries, seed,
+      auth)
 
   fun id(): U128 =>
     _id
@@ -300,6 +331,15 @@ class LiveWActorHelper is WActorHelper
   fun ref destroy_actor(id: U128) =>
     _w_actor._forget_actor(id)
 
+  fun ref subscribe_to_broadcast_variable(k: String) =>
+    _w_actor._subscribe_to_broadcast_variable(k)
+
+  fun ref read_broadcast_variable(k: String): (Any val | None) =>
+    _w_actor._read_broadcast_variable(k)
+
+  fun ref update_broadcast_variable(k: String, v: Any val) =>
+    _w_actor._update_broadcast_variable(k, v)
+
   fun ref set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   =>
@@ -331,6 +371,15 @@ class EmptyWActorHelper is WActorHelper
     None
 
   fun ref destroy_actor(id: U128) =>
+    None
+
+  fun ref subscribe_to_broadcast_variable(k: String) =>
+    None
+
+  fun ref read_broadcast_variable(k: String): (Any val | None) =>
+    None
+
+  fun ref update_broadcast_variable(k: String, v: Any val) =>
     None
 
   fun ref set_timer(duration: U128, callback: {()},
