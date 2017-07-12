@@ -5,6 +5,7 @@ use "serialise"
 use "time"
 use "sendence/bytes"
 use "sendence/rand"
+use "wallaroo/broadcast"
 use "wallaroo/boundary"
 use "wallaroo/data_channel"
 use "wallaroo/fail"
@@ -44,6 +45,8 @@ actor WActorInitializer is LayoutInitializer
   let _connections: Connections
   let _router_registry: RouterRegistry
 
+  let _broadcast_variables: BroadcastVariables
+
   var _recovered_worker_names: Array[String] val = recover val Array[String] end
   var _recovering: Bool = false
 
@@ -67,7 +70,8 @@ actor WActorInitializer is LayoutInitializer
     data_channel_file: String, worker_names_file: String,
     data_receivers: DataReceivers, metrics_conn: MetricsSink,
     seed: U64, connections: Connections,
-    router_registry: RouterRegistry, is_initializer: Bool)
+    router_registry: RouterRegistry, broadcast_variables: BroadcastVariables,
+    is_initializer: Bool)
   =>
     _worker_name = worker_name
     _app_name = app_name
@@ -88,6 +92,7 @@ actor WActorInitializer is LayoutInitializer
     _router_registry = router_registry
     _central_registry = CentralWActorRegistry(_worker_name, _auth, this,
       _connections, _sinks, _event_log, _rand.u64())
+    _broadcast_variables = broadcast_variables
     _is_initializer = is_initializer
 
   be update_actor_to_worker_map(actor_to_worker_map: Map[U128, String] val) =>
@@ -347,8 +352,8 @@ actor WActorInitializer is LayoutInitializer
             .cstring(), las.actor_builders().size())
           for builder in las.actor_builders().values() do
             _actors.push(builder(_worker_name, cr, _auth, _event_log,
-              las.actor_to_worker_map(), _connections, _outgoing_boundaries,
-              _rand.u64()))
+              las.actor_to_worker_map(), _connections, _broadcast_variables,
+              _outgoing_boundaries, _rand.u64()))
           end
 
           _router_registry.register_boundaries(_outgoing_boundaries,

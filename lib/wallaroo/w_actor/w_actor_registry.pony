@@ -2,6 +2,7 @@ use "collections"
 use "time"
 use "sendence/guid"
 use "sendence/rand"
+use "wallaroo/broadcast"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/invariant"
@@ -20,6 +21,7 @@ class WActorRegistry
   let _actors: Map[U128, WActorWrapper tag] = _actors.create()
   let _roles: Map[String, Role] = _roles.create()
   var _boundaries: Map[String, OutgoingBoundary] val
+  let _broadcast_variables: BroadcastVariables
 
   let _central_actor_registry: CentralWActorRegistry
   let _rand: EnhancedRandom
@@ -28,6 +30,7 @@ class WActorRegistry
   new create(worker: String, auth: AmbientAuth, event_log: EventLog,
     central_actor_registry: CentralWActorRegistry,
     actor_to_worker: Map[U128, String] val, connections: Connections,
+    broadcast_variables: BroadcastVariables,
     boundaries: Map[String, OutgoingBoundary] val, seed: U64 = Time.micros())
   =>
     _worker_name = worker
@@ -38,6 +41,7 @@ class WActorRegistry
       _actor_to_worker_map(k) = v
     end
     _connections = connections
+    _broadcast_variables = broadcast_variables
     _boundaries = boundaries
     _rand = EnhancedRandom(seed)
 
@@ -83,8 +87,8 @@ class WActorRegistry
     end
 
     let new_actor = new_builder(_worker_name, _central_actor_registry, _auth,
-      _event_log, consume new_actor_to_worker, _connections, _boundaries,
-      _rand.u64())
+      _event_log, consume new_actor_to_worker, _connections,
+      _broadcast_variables, _boundaries, _rand.u64())
     w_actor._update_actor_being_created(new_actor)
 
     register_actor(new_id, new_actor)

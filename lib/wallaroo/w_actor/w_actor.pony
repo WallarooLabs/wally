@@ -1,3 +1,4 @@
+use "wallaroo/broadcast"
 use "wallaroo/fail"
 
 primitive BasicRoles
@@ -30,6 +31,9 @@ trait WActorHelper
   fun ref actors_in_role(role: String): Array[U128]
   fun ref create_actor(builder: WActorBuilder)
   fun ref destroy_actor(id: U128)
+  fun ref subscribe_to_broadcast_variable(k: String)
+  fun ref read_broadcast_variable(k: String): (Any val | None)
+  fun ref update_broadcast_variable(k: String, v: Any val)
   fun ref set_timer(duration: U128, callback: {()},
     is_repeating: Bool = false): WActorTimer
   fun ref cancel_timer(t: WActorTimer)

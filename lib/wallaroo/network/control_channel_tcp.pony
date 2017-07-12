@@ -5,6 +5,7 @@ use "files"
 use "sendence/bytes"
 use "sendence/hub"
 use "wallaroo"
+use "wallaroo/broadcast"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/messages"
@@ -27,6 +28,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
+  let _broadcast_variables: (BroadcastVariables | None)
   let _recovery_file: FilePath
   let _joining_existing_cluster: Bool
 
@@ -36,7 +38,8 @@ class ControlChannelListenNotifier is TCPListenNotify
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
     recovery_file: FilePath, data_host: String, data_service: String,
-    joining: Bool = false)
+    joining: Bool = false,
+    broadcast_variables: (BroadcastVariables | None) = None)
   =>
     _auth = auth
     _name = name
@@ -49,6 +52,7 @@ class ControlChannelListenNotifier is TCPListenNotify
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
+    _broadcast_variables = broadcast_variables
     _recovery_file = recovery_file
     _d_host = data_host
     _d_service = data_service
@@ -104,7 +108,7 @@ class ControlChannelListenNotifier is TCPListenNotify
   fun ref connected(listen: TCPListener ref) : TCPConnectionNotify iso^ =>
     ControlChannelConnectNotifier(_name, _auth, _connections,
       _initializer, _layout_initializer, _recovery, _recovery_replayer,
-      _router_registry, _d_host, _d_service)
+      _router_registry, _broadcast_variables, _d_host, _d_service)
 
 class ControlChannelConnectNotifier is TCPConnectionNotify
   let _auth: AmbientAuth
@@ -115,6 +119,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   let _router_registry: RouterRegistry
+  let _broadcast_variables: (BroadcastVariables | None)
   let _d_host: String
   let _d_service: String
   var _header: Bool = true
@@ -123,6 +128,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     connections: Connections, initializer: (ClusterInitializer | None),
     layout_initializer: LayoutInitializer, recovery: Recovery,
     recovery_replayer: RecoveryReplayer, router_registry: RouterRegistry,
+    broadcast_variables: (BroadcastVariables | None),
     data_host: String, data_service: String)
   =>
     _auth = auth
@@ -133,6 +139,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
     _recovery = recovery
     _recovery_replayer = recovery_replayer
     _router_registry = router_registry
+    _broadcast_variables = broadcast_variables
     _d_host = data_host
     _d_service = data_service
 
@@ -254,6 +261,17 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         // create a bottleneck through the router registry and the central
         // actor registry.
         _router_registry.broadcast_to_actors(m.data)
+      | let m: BroadcastVariableMsg =>
+        ifdef "trace" then
+          @printf[I32](("Received BroadcastVariable on Control Channel\n")
+            .cstring())
+        end
+        match _broadcast_variables
+        | let bv: BroadcastVariables =>
+          bv.external_update(m.k, m.v, m.ts, m.worker)
+        else
+          Fail()
+        end
       | let m: WActorRegistryDigestMsg val =>
         ifdef "trace" then
           @printf[I32](("Received WActorRegistryDigestMsg on Control" +

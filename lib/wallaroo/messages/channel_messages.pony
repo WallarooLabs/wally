@@ -3,6 +3,7 @@ use "serialise"
 use "net"
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/broadcast"
 use "wallaroo/initialization"
 use "wallaroo/routing"
 use "wallaroo/topology"
@@ -233,6 +234,11 @@ primitive ChannelMsgEncoder
     Array[ByteSeq] val ?
   =>
     _encode(BroadcastToActorsMsg(data), auth)
+
+  fun broadcast_variable(k: String, v: Any val, ts: VectorTimestamp,
+    worker: String, auth: AmbientAuth): Array[ByteSeq] val ?
+  =>
+    _encode(BroadcastVariableMsg(k, v, ts, worker), auth)
 
   fun request_w_actor_registry_digest(sender: String, auth: AmbientAuth):
     Array[ByteSeq] val ?
@@ -522,6 +528,20 @@ class ActorDataMsg is ChannelMsg
   new val create(msg: ActorDeliveryMsg val, seq_id': SeqId) =>
     seq_id = seq_id'
     delivery_msg = msg
+
+class val BroadcastVariableMsg is ChannelMsg
+  let k: String
+  let v: Any val
+  let ts: VectorTimestamp
+  let worker: String
+
+  new val create(k': String, v': Any val, ts': VectorTimestamp,
+    worker': String)
+  =>
+    k = k'
+    v = v'
+    ts = ts'
+    worker = worker'
 
 class ReplayMsg is ChannelMsg
   let data_bytes: Array[ByteSeq] val
