@@ -6,6 +6,7 @@ This package represents the unit test suite for Wallaroo.
 All tests can be run by compiling and running this package.
 """
 use "sendence/connemara"
+use broadcast = "broadcast"
 use cluster_manager = "cluster_manager"
 use data_channel = "data_channel"
 use initialization = "initialization"
@@ -22,6 +23,7 @@ actor Main is TestList
     None
 
   fun tag tests(test: Connemara) =>
+    broadcast.Main.make().tests(test)
     cluster_manager.Main.make().tests(test)
     data_channel.Main.make().tests(test)
     initialization.Main.make().tests(test)
