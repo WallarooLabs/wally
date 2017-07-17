@@ -3,7 +3,7 @@ use "wallaroo/fail"
 
 class val VectorTimestamp
   let _worker: String
-  // !! Use persistent map to improve performance
+  // TODO: Use persistent map to improve performance
   let _vs: Map[String, U64] val
 
   new val create(worker: String, vs: Map[String, U64] val =
@@ -54,73 +54,61 @@ class val VectorTimestamp
   fun val gt(other: VectorTimestamp): Bool =>
     other.is_subset_of(this) and
     (
-      var none_less = true
       var at_least_one_greater = false
       for (k, v) in _vs.pairs() do
         try
           let v' = other._vs(k)
           if v < v' then
-            none_less = false
+            return false
           else
             if v > v' then at_least_one_greater = true end
           end
-        else
-          // This should never happen
-          Fail()
         end
       end
-      none_less and at_least_one_greater
+      at_least_one_greater or (_vs.size() > other._vs.size())
     )
 
   fun val ge(other: VectorTimestamp): Bool =>
     other.is_subset_of(this) and
     (
-      var none_less = true
       for (k, v) in _vs.pairs() do
         try
-          if v < other._vs(k) then none_less = false end
-        else
-          // This should never happen
-          Fail()
+          if v < other._vs(k) then return false end
         end
       end
-      none_less
+      true
     )
 
   fun val lt(other: VectorTimestamp): Bool =>
     is_subset_of(other) and
     (
-      var none_greater = true
       var at_least_one_less = false
       for (k, v) in _vs.pairs() do
         try
           let v' = other._vs(k)
           if v > v' then
-            none_greater = false
+            return false
           else
             if v < v' then at_least_one_less = true end
           end
         else
-          // This should never happen
-          Fail()
+          return false
         end
       end
-      none_greater and at_least_one_less
+      at_least_one_less or (other._vs.size() > _vs.size())
     )
 
   fun val le(other: VectorTimestamp): Bool =>
     is_subset_of(other) and
     (
-      var none_greater = true
       for (k, v) in _vs.pairs() do
         try
-          if v > other._vs(k) then none_greater = false end
+          if v > other._vs(k) then return false end
         else
-          // This should never happen
-          Fail()
+          return false
         end
       end
-      none_greater
+      true
     )
 
   fun val is_comparable(other: VectorTimestamp): Bool =>
@@ -131,3 +119,10 @@ class val VectorTimestamp
       if not other.contains(k) then return false end
     end
     true
+
+  fun print() =>
+    @printf[I32]("VTs{{{%s\n".cstring(), _worker.cstring())
+    for (k, v) in _vs.pairs() do
+      @printf[I32]("  %s: %s\n".cstring(), k.cstring(), v.string().cstring())
+    end
+    @printf[I32]("}}}\n".cstring())
