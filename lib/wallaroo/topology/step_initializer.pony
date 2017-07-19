@@ -231,3 +231,28 @@ class PreStateData
   fun clone_router_and_set_input_type(r: Router val): Router val =>
     _runner_builder.clone_router_and_set_input_type(r)
   fun is_default_target(): Bool => _is_default_target
+
+class PreStatelessData
+  let _name: String
+  let _state_name: String
+  let _runner_builder: RunnerBuilder val
+  let _target_id: (U128 | None)
+  let _forward_route_builder: RouteBuilder val
+  let _is_default_target: Bool
+
+  new val create(runner_builder: RunnerBuilder val, t_id: (U128 | None),
+    is_default_target': Bool = false) =>
+    _runner_builder = runner_builder
+    _state_name = runner_builder.state_name()
+    _name = runner_builder.name()
+    _target_id = t_id
+    _forward_route_builder = runner_builder.forward_route_builder()
+    _is_default_target = is_default_target'
+
+  fun name(): String => _name
+  fun state_name(): String => _state_name
+  fun target_id(): (U128 | None) => _target_id
+  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
+  fun clone_router_and_set_input_type(r: Router val): Router val =>
+    _runner_builder.clone_router_and_set_input_type(r)
+  fun is_default_target(): Bool => _is_default_target

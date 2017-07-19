@@ -190,6 +190,15 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _p.add_runner_builder(next_builder)
     PipelineBuilder[In, Out, Next](_a, _p)
 
+  fun ref to_parallel[Next: Any val](
+    comp_builder: ComputationBuilder[Last, Next] val,
+    id: U128 = 0): PipelineBuilder[In, Out, Next]
+  =>
+    let next_builder = ComputationRunnerBuilder[Last, Next](
+      comp_builder, TypedRouteBuilder[Next] where parallelized' = true)
+    _p.add_runner_builder(next_builder)
+    PipelineBuilder[In, Out, Next](_a, _p)
+
   fun ref to_stateful[Next: Any val, S: State ref](
     s_comp: StateComputation[Last, Next, S] val,
     s_initializer: StateBuilder[S] val,

@@ -50,6 +50,7 @@ trait RunnerBuilder
   fun state_name(): String => ""
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool
+  fun is_stateless_parallel(): Bool => false
   fun is_multi(): Bool => false
   fun id(): U128
   fun route_builder(): RouteBuilder val
@@ -66,8 +67,11 @@ class RunnerSequenceBuilder is RunnerBuilder
   var _forward_route_builder: RouteBuilder val
   var _in_route_builder: (RouteBuilder val | None)
   var _state_name: String
+  let _parallelized: Bool
 
-  new val create(bs: Array[RunnerBuilder val] val) =>
+  new val create(bs: Array[RunnerBuilder val] val,
+    parallelized': Bool = false)
+  =>
     _runner_builders = bs
     _id =
       try
@@ -95,6 +99,8 @@ class RunnerSequenceBuilder is RunnerBuilder
       else
         ""
       end
+
+    _parallelized = parallelized'
 
   fun apply(event_log: EventLog,
     auth: AmbientAuth,
@@ -146,6 +152,7 @@ class RunnerSequenceBuilder is RunnerBuilder
       false
     end
   fun is_stateful(): Bool => false
+  fun is_stateless_parallel(): Bool => _parallelized
   fun is_multi(): Bool =>
     try
       _runner_builders(_runner_builders.size() - 1).is_multi()
@@ -174,13 +181,16 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   let _comp_builder: ComputationBuilder[In, Out] val
   let _id: U128
   let _route_builder: RouteBuilder val
+  let _parallelized: Bool
 
   new val create(comp_builder: ComputationBuilder[In, Out] val,
-    route_builder': RouteBuilder val, id': U128 = 0)
+    route_builder': RouteBuilder val, id': U128 = 0,
+    parallelized': Bool = false)
   =>
     _comp_builder = comp_builder
     _route_builder = route_builder'
     _id = if id' == 0 then GuidGenerator.u128() else id' end
+    _parallelized = parallelized'
 
   fun apply(event_log: EventLog,
     auth: AmbientAuth,
@@ -198,6 +208,7 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   fun name(): String => _comp_builder().name()
   fun state_name(): String => ""
   fun is_stateful(): Bool => false
+  fun is_stateless_parallel(): Bool => _parallelized
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => _route_builder
   fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
