@@ -292,10 +292,8 @@ actor LocalTopologyInitializer is LayoutInitializer
     match _topology
     | let t: LocalTopology =>
       _topology = t.add_worker_name(w)
-      ifdef "resilience" then
-        _save_local_topology()
-        _save_worker_names()
-      end
+      _save_local_topology()
+      _save_worker_names()
     else
       Fail()
     end
@@ -356,16 +354,9 @@ actor LocalTopologyInitializer is LayoutInitializer
               data_channel_filepath, this, _data_receivers, _recovery_replayer,
               _router_registry)
 
-          ifdef "resilience" then
-            conns.make_and_register_recoverable_data_channel_listener(
-              _auth, consume data_notifier, _router_registry,
-              data_channel_filepath, host, service)
-          else
-            let dch_listener = DataChannelListener(_auth,
-              consume data_notifier, _router_registry,
-              host, service)
-            conns.register_listener(dch_listener)
-          end
+          conns.make_and_register_recoverable_data_channel_listener(
+            _auth, consume data_notifier, _router_registry,
+            data_channel_filepath, host, service)
         else
           match cluster_initializer
             | let ci: ClusterInitializer =>
@@ -421,15 +412,9 @@ actor LocalTopologyInitializer is LayoutInitializer
               data_channel_filepath, this, _data_receivers, _recovery_replayer,
               _router_registry)
 
-          ifdef "resilience" then
-            conns.make_and_register_recoverable_data_channel_listener(
-              _auth, consume data_notifier, _router_registry,
-              data_channel_filepath)
-          else
-            let dch_listener = DataChannelListener(_auth,
-              consume data_notifier, _router_registry)
-            conns.register_listener(dch_listener)
-          end
+          conns.make_and_register_recoverable_data_channel_listener(
+            _auth, consume data_notifier, _router_registry,
+            data_channel_filepath)
         else
           match cluster_initializer
           | let ci: ClusterInitializer =>
@@ -520,36 +505,32 @@ actor LocalTopologyInitializer is LayoutInitializer
         error
       end
 
-      ifdef "resilience" then
-        try
-          let local_topology_file = FilePath(_auth, _local_topology_file)
-          if local_topology_file.exists() then
-            //we are recovering an existing worker topology
-            let data = recover val
-              let file = File(local_topology_file)
-              file.read(file.size())
-            end
-            match Serialised.input(InputSerialisedAuth(_auth), data)(
-              DeserialiseAuth(_auth))
-            | let t: LocalTopology =>
-              _topology = t
-            else
-              @printf[I32]("error restoring previous topology!".cstring())
-            end
+      try
+        let local_topology_file = FilePath(_auth, _local_topology_file)
+        if local_topology_file.exists() then
+          //we are recovering an existing worker topology
+          let data = recover val
+            let file = File(local_topology_file)
+            file.read(file.size())
           end
-        else
-          @printf[I32]("error restoring previous topology!".cstring())
+          match Serialised.input(InputSerialisedAuth(_auth), data)(
+            DeserialiseAuth(_auth))
+          | let t: LocalTopology val =>
+            _topology = t
+          else
+            @printf[I32]("error restoring previous topology!".cstring())
+          end
         end
+      else
+        @printf[I32]("error restoring previous topology!".cstring())
       end
 
       match _topology
       | let t: LocalTopology =>
         _router_registry.set_pre_state_data(t.pre_state_data())
 
-        ifdef "resilience" then
-          _save_local_topology()
-          _save_worker_names()
-        end
+        _save_local_topology()
+        _save_worker_names()
 
         if t.is_empty() then
           @printf[I32]("----This worker has no steps----\n".cstring())
@@ -1393,10 +1374,8 @@ actor LocalTopologyInitializer is LayoutInitializer
           _router_registry.set_partition_router(state_name, partition_router)
         end
 
-        ifdef "resilience" then
-          _save_local_topology()
-          _save_worker_names()
-        end
+        _save_local_topology()
+        _save_worker_names()
 
         // Call this on router registry instead of Connections directly
         // to make sure that other messages on registry queues are

@@ -126,15 +126,13 @@ actor Startup
       _connection_addresses_file = _startup_options.resilience_dir + "/" +
         name + "-" + _startup_options.worker_name + ".connection-addresses"
 
-      ifdef "resilience" then
-        @printf[I32](("|||Resilience directory: " +
-          _startup_options.resilience_dir + "|||\n").cstring())
+      @printf[I32](("|||Resilience directory: " +
+        _startup_options.resilience_dir + "|||\n").cstring())
 
-        if not FilePath(auth, _startup_options.resilience_dir).exists() then
-          @printf[I32](("Resilience directory: " +
-            _startup_options.resilience_dir + " doesn't exist\n").cstring())
-          error
-        end
+      if not FilePath(auth, _startup_options.resilience_dir).exists() then
+        @printf[I32](("Resilience directory: " +
+          _startup_options.resilience_dir + " doesn't exist\n").cstring())
+        error
       end
 
       if _startup_options.is_joining then
@@ -200,72 +198,72 @@ actor Startup
       var is_recovering: Bool = false
 
       // check to see if we can recover
+      // Use Set to make the logic explicit and clear
+      let existing_files: Set[String] = Set[String]
+
+      let event_log_filepath: FilePath = FilePath(auth, _event_log_file)
+      if event_log_filepath.exists() then
+        existing_files.set(event_log_filepath.path)
+      end
+
+      let local_topology_filepath: FilePath = FilePath(auth,
+        _local_topology_file)
+      if local_topology_filepath.exists() then
+        existing_files.set(local_topology_filepath.path)
+      end
+
+      let data_channel_filepath: FilePath = FilePath(auth,
+        _data_channel_file)
+      if data_channel_filepath.exists() then
+        existing_files.set(data_channel_filepath.path)
+      end
+
+      let control_channel_filepath: FilePath = FilePath(auth,
+        _control_channel_file)
+      if control_channel_filepath.exists() then
+        existing_files.set(control_channel_filepath.path)
+      end
+
+      let worker_names_filepath: FilePath = FilePath(auth,
+        _worker_names_file)
+      if worker_names_filepath.exists() then
+        existing_files.set(worker_names_filepath.path)
+      end
+
+      let connection_addresses_filepath: FilePath = FilePath(auth,
+        _connection_addresses_file)
+      if connection_addresses_filepath.exists() then
+        existing_files.set(connection_addresses_filepath.path)
+      end
+
+      let required_files: Set[String] = Set[String]
       ifdef "resilience" then
-        // Use Set to make the logic explicit and clear
-        let existing_files: Set[String] = Set[String]
-
-        let event_log_filepath: FilePath = FilePath(auth, _event_log_file)
-        if event_log_filepath.exists() then
-          existing_files.set(event_log_filepath.path)
-        end
-
-        let local_topology_filepath: FilePath = FilePath(auth,
-          _local_topology_file)
-        if local_topology_filepath.exists() then
-          existing_files.set(local_topology_filepath.path)
-        end
-
-        let data_channel_filepath: FilePath = FilePath(auth,
-          _data_channel_file)
-        if data_channel_filepath.exists() then
-          existing_files.set(data_channel_filepath.path)
-        end
-
-        let control_channel_filepath: FilePath = FilePath(auth,
-          _control_channel_file)
-        if control_channel_filepath.exists() then
-          existing_files.set(control_channel_filepath.path)
-        end
-
-        let worker_names_filepath: FilePath = FilePath(auth,
-          _worker_names_file)
-        if worker_names_filepath.exists() then
-          existing_files.set(worker_names_filepath.path)
-        end
-
-        let connection_addresses_filepath: FilePath = FilePath(auth,
-          _connection_addresses_file)
-        if connection_addresses_filepath.exists() then
-          existing_files.set(connection_addresses_filepath.path)
-        end
-
-        let required_files: Set[String] = Set[String]
         required_files.set(event_log_filepath.path)
-        required_files.set(local_topology_filepath.path)
-        required_files.set(control_channel_filepath.path)
-        required_files.set(worker_names_filepath.path)
-        if not _startup_options.is_initializer then
-          required_files.set(data_channel_filepath.path)
-          required_files.set(connection_addresses_filepath.path)
-        end
+      end
+      required_files.set(local_topology_filepath.path)
+      required_files.set(control_channel_filepath.path)
+      required_files.set(worker_names_filepath.path)
+      if not _startup_options.is_initializer then
+        required_files.set(data_channel_filepath.path)
+        required_files.set(connection_addresses_filepath.path)
+      end
 
-        // Only validate _all_ files exist if _any_ files exist.
-        if existing_files.size() > 0 then
-          // If any recovery file exists, but not all, then fail
-          if (required_files.op_and(existing_files)) != required_files then
-            @printf[I32](("Some resilience recovery files are missing! "
-              + "Cannot continue!\n").cstring())
-              let files_missing = required_files.without(existing_files)
-              let files_missing_str: String val = "\n    ".join(
-                Iter[String](files_missing.values()).collect(Array[String]))
-              @printf[I32]("The missing files are:\n    %s\n".cstring(),
-                files_missing_str.cstring())
-            Fail()
-          else
-            @printf[I32]("Recovering from recovery files!\n".cstring())
-            // we are recovering because all files exist
-            is_recovering = true
-          end
+      // Only validate _all_ files exist if _any_ files exist.
+      if existing_files.size() > 0 then
+        // If any recovery file exists, but not all, then fail
+        if (required_files.op_and(existing_files)) != required_files then
+          @printf[I32](("Some resilience/recovery files are missing! "
+            + "Cannot continue!\n").cstring())
+            let files_missing = required_files.without(existing_files)
+            let files_missing_str: String val = "\n    ".join(
+              Iter[String](files_missing.values()).collect(Array[String]))
+            @printf[I32]("The missing files are:\n    %s\n".cstring(),
+              files_missing_str.cstring())
+          Fail()
+        else
+          @printf[I32]("Recovering from recovery files!\n".cstring())
+          // we are recovering because all files exist
+          is_recovering = true
         end
       end
 
@@ -336,8 +334,6 @@ actor Startup
         end
       end
 
-      let control_channel_filepath: FilePath = FilePath(auth,
-        _control_channel_file)
       let control_notifier: TCPListenNotify iso =
         ControlChannelListenNotifier(_startup_options.worker_name,
           auth, connections,
@@ -347,42 +343,26 @@ actor Startup
           control_channel_filepath, _startup_options.my_d_host,
           _startup_options.my_d_service)
 
-      ifdef "resilience" then
-        if _startup_options.is_initializer then
-          connections.make_and_register_recoverable_listener(
-            auth, consume control_notifier, control_channel_filepath,
-            _startup_options.c_host, _startup_options.c_service)
-        else
-          connections.make_and_register_recoverable_listener(
-            auth, consume control_notifier, control_channel_filepath,
-            _startup_options.my_c_host, _startup_options.my_c_service)
-        end
+      if _startup_options.is_initializer then
+        connections.make_and_register_recoverable_listener(
+          auth, consume control_notifier, control_channel_filepath,
+          _startup_options.c_host, _startup_options.c_service)
       else
-        if _startup_options.is_initializer then
-          connections.register_listener(
-            TCPListener(auth, consume control_notifier,
-              _startup_options.c_host, _startup_options.c_service))
-        else
-          connections.register_listener(
-            TCPListener(auth, consume control_notifier,
-              _startup_options.my_c_host, _startup_options.my_c_service))
-        end
+        connections.make_and_register_recoverable_listener(
+          auth, consume control_notifier, control_channel_filepath,
+          _startup_options.my_c_host, _startup_options.my_c_service)
       end
 
-      ifdef "resilience" then
-        if is_recovering then
-          // need to do this before recreating the data connection as at
-          // that point replay starts
-          let worker_names_filepath: FilePath = FilePath(auth,
-            _worker_names_file)
-          let recovered_workers = _recover_worker_names(
-            worker_names_filepath)
-          if _is_multi_worker then
-            local_topology_initializer.recover_and_initialize(
-              recovered_workers, _cluster_initializer)
-          else
-            local_topology_initializer.initialize(where recovering = true)
-          end
+      if is_recovering then
+        // need to do this before recreating the data connection as at
+        // that point replay starts
+        let recovered_workers = _recover_worker_names(
+          worker_names_filepath)
+        if _is_multi_worker then
+          local_topology_initializer.recover_and_initialize(
+            recovered_workers, _cluster_initializer)
+        else
+          local_topology_initializer.initialize(where recovering = true)
         end
       end
 
@@ -518,15 +498,9 @@ actor Startup
           recovery_replayer, router_registry, control_channel_filepath,
           _startup_options.my_d_host, _startup_options.my_d_service)
 
-      ifdef "resilience" then
-        connections.make_and_register_recoverable_listener(
-          auth, consume control_notifier, control_channel_filepath,
-          _startup_options.my_c_host, _startup_options.my_c_service)
-      else
-        connections.register_listener(
-          TCPListener(auth, consume control_notifier,
-            _startup_options.my_c_host, _startup_options.my_c_service))
-      end
+      connections.make_and_register_recoverable_listener(
+        auth, consume control_notifier, control_channel_filepath,
+        _startup_options.my_c_host, _startup_options.my_c_service)
 
       // Call this on local topology initializer instead of Connections
       // directly to make sure messages are processed in the create

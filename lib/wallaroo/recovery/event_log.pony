@@ -33,10 +33,13 @@ trait Backend
   fun ref encode_entry(entry: LogEntry)
 
 class DummyBackend is Backend
-  new create() => None
+  let _event_log: EventLog
+  new create(event_log: EventLog) =>
+    _event_log = event_log
   fun ref sync() => None
   fun ref datasync() => None
-  fun ref start_log_replay() => None
+  fun ref start_log_replay() =>
+    _event_log.log_replay_finished()
   fun ref write() => None
   fun ref encode_entry(entry: LogEntry) => None
 
@@ -70,75 +73,76 @@ class FileBackend is Backend
 
   fun ref start_log_replay() =>
     if _replay_log_exists then
-      @printf[I32]("RESILIENCE: Replaying from recovery log file.\n".cstring())
+        @printf[I32]("RESILIENCE: Replaying from recovery log file.\n".cstring())
 
-      //replay log to EventLog
-      try
-        let r = Reader
+        //replay log to EventLog
+        try
+          let r = Reader
 
-        //seek beginning of file
-        _file.seek_start(0)
-        var size = _file.size()
+          //seek beginning of file
+          _file.seek_start(0)
+          var size = _file.size()
 
-        var num_replayed: USize = 0
-        var num_skipped: USize = 0
+          var num_replayed: USize = 0
+          var num_skipped: USize = 0
 
-        // array to hold recovered data temporarily until we've sent it off to
-        // be replayed
-        var replay_buffer: Array[ReplayEntry val] ref = replay_buffer.create()
+          // array to hold recovered data temporarily until we've sent it
+          // off to be replayed
+          var replay_buffer: Array[ReplayEntry val] ref =
+            replay_buffer.create()
 
-        let watermarks: Map[U128, U64] = watermarks.create()
+          let watermarks: Map[U128, U64] = watermarks.create()
 
-        //start iterating until we reach original EOF
-        while _file.position() < size do
-          r.append(_file.read(25))
-          let is_watermark = r.bool()
-          let origin_id = r.u128_be()
-          let seq_id = r.u64_be()
-          if is_watermark then
-            // save last watermark read from file
-            watermarks(origin_id) = seq_id
-          else
-            r.append(_file.read(24))
-            let uid = r.u128_be()
-            let fractional_size = r.u64_be()
-            let frac_ids = recover val
-              if fractional_size > 0 then
-                let bytes_to_read = fractional_size.usize() * 4
-                r.append(_file.read(bytes_to_read))
-                let l = Array[U32]
-                for i in Range(0,fractional_size.usize()) do
-                  l.push(r.u32_be())
+          //start iterating until we reach original EOF
+          while _file.position() < size do
+            r.append(_file.read(25))
+            let is_watermark = r.bool()
+            let origin_id = r.u128_be()
+            let seq_id = r.u64_be()
+            if is_watermark then
+              // save last watermark read from file
+              watermarks(origin_id) = seq_id
+            else
+              r.append(_file.read(24))
+              let uid = r.u128_be()
+              let fractional_size = r.u64_be()
+              let frac_ids = recover val
+                if fractional_size > 0 then
+                  let bytes_to_read = fractional_size.usize() * 4
+                  r.append(_file.read(bytes_to_read))
+                  let l = Array[U32]
+                  for i in Range(0,fractional_size.usize()) do
+                    l.push(r.u32_be())
+                  end
+                  l
+                else
+                  //None is faster if we have no frac_ids, which will
+                  // probably be true most of the time
+                  None
                 end
-                l
-              else
-                //None is faster if we have no frac_ids, which will probably be
-                //true most of the time
-                None
               end
-            end
-            r.append(_file.read(16))
-            let statechange_id = r.u64_be()
-            let payload_length = r.u64_be()
-            let payload = recover val
-              if payload_length > 0 then
-                _file.read(payload_length.usize())
-              else
-                Array[U8]
+              r.append(_file.read(16))
+              let statechange_id = r.u64_be()
+              let payload_length = r.u64_be()
+              let payload = recover val
+                if payload_length > 0 then
+                  _file.read(payload_length.usize())
+                else
+                  Array[U8]
+                end
               end
+
+              // put entry into temporary recovered buffer
+              replay_buffer.push((origin_id, uid, frac_ids,
+                statechange_id, seq_id, payload))
             end
 
-            // put entry into temporary recovered buffer
-            replay_buffer.push((origin_id, uid, frac_ids,
-              statechange_id, seq_id, payload))
+            // clear read buffer to free file data read so far
+            if r.size() > 0 then
+              Fail()
+            end
+            r.clear()
           end
-
-          // clear read buffer to free file data read so far
-          if r.size() > 0 then
-            Fail()
-          end
-          r.clear()
-        end
 
         // iterate through recovered buffer and replay entries at or below
         // watermark
@@ -151,14 +155,14 @@ class FileBackend is Backend
           else
             num_skipped = num_skipped + 1
           end
+
+          @printf[I32]("RESILIENCE: Replayed %d entries from recovery log file.\n"
+            .cstring(), num_replayed)
+          @printf[I32]("RESILIENCE: Skipped %d entries from recovery log file.\n"
+            .cstring(), num_skipped)
+
+          _file.seek_end(0)
         end
-
-        @printf[I32]("RESILIENCE: Replayed %d entries from recovery log file.\n"
-          .cstring(), num_replayed)
-        @printf[I32]("RESILIENCE: Skipped %d entries from recovery log file.\n"
-          .cstring(), num_skipped)
-
-        _file.seek_end(0)
         _event_log.log_replay_finished()
       else
         @printf[I32]("Cannot recover state from eventlog\n".cstring())
@@ -263,10 +267,10 @@ actor EventLog
           FileBackend(FilePath(env.root as AmbientAuth, f), this,
             backend_file_length)
         else
-          DummyBackend
+          DummyBackend(this)
         end
       else
-        DummyBackend
+        DummyBackend(this)
       end
     end
 

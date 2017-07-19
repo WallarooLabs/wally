@@ -119,10 +119,6 @@ actor Connections is Cluster
     recovery_addr_file: FilePath val,
     host: String val = "", port: String val = "0")
   =>
-    // TODO: Not sure if this is the right way to check this
-    ifdef not "resilience" then
-      Fail()
-    end
     if recovery_addr_file.exists() then
       try
         let file = File(recovery_addr_file)
@@ -147,10 +143,6 @@ actor Connections is Cluster
     recovery_addr_file: FilePath val,
     host: String val = "", port: String val = "0")
   =>
-    // TODO: Not sure if this is the right way to check this
-    ifdef not "resilience" then
-      Fail()
-    end
     if recovery_addr_file.exists() then
       try
         let file = File(recovery_addr_file)
@@ -361,9 +353,7 @@ actor Connections is Cluster
     layout_initializer: LayoutInitializer)
   =>
     try
-      ifdef "resilience" then
-        _save_connections(control_addrs, data_addrs)
-      end
+      _save_connections(control_addrs, data_addrs)
 
       for (target, address) in control_addrs.pairs() do
         if target != _worker_name then
@@ -441,29 +431,24 @@ actor Connections is Cluster
     var addresses: Map[String, Map[String, (String, String)]] val =
       recover val Map[String, Map[String, (String, String)]] end
     try
-      ifdef "resilience" then
-        @printf[I32]("Recovering connection addresses!\n".cstring())
-        try
-          let connection_addresses_file = FilePath(_auth,
-            _connection_addresses_file)
-          if connection_addresses_file.exists() then
-            //we are recovering an existing worker topology
-            let data = recover val
-              let file = File(connection_addresses_file)
-              file.read(file.size())
-            end
-            match Serialised.input(InputSerialisedAuth(_auth), data)(
-              DeserialiseAuth(_auth))
-            | let a: Map[String, Map[String, (String, String)]] val =>
-              addresses = a
-            else
-              @printf[I32]("error restoring connection addresses!".cstring())
-              Fail()
-            end
+      @printf[I32]("Recovering connection addresses!\n".cstring())
+      try
+        let connection_addresses_file = FilePath(_auth,
+          _connection_addresses_file)
+        if connection_addresses_file.exists() then
+          //we are recovering an existing worker topology
+          let data = recover val
+            let file = File(connection_addresses_file)
+            file.read(file.size())
           end
-        else
-          @printf[I32]("error restoring connection addresses!".cstring())
-          Fail()
+          match Serialised.input(InputSerialisedAuth(_auth), data)(
+            DeserialiseAuth(_auth))
+          | let a: Map[String, Map[String, (String, String)]] val =>
+            addresses = a
+          else
+            @printf[I32]("error restoring connection addresses!".cstring())
+            Fail()
+          end
         end
       else
         Fail()
