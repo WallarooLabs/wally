@@ -90,33 +90,27 @@ class DataChannelListenNotifier is DataChannelListenNotify
 
       @printf[I32]((_name + " data channel: listening on " + _host + ":" +
         _service + "\n").cstring())
-      ifdef "resilience" then
-        if _recovery_file.exists() then
-          @printf[I32]("Recovery file exists for data channel\n".cstring())
-        end
-        if _joining_existing_cluster then
-          //TODO: Do we actually need to do this? Isn't this sent as
-          // part of joining worker initialized message?
+      if _recovery_file.exists() then
+        @printf[I32]("Recovery file exists for data channel\n".cstring())
+      end
+      if _joining_existing_cluster then
+        //TODO: Do we actually need to do this? Isn't this sent as
+        // part of joining worker initialized message?
+        let message = ChannelMsgEncoder.identify_data_port(_name, _service,
+          _auth)
+        _connections.send_control_to_cluster(message)
+      else
+        if not _recovery_file.exists() then
           let message = ChannelMsgEncoder.identify_data_port(_name, _service,
             _auth)
           _connections.send_control_to_cluster(message)
-        else
-          if not _recovery_file.exists() then
-            let message = ChannelMsgEncoder.identify_data_port(_name, _service,
-              _auth)
-            _connections.send_control_to_cluster(message)
-          end
         end
-        let f = File(_recovery_file)
-        f.print(_host)
-        f.print(_service)
-        f.sync()
-        f.dispose()
-      else
-        let message = ChannelMsgEncoder.identify_data_port(_name, _service,
-          _auth)
-        _connections.send_control("initializer", message)
       end
+      let f = File(_recovery_file)
+      f.print(_host)
+      f.print(_service)
+      f.sync()
+      f.dispose()
     else
       @printf[I32]((_name + "data : couldn't get local address\n").cstring())
       listen.close()

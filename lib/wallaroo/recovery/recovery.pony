@@ -75,7 +75,9 @@ actor Recovery
     end
 
   fun ref _start_log_replay(workers: Array[String] val) =>
-    @printf[I32]("|~~ - Recovery Phase: Log Replay - ~~|\n".cstring())
+    ifdef "resilience" then
+      @printf[I32]("|~~ - Recovery Phase: Log Replay - ~~|\n".cstring())
+    end
     _recovery_phase = _LogReplay(workers, this)
     try
       _recovery_phase.start_log_replay(_event_log)

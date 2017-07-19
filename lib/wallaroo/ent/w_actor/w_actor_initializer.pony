@@ -193,16 +193,9 @@ actor WActorInitializer is LayoutInitializer
               data_channel_filepath, this, _data_receivers, _recovery_replayer,
               _router_registry)
 
-          ifdef "resilience" then
-            conns.make_and_register_recoverable_data_channel_listener(
-              _auth, consume data_notifier, _router_registry,
-              data_channel_filepath, host, service)
-          else
-            let dch_listener = DataChannelListener(_auth,
-              consume data_notifier, _router_registry,
-              host, service)
-            conns.register_listener(dch_listener)
-          end
+          conns.make_and_register_recoverable_data_channel_listener(
+            _auth, consume data_notifier, _router_registry,
+            data_channel_filepath, host, service)
         else
           match cluster_initializer
             | let ci: ClusterInitializer =>
@@ -250,15 +243,9 @@ actor WActorInitializer is LayoutInitializer
               data_channel_filepath, this, _data_receivers, _recovery_replayer,
               _router_registry)
 
-          ifdef "resilience" then
-            conns.make_and_register_recoverable_data_channel_listener(
-              _auth, consume data_notifier, _router_registry,
-              data_channel_filepath)
-          else
-            let dch_listener = DataChannelListener(_auth,
-              consume data_notifier, _router_registry)
-            conns.register_listener(dch_listener)
-          end
+          conns.make_and_register_recoverable_data_channel_listener(
+            _auth, consume data_notifier, _router_registry,
+            data_channel_filepath)
         else
           match cluster_initializer
           | let ci: ClusterInitializer =>
@@ -278,29 +265,25 @@ actor WActorInitializer is LayoutInitializer
     recovering: Bool = false)
   =>
     try
-      ifdef "resilience" then
-        let local_actor_system_file = FilePath(_auth, _local_actor_system_file)
-        if local_actor_system_file.exists() then
-          //we are recovering an existing worker topology
-          let data = recover val
-            let file = File(local_actor_system_file)
-            file.read(file.size())
-          end
-          match Serialised.input(InputSerialisedAuth(_auth), data)(
-            DeserialiseAuth(_auth))
-          | let las: LocalActorSystem =>
-            _system = las
-            @printf[I32]("||| -- Recovered Actor System! -- |||\n".cstring())
-          else
-            @printf[I32]("error restoring previous actor system!".cstring())
-          end
+      let local_actor_system_file = FilePath(_auth, _local_actor_system_file)
+      if local_actor_system_file.exists() then
+        //we are recovering an existing worker topology
+        let data = recover val
+          let file = File(local_actor_system_file)
+          file.read(file.size())
+        end
+        match Serialised.input(InputSerialisedAuth(_auth), data)(
+          DeserialiseAuth(_auth))
+        | let las: LocalActorSystem =>
+          _system = las
+          @printf[I32]("||| -- Recovered Actor System! -- |||\n".cstring())
+        else
+          @printf[I32]("error restoring previous actor system!".cstring())
         end
       end
 
-      ifdef "resilience" then
-        _save_local_actor_system()
-        _save_worker_names()
-      end
+      _save_local_actor_system()
+      _save_worker_names()
 
       match _system
       | let las: LocalActorSystem =>
