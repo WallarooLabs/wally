@@ -135,16 +135,51 @@ actor ApplicationDistributor is Distributor
         @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline.size().string() + " uncoalesced runner builders\n").cstring())
 
 
-        //////////
-        // Coalesce runner builders if we can
+        ///////////
+        // For the current pipeline, the following code transforms the
+        // sequence of runner builders (corresponding to all computations
+        // defined via the API for that pipeline) into a sequence of
+        // runner builders corresponding to steps in the running application.
+        //
+        // If coalescing is on, we try to coalesce all contiguous sequences of
+        // stateless computations into single runner builders (of type
+        // RunnerSequenceBuilder). Each RunnerSequenceBuilder will correspond
+        // to a single step.
+        //
+        // We handle the runner builders for the source first. If coalescing
+        // is on, we take all contiguous runner builders starting from the
+        // first and coalesce them into one RunnerSequenceBuilder. In the
+        // process of doing this, we store them in `source_runner_builders`,
+        // which we will then use to create the RunnerSequenceBuilder.
+        //
+        // We then go through the rest of the runner builders from the
+        // pipeline, coalescing contiguous sequences of runner builders
+        // into single RunnerSequenceBuilders and adding them to
+        // `step_runner_builders`, which will be used to build the
+        // StepInitializers (1-to-1 between members of `step_runner_builders`
+        // and steps in the running application). As we iterate over
+        // contiguous stateless computations, we add them to
+        // `latest_runner_builders`, which will be used to construct the
+        // corresponding RunnerSequenceBuilder.
+        ///////////
+
+        //
         var handled_source_runners = false
+        // Used to store the first sequence of contiguous stateless
+        // computations as we accumulate them to eventually turn into a
+        // RunnerSequenceBuilder. When coalescing is off, we only put a
+        // single runner builder here.
         var source_runner_builders: Array[RunnerBuilder val] trn =
           recover Array[RunnerBuilder val] end
 
         // We'll use this array when creating StepInitializers
-        let runner_builders: Array[RunnerBuilder val] trn =
+        let step_runner_builders: Array[RunnerBuilder val] trn =
           recover Array[RunnerBuilder val] end
 
+        // Used to temporarily store contiguous stateless computations as
+        // we accumulate them to eventually turn into a RunnerSequenceBuilder.
+        // When coalescing is off, we do not use this since each computation
+        // will correspond to a step.
         var latest_runner_builders: Array[RunnerBuilder val] trn =
           recover Array[RunnerBuilder val] end
 
@@ -162,14 +197,14 @@ actor ApplicationDistributor is Distributor
               let seq_builder = RunnerSequenceBuilder(
                 latest_runner_builders = recover Array[RunnerBuilder val] end
                 )
-              runner_builders.push(seq_builder)
+              step_runner_builders.push(seq_builder)
             else
               source_runner_builders.push(r_builder)
               handled_source_runners = true
             end
           elseif not pipeline.is_coalesced() then
             if handled_source_runners then
-              runner_builders.push(r_builder)
+              step_runner_builders.push(r_builder)
             else
               source_runner_builders.push(r_builder)
               handled_source_runners = true
@@ -177,7 +212,7 @@ actor ApplicationDistributor is Distributor
           // TODO: If the developer specified an id, then this needs to be on
           // a separate step to be accessed by multiple pipelines
           // elseif ??? then
-          //   runner_builders.push(r_builder)
+          //   step_runner_builders.push(r_builder)
           //   handled_source_runners = true
           else
             if handled_source_runners then
@@ -191,7 +226,7 @@ actor ApplicationDistributor is Distributor
         if latest_runner_builders.size() > 0 then
           let seq_builder = RunnerSequenceBuilder(
             latest_runner_builders = recover Array[RunnerBuilder val] end)
-          runner_builders.push(seq_builder)
+          step_runner_builders.push(seq_builder)
         end
 
         // Create Source Initializer and add it to the graph for the
@@ -219,7 +254,7 @@ actor ApplicationDistributor is Distributor
         let source_pre_state_target_id: (U128 | None) =
           if source_seq_builder.is_prestate() then
             try
-              runner_builders(0).id()
+              step_runner_builders(0).id()
             else
               match pipeline.sink_id()
               | let sid: U128 =>
@@ -309,10 +344,10 @@ actor ApplicationDistributor is Distributor
         // Each worker gets a near-equal share of the total computations
         // in this naive algorithm
         let per_worker: USize =
-          if runner_builders.size() <= worker_count then
+          if step_runner_builders.size() <= worker_count then
             1
           else
-            runner_builders.size() / worker_count
+            step_runner_builders.size() / worker_count
           end
 
         @printf[I32](("Each worker gets roughly " + per_worker.string() + " steps\n").cstring())
@@ -333,22 +368,22 @@ actor ApplicationDistributor is Distributor
           // that is the "anchor" for the partition, so instead we
           // make sure it gets put on the same worker
           try
-            match runner_builders(count)
+            match step_runner_builders(count)
             | let pb: PartitionBuilder val =>
               count = count + 1
             end
           end
 
           if (i == (worker_count - 1)) and
-            (count < runner_builders.size()) then
+            (count < step_runner_builders.size()) then
             // Make sure we cover all steps by forcing the rest on the
             // last worker if need be
-            boundaries.push(runner_builders.size())
+            boundaries.push(step_runner_builders.size())
           else
-            let b = if count < runner_builders.size() then
+            let b = if count < step_runner_builders.size() then
               count
             else
-              runner_builders.size()
+              step_runner_builders.size()
             end
             boundaries.push(b)
           end
@@ -406,7 +441,7 @@ actor ApplicationDistributor is Distributor
           end
 
           // Make sure there are still runner_builders left in the pipeline.
-          if runner_builder_idx < runner_builders.size() then
+          if runner_builder_idx < step_runner_builders.size() then
             var cur_step_id = _guid_gen.u128()
 
             // Until we hit the boundary for this worker, keep adding
@@ -414,7 +449,7 @@ actor ApplicationDistributor is Distributor
             while runner_builder_idx < boundary do
               var next_runner_builder: RunnerBuilder val =
                 try
-                  runner_builders(runner_builder_idx)
+                  step_runner_builders(runner_builder_idx)
                 else
                   @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
                   error
@@ -436,7 +471,7 @@ actor ApplicationDistributor is Distributor
 
                 let pre_state_target_id: (U128 | None) =
                   try
-                    runner_builders(runner_builder_idx + 1).id()
+                    step_runner_builders(runner_builder_idx + 1).id()
                   else
                     match pipeline.sink_id()
                     | let sid: U128 =>
@@ -547,7 +582,7 @@ actor ApplicationDistributor is Distributor
 
           // Create the EgressBuilder for this worker and add to its graph.
           // First, check if there is going to be a step across the boundary
-          if runner_builder_idx < runner_builders.size() then
+          if runner_builder_idx < step_runner_builders.size() then
           ///////
           // We need a Proxy since there are more steps to go in this
           // pipeline
@@ -555,7 +590,7 @@ actor ApplicationDistributor is Distributor
             | let w: String =>
               let next_runner_builder =
                 try
-                  runner_builders(runner_builder_idx)
+                  step_runner_builders(runner_builder_idx)
                 else
                   @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
                   error
@@ -569,7 +604,7 @@ actor ApplicationDistributor is Distributor
                 // Build our egress builder for the proxy
                 let egress_id =
                   try
-                    runner_builders(runner_builder_idx).id()
+                    step_runner_builders(runner_builder_idx).id()
                   else
                     @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
                     error
