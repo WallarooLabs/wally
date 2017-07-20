@@ -473,7 +473,31 @@ class ComputationRunner[In: Any val, Out: Any val]
           _next.run[Out](metric_name, pipeline_time_spent, output, producer,
             router, omni_router,
             i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-            computation_end, new_metrics_id, worker_ingress_ts, metrics_reporter)
+            computation_end, new_metrics_id, worker_ingress_ts,
+            metrics_reporter)
+        | let outputs: Array[Out] val =>
+          var this_is_finished = true
+          var this_last_ts = computation_end
+          // this is unused and kept here only for short term posterity until
+          // https://github.com/Sendence/wallaroo/issues/1010 is addressed
+          let this_keep_sending = true
+
+          for output in outputs.values() do
+            (let f, let s, let ts) = _next.run[Out](metric_name, pipeline_time_spent, output, producer,
+              router, omni_router,
+              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+              computation_end, new_metrics_id, worker_ingress_ts,
+              metrics_reporter)
+
+            // we are sending multiple messages, only mark this message as
+            // finished if all are finished
+            if (f == false) then
+              this_is_finished = false
+            end
+
+            this_last_ts = ts
+          end
+          (this_is_finished, this_keep_sending, this_last_ts)
         else
           (true, true, computation_end)
         end
@@ -659,7 +683,6 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
           sc.write_log_entry(_wb)
           //TODO: batching? race between queueing and watermark?
           let payload = _wb.done()
-          //TODO: deal with creating fractional message ids here
           match _id
           | let buffer_id: U128 =>
 

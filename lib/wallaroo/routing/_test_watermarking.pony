@@ -27,6 +27,10 @@ actor TestWatermarking is TestList
     test(_TestOutgoingToIncomingIndexFor2)
     test(_TestOriginHighsBelow1)
     test(_TestOriginHighsBelow2)
+    test(_TestOriginHighsBelowWithOneToManyPartiallyAcked)
+    test(_TestOriginHighsBelowWithOneToManyFullyAcked1)
+    test(_TestOriginHighsBelowWithOneToManyFullyAcked2)
+    test(_TestOriginHighsBelowWithOneToManyFullyAcked3)
     test(_TestOutgoingToIncomingEviction)
     test(_TestOutgoingToIncomingBadEviction)
 
@@ -641,6 +645,173 @@ class iso _TestOriginHighsBelow2 is UnitTest
     h.assert_false(highs.contains((o2, o2route)))
     try
       h.assert_eq[U64](SeqId(1), highs((o1, o1route)))
+    else
+      h.fail()
+    end
+
+class iso _TestOriginHighsBelowWithOneToManyPartiallyAcked is UnitTest
+  fun name(): String =>
+    "watermarking/OriginHighsBelowWithOneToManyPartiallyAcked"
+
+  fun ref apply(h: TestHelper) =>
+    let o1 = _TestProducer
+    let o1route = RouteId(1)
+    let o2 = _TestProducer
+    let o2route = RouteId(3)
+    let t = _OutgoingToIncoming
+
+    t.add(SeqId(1), o1, o1route, SeqId(1))
+    // this incoming message is 1 to many
+    // in particular (o2, o2route, SeqId(1)) results in 4 outgoing messages
+    t.add(SeqId(2), o2, o2route, SeqId(1))
+    t.add(SeqId(3), o2, o2route, SeqId(1))
+    t.add(SeqId(4), o2, o2route, SeqId(1))
+    t.add(SeqId(5), o2, o2route, SeqId(1))
+
+    t.add(SeqId(6), o1, o1route, SeqId(2))
+    t.add(SeqId(7), o1, o1route, SeqId(3))
+    t.add(SeqId(8), o2, o2route, SeqId(2))
+    t.add(SeqId(9), o1, o1route, SeqId(4))
+
+    let index: USize = 3
+    try
+      h.assert_eq[USize](index, t._index_for(SeqId(4)))
+    else
+      h.fail()
+    end
+    let highs = t._origin_highs_below(index)
+
+    h.assert_eq[USize](1, highs.size())
+    h.assert_true(highs.contains((o1, o1route)))
+    h.assert_false(highs.contains((o2, o2route)))
+    try
+      h.assert_eq[U64](SeqId(1), highs((o1, o1route)))
+    else
+      h.fail()
+    end
+
+class iso _TestOriginHighsBelowWithOneToManyFullyAcked1 is UnitTest
+  fun name(): String =>
+    "watermarking/OriginHighsBelowWithOneToManyFullyAcked1"
+
+  fun ref apply(h: TestHelper) =>
+    let o1 = _TestProducer
+    let o1route = RouteId(1)
+    let o2 = _TestProducer
+    let o2route = RouteId(3)
+    let t = _OutgoingToIncoming
+
+    t.add(SeqId(1), o1, o1route, SeqId(1))
+    // this incoming message is 1 to many
+    // in particular (o2, o2route, SeqId(1)) results in 4 outgoing messages
+    t.add(SeqId(2), o2, o2route, SeqId(1))
+    t.add(SeqId(3), o2, o2route, SeqId(1))
+    t.add(SeqId(4), o2, o2route, SeqId(1))
+    t.add(SeqId(5), o2, o2route, SeqId(1))
+
+    t.add(SeqId(6), o1, o1route, SeqId(2))
+    t.add(SeqId(7), o1, o1route, SeqId(3))
+    t.add(SeqId(8), o2, o2route, SeqId(2))
+    t.add(SeqId(9), o1, o1route, SeqId(4))
+
+    let index: USize = 4
+    try
+      h.assert_eq[USize](index, t._index_for(SeqId(5)))
+    else
+      h.fail()
+    end
+    let highs = t._origin_highs_below(index)
+
+    h.assert_eq[USize](2, highs.size())
+    h.assert_true(highs.contains((o1, o1route)))
+    h.assert_true(highs.contains((o2, o2route)))
+    try
+      h.assert_eq[U64](SeqId(1), highs((o1, o1route)))
+      h.assert_eq[U64](SeqId(1), highs((o2, o2route)))
+    else
+      h.fail()
+    end
+
+class iso _TestOriginHighsBelowWithOneToManyFullyAcked2 is UnitTest
+  fun name(): String =>
+    "watermarking/OriginHighsBelowWithOneToManyFullyAcked2"
+
+  fun ref apply(h: TestHelper) =>
+    let o1 = _TestProducer
+    let o1route = RouteId(1)
+    let o2 = _TestProducer
+    let o2route = RouteId(3)
+    let t = _OutgoingToIncoming
+
+    t.add(SeqId(1), o1, o1route, SeqId(1))
+    // this incoming message is 1 to many
+    // in particular (o2, o2route, SeqId(1)) results in 4 outgoing messages
+    t.add(SeqId(2), o2, o2route, SeqId(1))
+    t.add(SeqId(3), o2, o2route, SeqId(1))
+    t.add(SeqId(4), o2, o2route, SeqId(1))
+    t.add(SeqId(5), o2, o2route, SeqId(1))
+
+    t.add(SeqId(6), o1, o1route, SeqId(2))
+    t.add(SeqId(7), o1, o1route, SeqId(3))
+    t.add(SeqId(8), o2, o2route, SeqId(2))
+    t.add(SeqId(9), o1, o1route, SeqId(4))
+
+    let index: USize = 7
+    try
+      h.assert_eq[USize](index, t._index_for(SeqId(8)))
+    else
+      h.fail()
+    end
+    let highs = t._origin_highs_below(index)
+
+    h.assert_eq[USize](2, highs.size())
+    h.assert_true(highs.contains((o1, o1route)))
+    h.assert_true(highs.contains((o2, o2route)))
+    try
+      h.assert_eq[U64](SeqId(3), highs((o1, o1route)))
+      h.assert_eq[U64](SeqId(2), highs((o2, o2route)))
+    else
+      h.fail()
+    end
+
+class iso _TestOriginHighsBelowWithOneToManyFullyAcked3 is UnitTest
+  fun name(): String =>
+    "watermarking/OriginHighsBelowWithOneToManyFullyAcked3"
+
+  fun ref apply(h: TestHelper) =>
+    let o1 = _TestProducer
+    let o1route = RouteId(1)
+    let o2 = _TestProducer
+    let o2route = RouteId(3)
+    let t = _OutgoingToIncoming
+
+    t.add(SeqId(1), o1, o1route, SeqId(1))
+    // this incoming message is 1 to many
+    // in particular (o2, o2route, SeqId(1)) results in 4 outgoing messages
+    t.add(SeqId(2), o2, o2route, SeqId(1))
+    t.add(SeqId(3), o2, o2route, SeqId(1))
+    t.add(SeqId(4), o2, o2route, SeqId(1))
+    t.add(SeqId(5), o2, o2route, SeqId(1))
+
+    t.add(SeqId(6), o1, o1route, SeqId(2))
+    t.add(SeqId(7), o1, o1route, SeqId(3))
+    t.add(SeqId(8), o2, o2route, SeqId(2))
+    t.add(SeqId(9), o1, o1route, SeqId(4))
+
+    let index: USize = 6
+    try
+      h.assert_eq[USize](index, t._index_for(SeqId(7)))
+    else
+      h.fail()
+    end
+    let highs = t._origin_highs_below(index)
+
+    h.assert_eq[USize](2, highs.size())
+    h.assert_true(highs.contains((o1, o1route)))
+    h.assert_true(highs.contains((o2, o2route)))
+    try
+      h.assert_eq[U64](SeqId(3), highs((o1, o1route)))
+      h.assert_eq[U64](SeqId(1), highs((o2, o2route)))
     else
       h.fail()
     end
