@@ -134,16 +134,6 @@ actor ApplicationDistributor is Distributor
         var pipeline_default_state_name = ""
         var pipeline_default_target_worker = ""
 
-        let source_addr_trn: Array[String] trn = recover Array[String] end
-        try
-          source_addr_trn.push(_input_addrs(pipeline_id)(0))
-          source_addr_trn.push(_input_addrs(pipeline_id)(1))
-        else
-          @printf[I32]("No input address!\n".cstring())
-          error
-        end
-        let source_addr: Array[String] val = consume source_addr_trn
-
         let sink_addr_trn: Array[String] trn = recover Array[String] end
         try
           let output_addr = _output_addrs(pipeline.sink_addr_idx())
@@ -301,7 +291,7 @@ actor ApplicationDistributor is Distributor
 
         let source_initializer = SourceData(source_node_id,
           pipeline.source_builder(), source_seq_builder,
-          pipeline.source_route_builder(), source_addr,
+          pipeline.source_route_builder(),
           source_pre_state_target_id)
 
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
