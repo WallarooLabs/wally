@@ -14,7 +14,8 @@ actor Main
       let application = recover val
         Application("Celsius Conversion App")
           .new_pipeline[F32, F32]("Celsius Conversion")
-            .from(CelsiusDecoder)
+            // TODO: get the host and service from the command line, not hard coded
+            .from(TCPSourceInformation[F32](CelsiusDecoder, "localhost", "3030"))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
             .to_sink(FahrenheitEncoder, recover [0] end)
