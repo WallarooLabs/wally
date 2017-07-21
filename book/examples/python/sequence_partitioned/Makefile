@@ -19,24 +19,20 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 RECURSE_SUBMAKEFILES := false
 
-PYTHON_PATH = $(buffy_path)/machida
-MACHIDA_BIN_PATH = $(buffy_path)/machida/build
-VALIDATOR_PATH = $(buffy_path)/testing/correctness/apps/sequence_window/validator
-INTEGRATION_PATH = $(buffy_path)/testing/tools
-INTEGRATION_BIN_PATH = $(INTEGRATION_PATH)/integration
 SEQUENCE_PART_PATH = $(buffy_path)/book/examples/python/sequence_partitioned
 
-build-book-examples-python-sequence_partitioned-all = build-machida-all build-testing-correctness-apps-sequence_window-validator-all
-test-book-examples-python-sequence_partitioned-all = build-book-examples-python-sequence_partitioned-all sequence_partitioned_py_test
-clean-book-examples-python-sequence_partitioned-all = sequence_partitioned_py_clean
+build-book-examples-python-sequence_partitioned-all += build-machida-all
+build-book-examples-python-sequence_partitioned-all += build-testing-correctness-apps-sequence_window-validator-all
+test-book-examples-python-sequence_partitioned-all += build-book-examples-python-sequence_partitioned-all
+test-book-examples-python-sequence_partitioned-all += sequence_partitioned_py_test
+clean-book-examples-python-sequence_partitioned-all += sequence_partitioned_py_clean
 
 sequence_partitioned_py_clean:
 	$(QUIET)rm -f $(SEQUENCE_PART_PATH)/received.txt
 
 sequence_partitioned_py_test:
-	export PYTHONPATH=".:$(PYTHON_PATH):$(INTEGRATION_PATH)" && \
-	export PATH="$(PATH):$(MACHIDA_BIN_PATH):$(INTEGRATION_BIN_PATH)" && \
 	cd $(SEQUENCE_PART_PATH) && \
+	export PYTHONPATH="$(PYTHONPATH)" && \
 	integration_test --sequence-sender '(0,1000]' \
 	  --log-level error \
 		--command 'machida --application-module sequence_partitioned' \

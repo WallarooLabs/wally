@@ -40,7 +40,7 @@ class val LetterStateBuilder
 
 class LetterState is State
   var letter: String = " "
-  var count: U32 = 0
+  var count: U64 = 0
 
 class AddVotesStateChange is StateChange[LetterState]
   var _id: U64
@@ -62,12 +62,12 @@ class AddVotesStateChange is StateChange[LetterState]
   fun write_log_entry(out_writer: Writer) =>
     out_writer.u32_be(_votes.letter.size().u32())
     out_writer.write(_votes.letter)
-    out_writer.u32_be(_votes.count)
+    out_writer.u64_be(_votes.count)
 
   fun ref read_log_entry(in_reader: Reader) ? =>
     let letter_size = in_reader.u32_be().usize()
     let letter = String.from_array(in_reader.block(letter_size))
-    let count = in_reader.u32_be()
+    let count = in_reader.u64_be()
     _votes = Votes(letter, count)
 
 class AddVotesStateChangeBuilder is StateChangeBuilder[LetterState]
@@ -111,7 +111,7 @@ primitive VotesDecoder is FramedSourceHandler[Votes val]
     // Assumption: 1 byte for letter
     let letter = String.from_array(data.trim(0, 1))
     let count = Bytes.to_u32(data(1), data(2), data(3), data(4))
-    Votes(letter, count)
+    Votes(letter, count.u64())
 
 primitive LetterPartitionFunction
   fun apply(votes: Votes val): String =>
@@ -119,22 +119,23 @@ primitive LetterPartitionFunction
 
 class Votes
   let letter: String
-  let count: U32
+  let count: U64
 
-  new val create(l: String, c: U32) =>
+  new val create(l: String, c: U64) =>
     letter = l
     count = c
 
 class LetterTotal
   let letter: String
-  let count: U32
+  let count: U64
 
-  new val create(l: String, c: U32) =>
+  new val create(l: String, c: U64) =>
     letter = l
     count = c
 
 primitive LetterTotalEncoder
   fun apply(t: LetterTotal val, wb: Writer = Writer): Array[ByteSeq] val =>
+    wb.u32_be(9)
     wb.write(t.letter) // Assumption: letter is 1 byte
-    wb.u32_be(t.count)
+    wb.u64_be(t.count)
     wb.done()

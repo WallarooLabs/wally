@@ -19,23 +19,19 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 RECURSE_SUBMAKEFILES := false
 
-PYTHON_PATH = $(buffy_path)/machida
-MACHIDA_BIN_PATH = $(buffy_path)/machida/build
-INTEGRATION_PATH = $(buffy_path)/testing/tools
-INTEGRATION_BIN_PATH = $(INTEGRATION_PATH)/integration
 MARKET_SPREAD_PY_PATH = $(buffy_path)/book/examples/python/market_spread
 
-build-book-examples-python-market_spread-all = build-machida-all
-test-book-examples-python-market_spread-all = build-book-examples-python-market_spread-all market_spread_py_test
-clean-book-examples-python-market_spread-all = market_spread_py_clean
+build-book-examples-python-market_spread-all += build-machida-all
+test-book-examples-python-market_spread-all += build-book-examples-python-market_spread-all
+test-book-examples-python-market_spread-all += market_spread_py_test
+clean-book-examples-python-market_spread-all += market_spread_py_clean
 
 market_spread_py_clean:
 	$(QUIET)rm -f $(MARKET_SPREAD_PY_PATH)/received.txt $(MARKET_SPREAD_PY_PATH)/_expected.txt $(MARKET_SPREAD_PY_PATH)/_orders.txt $(MARKET_SPREAD_PY_PATH)/_market.txt
 
 market_spread_py_test:
-	export PYTHONPATH=".:$(PYTHON_PATH):$(INTEGRATION_PATH)" && \
-	export PATH="$(PATH):$(MACHIDA_BIN_PATH):$(INTEGRATION_BIN_PATH)" && \
 	cd $(MARKET_SPREAD_PY_PATH) && \
+	export PYTHONPATH="$(PYTHONPATH)" && \
 	python _test/gen.py && \
 	integration_test --framed-file-sender _market.txt 1 \
 		--framed-file-sender _orders.txt 0 \

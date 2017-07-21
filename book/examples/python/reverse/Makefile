@@ -19,19 +19,15 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 RECURSE_SUBMAKEFILES := false
 
-PYTHON_PATH = $(buffy_path)/machida
-MACHIDA_BIN_PATH = $(buffy_path)/machida/build
-INTEGRATION_PATH = $(buffy_path)/testing/tools
-INTEGRATION_BIN_PATH = $(INTEGRATION_PATH)/integration
 REVERSE_PY_PATH = $(buffy_path)/book/examples/python/reverse
 
-build-book-examples-python-reverse-all = build-machida-all
-test-book-examples-python-reverse-all = build-book-examples-python-reverse-all reverse_py_test
+build-book-examples-python-reverse-all += build-machida-all
+test-book-examples-python-reverse-all += build-book-examples-python-reverse-all
+test-book-examples-python-reverse-all += reverse_py_test
 
 reverse_py_test:
-	export PYTHONPATH=".:$(PYTHON_PATH):$(INTEGRATION_PATH)" && \
-	export PATH="$(PATH):$(MACHIDA_BIN_PATH):$(INTEGRATION_BIN_PATH)" && \
 	cd $(REVERSE_PY_PATH) && \
+	export PYTHONPATH="$(PYTHONPATH)" && \
 	integration_test --csv-sender '1234,5678,1212,1111' \
 	  --validation-cmp --sink-mode 'newlines' \
 	  --expected-csv '4321,8765,2121,1111' \

@@ -19,19 +19,15 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 RECURSE_SUBMAKEFILES := false
 
-PYTHON_PATH = $(buffy_path)/machida
-MACHIDA_BIN_PATH = $(buffy_path)/machida/build
-INTEGRATION_PATH = $(buffy_path)/testing/tools
-INTEGRATION_BIN_PATH = $(INTEGRATION_PATH)/integration
 CELSIUS_PY_PATH = $(buffy_path)/book/examples/python/celsius
 
-build-book-examples-python-celsius-all = build-machida-all
-test-book-examples-python-celsius-all = build-book-examples-python-celsius-all celsius_py_test
+build-book-examples-python-celsius-all += build-machida-all
+build-book-examples-python-celsius-all += build-book-examples-python-celsius-all
+test-book-examples-python-celsius-all += celsius_py_test
 
 celsius_py_test:
-	export PYTHONPATH=".:$(PYTHON_PATH):$(INTEGRATION_PATH)" && \
-	export PATH="$(PATH):$(MACHIDA_BIN_PATH):$(INTEGRATION_BIN_PATH)" && \
 	cd $(CELSIUS_PY_PATH) && \
+	export PYTHONPATH="$(PYTHONPATH)" && \
 	integration_test --framed-file-sender \
 	  _test.txt --validation-cmp \
 	  --expected-file _expected.txt \

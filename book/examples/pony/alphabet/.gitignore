@@ -3,3 +3,5 @@ sender
 sent.txt
 alphabet.out
 alphabet.d
+_expected.json
+_test.txt

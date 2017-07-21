@@ -19,19 +19,16 @@ DOCKER_TARGET := false
 # uncomment to disable generate recursing into Makefiles of subdirectories
 RECURSE_SUBMAKEFILES := false
 
-PYTHON_PATH = $(buffy_path)/machida
-SEQUENCE_WINDOW_PATH = $(buffy_path)/testing/correctness/apps/sequence_window
-SEQUENCE_VALIDATOR_PATH = $(SEQUENCE_WINDOW_PATH)/validator
-INTEGRATION_PATH = $(buffy_path)/testing/tools
 CORRECTNESS_TESTS_PATH = $(buffy_path)/testing/correctness/tests
 
-build-testing-correctness-tests-all = sequence_window_build_recovery_spike build-testing-correctness-apps-sequence_window-validator-all
-test-testing-correctness-tests-all = build-testing-correctness-tests-all correctness_tests
+build-testing-correctness-tests-all += build-testing-correctness-apps-sequence_window-all
+test-testing-correctness-tests-all += build-testing-correctness-tests-all
+test-testing-correctness-tests-all += correctness_tests
 
 correctness_tests:
-	export PYTHONPATH=".:$(PYTHON_PATH):$(INTEGRATION_PATH)" && \
-	export PATH="${PATH}:$(SEQUENCE_WINDOW_PATH):${VALIDATOR_PATH}" && \
 	cd $(CORRECTNESS_TESTS_PATH) && \
+	export PATH="${PATH}:$(SEQUENCE_WINDOW_ABS_PATH):${VALIDATOR_PATH}" && \
+	export PYTHONPATH="$(PYTHONPATH)" && \
 	python2 -m pytest correctness_tests.py --verbose
 
 

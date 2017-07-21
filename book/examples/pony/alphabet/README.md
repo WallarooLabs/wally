@@ -49,7 +49,7 @@ docker start mui
 1. Start a listener
 
 ```bash
-nc -l 127.0.0.1 7002 > alphabet.out
+../../../../giles/receiver/receiver --listen 127.0.0.1:7002
 ```
 
 2. Start the application

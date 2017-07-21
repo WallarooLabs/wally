@@ -20,6 +20,19 @@ DOCKER_TARGET := false
 #RECURSE_SUBMAKEFILES := false
 
 
+CELSIUS_PONY_PATH = $(buffy_path)/book/examples/pony/celsius
+
+test-book-examples-pony-celsius-all += build-book-examples-pony-celsius-all
+test-book-examples-pony-celsius-all += celsius_pony_test
+
+celsius_pony_test:
+	cd $(CELSIUS_PONY_PATH) && \
+	integration_test --framed-file-sender _test.msg \
+	  --validation-cmp \
+	  --expected-file _expected.msg \
+		--log-level error \
+		--command './celsius' \
+		--sink-expect 100
 
 #########################################################################################
 #### don't change after this line unless to disable standard rules generation makefile

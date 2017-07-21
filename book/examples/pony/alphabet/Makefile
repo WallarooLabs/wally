@@ -20,6 +20,22 @@ DOCKER_TARGET := false
 #RECURSE_SUBMAKEFILES := false
 
 
+ALPHABET_PONY_PATH = $(buffy_path)/book/examples/pony/alphabet
+
+test-book-examples-pony-alphabet-all += build-book-examples-pony-alphabet-all
+test-book-examples-pony-alphabet-all += alphabet_pony_test
+
+alphabet_pony_test:
+	cd $(ALPHABET_PONY_PATH) && \
+	python _test/gen.py && \
+	integration_test --framed-file-sender _test.txt \
+		--validation-cmd 'python _test/validate.py --expected _expected.json --output' \
+		--log-level error \
+		--batch-size 10 \
+		--output 'received.txt' \
+		--command './alphabet' \
+		--workers 4 \
+		--sink-expect 1000
 
 #########################################################################################
 #### don't change after this line unless to disable standard rules generation makefile

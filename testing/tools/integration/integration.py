@@ -275,14 +275,14 @@ class ExpectationError(StopError):
     pass
 
 
-class SinkStopper(StoppableThread):
+class SinkExpect(StoppableThread):
     """
     Stop the sink after receiving an expected number of messages.
     """
-    __base_name__ = 'SinkStopper'
+    __base_name__ = 'SinkExpect'
 
     def __init__(self, sink, expected, timeout=30):
-        super(SinkStopper, self).__init__()
+        super(SinkExpect, self).__init__()
         self.sink = sink
         self.expected = expected
         self.timeout = timeout
@@ -318,8 +318,50 @@ class SinkStopper(StoppableThread):
     def stop(self):
         logging.debug('%s: stopping Sink Receiver', self.name)
         self.sink.stop()
-        super(SinkStopper, self).stop()
+        super(SinkExpect, self).stop()
 
+
+class SinkAwaitValue(StoppableThread):
+    """
+    Stop the sink after receiving an expected value.
+    """
+    __base_name__ = 'SinkAwaitValue'
+
+    def __init__(self, sink, value, timeout=30):
+        super(SinkAwaitValue, self).__init__()
+        self.sink = sink
+        self.value= value
+        self.timeout = timeout
+        self.name = self.__base_name__
+        self.error = None
+        self.position = 0
+
+    def run(self):
+        started = time.time()
+        while not self.stopped():
+            msgs = len(self.sink.data)
+            if msgs and msgs > self.position:
+                while self.position < msgs:
+                    if self.sink.data[self.position] == self.value:
+                        self.stop()
+                        break
+                    self.position += 1
+            if time.time() - started > self.timeout:
+                self.error = TimeoutError('{}: has timed out after {} seconds'
+                                          ', with {} messages. before '
+                                          'receiving the awaited value '
+                                          '{!r}.'.format(self.name,
+                                                         self.timeout,
+                                                         msgs,
+                                                         self.value))
+                self.stop()
+                break
+            time.sleep(0.1)
+
+    def stop(self):
+        logging.debug('%s: stopping Sink Receiver', self.name)
+        self.sink.stop()
+        super(SinkAwaitValue, self).stop()
 
 class Sender(StoppableThread):
     """
@@ -330,13 +372,15 @@ class Sender(StoppableThread):
     `reader` is a Reader instance
     `batch_size` denotes how many records to send at once (default=1)
     `interval` denotes the minimum delay between transmissions, in seconds
-    (default=0.001)
+        (default=0.001)
     `header_length` denotes the byte length of the length header
     `header_fmt` is the format to use for encoding the length using
-    `struct.pack`
+        `struct.pack`
+    `reconnect` is a boolean denoting whether sender should attempt to
+        reconnect after a connection is lost.
     """
     def __init__(self, host, port, reader, batch_size=1, interval=0.001,
-                 header_fmt='>I'):
+                 header_fmt='>I', reconnect=False):
         super(Sender, self).__init__()
         self.daemon = True
         self.reader = reader
@@ -352,6 +396,7 @@ class Sender(StoppableThread):
         self.name = 'Sender'
         self.error = None
         self._bytes_sent = 0
+        self.reconnect = reconnect
 
     def send(self, bs):
         self.sock.sendall(bs)
@@ -374,26 +419,41 @@ class Sender(StoppableThread):
             self.batch = []
 
     def run(self):
-        try:
-            logging.info("Sender connecting to ({}, {})."
-                         .format(self.host, self.port))
-            self.sock.connect((self.host, self.port))
-            while not self.stopped():
-                header = self.reader.read(self.header_length)
-                if not header:
-                    break
-                expect = struct.unpack(self.header_fmt, header)[0]
-                body = self.reader.read(expect)
-                if not body:
-                    break
-                self.batch_append(''.join((header, body)))
-                self.batch_send()
-                time.sleep(0.000000001)
-            self.batch_send_final()
-            self.sock.close()
-        except Exception as err:
-            self.error = err
-            raise err
+        while not self.stopped():
+            try:
+                logging.info("Sender connecting to ({}, {})."
+                             .format(self.host, self.port))
+                self.sock.connect((self.host, self.port))
+                while not self.stopped():
+                    header = self.reader.read(self.header_length)
+                    if not header:
+                        self.maybe_stop()
+                        break
+                    expect = struct.unpack(self.header_fmt, header)[0]
+                    body = self.reader.read(expect)
+                    if not body:
+                        self.maybe_stop()
+                        break
+                    self.batch_append(''.join((header, body)))
+                    self.batch_send()
+                    time.sleep(0.000000001)
+                self.batch_send_final()
+                self.sock.close()
+            except KeyboardInterrupt:
+                logging.info("KeyboardInterrupt received.")
+                self.stop()
+                break
+            except Exception as err:
+                self.error = err
+                logging.error(err)
+            if not self.reconnect:
+                break
+            logging.info("Waiting 1 second before retrying...")
+            time.sleep(1)
+
+    def maybe_stop(self):
+        if not self.batch:
+            self.stop()
 
 
 def sequence_generator(stop=1000, start=0, header_fmt='>I'):
@@ -874,7 +934,7 @@ def pipeline_test(generator, expected, command, workers=1, sources=1,
                                                   sink_expect_timeout))
             stoppers = []
             for sink, sink_expect_val in zip(sinks, sink_expect):
-                stopper = SinkStopper(sink, sink_expect_val, sink_expect_timeout)
+                stopper = SinkExpect(sink, sink_expect_val, sink_expect_timeout)
                 stopper.start()
                 stoppers.append(stopper)
             for stopper in stoppers:
