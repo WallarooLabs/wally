@@ -11,23 +11,21 @@ rules_mk_path := ../../../../../rules.mk
 PONY_TARGET := false
 
 # uncomment to disable generate exs related targets (build/test/clean) for elixir sources in this directory
-EXS_TARGET := false
+#EXS_TARGET := false
 
 # uncomment to disable generate docker related targets (build/push) for Dockerfile in this directory
-DOCKER_TARGET := false
+#DOCKER_TARGET := false
 
 # uncomment to disable generate recursing into Makefiles of subdirectories
 RECURSE_SUBMAKEFILES := false
 
-
 VALIDATOR_PATH = $(buffy_path)/testing/correctness/apps/sequence_window/validator
 VALIDATOR_EXAMPLES = $(VALIDATOR_PATH)/examples
-SEQUENCE_WINDOW_PATH = $(buffy_path)/testing/correctness/apps/sequence_window
-WALLAROO_LIB =  $(buffy_path)/lib
 
-build-testing-correctness-apps-sequence_window-validator-all = validator_clean validator_build
-test-testing-correctness-apps-sequence_window-validator-all = validator_clean validator_build validator_test
-clean-testing-correctness-apps-sequence_window-validator-all = validator_clean
+build-testing-correctness-apps-sequence_window-validator-all += validator_clean
+build-testing-correctness-apps-sequence_window-validator-all += validator_build
+test-testing-correctness-apps-sequence_window-validator-all += validator_test
+clean-testing-correctness-apps-sequence_window-validator-all += validator_clean
 
 validator_clean:
 	$(QUIET)rm -f $(VALIDATOR_PATH)/validator
@@ -36,7 +34,7 @@ validator_clean:
 
 validator_build:
 	cd $(VALIDATOR_PATH) && \
-	stable env ponyc --path=$(WALLAROO_LIB) --path=$(SEQUENCE_WINDOW_PATH) $(SEQUENCE_WINDOW_PATH)/validator
+	stable env ponyc --path=$(WALLAROO_LIB) --path=$(SEQUENCE_WINDOW_PATH) $(VALIDATOR_PATH)
 
 validator_test:
 	$(QUIET)python $(VALIDATOR_EXAMPLES)/data_gen.py

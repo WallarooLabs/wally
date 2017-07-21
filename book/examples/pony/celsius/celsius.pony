@@ -52,6 +52,7 @@ primitive CelsiusDecoder is FramedSourceHandler[F32]
 
 primitive FahrenheitEncoder
   fun apply(f: F32, wb: Writer): Array[ByteSeq] val =>
+    wb.u32_be(4)
     wb.f32_be(f)
     wb.done()
 

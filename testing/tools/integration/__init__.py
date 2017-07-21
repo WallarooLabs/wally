@@ -66,6 +66,7 @@ from integration import (clean_up_resilience_path,
                          start_runners,
                          pipeline_test,
                          Sink,
-                         SinkStopper,
+                         SinkAwaitValue,
+                         SinkExpect,
                          TCPReceiver,
                          TimeoutError)

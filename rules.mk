@@ -39,6 +39,15 @@ buffy_dir := $(RULES_MK_PATH)
 abs_buffy_dir := $(abspath $(buffy_dir))
 buffy_path := $(abs_buffy_dir)
 
+# Set global path variables
+integration_path := $(buffy_path)/testing/tools
+integration_bin_path := $(integration_path)/integration
+wallaroo_lib :=  $(buffy_path)/lib
+wallaroo_python_path := $(buffy_path)/machida
+machida_bin_path := $(buffy_path)/machida/build
+PYTHONPATH := .:$(integration_path):$(wallaroo_python_path)
+PATH := $(PATH):$(integration_bin_path):$(machida_bin_path)
+
 # initialize default for some normal targets and variables
 build-buffyroot-all :=
 test-buffyroot-all :=

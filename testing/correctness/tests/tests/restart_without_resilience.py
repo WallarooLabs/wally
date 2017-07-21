@@ -1,4 +1,4 @@
-def test_recovery():
+def test_restart():
     # import requisite components for integration test
     from integration import (clean_up_resilience_path,
                              ex_validate,
@@ -11,23 +11,26 @@ def test_recovery():
                              sequence_generator,
                              setup_resilience_path,
                              Sink,
-                             SinkExpect,
+                             SinkAwaitValue,
                              start_runners,
                              TimeoutError)
     import os
     import re
+    import struct
     import time
 
     host = '127.0.0.1'
     sources = 1
     workers = 2
     res_dir = '/tmp/res-data'
-    expect = 2000
+    expect = 200
+    last_value = '[194,196,198,200]'
+    await_value = struct.pack('>I', len(last_value)) + last_value
 
     setup_resilience_path(res_dir)
 
     command = '''
-        sequence_window_resilience \
+        sequence_window
           --resilience-dir {res_dir}
         '''.format(res_dir = res_dir)
 
@@ -63,8 +66,8 @@ def test_recovery():
             raise runner_ready_checker.error
 
         # start sender
-        sender = Sender(host, input_ports[0], reader, batch_size=100,
-                        interval=0.05)
+        sender = Sender(host, input_ports[0], reader, batch_size=1,
+                        interval=0.05, reconnect=True)
         sender.start()
         time.sleep(0.2)
 
@@ -77,7 +80,7 @@ def test_recovery():
 
 
         # wait until sender completes (~1 second)
-        sender.join(5)
+        sender.join(10)
         if sender.error:
             raise sender.error
         if sender.is_alive():
@@ -85,8 +88,8 @@ def test_recovery():
             raise TimeoutError('Sender did not complete in the expected '
                                'period')
 
-        # Use metrics to determine when to stop runners and sink
-        stopper = SinkExpect(sink, expect)
+        # Wait for the last sent value expected at the worker
+        stopper = SinkAwaitValue(sink, await_value, 30)
         stopper.start()
         stopper.join()
         if stopper.error:
@@ -99,31 +102,16 @@ def test_recovery():
         # Stop sink
         sink.stop()
 
-        # Use validator to validate the data in at-least-once mode
-        # save sink data to a file
-        out_file = os.path.join(res_dir, 'received.txt')
-        sink.save(out_file, mode='giles')
-
-
-        # Validate captured output
-        cmd_validate = ('validator -i {out_file} -e {expect} -a'
-                        .format(out_file = out_file,
-                                expect = expect))
-        success, stdout, retcode, cmd = ex_validate(cmd_validate)
-        try:
-            assert(success)
-        except AssertionError:
-            raise AssertionError('Validation failed with the following '
-                                 'error:\n{}'.format(stdout))
-
         # Validate worker actually underwent recovery
-        pattern = "RESILIENCE\: Replayed \d+ entries from recovery log file\."
+        pattern_restarting = "Restarting a listener ..."
+        pattern_output = "output: " + await_value
         stdout, stderr = runners[-1].get_output()
         try:
-            assert(re.search(pattern, stdout) is not None)
+            assert(re.search(pattern_restarting, stdout) is not None)
+            assert(re.search(pattern_output, stdout) is not None)
         except AssertionError:
-            raise AssertionError('Worker does not appear to have performed '
-                                 'recovery as expected. Worker output is '
+            raise AssertionError('Worker does not appear to have reconnected '
+                                 'as expected. Worker output is '
                                  'included below.\nSTDOUT\n---\n%s\n---\n'
                                  'STDERR\n---\n%s' % (stdout, stderr))
     finally:
