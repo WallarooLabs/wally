@@ -118,7 +118,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _pipeline_id: USize
   let _name: String
   let _app_name: String
-  var _decoder: (FramedSourceHandler[In] val | None) = None
   let _runner_builders: Array[RunnerBuilder val]
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
   var _source_builder: (SourceBuilderBuilder val | None) = None
@@ -138,9 +137,15 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _source_route_builder = TypedRouteBuilder[In]
     _is_coalesced = coalescing
 
-  fun ref add_decoder(d: FramedSourceHandler[In] val) =>
-    _decoder = d
-    _source_builder = TypedSourceBuilderBuilder[In](_app_name, _name, d)
+  fun ref add_source_information(source_information: Any val) =>
+    try
+      let si = source_information as TCPSourceInformation[In] val
+      _source_builder = TypedTCPSourceBuilderBuilder[In](_app_name, _name,
+        si.handler(), si.host(), si.service())
+    else
+      @printf[U32]("Could not cast source_information as TCPSourceInformation\n".cstring())
+      Fail()
+    end
 
   fun ref add_runner_builder(p: RunnerBuilder val) =>
     _runner_builders.push(p)
@@ -191,8 +196,8 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _a = a
     _p = p
 
-  fun ref from(d: FramedSourceHandler[In] val): PipelineBuilder[In, Out, Last] =>
-    _p.add_decoder(d)
+  fun ref from(source_information: Any val): PipelineBuilder[In, Out, Last] =>
+    _p.add_source_information(source_information)
     PipelineBuilder[In, Out, Last](_a, _p)
 
   fun ref to[Next: Any val](
