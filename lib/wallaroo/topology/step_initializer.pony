@@ -89,7 +89,7 @@ class SourceData
 
   new val create(id': U128, b: SourceBuilderBuilder val, r: RunnerBuilder val,
     default_source_route_builder: RouteBuilder val,
-    a: Array[String] val, pre_state_target_id': (U128 | None) = None)
+    pre_state_target_id': (U128 | None) = None)
   =>
     _id = id'
     _pipeline_name = b.name()
@@ -104,7 +104,12 @@ class SourceData
       else
         _runner_builder.route_builder()
       end
-    _address = a
+
+    let source_addr_trn: Array[String] trn = recover Array[String] end
+    source_addr_trn.push(b.host())
+    source_addr_trn.push(b.service())
+    _address = consume source_addr_trn
+
     _pre_state_target_id = pre_state_target_id'
 
   fun builder(): SourceBuilderBuilder val => _builder
@@ -230,4 +235,3 @@ class PreStateData
   fun clone_router_and_set_input_type(r: Router val): Router val =>
     _runner_builder.clone_router_and_set_input_type(r)
   fun is_default_target(): Bool => _is_default_target
-
