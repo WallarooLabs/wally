@@ -7,6 +7,24 @@ use "wallaroo/routing"
 use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
+primitive TCPSourceListenerBuilderBuilder
+  fun apply (source_builder: SourceBuilder val, router: Router val,
+    router_registry: RouterRegistry, route_builder: RouteBuilder val,
+    outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
+    tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
+    layout_initializer: LayoutInitializer,
+    metrics_reporter: MetricsReporter iso,
+    default_target: (Step | None) = None,
+    default_in_route_builder: (RouteBuilder val | None) = None,
+    target_router: Router val = EmptyRouter,
+    host: String, service: String): TCPSourceListenerBuilder val
+  =>
+    TCPSourceListenerBuilder(source_builder, router, router_registry,
+      route_builder,
+      outgoing_boundary_builders, tcp_sinks, event_log, auth,
+      layout_initializer, consume metrics_reporter, default_target,
+      default_in_route_builder, target_router, host, service)
+
 class TCPSourceListenerBuilder
   let _source_builder: SourceBuilder val
   let _router: Router val
@@ -51,7 +69,7 @@ class TCPSourceListenerBuilder
     _service = service
     _metrics_reporter = consume metrics_reporter
 
-  fun apply(): TCPSourceListener =>
+  fun apply() =>
     let tcp_l = TCPSourceListener(_source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders, _tcp_sinks,
       _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),

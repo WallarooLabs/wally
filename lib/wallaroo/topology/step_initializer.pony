@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "wallaroo/boundary"
+use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
@@ -84,11 +85,13 @@ class SourceData
   let _builder: SourceBuilderBuilder val
   let _runner_builder: RunnerBuilder val
   let _route_builder: RouteBuilder val
+  let _source_listener_builder_builder: TCPSourceListenerBuilderBuilder val
   let _address: Array[String] val
   let _pre_state_target_id: (U128 | None)
 
   new val create(id': U128, b: SourceBuilderBuilder val, r: RunnerBuilder val,
     default_source_route_builder: RouteBuilder val,
+    s: TCPSourceListenerBuilderBuilder val,
     pre_state_target_id': (U128 | None) = None)
   =>
     _id = id'
@@ -104,6 +107,7 @@ class SourceData
       else
         _runner_builder.route_builder()
       end
+    _source_listener_builder_builder = s
 
     let source_addr_trn: Array[String] trn = recover Array[String] end
     source_addr_trn.push(b.host())
@@ -138,6 +142,10 @@ class SourceData
     default_r: (Router val | None) = None): Router val
   =>
     _runner_builder.clone_router_and_set_input_type(r, default_r)
+
+  fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder val =>
+    _source_listener_builder_builder
+
 
 class EgressBuilder
   let _name: String
