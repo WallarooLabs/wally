@@ -8,6 +8,7 @@ use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/recovery"
 
@@ -292,6 +293,7 @@ actor ApplicationDistributor is Distributor
         let source_initializer = SourceData(source_node_id,
           pipeline.source_builder(), source_seq_builder,
           pipeline.source_route_builder(),
+          pipeline.source_listener_builder_builder(),
           source_pre_state_target_id)
 
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
