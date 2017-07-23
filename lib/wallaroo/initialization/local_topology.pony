@@ -1081,26 +1081,21 @@ actor LocalTopologyInitializer is LayoutInitializer
                 consume sinks_for_source_trn
 
               let listen_auth = TCPListenAuth(_auth)
-              try
-                @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
-                tcpsl_builders.push(
-                  TCPSourceListenerBuilder(
-                    source_data.builder()(source_data.runner_builder(),
-                      out_router, _metrics_conn,
-                      source_data.pre_state_target_id(), t.worker_name(),
-                      source_reporter.clone()),
-                    out_router, _router_registry,
-                    source_data.route_builder(),
-                    _outgoing_boundary_builders, sinks_for_source,
-                    _event_log, _auth, this,  consume source_reporter,
-                    default_target, default_in_route_builder,
-                    state_comp_target_router,
-                    source_data.address()(0),
-                    source_data.address()(1))
-                )
-              else
-                @printf[I32]("Ill-formed source address\n".cstring())
-              end
+              @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
+
+              tcpsl_builders.push(source_data.source_listener_builder_builder()(
+                source_data.builder()(source_data.runner_builder(),
+                  out_router, _metrics_conn,
+                  source_data.pre_state_target_id(), t.worker_name(),
+                  source_reporter.clone()),
+                out_router, _router_registry,
+                source_data.route_builder(),
+                _outgoing_boundary_builders, sinks_for_source,
+                _event_log, _auth, this,  consume source_reporter,
+                default_target, default_in_route_builder,
+                state_comp_target_router,
+                source_data.address()(0),
+                source_data.address()(1)))
 
               // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one

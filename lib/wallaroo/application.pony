@@ -103,6 +103,7 @@ trait BasicPipeline
   fun source_id(): USize
   fun source_builder(): SourceBuilderBuilder val ?
   fun source_route_builder(): RouteBuilder val
+  fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder val
   fun sink_builder(): (TCPSinkBuilder | None)
   fun sink_target_ids(): Array[U64] val
   // TODO: Change this when we need more sinks per pipeline
@@ -122,6 +123,11 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
   var _source_builder: (SourceBuilderBuilder val | None) = None
   let _source_route_builder: RouteBuilder val
+  // TODO: The source listener should not be given a value here, it should come
+  // from the source information that is used when creating the pipeline.
+  // For now though this works because at the moment all pipelines have TCP
+  // sources.
+  var _source_listener_builder_builder: TCPSourceListenerBuilderBuilder val = TCPSourceListenerBuilderBuilder
   var _sink_builder: (TCPSinkBuilder | None) = None
   var _sink_id: (U128 | None) = None
   let _is_coalesced: Bool
@@ -140,6 +146,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun ref add_source_information(source_information: Any val) =>
     try
       let si = source_information as TCPSourceInformation[In] val
+      _source_listener_builder_builder = si.source_listener_builder_builder()
       _source_builder = TypedTCPSourceBuilderBuilder[In](_app_name, _name,
         si.handler(), si.host(), si.service())
     else
@@ -167,6 +174,9 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _source_builder as SourceBuilderBuilder val
 
   fun source_route_builder(): RouteBuilder val => _source_route_builder
+
+  fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder val =>
+    _source_listener_builder_builder
 
   fun sink_builder(): (TCPSinkBuilder | None) => _sink_builder
 
