@@ -8,14 +8,10 @@ class TCPSourceInformation[In: Any val]
     _host = host'
     _service = service'
 
-  fun handler(): FramedSourceHandler[In] val =>
-    _handler
-
-  fun host(): String =>
-    _host
-
-  fun service(): String =>
-    _service
-
   fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder val =>
     TCPSourceListenerBuilderBuilder
+
+  fun source_builder(app_name: String, name: String):
+    TypedTCPSourceBuilderBuilder[In]
+  =>
+    TypedTCPSourceBuilderBuilder[In](app_name, name, _handler, _host, _service)
