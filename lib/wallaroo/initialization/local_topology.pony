@@ -19,8 +19,8 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
+use "wallaroo/source"
 use "wallaroo/tcp_sink"
-use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 class LocalTopology
@@ -216,8 +216,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
   // once EventLog signals we're ready
-  let tcpsl_builders: Array[TCPSourceListenerBuilder val] =
-    recover iso Array[TCPSourceListenerBuilder val] end
+  let sl_builders: Array[SourceListenerBuilder val] =
+    recover iso Array[SourceListenerBuilder val] end
 
   // Cluster Management
   var _cluster_manager: (ClusterManager | None) = None
@@ -1083,7 +1083,7 @@ actor LocalTopologyInitializer is LayoutInitializer
               let listen_auth = TCPListenAuth(_auth)
               @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
 
-              tcpsl_builders.push(source_data.source_listener_builder_builder()(
+              sl_builders.push(source_data.source_listener_builder_builder()(
                 source_data.builder()(source_data.runner_builder(),
                   out_router, _metrics_conn,
                   source_data.pre_state_target_id(), t.worker_name(),
@@ -1447,7 +1447,7 @@ actor LocalTopologyInitializer is LayoutInitializer
     if not _topology_initialized then
       @printf[I32]("ERROR: Tried to spin up source listeners before topology was initialized!\n".cstring())
     else
-      for builder in tcpsl_builders.values() do
+      for builder in sl_builders.values() do
         builder()
       end
     end
