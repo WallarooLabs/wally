@@ -6,6 +6,7 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
+use "wallaroo/source"
 use "wallaroo/tcp_source"
 use "wallaroo/tcp_sink"
 
@@ -85,13 +86,13 @@ class SourceData
   let _builder: SourceBuilderBuilder val
   let _runner_builder: RunnerBuilder val
   let _route_builder: RouteBuilder val
-  let _source_listener_builder_builder: TCPSourceListenerBuilderBuilder val
+  let _source_listener_builder_builder: SourceListenerBuilderBuilder val
   let _address: Array[String] val
   let _pre_state_target_id: (U128 | None)
 
   new val create(id': U128, b: SourceBuilderBuilder val, r: RunnerBuilder val,
     default_source_route_builder: RouteBuilder val,
-    s: TCPSourceListenerBuilderBuilder val,
+    s: SourceListenerBuilderBuilder val,
     pre_state_target_id': (U128 | None) = None)
   =>
     _id = id'
@@ -143,7 +144,7 @@ class SourceData
   =>
     _runner_builder.clone_router_and_set_input_type(r, default_r)
 
-  fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder val =>
+  fun source_listener_builder_builder(): SourceListenerBuilderBuilder val =>
     _source_listener_builder_builder
 
 

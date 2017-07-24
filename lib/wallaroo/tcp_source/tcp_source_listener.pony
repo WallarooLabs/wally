@@ -4,11 +4,12 @@ use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/recovery"
 use "wallaroo/routing"
+use "wallaroo/source"
 use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
 primitive TCPSourceListenerBuilderBuilder
-  fun apply (source_builder: SourceBuilder val, router: Router val,
+  fun apply(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
     tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
