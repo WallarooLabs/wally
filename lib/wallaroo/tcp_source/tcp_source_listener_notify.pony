@@ -1,14 +1,9 @@
 use "net"
 use "wallaroo/fail"
 use "wallaroo/metrics"
+use "wallaroo/source"
 use "wallaroo/topology"
 use "wallaroo/recovery"
-
-trait val SourceBuilder
-  fun name(): String
-  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router val):
-    TCPSourceNotify iso^
-  fun val update_router(router: Router val): SourceBuilder val
 
 class val _SourceBuilder[In: Any val] is SourceBuilder
   let _app_name: String
@@ -51,16 +46,6 @@ class val _SourceBuilder[In: Any val] is SourceBuilder
     _SourceBuilder[In](_app_name, _worker_name, _name, _runner_builder,
       _handler, router, _metrics_conn, _pre_state_target_id,
       _metrics_reporter.clone())
-
-interface val SourceBuilderBuilder
-  fun name(): String
-  fun apply(runner_builder: RunnerBuilder val, router: Router val,
-    metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
-    worker_name: String,
-    metrics_reporter: MetricsReporter iso):
-      SourceBuilder val
-  fun host(): String
-  fun service(): String
 
 class val TypedTCPSourceBuilderBuilder[In: Any val]
   let _app_name: String
