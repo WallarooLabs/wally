@@ -143,6 +143,7 @@ actor WActorWithState is WActorWrapper
 
   be broadcast_variable_update(k: String, v: Any val) =>
     _broadcast_variable_map(k) = v
+    _w_actor.receive_broadcast_variable_update(k, v)
 
   fun ref _create_actor(builder: WActorBuilder) =>
     _actor_registry.create_actor(builder, this)
