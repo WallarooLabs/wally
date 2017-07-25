@@ -125,8 +125,15 @@ class SourceListenerNotify is TCPSourceListenerNotify
       (_source_builder.name() + " source is unable to listen\n").cstring())
     Fail()
 
-  fun ref connected(listen: TCPSourceListener ref): TCPSourceNotify iso^ =>
-    _source_builder(_event_log, _auth, _target_router)
+  fun ref connected(listen: TCPSourceListener ref): TCPSourceNotify iso^ ? =>
+    try
+      _source_builder(_event_log, _auth, _target_router) as TCPSourceNotify iso^
+    else
+      @printf[I32](
+        (_source_builder.name() + " could not create a TCPSourceNotify\n").cstring())
+      Fail()
+      error
+    end
 
   fun ref update_router(router: Router val) =>
     _source_builder = _source_builder.update_router(router)
