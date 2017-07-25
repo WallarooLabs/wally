@@ -1,12 +1,11 @@
 use "wallaroo/metrics"
 use "wallaroo/topology"
-use "wallaroo/tcp_source"
 use "wallaroo/recovery"
 
 trait val SourceBuilder
   fun name(): String
   fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router val):
-    TCPSourceNotify iso^
+    SourceNotify iso^
   fun val update_router(router: Router val): SourceBuilder val
 
 interface val SourceBuilderBuilder
