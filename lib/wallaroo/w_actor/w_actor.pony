@@ -13,6 +13,12 @@ trait WActor
     """
     Called when receiving data from a Wallaroo pipeline
     """
+  fun ref receive_broadcast_variable_update(k: String, v: Any val) =>
+    """
+    Called when a broadcast variable you've subscribed to is updated.
+    This is optional for implementing a WActor.
+    """
+    None
 
 class EmptyWActor is WActor
   fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>

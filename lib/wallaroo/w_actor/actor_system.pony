@@ -59,7 +59,7 @@ class ActorSystem
     _sinks.push(builder)
     this
 
-  fun ref set_broadcast_default(k: String, v: Any val) =>
+  fun ref create_broadcast_variable(k: String, v: Any val) =>
     _broadcast_variables(k) = v
 
   fun val actor_builders(): Array[WActorWrapperBuilder] val =>
