@@ -8,7 +8,6 @@ def deserialize(bs):
     return pickle.loads(bs)
 
 
-
 def join_longs(left, right):
     r = left << 64
     r += right
@@ -24,6 +23,9 @@ def split_longs(u128):
 class WActor(object):
     def __init__(self):
         self._call_log = []
+        #TODO: this is currently not populated with defaults, and anything that
+        # happens before actor creation (and subscription) is missed.
+        self._broadcast_var_values_cache = {}
 
     def _clear_call_log(self):
         self._call_log = []
@@ -58,6 +60,20 @@ class WActor(object):
         self.setup()
         return self._get_call_log()
 
+    def receive_broadcast_variable_update_wrapper(self, key, value):
+        self._broadcast_var_values_cache[key] = value
+        if "receive_broadcast_variable_update" in dir(self):
+            self.receive_broadcast_variable_update(self, key, value)
+
+    def subscribe_to_broadcast_variable(self, key):
+        self._call_log.append(("subscribe_to_broadcast_variable", key))
+
+    def read_broadcast_variable(self, key):
+        return self._broadcast_var_values_cache[key]
+
+    def update_broadcast_variable(self, key, value):
+        self._call_log.append(("update_broadcast_variable", (key, value)))
+
 
 class Source:
     def kind(self):
@@ -75,6 +91,7 @@ class ActorSystem:
         self.actors = []
         self.sources = []
         self.sinks = []
+        self.broadcast_variables = {}
 
     def add_actor(self, actor):
         self.actors.append(actor)
@@ -87,3 +104,6 @@ class ActorSystem:
 
     def add_simulated_source(self):
         self.sources.append(SimulatedSource())
+
+    def create_broadcast_variable(self, key, default_value):
+        self.broadcast_variables[key] = default_value
