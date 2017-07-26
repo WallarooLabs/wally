@@ -336,7 +336,7 @@ actor WActorInitializer is LayoutInitializer
 
               TCPSourceListener(source_builder,
                 EmptyRouter, _router_registry, EmptyRouteBuilder,
-                _outgoing_boundary_builders, recover Array[TCPSink] end,
+                _outgoing_boundary_builders,
                 _event_log, _auth, this, consume empty_metrics_reporter
                 where host = host, service = service)
             end
