@@ -15,7 +15,7 @@ interface SourceListenerBuilderBuilder
   fun apply(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
-    tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,

@@ -12,7 +12,7 @@ primitive TCPSourceListenerBuilderBuilder
   fun apply(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
-    tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
@@ -22,7 +22,7 @@ primitive TCPSourceListenerBuilderBuilder
   =>
     TCPSourceListenerBuilder(source_builder, router, router_registry,
       route_builder,
-      outgoing_boundary_builders, tcp_sinks, event_log, auth,
+      outgoing_boundary_builders, event_log, auth,
       layout_initializer, consume metrics_reporter, default_target,
       default_in_route_builder, target_router, host, service)
 
@@ -33,7 +33,6 @@ class TCPSourceListenerBuilder
   let _route_builder: RouteBuilder val
   let _default_in_route_builder: (RouteBuilder val | None)
   let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val
-  let _tcp_sinks: Array[TCPSink] val
   let _layout_initializer: LayoutInitializer
   let _event_log: EventLog
   let _auth: AmbientAuth
@@ -46,7 +45,7 @@ class TCPSourceListenerBuilder
   new val create(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
-    tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
@@ -60,7 +59,6 @@ class TCPSourceListenerBuilder
     _route_builder = route_builder
     _default_in_route_builder = default_in_route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
-    _tcp_sinks = tcp_sinks
     _layout_initializer = layout_initializer
     _event_log = event_log
     _auth = auth
@@ -72,7 +70,7 @@ class TCPSourceListenerBuilder
 
   fun apply() =>
     let tcp_l = TCPSourceListener(_source_builder, _router, _router_registry,
-      _route_builder, _outgoing_boundary_builders, _tcp_sinks,
+      _route_builder, _outgoing_boundary_builders,
       _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
       _default_target, _default_in_route_builder, _target_router, _host,
       _service)
@@ -90,7 +88,6 @@ actor TCPSourceListener
   let _route_builder: RouteBuilder val
   let _default_in_route_builder: (RouteBuilder val | None)
   var _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val
-  let _tcp_sinks: Array[TCPSink] val
   let _layout_initializer: LayoutInitializer
   let _default_target: (Step | None)
   var _fd: U32
@@ -105,7 +102,7 @@ actor TCPSourceListener
   new create(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
-    tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
@@ -123,7 +120,6 @@ actor TCPSourceListener
     _route_builder = route_builder
     _default_in_route_builder = default_in_route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
-    _tcp_sinks = tcp_sinks
     _layout_initializer = layout_initializer
     _event = @pony_os_listen_tcp[AsioEventID](this,
       host.cstring(), service.cstring())
@@ -218,7 +214,7 @@ actor TCPSourceListener
     try
       let source = TCPSource._accept(this, _notify.connected(this),
         _router.routes(), _route_builder, _outgoing_boundary_builders,
-        _tcp_sinks, _layout_initializer, ns, _default_target,
+        _layout_initializer, ns, _default_target,
         _default_in_route_builder, _init_size, _max_size,
         _metrics_reporter.clone())
       // TODO: We need to figure out how to unregister this when the
