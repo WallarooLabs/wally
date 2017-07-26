@@ -7,7 +7,7 @@ use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/rebalancing"
 use "wallaroo/routing"
-use "wallaroo/tcp_sink"
+use "wallaroo/sink"
 use "wallaroo/w_actor"
 
 interface Router
@@ -78,7 +78,7 @@ class DirectRouter
 
   fun has_sink(): Bool =>
     match _target
-    | let tcp: TCPSink =>
+    | let tcp: Sink =>
       true
     else
       false

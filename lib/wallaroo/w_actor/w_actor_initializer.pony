@@ -16,7 +16,7 @@ use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/source"
-use "wallaroo/tcp_sink"
+use "wallaroo/sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -36,7 +36,7 @@ actor WActorInitializer is LayoutInitializer
   let _data_receivers: DataReceivers
   let _metrics_conn: MetricsSink
   let _central_registry: CentralWActorRegistry
-  var _sinks: Array[TCPSink] val = recover Array[TCPSink] end
+  var _sinks: Array[Sink] val = recover Array[Sink] end
   var _outgoing_boundaries: Map[String, OutgoingBoundary] val =
     recover Map[String, OutgoingBoundary] end
   var _outgoing_boundary_builders:
@@ -101,7 +101,7 @@ actor WActorInitializer is LayoutInitializer
 
   be update_local_actor_system(las: LocalActorSystem) =>
     _system = las
-    let sinks: Array[TCPSink] trn = recover Array[TCPSink] end
+    let sinks: Array[Sink] trn = recover Array[Sink] end
     try
       for (idx, sink_builder) in las.sinks().pairs() do
         let empty_metrics_reporter =
@@ -112,8 +112,7 @@ actor WActorInitializer is LayoutInitializer
         let host = sink_addr(0)
         let service = sink_addr(1)
 
-        let next_sink = sink_builder(consume empty_metrics_reporter,
-          host, service)
+        let next_sink = sink_builder(consume empty_metrics_reporter)
         sinks.push(next_sink)
       end
     else

@@ -6,7 +6,7 @@ use "wallaroo/fail"
 use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
-use "wallaroo/tcp_sink"
+use "wallaroo/sink"
 use "wallaroo/topology"
 use "wallaroo/watermarking"
 
@@ -16,7 +16,7 @@ trait WActorWrapper
   be register_actor(id: U128, w_actor: WActorWrapper tag)
   be register_actor_for_worker(id: U128, worker: String)
   be register_as_role(role: String, w_actor: U128)
-  be register_sinks(s: Array[TCPSink] val)
+  be register_sinks(s: Array[Sink] val)
   be tick()
   be create_actor(builder: WActorBuilder)
   be forget_actor(id: U128)
@@ -48,7 +48,7 @@ actor WActorWithState is WActorWrapper
   let _auth: AmbientAuth
   let _actor_registry: WActorRegistry
   let _central_actor_registry: CentralWActorRegistry
-  var _sinks: Array[TCPSink] val = recover Array[TCPSink] end
+  var _sinks: Array[Sink] val = recover Array[Sink] end
   var _w_actor: WActor = EmptyWActor
   var _w_actor_id: U128
   var _helper: WActorHelper = EmptyWActorHelper
@@ -129,7 +129,7 @@ actor WActorWithState is WActorWrapper
   be register_as_role(role: String, w_actor: U128) =>
     _actor_registry.register_as_role(role, w_actor)
 
-  be register_sinks(s: Array[TCPSink] val) =>
+  be register_sinks(s: Array[Sink] val) =>
     _sinks = s
 
   be tick() =>
@@ -234,7 +234,7 @@ actor WActorWithState is WActorWrapper
 
   fun ref _send_to_sink[Out: Any val](sink_id: USize, output: Out) =>
     try
-      // TODO: Should we create a separate TCPSink method for when we're not
+      // TODO: Should we create a separate Sink method for when we're not
       // using the pipeline metadata?  Or do we create the same metadata
       // for actor system messages.
       _sinks(sink_id).run[Out]("", 0, output, _dummy_actor_producer,
