@@ -6,6 +6,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/source"
+use "wallaroo/sink"
 use "wallaroo/state"
 use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
@@ -105,8 +106,7 @@ trait BasicPipeline
   fun source_builder(): SourceBuilderBuilder val ?
   fun source_route_builder(): RouteBuilder val
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder val
-  fun sink_builder(): (TCPSinkBuilder | None)
-  fun sink_target_ids(): Array[U64] val
+  fun sink_builder(): (SinkBuilder | None)
   // TODO: Change this when we need more sinks per pipeline
   // ASSUMPTION: There is at most one sink per pipeline
   fun sink_id(): (U128 | None)
@@ -121,15 +121,14 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _name: String
   let _app_name: String
   let _runner_builders: Array[RunnerBuilder val]
-  var _sink_target_ids: Array[U64] val = recover Array[U64] end
-  var _source_builder: (SourceBuilderBuilder val | None) = None
-  let _source_route_builder: RouteBuilder val
   // TODO: The source listener should not be given a value here, it should come
   // from the source information that is used when creating the pipeline.
   // For now though this works because at the moment all pipelines have TCP
   // sources.
   var _source_listener_builder_builder: SourceListenerBuilderBuilder val = TCPSourceListenerBuilderBuilder
-  var _sink_builder: (TCPSinkBuilder | None) = None
+  var _source_builder: (SourceBuilderBuilder val | None) = None
+  let _source_route_builder: RouteBuilder val
+  var _sink_builder: (SinkBuilder | None) = None
   var _sink_id: (U128 | None) = None
   let _is_coalesced: Bool
   var _sink_addr_idx: USize = 0
@@ -153,11 +152,8 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
 
   fun apply(i: USize): RunnerBuilder val ? => _runner_builders(i)
 
-  fun ref update_sink(sink_builder': TCPSinkBuilder,
-    sink_ids: Array[U64] val)
-  =>
+  fun ref update_sink(sink_builder': SinkBuilder) =>
     _sink_builder = sink_builder'
-    _sink_target_ids = sink_ids
 
   fun ref update_sink_addr_idx(idx: USize) =>
     _sink_addr_idx = idx
@@ -172,9 +168,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder val =>
     _source_listener_builder_builder
 
-  fun sink_builder(): (TCPSinkBuilder | None) => _sink_builder
-
-  fun sink_target_ids(): Array[U64] val => _sink_target_ids
+  fun sink_builder(): (SinkBuilder | None) => _sink_builder
 
   // TODO: Change this when we need more sinks per pipeline
   // ASSUMPTION: There is at most one sink per pipeline
@@ -297,15 +291,11 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _a.add_pipeline(_p as BasicPipeline)
     _a
 
-  fun ref to_sink(encoder: SinkEncoder[Out],
-    sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val
-      = recover Array[Array[ByteSeq] val] end): Application ?
-  =>
-    let sink_builder: TCPSinkBuilder =
-      TCPSinkBuilder(TypedEncoderWrapper[Out](encoder), initial_msgs)
+  fun ref to_sink(sink_information: SinkInformation[Out]): Application ? =>
+    let sink_builder = sink_information()
     _a.increment_sink_count()
     _p.update_sink_addr_idx(_a.sink_count - 1)
-    _p.update_sink(sink_builder, sink_ids)
+    _p.update_sink(sink_builder)
     _p.update_sink_id()
     _a.add_pipeline(_p as BasicPipeline)
     _a
