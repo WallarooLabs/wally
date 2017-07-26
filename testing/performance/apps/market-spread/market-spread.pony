@@ -57,6 +57,7 @@ use "wallaroo/fail"
 use "wallaroo/metrics"
 use "wallaroo/state"
 use "wallaroo/tcp_source"
+use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
 actor Main
@@ -109,8 +110,8 @@ actor Main
               (OrderResult val | None), SymbolData](CheckOrder,
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
-            .to_sink(OrderResultEncoder, recover [0] end,
-              initial_report_msgs)
+            .to_sink(TCPSinkInformation[OrderResult val](OrderResultEncoder,
+              "127.0.0.1", "5555", initial_report_msgs))
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo", FixNbboFrameHandler
               where init_file = init_file)
