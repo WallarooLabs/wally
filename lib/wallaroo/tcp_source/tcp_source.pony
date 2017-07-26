@@ -9,7 +9,6 @@ use "wallaroo/initialization"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/routing"
-use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 use "wallaroo/watermarking"
 
@@ -34,7 +33,6 @@ actor TCPSource is Producer
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
-  let _tcp_sinks: Array[TCPSink] val
   let _layout_initializer: LayoutInitializer
   var _unregistered: Bool = false
 
@@ -68,7 +66,6 @@ actor TCPSource is Producer
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
     routes: Array[ConsumerStep] val, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
-    tcp_sinks: Array[TCPSink] val,
     layout_initializer: LayoutInitializer,
     fd: U32, default_target: (ConsumerStep | None) = None,
     forward_route_builder: (RouteBuilder val | None) = None,
@@ -95,7 +92,6 @@ actor TCPSource is Producer
     _next_size = init_size
     _max_size = max_size
 
-    _tcp_sinks = tcp_sinks
     _layout_initializer = layout_initializer
 
     _route_builder = route_builder
