@@ -105,17 +105,15 @@ class ArraySourceListenerBuilder[In: Any val]
     _array = array
     _emit_gap = emit_gap
 
-  fun apply() =>
+  fun apply(): SourceListener =>
     let array_l = ArraySourceListener[In](_source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders, _tcp_sinks,
       _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
       _default_target, _default_in_route_builder, _target_router, _array,
       _emit_gap, _host, _service)
-    // TODO: What should we do here?
-    // _router_registry.register_source_listener(array_l)
     array_l
 
-actor ArraySourceListener[In: Any val]
+actor ArraySourceListener[In: Any val] is SourceListener
   let _notify: ArraySourceListenerNotify[In]
   let _router: Router val
   let _router_registry: RouterRegistry
@@ -158,14 +156,12 @@ actor ArraySourceListener[In: Any val]
 
   be _spawn() =>
     try
-      // TODO: finish this constructor call
       let source = ArraySource[In](this, _notify.build_source(),
         _router.routes(), _route_builder, _outgoing_boundary_builders,
         _layout_initializer, _default_target,
         _default_in_route_builder,
         _metrics_reporter.clone(), _array, _emit_gap)
-      // TODO: what should we do here?
-      // _router_registry.register_source(source)
+      _router_registry.register_source(source)
     else
       @printf[I32](("Could not create ArraySource.\n").cstring())
       Fail()
@@ -409,7 +405,6 @@ actor ArraySource[In: Any val] is Producer
     _array = array
     _emit_gap = emit_gap
 
-    // TODO: create timer
     let timers = Timers
     let timer = Timer(ArraySourceTimerNotify[In](this), _emit_gap, _emit_gap)
     timers(consume timer)
