@@ -1,3 +1,5 @@
+use "wallaroo/source"
+
 class TCPSourceInformation[In: Any val]
   let _handler: FramedSourceHandler[In] val
   let _host: String
