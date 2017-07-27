@@ -68,16 +68,15 @@ class TCPSourceListenerBuilder
     _service = service
     _metrics_reporter = consume metrics_reporter
 
-  fun apply() =>
+  fun apply(): SourceListener =>
     let tcp_l = TCPSourceListener(_source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders,
       _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
       _default_target, _default_in_route_builder, _target_router, _host,
       _service)
-    _router_registry.register_source_listener(tcp_l)
     tcp_l
 
-actor TCPSourceListener
+actor TCPSourceListener is SourceListener
   """
   # TCPSourceListener
   """
