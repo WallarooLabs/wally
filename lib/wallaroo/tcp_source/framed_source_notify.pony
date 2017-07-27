@@ -8,15 +8,22 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/recovery"
 use "wallaroo/routing"
+use "wallaroo/source"
 use "wallaroo/topology"
 
 
-interface FramedSourceHandler[In: Any val]
-  fun header_length(): USize
-  fun payload_length(data: Array[U8] iso): USize ?
-  fun decode(data: Array[U8] val): In ?
+primitive TCPFramedSourceNotifyBuilder[In: Any val]
+  fun apply(pipeline_name: String, auth: AmbientAuth,
+    handler: FramedSourceHandler[In] val,
+    runner_builder: RunnerBuilder val, router: Router val,
+    metrics_reporter: MetricsReporter iso, event_log: EventLog,
+    target_router: Router val, pre_state_target_id: (U128 | None) = None):
+    SourceNotify iso^
+  =>
+    TCPFramedSourceNotify[In](pipeline_name, auth, handler, runner_builder, router,
+      consume metrics_reporter, event_log, target_router, pre_state_target_id)
 
-class FramedSourceNotify[In: Any val] is TCPSourceNotify
+class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   let _guid_gen: GuidGenerator = GuidGenerator
   var _header: Bool = true
   let _pipeline_name: String
