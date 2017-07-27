@@ -9,7 +9,7 @@ use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 interface SourceListenerBuilder
-  fun apply()
+  fun apply(): SourceListener
 
 interface SourceListenerBuilderBuilder
   fun apply(source_builder: SourceBuilder val, router: Router val,

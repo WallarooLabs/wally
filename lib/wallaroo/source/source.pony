@@ -1,6 +1,9 @@
+use "collections"
+use "wallaroo/boundary"
 use "wallaroo/metrics"
-use "wallaroo/topology"
 use "wallaroo/recovery"
+use "wallaroo/routing"
+use "wallaroo/topology"
 
 trait val SourceBuilder
   fun name(): String
@@ -68,3 +71,16 @@ interface SourceInformation[In: Any val]
 
   fun source_builder(app_name: String, name: String):
     SourceBuilderBuilder
+
+interface tag Source
+  be update_router(router: PartitionRouter val)
+  be add_boundary_builders(
+    boundary_builders: Map[String, OutgoingBoundaryBuilder val] val)
+  be reconnect_boundary(target_worker_name: String)
+  be mute(c: Consumer)
+  be unmute(c: Consumer)
+
+interface tag SourceListener
+  be update_router(router: PartitionRouter val)
+  be add_boundary_builders(
+    boundary_builders: Map[String, OutgoingBoundaryBuilder val] val)
