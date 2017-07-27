@@ -5,47 +5,6 @@ use "wallaroo/source"
 use "wallaroo/topology"
 use "wallaroo/recovery"
 
-class val _SourceBuilder[In: Any val] is SourceBuilder
-  let _app_name: String
-  let _worker_name: String
-  let _name: String
-  let _runner_builder: RunnerBuilder val
-  let _handler: FramedSourceHandler[In] val
-  let _router: Router val
-  let _metrics_conn: MetricsSink
-  let _pre_state_target_id: (U128 | None)
-  let _metrics_reporter: MetricsReporter
-
-  new val create(app_name: String, worker_name: String,
-    name': String,
-    runner_builder: RunnerBuilder val,
-    handler: FramedSourceHandler[In] val,
-    router: Router val, metrics_conn: MetricsSink,
-    pre_state_target_id: (U128 | None) = None,
-    metrics_reporter: MetricsReporter iso)
-  =>
-    _app_name = app_name
-    _worker_name = worker_name
-    _name = name'
-    _runner_builder = runner_builder
-    _handler = handler
-    _router = router
-    _metrics_conn = metrics_conn
-    _pre_state_target_id = pre_state_target_id
-    _metrics_reporter = consume metrics_reporter
-
-  fun name(): String => _name
-
-  fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router val):
-    TCPSourceNotify iso^
-  =>
-    FramedSourceNotify[In](_name, auth, _handler, _runner_builder, _router,
-      _metrics_reporter.clone(), event_log, target_router, _pre_state_target_id)
-
-  fun val update_router(router: Router val): SourceBuilder val =>
-    _SourceBuilder[In](_app_name, _worker_name, _name, _runner_builder,
-      _handler, router, _metrics_conn, _pre_state_target_id,
-      _metrics_reporter.clone())
 
 class val TypedTCPSourceBuilderBuilder[In: Any val]
   let _app_name: String
@@ -70,9 +29,10 @@ class val TypedTCPSourceBuilderBuilder[In: Any val]
     worker_name: String, metrics_reporter: MetricsReporter iso):
       SourceBuilder val
   =>
-    _SourceBuilder[In](_app_name, worker_name,
+    BasicSourceBuilder[In, FramedSourceHandler[In] val](_app_name, worker_name,
       _name, runner_builder, _handler, router,
-      metrics_conn, pre_state_target_id, consume metrics_reporter)
+      metrics_conn, pre_state_target_id, consume metrics_reporter,
+      TCPFramedSourceNotifyBuilder[In])
 
   fun host(): String =>
     _host
