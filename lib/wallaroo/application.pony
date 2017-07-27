@@ -111,7 +111,6 @@ trait BasicPipeline
   // ASSUMPTION: There is at most one sink per pipeline
   fun sink_id(): (U128 | None)
   // The index into the list of provided sink addresses
-  fun sink_addr_idx(): USize
   fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder val ?
   fun size(): USize
@@ -131,7 +130,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   var _sink_builder: (SinkBuilder | None) = None
   var _sink_id: (U128 | None) = None
   let _is_coalesced: Bool
-  var _sink_addr_idx: USize = 0
 
   new create(app_name: String, p_id: USize, n: String,
     coalescing: Bool)
@@ -155,9 +153,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun ref update_sink(sink_builder': SinkBuilder) =>
     _sink_builder = sink_builder'
 
-  fun ref update_sink_addr_idx(idx: USize) =>
-    _sink_addr_idx = idx
-
   fun source_id(): USize => _pipeline_id
 
   fun source_builder(): SourceBuilderBuilder ? =>
@@ -173,9 +168,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   // TODO: Change this when we need more sinks per pipeline
   // ASSUMPTION: There is at most one sink per pipeline
   fun sink_id(): (U128 | None) => _sink_id
-
-  // The index into the list of provided sink addresses
-  fun sink_addr_idx(): USize => _sink_addr_idx
 
   fun ref update_sink_id() =>
     _sink_id = GuidGenerator.u128()
@@ -294,7 +286,6 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   fun ref to_sink(sink_information: SinkConfig[Out]): Application ? =>
     let sink_builder = sink_information()
     _a.increment_sink_count()
-    _p.update_sink_addr_idx(_a.sink_count - 1)
     _p.update_sink(sink_builder)
     _p.update_sink_id()
     _a.add_pipeline(_p as BasicPipeline)

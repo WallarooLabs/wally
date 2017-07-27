@@ -152,16 +152,17 @@ class EgressBuilder
   let _name: String
   let _pipeline_name: String
   let _id: U128
-  let _addr: (Array[String] val | ProxyAddress val)
+  // None if this is a sink to an external system
+  let _proxy_addr: (ProxyAddress val | None)
   let _sink_builder: (SinkBuilder | None)
 
   new val create(pipeline_name': String, id': U128,
-    addr: (Array[String] val | ProxyAddress val),
-    sink_builder: (SinkBuilder | None) = None)
+    sink_builder: (SinkBuilder | None) = None,
+    proxy_addr: (ProxyAddress val | None) = None)
   =>
     _pipeline_name = pipeline_name'
     _name =
-      match addr
+      match proxy_addr
       | let pa: ProxyAddress val =>
         "Proxy to " + pa.worker
       else
@@ -169,7 +170,7 @@ class EgressBuilder
       end
 
     _id = id'
-    _addr = addr
+    _proxy_addr = proxy_addr
     _sink_builder = sink_builder
 
   fun name(): String => _name
@@ -184,28 +185,28 @@ class EgressBuilder
   fun clone_router_and_set_input_type(r: Router val,
     dr: (Router val | None) = None): Router val => r
 
-  fun target_address(): (Array[String] val | ProxyAddress val |
-    PartitionAddresses val) => _addr
+  fun target_address(): (ProxyAddress val | PartitionAddresses val | None) =>
+    _proxy_addr
 
   fun apply(worker_name: String, reporter: MetricsReporter ref,
     auth: AmbientAuth,
     proxies: Map[String, OutgoingBoundary] val =
       recover Map[String, OutgoingBoundary] end): ConsumerStep tag ?
   =>
-    match _addr
-    | let a: Array[String] val =>
-      match _sink_builder
-      | let sb: SinkBuilder =>
-        sb(reporter.clone())
-      else
-        EmptySink
-      end
+    match _proxy_addr
     | let p: ProxyAddress val =>
       try
         proxies(p.worker)
       else
         @printf[I32](("Couldn't find proxy for " + p.worker + ".\n").cstring())
         error
+      end
+    | None =>
+      match _sink_builder
+      | let sb: SinkBuilder =>
+        sb(reporter.clone())
+      else
+        EmptySink
       end
     else
       // The match is exhaustive, so this can't happen

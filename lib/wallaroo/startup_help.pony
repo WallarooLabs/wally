@@ -5,7 +5,6 @@ primitive StartupHelp
       To run Wallaroo:
       -----------------------------------------------------------------------------------
       --in/-i *[Comma-separated list of input addresses sources listen on]
-      --out/-o *[Sets address for sink outputs]
       --control/-c *[Sets address for initializer control channel]
       --data/-d *[Sets address for initializer data channel]
       --my-control [Optionally sets address for my control channel]
