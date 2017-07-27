@@ -28,7 +28,6 @@ actor WActorInitializer is LayoutInitializer
   let _event_log: EventLog
   let _local_actor_system_file: String
   let _input_addrs: Array[Array[String]] val
-  let _output_addrs: Array[Array[String]] val
   let _recovery: Recovery
   let _recovery_replayer: RecoveryReplayer
   let _data_channel_file: String
@@ -65,7 +64,7 @@ actor WActorInitializer is LayoutInitializer
   new create(worker_name: String, app_name: String,
     auth: AmbientAuth, event_log: EventLog,
     input_addrs: Array[Array[String]] val,
-    output_addrs: Array[Array[String]] val, local_actor_system_file: String,
+    local_actor_system_file: String,
     expected_iterations: USize, recovery: Recovery,
     recovery_replayer: RecoveryReplayer,
     data_channel_file: String, worker_names_file: String,
@@ -80,7 +79,6 @@ actor WActorInitializer is LayoutInitializer
     _event_log = event_log
     _local_actor_system_file = local_actor_system_file
     _input_addrs = input_addrs
-    _output_addrs = output_addrs
     _expected_iterations = expected_iterations
     _recovery = recovery
     _recovery_replayer = recovery_replayer
@@ -102,22 +100,13 @@ actor WActorInitializer is LayoutInitializer
   be update_local_actor_system(las: LocalActorSystem) =>
     _system = las
     let sinks: Array[Sink] trn = recover Array[Sink] end
-    try
-      for (idx, sink_builder) in las.sinks().pairs() do
-        let empty_metrics_reporter =
-          MetricsReporter(_app_name, "",
-            ReconnectingMetricsSink("", "", "", ""))
+    for (idx, sink_builder) in las.sinks().pairs() do
+      let empty_metrics_reporter =
+        MetricsReporter(_app_name, "",
+          ReconnectingMetricsSink("", "", "", ""))
 
-        let sink_addr = _output_addrs(idx)
-        let host = sink_addr(0)
-        let service = sink_addr(1)
-
-        let next_sink = sink_builder(consume empty_metrics_reporter)
-        sinks.push(next_sink)
-      end
-    else
-      @printf[I32]("Error creating sinks! Be sure you've provided as many sink addresses as you have defined sinks.\n".cstring())
-      Fail()
+      let next_sink = sink_builder(consume empty_metrics_reporter)
+      sinks.push(next_sink)
     end
     _sinks = consume sinks
     _central_registry.update_sinks(_sinks)
