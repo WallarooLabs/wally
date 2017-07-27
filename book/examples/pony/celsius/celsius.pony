@@ -12,11 +12,16 @@ use "wallaroo/topology"
 actor Main
   new create(env: Env) =>
     try
+      let temps: Array[Array[U8] val] trn = recover Array[Array[U8] val] end
+      temps.push(recover [as U8: 0, 0, 0, 0] end)
+      let t: Array[Array[U8] val] val = consume temps
+
       let application = recover val
         Application("Celsius Conversion App")
           .new_pipeline[F32, F32]("Celsius Conversion")
             // TODO: get the host and service from the command line, not hard coded
-            .from(TCPSourceInformation[F32](CelsiusDecoder, "localhost", "3030"))
+            // .from(TCPSourceInformation[F32](CelsiusDecoder, "localhost", "3030"))
+            .from(ArraySourceInformation[F32](t, 2_000_000_000, CelsiusArrayDecoder))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
             .to_sink(FahrenheitEncoder, recover [0] end)
@@ -53,32 +58,8 @@ primitive FahrenheitEncoder
     wb.f32_be(f)
     wb.done()
 
-// primitive CelsiusFileDecoder is FileSourceHandler[F32]
-//   fun decode(s: String): F32 ? =>
-//     s.f32()
-
-// class _FileSourceNotify is TimerNotify
-//   let _file_source: FileSource
-
-//   new create(file_source: FileSource) =>
-//     _file_source = file_source
-
-//   fun ref apply(timer: Timer, count: U64): Bool =>
-//     _file_source.read()
-//     true
-
-// actor FileSource is TimerNotify
-//   let _file_input: File iso
-//   let _interval: U64
-
-//   new create(file_input: File iso, interval: U64) =>
-//     _file_input = consume file_input
-//     _interval = interval
-//     let timers = Timers
-//     let timer = Timer(recover _FileSourceNotify(this) end, 1_000, _interval)
-//     timers(consume timer)
-
-//   be read() =>
-//     try
-//       @printf[I32]("%s\n".cstring(), _file_input.line().cstring())
-//     end
+primitive CelsiusArrayDecoder is SourceHandler[F32]
+  fun decode(a: Array[U8] val): F32 ? =>
+    let r = Reader
+    r.append(a)
+    r.f32_be()
