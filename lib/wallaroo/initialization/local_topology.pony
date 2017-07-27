@@ -1429,7 +1429,8 @@ actor LocalTopologyInitializer is LayoutInitializer
       @printf[I32]("ERROR: Tried to spin up source listeners before topology was initialized!\n".cstring())
     else
       for builder in sl_builders.values() do
-        builder()
+        let sl = builder()
+        _router_registry.register_source_listener(sl)
       end
     end
 
