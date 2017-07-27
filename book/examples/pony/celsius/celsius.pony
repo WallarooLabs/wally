@@ -5,6 +5,7 @@ use "time"
 use "sendence/bytes"
 use "wallaroo"
 use "wallaroo/fail"
+use "wallaroo/source"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
