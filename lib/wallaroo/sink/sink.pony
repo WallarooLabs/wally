@@ -4,7 +4,7 @@ use "wallaroo/topology"
 
 type Sink is (Consumer & RunnableStep & Initializable tag)
 
-interface val SinkInformation[Out: Any val]
+interface val SinkConfig[Out: Any val]
   fun apply(): SinkBuilder
 
 interface val SinkBuilder

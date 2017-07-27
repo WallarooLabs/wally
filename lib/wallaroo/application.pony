@@ -291,7 +291,7 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _a.add_pipeline(_p as BasicPipeline)
     _a
 
-  fun ref to_sink(sink_information: SinkInformation[Out]): Application ? =>
+  fun ref to_sink(sink_information: SinkConfig[Out]): Application ? =>
     let sink_builder = sink_information()
     _a.increment_sink_count()
     _p.update_sink_addr_idx(_a.sink_count - 1)

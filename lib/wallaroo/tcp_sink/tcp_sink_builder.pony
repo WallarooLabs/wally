@@ -2,7 +2,7 @@ use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/sink"
 
-class val TCPSinkInformation[Out: Any val] is SinkInformation[Out]
+class val TCPSinkConfig[Out: Any val] is SinkConfig[Out]
   let _encoder: SinkEncoder[Out]
   let _host: String
   let _service: String
