@@ -110,7 +110,7 @@ actor Main
               (OrderResult val | None), SymbolData](CheckOrder,
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
-            .to_sink(TCPSinkInformation[OrderResult val](OrderResultEncoder,
+            .to_sink(TCPSinkConfig[OrderResult val](OrderResultEncoder,
               "127.0.0.1", "5555", initial_report_msgs))
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo", FixNbboFrameHandler

@@ -50,7 +50,7 @@ class ActorSystem
 
   // TODO: Figure out why this failed to get passed "Reachability"
   // when compiling if you use .> but not if you use .
-  fun ref add_sink[Out: Any val](sink_information: SinkInformation[Out]):
+  fun ref add_sink[Out: Any val](sink_information: SinkConfig[Out]):
     ActorSystem
   =>
     let builder = sink_information()
