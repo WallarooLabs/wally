@@ -215,8 +215,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
   // once EventLog signals we're ready
-  let sl_builders: Array[SourceListenerBuilder val] =
-    recover iso Array[SourceListenerBuilder val] end
+  let sl_builders: Array[SourceListenerBuilder] =
+    recover iso Array[SourceListenerBuilder] end
 
   // Cluster Management
   var _cluster_manager: (ClusterManager | None) = None
@@ -1075,9 +1075,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 _outgoing_boundary_builders,
                 _event_log, _auth, this,  consume source_reporter,
                 default_target, default_in_route_builder,
-                state_comp_target_router,
-                source_data.address()(0),
-                source_data.address()(1)))
+                state_comp_target_router))
 
               // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one
