@@ -9,7 +9,7 @@ trait val SourceBuilder
   fun name(): String
   fun apply(event_log: EventLog, auth: AmbientAuth, target_router: Router val):
     SourceNotify iso^
-  fun val update_router(router: Router val): SourceBuilder val
+  fun val update_router(router: Router val): SourceBuilder
 
 class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBuilder
   let _app_name: String
@@ -51,7 +51,7 @@ class val BasicSourceBuilder[In: Any val, SH: SourceHandler[In] val] is SourceBu
     _source_notify_builder(_name, auth, _handler, _runner_builder, _router,
       _metrics_reporter.clone(), event_log, target_router, _pre_state_target_id)
 
-  fun val update_router(router: Router val): SourceBuilder val =>
+  fun val update_router(router: Router val): SourceBuilder =>
     BasicSourceBuilder[In, SH](_app_name, _worker_name, _name, _runner_builder,
       _handler, router, _metrics_conn, _pre_state_target_id,
       _metrics_reporter.clone(), _source_notify_builder)
@@ -62,12 +62,10 @@ interface val SourceBuilderBuilder
     metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
     worker_name: String,
     metrics_reporter: MetricsReporter iso):
-      SourceBuilder val
-  fun host(): String
-  fun service(): String
+      SourceBuilder
 
-interface SourceInformation[In: Any val]
-  fun source_listener_builder_builder(): SourceListenerBuilderBuilder val
+interface val SourceConfig[In: Any val]
+  fun source_listener_builder_builder(): SourceListenerBuilderBuilder
 
   fun source_builder(app_name: String, name: String):
     SourceBuilderBuilder

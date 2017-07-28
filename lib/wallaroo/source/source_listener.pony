@@ -8,11 +8,11 @@ use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
-interface SourceListenerBuilder
+interface val SourceListenerBuilder
   fun apply(): SourceListener
 
-interface SourceListenerBuilderBuilder
-  fun apply(source_builder: SourceBuilder val, router: Router val,
+interface val SourceListenerBuilderBuilder
+  fun apply(source_builder: SourceBuilder, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
     event_log: EventLog, auth: AmbientAuth,
@@ -20,5 +20,4 @@ interface SourceListenerBuilderBuilder
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder val | None) = None,
-    target_router: Router val = EmptyRouter,
-    host: String, service: String): SourceListenerBuilder val
+    target_router: Router val = EmptyRouter): SourceListenerBuilder
