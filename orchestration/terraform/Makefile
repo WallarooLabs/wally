@@ -1,5 +1,6 @@
 current_dir := $(shell pwd)
 cluster_name ?= ## Cluster name to manage.
+cluster_project_name ?= buffy## Project name to assign as a tag to the cluster.
 provider ?= aws## Provider to launch cluster in (aws, packet).
 region ?= us-east-1## Region to launch cluster in. For Packet: ewr1==New York, sjc1==San Jose,CA, ams1==Amsterdam
 availability_zone ?= ## Availability Zone to launch cluster in.
@@ -29,8 +30,8 @@ ptpd_offset_max ?= 0.00025## ptpd offset tolerance beyond which things care cons
 
 inventory_script := ec2.py
 ansible_user := ubuntu
-all_instances := 'tag_Project_buffy:&tag_ClusterName_$(cluster_name):&$(region)'
-follower_instances := 'tag_Project_buffy:&tag_ClusterName_$(cluster_name):&tag_Role_follower:&$(region)'
+all_instances := 'tag_Project_$(cluster_project_name):&tag_ClusterName_$(cluster_name):&$(region)'
+follower_instances := 'tag_Project_$(cluster_project_name):&tag_ClusterName_$(cluster_name):&tag_Role_follower:&$(region)'
 
 # if debug shell command output requested
 ifdef DEBUG_SHELL
@@ -75,7 +76,8 @@ ifneq (,$(filter $(provider),packet))
   cluster_pem := ~/.ssh/ec2/us-east-1.pem
   inventory_script := packet_net.py
   ansible_user := root
-  all_instances := 'tag_buffy:&tag_Cluster_$(cluster_name):&$(region)'
+  all_instances := 'tag_$(cluster_project_name):&tag_Cluster_$(cluster_name):&$(region)'
+  follower_instances := 'tag_$(cluster_project_name):&tag_ClusterName_$(cluster_name):&tag_Role_follower:&$(region)'
 endif
 
 
@@ -275,6 +277,7 @@ terraform-plan: # actual terraform plan command
  in region '$(region)' at provider '$(provider)'...\033[0m"
 	cd $(provider)-cluster && terraform plan -var $(provider)_key_name=$(region) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
+          project_tag=$(cluster_project_name) -var \
           $(provider)_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
           $(num_leaders_arg) $(num_followers_arg) $(packet_vars)
 	@echo "\033[36m==> Successfully ran terraform plan for cluster \
@@ -285,6 +288,7 @@ terraform-apply: # actual terraform apply command
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
 	cd $(provider)-cluster && terraform apply -var $(provider)_key_name=$(region) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
+          project_tag=$(cluster_project_name) -var \
           $(provider)_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
           $(num_leaders_arg) $(num_followers_arg) $(packet_vars)
 	@echo "\033[36m==> Successfully ran terraform apply for cluster \
@@ -295,6 +299,7 @@ terraform-destroy: # actual terraform destroy command
 '$(cluster_name)' in region '$(region)' at provider '$(provider)'...\033[0m"
 	cd $(provider)-cluster && terraform destroy -force -var $(provider)_key_name=$(region) \
           $(terraform_args) -var cluster_name=$(cluster_name) -var \
+          project_tag=$(cluster_project_name) -var \
           $(provider)_region=$(region) $(pg_arg) $(az_arg) $(ci_args) \
           $(num_leaders_arg) $(num_followers_arg) $(packet_vars)
 	@echo "\033[36m==> Successfully ran terraform destroy for cluster \
@@ -359,6 +364,7 @@ configure: check-cluster-name ## Configure nodes using ansible
           $(ansible_vault_password) --timeout=30 -i \
           ../ansible/$(inventory_script) --ssh-common-args="-o StrictHostKeyChecking=no -i \
           $(cluster_full_pem)" --extra-vars "cluster_name=$(cluster_name) \
+          cluster_project_name=$(cluster_project_name) \
           $(provider)_region=$(region) isolcpus=$(ansible_isolcpus) \
 	  install_devtools=$(ansible_install_devtools) ssh_key_file=$(cluster_full_pem) \
           $(ansible_raid_level_arg) $(ansible_raid_fs_arg) \
