@@ -14,7 +14,7 @@ use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
 
-class val ArraySourceInformation[In: Any val] is SourceInformation[In]
+class val ArraySourceConfig[In: Any val] is SourceConfig[In]
   let _array: Array[Array[U8] val] val
   let _emit_gap: U64
   let _handler: SourceHandler[In] val
@@ -46,14 +46,13 @@ class val ArraySourceListenerBuilderBuilder[In: Any val]
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
     default_in_route_builder: (RouteBuilder val | None) = None,
-    target_router: Router val = EmptyRouter,
-    host: String, service: String): ArraySourceListenerBuilder[In] val
+    target_router: Router val = EmptyRouter): ArraySourceListenerBuilder[In] val
   =>
     ArraySourceListenerBuilder[In](source_builder, router, router_registry,
       route_builder,
       outgoing_boundary_builders, tcp_sinks, event_log, auth,
       layout_initializer, consume metrics_reporter, default_target,
-      default_in_route_builder, target_router, _array, _emit_gap, host, service)
+      default_in_route_builder, target_router, _array, _emit_gap)
 
 class ArraySourceListenerBuilder[In: Any val]
   let _source_builder: SourceBuilder val
@@ -68,8 +67,6 @@ class ArraySourceListenerBuilder[In: Any val]
   let _auth: AmbientAuth
   let _default_target: (Step | None)
   let _target_router: Router val
-  let _host: String
-  let _service: String
   let _metrics_reporter: MetricsReporter
   let _array: Array[Array[U8] val] val
   let _emit_gap: U64
@@ -84,8 +81,7 @@ class ArraySourceListenerBuilder[In: Any val]
     default_in_route_builder: (RouteBuilder val | None) = None,
     target_router: Router val = EmptyRouter,
     array: Array[Array[U8] val] val,
-    emit_gap: U64,
-    host: String = "", service: String = "0")
+    emit_gap: U64)
   =>
     _source_builder = source_builder
     _router = router
@@ -99,19 +95,16 @@ class ArraySourceListenerBuilder[In: Any val]
     _auth = auth
     _default_target = default_target
     _target_router = target_router
-    _host = host
-    _service = service
     _metrics_reporter = consume metrics_reporter
     _array = array
     _emit_gap = emit_gap
 
   fun apply(): SourceListener =>
-    let array_l = ArraySourceListener[In](_source_builder, _router, _router_registry,
+    ArraySourceListener[In](_source_builder, _router, _router_registry,
       _route_builder, _outgoing_boundary_builders, _tcp_sinks,
       _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
       _default_target, _default_in_route_builder, _target_router, _array,
-      _emit_gap, _host, _service)
-    array_l
+      _emit_gap)
 
 actor ArraySourceListener[In: Any val] is SourceListener
   let _notify: ArraySourceListenerNotify[In]
@@ -136,8 +129,7 @@ actor ArraySourceListener[In: Any val] is SourceListener
     default_in_route_builder: (RouteBuilder val | None) = None,
     target_router: Router val = EmptyRouter,
     array: Array[Array[U8] val] val,
-    emit_gap: U64,
-    host: String = "", service: String = "0")
+    emit_gap: U64)
   =>
     _notify = ArraySourceListenerNotify[In](source_builder, event_log, auth, target_router)
     _router = router
@@ -349,12 +341,6 @@ class val ArraySourceBuilderBuilder[In: Any val]
       _name, runner_builder, _handler, router,
       metrics_conn, pre_state_target_id, consume metrics_reporter,
       ArraySourceNotifyBuilder[In])
-
-  fun host(): String =>
-    ""
-
-  fun service(): String =>
-    ""
 
 class ArraySourceTimerNotify[In: Any val] is TimerNotify
   let _array_source: ArraySource[In] tag

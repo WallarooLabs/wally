@@ -86,13 +86,12 @@ class SourceData
   let _builder: SourceBuilderBuilder val
   let _runner_builder: RunnerBuilder val
   let _route_builder: RouteBuilder val
-  let _source_listener_builder_builder: SourceListenerBuilderBuilder val
-  let _address: Array[String] val
+  let _source_listener_builder_builder: SourceListenerBuilderBuilder
   let _pre_state_target_id: (U128 | None)
 
   new val create(id': U128, b: SourceBuilderBuilder val, r: RunnerBuilder val,
     default_source_route_builder: RouteBuilder val,
-    s: SourceListenerBuilderBuilder val,
+    s: SourceListenerBuilderBuilder,
     pre_state_target_id': (U128 | None) = None)
   =>
     _id = id'
@@ -110,17 +109,11 @@ class SourceData
       end
     _source_listener_builder_builder = s
 
-    let source_addr_trn: Array[String] trn = recover Array[String] end
-    source_addr_trn.push(b.host())
-    source_addr_trn.push(b.service())
-    _address = consume source_addr_trn
-
     _pre_state_target_id = pre_state_target_id'
 
-  fun builder(): SourceBuilderBuilder val => _builder
+  fun builder(): SourceBuilderBuilder => _builder
   fun runner_builder(): RunnerBuilder val => _runner_builder
   fun route_builder(): RouteBuilder val => _route_builder
-  fun address(): Array[String] val => _address
 
   fun name(): String => _name
   fun state_name(): String => _state_name
@@ -144,7 +137,7 @@ class SourceData
   =>
     _runner_builder.clone_router_and_set_input_type(r, default_r)
 
-  fun source_listener_builder_builder(): SourceListenerBuilderBuilder val =>
+  fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
     _source_listener_builder_builder
 
 

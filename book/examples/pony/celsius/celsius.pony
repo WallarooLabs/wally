@@ -21,7 +21,7 @@ actor Main
           .new_pipeline[F32, F32]("Celsius Conversion")
             // TODO: get the host and service from the command line, not hard coded
             // .from(TCPSourceInformation[F32](CelsiusDecoder, "localhost", "3030"))
-            .from(ArraySourceInformation[F32](t, 2_000_000_000, CelsiusArrayDecoder))
+            .from(ArraySourceConfig[F32](t, 2_000_000_000, CelsiusArrayDecoder))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
             .to_sink(FahrenheitEncoder, recover [0] end)

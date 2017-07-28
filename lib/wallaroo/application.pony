@@ -102,9 +102,9 @@ class Application
 trait BasicPipeline
   fun name(): String
   fun source_id(): USize
-  fun source_builder(): SourceBuilderBuilder val ?
+  fun source_builder(): SourceBuilderBuilder ?
   fun source_route_builder(): RouteBuilder val
-  fun source_listener_builder_builder(): SourceListenerBuilderBuilder val
+  fun source_listener_builder_builder(): SourceListenerBuilderBuilder
   fun sink_builder(): (TCPSinkBuilder | None)
   fun sink_target_ids(): Array[U64] val
   // TODO: Change this when we need more sinks per pipeline
@@ -122,13 +122,13 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _app_name: String
   let _runner_builders: Array[RunnerBuilder val]
   var _sink_target_ids: Array[U64] val = recover Array[U64] end
-  var _source_builder: (SourceBuilderBuilder val | None) = None
+  var _source_builder: (SourceBuilderBuilder | None) = None
   let _source_route_builder: RouteBuilder val
   // TODO: The source listener should not be given a value here, it should come
   // from the source information that is used when creating the pipeline.
   // For now though this works because at the moment all pipelines have TCP
   // sources.
-  var _source_listener_builder_builder: SourceListenerBuilderBuilder val = TCPSourceListenerBuilderBuilder
+  var _source_listener_builder_builder: SourceListenerBuilderBuilder = TCPSourceListenerBuilderBuilder("", "")
   var _sink_builder: (TCPSinkBuilder | None) = None
   var _sink_id: (U128 | None) = None
   let _is_coalesced: Bool
@@ -144,9 +144,9 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _source_route_builder = TypedRouteBuilder[In]
     _is_coalesced = coalescing
 
-  fun ref add_source_information(si: SourceInformation[In] val) =>
-    _source_listener_builder_builder = si.source_listener_builder_builder()
-    _source_builder = si.source_builder(_app_name, _name)
+  fun ref add_source_config(sc: SourceConfig[In]) =>
+    _source_listener_builder_builder = sc.source_listener_builder_builder()
+    _source_builder = sc.source_builder(_app_name, _name)
 
   fun ref add_runner_builder(p: RunnerBuilder val) =>
     _runner_builders.push(p)
@@ -165,11 +165,11 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun source_id(): USize => _pipeline_id
 
   fun source_builder(): SourceBuilderBuilder ? =>
-    _source_builder as SourceBuilderBuilder val
+    _source_builder as SourceBuilderBuilder
 
   fun source_route_builder(): RouteBuilder val => _source_route_builder
 
-  fun source_listener_builder_builder(): SourceListenerBuilderBuilder val =>
+  fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
     _source_listener_builder_builder
 
   fun sink_builder(): (TCPSinkBuilder | None) => _sink_builder
@@ -200,8 +200,8 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _a = a
     _p = p
 
-  fun ref from(source_information: SourceInformation[In] val): PipelineBuilder[In, Out, Last] =>
-    _p.add_source_information(source_information)
+  fun ref from(source_config: SourceConfig[In]): PipelineBuilder[In, Out, Last] =>
+    _p.add_source_config(source_config)
     PipelineBuilder[In, Out, Last](_a, _p)
 
   fun ref to[Next: Any val](
