@@ -1,6 +1,6 @@
 use "wallaroo/source"
 
-class TCPSourceInformation[In: Any val]
+class TCPSourceConfig[In: Any val]
   let _handler: FramedSourceHandler[In] val
   let _host: String
   let _service: String
@@ -11,7 +11,7 @@ class TCPSourceInformation[In: Any val]
     _service = service'
 
   fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder val =>
-    TCPSourceListenerBuilderBuilder
+    TCPSourceListenerBuilderBuilder(_host, _service)
 
   fun source_builder(app_name: String, name: String):
     TypedTCPSourceBuilderBuilder[In]

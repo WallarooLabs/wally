@@ -27,7 +27,7 @@ class val TypedTCPSourceBuilderBuilder[In: Any val]
   fun apply(runner_builder: RunnerBuilder val, router: Router val,
     metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
     worker_name: String, metrics_reporter: MetricsReporter iso):
-      SourceBuilder val
+      SourceBuilder
   =>
     BasicSourceBuilder[In, FramedSourceHandler[In] val](_app_name, worker_name,
       _name, runner_builder, _handler, router,
@@ -65,12 +65,12 @@ interface TCPSourceListenerNotify
   fun ref update_router(router: Router val)
 
 class SourceListenerNotify is TCPSourceListenerNotify
-  var _source_builder: SourceBuilder val
+  var _source_builder: SourceBuilder
   let _event_log: EventLog
   let _target_router: Router val
   let _auth: AmbientAuth
 
-  new iso create(builder: SourceBuilder val, event_log: EventLog, auth: AmbientAuth,
+  new iso create(builder: SourceBuilder, event_log: EventLog, auth: AmbientAuth,
     target_router: Router val) =>
     _source_builder = builder
     _event_log = event_log
