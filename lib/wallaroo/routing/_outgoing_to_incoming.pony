@@ -34,7 +34,11 @@ class _OutgoingToIncoming
     // ASSUMPTION: given the monotonic nature of outgoing sequence ids, we will
     // get ever increasing values for o_seq_id
     _seq_id_to_incoming.push((o_seq_id, (i_origin, i_route_id, i_seq_id)))
-    _highest_outgoing_seen.update((i_origin, i_route_id, i_seq_id), o_seq_id)
+    ifdef "onetomany" then
+      _highest_outgoing_seen.update((i_origin, i_route_id, i_seq_id), o_seq_id)
+    else
+      _highest_outgoing_seen.update((i_origin, 1, 1), o_seq_id)
+    end
 
   fun ref origin_notifications(up_to: SeqId)
     : MapIs[(Producer, RouteId), U64] ?
