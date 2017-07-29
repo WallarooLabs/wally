@@ -35,9 +35,9 @@ class _OutgoingToIncoming
     // get ever increasing values for o_seq_id
     _seq_id_to_incoming.push((o_seq_id, (i_origin, i_route_id, i_seq_id)))
     ifdef "onetomany" then
-      _highest_outgoing_seen.update((i_origin, i_route_id, i_seq_id), o_seq_id)
+      _highest_outgoing_seen.insert((i_origin, i_route_id, i_seq_id), o_seq_id)
     else
-      _highest_outgoing_seen.update((i_origin, 1, 1), o_seq_id)
+      _highest_outgoing_seen.insert((i_origin, 1, 1), o_seq_id)
     end
 
   fun ref origin_notifications(up_to: SeqId)
@@ -105,7 +105,7 @@ class _OutgoingToIncoming
 
             if outgoing_id == _highest_outgoing_seen((o, r, s)) then
               // only ack this message if we are seeing its highest value
-              high_by_origin_route.update((o, r), s)
+              high_by_origin_route.insert((o, r), s)
               _highest_outgoing_seen.remove((o, r, s))
             end
           end
