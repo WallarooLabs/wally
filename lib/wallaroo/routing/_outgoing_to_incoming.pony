@@ -86,13 +86,24 @@ class _OutgoingToIncoming
 
     ifdef "onetomany" then
       try
-        for i in Range(0, index + 1) do
-          (let outgoing_id, (let o, let r, let s)) = _seq_id_to_incoming(i)
+        ifdef "onetomany1" then
+          for i in Reverse(index, 0) do
+            (let outgoing_id, (let o, let r, let s)) = _seq_id_to_incoming(i)
+            if outgoing_id == _highest_outgoing_seen((o, r, s)) then
+              high_by_origin_route.insert_if_absent((o, r), s)
+            end
+          end
+        end
 
-          if outgoing_id == _highest_outgoing_seen((o, r, s)) then
-            // only ack this message if we are seeing its highest value
-            high_by_origin_route.update((o, r), s)
-            _highest_outgoing_seen.remove((o, r, s))
+        ifdef "onetomany2" then
+          for i in Range(0, index + 1) do
+            (let outgoing_id, (let o, let r, let s)) = _seq_id_to_incoming(i)
+
+            if outgoing_id == _highest_outgoing_seen((o, r, s)) then
+              // only ack this message if we are seeing its highest value
+              high_by_origin_route.update((o, r), s)
+              _highest_outgoing_seen.remove((o, r, s))
+            end
           end
         end
       else
