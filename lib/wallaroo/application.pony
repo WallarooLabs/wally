@@ -32,7 +32,7 @@ class Application
     _name = name'
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
-    pipeline_name: String,
+    pipeline_name: String, source_config: SourceConfig[In],
     init_file: (InitFile val | None) = None, coalescing: Bool = true):
       PipelineBuilder[In, Out, In]
   =>
@@ -42,7 +42,7 @@ class Application
       add_init_file(pipeline_id, f)
     end
     let pipeline = Pipeline[In, Out](_name, pipeline_id, pipeline_name,
-      coalescing)
+      source_config, coalescing)
     PipelineBuilder[In, Out, In](this, pipeline)
 
   // TODO: Replace this with a better approach.  This is a shortcut to get
@@ -122,18 +122,14 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _runner_builders: Array[RunnerBuilder val]
   var _source_builder: (SourceBuilderBuilder | None) = None
   let _source_route_builder: RouteBuilder val
-  // TODO: The source listener should not be given a value here, it should come
-  // from the source information that is used when creating the pipeline.
-  // For now though this works because at the moment all pipelines have TCP
-  // sources.
-  var _source_listener_builder_builder: SourceListenerBuilderBuilder = TCPSourceListenerBuilderBuilder("", "")
+  let _source_listener_builder_builder: SourceListenerBuilderBuilder
   var _sink_builder: (SinkBuilder | None) = None
 
   var _sink_id: (U128 | None) = None
   let _is_coalesced: Bool
 
   new create(app_name: String, p_id: USize, n: String,
-    coalescing: Bool)
+    sc: SourceConfig[In], coalescing: Bool)
   =>
     _pipeline_id = p_id
     _runner_builders = Array[RunnerBuilder val]
@@ -141,8 +137,6 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _app_name = app_name
     _source_route_builder = TypedRouteBuilder[In]
     _is_coalesced = coalescing
-
-  fun ref add_source_config(sc: SourceConfig[In]) =>
     _source_listener_builder_builder = sc.source_listener_builder_builder()
     _source_builder = sc.source_builder(_app_name, _name)
 
@@ -186,10 +180,6 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
   new create(a: Application, p: Pipeline[In, Out]) =>
     _a = a
     _p = p
-
-  fun ref from(source_config: SourceConfig[In]): PipelineBuilder[In, Out, Last] =>
-    _p.add_source_config(source_config)
-    PipelineBuilder[In, Out, Last](_a, _p)
 
   fun ref to[Next: Any val](
     comp_builder: ComputationBuilder[Last, Next] val,
