@@ -1,6 +1,42 @@
+use "options"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/sink"
+
+primitive TCPSinkConfigCLIParser
+  fun apply(args: Array[String] val): Array[TCPSinkConfigOptions] val ? =>
+    let out_arg = "out"
+
+    let options = Options(args, false)
+
+    options.add(out_arg where arg = StringArgument, mode = Required)
+
+    for option in options do
+      match option
+      | (out_arg, let output: String) =>
+        return _from_output_string(output)
+      end
+    end
+
+    error
+
+  fun _from_output_string(outputs: String): Array[TCPSinkConfigOptions] val ? =>
+    let opts = recover trn Array[TCPSinkConfigOptions] end
+
+    for output in outputs.split(",").values() do
+      let o = outputs.split(":")
+      opts.push(TCPSinkConfigOptions(o(0), o(1)))
+    end
+
+    consume opts
+
+class val TCPSinkConfigOptions
+  let host: String
+  let service: String
+
+  new val create(host': String, service': String) =>
+    host = host'
+    service = service'
 
 class val TCPSinkConfig[Out: Any val] is SinkConfig[Out]
   let _encoder: SinkEncoder[Out]
@@ -16,6 +52,16 @@ class val TCPSinkConfig[Out: Any val] is SinkConfig[Out]
     _initial_msgs = initial_msgs
     _host = host
     _service = service
+
+  new val from_options(encoder: SinkEncoder[Out], opts: TCPSinkConfigOptions,
+    initial_msgs: Array[Array[ByteSeq] val] val =
+    recover Array[Array[ByteSeq] val] end)
+  =>
+    _encoder = encoder
+    _initial_msgs = initial_msgs
+    _host = opts.host
+    _service = opts.service
+
 
   fun apply(): SinkBuilder =>
     TCPSinkBuilder(TypedEncoderWrapper[Out](_encoder), _host, _service,
