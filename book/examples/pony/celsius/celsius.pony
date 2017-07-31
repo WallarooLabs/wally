@@ -19,12 +19,13 @@ actor Main
       let application = recover val
         Application("Celsius Conversion App")
           .new_pipeline[F32, F32]("Celsius Conversion")
-            // TODO: get the host and service from the command line, not hard coded
-            // .from(TCPSourceInformation[F32](CelsiusDecoder, "localhost", "3030"))
-            .from(ArraySourceConfig[F32](t, 2_000_000_000, CelsiusArrayDecoder))
+            .from(TCPSourceConfig[F32].from_options(CelsiusDecoder,
+              TCPSourceConfigCLIParser(env.args)(0)))
+            // .from(ArraySourceConfig[F32](t, 2_000_000_000, CelsiusArrayDecoder))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
-            .to_sink(FahrenheitEncoder, recover [0] end)
+            .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
+               TCPSinkConfigCLIParser(env.args)(0)))
       end
       Startup(env, application, "celsius-conversion")
     else
