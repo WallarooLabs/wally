@@ -2,6 +2,8 @@ use "collections"
 use "buffered"
 
 use "wallaroo"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/state"
@@ -411,7 +413,9 @@ primitive Machida
     end
     r
 
-  fun apply_application_setup(application_setup_data: Pointer[U8] val):
+  fun apply_application_setup(application_setup_data: Pointer[U8] val,
+    source_configs: Array[TCPSourceConfigOptions] val,
+    sink_configs: Array[TCPSinkConfigOptions] val):
     Application ?
   =>
     let application_setup_item_count = @list_item_count(application_setup_data)
@@ -430,6 +434,9 @@ primitive Machida
         break
       end
     end
+
+    var source_idx: USize = 0
+    var sink_idx: USize = 0
 
     var latest: (Application | PipelineBuilder[PyData val, PyData val,
       PyData val]) = (app as Application)
@@ -450,7 +457,9 @@ primitive Machida
         end
 
         latest = (latest as Application).new_pipeline[PyData val, PyData val](
-          name, decoder)
+          name,
+          TCPSourceConfig[PyData val].from_options(decoder, source_configs(source_idx)))
+        source_idx = source_idx + 1
       | "to" =>
         let computation_class = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(computation_class)
@@ -545,7 +554,9 @@ primitive Machida
           PyEncoder(encoderp)
         end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
-        latest = pb.to_sink(encoder, recover [0] end)
+        latest = pb.to_sink(
+          TCPSinkConfig[PyData val].from_options(encoder, sink_configs(sink_idx)))
+        sink_idx = sink_idx + 1
         latest
       | "done" =>
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
