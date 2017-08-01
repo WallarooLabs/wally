@@ -1,5 +1,4 @@
 use "sendence/connemara"
-
 use "wallaroo/topology"
 
 actor Main is TestList
@@ -10,4 +9,5 @@ actor Main is TestList
     None
 
   fun tag tests(test: Connemara) =>
+    TestWatermarker.make().tests(test)
     TestWatermarking.make().tests(test)
