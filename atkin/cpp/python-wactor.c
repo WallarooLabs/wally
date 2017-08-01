@@ -217,6 +217,22 @@ extern PyObject *call_fn(PyObject *actor, const char* funcName, PyObject *args)
   return pCallLog;
 }
 
+extern PyObject *call_fn_with_str(PyObject *actor,
+                                  const char* funcName,
+                                  const char* strArg,
+                                  PyObject *args)
+{
+  PyObject *pFunc, *pCallLog, *pStrArg;
+
+  pFunc = PyObject_GetAttrString(actor, funcName);
+  pStrArg = PyString_FromString(strArg);
+  pCallLog = PyObject_CallFunctionObjArgs(pFunc, pStrArg, args, NULL);
+  Py_DECREF(pFunc);
+  Py_DECREF(pStrArg);
+
+  return pCallLog;
+}
+
 extern PyObject *call_fn_with_id(PyObject *actor, const char* funcName,
     __uint128_t sender_id, PyObject *args)
 {
