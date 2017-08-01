@@ -7,6 +7,7 @@ use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/w_actor"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 
 use @set_user_serialization_fns[None](module: Pointer[U8] tag)
@@ -111,7 +112,7 @@ class PySource is WActorFramedSourceHandler
       error
     end
     @py_incref(decoded)
-    PyData(decoded) 
+    PyData(decoded)
 
   fun _serialise_space(): USize =>
     Atkin.user_serialization_get_size(_source)
@@ -251,7 +252,7 @@ class PyActor is WActor
         end
       end
     end
-    @py_decref(helper_calls) 
+    @py_decref(helper_calls)
 
   fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
     match payload
@@ -373,6 +374,7 @@ primitive Atkin
     r
 
   fun create_actor_system(module: ModuleP, args: Array[String] val,
+    tcp_sink_configs: Array[TCPSinkConfigOptions] val,
     init_seed: U64): ActorSystem val ?
   =>
     let pyargs = pony_array_string_to_py_list_string(args)
@@ -407,7 +409,8 @@ primitive Atkin
         let pysink = @PyList_GetItem(pysink_list, idx)
         @py_incref(pysink)
         let sink = PySink(pysink)
-        actor_system.add_sink[(PyData val | None)](sink)
+        actor_system.add_sink[(PyData val | None)](
+          TCPSinkConfig[PyData val].from_options(sink, tcp_sink_configs(idx)))
       end
       @py_decref(pysink_list)
     end
@@ -441,4 +444,3 @@ primitive Atkin
 
   fun startup(env: Env, module: ModuleP, actor_system: ActorSystem val) =>
     ActorSystemStartup(env, actor_system, actor_system.name())
-
