@@ -6,23 +6,23 @@ actor TestWatermarker is TestList
     None
 
   fun tag tests(test: Connemara) =>
-    test(_TestProposeWatermarkFullyAckedFoo)
-    test(_TestProposeWatermarkFullyAckedFilterLastFoo)
-    test(_TestProposeWatermarkOnlyFilterFoo)
-    test(_TestProposeWatermarkFullyAckedNoneFilteredFoo)
-    test(_TestProposeWatermark1Foo)
-    test(_TestProposeWatermark2Foo)
-    test(_TestProposeWatermark3Foo)
-    test(_TestProposeWatermark4Foo)
-    test(_TestProposeWatermark5Foo)
+    test(_TestProposeWatermarkFullyAcked)
+    test(_TestProposeWatermarkFullyAckedFilterLast)
+    test(_TestProposeWatermarkOnlyFilter)
+    test(_TestProposeWatermarkFullyAckedNoneFiltered)
+    test(_TestProposeWatermark1)
+    test(_TestProposeWatermark2)
+    test(_TestProposeWatermark3)
+    test(_TestProposeWatermark4)
+    test(_TestProposeWatermark5)
 
-class iso _TestProposeWatermarkFullyAckedFoo is UnitTest
+class iso _TestProposeWatermarkFullyAcked is UnitTest
   """
   Test we get the correct proposed watermark when
   all routes are fully acked
   """
   fun name(): String =>
-    "watermarker/ProposeWatermarkFullyAckedFoo"
+    "watermarker/ProposeWatermarkFullyAcked"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -42,13 +42,13 @@ class iso _TestProposeWatermarkFullyAckedFoo is UnitTest
     let proposed = marker.propose_watermark()
     h.assert_eq[U64](3, proposed)
 
-class iso _TestProposeWatermarkFullyAckedFilterLastFoo is UnitTest
+class iso _TestProposeWatermarkFullyAckedFilterLast is UnitTest
   """
   Test we get the correct proposed watermark when
   all routes are fully acked
   """
   fun name(): String =>
-    "watermarking/ProposeWatermarkFullyAckedFilterLastFoo"
+    "watermarking/ProposeWatermarkFullyAckedFilterLast"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -69,13 +69,13 @@ class iso _TestProposeWatermarkFullyAckedFilterLastFoo is UnitTest
     let proposed = marker.propose_watermark()
     h.assert_eq[U64](4, proposed)
 
-class iso _TestProposeWatermarkOnlyFilterFoo is UnitTest
+class iso _TestProposeWatermarkOnlyFilter is UnitTest
   """
   Test we get the correct proposed watermark when
   all routes are fully acked
   """
   fun name(): String =>
-    "watermarking/ProposeWatermarkOnlyFilterFoo"
+    "watermarking/ProposeWatermarkOnlyFilter"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -91,13 +91,13 @@ class iso _TestProposeWatermarkOnlyFilterFoo is UnitTest
     let proposed: U64 = marker.propose_watermark()
     h.assert_eq[U64](4, proposed)
 
-class iso _TestProposeWatermarkFullyAckedNoneFilteredFoo is UnitTest
+class iso _TestProposeWatermarkFullyAckedNoneFiltered is UnitTest
   """
   Test we get the correct proposed watermark when
   all routes are fully acked and none were filtered
   """
   fun name(): String =>
-    "watermarking/ProposeWatermarkFullyAckedNoneFilteredFoo"
+    "watermarking/ProposeWatermarkFullyAckedNoneFiltered"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -116,7 +116,7 @@ class iso _TestProposeWatermarkFullyAckedNoneFilteredFoo is UnitTest
     let proposed: U64 = marker.propose_watermark()
     h.assert_eq[U64](3, proposed)
 
-class iso _TestProposeWatermark1Foo is UnitTest
+class iso _TestProposeWatermark1 is UnitTest
   """
   Route | Sent | Ack
   A       0     0
@@ -127,7 +127,7 @@ class iso _TestProposeWatermark1Foo is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "watermarking/ProposeWatermark1Foo"
+    "watermarking/ProposeWatermark1"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -154,7 +154,7 @@ class iso _TestProposeWatermark1Foo is UnitTest
     let proposed: U64 = marker.propose_watermark()
     h.assert_eq[U64](1, proposed)
 
-class iso _TestProposeWatermark2Foo is UnitTest
+class iso _TestProposeWatermark2 is UnitTest
   """
   Route | Sent | Ack
     A       0     0
@@ -165,7 +165,7 @@ class iso _TestProposeWatermark2Foo is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "watermarking/ProposeWatermark2Foo"
+    "watermarking/ProposeWatermark2"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -193,7 +193,7 @@ class iso _TestProposeWatermark2Foo is UnitTest
     let proposed: U64 = marker.propose_watermark()
     h.assert_eq[U64](1, proposed)
 
-class iso _TestProposeWatermark3Foo is UnitTest
+class iso _TestProposeWatermark3 is UnitTest
   """
   Route | Sent | Ack
     A       0     0
@@ -204,7 +204,7 @@ class iso _TestProposeWatermark3Foo is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "watermarking/ProposeWatermark3Foo"
+    "watermarking/ProposeWatermark3"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -233,7 +233,7 @@ class iso _TestProposeWatermark3Foo is UnitTest
     let proposed: U64 = marker.propose_watermark()
     h.assert_eq[U64](1, proposed)
 
-class iso _TestProposeWatermark4Foo is UnitTest
+class iso _TestProposeWatermark4 is UnitTest
   """
   Route | Sent | Ack
     A       7     7
@@ -244,7 +244,7 @@ class iso _TestProposeWatermark4Foo is UnitTest
   Should be 3
   """
   fun name(): String =>
-    "watermarking/ProposeWatermark4Foo"
+    "watermarking/ProposeWatermark4"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -269,7 +269,7 @@ class iso _TestProposeWatermark4Foo is UnitTest
     let proposed: U64 = marker.propose_watermark()
     h.assert_eq[U64](3, proposed)
 
-class iso _TestProposeWatermark5Foo is UnitTest
+class iso _TestProposeWatermark5 is UnitTest
   """
   Route | Sent | Ack
     A       7     7
@@ -280,7 +280,7 @@ class iso _TestProposeWatermark5Foo is UnitTest
   Should be 0
   """
   fun name(): String =>
-    "watermarking/ProposeWatermark5Foo"
+    "watermarking/ProposeWatermark5"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
