@@ -7,6 +7,7 @@ so that it may be unit tested separately from the main application.
 use "buffered"
 use "collections"
 use "sendence/bytes"
+use "wallaroo/source"
 use "wallaroo/tcp_source"
 
 primitive WindowEncoder

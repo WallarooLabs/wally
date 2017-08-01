@@ -18,6 +18,8 @@ use "serialise"
 use "sendence/bytes"
 use "wallaroo"
 use "wallaroo/fail"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -48,14 +50,20 @@ actor Main
           match app_type
           | Ping =>
             Application("Ping App")
-              .new_pipeline[U8, U8]("Ping", PongDecoder)
+              .new_pipeline[U8, U8]("Ping",
+                TCPSourceConfig[U8].from_options(PongDecoder,
+                  TCPSourceConfigCLIParser(env.args)(0)))
                 .to[U8]({(): Pingify => Pingify})
-                .to_sink(PingPongEncoder, recover [0] end)
+                .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
+                  TCPSinkConfigCLIParser(env.args)(0)))
           | Pong =>
             Application("Pong App")
-              .new_pipeline[U8, U8]("Pong", PingDecoder)
+              .new_pipeline[U8, U8]("Pong",
+                TCPSourceConfig[U8].from_options(PingDecoder,
+                  TCPSourceConfigCLIParser(env.args)(0)))
                 .to[U8]({(): Pongify => Pongify})
-                .to_sink(PingPongEncoder, recover [0] end)
+                .to_sink(TCPSinkConfig[U8].from_options(PingPongEncoder,
+                  TCPSinkConfigCLIParser(env.args)(0)))
           else
             @printf[I32]("Use --ping or --pong to start app.\n".cstring())
             error

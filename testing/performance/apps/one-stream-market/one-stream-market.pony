@@ -38,6 +38,8 @@ use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/metrics"
 use "wallaroo/state"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -85,13 +87,16 @@ actor Main
       let application = recover val
         Application("One Steam NBBO Updater App")
           .new_pipeline[FixNbboMessage val, NbboResult val](
-            "Nbbo", FixNbboFrameHandler)
+            "Nbbo",
+            TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to_state_partition[Symboly val, String,
               (NbboResult val | None), SymbolData](ProcessNbbo,
                 SymbolDataBuilder, "symbol-data",
                 symbol_data_partition where multi_worker = true)
-            .to_sink(NbboResultEncoder, recover [0] end,
-              initial_report_msgs)
+            .to_sink(TCPSinkConfig[NbboResult val].from_options(NbboResultEncoder,
+              TCPSinkConfigCLIParser(env.args)(0),
+              initial_report_msgs))
       end
       Startup(env, application, "market-spread")
     else
