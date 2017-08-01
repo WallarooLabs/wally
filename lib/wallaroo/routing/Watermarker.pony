@@ -43,8 +43,7 @@ class ref Watermarker
       Fail()
     end
 
-  fun ref filtered(o_seq_id: SeqId)
-  =>
+  fun ref filtered(o_seq_id: SeqId) =>
     """
     Filter out a message or otherwise have this be the end of the line
     """
@@ -67,7 +66,6 @@ class ref Watermarker
     let proposed_watermark = _ProposeWatermark(_filter_route, _routes)
     proposed_watermark
 
-  // from data receiver routes. might be temporary
   fun unacked_route_ids(): Array[RouteId] =>
     let arr = Array[RouteId]
     for (r_id, r) in _routes.pairs() do
