@@ -2,7 +2,7 @@ use "collections"
 
 use "sendence/options"
 use "wallaroo"
-use "wallaroo/tcp_source"
+use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
 use "lib:python2.7"
@@ -30,9 +30,11 @@ actor Main
         let module = Atkin.load_module(module_name)
 
         try
+          let tcp_sink_configs = TCPSinkConfigCLIParser(env.args)
+
           Atkin.set_user_serialization_fns(module)
           let actor_system = Atkin.create_actor_system(module,
-            options.remaining(), seed)
+            options.remaining(), tcp_sink_configs, seed)
           Atkin.startup(env, module, actor_system)
         else
           env.err.print("Something went wrong while building the application")
