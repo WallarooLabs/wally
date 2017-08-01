@@ -48,7 +48,7 @@ class iso _TestProposeWatermarkFullyAckedFilterLast is UnitTest
   all routes are fully acked
   """
   fun name(): String =>
-    "watermarking/ProposeWatermarkFullyAckedFilterLast"
+    "watermarker/ProposeWatermarkFullyAckedFilterLast"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -75,7 +75,7 @@ class iso _TestProposeWatermarkOnlyFilter is UnitTest
   all routes are fully acked
   """
   fun name(): String =>
-    "watermarking/ProposeWatermarkOnlyFilter"
+    "watermarker/ProposeWatermarkOnlyFilter"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -97,7 +97,7 @@ class iso _TestProposeWatermarkFullyAckedNoneFiltered is UnitTest
   all routes are fully acked and none were filtered
   """
   fun name(): String =>
-    "watermarking/ProposeWatermarkFullyAckedNoneFiltered"
+    "watermarker/ProposeWatermarkFullyAckedNoneFiltered"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -127,7 +127,7 @@ class iso _TestProposeWatermark1 is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "watermarking/ProposeWatermark1"
+    "watermarker/ProposeWatermark1"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -165,7 +165,7 @@ class iso _TestProposeWatermark2 is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "watermarking/ProposeWatermark2"
+    "watermarker/ProposeWatermark2"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -204,7 +204,7 @@ class iso _TestProposeWatermark3 is UnitTest
   Should be 1
   """
   fun name(): String =>
-    "watermarking/ProposeWatermark3"
+    "watermarker/ProposeWatermark3"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -244,7 +244,7 @@ class iso _TestProposeWatermark4 is UnitTest
   Should be 3
   """
   fun name(): String =>
-    "watermarking/ProposeWatermark4"
+    "watermarker/ProposeWatermark4"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
@@ -280,7 +280,7 @@ class iso _TestProposeWatermark5 is UnitTest
   Should be 0
   """
   fun name(): String =>
-    "watermarking/ProposeWatermark5"
+    "watermarker/ProposeWatermark5"
 
   fun ref apply(h: TestHelper) =>
     let marker: Watermarker = Watermarker
