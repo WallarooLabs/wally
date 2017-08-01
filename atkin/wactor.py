@@ -79,17 +79,17 @@ class WActor(object):
         self._call_log.append(("update_broadcast_variable", (key, value)))
 
 
-class Source:
+class Source(object):
     def kind(self):
         return "external"
 
 
-class SimulatedSource:
+class SimulatedSource(object):
     def kind(self):
         return "simulated"
 
 
-class ActorSystem:
+class ActorSystem(object):
     def __init__(self, name):
         self.name = name
         self.actors = []

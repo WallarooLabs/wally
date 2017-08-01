@@ -427,7 +427,6 @@ primitive Atkin
       let pybvar_list_count = @list_item_count(pybvar_list)
       for idx in Range(0, pybvar_list_count) do
         let pybvar = @PyList_GetItem(pybvar_list, idx)
-        @py_incref(pybvar)
         let key = recover val
           let s = @PyTuple_GetItem(pybvar, 0)
           let r = String.copy_cstring(@PyString_AsString(s))
