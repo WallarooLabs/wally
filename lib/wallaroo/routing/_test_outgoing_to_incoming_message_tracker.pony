@@ -104,6 +104,11 @@ class iso _TestIndexForWithGaps is UnitTest
     h.assert_eq[USize](5, t._index_for(551))
 
 class iso _TestIndexForWithGaps2 is UnitTest
+  """
+  Test that index for correctly finds values when the SeqId we are
+  searching for doesn't exist in our map because it's a SeqId that
+  is part of a 1-to-many sequence.
+  """
   fun name(): String =>
     "outgoing_to_incoming_message_tracker/IndexForWithGaps2"
 
