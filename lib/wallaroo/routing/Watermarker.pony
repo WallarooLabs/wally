@@ -10,9 +10,9 @@ class ref Watermarker
   let _routes: Map[RouteId, _Route] = _routes.create()
 
   fun ref add_route(id: RouteId) =>
-      ifdef debug then
-        Invariant(not _routes.contains(id))
-      end
+    ifdef debug then
+      Invariant(not _routes.contains(id))
+    end
 
     if not _routes.contains(id) then
         _routes(id) = _Route
@@ -66,3 +66,13 @@ class ref Watermarker
   fun ref propose_watermark(): U64 =>
     let proposed_watermark = _ProposeWatermark(_filter_route, _routes)
     proposed_watermark
+
+  // from data receiver routes. might be temporary
+  fun unacked_route_ids(): Array[RouteId] =>
+    let arr = Array[RouteId]
+    for (r_id, r) in _routes.pairs() do
+      if not r.is_fully_acked() then
+        arr.push(r_id)
+      end
+    end
+    arr
