@@ -63,8 +63,7 @@ class ref Watermarker
     end
 
   fun ref propose_watermark(): U64 =>
-    let proposed_watermark = _ProposeWatermark(_filter_route, _routes)
-    proposed_watermark
+    _ProposeWatermark(_filter_route, _routes)
 
   fun unacked_route_ids(): Array[RouteId] =>
     let arr = Array[RouteId]
