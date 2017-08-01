@@ -9,5 +9,5 @@ actor Main is TestList
     None
 
   fun tag tests(test: Connemara) =>
+    TestOutgoingToIncomingMessageTracker.make().tests(test)
     TestWatermarker.make().tests(test)
-    TestWatermarking.make().tests(test)

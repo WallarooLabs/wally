@@ -3,8 +3,6 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/topology"
 
-type ProducerRouteSeqId is (Producer, RouteId, SeqId)
-
 class _OutgoingToIncoming
   let _seq_id_to_incoming: Array[(SeqId, ProducerRouteSeqId)] ref
 

@@ -1,46 +1,51 @@
 use "sendence/connemara"
-
 use "wallaroo/topology"
 
-actor TestWatermarking is TestList
+actor TestOutgoingToIncomingMessageTracker is TestList
   new make() =>
     None
 
   fun tag tests(test: Connemara) =>
-    test(_TestOutgoingToIncomingEmptyIndexFor)
-    test(_TestOutgoingToIncomingIndexFor1)
-    test(_TestOutgoingToIncomingIndexFor2)
+    test(_TestEmptyIndexFor)
+    test(_TestBelowFirstIndex)
+    test(_TestIndexFor1)
+    test(_TestIndexFor2)
+    test(_TestIndexForWithGaps)
+    test(_TestIndexForWithGaps2)
     test(_TestOriginHighsBelow1)
     test(_TestOriginHighsBelow2)
     test(_TestOriginHighsBelowWithOneToManyPartiallyAcked)
     test(_TestOriginHighsBelowWithOneToManyFullyAcked1)
     test(_TestOriginHighsBelowWithOneToManyFullyAcked2)
-    test(_TestOriginHighsBelowWithOneToManyFullyAcked3)
     test(_TestOutgoingToIncomingEviction)
-    test(_TestOutgoingToIncomingBadEviction)
+    test(_TestOutgoingToIncomingEvictionBelow)
 
-class iso _TestOutgoingToIncomingEmptyIndexFor is UnitTest
-  """
-  Trying to get an index of a non-existent item should
-  throw an error
-  """
+class iso _TestEmptyIndexFor is UnitTest
   fun name(): String =>
-    "watermarking/OutgoingToIncomingEmptyIndexFor"
+    "outgoing_to_incoming_message_tracker/EmptyIndexFor"
 
   fun ref apply(h: TestHelper) =>
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
 
-    try
-      t._index_for(1)
-      h.fail()
-    end
+    h.assert_eq[USize](-1, t._index_for(1))
 
-class iso _TestOutgoingToIncomingIndexFor1 is UnitTest
+class iso _TestBelowFirstIndex is UnitTest
   fun name(): String =>
-    "watermarking/OutgoingToIncomingIndexFor1"
+    "outgoing_to_incoming_message_tracker/BelowFirstIndex"
 
   fun ref apply(h: TestHelper) =>
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
+
+    t.add(SeqId(2), _TestProducer, RouteId(1), SeqId(1))
+
+    h.assert_eq[USize](-1, t._index_for(1))
+
+class iso _TestIndexFor1 is UnitTest
+  fun name(): String =>
+    "outgoing_to_incoming_message_tracker/IndexFor1"
+
+  fun ref apply(h: TestHelper) =>
+    let t = OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), _TestProducer, RouteId(1), SeqId(1))
     t.add(SeqId(2), _TestProducer, RouteId(1), SeqId(2))
@@ -49,24 +54,19 @@ class iso _TestOutgoingToIncomingIndexFor1 is UnitTest
     t.add(SeqId(5), _TestProducer, RouteId(1), SeqId(5))
     t.add(SeqId(6), _TestProducer, RouteId(1), SeqId(6))
 
-    try
-      h.assert_eq[USize](0, t._index_for(1))
-      h.assert_eq[USize](1, t._index_for(2))
-      h.assert_eq[USize](2, t._index_for(3))
-      h.assert_eq[USize](3, t._index_for(4))
-      h.assert_eq[USize](4, t._index_for(5))
-      h.assert_eq[USize](5, t._index_for(6))
-    else
-      h.fail()
-    end
+    h.assert_eq[USize](0, t._index_for(1))
+    h.assert_eq[USize](1, t._index_for(2))
+    h.assert_eq[USize](2, t._index_for(3))
+    h.assert_eq[USize](3, t._index_for(4))
+    h.assert_eq[USize](4, t._index_for(5))
+    h.assert_eq[USize](5, t._index_for(6))
 
-
-class iso _TestOutgoingToIncomingIndexFor2 is UnitTest
+class iso _TestIndexFor2 is UnitTest
   fun name(): String =>
-    "watermarking/OutgoingToIncomingIndexFor2"
+    "outgoing_to_incoming_message_tracker/IndexFor2"
 
   fun ref apply(h: TestHelper) =>
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
 
     t.add(SeqId(505), _TestProducer, RouteId(1), SeqId(10))
     t.add(SeqId(506), _TestProducer, RouteId(1), SeqId(11))
@@ -75,27 +75,64 @@ class iso _TestOutgoingToIncomingIndexFor2 is UnitTest
     t.add(SeqId(509), _TestProducer, RouteId(1), SeqId(14))
     t.add(SeqId(510), _TestProducer, RouteId(1), SeqId(15))
 
-    try
-      h.assert_eq[USize](0, t._index_for(505))
-      h.assert_eq[USize](1, t._index_for(506))
-      h.assert_eq[USize](2, t._index_for(507))
-      h.assert_eq[USize](3, t._index_for(508))
-      h.assert_eq[USize](4, t._index_for(509))
-      h.assert_eq[USize](5, t._index_for(510))
-    else
-      h.fail()
-    end
+    h.assert_eq[USize](0, t._index_for(505))
+    h.assert_eq[USize](1, t._index_for(506))
+    h.assert_eq[USize](2, t._index_for(507))
+    h.assert_eq[USize](3, t._index_for(508))
+    h.assert_eq[USize](4, t._index_for(509))
+    h.assert_eq[USize](5, t._index_for(510))
+
+class iso _TestIndexForWithGaps is UnitTest
+  fun name(): String =>
+    "outgoing_to_incoming_message_tracker/IndexForWithGaps"
+
+  fun ref apply(h: TestHelper) =>
+    let t = OutgoingToIncomingMessageTracker
+
+    t.add(SeqId(505), _TestProducer, RouteId(1), SeqId(10))
+    t.add(SeqId(516), _TestProducer, RouteId(1), SeqId(11))
+    t.add(SeqId(527), _TestProducer, RouteId(1), SeqId(12))
+    t.add(SeqId(538), _TestProducer, RouteId(1), SeqId(13))
+    t.add(SeqId(549), _TestProducer, RouteId(1), SeqId(14))
+    t.add(SeqId(551), _TestProducer, RouteId(1), SeqId(15))
+
+    h.assert_eq[USize](0, t._index_for(505))
+    h.assert_eq[USize](1, t._index_for(516))
+    h.assert_eq[USize](2, t._index_for(527))
+    h.assert_eq[USize](3, t._index_for(538))
+    h.assert_eq[USize](4, t._index_for(549))
+    h.assert_eq[USize](5, t._index_for(551))
+
+class iso _TestIndexForWithGaps2 is UnitTest
+  fun name(): String =>
+    "outgoing_to_incoming_message_tracker/IndexForWithGaps2"
+
+  fun ref apply(h: TestHelper) =>
+    let t = OutgoingToIncomingMessageTracker
+
+    t.add(SeqId(505), _TestProducer, RouteId(1), SeqId(10))
+    t.add(SeqId(516), _TestProducer, RouteId(1), SeqId(11))
+    t.add(SeqId(527), _TestProducer, RouteId(1), SeqId(12))
+    t.add(SeqId(538), _TestProducer, RouteId(1), SeqId(13))
+    t.add(SeqId(549), _TestProducer, RouteId(1), SeqId(14))
+    t.add(SeqId(551), _TestProducer, RouteId(1), SeqId(15))
+
+    h.assert_eq[USize](0, t._index_for(508))
+    h.assert_eq[USize](1, t._index_for(518))
+    h.assert_eq[USize](2, t._index_for(531))
+    h.assert_eq[USize](3, t._index_for(542))
+    h.assert_eq[USize](4, t._index_for(550))
 
 class iso _TestOriginHighsBelow1 is UnitTest
   fun name(): String =>
-    "watermarking/OriginHighsBelow1"
+    "outgoing_to_incoming_message_tracker/OriginHighsBelow1"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     t.add(SeqId(2), o2, o2route, SeqId(1))
@@ -104,15 +141,7 @@ class iso _TestOriginHighsBelow1 is UnitTest
     t.add(SeqId(5), o2, o2route, SeqId(2))
     t.add(SeqId(6), o1, o1route, SeqId(4))
 
-    let index: USize = 4
-    try
-      h.assert_eq[USize](index, t._index_for(SeqId(5)))
-    else
-      h.fail()
-    end
-
-    let highs = t._origin_highs_below(index)
-
+    let highs = t._origin_highs_below(SeqId(5))
     h.assert_eq[USize](2, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_true(highs.contains((o2, o2route)))
@@ -125,14 +154,14 @@ class iso _TestOriginHighsBelow1 is UnitTest
 
 class iso _TestOriginHighsBelow2 is UnitTest
   fun name(): String =>
-    "watermarking/OriginHighsBelow2"
+    "outgoing_to_incoming_message_tracker/OriginHighsBelow2"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     t.add(SeqId(2), o2, o2route, SeqId(1))
@@ -141,14 +170,7 @@ class iso _TestOriginHighsBelow2 is UnitTest
     t.add(SeqId(5), o2, o2route, SeqId(2))
     t.add(SeqId(6), o1, o1route, SeqId(4))
 
-    let index: USize = 0
-    try
-      h.assert_eq[USize](index, t._index_for(SeqId(1)))
-    else
-      h.fail()
-    end
-    let highs = t._origin_highs_below(index)
-
+    let highs = t._origin_highs_below(SeqId(1))
     h.assert_eq[USize](1, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_false(highs.contains((o2, o2route)))
@@ -160,21 +182,18 @@ class iso _TestOriginHighsBelow2 is UnitTest
 
 class iso _TestOriginHighsBelowWithOneToManyPartiallyAcked is UnitTest
   fun name(): String =>
-    "watermarking/OriginHighsBelowWithOneToManyPartiallyAcked"
+    "outgoing_to_incoming_message_tracker/OriginHighsBelowWithOneToManyPartiallyAcked"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     // this incoming message is 1 to many
     // in particular (o2, o2route, SeqId(1)) results in 4 outgoing messages
-    t.add(SeqId(2), o2, o2route, SeqId(1))
-    t.add(SeqId(3), o2, o2route, SeqId(1))
-    t.add(SeqId(4), o2, o2route, SeqId(1))
     t.add(SeqId(5), o2, o2route, SeqId(1))
 
     t.add(SeqId(6), o1, o1route, SeqId(2))
@@ -182,14 +201,7 @@ class iso _TestOriginHighsBelowWithOneToManyPartiallyAcked is UnitTest
     t.add(SeqId(8), o2, o2route, SeqId(2))
     t.add(SeqId(9), o1, o1route, SeqId(4))
 
-    let index: USize = 3
-    try
-      h.assert_eq[USize](index, t._index_for(SeqId(4)))
-    else
-      h.fail()
-    end
-    let highs = t._origin_highs_below(index)
-
+    let highs = t._origin_highs_below(SeqId(4))
     h.assert_eq[USize](1, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_false(highs.contains((o2, o2route)))
@@ -201,21 +213,18 @@ class iso _TestOriginHighsBelowWithOneToManyPartiallyAcked is UnitTest
 
 class iso _TestOriginHighsBelowWithOneToManyFullyAcked1 is UnitTest
   fun name(): String =>
-    "watermarking/OriginHighsBelowWithOneToManyFullyAcked1"
+    "outgoing_to_incoming_message_tracker/OriginHighsBelowWithOneToManyFullyAcked1"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     // this incoming message is 1 to many
     // in particular (o2, o2route, SeqId(1)) results in 4 outgoing messages
-    t.add(SeqId(2), o2, o2route, SeqId(1))
-    t.add(SeqId(3), o2, o2route, SeqId(1))
-    t.add(SeqId(4), o2, o2route, SeqId(1))
     t.add(SeqId(5), o2, o2route, SeqId(1))
 
     t.add(SeqId(6), o1, o1route, SeqId(2))
@@ -223,14 +232,7 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked1 is UnitTest
     t.add(SeqId(8), o2, o2route, SeqId(2))
     t.add(SeqId(9), o1, o1route, SeqId(4))
 
-    let index: USize = 4
-    try
-      h.assert_eq[USize](index, t._index_for(SeqId(5)))
-    else
-      h.fail()
-    end
-    let highs = t._origin_highs_below(index)
-
+    let highs = t._origin_highs_below(SeqId(5))
     h.assert_eq[USize](2, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_true(highs.contains((o2, o2route)))
@@ -243,21 +245,18 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked1 is UnitTest
 
 class iso _TestOriginHighsBelowWithOneToManyFullyAcked2 is UnitTest
   fun name(): String =>
-    "watermarking/OriginHighsBelowWithOneToManyFullyAcked2"
+    "outgoing_to_incoming_message_tracker/OriginHighsBelowWithOneToManyFullyAcked2"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     // this incoming message is 1 to many
     // in particular (o2, o2route, SeqId(1)) results in 4 outgoing messages
-    t.add(SeqId(2), o2, o2route, SeqId(1))
-    t.add(SeqId(3), o2, o2route, SeqId(1))
-    t.add(SeqId(4), o2, o2route, SeqId(1))
     t.add(SeqId(5), o2, o2route, SeqId(1))
 
     t.add(SeqId(6), o1, o1route, SeqId(2))
@@ -265,13 +264,7 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked2 is UnitTest
     t.add(SeqId(8), o2, o2route, SeqId(2))
     t.add(SeqId(9), o1, o1route, SeqId(4))
 
-    let index: USize = 7
-    try
-      h.assert_eq[USize](index, t._index_for(SeqId(8)))
-    else
-      h.fail()
-    end
-    let highs = t._origin_highs_below(index)
+    let highs = t._origin_highs_below(SeqId(8))
 
     h.assert_eq[USize](2, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
@@ -285,21 +278,18 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked2 is UnitTest
 
 class iso _TestOriginHighsBelowWithOneToManyFullyAcked3 is UnitTest
   fun name(): String =>
-    "watermarking/OriginHighsBelowWithOneToManyFullyAcked3"
+    "outgoing_to_incoming_message_tracker/OriginHighsBelowWithOneToManyFullyAcked3"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     // this incoming message is 1 to many
     // in particular (o2, o2route, SeqId(1)) results in 4 outgoing messages
-    t.add(SeqId(2), o2, o2route, SeqId(1))
-    t.add(SeqId(3), o2, o2route, SeqId(1))
-    t.add(SeqId(4), o2, o2route, SeqId(1))
     t.add(SeqId(5), o2, o2route, SeqId(1))
 
     t.add(SeqId(6), o1, o1route, SeqId(2))
@@ -307,14 +297,7 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked3 is UnitTest
     t.add(SeqId(8), o2, o2route, SeqId(2))
     t.add(SeqId(9), o1, o1route, SeqId(4))
 
-    let index: USize = 6
-    try
-      h.assert_eq[USize](index, t._index_for(SeqId(7)))
-    else
-      h.fail()
-    end
-    let highs = t._origin_highs_below(index)
-
+    let highs = t._origin_highs_below(SeqId(7))
     h.assert_eq[USize](2, highs.size())
     h.assert_true(highs.contains((o1, o1route)))
     h.assert_true(highs.contains((o2, o2route)))
@@ -327,14 +310,14 @@ class iso _TestOriginHighsBelowWithOneToManyFullyAcked3 is UnitTest
 
 class iso _TestOutgoingToIncomingEviction is UnitTest
   fun name(): String =>
-    "watermarking/OutgoingToIncomingEviction"
+    "outgoing_to_incoming_message_tracker/OutgoingToIncomingEviction"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
 
     t.add(SeqId(1), o1, o1route, SeqId(1))
     t.add(SeqId(2), o2, o2route, SeqId(1))
@@ -344,40 +327,34 @@ class iso _TestOutgoingToIncomingEviction is UnitTest
     t.add(SeqId(6), o1, o1route, SeqId(4))
 
     let evict_through = SeqId(3)
-    let index: USize = 2
-    try
-      h.assert_eq[USize](index, t._index_for(evict_through))
-    else
-      h.fail()
-    end
 
-    try
-      t.evict(evict_through)
-      h.assert_eq[USize](3, t.size())
-      h.assert_true(t.contains(SeqId(4)))
-      h.assert_true(t.contains(SeqId(5)))
-      h.assert_true(t.contains(SeqId(6)))
-    else
-      h.fail()
-    end
+    t.evict(evict_through)
+    h.assert_eq[USize](3, t._size())
+    h.assert_true(t._contains(SeqId(4)))
+    h.assert_true(t._contains(SeqId(5)))
+    h.assert_true(t._contains(SeqId(6)))
 
-class iso _TestOutgoingToIncomingBadEviction is UnitTest
+class iso _TestOutgoingToIncomingEvictionBelow is UnitTest
   fun name(): String =>
-    "watermarking/OutgoingToIncomingBadEviction"
+    "outgoing_to_incoming_message_tracker/OutgoingToIncomingEvictionBelow"
 
   fun ref apply(h: TestHelper) =>
     let o1 = _TestProducer
     let o1route = RouteId(1)
     let o2 = _TestProducer
     let o2route = RouteId(3)
-    let t = _OutgoingToIncoming
+    let t = OutgoingToIncomingMessageTracker
 
-    h.assert_eq[USize](0, t.size())
 
-    try
-      t.evict(1)
-      h.fail()
-    end
+    t.add(SeqId(5), o2, o2route, SeqId(2))
+    t.add(SeqId(6), o1, o1route, SeqId(4))
+
+    let evict_through = SeqId(3)
+
+    t.evict(evict_through)
+    h.assert_eq[USize](2, t._size())
+    h.assert_true(t._contains(SeqId(5)))
+    h.assert_true(t._contains(SeqId(6)))
 
 actor _TestProducer is Producer
   be mute(c: Consumer) =>
