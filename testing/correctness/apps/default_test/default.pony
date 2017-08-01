@@ -19,6 +19,8 @@ use "sendence/hub"
 use "wallaroo/"
 use "wallaroo/fail"
 use "wallaroo/state"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -31,11 +33,13 @@ actor Main
       let application = recover val
         Application("Complex Numbers App")
           .new_pipeline[String, Result val]("Default Test",
-            DefaultTestFrameHandler)
+            TCPSourceConfig[String].from_options(DefaultTestFrameHandler,
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to_state_partition[String, String, Result val, NormalState](UpdateState, NormalStateBuilder, "normal-state",
               symbol_data_partition where multi_worker = true,
               default_state_name = "default-state")
-            .to_sink(ResultEncoder, recover [0] end)
+            .to_sink(TCPSinkConfig[Result val].from_options(ResultEncoder,
+               TCPSinkConfigCLIParser(env.args)(0)))
           .partition_default_target[String, Result val, DefaultState](
             "Default Test", "default-state", UpdateDefaultState,
             DefaultStateBuilder)

@@ -61,6 +61,8 @@ use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/metrics"
 use "wallaroo/state"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -108,16 +110,20 @@ actor Main
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixOrderMessage val, Array[ByteSeq] val](
-            "Orders", FixOrderFrameHandler)
+            "Orders",
+            TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
+              TCPSourceConfigCLIParser(env.args)(0)))
             // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
             .to_state_partition[Symboly val, String,
               (Array[ByteSeq] val | None), SymbolData](CheckOrder,
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
-            .to_sink(EmptyEncoder, recover [0] end,
-              initial_report_msgs)
+            .to_sink(TCPSinkConfig[Array[ByteSeq] val].from_options(EmptyEncoder,
+              TCPSinkConfigCLIParser(env.args)(0), initial_report_msgs))
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler
+            "Nbbo",
+            TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
+              TCPSourceConfigCLIParser(env.args)(0))
               where init_file = init_file)
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",

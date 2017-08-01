@@ -5,6 +5,8 @@ use "sendence/bytes"
 use "wallaroo/"
 use "wallaroo/fail"
 use "wallaroo/state"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -18,11 +20,14 @@ actor Main
       let application = recover val
         Application("Alphabet Popularity Contest")
           .new_pipeline[Votes val, LetterTotal val]("Alphabet Votes",
-            VotesDecoder)
+            TCPSourceConfig[Votes val].from_options(VotesDecoder,
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to_state_partition[Votes val, String, LetterTotal val,
               LetterState](AddVotes, LetterStateBuilder, "letter-state",
               letter_partition where multi_worker = true)
-            .to_sink(LetterTotalEncoder, recover [0] end)
+            .to_sink(TCPSinkConfig[LetterTotal val].from_options(
+              LetterTotalEncoder,
+              TCPSinkConfigCLIParser(env.args)(0)))
       end
       Startup(env, application, "alphabet-contest")
     else
