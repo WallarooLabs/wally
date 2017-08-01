@@ -129,6 +129,11 @@ class iso _TestIndexForWithGaps2 is UnitTest
     h.assert_eq[USize](4, t._index_for(550))
 
 class iso _TestOriginHighsBelow1 is UnitTest
+  """
+  Test origin highs below when there are multiple
+  messages that went out on the route below the SeqId that
+  we are getting up to.
+  """
   fun name(): String =>
     "outgoing_to_incoming_message_tracker/OriginHighsBelow1"
 
@@ -158,6 +163,10 @@ class iso _TestOriginHighsBelow1 is UnitTest
     end
 
 class iso _TestOriginHighsBelow2 is UnitTest
+  """
+  Test _origin_high_below correctly only gets first item in
+  and not others.
+  """
   fun name(): String =>
     "outgoing_to_incoming_message_tracker/OriginHighsBelow2"
 
