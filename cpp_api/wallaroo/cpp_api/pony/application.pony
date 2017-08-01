@@ -1,5 +1,7 @@
 use "collections"
 use "wallaroo"
+use "wallaroo/tcp_sink"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/fail"
 
@@ -33,19 +35,35 @@ class CPPApplicationBuilder
   var _application: (None | Application) = None
   var _pipeline_builder: (None | PipelineBuilder[CPPData val, CPPData val, CPPData val]) = None
 
-  fun ref create_application(application_name': Pointer[U8] ref) =>
+  let _source_configs: Array[TCPSourceConfigOptions] val
+  let _sink_configs: Array[TCPSinkConfigOptions] val
+  var _source_idx: USize = 0
+  var _sink_idx: USize = 0
+
+  new create(source_configs: Array[TCPSourceConfigOptions] val,
+    sink_configs: Array[TCPSinkConfigOptions] val) =>
+    _source_configs = source_configs
+    _sink_configs = sink_configs
+
+  fun ref create_application(application_name': Pointer[U8] ref)
+  =>
     let application_name: String = String.from_cstring(application_name').clone()
     _application = recover Application(application_name) end
 
   fun ref new_pipeline(name': Pointer[U8] ref,
     source_decoder': Pointer[U8] val)
   =>
-    match _application
-    | let app: Application =>
-      let name = String.from_cstring(name')
-      let source_decoder = recover val CPPSourceDecoder(source_decoder') end
-      _pipeline_builder = app.
-        new_pipeline[CPPData val, CPPData val](name.clone(), source_decoder)
+    try
+      match _application
+      | let app: Application =>
+        let name = String.from_cstring(name')
+        let source_decoder = recover val CPPSourceDecoder(source_decoder') end
+        _pipeline_builder = app.new_pipeline[CPPData val, CPPData val](name.clone(),
+          TCPSourceConfig[CPPData val].from_options(source_decoder, _source_configs(_source_idx)))
+        _source_idx = _source_idx + 1
+      end
+    else
+      Fail()
     end
 
   fun ref to(computation_builder': ComputationBuilderP) =>
@@ -134,7 +152,9 @@ class CPPApplicationBuilder
       match _pipeline_builder
       | let pb: PipelineBuilder[CPPData val, CPPData val, CPPData val] =>
         let sink_encoder = recover val CPPSinkEncoder(sink_encoder') end
-        pb.to_sink(sink_encoder, recover [0] end)
+        pb.to_sink(TCPSinkConfig[CPPData val].from_options(sink_encoder,
+          _sink_configs(_sink_idx)))
+        _sink_idx = _sink_idx + 1
         _pipeline_builder = None
       end
     else
