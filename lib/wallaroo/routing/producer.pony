@@ -13,6 +13,8 @@ trait tag Producer
   fun tag hash(): U64 =>
     (digestof this).hash()
 
+  //TO DO: one to many. swap in a watermarker here.
+
   fun ref _x_resilience_routes(): Routes
 
   fun ref _flush(low_watermark: SeqId)
