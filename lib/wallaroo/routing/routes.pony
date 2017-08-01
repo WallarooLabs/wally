@@ -13,14 +13,14 @@ class Routes
   var _flushed_watermark: U64 = 0
   var _flushing: Bool = false
   let _ack_batch_size: USize
-  let _outgoing_to_incoming: _OutgoingToIncoming
+  let _outgoing_to_incoming: OutgoingToIncomingMessageTracker
   var _ack_next_time: Bool = false
   var _last_proposed_watermark: SeqId = 0
 
   // TODO: Change this to a reasonable value!
   new create(ack_batch_size': USize = 100) =>
     _ack_batch_size = ack_batch_size'
-    _outgoing_to_incoming = _OutgoingToIncoming(_ack_batch_size)
+    _outgoing_to_incoming = OutgoingToIncomingMessageTracker(_ack_batch_size)
 
   fun print_flushing() =>
     if _flushing then
@@ -93,22 +93,14 @@ class Routes
     end
 
   fun ref flushed(up_to: SeqId) =>
-    ifdef debug then
-      Invariant(_outgoing_to_incoming.contains(up_to))
+    _flushing = false
+    for (o_r, id) in
+      _outgoing_to_incoming._origin_highs_below(up_to).pairs()
+    do
+      o_r._1.update_watermark(o_r._2, id)
     end
-
-    try
-      _flushing = false
-      for (o_r, id) in
-        _outgoing_to_incoming.origin_notifications(up_to).pairs()
-      do
-        o_r._1.update_watermark(o_r._2, id)
-      end
-      _outgoing_to_incoming.evict(up_to)
-      _flushed_watermark = up_to
-    else
-      Fail()
-    end
+    _outgoing_to_incoming.evict(up_to)
+    _flushed_watermark = up_to
 
   fun ref _add_incoming(producer: Producer ref, o_seq_id: SeqId,
     i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
@@ -117,7 +109,7 @@ class Routes
 
   fun ref _maybe_ack(producer: Producer ref) =>
     if not _flushing and
-      (((_outgoing_to_incoming.size() % _ack_batch_size) == 0) or
+      (((_outgoing_to_incoming._size() % _ack_batch_size) == 0) or
       _ack_next_time)
     then
       _ack(producer)

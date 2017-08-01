@@ -24,9 +24,6 @@ class ref OutgoingToIncomingMessageTracker
 
     _seq_id_to_incoming.remove(0, n + 1)
 
-
-
-
   fun _origin_highs_below(id: SeqId): MapIs[(Producer, RouteId), U64] =>
     let high_by_origin_route: MapIs[(Producer, RouteId), U64] =
       MapIs[(Producer, RouteId), U64]
