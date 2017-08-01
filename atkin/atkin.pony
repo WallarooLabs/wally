@@ -34,6 +34,8 @@ use @call_fn_bufferarg[Pointer[U8] val](o: Pointer[U8] val, fn: CString,
 use @get_actor_count[USize](m: ModuleP)
 use @call_fn[Pointer[U8] val](actr: Pointer[U8] val,
   f_name: CString, args: Pointer[U8] tag)
+use @call_fn_with_str[Pointer[U8] val](actr: Pointer[U8] val,
+  f_name: CString, strArg: CString, args: Pointer[U8] tag)
 use @call_fn_with_id[Pointer[U8] val](actr: Pointer[U8] val,
   f_name: CString, sender_id: U128 val, args: Pointer[U8] tag)
 use @get_none[Pointer[U8] val]()
@@ -230,9 +232,23 @@ class PyActor is WActor
             String.copy_cstring(@PyString_AsString(s))
           end
           helper.register_as_role(role)
+        | "subscribe_to_broadcast_variable" =>
+          let var_name = recover val
+            let s = @PyTuple_GetItem(call, 1)
+            String.copy_cstring(@PyString_AsString(s))
+          end
+          helper.subscribe_to_broadcast_variable(var_name)
+        | "update_broadcast_variable" =>
+          let var_name = recover val
+            let s = @PyTuple_GetItem(call_args, 0)
+            String.copy_cstring(@PyString_AsString(s))
+          end
+          let new_value = @PyTuple_GetItem(call_args, 1)
+          helper.update_broadcast_variable(var_name,
+                                           Atkin.wrap_pointer(new_value))
+        else
+          Fail()
         end
-      else
-        Fail()
       end
     end
     @py_decref(helper_calls) 
@@ -264,6 +280,20 @@ class PyActor is WActor
         Fail()
       end
       run_helper_calls(h, helper_calls)
+    else
+      Fail()
+    end
+
+  fun ref receive_broadcast_variable_update(var_name: String, payload: Any val) =>
+    match payload
+    | let p: PyData val =>
+      @call_fn_with_str(_actor,
+                        "receive_broadcast_variable_update_wrapper".cstring(),
+                        var_name.cstring(),
+                        p.obj())
+      if Atkin.print_errors() then
+        Fail()
+      end
     else
       Fail()
     end
@@ -391,6 +421,22 @@ primitive Atkin
         actor_system.add_actor(actor_builder)
       end
       @py_decref(pyactor_list)
+    end
+    let pybvar_list = @get_attribute(pyactor_system, "broadcast_variables".cstring())
+    if not pybvar_list.is_null() then
+      let pybvar_list_count = @list_item_count(pybvar_list)
+      for idx in Range(0, pybvar_list_count) do
+        let pybvar = @PyList_GetItem(pybvar_list, idx)
+        @py_incref(pybvar)
+        let key = recover val
+          let s = @PyTuple_GetItem(pybvar, 0)
+          let r = String.copy_cstring(@PyString_AsString(s))
+          r
+        end
+        let default_value = Atkin.wrap_pointer(@PyTuple_GetItem(pybvar, 1))
+        actor_system.create_broadcast_variable(key, default_value)
+      end
+      @py_decref(pybvar_list)
     end
     actor_system
 

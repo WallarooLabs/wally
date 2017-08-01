@@ -69,9 +69,13 @@ class WActor(object):
         self._call_log.append(("subscribe_to_broadcast_variable", key))
 
     def read_broadcast_variable(self, key):
-        return self._broadcast_var_values_cache[key]
+        if key in self._broadcast_var_values_cache:
+            return self._broadcast_var_values_cache[key]
+        else:
+            return None
 
     def update_broadcast_variable(self, key, value):
+        self._broadcast_var_values_cache[key] = value
         self._call_log.append(("update_broadcast_variable", (key, value)))
 
 
@@ -91,7 +95,7 @@ class ActorSystem:
         self.actors = []
         self.sources = []
         self.sinks = []
-        self.broadcast_variables = {}
+        self.broadcast_variables = []
 
     def add_actor(self, actor):
         self.actors.append(actor)
@@ -106,4 +110,4 @@ class ActorSystem:
         self.sources.append(SimulatedSource())
 
     def create_broadcast_variable(self, key, default_value):
-        self.broadcast_variables[key] = default_value
+        self.broadcast_variables.append((key, default_value))
