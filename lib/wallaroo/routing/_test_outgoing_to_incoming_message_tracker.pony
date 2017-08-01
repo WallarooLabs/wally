@@ -344,6 +344,9 @@ class iso _TestOutgoingToIncomingEviction is UnitTest
 
     t.evict(evict_through)
     h.assert_eq[USize](3, t._size())
+    h.assert_false(t._contains(SeqId(1)))
+    h.assert_false(t._contains(SeqId(2)))
+    h.assert_false(t._contains(SeqId(3)))
     h.assert_true(t._contains(SeqId(4)))
     h.assert_true(t._contains(SeqId(5)))
     h.assert_true(t._contains(SeqId(6)))
