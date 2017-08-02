@@ -23,11 +23,6 @@ class Routes
     _outgoing_to_incoming = OutgoingToIncomingMessageTracker(_ack_batch_size)
     _watermarker = Watermarker
 
-  fun print_flushing() =>
-    if _flushing then
-      @printf[I32]("Still Flushing!\n".cstring())
-    end
-
   fun ref add_route(route: Route) =>
     _watermarker.add_route(route.id())
 

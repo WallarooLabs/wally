@@ -114,9 +114,6 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
   // Application startup lifecycle event
   //
 
-  be print_flushing() =>
-    _resilience_routes.print_flushing()
-
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
 
