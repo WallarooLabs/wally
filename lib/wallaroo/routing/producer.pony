@@ -61,13 +61,3 @@ trait tag Producer
     end
 
     _x_resilience_routes().receive_ack(this, route_id, seq_id)
-
-primitive HashProducer
-  fun hash(o: Producer): U64 =>
-    o.hash()
-
-  fun eq(o1: Producer, o2: Producer): Bool =>
-    o1.hash() == o2.hash()
-
-  fun ne(o1: Producer, o2: Producer): Bool =>
-    o1.hash() != o2.hash()
