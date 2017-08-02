@@ -8,19 +8,20 @@ class Routes
   """
   All the routes available
   """
-  let _filter_route: _FilterRoute ref = recover ref _FilterRoute end
-  let _routes: Map[RouteId, _Route] = _routes.create()
   var _flushed_watermark: U64 = 0
   var _flushing: Bool = false
   let _ack_batch_size: USize
   let _outgoing_to_incoming: OutgoingToIncomingMessageTracker
+  let _watermarker: Watermarker
   var _ack_next_time: Bool = false
   var _last_proposed_watermark: SeqId = 0
+
 
   // TODO: Change this to a reasonable value!
   new create(ack_batch_size': USize = 100) =>
     _ack_batch_size = ack_batch_size'
     _outgoing_to_incoming = OutgoingToIncomingMessageTracker(_ack_batch_size)
+    _watermarker = Watermarker
 
   fun print_flushing() =>
     if _flushing then
@@ -28,43 +29,16 @@ class Routes
     end
 
   fun ref add_route(route: Route) =>
-    if not _routes.contains(route.id()) then
-        _routes(route.id()) = _Route
-    end
+    _watermarker.add_route(route.id())
 
   fun ref remove_route(route: Route) =>
-    try
-      let old_route = _routes(route.id())
-      ifdef debug then
-        // We currently assume stop the world and finishing all in-flight
-        // processing before any route migration.
-        Invariant(old_route.is_fully_acked())
-      end
-      _routes.remove(route.id())
-    else
-      Fail()
-    end
-
-  fun is_fully_acked(): Bool =>
-    if not _filter_route.is_fully_acked() then return false end
-    for (_, route) in _routes.pairs() do
-      if not route.is_fully_acked() then return false end
-    end
-    true
+    _watermarker.remove_route(route.id())
 
   fun ref send(producer: Producer ref, o_route_id: RouteId, o_seq_id: SeqId,
     i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
   =>
-    ifdef debug then
-      Invariant(_routes.contains(o_route_id))
-    end
-
-    try
-      _routes(o_route_id).send(o_seq_id)
-      _add_incoming(producer, o_seq_id, i_origin, i_route_id, i_seq_id)
-    else
-      Fail()
-    end
+    _watermarker.sent(o_route_id, o_seq_id)
+    _add_incoming(producer, o_seq_id, i_origin, i_route_id, i_seq_id)
 
   fun ref filter(producer: Producer ref, o_seq_id: SeqId,
     i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
@@ -72,25 +46,15 @@ class Routes
     """
     Filter out a message or otherwise have this be the end of the line
     """
-    _filter_route.filter(o_seq_id)
+    _watermarker.filtered(o_seq_id)
     _add_incoming(producer, o_seq_id, i_origin, i_route_id, i_seq_id)
     _maybe_ack(producer)
 
   fun ref receive_ack(producer: Producer ref, route_id: RouteId,
     seq_id: SeqId)
   =>
-    ifdef debug then
-      Invariant(_routes.contains(route_id))
-      LazyInvariant({()(_routes, route_id, seq_id): Bool ? =>
-          _routes(route_id).highest_seq_id_sent() >= seq_id})
-    end
-
-    try
-      _routes(route_id).receive_ack(seq_id)
-      _maybe_ack(producer)
-    else
-      Fail()
-    end
+    _watermarker.ack_received(route_id, seq_id)
+    _maybe_ack(producer)
 
   fun ref flushed(up_to: SeqId) =>
     _flushing = false
@@ -133,7 +97,7 @@ class Routes
     end
 
   fun ref propose_new_watermark(): U64 =>
-    let proposed_watermark = _ProposeWatermark(_filter_route, _routes)
+    let proposed_watermark = _watermarker.propose_watermark()
     ifdef debug then
       Invariant(proposed_watermark >= _flushed_watermark)
     end
