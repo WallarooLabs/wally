@@ -106,7 +106,7 @@ trait BasicPipeline
   fun source_builder(): SourceBuilderBuilder ?
   fun source_route_builder(): RouteBuilder val
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder
-  fun sink_builder(): (TCPSinkBuilder | None)
+  fun sink_builder(): (SinkBuilder | None)
   // TODO: Change this when we need more sinks per pipeline
   // ASSUMPTION: There is at most one sink per pipeline
   fun sink_id(): (U128 | None)

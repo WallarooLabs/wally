@@ -41,7 +41,7 @@ class val ArraySourceListenerBuilderBuilder[In: Any val]
   fun apply(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
-    tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
@@ -50,7 +50,7 @@ class val ArraySourceListenerBuilderBuilder[In: Any val]
   =>
     ArraySourceListenerBuilder[In](source_builder, router, router_registry,
       route_builder,
-      outgoing_boundary_builders, tcp_sinks, event_log, auth,
+      outgoing_boundary_builders, event_log, auth,
       layout_initializer, consume metrics_reporter, default_target,
       default_in_route_builder, target_router, _array, _emit_gap)
 
@@ -61,7 +61,6 @@ class ArraySourceListenerBuilder[In: Any val]
   let _route_builder: RouteBuilder val
   let _default_in_route_builder: (RouteBuilder val | None)
   let _outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val
-  let _tcp_sinks: Array[TCPSink] val
   let _layout_initializer: LayoutInitializer
   let _event_log: EventLog
   let _auth: AmbientAuth
@@ -74,7 +73,7 @@ class ArraySourceListenerBuilder[In: Any val]
   new val create(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
-    tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
@@ -89,7 +88,6 @@ class ArraySourceListenerBuilder[In: Any val]
     _route_builder = route_builder
     _default_in_route_builder = default_in_route_builder
     _outgoing_boundary_builders = outgoing_boundary_builders
-    _tcp_sinks = tcp_sinks
     _layout_initializer = layout_initializer
     _event_log = event_log
     _auth = auth
@@ -101,7 +99,7 @@ class ArraySourceListenerBuilder[In: Any val]
 
   fun apply(): SourceListener =>
     ArraySourceListener[In](_source_builder, _router, _router_registry,
-      _route_builder, _outgoing_boundary_builders, _tcp_sinks,
+      _route_builder, _outgoing_boundary_builders,
       _event_log, _auth, _layout_initializer, _metrics_reporter.clone(),
       _default_target, _default_in_route_builder, _target_router, _array,
       _emit_gap)
@@ -122,7 +120,7 @@ actor ArraySourceListener[In: Any val] is SourceListener
   new create(source_builder: SourceBuilder val, router: Router val,
     router_registry: RouterRegistry, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
-    tcp_sinks: Array[TCPSink] val, event_log: EventLog, auth: AmbientAuth,
+    event_log: EventLog, auth: AmbientAuth,
     layout_initializer: LayoutInitializer,
     metrics_reporter: MetricsReporter iso,
     default_target: (Step | None) = None,
