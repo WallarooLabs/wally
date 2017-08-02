@@ -8,7 +8,7 @@ trait BasicComputation
   fun name(): String
 
 interface Computation[In: Any val, Out: Any val] is BasicComputation
-  fun apply(input: In): (Out | None)
+  fun apply(input: In): (Out | Array[Out] val | None)
   fun name(): String
 
 interface StateComputation[In: Any val, Out: Any val, S: State ref] is BasicComputation
@@ -16,7 +16,8 @@ interface StateComputation[In: Any val, Out: Any val, S: State ref] is BasicComp
   // if there is no value to forward) and a StateChange if there was one (or
   // None to indicate no state change).
   fun apply(input: In, sc_repo: StateChangeRepository[S], state: S):
-    ((Out | None), (StateChange[S] ref | DirectStateChange | None))
+    ((Out | Array[Out] val | None),
+     (StateChange[S] ref | DirectStateChange | None))
 
   fun name(): String
 
