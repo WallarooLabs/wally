@@ -76,9 +76,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
   let _recovery_replayer: RecoveryReplayer
 
-  // Resilience routes
-  // TODO: This needs to be merged with credit flow producer routes
-  let _resilience_routes: Routes = Routes
+  let _resilience_routes: Acker = Acker
 
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
@@ -364,7 +362,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
       route.request_ack()
     end
 
-  fun ref _x_resilience_routes(): Routes =>
+  fun ref _x_resilience_routes(): Acker =>
     _resilience_routes
 
   fun ref _flush(low_watermark: SeqId) =>

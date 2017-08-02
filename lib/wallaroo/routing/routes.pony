@@ -1,21 +1,18 @@
-use "collections"
 use "time"
-use "wallaroo/fail"
 use "wallaroo/invariant"
-use "wallaroo/topology"
 
-class Routes
+class Acker
   """
-  All the routes available
+  Handles coordination between different moving parts that are used to
+  when making decisions of what messages to acknowledge having been handled.
   """
   var _flushed_watermark: U64 = 0
   var _flushing: Bool = false
   let _ack_batch_size: USize
-  let _outgoing_to_incoming: OutgoingToIncomingMessageTracker
-  let _watermarker: Watermarker
   var _ack_next_time: Bool = false
   var _last_proposed_watermark: SeqId = 0
-
+  let _outgoing_to_incoming: OutgoingToIncomingMessageTracker
+  let _watermarker: Watermarker
 
   // TODO: Change this to a reasonable value!
   new create(ack_batch_size': USize = 100) =>

@@ -406,8 +406,8 @@ actor _DummyActorProducer is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
-  fun ref _x_resilience_routes(): Routes =>
-    Routes
+  fun ref _x_resilience_routes(): Acker =>
+    Acker
 
   fun ref _flush(low_watermark: SeqId) =>
     None

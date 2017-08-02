@@ -128,10 +128,10 @@ actor DataReceiver is Producer
 
   //////////////
   // ORIGIN (resilience)
-  fun ref _x_resilience_routes(): Routes =>
+  fun ref _x_resilience_routes(): Acker =>
     // TODO: I dont think we need this.
     // Need to discuss with John
-    Routes
+    Acker
 
   fun ref bookkeeping(route_id: RouteId, seq_id: SeqId) =>
     """

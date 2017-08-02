@@ -15,7 +15,7 @@ trait tag Producer
 
   //TO DO: one to many. swap in a watermarker here.
 
-  fun ref _x_resilience_routes(): Routes
+  fun ref _x_resilience_routes(): Acker
 
   fun ref _flush(low_watermark: SeqId)
 

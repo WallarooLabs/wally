@@ -179,10 +179,10 @@ actor TCPSource is Producer
 
   //////////////
   // ORIGIN (resilience)
-  fun ref _x_resilience_routes(): Routes =>
+  fun ref _x_resilience_routes(): Acker =>
     // TODO: we don't really need this
     // Because we dont actually do any resilience work
-    Routes
+    Acker
 
   // Override these for TCPSource as we are currently
   // not resilient.
