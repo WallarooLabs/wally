@@ -11,14 +11,14 @@ class _AckedOnRoute
   var _highest_seq_id_acked: U64 = 0
   var _last_ack: U64 = Time.millis()
 
-  fun ref send(o_seq_id: SeqId) =>
+  fun ref sent(o_seq_id: SeqId) =>
     ifdef debug then
       Invariant(o_seq_id > _highest_seq_id_sent)
     end
 
     _highest_seq_id_sent = o_seq_id
 
-  fun ref receive_ack(seq_id: SeqId) =>
+  fun ref ack_received(seq_id: SeqId) =>
     ifdef debug then
       Invariant(seq_id <= _highest_seq_id_sent)
     end

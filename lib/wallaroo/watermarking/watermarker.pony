@@ -39,7 +39,7 @@ class ref Watermarker
     end
 
     try
-      _routes(o_route_id).send(o_seq_id)
+      _routes(o_route_id).sent(o_seq_id)
     else
       Fail()
     end
@@ -58,7 +58,7 @@ class ref Watermarker
     end
 
     try
-      _routes(route_id).receive_ack(seq_id)
+      _routes(route_id).ack_received(seq_id)
     else
       Fail()
     end
