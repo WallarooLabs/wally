@@ -22,7 +22,6 @@ actor Main
           .new_pipeline[F32, F32]("Celsius Conversion",
             TCPSourceConfig[F32].from_options(CelsiusDecoder,
               TCPSourceConfigCLIParser(env.args)(0)))
-            // .from(ArraySourceConfig[F32](t, 2_000_000_000, CelsiusArrayDecoder))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
             .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
