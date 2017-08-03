@@ -1,6 +1,7 @@
 use "collections"
 use "wallaroo/boundary"
 use "wallaroo/topology"
+use "wallaroo/watermarking"
 
 trait tag Producer
   be mute(c: Consumer)
@@ -13,9 +14,12 @@ trait tag Producer
   fun tag hash(): U64 =>
     (digestof this).hash()
 
-  fun ref _x_resilience_routes(): Routes
+  //TO DO: one to many. swap in a watermarker here.
 
-  fun ref _flush(low_watermark: SeqId)
+  fun ref _x_resilience_routes(): Acker
+
+  // TO DO: temporary one to many change to make this public
+  fun ref flush(low_watermark: SeqId)
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
     payload: ByteSeq)
@@ -59,13 +63,3 @@ trait tag Producer
     end
 
     _x_resilience_routes().receive_ack(this, route_id, seq_id)
-
-primitive HashProducer
-  fun hash(o: Producer): U64 =>
-    o.hash()
-
-  fun eq(o1: Producer, o2: Producer): Bool =>
-    o1.hash() == o2.hash()
-
-  fun ne(o1: Producer, o2: Producer): Bool =>
-    o1.hash() != o2.hash()

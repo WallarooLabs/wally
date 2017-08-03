@@ -9,6 +9,7 @@ use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
+use "wallaroo/watermarking"
 
 
 actor DataReceiver is Producer
@@ -34,7 +35,7 @@ actor DataReceiver is Producer
   var _latest_conn: (DataChannel | None) = None
   var _replay_pending: Bool = false
 
-  let _resilience_routes: DataReceiverRoutes = DataReceiverRoutes
+  let _watermarker: Watermarker = Watermarker
 
   // Timer to periodically request acks to prevent deadlock.
   var _timer_init: _TimerInit = _UninitializedTimerInit
@@ -103,9 +104,9 @@ actor DataReceiver is Producer
     _timer_init = _EmptyTimerInit
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-    _resilience_routes.receive_ack(route_id, seq_id)
+    _watermarker.ack_received(route_id, seq_id)
     try
-      let watermark = _resilience_routes.propose_new_watermark()
+      let watermark = _watermarker.propose_watermark()
 
       if watermark > _last_id_acked then
         ifdef "trace" then
@@ -122,16 +123,16 @@ actor DataReceiver is Producer
       @printf[I32]("Error creating ack watermark message\n".cstring())
     end
 
-  fun ref _flush(low_watermark: SeqId) =>
+  fun ref flush(low_watermark: SeqId) =>
     """This is not a real Origin, so it doesn't write any State"""
     None
 
   //////////////
   // ORIGIN (resilience)
-  fun ref _x_resilience_routes(): Routes =>
+  fun ref _x_resilience_routes(): Acker =>
     // TODO: I dont think we need this.
     // Need to discuss with John
-    Routes
+    Acker
 
   fun ref bookkeeping(route_id: RouteId, seq_id: SeqId) =>
     """
@@ -142,7 +143,7 @@ actor DataReceiver is Producer
         route_id)
     end
     ifdef "resilience" then
-      _resilience_routes.send(route_id, seq_id)
+      _watermarker.sent(route_id, seq_id)
     end
 
   be update_router(router: DataRouter val) =>
@@ -161,9 +162,7 @@ actor DataReceiver is Producer
     _router = router
     _router.register_producer(this)
     for id in _router.route_ids().values() do
-      if not _resilience_routes.contains(id) then
-        _resilience_routes.add_route(id)
-      end
+      _watermarker.add_route(id)
     end
 
   be received(d: DeliveryMsg val, pipeline_time_spent: U64, seq_id: SeqId,
@@ -199,7 +198,7 @@ actor DataReceiver is Producer
     end
 
   fun ref _request_ack() =>
-    _router.request_ack(_resilience_routes.unacked_route_ids())
+    _router.request_ack(_watermarker.unacked_route_ids())
     _last_request = _ack_counter
 
   be replay_received(r: ReplayableDeliveryMsg val, pipeline_time_spent: U64,

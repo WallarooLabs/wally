@@ -11,9 +11,9 @@ use cluster_manager = "cluster_manager"
 use data_channel = "data_channel"
 use initialization = "initialization"
 use rebalancing = "rebalancing"
-use routing = "routing"
 use spike = "spike"
 use topology = "topology"
+use watermarking = "watermarking"
 
 actor Main is TestList
   new create(env: Env) =>
@@ -28,6 +28,6 @@ actor Main is TestList
     data_channel.Main.make().tests(test)
     initialization.Main.make().tests(test)
     rebalancing.Main.make().tests(test)
-    routing.Main.make().tests(test)
     spike.Main.make().tests(test)
     topology.Main.make().tests(test)
+    watermarking.Main.make().tests(test)

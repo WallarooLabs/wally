@@ -8,6 +8,7 @@ use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
 use "wallaroo/topology"
+use "wallaroo/watermarking"
 
 trait WActorWrapper
   be receive(msg: WMessage val)
@@ -406,10 +407,10 @@ actor _DummyActorProducer is Producer
   fun ref current_sequence_id(): SeqId =>
     0
 
-  fun ref _x_resilience_routes(): Routes =>
-    Routes
+  fun ref _x_resilience_routes(): Acker =>
+    Acker
 
-  fun ref _flush(low_watermark: SeqId) =>
+  fun ref flush(low_watermark: SeqId) =>
     None
 
   fun ref update_router(router: Router val) =>

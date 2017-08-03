@@ -14,6 +14,7 @@ use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
+use "wallaroo/watermarking"
 
 // TODO: CREDITFLOW- Every runnable step is also a credit flow consumer
 // Really this should probably be another method on Consumer
@@ -76,9 +77,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
   let _recovery_replayer: RecoveryReplayer
 
-  // Resilience routes
-  // TODO: This needs to be merged with credit flow producer routes
-  let _resilience_routes: Routes = Routes
+  let _resilience_routes: Acker = Acker
 
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
@@ -113,9 +112,6 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
   //
   // Application startup lifecycle event
   //
-
-  be print_flushing() =>
-    _resilience_routes.print_flushing()
 
   be application_begin_reporting(initializer: LocalTopologyInitializer) =>
     initializer.report_created(this)
@@ -367,10 +363,10 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
       route.request_ack()
     end
 
-  fun ref _x_resilience_routes(): Routes =>
+  fun ref _x_resilience_routes(): Acker =>
     _resilience_routes
 
-  fun ref _flush(low_watermark: SeqId) =>
+  fun ref flush(low_watermark: SeqId) =>
     ifdef "trace" then
       @printf[I32]("flushing at and below: %llu\n".cstring(), low_watermark)
     end

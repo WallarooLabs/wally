@@ -11,6 +11,7 @@ use "wallaroo/metrics"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
 use "wallaroo/topology"
+use "wallaroo/watermarking"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
   flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
@@ -179,14 +180,14 @@ actor TCPSource is Producer
 
   //////////////
   // ORIGIN (resilience)
-  fun ref _x_resilience_routes(): Routes =>
+  fun ref _x_resilience_routes(): Acker =>
     // TODO: we don't really need this
     // Because we dont actually do any resilience work
-    Routes
+    Acker
 
   // Override these for TCPSource as we are currently
   // not resilient.
-  fun ref _flush(low_watermark: U64) =>
+  fun ref flush(low_watermark: U64) =>
     None
 
   be log_flushed(low_watermark: SeqId) =>
