@@ -1,6 +1,7 @@
 use "buffered"
 use "collections"
 use "files"
+use "sendence/conversions"
 use "wallaroo/boundary"
 use "wallaroo/fail"
 use "wallaroo/initialization"
@@ -89,7 +90,7 @@ class FileBackend is Backend
         //start iterating until we reach original EOF
         while _file.position() < size do
           r.append(_file.read(25))
-          let is_watermark = r.bool()
+          let is_watermark = BoolConverter.u8_to_bool(r.u8())
           let origin_id = r.u128_be()
           let seq_id = r.u64_be()
           if is_watermark then
@@ -166,14 +167,12 @@ class FileBackend is Backend
       Fail()
     end
 
-  fun ref write() ?
-  =>
+  fun ref write() ? =>
     if not _file.writev(recover val _writer.done() end) then
       error
     end
 
-  fun ref encode_entry(entry: LogEntry)
-  =>
+  fun ref encode_entry(entry: LogEntry) =>
     (let is_watermark: Bool, let origin_id: U128, let uid: U128,
      let frac_ids: None, let statechange_id: U64, let seq_id: U64,
      let payload: Array[ByteSeq] val) = consume entry
@@ -186,7 +185,7 @@ class FileBackend is Backend
       end
     end
 
-    _writer.bool(is_watermark)
+    _writer.u8(BoolConverter.bool_to_u8(is_watermark))
     _writer.u128_be(origin_id)
     _writer.u64_be(seq_id)
 

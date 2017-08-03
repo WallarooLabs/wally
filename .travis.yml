@@ -83,9 +83,10 @@ install:
       tar zxvf cmake-3.5.2-Linux-x86_64.tar.gz;
       export PATH=/tmp/dl/cmake-3.5.2-Linux-x86_64/bin:$PATH;
     fi;
-  - echo "Installing sendence/ponyc";
+  - echo "Installing ponyc";
     cd /tmp;
-    git clone git@github.com:Sendence/ponyc.git;
+    git clone git@github.com:ponylang/ponyc.git;
+    git checkout 0.13.2;
     cd ponyc;
     make CC=$CC1 CXX=$CXX1;
     sudo make install;
@@ -93,7 +94,6 @@ install:
     cd /tmp;
     git clone https://github.com/ponylang/pony-stable;
     cd pony-stable;
-    git checkout 0054b429a54818d187100ed40f5525ec7931b31b;
     sudo make install;
   - cd $INSTALL_STARTED_AT
   - if [ "${TRAVIS_OS_NAME}" = "osx" ];

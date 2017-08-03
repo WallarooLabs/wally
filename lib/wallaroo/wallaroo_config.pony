@@ -5,16 +5,16 @@ class StartupOptions
   var m_arg: (Array[String] | None) = None
   var input_addrs: Array[Array[String]] val = recover Array[Array[String]] end
   var output_addrs: Array[Array[String]] val = recover Array[Array[String]] end
-  var c_addr: Array[String] = ["", "0"]
+  var c_addr: Array[String] = [""; "0"]
   var c_host: String = ""
   var c_service: String = "0"
-  var d_addr: Array[String] val = recover ["", "0"] end
+  var d_addr: Array[String] val = recover [""; "0"] end
   var d_host: String = ""
   var d_service: String = "0"
-  var my_c_addr: Array[String] = ["", "0"]
+  var my_c_addr: Array[String] = [""; "0"]
   var my_c_host: String = ""
   var my_c_service: String = "0"
-  var my_d_addr: Array[String] = ["", "0"]
+  var my_d_addr: Array[String] = [""; "0"]
   var my_d_host: String = ""
   var my_d_service: String = "0"
   var p_arg: (Array[String] | None) = None
@@ -25,8 +25,6 @@ class StartupOptions
   var event_log_file_length: (USize | None) = None
   var j_arg: (Array[String] | None) = None
   var is_joining: Bool = false
-  var is_swarm_managed: Bool = false
-  var a_arg: (String | None) = None
   var stop_the_world_pause: U64 = 2_000_000_000
   var spike_config: (SpikeConfig | None) = None
 
@@ -72,8 +70,6 @@ primitive WallarooConfig
       // All this does is give the new worker metrics info so it can
       // register with the UI (a "nominal join").
       .add("join", "j", StringArgument)
-      .add("swarm-managed", "s", None)
-      .add("swarm-manager-address", "a", StringArgument)
       .add("stop-pause", "u", I64Argument)
       .add("spike-seed", "", I64Argument)
       .add("spike-drop", "", None)
@@ -135,8 +131,6 @@ primitive WallarooConfig
       | ("join", let arg: String) =>
         so.j_arg = arg.split(":")
         so.is_joining = true
-      | ("swarm-managed", None) => so.is_swarm_managed = true
-      | ("swarm-manager-address", let arg: String) => so.a_arg = arg
       | ("stop-pause", let arg: I64) =>
         so.stop_the_world_pause = arg.u64()
       | ("spike-seed", let arg: I64) => spike_seed = arg.u64()

@@ -2,9 +2,9 @@ use "net"
 use "sendence/messages"
 use "sendence/options"
 use "sendence/tcp"
+use "wallaroo/fail"
 
 actor Main
-
   new create(env: Env) =>
     var options = Options(env.args)
     var args = options.remaining()
@@ -119,6 +119,9 @@ class DagonNotify is TCPConnectionNotify
 
   fun ref accepted(conn: TCPConnection ref) =>
     _env.out.print("Dagon accepted connection")
+
+  fun ref connect_failed(conn: TCPConnection ref) =>
+    Fail()
 
   fun ref received(conn: TCPConnection ref, data: Array[U8] iso,
     n: USize): Bool

@@ -13,12 +13,14 @@ use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
 use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
+  flags: U32, nsec: U64, noisy: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
+use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
+use @pony_asio_event_set_readable[None](event: AsioEventID, readable: Bool)
 
 actor TCPSource is Producer
   """
@@ -84,13 +86,13 @@ actor TCPSource is Producer
     _fd = fd
     ifdef linux then
       _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write_oneshot(), 0, true, true)
+        AsioEvent.read_write_oneshot(), 0, true)
     else
       _event = @pony_asio_event_create(this, fd,
-        AsioEvent.read_write(), 0, true, false)
+        AsioEvent.read_write(), 0, true)
     end
     _connected = true
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
 
@@ -356,7 +358,7 @@ actor TCPSource is Producer
     @pony_asio_event_unsubscribe(_event)
     _readable = false
     ifdef linux then
-      AsioEvent.set_readable(_event, false)
+      @pony_asio_event_set_readable(_event, false)
     end
 
 
@@ -409,7 +411,7 @@ actor TCPSource is Producer
           ifdef linux then
             // this is safe because asio thread isn't currently subscribed
             // for a read event so will not be writing to the readable flag
-            AsioEvent.set_readable(_event, false)
+            @pony_asio_event_set_readable(_event, false)
             _readable = false
             @pony_asio_event_resubscribe_read(_event)
           else

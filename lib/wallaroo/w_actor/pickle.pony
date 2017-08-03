@@ -10,7 +10,7 @@ primitive Pickle
   fun apply[S: Any #read](s: S, auth: AmbientAuth): ByteSeq val ? =>
     Serialised(SerialiseAuth(auth), s).output(OutputSerialisedAuth(auth))
 
-  fun md5_digest(data: ByteSeq): String =>
+  fun md5_digest(data: ByteSeq): String ? =>
     ToHexString(Digest.md5().>append(data).final())
 
 primitive Unpickle

@@ -100,8 +100,8 @@ class WindowValidator
     the `--expected/-e` value.
   """
 
-  var ring_0: Ring[U64] = Ring[U64].from_array(recover [0,0,0,0] end, 4, 0)
-  var ring_1: Ring[U64] = Ring[U64].from_array(recover [0,0,0,0] end, 4 ,0)
+  var ring_0: Ring[U64] = Ring[U64].from_array(recover [0;0;0;0] end, 4, 0)
+  var ring_1: Ring[U64] = Ring[U64].from_array(recover [0;0;0;0] end, 4 ,0)
   var count_0: U64 = 0
   var count_1: U64 = 0
   var counter: USize = 0

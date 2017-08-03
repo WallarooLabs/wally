@@ -1,9 +1,5 @@
 use "collections"
-use "wallaroo/fail"
-use "wallaroo/invariant"
 
-// TODO: Figure out if there's a compilation order making Fail() appear like
-// it hasn't been declared and then replace None with Fail() in these defaults
 trait tag Cluster
   """
   A trait for sending messages to workers in the cluster.

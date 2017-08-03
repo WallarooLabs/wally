@@ -12,13 +12,13 @@ use "wallaroo/network"
 use "wallaroo/routing"
 use "wallaroo/topology"
 
-use @pony_asio_event_create[AsioEventID](owner: AsioEventNotify, fd: U32,
-  flags: U32, nsec: U64, noisy: Bool, auto_resub: Bool)
 use @pony_asio_event_fd[U32](event: AsioEventID)
 use @pony_asio_event_unsubscribe[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
+use @pony_asio_event_set_writeable[None](event: AsioEventID, writeable: Bool)
+use @pony_asio_event_set_readable[None](event: AsioEventID, readable: Bool)
 
 actor TCPSink is (Consumer & RunnableStep & Initializable)
   """
@@ -101,7 +101,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
     """
     _encoder = encoder_wrapper
     _metrics_reporter = consume metrics_reporter
-    _read_buf = recover Array[U8].undefined(init_size) end
+    _read_buf = recover Array[U8].>undefined(init_size) end
     _next_size = init_size
     _max_size = max_size
     _notify = TCPSinkNotify
@@ -399,7 +399,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
 
     var data_size: USize = 0
     for bytes in _notify.sentv(this, data).values() do
-      _pending_writev.push(bytes.cpointer().usize()).push(bytes.size())
+      _pending_writev.>push(bytes.cpointer().usize()).>push(bytes.size())
       _pending_writev_total = _pending_writev_total + bytes.size()
       _pending.push((bytes, 0))
       data_size = data_size + bytes.size()
@@ -422,7 +422,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
     everything was written. On an error, close the connection. This is for
     data that has already been transformed by the notifier.
     """
-    _pending_writev.push(data.cpointer().usize()).push(data.size())
+    _pending_writev.>push(data.cpointer().usize()).>push(data.size())
     _pending_writev_total = _pending_writev_total + data.size()
     ifdef "resilience" then
       match tracking_id
@@ -502,8 +502,8 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
     _readable = false
     _writeable = false
     ifdef linux then
-      AsioEvent.set_readable(_event, false)
-      AsioEvent.set_writeable(_event, false)
+      @pony_asio_event_set_readable(_event, false)
+      @pony_asio_event_set_writeable(_event, false)
     end
 
     @pony_os_socket_close[None](_fd)
@@ -539,7 +539,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
           ifdef linux then
             // this is safe because asio thread isn't currently subscribed
             // for a read event so will not be writing to the readable flag
-            AsioEvent.set_readable(_event, false)
+            @pony_asio_event_set_readable(_event, false)
             _readable = false
             @pony_asio_event_resubscribe_read(_event)
           else
@@ -725,11 +725,11 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
       _read_buf.undefined(_next_size)
     end
 
-  fun local_address(): IPAddress =>
+  fun local_address(): NetAddress =>
     """
     Return the local IP address.
     """
-    let ip = recover IPAddress end
+    let ip = recover NetAddress end
     @pony_os_sockname[Bool](_fd, ip)
     ip
 
@@ -774,7 +774,7 @@ actor TCPSink is (Consumer & RunnableStep & Initializable)
       ifdef linux then
         // this is safe because asio thread isn't currently subscribed
         // for a write event so will not be writing to the readable flag
-        AsioEvent.set_writeable(_event, false)
+        @pony_asio_event_set_writeable(_event, false)
         @pony_asio_event_resubscribe_write(_event)
       end
       _notify.throttled(this)
