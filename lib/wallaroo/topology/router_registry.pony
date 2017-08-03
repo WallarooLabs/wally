@@ -7,7 +7,7 @@ use "wallaroo/fail"
 use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
-use "wallaroo/tcp_source"
+use "wallaroo/source"
 use "wallaroo/w_actor"
 
 actor RouterRegistry
@@ -25,8 +25,8 @@ actor RouterRegistry
 
   var _application_ready_to_work: Bool = false
 
-  let _sources: SetIs[TCPSource] = _sources.create()
-  let _source_listeners: SetIs[TCPSourceListener] = _source_listeners.create()
+  let _sources: SetIs[Source] = _sources.create()
+  let _source_listeners: SetIs[SourceListener] = _source_listeners.create()
   let _data_channel_listeners: SetIs[DataChannelListener] =
     _data_channel_listeners.create()
   let _control_channel_listeners: SetIs[TCPListener] =
@@ -97,13 +97,13 @@ actor RouterRegistry
   be update_actor_data_router(adr: ActorSystemDataRouter) =>
     _actor_data_router = adr
 
-  be register_source(tcp_source: TCPSource) =>
+  be register_source(tcp_source: Source) =>
     _sources.set(tcp_source)
     if not _migrating and _application_ready_to_work then
       tcp_source.unmute(_dummy_consumer)
     end
 
-  be register_source_listener(tcp_source_listener: TCPSourceListener) =>
+  be register_source_listener(tcp_source_listener: SourceListener) =>
     _source_listeners.set(tcp_source_listener)
 
   be register_data_channel_listener(dchl: DataChannelListener) =>

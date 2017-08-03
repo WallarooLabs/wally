@@ -56,7 +56,9 @@ use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/metrics"
 use "wallaroo/state"
+use "wallaroo/source"
 use "wallaroo/tcp_source"
+use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
 actor Main
@@ -103,16 +105,21 @@ actor Main
       let application = recover val
         Application("Market Spread App")
           .new_pipeline[FixOrderMessage val, OrderResult val](
-            "Orders", FixOrderFrameHandler)
+            "Orders",
+            TCPSourceConfig[FixOrderMessage val].from_options(FixOrderFrameHandler,
+              TCPSourceConfigCLIParser(env.args)(0)))
             // .to[FixOrderMessage val](IdentityBuilder[FixOrderMessage val])
             .to_state_partition[Symboly val, String,
               (OrderResult val | None), SymbolData](CheckOrder,
               SymbolDataBuilder, "symbol-data", symbol_data_partition
               where multi_worker = true)
-            .to_sink(OrderResultEncoder, recover [0] end,
-              initial_report_msgs)
+            //!! TODO: Update to use command line for host/service
+            .to_sink(TCPSinkConfig[OrderResult val].from_options(OrderResultEncoder,
+              TCPSinkConfigCLIParser(env.args)(0)))
           .new_pipeline[FixNbboMessage val, None](
-            "Nbbo", FixNbboFrameHandler
+            "Nbbo",
+            TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
+              TCPSourceConfigCLIParser(env.args)(0))
               where init_file = init_file)
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",

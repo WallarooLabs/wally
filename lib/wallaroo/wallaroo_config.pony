@@ -4,7 +4,6 @@ use "wallaroo/spike"
 class StartupOptions
   var m_arg: (Array[String] | None) = None
   var input_addrs: Array[Array[String]] val = recover Array[Array[String]] end
-  var output_addrs: Array[Array[String]] val = recover Array[Array[String]] end
   var c_addr: Array[String] = ["", "0"]
   var c_host: String = ""
   var c_service: String = "0"
@@ -52,7 +51,6 @@ primitive WallarooConfig
     options
       .add("metrics", "m", StringArgument)
       .add("in", "i", StringArgument)
-      .add("out", "o", StringArgument)
       .add("control", "c", StringArgument)
       .add("data", "d", StringArgument)
       .add("my-control", "x", StringArgument)
@@ -90,13 +88,6 @@ primitive WallarooConfig
           i_addrs_write.push(addr.split(":"))
         end
         so.input_addrs = consume i_addrs_write
-      | ("out", let arg: String) =>
-        let o_addrs_write: Array[Array[String]] trn =
-          recover Array[Array[String]] end
-        for addr in arg.split(",").values() do
-          o_addrs_write.push(addr.split(":"))
-        end
-        so.output_addrs = consume o_addrs_write
       | ("control", let arg: String) =>
         so.c_addr = arg.split(":")
         so.c_host = so.c_addr(0)
