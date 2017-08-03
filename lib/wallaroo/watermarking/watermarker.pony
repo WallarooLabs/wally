@@ -8,7 +8,7 @@ class ref Watermarker
   Tracks watermarks across all routes so we can propose a new watermark.
   """
   let _filter_route: _FilterRoute = _FilterRoute
-  let _routes: Map[RouteId, _Route] = _routes.create()
+  let _routes: Map[RouteId, _AckedOnRoute] = _routes.create()
 
   fun ref add_route(id: RouteId) =>
     ifdef debug then
@@ -16,7 +16,7 @@ class ref Watermarker
     end
 
     if not _routes.contains(id) then
-        _routes(id) = _Route
+        _routes(id) = _AckedOnRoute
     end
 
   fun ref remove_route(id: RouteId) =>
