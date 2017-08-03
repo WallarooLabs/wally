@@ -1,4 +1,6 @@
 use "wallaroo"
+use "wallaroo/tcp_sink"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 use @w_wrapper_main[Bool](argc: U32, argv: Pointer[Pointer[U8] tag] tag,
@@ -10,7 +12,10 @@ class WallarooMain
       (let argc, let argv) = _extract_c_args(WallarooConfig.application_args(env.args))
 
       let application = recover
-        let application_builder: CPPApplicationBuilder ref = CPPApplicationBuilder
+        let source_configs = TCPSourceConfigCLIParser(env.args)
+        let sink_configs = TCPSinkConfigCLIParser(env.args)
+        let application_builder: CPPApplicationBuilder ref =
+          CPPApplicationBuilder(source_configs, sink_configs)
         let res = @w_wrapper_main(argc, argv, application_builder)
         if not res then
           error

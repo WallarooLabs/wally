@@ -56,6 +56,8 @@ use "sendence/time"
 use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/metrics"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/w_actor"
@@ -72,7 +74,8 @@ actor Main
       ActorSystem("ActorSystem Celsius App", init_seed)
         .> add_source(CelsiusDecoder, IngressWActorRouter)
         .> add_actor(CelsiusBuilder)
-        .add_sink[F32](FahrenheitEncoder)
+        .add_sink[F32](TCPSinkConfig[F32](FahrenheitEncoder, "127.0.0.1",
+          "5555"))
     end
 
 class Celsius is WActor
