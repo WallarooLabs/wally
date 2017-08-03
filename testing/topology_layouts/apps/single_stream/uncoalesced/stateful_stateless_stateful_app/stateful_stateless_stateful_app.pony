@@ -1,5 +1,8 @@
 use "wallaroo"
 use "wallaroo/generic_app_components"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 actor Main
@@ -10,13 +13,17 @@ actor Main
           "single_stream-uncoalesced-stateful_stateless_stateful_app")
           .new_pipeline[U64, U64](
             "Uncoalesced Stateful -> Stateless -> Stateful",
-            U64Decoder where coalescing = false)
+            TCPSourceConfig[U64].from_options(U64Decoder,
+              TCPSourceConfigCLIParser(env.args)(0))
+            where coalescing = false)
             .to_stateful[U64 val, U64Counter](UpdateU64Counter,
               U64CounterBuilder, "u64-counter-builder")
             .to[U64]({(): Double => Double})
             .to_stateful[U64 val, U64Counter](UpdateU64Counter,
               U64CounterBuilder, "u64-counter-builder")
-            .to_sink(FramedU64Encoder, recover [0] end)
+            .to_sink(TCPSinkConfig[U64].from_options(
+              FramedU64Encoder,
+              TCPSinkConfigCLIParser(env.args)(0)))
       end
       Startup(env, application,
         "single_stream-uncoalesced-stateful_stateless_stateful_app")
