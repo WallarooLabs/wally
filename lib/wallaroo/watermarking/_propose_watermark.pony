@@ -2,8 +2,8 @@ interface Values[A]
   fun values(): Iterator[this->A]
 
 primitive _ProposeWatermark
-  fun apply(filter_route: _FilterRoute,
-    routes: Values[_Route]): U64
+  fun apply(filter_route: _FilteredOnStep,
+    routes: Values[_AckedOnRoute]): U64
   =>
     """
     Determine what we can propose as a new watermark for flushing.
@@ -86,7 +86,7 @@ primitive _ProposeWatermark
 
     watermark
 
-  fun _all_routes_acked(routes: Values[_Route]): Bool =>
+  fun _all_routes_acked(routes: Values[_AckedOnRoute]): Bool =>
     for route in routes.values() do
       if not route.is_fully_acked() then
         return false
