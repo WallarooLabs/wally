@@ -1,5 +1,6 @@
 use "time"
 use "wallaroo/invariant"
+use "wallaroo/routing"
 
 class Acker
   """
@@ -80,7 +81,7 @@ class Acker
 
     _flushing = true
     _ack_next_time = false
-    producer._flush(proposed_watermark)
+    producer.flush(proposed_watermark)
 
   fun ref request_ack(producer: Producer ref) =>
     _ack_next_time = true

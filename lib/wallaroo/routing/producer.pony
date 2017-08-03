@@ -1,6 +1,7 @@
 use "collections"
 use "wallaroo/boundary"
 use "wallaroo/topology"
+use "wallaroo/watermarking"
 
 trait tag Producer
   be mute(c: Consumer)
@@ -17,7 +18,8 @@ trait tag Producer
 
   fun ref _x_resilience_routes(): Acker
 
-  fun ref _flush(low_watermark: SeqId)
+  // TO DO: temporary one to many change to make this public
+  fun ref flush(low_watermark: SeqId)
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
     payload: ByteSeq)

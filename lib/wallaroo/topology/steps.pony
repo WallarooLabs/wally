@@ -14,6 +14,7 @@ use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/tcp_sink"
+use "wallaroo/watermarking"
 
 // TODO: CREDITFLOW- Every runnable step is also a credit flow consumer
 // Really this should probably be another method on Consumer
@@ -365,7 +366,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
   fun ref _x_resilience_routes(): Acker =>
     _resilience_routes
 
-  fun ref _flush(low_watermark: SeqId) =>
+  fun ref flush(low_watermark: SeqId) =>
     ifdef "trace" then
       @printf[I32]("flushing at and below: %llu\n".cstring(), low_watermark)
     end

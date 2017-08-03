@@ -9,6 +9,7 @@ use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
 use "wallaroo/topology"
+use "wallaroo/watermarking"
 
 
 actor DataReceiver is Producer
@@ -122,7 +123,7 @@ actor DataReceiver is Producer
       @printf[I32]("Error creating ack watermark message\n".cstring())
     end
 
-  fun ref _flush(low_watermark: SeqId) =>
+  fun ref flush(low_watermark: SeqId) =>
     """This is not a real Origin, so it doesn't write any State"""
     None
 

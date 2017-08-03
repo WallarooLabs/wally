@@ -1,5 +1,6 @@
 use "sendence/connemara"
 use "wallaroo/topology"
+use "wallaroo/routing"
 
 actor TestOutgoingToIncomingMessageTracker is TestList
   new make() =>
@@ -392,7 +393,7 @@ actor _TestProducer is Producer
   fun ref _x_resilience_routes(): Acker =>
     Acker
 
-  fun ref _flush(low_watermark: SeqId) =>
+  fun ref flush(low_watermark: SeqId) =>
     None
 
   fun ref update_router(router: Router val) =>

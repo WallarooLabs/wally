@@ -1,6 +1,7 @@
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/topology"
+use "wallaroo/routing"
 
 class TerminusRoute
   """
