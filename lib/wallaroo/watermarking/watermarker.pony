@@ -7,7 +7,7 @@ class ref Watermarker
   """
   Tracks watermarks across all routes so we can propose a new watermark.
   """
-  let _filter_route: _FilterRoute = _FilterRoute
+  let _filter_route: _FilteredOnStep = _FilteredOnStep
   let _routes: Map[RouteId, _AckedOnRoute] = _routes.create()
 
   fun ref add_route(id: RouteId) =>

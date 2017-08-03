@@ -96,19 +96,3 @@ class Acker
     end
     _last_proposed_watermark = proposed_watermark
     proposed_watermark
-
-class _FilterRoute
-  var _highest_seq_id: U64 = 0
-
-  fun ref filter(o_seq_id: SeqId) =>
-    ifdef debug then
-      Invariant(o_seq_id > _highest_seq_id)
-    end
-
-    _highest_seq_id = o_seq_id
-
-  fun is_fully_acked(): Bool =>
-    true
-
-  fun highest_seq_id(): U64 =>
-    _highest_seq_id
