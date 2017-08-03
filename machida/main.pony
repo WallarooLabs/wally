@@ -3,6 +3,7 @@ use "signals"
 use "sendence/options"
 use "wallaroo"
 use "wallaroo/tcp_source"
+use "wallaroo/tcp_sink"
 use "wallaroo/topology"
 
 use "lib:python2.7"
@@ -34,7 +35,9 @@ actor Main
           let application_setup =
             Machida.application_setup(module, options.remaining())
           let application = recover val
-            Machida.apply_application_setup(application_setup)
+            let tcp_sources = TCPSourceConfigCLIParser(env.args)
+            let tcp_sinks = TCPSinkConfigCLIParser(env.args)
+            Machida.apply_application_setup(application_setup, tcp_sources, tcp_sinks)
           end
           Startup(env, application, module_name)
         else

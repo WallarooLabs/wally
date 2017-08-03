@@ -5,6 +5,8 @@ use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
+use "wallaroo/source"
+use "wallaroo/sink"
 use "wallaroo/state"
 use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
@@ -30,7 +32,7 @@ class Application
     _name = name'
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
-    pipeline_name: String, decoder: FramedSourceHandler[In] val,
+    pipeline_name: String, source_config: SourceConfig[In],
     init_file: (InitFile val | None) = None, coalescing: Bool = true):
       PipelineBuilder[In, Out, In]
   =>
@@ -40,7 +42,7 @@ class Application
       add_init_file(pipeline_id, f)
     end
     let pipeline = Pipeline[In, Out](_name, pipeline_id, pipeline_name,
-      decoder, coalescing)
+      source_config, coalescing)
     PipelineBuilder[In, Out, In](this, pipeline)
 
   // TODO: Replace this with a better approach.  This is a shortcut to get
@@ -101,15 +103,14 @@ class Application
 trait BasicPipeline
   fun name(): String
   fun source_id(): USize
-  fun source_builder(): SourceBuilderBuilder val
+  fun source_builder(): SourceBuilderBuilder ?
   fun source_route_builder(): RouteBuilder val
-  fun sink_builder(): (TCPSinkBuilder | None)
-  fun sink_target_ids(): Array[U64] val
+  fun source_listener_builder_builder(): SourceListenerBuilderBuilder
+  fun sink_builder(): (SinkBuilder | None)
   // TODO: Change this when we need more sinks per pipeline
   // ASSUMPTION: There is at most one sink per pipeline
   fun sink_id(): (U128 | None)
   // The index into the list of provided sink addresses
-  fun sink_addr_idx(): USize
   fun is_coalesced(): Bool
   fun apply(i: USize): RunnerBuilder val ?
   fun size(): USize
@@ -117,57 +118,51 @@ trait BasicPipeline
 class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _pipeline_id: USize
   let _name: String
-  let _decoder: FramedSourceHandler[In] val
+  let _app_name: String
   let _runner_builders: Array[RunnerBuilder val]
-  var _sink_target_ids: Array[U64] val = recover Array[U64] end
-  let _source_builder: SourceBuilderBuilder val
+  var _source_builder: (SourceBuilderBuilder | None) = None
   let _source_route_builder: RouteBuilder val
-  var _sink_builder: (TCPSinkBuilder | None) = None
+  let _source_listener_builder_builder: SourceListenerBuilderBuilder
+  var _sink_builder: (SinkBuilder | None) = None
+
   var _sink_id: (U128 | None) = None
   let _is_coalesced: Bool
-  var _sink_addr_idx: USize = 0
 
   new create(app_name: String, p_id: USize, n: String,
-    d: FramedSourceHandler[In] val, coalescing: Bool)
+    sc: SourceConfig[In], coalescing: Bool)
   =>
     _pipeline_id = p_id
-    _decoder = d
     _runner_builders = Array[RunnerBuilder val]
     _name = n
-    _source_builder = TypedSourceBuilderBuilder[In](app_name, _name, _decoder)
+    _app_name = app_name
     _source_route_builder = TypedRouteBuilder[In]
     _is_coalesced = coalescing
+    _source_listener_builder_builder = sc.source_listener_builder_builder()
+    _source_builder = sc.source_builder(_app_name, _name)
 
   fun ref add_runner_builder(p: RunnerBuilder val) =>
     _runner_builders.push(p)
 
   fun apply(i: USize): RunnerBuilder val ? => _runner_builders(i)
 
-  fun ref update_sink(sink_builder': TCPSinkBuilder,
-    sink_ids: Array[U64] val)
-  =>
+  fun ref update_sink(sink_builder': SinkBuilder) =>
     _sink_builder = sink_builder'
-    _sink_target_ids = sink_ids
-
-  fun ref update_sink_addr_idx(idx: USize) =>
-    _sink_addr_idx = idx
 
   fun source_id(): USize => _pipeline_id
 
-  fun source_builder(): SourceBuilderBuilder val => _source_builder
+  fun source_builder(): SourceBuilderBuilder ? =>
+    _source_builder as SourceBuilderBuilder
 
   fun source_route_builder(): RouteBuilder val => _source_route_builder
 
-  fun sink_builder(): (TCPSinkBuilder | None) => _sink_builder
+  fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
+    _source_listener_builder_builder
 
-  fun sink_target_ids(): Array[U64] val => _sink_target_ids
+  fun sink_builder(): (SinkBuilder | None) => _sink_builder
 
   // TODO: Change this when we need more sinks per pipeline
   // ASSUMPTION: There is at most one sink per pipeline
   fun sink_id(): (U128 | None) => _sink_id
-
-  // The index into the list of provided sink addresses
-  fun sink_addr_idx(): USize => _sink_addr_idx
 
   fun ref update_sink_id() =>
     _sink_id = GuidGenerator.u128()
@@ -279,15 +274,10 @@ class PipelineBuilder[In: Any val, Out: Any val, Last: Any val]
     _a.add_pipeline(_p as BasicPipeline)
     _a
 
-  fun ref to_sink(encoder: SinkEncoder[Out],
-    sink_ids: Array[U64] val, initial_msgs: Array[Array[ByteSeq] val] val
-      = recover Array[Array[ByteSeq] val] end): Application ?
-  =>
-    let sink_builder: TCPSinkBuilder =
-      TCPSinkBuilder(TypedEncoderWrapper[Out](encoder), initial_msgs)
+  fun ref to_sink(sink_information: SinkConfig[Out]): Application ? =>
+    let sink_builder = sink_information()
     _a.increment_sink_count()
-    _p.update_sink_addr_idx(_a.sink_count - 1)
-    _p.update_sink(sink_builder, sink_ids)
+    _p.update_sink(sink_builder)
     _p.update_sink_id()
     _a.add_pipeline(_p as BasicPipeline)
     _a

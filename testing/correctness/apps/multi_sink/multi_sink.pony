@@ -3,6 +3,8 @@ use "serialise"
 use "sendence/bytes"
 use "wallaroo"
 use "wallaroo/fail"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -11,14 +13,20 @@ actor Main
     try
       let application = recover val
         Application("Celsius Conversion App")
-          .new_pipeline[F32, F32]("Celsius Conversion", CelsiusDecoder)
+          .new_pipeline[F32, F32]("Celsius Conversion",
+            TCPSourceConfig[F32].from_options(CelsiusDecoder,
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
-            .to_sink(FahrenheitEncoder, recover [0] end)
-          .new_pipeline[F32, F32]("Celsius Conversion", CelsiusDecoder)
+            .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
+               TCPSinkConfigCLIParser(env.args)(0)))
+          .new_pipeline[F32, F32]("Celsius Conversion",
+            TCPSourceConfig[F32].from_options(CelsiusDecoder,
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to[F32]({(): Multiply => Multiply})
             .to[F32]({(): Add => Add})
-            .to_sink(FahrenheitEncoder, recover [0] end)
+            .to_sink(TCPSinkConfig[F32 val].from_options(FahrenheitEncoder,
+               TCPSinkConfigCLIParser(env.args)(0)))
       end
       Startup(env, application, "celsius-conversion")
     else

@@ -8,6 +8,7 @@ use "wallaroo"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
+use "wallaroo/tcp_source"
 use "wallaroo/topology"
 use "wallaroo/recovery"
 
@@ -16,18 +17,15 @@ actor ApplicationDistributor is Distributor
   let _guid_gen: GuidGenerator = GuidGenerator
   let _local_topology_initializer: LocalTopologyInitializer
   let _input_addrs: Array[Array[String]] val
-  let _output_addrs: Array[Array[String]] val
   let _application: Application val
 
   new create(auth: AmbientAuth, application: Application val,
     local_topology_initializer: LocalTopologyInitializer,
-    input_addrs: Array[Array[String]] val,
-    output_addrs: Array[Array[String]] val)
+    input_addrs: Array[Array[String]] val)
   =>
     _auth = auth
     _local_topology_initializer = local_topology_initializer
     _input_addrs = input_addrs
-    _output_addrs = output_addrs
     _application = application
 
   be distribute(cluster_initializer: (ClusterInitializer | None),
@@ -134,27 +132,6 @@ actor ApplicationDistributor is Distributor
         var pipeline_default_state_name = ""
         var pipeline_default_target_worker = ""
 
-        let source_addr_trn: Array[String] trn = recover Array[String] end
-        try
-          source_addr_trn.push(_input_addrs(pipeline_id)(0))
-          source_addr_trn.push(_input_addrs(pipeline_id)(1))
-        else
-          @printf[I32]("No input address!\n".cstring())
-          error
-        end
-        let source_addr: Array[String] val = consume source_addr_trn
-
-        let sink_addr_trn: Array[String] trn = recover Array[String] end
-        try
-          let output_addr = _output_addrs(pipeline.sink_addr_idx())
-          sink_addr_trn.push(output_addr(0))
-          sink_addr_trn.push(output_addr(1))
-        else
-          @printf[I32]("No output address!\n".cstring())
-          error
-        end
-        let sink_addr: Array[String] val = consume sink_addr_trn
-
         @printf[I32](("The " + pipeline.name() + " pipeline has " + pipeline.size().string() + " uncoalesced runner builders\n").cstring())
 
 
@@ -249,7 +226,7 @@ actor ApplicationDistributor is Distributor
                 // We need a sink on every worker involved in the
                 // partition
                 let egress_builder = EgressBuilder(pipeline.name(),
-                  sid, sink_addr, pipeline.sink_builder())
+                  sid, pipeline.sink_builder())
 
                 match source_partition_workers
                 | let w: String =>
@@ -301,7 +278,8 @@ actor ApplicationDistributor is Distributor
 
         let source_initializer = SourceData(source_node_id,
           pipeline.source_builder(), source_seq_builder,
-          pipeline.source_route_builder(), source_addr,
+          pipeline.source_route_builder(),
+          pipeline.source_listener_builder_builder(),
           source_pre_state_target_id)
 
         @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
@@ -465,7 +443,7 @@ actor ApplicationDistributor is Distributor
                       // We need a sink on every worker involved in the
                       // partition
                       let egress_builder = EgressBuilder(pipeline.name(),
-                        sid, sink_addr, pipeline.sink_builder())
+                        sid, pipeline.sink_builder())
 
                       match partition_workers
                       | let w: String =>
@@ -600,7 +578,7 @@ actor ApplicationDistributor is Distributor
                 let proxy_address = ProxyAddress(w, egress_id)
 
                 let egress_builder = EgressBuilder(pipeline.name(),
-                  egress_id, proxy_address)
+                  egress_id where proxy_addr = proxy_address)
 
                 try
                   // If we've already created a node for this proxy, it
@@ -629,7 +607,7 @@ actor ApplicationDistributor is Distributor
             match pipeline.sink_id()
             | let sid: U128 =>
               let egress_builder = EgressBuilder(pipeline.name(),
-                sid, sink_addr, pipeline.sink_builder())
+                sid, pipeline.sink_builder())
 
               try
                 local_graphs(worker).add_node(egress_builder, sid)
