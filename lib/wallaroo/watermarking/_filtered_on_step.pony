@@ -7,7 +7,7 @@ class _FilteredOnStep
   """
   var _highest_seq_id: U64 = 0
 
-  fun ref filter(o_seq_id: SeqId) =>
+  fun ref filtered(o_seq_id: SeqId) =>
     ifdef debug then
       Invariant(o_seq_id > _highest_seq_id)
     end

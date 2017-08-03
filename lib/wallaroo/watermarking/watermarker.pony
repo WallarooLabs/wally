@@ -7,7 +7,7 @@ class ref Watermarker
   """
   Tracks watermarks across all routes so we can propose a new watermark.
   """
-  let _filter_route: _FilteredOnStep = _FilteredOnStep
+  let _filtered: _FilteredOnStep = _FilteredOnStep
   let _routes: Map[RouteId, _AckedOnRoute] = _routes.create()
 
   fun ref add_route(id: RouteId) =>
@@ -48,7 +48,7 @@ class ref Watermarker
     """
     Filter out a message or otherwise have this be the end of the line
     """
-    _filter_route.filter(o_seq_id)
+    _filtered.filtered(o_seq_id)
 
   fun ref ack_received(route_id: RouteId, seq_id: SeqId) =>
     ifdef debug then
@@ -64,7 +64,7 @@ class ref Watermarker
     end
 
   fun ref propose_watermark(): U64 =>
-    _ProposeWatermark(_filter_route, _routes)
+    _ProposeWatermark(_filtered, _routes)
 
   fun unacked_route_ids(): Array[RouteId] =>
     let arr = Array[RouteId]
