@@ -19,8 +19,8 @@ use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
 use "wallaroo/routing"
+use "wallaroo/source"
 use "wallaroo/tcp_sink"
-use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
 class LocalTopology
@@ -208,7 +208,6 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   // Lifecycle
   var _omni_router: (OmniRouter val | None) = None
-  var _tcp_sinks: Array[TCPSink] val = recover Array[TCPSink] end
   var _created: SetIs[Initializable tag] = _created.create()
   var _initialized: SetIs[Initializable tag] = _initialized.create()
   var _ready_to_work: SetIs[Initializable tag] = _ready_to_work.create()
@@ -216,8 +215,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
   // once EventLog signals we're ready
-  let tcpsl_builders: Array[TCPSourceListenerBuilder val] =
-    recover iso Array[TCPSourceListenerBuilder val] end
+  let sl_builders: Array[SourceListenerBuilder] =
+    recover iso Array[SourceListenerBuilder] end
 
   // Cluster Management
   var _cluster_manager: (ClusterManager | None) = None
@@ -571,8 +570,6 @@ actor LocalTopologyInitializer is LayoutInitializer
         // DataRouter for the data channel boundary
         var data_routes: Map[U128, ConsumerStep tag] trn =
           recover Map[U128, ConsumerStep tag] end
-
-        let tcp_sinks_trn: Array[TCPSink] trn = recover Array[TCPSink] end
 
         // Update the step ids for all OutgoingBoundaries
         if _worker_count > 1 then
@@ -943,11 +940,6 @@ actor LocalTopologyInitializer is LayoutInitializer
                 let sink = egress_builder(_worker_name,
                   consume sink_reporter, _auth, _outgoing_boundaries)
 
-                match sink
-                | let tcp: TCPSink =>
-                  tcp_sinks_trn.push(tcp)
-                end
-
                 if not _initializables.contains(sink) then
                   _initializables.set(sink)
                 end
@@ -1070,37 +1062,20 @@ actor LocalTopologyInitializer is LayoutInitializer
                 t.worker_name(),
                 _metrics_conn)
 
-              // Get all the sinks so far, which should include any sinks
-              // prestate on this source might target
-              let sinks_for_source_trn: Array[TCPSink] trn =
-                recover Array[TCPSink] end
-              for sink in tcp_sinks_trn.values() do
-                sinks_for_source_trn.push(sink)
-              end
-              let sinks_for_source: Array[TCPSink] val =
-                consume sinks_for_source_trn
-
               let listen_auth = TCPListenAuth(_auth)
-              try
-                @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
-                tcpsl_builders.push(
-                  TCPSourceListenerBuilder(
-                    source_data.builder()(source_data.runner_builder(),
-                      out_router, _metrics_conn,
-                      source_data.pre_state_target_id(), t.worker_name(),
-                      source_reporter.clone()),
-                    out_router, _router_registry,
-                    source_data.route_builder(),
-                    _outgoing_boundary_builders, sinks_for_source,
-                    _event_log, _auth, this,  consume source_reporter,
-                    default_target, default_in_route_builder,
-                    state_comp_target_router,
-                    source_data.address()(0),
-                    source_data.address()(1))
-                )
-              else
-                @printf[I32]("Ill-formed source address\n".cstring())
-              end
+              @printf[I32](("----Creating source for " + pipeline_name + " pipeline with " + source_data.name() + "----\n").cstring())
+
+              sl_builders.push(source_data.source_listener_builder_builder()(
+                source_data.builder()(source_data.runner_builder(),
+                  out_router, _metrics_conn,
+                  source_data.pre_state_target_id(), t.worker_name(),
+                  source_reporter.clone()),
+                out_router, _router_registry,
+                source_data.route_builder(),
+                _outgoing_boundary_builders,
+                _event_log, _auth, this,  consume source_reporter,
+                default_target, default_in_route_builder,
+                state_comp_target_router))
 
               // Nothing connects to a source via an in edge locally,
               // so this just marks that we've built this one
@@ -1211,7 +1186,6 @@ actor LocalTopologyInitializer is LayoutInitializer
         _router_registry.set_omni_router(omni_router)
 
         // Initialize all our initializables to get backpressure started
-        _tcp_sinks = consume tcp_sinks_trn
         _omni_router = omni_router
         for i in _initializables.values() do
           i.application_begin_reporting(this)
@@ -1452,8 +1426,9 @@ actor LocalTopologyInitializer is LayoutInitializer
     if not _topology_initialized then
       @printf[I32]("ERROR: Tried to spin up source listeners before topology was initialized!\n".cstring())
     else
-      for builder in tcpsl_builders.values() do
-        builder()
+      for builder in sl_builders.values() do
+        let sl = builder()
+        _router_registry.register_source_listener(sl)
       end
     end
 

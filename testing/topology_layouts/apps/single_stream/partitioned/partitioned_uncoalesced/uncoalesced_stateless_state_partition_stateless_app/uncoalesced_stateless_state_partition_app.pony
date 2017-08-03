@@ -1,6 +1,9 @@
 use "wallaroo"
-use "wallaroo/topology"
 use "wallaroo/generic_app_components"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
+use "wallaroo/tcp_source"
+use "wallaroo/topology"
 
 actor Main
   new create(env: Env) =>
@@ -15,14 +18,18 @@ actor Main
           "stateless_state_partition_stateless_app")
           .new_pipeline[U64, U64](
             "Uncoalesced -> Stateless -> State Partition -> Stateless",
-            U64Decoder where coalescing = false)
+            TCPSourceConfig[U64].from_options(U64Decoder,
+              TCPSourceConfigCLIParser(env.args)(0))
+            where coalescing = false)
             .to[U64]({(): Double => Double})
             .to_state_partition[U64 val, U64 val, U64, U64Counter](
               UpdateU64Counter, U64CounterBuilder,
               "counter-state",
               powers_of_2_partition where multi_worker = true)
             .to[U64]({(): Divide => Divide})
-            .to_sink(FramedU64Encoder, recover [0] end)
+            .to_sink(TCPSinkConfig[U64].from_options(
+              FramedU64Encoder,
+              TCPSinkConfigCLIParser(env.args)(0)))
       end
       Startup(env, application,
         "single_stream-partitioned-uncoalesced-" +

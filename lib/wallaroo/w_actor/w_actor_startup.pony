@@ -224,7 +224,7 @@ actor ActorSystemStartup
 
       let initializer = WActorInitializer(_startup_options.worker_name,
         _app_name, auth, event_log, _startup_options.input_addrs,
-        _startup_options.output_addrs, _local_actor_system_file,
+        _local_actor_system_file,
         _iterations, recovery, recovery_replayer, _data_channel_file,
         _worker_names_file, data_receivers, empty_metrics_conn, seed,
         connections, router_registry, broadcast_variables,
@@ -234,8 +234,7 @@ actor ActorSystemStartup
         @printf[I32]("Running as Initializer...\n".cstring())
         let distributor =
           ActorSystemDistributor(auth, _system, initializer, connections,
-            _startup_options.input_addrs, _startup_options.output_addrs,
-            is_recovering)
+            _startup_options.input_addrs, is_recovering)
         _cluster_initializer = ClusterInitializer(auth,
           _startup_options.worker_name, _startup_options.worker_count,
           connections, distributor, initializer, _startup_options.d_addr,

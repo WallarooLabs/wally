@@ -26,6 +26,8 @@ use "sendence/bytes"
 use "wallaroo/"
 use "wallaroo/fail"
 use "wallaroo/state"
+use "wallaroo/source"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -34,7 +36,10 @@ actor Main
     try
       let application = recover val
         Application("Complex Numbers App")
-          .new_pipeline[Complex val, Complex val]("Complex Numbers", ComplexDecoder where coalescing = false)
+          .new_pipeline[Complex val, Complex val]("Complex Numbers",
+            TCPSourceConfig[Complex val].from_options(ComplexDecoder,
+              TCPSourceConfigCLIParser(env.args)(0))
+            where coalescing = false)
             .to[Complex val]({(): Computation[Complex val, Complex val] iso^
               => Conjugate })
             .to[Complex val]({(): Computation[Complex val, Complex val] iso^
@@ -45,11 +50,15 @@ actor Main
               => Scale(10) })
             .to[Complex val]({(): Computation[Complex val, Complex val] iso^
               => Conjugate })
-            .to_sink(ComplexEncoder, recover [0] end)
-          .new_pipeline[Complex val, Complex val]("Complex Numbers Second", ComplexDecoder)
+            .to_sink(TCPSinkConfig[Complex val].from_options(ComplexEncoder,
+               TCPSinkConfigCLIParser(env.args)(0)))
+          .new_pipeline[Complex val, Complex val]("Complex Numbers Second",
+            TCPSourceConfig[Complex val].from_options(ComplexDecoder,
+              TCPSourceConfigCLIParser(env.args)(0)))
             .to[Complex val]({(): Computation[Complex val, Complex val] iso^
               => Conjugate })
-            .to_sink(ComplexEncoder, recover [0] end)
+            .to_sink(TCPSinkConfig[Complex val].from_options(ComplexEncoder,
+               TCPSinkConfigCLIParser(env.args)(0)))
       end
       Startup(env, application, None)
     else
@@ -153,4 +162,3 @@ primitive UpdateCounter
 
   fun state_change_builders(): Array[StateChangeBuilder[Counter] val] val =>
     recover Array[StateChangeBuilder[Counter] val] end
-
