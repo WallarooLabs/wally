@@ -56,7 +56,7 @@ def test_recovery():
                       metrics_port, control_port, data_port, workers)
 
         # Wait for first runner (initializer) to report application ready
-        runner_ready_checker = RunnerReadyChecker(runners[0], 5)
+        runner_ready_checker = RunnerReadyChecker(runners[0], timeout=30)
         runner_ready_checker.start()
         runner_ready_checker.join()
         if runner_ready_checker.error:
