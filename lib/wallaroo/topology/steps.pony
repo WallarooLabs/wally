@@ -45,12 +45,6 @@ interface Initializable
 type ConsumerStep is (RunnableStep & Consumer & Initializable tag)
 
 actor Step is (RunnableStep & Producer & Consumer & Initializable)
-  """
-  # Step
-
-  ## Future work
-  * Switch to requesting credits via promise
-  """
   let _runner: Runner
   var _router: Router val = EmptyRouter
   // For use if this is a state step, otherwise EmptyOmniRouter
