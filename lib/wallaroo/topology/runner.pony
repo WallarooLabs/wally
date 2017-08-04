@@ -657,9 +657,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
       | let sc: StateChange[S] ref =>
         ifdef "resilience" then
           sc.write_log_entry(_wb)
-          //TODO: batching? race between queueing and watermark?
           let payload = _wb.done()
-          //TODO: deal with creating fractional message ids here
           match _id
           | let buffer_id: U128 =>
 
