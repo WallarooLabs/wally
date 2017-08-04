@@ -1,7 +1,7 @@
 use "collections"
 use "sendence/connemara"
 
-actor TestVectorTimestamp is TestList
+actor _TestVectorTimestamp is TestList
   new make() =>
     None
 

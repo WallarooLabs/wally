@@ -10,5 +10,5 @@ actor Main is TestList
     None
 
   fun tag tests(test: Connemara) =>
-    TestVectorTimestamp.make().tests(test)
-    TestExternalBroadcastVariableUpdater.make().tests(test)
+    _TestVectorTimestamp.make().tests(test)
+    _TestExternalBroadcastVariableUpdater.make().tests(test)

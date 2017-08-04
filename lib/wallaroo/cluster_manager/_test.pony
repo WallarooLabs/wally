@@ -8,5 +8,5 @@ actor Main is TestList
     None
 
   fun tag tests(test: Connemara) =>
-    TestDockerSwarmClusterManager.make().tests(test)
-    TestThroughputBasedClusterGrowthTrigger.make().tests(test)
+    _TestDockerSwarmClusterManager.make().tests(test)
+    _TestThroughputBasedClusterGrowthTrigger.make().tests(test)

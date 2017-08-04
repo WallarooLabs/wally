@@ -2,7 +2,7 @@ use "collections"
 use "sendence/connemara"
 use "wallaroo/metrics"
 
-actor TestThroughputBasedClusterGrowthTrigger is TestList
+actor _TestThroughputBasedClusterGrowthTrigger is TestList
   new make() =>
     None
 

@@ -1,7 +1,7 @@
 use "collections"
 use "sendence/connemara"
 
-actor TestExternalBroadcastVariableUpdater is TestList
+actor _TestExternalBroadcastVariableUpdater is TestList
   new make() =>
     None
 
