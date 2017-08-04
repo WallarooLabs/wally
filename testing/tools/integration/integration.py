@@ -263,7 +263,15 @@ class Sink(TCPReceiver):
     __base_name__ = 'Sink'
 
 
-class TimeoutError(Exception):
+class StopError(Exception):
+    pass
+
+
+class TimeoutError(StopError):
+    pass
+
+
+class ExpectationError(StopError):
     pass
 
 
@@ -285,7 +293,15 @@ class SinkStopper(StoppableThread):
         started = time.time()
         while not self.stopped():
             msgs = len(self.sink.data)
-            if msgs >= self.expected:
+            if msgs > self.expected:
+                self.error = ExpectationError('{}: has received too many '
+                                              'messages. Expected {} but got '
+                                              '{}.'.format(self.name,
+                                                           self.expected,
+                                                           msgs))
+                self.stop()
+                break
+            if msgs == self.expected:
                 self.stop()
                 break
             if time.time() - started > self.timeout:
