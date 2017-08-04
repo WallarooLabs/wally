@@ -35,7 +35,7 @@ single_stream_filtering_stateless_stateless_filter_app_test:
 	--expected-file ../../../data_gen/_expected.msg \
 	--log-level error \
 	--command './stateless_filtered_app' \
-	--sink-expect 50
+	--sink-expect 100
 
 two_worker_single_stream_filtering_stateless_stateless_filter_app_test:
 	export PYTHONPATH=".:$(INTEGRATION_PATH)" && \
@@ -48,7 +48,7 @@ two_worker_single_stream_filtering_stateless_stateless_filter_app_test:
 	--expected-file ../../../data_gen/_expected.msg \
 	--log-level error \
 	--command './stateless_filtered_app' \
-	--sink-expect 50
+	--sink-expect 100
 
 three_worker_single_stream_filtering_stateless_stateless_filter_app_test:
 	export PYTHONPATH=".:$(INTEGRATION_PATH)" && \
@@ -61,7 +61,7 @@ three_worker_single_stream_filtering_stateless_stateless_filter_app_test:
 	--expected-file ../../../data_gen/_expected.msg \
 	--log-level error \
 	--command './stateless_filtered_app' \
-	--sink-expect 50
+	--sink-expect 100
 
 
 #########################################################################################
