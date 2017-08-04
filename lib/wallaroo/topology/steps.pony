@@ -58,7 +58,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     SeqId, RouteId)] = _deduplication_list.create()
   let _event_log: EventLog
   var _id: U128
-  var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
+  let _seq_id_generator: StepSeqIdGenerator = StepSeqIdGenerator
 
   let _filter_route_id: RouteId = GuidGenerator.u64()
 
@@ -238,7 +238,8 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    next_sequence_id()
+    _seq_id_generator.new_incoming_message()
+
     let my_latest_ts = ifdef "detailed-metrics" then
         Time.nanos()
       else
@@ -265,9 +266,6 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
         ifdef "trace" then
           @printf[I32]("Filtering\n".cstring())
         end
-        // TODO ideally we want filter to create the id
-        // but there's problems initializing Routes with a ref
-        // back to its container. Especially in Boundary etc
         _resilience_routes.filter(this, current_sequence_id(),
           i_origin, i_route_id, i_seq_id)
       end
@@ -285,10 +283,10 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     end
 
   fun ref next_sequence_id(): SeqId =>
-    _seq_id = _seq_id + 1
+    _seq_id_generator.new_id()
 
   fun ref current_sequence_id(): SeqId =>
-    _seq_id
+    _seq_id_generator.latest_for_run()
 
   ///////////
   // RECOVERY
@@ -308,7 +306,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
-    next_sequence_id()
+    _seq_id_generator.new_incoming_message()
     if not _is_duplicate(i_origin, msg_uid, i_frac_ids, i_seq_id,
       i_route_id) then
       _deduplication_list.push((i_origin, msg_uid, i_frac_ids, i_seq_id,
