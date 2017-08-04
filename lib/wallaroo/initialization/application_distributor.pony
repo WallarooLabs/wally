@@ -97,6 +97,15 @@ actor ApplicationDistributor is Distributor
         local_graphs(name) = Dag[StepInitializer val]
       end
 
+      // Edges that must be added at the end (because we need to create the
+      // edge at the time the origin node is created, in which case the target // node will not yet exist).
+      // Map from worker name to all (from_id, to_id) pairs
+      let unbuilt_edges: Map[String, Array[(U128, U128)]] =
+        unbuilt_edges.create()
+      for w in all_workers.values() do
+        unbuilt_edges(w) = Array[(U128, U128)]
+      end
+
       // Create StateSubpartitions
       let ssb_trn: Map[String, StateSubpartition val] trn =
         recover Map[String, StateSubpartition val] end
@@ -105,6 +114,9 @@ actor ApplicationDistributor is Distributor
       end
       let state_subpartitions: Map[String, StateSubpartition val] val =
         consume ssb_trn
+
+      // Keep track of sink ids
+      let sink_ids: Array[U128] = sink_ids.create()
 
       // Keep track of proxy ids per worker
       let proxy_ids: Map[String, Map[String, U128]] = proxy_ids.create()
@@ -299,6 +311,8 @@ actor ApplicationDistributor is Distributor
                 // source_partition_workers shouldn't be None since we showed
                 // that source_seq_builders.is_prestate() is true
                 end
+
+                sink_ids.push(sid)
               end
 
               pipeline.sink_id()
@@ -515,6 +529,8 @@ actor ApplicationDistributor is Distributor
                           end
                         end
                       end
+
+                      sink_ids.push(sid)
                     end
 
                     pipeline.sink_id()
@@ -551,7 +567,7 @@ actor ApplicationDistributor is Distributor
                 step_map(next_id) = ProxyAddress(worker, next_id)
                 try
                   local_graphs(worker).add_node(next_initializer, next_id)
-                  local_graphs = _add_edge_from_last_initializer(
+                  local_graphs = _add_edges_to_graph(
                     last_initializer, local_graphs = recover Map[String,
                       Dag[StepInitializer val] trn] end,
                     next_id, worker)
@@ -567,117 +583,108 @@ actor ApplicationDistributor is Distributor
                 steps(next_id) = worker
               //////////////////////////////////////
               // PARALLELIZED STATELESS COMPUTATIONS
-              //!!
-              // elseif next_runner_builder.is_stateless_parallel() then
-////
-//!!
-////
+              elseif next_runner_builder.is_stateless_parallel() then
+                let pony_thread_count = @ponyint_sched_cores[I32]().usize()
+                let partition_count = worker_count * pony_thread_count
+                let partition_id_to_worker_trn: Map[U64, String] trn =
+                  recover Map[U64, String] end
+                let partition_id_to_step_id_trn: Map[U64, U128] trn =
+                  recover Map[U64, U128] end
+                let worker_to_step_id_trn: Map[String, Array[U128] trn] trn =
+                  recover Map[String, Array[U128] trn] end
+                for w in all_workers.values() do
+                  worker_to_step_id_trn(w) = recover Array[U128] end
+                end
+                for id in Range[U64](0, partition_count.u64()) do
+                  let step_id = _guid_gen.u128()
+                  partition_id_to_step_id_trn(id) = step_id
+                  let w = all_workers(id.usize() % worker_count)
+                  partition_id_to_worker_trn(id) = w
+                  worker_to_step_id_trn(w).push(step_id)
+                end
+                let partition_id_to_worker: Map[U64, String] val =
+                  consume partition_id_to_worker_trn
+                let partition_id_to_step_id: Map[U64, U128] val =
+                  consume partition_id_to_step_id_trn
+                let worker_to_step_id_collector:
+                  Map[String, Array[U128] val] trn =
+                  recover Map[String, Array[U128] val] end
+                for (k, v) in worker_to_step_id_trn.pairs() do
+                  match worker_to_step_id_trn(k) = recover Array[U128] end
+                  | let arr: Array[U128] trn =>
+                    worker_to_step_id_collector(k) = consume arr
+                  end
+                end
+                let worker_to_step_id: Map[String, Array[U128] val] val =
+                  consume worker_to_step_id_collector
 
-              //   @printf[I32](("Preparing to spin up " + next_runner_builder.name() + "stateless partition on " + worker + "\n")
-              //     .cstring())
-              //   let next_id = next_runner_builder.id()
-              //   let next_initializer = StepBuilder(application.name(),
-              //     worker, pipeline.name(), next_runner_builder, next_id)
-              //   step_map(next_id) = ProxyAddress(worker, next_id)
+                // Create a node in the graph for this worker
+                // containing the blueprint for creating the stateless
+                // partition router.
+                let next_id = next_runner_builder.id()
+                let psd = PreStatelessData(pipeline.name(), next_id,
+                  partition_id_to_worker,
+                  partition_id_to_step_id, worker_to_step_id)
+                local_graphs(worker).add_node(psd, next_id)
+                local_graphs = _add_edges_to_graph(
+                  last_initializer, local_graphs = recover Map[String,
+                    Dag[StepInitializer val] trn] end,
+                  next_id, worker)
 
-              //   try
-              //     local_graphs(worker).add_node(next_initializer, next_id)
-              //     local_graphs = _add_edge_from_last_initializer(
-              //       last_initializer, local_graphs = recover Map[String,
-              //         Dag[StepInitializer val] trn] end,
-              //       next_id, worker)
+                // Keep track of all stateless partition computation ids
+                // for this worker so we can connect their outputs to
+                // the next step initializer (or egress) for this worker.
+                let last_initializer_ids = Array[U128]
 
-              //     //!! next_ids
-              //     // last_initializer = next_ids
-              //   else
-              //     @printf[I32](("No graph for worker " + worker + "\n").cstring())
-              //     error
-              //   end
+                // Get the id for the step that all stateless partition
+                // computations will connect to as their output target.
+                let successor_step_id: (U128 | None) =
+                  if (runner_builder_idx + 1) < step_runner_builders.size()
+                  then
+                    step_runner_builders(runner_builder_idx + 1).id()
+                  else
+                    match pipeline.sink_id()
+                    | let sink_id: U128 => sink_id
+                    else
+                      None
+                    end
+                  end
 
-              //   steps(next_id) = worker
-              // end
+                // Add nodes for all stateless partition computations on
+                // all workers.
+                for w in all_workers.values() do
+                  @printf[I32](("Preparing to spin up " + next_runner_builder.name() + "stateless partition on " + w + "\n")
+                    .cstring())
+                  for s_id in worker_to_step_id(w).values() do
+                    let next_initializer = StepBuilder(application.name(),
+                      w, pipeline.name(), next_runner_builder, s_id)
+                    step_map(s_id) = ProxyAddress(w, s_id)
 
-              // runner_builder_idx = runner_builder_idx + 1
+                    try
+                      local_graphs(w).add_node(next_initializer, s_id)
+                      if w == worker then
+                        last_initializer_ids.push(s_id)
+                      else
+                        match successor_step_id
+                        | let ss_id: U128 =>
+                          unbuilt_edges(w).push((s_id, ss_id))
+                        else
+                          @printf[I32](("There is no step or sink after a " +
+                            "stateless computation partition. This means " +
+                            "unnecessary work is occurring in the topology." +
+                            "\n").cstring())
+                        end
+                      end
+                    else
+                      @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                      error
+                    end
 
+                    steps(s_id) = worker
+                  end
 
-                // let pre_stateless_target_id: (U128 | None) =
-                //   try
-                //     step_runner_builders(runner_builder_idx + 1).id()
-                //   else
-                //     match pipeline.sink_id()
-                //     | let sid: U128 =>
-                //       // We need a sink on every worker involved in the
-                //       // partition
-                //       let egress_builder = EgressBuilder(pipeline.name(),
-                //         sid, sink_addr, pipeline.sink_builder())
-
-                //       for w in all_workers.values() do
-                //         try
-                //           local_graphs(w).add_node(egress_builder, sid)
-                //         else
-                //           @printf[I32](("No graph for worker " + w + "\n").cstring())
-                //           error
-                //         end
-                //       end
-                //     end
-
-                //     pipeline.sink_id()
-                //   end
-
-                // @printf[I32](("Preparing to spin up prestateless step " +
-                //   next_runner_builder.name() + " on " + worker + "\n")
-                //   .cstring())
-
-                // let psd = PreStatelessData(next_runner_builder,
-                //   pre_state_target_id)
-                // pre_stateless_data.push(psd)
-
-                // let state_builder =
-                //   try
-                //     application.state_builder(psd.state_name())
-                //   else
-                //     @printf[I32]("Failed to find state builder for prestate.\n".cstring())
-                //     error
-                //   end
-
-                // // TODO: Update this approach when we create post-POC default
-                // // strategy.
-                // // ASSUMPTION: There is only one partititon default target
-                // // per application.
-                // if state_builder.default_state_name() != "" then
-                //   pipeline_default_state_name =
-                //     state_builder.default_state_name()
-                //   pipeline_default_target_worker = "worker"
-                // end
-
-                // let next_id = next_runner_builder.id()
-                // let next_initializer = StepBuilder(application.name(),
-                //   worker, pipeline.name(), next_runner_builder,
-                //   next_id where pre_state_target_id' = pre_state_target_id)
-                // step_map(next_id) = ProxyAddress(worker, next_id)
-                // try
-                //   local_graphs(worker).add_node(next_initializer, next_id)
-                //   local_graphs = _add_edge_from_last_initializer(
-                //     last_initializer, local_graphs = recover Map[String,
-                //       Dag[StepInitializer val] trn] end,
-                //     next_id, worker)
-
-                //   // Pre state step uses a partition router and has no direct
-                //   // out, so don't connect an edge to the next node
-                //   last_initializer = None
-                // else
-                //   @printf[I32](("No graph for worker " + worker + "\n").cstring())
-                //   error
-                // end
-
-                // steps(next_id) = worker
-
-
-///
-//!!
-///
-
-
+                  last_initializer = last_initializer_ids
+                end
               else
               //////////////////////////////
               // NON-PRESTATE RUNNER BUILDER
@@ -689,7 +696,7 @@ actor ApplicationDistributor is Distributor
 
                 try
                   local_graphs(worker).add_node(next_initializer, next_id)
-                  local_graphs = _add_edge_from_last_initializer(
+                  local_graphs = _add_edges_to_graph(
                     last_initializer, local_graphs = recover Map[String,
                       Dag[StepInitializer val] trn] end,
                     next_id, worker)
@@ -748,7 +755,7 @@ actor ApplicationDistributor is Distributor
                   // will simply be overwritten (which effectively means
                   // there is one node per OutgoingBoundary)
                   local_graphs(worker).add_node(egress_builder, egress_id)
-                  local_graphs = _add_edge_from_last_initializer(
+                  local_graphs = _add_edges_to_graph(
                     last_initializer, local_graphs = recover Map[String,
                       Dag[StepInitializer val] trn] end,
                     egress_id, worker)
@@ -774,7 +781,7 @@ actor ApplicationDistributor is Distributor
 
               try
                 local_graphs(worker).add_node(egress_builder, sid)
-                  local_graphs = _add_edge_from_last_initializer(
+                  local_graphs = _add_edges_to_graph(
                     last_initializer, local_graphs = recover Map[String,
                       Dag[StepInitializer val] trn] end,
                     sid, worker)
@@ -782,6 +789,8 @@ actor ApplicationDistributor is Distributor
                 @printf[I32](("No graph for worker " + worker + "\n").cstring())
                 error
               end
+
+              sink_ids.push(sid)
             end
           end
 
@@ -893,6 +902,35 @@ actor ApplicationDistributor is Distributor
       let other_local_topologies: Map[String, LocalTopology val] trn =
         recover Map[String, LocalTopology val] end
 
+      // Add unbuilt edges
+      for (w, edges) in unbuilt_edges.pairs() do
+        for edge in edges.values() do
+          try
+            if (steps.contains(edge._2) and (steps(edge._2) == w)) or
+              sink_ids.contains(edge._2)
+            then
+              //Local step or Sink
+              try
+                local_graphs =
+                  _add_edges_to_graph(edge._1, local_graphs = recover
+                    Map[String, Dag[StepInitializer val] trn] end, edge._2, w)
+              else
+                @printf[I32]("Error building unbuilt edge on %s!\n".cstring(),
+                  w.cstring())
+                Fail()
+              end
+            else
+              //Proxy
+              let target_worker = steps(edge._2)
+            end
+          else
+            @printf[I32]("Unbuilt edge refers to nonexistent step id\n"
+              .cstring())
+            Fail()
+          end
+        end
+      end
+
       // For each worker, generate a LocalTopology from its LocalGraph
       for (w, g) in local_graphs.pairs() do
         let p_ids: Map[String, U128] trn = recover Map[String, U128] end
@@ -946,18 +984,17 @@ actor ApplicationDistributor is Distributor
       @printf[I32]("Error initializing application!\n".cstring())
     end
 
-  fun ref _add_edge_from_last_initializer(
-    last_initializer: (U128 | Array[U128] | None),
+  fun ref _add_edges_to_graph(origin_ids: (U128 | Array[U128] | None),
     local_graphs: Map[String, Dag[StepInitializer val] trn] trn,
-    next_id: U128, worker: String):
+    target_id: U128, worker: String):
     Map[String, Dag[StepInitializer val] trn] trn^ ?
   =>
-    match last_initializer
+    match origin_ids
     | let last_id: U128 =>
-      local_graphs(worker).add_edge(last_id, next_id)
+      local_graphs(worker).add_edge(last_id, target_id)
     | let last_ids: Array[U128] =>
       for l_id in last_ids.values() do
-        local_graphs(worker).add_edge(l_id, next_id)
+        local_graphs(worker).add_edge(l_id, target_id)
       end
     end
     consume local_graphs

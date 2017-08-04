@@ -141,8 +141,12 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
 
   be application_initialized(initializer: LocalTopologyInitializer) =>
     _initializer = initializer
-    for r in _routes.values() do
-      r.application_initialized("Step")
+    if _routes.size() > 0 then
+      for r in _routes.values() do
+        r.application_initialized("Step")
+      end
+    else
+      _report_ready_to_work()
     end
 
   fun ref report_route_ready_to_work(r: RouteLogic) =>
@@ -150,15 +154,18 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
       _ready_to_work_routes.set(r)
 
       if _ready_to_work_routes.size() == _routes.size() then
-        match _initializer
-        | let lti: LocalTopologyInitializer =>
-          lti.report_ready_to_work(this)
-        else
-          Fail()
-        end
+        _report_ready_to_work()
       end
     else
       // A route should only signal this once
+      Fail()
+    end
+
+  fun ref _report_ready_to_work() =>
+    match _initializer
+    | let lti: LocalTopologyInitializer =>
+      lti.report_ready_to_work(this)
+    else
       Fail()
     end
 
