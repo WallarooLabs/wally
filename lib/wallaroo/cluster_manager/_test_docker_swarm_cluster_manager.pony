@@ -1,7 +1,7 @@
 use "sendence/connemara"
 use "json"
 
-actor TestDockerSwarmClusterManager is TestList
+actor _TestDockerSwarmClusterManager is TestList
   new make() =>
     None
 

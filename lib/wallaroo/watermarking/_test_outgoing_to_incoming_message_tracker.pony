@@ -2,7 +2,7 @@ use "sendence/connemara"
 use "wallaroo/topology"
 use "wallaroo/routing"
 
-actor TestOutgoingToIncomingMessageTracker is TestList
+actor _TestOutgoingToIncomingMessageTracker is TestList
   new make() =>
     None
 

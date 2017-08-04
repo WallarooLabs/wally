@@ -2,7 +2,7 @@ use "sendence/connemara"
 use "wallaroo/topology"
 use "wallaroo/routing"
 
-actor TestWatermarker is TestList
+actor _TestWatermarker is TestList
   new make() =>
     None
 
