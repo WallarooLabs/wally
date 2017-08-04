@@ -718,12 +718,14 @@ actor LocalTopologyInitializer is LayoutInitializer
             // STEP BUILDER
             ///////////////
               let next_id = builder.id()
-              @printf[I32](("Handling id " + next_id.string() + "\n").cstring())
+              @printf[I32](("Handling id " + next_id.string() + "\n")
+                .cstring())
 
               if builder.is_prestate() then
               ///////////////////
               // PRESTATE BUILDER
-                @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
+                @printf[I32](("----Spinning up " + builder.name() + "----\n")
+                  .cstring())
 
                 // TODO: Change this when we implement post-POC default
                 // strategy
@@ -780,7 +782,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                     try
                       built_routers(id)
                     else
-                      @printf[I32]("No router found to prestate target step\n".cstring())
+                      @printf[I32]("No router found to prestate target step\n"
+                        .cstring())
                       error
                     end
                   else
@@ -802,24 +805,30 @@ actor LocalTopologyInitializer is LayoutInitializer
               elseif not builder.is_stateful() then
               //////////////////////////////////
               // STATELESS, NON-PRESTATE BUILDER
-                @printf[I32](("----Spinning up " + builder.name() + "----\n").cstring())
+                @printf[I32](("----Spinning up " + builder.name() + "----\n")
+                  .cstring())
                 // Currently there are no splits (II), so we know that a node // has only one output in the graph. We also know this is not
                 // a sink or proxy, so there is exactly one output.
-                let out_id: U128 =
+                let out_id: (U128 | None) =
                   match _get_output_node_id(next_node,
                     default_target_id, default_target_state_step_id)
                   | let id: U128 => id
                   else
-                    @printf[I32]("Invariant was violated: non-sink node had no output node.")
-                    error
+                    None
                   end
 
                 let out_router =
-                  try
-                    builder.clone_router_and_set_input_type(built_routers(out_id))
+                  match out_id
+                  | let id: U128 =>
+                    try
+                      builder.clone_router_and_set_input_type(
+                        built_routers(id))
+                    else
+                      @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
+                      error
+                    end
                   else
-                    @printf[I32]("Invariant was violated: node was not built before one of its inputs.\n".cstring())
-                    error
+                    EmptyRouter
                   end
 
                 // Check if this is a default target.  If so, route it
@@ -882,7 +891,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                 for in_node in next_node.ins() do
                   match in_node.value
                   | let b: StepBuilder val =>
-                    @printf[I32](("----Spinning up " + b.name() + "----\n").cstring())
+                    @printf[I32](("----Spinning up " + b.name() + "----\n")
+                      .cstring())
 
                     let state_comp_target =
                       match b.pre_state_target_id()
@@ -890,11 +900,13 @@ actor LocalTopologyInitializer is LayoutInitializer
                         try
                           built_routers(id)
                         else
-                          @printf[I32]("Prestate comp target not built! We should have already caught this\n".cstring())
+                          @printf[I32](("Prestate comp target not built! We " +
+                            "should have already caught this\n").cstring())
                           error
                         end
                       else
-                        @printf[I32]("There is no prestate comp target. Using an EmptyRouter\n".cstring())
+                        @printf[I32](("There is no prestate comp target. " +
+                          "using an EmptyRouter\n").cstring())
                         EmptyRouter
                       end
 
@@ -920,7 +932,8 @@ actor LocalTopologyInitializer is LayoutInitializer
 
                     @printf[I32](("Finished handling " + in_node.value.name() + " node\n").cstring())
                   else
-                    @printf[I32]("State steps should only have prestate predecessors!\n".cstring())
+                    @printf[I32](("State steps should only have prestate " +
+                      "predecessors!\n").cstring())
                     error
                   end
                 end
@@ -961,6 +974,68 @@ actor LocalTopologyInitializer is LayoutInitializer
                 built_stateless_steps(next_id) = sink
                 data_routes(next_id) = sink
                 built_routers(next_id) = sink_router
+              end
+            | let pre_stateless_data: PreStatelessData =>
+            //////////////////////
+            // PRE-STATELESS DATA
+            //////////////////////
+              try
+                let local_step_ids =
+                  pre_stateless_data.worker_to_step_id(_worker_name)
+
+                // Make sure all local steps for this stateless partition
+                // have already been initialized on this worker.
+                var ready = true
+                for id in local_step_ids.values() do
+                  if not built_stateless_steps.contains(id) then
+                    ready = false
+                  end
+                end
+
+                if ready then
+                  let partition_routes:
+                    Map[U64, (Step | ProxyRouter val)] trn =
+                    recover Map[U64, (Step | ProxyRouter val)] end
+
+                  for (p_id, step_id) in
+                    pre_stateless_data.partition_id_to_step_id.pairs()
+                  do
+                    if local_step_ids.contains(step_id) then
+                      match built_stateless_steps(step_id)
+                      | let s: Step =>
+                        partition_routes(p_id) = s
+                      else
+                        @printf[I32](("We should only be creating stateless " +
+                          "partition routes to Steps!\n").cstring())
+                        Fail()
+                      end
+                    else
+                      let target_worker =
+                        pre_stateless_data.partition_id_to_worker(p_id)
+                      let proxy_address = ProxyAddress(target_worker, step_id)
+
+                      partition_routes(p_id) = ProxyRouter(target_worker,
+                        _outgoing_boundaries(target_worker),
+                        proxy_address, _auth)
+                    end
+                  end
+
+                  let stateless_partition_router =
+                    LocalStatelessPartitionRouter(
+                      pre_stateless_data.partition_id_to_step_id,
+                      consume partition_routes)
+
+                  built_routers(next_node.id) = stateless_partition_router
+                else
+                  // We need to wait until all local stateless partition steps
+                  // are spun up on this worker before we can create the
+                  // LocalStatelessPartitionRouter
+                  frontier.unshift(next_node)
+                end
+              else
+                @printf[I32]("Error spinning up stateless partition\n"
+                  .cstring())
+                Fail()
               end
             | let source_data: SourceData val =>
             /////////////////

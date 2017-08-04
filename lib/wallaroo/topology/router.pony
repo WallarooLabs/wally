@@ -982,3 +982,187 @@ class LocalPartitionRouter[In: Any val,
     else
       false
     end
+
+trait val StatelessPartitionRouter is (Router &
+  Equatable[StatelessPartitionRouter])
+  fun register_routes(router: Router val, route_builder: RouteBuilder val)
+  fun update_route(partition_id: U64, target: (Step | ProxyRouter val)):
+    StatelessPartitionRouter ?
+  fun size(): USize
+  fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
+    StatelessPartitionRouter
+
+class val LocalStatelessPartitionRouter is StatelessPartitionRouter
+  // Maps stateless partition id to step id
+  let _step_ids: Map[U64, U128] val
+  // Maps stateless partition id to step or proxy router
+  let _partition_routes: Map[U64, (Step | ProxyRouter val)] val
+  let _partition_size: USize
+
+  new val create(s_ids: Map[U64, U128] val,
+    partition_routes: Map[U64, (Step | ProxyRouter val)] val)
+  =>
+    _step_ids = s_ids
+    _partition_routes = partition_routes
+    _partition_size = _partition_routes.size()
+
+  fun size(): USize =>
+    _partition_size
+
+  fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
+    producer: Producer ref,
+    i_origin: Producer, i_msg_uid: U128,
+    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
+  =>
+    ifdef "trace" then
+      @printf[I32]("Rcvd msg at StatelessPartitionRouter\n".cstring())
+    end
+    let stateless_partition_id = i_seq_id % size().u64()
+
+    try
+      match _partition_routes(stateless_partition_id)
+      | let s: Step =>
+        let might_be_route = producer.route_to(s)
+        match might_be_route
+        | let r: Route =>
+          ifdef "trace" then
+            @printf[I32]("StatelessPartitionRouter found Route\n".cstring())
+          end
+          let keep_sending = r.run[D](metric_name, pipeline_time_spent, data,
+            // hand down producer so we can update route_id
+            producer,
+            // incoming envelope
+            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+            latest_ts, metrics_id, worker_ingress_ts)
+          (false, keep_sending, latest_ts)
+        else
+          // TODO: What do we do if we get None?
+          (true, true, latest_ts)
+        end
+      | let p: ProxyRouter val =>
+        p.route[D](metric_name, pipeline_time_spent, data, producer,
+          i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+          latest_ts, metrics_id, worker_ingress_ts)
+      else
+        // No step or proxyrouter
+        (true, true, latest_ts)
+      end
+    else
+      // Can't find route
+      (true, true, latest_ts)
+    end
+
+  fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
+    for r in _partition_routes.values() do
+      match r
+      | let step: Step =>
+        step.register_routes(router, route_builder)
+      end
+    end
+
+  fun routes(): Array[ConsumerStep] val =>
+    let cs: Array[ConsumerStep] trn =
+      recover Array[ConsumerStep] end
+
+    for s in _partition_routes.values() do
+      match s
+      | let step: Step =>
+        cs.push(step)
+      end
+    end
+
+    consume cs
+
+  fun routes_not_in(router: Router val): Array[ConsumerStep] val =>
+    let diff: Array[ConsumerStep] trn = recover Array[ConsumerStep] end
+    let other_routes = router.routes()
+    for r in routes().values() do
+      if not other_routes.contains(r) then diff.push(r) end
+    end
+    consume diff
+
+  fun update_route(partition_id: U64, target: (Step | ProxyRouter val)):
+    StatelessPartitionRouter ?
+  =>
+    // TODO: Using persistent maps for our fields would make this much more
+    // efficient
+    let target_id = _step_ids(partition_id)
+    let new_partition_routes: Map[U64, (Step | ProxyRouter val)] trn =
+      recover Map[U64, (Step | ProxyRouter val)] end
+    match target
+    | let step: Step =>
+      for (p_id, t) in _partition_routes.pairs() do
+        if p_id == partition_id then
+          new_partition_routes(p_id) = target
+        else
+          new_partition_routes(p_id) = t
+        end
+      end
+      LocalStatelessPartitionRouter(_step_ids,
+        consume new_partition_routes)
+    | let proxy_router: ProxyRouter val =>
+      for (p_id, t) in _partition_routes.pairs() do
+        if p_id == partition_id then
+          new_partition_routes(p_id) = target
+        else
+          new_partition_routes(p_id) = t
+        end
+      end
+      LocalStatelessPartitionRouter(_step_ids,
+        consume new_partition_routes)
+    else
+      error
+    end
+
+  fun update_boundaries(ob: box->Map[String, OutgoingBoundary]):
+    StatelessPartitionRouter
+  =>
+    let new_partition_routes: Map[U64, (Step | ProxyRouter val)] trn =
+      recover Map[U64, (Step | ProxyRouter val)] end
+    for (p_id, target) in _partition_routes.pairs() do
+      match target
+      | let pr: ProxyRouter val =>
+        new_partition_routes(p_id) = pr.update_boundary(ob)
+      else
+        new_partition_routes(p_id) = target
+      end
+    end
+    LocalStatelessPartitionRouter(_step_ids,
+      consume new_partition_routes)
+
+  fun eq(that: box->StatelessPartitionRouter): Bool =>
+    match that
+    | let o: box->LocalStatelessPartitionRouter =>
+        MapEquality[U64, U128](_step_ids, o._step_ids) and
+        _partition_routes_eq(o._partition_routes)
+    else
+      false
+    end
+
+  fun _partition_routes_eq(opr: Map[U64, (Step | ProxyRouter val)] val): Bool
+  =>
+    try
+      // These equality checks depend on the identity of Step or ProxyRouter
+      // val which means we don't expect them to be created independently
+      if _partition_routes.size() != opr.size() then return false end
+      for (p_id, v) in _partition_routes.pairs() do
+        match v
+        | let s: Step =>
+          if opr(p_id) isnt v then return false end
+        | let pr: ProxyRouter val =>
+          match opr(p_id)
+          | let pr2: ProxyRouter val =>
+            pr == pr2
+          else
+            false
+          end
+        else
+          false
+        end
+      end
+      true
+    else
+      false
+    end
+

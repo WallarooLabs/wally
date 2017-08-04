@@ -10,7 +10,8 @@ use "wallaroo/source"
 use "wallaroo/tcp_source"
 use "wallaroo/sink"
 
-type StepInitializer is (StepBuilder | SourceData | EgressBuilder)
+type StepInitializer is (StepBuilder | SourceData | EgressBuilder |
+  PreStatelessData)
 
 class StepBuilder
   let _app_name: String
@@ -232,27 +233,43 @@ class PreStateData
     _runner_builder.clone_router_and_set_input_type(r)
   fun is_default_target(): Bool => _is_default_target
 
-class PreStatelessData
-  let _name: String
-  let _state_name: String
-  let _runner_builder: RunnerBuilder val
-  let _target_id: (U128 | None)
-  let _forward_route_builder: RouteBuilder val
-  let _is_default_target: Bool
+class val PreStatelessData
+  """
+  Unlike PreStateData, this is simply used to create a StatelessPartitionRouter
+  during local initialization. Whatever step/s come before a stateless
+  partition do not need to do anything special; they only need the correct
+  StatelessPartitionRouter.
 
-  new val create(runner_builder: RunnerBuilder val, t_id: (U128 | None),
-    is_default_target': Bool = false) =>
-    _runner_builder = runner_builder
-    _state_name = runner_builder.state_name()
-    _name = runner_builder.name()
-    _target_id = t_id
-    _forward_route_builder = runner_builder.forward_route_builder()
-    _is_default_target = is_default_target'
+  This is a StepInitializer because it inhabits a node in the local topology
+  graph, but it does not provide the blueprint for a step.  Instead, it
+  provides a blueprint for creating the router for the previous step/s in the
+  graph that have edges into it.
+  """
+  let _pipeline_name: String
+  let _id: U128
+  let partition_id_to_worker: Map[U64, String] val
+  let partition_id_to_step_id: Map[U64, U128] val
+  let worker_to_step_id: Map[String, Array[U128] val] val
 
-  fun name(): String => _name
-  fun state_name(): String => _state_name
-  fun target_id(): (U128 | None) => _target_id
-  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  fun clone_router_and_set_input_type(r: Router val): Router val =>
-    _runner_builder.clone_router_and_set_input_type(r)
-  fun is_default_target(): Bool => _is_default_target
+  new val create(pipeline_name': String, step_id': U128,
+    partition_id_to_worker': Map[U64, String] val,
+    partition_id_to_step_id': Map[U64, U128] val,
+    worker_to_step_id': Map[String, Array[U128] val] val)
+  =>
+    _pipeline_name = pipeline_name'
+    _id = step_id'
+    partition_id_to_worker = partition_id_to_worker'
+    partition_id_to_step_id = partition_id_to_step_id'
+    worker_to_step_id = worker_to_step_id'
+
+  fun name(): String => "PreStatelessData"
+  fun state_name(): String => ""
+  fun pipeline_name(): String => _pipeline_name
+  fun id(): U128 => _id
+  fun pre_state_target_id(): (U128 | None) => None
+  fun is_prestate(): Bool => false
+  fun is_stateful(): Bool => false
+  fun is_partitioned(): Bool => false
+  fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun clone_router_and_set_input_type(r: Router val,
+    dr: (Router val | None) = None): Router val => r
