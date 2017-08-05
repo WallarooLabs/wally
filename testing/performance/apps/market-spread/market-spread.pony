@@ -119,7 +119,7 @@ actor Main
           .new_pipeline[FixNbboMessage val, None](
             "Nbbo",
             TCPSourceConfig[FixNbboMessage val].from_options(FixNbboFrameHandler,
-              TCPSourceConfigCLIParser(env.args)(0))
+              TCPSourceConfigCLIParser(env.args)(1))
               where init_file = init_file)
             .to_state_partition[Symboly val, String, None,
                SymbolData](UpdateNbbo, SymbolDataBuilder, "symbol-data",
