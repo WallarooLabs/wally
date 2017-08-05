@@ -5,10 +5,11 @@ use "wallaroo/source"
 primitive TCPSourceConfigCLIParser
   fun apply(args: Array[String] val): Array[TCPSourceConfigOptions] val ? =>
     let in_arg = "in"
+    let short_in_arg = "i"
 
     let options = Options(args, false)
 
-    options.add(in_arg where arg = StringArgument, mode = Required)
+    options.add(in_arg, short_in_arg, StringArgument, Required)
 
     for option in options do
       match option

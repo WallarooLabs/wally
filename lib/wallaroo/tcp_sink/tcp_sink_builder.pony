@@ -6,10 +6,11 @@ use "wallaroo/sink"
 primitive TCPSinkConfigCLIParser
   fun apply(args: Array[String] val): Array[TCPSinkConfigOptions] val ? =>
     let out_arg = "out"
+    let out_short_arg = "o"
 
     let options = Options(args, false)
 
-    options.add(out_arg where arg = StringArgument, mode = Required)
+    options.add(out_arg, out_short_arg, StringArgument, Required)
 
     for option in options do
       match option
