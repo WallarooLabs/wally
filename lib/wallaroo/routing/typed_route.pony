@@ -42,13 +42,9 @@ class TypedRoute[In: Any val] is Route
     """
     _route.dispose()
 
-  // TO DO: one to many
-  // remove  origin, i_route_id, i_seq_id
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref,
-    origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
+    cfp: Producer ref, msg_uid: U128, frac_ids: None, latest_ts: U64,
+    metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     ifdef "trace" then
       @printf[I32]("--Rcvd msg at Route (%s)\n".cstring(),
