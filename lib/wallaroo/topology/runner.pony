@@ -553,6 +553,8 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
     //   )
     // end
 
+  // TO DO: one to many
+  // remove unused i_origin, i_seq_id, i_route_id
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router val,
     omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
@@ -572,7 +574,7 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
           shared_state_router.route[
             StateComputationWrapper[In, Out, S] val](
             metric_name, pipeline_time_spent, processor, producer,
-            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+            i_msg_uid, i_frac_ids,
             latest_ts, metrics_id + 1, worker_ingress_ts)
         else
           (true, true, latest_ts)
@@ -745,6 +747,8 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
     end
 
 class iso RouterRunner
+  // TO DO: one to many
+  // Remove unused i_origin, i_seq_ud, i_route_id
   fun ref run[Out: Any val](metric_name: String, pipeline_time_spent: U64,
     output: Out, producer: Producer ref, router: Router val,
     omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
@@ -755,7 +759,7 @@ class iso RouterRunner
     match router
     | let r: Router val =>
       r.route[Out](metric_name, pipeline_time_spent, output, producer,
-        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        i_msg_uid, i_frac_ids,
         latest_ts, metrics_id, worker_ingress_ts)
     else
       (true, true, latest_ts)
