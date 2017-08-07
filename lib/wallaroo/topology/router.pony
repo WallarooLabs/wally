@@ -43,6 +43,8 @@ class DirectRouter
   new val create(target: ConsumerStep tag) =>
     _target = target
 
+  // TO DO: one to many
+  // remove i_origin, i_seq_id, i_route_id
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, i_msg_uid: U128,
@@ -63,7 +65,7 @@ class DirectRouter
         // hand down producer so we can call _next_sequence_id()
         producer,
         // incoming envelope
-        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        i_msg_uid, i_frac_ids,
         latest_ts, metrics_id, worker_ingress_ts)
       (false, keep_sending, latest_ts)
     else
@@ -250,6 +252,8 @@ class StepIdRouter is OmniRouter
     _step_map = step_map
     _outgoing_boundaries = outgoing_boundaries
 
+  // TO DO: one to many
+  // remove unused i_origin, i_seq_id, i_route_id
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
@@ -275,7 +279,7 @@ class StepIdRouter is OmniRouter
           // hand down producer so we can update route_id
           producer,
           // incoming envelope
-          i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
+          msg_uid, i_frac_ids,
           latest_ts, metrics_id, worker_ingress_ts)
 
         (false, keep_sending, latest_ts)
@@ -771,7 +775,7 @@ class LocalPartitionRouter[In: Any val,
                 // hand down producer so we can update route_id
                 producer,
                 // incoming envelope
-                i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+                i_msg_uid, i_frac_ids,
                 latest_ts, metrics_id, worker_ingress_ts)
               (false, keep_sending, latest_ts)
             else
