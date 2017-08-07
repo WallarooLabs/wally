@@ -8,7 +8,7 @@ trait BasicComputation
   fun name(): String
 
 interface Computation[In: Any val, Out: Any val] is BasicComputation
-  fun apply(input: In): (Out | None)
+  fun apply(input: In): (Out | Array[Out] val | None)
   fun name(): String
 
 interface StateComputation[In: Any val, Out: Any val, S: State ref] is BasicComputation
@@ -16,7 +16,8 @@ interface StateComputation[In: Any val, Out: Any val, S: State ref] is BasicComp
   // if there is no value to forward) and a StateChange if there was one (or
   // None to indicate no state change).
   fun apply(input: In, sc_repo: StateChangeRepository[S], state: S):
-    ((Out | None), (StateChange[S] ref | DirectStateChange | None))
+    ((Out | Array[Out] val | None),
+     (StateChange[S] ref | DirectStateChange | None))
 
   fun name(): String
 
@@ -81,9 +82,36 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
         i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
         computation_end, metrics_id, worker_ingress_ts)
 
-      (is_finished, keep_sending, result._2, computation_start, computation_end, last_ts)
+      (is_finished, keep_sending, result._2, computation_start,
+        computation_end, last_ts)
+      | (let outputs: Array[Out] val, _) =>
+          var this_is_finished = true
+          var this_last_ts = computation_end
+          // this is unused and kept here only for short term posterity until
+          // https://github.com/Sendence/wallaroo/issues/1010 is addressed
+          let this_keep_sending = true
+
+          for output in outputs.values() do
+            (let f, let s, let ts) =
+              omni_router.route_with_target_id[Out](
+                _target_id, metric_name, pipeline_time_spent, output, producer,
+                // incoming envelope
+                i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+                computation_end, metrics_id, worker_ingress_ts)
+
+            // we are sending multiple messages, only mark this message as
+            // finished if all are finished
+            if (f == false) then
+              this_is_finished = false
+            end
+
+            this_last_ts = ts
+          end
+          (this_is_finished, this_keep_sending, result._2,
+            computation_start, computation_end, this_last_ts)
     else
-      (true, true, result._2, computation_start, computation_end, computation_end)
+      (true, true, result._2, computation_start, computation_end,
+        computation_end)
     end
 
   fun name(): String => _state_comp.name()
