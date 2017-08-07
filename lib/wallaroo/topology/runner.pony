@@ -640,6 +640,8 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
       end
     end
 
+  // TO DO: one to many
+  // Remove unused i_origin, i_seq_id, i_route_id
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router val,
     omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
@@ -659,7 +661,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
 
       let result = sp(_state, _state_change_repository, omni_router,
         metric_name, pipeline_time_spent, producer,
-        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        i_msg_uid, i_frac_ids,
         latest_ts, new_metrics_id, worker_ingress_ts)
       let is_finished = result._1
       let keep_sending = result._2
