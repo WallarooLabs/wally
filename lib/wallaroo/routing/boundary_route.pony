@@ -52,13 +52,10 @@ class BoundaryRoute is Route
     Fail()
     true
 
-  // TO DO: one to many
-  // remove unused i_seq_id, i_route_id, i_origin
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
     pipeline_time_spent: U64, cfp: Producer ref,
-    i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
-    worker_ingress_ts: U64): Bool
+    msg_uid: U128, i_frac_ids: None, latest_ts: U64, metrics_id: U16,
+    metric_name: String, worker_ingress_ts: U64): Bool
   =>
     ifdef debug then
       match _step
