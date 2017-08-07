@@ -104,6 +104,8 @@ class ProxyRouter is Equatable[ProxyRouter]
     _target_proxy_address = target_proxy_address
     _auth = auth
 
+  // TO DO: one to many
+  // remove unused i_origin, i_seq_id, i_route_id
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     producer: Producer ref,
     i_origin: Producer, msg_uid: U128,
@@ -127,8 +129,8 @@ class ProxyRouter is Equatable[ProxyRouter]
         msg_uid, i_frac_ids)
 
       let keep_sending = r.forward(delivery_msg, pipeline_time_spent, producer,
-        i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id, latest_ts,
-        metrics_id, metric_name, worker_ingress_ts)
+        msg_uid, i_frac_ids, latest_ts, metrics_id, metric_name,
+        worker_ingress_ts)
 
       (false, keep_sending, latest_ts)
     else
@@ -302,9 +304,8 @@ class StepIdRouter is OmniRouter
                 pa, msg_uid, i_frac_ids)
 
               let keep_sending = r.forward(delivery_msg, pipeline_time_spent,
-                producer, i_origin, msg_uid, i_frac_ids,
-                i_seq_id, i_route_id, latest_ts, metrics_id, metric_name,
-                worker_ingress_ts)
+                producer, msg_uid, i_frac_ids, latest_ts, metrics_id,
+                metric_name, worker_ingress_ts)
               (false, keep_sending, latest_ts)
             else
               // We don't have a route to this boundary

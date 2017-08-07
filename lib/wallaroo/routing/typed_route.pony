@@ -73,9 +73,8 @@ class TypedRoute[In: Any val] is Route
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
     pipeline_time_spent: U64, cfp: Producer ref,
-    i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
-    i_route_id: RouteId, latest_ts: U64, metrics_id: U16, metric_name: String,
-    worker_ingress_ts: U64): Bool
+    msg_uid: U128, i_frac_ids: None, latest_ts: U64, metrics_id: U16,
+    metric_name: String, worker_ingress_ts: U64): Bool
   =>
     // Forward should never be called on a TypedRoute
     Fail()
