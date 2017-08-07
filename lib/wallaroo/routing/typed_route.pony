@@ -42,6 +42,8 @@ class TypedRoute[In: Any val] is Route
     """
     _route.dispose()
 
+  // TO DO: one to many
+  // remove  origin, i_route_id, i_seq_id
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
     cfp: Producer ref,
     origin: Producer, msg_uid: U128,
@@ -62,8 +64,7 @@ class TypedRoute[In: Any val] is Route
       end
 
       _send_message_on_route(metric_name, pipeline_time_spent, input, cfp,
-        origin, msg_uid, frac_ids, i_seq_id, i_route_id, latest_ts,
-        metrics_id, worker_ingress_ts)
+        msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
       true
     else
       Fail()
@@ -80,12 +81,9 @@ class TypedRoute[In: Any val] is Route
     Fail()
     true
 
-  // TO DO: one to many
-  // remove  i_origin, i_route_id, i_seq_id
   fun ref _send_message_on_route(metric_name: String, pipeline_time_spent: U64,
-    input: In, cfp: Producer ref, i_origin: Producer, msg_uid: U128,
-    frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64)
+    input: In, cfp: Producer ref, msg_uid: U128, frac_ids: None,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     let o_seq_id = cfp.next_sequence_id()
 
