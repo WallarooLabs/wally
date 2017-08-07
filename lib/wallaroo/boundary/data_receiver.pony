@@ -129,7 +129,7 @@ actor DataReceiver is Producer
 
   //////////////
   // ORIGIN (resilience)
-  fun ref _x_resilience_routes(): Acker =>
+  fun ref _acker(): Acker =>
     // TODO: I dont think we need this.
     // Need to discuss with John
     Acker

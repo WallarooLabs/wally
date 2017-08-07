@@ -14,9 +14,7 @@ trait tag Producer
   fun tag hash(): U64 =>
     (digestof this).hash()
 
-  //TO DO: one to many. swap in a watermarker here.
-
-  fun ref _x_resilience_routes(): Acker
+  fun ref _acker(): Acker
 
   // TO DO: temporary one to many change to make this public
   fun ref flush(low_watermark: SeqId)
@@ -32,7 +30,7 @@ trait tag Producer
     particular origin. We can now send the low watermark upstream to this
     origin.
     """
-    _x_resilience_routes().flushed(low_watermark)
+    _acker().flushed(low_watermark)
 
   fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId)
   =>
@@ -43,7 +41,7 @@ trait tag Producer
       @printf[I32]("Bookkeeping called for route %llu\n".cstring(), o_route_id)
     end
     ifdef "resilience" then
-      _x_resilience_routes().sent(o_route_id, o_seq_id)
+      _acker().sent(o_route_id, o_seq_id)
     end
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
@@ -60,4 +58,4 @@ trait tag Producer
       "\tseq_id: " + seq_id.string() + "\n\n").cstring())
     end
 
-    _x_resilience_routes().ack_received(this, route_id, seq_id)
+    _acker().ack_received(this, route_id, seq_id)
