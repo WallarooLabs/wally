@@ -52,6 +52,8 @@ class BoundaryRoute is Route
     Fail()
     true
 
+  // TO DO: one to many
+  // remove unused i_seq_id, i_route_id, i_origin
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
     pipeline_time_spent: U64, cfp: Producer ref,
     i_origin: Producer, msg_uid: U128, i_frac_ids: None, i_seq_id: SeqId,
@@ -71,24 +73,18 @@ class BoundaryRoute is Route
     _send_message_on_route(delivery_msg,
       pipeline_time_spent,
       cfp,
-      i_origin,
       msg_uid,
       i_frac_ids,
-      i_seq_id,
-      _route_id,
       latest_ts,
       metrics_id,
       metric_name,
       worker_ingress_ts)
     true
 
-  // TO DO: one to many
-  // remove , i_origin, i_route_id, i_seq_id
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val,
-    pipeline_time_spent: U64,
-    cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
-    i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64, metrics_id: U16,
-    metric_name: String, worker_ingress_ts: U64)
+    pipeline_time_spent: U64, cfp: Producer ref, msg_uid: U128,
+    i_frac_ids: None, latest_ts: U64, metrics_id: U16, metric_name: String,
+    worker_ingress_ts: U64)
   =>
     let o_seq_id = cfp.next_sequence_id()
 
