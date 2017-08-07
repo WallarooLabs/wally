@@ -71,7 +71,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
   var _ready_to_work_routes: SetIs[RouteLogic] = _ready_to_work_routes.create()
   let _recovery_replayer: RecoveryReplayer
 
-  let _resilience_routes: Acker = Acker
+  let _acker_x: Acker = Acker
 
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
     _outgoing_boundaries.create()
@@ -131,7 +131,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     for r in _routes.values() do
       r.application_created()
       ifdef "resilience" then
-        _resilience_routes.add_route(r)
+        _acker_x.add_route(r)
       end
     end
 
@@ -174,7 +174,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
       let next_route = route_builder(this, consumer, _metrics_reporter)
       if not _routes.contains(consumer) then
         _routes(consumer) = next_route
-        _resilience_routes.add_route(next_route)
+        _acker_x.add_route(next_route)
       end
       if _initialized then
         Fail()
@@ -190,12 +190,12 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
       _router = router
       for outdated_consumer in old_router.routes_not_in(_router).values() do
         let outdated_route = _routes(outdated_consumer)
-        _resilience_routes.remove_route(outdated_route)
+        _acker_x.remove_route(outdated_route)
       end
       for consumer in _router.routes().values() do
         if not _routes.contains(consumer) then
           let new_route = _route_builder(this, consumer, _metrics_reporter)
-          _resilience_routes.add_route(new_route)
+          _acker_x.add_route(new_route)
           _routes(consumer) = new_route
         end
       end
@@ -210,7 +210,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
       for outdated_consumer in old_router.routes_not_in(_omni_router).values()
       do
         let outdated_route = _routes(outdated_consumer)
-        _resilience_routes.remove_route(outdated_route)
+        _acker_x.remove_route(outdated_route)
       end
     else
       Fail()
@@ -221,7 +221,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
       if not _outgoing_boundaries.contains(state_name) then
         _outgoing_boundaries(state_name) = boundary
         let new_route = _route_builder(this, boundary, _metrics_reporter)
-        _resilience_routes.add_route(new_route)
+        _acker_x.add_route(new_route)
         _routes(boundary) = new_route
       end
     end
@@ -266,7 +266,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
         ifdef "trace" then
           @printf[I32]("Filtering\n".cstring())
         end
-        _resilience_routes.filtered(this, current_sequence_id())
+        _acker_x.filtered(this, current_sequence_id())
       end
       let end_ts = Time.nanos()
       let time_spent = end_ts - worker_ingress_ts
@@ -282,7 +282,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     end
 
     ifdef "resilience" then
-      _resilience_routes.track_incoming_to_outgoing(this,
+      _acker_x.track_incoming_to_outgoing(this,
         current_sequence_id(), i_origin, i_route_id, i_seq_id)
     end
 
@@ -322,7 +322,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
 
       if is_finished then
         ifdef "resilience" then
-          _resilience_routes.filtered(this, current_sequence_id())
+          _acker_x.filtered(this, current_sequence_id())
         end
         let end_ts = Time.nanos()
         let time_spent = end_ts - worker_ingress_ts
@@ -342,25 +342,25 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
           @printf[I32]("Filtering a dupe in replay\n".cstring())
         end
 
-        _resilience_routes.filtered(this, current_sequence_id())
+        _acker_x.filtered(this, current_sequence_id())
       end
     end
 
     ifdef "resilience" then
-      _resilience_routes.track_incoming_to_outgoing(this,
+      _acker_x.track_incoming_to_outgoing(this,
         current_sequence_id(), i_origin, i_route_id, i_seq_id)
     end
 
   //////////////////////
   // ORIGIN (resilience)
   be request_ack() =>
-    _resilience_routes.request_ack(this)
+    _acker_x.request_ack(this)
     for route in _routes.values() do
       route.request_ack()
     end
 
-  fun ref _x_resilience_routes(): Acker =>
-    _resilience_routes
+  fun ref _acker(): Acker =>
+    _acker_x
 
   fun ref flush(low_watermark: SeqId) =>
     ifdef "trace" then
