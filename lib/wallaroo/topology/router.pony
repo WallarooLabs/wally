@@ -189,9 +189,7 @@ class ProxyRouter is Equatable[ProxyRouter]
 trait OmniRouter is Equatable[OmniRouter]
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref,
-    i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    producer: Producer ref, msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   fun val add_boundary(w: String, boundary: OutgoingBoundary): OmniRouter val
   fun val update_route_to_proxy(id: U128,
@@ -204,9 +202,7 @@ trait OmniRouter is Equatable[OmniRouter]
 class val EmptyOmniRouter is OmniRouter
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref,
-    i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    producer: Producer ref, msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     @printf[I32]("route_with_target_id() was called on an EmptyOmniRouter\n".cstring())
@@ -252,13 +248,9 @@ class StepIdRouter is OmniRouter
     _step_map = step_map
     _outgoing_boundaries = outgoing_boundaries
 
-  // TO DO: one to many
-  // remove unused i_origin, i_seq_id, i_route_id
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref,
-    i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    producer: Producer ref, msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
