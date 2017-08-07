@@ -34,6 +34,7 @@ trait tag Producer
     """
     _x_resilience_routes().flushed(low_watermark)
 
+  // TO DO: one to many. cut down method signature
   fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId,
     i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
   =>
@@ -44,8 +45,7 @@ trait tag Producer
       @printf[I32]("Bookkeeping called for route %llu\n".cstring(), o_route_id)
     end
     ifdef "resilience" then
-      _x_resilience_routes().send(this, o_route_id, o_seq_id,
-        i_origin, i_route_id, i_seq_id)
+      _x_resilience_routes().sent(o_route_id, o_seq_id)
     end
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
@@ -62,4 +62,4 @@ trait tag Producer
       "\tseq_id: " + seq_id.string() + "\n\n").cstring())
     end
 
-    _x_resilience_routes().receive_ack(this, route_id, seq_id)
+    _x_resilience_routes().ack_received(this, route_id, seq_id)

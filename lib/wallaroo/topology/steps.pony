@@ -266,8 +266,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
         ifdef "trace" then
           @printf[I32]("Filtering\n".cstring())
         end
-        _resilience_routes.filter(this, current_sequence_id(),
-          i_origin, i_route_id, i_seq_id)
+        _resilience_routes.filtered(this, current_sequence_id())
       end
       let end_ts = Time.nanos()
       let time_spent = end_ts - worker_ingress_ts
@@ -280,6 +279,11 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
       _metrics_reporter.pipeline_metric(metric_name,
         time_spent + pipeline_time_spent)
       _metrics_reporter.worker_metric(metric_name, time_spent)
+    end
+
+    ifdef "resilience" then
+      _resilience_routes.track_incoming_to_outgoing(this,
+        current_sequence_id(), i_origin, i_route_id, i_seq_id)
     end
 
   fun ref next_sequence_id(): SeqId =>
@@ -317,10 +321,8 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
         latest_ts, metrics_id, worker_ingress_ts, _metrics_reporter)
 
       if is_finished then
-        //TODO: be more efficient (batching?)
         ifdef "resilience" then
-          _resilience_routes.filter(this, current_sequence_id(),
-            i_origin, i_route_id, i_seq_id)
+          _resilience_routes.filtered(this, current_sequence_id())
         end
         let end_ts = Time.nanos()
         let time_spent = end_ts - worker_ingress_ts
@@ -339,12 +341,14 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
         ifdef "trace" then
           @printf[I32]("Filtering a dupe in replay\n".cstring())
         end
-        // TODO ideally we want filter to create the id
-        // but there's problems initializing Routes with a ref
-        // back to its container. Especially in Boundary etc
-        _resilience_routes.filter(this, current_sequence_id(),
-          i_origin, i_route_id, i_seq_id)
+
+        _resilience_routes.filtered(this, current_sequence_id())
       end
+    end
+
+    ifdef "resilience" then
+      _resilience_routes.track_incoming_to_outgoing(this,
+        current_sequence_id(), i_origin, i_route_id, i_seq_id)
     end
 
   //////////////////////

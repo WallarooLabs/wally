@@ -27,27 +27,28 @@ class Acker
   fun ref remove_route(route: Route) =>
     _watermarker.remove_route(route.id())
 
-  fun ref send(producer: Producer ref, o_route_id: RouteId, o_seq_id: SeqId,
-    i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
-  =>
+  fun ref sent(o_route_id: RouteId, o_seq_id: SeqId) =>
     _watermarker.sent(o_route_id, o_seq_id)
-    _add_incoming(producer, o_seq_id, i_origin, i_route_id, i_seq_id)
 
-  fun ref filter(producer: Producer ref, o_seq_id: SeqId,
-    i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
+  fun ref filtered(producer: Producer ref, o_seq_id: SeqId)
   =>
     """
     Filter out a message or otherwise have this be the end of the line
     """
     _watermarker.filtered(o_seq_id)
-    _add_incoming(producer, o_seq_id, i_origin, i_route_id, i_seq_id)
+    // TO DO: one to many. _maybe_ack feels weird here.
     _maybe_ack(producer)
 
-  fun ref receive_ack(producer: Producer ref, route_id: RouteId,
+  fun ref ack_received(producer: Producer ref, route_id: RouteId,
     seq_id: SeqId)
   =>
     _watermarker.ack_received(route_id, seq_id)
     _maybe_ack(producer)
+
+  fun ref track_incoming_to_outgoing(producer: Producer ref, o_seq_id: SeqId,
+    i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
+  =>
+    _add_incoming(producer, o_seq_id, i_origin, i_route_id, i_seq_id)
 
   fun ref flushed(up_to: SeqId) =>
     _flushing = false
