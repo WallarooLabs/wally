@@ -22,8 +22,7 @@ interface Runner
   // and a Bool indicating whether the Route has filled its queue
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router val,
-    omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    omni_router: OmniRouter val, i_msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   fun name(): String
@@ -445,9 +444,8 @@ class ComputationRunner[In: Any val, Out: Any val]
 
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router val,
-    omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
-    metrics_id: U16, worker_ingress_ts: U64,
+    omni_router: OmniRouter val, i_msg_uid: U128, i_frac_ids: None,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
     var computation_start: U64 = 0
@@ -472,7 +470,7 @@ class ComputationRunner[In: Any val, Out: Any val]
         | let output: Out =>
           _next.run[Out](metric_name, pipeline_time_spent, output, producer,
             router, omni_router,
-            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+            i_msg_uid, i_frac_ids,
             computation_end, new_metrics_id, worker_ingress_ts,
             metrics_reporter)
         | let outputs: Array[Out] val =>
@@ -485,7 +483,7 @@ class ComputationRunner[In: Any val, Out: Any val]
           for output in outputs.values() do
             (let f, let s, let ts) = _next.run[Out](metric_name, pipeline_time_spent, output, producer,
               router, omni_router,
-              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+              i_msg_uid, i_frac_ids,
               computation_end, new_metrics_id, worker_ingress_ts,
               metrics_reporter)
 
@@ -553,12 +551,9 @@ class PreStateRunner[In: Any val, Out: Any val, S: State ref]
     //   )
     // end
 
-  // TO DO: one to many
-  // remove unused i_origin, i_seq_id, i_route_id
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router val,
-    omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    omni_router: OmniRouter val, i_msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
@@ -640,12 +635,9 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
       end
     end
 
-  // TO DO: one to many
-  // Remove unused i_origin, i_seq_id, i_route_id
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router val,
-    omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    omni_router: OmniRouter val, i_msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
@@ -749,12 +741,9 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
     end
 
 class iso RouterRunner
-  // TO DO: one to many
-  // Remove unused i_origin, i_seq_ud, i_route_id
   fun ref run[Out: Any val](metric_name: String, pipeline_time_spent: U64,
     output: Out, producer: Producer ref, router: Router val,
-    omni_router: OmniRouter val, i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    omni_router: OmniRouter val, i_msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64,
     metrics_reporter: MetricsReporter ref): (Bool, Bool, U64)
   =>
