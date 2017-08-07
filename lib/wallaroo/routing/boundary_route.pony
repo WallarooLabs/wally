@@ -82,6 +82,8 @@ class BoundaryRoute is Route
       worker_ingress_ts)
     true
 
+  // TO DO: one to many
+  // remove , i_origin, i_route_id, i_seq_id
   fun ref _send_message_on_route(delivery_msg: ReplayableDeliveryMsg val,
     pipeline_time_spent: U64,
     cfp: Producer ref, i_origin: Producer, msg_uid: U128, i_frac_ids: None,
@@ -100,7 +102,7 @@ class BoundaryRoute is Route
       worker_ingress_ts)
 
     ifdef "resilience" then
-      cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id, i_seq_id)
+      cfp._bookkeeping(_route_id, o_seq_id)
     end
 
   fun ref request_ack() =>

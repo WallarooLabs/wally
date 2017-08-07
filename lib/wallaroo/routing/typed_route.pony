@@ -80,6 +80,8 @@ class TypedRoute[In: Any val] is Route
     Fail()
     true
 
+  // TO DO: one to many
+  // remove  i_origin, i_route_id, i_seq_id
   fun ref _send_message_on_route(metric_name: String, pipeline_time_spent: U64,
     input: In, cfp: Producer ref, i_origin: Producer, msg_uid: U128,
     frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
@@ -120,7 +122,7 @@ class TypedRoute[In: Any val] is Route
     end
 
     ifdef "resilience" then
-      cfp._bookkeeping(_route_id, o_seq_id, i_origin, i_route_id, i_seq_id)
+      cfp._bookkeeping(_route_id, o_seq_id)
     end
 
   fun ref request_ack() =>
