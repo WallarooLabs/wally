@@ -10,10 +10,6 @@ trait tag Producer
   fun ref next_sequence_id(): SeqId
   fun ref current_sequence_id(): SeqId
 
-  // from Origin
-  fun tag hash(): U64 =>
-    (digestof this).hash()
-
   fun ref _acker(): Acker
 
   // TO DO: temporary one to many change to make this public
