@@ -6,7 +6,7 @@ use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/network"
-use "wallaroo/tcp_sink"
+use "wallaroo/sink"
 use "wallaroo/tcp_source"
 use "wallaroo/recovery"
 use "wallaroo/routing"
@@ -22,7 +22,7 @@ class ActorSystem
   let _actor_builders: Array[WActorWrapperBuilder] = _actor_builders.create()
   let _sources: Array[(WActorFramedSourceHandler, WActorRouter)] =
     _sources.create()
-  let _sinks: Array[TCPSinkBuilder] = _sinks.create()
+  let _sinks: Array[SinkBuilder] = _sinks.create()
   let _broadcast_variables: Map[String, Any val] =
     _broadcast_variables.create()
 
@@ -50,12 +50,10 @@ class ActorSystem
 
   // TODO: Figure out why this failed to get passed "Reachability"
   // when compiling if you use .> but not if you use .
-  fun ref add_sink[Out: Any val](encoder: SinkEncoder[Out],
-    initial_msgs: Array[Array[ByteSeq] val] val
-      = recover Array[Array[ByteSeq] val] end): ActorSystem
+  fun ref add_sink[Out: Any val](sink_information: SinkConfig[Out]):
+    ActorSystem
   =>
-    let builder = TCPSinkBuilder(TypedEncoderWrapper[Out](encoder),
-      initial_msgs)
+    let builder = sink_information()
     _sinks.push(builder)
     this
 
@@ -68,7 +66,7 @@ class ActorSystem
   fun val sources(): Array[(WActorFramedSourceHandler, WActorRouter)] val =>
     _sources
 
-  fun val sinks(): Array[TCPSinkBuilder] val =>
+  fun val sinks(): Array[SinkBuilder] val =>
     _sinks
 
   fun val broadcast_variables(): Map[String, Any val] val =>
@@ -78,7 +76,7 @@ class val LocalActorSystem
   let _name: String
   let _actor_builders: Array[WActorWrapperBuilder] val
   let _sources: Array[(WActorFramedSourceHandler, WActorRouter)] val
-  let _sinks: Array[TCPSinkBuilder] val
+  let _sinks: Array[SinkBuilder] val
   let _actor_to_worker_map: Map[U128, String] val
   let _worker_names: Array[String] val
   let _roles: Map[String, Role box] val
@@ -87,7 +85,7 @@ class val LocalActorSystem
   new val create(name': String,
     actor_builders': Array[WActorWrapperBuilder] val,
     sources': Array[(WActorFramedSourceHandler, WActorRouter)] val,
-    sinks': Array[TCPSinkBuilder] val,
+    sinks': Array[SinkBuilder] val,
     actor_to_worker_map': Map[U128, String] val,
     worker_names': Array[String] val,
     roles': Map[String, Role box] val,
@@ -159,7 +157,7 @@ class val LocalActorSystem
   fun sources(): Array[(WActorFramedSourceHandler, WActorRouter)] val =>
     _sources
 
-  fun sinks(): Array[TCPSinkBuilder] val =>
+  fun sinks(): Array[SinkBuilder] val =>
     _sinks
 
   fun actor_to_worker_map(): Map[U128, String] val =>

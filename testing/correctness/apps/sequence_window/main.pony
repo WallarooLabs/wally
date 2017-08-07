@@ -65,6 +65,7 @@ use "sendence/bytes"
 use "wallaroo/"
 use "wallaroo/fail"
 use "wallaroo/state"
+use "wallaroo/tcp_sink"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 use "window_codecs"
@@ -83,11 +84,13 @@ actor Main
       let application = recover val
         Application("Sequence Window Printer")
           .new_pipeline[U64 val, String val]("Sequence Window",
-            U64FramedHandler)
+            TCPSourceConfig[U64 val].from_options(U64FramedHandler,
+              TCPSourceConfigCLIParser(env.args)(0)))
           .to_state_partition[U64 val, U64 val, String val,
             WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
               partition where multi_worker = true)
-          .to_sink(WindowEncoder, recover [0] end)
+          .to_sink(TCPSinkConfig[String val].from_options(WindowEncoder,
+              TCPSinkConfigCLIParser(env.args)(0)))
       end
       Startup(env, application, "sequence_window")
     else

@@ -9,7 +9,7 @@ use "wallaroo/invariant"
 use "wallaroo/messages"
 use "wallaroo/network"
 use "wallaroo/recovery"
-use "wallaroo/tcp_sink"
+use "wallaroo/sink"
 use "wallaroo/topology"
 
 class WActorRegistry
@@ -159,7 +159,7 @@ actor CentralWActorRegistry
   let _worker_name: String
   let _auth: AmbientAuth
   let _initializer: WActorInitializer
-  var _sinks: Array[TCPSink] val
+  var _sinks: Array[Sink] val
   let _event_log: EventLog
   let _actors: Map[U128, WActorWrapper tag] = _actors.create()
   let _role_sets: Map[String, SetIs[U128]] = _role_sets.create()
@@ -172,7 +172,7 @@ actor CentralWActorRegistry
   let _rand: EnhancedRandom
 
   new create(worker: String, auth: AmbientAuth, init: WActorInitializer,
-    connections: Connections, sinks: Array[TCPSink] val, event_log: EventLog,
+    connections: Connections, sinks: Array[Sink] val, event_log: EventLog,
     seed: U64)
   =>
     _worker_name = worker
@@ -183,7 +183,7 @@ actor CentralWActorRegistry
     _event_log = event_log
     _rand = EnhancedRandom(seed)
 
-  be update_sinks(s: Array[TCPSink] val) =>
+  be update_sinks(s: Array[Sink] val) =>
     _sinks = s
 
   be update_boundaries(bs: Map[String, OutgoingBoundary] val) =>

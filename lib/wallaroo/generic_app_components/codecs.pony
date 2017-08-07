@@ -1,5 +1,5 @@
 use "buffered"
-use "wallaroo/tcp_source"
+use "wallaroo/source"
 use "sendence/bytes"
 
 primitive U64Decoder is FramedSourceHandler[U64 val]
