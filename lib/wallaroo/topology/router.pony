@@ -12,9 +12,7 @@ use "wallaroo/w_actor"
 
 interface Router
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref,
-    i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    producer: Producer ref, i_msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   fun routes(): Array[ConsumerStep] val
   fun routes_not_in(router: Router val): Array[ConsumerStep] val
@@ -24,9 +22,7 @@ interface RouterBuilder
 
 class EmptyRouter
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref,
-    i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    producer: Producer ref, i_msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     (true, true, latest_ts)
@@ -43,12 +39,8 @@ class DirectRouter
   new val create(target: ConsumerStep tag) =>
     _target = target
 
-  // TO DO: one to many
-  // remove i_origin, i_seq_id, i_route_id
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref,
-    i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    producer: Producer ref, i_msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
@@ -106,12 +98,8 @@ class ProxyRouter is Equatable[ProxyRouter]
     _target_proxy_address = target_proxy_address
     _auth = auth
 
-  // TO DO: one to many
-  // remove unused i_origin, i_seq_id, i_route_id
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref,
-    i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    producer: Producer ref, msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
@@ -739,9 +727,7 @@ class LocalPartitionRouter[In: Any val,
     end
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref,
-    i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    producer: Producer ref, i_msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
@@ -776,7 +762,7 @@ class LocalPartitionRouter[In: Any val,
             end
           | let p: ProxyRouter val =>
             p.route[D](metric_name, pipeline_time_spent, data, producer,
-              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+              i_msg_uid, i_frac_ids,
               latest_ts, metrics_id, worker_ingress_ts)
           else
             // No step or proxyrouter
@@ -791,7 +777,7 @@ class LocalPartitionRouter[In: Any val,
               @printf[I32]("PartitionRouter sending to default step as there was no entry for key\n".cstring())
             end
             r.route[In](metric_name, pipeline_time_spent, input, producer,
-              i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+              i_msg_uid, i_frac_ids,
               latest_ts, metrics_id, worker_ingress_ts)
           else
             ifdef debug then
