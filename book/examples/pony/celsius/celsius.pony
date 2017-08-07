@@ -13,10 +13,6 @@ use "wallaroo/topology"
 actor Main
   new create(env: Env) =>
     try
-      let temps: Array[Array[U8] val] trn = recover Array[Array[U8] val] end
-      temps.push(recover [as U8: 0, 0, 0, 0] end)
-      let t: Array[Array[U8] val] val = consume temps
-
       let application = recover val
         Application("Celsius Conversion App")
           .new_pipeline[F32, F32]("Celsius Conversion",
