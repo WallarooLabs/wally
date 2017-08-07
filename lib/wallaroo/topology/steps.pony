@@ -259,7 +259,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     end
     (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
       pipeline_time_spent, data, this, _router, _omni_router,
-      i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
+      msg_uid, i_frac_ids,
       my_latest_ts, my_metrics_id, worker_ingress_ts, _metrics_reporter)
     if is_finished then
       ifdef "resilience" then
@@ -317,7 +317,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
         i_route_id))
       (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
         pipeline_time_spent, data, this, _router, _omni_router,
-        i_origin, msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        msg_uid, i_frac_ids,
         latest_ts, metrics_id, worker_ingress_ts, _metrics_reporter)
 
       if is_finished then
