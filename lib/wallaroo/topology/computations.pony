@@ -57,6 +57,8 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
 
   fun input(): Any val => _input
 
+  // TO DO: one to many
+  // remove unused i_origin, i_seq_id, i_route_id
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref,
@@ -79,7 +81,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
       (let is_finished, let keep_sending, let last_ts) = omni_router.route_with_target_id[Out](
         _target_id, metric_name, pipeline_time_spent, output, producer,
         // incoming envelope
-        i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+        i_msg_uid, i_frac_ids,
         computation_end, metrics_id, worker_ingress_ts)
 
       (is_finished, keep_sending, result._2, computation_start,
@@ -96,7 +98,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
               omni_router.route_with_target_id[Out](
                 _target_id, metric_name, pipeline_time_spent, output, producer,
                 // incoming envelope
-                i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
+                i_msg_uid, i_frac_ids,
                 computation_end, metrics_id, worker_ingress_ts)
 
             // we are sending multiple messages, only mark this message as
