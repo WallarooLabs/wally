@@ -33,12 +33,10 @@ trait StateProcessor[S: State ref] is BasicComputation
   // still want the message passed along
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
-    producer: Producer ref,
-    i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: SeqId,
-      latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
-      (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
-        U64, U64)
+    producer: Producer ref, i_msg_uid: U128, i_frac_ids: None,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
+    (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
+      U64, U64)
 
 trait InputWrapper
   fun input(): Any val
@@ -57,16 +55,12 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
 
   fun input(): Any val => _input
 
-  // TO DO: one to many
-  // remove unused i_origin, i_seq_id, i_route_id
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
-    producer: Producer ref,
-    i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
-      latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
-      (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
-        U64, U64)
+    producer: Producer ref, i_msg_uid: U128, i_frac_ids: None,
+    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
+    (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
+      U64, U64)
   =>
     let computation_start = Time.nanos()
     let result = _state_comp(_input, sc_repo, state)
