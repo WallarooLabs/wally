@@ -193,9 +193,7 @@ actor TCPSource is Producer
   be log_flushed(low_watermark: SeqId) =>
     None
 
-  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId,
-    i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
-  =>
+  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
     None
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>

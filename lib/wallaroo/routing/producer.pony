@@ -34,9 +34,7 @@ trait tag Producer
     """
     _x_resilience_routes().flushed(low_watermark)
 
-  // TO DO: one to many. cut down method signature
-  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId,
-    i_origin: Producer, i_route_id: RouteId, i_seq_id: SeqId)
+  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId)
   =>
     """
     Process envelopes and keep track of things
