@@ -110,11 +110,12 @@ extern PyObject *get_name(PyObject *pObject)
   return pValue;
 }
 
-extern PyObject *computation_compute(PyObject *computation, PyObject *data)
+extern PyObject *computation_compute(PyObject *computation, PyObject *data,
+  char* method)
 {
   PyObject *pFunc, *pValue;
 
-  pFunc = PyObject_GetAttrString(computation, "compute");
+  pFunc = PyObject_GetAttrString(computation, method);
   pValue = PyObject_CallFunctionObjArgs(pFunc, data, NULL);
   Py_DECREF(pFunc);
 
@@ -282,4 +283,9 @@ extern int py_bool_check(PyObject *b)
 extern int is_py_none(PyObject *o)
 {
   return o == Py_None;
+}
+
+extern int py_list_check(PyObject *l)
+{
+  return PyList_Check(l);
 }
