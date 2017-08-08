@@ -294,9 +294,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
 
   ///////////
   // RECOVERY
-  fun _is_duplicate(origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId): Bool
-  =>
+  fun _is_duplicate(msg_uid: U128): Bool =>
     for e in _deduplication_list.values() do
       //TODO: Bloom filter maybe?
       if e._2 == msg_uid then
@@ -311,8 +309,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _seq_id_generator.new_incoming_message()
-    if not _is_duplicate(i_origin, msg_uid, i_frac_ids, i_seq_id,
-      i_route_id) then
+    if not _is_duplicate(msg_uid) then
       _deduplication_list.push((i_origin, msg_uid, i_frac_ids, i_seq_id,
         i_route_id))
       (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
@@ -370,8 +367,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
 
   be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val)
   =>
-    //TODO: replace origin_id seq_id and route_id in here if needed (amosca believes not)
-    if not _is_duplicate(this, uid, frac_ids, 0, 0) then
+    if not _is_duplicate(uid) then
       _deduplication_list.push((this, uid, frac_ids, 0, 0))
       match _runner
       | let r: ReplayableRunner =>
