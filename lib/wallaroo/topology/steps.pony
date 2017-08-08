@@ -53,7 +53,6 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
   let _metrics_reporter: MetricsReporter
   let _default_target: (Step | None)
   // list of envelopes
-  // (origin, msg_uid, frac_ids, seq_id, route_id)
   let _deduplication_list: Array[(Producer, U128, (Array[U64] val | None),
     SeqId, RouteId)] = _deduplication_list.create()
   let _event_log: EventLog
