@@ -157,11 +157,12 @@ extern PyObject *state_builder_build_state(PyObject *state_builder)
   return pValue;
 }
 
-extern PyObject *stateful_computation_compute(PyObject *computation, PyObject *data, PyObject *state)
+extern PyObject *stateful_computation_compute(PyObject *computation,
+  PyObject *data, PyObject *state, char *method)
 {
   PyObject *pFunc, *pValue;
 
-  pFunc = PyObject_GetAttrString(computation, "compute");
+  pFunc = PyObject_GetAttrString(computation, method);
   pValue = PyObject_CallFunctionObjArgs(pFunc, data, state, NULL);
   Py_DECREF(pFunc);
 

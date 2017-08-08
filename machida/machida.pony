@@ -38,7 +38,7 @@ use @computation_compute[Pointer[U8] val](c: Pointer[U8] val,
 use @state_builder_build_state[Pointer[U8] val](sb: Pointer[U8] val)
 
 use @stateful_computation_compute[Pointer[U8] val](c: Pointer[U8] val,
-  d: Pointer[U8] val, s: Pointer[U8] val)
+  d: Pointer[U8] val, s: Pointer[U8] val, m: Pointer[U8] tag)
 
 use @source_decoder_header_length[USize](source_decoder: Pointer[U8] val)
 use @source_decoder_payload_length[USize](source_decoder: Pointer[U8] val,
@@ -285,25 +285,11 @@ class PyComputation is Computation[PyData val, PyData val]
     _is_multi = Machida.implements_compute_multi(_computation)
 
   fun apply(input: PyData val): (PyData val | Array[PyData val] val |None) =>
-    let r: Pointer[U8] val = if not _is_multi then
-      Machida.computation_compute(_computation, input.obj())
-    else
-      Machida.computation_compute_multi(_computation, input.obj())
-    end
+    let r: Pointer[U8] val =
+      Machida.computation_compute(_computation, input.obj(), _is_multi)
 
     if not r.is_null() then
-      if not _is_multi then
-        recover PyData(r) end
-      else
-        if @py_list_check(r) == 1 then
-          let out = Machida.py_list_int_to_pony_array_pydata(r)
-          Machida.dec_ref(r)
-          out
-        else
-          @printf[U32]("compute_multi must return a list\n".cstring())
-          Fail()
-        end
-      end
+      Machida.process_computation_results(r, _is_multi)
     else
       None
     end
@@ -326,22 +312,26 @@ class PyComputation is Computation[PyData val, PyData val]
 class PyStateComputation is StateComputation[PyData val, PyData val, PyState]
   var _computation: Pointer[U8] val
   let _name: String
+  let _is_multi: Bool
 
   new create(computation: Pointer[U8] val) =>
     _computation = computation
     _name = Machida.get_name(_computation)
+    _is_multi = Machida.implements_compute_multi(_computation)
 
   fun apply(input: PyData val,
     sc_repo: StateChangeRepository[PyState], state: PyState):
-    ((PyData val | None), (None | DirectStateChange))
+    ((PyData val | Array[PyData val] val | None), (None | DirectStateChange))
   =>
-    (let data, let persist) = Machida.stateful_computation_compute(_computation,
-      input.obj(), state.obj())
+    (let data, let persist) =
+      Machida.stateful_computation_compute(_computation, input.obj(),
+        state.obj(), _is_multi)
+
     let d = recover if Machida.is_py_none(data) then
         Machida.dec_ref(data)
         None
       else
-        recover val PyData(data) end
+        Machida.process_computation_results(data, _is_multi)
       end
     end
 
@@ -610,24 +600,21 @@ primitive Machida
     print_errors()
     r
 
-  fun computation_compute(computation: Pointer[U8] val, data: Pointer[U8] val):
-    Pointer[U8] val
+  fun computation_compute(computation: Pointer[U8] val, data: Pointer[U8] val,
+    multi: Bool): Pointer[U8] val
   =>
-    let r = @computation_compute(computation, data, "compute".cstring())
-    print_errors()
-    r
-
-  fun computation_compute_multi(computation: Pointer[U8] val,
-    data: Pointer[U8] val): Pointer[U8] val
-  =>
-    let r = @computation_compute(computation, data, "compute_multi".cstring())
+    let method = if multi then "compute_multi" else "compute" end
+    let r = @computation_compute(computation, data, method.cstring())
     print_errors()
     r
 
   fun stateful_computation_compute(computation: Pointer[U8] val,
-    data: Pointer[U8] val, state: Pointer[U8] val): (Pointer[U8] val, Pointer[U8] val)
+    data: Pointer[U8] val, state: Pointer[U8] val, multi: Bool):
+  (Pointer[U8] val, Pointer[U8] val)
   =>
-    let r = @stateful_computation_compute(computation, data, state)
+    let method = if multi then "compute_multi" else "compute" end
+    let r =
+      @stateful_computation_compute(computation, data, state, method.cstring())
     print_errors()
     let msg = @PyTuple_GetItem(r, 0)
     let persist = @PyTuple_GetItem(r, 1)
@@ -758,6 +745,23 @@ primitive Machida
 
   fun dec_ref(o: Pointer[U8] box) =>
     @py_decref(o)
+
+  fun process_computation_results(data: Pointer[U8] val, multi: Bool):
+    (PyData val | Array[PyData val] val)
+  =>
+    if not multi then
+      recover val PyData(data) end
+    else
+      if @py_list_check(data) == 1 then
+        let out = Machida.py_list_int_to_pony_array_pydata(data)
+        Machida.dec_ref(data)
+        out
+      else
+        @printf[U32]("compute_multi must return a list\n".cstring())
+        Fail()
+        recover val Array[PyData val] end
+      end
+    end
 
   fun implements_compute_multi(o: Pointer[U8] box): Bool =>
     implements_method(o, "compute_multi")
