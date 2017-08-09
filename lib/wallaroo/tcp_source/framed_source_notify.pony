@@ -75,7 +75,6 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
 
       (let is_finished, let keep_sending, let last_ts) =
         try
-          conn.next_sequence_id()
           let decoded =
             try
               _handler.decode(consume data)
