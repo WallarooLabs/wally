@@ -135,7 +135,7 @@ Use `data` to perform a computation and return a new output. `data` is the pytho
 
 ##### `compute_multi(data)`
 
-Use `data` to perform a computation and return a series of new outputs. `data` is the python object the previous step in the pipeline returned. Output is a list of items. Used to turn 1 incoming object into many outgoing objects.
+Use `data` to perform a computation and return a series of new outputs. `data` is the python object the previous step in the pipeline returned. Output is a list of items. Used to turn 1 incoming object into many outgoing objects. Each item in the list will arrive individually at the next step; i.e. not as a list.
 
 #### Example Computations
 
@@ -340,7 +340,7 @@ Why wouldn't we always return `True`? There are two answers:
 
 ##### `compute_multi(data, state)`
 
-Same as `compute` but the first element of the return tuple is a list of messages to send on to our next step. Allows taking a single input message and creating multiple outputs.
+Same as `compute` but the first element of the return tuple is a list of messages to send on to our next step. Allows taking a single input message and creating multiple outputs. Each item in the list will arrive individually at the next step; i.e. not as a list.
 
 #### Example StateComputation
 
