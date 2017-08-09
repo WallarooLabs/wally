@@ -1,4 +1,5 @@
 use "wallaroo/boundary"
+use "wallaroo/fail"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 
@@ -17,8 +18,15 @@ primitive TypedRouteBuilder[In: Any val] is RouteBuilder
       TypedRoute[In](step, consumer, consume metrics_reporter)
     end
 
-primitive EmptyRouteBuilder is RouteBuilder
+primitive BoundaryOnlyRouteBuilder is RouteBuilder
   fun apply(step: Producer ref, consumer: ConsumerStep,
     metrics_reporter: MetricsReporter ref): Route
   =>
-    EmptyRoute
+    match consumer
+    | let boundary: OutgoingBoundary =>
+      BoundaryRoute(step, boundary, consume metrics_reporter)
+    else
+      Fail()
+      EmptyRoute
+    end
+

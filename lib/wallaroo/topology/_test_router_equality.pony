@@ -256,7 +256,7 @@ primitive _DefaultRouterGenerator
 primitive _StepGenerator
   fun apply(event_log: EventLog, recovery_replayer: RecoveryReplayer): Step =>
     Step(RouterRunner, MetricsReporter("", "", _NullMetricsSink),
-      1, EmptyRouteBuilder, event_log, recovery_replayer,
+      1, BoundaryOnlyRouteBuilder, event_log, recovery_replayer,
       recover Map[String, OutgoingBoundary] end)
 
 primitive _BoundaryGenerator

@@ -595,8 +595,11 @@ class DataRouter is Equatable[DataRouter]
     ids
 
   fun routes(): Array[ConsumerStep] val =>
-    // TODO: CREDITFLOW - real implmentation?
-    recover val Array[ConsumerStep] end
+    let rs: Array[ConsumerStep] trn = recover Array[ConsumerStep] end
+    for step in _data_routes.values() do
+      rs.push(step)
+    end
+    consume rs
 
   fun remove_route(id: U128): DataRouter val =>
     // TODO: Using persistent maps for our fields would make this much more
@@ -1001,15 +1004,13 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
     _partition_size
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref,
-    i_origin: Producer, i_msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    producer: Producer ref, i_msg_uid: U128, i_frac_ids: None,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
       @printf[I32]("Rcvd msg at StatelessPartitionRouter\n".cstring())
     end
-    let stateless_partition_id = i_seq_id % size().u64()
+    let stateless_partition_id = producer.current_sequence_id() % size().u64()
 
     try
       match _partition_routes(stateless_partition_id)
@@ -1024,8 +1025,8 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
             // hand down producer so we can update route_id
             producer,
             // incoming envelope
-            i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-            latest_ts, metrics_id, worker_ingress_ts)
+            i_msg_uid, i_frac_ids, latest_ts, metrics_id,
+            worker_ingress_ts)
           (false, keep_sending, latest_ts)
         else
           // TODO: What do we do if we get None?
@@ -1033,8 +1034,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
         end
       | let p: ProxyRouter val =>
         p.route[D](metric_name, pipeline_time_spent, data, producer,
-          i_origin, i_msg_uid, i_frac_ids, i_seq_id, i_route_id,
-          latest_ts, metrics_id, worker_ingress_ts)
+          i_msg_uid, i_frac_ids, latest_ts, metrics_id, worker_ingress_ts)
       else
         // No step or proxyrouter
         (true, true, latest_ts)
@@ -1053,17 +1053,25 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
     end
 
   fun routes(): Array[ConsumerStep] val =>
-    let cs: Array[ConsumerStep] trn =
-      recover Array[ConsumerStep] end
+    let cs: SetIs[ConsumerStep] = cs.create()
 
     for s in _partition_routes.values() do
       match s
       | let step: Step =>
-        cs.push(step)
+        cs.set(step)
+      | let pr: ProxyRouter val =>
+        for r in pr.routes().values() do
+          cs.set(r)
+        end
       end
     end
 
-    consume cs
+    let to_send: Array[ConsumerStep] trn = recover Array[ConsumerStep] end
+    for c in cs.values() do
+      to_send.push(c)
+    end
+
+    consume to_send
 
   fun routes_not_in(router: Router val): Array[ConsumerStep] val =>
     let diff: Array[ConsumerStep] trn = recover Array[ConsumerStep] end

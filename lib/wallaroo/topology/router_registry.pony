@@ -155,6 +155,11 @@ actor RouterRegistry
     for step in _omni_router_steps.values() do
       step.add_boundaries(new_boundaries_sendable)
     end
+    for step in _data_router.routes().values() do
+      match step
+      | let s: Step => s.add_boundaries(new_boundaries_sendable)
+      end
+    end
 
     // Boundary builders
     let new_boundary_builders: Map[String, OutgoingBoundaryBuilder val] trn =
