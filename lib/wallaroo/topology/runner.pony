@@ -83,7 +83,7 @@ class RunnerSequenceBuilder is RunnerBuilder
       try
         _runner_builders(_runner_builders.size() - 1).forward_route_builder()
       else
-        EmptyRouteBuilder
+        BoundaryOnlyRouteBuilder
       end
 
     _in_route_builder =
@@ -164,7 +164,7 @@ class RunnerSequenceBuilder is RunnerBuilder
     try
       _runner_builders(_runner_builders.size() - 1).route_builder()
     else
-      EmptyRouteBuilder
+      BoundaryOnlyRouteBuilder
     end
   fun forward_route_builder(): RouteBuilder val => _forward_route_builder
   fun in_route_builder(): (RouteBuilder val | None) => _in_route_builder
@@ -211,7 +211,7 @@ class ComputationRunnerBuilder[In: Any val, Out: Any val] is RunnerBuilder
   fun is_stateless_parallel(): Bool => _parallelized
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => _route_builder
-  fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun forward_route_builder(): RouteBuilder val => BoundaryOnlyRouteBuilder
 
 interface DefaultStateable
   fun default_state_name(): String
@@ -292,7 +292,7 @@ class StateRunnerBuilder[S: State ref] is RunnerBuilder
   new val create(state_builder: StateBuilder[S] val,
     state_name': String,
     state_change_builders: Array[StateChangeBuilder[S] val] val,
-    route_builder': RouteBuilder val = EmptyRouteBuilder)
+    route_builder': RouteBuilder val = BoundaryOnlyRouteBuilder)
   =>
     _state_builder = state_builder
     _state_name = state_name'
@@ -317,7 +317,7 @@ class StateRunnerBuilder[S: State ref] is RunnerBuilder
   fun is_stateful(): Bool => true
   fun id(): U128 => _id
   fun route_builder(): RouteBuilder val => _route_builder
-  fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun forward_route_builder(): RouteBuilder val => BoundaryOnlyRouteBuilder
 
 trait PartitionBuilder
   // These two methods need to be deterministic at the moment since they

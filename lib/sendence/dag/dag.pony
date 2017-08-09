@@ -6,9 +6,12 @@ class Dag[V: Any val]
   let _edges: Array[(DagNode[V], DagNode[V])] = _edges.create()
 
   fun ref add_node(value: V, id': U128 = 0): U128 =>
-    let id = if id' == 0 then _gen_guid() else id' end 
+    let id = if id' == 0 then _gen_guid() else id' end
     _nodes(id) = DagNode[V](value, id)
     id
+
+  fun contains(id: U128): Bool =>
+    _nodes.contains(id)
 
   fun get_node(id: U128): this->DagNode[V] ? =>
     _nodes(id)
@@ -34,8 +37,8 @@ class Dag[V: Any val]
         else
           @printf[I32]("There is no node for to_id\n".cstring())
           error
-        end        
-        
+        end
+
       // Obviously this only catches simple cycles
       if from.has_input_from(to) then
         @printf[I32]("Cycles are not allowed!\n".cstring())
@@ -43,9 +46,9 @@ class Dag[V: Any val]
       end
       if not from.has_output_from(to) then
         _edges.push((from, to))
-        from.add_output(to)      
-        to.add_input(from)      
-      end    
+        from.add_output(to)
+        to.add_input(from)
+      end
     else
       @printf[I32]("Failed to add edge to graph\n".cstring())
       error
@@ -54,19 +57,19 @@ class Dag[V: Any val]
   fun is_empty(): Bool => _nodes.size() == 0
 
   fun clone(): Dag[V] val ? =>
-    let c: Dag[V] trn = recover Dag[V] end 
+    let c: Dag[V] trn = recover Dag[V] end
     for (id, node) in _nodes.pairs() do
       c.add_node(node.value, node.id)
     end
     for edge in _edges.values() do
       c.add_edge(edge._1.id, edge._2.id)
-    end 
+    end
     consume c
 
   fun string(): String =>
     var s = "GRAPH:\n"
     for (id, node) in _nodes.pairs() do
-      let name = 
+      let name =
         match node.value
         | let n: Named val => "\"" + n.name() + "\""
         else
@@ -76,7 +79,7 @@ class Dag[V: Any val]
       s = s + name + " --> "
       var outputs = ""
       for out in node.outs() do
-        let out_name = 
+        let out_name =
           match out.value
           | let n: Named val => "\"" + n.name() + "\""
           else
@@ -94,7 +97,7 @@ class Dag[V: Any val]
   // as a field
   fun _gen_guid(): U128 =>
     GuidGenerator.u128()
- 
+
 class DagNode[V: Any val]
   let id: U128
   let _ins: Array[DagNode[V]] = _ins.create()

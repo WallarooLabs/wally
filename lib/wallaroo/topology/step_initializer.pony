@@ -28,7 +28,7 @@ class StepBuilder
     pipeline_name': String, r: RunnerBuilder val, id': U128,
     is_stateful': Bool = false,
     pre_state_target_id': (U128 | None) = None,
-    forward_route_builder': RouteBuilder val = EmptyRouteBuilder)
+    forward_route_builder': RouteBuilder val = BoundaryOnlyRouteBuilder)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -103,7 +103,7 @@ class SourceData
     _state_name = _runner_builder.state_name()
     _route_builder =
       match _runner_builder.route_builder()
-      | let e: EmptyRouteBuilder val =>
+      | let e: BoundaryOnlyRouteBuilder val =>
         default_source_route_builder
       else
         _runner_builder.route_builder()
@@ -175,7 +175,7 @@ class EgressBuilder
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun forward_route_builder(): RouteBuilder val => BoundaryOnlyRouteBuilder
   fun clone_router_and_set_input_type(r: Router val,
     dr: (Router val | None) = None): Router val => r
 
@@ -270,6 +270,6 @@ class val PreStatelessData
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder val => EmptyRouteBuilder
+  fun forward_route_builder(): RouteBuilder val => BoundaryOnlyRouteBuilder
   fun clone_router_and_set_input_type(r: Router val,
     dr: (Router val | None) = None): Router val => r

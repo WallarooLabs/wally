@@ -1,27 +1,21 @@
 """
-This app provides an example of two separate running Wallaroo apps
-that are connected sink-to-source (forming a closed circle between
-them). There is no need to set up any external data listeners.
+This app demonstrates a stateless partition where all data ends up
+at a computation after the partition which prints "Finished processing x",
+where x is the value of the U64 that entered the system.
 
-// 1. Giles receiver:
-// ```bash
-// ../../../../giles/receiver/receiver --ponythreads=1 --ponynoblock \
-// --ponypinasio -l 127.0.0.1:5555
-// ```
-
-2. Worker 1:
+1. Worker 1:
 ```bash
 ./simple_stateless_partition -i 127.0.0.1:7000 -o 127.0.0.1:7001 \
 -m 127.0.0.1:5001 -c 127.0.0.1:6002 -d 127.0.0.1:6004 -w 2 -t
 ```
 
-3. Worker 2:
+2. Worker 2:
 ```bash
 ./simple_stateless_partition -i 127.0.0.1:7000 -o 127.0.0.1:7001 \
 -m 127.0.0.1:5001 -c 127.0.0.1:6002 -d 127.0.0.1:6004 -n worker2 -w 2
 ```
 
-4. Sender
+3. Sender
 ```bash
 ../../../../giles/sender/sender -h 127.0.0.1:7000 -s 100 -i 50_000_000 \
 --ponythreads=1 -y -g 12 -w -u -m 10000
@@ -33,6 +27,7 @@ use "serialise"
 use "sendence/bytes"
 use "wallaroo"
 use "wallaroo/fail"
+use "wallaroo/source"
 use "wallaroo/tcp_source"
 use "wallaroo/topology"
 
@@ -42,10 +37,11 @@ actor Main
       let application =
         recover val
           Application("Simple Stateless Partition")
-            .new_pipeline[U64, U64]("IdentityPrint Pipeline",
-              U64FramedHandler where coalescing = false)
-              .to[U64]({(): Identity => Identity})
+            .new_pipeline[U64, None]("IdentityPrint Pipeline",
+              TCPSourceConfig[U64].from_options(U64FramedHandler,
+              TCPSourceConfigCLIParser(env.args)(0)) where coalescing = false)
               .to_parallel[U64]({(): IdentityPrint => IdentityPrint})
+              .to[None]({(): EndOfLine => EndOfLine})
               .done()
         end
       Startup(env, application, "simple-stateless-partition")
@@ -60,13 +56,14 @@ primitive IdentityPrint is Computation[U64, U64]
 
   fun name(): String => "IdentityPrint"
 
-primitive Identity is Computation[U64, U64]
-  fun apply(input: U64): U64 =>
-    input
+primitive EndOfLine is Computation[U64, None]
+  fun apply(input: U64): None =>
+    @printf[I32]("Finished processing %s\n".cstring(),
+      input.string().cstring())
 
-  fun name(): String => "Identity"
+  fun name(): String => "EndOfLine"
 
-primitive U64FramedHandler is FramedSourceHandler[U64 val]
+primitive U64FramedHandler is FramedSourceHandler[U64]
   fun header_length(): USize =>
     4
 

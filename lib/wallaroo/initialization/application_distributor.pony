@@ -98,7 +98,8 @@ actor ApplicationDistributor is Distributor
       end
 
       // Edges that must be added at the end (because we need to create the
-      // edge at the time the origin node is created, in which case the target // node will not yet exist).
+      // edge at the time the origin node is created, in which case the target
+      // node will not yet exist).
       // Map from worker name to all (from_id, to_id) pairs
       let unbuilt_edges: Map[String, Array[(U128, U128)]] =
         unbuilt_edges.create()
@@ -213,6 +214,9 @@ actor ApplicationDistributor is Distributor
 
           if r_builder.is_stateless_parallel() then
             parallel_stateless = true
+            // We're done putting runners on the source since
+            // the stateless partition will not be on the source
+            handled_source_runners = true
           end
 
           if r_builder.is_stateful() then
@@ -252,6 +256,9 @@ actor ApplicationDistributor is Distributor
             latest_runner_builders = recover Array[RunnerBuilder val] end,
             parallel_stateless)
           step_runner_builders.push(seq_builder)
+          // We're done with this coalesced sequence of runners, so
+          // we set parallel_stateless to false to indicate we are back
+          // to searching for a stateless partition.
           parallel_stateless = false
         end
 
@@ -304,7 +311,8 @@ actor ApplicationDistributor is Distributor
                     try
                       local_graphs(w).add_node(egress_builder, sid)
                     else
-                      @printf[I32](("No graph for worker " + w + "\n").cstring())
+                      @printf[I32](("No graph for worker " + w + "\n")
+                        .cstring())
                       error
                     end
                   end
@@ -330,7 +338,8 @@ actor ApplicationDistributor is Distributor
             try
               application.state_builder(psd.state_name())
             else
-              @printf[I32]("Failed to find state builder for prestate.\n".cstring())
+              @printf[I32]("Failed to find state builder for prestate.\n"
+                .cstring())
               error
             end
           if state_builder.default_state_name() != "" then
@@ -345,7 +354,8 @@ actor ApplicationDistributor is Distributor
           pipeline.source_listener_builder_builder(),
           source_pre_state_target_id)
 
-        @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() + " on source on initializer\n").cstring())
+        @printf[I32](("\nPreparing to spin up " + source_seq_builder.name() +
+          " on source on initializer\n").cstring())
 
         try
           local_graphs(initializer_name).add_node(source_initializer,
@@ -379,7 +389,8 @@ actor ApplicationDistributor is Distributor
             step_runner_builders.size() / worker_count
           end
 
-        @printf[I32](("Each worker gets roughly " + per_worker.string() + " steps\n").cstring())
+        @printf[I32](("Each worker gets roughly " + per_worker.string() +
+          " steps\n").cstring())
 
         // Each worker gets a boundary value. Let's say "initializer" gets 2
         // steps, "worker2" 2 steps, and "worker3" 3 steps. Then the boundaries
@@ -434,7 +445,8 @@ actor ApplicationDistributor is Distributor
             try
               boundaries(boundaries_idx)
             else
-              @printf[I32](("No boundary found for boundaries_idx " + boundaries_idx.string() + "\n").cstring())
+              @printf[I32](("No boundary found for boundaries_idx " +
+                boundaries_idx.string() + "\n").cstring())
               error
             end
 
@@ -480,7 +492,8 @@ actor ApplicationDistributor is Distributor
                 try
                   step_runner_builders(runner_builder_idx)
                 else
-                  @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
+                  @printf[I32](("No runner builder found for idx " +
+                    runner_builder_idx.string() + "\n").cstring())
                   error
                 end
 
@@ -514,7 +527,8 @@ actor ApplicationDistributor is Distributor
                         try
                           local_graphs(w).add_node(egress_builder, sid)
                         else
-                          @printf[I32](("No graph for worker " + w + "\n").cstring())
+                          @printf[I32](("No graph for worker " + w + "\n")
+                            .cstring())
                           error
                         end
                       | let ws: Array[String] val =>
@@ -524,7 +538,8 @@ actor ApplicationDistributor is Distributor
                           try
                             local_graphs(w).add_node(egress_builder, sid)
                           else
-                            @printf[I32](("No graph for worker " + w + "\n").cstring())
+                            @printf[I32](("No graph for worker " + w + "\n")
+                              .cstring())
                             error
                           end
                         end
@@ -536,7 +551,9 @@ actor ApplicationDistributor is Distributor
                     pipeline.sink_id()
                   end
 
-                @printf[I32](("Preparing to spin up prestate step " + next_runner_builder.name() + " on " + worker + "\n").cstring())
+                @printf[I32](("Preparing to spin up prestate step " +
+                  next_runner_builder.name() + " on " + worker + "\n")
+                  .cstring())
 
                 let psd = PreStateData(next_runner_builder,
                   pre_state_target_id)
@@ -546,7 +563,8 @@ actor ApplicationDistributor is Distributor
                   try
                     application.state_builder(psd.state_name())
                   else
-                    @printf[I32]("Failed to find state builder for prestate.\n".cstring())
+                    @printf[I32]("Failed to find state builder for prestate.\n"
+                      .cstring())
                     error
                   end
 
@@ -576,7 +594,8 @@ actor ApplicationDistributor is Distributor
                   // out, so don't connect an edge to the next node
                   last_initializer = None
                 else
-                  @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                  @printf[I32](("No graph for worker " + worker + "\n")
+                    .cstring())
                   error
                 end
 
@@ -584,6 +603,14 @@ actor ApplicationDistributor is Distributor
               //////////////////////////////////////
               // PARALLELIZED STATELESS COMPUTATIONS
               elseif next_runner_builder.is_stateless_parallel() then
+                // First we calculate the size of the partition and determine
+                // where the steps in the partition go in the cluster. We are
+                // populating three maps. Two of them, partition_id_to_worker
+                // and partition_id_to_step_id, will be used to create a
+                // StatelessPartitionRouter during local topology
+                // initialization. The third, worker_to_step_id, will be used
+                // here to determine which step ids we will put in which
+                // local graphs.
                 let pony_thread_count = @ponyint_sched_cores[I32]().usize()
                 let partition_count = worker_count * pony_thread_count
                 let partition_id_to_worker_trn: Map[U64, String] trn =
@@ -653,8 +680,9 @@ actor ApplicationDistributor is Distributor
                 // Add nodes for all stateless partition computations on
                 // all workers.
                 for w in all_workers.values() do
-                  @printf[I32](("Preparing to spin up " + next_runner_builder.name() + "stateless partition on " + w + "\n")
-                    .cstring())
+                  @printf[I32](("Preparing to spin up " +
+                    next_runner_builder.name() + "stateless partition on " +
+                    w + "\n").cstring())
                   for s_id in worker_to_step_id(w).values() do
                     let next_initializer = StepBuilder(application.name(),
                       w, pipeline.name(), next_runner_builder, s_id)
@@ -667,6 +695,11 @@ actor ApplicationDistributor is Distributor
                       else
                         match successor_step_id
                         | let ss_id: U128 =>
+                          // We have not yet built the node corresponding
+                          // to our successor step id (i.e. the node that
+                          // this node has an edge to). So we keep track of
+                          // that here and use that later, once we know
+                          // all nodes have been added to the graphs.
                           unbuilt_edges(w).push((s_id, ss_id))
                         else
                           @printf[I32](("There is no step or sink after a " +
@@ -676,7 +709,8 @@ actor ApplicationDistributor is Distributor
                         end
                       end
                     else
-                      @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                      @printf[I32](("No graph for worker " + worker + "\n")
+                        .cstring())
                       error
                     end
 
@@ -688,7 +722,9 @@ actor ApplicationDistributor is Distributor
               else
               //////////////////////////////
               // NON-PRESTATE RUNNER BUILDER
-                @printf[I32](("Preparing to spin up " + next_runner_builder.name() + " on " + worker + "\n").cstring())
+                @printf[I32](("Preparing to spin up " +
+                  next_runner_builder.name() + " on " + worker + "\n")
+                  .cstring())
                 let next_id = next_runner_builder.id()
                 let next_initializer = StepBuilder(application.name(),
                   worker, pipeline.name(), next_runner_builder, next_id)
@@ -703,7 +739,8 @@ actor ApplicationDistributor is Distributor
 
                   last_initializer = next_id
                 else
-                  @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                  @printf[I32](("No graph for worker " + worker + "\n")
+                    .cstring())
                   error
                 end
 
@@ -712,7 +749,8 @@ actor ApplicationDistributor is Distributor
 
               runner_builder_idx = runner_builder_idx + 1
             end
-            // We've reached the end of this worker's runner builders for this // pipeline
+            // We've reached the end of this worker's runner builders for this
+            // pipeline
           end
 
           // Create the EgressBuilder for this worker and add to its graph.
@@ -727,13 +765,15 @@ actor ApplicationDistributor is Distributor
                 try
                   step_runner_builders(runner_builder_idx)
                 else
-                  @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
+                  @printf[I32](("No runner builder found for idx " +
+                    runner_builder_idx.string() + "\n").cstring())
                   error
                 end
 
               match next_runner_builder
               | let pb: PartitionBuilder val =>
-                @printf[I32]("A PartitionBuilder should never begin the chain on a non-initializer worker!\n".cstring())
+                @printf[I32](("A PartitionBuilder should never begin the " +
+                  "chain on a non-initializer worker!\n").cstring())
                 error
               else
                 // Build our egress builder for the proxy
@@ -741,7 +781,8 @@ actor ApplicationDistributor is Distributor
                   try
                     step_runner_builders(runner_builder_idx).id()
                   else
-                    @printf[I32](("No runner builder found for idx " + runner_builder_idx.string() + "\n").cstring())
+                    @printf[I32](("No runner builder found for idx " +
+                      runner_builder_idx.string() + "\n").cstring())
                     error
                   end
 
@@ -760,14 +801,16 @@ actor ApplicationDistributor is Distributor
                       Dag[StepInitializer val] trn] end,
                     egress_id, worker)
                 else
-                  @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                  @printf[I32](("No graph for worker " + worker + "\n")
+                    .cstring())
                   error
                 end
               end
             else
               // Something went wrong, since if there are more runner builders
               // there should be more workers
-              @printf[I32]("Not all runner builders were assigned to a worker\n".cstring())
+              @printf[I32](("Not all runner builders were assigned to a " +
+                "worker\n").cstring())
               error
             end
           else
@@ -786,7 +829,8 @@ actor ApplicationDistributor is Distributor
                       Dag[StepInitializer val] trn] end,
                     sid, worker)
               else
-                @printf[I32](("No graph for worker " + worker + "\n").cstring())
+                @printf[I32](("No graph for worker " + worker + "\n")
+                  .cstring())
                 error
               end
 
@@ -810,7 +854,8 @@ actor ApplicationDistributor is Distributor
           @printf[I32]("-----We have a real default target name\n".cstring())
           match application.default_target
           | let default_target: Array[RunnerBuilder val] val =>
-            @printf[I32](("Preparing to spin up default target state on " + pipeline_default_target_worker + "\n").cstring())
+            @printf[I32](("Preparing to spin up default target state on " +
+              pipeline_default_target_worker + "\n").cstring())
 
             // The target will always be the sink (a stipulation of
             // the temporary POC strategy)
@@ -820,7 +865,8 @@ actor ApplicationDistributor is Distributor
                 try
                   default_target(0)
                 else
-                  @printf[I32]("Default target had no prestate value!\n".cstring())
+                  @printf[I32]("Default target had no prestate value!\n"
+                    .cstring())
                   error
                 end
 
@@ -828,7 +874,8 @@ actor ApplicationDistributor is Distributor
                 try
                   default_target(1)
                 else
-                  @printf[I32]("Default target had no state value!\n".cstring())
+                  @printf[I32]("Default target had no state value!\n"
+                    .cstring())
                   error
                 end
 
@@ -848,7 +895,9 @@ actor ApplicationDistributor is Distributor
                 default_pre_state_target_id,
                 pre_state_runner_builder.forward_route_builder())
 
-              @printf[I32](("Preparing to spin up default target state for " + state_runner_builder.name() + " on " + pipeline_default_target_worker + "\n").cstring())
+              @printf[I32](("Preparing to spin up default target state for " +
+                state_runner_builder.name() + " on " +
+                pipeline_default_target_worker + "\n").cstring())
 
               let state_builder = StepBuilder(application.name(),
                 pipeline_default_target_worker,
@@ -867,8 +916,10 @@ actor ApplicationDistributor is Distributor
               next_default_targets.push(pre_state_builder)
               next_default_targets.push(state_builder)
 
-              @printf[I32](("Adding default target for " + pipeline_default_target_worker + "\n").cstring())
-              default_targets(pipeline_default_target_worker) = consume next_default_targets
+              @printf[I32](("Adding default target for " +
+                pipeline_default_target_worker + "\n").cstring())
+              default_targets(pipeline_default_target_worker) =
+                consume next_default_targets
 
               // Create ProxyAddresses for the other workers
               let proxy_address = ProxyAddress(pipeline_default_target_worker,
@@ -906,22 +957,30 @@ actor ApplicationDistributor is Distributor
       for (w, edges) in unbuilt_edges.pairs() do
         for edge in edges.values() do
           try
-            if (steps.contains(edge._2) and (steps(edge._2) == w)) or
-              sink_ids.contains(edge._2)
+            if not ((steps.contains(edge._2) and (steps(edge._2) == w)) or
+              sink_ids.contains(edge._2))
             then
-              //Local step or Sink
-              try
-                local_graphs =
-                  _add_edges_to_graph(edge._1, local_graphs = recover
-                    Map[String, Dag[StepInitializer val] trn] end, edge._2, w)
-              else
-                @printf[I32]("Error building unbuilt edge on %s!\n".cstring(),
-                  w.cstring())
-                Fail()
+              //We need a Proxy
+              // Check if we have a corresponding egress builder node in the
+              // graph for this worker already. If not, create one.
+              if not local_graphs(w).contains(edge._2) then
+                let target_worker = steps(edge._2)
+                let proxy_address = ProxyAddress(target_worker, edge._2)
+                let egress_builder = EgressBuilder("All pipelines",
+                  edge._2 where proxy_addr = proxy_address)
+                local_graphs(w).add_node(egress_builder, edge._2)
               end
+            end
+
+            // Add this edge to the graph
+            try
+              local_graphs =
+                _add_edges_to_graph(edge._1, local_graphs = recover
+                  Map[String, Dag[StepInitializer val] trn] end, edge._2, w)
             else
-              //Proxy
-              let target_worker = steps(edge._2)
+              @printf[I32]("Error building unbuilt edge on %s!\n".cstring(),
+                w.cstring())
+              Fail()
             end
           else
             @printf[I32]("Unbuilt edge refers to nonexistent step id\n"
@@ -942,7 +1001,8 @@ actor ApplicationDistributor is Distributor
           try
             default_targets(w)
           else
-            @printf[I32](("No default target specified for " + w + "\n").cstring())
+            @printf[I32](("No default target specified for " + w + "\n")
+              .cstring())
             None
           end
 
@@ -978,8 +1038,10 @@ actor ApplicationDistributor is Distributor
           @printf[I32]("Error distributing local topologies!\n".cstring())
         end
       end
-      @printf[I32]("\n^^^^^^|Finished Initializing Topologies for Workers|^^^^^^^\n".cstring())
-      @printf[I32]("---------------------------------------------------------\n".cstring())
+      @printf[I32](("\n^^^^^^|Finished Initializing Topologies for " +
+        "Workers|^^^^^^^\n").cstring())
+      @printf[I32](("------------------------------------------------------" +
+        "---\n").cstring())
     else
       @printf[I32]("Error initializing application!\n".cstring())
     end

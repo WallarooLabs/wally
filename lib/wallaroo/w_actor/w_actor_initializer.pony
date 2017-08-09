@@ -323,7 +323,7 @@ actor WActorInitializer is LayoutInitializer
               let service = source_addr(1)
 
               TCPSourceListener(source_builder,
-                EmptyRouter, _router_registry, EmptyRouteBuilder,
+                EmptyRouter, _router_registry, BoundaryOnlyRouteBuilder,
                 _outgoing_boundary_builders,
                 _event_log, _auth, this, consume empty_metrics_reporter
                 where host = host, service = service)

@@ -64,7 +64,8 @@ class LocalTopology
     //resilience
     worker_names = worker_names'
 
-  fun state_builders(): Map[String, StateSubpartition val] val => _state_builders
+  fun state_builders(): Map[String, StateSubpartition val] val =>
+    _state_builders
 
   fun update_state_map(state_name: String,
     state_map: Map[String, Router val],
@@ -79,12 +80,14 @@ class LocalTopology
       try
         _state_builders(state_name)
       else
-        @printf[I32](("Tried to update state map with nonexistent state name " + state_name + "\n").cstring())
+        @printf[I32](("Tried to update state map with nonexistent state " +
+          "name " + state_name + "\n").cstring())
         error
       end
 
     if not state_map.contains(state_name) then
-      @printf[I32](("----Creating state steps for " + state_name + "----\n").cstring())
+      @printf[I32](("----Creating state steps for " + state_name + "----\n")
+        .cstring())
       state_map(state_name) = subpartition.build(_app_name, _worker_name,
          metrics_conn, auth, event_log, recovery_replayer, outgoing_boundaries,
          initializables, data_routes, default_router)
@@ -105,7 +108,8 @@ class LocalTopology
 
   fun proxy_ids(): Map[String, U128] val => _proxy_ids
 
-  fun update_proxy_address_for_state_key[Key: (Hashable val & Equatable[Key] val)](
+  fun update_proxy_address_for_state_key[Key: (Hashable val &
+    Equatable[Key] val)](
     state_name: String, key: Key, pa: ProxyAddress val): LocalTopology val ?
   =>
     let new_subpartition = _state_builders(state_name).update_key[Key](key, pa)
@@ -200,7 +204,8 @@ actor LocalTopologyInitializer is LayoutInitializer
   let _data_channel_file: String
   let _worker_names_file: String
   var _topology_initialized: Bool = false
-  var _recovered_worker_names: Array[String] val = recover val Array[String] end
+  var _recovered_worker_names: Array[String] val =
+    recover val Array[String] end
   var _recovering: Bool = false
   let _is_joining: Bool
 
@@ -508,7 +513,8 @@ actor LocalTopologyInitializer is LayoutInitializer
       return
     end
 
-    @printf[I32]("---------------------------------------------------------\n".cstring())
+    @printf[I32](("------------------------------------------------------" +
+      "---\n").cstring())
     @printf[I32]("|v|v|v|Initializing Local Topology|v|v|v|\n\n".cstring())
     _cluster_initializer = cluster_initializer
     try
@@ -560,7 +566,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         // Make sure we only create shared state once and reuse it
         let state_map: Map[String, Router val] = state_map.create()
 
-        @printf[I32](("\nInitializing " + t.name() + " application locally:\n\n").cstring())
+        @printf[I32](("\nInitializing " + t.name() +
+          " application locally:\n\n").cstring())
 
         // For passing into partition builders so they can add state steps
         // to our data routes
@@ -606,7 +613,8 @@ actor LocalTopologyInitializer is LayoutInitializer
             try
               targets(0)
             else
-              @printf[I32]("No StepInitializer for prestate default target\n".cstring())
+              @printf[I32]("No StepInitializer for prestate default target\n"
+                .cstring())
               error
             end
 
@@ -617,14 +625,16 @@ actor LocalTopologyInitializer is LayoutInitializer
             try
               targets(1)
             else
-              @printf[I32]("No StepInitializer for state default target\n".cstring())
+              @printf[I32]("No StepInitializer for state default target\n"
+                .cstring())
               error
             end
           default_target_state_step_id = state_builder.id()
 
           let state_step = state_builder(EmptyRouter, _metrics_conn,
             _event_log, _recovery_replayer, _auth, _outgoing_boundaries)
-          state_step.update_route_builder(state_builder.forward_route_builder())
+          state_step.update_route_builder(
+            state_builder.forward_route_builder())
 
           default_target_state_step = state_step
           _initializables.set(state_step)
@@ -668,7 +678,8 @@ actor LocalTopologyInitializer is LayoutInitializer
             source_data_nodes.push(node)
           else
             if node.is_sink() and node.value.is_prestate() then
-              @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
+              @printf[I32](("Adding " + node.value.name() +
+                " node to frontier\n").cstring())
               frontier.push(node)
             else
               non_partitions.push(node)
@@ -677,12 +688,14 @@ actor LocalTopologyInitializer is LayoutInitializer
         end
 
         for node in non_partitions.values() do
-          @printf[I32](("Adding " + node.value.name() + " node to frontier\n").cstring())
+          @printf[I32](("Adding " + node.value.name() + " node to frontier\n")
+            .cstring())
           frontier.push(node)
         end
 
         for node in source_data_nodes.values() do
-          @printf[I32](("Adding " + node.value.name() + " node to end of frontier\n").cstring())
+          @printf[I32](("Adding " + node.value.name() +
+            " node to end of frontier\n").cstring())
           frontier.unshift(node)
         end
 
@@ -700,7 +713,9 @@ actor LocalTopologyInitializer is LayoutInitializer
             // We've already handled this node (probably because it's
             // pre-state)
             // TODO: I don't think this should ever happen.
-            @printf[I32](("We've already handled " + next_node.value.name() + " with id " + next_node.id.string() + " so we're not handling it again\n").cstring())
+            @printf[I32](("We've already handled " + next_node.value.name() +
+              " with id " + next_node.id.string() + " so we're not handling " +
+              " it again\n").cstring())
             continue
           end
 
@@ -708,7 +723,8 @@ actor LocalTopologyInitializer is LayoutInitializer
           // have been built (though currently, because there are no
           // splits (II), there will only be at most one output per node)
           if _is_ready_for_building(next_node, built_routers) then
-            @printf[I32](("Handling " + next_node.value.name() + " node\n").cstring())
+            @printf[I32](("Handling " + next_node.value.name() + " node\n")
+              .cstring())
             let next_initializer: StepInitializer val = next_node.value
 
             // ...match kind of initializer and go from there...
@@ -746,7 +762,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                       _initializables.set(default_pre_state_step)
                       built_stateless_steps(default_pre_state_id) =
                         default_pre_state_step
-                      data_routes(default_pre_state_id) = default_pre_state_step
+                      data_routes(default_pre_state_id) =
+                        default_pre_state_step
                       let router = DirectRouter(default_pre_state_step)
                       built_routers(default_pre_state_id) = router
                       router
@@ -772,7 +789,8 @@ actor LocalTopologyInitializer is LayoutInitializer
                       state_map(builder.state_name()), default_router)
                   else
                     // Not a partition, so we need a direct target router
-                    @printf[I32](("No partition router found for " + builder.state_name() + "\n").cstring())
+                    @printf[I32](("No partition router found for " +
+                      builder.state_name() + "\n").cstring())
                     error
                   end
 
@@ -808,7 +826,7 @@ actor LocalTopologyInitializer is LayoutInitializer
                 @printf[I32](("----Spinning up " + builder.name() + "----\n")
                   .cstring())
                 // Currently there are no splits (II), so we know that a node // has only one output in the graph. We also know this is not
-                // a sink or proxy, so there is exactly one output.
+                // a sink or proxy, so there is at most one output.
                 let out_id: (U128 | None) =
                   match _get_output_node_id(next_node,
                     default_target_id, default_target_state_step_id)
@@ -993,6 +1011,9 @@ actor LocalTopologyInitializer is LayoutInitializer
                 end
 
                 if ready then
+                  // Populate partition routes with all local steps in
+                  // the partition and proxy routers for any steps that
+                  // exist on other workers.
                   let partition_routes:
                     Map[U64, (Step | ProxyRouter val)] trn =
                     recover Map[U64, (Step | ProxyRouter val)] end
