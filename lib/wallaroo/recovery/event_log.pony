@@ -95,9 +95,8 @@ class FileBackend is Backend
             // save last watermark read from file
             watermarks(origin_id) = seq_id
           else
-            r.append(_file.read(24))
+            r.append(_file.read(32))
             let uid = r.u128_be()
-            r.append(_file.read(16)) //TODO: use sizeof-type things?
             let statechange_id = r.u64_be()
             let payload_length = r.u64_be()
             let payload = recover val
@@ -325,4 +324,3 @@ actor EventLog
       @printf[I32]("Errror writing/flushing/syncing ack to disk!\n".cstring())
       Fail()
     end
-
