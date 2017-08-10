@@ -19,13 +19,6 @@ sudo: required
 
 matrix:
   include:
-    - os: osx
-      env:
-        - LLVM_VERSION="3.9.1"
-        - LLVM_CONFIG="llvm-config-3.9"
-        - CC1=clang-3.9
-        - CXX1=clang++-3.9
-        - lto=no
     - os: linux
       addons:
         apt:
