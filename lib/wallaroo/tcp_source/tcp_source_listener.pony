@@ -1,5 +1,6 @@
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/recovery"
@@ -141,7 +142,7 @@ actor TCPSourceListener is SourceListener
   be update_router(router: PartitionRouter val) =>
     _notify.update_router(router)
 
-  be remove_route_for(moving_step: ConsumerStep) =>
+  be remove_route_for(moving_step: Consumer) =>
     None
 
   be add_boundary_builders(

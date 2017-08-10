@@ -3,6 +3,7 @@ use "collections"
 use "net"
 use "time"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
@@ -21,7 +22,7 @@ use @pony_asio_event_resubscribe_read[None](event: AsioEventID)
 use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
-actor TCPSink is (Consumer & RunnableStep & Initializable)
+actor TCPSink is Consumer
   """
   # TCPSink
 

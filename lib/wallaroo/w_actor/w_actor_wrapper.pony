@@ -1,6 +1,7 @@
 use "collections"
 use "sendence/guid"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/broadcast"
 use "wallaroo/fail"
 use "wallaroo/network"
@@ -415,4 +416,7 @@ actor _DummyActorProducer is Producer
     None
 
   fun ref update_router(router: Router val) =>
+    None
+
+  be request_ack() =>
     None

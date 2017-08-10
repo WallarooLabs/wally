@@ -3,6 +3,7 @@ use "net"
 use "time"
 use "wallaroo/boundary"
 use "wallaroo/data_channel"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/network"
 use "wallaroo/recovery"
@@ -16,7 +17,7 @@ actor RouterRegistry
   let _worker_name: String
   let _connections: Connections
   var _data_router: DataRouter val =
-    DataRouter(recover Map[U128, ConsumerStep tag] end)
+    DataRouter(recover Map[U128, Consumer] end)
   var _pre_state_data: (Array[PreStateData val] val | None) = None
   let _partition_routers: Map[String, PartitionRouter val] =
     _partition_routers.create()
@@ -487,7 +488,7 @@ actor RouterRegistry
   /////
   // Step moved onto this worker
   /////
-  be move_proxy_to_step(id: U128, target: ConsumerStep,
+  be move_proxy_to_step(id: U128, target: Consumer,
     source_worker: String)
   =>
     """
@@ -497,7 +498,7 @@ actor RouterRegistry
     _move_proxy_to_step(id, target, source_worker)
 
   be move_proxy_to_stateful_step[K: (Hashable val & Equatable[K] val)](
-    id: U128, target: ConsumerStep, key: K, state_name: String,
+    id: U128, target: Consumer, key: K, state_name: String,
     source_worker: String)
   =>
     """
@@ -543,7 +544,7 @@ actor RouterRegistry
     _connections.notify_cluster_of_new_stateful_step[K](id, key, state_name,
       recover [source_worker] end)
 
-  fun ref _move_proxy_to_step(id: U128, target: ConsumerStep,
+  fun ref _move_proxy_to_step(id: U128, target: Consumer,
     source_worker: String)
   =>
     """

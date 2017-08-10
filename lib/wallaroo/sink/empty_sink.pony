@@ -1,11 +1,12 @@
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/initialization"
 use "wallaroo/routing"
 use "wallaroo/topology"
 use "wallaroo/fail"
 
-actor EmptySink is ConsumerStep
+actor EmptySink is Consumer
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
     seq_id: SeqId, route_id: RouteId,

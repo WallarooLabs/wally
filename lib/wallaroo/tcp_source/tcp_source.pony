@@ -4,6 +4,7 @@ use "net"
 use "time"
 use "sendence/guid"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
@@ -64,10 +65,10 @@ actor TCPSource is Producer
   var _seq_id: SeqId = 1 // 0 is reserved for "not seen yet"
 
   new _accept(listen: TCPSourceListener, notify: TCPSourceNotify iso,
-    routes: Array[ConsumerStep] val, route_builder: RouteBuilder val,
+    routes: Array[Consumer] val, route_builder: RouteBuilder val,
     outgoing_boundary_builders: Map[String, OutgoingBoundaryBuilder val] val,
     layout_initializer: LayoutInitializer,
-    fd: U32, default_target: (ConsumerStep | None) = None,
+    fd: U32, default_target: (Consumer | None) = None,
     forward_route_builder: (RouteBuilder val | None) = None,
     init_size: USize = 64, max_size: USize = 16384,
     metrics_reporter: MetricsReporter iso)
@@ -117,7 +118,7 @@ actor TCPSource is Producer
     _notify.update_boundaries(_outgoing_boundaries)
 
     match default_target
-    | let r: ConsumerStep =>
+    | let r: Consumer =>
       match forward_route_builder
       | let frb: RouteBuilder val =>
         _routes(r) = frb(this, r, _metrics_reporter)
@@ -167,7 +168,7 @@ actor TCPSource is Producer
       Fail()
     end
 
-  be remove_route_for(step: ConsumerStep) =>
+  be remove_route_for(step: Consumer) =>
     try
       _routes.remove(step)
     else
@@ -176,6 +177,9 @@ actor TCPSource is Producer
 
   //////////////
   // ORIGIN (resilience)
+  be request_ack() =>
+    None
+
   fun ref _acker(): Acker =>
     // TODO: we don't really need this
     // Because we dont actually do any resilience work
@@ -189,7 +193,7 @@ actor TCPSource is Producer
   be log_flushed(low_watermark: SeqId) =>
     None
 
-  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
+  fun ref bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
     None
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>

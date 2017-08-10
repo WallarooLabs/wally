@@ -1,5 +1,6 @@
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/metrics"
 use "wallaroo/recovery"
 use "wallaroo/routing"

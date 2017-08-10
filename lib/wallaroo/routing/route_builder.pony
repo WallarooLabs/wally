@@ -1,14 +1,15 @@
 use "wallaroo/boundary"
 use "wallaroo/fail"
+use "wallaroo/core"
 use "wallaroo/metrics"
 use "wallaroo/topology"
 
 trait RouteBuilder
-  fun apply(step: Producer ref, consumer: ConsumerStep,
+  fun apply(step: Producer ref, consumer: Consumer,
     metrics_reporter: MetricsReporter ref): Route
 
 primitive TypedRouteBuilder[In: Any val] is RouteBuilder
-  fun apply(step: Producer ref, consumer: ConsumerStep,
+  fun apply(step: Producer ref, consumer: Consumer,
     metrics_reporter: MetricsReporter ref): Route
   =>
     match consumer
@@ -19,7 +20,7 @@ primitive TypedRouteBuilder[In: Any val] is RouteBuilder
     end
 
 primitive BoundaryOnlyRouteBuilder is RouteBuilder
-  fun apply(step: Producer ref, consumer: ConsumerStep,
+  fun apply(step: Producer ref, consumer: Consumer,
     metrics_reporter: MetricsReporter ref): Route
   =>
     match consumer

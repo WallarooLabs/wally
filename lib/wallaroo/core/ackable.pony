@@ -1,15 +1,10 @@
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/routing"
 use "wallaroo/topology"
 use "wallaroo/watermarking"
 
-trait tag Producer
-  be mute(c: Consumer)
-  be unmute(c: Consumer)
-  fun ref route_to(c: Consumer): (Route | None)
-  fun ref next_sequence_id(): SeqId
-  fun ref current_sequence_id(): SeqId
-
+trait tag Ackable
   fun ref _acker(): Acker
 
   // TO DO: temporary one to many change to make this public
@@ -26,7 +21,7 @@ trait tag Producer
     """
     _acker().flushed(low_watermark)
 
-  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
+  fun ref bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
     """
     Process envelopes and keep track of things
     """
@@ -38,9 +33,9 @@ trait tag Producer
     end
 
   be update_watermark(route_id: RouteId, seq_id: SeqId) =>
-  """
-  Process a high watermark received from a downstream step.
-  """
+    """
+    Process a high watermark received from a downstream step.
+    """
     _update_watermark(route_id, seq_id)
 
   fun ref _update_watermark(route_id: RouteId, seq_id: SeqId) =>

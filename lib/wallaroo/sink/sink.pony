@@ -1,8 +1,9 @@
+use "wallaroo/core"
 use "wallaroo/metrics"
 use "wallaroo/routing"
 use "wallaroo/topology"
 
-type Sink is (Consumer & RunnableStep & Initializable tag)
+type Sink is Consumer
 
 interface val SinkConfig[Out: Any val]
   fun apply(): SinkBuilder

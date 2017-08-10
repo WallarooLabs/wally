@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "time"
+use "wallaroo/core"
 use "wallaroo/data_channel"
 use "wallaroo/fail"
 use "wallaroo/invariant"
@@ -18,7 +19,7 @@ actor DataReceiver is Producer
   var _sender_name: String
   var _sender_step_id: U128 = 0
   var _router: DataRouter val =
-    DataRouter(recover Map[U128, ConsumerStep tag] end)
+    DataRouter(recover Map[U128, Consumer] end)
   var _last_id_seen: SeqId = 0
   var _last_id_acked: SeqId = 0
   var _connected: Bool = false

@@ -4,6 +4,7 @@ use "net"
 use "time"
 use "sendence/bytes"
 use "sendence/time"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
@@ -58,7 +59,7 @@ class OutgoingBoundaryBuilder
     boundary.register_step_id(step_id)
     boundary.quick_initialize(layout_initializer)
 
-actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
+actor OutgoingBoundary is Consumer
   // Steplike
   let _wb: Writer = Writer
   let _metrics_reporter: MetricsReporter

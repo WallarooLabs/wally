@@ -3,6 +3,7 @@ use "time"
 use "sendence/guid"
 use "sendence/time"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/messages"
 use "wallaroo/metrics"
@@ -51,7 +52,7 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     _metrics_reporter = consume metrics_reporter
     _header_size = _handler.header_length()
 
-  fun routes(): Array[ConsumerStep] val =>
+  fun routes(): Array[Consumer] val =>
     _router.routes()
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
