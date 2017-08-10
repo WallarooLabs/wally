@@ -6,6 +6,7 @@ use "time"
 use "sendence/guid"
 use "sendence/time"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/invariant"
@@ -16,35 +17,7 @@ use "wallaroo/routing"
 use "wallaroo/tcp_sink"
 use "wallaroo/watermarking"
 
-// TODO: CREDITFLOW- Every runnable step is also a credit flow consumer
-// Really this should probably be another method on Consumer
-// At which point ConsumerStep goes away as well
-trait tag RunnableStep
-  be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    origin: Producer, msg_uid: U128,
-    seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-
-  be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
-    data: D, origin: Producer, msg_uid: U128,
-    incoming_seq_id: SeqId, route_id: RouteId,
-    latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
-
-  be request_ack()
-
-  be receive_state(state: ByteSeq val)
-
-interface Initializable
-  be application_begin_reporting(initializer: LocalTopologyInitializer)
-  be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter val)
-
-  be application_initialized(initializer: LocalTopologyInitializer)
-  be application_ready_to_work(initializer: LocalTopologyInitializer)
-
-type ConsumerStep is (RunnableStep & Consumer & Initializable tag)
-
-actor Step is (RunnableStep & Producer & Consumer & Initializable)
+actor Step is (Producer & Consumer)
   let _runner: Runner
   var _router: Router val = EmptyRouter
   // For use if this is a state step, otherwise EmptyOmniRouter
@@ -123,7 +96,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     end
 
     match _default_target
-    | let r: ConsumerStep =>
+    | let r: Consumer =>
       _routes(r) = _route_builder(this, r, _metrics_reporter)
     end
 
@@ -232,7 +205,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
       end
     end
 
-  be remove_route_for(step: ConsumerStep) =>
+  be remove_route_for(step: Consumer) =>
     try
       _routes.remove(step)
     else
@@ -288,8 +261,8 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     end
 
     ifdef "resilience" then
-      _acker_x.track_incoming_to_outgoing(this,
-        current_sequence_id(), i_origin, i_route_id, i_seq_id)
+      _acker_x.track_incoming_to_outgoing(current_sequence_id(), i_origin,
+        i_route_id, i_seq_id)
     end
 
   fun ref next_sequence_id(): SeqId =>
@@ -350,8 +323,8 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     end
 
     ifdef "resilience" then
-      _acker_x.track_incoming_to_outgoing(this,
-        current_sequence_id(), i_origin, i_route_id, i_seq_id)
+      _acker_x.track_incoming_to_outgoing(current_sequence_id(), i_origin,
+        i_route_id, i_seq_id)
     end
 
   //////////////////////

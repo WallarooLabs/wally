@@ -1,5 +1,6 @@
 use "sendence/guid"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
@@ -92,7 +93,7 @@ class BoundaryRoute is Route
       worker_ingress_ts)
 
     ifdef "resilience" then
-      cfp._bookkeeping(_route_id, o_seq_id)
+      cfp.bookkeeping(_route_id, o_seq_id)
     end
 
   fun ref request_ack() =>

@@ -1,4 +1,5 @@
 use "collections"
+use "wallaroo/core"
 use "wallaroo/data_channel"
 use "wallaroo/network"
 use "wallaroo/recovery"
@@ -31,7 +32,7 @@ actor DataReceivers
   let _data_receivers: Map[_BoundaryId, DataReceiver] =
     _data_receivers.create()
   var _data_router: DataRouter val =
-    DataRouter(recover Map[U128, ConsumerStep tag] end)
+    DataRouter(recover Map[U128, Consumer] end)
   let _subscribers: SetIs[DataReceiversSubscriber tag] = _subscribers.create()
 
   new create(auth: AmbientAuth, worker_name: String,

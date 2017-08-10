@@ -3,6 +3,7 @@ use "files"
 use "net"
 use "sendence/equality"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
@@ -89,7 +90,7 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
 interface StateAddresses
   fun apply(key: Any val): (Step tag | ProxyRouter val | None)
   fun register_routes(router: Router val, route_builder: RouteBuilder val)
-  fun steps(): Array[ConsumerStep] val
+  fun steps(): Array[Consumer] val
 
 class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
   let _addresses: Map[Key, (Step | ProxyRouter val)] val
@@ -117,12 +118,12 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
       end
     end
 
-  fun steps(): Array[ConsumerStep] val =>
-    let ss: Array[ConsumerStep] trn =
-      recover Array[ConsumerStep] end
+  fun steps(): Array[Consumer] val =>
+    let ss: Array[Consumer] trn =
+      recover Array[Consumer] end
     for s in _addresses.values() do
       match s
-      | let cfcs: ConsumerStep =>
+      | let cfcs: Consumer =>
         ss.push(cfcs)
       end
     end
@@ -135,8 +136,8 @@ trait StateSubpartition is Equatable[StateSubpartition]
     auth: AmbientAuth, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    initializables: SetIs[Initializable tag],
-    data_routes: Map[U128, ConsumerStep tag],
+    initializables: SetIs[Initializable],
+    data_routes: Map[U128, Consumer],
     default_router: (Router val | None) = None): PartitionRouter val
   fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
     pa: ProxyAddress val): StateSubpartition val ?
@@ -169,8 +170,8 @@ class KeyedStateSubpartition[PIn: Any val,
     auth: AmbientAuth, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    initializables: SetIs[Initializable tag],
-    data_routes: Map[U128, ConsumerStep tag],
+    initializables: SetIs[Initializable],
+    data_routes: Map[U128, Consumer],
     default_router: (Router val | None) = None):
     LocalPartitionRouter[PIn, Key] val
   =>

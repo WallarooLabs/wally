@@ -4,6 +4,7 @@ use "sendence/bytes"
 use "sendence/guid"
 use "sendence/time"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/recovery"
 use "wallaroo/routing"
@@ -42,8 +43,8 @@ class WActorSourceNotify is TCPSourceNotify
   fun ref broadcast_to_role(role: String, data: Any val) =>
     _central_actor_registry.broadcast_to_role(role, data)
 
-  fun routes(): Array[ConsumerStep] val =>
-    recover Array[ConsumerStep] end
+  fun routes(): Array[Consumer] val =>
+    recover Array[Consumer] end
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then

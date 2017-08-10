@@ -2,6 +2,7 @@ use "collections"
 use "sendence/connemara"
 use "sendence/equality"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/metrics"
 use "wallaroo/network"
 use "wallaroo/recovery"
@@ -96,12 +97,12 @@ class iso _TestOmniRouterEquality is UnitTest
     let boundary2 = _BoundaryGenerator("w1", auth)
     let boundary3 = _BoundaryGenerator("w1", auth)
 
-    let base_data_routes: Map[U128, ConsumerStep tag] trn =
-      recover Map[U128, ConsumerStep tag] end
+    let base_data_routes: Map[U128, Consumer] trn =
+      recover Map[U128, Consumer] end
     base_data_routes(1) = step1
 
-    let target_data_routes: Map[U128, ConsumerStep tag] trn =
-      recover Map[U128, ConsumerStep tag] end
+    let target_data_routes: Map[U128, Consumer] trn =
+      recover Map[U128, Consumer] end
     target_data_routes(2) = step2
 
     let base_step_map: Map[U128, (ProxyAddress val | U128)] trn =
@@ -156,13 +157,13 @@ class iso _TestDataRouterEqualityAfterRemove is UnitTest
     let step1 = _StepGenerator(event_log, recovery_replayer)
     let step2 = _StepGenerator(event_log, recovery_replayer)
 
-    let base_routes: Map[U128, ConsumerStep tag] trn =
-      recover Map[U128, ConsumerStep tag] end
+    let base_routes: Map[U128, Consumer] trn =
+      recover Map[U128, Consumer] end
     base_routes(1) = step1
     base_routes(2) = step2
 
-    let target_routes: Map[U128, ConsumerStep tag] trn =
-      recover Map[U128, ConsumerStep tag] end
+    let target_routes: Map[U128, Consumer] trn =
+      recover Map[U128, Consumer] end
     target_routes(1) = step1
 
     var base_router = DataRouter(consume base_routes)
@@ -191,12 +192,12 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
     let step1 = _StepGenerator(event_log, recovery_replayer)
     let step2 = _StepGenerator(event_log, recovery_replayer)
 
-    let base_routes: Map[U128, ConsumerStep tag] trn =
-      recover Map[U128, ConsumerStep tag] end
+    let base_routes: Map[U128, Consumer] trn =
+      recover Map[U128, Consumer] end
     base_routes(1) = step1
 
-    let target_routes: Map[U128, ConsumerStep tag] trn =
-      recover Map[U128, ConsumerStep tag] end
+    let target_routes: Map[U128, Consumer] trn =
+      recover Map[U128, Consumer] end
     target_routes(1) = step1
     target_routes(2) = step2
 

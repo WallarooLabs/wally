@@ -1,5 +1,6 @@
 use "time"
 use "sendence/guid"
+use "wallaroo/core"
 use "wallaroo/fail"
 use "wallaroo/invariant"
 use "wallaroo/messages"
@@ -14,11 +15,11 @@ class TypedRoute[In: Any val] is Route
   let _route_id: U64 = 1 + GuidGenerator.u64() // route 0 is used for filtered messages
   var _step_type: String = ""
   let _step: Producer ref
-  let _consumer: ConsumerStep
+  let _consumer: Consumer
   let _metrics_reporter: MetricsReporter
   var _route: RouteLogic = _EmptyRouteLogic
 
-  new create(step: Producer ref, consumer: ConsumerStep,
+  new create(step: Producer ref, consumer: Consumer,
     metrics_reporter: MetricsReporter ref)
   =>
     _step = step
@@ -114,7 +115,7 @@ class TypedRoute[In: Any val] is Route
     end
 
     ifdef "resilience" then
-      cfp._bookkeeping(_route_id, o_seq_id)
+      cfp.bookkeeping(_route_id, o_seq_id)
     end
 
   fun ref request_ack() =>

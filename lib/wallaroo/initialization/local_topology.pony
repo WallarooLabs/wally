@@ -12,6 +12,7 @@ use "sendence/queue"
 use "wallaroo"
 use "wallaroo/boundary"
 use "wallaroo/cluster_manager"
+use "wallaroo/core"
 use "wallaroo/data_channel"
 use "wallaroo/fail"
 use "wallaroo/messages"
@@ -72,8 +73,8 @@ class LocalTopology
     metrics_conn: MetricsSink, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    initializables: SetIs[Initializable tag],
-    data_routes: Map[U128, ConsumerStep tag],
+    initializables: SetIs[Initializable],
+    data_routes: Map[U128, Consumer tag],
     default_router: (Router val | None)) ?
   =>
     let subpartition =
@@ -213,10 +214,10 @@ actor LocalTopologyInitializer is LayoutInitializer
 
   // Lifecycle
   var _omni_router: (OmniRouter val | None) = None
-  var _created: SetIs[Initializable tag] = _created.create()
-  var _initialized: SetIs[Initializable tag] = _initialized.create()
-  var _ready_to_work: SetIs[Initializable tag] = _ready_to_work.create()
-  let _initializables: SetIs[Initializable tag] = _initializables.create()
+  var _created: SetIs[Initializable] = _created.create()
+  var _initialized: SetIs[Initializable] = _initialized.create()
+  var _ready_to_work: SetIs[Initializable] = _ready_to_work.create()
+  let _initializables: SetIs[Initializable] = _initializables.create()
 
   // Accumulate all TCPSourceListenerBuilders so we can build them
   // once EventLog signals we're ready
@@ -571,12 +572,12 @@ actor LocalTopologyInitializer is LayoutInitializer
 
         // For passing into partition builders so they can add state steps
         // to our data routes
-        let data_routes_ref = Map[U128, ConsumerStep tag]
+        let data_routes_ref = Map[U128, Consumer]
 
-        // Keep track of all ConsumerSteps by id so we can create a
+        // Keep track of all Consumers by id so we can create a
         // DataRouter for the data channel boundary
-        var data_routes: Map[U128, ConsumerStep tag] trn =
-          recover Map[U128, ConsumerStep tag] end
+        var data_routes: Map[U128, Consumer] trn =
+          recover Map[U128, Consumer] end
 
         // Update the step ids for all OutgoingBoundaries
         if _worker_count > 1 then
@@ -594,8 +595,8 @@ actor LocalTopologyInitializer is LayoutInitializer
         // Keep track of steps we've built that we'll use for the OmniRouter.
         // Unlike data_routes, these will not include state steps, which will
         // never be direct targets for state computation outputs.
-        let built_stateless_steps: Map[U128, ConsumerStep] trn =
-          recover Map[U128, ConsumerStep] end
+        let built_stateless_steps: Map[U128, Consumer] trn =
+          recover Map[U128, Consumer] end
 
         // TODO: Replace this when we move past the temporary POC based default
         // target strategy. There can currently only be one partition default
@@ -1311,10 +1312,10 @@ actor LocalTopologyInitializer is LayoutInitializer
     @printf[I32]("|v|v|v|Initializing Joining Worker Local Topology|v|v|v|\n\n".cstring())
     try
       let built_routers = Map[U128, Router val]
-      let data_routes: Map[U128, ConsumerStep tag] trn =
-        recover Map[U128, ConsumerStep tag] end
-      let built_stateless_steps: Map[U128, ConsumerStep] trn =
-        recover Map[U128, ConsumerStep] end
+      let data_routes: Map[U128, Consumer] trn =
+        recover Map[U128, Consumer] end
+      let built_stateless_steps: Map[U128, Consumer] trn =
+        recover Map[U128, Consumer] end
 
       match _topology
       | let t: LocalTopology val =>
@@ -1377,7 +1378,7 @@ actor LocalTopologyInitializer is LayoutInitializer
           let partition_router = subpartition.build(_application.name(),
             _worker_name, _metrics_conn, _auth, _event_log, _recovery_replayer,
             _outgoing_boundaries, _initializables,
-            recover Map[U128, ConsumerStep] end where default_router = None)
+            recover Map[U128, Consumer] end where default_router = None)
           _router_registry.set_partition_router(state_name, partition_router)
         end
 
@@ -1436,7 +1437,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
-  be report_created(initializable: Initializable tag) =>
+  be report_created(initializable: Initializable) =>
     if not _created.contains(initializable) then
       match _omni_router
       | let o_router: OmniRouter val =>
@@ -1461,7 +1462,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
-  be report_initialized(initializable: Initializable tag) =>
+  be report_initialized(initializable: Initializable) =>
     if not _initialized.contains(initializable) then
       _initialized.set(initializable)
       if _initialized.size() == _initializables.size() then
@@ -1476,7 +1477,7 @@ actor LocalTopologyInitializer is LayoutInitializer
       Fail()
     end
 
-  be report_ready_to_work(initializable: Initializable tag) =>
+  be report_ready_to_work(initializable: Initializable) =>
     if not _ready_to_work.contains(initializable) then
       _ready_to_work.set(initializable)
       if _ready_to_work.size() == _initializables.size() then

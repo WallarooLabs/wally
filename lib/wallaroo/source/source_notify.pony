@@ -1,5 +1,6 @@
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/messages"
 use "wallaroo/metrics"
 use "wallaroo/recovery"
@@ -15,7 +16,7 @@ interface FramedSourceHandler[In: Any val]
   fun decode(data: Array[U8] val): In ?
 
 interface SourceNotify
-  fun ref routes(): Array[ConsumerStep] val
+  fun ref routes(): Array[Consumer] val
 
   fun ref update_router(router: Router val)
 

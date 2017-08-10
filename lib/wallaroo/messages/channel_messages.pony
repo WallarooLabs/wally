@@ -4,6 +4,7 @@ use "net"
 use "collections"
 use "wallaroo/boundary"
 use "wallaroo/broadcast"
+use "wallaroo/core"
 use "wallaroo/initialization"
 use "wallaroo/routing"
 use "wallaroo/topology"
@@ -432,8 +433,7 @@ trait StepMigrationMsg is ChannelMsg
   fun step_id(): U128
   fun state(): ByteSeq val
   fun worker(): String
-  fun update_router_registry(router_registry: RouterRegistry,
-    target: ConsumerStep)
+  fun update_router_registry(router_registry: RouterRegistry, target: Consumer)
 
 class KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is
   StepMigrationMsg
@@ -456,8 +456,7 @@ class KeyedStepMigrationMsg[K: (Hashable val & Equatable[K] val)] is
   fun step_id(): U128 => _step_id
   fun state(): ByteSeq val => _state
   fun worker(): String => _worker
-  fun update_router_registry(router_registry: RouterRegistry,
-    target: ConsumerStep)
+  fun update_router_registry(router_registry: RouterRegistry, target: Consumer)
   =>
     router_registry.move_proxy_to_stateful_step[K](_step_id, target, _key,
       _state_name, _worker)
@@ -576,12 +575,12 @@ class ReplayMsg is ChannelMsg
 trait DeliveryMsg is ChannelMsg
   fun target_id(): U128
   fun sender_name(): String
-  fun deliver(pipeline_time_spent: U64, target_step: RunnableStep tag,
+  fun deliver(pipeline_time_spent: U64, target_step: Consumer,
     origin: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64): Bool
 
 trait ReplayableDeliveryMsg is DeliveryMsg
-  fun replay_deliver(pipeline_time_spent: U64, target_step: RunnableStep tag,
+  fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
     origin: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64): Bool
   fun input(): Any val
@@ -613,7 +612,7 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
   fun target_id(): U128 => _target_id
   fun sender_name(): String => _sender_name
 
-  fun deliver(pipeline_time_spent: U64, target_step: RunnableStep tag,
+  fun deliver(pipeline_time_spent: U64, target_step: Consumer,
     origin: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
@@ -622,7 +621,7 @@ class ForwardMsg[D: Any val] is ReplayableDeliveryMsg
       worker_ingress_ts)
     false
 
-  fun replay_deliver(pipeline_time_spent: U64, target_step: RunnableStep tag,
+  fun replay_deliver(pipeline_time_spent: U64, target_step: Consumer,
     origin: Producer, seq_id: SeqId, route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64): Bool
   =>

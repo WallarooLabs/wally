@@ -1,5 +1,6 @@
 use "collections"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/messages"
 use "wallaroo/routing"
 use "wallaroo/topology"
@@ -10,7 +11,7 @@ interface TCPSourceNotify
   // on startup. It probably makes more sense to make this
   // available via the source builder that Listener gets
   // and it can then make routes available
-  fun ref routes(): Array[ConsumerStep] val
+  fun ref routes(): Array[Consumer] val
 
   fun ref update_router(router: Router val)
 

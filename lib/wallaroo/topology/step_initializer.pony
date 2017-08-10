@@ -1,6 +1,7 @@
 use "collections"
 use "net"
 use "wallaroo/boundary"
+use "wallaroo/core"
 use "wallaroo/initialization"
 use "wallaroo/metrics"
 use "wallaroo/network"
@@ -185,7 +186,7 @@ class EgressBuilder
   fun apply(worker_name: String, reporter: MetricsReporter ref,
     auth: AmbientAuth,
     proxies: Map[String, OutgoingBoundary] val =
-      recover Map[String, OutgoingBoundary] end): ConsumerStep tag ?
+      recover Map[String, OutgoingBoundary] end): Consumer ?
   =>
     match _proxy_addr
     | let p: ProxyAddress val =>

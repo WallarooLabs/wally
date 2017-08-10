@@ -1,4 +1,5 @@
 use "sendence/connemara"
+use "wallaroo/core"
 use "wallaroo/topology"
 use "wallaroo/routing"
 
@@ -397,4 +398,7 @@ actor _TestProducer is Producer
     None
 
   fun ref update_router(router: Router val) =>
+    None
+
+  be request_ack() =>
     None

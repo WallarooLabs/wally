@@ -1,6 +1,7 @@
 use "buffered"
 use "time"
 use "wallaroo"
+use "wallaroo/core"
 use "wallaroo/routing"
 use "wallaroo/state"
 
