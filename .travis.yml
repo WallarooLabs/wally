@@ -33,6 +33,9 @@ matrix:
         - CXX1=g++-5
         - lto=no
 
+before_install:
+- echo -e "machine github.com\n  login $CI_USER_TOKEN" >> ~/.netrc
+
 install:
   # Based on how travis-ci works, when this is run, we are in the source
   # directory for Buffy. This means, when we go to git clone and install
@@ -88,6 +91,16 @@ install:
     cd pony-stable;
     git checkout 0054b429a54818d187100ed40f5525ec7931b31b;
     sudo make install;
+  - echo "Installing snappy and lz4";
+  - if [ "${TRAVIS_OS_NAME}" = "linux" ];
+    then
+      sudo apt-get install libsnappy-dev;
+      cd /tmp;
+      wget -O liblz4-1.7.5.tar.gz https://github.com/lz4/lz4/archive/v1.7.5.tar.gz;
+      tar zxvf liblz4-1.7.5.tar.gz;
+      cd lz4-1.7.5;
+      sudo make install;
+    fi
   - cd $INSTALL_STARTED_AT
   - if [ "${TRAVIS_OS_NAME}" = "osx" ];
     then
