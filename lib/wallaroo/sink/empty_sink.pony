@@ -8,7 +8,7 @@ use "wallaroo/fail"
 actor EmptySink is ConsumerStep
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId,
+    seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     ifdef "trace" then
@@ -18,7 +18,7 @@ actor EmptySink is ConsumerStep
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, origin: Producer, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
+    incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     None

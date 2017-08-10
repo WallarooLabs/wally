@@ -13,12 +13,12 @@ trait Route
   // Return false to indicate queue is full and if producer is a Source, it
   // should mute
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: U128, frac_ids: None,
+    cfp: Producer ref, msg_uid: U128,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
     pipeline_time_spent: U64, cfp: Producer ref,
-    msg_uid: U128, i_frac_ids: None, latest_ts: U64, metrics_id: U16,
+    msg_uid: U128, latest_ts: U64, metrics_id: U16,
     metric_name: String, worker_ingress_ts: U64): Bool
 
   fun ref request_ack()
@@ -77,7 +77,7 @@ class EmptyRoute is Route
   fun ref request_ack() => None
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: U128, frac_ids: None,
+    cfp: Producer ref, msg_uid: U128,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     Fail()
@@ -85,7 +85,7 @@ class EmptyRoute is Route
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
     pipeline_time_spent: U64, cfp: Producer ref,
-    msg_uid: U128, i_frac_ids: None, latest_ts: U64, metrics_id: U16,
+    msg_uid: U128, latest_ts: U64, metrics_id: U16,
     metric_name: String, worker_ingress_ts: U64): Bool
   =>
     Fail()

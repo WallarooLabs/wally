@@ -22,12 +22,12 @@ use "wallaroo/watermarking"
 trait tag RunnableStep
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId,
+    seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, origin: Producer, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
+    incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
 
   be request_ack()
@@ -53,7 +53,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
   let _metrics_reporter: MetricsReporter
   let _default_target: (Step | None)
   // list of envelopes
-  let _deduplication_list: Array[(Producer, U128, (Array[U64] val | None),
+  let _deduplication_list: Array[(Producer, U128,
     SeqId, RouteId)] = _deduplication_list.create()
   let _event_log: EventLog
   var _id: U128
@@ -234,7 +234,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _seq_id_generator.new_incoming_message()
@@ -258,7 +258,7 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     end
     (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
       pipeline_time_spent, data, this, _router, _omni_router,
-      msg_uid, i_frac_ids,
+      msg_uid,
       my_latest_ts, my_metrics_id, worker_ingress_ts, _metrics_reporter)
     if is_finished then
       ifdef "resilience" then
@@ -304,16 +304,16 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, i_origin: Producer, msg_uid: U128,
-    i_frac_ids: None, i_seq_id: SeqId, i_route_id: RouteId,
+    i_seq_id: SeqId, i_route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     _seq_id_generator.new_incoming_message()
     if not _is_duplicate(msg_uid) then
-      _deduplication_list.push((i_origin, msg_uid, i_frac_ids, i_seq_id,
+      _deduplication_list.push((i_origin, msg_uid, i_seq_id,
         i_route_id))
       (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
         pipeline_time_spent, data, this, _router, _omni_router,
-        msg_uid, i_frac_ids,
+        msg_uid,
         latest_ts, metrics_id, worker_ingress_ts, _metrics_reporter)
 
       if is_finished then
@@ -364,13 +364,13 @@ actor Step is (RunnableStep & Producer & Consumer & Initializable)
     end
     _event_log.flush_buffer(_id, low_watermark)
 
-  be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64, payload: ByteSeq val)
+  be replay_log_entry(uid: U128, statechange_id: U64, payload: ByteSeq val)
   =>
     if not _is_duplicate(uid) then
-      _deduplication_list.push((this, uid, frac_ids, 0, 0))
+      _deduplication_list.push((this, uid, 0, 0))
       match _runner
       | let r: ReplayableRunner =>
-        r.replay_log_entry(uid, frac_ids, statechange_id, payload, this)
+        r.replay_log_entry(uid, statechange_id, payload, this)
       else
         @printf[I32]("trying to replay a message to a non-replayable
         runner!".cstring())

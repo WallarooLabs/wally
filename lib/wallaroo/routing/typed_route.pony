@@ -43,7 +43,7 @@ class TypedRoute[In: Any val] is Route
     _route.dispose()
 
   fun ref run[D](metric_name: String, pipeline_time_spent: U64, data: D,
-    cfp: Producer ref, msg_uid: U128, frac_ids: None, latest_ts: U64,
+    cfp: Producer ref, msg_uid: U128, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64): Bool
   =>
     ifdef "trace" then
@@ -60,7 +60,7 @@ class TypedRoute[In: Any val] is Route
       end
 
       _send_message_on_route(metric_name, pipeline_time_spent, input, cfp,
-        msg_uid, frac_ids, latest_ts, metrics_id, worker_ingress_ts)
+        msg_uid, latest_ts, metrics_id, worker_ingress_ts)
       true
     else
       Fail()
@@ -69,7 +69,7 @@ class TypedRoute[In: Any val] is Route
 
   fun ref forward(delivery_msg: ReplayableDeliveryMsg val,
     pipeline_time_spent: U64, cfp: Producer ref,
-    msg_uid: U128, i_frac_ids: None, latest_ts: U64, metrics_id: U16,
+    msg_uid: U128, latest_ts: U64, metrics_id: U16,
     metric_name: String, worker_ingress_ts: U64): Bool
   =>
     // Forward should never be called on a TypedRoute
@@ -77,7 +77,7 @@ class TypedRoute[In: Any val] is Route
     true
 
   fun ref _send_message_on_route(metric_name: String, pipeline_time_spent: U64,
-    input: In, cfp: Producer ref, msg_uid: U128, frac_ids: None,
+    input: In, cfp: Producer ref, msg_uid: U128,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     let o_seq_id = cfp.next_sequence_id()
@@ -102,7 +102,6 @@ class TypedRoute[In: Any val] is Route
       input,
       cfp,
       msg_uid,
-      frac_ids,
       o_seq_id,
       _route_id,
       my_latest_ts,
