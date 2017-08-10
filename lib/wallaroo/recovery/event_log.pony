@@ -15,7 +15,7 @@ interface tag Resilient
   be log_flushed(low_watermark: SeqId)
 
 //TODO: explain in comment
-type LogEntry is (Bool, U128, U128, None, U64, U64, Array[ByteSeq] iso)
+type LogEntry is (Bool, U128, U128, U64, U64, Array[ByteSeq] iso)
 
 // used to hold a receovered log entry that might need to be replayed on
 // recovery
@@ -97,21 +97,6 @@ class FileBackend is Backend
           else
             r.append(_file.read(24))
             let uid = r.u128_be()
-            let fractional_size = r.u64_be()
-            let frac_ids = recover val
-              if fractional_size > 0 then
-                r.append(_file.read(fractional_size.usize() * 8))
-                let l = Array[U64]
-                for i in Range(0,fractional_size.usize()) do
-                  l.push(r.u64_be())
-                end
-                l
-              else
-                //None is faster if we have no frac_ids, which will probably be
-                //true most of the time
-                None
-              end
-            end
             r.append(_file.read(16)) //TODO: use sizeof-type things?
             let statechange_id = r.u64_be()
             let payload_length = r.u64_be()
@@ -173,7 +158,7 @@ class FileBackend is Backend
   fun ref encode_entry(entry: LogEntry)
   =>
     (let is_watermark: Bool, let origin_id: U128, let uid: U128,
-     let frac_ids: None, let statechange_id: U64, let seq_id: U64,
+     let statechange_id: U64, let seq_id: U64,
      let payload: Array[ByteSeq] val) = consume entry
 
     ifdef "trace" then
@@ -190,9 +175,6 @@ class FileBackend is Backend
 
     if not is_watermark then
       _writer.u128_be(uid)
-
-      //we have no frac_ids
-      _writer.u64_be(0)
 
       _writer.u64_be(statechange_id)
       var payload_size: USize = 0
@@ -286,14 +268,14 @@ actor EventLog
     _origins(id) = origin
 
   be queue_log_entry(origin_id: U128, uid: U128,
-    frac_ids: None, statechange_id: U64, seq_id: U64,
+    statechange_id: U64, seq_id: U64,
     payload: Array[ByteSeq] iso)
   =>
     ifdef "resilience" then
       // add to backend buffer after encoding
       // encode right away to amortize encoding cost per entry when received
       // as opposed to when writing a batch to disk
-      _backend.encode_entry((false, origin_id, uid, frac_ids, statechange_id,
+      _backend.encode_entry((false, origin_id, uid, statechange_id,
         seq_id, consume payload))
 
       num_encoded = num_encoded + 1
@@ -324,7 +306,7 @@ actor EventLog
 
     try
       // Add low watermark ack to buffer
-      _backend.encode_entry((true, origin_id, 0, None, 0, low_watermark
+      _backend.encode_entry((true, origin_id, 0, 0, low_watermark
                        , recover Array[ByteSeq] end))
 
       num_encoded = num_encoded + 1
