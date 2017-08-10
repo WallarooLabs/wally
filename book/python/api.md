@@ -68,7 +68,13 @@ This is necessary if you intend to add another pipeline.
 
 ##### `to(computation_cls)`
 
-Add a stateless computation _class_ to the current pipeline.
+Add a stateless computation _class_ to the current pipeline. Only a single instance of the computation will be created.
+
+Note that this method takes a _class_, rather than an _instance_ as its argument. `computation_cls` must be a [Computation](#computation).
+
+##### `to_parallel(computation_cls)`
+
+Add a stateless computation _class_ to the current pipeline. Creates one copy of the computation per worker in the cluster allowing you to parallelize stateless work.
 
 Note that this method takes a _class_, rather than an _instance_ as its argument. `computation_cls` must be a [Computation](#computation).
 
@@ -81,7 +87,6 @@ Add a StateComputation _instance_, along with a [StateBuilder](#statebuilder) _i
 `state_builder` must be a [StateBuilder](#statebuilder).
 
 `state_name` must be a str. `state_name` is the name of the state object that we will run computations against. You can share the object across pipelines by using the same name. Using different names for different objects, keeps them separate and in this way, acts as a sort of namespace.
-
 
 ##### `to_state_partition(computation, state_builder, state_partition_name, partition_function, partition_keys)`
 

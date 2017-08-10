@@ -32,6 +32,13 @@ class ApplicationBuilder(object):
         self._actions.append(("to", computation))
         return self
 
+    def to_parallel(self, computation):
+        if not inspect.isclass(computation):
+            raise WallarooParameterError("Expecting a Computation class. Got "
+                                         "an instance instead.")
+        self._actions.append(("to_parallel", computation))
+        return self
+
     def to_stateful(self, computation, state_builder, state_name):
         if inspect.isclass(computation):
             raise WallarooParameterError("Expecting a Computation Builder "
