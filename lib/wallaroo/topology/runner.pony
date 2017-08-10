@@ -677,7 +677,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
           match _id
           | let buffer_id: U128 =>
 
-            _event_log.queue_log_entry(buffer_id, i_msg_uid, None,
+            _event_log.queue_log_entry(buffer_id, i_msg_uid,
               sc.id(), producer.current_sequence_id(), consume payload)
           else
             @printf[I32]("StateRunner with unassigned EventLogBuffer!".cstring())
@@ -691,7 +691,7 @@ class StateRunner[S: State ref] is (Runner & ReplayableRunner & SerializableStat
           | let buffer_id: U128 =>
             _state.write_log_entry(_wb, _auth)
             let payload = _wb.done()
-            _event_log.queue_log_entry(buffer_id, i_msg_uid, None,
+            _event_log.queue_log_entry(buffer_id, i_msg_uid,
               U64.max_value(), producer.current_sequence_id(), consume payload)
           end
         end
