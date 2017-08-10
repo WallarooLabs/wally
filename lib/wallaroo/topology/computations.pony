@@ -33,7 +33,7 @@ trait StateProcessor[S: State ref] is BasicComputation
   // still want the message passed along
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
-    producer: Producer ref, i_msg_uid: U128, i_frac_ids: None,
+    producer: Producer ref, i_msg_uid: U128,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
     (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
       U64, U64)
@@ -57,7 +57,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
 
   fun apply(state: S, sc_repo: StateChangeRepository[S],
     omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
-    producer: Producer ref, i_msg_uid: U128, i_frac_ids: None,
+    producer: Producer ref, i_msg_uid: U128,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
     (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
       U64, U64)
@@ -74,9 +74,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
     | (let output: Out, _) =>
       (let is_finished, let keep_sending, let last_ts) = omni_router.route_with_target_id[Out](
         _target_id, metric_name, pipeline_time_spent, output, producer,
-        // incoming envelope
-        i_msg_uid, i_frac_ids,
-        computation_end, metrics_id, worker_ingress_ts)
+        i_msg_uid, computation_end, metrics_id, worker_ingress_ts)
 
       (is_finished, keep_sending, result._2, computation_start,
         computation_end, last_ts)
@@ -91,9 +89,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
             (let f, let s, let ts) =
               omni_router.route_with_target_id[Out](
                 _target_id, metric_name, pipeline_time_spent, output, producer,
-                // incoming envelope
-                i_msg_uid, i_frac_ids,
-                computation_end, metrics_id, worker_ingress_ts)
+                i_msg_uid, computation_end, metrics_id, worker_ingress_ts)
 
             // we are sending multiple messages, only mark this message as
             // finished if all are finished

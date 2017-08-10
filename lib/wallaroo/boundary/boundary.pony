@@ -241,7 +241,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
     origin: Producer, msg_uid: U128,
-    frac_ids: None, seq_id: SeqId, route_id: RouteId,
+    seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Run should never be called on an OutgoingBoundary
@@ -249,7 +249,7 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
 
   be replay_run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, origin: Producer, msg_uid: U128,
-    frac_ids: None, incoming_seq_id: SeqId, route_id: RouteId,
+    incoming_seq_id: SeqId, route_id: RouteId,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64)
   =>
     // Should never be called on an OutgoingBoundary
@@ -261,7 +261,6 @@ actor OutgoingBoundary is (Consumer & RunnableStep & Initializable)
     metrics_id: U16, worker_ingress_ts: U64)
   =>
     let metric_name = delivery_msg.metric_name()
-    let i_frac_ids = delivery_msg.frac_ids()
     let msg_uid = delivery_msg.msg_uid()
 
     ifdef "trace" then

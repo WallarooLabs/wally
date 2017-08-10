@@ -15,9 +15,7 @@ trait tag Producer
   // TO DO: temporary one to many change to make this public
   fun ref flush(low_watermark: SeqId)
 
-  be replay_log_entry(uid: U128, frac_ids: None, statechange_id: U64,
-    payload: ByteSeq)
-  =>
+  be replay_log_entry(uid: U128, statechange_id: U64, payload: ByteSeq) =>
     None
 
   be log_flushed(low_watermark: SeqId) =>
@@ -28,8 +26,7 @@ trait tag Producer
     """
     _acker().flushed(low_watermark)
 
-  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId)
-  =>
+  fun ref _bookkeeping(o_route_id: RouteId, o_seq_id: SeqId) =>
     """
     Process envelopes and keep track of things
     """
