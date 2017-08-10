@@ -1004,7 +1004,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
     _partition_size
 
   fun route[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
-    producer: Producer ref, i_msg_uid: U128, i_frac_ids: None,
+    producer: Producer ref, i_msg_uid: U128,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64): (Bool, Bool, U64)
   =>
     ifdef "trace" then
@@ -1022,10 +1022,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
             @printf[I32]("StatelessPartitionRouter found Route\n".cstring())
           end
           let keep_sending = r.run[D](metric_name, pipeline_time_spent, data,
-            // hand down producer so we can update route_id
-            producer,
-            // incoming envelope
-            i_msg_uid, i_frac_ids, latest_ts, metrics_id,
+            producer, i_msg_uid, latest_ts, metrics_id,
             worker_ingress_ts)
           (false, keep_sending, latest_ts)
         else
@@ -1034,7 +1031,7 @@ class val LocalStatelessPartitionRouter is StatelessPartitionRouter
         end
       | let p: ProxyRouter val =>
         p.route[D](metric_name, pipeline_time_spent, data, producer,
-          i_msg_uid, i_frac_ids, latest_ts, metrics_id, worker_ingress_ts)
+          i_msg_uid, latest_ts, metrics_id, worker_ingress_ts)
       else
         // No step or proxyrouter
         (true, true, latest_ts)
