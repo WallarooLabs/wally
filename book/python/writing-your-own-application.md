@@ -95,11 +95,13 @@ ab.new_pipeline("reverse", Decoder())
 Since each pipeline must have a source, it must also have a source decoder. So `new_pipeline` takes a name and a `Decoder` instance as its arguments.
 
 Next, we add the computation step:
+
 ```python
 ab.to(Reverse)
 ```
 
 And finally, we add the sink along with an encoder:
+
 ```python
 ab.to_sink(Encoder())
 ```

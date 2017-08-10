@@ -466,6 +466,12 @@ primitive Machida
         let builder = recover val PyComputationBuilder(computation_class) end
         let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
         latest = pb.to[PyData val](builder)
+      | "to_parallel" =>
+        let computation_class = @PyTuple_GetItem(item, 1)
+        Machida.inc_ref(computation_class)
+        let builder = recover val PyComputationBuilder(computation_class) end
+        let pb = (latest as PipelineBuilder[PyData val, PyData val, PyData val])
+        latest = pb.to_parallel[PyData val](builder)
       | "to_stateful" =>
         let state_computationp = @PyTuple_GetItem(item, 1)
         Machida.inc_ref(state_computationp)
