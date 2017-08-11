@@ -86,6 +86,7 @@ actor Main
           .new_pipeline[U64 val, String val]("Sequence Window",
             TCPSourceConfig[U64 val].from_options(U64FramedHandler,
               TCPSourceConfigCLIParser(env.args)(0)))
+          .to[U64]({(): MaybeOneToMany => MaybeOneToMany})
           .to_state_partition[U64 val, U64 val, String val,
             WindowState](ObserveNewValue, WindowStateBuilder, "window-state",
               partition where multi_worker = true)
@@ -101,6 +102,35 @@ primitive WindowPartitionFunction
   fun apply(u: U64 val): U64 =>
     // Always use the same partition
     u % 2
+
+primitive MaybeOneToMany is Computation[U64, U64]
+  """
+  Possibly one to many this message.
+
+  The goal is to keep a continous sequence of incrementing U64s.
+  Every 6th number, we will send that number plus the next two numbers as a
+  "one to many" message. We then filter the next to numbers when we come to
+  them. This allows for us to test with a "normal" sequence window test that
+  both "1 to 1" and "1 to many" work correctly.
+  """
+  fun name(): String =>
+      "I might one to many this message!"
+
+  fun apply(input: U64): (U64 | Array[U64] val | None) =>
+    if input < 6 then
+      // start our sneaky logic at 6. if we start before 6, then we will skip
+      // 1 and 2. Not what we want.
+      input
+    else
+      let mod_six = input % 6
+      if mod_six == 0 then
+        recover val [input, input + 1, input + 2] end
+      elseif (mod_six == 1) or (mod_six == 2) then
+        None
+      else
+        input
+      end
+    end
 
 class val WindowStateBuilder
   fun apply(): WindowState => WindowState
