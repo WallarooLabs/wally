@@ -18,21 +18,21 @@ use "wallaroo/tcp_sink"
 use "wallaroo/watermarking"
 
 actor Step is (Producer & Consumer)
+  var _id: U128
   let _runner: Runner
   var _router: Router val = EmptyRouter
   // For use if this is a state step, otherwise EmptyOmniRouter
   var _omni_router: OmniRouter val
   var _route_builder: RouteBuilder val
   let _metrics_reporter: MetricsReporter
+  // If this is a state step and the state partition uses a default step,
+  // then this is used to create a route to that step during initialization.
   let _default_target: (Step | None)
   // list of envelopes
   let _deduplication_list: Array[(Producer, U128,
     SeqId, RouteId)] = _deduplication_list.create()
   let _event_log: EventLog
-  var _id: U128
   let _seq_id_generator: StepSeqIdGenerator = StepSeqIdGenerator
-
-  let _filter_route_id: RouteId = GuidGenerator.u64()
 
   let _routes: MapIs[Consumer, Route] = _routes.create()
   var _upstreams: Array[Producer] = _upstreams.create()
@@ -209,7 +209,8 @@ actor Step is (Producer & Consumer)
     try
       _routes.remove(step)
     else
-      @printf[I32]("Tried to remove route for step but there was no route to remove\n".cstring())
+      @printf[I32](("Tried to remove route for step but there was no route " +
+        "to remove\n").cstring())
     end
 
   be run[D: Any val](metric_name: String, pipeline_time_spent: U64, data: D,
@@ -226,8 +227,9 @@ actor Step is (Producer & Consumer)
       end
 
     let my_metrics_id = ifdef "detailed-metrics" then
-        _metrics_reporter.step_metric(metric_name, "Before receive at step behavior",
-          metrics_id, latest_ts, my_latest_ts)
+        _metrics_reporter.step_metric(metric_name,
+          "Before receive at step behavior", metrics_id, latest_ts,
+          my_latest_ts)
         metrics_id + 1
       else
         metrics_id
@@ -238,8 +240,8 @@ actor Step is (Producer & Consumer)
     end
     (let is_finished, _, let last_ts) = _runner.run[D](metric_name,
       pipeline_time_spent, data, this, _router, _omni_router,
-      msg_uid,
-      my_latest_ts, my_metrics_id, worker_ingress_ts, _metrics_reporter)
+      msg_uid, my_latest_ts, my_metrics_id, worker_ingress_ts,
+      _metrics_reporter)
     if is_finished then
       ifdef "resilience" then
         ifdef "trace" then
@@ -304,8 +306,8 @@ actor Step is (Producer & Consumer)
         let time_spent = end_ts - worker_ingress_ts
 
         ifdef "detailed-metrics" then
-          _metrics_reporter.step_metric(metric_name, "Before end at Step replay",
-            9999, last_ts, end_ts)
+          _metrics_reporter.step_metric(metric_name,
+            "Before end at Step replay", 9999, last_ts, end_ts)
         end
 
         _metrics_reporter.pipeline_metric(metric_name,
@@ -401,7 +403,8 @@ actor Step is (Producer & Consumer)
       u.unmute(c)
     end
 
-  // Grow-to-fit
+  ///////////////
+  // GROW-TO-FIT
   be receive_state(state: ByteSeq val) =>
     ifdef "trace" then
       @printf[I32]("Received new state\n".cstring())
