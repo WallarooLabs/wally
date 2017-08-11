@@ -69,7 +69,7 @@ actor OutgoingBoundary is Consumer
   var _reported_initialized: Bool = false
 
   // Consumer
-  var _upstreams: Array[Producer] = _upstreams.create()
+  var _upstreams: SetIs[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
 
   // TCP
@@ -406,17 +406,14 @@ actor OutgoingBoundary is Consumer
       Invariant(not _upstreams.contains(producer))
     end
 
-    _upstreams.push(producer)
+    _upstreams.set(producer)
 
   be unregister_producer(producer: Producer) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
 
-    try
-      let i = _upstreams.find(producer)
-      _upstreams.delete(i)
-    end
+    _upstreams.unset(producer)
 
   //
   // TCP

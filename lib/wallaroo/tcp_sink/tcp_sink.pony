@@ -53,7 +53,7 @@ actor TCPSink is Consumer
   var _initializer: (LocalTopologyInitializer | None) = None
 
   // Consumer
-  var _upstreams: Array[Producer] = _upstreams.create()
+  var _upstreams: SetIs[Producer] = _upstreams.create()
   var _mute_outstanding: Bool = false
 
   // TCP
@@ -250,28 +250,15 @@ actor TCPSink is Consumer
   be request_ack() =>
     _terminus_route.request_ack()
 
-  //
-  // CREDIT FLOW
   be register_producer(producer: Producer) =>
-    //TODO: Do we need this invariant? Joining worker somehow registers
-    // the same thing multiple times. Can we replace _upstreams with a
-    // set?
-    // ifdef debug then
-    //   Invariant(not _upstreams.contains(producer))
-    // end
-    if not _upstreams.contains(producer) then
-      _upstreams.push(producer)
-    end
+    _upstreams.set(producer)
 
   be unregister_producer(producer: Producer) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
 
-    try
-      let i = _upstreams.find(producer)
-      _upstreams.delete(i)
-    end
+    _upstreams.unset(producer)
 
   //
   // TCP
