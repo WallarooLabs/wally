@@ -25,10 +25,7 @@ actor DataReceiver is Producer
   var _connected: Bool = false
   var _reconnecting: Bool = false
   var _ack_counter: USize = 0
-  // TODO: Get this information via data_connect()
-  var _boundary_queue_max: USize = 16_000
-  var _request_threshold: USize = 8_000
-  var _request_pause: USize = 4_000
+
   var _last_request: USize = 0
 
   // TODO: Test replacing this with state machine class

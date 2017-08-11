@@ -236,7 +236,7 @@ class KeyedStateSubpartition[PIn: Any val,
   fun eq(that: box->StateSubpartition): Bool =>
     match that
     | let kss: box->KeyedStateSubpartition[PIn, Key] =>
-      // TODO: Add RunnerBuilder equality check assumes that
+      // ASSUMPTION: Add RunnerBuilder equality check assumes that
       // runner builder would not change over time, which currently
       // is true.
       (_partition_addresses == kss._partition_addresses) and

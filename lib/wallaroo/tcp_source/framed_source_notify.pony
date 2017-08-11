@@ -21,8 +21,9 @@ primitive TCPFramedSourceNotifyBuilder[In: Any val]
     target_router: Router val, pre_state_target_id: (U128 | None) = None):
     SourceNotify iso^
   =>
-    TCPFramedSourceNotify[In](pipeline_name, auth, handler, runner_builder, router,
-      consume metrics_reporter, event_log, target_router, pre_state_target_id)
+    TCPFramedSourceNotify[In](pipeline_name, auth, handler, runner_builder,
+      router, consume metrics_reporter, event_log, target_router,
+      pre_state_target_id)
 
 class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   let _guid_gen: GuidGenerator = GuidGenerator
@@ -43,7 +44,6 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     target_router: Router val, pre_state_target_id: (U128 | None) = None)
   =>
     _pipeline_name = pipeline_name
-    // TODO: Figure out how to name sources
     _source_name = pipeline_name + " source"
     _handler = handler
     _runner = runner_builder(event_log, auth, None,
@@ -57,12 +57,13 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
 
   fun ref received(conn: TCPSource ref, data: Array[U8] iso): Bool =>
     if _header then
-      // TODO: we need to provide a good error handling route for crap
       try
         let payload_size: USize = _handler.payload_length(consume data)
 
         conn.expect(payload_size)
         _header = false
+      else
+        Fail()
       end
       true
     else
@@ -142,7 +143,8 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
     else
       ifdef debug then
         @printf[I32](("FramedSourceNotify doesn't have PartitionRouter." +
-          " Updating boundaries is a noop for this kind of Source.\n").cstring())
+          " Updating boundaries is a noop for this kind of Source.\n")
+          .cstring())
       end
     end
 

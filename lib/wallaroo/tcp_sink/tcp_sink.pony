@@ -41,7 +41,8 @@ actor TCPSink is Consumer
   ## Possible future work
 
   - Much better algo for determining how many credits to hand out per producer
-  - At the moment we treat sending over TCP as done. In the future we can and should support ack of the data being handled from the other side.
+  - At the moment we treat sending over TCP as done. In the future we can and
+    should support ack of the data being handled from the other side.
   - Handle reconnecting after being disconnected from the downstream
   - Optional in sink deduplication (this woud involve storing what we sent and
     was acknowleged.)
@@ -152,8 +153,8 @@ actor TCPSink is Consumer
     var receive_ts: U64 = 0
     ifdef "detailed-metrics" then
       receive_ts = Time.nanos()
-      _metrics_reporter.step_metric(metric_name, "Before receive at sink", 9998,
-        latest_ts, receive_ts)
+      _metrics_reporter.step_metric(metric_name, "Before receive at sink",
+        9998, latest_ts, receive_ts)
     end
 
     ifdef "trace" then
