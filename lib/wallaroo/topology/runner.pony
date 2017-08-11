@@ -19,8 +19,10 @@ use "wallaroo/w_actor"
 
 
 interface Runner
-  // Return a Bool indicating whether the message is finished processing
-  // and a Bool indicating whether the Route has filled its queue
+  // Return a Bool indicating whether the message is finished processing,
+  // a Bool indicating whether the Route has filled its queue, and a U64
+  // indicating the last timestamp for calculating the duration of the
+  // computation
   fun ref run[D: Any val](metric_name: String, pipeline_time_spent: U64,
     data: D, producer: Producer ref, router: Router val,
     omni_router: OmniRouter val, i_msg_uid: U128,

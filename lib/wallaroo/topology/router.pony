@@ -175,6 +175,8 @@ class ProxyRouter is Equatable[ProxyRouter]
       (_target is that._target) and
       (_target_proxy_address == that._target_proxy_address)
 
+// An OmniRouter is a router that can route a message to any Consumer in the
+// system by using a target id.
 trait OmniRouter is Equatable[OmniRouter]
   fun route_with_target_id[D: Any val](target_id: U128,
     metric_name: String, pipeline_time_spent: U64, data: D,
