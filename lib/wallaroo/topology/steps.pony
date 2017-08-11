@@ -35,7 +35,7 @@ actor Step is (Producer & Consumer)
   let _seq_id_generator: StepSeqIdGenerator = StepSeqIdGenerator
 
   let _routes: MapIs[Consumer, Route] = _routes.create()
-  var _upstreams: Array[Producer] = _upstreams.create()
+  var _upstreams: SetIs[Producer] = _upstreams.create()
 
   // Lifecycle
   var _initializer: (LocalTopologyInitializer | None) = None
@@ -373,25 +373,14 @@ actor Step is (Producer & Consumer)
     end
 
   be register_producer(producer: Producer) =>
-    //TODO: Do we need this invariant? Joining worker somehow registers
-    // the same thing multiple times. Can we replace _upstreams with a
-    // set?
-    // ifdef debug then
-    //   Invariant(not _upstreams.contains(producer))
-    // end
-    if not _upstreams.contains(producer) then
-      _upstreams.push(producer)
-    end
+    _upstreams.set(producer)
 
   be unregister_producer(producer: Producer) =>
     ifdef debug then
       Invariant(_upstreams.contains(producer))
     end
 
-    try
-      let i = _upstreams.find(producer)
-      _upstreams.delete(i)
-    end
+    _upstreams.unset(producer)
 
   be mute(c: Consumer) =>
     for u in _upstreams.values() do
