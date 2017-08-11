@@ -817,7 +817,6 @@ class LocalPartitionRouter[In: Any val,
     end
 
   fun routes(): Array[Consumer] val =>
-    // TODO: CREDITFLOW we need to handle proxies once we have boundary actors
     let cs: Array[Consumer] trn =
       recover Array[Consumer] end
 

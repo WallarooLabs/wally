@@ -399,8 +399,6 @@ actor OutgoingBoundary is Consumer
     // TODO: How do we propagate this down?
     None
 
-  //
-  // CREDIT FLOW
   be register_producer(producer: Producer) =>
     ifdef debug then
       Invariant(not _upstreams.contains(producer))

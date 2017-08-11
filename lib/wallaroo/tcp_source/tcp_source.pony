@@ -29,7 +29,6 @@ actor TCPSource is Producer
   * Switch to requesting credits via promise
   """
   let _guid: GuidGenerator = GuidGenerator
-  // Credit Flow
   let _routes: MapIs[Consumer, Route] = _routes.create()
   let _route_builder: RouteBuilder val
   let _outgoing_boundaries: Map[String, OutgoingBoundary] =
@@ -210,8 +209,6 @@ actor TCPSource is Producer
     """
     close()
 
-  //
-  // CREDIT FLOW
   fun ref route_to(c: Consumer): (Route | None) =>
     try
       _routes(c)
