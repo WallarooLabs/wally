@@ -61,11 +61,11 @@ class iso _TestLocalPartitionRouterEquality is UnitTest
     let target_partition_routes = _TargetPartitionRoutesGenerator(event_log, auth,
       new_proxy_router, boundary2, boundary3)
 
-    var base_router: PartitionRouter val =
+    var base_router: PartitionRouter =
       LocalPartitionRouter[String, String](consume base_local_map,
         consume base_step_ids, base_partition_routes,
       _PartitionFunctionGenerator(), _DefaultRouterGenerator())
-    var target_router: PartitionRouter val =
+    var target_router: PartitionRouter =
       LocalPartitionRouter[String, String](consume target_local_map,
         consume target_step_ids, target_partition_routes,
         _PartitionFunctionGenerator(), _DefaultRouterGenerator())
@@ -105,13 +105,13 @@ class iso _TestOmniRouterEquality is UnitTest
       recover Map[U128, Consumer] end
     target_data_routes(2) = step2
 
-    let base_step_map: Map[U128, (ProxyAddress val | U128)] trn =
-      recover Map[U128, (ProxyAddress val | U128)] end
+    let base_step_map: Map[U128, (ProxyAddress | U128)] trn =
+      recover Map[U128, (ProxyAddress | U128)] end
     base_step_map(1) = ProxyAddress("w1", 1)
     base_step_map(2) = ProxyAddress("w2", 2)
 
-    let target_step_map: Map[U128, (ProxyAddress val | U128)] trn =
-      recover Map[U128, (ProxyAddress val | U128)] end
+    let target_step_map: Map[U128, (ProxyAddress | U128)] trn =
+      recover Map[U128, (ProxyAddress | U128)] end
     target_step_map(1) = ProxyAddress("w2", 1)
     target_step_map(2) = ProxyAddress("w1", 2)
 
@@ -124,11 +124,11 @@ class iso _TestOmniRouterEquality is UnitTest
     target_boundaries("w2") = boundary2
     target_boundaries("w3") = boundary3
 
-    var base_router: OmniRouter val = StepIdRouter("w1",
+    var base_router: OmniRouter = StepIdRouter("w1",
       consume base_data_routes, consume base_step_map,
       consume base_boundaries)
 
-    let target_router: OmniRouter val = StepIdRouter("w1",
+    let target_router: OmniRouter = StepIdRouter("w1",
       consume target_data_routes, consume target_step_map,
       consume target_boundaries)
 
@@ -213,10 +213,10 @@ class iso _TestDataRouterEqualityAfterAdd is UnitTest
 primitive _BasePartitionRoutesGenerator
   fun apply(event_log: EventLog, auth: AmbientAuth, step1: Step,
     boundary2: OutgoingBoundary, boundary3: OutgoingBoundary):
-    Map[String, (Step | ProxyRouter val)] val
+    Map[String, (Step | ProxyRouter)] val
   =>
-    let m: Map[String, (Step | ProxyRouter val)] trn =
-      recover Map[String, (Step | ProxyRouter val)] end
+    let m: Map[String, (Step | ProxyRouter)] trn =
+      recover Map[String, (Step | ProxyRouter)] end
     m("k1") = step1
     m("k2") = ProxyRouter("w1", boundary2,
       ProxyAddress("w2", 2), auth)
@@ -226,11 +226,11 @@ primitive _BasePartitionRoutesGenerator
 
 primitive _TargetPartitionRoutesGenerator
   fun apply(event_log: EventLog, auth: AmbientAuth,
-    new_proxy_router: ProxyRouter val, boundary2: OutgoingBoundary,
-    boundary3: OutgoingBoundary): Map[String, (Step | ProxyRouter val)] val
+    new_proxy_router: ProxyRouter, boundary2: OutgoingBoundary,
+    boundary3: OutgoingBoundary): Map[String, (Step | ProxyRouter)] val
   =>
-    let m: Map[String, (Step | ProxyRouter val)] trn =
-      recover Map[String, (Step | ProxyRouter val)] end
+    let m: Map[String, (Step | ProxyRouter)] trn =
+      recover Map[String, (Step | ProxyRouter)] end
     m("k1") = new_proxy_router
     m("k2") = ProxyRouter("w1", boundary2,
       ProxyAddress("w2", 2), auth)
@@ -251,7 +251,7 @@ primitive _PartitionFunctionGenerator
     {(s: String): String => s}
 
 primitive _DefaultRouterGenerator
-  fun apply(): (Router val | None) =>
+  fun apply(): (Router | None) =>
     None
 
 primitive _StepGenerator

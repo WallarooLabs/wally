@@ -167,10 +167,10 @@ class HomeConnectNotify is TCPConnectionNotify
       try
         let decoded = ExternalMsgDecoder(consume chunked)
         match decoded
-        | let m: ExternalStartMsg val =>
+        | let m: ExternalStartMsg =>
           _env.out.print("\t" + node_name + ": received start message")
           _child.start()
-        | let m: ExternalShutdownMsg val =>
+        | let m: ExternalShutdownMsg =>
          _env.out.print("\t" + node_name + ": received shutdown messages ")
          _child.send_done_shutdown()
          _child.shutdown()

@@ -100,7 +100,7 @@ class BufferedExternalMsgEncoder
     _buffer.done()
 
 primitive ExternalMsgDecoder
-  fun apply(data: Array[U8] val): ExternalMsg val ? =>
+  fun apply(data: Array[U8] val): ExternalMsg ? =>
     match _decode(data)
     | (_Data(), let s: String) =>
       ExternalDataMsg(s)
@@ -134,19 +134,19 @@ primitive ExternalMsgDecoder
 
 trait val ExternalMsg
 
-class ExternalDataMsg is ExternalMsg
+class val ExternalDataMsg is ExternalMsg
   let data: String
 
   new val create(d: String) =>
     data = d
 
-class ExternalReadyMsg is ExternalMsg
+class val ExternalReadyMsg is ExternalMsg
   let node_name: String
 
   new val create(n: String) =>
     node_name = n
 
-class ExternalTopologyReadyMsg is ExternalMsg
+class val ExternalTopologyReadyMsg is ExternalMsg
   let node_name: String
 
   new val create(n: String) =>
@@ -154,19 +154,19 @@ class ExternalTopologyReadyMsg is ExternalMsg
 
 primitive ExternalStartMsg is ExternalMsg
 
-class ExternalShutdownMsg is ExternalMsg
+class val ExternalShutdownMsg is ExternalMsg
   let node_name: String
 
   new val create(n: String) =>
     node_name = n
 
-class ExternalDoneShutdownMsg is ExternalMsg
+class val ExternalDoneShutdownMsg is ExternalMsg
   let node_name: String
 
   new val create(n: String) =>
     node_name = n
 
-class ExternalDoneMsg is ExternalMsg
+class val ExternalDoneMsg is ExternalMsg
   let node_name: String
 
   new val create(n: String) =>

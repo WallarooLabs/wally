@@ -50,11 +50,11 @@ actor MetricsCollector
   let _env: Env
   let _input_file_path: String
   let _output_file_path: String
-  let _overall_metrics_msgs: Map[String, Array[HubMetricsMsg val]] =
+  let _overall_metrics_msgs: Map[String, Array[HubMetricsMsg]] =
     _overall_metrics_msgs.create()
-  let _computation_metrics_msgs: Map[String, Array[HubMetricsMsg val]] =
+  let _computation_metrics_msgs: Map[String, Array[HubMetricsMsg]] =
     _computation_metrics_msgs.create()
-  let _worker_metrics_msgs: Map[String, Array[HubMetricsMsg val]] =
+  let _worker_metrics_msgs: Map[String, Array[HubMetricsMsg]] =
     _worker_metrics_msgs.create()
   let _overall_metrics_data: Map[String, MetricsData] =
     _overall_metrics_data.create()
@@ -69,7 +69,7 @@ actor MetricsCollector
     _output_file_path = output_file_path
     collect_metrics()
 
-  fun ref add_metrics(metrics_msg: HubMetricsMsg val) =>
+  fun ref add_metrics(metrics_msg: HubMetricsMsg) =>
     match metrics_msg.category
     | ("start-to-end") =>
       add_overall_metrics(metrics_msg)
@@ -82,24 +82,24 @@ actor MetricsCollector
         metrics_msg.category + "\n").cstring())
     end
 
-  fun ref add_overall_metrics(metrics_msg: HubMetricsMsg val) =>
+  fun ref add_overall_metrics(metrics_msg: HubMetricsMsg) =>
     let name = metrics_msg.name
     let metrics_array = _overall_metrics_msgs.get_or_else(name,
-      Array[HubMetricsMsg val])
+      Array[HubMetricsMsg])
     metrics_array.push(metrics_msg)
     _overall_metrics_msgs.update(name, metrics_array)
 
-  fun ref add_computation_metrics(metrics_msg: HubMetricsMsg val) =>
+  fun ref add_computation_metrics(metrics_msg: HubMetricsMsg) =>
     let name = metrics_msg.name
     let metrics_array = _computation_metrics_msgs.get_or_else(name,
-      Array[HubMetricsMsg val])
+      Array[HubMetricsMsg])
     metrics_array.push(metrics_msg)
     _computation_metrics_msgs.update(name, metrics_array)
 
-  fun ref add_worker_metrics(metrics_msg: HubMetricsMsg val) =>
+  fun ref add_worker_metrics(metrics_msg: HubMetricsMsg) =>
     let name = metrics_msg.name
     let metrics_array = _worker_metrics_msgs.get_or_else(name,
-      Array[HubMetricsMsg val])
+      Array[HubMetricsMsg])
     metrics_array.push(metrics_msg)
     _worker_metrics_msgs.update(name, metrics_array)
 
@@ -166,7 +166,7 @@ actor MetricsCollector
           | HubOtherMsg =>
             @printf[I32]("Decoded HubOtherMsg\n".cstring())
           else
-            add_metrics(hub_msg as HubMetricsMsg val)
+            add_metrics(hub_msg as HubMetricsMsg)
           end
 
         else
@@ -235,7 +235,7 @@ class MetricsData
   var latency_stats: ( LatencyStats | None ) = None
 
   new create(name': String, category': String, period': U64,
-    metrics_msgs: Array[HubMetricsMsg val])
+    metrics_msgs: Array[HubMetricsMsg])
   =>
     name = name'
     category = category'

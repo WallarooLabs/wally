@@ -125,7 +125,7 @@ actor TCPSink is Consumer
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter val)
+    omni_router: OmniRouter)
   =>
     _mute_upstreams()
     initializer.report_initialized(this)
@@ -205,7 +205,7 @@ actor TCPSink is Consumer
     run[D](metric_name, pipeline_time_spent, data, i_origin, msg_uid,
       i_seq_id, i_route_id, latest_ts, metrics_id, worker_ingress_ts)
 
-  be update_router(router: Router val) =>
+  be update_router(router: Router) =>
     """
     No-op: TCPSink has no router
     """

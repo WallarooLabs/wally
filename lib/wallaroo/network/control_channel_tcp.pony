@@ -163,7 +163,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
       end
       let msg = ChannelMsgDecoder(consume data, _auth)
       match msg
-      | let m: IdentifyControlPortMsg val =>
+      | let m: IdentifyControlPortMsg =>
         ifdef "trace" then
           @printf[I32]("Received IdentifyControlPortMsg on Control Channel\n"
             .cstring())
@@ -176,7 +176,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           end
           _connections.create_control_connection(m.worker_name, host, m.service)
         end
-      | let m: IdentifyDataPortMsg val =>
+      | let m: IdentifyDataPortMsg =>
         ifdef "trace" then
           @printf[I32]("Received IdentifyDataPortMsg on Control Channel\n"
             .cstring())
@@ -189,13 +189,13 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           end
           _connections.create_data_connection(m.worker_name, host, m.service)
         end
-      | let m: RequestBoundaryCountMsg val =>
+      | let m: RequestBoundaryCountMsg =>
         ifdef "trace" then
           @printf[I32]("Received RequestBoundaryCountMsg on Control Channel\n"
             .cstring())
         end
         _router_registry.inform_worker_of_boundary_count(m.sender_name)
-      | let m: ReconnectDataPortMsg val =>
+      | let m: ReconnectDataPortMsg =>
         // Sending worker is telling us we need to reconnect all boundaries
         // to that worker
         ifdef "trace" then
@@ -204,14 +204,14 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
         _connections.reconnect_data_connection(m.worker_name)
         _router_registry.reconnect_source_boundaries(m.worker_name)
-      | let m: ReplayBoundaryCountMsg val =>
+      | let m: ReplayBoundaryCountMsg =>
         ifdef "trace" then
           @printf[I32]("Received ReplayBoundaryCountMsg on Control Channel\n"
             .cstring())
         end
         _recovery_replayer.add_expected_boundary_count(m.sender_name,
           m.boundary_count)
-      | let m: SpinUpLocalTopologyMsg val =>
+      | let m: SpinUpLocalTopologyMsg =>
         ifdef "trace" then
           @printf[I32]("Received SpinUpLocalTopologyMsg on Control Channel\n"
             .cstring())
@@ -223,7 +223,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
-      | let m: SpinUpLocalActorSystemMsg val =>
+      | let m: SpinUpLocalActorSystemMsg =>
         ifdef "trace" then
           @printf[I32](("Received SpinUpLocalActorSystemMsg on Control" +
             "Channel\n").cstring())
@@ -235,24 +235,24 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
-      | let m: RegisterActorForWorkerMsg val =>
+      | let m: RegisterActorForWorkerMsg =>
         ifdef "trace" then
           @printf[I32](("Received RegisterActorForWorkerMsg on Control" +
             "Channel\n").cstring())
         end
         _router_registry.register_actor_for_worker(m.id, m.worker)
-      | let m: ForgetActorMsg val =>
+      | let m: ForgetActorMsg =>
         ifdef "trace" then
           @printf[I32]("Received ForgetActor on Control Channel\n".cstring())
         end
         _router_registry.forget_external_actor(m.id)
-      | let m: RegisterAsRoleMsg val =>
+      | let m: RegisterAsRoleMsg =>
         ifdef "trace" then
           @printf[I32](("Received RegisterAsRoleMsg on Control" +
             "Channel\n").cstring())
         end
         _router_registry.register_as_role(m.role, m.id)
-      | let m: BroadcastToActorsMsg val =>
+      | let m: BroadcastToActorsMsg =>
         ifdef "trace" then
           @printf[I32](("Received BroadcastToActorsMsg on Control" +
             "Channel\n").cstring())
@@ -272,7 +272,7 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
-      | let m: WActorRegistryDigestMsg val =>
+      | let m: WActorRegistryDigestMsg =>
         ifdef "trace" then
           @printf[I32](("Received WActorRegistryDigestMsg on Control" +
             "Channel\n").cstring())
@@ -281,13 +281,13 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         // Assumption: We only receive this digest message during
         // registry recovery phase of Recovery
         _recovery.w_actor_registry_recovery_finished()
-      | let m: RequestWActorRegistryDigestMsg val =>
+      | let m: RequestWActorRegistryDigestMsg =>
         ifdef "trace" then
           @printf[I32](("Received RequestWActorRegistryDigestMsg on Control" +
             "Channel\n").cstring())
         end
         _router_registry.send_digest_to(m.sender)
-      | let m: TopologyReadyMsg val =>
+      | let m: TopologyReadyMsg =>
         ifdef "trace" then
           @printf[I32]("Received TopologyReadyMsg on Control Channel\n"
             .cstring())
@@ -302,14 +302,14 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
           end
           i.topology_ready(m.worker_name)
         end
-      | let m: CreateConnectionsMsg val =>
+      | let m: CreateConnectionsMsg =>
         ifdef "trace" then
           @printf[I32]("Received CreateConnectionsMsg on Control Channel\n"
             .cstring())
         end
         _connections.create_connections(m.control_addrs, m.data_addrs,
           _layout_initializer)
-      | let m: ConnectionsReadyMsg val =>
+      | let m: ConnectionsReadyMsg =>
         ifdef "trace" then
           @printf[I32]("Received ConnectionsReadyMsg on Control Channel\n"
             .cstring())
@@ -325,18 +325,18 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         end
         _layout_initializer.create_data_channel_listener(m.workers,
           _d_host, _d_service)
-      | let m: JoinClusterMsg val =>
+      | let m: JoinClusterMsg =>
         match _layout_initializer
         | let lti: LocalTopologyInitializer =>
           lti.inform_joining_worker(conn, m.worker_name)
         else
           Fail()
         end
-      | let m: AnnounceNewStatefulStepMsg val =>
+      | let m: AnnounceNewStatefulStepMsg =>
         m.update_registry(_router_registry)
-      | let m: StepMigrationCompleteMsg val =>
+      | let m: StepMigrationCompleteMsg =>
         _router_registry.step_migration_complete(m.step_id)
-      | let m: JoiningWorkerInitializedMsg val =>
+      | let m: JoiningWorkerInitializedMsg =>
         try
           (let joining_host, _) = conn.remote_address().name()
           match _layout_initializer
@@ -349,21 +349,21 @@ class ControlChannelConnectNotifier is TCPConnectionNotify
         else
           Fail()
         end
-      | let m: AckMigrationBatchCompleteMsg val =>
+      | let m: AckMigrationBatchCompleteMsg =>
         ifdef "trace" then
           @printf[I32](("Received AckMigrationBatchCompleteMsg on Control " +
             "Channel\n").cstring())
         end
         _router_registry.process_migrating_target_ack(m.sender_name)
-      | let m: MuteRequestMsg val =>
+      | let m: MuteRequestMsg =>
         @printf[I32]("Control Ch: Received Mute Request from %s\n".cstring(),
           m.originating_worker.cstring())
         _router_registry.remote_mute_request(m.originating_worker)
-      | let m: UnmuteRequestMsg val =>
+      | let m: UnmuteRequestMsg =>
         @printf[I32]("Control Ch: Received Unmute Request from %s\n".cstring(),
           m.originating_worker.cstring())
         _router_registry.remote_unmute_request(m.originating_worker)
-      | let m: UnknownChannelMsg val =>
+      | let m: UnknownChannelMsg =>
         @printf[I32]("Unknown channel message type.\n".cstring())
       else
         @printf[I32](("Incoming Channel Message type not handled by control " +
@@ -435,7 +435,7 @@ class JoiningControlSenderConnectNotifier is TCPConnectionNotify
     else
       let msg = ChannelMsgDecoder(consume data, _auth)
       match msg
-      | let m: InformJoiningWorkerMsg val =>
+      | let m: InformJoiningWorkerMsg =>
         try
           // We need to get the host here because the sender didn't know
           // how its host string appears externally. We'll use it to

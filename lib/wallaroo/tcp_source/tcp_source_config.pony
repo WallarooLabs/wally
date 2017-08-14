@@ -53,7 +53,7 @@ class val TCPSourceConfig[In: Any val]
     _host = opts.host
     _service = opts.service
 
-  fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder val =>
+  fun source_listener_builder_builder(): TCPSourceListenerBuilderBuilder =>
     TCPSourceListenerBuilderBuilder(_host, _service)
 
   fun source_builder(app_name: String, name: String):

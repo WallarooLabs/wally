@@ -37,7 +37,7 @@ trait tag AckRequester
 trait tag Initializable
   be application_begin_reporting(initializer: LocalTopologyInitializer)
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter val)
+    omni_router: OmniRouter)
 
   be application_initialized(initializer: LocalTopologyInitializer)
   be application_ready_to_work(initializer: LocalTopologyInitializer)

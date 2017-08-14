@@ -13,7 +13,7 @@ interface TCPSourceNotify
   // and it can then make routes available
   fun ref routes(): Array[Consumer] val
 
-  fun ref update_router(router: Router val)
+  fun ref update_router(router: Router)
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary])
 

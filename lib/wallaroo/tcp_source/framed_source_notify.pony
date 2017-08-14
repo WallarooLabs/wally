@@ -16,9 +16,9 @@ use "wallaroo/topology"
 primitive TCPFramedSourceNotifyBuilder[In: Any val]
   fun apply(pipeline_name: String, auth: AmbientAuth,
     handler: FramedSourceHandler[In] val,
-    runner_builder: RunnerBuilder val, router: Router val,
+    runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router val, pre_state_target_id: (U128 | None) = None):
+    target_router: Router, pre_state_target_id: (U128 | None) = None):
     SourceNotify iso^
   =>
     TCPFramedSourceNotify[In](pipeline_name, auth, handler, runner_builder,
@@ -32,16 +32,16 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
   let _source_name: String
   let _handler: FramedSourceHandler[In] val
   let _runner: Runner
-  var _router: Router val
-  let _omni_router: OmniRouter val = EmptyOmniRouter
+  var _router: Router
+  let _omni_router: OmniRouter = EmptyOmniRouter
   let _metrics_reporter: MetricsReporter
   let _header_size: USize
 
   new iso create(pipeline_name: String, auth: AmbientAuth,
     handler: FramedSourceHandler[In] val,
-    runner_builder: RunnerBuilder val, router: Router val,
+    runner_builder: RunnerBuilder, router: Router,
     metrics_reporter: MetricsReporter iso, event_log: EventLog,
-    target_router: Router val, pre_state_target_id: (U128 | None) = None)
+    target_router: Router, pre_state_target_id: (U128 | None) = None)
   =>
     _pipeline_name = pipeline_name
     _source_name = pipeline_name + " source"
@@ -133,12 +133,12 @@ class TCPFramedSourceNotify[In: Any val] is TCPSourceNotify
       end
     end
 
-  fun ref update_router(router: Router val) =>
+  fun ref update_router(router: Router) =>
     _router = router
 
   fun ref update_boundaries(obs: box->Map[String, OutgoingBoundary]) =>
     match _router
-    | let p_router: PartitionRouter val =>
+    | let p_router: PartitionRouter =>
       _router = p_router.update_boundaries(obs)
     else
       ifdef debug then

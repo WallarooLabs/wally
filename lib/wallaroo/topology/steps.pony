@@ -20,10 +20,10 @@ use "wallaroo/watermarking"
 actor Step is (Producer & Consumer)
   var _id: U128
   let _runner: Runner
-  var _router: Router val = EmptyRouter
+  var _router: Router = EmptyRouter
   // For use if this is a state step, otherwise EmptyOmniRouter
-  var _omni_router: OmniRouter val
-  var _route_builder: RouteBuilder val
+  var _omni_router: OmniRouter
+  var _route_builder: RouteBuilder
   let _metrics_reporter: MetricsReporter
   // If this is a state step and the state partition uses a default step,
   // then this is used to create a route to that step during initialization.
@@ -49,11 +49,11 @@ actor Step is (Producer & Consumer)
     _outgoing_boundaries.create()
 
   new create(runner: Runner iso, metrics_reporter: MetricsReporter iso,
-    id: U128, route_builder: RouteBuilder val, event_log: EventLog,
+    id: U128, route_builder: RouteBuilder, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    router: Router val = EmptyRouter, default_target: (Step | None) = None,
-    omni_router: OmniRouter val = EmptyOmniRouter)
+    router: Router = EmptyRouter, default_target: (Step | None) = None,
+    omni_router: OmniRouter = EmptyOmniRouter)
   =>
     _runner = consume runner
     match _runner
@@ -83,7 +83,7 @@ actor Step is (Producer & Consumer)
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter val)
+    omni_router: OmniRouter)
   =>
     for consumer in _router.routes().values() do
       _routes(consumer) =
@@ -145,10 +145,10 @@ actor Step is (Producer & Consumer)
   be application_ready_to_work(initializer: LocalTopologyInitializer) =>
     None
 
-  be update_route_builder(route_builder: RouteBuilder val) =>
+  be update_route_builder(route_builder: RouteBuilder) =>
     _route_builder = route_builder
 
-  be register_routes(router: Router val, route_builder: RouteBuilder val) =>
+  be register_routes(router: Router, route_builder: RouteBuilder) =>
     for consumer in router.routes().values() do
       let next_route = route_builder(this, consumer, _metrics_reporter)
       if not _routes.contains(consumer) then
@@ -160,10 +160,10 @@ actor Step is (Producer & Consumer)
       end
     end
 
-  be update_router(router: Router val) =>
+  be update_router(router: Router) =>
     _update_router(router)
 
-  fun ref _update_router(router: Router val) =>
+  fun ref _update_router(router: Router) =>
     try
       let old_router = _router
       _router = router
@@ -182,7 +182,7 @@ actor Step is (Producer & Consumer)
       Fail()
     end
 
-  be update_omni_router(omni_router: OmniRouter val) =>
+  be update_omni_router(omni_router: OmniRouter) =>
     try
       let old_router = _omni_router
       _omni_router = omni_router

@@ -215,11 +215,11 @@ trait AMsg
 trait AMsgBuilder
 
 primitive IncrementsMsgBuilder is AMsgBuilder
-  fun apply(increments: USize): IncrementsMsg val =>
+  fun apply(increments: USize): IncrementsMsg =>
     IncrementsMsg(increments)
 
 primitive GossipMsgBuilder is AMsgBuilder
-  fun apply(data: PMap[U64, USize]): GossipMsg val =>
+  fun apply(data: PMap[U64, USize]): GossipMsg =>
     GossipMsg(data)
 
 class val IncrementsMsg is AMsg

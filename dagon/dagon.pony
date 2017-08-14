@@ -315,19 +315,19 @@ class ConnectNotify is TCPConnectionNotify
       try
         let decoded = ExternalMsgDecoder(consume chunked)
         match decoded
-        | let m: ExternalReadyMsg val =>
+        | let m: ExternalReadyMsg =>
           _env.out.print("dagon: " + m.node_name + ": Ready")
           _p_mgr.received_ready(conn, m.node_name)
-        | let m: ExternalTopologyReadyMsg val =>
+        | let m: ExternalTopologyReadyMsg =>
           _env.out.print("dagon: " + m.node_name + ": TopologyReady")
           _p_mgr.received_topology_ready(conn, m.node_name)
-        | let m: ExternalDoneMsg val =>
+        | let m: ExternalDoneMsg =>
           _env.out.print("dagon: " + m.node_name + ": Done")
           _p_mgr.received_done(conn, m.node_name)
-        | let m: ExternalDoneShutdownMsg val =>
+        | let m: ExternalDoneShutdownMsg =>
           _env.out.print("dagon: " + m.node_name + ": DoneShutdown")
           _p_mgr.received_done_shutdown(conn, m.node_name)
-        | let m: ExternalStartGilesSendersMsg val =>
+        | let m: ExternalStartGilesSendersMsg =>
           _p_mgr.received_start_senders(conn)
         else
           _env.out.print("dagon: Unexpected message from child")

@@ -27,7 +27,7 @@ actor Connections is Cluster
   let _control_addrs: Map[String, (String, String)] = _control_addrs.create()
   let _data_addrs: Map[String, (String, String)] = _data_addrs.create()
   let _control_conns: Map[String, TCPConnection] = _control_conns.create()
-  let _data_conn_builders: Map[String, OutgoingBoundaryBuilder val] =
+  let _data_conn_builders: Map[String, OutgoingBoundaryBuilder] =
     _data_conn_builders.create()
   let _data_conns: Map[String, OutgoingBoundary] = _data_conns.create()
   var _phone_home: (TCPConnection | None) = None
@@ -321,8 +321,8 @@ actor Connections is Cluster
       out_bs(target) = boundary
     end
 
-    let out_bbs: Map[String, OutgoingBoundaryBuilder val] trn =
-      recover Map[String, OutgoingBoundaryBuilder val] end
+    let out_bbs: Map[String, OutgoingBoundaryBuilder] trn =
+      recover Map[String, OutgoingBoundaryBuilder] end
 
     for (target, builder) in _data_conn_builders.pairs() do
       out_bbs(target) = builder
@@ -543,7 +543,7 @@ actor Connections is Cluster
     end
 
   be inform_joining_worker(conn: TCPConnection, worker: String,
-    local_topology: LocalTopology val)
+    local_topology: LocalTopology)
   =>
     let c_addrs: Map[String, (String, String)] trn =
       recover Map[String, (String, String)] end

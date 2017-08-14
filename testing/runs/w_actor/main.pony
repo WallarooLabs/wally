@@ -104,26 +104,26 @@ primitive ARoles
   fun two(): String => "two"
   fun three(): String => "three"
 
-trait AMsg
+trait val AMsg
   fun string(): String
 
-trait AMsgBuilder
+trait val AMsgBuilder
 
 primitive SetActorProbability is AMsgBuilder
-  fun apply(prob: F64): SetActorProbabilityMsg val =>
+  fun apply(prob: F64): SetActorProbabilityMsg =>
     SetActorProbabilityMsg(prob)
 
 primitive SetNumberOfMessagesToSend is AMsgBuilder
-  fun apply(n: USize): SetNumberOfMessagesToSendMsg val =>
+  fun apply(n: USize): SetNumberOfMessagesToSendMsg =>
     SetNumberOfMessagesToSendMsg(n)
 
 primitive ChangeMessageTypesToSend is AMsgBuilder
   fun apply(types: Array[AMsgBuilder val] val):
-    ChangeMessageTypesToSendMsg val
+    ChangeMessageTypesToSendMsg
   =>
     ChangeMessageTypesToSendMsg(types)
 
-class SetActorProbabilityMsg is AMsg
+class val SetActorProbabilityMsg is AMsg
   let prob: F64
 
   new val create(prob': F64) =>
@@ -132,7 +132,7 @@ class SetActorProbabilityMsg is AMsg
   fun string(): String =>
     "SetActorProbabilityMsg"
 
-class SetNumberOfMessagesToSendMsg is AMsg
+class val SetNumberOfMessagesToSendMsg is AMsg
   let n: USize
 
   new val create(n': USize) =>
@@ -141,7 +141,7 @@ class SetNumberOfMessagesToSendMsg is AMsg
   fun string(): String =>
     "SetNumberOfMessagesToSendMsg"
 
-class ChangeMessageTypesToSendMsg is AMsg
+class val ChangeMessageTypesToSendMsg is AMsg
   let types: Array[AMsgBuilder val] val
 
   new val create(types': Array[AMsgBuilder val] val) =>
@@ -179,19 +179,19 @@ class A is WActor
 
   fun ref receive(sender: U128, payload: Any val, h: WActorHelper) =>
     match payload
-    | let m: SetActorProbabilityMsg val =>
+    | let m: SetActorProbabilityMsg =>
       ifdef debug then
         @printf[I32]("Received %s to %s\n".cstring(), m.string().cstring(),
           m.prob.string().cstring())
       end
       _emission_prob = m.prob
-    | let m: SetNumberOfMessagesToSendMsg val =>
+    | let m: SetNumberOfMessagesToSendMsg =>
       ifdef debug then
         @printf[I32]("Received %s to %lu msgs\n".cstring(),
           m.string().cstring(), m.n)
       end
       _n_messages = m.n
-    | let m: ChangeMessageTypesToSendMsg val =>
+    | let m: ChangeMessageTypesToSendMsg =>
       ifdef debug then
         @printf[I32]("Received %s\n".cstring(), m.string().cstring())
       end
@@ -231,7 +231,7 @@ class A is WActor
   fun ref select_role(h: WActorHelper): String ? =>
     _rand.pick[String]([ARoles.one(), ARoles.two(), ARoles.three()])
 
-  fun ref create_message(): AMsg val ? =>
+  fun ref create_message(): AMsg ? =>
     match _rand.pick[AMsgBuilder val](_message_types_to_send)
     | let blder: SetActorProbability val =>
       SetActorProbability(_rand.f64_between(0.1, 0.9))

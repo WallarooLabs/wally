@@ -35,17 +35,17 @@ primitive SingleStepPartitionFunction[In: Any val] is
   fun apply(input: In): U8 => 0
 
 interface PartitionAddresses is Equatable[PartitionAddresses]
-  fun apply(key: Any val): (ProxyAddress val | None)
+  fun apply(key: Any val): (ProxyAddress | None)
   fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
-    pa: ProxyAddress val): PartitionAddresses val ?
+    pa: ProxyAddress): PartitionAddresses val ?
 
 class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
-  let _addresses: Map[Key, ProxyAddress val] val
+  let _addresses: Map[Key, ProxyAddress] val
 
-  new val create(a: Map[Key, ProxyAddress val] val) =>
+  new val create(a: Map[Key, ProxyAddress] val) =>
     _addresses = a
 
-  fun apply(k: Any val): (ProxyAddress val | None) =>
+  fun apply(k: Any val): (ProxyAddress | None) =>
     match k
     | let key: Key =>
       try
@@ -57,13 +57,13 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
       None
     end
 
-  fun pairs(): Iterator[(Key, ProxyAddress val)] => _addresses.pairs()
+  fun pairs(): Iterator[(Key, ProxyAddress)] => _addresses.pairs()
 
   fun update_key[K: (Hashable val & Equatable[K] val)](key: K,
-    pa: ProxyAddress val): PartitionAddresses val ?
+    pa: ProxyAddress): PartitionAddresses val ?
   =>
-    let new_addresses: Map[Key, ProxyAddress val] trn =
-      recover Map[Key, ProxyAddress val] end
+    let new_addresses: Map[Key, ProxyAddress] trn =
+      recover Map[Key, ProxyAddress] end
     // TODO: This would be much more efficient with a persistent map, since
     // we wouldn't have to copy everything to make a small change.
     for (k, v) in _addresses.pairs() do
@@ -80,7 +80,7 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
   fun eq(that: box->PartitionAddresses): Bool =>
     match that
     | let that_keyed: box->KeyedPartitionAddresses[Key] =>
-      MapEquality[Key, ProxyAddress val](_addresses, that_keyed._addresses)
+      MapEquality[Key, ProxyAddress](_addresses, that_keyed._addresses)
     else
       false
     end
@@ -88,17 +88,17 @@ class KeyedPartitionAddresses[Key: (Hashable val & Equatable[Key] val)]
   fun ne(that: box->PartitionAddresses): Bool => not eq(that)
 
 interface StateAddresses
-  fun apply(key: Any val): (Step tag | ProxyRouter val | None)
-  fun register_routes(router: Router val, route_builder: RouteBuilder val)
+  fun apply(key: Any val): (Step tag | ProxyRouter | None)
+  fun register_routes(router: Router, route_builder: RouteBuilder)
   fun steps(): Array[Consumer] val
 
 class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
-  let _addresses: Map[Key, (Step | ProxyRouter val)] val
+  let _addresses: Map[Key, (Step | ProxyRouter)] val
 
-  new val create(a: Map[Key, (Step | ProxyRouter val)] val) =>
+  new val create(a: Map[Key, (Step | ProxyRouter)] val) =>
     _addresses = a
 
-  fun apply(k: Any val): (Step | ProxyRouter val | None) =>
+  fun apply(k: Any val): (Step | ProxyRouter | None) =>
     match k
     | let key: Key =>
       try
@@ -110,7 +110,7 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
       None
     end
 
-  fun register_routes(router: Router val, route_builder: RouteBuilder val) =>
+  fun register_routes(router: Router, route_builder: RouteBuilder) =>
     for s in _addresses.values() do
       match s
       | let step: Step =>
@@ -130,7 +130,7 @@ class KeyedStateAddresses[Key: (Hashable val & Equatable[Key] val)]
 
     consume ss
 
-trait StateSubpartition is Equatable[StateSubpartition]
+trait val StateSubpartition is Equatable[StateSubpartition]
   fun build(app_name: String, worker_name: String,
     metrics_conn: MetricsSink,
     auth: AmbientAuth, event_log: EventLog,
@@ -138,21 +138,21 @@ trait StateSubpartition is Equatable[StateSubpartition]
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer],
-    default_router: (Router val | None) = None): PartitionRouter val
+    default_router: (Router | None) = None): PartitionRouter
   fun update_key[Key: (Hashable val & Equatable[Key] val)](key: Key,
-    pa: ProxyAddress val): StateSubpartition val ?
-  fun runner_builder(): RunnerBuilder val
+    pa: ProxyAddress): StateSubpartition ?
+  fun runner_builder(): RunnerBuilder
 
-class KeyedStateSubpartition[PIn: Any val,
+class val KeyedStateSubpartition[PIn: Any val,
   Key: (Hashable val & Equatable[Key] val)] is StateSubpartition
   let _partition_addresses: KeyedPartitionAddresses[Key] val
   let _id_map: Map[Key, U128] val
   let _partition_function: PartitionFunction[PIn, Key] val
   let _pipeline_name: String
-  let _runner_builder: RunnerBuilder val
+  let _runner_builder: RunnerBuilder
 
   new val create(partition_addresses': KeyedPartitionAddresses[Key] val,
-    id_map': Map[Key, U128] val, runner_builder': RunnerBuilder val,
+    id_map': Map[Key, U128] val, runner_builder': RunnerBuilder,
     partition_function': PartitionFunction[PIn, Key] val,
     pipeline_name': String)
   =>
@@ -162,7 +162,7 @@ class KeyedStateSubpartition[PIn: Any val,
     _pipeline_name = pipeline_name'
     _runner_builder = runner_builder'
 
-  fun runner_builder(): RunnerBuilder val =>
+  fun runner_builder(): RunnerBuilder =>
     _runner_builder
 
   fun build(app_name: String, worker_name: String,
@@ -172,11 +172,11 @@ class KeyedStateSubpartition[PIn: Any val,
     outgoing_boundaries: Map[String, OutgoingBoundary] val,
     initializables: SetIs[Initializable],
     data_routes: Map[U128, Consumer],
-    default_router: (Router val | None) = None):
+    default_router: (Router | None) = None):
     LocalPartitionRouter[PIn, Key] val
   =>
-    let routes: Map[Key, (Step | ProxyRouter val)] trn =
-      recover Map[Key, (Step | ProxyRouter val)] end
+    let routes: Map[Key, (Step | ProxyRouter)] trn =
+      recover Map[Key, (Step | ProxyRouter)] end
 
     let m: Map[U128, Step] trn = recover Map[U128, Step] end
 
@@ -185,7 +185,7 @@ class KeyedStateSubpartition[PIn: Any val,
     for (key, id) in _id_map.pairs() do
       let proxy_address = _partition_addresses(key)
       match proxy_address
-      | let pa: ProxyAddress val =>
+      | let pa: ProxyAddress =>
         if pa.worker == worker_name then
           let reporter = MetricsReporter(app_name, worker_name, metrics_conn)
           let next_state_step = Step(_runner_builder(where event_log = event_log, auth=auth),
@@ -218,7 +218,7 @@ class KeyedStateSubpartition[PIn: Any val,
       _partition_function, default_router)
 
   fun update_key[K: (Hashable val & Equatable[K] val)](k: K,
-    pa: ProxyAddress val): StateSubpartition val ?
+    pa: ProxyAddress): StateSubpartition ?
   =>
     match k
     | let key: Key =>

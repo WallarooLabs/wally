@@ -24,7 +24,7 @@ class val TypedTCPSourceBuilderBuilder[In: Any val]
 
   fun name(): String => _name
 
-  fun apply(runner_builder: RunnerBuilder val, router: Router val,
+  fun apply(runner_builder: RunnerBuilder, router: Router,
     metrics_conn: MetricsSink, pre_state_target_id: (U128 | None) = None,
     worker_name: String, metrics_reporter: MetricsReporter iso):
       SourceBuilder
@@ -62,16 +62,16 @@ interface TCPSourceListenerNotify
     newly established connection to the server.
     """
 
-  fun ref update_router(router: Router val)
+  fun ref update_router(router: Router)
 
 class SourceListenerNotify is TCPSourceListenerNotify
   var _source_builder: SourceBuilder
   let _event_log: EventLog
-  let _target_router: Router val
+  let _target_router: Router
   let _auth: AmbientAuth
 
   new iso create(builder: SourceBuilder, event_log: EventLog, auth: AmbientAuth,
-    target_router: Router val) =>
+    target_router: Router) =>
     _source_builder = builder
     _event_log = event_log
     _target_router = target_router
@@ -95,5 +95,5 @@ class SourceListenerNotify is TCPSourceListenerNotify
       error
     end
 
-  fun ref update_router(router: Router val) =>
+  fun ref update_router(router: Router) =>
     _source_builder = _source_builder.update_router(router)

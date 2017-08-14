@@ -31,7 +31,7 @@ trait StateProcessor[S: State ref] is BasicComputation
   // keep receiving data and the state change (or None if there was
   // no state change).
   fun apply(state: S, sc_repo: StateChangeRepository[S],
-    omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
+    omni_router: OmniRouter, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref, i_msg_uid: U128,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
     (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,
@@ -55,7 +55,7 @@ class StateComputationWrapper[In: Any val, Out: Any val, S: State ref]
   fun input(): Any val => _input
 
   fun apply(state: S, sc_repo: StateChangeRepository[S],
-    omni_router: OmniRouter val, metric_name: String, pipeline_time_spent: U64,
+    omni_router: OmniRouter, metric_name: String, pipeline_time_spent: U64,
     producer: Producer ref, i_msg_uid: U128,
     latest_ts: U64, metrics_id: U16, worker_ingress_ts: U64):
     (Bool, Bool, (StateChange[S] ref | DirectStateChange | None), U64,

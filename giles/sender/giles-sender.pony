@@ -270,7 +270,7 @@ class ToDagonNotify is TCPConnectionNotify
       try
         let decoded = ExternalMsgDecoder(consume chunked)
         match decoded
-        | let m: ExternalStartMsg val =>
+        | let m: ExternalStartMsg =>
             _coordinator.go()
         else
           @printf[I32]("Unexpected message from Dagon\n".cstring())

@@ -41,69 +41,69 @@ class iso _TestLocalTopologyEquality is UnitTest
     h.assert_eq[Bool](true, base_topology == target_topology)
 
 primitive _BaseLocalTopologyGenerator
-  fun apply(dag: Dag[StepInitializer val] val,
-    psd: Array[PreStateData val] val,
-    default_target: (Array[StepBuilder val] val | ProxyAddress val | None),
+  fun apply(dag: Dag[StepInitializer] val,
+    psd: Array[PreStateData] val,
+    default_target: (Array[StepBuilder] val | ProxyAddress | None),
     pf: PartitionFunction[String, String] val,
-    rb: RunnerBuilder val): LocalTopology val
+    rb: RunnerBuilder): LocalTopology
   =>
     LocalTopology("test", "w1", dag, _StepMapGenerator(),
       _BaseStateBuildersGenerator(rb, pf), psd, _ProxyIdsGenerator(),
       default_target, "test-default", 1, _BaseWorkerNamesGenerator())
 
 primitive _TargetLocalTopologyGenerator
-  fun apply(dag: Dag[StepInitializer val] val,
-    psd: Array[PreStateData val] val,
-    default_target: (Array[StepBuilder val] val | ProxyAddress val | None),
+  fun apply(dag: Dag[StepInitializer] val,
+    psd: Array[PreStateData] val,
+    default_target: (Array[StepBuilder] val | ProxyAddress | None),
     pf: PartitionFunction[String, String] val,
-    rb: RunnerBuilder val): LocalTopology val
+    rb: RunnerBuilder): LocalTopology
   =>
     LocalTopology("test", "w1", dag, _StepMapGenerator(),
       _TargetStateBuildersGenerator(rb, pf), psd, _ProxyIdsGenerator(),
       default_target, "test-default", 1, _TargetWorkerNamesGenerator())
 
 primitive _DagGenerator
-  fun apply(): Dag[StepInitializer val] val =>
-    Dag[StepInitializer val]
+  fun apply(): Dag[StepInitializer] val =>
+    Dag[StepInitializer]
 
 primitive _StepMapGenerator
-  fun apply(): Map[U128, (ProxyAddress val | U128)] val =>
-    let m: Map[U128, (ProxyAddress val | U128)] trn =
-      recover Map[U128, (ProxyAddress val | U128)] end
+  fun apply(): Map[U128, (ProxyAddress | U128)] val =>
+    let m: Map[U128, (ProxyAddress | U128)] trn =
+      recover Map[U128, (ProxyAddress | U128)] end
     m(1) = ProxyAddress("w1", 10)
     m(2) = ProxyAddress("w2", 20)
     m(3) = ProxyAddress("w3", 30)
     consume m
 
 primitive _BaseStateBuildersGenerator
-  fun apply(rb: RunnerBuilder val, pf: PartitionFunction[String, String] val):
-    Map[String, StateSubpartition val] val
+  fun apply(rb: RunnerBuilder, pf: PartitionFunction[String, String] val):
+    Map[String, StateSubpartition] val
   =>
-    let m: Map[String, StateSubpartition val] trn =
-      recover Map[String, StateSubpartition val] end
+    let m: Map[String, StateSubpartition] trn =
+      recover Map[String, StateSubpartition] end
     m("state") = _BaseStateSubpartitionGenerator(rb, pf)
     consume m
 
 primitive _TargetStateBuildersGenerator
-  fun apply(rb: RunnerBuilder val, pf: PartitionFunction[String, String] val):
-    Map[String, StateSubpartition val] val
+  fun apply(rb: RunnerBuilder, pf: PartitionFunction[String, String] val):
+    Map[String, StateSubpartition] val
   =>
-    let m: Map[String, StateSubpartition val] trn =
-      recover Map[String, StateSubpartition val] end
+    let m: Map[String, StateSubpartition] trn =
+      recover Map[String, StateSubpartition] end
     m("state") = _TargetStateSubpartitionGenerator(rb, pf)
     consume m
 
 primitive _BaseStateSubpartitionGenerator
-  fun apply(rb: RunnerBuilder val, pf: PartitionFunction[String, String] val):
-    StateSubpartition val
+  fun apply(rb: RunnerBuilder, pf: PartitionFunction[String, String] val):
+    StateSubpartition
   =>
     KeyedStateSubpartition[String, String](
       _BaseKeyedPartitionAddressesGenerator(), _IdMapGenerator(),
       rb, pf, "pipeline")
 
 primitive _TargetStateSubpartitionGenerator
-  fun apply(rb: RunnerBuilder val, pf: PartitionFunction[String, String] val):
-    StateSubpartition val
+  fun apply(rb: RunnerBuilder, pf: PartitionFunction[String, String] val):
+    StateSubpartition
   =>
     KeyedStateSubpartition[String, String](
       _TargetKeyedPartitionAddressesGenerator(), _IdMapGenerator(),
@@ -111,8 +111,8 @@ primitive _TargetStateSubpartitionGenerator
 
 primitive _BaseKeyedPartitionAddressesGenerator
   fun apply(): KeyedPartitionAddresses[String] val =>
-    let m: Map[String, ProxyAddress val] trn =
-      recover Map[String, ProxyAddress val] end
+    let m: Map[String, ProxyAddress] trn =
+      recover Map[String, ProxyAddress] end
     m("k1") = ProxyAddress("w1", 10)
     m("k2") = ProxyAddress("w2", 20)
     m("k3") = ProxyAddress("w3", 30)
@@ -120,8 +120,8 @@ primitive _BaseKeyedPartitionAddressesGenerator
 
 primitive _TargetKeyedPartitionAddressesGenerator
   fun apply(): KeyedPartitionAddresses[String] val =>
-    let m: Map[String, ProxyAddress val] trn =
-      recover Map[String, ProxyAddress val] end
+    let m: Map[String, ProxyAddress] trn =
+      recover Map[String, ProxyAddress] end
     m("k1") = ProxyAddress("w2", 10)
     m("k2") = ProxyAddress("w2", 20)
     m("k3") = ProxyAddress("w3", 30)
@@ -140,16 +140,16 @@ primitive _PartitionFunctionGenerator
     {(s: String): String => s}
 
 primitive _PreStateDataArrayGenerator
-  fun apply(rb: RunnerBuilder val): Array[PreStateData val] val =>
+  fun apply(rb: RunnerBuilder): Array[PreStateData] val =>
     recover [_PreStateDataGenerator(rb), _PreStateDataGenerator(rb),
       _PreStateDataGenerator(rb)] end
 
 primitive _PreStateDataGenerator
-  fun apply(rb: RunnerBuilder val): PreStateData val =>
+  fun apply(rb: RunnerBuilder): PreStateData =>
     PreStateData(rb, 1000)
 
 primitive _RunnerBuilderGenerator
-  fun apply(): RunnerBuilder val =>
+  fun apply(): RunnerBuilder =>
     ComputationRunnerBuilder[U8, U8](_ComputationBuilderGenerator(),
       BoundaryOnlyRouteBuilder)
 
@@ -167,7 +167,7 @@ primitive _ProxyIdsGenerator
     recover Map[String, U128] end
 
 primitive _DefaultTargetGenerator
-  fun apply(): (Array[StepBuilder val] val | ProxyAddress val | None) =>
+  fun apply(): (Array[StepBuilder] val | ProxyAddress | None) =>
     None
 
 primitive _BaseWorkerNamesGenerator

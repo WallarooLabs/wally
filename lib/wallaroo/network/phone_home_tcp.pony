@@ -33,7 +33,7 @@ class HomeConnectNotify is TCPConnectionNotify
       try
         let external_msg = ExternalMsgDecoder(consume data)
         match external_msg
-        | let m: ExternalShutdownMsg val =>
+        | let m: ExternalShutdownMsg =>
           @printf[I32]("Received ExternalShutdownMsg\n".cstring())
           _connections.shutdown()
         end

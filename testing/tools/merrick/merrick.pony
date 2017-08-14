@@ -235,7 +235,7 @@ class ToDagonNotify is TCPConnectionNotify
       try
         let decoded = ExternalMsgDecoder(consume data)
         match decoded
-        | let d: ExternalShutdownMsg val =>
+        | let d: ExternalShutdownMsg =>
           _coordinator.finished()
         else
           @printf[I32]("Unexpected data from Dagon\n".cstring())

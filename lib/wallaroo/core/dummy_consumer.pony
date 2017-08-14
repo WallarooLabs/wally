@@ -36,7 +36,7 @@ actor DummyConsumer is Consumer
     None
 
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter val)
+    omni_router: OmniRouter)
   =>
     None
 

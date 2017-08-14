@@ -18,12 +18,12 @@ class Application
   let _name: String
   let pipelines: Array[BasicPipeline] = Array[BasicPipeline]
   // _state_builders maps from state_name to StateSubpartition
-  let _state_builders: Map[String, PartitionBuilder val] =
+  let _state_builders: Map[String, PartitionBuilder] =
     _state_builders.create()
   // Map from source id to filename
-  let init_files: Map[USize, InitFile val] = init_files.create()
+  let init_files: Map[USize, InitFile] = init_files.create()
   // TODO: Replace this default strategy with a better one after POC
-  var default_target: (Array[RunnerBuilder val] val | None) = None
+  var default_target: (Array[RunnerBuilder] val | None) = None
   var default_state_name: String = ""
   var default_target_id: U128 = 0
   var sink_count: USize = 0
@@ -33,12 +33,12 @@ class Application
 
   fun ref new_pipeline[In: Any val, Out: Any val] (
     pipeline_name: String, source_config: SourceConfig[In],
-    init_file: (InitFile val | None) = None, coalescing: Bool = true):
+    init_file: (InitFile | None) = None, coalescing: Bool = true):
       PipelineBuilder[In, Out, In]
   =>
     let pipeline_id = pipelines.size()
     match init_file
-    | let f: InitFile val =>
+    | let f: InitFile =>
       add_init_file(pipeline_id, f)
     end
     let pipeline = Pipeline[In, Out](_name, pipeline_id, pipeline_name,
@@ -56,8 +56,8 @@ class Application
   =>
     default_state_name = default_name
 
-    let builders: Array[RunnerBuilder val] trn =
-      recover Array[RunnerBuilder val] end
+    let builders: Array[RunnerBuilder] trn =
+      recover Array[RunnerBuilder] end
 
     let pre_state_builder = PreStateRunnerBuilder[In, Out, In, U8, S](
       s_comp, default_name, SingleStepPartitionFunction[In],
@@ -77,22 +77,22 @@ class Application
   fun ref add_pipeline(p: BasicPipeline) =>
     pipelines.push(p)
 
-  fun ref add_init_file(source_id: USize, init_file: InitFile val) =>
+  fun ref add_init_file(source_id: USize, init_file: InitFile) =>
     init_files(source_id) = init_file
 
   fun ref add_state_builder(state_name: String,
-    state_partition: PartitionBuilder val)
+    state_partition: PartitionBuilder)
   =>
     _state_builders(state_name) = state_partition
 
   fun ref increment_sink_count() =>
     sink_count = sink_count + 1
 
-  fun state_builder(state_name: String): PartitionBuilder val ? =>
+  fun state_builder(state_name: String): PartitionBuilder ? =>
     _state_builders(state_name)
-  fun state_builders(): Map[String, PartitionBuilder val] val =>
-    let builders: Map[String, PartitionBuilder val] trn =
-      recover Map[String, PartitionBuilder val] end
+  fun state_builders(): Map[String, PartitionBuilder] val =>
+    let builders: Map[String, PartitionBuilder] trn =
+      recover Map[String, PartitionBuilder] end
     for (k, v) in _state_builders.pairs() do
       builders(k) = v
     end
@@ -104,7 +104,7 @@ trait BasicPipeline
   fun name(): String
   fun source_id(): USize
   fun source_builder(): SourceBuilderBuilder ?
-  fun source_route_builder(): RouteBuilder val
+  fun source_route_builder(): RouteBuilder
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder
   fun sink_builder(): (SinkBuilder | None)
   // TODO: Change this when we need more sinks per pipeline
@@ -112,16 +112,16 @@ trait BasicPipeline
   fun sink_id(): (U128 | None)
   // The index into the list of provided sink addresses
   fun is_coalesced(): Bool
-  fun apply(i: USize): RunnerBuilder val ?
+  fun apply(i: USize): RunnerBuilder ?
   fun size(): USize
 
 class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   let _pipeline_id: USize
   let _name: String
   let _app_name: String
-  let _runner_builders: Array[RunnerBuilder val]
+  let _runner_builders: Array[RunnerBuilder]
   var _source_builder: (SourceBuilderBuilder | None) = None
-  let _source_route_builder: RouteBuilder val
+  let _source_route_builder: RouteBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
   var _sink_builder: (SinkBuilder | None) = None
 
@@ -132,7 +132,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     sc: SourceConfig[In], coalescing: Bool)
   =>
     _pipeline_id = p_id
-    _runner_builders = Array[RunnerBuilder val]
+    _runner_builders = Array[RunnerBuilder]
     _name = n
     _app_name = app_name
     _source_route_builder = TypedRouteBuilder[In]
@@ -140,10 +140,10 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
     _source_listener_builder_builder = sc.source_listener_builder_builder()
     _source_builder = sc.source_builder(_app_name, _name)
 
-  fun ref add_runner_builder(p: RunnerBuilder val) =>
+  fun ref add_runner_builder(p: RunnerBuilder) =>
     _runner_builders.push(p)
 
-  fun apply(i: USize): RunnerBuilder val ? => _runner_builders(i)
+  fun apply(i: USize): RunnerBuilder ? => _runner_builders(i)
 
   fun ref update_sink(sink_builder': SinkBuilder) =>
     _sink_builder = sink_builder'
@@ -153,7 +153,7 @@ class Pipeline[In: Any val, Out: Any val] is BasicPipeline
   fun source_builder(): SourceBuilderBuilder ? =>
     _source_builder as SourceBuilderBuilder
 
-  fun source_route_builder(): RouteBuilder val => _source_route_builder
+  fun source_route_builder(): RouteBuilder => _source_route_builder
 
   fun source_listener_builder_builder(): SourceListenerBuilderBuilder =>
     _source_listener_builder_builder

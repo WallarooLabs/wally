@@ -61,7 +61,7 @@ actor Main
     end
 
 primitive _RunnerBuilderGenerator
-  fun apply(): RunnerBuilder val =>
+  fun apply(): RunnerBuilder =>
 		let comp = CountComputation
     StateRunnerBuilder[CountState](
 			CountStateBuilder,

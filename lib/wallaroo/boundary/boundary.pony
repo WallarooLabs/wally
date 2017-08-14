@@ -25,7 +25,7 @@ use @pony_asio_event_resubscribe_write[None](event: AsioEventID)
 use @pony_asio_event_destroy[None](event: AsioEventID)
 
 
-class OutgoingBoundaryBuilder
+class val OutgoingBoundaryBuilder
   let _auth: AmbientAuth
   let _worker_name: String
   let _reporter: MetricsReporter val
@@ -154,7 +154,7 @@ actor OutgoingBoundary is Consumer
     initializer.report_created(this)
 
   be application_created(initializer: LocalTopologyInitializer,
-    omni_router: OmniRouter val)
+    omni_router: OmniRouter)
   =>
     _connect_count = @pony_os_connect_tcp[U32](this,
       _host.cstring(), _service.cstring(),
@@ -257,7 +257,7 @@ actor OutgoingBoundary is Consumer
     Fail()
 
   // TODO: open question: how do we reconnect if our external system goes away?
-  be forward(delivery_msg: ReplayableDeliveryMsg val, pipeline_time_spent: U64,
+  be forward(delivery_msg: ReplayableDeliveryMsg, pipeline_time_spent: U64,
     i_origin: Producer, i_seq_id: SeqId, i_route_id: RouteId, latest_ts: U64,
     metrics_id: U16, worker_ingress_ts: U64)
   =>
@@ -314,7 +314,7 @@ actor OutgoingBoundary is Consumer
 
     _maybe_mute_or_unmute_upstreams()
 
-  be forward_actor_data(delivery_msg: ActorDeliveryMsg val) =>
+  be forward_actor_data(delivery_msg: ActorDeliveryMsg) =>
     ifdef "trace" then
       @printf[I32]("Rcvd actor message at OutgoingBoundary\n".cstring())
     end
@@ -380,7 +380,7 @@ actor OutgoingBoundary is Consumer
       Fail()
     end
 
-  be update_router(router: Router val) =>
+  be update_router(router: Router) =>
     """
     No-op: OutgoingBoundary has no router
     """
@@ -938,18 +938,18 @@ class BoundaryNotify is WallarooOutgoingNetworkActorNotify
         @printf[I32]("Rcvd msg at OutgoingBoundary\n".cstring())
       end
       match ChannelMsgDecoder(consume data, _auth)
-      | let ac: AckDataConnectMsg val =>
+      | let ac: AckDataConnectMsg =>
         ifdef "trace" then
           @printf[I32]("Received AckDataConnectMsg at Boundary\n".cstring())
         end
         conn.receive_connect_ack(ac.last_id_seen)
-      | let sn: StartNormalDataSendingMsg val =>
+      | let sn: StartNormalDataSendingMsg =>
         ifdef "trace" then
           @printf[I32]("Received StartNormalDataSendingMsg at Boundary\n"
             .cstring())
         end
         conn.start_normal_sending()
-      | let aw: AckWatermarkMsg val =>
+      | let aw: AckWatermarkMsg =>
         ifdef "trace" then
           @printf[I32]("Received AckWatermarkMsg at Boundary\n".cstring())
         end

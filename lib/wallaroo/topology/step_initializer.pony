@@ -14,22 +14,22 @@ use "wallaroo/sink"
 type StepInitializer is (StepBuilder | SourceData | EgressBuilder |
   PreStatelessData)
 
-class StepBuilder
+class val StepBuilder
   let _app_name: String
   let _worker_name: String
   let _pipeline_name: String
   let _state_name: String
-  let _runner_builder: RunnerBuilder val
+  let _runner_builder: RunnerBuilder
   let _id: U128
   let _pre_state_target_id: (U128 | None)
   let _is_stateful: Bool
-  let _forward_route_builder: RouteBuilder val
+  let _forward_route_builder: RouteBuilder
 
   new val create(app_name: String, worker_name: String,
-    pipeline_name': String, r: RunnerBuilder val, id': U128,
+    pipeline_name': String, r: RunnerBuilder, id': U128,
     is_stateful': Bool = false,
     pre_state_target_id': (U128 | None) = None,
-    forward_route_builder': RouteBuilder val = BoundaryOnlyRouteBuilder)
+    forward_route_builder': RouteBuilder = BoundaryOnlyRouteBuilder)
   =>
     _app_name = app_name
     _worker_name = worker_name
@@ -56,19 +56,19 @@ class StepBuilder
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => _is_stateful
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  fun in_route_builder(): (RouteBuilder val | None) =>
+  fun forward_route_builder(): RouteBuilder => _forward_route_builder
+  fun in_route_builder(): (RouteBuilder | None) =>
     _runner_builder.in_route_builder()
-  fun clone_router_and_set_input_type(r: Router val,
-    default_r: (Router val | None) = None): Router val
+  fun clone_router_and_set_input_type(r: Router,
+    default_r: (Router | None) = None): Router
   =>
     _runner_builder.clone_router_and_set_input_type(r, default_r)
 
-  fun apply(next: Router val, metrics_conn: MetricsSink, event_log: EventLog,
+  fun apply(next: Router, metrics_conn: MetricsSink, event_log: EventLog,
     recovery_replayer: RecoveryReplayer,
     auth: AmbientAuth, outgoing_boundaries: Map[String, OutgoingBoundary] val,
-    router: Router val = EmptyRouter,
-    omni_router: OmniRouter val = EmptyOmniRouter,
+    router: Router = EmptyRouter,
+    omni_router: OmniRouter = EmptyOmniRouter,
     default_target: (Step | None) = None): Step tag
   =>
     let runner = _runner_builder(where event_log = event_log, auth = auth, router = router,
@@ -80,19 +80,19 @@ class StepBuilder
     step.update_router(next)
     step
 
-class SourceData
+class val SourceData
   let _id: U128
   let _pipeline_name: String
   let _name: String
   let _state_name: String
-  let _builder: SourceBuilderBuilder val
-  let _runner_builder: RunnerBuilder val
-  let _route_builder: RouteBuilder val
+  let _builder: SourceBuilderBuilder
+  let _runner_builder: RunnerBuilder
+  let _route_builder: RouteBuilder
   let _source_listener_builder_builder: SourceListenerBuilderBuilder
   let _pre_state_target_id: (U128 | None)
 
-  new val create(id': U128, b: SourceBuilderBuilder val, r: RunnerBuilder val,
-    default_source_route_builder: RouteBuilder val,
+  new val create(id': U128, b: SourceBuilderBuilder, r: RunnerBuilder,
+    default_source_route_builder: RouteBuilder,
     s: SourceListenerBuilderBuilder,
     pre_state_target_id': (U128 | None) = None)
   =>
@@ -104,7 +104,7 @@ class SourceData
     _state_name = _runner_builder.state_name()
     _route_builder =
       match _runner_builder.route_builder()
-      | let e: BoundaryOnlyRouteBuilder val =>
+      | let e: BoundaryOnlyRouteBuilder =>
         default_source_route_builder
       else
         _runner_builder.route_builder()
@@ -114,8 +114,8 @@ class SourceData
     _pre_state_target_id = pre_state_target_id'
 
   fun builder(): SourceBuilderBuilder => _builder
-  fun runner_builder(): RunnerBuilder val => _runner_builder
-  fun route_builder(): RouteBuilder val => _route_builder
+  fun runner_builder(): RunnerBuilder => _runner_builder
+  fun route_builder(): RouteBuilder => _route_builder
 
   fun name(): String => _name
   fun state_name(): String => _state_name
@@ -132,10 +132,10 @@ class SourceData
   fun is_prestate(): Bool => _runner_builder.is_prestate()
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder val =>
+  fun forward_route_builder(): RouteBuilder =>
     _runner_builder.forward_route_builder()
-  fun clone_router_and_set_input_type(r: Router val,
-    default_r: (Router val | None) = None): Router val
+  fun clone_router_and_set_input_type(r: Router,
+    default_r: (Router | None) = None): Router
   =>
     _runner_builder.clone_router_and_set_input_type(r, default_r)
 
@@ -143,22 +143,22 @@ class SourceData
     _source_listener_builder_builder
 
 
-class EgressBuilder
+class val EgressBuilder
   let _name: String
   let _pipeline_name: String
   let _id: U128
   // None if this is a sink to an external system
-  let _proxy_addr: (ProxyAddress val | None)
+  let _proxy_addr: (ProxyAddress | None)
   let _sink_builder: (SinkBuilder | None)
 
   new val create(pipeline_name': String, id': U128,
     sink_builder: (SinkBuilder | None) = None,
-    proxy_addr: (ProxyAddress val | None) = None)
+    proxy_addr: (ProxyAddress | None) = None)
   =>
     _pipeline_name = pipeline_name'
     _name =
       match proxy_addr
-      | let pa: ProxyAddress val =>
+      | let pa: ProxyAddress =>
         "Proxy to " + pa.worker
       else
         _pipeline_name + " sink"
@@ -176,11 +176,11 @@ class EgressBuilder
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder val => BoundaryOnlyRouteBuilder
-  fun clone_router_and_set_input_type(r: Router val,
-    dr: (Router val | None) = None): Router val => r
+  fun forward_route_builder(): RouteBuilder => BoundaryOnlyRouteBuilder
+  fun clone_router_and_set_input_type(r: Router,
+    dr: (Router | None) = None): Router => r
 
-  fun target_address(): (ProxyAddress val | PartitionAddresses val | None) =>
+  fun target_address(): (ProxyAddress | PartitionAddresses val | None) =>
     _proxy_addr
 
   fun apply(worker_name: String, reporter: MetricsReporter ref,
@@ -189,7 +189,7 @@ class EgressBuilder
       recover Map[String, OutgoingBoundary] end): Consumer ?
   =>
     match _proxy_addr
-    | let p: ProxyAddress val =>
+    | let p: ProxyAddress =>
       try
         proxies(p.worker)
       else
@@ -209,15 +209,15 @@ class EgressBuilder
       error
     end
 
-class PreStateData
+class val PreStateData
   let _state_name: String
   let _pre_state_name: String
-  let _runner_builder: RunnerBuilder val
+  let _runner_builder: RunnerBuilder
   let _target_id: (U128 | None)
-  let _forward_route_builder: RouteBuilder val
+  let _forward_route_builder: RouteBuilder
   let _is_default_target: Bool
 
-  new val create(runner_builder: RunnerBuilder val, t_id: (U128 | None),
+  new val create(runner_builder: RunnerBuilder, t_id: (U128 | None),
     is_default_target': Bool = false) =>
     _runner_builder = runner_builder
     _state_name = runner_builder.state_name()
@@ -229,8 +229,8 @@ class PreStateData
   fun state_name(): String => _state_name
   fun pre_state_name(): String => _pre_state_name
   fun target_id(): (U128 | None) => _target_id
-  fun forward_route_builder(): RouteBuilder val => _forward_route_builder
-  fun clone_router_and_set_input_type(r: Router val): Router val =>
+  fun forward_route_builder(): RouteBuilder => _forward_route_builder
+  fun clone_router_and_set_input_type(r: Router): Router =>
     _runner_builder.clone_router_and_set_input_type(r)
   fun is_default_target(): Bool => _is_default_target
 
@@ -271,6 +271,6 @@ class val PreStatelessData
   fun is_prestate(): Bool => false
   fun is_stateful(): Bool => false
   fun is_partitioned(): Bool => false
-  fun forward_route_builder(): RouteBuilder val => BoundaryOnlyRouteBuilder
-  fun clone_router_and_set_input_type(r: Router val,
-    dr: (Router val | None) = None): Router val => r
+  fun forward_route_builder(): RouteBuilder => BoundaryOnlyRouteBuilder
+  fun clone_router_and_set_input_type(r: Router,
+    dr: (Router | None) = None): Router => r
